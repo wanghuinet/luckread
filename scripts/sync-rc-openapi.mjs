@@ -133,7 +133,3825 @@ function parseOpenApi(raw = fs.readFileSync(`${root}/${openapiPath}`, 'utf8')) {
   return operations;
 }
 
+function buildCommerceOpenApiOperation({ operationId, method }) {
+  const parameters = [
+    '      parameters:',
+    '        - name: limit',
+    '          in: query',
+    '          required: false',
+    '          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }',
+    '        - name: cursor',
+    '          in: query',
+    '          required: false',
+    '          schema: { type: string, minLength: 1, maxLength: 512 }',
+  ];
+  const listEnvelope = (itemSchema) => ({
+    type: 'object',
+    additionalProperties: false,
+    required: ['data', 'requestId'],
+    properties: {
+      data: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['items', 'nextCursor', 'hasMore'],
+        properties: {
+          items: { type: 'array', maxItems: 50, items: itemSchema },
+          nextCursor: { type: ['string', 'null'], maxLength: 512 },
+          hasMore: { type: 'boolean' },
+        },
+      },
+      requestId: { type: 'string', pattern: '^req_[A-Za-z0-9_-]{1,123}
+  const tagMap = {
+    auth_identity: 'Auth',
+    users_accounts: 'Users',
+    content: 'Contents',
+    media: 'Media',
+    feed: 'Feed',
+    interaction: 'Interactions',
+    notification: 'Notifications',
+    search_discovery: 'Search',
+    creator_ip_mcn: 'Creators',
+    subscription_entitlement_payment: 'Users',
+    audit_compliance: 'Admin',
+    analytics: 'Analytics',
+    recommendation_realtime: 'Feed',
+    open_platform: 'Developer',
+  };
+  const params = pathParameterNames(canonicalPath);
+  const lines = [];
+  lines.push(`    ${method.toLowerCase()}:`);
+  lines.push(`      tags: [${tagMap[domain] ?? 'Contents'}]`);
+  lines.push(`      summary: Discovery draft for ${method} ${canonicalPath}`);
+  lines.push(`      operationId: ${operationId}`);
+  lines.push('      x-luckread-contract-status: DISCOVERY_DRAFT');
+  lines.push(`      x-luckread-source: ${inventoryPath}`);
+  if (params.length) {
+    lines.push('      parameters:');
+    for (const name of params) {
+      lines.push(`        - name: ${name}`);
+      lines.push('          in: path');
+      lines.push('          required: true');
+      lines.push("          schema: { $ref: '#/components/schemas/ResourceId' }");
+    }
+  }
+  lines.push('      responses:');
+  lines.push('        default:');
+  lines.push('          description: Discovery-only operation; detailed response contract remains to be closed.');
+  return lines.join('\n');
+}
+
+function insertIntoExistingPath(raw, rawPath, methodBlocks) {
+  const lines = raw.split('\n');
+  const header = `  ${rawPath}:`;
+  const start = lines.findIndex((line) => line === header);
+  if (start < 0) return null;
+  let end = lines.length;
+  for (let i = start + 1; i < lines.length; i += 1) {
+    if (/^  \/.*:\s*$/.test(lines[i]) || lines[i] === 'components:') { end = i; break; }
+  }
+  const before = lines.slice(0, end);
+  const after = lines.slice(end);
+  if (before.length && before[before.length - 1] !== '') before.push('');
+  return [...before, ...methodBlocks.flatMap((b, i) => i ? ['', ...b.split('\n')] : b.split('\n')), ...after].join('\n');
+}
+
+function addOpenApiOperations(raw, missing) {
+  if (!missing.length) return { raw, added: 0 };
+  let next = raw;
+  let added = 0;
+  const existingPathNames = new Set([...next.matchAll(/^  (\/[^:#]+):\s*$/gm)].map((m) => m[1]));
+  const existingOperations = parseOpenApi(next);
+  const existingKeys = new Set(existingOperations.map((x) => operationKey(x.method, x.path)));
+  const grouped = new Map();
+
+  for (const op of missing) {
+    const key = operationKey(op.method, op.path);
+    if (existingKeys.has(key)) continue;
+    const rawPath = openapiPathFromCanonical(op.path);
+    if (!grouped.has(rawPath)) grouped.set(rawPath, []);
+    grouped.get(rawPath).push(op);
+  }
+
+  const newPathBlocks = [];
+  for (const [rawPath, ops] of [...grouped.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+    ops.sort((a, b) => a.method.localeCompare(b.method));
+    const methodBlocks = ops.map((op) => buildOpenApiOperation(op));
+    if (existingPathNames.has(rawPath)) {
+      const changed = insertIntoExistingPath(next, rawPath, methodBlocks);
+      if (changed !== null) {
+        next = changed;
+        added += ops.length;
+        for (const op of ops) existingKeys.add(operationKey(op.method, op.path));
+      }
+    } else {
+      newPathBlocks.push(`  ${rawPath}:\n${methodBlocks.join('\n\n')}`);
+      added += ops.length;
+    }
+  }
+
+  if (newPathBlocks.length) {
+    const marker = '\ncomponents:\n';
+    const index = next.indexOf(marker);
+    if (index < 0) throw new Error('canonical OpenAPI components marker not found');
+    next = `${next.slice(0, index)}\n${newPathBlocks.join('\n\n')}\n${next.slice(index)}`;
+  }
+  return { raw: next, added };
+}
+
+const inventory = readJson(inventoryPath);
+const domainPolicies = loadDomainPolicies();
+const openapiRaw = fs.readFileSync(`${root}/${openapiPath}`, 'utf8');
+const openapiOperations = parseOpenApi(openapiRaw);
+
+const inventoryRecords = [];
+for (const [domain, group] of Object.entries(inventory.domains ?? {})) {
+  for (const raw of group.endpoint_groups ?? []) {
+    const match = String(raw).match(/^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s+(\/v1\/\S+)$/);
+    if (!match) continue;
+    inventoryRecords.push({ method: match[1], path: match[2], domain });
+  }
+}
+
+const inventoryMap = new Map(inventoryRecords.map((x) => [operationKey(x.method, x.path), x]));
+const openapiMap = new Map(openapiOperations.map((x) => [operationKey(x.method, x.path), x]));
+
+let addedToInventory = 0;
+for (const op of openapiOperations.sort((a, b) => operationKey(a.method, a.path).localeCompare(operationKey(b.method, b.path)))) {
+  const key = operationKey(op.method, op.path);
+  if (inventoryMap.has(key)) continue;
+  const domain = inferDomain(op.path, op.tags);
+  if (!inventory.domains[domain]) inventory.domains[domain] = { required: true, endpoint_groups: [] };
+  inventory.domains[domain].endpoint_groups.push(`${op.method} ${op.path}`);
+  inventoryMap.set(key, { method: op.method, path: op.path, domain });
+  addedToInventory += 1;
+}
+for (const group of Object.values(inventory.domains ?? {})) group.endpoint_groups = [...new Set(group.endpoint_groups)].sort();
+
+const missingOpenApi = [];
+for (const [key, record] of inventoryMap) {
+  if (openapiMap.has(key)) continue;
+  const separator = key.indexOf(' ');
+  const method = key.slice(0, separator);
+  const path = key.slice(separator + 1);
+  const exactPolicy = domainPolicies.find((p) => operationKey(p.method, p.path) === key);
+  const operationId = exactPolicy?.operationId ?? generatedOperationId(method, path);
+  missingOpenApi.push({ operationId, method, path, domain: record.domain });
+}
+
+const { raw: openapiNext, added: addedToOpenApi } = addOpenApiOperations(openapiRaw, missingOpenApi);
+if (openapiNext !== openapiRaw) fs.writeFileSync(`${root}/${openapiPath}`, openapiNext);
+
+const effectiveOpenApi = parseOpenApi(openapiNext);
+const effectiveByKey = new Map(effectiveOpenApi.map((x) => [operationKey(x.method, x.path), x]));
+
+const existingPolicy = fs.existsSync(`${root}/${consolidatedPolicyPath}`) ? readJson(consolidatedPolicyPath) : { version: '1.0.0', operations: [] };
+const existingPolicyById = new Map((existingPolicy.operations ?? []).map((x) => [x.operationId, x]));
+const policyByMethodPath = new Map(domainPolicies.map((p) => [operationKey(p.method, p.path), p]));
+const targetOperations = [...effectiveByKey.values()].sort((a, b) => operationKey(a.method, a.path).localeCompare(operationKey(b.method, b.path)));
+const usedIds = new Set();
+const consolidatedOperations = [];
+
+for (const op of targetOperations) {
+  const key = operationKey(op.method, op.path);
+  const source = policyByMethodPath.get(key);
+  const existing = existingPolicyById.get(op.operationId) ?? (source?.operationId ? existingPolicyById.get(source.operationId) : null);
+  let operationId = op.operationId;
+  while (usedIds.has(operationId)) operationId = `${operationId}Op`;
+  usedIds.add(operationId);
+
+  if (existing) {
+    consolidatedOperations.push({ ...existing, operationId });
+    continue;
+  }
+
+  const authorization = source?.authorization;
+  const retry = source?.retry;
+  const idempotency = source?.idempotency;
+  const stateful = source?.stateMachine?.required === true || operationId === 'transitionAccountState' || operationId === 'transitionContentState';
+  let stateMachine = 'none';
+  if (operationId === 'transitionAccountState' || /account-state/i.test(op.path)) stateMachine = 'account';
+  else if (stateful) stateMachine = 'content';
+
+  const method = String(op.method).toUpperCase();
+  const authMode = authorization?.required === false ? 'public' : stateMachine !== 'none' ? 'state-machine' : 'permission';
+  const permissions = authorization?.permission ? [authorization.permission] : [];
+  consolidatedOperations.push({
+    operationId,
+    auth: { mode: authMode },
+    permissions,
+    auditRequired: method !== 'GET' && method !== 'HEAD',
+    optimisticLockRequired: retry?.requiresOptimisticConcurrency === true,
+    idempotencyRequired: idempotency?.required === true,
+    stateMachine,
+    'x-luckread-contract-status': 'DISCOVERY_DRAFT',
+    'x-luckread-source': source?.__source ?? inventoryPath,
+  });
+}
+
+writeJson(inventoryPath, inventory);
+writeJson(consolidatedPolicyPath, { ...existingPolicy, version: existingPolicy.version ?? '1.0.0', operations: consolidatedOperations });
+
+console.log(JSON.stringify({
+  status: 'SYNCHRONIZED_DRAFT',
+  openapiOperations: effectiveOpenApi.length,
+  inventoryOperations: inventoryMap.size,
+  addedToInventory,
+  addedToOpenApi,
+  consolidatedPolicyOperations: consolidatedOperations.length,
+  remainingInventoryWithoutOpenApi: inventoryMap.size - effectiveOpenApi.length,
+}, null, 2));
+ },
+    },
+  });
+  const response = (schema) => [
+    "      responses:",
+    "        '200':",
+    '          description: Customer-owned data returned using bounded keyset pagination.',
+    '          headers:',
+    '            Cache-Control:',
+    "              schema: { type: string, const: no-store }",
+    '          content:',
+    '            application/json:',
+    '              schema: ' + JSON.stringify(schema),
+    "        '400': { $ref: '#/components/responses/ValidationFailed' }",
+    "        '401': { $ref: '#/components/responses/Unauthenticated' }",
+    "        '403': { $ref: '#/components/responses/PermissionDenied' }",
+    "        '429': { $ref: '#/components/responses/RateLimited' }",
+    "        '503': { $ref: '#/components/responses/ServiceUnavailable' }",
+  ];
+  if (operationId === 'postPaymentsRefunds' && method === 'POST') {
+    const commandSchema = {
+      type: 'object',
+      additionalProperties: false,
+      required: ['data', 'requestId'],
+      properties: {
+        data: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['refundId', 'paymentId', 'orderId', 'amountMinor', 'capturedAmountMinor', 'currency', 'status', 'reason', 'version', 'providerUpdatedAt', 'createdAt', 'updatedAt', 'replayed'],
+          properties: {
+            refundId: { type: 'string', pattern: '^ref_[A-Za-z0-9]{26}
+  const tagMap = {
+    auth_identity: 'Auth',
+    users_accounts: 'Users',
+    content: 'Contents',
+    media: 'Media',
+    feed: 'Feed',
+    interaction: 'Interactions',
+    notification: 'Notifications',
+    search_discovery: 'Search',
+    creator_ip_mcn: 'Creators',
+    subscription_entitlement_payment: 'Users',
+    audit_compliance: 'Admin',
+    analytics: 'Analytics',
+    recommendation_realtime: 'Feed',
+    open_platform: 'Developer',
+  };
+  const params = pathParameterNames(canonicalPath);
+  const lines = [];
+  lines.push(`    ${method.toLowerCase()}:`);
+  lines.push(`      tags: [${tagMap[domain] ?? 'Contents'}]`);
+  lines.push(`      summary: Discovery draft for ${method} ${canonicalPath}`);
+  lines.push(`      operationId: ${operationId}`);
+  lines.push('      x-luckread-contract-status: DISCOVERY_DRAFT');
+  lines.push(`      x-luckread-source: ${inventoryPath}`);
+  if (params.length) {
+    lines.push('      parameters:');
+    for (const name of params) {
+      lines.push(`        - name: ${name}`);
+      lines.push('          in: path');
+      lines.push('          required: true');
+      lines.push("          schema: { $ref: '#/components/schemas/ResourceId' }");
+    }
+  }
+  lines.push('      responses:');
+  lines.push('        default:');
+  lines.push('          description: Discovery-only operation; detailed response contract remains to be closed.');
+  return lines.join('\n');
+}
+
+function insertIntoExistingPath(raw, rawPath, methodBlocks) {
+  const lines = raw.split('\n');
+  const header = `  ${rawPath}:`;
+  const start = lines.findIndex((line) => line === header);
+  if (start < 0) return null;
+  let end = lines.length;
+  for (let i = start + 1; i < lines.length; i += 1) {
+    if (/^  \/.*:\s*$/.test(lines[i]) || lines[i] === 'components:') { end = i; break; }
+  }
+  const before = lines.slice(0, end);
+  const after = lines.slice(end);
+  if (before.length && before[before.length - 1] !== '') before.push('');
+  return [...before, ...methodBlocks.flatMap((b, i) => i ? ['', ...b.split('\n')] : b.split('\n')), ...after].join('\n');
+}
+
+function addOpenApiOperations(raw, missing) {
+  if (!missing.length) return { raw, added: 0 };
+  let next = raw;
+  let added = 0;
+  const existingPathNames = new Set([...next.matchAll(/^  (\/[^:#]+):\s*$/gm)].map((m) => m[1]));
+  const existingOperations = parseOpenApi(next);
+  const existingKeys = new Set(existingOperations.map((x) => operationKey(x.method, x.path)));
+  const grouped = new Map();
+
+  for (const op of missing) {
+    const key = operationKey(op.method, op.path);
+    if (existingKeys.has(key)) continue;
+    const rawPath = openapiPathFromCanonical(op.path);
+    if (!grouped.has(rawPath)) grouped.set(rawPath, []);
+    grouped.get(rawPath).push(op);
+  }
+
+  const newPathBlocks = [];
+  for (const [rawPath, ops] of [...grouped.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+    ops.sort((a, b) => a.method.localeCompare(b.method));
+    const methodBlocks = ops.map((op) => buildOpenApiOperation(op));
+    if (existingPathNames.has(rawPath)) {
+      const changed = insertIntoExistingPath(next, rawPath, methodBlocks);
+      if (changed !== null) {
+        next = changed;
+        added += ops.length;
+        for (const op of ops) existingKeys.add(operationKey(op.method, op.path));
+      }
+    } else {
+      newPathBlocks.push(`  ${rawPath}:\n${methodBlocks.join('\n\n')}`);
+      added += ops.length;
+    }
+  }
+
+  if (newPathBlocks.length) {
+    const marker = '\ncomponents:\n';
+    const index = next.indexOf(marker);
+    if (index < 0) throw new Error('canonical OpenAPI components marker not found');
+    next = `${next.slice(0, index)}\n${newPathBlocks.join('\n\n')}\n${next.slice(index)}`;
+  }
+  return { raw: next, added };
+}
+
+const inventory = readJson(inventoryPath);
+const domainPolicies = loadDomainPolicies();
+const openapiRaw = fs.readFileSync(`${root}/${openapiPath}`, 'utf8');
+const openapiOperations = parseOpenApi(openapiRaw);
+
+const inventoryRecords = [];
+for (const [domain, group] of Object.entries(inventory.domains ?? {})) {
+  for (const raw of group.endpoint_groups ?? []) {
+    const match = String(raw).match(/^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s+(\/v1\/\S+)$/);
+    if (!match) continue;
+    inventoryRecords.push({ method: match[1], path: match[2], domain });
+  }
+}
+
+const inventoryMap = new Map(inventoryRecords.map((x) => [operationKey(x.method, x.path), x]));
+const openapiMap = new Map(openapiOperations.map((x) => [operationKey(x.method, x.path), x]));
+
+let addedToInventory = 0;
+for (const op of openapiOperations.sort((a, b) => operationKey(a.method, a.path).localeCompare(operationKey(b.method, b.path)))) {
+  const key = operationKey(op.method, op.path);
+  if (inventoryMap.has(key)) continue;
+  const domain = inferDomain(op.path, op.tags);
+  if (!inventory.domains[domain]) inventory.domains[domain] = { required: true, endpoint_groups: [] };
+  inventory.domains[domain].endpoint_groups.push(`${op.method} ${op.path}`);
+  inventoryMap.set(key, { method: op.method, path: op.path, domain });
+  addedToInventory += 1;
+}
+for (const group of Object.values(inventory.domains ?? {})) group.endpoint_groups = [...new Set(group.endpoint_groups)].sort();
+
+const missingOpenApi = [];
+for (const [key, record] of inventoryMap) {
+  if (openapiMap.has(key)) continue;
+  const separator = key.indexOf(' ');
+  const method = key.slice(0, separator);
+  const path = key.slice(separator + 1);
+  const exactPolicy = domainPolicies.find((p) => operationKey(p.method, p.path) === key);
+  const operationId = exactPolicy?.operationId ?? generatedOperationId(method, path);
+  missingOpenApi.push({ operationId, method, path, domain: record.domain });
+}
+
+const { raw: openapiNext, added: addedToOpenApi } = addOpenApiOperations(openapiRaw, missingOpenApi);
+if (openapiNext !== openapiRaw) fs.writeFileSync(`${root}/${openapiPath}`, openapiNext);
+
+const effectiveOpenApi = parseOpenApi(openapiNext);
+const effectiveByKey = new Map(effectiveOpenApi.map((x) => [operationKey(x.method, x.path), x]));
+
+const existingPolicy = fs.existsSync(`${root}/${consolidatedPolicyPath}`) ? readJson(consolidatedPolicyPath) : { version: '1.0.0', operations: [] };
+const existingPolicyById = new Map((existingPolicy.operations ?? []).map((x) => [x.operationId, x]));
+const policyByMethodPath = new Map(domainPolicies.map((p) => [operationKey(p.method, p.path), p]));
+const targetOperations = [...effectiveByKey.values()].sort((a, b) => operationKey(a.method, a.path).localeCompare(operationKey(b.method, b.path)));
+const usedIds = new Set();
+const consolidatedOperations = [];
+
+for (const op of targetOperations) {
+  const key = operationKey(op.method, op.path);
+  const source = policyByMethodPath.get(key);
+  const existing = existingPolicyById.get(op.operationId) ?? (source?.operationId ? existingPolicyById.get(source.operationId) : null);
+  let operationId = op.operationId;
+  while (usedIds.has(operationId)) operationId = `${operationId}Op`;
+  usedIds.add(operationId);
+
+  if (existing) {
+    consolidatedOperations.push({ ...existing, operationId });
+    continue;
+  }
+
+  const authorization = source?.authorization;
+  const retry = source?.retry;
+  const idempotency = source?.idempotency;
+  const stateful = source?.stateMachine?.required === true || operationId === 'transitionAccountState' || operationId === 'transitionContentState';
+  let stateMachine = 'none';
+  if (operationId === 'transitionAccountState' || /account-state/i.test(op.path)) stateMachine = 'account';
+  else if (stateful) stateMachine = 'content';
+
+  const method = String(op.method).toUpperCase();
+  const authMode = authorization?.required === false ? 'public' : stateMachine !== 'none' ? 'state-machine' : 'permission';
+  const permissions = authorization?.permission ? [authorization.permission] : [];
+  consolidatedOperations.push({
+    operationId,
+    auth: { mode: authMode },
+    permissions,
+    auditRequired: method !== 'GET' && method !== 'HEAD',
+    optimisticLockRequired: retry?.requiresOptimisticConcurrency === true,
+    idempotencyRequired: idempotency?.required === true,
+    stateMachine,
+    'x-luckread-contract-status': 'DISCOVERY_DRAFT',
+    'x-luckread-source': source?.__source ?? inventoryPath,
+  });
+}
+
+writeJson(inventoryPath, inventory);
+writeJson(consolidatedPolicyPath, { ...existingPolicy, version: existingPolicy.version ?? '1.0.0', operations: consolidatedOperations });
+
+console.log(JSON.stringify({
+  status: 'SYNCHRONIZED_DRAFT',
+  openapiOperations: effectiveOpenApi.length,
+  inventoryOperations: inventoryMap.size,
+  addedToInventory,
+  addedToOpenApi,
+  consolidatedPolicyOperations: consolidatedOperations.length,
+  remainingInventoryWithoutOpenApi: inventoryMap.size - effectiveOpenApi.length,
+}, null, 2));
+ },
+            paymentId: { type: 'string', pattern: '^pay_[A-Za-z0-9]{26}
+  const tagMap = {
+    auth_identity: 'Auth',
+    users_accounts: 'Users',
+    content: 'Contents',
+    media: 'Media',
+    feed: 'Feed',
+    interaction: 'Interactions',
+    notification: 'Notifications',
+    search_discovery: 'Search',
+    creator_ip_mcn: 'Creators',
+    subscription_entitlement_payment: 'Users',
+    audit_compliance: 'Admin',
+    analytics: 'Analytics',
+    recommendation_realtime: 'Feed',
+    open_platform: 'Developer',
+  };
+  const params = pathParameterNames(canonicalPath);
+  const lines = [];
+  lines.push(`    ${method.toLowerCase()}:`);
+  lines.push(`      tags: [${tagMap[domain] ?? 'Contents'}]`);
+  lines.push(`      summary: Discovery draft for ${method} ${canonicalPath}`);
+  lines.push(`      operationId: ${operationId}`);
+  lines.push('      x-luckread-contract-status: DISCOVERY_DRAFT');
+  lines.push(`      x-luckread-source: ${inventoryPath}`);
+  if (params.length) {
+    lines.push('      parameters:');
+    for (const name of params) {
+      lines.push(`        - name: ${name}`);
+      lines.push('          in: path');
+      lines.push('          required: true');
+      lines.push("          schema: { $ref: '#/components/schemas/ResourceId' }");
+    }
+  }
+  lines.push('      responses:');
+  lines.push('        default:');
+  lines.push('          description: Discovery-only operation; detailed response contract remains to be closed.');
+  return lines.join('\n');
+}
+
+function insertIntoExistingPath(raw, rawPath, methodBlocks) {
+  const lines = raw.split('\n');
+  const header = `  ${rawPath}:`;
+  const start = lines.findIndex((line) => line === header);
+  if (start < 0) return null;
+  let end = lines.length;
+  for (let i = start + 1; i < lines.length; i += 1) {
+    if (/^  \/.*:\s*$/.test(lines[i]) || lines[i] === 'components:') { end = i; break; }
+  }
+  const before = lines.slice(0, end);
+  const after = lines.slice(end);
+  if (before.length && before[before.length - 1] !== '') before.push('');
+  return [...before, ...methodBlocks.flatMap((b, i) => i ? ['', ...b.split('\n')] : b.split('\n')), ...after].join('\n');
+}
+
+function addOpenApiOperations(raw, missing) {
+  if (!missing.length) return { raw, added: 0 };
+  let next = raw;
+  let added = 0;
+  const existingPathNames = new Set([...next.matchAll(/^  (\/[^:#]+):\s*$/gm)].map((m) => m[1]));
+  const existingOperations = parseOpenApi(next);
+  const existingKeys = new Set(existingOperations.map((x) => operationKey(x.method, x.path)));
+  const grouped = new Map();
+
+  for (const op of missing) {
+    const key = operationKey(op.method, op.path);
+    if (existingKeys.has(key)) continue;
+    const rawPath = openapiPathFromCanonical(op.path);
+    if (!grouped.has(rawPath)) grouped.set(rawPath, []);
+    grouped.get(rawPath).push(op);
+  }
+
+  const newPathBlocks = [];
+  for (const [rawPath, ops] of [...grouped.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+    ops.sort((a, b) => a.method.localeCompare(b.method));
+    const methodBlocks = ops.map((op) => buildOpenApiOperation(op));
+    if (existingPathNames.has(rawPath)) {
+      const changed = insertIntoExistingPath(next, rawPath, methodBlocks);
+      if (changed !== null) {
+        next = changed;
+        added += ops.length;
+        for (const op of ops) existingKeys.add(operationKey(op.method, op.path));
+      }
+    } else {
+      newPathBlocks.push(`  ${rawPath}:\n${methodBlocks.join('\n\n')}`);
+      added += ops.length;
+    }
+  }
+
+  if (newPathBlocks.length) {
+    const marker = '\ncomponents:\n';
+    const index = next.indexOf(marker);
+    if (index < 0) throw new Error('canonical OpenAPI components marker not found');
+    next = `${next.slice(0, index)}\n${newPathBlocks.join('\n\n')}\n${next.slice(index)}`;
+  }
+  return { raw: next, added };
+}
+
+const inventory = readJson(inventoryPath);
+const domainPolicies = loadDomainPolicies();
+const openapiRaw = fs.readFileSync(`${root}/${openapiPath}`, 'utf8');
+const openapiOperations = parseOpenApi(openapiRaw);
+
+const inventoryRecords = [];
+for (const [domain, group] of Object.entries(inventory.domains ?? {})) {
+  for (const raw of group.endpoint_groups ?? []) {
+    const match = String(raw).match(/^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s+(\/v1\/\S+)$/);
+    if (!match) continue;
+    inventoryRecords.push({ method: match[1], path: match[2], domain });
+  }
+}
+
+const inventoryMap = new Map(inventoryRecords.map((x) => [operationKey(x.method, x.path), x]));
+const openapiMap = new Map(openapiOperations.map((x) => [operationKey(x.method, x.path), x]));
+
+let addedToInventory = 0;
+for (const op of openapiOperations.sort((a, b) => operationKey(a.method, a.path).localeCompare(operationKey(b.method, b.path)))) {
+  const key = operationKey(op.method, op.path);
+  if (inventoryMap.has(key)) continue;
+  const domain = inferDomain(op.path, op.tags);
+  if (!inventory.domains[domain]) inventory.domains[domain] = { required: true, endpoint_groups: [] };
+  inventory.domains[domain].endpoint_groups.push(`${op.method} ${op.path}`);
+  inventoryMap.set(key, { method: op.method, path: op.path, domain });
+  addedToInventory += 1;
+}
+for (const group of Object.values(inventory.domains ?? {})) group.endpoint_groups = [...new Set(group.endpoint_groups)].sort();
+
+const missingOpenApi = [];
+for (const [key, record] of inventoryMap) {
+  if (openapiMap.has(key)) continue;
+  const separator = key.indexOf(' ');
+  const method = key.slice(0, separator);
+  const path = key.slice(separator + 1);
+  const exactPolicy = domainPolicies.find((p) => operationKey(p.method, p.path) === key);
+  const operationId = exactPolicy?.operationId ?? generatedOperationId(method, path);
+  missingOpenApi.push({ operationId, method, path, domain: record.domain });
+}
+
+const { raw: openapiNext, added: addedToOpenApi } = addOpenApiOperations(openapiRaw, missingOpenApi);
+if (openapiNext !== openapiRaw) fs.writeFileSync(`${root}/${openapiPath}`, openapiNext);
+
+const effectiveOpenApi = parseOpenApi(openapiNext);
+const effectiveByKey = new Map(effectiveOpenApi.map((x) => [operationKey(x.method, x.path), x]));
+
+const existingPolicy = fs.existsSync(`${root}/${consolidatedPolicyPath}`) ? readJson(consolidatedPolicyPath) : { version: '1.0.0', operations: [] };
+const existingPolicyById = new Map((existingPolicy.operations ?? []).map((x) => [x.operationId, x]));
+const policyByMethodPath = new Map(domainPolicies.map((p) => [operationKey(p.method, p.path), p]));
+const targetOperations = [...effectiveByKey.values()].sort((a, b) => operationKey(a.method, a.path).localeCompare(operationKey(b.method, b.path)));
+const usedIds = new Set();
+const consolidatedOperations = [];
+
+for (const op of targetOperations) {
+  const key = operationKey(op.method, op.path);
+  const source = policyByMethodPath.get(key);
+  const existing = existingPolicyById.get(op.operationId) ?? (source?.operationId ? existingPolicyById.get(source.operationId) : null);
+  let operationId = op.operationId;
+  while (usedIds.has(operationId)) operationId = `${operationId}Op`;
+  usedIds.add(operationId);
+
+  if (existing) {
+    consolidatedOperations.push({ ...existing, operationId });
+    continue;
+  }
+
+  const authorization = source?.authorization;
+  const retry = source?.retry;
+  const idempotency = source?.idempotency;
+  const stateful = source?.stateMachine?.required === true || operationId === 'transitionAccountState' || operationId === 'transitionContentState';
+  let stateMachine = 'none';
+  if (operationId === 'transitionAccountState' || /account-state/i.test(op.path)) stateMachine = 'account';
+  else if (stateful) stateMachine = 'content';
+
+  const method = String(op.method).toUpperCase();
+  const authMode = authorization?.required === false ? 'public' : stateMachine !== 'none' ? 'state-machine' : 'permission';
+  const permissions = authorization?.permission ? [authorization.permission] : [];
+  consolidatedOperations.push({
+    operationId,
+    auth: { mode: authMode },
+    permissions,
+    auditRequired: method !== 'GET' && method !== 'HEAD',
+    optimisticLockRequired: retry?.requiresOptimisticConcurrency === true,
+    idempotencyRequired: idempotency?.required === true,
+    stateMachine,
+    'x-luckread-contract-status': 'DISCOVERY_DRAFT',
+    'x-luckread-source': source?.__source ?? inventoryPath,
+  });
+}
+
+writeJson(inventoryPath, inventory);
+writeJson(consolidatedPolicyPath, { ...existingPolicy, version: existingPolicy.version ?? '1.0.0', operations: consolidatedOperations });
+
+console.log(JSON.stringify({
+  status: 'SYNCHRONIZED_DRAFT',
+  openapiOperations: effectiveOpenApi.length,
+  inventoryOperations: inventoryMap.size,
+  addedToInventory,
+  addedToOpenApi,
+  consolidatedPolicyOperations: consolidatedOperations.length,
+  remainingInventoryWithoutOpenApi: inventoryMap.size - effectiveOpenApi.length,
+}, null, 2));
+ },
+            orderId: { type: 'string', pattern: '^ord_[A-Za-z0-9_-]{1,90}
+  const tagMap = {
+    auth_identity: 'Auth',
+    users_accounts: 'Users',
+    content: 'Contents',
+    media: 'Media',
+    feed: 'Feed',
+    interaction: 'Interactions',
+    notification: 'Notifications',
+    search_discovery: 'Search',
+    creator_ip_mcn: 'Creators',
+    subscription_entitlement_payment: 'Users',
+    audit_compliance: 'Admin',
+    analytics: 'Analytics',
+    recommendation_realtime: 'Feed',
+    open_platform: 'Developer',
+  };
+  const params = pathParameterNames(canonicalPath);
+  const lines = [];
+  lines.push(`    ${method.toLowerCase()}:`);
+  lines.push(`      tags: [${tagMap[domain] ?? 'Contents'}]`);
+  lines.push(`      summary: Discovery draft for ${method} ${canonicalPath}`);
+  lines.push(`      operationId: ${operationId}`);
+  lines.push('      x-luckread-contract-status: DISCOVERY_DRAFT');
+  lines.push(`      x-luckread-source: ${inventoryPath}`);
+  if (params.length) {
+    lines.push('      parameters:');
+    for (const name of params) {
+      lines.push(`        - name: ${name}`);
+      lines.push('          in: path');
+      lines.push('          required: true');
+      lines.push("          schema: { $ref: '#/components/schemas/ResourceId' }");
+    }
+  }
+  lines.push('      responses:');
+  lines.push('        default:');
+  lines.push('          description: Discovery-only operation; detailed response contract remains to be closed.');
+  return lines.join('\n');
+}
+
+function insertIntoExistingPath(raw, rawPath, methodBlocks) {
+  const lines = raw.split('\n');
+  const header = `  ${rawPath}:`;
+  const start = lines.findIndex((line) => line === header);
+  if (start < 0) return null;
+  let end = lines.length;
+  for (let i = start + 1; i < lines.length; i += 1) {
+    if (/^  \/.*:\s*$/.test(lines[i]) || lines[i] === 'components:') { end = i; break; }
+  }
+  const before = lines.slice(0, end);
+  const after = lines.slice(end);
+  if (before.length && before[before.length - 1] !== '') before.push('');
+  return [...before, ...methodBlocks.flatMap((b, i) => i ? ['', ...b.split('\n')] : b.split('\n')), ...after].join('\n');
+}
+
+function addOpenApiOperations(raw, missing) {
+  if (!missing.length) return { raw, added: 0 };
+  let next = raw;
+  let added = 0;
+  const existingPathNames = new Set([...next.matchAll(/^  (\/[^:#]+):\s*$/gm)].map((m) => m[1]));
+  const existingOperations = parseOpenApi(next);
+  const existingKeys = new Set(existingOperations.map((x) => operationKey(x.method, x.path)));
+  const grouped = new Map();
+
+  for (const op of missing) {
+    const key = operationKey(op.method, op.path);
+    if (existingKeys.has(key)) continue;
+    const rawPath = openapiPathFromCanonical(op.path);
+    if (!grouped.has(rawPath)) grouped.set(rawPath, []);
+    grouped.get(rawPath).push(op);
+  }
+
+  const newPathBlocks = [];
+  for (const [rawPath, ops] of [...grouped.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+    ops.sort((a, b) => a.method.localeCompare(b.method));
+    const methodBlocks = ops.map((op) => buildOpenApiOperation(op));
+    if (existingPathNames.has(rawPath)) {
+      const changed = insertIntoExistingPath(next, rawPath, methodBlocks);
+      if (changed !== null) {
+        next = changed;
+        added += ops.length;
+        for (const op of ops) existingKeys.add(operationKey(op.method, op.path));
+      }
+    } else {
+      newPathBlocks.push(`  ${rawPath}:\n${methodBlocks.join('\n\n')}`);
+      added += ops.length;
+    }
+  }
+
+  if (newPathBlocks.length) {
+    const marker = '\ncomponents:\n';
+    const index = next.indexOf(marker);
+    if (index < 0) throw new Error('canonical OpenAPI components marker not found');
+    next = `${next.slice(0, index)}\n${newPathBlocks.join('\n\n')}\n${next.slice(index)}`;
+  }
+  return { raw: next, added };
+}
+
+const inventory = readJson(inventoryPath);
+const domainPolicies = loadDomainPolicies();
+const openapiRaw = fs.readFileSync(`${root}/${openapiPath}`, 'utf8');
+const openapiOperations = parseOpenApi(openapiRaw);
+
+const inventoryRecords = [];
+for (const [domain, group] of Object.entries(inventory.domains ?? {})) {
+  for (const raw of group.endpoint_groups ?? []) {
+    const match = String(raw).match(/^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s+(\/v1\/\S+)$/);
+    if (!match) continue;
+    inventoryRecords.push({ method: match[1], path: match[2], domain });
+  }
+}
+
+const inventoryMap = new Map(inventoryRecords.map((x) => [operationKey(x.method, x.path), x]));
+const openapiMap = new Map(openapiOperations.map((x) => [operationKey(x.method, x.path), x]));
+
+let addedToInventory = 0;
+for (const op of openapiOperations.sort((a, b) => operationKey(a.method, a.path).localeCompare(operationKey(b.method, b.path)))) {
+  const key = operationKey(op.method, op.path);
+  if (inventoryMap.has(key)) continue;
+  const domain = inferDomain(op.path, op.tags);
+  if (!inventory.domains[domain]) inventory.domains[domain] = { required: true, endpoint_groups: [] };
+  inventory.domains[domain].endpoint_groups.push(`${op.method} ${op.path}`);
+  inventoryMap.set(key, { method: op.method, path: op.path, domain });
+  addedToInventory += 1;
+}
+for (const group of Object.values(inventory.domains ?? {})) group.endpoint_groups = [...new Set(group.endpoint_groups)].sort();
+
+const missingOpenApi = [];
+for (const [key, record] of inventoryMap) {
+  if (openapiMap.has(key)) continue;
+  const separator = key.indexOf(' ');
+  const method = key.slice(0, separator);
+  const path = key.slice(separator + 1);
+  const exactPolicy = domainPolicies.find((p) => operationKey(p.method, p.path) === key);
+  const operationId = exactPolicy?.operationId ?? generatedOperationId(method, path);
+  missingOpenApi.push({ operationId, method, path, domain: record.domain });
+}
+
+const { raw: openapiNext, added: addedToOpenApi } = addOpenApiOperations(openapiRaw, missingOpenApi);
+if (openapiNext !== openapiRaw) fs.writeFileSync(`${root}/${openapiPath}`, openapiNext);
+
+const effectiveOpenApi = parseOpenApi(openapiNext);
+const effectiveByKey = new Map(effectiveOpenApi.map((x) => [operationKey(x.method, x.path), x]));
+
+const existingPolicy = fs.existsSync(`${root}/${consolidatedPolicyPath}`) ? readJson(consolidatedPolicyPath) : { version: '1.0.0', operations: [] };
+const existingPolicyById = new Map((existingPolicy.operations ?? []).map((x) => [x.operationId, x]));
+const policyByMethodPath = new Map(domainPolicies.map((p) => [operationKey(p.method, p.path), p]));
+const targetOperations = [...effectiveByKey.values()].sort((a, b) => operationKey(a.method, a.path).localeCompare(operationKey(b.method, b.path)));
+const usedIds = new Set();
+const consolidatedOperations = [];
+
+for (const op of targetOperations) {
+  const key = operationKey(op.method, op.path);
+  const source = policyByMethodPath.get(key);
+  const existing = existingPolicyById.get(op.operationId) ?? (source?.operationId ? existingPolicyById.get(source.operationId) : null);
+  let operationId = op.operationId;
+  while (usedIds.has(operationId)) operationId = `${operationId}Op`;
+  usedIds.add(operationId);
+
+  if (existing) {
+    consolidatedOperations.push({ ...existing, operationId });
+    continue;
+  }
+
+  const authorization = source?.authorization;
+  const retry = source?.retry;
+  const idempotency = source?.idempotency;
+  const stateful = source?.stateMachine?.required === true || operationId === 'transitionAccountState' || operationId === 'transitionContentState';
+  let stateMachine = 'none';
+  if (operationId === 'transitionAccountState' || /account-state/i.test(op.path)) stateMachine = 'account';
+  else if (stateful) stateMachine = 'content';
+
+  const method = String(op.method).toUpperCase();
+  const authMode = authorization?.required === false ? 'public' : stateMachine !== 'none' ? 'state-machine' : 'permission';
+  const permissions = authorization?.permission ? [authorization.permission] : [];
+  consolidatedOperations.push({
+    operationId,
+    auth: { mode: authMode },
+    permissions,
+    auditRequired: method !== 'GET' && method !== 'HEAD',
+    optimisticLockRequired: retry?.requiresOptimisticConcurrency === true,
+    idempotencyRequired: idempotency?.required === true,
+    stateMachine,
+    'x-luckread-contract-status': 'DISCOVERY_DRAFT',
+    'x-luckread-source': source?.__source ?? inventoryPath,
+  });
+}
+
+writeJson(inventoryPath, inventory);
+writeJson(consolidatedPolicyPath, { ...existingPolicy, version: existingPolicy.version ?? '1.0.0', operations: consolidatedOperations });
+
+console.log(JSON.stringify({
+  status: 'SYNCHRONIZED_DRAFT',
+  openapiOperations: effectiveOpenApi.length,
+  inventoryOperations: inventoryMap.size,
+  addedToInventory,
+  addedToOpenApi,
+  consolidatedPolicyOperations: consolidatedOperations.length,
+  remainingInventoryWithoutOpenApi: inventoryMap.size - effectiveOpenApi.length,
+}, null, 2));
+ },
+            amountMinor: { type: 'integer', minimum: 100 },
+            capturedAmountMinor: { type: 'integer', minimum: 100 },
+            currency: { type: 'string', pattern: '^[A-Z]{3}
+  const tagMap = {
+    auth_identity: 'Auth',
+    users_accounts: 'Users',
+    content: 'Contents',
+    media: 'Media',
+    feed: 'Feed',
+    interaction: 'Interactions',
+    notification: 'Notifications',
+    search_discovery: 'Search',
+    creator_ip_mcn: 'Creators',
+    subscription_entitlement_payment: 'Users',
+    audit_compliance: 'Admin',
+    analytics: 'Analytics',
+    recommendation_realtime: 'Feed',
+    open_platform: 'Developer',
+  };
+  const params = pathParameterNames(canonicalPath);
+  const lines = [];
+  lines.push(`    ${method.toLowerCase()}:`);
+  lines.push(`      tags: [${tagMap[domain] ?? 'Contents'}]`);
+  lines.push(`      summary: Discovery draft for ${method} ${canonicalPath}`);
+  lines.push(`      operationId: ${operationId}`);
+  lines.push('      x-luckread-contract-status: DISCOVERY_DRAFT');
+  lines.push(`      x-luckread-source: ${inventoryPath}`);
+  if (params.length) {
+    lines.push('      parameters:');
+    for (const name of params) {
+      lines.push(`        - name: ${name}`);
+      lines.push('          in: path');
+      lines.push('          required: true');
+      lines.push("          schema: { $ref: '#/components/schemas/ResourceId' }");
+    }
+  }
+  lines.push('      responses:');
+  lines.push('        default:');
+  lines.push('          description: Discovery-only operation; detailed response contract remains to be closed.');
+  return lines.join('\n');
+}
+
+function insertIntoExistingPath(raw, rawPath, methodBlocks) {
+  const lines = raw.split('\n');
+  const header = `  ${rawPath}:`;
+  const start = lines.findIndex((line) => line === header);
+  if (start < 0) return null;
+  let end = lines.length;
+  for (let i = start + 1; i < lines.length; i += 1) {
+    if (/^  \/.*:\s*$/.test(lines[i]) || lines[i] === 'components:') { end = i; break; }
+  }
+  const before = lines.slice(0, end);
+  const after = lines.slice(end);
+  if (before.length && before[before.length - 1] !== '') before.push('');
+  return [...before, ...methodBlocks.flatMap((b, i) => i ? ['', ...b.split('\n')] : b.split('\n')), ...after].join('\n');
+}
+
+function addOpenApiOperations(raw, missing) {
+  if (!missing.length) return { raw, added: 0 };
+  let next = raw;
+  let added = 0;
+  const existingPathNames = new Set([...next.matchAll(/^  (\/[^:#]+):\s*$/gm)].map((m) => m[1]));
+  const existingOperations = parseOpenApi(next);
+  const existingKeys = new Set(existingOperations.map((x) => operationKey(x.method, x.path)));
+  const grouped = new Map();
+
+  for (const op of missing) {
+    const key = operationKey(op.method, op.path);
+    if (existingKeys.has(key)) continue;
+    const rawPath = openapiPathFromCanonical(op.path);
+    if (!grouped.has(rawPath)) grouped.set(rawPath, []);
+    grouped.get(rawPath).push(op);
+  }
+
+  const newPathBlocks = [];
+  for (const [rawPath, ops] of [...grouped.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+    ops.sort((a, b) => a.method.localeCompare(b.method));
+    const methodBlocks = ops.map((op) => buildOpenApiOperation(op));
+    if (existingPathNames.has(rawPath)) {
+      const changed = insertIntoExistingPath(next, rawPath, methodBlocks);
+      if (changed !== null) {
+        next = changed;
+        added += ops.length;
+        for (const op of ops) existingKeys.add(operationKey(op.method, op.path));
+      }
+    } else {
+      newPathBlocks.push(`  ${rawPath}:\n${methodBlocks.join('\n\n')}`);
+      added += ops.length;
+    }
+  }
+
+  if (newPathBlocks.length) {
+    const marker = '\ncomponents:\n';
+    const index = next.indexOf(marker);
+    if (index < 0) throw new Error('canonical OpenAPI components marker not found');
+    next = `${next.slice(0, index)}\n${newPathBlocks.join('\n\n')}\n${next.slice(index)}`;
+  }
+  return { raw: next, added };
+}
+
+const inventory = readJson(inventoryPath);
+const domainPolicies = loadDomainPolicies();
+const openapiRaw = fs.readFileSync(`${root}/${openapiPath}`, 'utf8');
+const openapiOperations = parseOpenApi(openapiRaw);
+
+const inventoryRecords = [];
+for (const [domain, group] of Object.entries(inventory.domains ?? {})) {
+  for (const raw of group.endpoint_groups ?? []) {
+    const match = String(raw).match(/^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s+(\/v1\/\S+)$/);
+    if (!match) continue;
+    inventoryRecords.push({ method: match[1], path: match[2], domain });
+  }
+}
+
+const inventoryMap = new Map(inventoryRecords.map((x) => [operationKey(x.method, x.path), x]));
+const openapiMap = new Map(openapiOperations.map((x) => [operationKey(x.method, x.path), x]));
+
+let addedToInventory = 0;
+for (const op of openapiOperations.sort((a, b) => operationKey(a.method, a.path).localeCompare(operationKey(b.method, b.path)))) {
+  const key = operationKey(op.method, op.path);
+  if (inventoryMap.has(key)) continue;
+  const domain = inferDomain(op.path, op.tags);
+  if (!inventory.domains[domain]) inventory.domains[domain] = { required: true, endpoint_groups: [] };
+  inventory.domains[domain].endpoint_groups.push(`${op.method} ${op.path}`);
+  inventoryMap.set(key, { method: op.method, path: op.path, domain });
+  addedToInventory += 1;
+}
+for (const group of Object.values(inventory.domains ?? {})) group.endpoint_groups = [...new Set(group.endpoint_groups)].sort();
+
+const missingOpenApi = [];
+for (const [key, record] of inventoryMap) {
+  if (openapiMap.has(key)) continue;
+  const separator = key.indexOf(' ');
+  const method = key.slice(0, separator);
+  const path = key.slice(separator + 1);
+  const exactPolicy = domainPolicies.find((p) => operationKey(p.method, p.path) === key);
+  const operationId = exactPolicy?.operationId ?? generatedOperationId(method, path);
+  missingOpenApi.push({ operationId, method, path, domain: record.domain });
+}
+
+const { raw: openapiNext, added: addedToOpenApi } = addOpenApiOperations(openapiRaw, missingOpenApi);
+if (openapiNext !== openapiRaw) fs.writeFileSync(`${root}/${openapiPath}`, openapiNext);
+
+const effectiveOpenApi = parseOpenApi(openapiNext);
+const effectiveByKey = new Map(effectiveOpenApi.map((x) => [operationKey(x.method, x.path), x]));
+
+const existingPolicy = fs.existsSync(`${root}/${consolidatedPolicyPath}`) ? readJson(consolidatedPolicyPath) : { version: '1.0.0', operations: [] };
+const existingPolicyById = new Map((existingPolicy.operations ?? []).map((x) => [x.operationId, x]));
+const policyByMethodPath = new Map(domainPolicies.map((p) => [operationKey(p.method, p.path), p]));
+const targetOperations = [...effectiveByKey.values()].sort((a, b) => operationKey(a.method, a.path).localeCompare(operationKey(b.method, b.path)));
+const usedIds = new Set();
+const consolidatedOperations = [];
+
+for (const op of targetOperations) {
+  const key = operationKey(op.method, op.path);
+  const source = policyByMethodPath.get(key);
+  const existing = existingPolicyById.get(op.operationId) ?? (source?.operationId ? existingPolicyById.get(source.operationId) : null);
+  let operationId = op.operationId;
+  while (usedIds.has(operationId)) operationId = `${operationId}Op`;
+  usedIds.add(operationId);
+
+  if (existing) {
+    consolidatedOperations.push({ ...existing, operationId });
+    continue;
+  }
+
+  const authorization = source?.authorization;
+  const retry = source?.retry;
+  const idempotency = source?.idempotency;
+  const stateful = source?.stateMachine?.required === true || operationId === 'transitionAccountState' || operationId === 'transitionContentState';
+  let stateMachine = 'none';
+  if (operationId === 'transitionAccountState' || /account-state/i.test(op.path)) stateMachine = 'account';
+  else if (stateful) stateMachine = 'content';
+
+  const method = String(op.method).toUpperCase();
+  const authMode = authorization?.required === false ? 'public' : stateMachine !== 'none' ? 'state-machine' : 'permission';
+  const permissions = authorization?.permission ? [authorization.permission] : [];
+  consolidatedOperations.push({
+    operationId,
+    auth: { mode: authMode },
+    permissions,
+    auditRequired: method !== 'GET' && method !== 'HEAD',
+    optimisticLockRequired: retry?.requiresOptimisticConcurrency === true,
+    idempotencyRequired: idempotency?.required === true,
+    stateMachine,
+    'x-luckread-contract-status': 'DISCOVERY_DRAFT',
+    'x-luckread-source': source?.__source ?? inventoryPath,
+  });
+}
+
+writeJson(inventoryPath, inventory);
+writeJson(consolidatedPolicyPath, { ...existingPolicy, version: existingPolicy.version ?? '1.0.0', operations: consolidatedOperations });
+
+console.log(JSON.stringify({
+  status: 'SYNCHRONIZED_DRAFT',
+  openapiOperations: effectiveOpenApi.length,
+  inventoryOperations: inventoryMap.size,
+  addedToInventory,
+  addedToOpenApi,
+  consolidatedPolicyOperations: consolidatedOperations.length,
+  remainingInventoryWithoutOpenApi: inventoryMap.size - effectiveOpenApi.length,
+}, null, 2));
+ },
+            status: { type: 'string', enum: ['REQUESTED', 'PENDING', 'SUCCEEDED', 'FAILED', 'REVIEW', 'RECONCILIATION_REQUIRED'] },
+            reason: { type: ['string', 'null'], maxLength: 255 },
+            version: { type: 'integer', minimum: 1 },
+            providerUpdatedAt: { type: ['string', 'null'], format: 'date-time' },
+            createdAt: { type: 'string', format: 'date-time' },
+            updatedAt: { type: 'string', format: 'date-time' },
+            replayed: { type: 'boolean' },
+          },
+        },
+        requestId: { type: 'string', pattern: '^req_[A-Za-z0-9_-]{1,123}
+  const tagMap = {
+    auth_identity: 'Auth',
+    users_accounts: 'Users',
+    content: 'Contents',
+    media: 'Media',
+    feed: 'Feed',
+    interaction: 'Interactions',
+    notification: 'Notifications',
+    search_discovery: 'Search',
+    creator_ip_mcn: 'Creators',
+    subscription_entitlement_payment: 'Users',
+    audit_compliance: 'Admin',
+    analytics: 'Analytics',
+    recommendation_realtime: 'Feed',
+    open_platform: 'Developer',
+  };
+  const params = pathParameterNames(canonicalPath);
+  const lines = [];
+  lines.push(`    ${method.toLowerCase()}:`);
+  lines.push(`      tags: [${tagMap[domain] ?? 'Contents'}]`);
+  lines.push(`      summary: Discovery draft for ${method} ${canonicalPath}`);
+  lines.push(`      operationId: ${operationId}`);
+  lines.push('      x-luckread-contract-status: DISCOVERY_DRAFT');
+  lines.push(`      x-luckread-source: ${inventoryPath}`);
+  if (params.length) {
+    lines.push('      parameters:');
+    for (const name of params) {
+      lines.push(`        - name: ${name}`);
+      lines.push('          in: path');
+      lines.push('          required: true');
+      lines.push("          schema: { $ref: '#/components/schemas/ResourceId' }");
+    }
+  }
+  lines.push('      responses:');
+  lines.push('        default:');
+  lines.push('          description: Discovery-only operation; detailed response contract remains to be closed.');
+  return lines.join('\n');
+}
+
+function insertIntoExistingPath(raw, rawPath, methodBlocks) {
+  const lines = raw.split('\n');
+  const header = `  ${rawPath}:`;
+  const start = lines.findIndex((line) => line === header);
+  if (start < 0) return null;
+  let end = lines.length;
+  for (let i = start + 1; i < lines.length; i += 1) {
+    if (/^  \/.*:\s*$/.test(lines[i]) || lines[i] === 'components:') { end = i; break; }
+  }
+  const before = lines.slice(0, end);
+  const after = lines.slice(end);
+  if (before.length && before[before.length - 1] !== '') before.push('');
+  return [...before, ...methodBlocks.flatMap((b, i) => i ? ['', ...b.split('\n')] : b.split('\n')), ...after].join('\n');
+}
+
+function addOpenApiOperations(raw, missing) {
+  if (!missing.length) return { raw, added: 0 };
+  let next = raw;
+  let added = 0;
+  const existingPathNames = new Set([...next.matchAll(/^  (\/[^:#]+):\s*$/gm)].map((m) => m[1]));
+  const existingOperations = parseOpenApi(next);
+  const existingKeys = new Set(existingOperations.map((x) => operationKey(x.method, x.path)));
+  const grouped = new Map();
+
+  for (const op of missing) {
+    const key = operationKey(op.method, op.path);
+    if (existingKeys.has(key)) continue;
+    const rawPath = openapiPathFromCanonical(op.path);
+    if (!grouped.has(rawPath)) grouped.set(rawPath, []);
+    grouped.get(rawPath).push(op);
+  }
+
+  const newPathBlocks = [];
+  for (const [rawPath, ops] of [...grouped.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+    ops.sort((a, b) => a.method.localeCompare(b.method));
+    const methodBlocks = ops.map((op) => buildOpenApiOperation(op));
+    if (existingPathNames.has(rawPath)) {
+      const changed = insertIntoExistingPath(next, rawPath, methodBlocks);
+      if (changed !== null) {
+        next = changed;
+        added += ops.length;
+        for (const op of ops) existingKeys.add(operationKey(op.method, op.path));
+      }
+    } else {
+      newPathBlocks.push(`  ${rawPath}:\n${methodBlocks.join('\n\n')}`);
+      added += ops.length;
+    }
+  }
+
+  if (newPathBlocks.length) {
+    const marker = '\ncomponents:\n';
+    const index = next.indexOf(marker);
+    if (index < 0) throw new Error('canonical OpenAPI components marker not found');
+    next = `${next.slice(0, index)}\n${newPathBlocks.join('\n\n')}\n${next.slice(index)}`;
+  }
+  return { raw: next, added };
+}
+
+const inventory = readJson(inventoryPath);
+const domainPolicies = loadDomainPolicies();
+const openapiRaw = fs.readFileSync(`${root}/${openapiPath}`, 'utf8');
+const openapiOperations = parseOpenApi(openapiRaw);
+
+const inventoryRecords = [];
+for (const [domain, group] of Object.entries(inventory.domains ?? {})) {
+  for (const raw of group.endpoint_groups ?? []) {
+    const match = String(raw).match(/^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s+(\/v1\/\S+)$/);
+    if (!match) continue;
+    inventoryRecords.push({ method: match[1], path: match[2], domain });
+  }
+}
+
+const inventoryMap = new Map(inventoryRecords.map((x) => [operationKey(x.method, x.path), x]));
+const openapiMap = new Map(openapiOperations.map((x) => [operationKey(x.method, x.path), x]));
+
+let addedToInventory = 0;
+for (const op of openapiOperations.sort((a, b) => operationKey(a.method, a.path).localeCompare(operationKey(b.method, b.path)))) {
+  const key = operationKey(op.method, op.path);
+  if (inventoryMap.has(key)) continue;
+  const domain = inferDomain(op.path, op.tags);
+  if (!inventory.domains[domain]) inventory.domains[domain] = { required: true, endpoint_groups: [] };
+  inventory.domains[domain].endpoint_groups.push(`${op.method} ${op.path}`);
+  inventoryMap.set(key, { method: op.method, path: op.path, domain });
+  addedToInventory += 1;
+}
+for (const group of Object.values(inventory.domains ?? {})) group.endpoint_groups = [...new Set(group.endpoint_groups)].sort();
+
+const missingOpenApi = [];
+for (const [key, record] of inventoryMap) {
+  if (openapiMap.has(key)) continue;
+  const separator = key.indexOf(' ');
+  const method = key.slice(0, separator);
+  const path = key.slice(separator + 1);
+  const exactPolicy = domainPolicies.find((p) => operationKey(p.method, p.path) === key);
+  const operationId = exactPolicy?.operationId ?? generatedOperationId(method, path);
+  missingOpenApi.push({ operationId, method, path, domain: record.domain });
+}
+
+const { raw: openapiNext, added: addedToOpenApi } = addOpenApiOperations(openapiRaw, missingOpenApi);
+if (openapiNext !== openapiRaw) fs.writeFileSync(`${root}/${openapiPath}`, openapiNext);
+
+const effectiveOpenApi = parseOpenApi(openapiNext);
+const effectiveByKey = new Map(effectiveOpenApi.map((x) => [operationKey(x.method, x.path), x]));
+
+const existingPolicy = fs.existsSync(`${root}/${consolidatedPolicyPath}`) ? readJson(consolidatedPolicyPath) : { version: '1.0.0', operations: [] };
+const existingPolicyById = new Map((existingPolicy.operations ?? []).map((x) => [x.operationId, x]));
+const policyByMethodPath = new Map(domainPolicies.map((p) => [operationKey(p.method, p.path), p]));
+const targetOperations = [...effectiveByKey.values()].sort((a, b) => operationKey(a.method, a.path).localeCompare(operationKey(b.method, b.path)));
+const usedIds = new Set();
+const consolidatedOperations = [];
+
+for (const op of targetOperations) {
+  const key = operationKey(op.method, op.path);
+  const source = policyByMethodPath.get(key);
+  const existing = existingPolicyById.get(op.operationId) ?? (source?.operationId ? existingPolicyById.get(source.operationId) : null);
+  let operationId = op.operationId;
+  while (usedIds.has(operationId)) operationId = `${operationId}Op`;
+  usedIds.add(operationId);
+
+  if (existing) {
+    consolidatedOperations.push({ ...existing, operationId });
+    continue;
+  }
+
+  const authorization = source?.authorization;
+  const retry = source?.retry;
+  const idempotency = source?.idempotency;
+  const stateful = source?.stateMachine?.required === true || operationId === 'transitionAccountState' || operationId === 'transitionContentState';
+  let stateMachine = 'none';
+  if (operationId === 'transitionAccountState' || /account-state/i.test(op.path)) stateMachine = 'account';
+  else if (stateful) stateMachine = 'content';
+
+  const method = String(op.method).toUpperCase();
+  const authMode = authorization?.required === false ? 'public' : stateMachine !== 'none' ? 'state-machine' : 'permission';
+  const permissions = authorization?.permission ? [authorization.permission] : [];
+  consolidatedOperations.push({
+    operationId,
+    auth: { mode: authMode },
+    permissions,
+    auditRequired: method !== 'GET' && method !== 'HEAD',
+    optimisticLockRequired: retry?.requiresOptimisticConcurrency === true,
+    idempotencyRequired: idempotency?.required === true,
+    stateMachine,
+    'x-luckread-contract-status': 'DISCOVERY_DRAFT',
+    'x-luckread-source': source?.__source ?? inventoryPath,
+  });
+}
+
+writeJson(inventoryPath, inventory);
+writeJson(consolidatedPolicyPath, { ...existingPolicy, version: existingPolicy.version ?? '1.0.0', operations: consolidatedOperations });
+
+console.log(JSON.stringify({
+  status: 'SYNCHRONIZED_DRAFT',
+  openapiOperations: effectiveOpenApi.length,
+  inventoryOperations: inventoryMap.size,
+  addedToInventory,
+  addedToOpenApi,
+  consolidatedPolicyOperations: consolidatedOperations.length,
+  remainingInventoryWithoutOpenApi: inventoryMap.size - effectiveOpenApi.length,
+}, null, 2));
+ },
+      },
+    };
+    return [
+      '    post:',
+      '      tags: [Commerce]',
+      '      summary: Create a full or partial refund for an owned payment',
+      '      description: W01 checks the authenticated customer payment.refund permission. W07 verifies D1-04 ownership and provider amount_received, reserves a stable Hyperswitch refund ID and waits for signed webhook final confirmation.',
+      '      operationId: postPaymentsRefunds',
+      '      x-luckread-contract-status: CONTRACTED_PARTIAL',
+      '      x-luckread-runtime-status: IMPLEMENTED_SOURCE_ONLY_PENDING_D1_04_MIGRATION',
+      '      x-luckread-source: contracts/api/commerce-operation-policy.v1.json',
+      '      parameters:',
+      "        - $ref: '#/components/parameters/IdempotencyKeyRequired'",
+      '      requestBody:',
+      '        required: true',
+      '        content:',
+      '          application/json:',
+      '            schema: ' + JSON.stringify({
+        type: 'object',
+        additionalProperties: false,
+        required: ['paymentId', 'amountMinor', 'currency'],
+        properties: {
+          paymentId: { type: 'string', pattern: '^pay_[A-Za-z0-9]{26}
+  const tagMap = {
+    auth_identity: 'Auth',
+    users_accounts: 'Users',
+    content: 'Contents',
+    media: 'Media',
+    feed: 'Feed',
+    interaction: 'Interactions',
+    notification: 'Notifications',
+    search_discovery: 'Search',
+    creator_ip_mcn: 'Creators',
+    subscription_entitlement_payment: 'Users',
+    audit_compliance: 'Admin',
+    analytics: 'Analytics',
+    recommendation_realtime: 'Feed',
+    open_platform: 'Developer',
+  };
+  const params = pathParameterNames(canonicalPath);
+  const lines = [];
+  lines.push(`    ${method.toLowerCase()}:`);
+  lines.push(`      tags: [${tagMap[domain] ?? 'Contents'}]`);
+  lines.push(`      summary: Discovery draft for ${method} ${canonicalPath}`);
+  lines.push(`      operationId: ${operationId}`);
+  lines.push('      x-luckread-contract-status: DISCOVERY_DRAFT');
+  lines.push(`      x-luckread-source: ${inventoryPath}`);
+  if (params.length) {
+    lines.push('      parameters:');
+    for (const name of params) {
+      lines.push(`        - name: ${name}`);
+      lines.push('          in: path');
+      lines.push('          required: true');
+      lines.push("          schema: { $ref: '#/components/schemas/ResourceId' }");
+    }
+  }
+  lines.push('      responses:');
+  lines.push('        default:');
+  lines.push('          description: Discovery-only operation; detailed response contract remains to be closed.');
+  return lines.join('\n');
+}
+
+function insertIntoExistingPath(raw, rawPath, methodBlocks) {
+  const lines = raw.split('\n');
+  const header = `  ${rawPath}:`;
+  const start = lines.findIndex((line) => line === header);
+  if (start < 0) return null;
+  let end = lines.length;
+  for (let i = start + 1; i < lines.length; i += 1) {
+    if (/^  \/.*:\s*$/.test(lines[i]) || lines[i] === 'components:') { end = i; break; }
+  }
+  const before = lines.slice(0, end);
+  const after = lines.slice(end);
+  if (before.length && before[before.length - 1] !== '') before.push('');
+  return [...before, ...methodBlocks.flatMap((b, i) => i ? ['', ...b.split('\n')] : b.split('\n')), ...after].join('\n');
+}
+
+function addOpenApiOperations(raw, missing) {
+  if (!missing.length) return { raw, added: 0 };
+  let next = raw;
+  let added = 0;
+  const existingPathNames = new Set([...next.matchAll(/^  (\/[^:#]+):\s*$/gm)].map((m) => m[1]));
+  const existingOperations = parseOpenApi(next);
+  const existingKeys = new Set(existingOperations.map((x) => operationKey(x.method, x.path)));
+  const grouped = new Map();
+
+  for (const op of missing) {
+    const key = operationKey(op.method, op.path);
+    if (existingKeys.has(key)) continue;
+    const rawPath = openapiPathFromCanonical(op.path);
+    if (!grouped.has(rawPath)) grouped.set(rawPath, []);
+    grouped.get(rawPath).push(op);
+  }
+
+  const newPathBlocks = [];
+  for (const [rawPath, ops] of [...grouped.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+    ops.sort((a, b) => a.method.localeCompare(b.method));
+    const methodBlocks = ops.map((op) => buildOpenApiOperation(op));
+    if (existingPathNames.has(rawPath)) {
+      const changed = insertIntoExistingPath(next, rawPath, methodBlocks);
+      if (changed !== null) {
+        next = changed;
+        added += ops.length;
+        for (const op of ops) existingKeys.add(operationKey(op.method, op.path));
+      }
+    } else {
+      newPathBlocks.push(`  ${rawPath}:\n${methodBlocks.join('\n\n')}`);
+      added += ops.length;
+    }
+  }
+
+  if (newPathBlocks.length) {
+    const marker = '\ncomponents:\n';
+    const index = next.indexOf(marker);
+    if (index < 0) throw new Error('canonical OpenAPI components marker not found');
+    next = `${next.slice(0, index)}\n${newPathBlocks.join('\n\n')}\n${next.slice(index)}`;
+  }
+  return { raw: next, added };
+}
+
+const inventory = readJson(inventoryPath);
+const domainPolicies = loadDomainPolicies();
+const openapiRaw = fs.readFileSync(`${root}/${openapiPath}`, 'utf8');
+const openapiOperations = parseOpenApi(openapiRaw);
+
+const inventoryRecords = [];
+for (const [domain, group] of Object.entries(inventory.domains ?? {})) {
+  for (const raw of group.endpoint_groups ?? []) {
+    const match = String(raw).match(/^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s+(\/v1\/\S+)$/);
+    if (!match) continue;
+    inventoryRecords.push({ method: match[1], path: match[2], domain });
+  }
+}
+
+const inventoryMap = new Map(inventoryRecords.map((x) => [operationKey(x.method, x.path), x]));
+const openapiMap = new Map(openapiOperations.map((x) => [operationKey(x.method, x.path), x]));
+
+let addedToInventory = 0;
+for (const op of openapiOperations.sort((a, b) => operationKey(a.method, a.path).localeCompare(operationKey(b.method, b.path)))) {
+  const key = operationKey(op.method, op.path);
+  if (inventoryMap.has(key)) continue;
+  const domain = inferDomain(op.path, op.tags);
+  if (!inventory.domains[domain]) inventory.domains[domain] = { required: true, endpoint_groups: [] };
+  inventory.domains[domain].endpoint_groups.push(`${op.method} ${op.path}`);
+  inventoryMap.set(key, { method: op.method, path: op.path, domain });
+  addedToInventory += 1;
+}
+for (const group of Object.values(inventory.domains ?? {})) group.endpoint_groups = [...new Set(group.endpoint_groups)].sort();
+
+const missingOpenApi = [];
+for (const [key, record] of inventoryMap) {
+  if (openapiMap.has(key)) continue;
+  const separator = key.indexOf(' ');
+  const method = key.slice(0, separator);
+  const path = key.slice(separator + 1);
+  const exactPolicy = domainPolicies.find((p) => operationKey(p.method, p.path) === key);
+  const operationId = exactPolicy?.operationId ?? generatedOperationId(method, path);
+  missingOpenApi.push({ operationId, method, path, domain: record.domain });
+}
+
+const { raw: openapiNext, added: addedToOpenApi } = addOpenApiOperations(openapiRaw, missingOpenApi);
+if (openapiNext !== openapiRaw) fs.writeFileSync(`${root}/${openapiPath}`, openapiNext);
+
+const effectiveOpenApi = parseOpenApi(openapiNext);
+const effectiveByKey = new Map(effectiveOpenApi.map((x) => [operationKey(x.method, x.path), x]));
+
+const existingPolicy = fs.existsSync(`${root}/${consolidatedPolicyPath}`) ? readJson(consolidatedPolicyPath) : { version: '1.0.0', operations: [] };
+const existingPolicyById = new Map((existingPolicy.operations ?? []).map((x) => [x.operationId, x]));
+const policyByMethodPath = new Map(domainPolicies.map((p) => [operationKey(p.method, p.path), p]));
+const targetOperations = [...effectiveByKey.values()].sort((a, b) => operationKey(a.method, a.path).localeCompare(operationKey(b.method, b.path)));
+const usedIds = new Set();
+const consolidatedOperations = [];
+
+for (const op of targetOperations) {
+  const key = operationKey(op.method, op.path);
+  const source = policyByMethodPath.get(key);
+  const existing = existingPolicyById.get(op.operationId) ?? (source?.operationId ? existingPolicyById.get(source.operationId) : null);
+  let operationId = op.operationId;
+  while (usedIds.has(operationId)) operationId = `${operationId}Op`;
+  usedIds.add(operationId);
+
+  if (existing) {
+    consolidatedOperations.push({ ...existing, operationId });
+    continue;
+  }
+
+  const authorization = source?.authorization;
+  const retry = source?.retry;
+  const idempotency = source?.idempotency;
+  const stateful = source?.stateMachine?.required === true || operationId === 'transitionAccountState' || operationId === 'transitionContentState';
+  let stateMachine = 'none';
+  if (operationId === 'transitionAccountState' || /account-state/i.test(op.path)) stateMachine = 'account';
+  else if (stateful) stateMachine = 'content';
+
+  const method = String(op.method).toUpperCase();
+  const authMode = authorization?.required === false ? 'public' : stateMachine !== 'none' ? 'state-machine' : 'permission';
+  const permissions = authorization?.permission ? [authorization.permission] : [];
+  consolidatedOperations.push({
+    operationId,
+    auth: { mode: authMode },
+    permissions,
+    auditRequired: method !== 'GET' && method !== 'HEAD',
+    optimisticLockRequired: retry?.requiresOptimisticConcurrency === true,
+    idempotencyRequired: idempotency?.required === true,
+    stateMachine,
+    'x-luckread-contract-status': 'DISCOVERY_DRAFT',
+    'x-luckread-source': source?.__source ?? inventoryPath,
+  });
+}
+
+writeJson(inventoryPath, inventory);
+writeJson(consolidatedPolicyPath, { ...existingPolicy, version: existingPolicy.version ?? '1.0.0', operations: consolidatedOperations });
+
+console.log(JSON.stringify({
+  status: 'SYNCHRONIZED_DRAFT',
+  openapiOperations: effectiveOpenApi.length,
+  inventoryOperations: inventoryMap.size,
+  addedToInventory,
+  addedToOpenApi,
+  consolidatedPolicyOperations: consolidatedOperations.length,
+  remainingInventoryWithoutOpenApi: inventoryMap.size - effectiveOpenApi.length,
+}, null, 2));
+ },
+          amountMinor: { type: 'integer', minimum: 100, maximum: 9007199254740991 },
+          currency: { type: 'string', pattern: '^[A-Z]{3}
+  const tagMap = {
+    auth_identity: 'Auth',
+    users_accounts: 'Users',
+    content: 'Contents',
+    media: 'Media',
+    feed: 'Feed',
+    interaction: 'Interactions',
+    notification: 'Notifications',
+    search_discovery: 'Search',
+    creator_ip_mcn: 'Creators',
+    subscription_entitlement_payment: 'Users',
+    audit_compliance: 'Admin',
+    analytics: 'Analytics',
+    recommendation_realtime: 'Feed',
+    open_platform: 'Developer',
+  };
+  const params = pathParameterNames(canonicalPath);
+  const lines = [];
+  lines.push(`    ${method.toLowerCase()}:`);
+  lines.push(`      tags: [${tagMap[domain] ?? 'Contents'}]`);
+  lines.push(`      summary: Discovery draft for ${method} ${canonicalPath}`);
+  lines.push(`      operationId: ${operationId}`);
+  lines.push('      x-luckread-contract-status: DISCOVERY_DRAFT');
+  lines.push(`      x-luckread-source: ${inventoryPath}`);
+  if (params.length) {
+    lines.push('      parameters:');
+    for (const name of params) {
+      lines.push(`        - name: ${name}`);
+      lines.push('          in: path');
+      lines.push('          required: true');
+      lines.push("          schema: { $ref: '#/components/schemas/ResourceId' }");
+    }
+  }
+  lines.push('      responses:');
+  lines.push('        default:');
+  lines.push('          description: Discovery-only operation; detailed response contract remains to be closed.');
+  return lines.join('\n');
+}
+
+function insertIntoExistingPath(raw, rawPath, methodBlocks) {
+  const lines = raw.split('\n');
+  const header = `  ${rawPath}:`;
+  const start = lines.findIndex((line) => line === header);
+  if (start < 0) return null;
+  let end = lines.length;
+  for (let i = start + 1; i < lines.length; i += 1) {
+    if (/^  \/.*:\s*$/.test(lines[i]) || lines[i] === 'components:') { end = i; break; }
+  }
+  const before = lines.slice(0, end);
+  const after = lines.slice(end);
+  if (before.length && before[before.length - 1] !== '') before.push('');
+  return [...before, ...methodBlocks.flatMap((b, i) => i ? ['', ...b.split('\n')] : b.split('\n')), ...after].join('\n');
+}
+
+function addOpenApiOperations(raw, missing) {
+  if (!missing.length) return { raw, added: 0 };
+  let next = raw;
+  let added = 0;
+  const existingPathNames = new Set([...next.matchAll(/^  (\/[^:#]+):\s*$/gm)].map((m) => m[1]));
+  const existingOperations = parseOpenApi(next);
+  const existingKeys = new Set(existingOperations.map((x) => operationKey(x.method, x.path)));
+  const grouped = new Map();
+
+  for (const op of missing) {
+    const key = operationKey(op.method, op.path);
+    if (existingKeys.has(key)) continue;
+    const rawPath = openapiPathFromCanonical(op.path);
+    if (!grouped.has(rawPath)) grouped.set(rawPath, []);
+    grouped.get(rawPath).push(op);
+  }
+
+  const newPathBlocks = [];
+  for (const [rawPath, ops] of [...grouped.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+    ops.sort((a, b) => a.method.localeCompare(b.method));
+    const methodBlocks = ops.map((op) => buildOpenApiOperation(op));
+    if (existingPathNames.has(rawPath)) {
+      const changed = insertIntoExistingPath(next, rawPath, methodBlocks);
+      if (changed !== null) {
+        next = changed;
+        added += ops.length;
+        for (const op of ops) existingKeys.add(operationKey(op.method, op.path));
+      }
+    } else {
+      newPathBlocks.push(`  ${rawPath}:\n${methodBlocks.join('\n\n')}`);
+      added += ops.length;
+    }
+  }
+
+  if (newPathBlocks.length) {
+    const marker = '\ncomponents:\n';
+    const index = next.indexOf(marker);
+    if (index < 0) throw new Error('canonical OpenAPI components marker not found');
+    next = `${next.slice(0, index)}\n${newPathBlocks.join('\n\n')}\n${next.slice(index)}`;
+  }
+  return { raw: next, added };
+}
+
+const inventory = readJson(inventoryPath);
+const domainPolicies = loadDomainPolicies();
+const openapiRaw = fs.readFileSync(`${root}/${openapiPath}`, 'utf8');
+const openapiOperations = parseOpenApi(openapiRaw);
+
+const inventoryRecords = [];
+for (const [domain, group] of Object.entries(inventory.domains ?? {})) {
+  for (const raw of group.endpoint_groups ?? []) {
+    const match = String(raw).match(/^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s+(\/v1\/\S+)$/);
+    if (!match) continue;
+    inventoryRecords.push({ method: match[1], path: match[2], domain });
+  }
+}
+
+const inventoryMap = new Map(inventoryRecords.map((x) => [operationKey(x.method, x.path), x]));
+const openapiMap = new Map(openapiOperations.map((x) => [operationKey(x.method, x.path), x]));
+
+let addedToInventory = 0;
+for (const op of openapiOperations.sort((a, b) => operationKey(a.method, a.path).localeCompare(operationKey(b.method, b.path)))) {
+  const key = operationKey(op.method, op.path);
+  if (inventoryMap.has(key)) continue;
+  const domain = inferDomain(op.path, op.tags);
+  if (!inventory.domains[domain]) inventory.domains[domain] = { required: true, endpoint_groups: [] };
+  inventory.domains[domain].endpoint_groups.push(`${op.method} ${op.path}`);
+  inventoryMap.set(key, { method: op.method, path: op.path, domain });
+  addedToInventory += 1;
+}
+for (const group of Object.values(inventory.domains ?? {})) group.endpoint_groups = [...new Set(group.endpoint_groups)].sort();
+
+const missingOpenApi = [];
+for (const [key, record] of inventoryMap) {
+  if (openapiMap.has(key)) continue;
+  const separator = key.indexOf(' ');
+  const method = key.slice(0, separator);
+  const path = key.slice(separator + 1);
+  const exactPolicy = domainPolicies.find((p) => operationKey(p.method, p.path) === key);
+  const operationId = exactPolicy?.operationId ?? generatedOperationId(method, path);
+  missingOpenApi.push({ operationId, method, path, domain: record.domain });
+}
+
+const { raw: openapiNext, added: addedToOpenApi } = addOpenApiOperations(openapiRaw, missingOpenApi);
+if (openapiNext !== openapiRaw) fs.writeFileSync(`${root}/${openapiPath}`, openapiNext);
+
+const effectiveOpenApi = parseOpenApi(openapiNext);
+const effectiveByKey = new Map(effectiveOpenApi.map((x) => [operationKey(x.method, x.path), x]));
+
+const existingPolicy = fs.existsSync(`${root}/${consolidatedPolicyPath}`) ? readJson(consolidatedPolicyPath) : { version: '1.0.0', operations: [] };
+const existingPolicyById = new Map((existingPolicy.operations ?? []).map((x) => [x.operationId, x]));
+const policyByMethodPath = new Map(domainPolicies.map((p) => [operationKey(p.method, p.path), p]));
+const targetOperations = [...effectiveByKey.values()].sort((a, b) => operationKey(a.method, a.path).localeCompare(operationKey(b.method, b.path)));
+const usedIds = new Set();
+const consolidatedOperations = [];
+
+for (const op of targetOperations) {
+  const key = operationKey(op.method, op.path);
+  const source = policyByMethodPath.get(key);
+  const existing = existingPolicyById.get(op.operationId) ?? (source?.operationId ? existingPolicyById.get(source.operationId) : null);
+  let operationId = op.operationId;
+  while (usedIds.has(operationId)) operationId = `${operationId}Op`;
+  usedIds.add(operationId);
+
+  if (existing) {
+    consolidatedOperations.push({ ...existing, operationId });
+    continue;
+  }
+
+  const authorization = source?.authorization;
+  const retry = source?.retry;
+  const idempotency = source?.idempotency;
+  const stateful = source?.stateMachine?.required === true || operationId === 'transitionAccountState' || operationId === 'transitionContentState';
+  let stateMachine = 'none';
+  if (operationId === 'transitionAccountState' || /account-state/i.test(op.path)) stateMachine = 'account';
+  else if (stateful) stateMachine = 'content';
+
+  const method = String(op.method).toUpperCase();
+  const authMode = authorization?.required === false ? 'public' : stateMachine !== 'none' ? 'state-machine' : 'permission';
+  const permissions = authorization?.permission ? [authorization.permission] : [];
+  consolidatedOperations.push({
+    operationId,
+    auth: { mode: authMode },
+    permissions,
+    auditRequired: method !== 'GET' && method !== 'HEAD',
+    optimisticLockRequired: retry?.requiresOptimisticConcurrency === true,
+    idempotencyRequired: idempotency?.required === true,
+    stateMachine,
+    'x-luckread-contract-status': 'DISCOVERY_DRAFT',
+    'x-luckread-source': source?.__source ?? inventoryPath,
+  });
+}
+
+writeJson(inventoryPath, inventory);
+writeJson(consolidatedPolicyPath, { ...existingPolicy, version: existingPolicy.version ?? '1.0.0', operations: consolidatedOperations });
+
+console.log(JSON.stringify({
+  status: 'SYNCHRONIZED_DRAFT',
+  openapiOperations: effectiveOpenApi.length,
+  inventoryOperations: inventoryMap.size,
+  addedToInventory,
+  addedToOpenApi,
+  consolidatedPolicyOperations: consolidatedOperations.length,
+  remainingInventoryWithoutOpenApi: inventoryMap.size - effectiveOpenApi.length,
+}, null, 2));
+ },
+          reason: { type: 'string', maxLength: 255 },
+        },
+      }),
+      '      responses:',
+      "        '202':",
+      '          description: Refund reserved and submitted or awaiting signed provider confirmation.',
+      '          headers:',
+      '            Cache-Control:',
+      "              schema: { type: string, const: no-store }",
+      '          content:',
+      '            application/json:',
+      '              schema: ' + JSON.stringify(commandSchema),
+      "        '200':",
+      '          description: Idempotent replay of an already finalized refund.',
+      '          content:',
+      '            application/json:',
+      '              schema: ' + JSON.stringify(commandSchema),
+      "        '400': { $ref: '#/components/responses/ValidationFailed' }",
+      "        '401': { $ref: '#/components/responses/Unauthenticated' }",
+      "        '403': { $ref: '#/components/responses/PermissionDenied' }",
+      "        '404': { $ref: '#/components/responses/NotFound' }",
+      "        '409': { $ref: '#/components/responses/InvalidState' }",
+      "        '428': { $ref: '#/components/responses/PreconditionRequired' }",
+      "        '429': { $ref: '#/components/responses/RateLimited' }",
+      "        '503': { $ref: '#/components/responses/ServiceUnavailable' }",
+    ].join('\n');
+  }
+  if (operationId === 'getPaymentsHistory' && method === 'GET') {
+    const item = {
+      type: 'object', additionalProperties: false,
+      required: ['paymentId', 'orderId', 'amountMinor', 'currency', 'status', 'version', 'providerUpdatedAt', 'createdAt', 'updatedAt', 'refundedMinor'],
+      properties: {
+        paymentId: { type: 'string', pattern: '^pay_[A-Za-z0-9]{26}
+  const tagMap = {
+    auth_identity: 'Auth',
+    users_accounts: 'Users',
+    content: 'Contents',
+    media: 'Media',
+    feed: 'Feed',
+    interaction: 'Interactions',
+    notification: 'Notifications',
+    search_discovery: 'Search',
+    creator_ip_mcn: 'Creators',
+    subscription_entitlement_payment: 'Users',
+    audit_compliance: 'Admin',
+    analytics: 'Analytics',
+    recommendation_realtime: 'Feed',
+    open_platform: 'Developer',
+  };
+  const params = pathParameterNames(canonicalPath);
+  const lines = [];
+  lines.push(`    ${method.toLowerCase()}:`);
+  lines.push(`      tags: [${tagMap[domain] ?? 'Contents'}]`);
+  lines.push(`      summary: Discovery draft for ${method} ${canonicalPath}`);
+  lines.push(`      operationId: ${operationId}`);
+  lines.push('      x-luckread-contract-status: DISCOVERY_DRAFT');
+  lines.push(`      x-luckread-source: ${inventoryPath}`);
+  if (params.length) {
+    lines.push('      parameters:');
+    for (const name of params) {
+      lines.push(`        - name: ${name}`);
+      lines.push('          in: path');
+      lines.push('          required: true');
+      lines.push("          schema: { $ref: '#/components/schemas/ResourceId' }");
+    }
+  }
+  lines.push('      responses:');
+  lines.push('        default:');
+  lines.push('          description: Discovery-only operation; detailed response contract remains to be closed.');
+  return lines.join('\n');
+}
+
+function insertIntoExistingPath(raw, rawPath, methodBlocks) {
+  const lines = raw.split('\n');
+  const header = `  ${rawPath}:`;
+  const start = lines.findIndex((line) => line === header);
+  if (start < 0) return null;
+  let end = lines.length;
+  for (let i = start + 1; i < lines.length; i += 1) {
+    if (/^  \/.*:\s*$/.test(lines[i]) || lines[i] === 'components:') { end = i; break; }
+  }
+  const before = lines.slice(0, end);
+  const after = lines.slice(end);
+  if (before.length && before[before.length - 1] !== '') before.push('');
+  return [...before, ...methodBlocks.flatMap((b, i) => i ? ['', ...b.split('\n')] : b.split('\n')), ...after].join('\n');
+}
+
+function addOpenApiOperations(raw, missing) {
+  if (!missing.length) return { raw, added: 0 };
+  let next = raw;
+  let added = 0;
+  const existingPathNames = new Set([...next.matchAll(/^  (\/[^:#]+):\s*$/gm)].map((m) => m[1]));
+  const existingOperations = parseOpenApi(next);
+  const existingKeys = new Set(existingOperations.map((x) => operationKey(x.method, x.path)));
+  const grouped = new Map();
+
+  for (const op of missing) {
+    const key = operationKey(op.method, op.path);
+    if (existingKeys.has(key)) continue;
+    const rawPath = openapiPathFromCanonical(op.path);
+    if (!grouped.has(rawPath)) grouped.set(rawPath, []);
+    grouped.get(rawPath).push(op);
+  }
+
+  const newPathBlocks = [];
+  for (const [rawPath, ops] of [...grouped.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+    ops.sort((a, b) => a.method.localeCompare(b.method));
+    const methodBlocks = ops.map((op) => buildOpenApiOperation(op));
+    if (existingPathNames.has(rawPath)) {
+      const changed = insertIntoExistingPath(next, rawPath, methodBlocks);
+      if (changed !== null) {
+        next = changed;
+        added += ops.length;
+        for (const op of ops) existingKeys.add(operationKey(op.method, op.path));
+      }
+    } else {
+      newPathBlocks.push(`  ${rawPath}:\n${methodBlocks.join('\n\n')}`);
+      added += ops.length;
+    }
+  }
+
+  if (newPathBlocks.length) {
+    const marker = '\ncomponents:\n';
+    const index = next.indexOf(marker);
+    if (index < 0) throw new Error('canonical OpenAPI components marker not found');
+    next = `${next.slice(0, index)}\n${newPathBlocks.join('\n\n')}\n${next.slice(index)}`;
+  }
+  return { raw: next, added };
+}
+
+const inventory = readJson(inventoryPath);
+const domainPolicies = loadDomainPolicies();
+const openapiRaw = fs.readFileSync(`${root}/${openapiPath}`, 'utf8');
+const openapiOperations = parseOpenApi(openapiRaw);
+
+const inventoryRecords = [];
+for (const [domain, group] of Object.entries(inventory.domains ?? {})) {
+  for (const raw of group.endpoint_groups ?? []) {
+    const match = String(raw).match(/^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s+(\/v1\/\S+)$/);
+    if (!match) continue;
+    inventoryRecords.push({ method: match[1], path: match[2], domain });
+  }
+}
+
+const inventoryMap = new Map(inventoryRecords.map((x) => [operationKey(x.method, x.path), x]));
+const openapiMap = new Map(openapiOperations.map((x) => [operationKey(x.method, x.path), x]));
+
+let addedToInventory = 0;
+for (const op of openapiOperations.sort((a, b) => operationKey(a.method, a.path).localeCompare(operationKey(b.method, b.path)))) {
+  const key = operationKey(op.method, op.path);
+  if (inventoryMap.has(key)) continue;
+  const domain = inferDomain(op.path, op.tags);
+  if (!inventory.domains[domain]) inventory.domains[domain] = { required: true, endpoint_groups: [] };
+  inventory.domains[domain].endpoint_groups.push(`${op.method} ${op.path}`);
+  inventoryMap.set(key, { method: op.method, path: op.path, domain });
+  addedToInventory += 1;
+}
+for (const group of Object.values(inventory.domains ?? {})) group.endpoint_groups = [...new Set(group.endpoint_groups)].sort();
+
+const missingOpenApi = [];
+for (const [key, record] of inventoryMap) {
+  if (openapiMap.has(key)) continue;
+  const separator = key.indexOf(' ');
+  const method = key.slice(0, separator);
+  const path = key.slice(separator + 1);
+  const exactPolicy = domainPolicies.find((p) => operationKey(p.method, p.path) === key);
+  const operationId = exactPolicy?.operationId ?? generatedOperationId(method, path);
+  missingOpenApi.push({ operationId, method, path, domain: record.domain });
+}
+
+const { raw: openapiNext, added: addedToOpenApi } = addOpenApiOperations(openapiRaw, missingOpenApi);
+if (openapiNext !== openapiRaw) fs.writeFileSync(`${root}/${openapiPath}`, openapiNext);
+
+const effectiveOpenApi = parseOpenApi(openapiNext);
+const effectiveByKey = new Map(effectiveOpenApi.map((x) => [operationKey(x.method, x.path), x]));
+
+const existingPolicy = fs.existsSync(`${root}/${consolidatedPolicyPath}`) ? readJson(consolidatedPolicyPath) : { version: '1.0.0', operations: [] };
+const existingPolicyById = new Map((existingPolicy.operations ?? []).map((x) => [x.operationId, x]));
+const policyByMethodPath = new Map(domainPolicies.map((p) => [operationKey(p.method, p.path), p]));
+const targetOperations = [...effectiveByKey.values()].sort((a, b) => operationKey(a.method, a.path).localeCompare(operationKey(b.method, b.path)));
+const usedIds = new Set();
+const consolidatedOperations = [];
+
+for (const op of targetOperations) {
+  const key = operationKey(op.method, op.path);
+  const source = policyByMethodPath.get(key);
+  const existing = existingPolicyById.get(op.operationId) ?? (source?.operationId ? existingPolicyById.get(source.operationId) : null);
+  let operationId = op.operationId;
+  while (usedIds.has(operationId)) operationId = `${operationId}Op`;
+  usedIds.add(operationId);
+
+  if (existing) {
+    consolidatedOperations.push({ ...existing, operationId });
+    continue;
+  }
+
+  const authorization = source?.authorization;
+  const retry = source?.retry;
+  const idempotency = source?.idempotency;
+  const stateful = source?.stateMachine?.required === true || operationId === 'transitionAccountState' || operationId === 'transitionContentState';
+  let stateMachine = 'none';
+  if (operationId === 'transitionAccountState' || /account-state/i.test(op.path)) stateMachine = 'account';
+  else if (stateful) stateMachine = 'content';
+
+  const method = String(op.method).toUpperCase();
+  const authMode = authorization?.required === false ? 'public' : stateMachine !== 'none' ? 'state-machine' : 'permission';
+  const permissions = authorization?.permission ? [authorization.permission] : [];
+  consolidatedOperations.push({
+    operationId,
+    auth: { mode: authMode },
+    permissions,
+    auditRequired: method !== 'GET' && method !== 'HEAD',
+    optimisticLockRequired: retry?.requiresOptimisticConcurrency === true,
+    idempotencyRequired: idempotency?.required === true,
+    stateMachine,
+    'x-luckread-contract-status': 'DISCOVERY_DRAFT',
+    'x-luckread-source': source?.__source ?? inventoryPath,
+  });
+}
+
+writeJson(inventoryPath, inventory);
+writeJson(consolidatedPolicyPath, { ...existingPolicy, version: existingPolicy.version ?? '1.0.0', operations: consolidatedOperations });
+
+console.log(JSON.stringify({
+  status: 'SYNCHRONIZED_DRAFT',
+  openapiOperations: effectiveOpenApi.length,
+  inventoryOperations: inventoryMap.size,
+  addedToInventory,
+  addedToOpenApi,
+  consolidatedPolicyOperations: consolidatedOperations.length,
+  remainingInventoryWithoutOpenApi: inventoryMap.size - effectiveOpenApi.length,
+}, null, 2));
+ },
+        orderId: { type: 'string', pattern: '^ord_[A-Za-z0-9_-]{1,90}
+  const tagMap = {
+    auth_identity: 'Auth',
+    users_accounts: 'Users',
+    content: 'Contents',
+    media: 'Media',
+    feed: 'Feed',
+    interaction: 'Interactions',
+    notification: 'Notifications',
+    search_discovery: 'Search',
+    creator_ip_mcn: 'Creators',
+    subscription_entitlement_payment: 'Users',
+    audit_compliance: 'Admin',
+    analytics: 'Analytics',
+    recommendation_realtime: 'Feed',
+    open_platform: 'Developer',
+  };
+  const params = pathParameterNames(canonicalPath);
+  const lines = [];
+  lines.push(`    ${method.toLowerCase()}:`);
+  lines.push(`      tags: [${tagMap[domain] ?? 'Contents'}]`);
+  lines.push(`      summary: Discovery draft for ${method} ${canonicalPath}`);
+  lines.push(`      operationId: ${operationId}`);
+  lines.push('      x-luckread-contract-status: DISCOVERY_DRAFT');
+  lines.push(`      x-luckread-source: ${inventoryPath}`);
+  if (params.length) {
+    lines.push('      parameters:');
+    for (const name of params) {
+      lines.push(`        - name: ${name}`);
+      lines.push('          in: path');
+      lines.push('          required: true');
+      lines.push("          schema: { $ref: '#/components/schemas/ResourceId' }");
+    }
+  }
+  lines.push('      responses:');
+  lines.push('        default:');
+  lines.push('          description: Discovery-only operation; detailed response contract remains to be closed.');
+  return lines.join('\n');
+}
+
+function insertIntoExistingPath(raw, rawPath, methodBlocks) {
+  const lines = raw.split('\n');
+  const header = `  ${rawPath}:`;
+  const start = lines.findIndex((line) => line === header);
+  if (start < 0) return null;
+  let end = lines.length;
+  for (let i = start + 1; i < lines.length; i += 1) {
+    if (/^  \/.*:\s*$/.test(lines[i]) || lines[i] === 'components:') { end = i; break; }
+  }
+  const before = lines.slice(0, end);
+  const after = lines.slice(end);
+  if (before.length && before[before.length - 1] !== '') before.push('');
+  return [...before, ...methodBlocks.flatMap((b, i) => i ? ['', ...b.split('\n')] : b.split('\n')), ...after].join('\n');
+}
+
+function addOpenApiOperations(raw, missing) {
+  if (!missing.length) return { raw, added: 0 };
+  let next = raw;
+  let added = 0;
+  const existingPathNames = new Set([...next.matchAll(/^  (\/[^:#]+):\s*$/gm)].map((m) => m[1]));
+  const existingOperations = parseOpenApi(next);
+  const existingKeys = new Set(existingOperations.map((x) => operationKey(x.method, x.path)));
+  const grouped = new Map();
+
+  for (const op of missing) {
+    const key = operationKey(op.method, op.path);
+    if (existingKeys.has(key)) continue;
+    const rawPath = openapiPathFromCanonical(op.path);
+    if (!grouped.has(rawPath)) grouped.set(rawPath, []);
+    grouped.get(rawPath).push(op);
+  }
+
+  const newPathBlocks = [];
+  for (const [rawPath, ops] of [...grouped.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+    ops.sort((a, b) => a.method.localeCompare(b.method));
+    const methodBlocks = ops.map((op) => buildOpenApiOperation(op));
+    if (existingPathNames.has(rawPath)) {
+      const changed = insertIntoExistingPath(next, rawPath, methodBlocks);
+      if (changed !== null) {
+        next = changed;
+        added += ops.length;
+        for (const op of ops) existingKeys.add(operationKey(op.method, op.path));
+      }
+    } else {
+      newPathBlocks.push(`  ${rawPath}:\n${methodBlocks.join('\n\n')}`);
+      added += ops.length;
+    }
+  }
+
+  if (newPathBlocks.length) {
+    const marker = '\ncomponents:\n';
+    const index = next.indexOf(marker);
+    if (index < 0) throw new Error('canonical OpenAPI components marker not found');
+    next = `${next.slice(0, index)}\n${newPathBlocks.join('\n\n')}\n${next.slice(index)}`;
+  }
+  return { raw: next, added };
+}
+
+const inventory = readJson(inventoryPath);
+const domainPolicies = loadDomainPolicies();
+const openapiRaw = fs.readFileSync(`${root}/${openapiPath}`, 'utf8');
+const openapiOperations = parseOpenApi(openapiRaw);
+
+const inventoryRecords = [];
+for (const [domain, group] of Object.entries(inventory.domains ?? {})) {
+  for (const raw of group.endpoint_groups ?? []) {
+    const match = String(raw).match(/^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s+(\/v1\/\S+)$/);
+    if (!match) continue;
+    inventoryRecords.push({ method: match[1], path: match[2], domain });
+  }
+}
+
+const inventoryMap = new Map(inventoryRecords.map((x) => [operationKey(x.method, x.path), x]));
+const openapiMap = new Map(openapiOperations.map((x) => [operationKey(x.method, x.path), x]));
+
+let addedToInventory = 0;
+for (const op of openapiOperations.sort((a, b) => operationKey(a.method, a.path).localeCompare(operationKey(b.method, b.path)))) {
+  const key = operationKey(op.method, op.path);
+  if (inventoryMap.has(key)) continue;
+  const domain = inferDomain(op.path, op.tags);
+  if (!inventory.domains[domain]) inventory.domains[domain] = { required: true, endpoint_groups: [] };
+  inventory.domains[domain].endpoint_groups.push(`${op.method} ${op.path}`);
+  inventoryMap.set(key, { method: op.method, path: op.path, domain });
+  addedToInventory += 1;
+}
+for (const group of Object.values(inventory.domains ?? {})) group.endpoint_groups = [...new Set(group.endpoint_groups)].sort();
+
+const missingOpenApi = [];
+for (const [key, record] of inventoryMap) {
+  if (openapiMap.has(key)) continue;
+  const separator = key.indexOf(' ');
+  const method = key.slice(0, separator);
+  const path = key.slice(separator + 1);
+  const exactPolicy = domainPolicies.find((p) => operationKey(p.method, p.path) === key);
+  const operationId = exactPolicy?.operationId ?? generatedOperationId(method, path);
+  missingOpenApi.push({ operationId, method, path, domain: record.domain });
+}
+
+const { raw: openapiNext, added: addedToOpenApi } = addOpenApiOperations(openapiRaw, missingOpenApi);
+if (openapiNext !== openapiRaw) fs.writeFileSync(`${root}/${openapiPath}`, openapiNext);
+
+const effectiveOpenApi = parseOpenApi(openapiNext);
+const effectiveByKey = new Map(effectiveOpenApi.map((x) => [operationKey(x.method, x.path), x]));
+
+const existingPolicy = fs.existsSync(`${root}/${consolidatedPolicyPath}`) ? readJson(consolidatedPolicyPath) : { version: '1.0.0', operations: [] };
+const existingPolicyById = new Map((existingPolicy.operations ?? []).map((x) => [x.operationId, x]));
+const policyByMethodPath = new Map(domainPolicies.map((p) => [operationKey(p.method, p.path), p]));
+const targetOperations = [...effectiveByKey.values()].sort((a, b) => operationKey(a.method, a.path).localeCompare(operationKey(b.method, b.path)));
+const usedIds = new Set();
+const consolidatedOperations = [];
+
+for (const op of targetOperations) {
+  const key = operationKey(op.method, op.path);
+  const source = policyByMethodPath.get(key);
+  const existing = existingPolicyById.get(op.operationId) ?? (source?.operationId ? existingPolicyById.get(source.operationId) : null);
+  let operationId = op.operationId;
+  while (usedIds.has(operationId)) operationId = `${operationId}Op`;
+  usedIds.add(operationId);
+
+  if (existing) {
+    consolidatedOperations.push({ ...existing, operationId });
+    continue;
+  }
+
+  const authorization = source?.authorization;
+  const retry = source?.retry;
+  const idempotency = source?.idempotency;
+  const stateful = source?.stateMachine?.required === true || operationId === 'transitionAccountState' || operationId === 'transitionContentState';
+  let stateMachine = 'none';
+  if (operationId === 'transitionAccountState' || /account-state/i.test(op.path)) stateMachine = 'account';
+  else if (stateful) stateMachine = 'content';
+
+  const method = String(op.method).toUpperCase();
+  const authMode = authorization?.required === false ? 'public' : stateMachine !== 'none' ? 'state-machine' : 'permission';
+  const permissions = authorization?.permission ? [authorization.permission] : [];
+  consolidatedOperations.push({
+    operationId,
+    auth: { mode: authMode },
+    permissions,
+    auditRequired: method !== 'GET' && method !== 'HEAD',
+    optimisticLockRequired: retry?.requiresOptimisticConcurrency === true,
+    idempotencyRequired: idempotency?.required === true,
+    stateMachine,
+    'x-luckread-contract-status': 'DISCOVERY_DRAFT',
+    'x-luckread-source': source?.__source ?? inventoryPath,
+  });
+}
+
+writeJson(inventoryPath, inventory);
+writeJson(consolidatedPolicyPath, { ...existingPolicy, version: existingPolicy.version ?? '1.0.0', operations: consolidatedOperations });
+
+console.log(JSON.stringify({
+  status: 'SYNCHRONIZED_DRAFT',
+  openapiOperations: effectiveOpenApi.length,
+  inventoryOperations: inventoryMap.size,
+  addedToInventory,
+  addedToOpenApi,
+  consolidatedPolicyOperations: consolidatedOperations.length,
+  remainingInventoryWithoutOpenApi: inventoryMap.size - effectiveOpenApi.length,
+}, null, 2));
+ },
+        amountMinor: { type: 'integer', minimum: 1 },
+        currency: { type: 'string', pattern: '^[A-Z]{3}
+  const tagMap = {
+    auth_identity: 'Auth',
+    users_accounts: 'Users',
+    content: 'Contents',
+    media: 'Media',
+    feed: 'Feed',
+    interaction: 'Interactions',
+    notification: 'Notifications',
+    search_discovery: 'Search',
+    creator_ip_mcn: 'Creators',
+    subscription_entitlement_payment: 'Users',
+    audit_compliance: 'Admin',
+    analytics: 'Analytics',
+    recommendation_realtime: 'Feed',
+    open_platform: 'Developer',
+  };
+  const params = pathParameterNames(canonicalPath);
+  const lines = [];
+  lines.push(`    ${method.toLowerCase()}:`);
+  lines.push(`      tags: [${tagMap[domain] ?? 'Contents'}]`);
+  lines.push(`      summary: Discovery draft for ${method} ${canonicalPath}`);
+  lines.push(`      operationId: ${operationId}`);
+  lines.push('      x-luckread-contract-status: DISCOVERY_DRAFT');
+  lines.push(`      x-luckread-source: ${inventoryPath}`);
+  if (params.length) {
+    lines.push('      parameters:');
+    for (const name of params) {
+      lines.push(`        - name: ${name}`);
+      lines.push('          in: path');
+      lines.push('          required: true');
+      lines.push("          schema: { $ref: '#/components/schemas/ResourceId' }");
+    }
+  }
+  lines.push('      responses:');
+  lines.push('        default:');
+  lines.push('          description: Discovery-only operation; detailed response contract remains to be closed.');
+  return lines.join('\n');
+}
+
+function insertIntoExistingPath(raw, rawPath, methodBlocks) {
+  const lines = raw.split('\n');
+  const header = `  ${rawPath}:`;
+  const start = lines.findIndex((line) => line === header);
+  if (start < 0) return null;
+  let end = lines.length;
+  for (let i = start + 1; i < lines.length; i += 1) {
+    if (/^  \/.*:\s*$/.test(lines[i]) || lines[i] === 'components:') { end = i; break; }
+  }
+  const before = lines.slice(0, end);
+  const after = lines.slice(end);
+  if (before.length && before[before.length - 1] !== '') before.push('');
+  return [...before, ...methodBlocks.flatMap((b, i) => i ? ['', ...b.split('\n')] : b.split('\n')), ...after].join('\n');
+}
+
+function addOpenApiOperations(raw, missing) {
+  if (!missing.length) return { raw, added: 0 };
+  let next = raw;
+  let added = 0;
+  const existingPathNames = new Set([...next.matchAll(/^  (\/[^:#]+):\s*$/gm)].map((m) => m[1]));
+  const existingOperations = parseOpenApi(next);
+  const existingKeys = new Set(existingOperations.map((x) => operationKey(x.method, x.path)));
+  const grouped = new Map();
+
+  for (const op of missing) {
+    const key = operationKey(op.method, op.path);
+    if (existingKeys.has(key)) continue;
+    const rawPath = openapiPathFromCanonical(op.path);
+    if (!grouped.has(rawPath)) grouped.set(rawPath, []);
+    grouped.get(rawPath).push(op);
+  }
+
+  const newPathBlocks = [];
+  for (const [rawPath, ops] of [...grouped.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+    ops.sort((a, b) => a.method.localeCompare(b.method));
+    const methodBlocks = ops.map((op) => buildOpenApiOperation(op));
+    if (existingPathNames.has(rawPath)) {
+      const changed = insertIntoExistingPath(next, rawPath, methodBlocks);
+      if (changed !== null) {
+        next = changed;
+        added += ops.length;
+        for (const op of ops) existingKeys.add(operationKey(op.method, op.path));
+      }
+    } else {
+      newPathBlocks.push(`  ${rawPath}:\n${methodBlocks.join('\n\n')}`);
+      added += ops.length;
+    }
+  }
+
+  if (newPathBlocks.length) {
+    const marker = '\ncomponents:\n';
+    const index = next.indexOf(marker);
+    if (index < 0) throw new Error('canonical OpenAPI components marker not found');
+    next = `${next.slice(0, index)}\n${newPathBlocks.join('\n\n')}\n${next.slice(index)}`;
+  }
+  return { raw: next, added };
+}
+
+const inventory = readJson(inventoryPath);
+const domainPolicies = loadDomainPolicies();
+const openapiRaw = fs.readFileSync(`${root}/${openapiPath}`, 'utf8');
+const openapiOperations = parseOpenApi(openapiRaw);
+
+const inventoryRecords = [];
+for (const [domain, group] of Object.entries(inventory.domains ?? {})) {
+  for (const raw of group.endpoint_groups ?? []) {
+    const match = String(raw).match(/^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s+(\/v1\/\S+)$/);
+    if (!match) continue;
+    inventoryRecords.push({ method: match[1], path: match[2], domain });
+  }
+}
+
+const inventoryMap = new Map(inventoryRecords.map((x) => [operationKey(x.method, x.path), x]));
+const openapiMap = new Map(openapiOperations.map((x) => [operationKey(x.method, x.path), x]));
+
+let addedToInventory = 0;
+for (const op of openapiOperations.sort((a, b) => operationKey(a.method, a.path).localeCompare(operationKey(b.method, b.path)))) {
+  const key = operationKey(op.method, op.path);
+  if (inventoryMap.has(key)) continue;
+  const domain = inferDomain(op.path, op.tags);
+  if (!inventory.domains[domain]) inventory.domains[domain] = { required: true, endpoint_groups: [] };
+  inventory.domains[domain].endpoint_groups.push(`${op.method} ${op.path}`);
+  inventoryMap.set(key, { method: op.method, path: op.path, domain });
+  addedToInventory += 1;
+}
+for (const group of Object.values(inventory.domains ?? {})) group.endpoint_groups = [...new Set(group.endpoint_groups)].sort();
+
+const missingOpenApi = [];
+for (const [key, record] of inventoryMap) {
+  if (openapiMap.has(key)) continue;
+  const separator = key.indexOf(' ');
+  const method = key.slice(0, separator);
+  const path = key.slice(separator + 1);
+  const exactPolicy = domainPolicies.find((p) => operationKey(p.method, p.path) === key);
+  const operationId = exactPolicy?.operationId ?? generatedOperationId(method, path);
+  missingOpenApi.push({ operationId, method, path, domain: record.domain });
+}
+
+const { raw: openapiNext, added: addedToOpenApi } = addOpenApiOperations(openapiRaw, missingOpenApi);
+if (openapiNext !== openapiRaw) fs.writeFileSync(`${root}/${openapiPath}`, openapiNext);
+
+const effectiveOpenApi = parseOpenApi(openapiNext);
+const effectiveByKey = new Map(effectiveOpenApi.map((x) => [operationKey(x.method, x.path), x]));
+
+const existingPolicy = fs.existsSync(`${root}/${consolidatedPolicyPath}`) ? readJson(consolidatedPolicyPath) : { version: '1.0.0', operations: [] };
+const existingPolicyById = new Map((existingPolicy.operations ?? []).map((x) => [x.operationId, x]));
+const policyByMethodPath = new Map(domainPolicies.map((p) => [operationKey(p.method, p.path), p]));
+const targetOperations = [...effectiveByKey.values()].sort((a, b) => operationKey(a.method, a.path).localeCompare(operationKey(b.method, b.path)));
+const usedIds = new Set();
+const consolidatedOperations = [];
+
+for (const op of targetOperations) {
+  const key = operationKey(op.method, op.path);
+  const source = policyByMethodPath.get(key);
+  const existing = existingPolicyById.get(op.operationId) ?? (source?.operationId ? existingPolicyById.get(source.operationId) : null);
+  let operationId = op.operationId;
+  while (usedIds.has(operationId)) operationId = `${operationId}Op`;
+  usedIds.add(operationId);
+
+  if (existing) {
+    consolidatedOperations.push({ ...existing, operationId });
+    continue;
+  }
+
+  const authorization = source?.authorization;
+  const retry = source?.retry;
+  const idempotency = source?.idempotency;
+  const stateful = source?.stateMachine?.required === true || operationId === 'transitionAccountState' || operationId === 'transitionContentState';
+  let stateMachine = 'none';
+  if (operationId === 'transitionAccountState' || /account-state/i.test(op.path)) stateMachine = 'account';
+  else if (stateful) stateMachine = 'content';
+
+  const method = String(op.method).toUpperCase();
+  const authMode = authorization?.required === false ? 'public' : stateMachine !== 'none' ? 'state-machine' : 'permission';
+  const permissions = authorization?.permission ? [authorization.permission] : [];
+  consolidatedOperations.push({
+    operationId,
+    auth: { mode: authMode },
+    permissions,
+    auditRequired: method !== 'GET' && method !== 'HEAD',
+    optimisticLockRequired: retry?.requiresOptimisticConcurrency === true,
+    idempotencyRequired: idempotency?.required === true,
+    stateMachine,
+    'x-luckread-contract-status': 'DISCOVERY_DRAFT',
+    'x-luckread-source': source?.__source ?? inventoryPath,
+  });
+}
+
+writeJson(inventoryPath, inventory);
+writeJson(consolidatedPolicyPath, { ...existingPolicy, version: existingPolicy.version ?? '1.0.0', operations: consolidatedOperations });
+
+console.log(JSON.stringify({
+  status: 'SYNCHRONIZED_DRAFT',
+  openapiOperations: effectiveOpenApi.length,
+  inventoryOperations: inventoryMap.size,
+  addedToInventory,
+  addedToOpenApi,
+  consolidatedPolicyOperations: consolidatedOperations.length,
+  remainingInventoryWithoutOpenApi: inventoryMap.size - effectiveOpenApi.length,
+}, null, 2));
+ },
+        status: { type: 'string', maxLength: 64 },
+        version: { type: 'integer', minimum: 1 },
+        providerUpdatedAt: { type: ['string', 'null'], format: 'date-time' },
+        createdAt: { type: 'string', format: 'date-time' },
+        updatedAt: { type: 'string', format: 'date-time' },
+        refundedMinor: { type: 'integer', minimum: 0 },
+      },
+    };
+    return [
+      '    get:',
+      '      tags: [Commerce]',
+      "      summary: List the authenticated customer's payment history",
+      '      operationId: getPaymentsHistory',
+      '      x-luckread-contract-status: CONTRACTED_PARTIAL',
+      '      x-luckread-runtime-status: IMPLEMENTED_SOURCE_ONLY_PENDING_D1_04_MIGRATION',
+      '      x-luckread-source: contracts/api/commerce-operation-policy.v1.json',
+      ...parameters,
+      ...response(listEnvelope(item)),
+    ].join('\n');
+  }
+  if (operationId === 'getPaymentsRefunds' && method === 'GET') {
+    const item = {
+      type: 'object', additionalProperties: false,
+      required: ['refundId', 'paymentId', 'orderId', 'amountMinor', 'currency', 'status', 'reason', 'version', 'providerUpdatedAt', 'createdAt', 'updatedAt'],
+      properties: {
+        refundId: { type: 'string', pattern: '^ref_[A-Za-z0-9]{26}
+  const tagMap = {
+    auth_identity: 'Auth',
+    users_accounts: 'Users',
+    content: 'Contents',
+    media: 'Media',
+    feed: 'Feed',
+    interaction: 'Interactions',
+    notification: 'Notifications',
+    search_discovery: 'Search',
+    creator_ip_mcn: 'Creators',
+    subscription_entitlement_payment: 'Users',
+    audit_compliance: 'Admin',
+    analytics: 'Analytics',
+    recommendation_realtime: 'Feed',
+    open_platform: 'Developer',
+  };
+  const params = pathParameterNames(canonicalPath);
+  const lines = [];
+  lines.push(`    ${method.toLowerCase()}:`);
+  lines.push(`      tags: [${tagMap[domain] ?? 'Contents'}]`);
+  lines.push(`      summary: Discovery draft for ${method} ${canonicalPath}`);
+  lines.push(`      operationId: ${operationId}`);
+  lines.push('      x-luckread-contract-status: DISCOVERY_DRAFT');
+  lines.push(`      x-luckread-source: ${inventoryPath}`);
+  if (params.length) {
+    lines.push('      parameters:');
+    for (const name of params) {
+      lines.push(`        - name: ${name}`);
+      lines.push('          in: path');
+      lines.push('          required: true');
+      lines.push("          schema: { $ref: '#/components/schemas/ResourceId' }");
+    }
+  }
+  lines.push('      responses:');
+  lines.push('        default:');
+  lines.push('          description: Discovery-only operation; detailed response contract remains to be closed.');
+  return lines.join('\n');
+}
+
+function insertIntoExistingPath(raw, rawPath, methodBlocks) {
+  const lines = raw.split('\n');
+  const header = `  ${rawPath}:`;
+  const start = lines.findIndex((line) => line === header);
+  if (start < 0) return null;
+  let end = lines.length;
+  for (let i = start + 1; i < lines.length; i += 1) {
+    if (/^  \/.*:\s*$/.test(lines[i]) || lines[i] === 'components:') { end = i; break; }
+  }
+  const before = lines.slice(0, end);
+  const after = lines.slice(end);
+  if (before.length && before[before.length - 1] !== '') before.push('');
+  return [...before, ...methodBlocks.flatMap((b, i) => i ? ['', ...b.split('\n')] : b.split('\n')), ...after].join('\n');
+}
+
+function addOpenApiOperations(raw, missing) {
+  if (!missing.length) return { raw, added: 0 };
+  let next = raw;
+  let added = 0;
+  const existingPathNames = new Set([...next.matchAll(/^  (\/[^:#]+):\s*$/gm)].map((m) => m[1]));
+  const existingOperations = parseOpenApi(next);
+  const existingKeys = new Set(existingOperations.map((x) => operationKey(x.method, x.path)));
+  const grouped = new Map();
+
+  for (const op of missing) {
+    const key = operationKey(op.method, op.path);
+    if (existingKeys.has(key)) continue;
+    const rawPath = openapiPathFromCanonical(op.path);
+    if (!grouped.has(rawPath)) grouped.set(rawPath, []);
+    grouped.get(rawPath).push(op);
+  }
+
+  const newPathBlocks = [];
+  for (const [rawPath, ops] of [...grouped.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+    ops.sort((a, b) => a.method.localeCompare(b.method));
+    const methodBlocks = ops.map((op) => buildOpenApiOperation(op));
+    if (existingPathNames.has(rawPath)) {
+      const changed = insertIntoExistingPath(next, rawPath, methodBlocks);
+      if (changed !== null) {
+        next = changed;
+        added += ops.length;
+        for (const op of ops) existingKeys.add(operationKey(op.method, op.path));
+      }
+    } else {
+      newPathBlocks.push(`  ${rawPath}:\n${methodBlocks.join('\n\n')}`);
+      added += ops.length;
+    }
+  }
+
+  if (newPathBlocks.length) {
+    const marker = '\ncomponents:\n';
+    const index = next.indexOf(marker);
+    if (index < 0) throw new Error('canonical OpenAPI components marker not found');
+    next = `${next.slice(0, index)}\n${newPathBlocks.join('\n\n')}\n${next.slice(index)}`;
+  }
+  return { raw: next, added };
+}
+
+const inventory = readJson(inventoryPath);
+const domainPolicies = loadDomainPolicies();
+const openapiRaw = fs.readFileSync(`${root}/${openapiPath}`, 'utf8');
+const openapiOperations = parseOpenApi(openapiRaw);
+
+const inventoryRecords = [];
+for (const [domain, group] of Object.entries(inventory.domains ?? {})) {
+  for (const raw of group.endpoint_groups ?? []) {
+    const match = String(raw).match(/^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s+(\/v1\/\S+)$/);
+    if (!match) continue;
+    inventoryRecords.push({ method: match[1], path: match[2], domain });
+  }
+}
+
+const inventoryMap = new Map(inventoryRecords.map((x) => [operationKey(x.method, x.path), x]));
+const openapiMap = new Map(openapiOperations.map((x) => [operationKey(x.method, x.path), x]));
+
+let addedToInventory = 0;
+for (const op of openapiOperations.sort((a, b) => operationKey(a.method, a.path).localeCompare(operationKey(b.method, b.path)))) {
+  const key = operationKey(op.method, op.path);
+  if (inventoryMap.has(key)) continue;
+  const domain = inferDomain(op.path, op.tags);
+  if (!inventory.domains[domain]) inventory.domains[domain] = { required: true, endpoint_groups: [] };
+  inventory.domains[domain].endpoint_groups.push(`${op.method} ${op.path}`);
+  inventoryMap.set(key, { method: op.method, path: op.path, domain });
+  addedToInventory += 1;
+}
+for (const group of Object.values(inventory.domains ?? {})) group.endpoint_groups = [...new Set(group.endpoint_groups)].sort();
+
+const missingOpenApi = [];
+for (const [key, record] of inventoryMap) {
+  if (openapiMap.has(key)) continue;
+  const separator = key.indexOf(' ');
+  const method = key.slice(0, separator);
+  const path = key.slice(separator + 1);
+  const exactPolicy = domainPolicies.find((p) => operationKey(p.method, p.path) === key);
+  const operationId = exactPolicy?.operationId ?? generatedOperationId(method, path);
+  missingOpenApi.push({ operationId, method, path, domain: record.domain });
+}
+
+const { raw: openapiNext, added: addedToOpenApi } = addOpenApiOperations(openapiRaw, missingOpenApi);
+if (openapiNext !== openapiRaw) fs.writeFileSync(`${root}/${openapiPath}`, openapiNext);
+
+const effectiveOpenApi = parseOpenApi(openapiNext);
+const effectiveByKey = new Map(effectiveOpenApi.map((x) => [operationKey(x.method, x.path), x]));
+
+const existingPolicy = fs.existsSync(`${root}/${consolidatedPolicyPath}`) ? readJson(consolidatedPolicyPath) : { version: '1.0.0', operations: [] };
+const existingPolicyById = new Map((existingPolicy.operations ?? []).map((x) => [x.operationId, x]));
+const policyByMethodPath = new Map(domainPolicies.map((p) => [operationKey(p.method, p.path), p]));
+const targetOperations = [...effectiveByKey.values()].sort((a, b) => operationKey(a.method, a.path).localeCompare(operationKey(b.method, b.path)));
+const usedIds = new Set();
+const consolidatedOperations = [];
+
+for (const op of targetOperations) {
+  const key = operationKey(op.method, op.path);
+  const source = policyByMethodPath.get(key);
+  const existing = existingPolicyById.get(op.operationId) ?? (source?.operationId ? existingPolicyById.get(source.operationId) : null);
+  let operationId = op.operationId;
+  while (usedIds.has(operationId)) operationId = `${operationId}Op`;
+  usedIds.add(operationId);
+
+  if (existing) {
+    consolidatedOperations.push({ ...existing, operationId });
+    continue;
+  }
+
+  const authorization = source?.authorization;
+  const retry = source?.retry;
+  const idempotency = source?.idempotency;
+  const stateful = source?.stateMachine?.required === true || operationId === 'transitionAccountState' || operationId === 'transitionContentState';
+  let stateMachine = 'none';
+  if (operationId === 'transitionAccountState' || /account-state/i.test(op.path)) stateMachine = 'account';
+  else if (stateful) stateMachine = 'content';
+
+  const method = String(op.method).toUpperCase();
+  const authMode = authorization?.required === false ? 'public' : stateMachine !== 'none' ? 'state-machine' : 'permission';
+  const permissions = authorization?.permission ? [authorization.permission] : [];
+  consolidatedOperations.push({
+    operationId,
+    auth: { mode: authMode },
+    permissions,
+    auditRequired: method !== 'GET' && method !== 'HEAD',
+    optimisticLockRequired: retry?.requiresOptimisticConcurrency === true,
+    idempotencyRequired: idempotency?.required === true,
+    stateMachine,
+    'x-luckread-contract-status': 'DISCOVERY_DRAFT',
+    'x-luckread-source': source?.__source ?? inventoryPath,
+  });
+}
+
+writeJson(inventoryPath, inventory);
+writeJson(consolidatedPolicyPath, { ...existingPolicy, version: existingPolicy.version ?? '1.0.0', operations: consolidatedOperations });
+
+console.log(JSON.stringify({
+  status: 'SYNCHRONIZED_DRAFT',
+  openapiOperations: effectiveOpenApi.length,
+  inventoryOperations: inventoryMap.size,
+  addedToInventory,
+  addedToOpenApi,
+  consolidatedPolicyOperations: consolidatedOperations.length,
+  remainingInventoryWithoutOpenApi: inventoryMap.size - effectiveOpenApi.length,
+}, null, 2));
+ },
+        paymentId: { type: 'string', pattern: '^pay_[A-Za-z0-9]{26}
+  const tagMap = {
+    auth_identity: 'Auth',
+    users_accounts: 'Users',
+    content: 'Contents',
+    media: 'Media',
+    feed: 'Feed',
+    interaction: 'Interactions',
+    notification: 'Notifications',
+    search_discovery: 'Search',
+    creator_ip_mcn: 'Creators',
+    subscription_entitlement_payment: 'Users',
+    audit_compliance: 'Admin',
+    analytics: 'Analytics',
+    recommendation_realtime: 'Feed',
+    open_platform: 'Developer',
+  };
+  const params = pathParameterNames(canonicalPath);
+  const lines = [];
+  lines.push(`    ${method.toLowerCase()}:`);
+  lines.push(`      tags: [${tagMap[domain] ?? 'Contents'}]`);
+  lines.push(`      summary: Discovery draft for ${method} ${canonicalPath}`);
+  lines.push(`      operationId: ${operationId}`);
+  lines.push('      x-luckread-contract-status: DISCOVERY_DRAFT');
+  lines.push(`      x-luckread-source: ${inventoryPath}`);
+  if (params.length) {
+    lines.push('      parameters:');
+    for (const name of params) {
+      lines.push(`        - name: ${name}`);
+      lines.push('          in: path');
+      lines.push('          required: true');
+      lines.push("          schema: { $ref: '#/components/schemas/ResourceId' }");
+    }
+  }
+  lines.push('      responses:');
+  lines.push('        default:');
+  lines.push('          description: Discovery-only operation; detailed response contract remains to be closed.');
+  return lines.join('\n');
+}
+
+function insertIntoExistingPath(raw, rawPath, methodBlocks) {
+  const lines = raw.split('\n');
+  const header = `  ${rawPath}:`;
+  const start = lines.findIndex((line) => line === header);
+  if (start < 0) return null;
+  let end = lines.length;
+  for (let i = start + 1; i < lines.length; i += 1) {
+    if (/^  \/.*:\s*$/.test(lines[i]) || lines[i] === 'components:') { end = i; break; }
+  }
+  const before = lines.slice(0, end);
+  const after = lines.slice(end);
+  if (before.length && before[before.length - 1] !== '') before.push('');
+  return [...before, ...methodBlocks.flatMap((b, i) => i ? ['', ...b.split('\n')] : b.split('\n')), ...after].join('\n');
+}
+
+function addOpenApiOperations(raw, missing) {
+  if (!missing.length) return { raw, added: 0 };
+  let next = raw;
+  let added = 0;
+  const existingPathNames = new Set([...next.matchAll(/^  (\/[^:#]+):\s*$/gm)].map((m) => m[1]));
+  const existingOperations = parseOpenApi(next);
+  const existingKeys = new Set(existingOperations.map((x) => operationKey(x.method, x.path)));
+  const grouped = new Map();
+
+  for (const op of missing) {
+    const key = operationKey(op.method, op.path);
+    if (existingKeys.has(key)) continue;
+    const rawPath = openapiPathFromCanonical(op.path);
+    if (!grouped.has(rawPath)) grouped.set(rawPath, []);
+    grouped.get(rawPath).push(op);
+  }
+
+  const newPathBlocks = [];
+  for (const [rawPath, ops] of [...grouped.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+    ops.sort((a, b) => a.method.localeCompare(b.method));
+    const methodBlocks = ops.map((op) => buildOpenApiOperation(op));
+    if (existingPathNames.has(rawPath)) {
+      const changed = insertIntoExistingPath(next, rawPath, methodBlocks);
+      if (changed !== null) {
+        next = changed;
+        added += ops.length;
+        for (const op of ops) existingKeys.add(operationKey(op.method, op.path));
+      }
+    } else {
+      newPathBlocks.push(`  ${rawPath}:\n${methodBlocks.join('\n\n')}`);
+      added += ops.length;
+    }
+  }
+
+  if (newPathBlocks.length) {
+    const marker = '\ncomponents:\n';
+    const index = next.indexOf(marker);
+    if (index < 0) throw new Error('canonical OpenAPI components marker not found');
+    next = `${next.slice(0, index)}\n${newPathBlocks.join('\n\n')}\n${next.slice(index)}`;
+  }
+  return { raw: next, added };
+}
+
+const inventory = readJson(inventoryPath);
+const domainPolicies = loadDomainPolicies();
+const openapiRaw = fs.readFileSync(`${root}/${openapiPath}`, 'utf8');
+const openapiOperations = parseOpenApi(openapiRaw);
+
+const inventoryRecords = [];
+for (const [domain, group] of Object.entries(inventory.domains ?? {})) {
+  for (const raw of group.endpoint_groups ?? []) {
+    const match = String(raw).match(/^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s+(\/v1\/\S+)$/);
+    if (!match) continue;
+    inventoryRecords.push({ method: match[1], path: match[2], domain });
+  }
+}
+
+const inventoryMap = new Map(inventoryRecords.map((x) => [operationKey(x.method, x.path), x]));
+const openapiMap = new Map(openapiOperations.map((x) => [operationKey(x.method, x.path), x]));
+
+let addedToInventory = 0;
+for (const op of openapiOperations.sort((a, b) => operationKey(a.method, a.path).localeCompare(operationKey(b.method, b.path)))) {
+  const key = operationKey(op.method, op.path);
+  if (inventoryMap.has(key)) continue;
+  const domain = inferDomain(op.path, op.tags);
+  if (!inventory.domains[domain]) inventory.domains[domain] = { required: true, endpoint_groups: [] };
+  inventory.domains[domain].endpoint_groups.push(`${op.method} ${op.path}`);
+  inventoryMap.set(key, { method: op.method, path: op.path, domain });
+  addedToInventory += 1;
+}
+for (const group of Object.values(inventory.domains ?? {})) group.endpoint_groups = [...new Set(group.endpoint_groups)].sort();
+
+const missingOpenApi = [];
+for (const [key, record] of inventoryMap) {
+  if (openapiMap.has(key)) continue;
+  const separator = key.indexOf(' ');
+  const method = key.slice(0, separator);
+  const path = key.slice(separator + 1);
+  const exactPolicy = domainPolicies.find((p) => operationKey(p.method, p.path) === key);
+  const operationId = exactPolicy?.operationId ?? generatedOperationId(method, path);
+  missingOpenApi.push({ operationId, method, path, domain: record.domain });
+}
+
+const { raw: openapiNext, added: addedToOpenApi } = addOpenApiOperations(openapiRaw, missingOpenApi);
+if (openapiNext !== openapiRaw) fs.writeFileSync(`${root}/${openapiPath}`, openapiNext);
+
+const effectiveOpenApi = parseOpenApi(openapiNext);
+const effectiveByKey = new Map(effectiveOpenApi.map((x) => [operationKey(x.method, x.path), x]));
+
+const existingPolicy = fs.existsSync(`${root}/${consolidatedPolicyPath}`) ? readJson(consolidatedPolicyPath) : { version: '1.0.0', operations: [] };
+const existingPolicyById = new Map((existingPolicy.operations ?? []).map((x) => [x.operationId, x]));
+const policyByMethodPath = new Map(domainPolicies.map((p) => [operationKey(p.method, p.path), p]));
+const targetOperations = [...effectiveByKey.values()].sort((a, b) => operationKey(a.method, a.path).localeCompare(operationKey(b.method, b.path)));
+const usedIds = new Set();
+const consolidatedOperations = [];
+
+for (const op of targetOperations) {
+  const key = operationKey(op.method, op.path);
+  const source = policyByMethodPath.get(key);
+  const existing = existingPolicyById.get(op.operationId) ?? (source?.operationId ? existingPolicyById.get(source.operationId) : null);
+  let operationId = op.operationId;
+  while (usedIds.has(operationId)) operationId = `${operationId}Op`;
+  usedIds.add(operationId);
+
+  if (existing) {
+    consolidatedOperations.push({ ...existing, operationId });
+    continue;
+  }
+
+  const authorization = source?.authorization;
+  const retry = source?.retry;
+  const idempotency = source?.idempotency;
+  const stateful = source?.stateMachine?.required === true || operationId === 'transitionAccountState' || operationId === 'transitionContentState';
+  let stateMachine = 'none';
+  if (operationId === 'transitionAccountState' || /account-state/i.test(op.path)) stateMachine = 'account';
+  else if (stateful) stateMachine = 'content';
+
+  const method = String(op.method).toUpperCase();
+  const authMode = authorization?.required === false ? 'public' : stateMachine !== 'none' ? 'state-machine' : 'permission';
+  const permissions = authorization?.permission ? [authorization.permission] : [];
+  consolidatedOperations.push({
+    operationId,
+    auth: { mode: authMode },
+    permissions,
+    auditRequired: method !== 'GET' && method !== 'HEAD',
+    optimisticLockRequired: retry?.requiresOptimisticConcurrency === true,
+    idempotencyRequired: idempotency?.required === true,
+    stateMachine,
+    'x-luckread-contract-status': 'DISCOVERY_DRAFT',
+    'x-luckread-source': source?.__source ?? inventoryPath,
+  });
+}
+
+writeJson(inventoryPath, inventory);
+writeJson(consolidatedPolicyPath, { ...existingPolicy, version: existingPolicy.version ?? '1.0.0', operations: consolidatedOperations });
+
+console.log(JSON.stringify({
+  status: 'SYNCHRONIZED_DRAFT',
+  openapiOperations: effectiveOpenApi.length,
+  inventoryOperations: inventoryMap.size,
+  addedToInventory,
+  addedToOpenApi,
+  consolidatedPolicyOperations: consolidatedOperations.length,
+  remainingInventoryWithoutOpenApi: inventoryMap.size - effectiveOpenApi.length,
+}, null, 2));
+ },
+        orderId: { type: 'string', pattern: '^ord_[A-Za-z0-9_-]{1,90}
+  const tagMap = {
+    auth_identity: 'Auth',
+    users_accounts: 'Users',
+    content: 'Contents',
+    media: 'Media',
+    feed: 'Feed',
+    interaction: 'Interactions',
+    notification: 'Notifications',
+    search_discovery: 'Search',
+    creator_ip_mcn: 'Creators',
+    subscription_entitlement_payment: 'Users',
+    audit_compliance: 'Admin',
+    analytics: 'Analytics',
+    recommendation_realtime: 'Feed',
+    open_platform: 'Developer',
+  };
+  const params = pathParameterNames(canonicalPath);
+  const lines = [];
+  lines.push(`    ${method.toLowerCase()}:`);
+  lines.push(`      tags: [${tagMap[domain] ?? 'Contents'}]`);
+  lines.push(`      summary: Discovery draft for ${method} ${canonicalPath}`);
+  lines.push(`      operationId: ${operationId}`);
+  lines.push('      x-luckread-contract-status: DISCOVERY_DRAFT');
+  lines.push(`      x-luckread-source: ${inventoryPath}`);
+  if (params.length) {
+    lines.push('      parameters:');
+    for (const name of params) {
+      lines.push(`        - name: ${name}`);
+      lines.push('          in: path');
+      lines.push('          required: true');
+      lines.push("          schema: { $ref: '#/components/schemas/ResourceId' }");
+    }
+  }
+  lines.push('      responses:');
+  lines.push('        default:');
+  lines.push('          description: Discovery-only operation; detailed response contract remains to be closed.');
+  return lines.join('\n');
+}
+
+function insertIntoExistingPath(raw, rawPath, methodBlocks) {
+  const lines = raw.split('\n');
+  const header = `  ${rawPath}:`;
+  const start = lines.findIndex((line) => line === header);
+  if (start < 0) return null;
+  let end = lines.length;
+  for (let i = start + 1; i < lines.length; i += 1) {
+    if (/^  \/.*:\s*$/.test(lines[i]) || lines[i] === 'components:') { end = i; break; }
+  }
+  const before = lines.slice(0, end);
+  const after = lines.slice(end);
+  if (before.length && before[before.length - 1] !== '') before.push('');
+  return [...before, ...methodBlocks.flatMap((b, i) => i ? ['', ...b.split('\n')] : b.split('\n')), ...after].join('\n');
+}
+
+function addOpenApiOperations(raw, missing) {
+  if (!missing.length) return { raw, added: 0 };
+  let next = raw;
+  let added = 0;
+  const existingPathNames = new Set([...next.matchAll(/^  (\/[^:#]+):\s*$/gm)].map((m) => m[1]));
+  const existingOperations = parseOpenApi(next);
+  const existingKeys = new Set(existingOperations.map((x) => operationKey(x.method, x.path)));
+  const grouped = new Map();
+
+  for (const op of missing) {
+    const key = operationKey(op.method, op.path);
+    if (existingKeys.has(key)) continue;
+    const rawPath = openapiPathFromCanonical(op.path);
+    if (!grouped.has(rawPath)) grouped.set(rawPath, []);
+    grouped.get(rawPath).push(op);
+  }
+
+  const newPathBlocks = [];
+  for (const [rawPath, ops] of [...grouped.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+    ops.sort((a, b) => a.method.localeCompare(b.method));
+    const methodBlocks = ops.map((op) => buildOpenApiOperation(op));
+    if (existingPathNames.has(rawPath)) {
+      const changed = insertIntoExistingPath(next, rawPath, methodBlocks);
+      if (changed !== null) {
+        next = changed;
+        added += ops.length;
+        for (const op of ops) existingKeys.add(operationKey(op.method, op.path));
+      }
+    } else {
+      newPathBlocks.push(`  ${rawPath}:\n${methodBlocks.join('\n\n')}`);
+      added += ops.length;
+    }
+  }
+
+  if (newPathBlocks.length) {
+    const marker = '\ncomponents:\n';
+    const index = next.indexOf(marker);
+    if (index < 0) throw new Error('canonical OpenAPI components marker not found');
+    next = `${next.slice(0, index)}\n${newPathBlocks.join('\n\n')}\n${next.slice(index)}`;
+  }
+  return { raw: next, added };
+}
+
+const inventory = readJson(inventoryPath);
+const domainPolicies = loadDomainPolicies();
+const openapiRaw = fs.readFileSync(`${root}/${openapiPath}`, 'utf8');
+const openapiOperations = parseOpenApi(openapiRaw);
+
+const inventoryRecords = [];
+for (const [domain, group] of Object.entries(inventory.domains ?? {})) {
+  for (const raw of group.endpoint_groups ?? []) {
+    const match = String(raw).match(/^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s+(\/v1\/\S+)$/);
+    if (!match) continue;
+    inventoryRecords.push({ method: match[1], path: match[2], domain });
+  }
+}
+
+const inventoryMap = new Map(inventoryRecords.map((x) => [operationKey(x.method, x.path), x]));
+const openapiMap = new Map(openapiOperations.map((x) => [operationKey(x.method, x.path), x]));
+
+let addedToInventory = 0;
+for (const op of openapiOperations.sort((a, b) => operationKey(a.method, a.path).localeCompare(operationKey(b.method, b.path)))) {
+  const key = operationKey(op.method, op.path);
+  if (inventoryMap.has(key)) continue;
+  const domain = inferDomain(op.path, op.tags);
+  if (!inventory.domains[domain]) inventory.domains[domain] = { required: true, endpoint_groups: [] };
+  inventory.domains[domain].endpoint_groups.push(`${op.method} ${op.path}`);
+  inventoryMap.set(key, { method: op.method, path: op.path, domain });
+  addedToInventory += 1;
+}
+for (const group of Object.values(inventory.domains ?? {})) group.endpoint_groups = [...new Set(group.endpoint_groups)].sort();
+
+const missingOpenApi = [];
+for (const [key, record] of inventoryMap) {
+  if (openapiMap.has(key)) continue;
+  const separator = key.indexOf(' ');
+  const method = key.slice(0, separator);
+  const path = key.slice(separator + 1);
+  const exactPolicy = domainPolicies.find((p) => operationKey(p.method, p.path) === key);
+  const operationId = exactPolicy?.operationId ?? generatedOperationId(method, path);
+  missingOpenApi.push({ operationId, method, path, domain: record.domain });
+}
+
+const { raw: openapiNext, added: addedToOpenApi } = addOpenApiOperations(openapiRaw, missingOpenApi);
+if (openapiNext !== openapiRaw) fs.writeFileSync(`${root}/${openapiPath}`, openapiNext);
+
+const effectiveOpenApi = parseOpenApi(openapiNext);
+const effectiveByKey = new Map(effectiveOpenApi.map((x) => [operationKey(x.method, x.path), x]));
+
+const existingPolicy = fs.existsSync(`${root}/${consolidatedPolicyPath}`) ? readJson(consolidatedPolicyPath) : { version: '1.0.0', operations: [] };
+const existingPolicyById = new Map((existingPolicy.operations ?? []).map((x) => [x.operationId, x]));
+const policyByMethodPath = new Map(domainPolicies.map((p) => [operationKey(p.method, p.path), p]));
+const targetOperations = [...effectiveByKey.values()].sort((a, b) => operationKey(a.method, a.path).localeCompare(operationKey(b.method, b.path)));
+const usedIds = new Set();
+const consolidatedOperations = [];
+
+for (const op of targetOperations) {
+  const key = operationKey(op.method, op.path);
+  const source = policyByMethodPath.get(key);
+  const existing = existingPolicyById.get(op.operationId) ?? (source?.operationId ? existingPolicyById.get(source.operationId) : null);
+  let operationId = op.operationId;
+  while (usedIds.has(operationId)) operationId = `${operationId}Op`;
+  usedIds.add(operationId);
+
+  if (existing) {
+    consolidatedOperations.push({ ...existing, operationId });
+    continue;
+  }
+
+  const authorization = source?.authorization;
+  const retry = source?.retry;
+  const idempotency = source?.idempotency;
+  const stateful = source?.stateMachine?.required === true || operationId === 'transitionAccountState' || operationId === 'transitionContentState';
+  let stateMachine = 'none';
+  if (operationId === 'transitionAccountState' || /account-state/i.test(op.path)) stateMachine = 'account';
+  else if (stateful) stateMachine = 'content';
+
+  const method = String(op.method).toUpperCase();
+  const authMode = authorization?.required === false ? 'public' : stateMachine !== 'none' ? 'state-machine' : 'permission';
+  const permissions = authorization?.permission ? [authorization.permission] : [];
+  consolidatedOperations.push({
+    operationId,
+    auth: { mode: authMode },
+    permissions,
+    auditRequired: method !== 'GET' && method !== 'HEAD',
+    optimisticLockRequired: retry?.requiresOptimisticConcurrency === true,
+    idempotencyRequired: idempotency?.required === true,
+    stateMachine,
+    'x-luckread-contract-status': 'DISCOVERY_DRAFT',
+    'x-luckread-source': source?.__source ?? inventoryPath,
+  });
+}
+
+writeJson(inventoryPath, inventory);
+writeJson(consolidatedPolicyPath, { ...existingPolicy, version: existingPolicy.version ?? '1.0.0', operations: consolidatedOperations });
+
+console.log(JSON.stringify({
+  status: 'SYNCHRONIZED_DRAFT',
+  openapiOperations: effectiveOpenApi.length,
+  inventoryOperations: inventoryMap.size,
+  addedToInventory,
+  addedToOpenApi,
+  consolidatedPolicyOperations: consolidatedOperations.length,
+  remainingInventoryWithoutOpenApi: inventoryMap.size - effectiveOpenApi.length,
+}, null, 2));
+ },
+        amountMinor: { type: 'integer', minimum: 100 },
+        currency: { type: 'string', pattern: '^[A-Z]{3}
+  const tagMap = {
+    auth_identity: 'Auth',
+    users_accounts: 'Users',
+    content: 'Contents',
+    media: 'Media',
+    feed: 'Feed',
+    interaction: 'Interactions',
+    notification: 'Notifications',
+    search_discovery: 'Search',
+    creator_ip_mcn: 'Creators',
+    subscription_entitlement_payment: 'Users',
+    audit_compliance: 'Admin',
+    analytics: 'Analytics',
+    recommendation_realtime: 'Feed',
+    open_platform: 'Developer',
+  };
+  const params = pathParameterNames(canonicalPath);
+  const lines = [];
+  lines.push(`    ${method.toLowerCase()}:`);
+  lines.push(`      tags: [${tagMap[domain] ?? 'Contents'}]`);
+  lines.push(`      summary: Discovery draft for ${method} ${canonicalPath}`);
+  lines.push(`      operationId: ${operationId}`);
+  lines.push('      x-luckread-contract-status: DISCOVERY_DRAFT');
+  lines.push(`      x-luckread-source: ${inventoryPath}`);
+  if (params.length) {
+    lines.push('      parameters:');
+    for (const name of params) {
+      lines.push(`        - name: ${name}`);
+      lines.push('          in: path');
+      lines.push('          required: true');
+      lines.push("          schema: { $ref: '#/components/schemas/ResourceId' }");
+    }
+  }
+  lines.push('      responses:');
+  lines.push('        default:');
+  lines.push('          description: Discovery-only operation; detailed response contract remains to be closed.');
+  return lines.join('\n');
+}
+
+function insertIntoExistingPath(raw, rawPath, methodBlocks) {
+  const lines = raw.split('\n');
+  const header = `  ${rawPath}:`;
+  const start = lines.findIndex((line) => line === header);
+  if (start < 0) return null;
+  let end = lines.length;
+  for (let i = start + 1; i < lines.length; i += 1) {
+    if (/^  \/.*:\s*$/.test(lines[i]) || lines[i] === 'components:') { end = i; break; }
+  }
+  const before = lines.slice(0, end);
+  const after = lines.slice(end);
+  if (before.length && before[before.length - 1] !== '') before.push('');
+  return [...before, ...methodBlocks.flatMap((b, i) => i ? ['', ...b.split('\n')] : b.split('\n')), ...after].join('\n');
+}
+
+function addOpenApiOperations(raw, missing) {
+  if (!missing.length) return { raw, added: 0 };
+  let next = raw;
+  let added = 0;
+  const existingPathNames = new Set([...next.matchAll(/^  (\/[^:#]+):\s*$/gm)].map((m) => m[1]));
+  const existingOperations = parseOpenApi(next);
+  const existingKeys = new Set(existingOperations.map((x) => operationKey(x.method, x.path)));
+  const grouped = new Map();
+
+  for (const op of missing) {
+    const key = operationKey(op.method, op.path);
+    if (existingKeys.has(key)) continue;
+    const rawPath = openapiPathFromCanonical(op.path);
+    if (!grouped.has(rawPath)) grouped.set(rawPath, []);
+    grouped.get(rawPath).push(op);
+  }
+
+  const newPathBlocks = [];
+  for (const [rawPath, ops] of [...grouped.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+    ops.sort((a, b) => a.method.localeCompare(b.method));
+    const methodBlocks = ops.map((op) => buildOpenApiOperation(op));
+    if (existingPathNames.has(rawPath)) {
+      const changed = insertIntoExistingPath(next, rawPath, methodBlocks);
+      if (changed !== null) {
+        next = changed;
+        added += ops.length;
+        for (const op of ops) existingKeys.add(operationKey(op.method, op.path));
+      }
+    } else {
+      newPathBlocks.push(`  ${rawPath}:\n${methodBlocks.join('\n\n')}`);
+      added += ops.length;
+    }
+  }
+
+  if (newPathBlocks.length) {
+    const marker = '\ncomponents:\n';
+    const index = next.indexOf(marker);
+    if (index < 0) throw new Error('canonical OpenAPI components marker not found');
+    next = `${next.slice(0, index)}\n${newPathBlocks.join('\n\n')}\n${next.slice(index)}`;
+  }
+  return { raw: next, added };
+}
+
+const inventory = readJson(inventoryPath);
+const domainPolicies = loadDomainPolicies();
+const openapiRaw = fs.readFileSync(`${root}/${openapiPath}`, 'utf8');
+const openapiOperations = parseOpenApi(openapiRaw);
+
+const inventoryRecords = [];
+for (const [domain, group] of Object.entries(inventory.domains ?? {})) {
+  for (const raw of group.endpoint_groups ?? []) {
+    const match = String(raw).match(/^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s+(\/v1\/\S+)$/);
+    if (!match) continue;
+    inventoryRecords.push({ method: match[1], path: match[2], domain });
+  }
+}
+
+const inventoryMap = new Map(inventoryRecords.map((x) => [operationKey(x.method, x.path), x]));
+const openapiMap = new Map(openapiOperations.map((x) => [operationKey(x.method, x.path), x]));
+
+let addedToInventory = 0;
+for (const op of openapiOperations.sort((a, b) => operationKey(a.method, a.path).localeCompare(operationKey(b.method, b.path)))) {
+  const key = operationKey(op.method, op.path);
+  if (inventoryMap.has(key)) continue;
+  const domain = inferDomain(op.path, op.tags);
+  if (!inventory.domains[domain]) inventory.domains[domain] = { required: true, endpoint_groups: [] };
+  inventory.domains[domain].endpoint_groups.push(`${op.method} ${op.path}`);
+  inventoryMap.set(key, { method: op.method, path: op.path, domain });
+  addedToInventory += 1;
+}
+for (const group of Object.values(inventory.domains ?? {})) group.endpoint_groups = [...new Set(group.endpoint_groups)].sort();
+
+const missingOpenApi = [];
+for (const [key, record] of inventoryMap) {
+  if (openapiMap.has(key)) continue;
+  const separator = key.indexOf(' ');
+  const method = key.slice(0, separator);
+  const path = key.slice(separator + 1);
+  const exactPolicy = domainPolicies.find((p) => operationKey(p.method, p.path) === key);
+  const operationId = exactPolicy?.operationId ?? generatedOperationId(method, path);
+  missingOpenApi.push({ operationId, method, path, domain: record.domain });
+}
+
+const { raw: openapiNext, added: addedToOpenApi } = addOpenApiOperations(openapiRaw, missingOpenApi);
+if (openapiNext !== openapiRaw) fs.writeFileSync(`${root}/${openapiPath}`, openapiNext);
+
+const effectiveOpenApi = parseOpenApi(openapiNext);
+const effectiveByKey = new Map(effectiveOpenApi.map((x) => [operationKey(x.method, x.path), x]));
+
+const existingPolicy = fs.existsSync(`${root}/${consolidatedPolicyPath}`) ? readJson(consolidatedPolicyPath) : { version: '1.0.0', operations: [] };
+const existingPolicyById = new Map((existingPolicy.operations ?? []).map((x) => [x.operationId, x]));
+const policyByMethodPath = new Map(domainPolicies.map((p) => [operationKey(p.method, p.path), p]));
+const targetOperations = [...effectiveByKey.values()].sort((a, b) => operationKey(a.method, a.path).localeCompare(operationKey(b.method, b.path)));
+const usedIds = new Set();
+const consolidatedOperations = [];
+
+for (const op of targetOperations) {
+  const key = operationKey(op.method, op.path);
+  const source = policyByMethodPath.get(key);
+  const existing = existingPolicyById.get(op.operationId) ?? (source?.operationId ? existingPolicyById.get(source.operationId) : null);
+  let operationId = op.operationId;
+  while (usedIds.has(operationId)) operationId = `${operationId}Op`;
+  usedIds.add(operationId);
+
+  if (existing) {
+    consolidatedOperations.push({ ...existing, operationId });
+    continue;
+  }
+
+  const authorization = source?.authorization;
+  const retry = source?.retry;
+  const idempotency = source?.idempotency;
+  const stateful = source?.stateMachine?.required === true || operationId === 'transitionAccountState' || operationId === 'transitionContentState';
+  let stateMachine = 'none';
+  if (operationId === 'transitionAccountState' || /account-state/i.test(op.path)) stateMachine = 'account';
+  else if (stateful) stateMachine = 'content';
+
+  const method = String(op.method).toUpperCase();
+  const authMode = authorization?.required === false ? 'public' : stateMachine !== 'none' ? 'state-machine' : 'permission';
+  const permissions = authorization?.permission ? [authorization.permission] : [];
+  consolidatedOperations.push({
+    operationId,
+    auth: { mode: authMode },
+    permissions,
+    auditRequired: method !== 'GET' && method !== 'HEAD',
+    optimisticLockRequired: retry?.requiresOptimisticConcurrency === true,
+    idempotencyRequired: idempotency?.required === true,
+    stateMachine,
+    'x-luckread-contract-status': 'DISCOVERY_DRAFT',
+    'x-luckread-source': source?.__source ?? inventoryPath,
+  });
+}
+
+writeJson(inventoryPath, inventory);
+writeJson(consolidatedPolicyPath, { ...existingPolicy, version: existingPolicy.version ?? '1.0.0', operations: consolidatedOperations });
+
+console.log(JSON.stringify({
+  status: 'SYNCHRONIZED_DRAFT',
+  openapiOperations: effectiveOpenApi.length,
+  inventoryOperations: inventoryMap.size,
+  addedToInventory,
+  addedToOpenApi,
+  consolidatedPolicyOperations: consolidatedOperations.length,
+  remainingInventoryWithoutOpenApi: inventoryMap.size - effectiveOpenApi.length,
+}, null, 2));
+ },
+        status: { type: 'string', enum: ['REQUESTED', 'PENDING', 'SUCCEEDED', 'FAILED', 'REVIEW', 'RECONCILIATION_REQUIRED'] },
+        reason: { type: ['string', 'null'], maxLength: 255 },
+        version: { type: 'integer', minimum: 1 },
+        providerUpdatedAt: { type: ['string', 'null'], format: 'date-time' },
+        createdAt: { type: 'string', format: 'date-time' },
+        updatedAt: { type: 'string', format: 'date-time' },
+      },
+    };
+    return [
+      '    get:',
+      '      tags: [Commerce]',
+      "      summary: List the authenticated customer's refund history",
+      '      operationId: getPaymentsRefunds',
+      '      x-luckread-contract-status: CONTRACTED_PARTIAL',
+      '      x-luckread-runtime-status: IMPLEMENTED_SOURCE_ONLY_PENDING_D1_04_MIGRATION',
+      '      x-luckread-source: contracts/api/commerce-operation-policy.v1.json',
+      ...parameters,
+      ...response(listEnvelope(item)),
+    ].join('\n');
+  }
+  if (operationId === 'getBillingDocuments' && method === 'GET') {
+    const item = {
+      type: 'object', additionalProperties: false,
+      required: ['documentId', 'documentType', 'documentNumber', 'orderId', 'paymentId', 'amountMinor', 'currency', 'snapshot', 'issuedAt', 'createdAt'],
+      properties: {
+        documentId: { type: 'string', minLength: 1, maxLength: 128 },
+        documentType: { type: 'string', enum: ['INVOICE', 'RECEIPT'] },
+        documentNumber: { type: 'string', minLength: 1, maxLength: 128 },
+        orderId: { type: 'string', pattern: '^ord_[A-Za-z0-9_-]{1,90}
+  const tagMap = {
+    auth_identity: 'Auth',
+    users_accounts: 'Users',
+    content: 'Contents',
+    media: 'Media',
+    feed: 'Feed',
+    interaction: 'Interactions',
+    notification: 'Notifications',
+    search_discovery: 'Search',
+    creator_ip_mcn: 'Creators',
+    subscription_entitlement_payment: 'Users',
+    audit_compliance: 'Admin',
+    analytics: 'Analytics',
+    recommendation_realtime: 'Feed',
+    open_platform: 'Developer',
+  };
+  const params = pathParameterNames(canonicalPath);
+  const lines = [];
+  lines.push(`    ${method.toLowerCase()}:`);
+  lines.push(`      tags: [${tagMap[domain] ?? 'Contents'}]`);
+  lines.push(`      summary: Discovery draft for ${method} ${canonicalPath}`);
+  lines.push(`      operationId: ${operationId}`);
+  lines.push('      x-luckread-contract-status: DISCOVERY_DRAFT');
+  lines.push(`      x-luckread-source: ${inventoryPath}`);
+  if (params.length) {
+    lines.push('      parameters:');
+    for (const name of params) {
+      lines.push(`        - name: ${name}`);
+      lines.push('          in: path');
+      lines.push('          required: true');
+      lines.push("          schema: { $ref: '#/components/schemas/ResourceId' }");
+    }
+  }
+  lines.push('      responses:');
+  lines.push('        default:');
+  lines.push('          description: Discovery-only operation; detailed response contract remains to be closed.');
+  return lines.join('\n');
+}
+
+function insertIntoExistingPath(raw, rawPath, methodBlocks) {
+  const lines = raw.split('\n');
+  const header = `  ${rawPath}:`;
+  const start = lines.findIndex((line) => line === header);
+  if (start < 0) return null;
+  let end = lines.length;
+  for (let i = start + 1; i < lines.length; i += 1) {
+    if (/^  \/.*:\s*$/.test(lines[i]) || lines[i] === 'components:') { end = i; break; }
+  }
+  const before = lines.slice(0, end);
+  const after = lines.slice(end);
+  if (before.length && before[before.length - 1] !== '') before.push('');
+  return [...before, ...methodBlocks.flatMap((b, i) => i ? ['', ...b.split('\n')] : b.split('\n')), ...after].join('\n');
+}
+
+function addOpenApiOperations(raw, missing) {
+  if (!missing.length) return { raw, added: 0 };
+  let next = raw;
+  let added = 0;
+  const existingPathNames = new Set([...next.matchAll(/^  (\/[^:#]+):\s*$/gm)].map((m) => m[1]));
+  const existingOperations = parseOpenApi(next);
+  const existingKeys = new Set(existingOperations.map((x) => operationKey(x.method, x.path)));
+  const grouped = new Map();
+
+  for (const op of missing) {
+    const key = operationKey(op.method, op.path);
+    if (existingKeys.has(key)) continue;
+    const rawPath = openapiPathFromCanonical(op.path);
+    if (!grouped.has(rawPath)) grouped.set(rawPath, []);
+    grouped.get(rawPath).push(op);
+  }
+
+  const newPathBlocks = [];
+  for (const [rawPath, ops] of [...grouped.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+    ops.sort((a, b) => a.method.localeCompare(b.method));
+    const methodBlocks = ops.map((op) => buildOpenApiOperation(op));
+    if (existingPathNames.has(rawPath)) {
+      const changed = insertIntoExistingPath(next, rawPath, methodBlocks);
+      if (changed !== null) {
+        next = changed;
+        added += ops.length;
+        for (const op of ops) existingKeys.add(operationKey(op.method, op.path));
+      }
+    } else {
+      newPathBlocks.push(`  ${rawPath}:\n${methodBlocks.join('\n\n')}`);
+      added += ops.length;
+    }
+  }
+
+  if (newPathBlocks.length) {
+    const marker = '\ncomponents:\n';
+    const index = next.indexOf(marker);
+    if (index < 0) throw new Error('canonical OpenAPI components marker not found');
+    next = `${next.slice(0, index)}\n${newPathBlocks.join('\n\n')}\n${next.slice(index)}`;
+  }
+  return { raw: next, added };
+}
+
+const inventory = readJson(inventoryPath);
+const domainPolicies = loadDomainPolicies();
+const openapiRaw = fs.readFileSync(`${root}/${openapiPath}`, 'utf8');
+const openapiOperations = parseOpenApi(openapiRaw);
+
+const inventoryRecords = [];
+for (const [domain, group] of Object.entries(inventory.domains ?? {})) {
+  for (const raw of group.endpoint_groups ?? []) {
+    const match = String(raw).match(/^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s+(\/v1\/\S+)$/);
+    if (!match) continue;
+    inventoryRecords.push({ method: match[1], path: match[2], domain });
+  }
+}
+
+const inventoryMap = new Map(inventoryRecords.map((x) => [operationKey(x.method, x.path), x]));
+const openapiMap = new Map(openapiOperations.map((x) => [operationKey(x.method, x.path), x]));
+
+let addedToInventory = 0;
+for (const op of openapiOperations.sort((a, b) => operationKey(a.method, a.path).localeCompare(operationKey(b.method, b.path)))) {
+  const key = operationKey(op.method, op.path);
+  if (inventoryMap.has(key)) continue;
+  const domain = inferDomain(op.path, op.tags);
+  if (!inventory.domains[domain]) inventory.domains[domain] = { required: true, endpoint_groups: [] };
+  inventory.domains[domain].endpoint_groups.push(`${op.method} ${op.path}`);
+  inventoryMap.set(key, { method: op.method, path: op.path, domain });
+  addedToInventory += 1;
+}
+for (const group of Object.values(inventory.domains ?? {})) group.endpoint_groups = [...new Set(group.endpoint_groups)].sort();
+
+const missingOpenApi = [];
+for (const [key, record] of inventoryMap) {
+  if (openapiMap.has(key)) continue;
+  const separator = key.indexOf(' ');
+  const method = key.slice(0, separator);
+  const path = key.slice(separator + 1);
+  const exactPolicy = domainPolicies.find((p) => operationKey(p.method, p.path) === key);
+  const operationId = exactPolicy?.operationId ?? generatedOperationId(method, path);
+  missingOpenApi.push({ operationId, method, path, domain: record.domain });
+}
+
+const { raw: openapiNext, added: addedToOpenApi } = addOpenApiOperations(openapiRaw, missingOpenApi);
+if (openapiNext !== openapiRaw) fs.writeFileSync(`${root}/${openapiPath}`, openapiNext);
+
+const effectiveOpenApi = parseOpenApi(openapiNext);
+const effectiveByKey = new Map(effectiveOpenApi.map((x) => [operationKey(x.method, x.path), x]));
+
+const existingPolicy = fs.existsSync(`${root}/${consolidatedPolicyPath}`) ? readJson(consolidatedPolicyPath) : { version: '1.0.0', operations: [] };
+const existingPolicyById = new Map((existingPolicy.operations ?? []).map((x) => [x.operationId, x]));
+const policyByMethodPath = new Map(domainPolicies.map((p) => [operationKey(p.method, p.path), p]));
+const targetOperations = [...effectiveByKey.values()].sort((a, b) => operationKey(a.method, a.path).localeCompare(operationKey(b.method, b.path)));
+const usedIds = new Set();
+const consolidatedOperations = [];
+
+for (const op of targetOperations) {
+  const key = operationKey(op.method, op.path);
+  const source = policyByMethodPath.get(key);
+  const existing = existingPolicyById.get(op.operationId) ?? (source?.operationId ? existingPolicyById.get(source.operationId) : null);
+  let operationId = op.operationId;
+  while (usedIds.has(operationId)) operationId = `${operationId}Op`;
+  usedIds.add(operationId);
+
+  if (existing) {
+    consolidatedOperations.push({ ...existing, operationId });
+    continue;
+  }
+
+  const authorization = source?.authorization;
+  const retry = source?.retry;
+  const idempotency = source?.idempotency;
+  const stateful = source?.stateMachine?.required === true || operationId === 'transitionAccountState' || operationId === 'transitionContentState';
+  let stateMachine = 'none';
+  if (operationId === 'transitionAccountState' || /account-state/i.test(op.path)) stateMachine = 'account';
+  else if (stateful) stateMachine = 'content';
+
+  const method = String(op.method).toUpperCase();
+  const authMode = authorization?.required === false ? 'public' : stateMachine !== 'none' ? 'state-machine' : 'permission';
+  const permissions = authorization?.permission ? [authorization.permission] : [];
+  consolidatedOperations.push({
+    operationId,
+    auth: { mode: authMode },
+    permissions,
+    auditRequired: method !== 'GET' && method !== 'HEAD',
+    optimisticLockRequired: retry?.requiresOptimisticConcurrency === true,
+    idempotencyRequired: idempotency?.required === true,
+    stateMachine,
+    'x-luckread-contract-status': 'DISCOVERY_DRAFT',
+    'x-luckread-source': source?.__source ?? inventoryPath,
+  });
+}
+
+writeJson(inventoryPath, inventory);
+writeJson(consolidatedPolicyPath, { ...existingPolicy, version: existingPolicy.version ?? '1.0.0', operations: consolidatedOperations });
+
+console.log(JSON.stringify({
+  status: 'SYNCHRONIZED_DRAFT',
+  openapiOperations: effectiveOpenApi.length,
+  inventoryOperations: inventoryMap.size,
+  addedToInventory,
+  addedToOpenApi,
+  consolidatedPolicyOperations: consolidatedOperations.length,
+  remainingInventoryWithoutOpenApi: inventoryMap.size - effectiveOpenApi.length,
+}, null, 2));
+ },
+        paymentId: { type: ['string', 'null'], pattern: '^pay_[A-Za-z0-9]{26}
+  const tagMap = {
+    auth_identity: 'Auth',
+    users_accounts: 'Users',
+    content: 'Contents',
+    media: 'Media',
+    feed: 'Feed',
+    interaction: 'Interactions',
+    notification: 'Notifications',
+    search_discovery: 'Search',
+    creator_ip_mcn: 'Creators',
+    subscription_entitlement_payment: 'Users',
+    audit_compliance: 'Admin',
+    analytics: 'Analytics',
+    recommendation_realtime: 'Feed',
+    open_platform: 'Developer',
+  };
+  const params = pathParameterNames(canonicalPath);
+  const lines = [];
+  lines.push(`    ${method.toLowerCase()}:`);
+  lines.push(`      tags: [${tagMap[domain] ?? 'Contents'}]`);
+  lines.push(`      summary: Discovery draft for ${method} ${canonicalPath}`);
+  lines.push(`      operationId: ${operationId}`);
+  lines.push('      x-luckread-contract-status: DISCOVERY_DRAFT');
+  lines.push(`      x-luckread-source: ${inventoryPath}`);
+  if (params.length) {
+    lines.push('      parameters:');
+    for (const name of params) {
+      lines.push(`        - name: ${name}`);
+      lines.push('          in: path');
+      lines.push('          required: true');
+      lines.push("          schema: { $ref: '#/components/schemas/ResourceId' }");
+    }
+  }
+  lines.push('      responses:');
+  lines.push('        default:');
+  lines.push('          description: Discovery-only operation; detailed response contract remains to be closed.');
+  return lines.join('\n');
+}
+
+function insertIntoExistingPath(raw, rawPath, methodBlocks) {
+  const lines = raw.split('\n');
+  const header = `  ${rawPath}:`;
+  const start = lines.findIndex((line) => line === header);
+  if (start < 0) return null;
+  let end = lines.length;
+  for (let i = start + 1; i < lines.length; i += 1) {
+    if (/^  \/.*:\s*$/.test(lines[i]) || lines[i] === 'components:') { end = i; break; }
+  }
+  const before = lines.slice(0, end);
+  const after = lines.slice(end);
+  if (before.length && before[before.length - 1] !== '') before.push('');
+  return [...before, ...methodBlocks.flatMap((b, i) => i ? ['', ...b.split('\n')] : b.split('\n')), ...after].join('\n');
+}
+
+function addOpenApiOperations(raw, missing) {
+  if (!missing.length) return { raw, added: 0 };
+  let next = raw;
+  let added = 0;
+  const existingPathNames = new Set([...next.matchAll(/^  (\/[^:#]+):\s*$/gm)].map((m) => m[1]));
+  const existingOperations = parseOpenApi(next);
+  const existingKeys = new Set(existingOperations.map((x) => operationKey(x.method, x.path)));
+  const grouped = new Map();
+
+  for (const op of missing) {
+    const key = operationKey(op.method, op.path);
+    if (existingKeys.has(key)) continue;
+    const rawPath = openapiPathFromCanonical(op.path);
+    if (!grouped.has(rawPath)) grouped.set(rawPath, []);
+    grouped.get(rawPath).push(op);
+  }
+
+  const newPathBlocks = [];
+  for (const [rawPath, ops] of [...grouped.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+    ops.sort((a, b) => a.method.localeCompare(b.method));
+    const methodBlocks = ops.map((op) => buildOpenApiOperation(op));
+    if (existingPathNames.has(rawPath)) {
+      const changed = insertIntoExistingPath(next, rawPath, methodBlocks);
+      if (changed !== null) {
+        next = changed;
+        added += ops.length;
+        for (const op of ops) existingKeys.add(operationKey(op.method, op.path));
+      }
+    } else {
+      newPathBlocks.push(`  ${rawPath}:\n${methodBlocks.join('\n\n')}`);
+      added += ops.length;
+    }
+  }
+
+  if (newPathBlocks.length) {
+    const marker = '\ncomponents:\n';
+    const index = next.indexOf(marker);
+    if (index < 0) throw new Error('canonical OpenAPI components marker not found');
+    next = `${next.slice(0, index)}\n${newPathBlocks.join('\n\n')}\n${next.slice(index)}`;
+  }
+  return { raw: next, added };
+}
+
+const inventory = readJson(inventoryPath);
+const domainPolicies = loadDomainPolicies();
+const openapiRaw = fs.readFileSync(`${root}/${openapiPath}`, 'utf8');
+const openapiOperations = parseOpenApi(openapiRaw);
+
+const inventoryRecords = [];
+for (const [domain, group] of Object.entries(inventory.domains ?? {})) {
+  for (const raw of group.endpoint_groups ?? []) {
+    const match = String(raw).match(/^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s+(\/v1\/\S+)$/);
+    if (!match) continue;
+    inventoryRecords.push({ method: match[1], path: match[2], domain });
+  }
+}
+
+const inventoryMap = new Map(inventoryRecords.map((x) => [operationKey(x.method, x.path), x]));
+const openapiMap = new Map(openapiOperations.map((x) => [operationKey(x.method, x.path), x]));
+
+let addedToInventory = 0;
+for (const op of openapiOperations.sort((a, b) => operationKey(a.method, a.path).localeCompare(operationKey(b.method, b.path)))) {
+  const key = operationKey(op.method, op.path);
+  if (inventoryMap.has(key)) continue;
+  const domain = inferDomain(op.path, op.tags);
+  if (!inventory.domains[domain]) inventory.domains[domain] = { required: true, endpoint_groups: [] };
+  inventory.domains[domain].endpoint_groups.push(`${op.method} ${op.path}`);
+  inventoryMap.set(key, { method: op.method, path: op.path, domain });
+  addedToInventory += 1;
+}
+for (const group of Object.values(inventory.domains ?? {})) group.endpoint_groups = [...new Set(group.endpoint_groups)].sort();
+
+const missingOpenApi = [];
+for (const [key, record] of inventoryMap) {
+  if (openapiMap.has(key)) continue;
+  const separator = key.indexOf(' ');
+  const method = key.slice(0, separator);
+  const path = key.slice(separator + 1);
+  const exactPolicy = domainPolicies.find((p) => operationKey(p.method, p.path) === key);
+  const operationId = exactPolicy?.operationId ?? generatedOperationId(method, path);
+  missingOpenApi.push({ operationId, method, path, domain: record.domain });
+}
+
+const { raw: openapiNext, added: addedToOpenApi } = addOpenApiOperations(openapiRaw, missingOpenApi);
+if (openapiNext !== openapiRaw) fs.writeFileSync(`${root}/${openapiPath}`, openapiNext);
+
+const effectiveOpenApi = parseOpenApi(openapiNext);
+const effectiveByKey = new Map(effectiveOpenApi.map((x) => [operationKey(x.method, x.path), x]));
+
+const existingPolicy = fs.existsSync(`${root}/${consolidatedPolicyPath}`) ? readJson(consolidatedPolicyPath) : { version: '1.0.0', operations: [] };
+const existingPolicyById = new Map((existingPolicy.operations ?? []).map((x) => [x.operationId, x]));
+const policyByMethodPath = new Map(domainPolicies.map((p) => [operationKey(p.method, p.path), p]));
+const targetOperations = [...effectiveByKey.values()].sort((a, b) => operationKey(a.method, a.path).localeCompare(operationKey(b.method, b.path)));
+const usedIds = new Set();
+const consolidatedOperations = [];
+
+for (const op of targetOperations) {
+  const key = operationKey(op.method, op.path);
+  const source = policyByMethodPath.get(key);
+  const existing = existingPolicyById.get(op.operationId) ?? (source?.operationId ? existingPolicyById.get(source.operationId) : null);
+  let operationId = op.operationId;
+  while (usedIds.has(operationId)) operationId = `${operationId}Op`;
+  usedIds.add(operationId);
+
+  if (existing) {
+    consolidatedOperations.push({ ...existing, operationId });
+    continue;
+  }
+
+  const authorization = source?.authorization;
+  const retry = source?.retry;
+  const idempotency = source?.idempotency;
+  const stateful = source?.stateMachine?.required === true || operationId === 'transitionAccountState' || operationId === 'transitionContentState';
+  let stateMachine = 'none';
+  if (operationId === 'transitionAccountState' || /account-state/i.test(op.path)) stateMachine = 'account';
+  else if (stateful) stateMachine = 'content';
+
+  const method = String(op.method).toUpperCase();
+  const authMode = authorization?.required === false ? 'public' : stateMachine !== 'none' ? 'state-machine' : 'permission';
+  const permissions = authorization?.permission ? [authorization.permission] : [];
+  consolidatedOperations.push({
+    operationId,
+    auth: { mode: authMode },
+    permissions,
+    auditRequired: method !== 'GET' && method !== 'HEAD',
+    optimisticLockRequired: retry?.requiresOptimisticConcurrency === true,
+    idempotencyRequired: idempotency?.required === true,
+    stateMachine,
+    'x-luckread-contract-status': 'DISCOVERY_DRAFT',
+    'x-luckread-source': source?.__source ?? inventoryPath,
+  });
+}
+
+writeJson(inventoryPath, inventory);
+writeJson(consolidatedPolicyPath, { ...existingPolicy, version: existingPolicy.version ?? '1.0.0', operations: consolidatedOperations });
+
+console.log(JSON.stringify({
+  status: 'SYNCHRONIZED_DRAFT',
+  openapiOperations: effectiveOpenApi.length,
+  inventoryOperations: inventoryMap.size,
+  addedToInventory,
+  addedToOpenApi,
+  consolidatedPolicyOperations: consolidatedOperations.length,
+  remainingInventoryWithoutOpenApi: inventoryMap.size - effectiveOpenApi.length,
+}, null, 2));
+ },
+        amountMinor: { type: 'integer', minimum: 1 },
+        currency: { type: 'string', pattern: '^[A-Z]{3}
+  const tagMap = {
+    auth_identity: 'Auth',
+    users_accounts: 'Users',
+    content: 'Contents',
+    media: 'Media',
+    feed: 'Feed',
+    interaction: 'Interactions',
+    notification: 'Notifications',
+    search_discovery: 'Search',
+    creator_ip_mcn: 'Creators',
+    subscription_entitlement_payment: 'Users',
+    audit_compliance: 'Admin',
+    analytics: 'Analytics',
+    recommendation_realtime: 'Feed',
+    open_platform: 'Developer',
+  };
+  const params = pathParameterNames(canonicalPath);
+  const lines = [];
+  lines.push(`    ${method.toLowerCase()}:`);
+  lines.push(`      tags: [${tagMap[domain] ?? 'Contents'}]`);
+  lines.push(`      summary: Discovery draft for ${method} ${canonicalPath}`);
+  lines.push(`      operationId: ${operationId}`);
+  lines.push('      x-luckread-contract-status: DISCOVERY_DRAFT');
+  lines.push(`      x-luckread-source: ${inventoryPath}`);
+  if (params.length) {
+    lines.push('      parameters:');
+    for (const name of params) {
+      lines.push(`        - name: ${name}`);
+      lines.push('          in: path');
+      lines.push('          required: true');
+      lines.push("          schema: { $ref: '#/components/schemas/ResourceId' }");
+    }
+  }
+  lines.push('      responses:');
+  lines.push('        default:');
+  lines.push('          description: Discovery-only operation; detailed response contract remains to be closed.');
+  return lines.join('\n');
+}
+
+function insertIntoExistingPath(raw, rawPath, methodBlocks) {
+  const lines = raw.split('\n');
+  const header = `  ${rawPath}:`;
+  const start = lines.findIndex((line) => line === header);
+  if (start < 0) return null;
+  let end = lines.length;
+  for (let i = start + 1; i < lines.length; i += 1) {
+    if (/^  \/.*:\s*$/.test(lines[i]) || lines[i] === 'components:') { end = i; break; }
+  }
+  const before = lines.slice(0, end);
+  const after = lines.slice(end);
+  if (before.length && before[before.length - 1] !== '') before.push('');
+  return [...before, ...methodBlocks.flatMap((b, i) => i ? ['', ...b.split('\n')] : b.split('\n')), ...after].join('\n');
+}
+
+function addOpenApiOperations(raw, missing) {
+  if (!missing.length) return { raw, added: 0 };
+  let next = raw;
+  let added = 0;
+  const existingPathNames = new Set([...next.matchAll(/^  (\/[^:#]+):\s*$/gm)].map((m) => m[1]));
+  const existingOperations = parseOpenApi(next);
+  const existingKeys = new Set(existingOperations.map((x) => operationKey(x.method, x.path)));
+  const grouped = new Map();
+
+  for (const op of missing) {
+    const key = operationKey(op.method, op.path);
+    if (existingKeys.has(key)) continue;
+    const rawPath = openapiPathFromCanonical(op.path);
+    if (!grouped.has(rawPath)) grouped.set(rawPath, []);
+    grouped.get(rawPath).push(op);
+  }
+
+  const newPathBlocks = [];
+  for (const [rawPath, ops] of [...grouped.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+    ops.sort((a, b) => a.method.localeCompare(b.method));
+    const methodBlocks = ops.map((op) => buildOpenApiOperation(op));
+    if (existingPathNames.has(rawPath)) {
+      const changed = insertIntoExistingPath(next, rawPath, methodBlocks);
+      if (changed !== null) {
+        next = changed;
+        added += ops.length;
+        for (const op of ops) existingKeys.add(operationKey(op.method, op.path));
+      }
+    } else {
+      newPathBlocks.push(`  ${rawPath}:\n${methodBlocks.join('\n\n')}`);
+      added += ops.length;
+    }
+  }
+
+  if (newPathBlocks.length) {
+    const marker = '\ncomponents:\n';
+    const index = next.indexOf(marker);
+    if (index < 0) throw new Error('canonical OpenAPI components marker not found');
+    next = `${next.slice(0, index)}\n${newPathBlocks.join('\n\n')}\n${next.slice(index)}`;
+  }
+  return { raw: next, added };
+}
+
+const inventory = readJson(inventoryPath);
+const domainPolicies = loadDomainPolicies();
+const openapiRaw = fs.readFileSync(`${root}/${openapiPath}`, 'utf8');
+const openapiOperations = parseOpenApi(openapiRaw);
+
+const inventoryRecords = [];
+for (const [domain, group] of Object.entries(inventory.domains ?? {})) {
+  for (const raw of group.endpoint_groups ?? []) {
+    const match = String(raw).match(/^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s+(\/v1\/\S+)$/);
+    if (!match) continue;
+    inventoryRecords.push({ method: match[1], path: match[2], domain });
+  }
+}
+
+const inventoryMap = new Map(inventoryRecords.map((x) => [operationKey(x.method, x.path), x]));
+const openapiMap = new Map(openapiOperations.map((x) => [operationKey(x.method, x.path), x]));
+
+let addedToInventory = 0;
+for (const op of openapiOperations.sort((a, b) => operationKey(a.method, a.path).localeCompare(operationKey(b.method, b.path)))) {
+  const key = operationKey(op.method, op.path);
+  if (inventoryMap.has(key)) continue;
+  const domain = inferDomain(op.path, op.tags);
+  if (!inventory.domains[domain]) inventory.domains[domain] = { required: true, endpoint_groups: [] };
+  inventory.domains[domain].endpoint_groups.push(`${op.method} ${op.path}`);
+  inventoryMap.set(key, { method: op.method, path: op.path, domain });
+  addedToInventory += 1;
+}
+for (const group of Object.values(inventory.domains ?? {})) group.endpoint_groups = [...new Set(group.endpoint_groups)].sort();
+
+const missingOpenApi = [];
+for (const [key, record] of inventoryMap) {
+  if (openapiMap.has(key)) continue;
+  const separator = key.indexOf(' ');
+  const method = key.slice(0, separator);
+  const path = key.slice(separator + 1);
+  const exactPolicy = domainPolicies.find((p) => operationKey(p.method, p.path) === key);
+  const operationId = exactPolicy?.operationId ?? generatedOperationId(method, path);
+  missingOpenApi.push({ operationId, method, path, domain: record.domain });
+}
+
+const { raw: openapiNext, added: addedToOpenApi } = addOpenApiOperations(openapiRaw, missingOpenApi);
+if (openapiNext !== openapiRaw) fs.writeFileSync(`${root}/${openapiPath}`, openapiNext);
+
+const effectiveOpenApi = parseOpenApi(openapiNext);
+const effectiveByKey = new Map(effectiveOpenApi.map((x) => [operationKey(x.method, x.path), x]));
+
+const existingPolicy = fs.existsSync(`${root}/${consolidatedPolicyPath}`) ? readJson(consolidatedPolicyPath) : { version: '1.0.0', operations: [] };
+const existingPolicyById = new Map((existingPolicy.operations ?? []).map((x) => [x.operationId, x]));
+const policyByMethodPath = new Map(domainPolicies.map((p) => [operationKey(p.method, p.path), p]));
+const targetOperations = [...effectiveByKey.values()].sort((a, b) => operationKey(a.method, a.path).localeCompare(operationKey(b.method, b.path)));
+const usedIds = new Set();
+const consolidatedOperations = [];
+
+for (const op of targetOperations) {
+  const key = operationKey(op.method, op.path);
+  const source = policyByMethodPath.get(key);
+  const existing = existingPolicyById.get(op.operationId) ?? (source?.operationId ? existingPolicyById.get(source.operationId) : null);
+  let operationId = op.operationId;
+  while (usedIds.has(operationId)) operationId = `${operationId}Op`;
+  usedIds.add(operationId);
+
+  if (existing) {
+    consolidatedOperations.push({ ...existing, operationId });
+    continue;
+  }
+
+  const authorization = source?.authorization;
+  const retry = source?.retry;
+  const idempotency = source?.idempotency;
+  const stateful = source?.stateMachine?.required === true || operationId === 'transitionAccountState' || operationId === 'transitionContentState';
+  let stateMachine = 'none';
+  if (operationId === 'transitionAccountState' || /account-state/i.test(op.path)) stateMachine = 'account';
+  else if (stateful) stateMachine = 'content';
+
+  const method = String(op.method).toUpperCase();
+  const authMode = authorization?.required === false ? 'public' : stateMachine !== 'none' ? 'state-machine' : 'permission';
+  const permissions = authorization?.permission ? [authorization.permission] : [];
+  consolidatedOperations.push({
+    operationId,
+    auth: { mode: authMode },
+    permissions,
+    auditRequired: method !== 'GET' && method !== 'HEAD',
+    optimisticLockRequired: retry?.requiresOptimisticConcurrency === true,
+    idempotencyRequired: idempotency?.required === true,
+    stateMachine,
+    'x-luckread-contract-status': 'DISCOVERY_DRAFT',
+    'x-luckread-source': source?.__source ?? inventoryPath,
+  });
+}
+
+writeJson(inventoryPath, inventory);
+writeJson(consolidatedPolicyPath, { ...existingPolicy, version: existingPolicy.version ?? '1.0.0', operations: consolidatedOperations });
+
+console.log(JSON.stringify({
+  status: 'SYNCHRONIZED_DRAFT',
+  openapiOperations: effectiveOpenApi.length,
+  inventoryOperations: inventoryMap.size,
+  addedToInventory,
+  addedToOpenApi,
+  consolidatedPolicyOperations: consolidatedOperations.length,
+  remainingInventoryWithoutOpenApi: inventoryMap.size - effectiveOpenApi.length,
+}, null, 2));
+ },
+        snapshot: { type: 'object', additionalProperties: true },
+        issuedAt: { type: 'string', format: 'date-time' },
+        createdAt: { type: 'string', format: 'date-time' },
+      },
+    };
+    return [
+      '    get:',
+      '      tags: [Commerce]',
+      "      summary: List the authenticated customer's invoices and receipts",
+      '      operationId: getBillingDocuments',
+      '      x-luckread-contract-status: CONTRACTED_PARTIAL',
+      '      x-luckread-runtime-status: IMPLEMENTED_SOURCE_ONLY_PENDING_D1_04_MIGRATION',
+      '      x-luckread-source: contracts/api/commerce-operation-policy.v1.json',
+      ...parameters,
+      ...response(listEnvelope(item)),
+    ].join('\n');
+  }
+  return null;
+}
+
 function buildOpenApiOperation({ operationId, method, canonicalPath, domain }) {
+  const commerceBlock = buildCommerceOpenApiOperation({ operationId, method });
+  if (commerceBlock) return commerceBlock;
   const tagMap = {
     auth_identity: 'Auth',
     users_accounts: 'Users',
