@@ -301,6 +301,37 @@
       "cache": "NO_STORE"
     },
     {
+      "operationId": "listCommerceOrders",
+      "method": "GET",
+      "publicPath": "/api/v1/commerce/orders",
+      "internalPath": "/commerce/orders",
+      "principalRequired": true,
+      "permission": "order.read",
+      "minimumGlobalLayer": "L2",
+      "query": {
+        "limit": "optional integer 1..50; default 20",
+        "cursor": "optional opaque endpoint-scoped keyset cursor; maximum 2048 characters"
+      },
+      "ownerScope": "W01 authorizes order.read for the W02-authenticated principal; W07 independently filters D1-04 orders by the same server-derived customerId. A cursor is never an owner credential.",
+      "ordering": "created_at DESC, order_id DESC; stable keyset continuation.",
+      "responseAuthority": "W07 D1-04 Order rows only. Return orderId, status, version, currency, subtotal/discount/tax/total minor amounts and createdAt/updatedAt. Exclude customerId, provider/merchant/payment references, credentials and internal item snapshots.",
+      "cache": "NO_STORE",
+      "failurePolicy": {
+        "invalidLimit": "400",
+        "invalidOrForeignEndpointCursor": "400 INVALID_CURSOR",
+        "authorizationDenied": "403",
+        "unavailableD1": "503"
+      },
+      "topologyConstraints": {
+        "newWorker": false,
+        "newDatabase": false,
+        "newQueue": false,
+        "newServiceBinding": false,
+        "d1Authority": "D1-04",
+        "crossD1Transactions": 0
+      }
+    },
+    {
       "operationId": "getCommerceOrder",
       "method": "GET",
       "publicPath": "/api/v1/commerce/orders/{orderId}",
