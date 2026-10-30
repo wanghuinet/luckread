@@ -16,7 +16,7 @@ describe('current-principal commerce order history adapter', () => {
     expect(permission).toBeLessThan(binding)
     expect(route).toContain("pathname: '/commerce/orders' + suffix")
     expect(route).toContain("method: 'GET'")
-    expect(route).not.toMatch(/fetch\\s*\\(\\s*['"`]https?:\\/\\//)
+    expect(route).not.toMatch(/fetch\s*\(\s*['"`]https?:\/\//)
   })
 
   it('keeps the owner predicate in W07 D1-04 and returns only the safe summary DTO', () => {
