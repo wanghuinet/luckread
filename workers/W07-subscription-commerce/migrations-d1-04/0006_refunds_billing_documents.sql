@@ -36,6 +36,7 @@ BEFORE INSERT ON refunds
 WHEN NOT EXISTS (
   SELECT 1 FROM payments
   WHERE payment_id = NEW.payment_id
+    AND order_id = NEW.order_id
     AND customer_id = NEW.customer_id
     AND merchant_id = NEW.merchant_id
     AND provider = NEW.provider
