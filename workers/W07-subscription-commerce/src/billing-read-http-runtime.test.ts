@@ -54,6 +54,16 @@ describe('W07 customer billing and payment history reads', () => {
     );
     expect(response?.status).toBe(405);
     expect(f.calls.payments).toHaveLength(0);
+
+    await expect(
+      handleCommerceBillingReadRequest(
+        new Request('https://luckread-w07.internal/commerce/payments/refunds', { method: 'POST' }),
+        CUSTOMER_ID,
+        f.env,
+        f.dependencies,
+      ),
+    ).resolves.toBeNull();
+    expect(f.calls.refunds).toHaveLength(0);
   });
 
   it('lists payment history within the server-derived customer scope using bounded keyset pagination', async () => {
