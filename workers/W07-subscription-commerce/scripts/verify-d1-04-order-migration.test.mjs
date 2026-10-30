@@ -162,6 +162,22 @@ test('all reviewed migrations already applied proceeds only to postflight verifi
   assert.equal(result.writesPerformed, false)
 })
 
+test('normalizes Wrangler .sql migration filenames for preflight and postflight admission', () => {
+  const migrationState = wrapMigrationState(REQUIRED_MIGRATION_IDS.map((migrationId) => migrationId + '.sql'))
+  const preflight = inspectD1_04OrderMigrationPreflight({
+    schemaSnapshot: schemaWithMigrations(REQUIRED_MIGRATION_IDS),
+    migrationState,
+  })
+  assert.equal(preflight.result, 'PREFLIGHT_PASS_ALREADY_APPLIED')
+  assert.equal(preflight.action, 'VERIFY_ONLY')
+  assert.deepEqual(preflight.pendingMigrationIds, [])
+
+  const report = verifyCompletePostflight({ migrationState })
+  assert.equal(report.result, 'POSTFLIGHT_PASS')
+  assert.deepEqual(report.appliedMigrations, REQUIRED_MIGRATION_IDS)
+  assert.equal(report.verifiedTriggers.length, 49)
+})
+
 test('fails closed if any target object exists without matching migration history', () => {
   assert.throws(() => inspectD1_04OrderMigrationPreflight({
     schemaSnapshot: wrapSchema([...baseSchema, targetObjectsFor([PAYMENT_MIGRATION_ID])[0]]),
@@ -190,7 +206,7 @@ test('postflight validates both migrations, all tables/columns/indexes/triggers,
   assert.deepEqual(report.appliedMigrations, REQUIRED_MIGRATION_IDS)
   assert.equal(report.verifiedTables.length, 10)
   assert.equal(report.verifiedIndexes.length, 22)
-  assert.equal(report.verifiedTriggers.length, 48)
+  assert.equal(report.verifiedTriggers.length, 49)
   assert.equal(report.databaseRowsExported, false)
 })
 
