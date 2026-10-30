@@ -1816,9 +1816,62 @@ paths:
                         items:
                           type: object
                           additionalProperties: false
-                          required: [orderId, status, version, currency, subtotalMinor, discountMinor, taxMinor, totalMinor, createdAt, updatedAt]
+                          required: [orderId, latestPaymentId, status, version, currency, subtotalMinor, discountMinor, taxMinor, totalMinor, createdAt, updatedAt]
                           properties:
-                            orderId: { type: string, pattern: '^ord_[A-Za-z0-9_-]{1,90}$' }
+                            orderId: { type: string, pattern: '^ord_[A-Za-z0-9_-]{1,90}                            status: { type: string, enum: [CREATED, PENDING_PAYMENT, CONFIRMED, PROCESSING, COMPLETED, CANCELLED, FAILED] }
+                            version: { type: integer, minimum: 1 }
+                            currency: { type: string, pattern: '^[A-Z]{3}$' }
+                            subtotalMinor: { type: integer, minimum: 0 }
+                            discountMinor: { type: integer, minimum: 0 }
+                            taxMinor: { type: integer, minimum: 0 }
+                            totalMinor: { type: integer, minimum: 0 }
+                            createdAt: { type: string, format: date-time }
+                            updatedAt: { type: string, format: date-time }
+                      limit: { type: integer, minimum: 1, maximum: 50 }
+                      hasMore: { type: boolean }
+                      nextCursor: { type: [string, 'null'], maxLength: 2048 }
+                  requestId: { $ref: '#/components/schemas/RequestId' }
+        '400': { $ref: '#/components/responses/InvalidCursor' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    post:
+      tags: [Commerce]
+      summary: Create a purchase order
+      description: >-
+        Contracted request and response shape only. Runtime creation remains blocked
+        until PAY-002 authoritative offer resolution, D1-04 persistence, atomic
+        idempotency, and security evidence are admitted. All item versions and
+        prices are resolved by the server; client-supplied totals and payment state
+        are never accepted.
+       }
+                            latestPaymentId: { type: [string, 'null'], pattern: '^pay_[A-Za-z0-9]{26}                            status: { type: string, enum: [CREATED, PENDING_PAYMENT, CONFIRMED, PROCESSING, COMPLETED, CANCELLED, FAILED] }
+                            version: { type: integer, minimum: 1 }
+                            currency: { type: string, pattern: '^[A-Z]{3}$' }
+                            subtotalMinor: { type: integer, minimum: 0 }
+                            discountMinor: { type: integer, minimum: 0 }
+                            taxMinor: { type: integer, minimum: 0 }
+                            totalMinor: { type: integer, minimum: 0 }
+                            createdAt: { type: string, format: date-time }
+                            updatedAt: { type: string, format: date-time }
+                      limit: { type: integer, minimum: 1, maximum: 50 }
+                      hasMore: { type: boolean }
+                      nextCursor: { type: [string, 'null'], maxLength: 2048 }
+                  requestId: { $ref: '#/components/schemas/RequestId' }
+        '400': { $ref: '#/components/responses/InvalidCursor' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    post:
+      tags: [Commerce]
+      summary: Create a purchase order
+      description: >-
+        Contracted request and response shape only. Runtime creation remains blocked
+        until PAY-002 authoritative offer resolution, D1-04 persistence, atomic
+        idempotency, and security evidence are admitted. All item versions and
+        prices are resolved by the server; client-supplied totals and payment state
+        are never accepted.
+       }
                             status: { type: string, enum: [CREATED, PENDING_PAYMENT, CONFIRMED, PROCESSING, COMPLETED, CANCELLED, FAILED] }
                             version: { type: integer, minimum: 1 }
                             currency: { type: string, pattern: '^[A-Z]{3}$' }
