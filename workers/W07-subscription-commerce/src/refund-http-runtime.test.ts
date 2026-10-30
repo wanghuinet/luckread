@@ -68,6 +68,7 @@ function createFixture(options: {
   reserveError?: Error;
   findExistingError?: Error;
   existingReservation?: RefundReservation | null;
+  retrieveProviderRefundError?: Error;
   createProviderError?: Error;
   env?: Record<string, unknown>;
 } = {}) {
@@ -76,6 +77,7 @@ function createFixture(options: {
     retrievePayment: [] as unknown[][],
     reserve: [] as unknown[][],
     findExistingReservation: [] as unknown[][],
+    retrieveProviderRefund: [] as unknown[][],
     createProviderRefund: [] as unknown[][],
     recordAcknowledgement: [] as unknown[][],
   };
@@ -127,6 +129,11 @@ function createFixture(options: {
       calls.findExistingReservation.push(args);
       if (options.findExistingError) throw options.findExistingError;
       return options.existingReservation ?? null;
+    },
+    retrieveProviderRefund: async (...args) => {
+      calls.retrieveProviderRefund.push(args);
+      if (options.retrieveProviderRefundError) throw options.retrieveProviderRefundError;
+      return remoteRefund;
     },
     createProviderRefund: async (...args) => {
       calls.createProviderRefund.push(args);
@@ -217,6 +224,7 @@ describe('W07 internal customer refund runtime', () => {
       reason: 'Customer request',
       expectedMerchantId: MERCHANT_ID,
     });
+    expect(fixture.calls.retrieveProviderRefund).toHaveLength(0);
     expect(fixture.calls.createProviderRefund).toHaveLength(1);
     expect(fixture.calls.createProviderRefund[0]?.[0]).toEqual({
       environment: 'sandbox',
@@ -274,7 +282,7 @@ describe('W07 internal customer refund runtime', () => {
     }
   });
 
-  it('retries a durable REQUESTED refund with the same provider refund_id without re-reading the Payment', async () => {
+  it('reconciles a durable REQUESTED refund through provider GET before any duplicate create', async () => {
     const fixture = createFixture({
       existingReservation: { refund: requestedRefund, replayed: true },
     });
@@ -291,6 +299,37 @@ describe('W07 internal customer refund runtime', () => {
     expect(fixture.calls.findExistingReservation).toHaveLength(1);
     expect(fixture.calls.retrievePayment).toHaveLength(0);
     expect(fixture.calls.reserve).toHaveLength(0);
+    expect(fixture.calls.retrieveProviderRefund).toHaveLength(1);
+    expect(fixture.calls.retrieveProviderRefund[0]?.[1]).toMatchObject({
+      paymentId: PAYMENT_ID,
+      refundId: REFUND_ID,
+      amount: 300,
+      currency: 'USD',
+    });
+    expect(fixture.calls.createProviderRefund).toHaveLength(0);
+    expect(fixture.calls.recordAcknowledgement).toHaveLength(1);
+    expect(await response?.json()).toMatchObject({
+      data: { refundId: REFUND_ID, status: 'PENDING', replayed: true },
+    });
+  });
+
+  it('retries POST with the same stable refund_id only after provider GET confirms 404', async () => {
+    const fixture = createFixture({
+      existingReservation: { refund: requestedRefund, replayed: true },
+      retrieveProviderRefundError: new HyperswitchClientError('UPSTREAM_REJECTED', 'refund not found', 404),
+    });
+    const response = await handleCommerceRefundRequest(
+      request({
+        idempotencyKey: IDEMPOTENCY_KEY,
+        body: { paymentId: PAYMENT_ID, amountMinor: 300, currency: 'USD', reason: 'Customer request' },
+      }),
+      CUSTOMER_ID,
+      fixture.env,
+      fixture.dependencies,
+    );
+    expect(response?.status).toBe(202);
+    expect(fixture.calls.retrieveProviderRefund).toHaveLength(1);
+    expect(fixture.calls.createProviderRefund).toHaveLength(1);
     expect(fixture.calls.createProviderRefund[0]?.[1]).toMatchObject({
       paymentId: PAYMENT_ID,
       refundId: REFUND_ID,
@@ -298,9 +337,6 @@ describe('W07 internal customer refund runtime', () => {
       currency: 'USD',
     });
     expect(fixture.calls.recordAcknowledgement).toHaveLength(1);
-    expect(await response?.json()).toMatchObject({
-      data: { refundId: REFUND_ID, status: 'PENDING', replayed: true },
-    });
   });
 
   it('returns an existing accepted refund without creating another provider refund', async () => {
