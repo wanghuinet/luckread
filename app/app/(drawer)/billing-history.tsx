@@ -53,6 +53,7 @@ function isOrderSummary(value: unknown): value is MyCommerceOrderSummary {
   const order = value as Record<string, unknown>;
   const statuses = Object.keys(ORDER_STATUS_LABELS);
   return typeof order.orderId === 'string' && /^ord_[A-Za-z0-9_-]{1,90}$/.test(order.orderId) &&
+    (order.latestPaymentId === null || (typeof order.latestPaymentId === 'string' && /^pay_[A-Za-z0-9]{26}$/.test(order.latestPaymentId))) &&
     typeof order.status === 'string' && statuses.includes(order.status) &&
     Number.isSafeInteger(order.version) && Number(order.version) >= 1 &&
     typeof order.currency === 'string' && /^[A-Z]{3}$/.test(order.currency) &&
