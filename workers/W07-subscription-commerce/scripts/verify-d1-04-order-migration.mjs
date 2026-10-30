@@ -485,9 +485,12 @@ export function verifyD1_04OrderMigrationPostflight({
       state.names.includes(PAYMENT_METHOD_REVOCATION_MIGRATION_ID) &&
       newObject && newObject.tableName === oldObject.tableName &&
       typeof newObject.sql === 'string' &&
-      newObject.sql.toLowerCase().includes('reconciliation_required') &&
-      newObject.sql.toLowerCase().includes('mandate_active') &&
-      newObject.sql.toLowerCase().includes('mandate_revoked')
+      newObject.sql.toLowerCase().includes("old.state in ('applied','rejected')") &&
+      newObject.sql.toLowerCase().includes("old.state = 'reconciliation_required'") &&
+      newObject.sql.toLowerCase().includes("old.event_type in ('mandate_active','mandate_revoked')") &&
+      newObject.sql.toLowerCase().includes("new.state = 'received'") &&
+      newObject.sql.toLowerCase().includes('new.processed_at is null') &&
+      newObject.sql.toLowerCase().includes('new.outcome_code is null')
     if (!newObject || (JSON.stringify(newObject) !== JSON.stringify(oldObject) && !isReviewedMandateReplayGuardUpdate)) {
       fail('pre-existing schema object was removed or changed: ' + oldObject.type + ':' + oldObject.name)
     }
@@ -495,9 +498,12 @@ export function verifyD1_04OrderMigrationPostflight({
 
   const mandateReplayGuard = present.get('trigger\u0000payment_provider_events_terminal_immutable')
   const mandateReplayGuardSql = typeof mandateReplayGuard?.sql === 'string' ? mandateReplayGuard.sql.toLowerCase() : ''
-  if (!mandateReplayGuardSql.includes('reconciliation_required') ||
-      !mandateReplayGuardSql.includes('mandate_active') ||
-      !mandateReplayGuardSql.includes('mandate_revoked')) {
+  if (!mandateReplayGuardSql.includes("old.state in ('applied','rejected')") ||
+      !mandateReplayGuardSql.includes("old.state = 'reconciliation_required'") ||
+      !mandateReplayGuardSql.includes("old.event_type in ('mandate_active','mandate_revoked')") ||
+      !mandateReplayGuardSql.includes("new.state = 'received'") ||
+      !mandateReplayGuardSql.includes('new.processed_at is null') ||
+      !mandateReplayGuardSql.includes('new.outcome_code is null')) {
     fail('payment provider event trigger does not permit only the reviewed mandate reconciliation replay')
   }
 
