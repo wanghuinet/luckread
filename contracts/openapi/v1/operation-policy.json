@@ -1221,7 +1221,7 @@
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
     },
     {
-      "operationId": "getPlans",
+      "operationId": "getPaymentsHistory",
       "auth": {
         "mode": "permission"
       },
@@ -1251,17 +1251,19 @@
       "x-luckread-source": "contracts/api/commerce-operation-policy.v1.json"
     },
     {
-      "operationId": "getPlansOp",
+      "operationId": "getPlans",
       "auth": {
         "mode": "permission"
       },
-      "permissions": [],
+      "permissions": [
+        "payment.read"
+      ],
       "auditRequired": false,
       "optimisticLockRequired": false,
       "idempotencyRequired": false,
       "stateMachine": "none",
-      "x-luckread-contract-status": "DISCOVERY_DRAFT",
-      "x-luckread-source": "contracts/api/api-inventory.v1.json"
+      "x-luckread-contract-status": "CONTRACTED_PARTIAL",
+      "x-luckread-source": "contracts/api/commerce-operation-policy.v1.json"
     },
     {
       "operationId": "getPostsPostId",
