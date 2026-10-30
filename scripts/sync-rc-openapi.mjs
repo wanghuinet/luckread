@@ -217,27 +217,31 @@ function insertIntoExistingPath(raw, rawPath, methodBlocks) {
 
 function replaceExistingOpenApiOperation(raw, rawPath, method, methodBlock) {
   const lines = raw.split('\n');
-  const header = \`  \${rawPath}:\`;
-  const pathStart = lines.findIndex((line) => line === header);
+  const pathHeader = '  ' + rawPath + ':';
+  const pathStart = lines.findIndex((line) => line === pathHeader);
   if (pathStart < 0) return null;
 
+  const methodHeaders = new Set([
+    '    get:', '    post:', '    put:', '    patch:',
+    '    delete:', '    head:', '    options:', '    trace:',
+  ]);
   let pathEnd = lines.length;
   for (let i = pathStart + 1; i < lines.length; i += 1) {
-    if (/^  \\/.*:\\s*$/.test(lines[i]) || lines[i] === 'components:') {
+    if ((lines[i].startsWith('  /') && lines[i].endsWith(':')) || lines[i] === 'components:') {
       pathEnd = i;
       break;
     }
   }
 
-  const methodName = String(method).toLowerCase();
+  const methodHeader = '    ' + String(method).toLowerCase() + ':';
   const methodStart = lines.findIndex((line, index) =>
-    index > pathStart && index < pathEnd && line === \`    \${methodName}:\`,
+    index > pathStart && index < pathEnd && line === methodHeader,
   );
   if (methodStart < 0) return null;
 
   let methodEnd = pathEnd;
   for (let i = methodStart + 1; i < pathEnd; i += 1) {
-    if (/^    (get|post|put|patch|delete|head|options|trace):\\s*$/i.test(lines[i])) {
+    if (methodHeaders.has(lines[i])) {
       methodEnd = i;
       break;
     }
