@@ -222,6 +222,7 @@ export async function handleCommerceRefundRequest(
     // reuse the same refund_id without re-reading the original Payment.
     const findExisting = dependencies.findExistingReservation ?? findExistingRefundReservation;
     let reservation: RefundReservation | null = await findExisting(env.D1_04, idempotencyInput);
+    let reconcileProviderBeforeCreate = reservation !== null;
 
     if (!reservation) {
       // The provider retrieval is server-authenticated and merchant-bound.
@@ -247,6 +248,9 @@ export async function handleCommerceRefundRequest(
         ...idempotencyInput,
         capturedAmountMinor: providerPayment.amountCaptured,
       });
+      // A concurrent request may have won the unique customer/idempotency-key
+      // insert. Its replay flag means the provider outcome may already exist.
+      reconcileProviderBeforeCreate = reservation.replayed;
     }
 
     // Do not issue another POST for already accepted, completed, or ambiguous
@@ -263,15 +267,17 @@ export async function handleCommerceRefundRequest(
     };
     const retrieveProviderRefund = dependencies.retrieveProviderRefund ?? retrieveHyperswitchRefund;
     let providerRefund: Awaited<ReturnType<typeof retrieveHyperswitchRefund>> | null = null;
-    try {
-      // A previous POST may have succeeded even when its response was lost.
-      // Reconcile by the durable provider refund_id before ever issuing another
-      // create call. A GET result cannot finalize state; the signed webhook can.
-      providerRefund = await retrieveProviderRefund(config, providerIdentity);
-    } catch (error) {
-      if (!(error instanceof HyperswitchClientError) || error.status !== 404) throw error;
-      // Provider confirms this refund_id does not exist; a retry may submit the
-      // original immutable request using the same idempotency identity.
+    if (reconcileProviderBeforeCreate) {
+      try {
+        // A previous POST may have succeeded even when its response was lost.
+        // Reconcile by the durable provider refund_id before another create call.
+        // A GET result cannot finalize state; only the signed webhook can.
+        providerRefund = await retrieveProviderRefund(config, providerIdentity);
+      } catch (error) {
+        if (!(error instanceof HyperswitchClientError) || error.status !== 404) throw error;
+        // Provider confirms this refund_id does not exist; retry the immutable
+        // request with the same identity rather than minting a second refund ID.
+      }
     }
 
     if (providerRefund) {
