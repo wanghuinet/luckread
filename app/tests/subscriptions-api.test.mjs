@@ -9,7 +9,10 @@ mock.module('../lib/api-client.ts', () => ({
   },
 }));
 
-const { fetchMySubscriptionsPage } = await import('../lib/subscriptions-api.ts');
+const {
+  fetchActiveMembershipPlansPage,
+  fetchMySubscriptionsPage,
+} = await import('../lib/subscriptions-api.ts');
 
 beforeEach(() => {
   calls.length = 0;
@@ -25,20 +28,41 @@ test('loads the signed-in subscriber list through the canonical W01 route', asyn
   expect(calls[0]?.options.signal).toBe(controller.signal);
 });
 
-test('rejects invalid page bounds before making a request', () => {
+test('loads active public membership plans through the existing W01 catalog route', async () => {
+  const controller = new AbortController();
+  await fetchActiveMembershipPlansPage({ limit: 10, cursor: 'opaque/cursor', signal: controller.signal });
+
+  expect(calls).toHaveLength(1);
+  expect(calls[0]?.path).toBe('/plans?limit=10&cursor=opaque%2Fcursor');
+  expect(calls[0]?.options.method).toBe('GET');
+  expect(calls[0]?.options.signal).toBe(controller.signal);
+});
+
+test('rejects invalid pagination bounds before making a request', () => {
   expect(() => fetchMySubscriptionsPage({ page: 0 })).toThrow('between 1 and 10000');
   expect(() => fetchMySubscriptionsPage({ limit: 51 })).toThrow('between 1 and 50');
+  expect(() => fetchActiveMembershipPlansPage({ limit: 0 })).toThrow('between 1 and 50');
+  expect(() => fetchActiveMembershipPlansPage({ cursor: '' })).toThrow('between 1 and 2048');
+  expect(() => fetchActiveMembershipPlansPage({ cursor: 'x'.repeat(2049) })).toThrow('between 1 and 2048');
   expect(calls).toHaveLength(0);
 });
 
-test('keeps subscription screen read-only until external billing synchronization is implemented', async () => {
+test('keeps subscription mutations and mobile checkout disabled until store billing is verified', async () => {
   const api = await import('../lib/subscriptions-api.ts');
-  const screen = readFileSync(new URL('../app/(drawer)/subscriptions.tsx', import.meta.url), 'utf8');
+  const subscriptionsScreen = readFileSync(new URL('../app/(drawer)/subscriptions.tsx', import.meta.url), 'utf8');
+  const plansScreen = readFileSync(new URL('../app/(drawer)/membership-plans.tsx', import.meta.url), 'utf8');
+  const drawer = readFileSync(new URL('../app/(drawer)/_layout.tsx', import.meta.url), 'utf8');
 
-  expect(Object.keys(api)).toEqual(['fetchMySubscriptionsPage']);
-  expect(screen).not.toContain('transitionMySubscription');
-  expect(screen).not.toContain('onTransition');
-  expect(screen).not.toContain('取消订阅');
-  expect(screen).not.toContain('暂停订阅');
-  expect(screen).not.toContain('恢复订阅');
+  expect(Object.keys(api).sort()).toEqual(['fetchActiveMembershipPlansPage', 'fetchMySubscriptionsPage'].sort());
+  expect(subscriptionsScreen).not.toContain('transitionMySubscription');
+  expect(subscriptionsScreen).not.toContain('onTransition');
+  expect(subscriptionsScreen).not.toContain('取消订阅');
+  expect(subscriptionsScreen).not.toContain('暂停订阅');
+  expect(subscriptionsScreen).not.toContain('恢复订阅');
+  expect(plansScreen).toContain('fetchActiveMembershipPlansPage');
+  expect(plansScreen).toContain('W07 已发布的公开会员目录');
+  expect(plansScreen).toContain('暂不开放购买操作');
+  expect(plansScreen).not.toContain('createCommerceOrder');
+  expect(plansScreen).not.toContain('confirmPayment');
+  expect(drawer).toContain("router.push('/membership-plans' as never)");
 });
