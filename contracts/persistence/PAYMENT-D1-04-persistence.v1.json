@@ -310,6 +310,234 @@
         "No raw webhook body, API key, client secret or cardholder data is stored.",
         "A conflict row can be inserted only when an immutable provider event receipt exists for the same provider, merchant, event ID, and existing payload hash."
       ]
+    },
+    "revenuecat_webhook_events": {
+      "purpose": "Durable idempotent inbox for authenticated RevenueCat store-subscription lifecycle events. This is provider-event transport evidence only; RevenueCat's current subscriber API and LuckRead's immutable product-plan mapping are re-read before any subscription state change.",
+      "primaryKey": "event_row_id",
+      "uniqueKey": [
+        "app_id",
+        "event_id"
+      ],
+      "columns": {
+        "event_row_id": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "immutable": true
+        },
+        "app_id": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "immutable": true,
+          "apiExposure": "NONE"
+        },
+        "event_id": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "immutable": true
+        },
+        "event_type": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "immutable": true,
+          "maxLength": 64
+        },
+        "event_timestamp_ms": {
+          "type": "INTEGER",
+          "required": true,
+          "nullable": false,
+          "immutable": true,
+          "minimum": 1
+        },
+        "api_version": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "immutable": true,
+          "maxLength": 32
+        },
+        "app_user_id": {
+          "type": "TEXT",
+          "required": false,
+          "nullable": true,
+          "immutable": true,
+          "apiExposure": "NONE",
+          "maxLength": 256
+        },
+        "product_id": {
+          "type": "TEXT",
+          "required": false,
+          "nullable": true,
+          "immutable": true,
+          "apiExposure": "NONE",
+          "maxLength": 255
+        },
+        "store": {
+          "type": "TEXT",
+          "required": false,
+          "nullable": true,
+          "immutable": true,
+          "maxLength": 64
+        },
+        "environment": {
+          "type": "TEXT",
+          "required": false,
+          "nullable": true,
+          "immutable": true,
+          "allowedValues": [
+            "PRODUCTION",
+            "SANDBOX"
+          ]
+        },
+        "transaction_id": {
+          "type": "TEXT",
+          "required": false,
+          "nullable": true,
+          "immutable": true,
+          "apiExposure": "NONE",
+          "maxLength": 255
+        },
+        "original_transaction_id": {
+          "type": "TEXT",
+          "required": false,
+          "nullable": true,
+          "immutable": true,
+          "apiExposure": "NONE",
+          "maxLength": 255
+        },
+        "event_data_json": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "immutable": true,
+          "format": "json",
+          "maxUtf8Bytes": 16384,
+          "privacy": "Allowlisted event fields only; subscriber_attributes and raw request body are excluded."
+        },
+        "payload_sha256": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "immutable": true,
+          "format": "sha-256"
+        },
+        "state": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "allowedValues": [
+            "RECEIVED",
+            "APPLIED",
+            "RECONCILIATION_REQUIRED",
+            "IGNORED"
+          ]
+        },
+        "received_at": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "immutable": true,
+          "format": "date-time"
+        },
+        "processed_at": {
+          "type": "TEXT",
+          "required": false,
+          "nullable": true,
+          "format": "date-time"
+        },
+        "outcome_code": {
+          "type": "TEXT",
+          "required": false,
+          "nullable": true,
+          "maxLength": 128
+        }
+      },
+      "invariants": [
+        "UNIQUE(app_id,event_id) is the RevenueCat webhook event identity within an explicitly allowlisted app.",
+        "Same event identity and same raw payload SHA-256 is an idempotent duplicate; same identity with a different hash creates a separate conflict fact.",
+        "Only the immutable original receipt is retained; raw webhook bytes and subscriber_attributes are never stored.",
+        "A durable receipt alone never creates a Payment, activates a Subscription, or grants a content entitlement.",
+        "Webhook event content is a hint for reconciliation; the current subscriber state must be read through RevenueCat's server API before applying subscription state."
+      ],
+      "indexes": [
+        "ix_revenuecat_webhook_events_state_received (state, received_at, event_row_id)",
+        "ix_revenuecat_webhook_events_user_received (app_user_id, received_at, event_row_id)"
+      ]
+    },
+    "revenuecat_webhook_event_conflicts": {
+      "purpose": "Durable anomaly facts when RevenueCat reuses an app/event ID with a different verified payload hash; the original webhook receipt remains immutable.",
+      "primaryKey": "conflict_id",
+      "uniqueKey": [
+        "app_id",
+        "event_id",
+        "incoming_payload_sha256"
+      ],
+      "columns": {
+        "conflict_id": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "immutable": true
+        },
+        "app_id": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "immutable": true,
+          "apiExposure": "NONE"
+        },
+        "event_id": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "immutable": true
+        },
+        "existing_payload_sha256": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "immutable": true,
+          "format": "sha-256"
+        },
+        "incoming_payload_sha256": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "immutable": true,
+          "format": "sha-256"
+        },
+        "occurrence_count": {
+          "type": "INTEGER",
+          "required": true,
+          "nullable": false,
+          "monotonic": true
+        },
+        "first_seen_at": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "immutable": true,
+          "format": "date-time"
+        },
+        "last_seen_at": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "format": "date-time"
+        }
+      },
+      "invariants": [
+        "existing_payload_sha256 and incoming_payload_sha256 must differ.",
+        "Conflict can be recorded only when the referenced immutable first receipt exists for the same app_id, event_id, and original hash.",
+        "The same incoming conflict hash is stored once; later repeats advance occurrence_count and last_seen_at only.",
+        "Conflict records are retained and never deleted or reassigned."
+      ],
+      "indexes": [
+        "ix_revenuecat_webhook_conflicts_event (app_id, event_id, last_seen_at)"
+      ]
     }
   },
   "mutationBudgets": {
@@ -335,14 +563,26 @@
     "id": "0002_payment_provider_events",
     "targetBinding": "D1_04",
     "appliedRemotely": false,
-    "rule": "Reviewed source only; no remote D1 mutation, Worker deployment or provider event application is authorized by this contract."
+    "rule": "Reviewed source only; no remote D1 mutation, Worker deployment or provider event application is authorized by this contract.",
+    "additionalCandidates": [
+      {
+        "file": "workers/W07-subscription-commerce/migrations-d1-04/0005_revenuecat_webhook_inbox.sql",
+        "id": "0005_revenuecat_webhook_inbox",
+        "targetBinding": "D1_04",
+        "appliedRemotely": false,
+        "purpose": "Additive RevenueCat webhook receipt and payload-conflict inbox; provider='hyperswitch' schema and provider constraints remain unchanged."
+      }
+    ]
   },
   "nonGoals": [
     "No new Worker, D1, Queue or Service Binding.",
     "No raw webhook payload, client secret, API key, or card data persistence.",
     "No ledger posting, refund, settlement, payout, order confirmation or entitlement grant.",
     "No cross-D1 foreign key or distributed transaction.",
-    "No provider event with the same event ID but a different payload hash can overwrite the first receipt; mismatch is recorded as a separate reconciliation conflict."
+    "No provider event with the same event ID but a different payload hash can overwrite the first receipt; mismatch is recorded as a separate reconciliation conflict.",
+    "RevenueCat store receipts are not written to payment_provider_events, whose provider-specific schema remains authoritative only for Hyperswitch.",
+    "No RevenueCat entitlement is granted from the webhook payload; subscriber state re-read and W07 plan mapping resolution are a later reconciliation module.",
+    "No new Worker, D1, Queue, or Service Binding is introduced by the RevenueCat webhook inbox."
   ],
   "promotionRule": "Remain CONTRACTED_NOT_VERIFIED until exact migration/schema evidence, provider retry and webhook idempotency runtime tests, security negatives, and exact-commit Evidence Registry admission pass."
 }

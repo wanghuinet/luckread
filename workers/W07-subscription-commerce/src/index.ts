@@ -7,6 +7,7 @@ import { applyDemoTaxPricing, isDemoPricingEnabled } from './demo-tax-pricing.js
 import { applyTaxJarSandboxPricing } from './taxjar-sandbox-pricing.js'
 import { handleCommercePaymentIntentRequest } from './payment-intent-http-runtime.js'
 import { handleHyperswitchWebhookRequest } from './payment-webhook-http-runtime.js'
+import { handleRevenueCatWebhookRequest } from './revenuecat-webhook-http-runtime.js'
 
 interface RateLimitBinding { limit(input: { key: string }): Promise<{ success: boolean }> }
 interface Env {
@@ -17,6 +18,9 @@ interface Env {
   HYPERSWITCH_API_KEY?: string
   HYPERSWITCH_MERCHANT_ID?: string
   HYPERSWITCH_WEBHOOK_SECRET?: string
+  REVENUECAT_WEBHOOK_AUTHORIZATION?: string
+  REVENUECAT_WEBHOOK_SIGNING_SECRET?: string
+  REVENUECAT_ALLOWED_APP_IDS?: string
   COMMERCE_DEMO_TAX_PROVIDER?: string
   TAXJAR_SANDBOX_API_KEY?: string
   TAXJAR_DEMO_FROM_STREET?: string
@@ -153,6 +157,14 @@ export default {
         if (!originLimiter) throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
         await applyRateLimit(originLimiter, 'origin:webhook')
         const webhookResponse = await handleHyperswitchWebhookRequest(request, env)
+        if (webhookResponse) return webhookResponse
+      }
+
+      if (new URL(request.url).pathname === '/internal/webhooks/revenuecat') {
+        const originLimiter = env.SUBSCRIPTION_ORIGIN_GLOBAL_LIMITER
+        if (!originLimiter) throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
+        await applyRateLimit(originLimiter, 'origin:webhook')
+        const webhookResponse = await handleRevenueCatWebhookRequest(request, env)
         if (webhookResponse) return webhookResponse
       }
 

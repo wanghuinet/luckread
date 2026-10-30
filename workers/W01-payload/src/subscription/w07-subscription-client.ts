@@ -99,3 +99,43 @@ export async function forwardW07HyperswitchWebhook(input: {
     },
   })
 }
+
+/** Relay an authenticated RevenueCat callback without changing signed payload bytes. */
+export async function forwardW07RevenueCatWebhook(input: {
+  request: Request
+  rawBody: ArrayBuffer
+}): Promise<Response> {
+  const service = await getW07Service()
+  const suppliedCorrelation = input.request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? ''
+  const correlationId = suppliedCorrelation.length > 0 &&
+    suppliedCorrelation.length <= 128 &&
+    !/[\u0000-\u001f\u007f]/.test(suppliedCorrelation)
+    ? suppliedCorrelation
+    : crypto.randomUUID()
+  const headers = new Headers({
+    'X-LuckRead-Caller': 'W01',
+    'X-LuckRead-Transport-Version': '1.0',
+    'X-LuckRead-Correlation-Id': correlationId,
+    'content-type': 'application/json',
+  })
+  // This is the one configured RevenueCat webhook Authorization value, not a
+  // browser session. No Cookie, user Authorization from a session, or arbitrary
+  // client header is copied to W07.
+  const authorization = input.request.headers.get('Authorization')
+  const signature = input.request.headers.get('X-RevenueCat-Webhook-Signature')
+  if (authorization !== null) headers.set('Authorization', authorization)
+  if (signature !== null) headers.set('X-RevenueCat-Webhook-Signature', signature)
+
+  const response = await service.fetch(new Request('https://luckread-w07.internal/internal/webhooks/revenuecat', {
+    method: 'POST',
+    headers,
+    body: input.rawBody,
+  }))
+  return new Response(await response.arrayBuffer(), {
+    status: response.status,
+    headers: {
+      'content-type': response.headers.get('content-type') ?? 'application/json; charset=utf-8',
+      'cache-control': 'no-store',
+    },
+  })
+}

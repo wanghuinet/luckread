@@ -331,6 +331,48 @@
       "deduplication": "W07 D1-04 unique provider + merchant + event ID; differing payload SHA-256 is recorded as a conflict.",
       "acknowledgement": "200 for applied/duplicate receipts; 202 for durably recorded reconciliation; 4xx for invalid signatures/transport; 503 when durable receipt cannot be persisted.",
       "cache": "NO_STORE"
+    },
+    {
+      "operationId": "receiveRevenueCatWebhook",
+      "method": "POST",
+      "publicPath": "/api/v1/webhooks/revenuecat",
+      "internalPath": "/internal/webhooks/revenuecat",
+      "principalRequired": false,
+      "authentication": "W07 checks the exact RevenueCat Authorization header configured in the RevenueCat dashboard for every request. When HMAC signing is enabled in the dashboard and REVENUECAT_WEBHOOK_SIGNING_SECRET is configured, W07 additionally requires X-RevenueCat-Webhook-Signature HMAC-SHA256 over the exact raw bytes and the supplied request timestamp.",
+      "provider": "revenuecat",
+      "maximumBodyBytes": 1048576,
+      "requiredHeaders": [
+        "Authorization"
+      ],
+      "optionalHeaders": [
+        "X-RevenueCat-Webhook-Signature"
+      ],
+      "forwardedHeaders": [
+        "Authorization",
+        "X-RevenueCat-Webhook-Signature",
+        "X-LuckRead-Caller",
+        "X-LuckRead-Transport-Version",
+        "X-LuckRead-Correlation-Id"
+      ],
+      "forbiddenForwarding": [
+        "cookie",
+        "browser session",
+        "arbitrary client headers",
+        "parsed or re-serialized body"
+      ],
+      "rawBodyPreserved": true,
+      "deduplication": "W07 D1-04 unique app_id + event.id; identical payload SHA-256 is a duplicate; differing payload SHA-256 is stored in a separate immutable conflict record.",
+      "acknowledgement": "200 only after durable receipt or conflict persistence; 200 for idempotent duplicates and dashboard TEST event; 4xx for invalid authorization/signature/transport/payload; 503 when configuration or durable persistence is unavailable.",
+      "entitlementEffect": "NONE; webhook receipt never directly creates a payment, subscription, or entitlement. A later reconciliation worker must re-read RevenueCat subscriber state through its server API.",
+      "cache": "NO_STORE",
+      "topologyConstraints": {
+        "workerCountDelta": 0,
+        "databaseCountDelta": 0,
+        "queueCountDelta": 0,
+        "serviceBindingDelta": 0,
+        "d1Authority": "D1-04",
+        "crossD1Transactions": 0
+      }
     }
   ],
   "trustBoundary": {

@@ -11,6 +11,7 @@ MIGRATION = WORKER / "migrations-d1-04" / "0001_order_commerce.sql"
 PAYMENT_MIGRATION = WORKER / "migrations-d1-04" / "0002_payment_provider_events.sql"
 SAVED_METHOD_MIGRATION = WORKER / "migrations-d1-04" / "0003_saved_payment_methods_mandates.sql"
 RENEWAL_MIGRATION = WORKER / "migrations-d1-04" / "0004_subscription_renewal_cycles.sql"
+REVENUECAT_WEBHOOK_MIGRATION = WORKER / "migrations-d1-04" / "0005_revenuecat_webhook_inbox.sql"
 CONFIG = WORKER / "wrangler.jsonc"
 NOW = "2026-10-28T00:00:00.000Z"
 LATER = "2026-10-28T00:00:01.000Z"
@@ -23,6 +24,7 @@ class D104OrderMigrationTests(unittest.TestCase):
         cls.payment_sql = PAYMENT_MIGRATION.read_text(encoding="utf-8")
         cls.saved_method_sql = SAVED_METHOD_MIGRATION.read_text(encoding="utf-8")
         cls.renewal_sql = RENEWAL_MIGRATION.read_text(encoding="utf-8")
+        cls.revenuecat_webhook_sql = REVENUECAT_WEBHOOK_MIGRATION.read_text(encoding="utf-8")
         config = json.loads(CONFIG.read_text(encoding="utf-8"))
         bindings = {item["binding"]: item for item in config["d1_databases"]}
         if bindings["D1_01"]["migrations_dir"] != "migrations":
@@ -38,6 +40,7 @@ class D104OrderMigrationTests(unittest.TestCase):
         self.db.executescript(self.payment_sql)
         self.db.executescript(self.saved_method_sql)
         self.db.executescript(self.renewal_sql)
+        self.db.executescript(self.revenuecat_webhook_sql)
 
     def tearDown(self):
         self.db.close()
@@ -121,12 +124,76 @@ class D104OrderMigrationTests(unittest.TestCase):
              state, count, version, first_seen, last_seen, resolved_at, resolution_code),
         )
 
+    def test_revenuecat_webhook_inbox_preserves_first_receipt_and_records_payload_conflict(self):
+        app_id = "luckread-android"
+        event_id = "evt_123"
+        first_hash = "a" * 64
+        second_hash = "b" * 64
+        event_values = (
+            "rcevt_1", app_id, event_id, "INITIAL_PURCHASE", 1793300000000, "1.0",
+            "user_1", "creator.gold:monthly-v1", "PLAY_STORE", "SANDBOX",
+            "GPA.1234-5678", "GPA.1234-5678", '{"product_id":"creator.gold:monthly-v1"}',
+            first_hash, NOW,
+        )
+        self.db.execute(
+            """INSERT INTO revenuecat_webhook_events(
+                event_row_id,app_id,event_id,event_type,event_timestamp_ms,api_version,
+                app_user_id,product_id,store,environment,transaction_id,original_transaction_id,
+                event_data_json,payload_sha256,state,received_at,processed_at,outcome_code
+            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,'RECEIVED',?,NULL,NULL)""",
+            event_values,
+        )
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                """INSERT INTO revenuecat_webhook_events(
+                    event_row_id,app_id,event_id,event_type,event_timestamp_ms,api_version,
+                    event_data_json,payload_sha256,state,received_at
+                ) VALUES('rcevt_duplicate',?,?, 'INITIAL_PURCHASE',1793300000000,'1.0','{}',?,'RECEIVED',?)""",
+                (app_id, event_id, first_hash, NOW),
+            )
+        self.db.execute(
+            """INSERT INTO revenuecat_webhook_event_conflicts(
+                conflict_id,app_id,event_id,existing_payload_sha256,incoming_payload_sha256,
+                occurrence_count,first_seen_at,last_seen_at
+            ) VALUES('rcconf_1',?,?,?,?,1,?,?)""",
+            (app_id, event_id, first_hash, second_hash, NOW, NOW),
+        )
+        self.db.execute(
+            """UPDATE revenuecat_webhook_event_conflicts
+               SET occurrence_count=occurrence_count+1,last_seen_at=?
+               WHERE app_id=? AND event_id=? AND incoming_payload_sha256=?""",
+            (LATER, app_id, event_id, second_hash),
+        )
+        self.assertEqual(
+            self.db.execute(
+                "SELECT occurrence_count,last_seen_at FROM revenuecat_webhook_event_conflicts WHERE app_id=? AND event_id=?",
+                (app_id, event_id),
+            ).fetchone(),
+            (2, LATER),
+        )
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                "UPDATE revenuecat_webhook_events SET event_data_json='{}' WHERE event_row_id='rcevt_1'"
+            )
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                """INSERT INTO revenuecat_webhook_event_conflicts(
+                    conflict_id,app_id,event_id,existing_payload_sha256,incoming_payload_sha256,
+                    occurrence_count,first_seen_at,last_seen_at
+                ) VALUES('rcconf_bad','other-app','unknown',?,?,1,?,?)""",
+                (first_hash, second_hash, NOW, NOW),
+            )
+        columns = {row[1] for row in self.db.execute('PRAGMA table_info("revenuecat_webhook_events")')}
+        self.assertNotIn("raw_body", columns)
+        self.assertNotIn("subscriber_attributes", columns)
+
     def test_only_expected_tables_and_indexes_exist(self):
         tables = {row[0] for row in self.db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         self.assertEqual(tables, {
             "orders", "order_lines", "order_create_idempotency", "payments", "payment_provider_events",
             "payment_provider_event_conflicts", "saved_payment_methods", "payment_mandates",
             "subscription_renewal_cycles", "subscription_renewal_scheduler_state",
+            "revenuecat_webhook_events", "revenuecat_webhook_event_conflicts",
         })
         indexes = {row[0] for row in self.db.execute("SELECT name FROM sqlite_master WHERE type='index' AND sql IS NOT NULL")}
         self.assertTrue({
@@ -141,6 +208,8 @@ class D104OrderMigrationTests(unittest.TestCase):
             "ix_payment_mandates_method_status",
             "ux_subscription_renewal_cycles_subscription_cycle", "ux_subscription_renewal_cycles_payment",
             "ix_subscription_renewal_cycles_state_updated", "ix_subscription_renewal_cycles_subscriber_cycle",
+            "ix_revenuecat_webhook_events_state_received", "ix_revenuecat_webhook_events_user_received",
+            "ix_revenuecat_webhook_conflicts_event",
         }.issubset(indexes))
         self.assertFalse(tables.intersection({"payment_intents", "ledger_entries", "refunds", "entitlements"}))
         self.assertNotIn("client_secret", {r[1] for r in self.db.execute('PRAGMA table_info("payments")')})
@@ -148,7 +217,8 @@ class D104OrderMigrationTests(unittest.TestCase):
         for table in ("orders", "order_lines", "order_create_idempotency", "payments",
                       "payment_provider_events", "payment_provider_event_conflicts",
                       "saved_payment_methods", "payment_mandates", "subscription_renewal_cycles",
-                      "subscription_renewal_scheduler_state"):
+                      "subscription_renewal_scheduler_state", "revenuecat_webhook_events",
+                      "revenuecat_webhook_event_conflicts"):
             self.assertEqual(self.db.execute(f'PRAGMA foreign_key_list("{table}")').fetchall(), [])
 
 
