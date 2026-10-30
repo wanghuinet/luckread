@@ -559,7 +559,21 @@ for (const op of targetOperations) {
   usedIds.add(operationId);
 
   if (existing) {
-    consolidatedOperations.push({ ...existing, operationId });
+    const merged = { ...existing, operationId };
+    if (source) {
+      const method = String(op.method).toUpperCase();
+      const authorization = source.authorization;
+      merged.auth = {
+        mode: authorization?.required === false ? 'public' : 'permission',
+      };
+      merged.permissions = authorization?.permission ? [authorization.permission] : [];
+      merged.auditRequired = method !== 'GET' && method !== 'HEAD';
+      merged.idempotencyRequired = source.idempotency?.required === true;
+      merged.optimisticLockRequired = source.retry?.requiresOptimisticConcurrency === true;
+      merged['x-luckread-contract-status'] = source.status ?? merged['x-luckread-contract-status'] ?? 'DISCOVERY_DRAFT';
+      merged['x-luckread-source'] = source.__source ?? merged['x-luckread-source'] ?? inventoryPath;
+    }
+    consolidatedOperations.push(merged);
     continue;
   }
 
@@ -582,7 +596,7 @@ for (const op of targetOperations) {
     optimisticLockRequired: retry?.requiresOptimisticConcurrency === true,
     idempotencyRequired: idempotency?.required === true,
     stateMachine,
-    'x-luckread-contract-status': 'DISCOVERY_DRAFT',
+    'x-luckread-contract-status': source?.status ?? 'DISCOVERY_DRAFT',
     'x-luckread-source': source?.__source ?? inventoryPath,
   });
 }
@@ -596,6 +610,7 @@ console.log(JSON.stringify({
   inventoryOperations: inventoryMap.size,
   addedToInventory,
   addedToOpenApi,
+  upgradedExistingOpenApiOperations,
   consolidatedPolicyOperations: consolidatedOperations.length,
   remainingInventoryWithoutOpenApi: inventoryMap.size - effectiveOpenApi.length,
 }, null, 2));
