@@ -345,11 +345,10 @@ export async function recordHyperswitchRefundAcknowledgement(
   const now = nowIso(dependencies.now);
   const updatedAt = nextTimestamp(now, row.updated_at);
   const updated = await db.prepare(
-    'UPDATE refunds SET status = ?, provider_updated_at = COALESCE(?, provider_updated_at), ' +
-    'outcome_code = ?, version = version + 1, updated_at = ? WHERE refund_id = ? AND version = ? ' +
-    'AND status IN (\'REQUESTED\',\'RECONCILIATION_REQUIRED\')',
+    'UPDATE refunds SET status = ?, outcome_code = ?, version = version + 1, updated_at = ? ' +
+    'WHERE refund_id = ? AND version = ? AND status IN (\\'REQUESTED\\',\\'RECONCILIATION_REQUIRED\\')',
   ).bind(
-    nextStatus, refund.updatedAt, outcomeCode, updatedAt, row.refund_id, row.version,
+    nextStatus, outcomeCode, updatedAt, row.refund_id, row.version,
   ).run().catch(() => {
     throw new RefundPersistenceError('SERVICE_UNAVAILABLE', 503);
   });
