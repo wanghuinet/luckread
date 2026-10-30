@@ -121,15 +121,15 @@ class D104OrderMigrationTests(unittest.TestCase):
     def payment(self, payment_id="pay_" + "a"*26, order_id="ord_1", customer="user_1",
                 provider="hyperswitch", merchant="merchant_1", amount=1000, currency="USD",
                 status="INITIATING", version=1, idempotency_key="payment_key_1",
-                request_hash="b"*64, provider_updated_at=None, failure_code=None,
+                request_hash="b"*64, provider_updated_at=None, failure_code=None, captured=0,
                 created=NOW, updated=NOW):
         self.db.execute(
             """INSERT INTO payments(payment_id,order_id,customer_id,provider,merchant_id,
                amount_minor,currency,status,version,idempotency_key,request_hash,
-               provider_updated_at,failure_code,created_at,updated_at)
-               VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+               provider_updated_at,failure_code,created_at,updated_at,amount_captured_minor)
+               VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (payment_id, order_id, customer, provider, merchant, amount, currency, status,
-             version, idempotency_key, request_hash, provider_updated_at, failure_code, created, updated),
+             version, idempotency_key, request_hash, provider_updated_at, failure_code, created, updated, captured),
         )
 
     def provider_event(self, row_id="evtrow_1", merchant="merchant_1", event_id="evt_1",
@@ -237,7 +237,7 @@ class D104OrderMigrationTests(unittest.TestCase):
 
     def test_refunds_reserve_only_captured_owner_payment_amount_and_release_failed_amount(self):
         self.order(subtotal=1200, total=1200)
-        self.payment(status="succeeded", amount=1200, provider_updated_at=NOW)
+        self.payment(status="succeeded", amount=1200, captured=1200, provider_updated_at=NOW)
 
         self.refund(amount=600, key="refund_key_1")
         self.refund(refund_id="ref_" + "b"*26, amount=500, key="refund_key_2",
@@ -279,6 +279,38 @@ class D104OrderMigrationTests(unittest.TestCase):
         )
         with self.assertRaises(sqlite3.IntegrityError):
             self.refund(refund_id="ref_" + "b"*26, key="refund_key_2", request_hash="e"*64)
+
+    def test_refunds_are_limited_by_captured_amount_not_original_intent_amount(self):
+        self.order(subtotal=1200, total=1200)
+        self.payment(status="succeeded", amount=1200, captured=600, provider_updated_at=NOW)
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.refund(amount=601)
+        self.refund(amount=600)
+        self.assertEqual(
+            self.db.execute("SELECT amount_minor FROM refunds WHERE refund_id=?", ("ref_" + "a"*26,)).fetchone()[0],
+            600,
+        )
+
+    def test_payment_captured_amount_observation_is_monotonic_bounded_and_versioned(self):
+        self.order()
+        self.payment(status="succeeded", captured=0, provider_updated_at=NOW)
+        self.db.execute(
+            """UPDATE payments SET amount_captured_minor=700,version=2,updated_at=?
+               WHERE payment_id=? AND version=1""",
+            (LATER, "pay_" + "a"*26),
+        )
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                """UPDATE payments SET amount_captured_minor=600,version=3,updated_at=?
+                   WHERE payment_id=? AND version=2""",
+                ("2026-10-28T00:00:02.000Z", "pay_" + "a"*26),
+            )
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                """UPDATE payments SET amount_captured_minor=1100,version=3,updated_at=?
+                   WHERE payment_id=? AND version=2""",
+                ("2026-10-28T00:00:02.000Z", "pay_" + "a"*26),
+            )
 
     def test_refund_amount_and_identity_are_immutable_and_provider_states_use_cas(self):
         self.order()
