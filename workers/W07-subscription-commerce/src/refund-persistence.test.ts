@@ -4,7 +4,6 @@ import {
   getRefundRequest,
   receiveHyperswitchWebhook,
   recordRefundProviderResponse,
-  type RefundDto,
   type RefundStatus,
 } from './payment-persistence.js'
 import type { HyperswitchRefund } from './hyperswitch-client.js'
@@ -126,29 +125,29 @@ class RefundTestD1 {
     if (sql.includes('FROM payment_provider_events')) {
       const [provider, merchantId, eventId] = values
       const row = this.events.find(e => e.provider === provider && e.merchant_id === merchantId && e.event_id === eventId)
-      return row ? structuredClone(row) as T : null
+      return row ? structuredClone(row) as unknown as T : null
     }
     if (sql.includes('FROM refunds') && sql.includes('SUM(amount_minor)')) {
       const [paymentId] = values
       const reserved = this.refunds
         .filter(r => r.payment_id === paymentId && ['INITIATING', 'pending', 'review', 'succeeded'].includes(r.status))
         .reduce((sum, row) => sum + row.amount_minor, 0)
-      return { reserved_minor: reserved } as T
+      return { reserved_minor: reserved } as unknown as T
     }
     if (sql.includes('FROM refunds') && sql.includes('idempotency_key = ?')) {
       const [customerId, key] = values
       const row = this.refunds.find(r => r.customer_id === customerId && r.idempotency_key === key)
-      return row ? structuredClone(row) as T : null
+      return row ? structuredClone(row) as unknown as T : null
     }
     if (sql.includes('FROM refunds') && sql.includes('customer_id = ? AND refund_id = ?')) {
       const [customerId, refundId] = values
       const row = this.refunds.find(r => r.customer_id === customerId && r.refund_id === refundId)
-      return row ? structuredClone(row) as T : null
+      return row ? structuredClone(row) as unknown as T : null
     }
     if (sql.includes('FROM refunds') && sql.includes('WHERE refund_id = ?')) {
       const [refundId] = values
       const row = this.refunds.find(r => r.refund_id === refundId)
-      return row ? structuredClone(row) as T : null
+      return row ? structuredClone(row) as unknown as T : null
     }
     throw new Error('Unexpected refund test query: ' + sql)
   }
