@@ -10,6 +10,7 @@ import {
   RENEWAL_MIGRATION_ID,
   REVENUECAT_WEBHOOK_MIGRATION_ID,
   PAYMENT_METHOD_REVOCATION_MIGRATION_ID,
+  REFUNDS_MIGRATION_ID,
   REQUIRED_MIGRATION_IDS,
   REQUIRED_COLUMNS,
   REQUIRED_INDEXES,
@@ -32,6 +33,15 @@ const paymentProviderEventsTerminalTriggerSql = paymentMethodRevocationMigration
   /CREATE TRIGGER payment_provider_events_terminal_immutable\b[\s\S]*?\bEND;/i,
 )?.[0]
 if (!paymentProviderEventsTerminalTriggerSql) throw new Error('0006 migration is missing its payment-provider event terminal trigger')
+
+const refundsMigrationSql = fs.readFileSync(
+  new URL('../migrations-d1-04/0007_refunds.sql', import.meta.url),
+  'utf8',
+)
+const paymentProviderEventsIdentityTriggerSql = refundsMigrationSql.match(
+  /CREATE TRIGGER payment_provider_events_identity_immutable\b[\s\S]*?\bEND;/i,
+)?.[0]
+if (!paymentProviderEventsIdentityTriggerSql) throw new Error('0007 migration is missing its payment-provider event identity trigger')
 const wrapSchema = (objects) => ({ success: true, results: [{ results: objects }] })
 const wrapMigrationState = (names) => ({ success: true, results: [{ results: names.map((name) => ({ name })) }] })
 
@@ -48,13 +58,20 @@ function targetObjectsFor(migrationIds) {
             ? ['revenuecat_webhook_events', 'revenuecat_webhook_event_conflicts']
             : id === PAYMENT_METHOD_REVOCATION_MIGRATION_ID
               ? ['payment_method_revocation_requests']
-              : [])
+              : id === REFUNDS_MIGRATION_ID
+                ? ['refunds']
+                : [])
   const objects = tables.map((tableName) => ({
     type: 'table',
     name: tableName,
     tbl_name: tableName,
     sql: 'CREATE TABLE ' + tableName + ' (probe TEXT)',
   }))
+  if (migrationIds.includes(REFUNDS_MIGRATION_ID)) {
+    const eventsTable = objects.find((object) => object.type === 'table' && object.name === 'payment_provider_events')
+    if (!eventsTable) throw new Error('Refund migration fixture requires the prior payment-provider events table')
+    eventsTable.sql = 'CREATE TABLE payment_provider_events (probe TEXT, refund_id TEXT REFERENCES refunds(refund_id))'
+  }
   for (const [tableName, names] of Object.entries(REQUIRED_INDEXES)) {
     for (const name of names) {
       if (!tables.includes(tableName)) continue
@@ -69,13 +86,16 @@ function targetObjectsFor(migrationIds) {
   for (const [tableName, names] of Object.entries(REQUIRED_TRIGGERS)) {
     for (const name of names) {
       if (!tables.includes(tableName)) continue
+      if (name === 'payment_provider_events_refund_binding_guard' && !migrationIds.includes(REFUNDS_MIGRATION_ID)) continue
       objects.push({
         type: 'trigger',
         name,
         tbl_name: tableName,
         sql: name === 'payment_provider_events_terminal_immutable' && migrationIds.includes(PAYMENT_METHOD_REVOCATION_MIGRATION_ID)
           ? paymentProviderEventsTerminalTriggerSql.replace(/;$/, '')
-          : 'CREATE TRIGGER ' + name + ' BEFORE UPDATE ON ' + tableName + ' BEGIN SELECT 1; END',
+          : name === 'payment_provider_events_identity_immutable' && migrationIds.includes(REFUNDS_MIGRATION_ID)
+            ? paymentProviderEventsIdentityTriggerSql.replace(/;$/, '')
+            : 'CREATE TRIGGER ' + name + ' BEFORE UPDATE ON ' + tableName + ' BEGIN SELECT 1; END',
       })
     }
   }
@@ -115,9 +135,10 @@ const tableInfo = {
   revenueCatWebhookEvents: tableInfoFor('revenuecat_webhook_events'),
   revenueCatWebhookConflicts: tableInfoFor('revenuecat_webhook_event_conflicts'),
   paymentMethodRevocationRequests: tableInfoFor('payment_method_revocation_requests'),
+  refunds: tableInfoFor('refunds'),
 }
 
-function verifyCompletePostflight({ preflightSchema = schemaWithMigrations(REQUIRED_MIGRATION_IDS.slice(0, 5)), postflightSchema = schemaWithMigrations(REQUIRED_MIGRATION_IDS), migrationState = wrapMigrationState(REQUIRED_MIGRATION_IDS) } = {}) {
+function verifyCompletePostflight({ preflightSchema = schemaWithMigrations(REQUIRED_MIGRATION_IDS.slice(0, 6)), postflightSchema = schemaWithMigrations(REQUIRED_MIGRATION_IDS), migrationState = wrapMigrationState(REQUIRED_MIGRATION_IDS) } = {}) {
   return verifyD1_04OrderMigrationPostflight({
     preflightSchema,
     postflightSchema,
@@ -135,6 +156,7 @@ function verifyCompletePostflight({ preflightSchema = schemaWithMigrations(REQUI
     revenueCatWebhookEventsTableInfo: tableInfo.revenueCatWebhookEvents,
     revenueCatWebhookConflictsTableInfo: tableInfo.revenueCatWebhookConflicts,
     paymentMethodRevocationRequestsTableInfo: tableInfo.paymentMethodRevocationRequests,
+    refundsTableInfo: tableInfo.refunds,
   })
 }
 
@@ -177,7 +199,7 @@ test('an applied Order migration can advance pending Payment, mandate and renewa
     migrationState: wrapMigrationState([ORDER_MIGRATION_ID]),
   })
   assert.equal(result.action, 'APPLY')
-  assert.deepEqual(result.pendingMigrationIds, [PAYMENT_MIGRATION_ID, SAVED_METHOD_MIGRATION_ID, RENEWAL_MIGRATION_ID, REVENUECAT_WEBHOOK_MIGRATION_ID, PAYMENT_METHOD_REVOCATION_MIGRATION_ID])
+  assert.deepEqual(result.pendingMigrationIds, [PAYMENT_MIGRATION_ID, SAVED_METHOD_MIGRATION_ID, RENEWAL_MIGRATION_ID, REVENUECAT_WEBHOOK_MIGRATION_ID, PAYMENT_METHOD_REVOCATION_MIGRATION_ID, REFUNDS_MIGRATION_ID])
   assert.equal(result.writesPerformed, false)
 })
 
@@ -205,7 +227,7 @@ test('normalizes Wrangler .sql migration filenames for preflight and postflight 
   const report = verifyCompletePostflight({ migrationState })
   assert.equal(report.result, 'POSTFLIGHT_PASS')
   assert.deepEqual(report.appliedMigrations, REQUIRED_MIGRATION_IDS)
-  assert.equal(report.verifiedTriggers.length, 63)
+  assert.equal(report.verifiedTriggers.length, 71)
 })
 
 test('fails closed if any target object exists without matching migration history', () => {
@@ -234,8 +256,8 @@ test('postflight validates both migrations, all tables/columns/indexes/triggers,
   assert.equal(report.result, 'POSTFLIGHT_PASS')
   assert.equal(report.baselineSchemaPreserved, true)
   assert.deepEqual(report.appliedMigrations, REQUIRED_MIGRATION_IDS)
-  assert.equal(report.verifiedTables.length, 13)
-  assert.equal(report.verifiedIndexes.length, 27)
+  assert.equal(report.verifiedTables.length, 14)
+  assert.equal(report.verifiedIndexes.length, 30)
   assert.equal(report.verifiedTriggers.length, 63)
   assert.equal(report.databaseRowsExported, false)
 })
@@ -273,6 +295,7 @@ test('workflow is manual-only, gates exact SHA/name/confirmation, and never depl
   const migration = fs.readFileSync(new URL('../migrations-d1-04/0004_subscription_renewal_cycles.sql', import.meta.url), 'utf8')
   const revenueCatMigration = fs.readFileSync(new URL('../migrations-d1-04/0005_revenuecat_webhook_inbox.sql', import.meta.url), 'utf8')
   const paymentMethodRevocationMigration = fs.readFileSync(new URL('../migrations-d1-04/0006_payment_method_revocation_requests.sql', import.meta.url), 'utf8')
+  const refundsMigration = fs.readFileSync(new URL('../migrations-d1-04/0007_refunds.sql', import.meta.url), 'utf8')
   assert.match(workflow, /workflow_dispatch:/)
   assert.doesNotMatch(workflow, /^\s{2}(push|pull_request):/m)
   assert.match(workflow, /source_sha:/)
@@ -291,6 +314,7 @@ test('workflow is manual-only, gates exact SHA/name/confirmation, and never depl
   assert.match(workflow, /0004_subscription_renewal_cycles\.sql/)
   assert.match(workflow, /0005_revenuecat_webhook_inbox\.sql/)
   assert.match(workflow, /0006_payment_method_revocation_requests\.sql/)
+  assert.match(workflow, /0007_refunds\.sql/)
   assert.match(workflow, /PRAGMA table_info\("saved_payment_methods"\)/)
   assert.match(workflow, /PRAGMA table_info\("payment_mandates"\)/)
   assert.match(workflow, /PRAGMA table_info\("subscription_renewal_cycles"\)/)
@@ -302,6 +326,8 @@ test('workflow is manual-only, gates exact SHA/name/confirmation, and never depl
   assert.match(revenueCatMigration, /CREATE TABLE revenuecat_webhook_event_conflicts/)
   assert.match(paymentMethodRevocationMigration, /CREATE TABLE payment_method_revocation_requests/)
   assert.match(paymentMethodRevocationMigration, /payment_method_revocation_request_completion_guard/)
+  assert.match(refundsMigration, /CREATE TABLE refunds/)
+  assert.match(refundsMigration, /payment_provider_events_refund_binding_guard/)
   assert.match(migration, /subscription_renewal_cycles_sync_state_transition_guard/)
   assert.match(workflow, /PRAGMA table_info\("payments"\)/)
   assert.match(workflow, /PRAGMA table_info\("payment_provider_events"\)/)
