@@ -6,6 +6,7 @@ import { resolveCommerceOrderItems } from './order-item-resolution.js'
 import { applyDemoTaxPricing, isDemoPricingEnabled } from './demo-tax-pricing.js'
 import { applyTaxJarSandboxPricing } from './taxjar-sandbox-pricing.js'
 import { handleCommercePaymentIntentRequest } from './payment-intent-http-runtime.js'
+import { handlePaymentStatusRequest } from './payment-status-http-runtime.js'
 import { handleHyperswitchWebhookRequest } from './payment-webhook-http-runtime.js'
 import { handleRevenueCatWebhookRequest } from './revenuecat-webhook-http-runtime.js'
 import { handleRevenueCatSubscriberReconciliationRequest } from './revenuecat-subscriber-reconciliation-runtime.js'
@@ -216,6 +217,8 @@ export default {
       requireLayer(request)
       const paymentIntentResponse = await handleCommercePaymentIntentRequest(request, principal, env)
       if (paymentIntentResponse) return paymentIntentResponse
+      const paymentStatusResponse = await handlePaymentStatusRequest(request, principal, env)
+      if (paymentStatusResponse) return paymentStatusResponse
       const paymentMethodPath = new URL(request.url).pathname
       if (paymentMethodPath === '/payment-methods' && request.method === 'GET') {
         const methods = await listOwnedSavedPaymentMethods(env, principal)
