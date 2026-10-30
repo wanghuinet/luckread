@@ -329,7 +329,11 @@ describe('W07 internal customer refund runtime', () => {
       missingKey.dependencies,
     );
     expect(missingKeyResponse?.status).toBe(428);
+    expect(await missingKeyResponse?.json()).toMatchObject({ error: { code: 'PRECONDITION_REQUIRED' } });
+    expect(missingKey.calls.resolvePayment).toHaveLength(0);
+    expect(missingKey.calls.retrievePayment).toHaveLength(0);
     expect(missingKey.calls.reserve).toHaveLength(0);
+    expect(missingKey.calls.createProviderRefund).toHaveLength(0);
 
     const conflict = createFixture({
       reserveError: new RefundPersistenceError('IDEMPOTENCY_KEY_REUSE_CONFLICT', 409),
