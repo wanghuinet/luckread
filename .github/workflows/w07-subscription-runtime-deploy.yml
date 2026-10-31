@@ -75,6 +75,7 @@ jobs:
           test -f migrations/0002_subscription_version_cas.sql
           test -f migrations/0003_membership_plans.sql
           test -f migrations/0005_subscription_plan_changes.sql
+          test -f migrations/0006_immediate_subscription_upgrades.sql
           test -f migrations-d1-04/0001_order_commerce.sql
           test -f migrations-d1-04/0006_refunds_billing_documents.sql
           test -f src/index.ts
@@ -107,7 +108,7 @@ jobs:
           set -euo pipefail
           npx --yes wrangler@4.116.0 d1 list --json --config wrangler.jsonc > /tmp/w07-d1-list.json
           node scripts/verify-d1-04-binding.mjs /tmp/w07-d1-list.json
-          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command="SELECT name FROM d1_migrations WHERE name IN ('0001_membership_subscriptions.sql','0002_subscription_version_cas.sql','0003_membership_plans.sql','0004_revenuecat_membership_product_bindings.sql','0005_subscription_plan_changes.sql') ORDER BY name" --json > /tmp/w07-d1-migrations.json
+          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command="SELECT name FROM d1_migrations WHERE name IN ('0001_membership_subscriptions.sql','0002_subscription_version_cas.sql','0003_membership_plans.sql','0004_revenuecat_membership_product_bindings.sql','0005_subscription_plan_changes.sql','0006_immediate_subscription_upgrades.sql') ORDER BY name" --json > /tmp/w07-d1-migrations.json
           npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA table_info("membership_subscriptions")' --json > /tmp/w07-subscription-schema.json
           npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA index_list("membership_subscriptions")' --json > /tmp/w07-subscription-indexes.json
           npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA foreign_key_list("membership_subscriptions")' --json > /tmp/w07-subscription-foreign-keys.json
@@ -119,6 +120,9 @@ jobs:
           npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA table_info("membership_subscription_plan_changes")' --json > /tmp/w07-plan-change-schema.json
           npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA index_list("membership_subscription_plan_changes")' --json > /tmp/w07-plan-change-indexes.json
           npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command="SELECT name FROM sqlite_master WHERE type = 'trigger' AND tbl_name IN ('membership_subscription_plan_changes','membership_subscriptions') ORDER BY name" --json > /tmp/w07-plan-change-triggers.json
+          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA table_info("membership_subscription_plan_change_applications")' --json > /tmp/w07-plan-upgrade-schema.json
+          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA index_list("membership_subscription_plan_change_applications")' --json > /tmp/w07-plan-upgrade-indexes.json
+          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command="SELECT name FROM sqlite_master WHERE type = 'trigger' AND tbl_name IN ('membership_subscription_plan_change_applications','membership_subscriptions') ORDER BY name" --json > /tmp/w07-plan-upgrade-triggers.json
           node scripts/verify-remote-preflight.mjs preflight \
             /tmp/w07-d1-list.json \
             /tmp/w07-d1-migrations.json \
@@ -195,7 +199,7 @@ jobs:
           set -euo pipefail
           npx --yes wrangler@4.116.0 d1 list --json --config wrangler.jsonc > /tmp/w07-post-d1-list.json
           node scripts/verify-d1-04-binding.mjs /tmp/w07-post-d1-list.json
-          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command="SELECT name FROM d1_migrations WHERE name IN ('0001_membership_subscriptions.sql','0002_subscription_version_cas.sql','0003_membership_plans.sql','0004_revenuecat_membership_product_bindings.sql','0005_subscription_plan_changes.sql') ORDER BY name" --json > /tmp/w07-post-d1-migrations.json
+          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command="SELECT name FROM d1_migrations WHERE name IN ('0001_membership_subscriptions.sql','0002_subscription_version_cas.sql','0003_membership_plans.sql','0004_revenuecat_membership_product_bindings.sql','0005_subscription_plan_changes.sql','0006_immediate_subscription_upgrades.sql') ORDER BY name" --json > /tmp/w07-post-d1-migrations.json
           npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA table_info("membership_subscriptions")' --json > /tmp/w07-post-subscription-schema.json
           npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA index_list("membership_subscriptions")' --json > /tmp/w07-post-subscription-indexes.json
           npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA foreign_key_list("membership_subscriptions")' --json > /tmp/w07-post-subscription-foreign-keys.json
@@ -209,6 +213,9 @@ jobs:
           npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA table_info("membership_subscription_plan_changes")' --json > /tmp/w07-post-plan-change-schema.json
           npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA index_list("membership_subscription_plan_changes")' --json > /tmp/w07-post-plan-change-indexes.json
           npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command="SELECT name FROM sqlite_master WHERE type = 'trigger' AND tbl_name IN ('membership_subscription_plan_changes','membership_subscriptions') ORDER BY name" --json > /tmp/w07-post-plan-change-triggers.json
+          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA table_info("membership_subscription_plan_change_applications")' --json > /tmp/w07-post-plan-upgrade-schema.json
+          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA index_list("membership_subscription_plan_change_applications")' --json > /tmp/w07-post-plan-upgrade-indexes.json
+          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command="SELECT name FROM sqlite_master WHERE type = 'trigger' AND tbl_name IN ('membership_subscription_plan_change_applications','membership_subscriptions') ORDER BY name" --json > /tmp/w07-post-plan-upgrade-triggers.json
           node scripts/verify-remote-preflight.mjs postflight \
             /tmp/w07-post-d1-list.json \
             /tmp/w07-post-d1-migrations.json \
@@ -223,6 +230,9 @@ jobs:
             /tmp/w07-post-plan-change-schema.json \
             /tmp/w07-post-plan-change-indexes.json \
             /tmp/w07-post-plan-change-triggers.json \
+            /tmp/w07-post-plan-upgrade-schema.json \
+            /tmp/w07-post-plan-upgrade-indexes.json \
+            /tmp/w07-post-plan-upgrade-triggers.json \
             /tmp/w07-post-subscription-version-integrity.json \
             /tmp/w07-post-plan-integrity.json
 
@@ -253,7 +263,7 @@ jobs:
               "domain": "D1-04",
               "databaseUuid": "9bfb89a5-fbb5-45b1-a2ee-eab674b0d736"
             },
-            "migrations": ["0001_membership_subscriptions", "0002_subscription_version_cas", "0003_membership_plans", "0004_revenuecat_membership_product_bindings", "0005_subscription_plan_changes"],
+            "migrations": ["0001_membership_subscriptions", "0002_subscription_version_cas", "0003_membership_plans", "0004_revenuecat_membership_product_bindings", "0005_subscription_plan_changes", "0006_immediate_subscription_upgrades"],
             "migrationAction": "$MIGRATION_ACTION",
             "remoteMigration": $REMOTE_MIGRATION,
             "confirmation": "DEPLOY_W07_SUBSCRIPTION",
