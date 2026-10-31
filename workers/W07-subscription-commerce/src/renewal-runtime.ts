@@ -68,6 +68,19 @@ type RenewalSubscriptionRow = Readonly<{
   name: string;
   tier: string;
   benefits_json: string;
+  scheduled_change_id: string | null;
+  scheduled_source_plan_id: string | null;
+  scheduled_source_plan_version: number | null;
+  scheduled_target_plan_id: string | null;
+  scheduled_target_plan_version: number | null;
+  scheduled_change_type: string | null;
+  scheduled_effective_at: string | null;
+  scheduled_billing_interval: string | null;
+  scheduled_price_minor: number | null;
+  scheduled_currency: string | null;
+  scheduled_name: string | null;
+  scheduled_tier: string | null;
+  scheduled_benefits_json: string | null;
 }>;
 
 type RenewalOfferSnapshot = Readonly<{
@@ -82,6 +95,9 @@ type RenewalOfferSnapshot = Readonly<{
   priceMinor: number;
   currency: string;
   benefits: string[];
+  planChangeId?: string;
+  sourcePlanId?: string;
+  sourcePlanVersion?: number;
 }>;
 
 type RenewalCycleRow = {
@@ -277,6 +293,15 @@ function parseOfferSnapshot(raw: string): RenewalOfferSnapshot {
       new Set(value.benefits as string[]).size !== value.benefits.length) {
     throw new RenewalRuntimeError('INTEGRITY_VIOLATION', 500);
   }
+  const hasPlanChange = value.planChangeId !== undefined ||
+    value.sourcePlanId !== undefined || value.sourcePlanVersion !== undefined;
+  if (hasPlanChange && (
+    typeof value.planChangeId !== 'string' || !/^spc_[A-Za-z0-9]{26}$/.test(value.planChangeId) ||
+    !isBoundedText(value.sourcePlanId) ||
+    !Number.isSafeInteger(value.sourcePlanVersion) || (value.sourcePlanVersion as number) < 1
+  )) {
+    throw new RenewalRuntimeError('INTEGRITY_VIOLATION', 500);
+  }
   return value as RenewalOfferSnapshot;
 }
 
@@ -337,6 +362,7 @@ function normalizePricingDecision(
     subscriptionId: cycle.subscription_id,
     cycleStart: cycle.cycle_start,
     cycleEnd: cycle.cycle_end,
+    ...(offer.planChangeId ? { planChangeId: offer.planChangeId } : {}),
   };
   const itemSnapshotJson = JSON.stringify({
     planId: offer.planId,
@@ -450,16 +476,61 @@ async function insertOrReadCycle(
       typeof subscription.currency !== 'string' || !/^[A-Z]{3}$/.test(subscription.currency)) {
     throw new RenewalRuntimeError('SUBSCRIPTION_SNAPSHOT_INVALID', 503);
   }
+
   const cycleStart = subscription.current_period_end;
-  const cycleEnd = addBillingPeriod(cycleStart, subscription.billing_interval);
+  const hasScheduledChange = subscription.scheduled_change_id !== null;
+  let planId = subscription.plan_id;
+  let planVersion = subscription.plan_version;
+  let billingInterval = subscription.billing_interval as 'MONTHLY' | 'YEARLY';
+  let priceMinor = subscription.price_minor;
+  let currency = subscription.currency;
+  let name = subscription.name;
+  let tier = subscription.tier;
+  let benefitsJson = subscription.benefits_json;
+  let planChange: Pick<RenewalOfferSnapshot, 'planChangeId' | 'sourcePlanId' | 'sourcePlanVersion'> | undefined;
+
+  if (hasScheduledChange) {
+    if (!/^spc_[A-Za-z0-9]{26}$/.test(subscription.scheduled_change_id!) ||
+        subscription.scheduled_source_plan_id !== subscription.plan_id ||
+        subscription.scheduled_source_plan_version !== subscription.plan_version ||
+        !isBoundedText(subscription.scheduled_target_plan_id) ||
+        !Number.isSafeInteger(subscription.scheduled_target_plan_version) ||
+        subscription.scheduled_target_plan_version! < 1 ||
+        !['DOWNGRADE', 'BILLING_INTERVAL_CHANGE', 'SAME_PRICE_CHANGE'].includes(subscription.scheduled_change_type ?? '') ||
+        subscription.scheduled_effective_at !== cycleStart ||
+        (subscription.scheduled_billing_interval !== 'MONTHLY' && subscription.scheduled_billing_interval !== 'YEARLY') ||
+        !isSafeMinor(subscription.scheduled_price_minor, true) ||
+        subscription.scheduled_currency !== subscription.currency ||
+        !isBoundedText(subscription.scheduled_name, 120) ||
+        typeof subscription.scheduled_tier !== 'string' ||
+        !/^[a-z][a-z0-9_-]{0,63}$/.test(subscription.scheduled_tier) ||
+        typeof subscription.scheduled_benefits_json !== 'string') {
+      throw new RenewalRuntimeError('SCHEDULED_PLAN_CHANGE_INVALID', 503);
+    }
+    planId = subscription.scheduled_target_plan_id!;
+    planVersion = subscription.scheduled_target_plan_version!;
+    billingInterval = subscription.scheduled_billing_interval;
+    priceMinor = subscription.scheduled_price_minor!;
+    name = subscription.scheduled_name!;
+    tier = subscription.scheduled_tier!;
+    benefitsJson = subscription.scheduled_benefits_json;
+    planChange = {
+      planChangeId: subscription.scheduled_change_id!,
+      sourcePlanId: subscription.plan_id,
+      sourcePlanVersion: subscription.plan_version,
+    };
+  }
+
+  const cycleEnd = addBillingPeriod(cycleStart, billingInterval);
   const cycleId = await renewalCycleIdFor(subscription.subscription_id, cycleStart, cycleEnd);
 
-  // PAST_DUE may only resume a previously recorded cycle; never synthesize a
-  // second cycle to "repair" a missing paid-cycle record.
+  // PAST_DUE may only resume the exact already-persisted cycle; the target offer
+  // remains immutable in D1-04 even though the active Subscription still points
+  // at its source plan until a successful payment is confirmed.
   if (subscription.status === 'PAST_DUE') {
     const existing = await readCycleByPeriod(env.D1_04, subscription.subscription_id, cycleStart);
     if (!existing || existing.cycle_id !== cycleId || existing.cycle_end !== cycleEnd ||
-        existing.plan_id !== subscription.plan_id || existing.plan_version !== subscription.plan_version ||
+        existing.plan_id !== planId || existing.plan_version !== planVersion ||
         existing.subscriber_id !== subscription.subscriber_id) {
       throw new RenewalRuntimeError('PAST_DUE_CYCLE_MISSING_OR_MISMATCHED', 503);
     }
@@ -468,7 +539,7 @@ async function insertOrReadCycle(
 
   let benefits: unknown;
   try {
-    benefits = JSON.parse(subscription.benefits_json) as unknown;
+    benefits = JSON.parse(benefitsJson);
   } catch {
     throw new RenewalRuntimeError('SUBSCRIPTION_SNAPSHOT_INVALID', 503);
   }
@@ -481,14 +552,15 @@ async function insertOrReadCycle(
     subscriptionId: subscription.subscription_id,
     subscriberId: subscription.subscriber_id,
     creatorId: subscription.creator_id,
-    planId: subscription.plan_id,
-    planVersion: subscription.plan_version,
-    name: subscription.name,
-    tier: subscription.tier,
-    billingInterval: subscription.billing_interval,
-    priceMinor: subscription.price_minor,
-    currency: subscription.currency,
+    planId,
+    planVersion,
+    name,
+    tier,
+    billingInterval,
+    priceMinor,
+    currency,
     benefits: benefits as string[],
+    ...planChange,
   };
   const offerSnapshotJson = JSON.stringify(offer);
   await env.D1_04.prepare(
@@ -500,13 +572,13 @@ async function insertOrReadCycle(
     "VALUES (?, 'hyperswitch', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, NULL, NULL, NULL, 'AWAITING_PRICING', " +
     '0, NULL, NULL, NULL, NULL, 1, ?, ?) ON CONFLICT(subscription_id, cycle_start) DO NOTHING',
   ).bind(
-    cycleId, merchantId, offer.subscriptionId, offer.subscriberId, offer.planId, offer.planVersion,
-    cycleStart, cycleEnd, offer.billingInterval, offer.currency, offerSnapshotJson, now, now,
+    cycleId, merchantId, offer.subscriptionId, offer.subscriberId, planId, planVersion,
+    cycleStart, cycleEnd, billingInterval, currency, offerSnapshotJson, now, now,
   ).run();
   const cycle = await readCycleByPeriod(env.D1_04, subscription.subscription_id, cycleStart);
   if (!cycle) throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
-  if (cycle.cycle_end !== cycleEnd || cycle.plan_id !== subscription.plan_id ||
-      cycle.plan_version !== subscription.plan_version || cycle.subscriber_id !== subscription.subscriber_id) {
+  if (cycle.cycle_end !== cycleEnd || cycle.plan_id !== planId ||
+      cycle.plan_version !== planVersion || cycle.subscriber_id !== subscription.subscriber_id) {
     throw new RenewalRuntimeError('CYCLE_IDENTITY_CONFLICT', 409);
   }
   return cycle;
@@ -562,14 +634,21 @@ export async function scanDueSubscriptionRenewals(
     rows = (await env.D1_01.prepare(
       'SELECT s.subscription_id, s.subscriber_id, s.plan_id, s.plan_version, s.creator_id, s.status, ' +
       's.current_period_start, s.current_period_end, s.cancel_at, pv.billing_interval, pv.price_minor, ' +
-      'pv.currency, pv.name, pv.tier, pv.benefits_json ' +
+      'pv.currency, pv.name, pv.tier, pv.benefits_json, ' +
+      'sc.change_id AS scheduled_change_id, sc.source_plan_id AS scheduled_source_plan_id, ' +
+      'sc.source_plan_version AS scheduled_source_plan_version, sc.target_plan_id AS scheduled_target_plan_id, ' +
+      'sc.target_plan_version AS scheduled_target_plan_version, sc.change_type AS scheduled_change_type, ' +
+      'sc.effective_at AS scheduled_effective_at, tpv.billing_interval AS scheduled_billing_interval, ' +
+      'tpv.price_minor AS scheduled_price_minor, tpv.currency AS scheduled_currency, tpv.name AS scheduled_name, ' +
+      'tpv.tier AS scheduled_tier, tpv.benefits_json AS scheduled_benefits_json ' +
       'FROM membership_subscriptions s ' +
       'JOIN membership_plan_versions pv ON pv.plan_id = s.plan_id AND pv.plan_version = s.plan_version ' +
+      "LEFT JOIN membership_subscription_plan_changes sc ON sc.subscription_id = s.subscription_id AND sc.subscriber_id = s.subscriber_id AND sc.status = 'SCHEDULED' AND sc.source_plan_id = s.plan_id AND sc.source_plan_version = s.plan_version AND sc.effective_at = s.current_period_end " +
+      'LEFT JOIN membership_plan_versions tpv ON tpv.plan_id = sc.target_plan_id AND tpv.plan_version = sc.target_plan_version ' +
       "WHERE s.status IN ('ACTIVE','PAST_DUE') AND s.current_period_end <= ? " +
       'AND (s.cancel_at IS NULL OR s.cancel_at > s.current_period_end) ' +
       'AND (? IS NULL OR s.current_period_end > ? OR (s.current_period_end = ? AND s.subscription_id > ?)) ' +
-      'ORDER BY s.current_period_end ASC, s.subscription_id ASC LIMIT ?',
-    ).bind(
+      'ORDER BY s.current_period_end ASC, s.subscription_id ASC LIMIT ?'    ).bind(
       now, cursor.cursor_period_end, cursor.cursor_period_end, cursor.cursor_period_end,
       cursor.cursor_subscription_id, limit,
     ).all<RenewalSubscriptionRow>()).results ?? [];
@@ -633,6 +712,12 @@ type ChargeSubscriptionRow = Readonly<{
   status: string;
   current_period_end: string;
   cancel_at: string | null;
+  scheduled_change_id: string | null;
+  scheduled_source_plan_id: string | null;
+  scheduled_source_plan_version: number | null;
+  scheduled_target_plan_id: string | null;
+  scheduled_target_plan_version: number | null;
+  scheduled_effective_at: string | null;
 }>;
 
 async function isSubscriptionChargeableForCycle(
@@ -642,18 +727,35 @@ async function isSubscriptionChargeableForCycle(
   let subscription: ChargeSubscriptionRow | null;
   try {
     subscription = await env.D1_01.prepare(
-      'SELECT subscription_id, subscriber_id, plan_id, plan_version, status, current_period_end, cancel_at ' +
-      'FROM membership_subscriptions WHERE subscription_id = ? AND subscriber_id = ? LIMIT 1',
+      'SELECT s.subscription_id, s.subscriber_id, s.plan_id, s.plan_version, s.status, s.current_period_end, s.cancel_at, ' +
+      'sc.change_id AS scheduled_change_id, sc.source_plan_id AS scheduled_source_plan_id, ' +
+      'sc.source_plan_version AS scheduled_source_plan_version, sc.target_plan_id AS scheduled_target_plan_id, ' +
+      'sc.target_plan_version AS scheduled_target_plan_version, sc.effective_at AS scheduled_effective_at ' +
+      'FROM membership_subscriptions s LEFT JOIN membership_subscription_plan_changes sc ' +
+      "ON sc.subscription_id = s.subscription_id AND sc.subscriber_id = s.subscriber_id AND sc.status = 'SCHEDULED' " +
+      'WHERE s.subscription_id = ? AND s.subscriber_id = ? LIMIT 1',
     ).bind(cycle.subscription_id, cycle.subscriber_id).first<ChargeSubscriptionRow>();
   } catch {
     throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
   }
   const retryingPastDue = cycle.outcome_code === 'RETRY_PREPARED' || cycle.attempt_number > 1;
+  const offer = parseOfferSnapshot(cycle.offer_snapshot_json);
+  const scheduledChangeValid = !!offer.planChangeId &&
+    subscription?.scheduled_change_id === offer.planChangeId &&
+    subscription.scheduled_source_plan_id === offer.sourcePlanId &&
+    subscription.scheduled_source_plan_version === offer.sourcePlanVersion &&
+    subscription.scheduled_target_plan_id === cycle.plan_id &&
+    subscription.scheduled_target_plan_version === cycle.plan_version &&
+    subscription.scheduled_effective_at === cycle.cycle_start &&
+    subscription.plan_id === offer.sourcePlanId &&
+    subscription.plan_version === offer.sourcePlanVersion;
+  const ordinaryCycleValid = !offer.planChangeId &&
+    subscription?.plan_id === cycle.plan_id &&
+    subscription?.plan_version === cycle.plan_version;
   return !!subscription &&
     subscription.subscription_id === cycle.subscription_id &&
     subscription.subscriber_id === cycle.subscriber_id &&
-    subscription.plan_id === cycle.plan_id &&
-    subscription.plan_version === cycle.plan_version &&
+    (ordinaryCycleValid || scheduledChangeValid) &&
     subscription.current_period_end === cycle.cycle_start &&
     (subscription.status === 'ACTIVE' || (retryingPastDue && subscription.status === 'PAST_DUE')) &&
     (subscription.cancel_at === null ||
