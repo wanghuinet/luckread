@@ -16,8 +16,6 @@ CREATE TABLE membership_subscription_plan_change_applications (
   current_period_end TEXT NOT NULL CHECK (length(current_period_end) BETWEEN 1 AND 64 AND current_period_end > current_period_start),
   order_id TEXT NOT NULL CHECK (length(order_id) BETWEEN 1 AND 255),
   payment_id TEXT NOT NULL CHECK (length(payment_id) = 30 AND substr(payment_id, 1, 4) = 'pay_' AND substr(payment_id, 5) NOT GLOB '*[^A-Za-z0-9]*'),
-  amount_minor INTEGER NOT NULL CHECK (typeof(amount_minor) = 'integer' AND amount_minor BETWEEN 1 AND 9007199254740991),
-  currency TEXT NOT NULL CHECK (length(currency) = 3 AND currency GLOB '[A-Z][A-Z][A-Z]'),
   request_hash TEXT NOT NULL CHECK (length(request_hash) = 64 AND request_hash NOT GLOB '*[^a-f0-9]*'),
   status TEXT NOT NULL CHECK (status IN ('READY','APPLIED')),
   version INTEGER NOT NULL DEFAULT 1 CHECK (typeof(version) = 'integer' AND version >= 1),
@@ -63,7 +61,6 @@ WHEN NOT EXISTS (
     AND sp.owner_id = tp.owner_id
     AND sv.billing_interval = tv.billing_interval
     AND sv.currency = tv.currency
-    AND sv.currency = NEW.currency
     AND tv.price_minor > sv.price_minor
 )
 BEGIN SELECT RAISE(ABORT, 'paid upgrade application does not match the current subscription and immutable plans'); END;
@@ -71,7 +68,7 @@ BEGIN SELECT RAISE(ABORT, 'paid upgrade application does not match the current s
 CREATE TRIGGER membership_subscription_plan_change_applications_identity_immutable
 BEFORE UPDATE OF application_id, subscription_id, subscriber_id, source_plan_id, source_plan_version,
   target_plan_id, target_plan_version, expected_subscription_version, current_period_start,
-  current_period_end, order_id, payment_id, amount_minor, currency, request_hash, created_at
+  current_period_end, order_id, payment_id, request_hash, created_at
 ON membership_subscription_plan_change_applications
 WHEN NEW.application_id IS NOT OLD.application_id
   OR NEW.subscription_id IS NOT OLD.subscription_id
@@ -85,8 +82,6 @@ WHEN NEW.application_id IS NOT OLD.application_id
   OR NEW.current_period_end IS NOT OLD.current_period_end
   OR NEW.order_id IS NOT OLD.order_id
   OR NEW.payment_id IS NOT OLD.payment_id
-  OR NEW.amount_minor IS NOT OLD.amount_minor
-  OR NEW.currency IS NOT OLD.currency
   OR NEW.request_hash IS NOT OLD.request_hash
   OR NEW.created_at IS NOT OLD.created_at
 BEGIN SELECT RAISE(ABORT, 'paid upgrade application identity is immutable'); END;
