@@ -62,6 +62,7 @@ export type RenewalScheduledDependencies = Readonly<{
   syncPending?: typeof syncPendingRenewalOutcomes;
   scanDue?: typeof scanDueSubscriptionRenewals;
   processCycle?: typeof processSubscriptionRenewalCycle;
+  expireTrials?: typeof expireDueWebMembershipTrials;
 }>;
 
 async function readTableNames(db: D1Database, expected: readonly string[]): Promise<Set<string>> {
@@ -107,6 +108,7 @@ export async function runRenewalScheduledBatch(
   const syncPending = dependencies.syncPending ?? syncPendingRenewalOutcomes;
   const scanDue = dependencies.scanDue ?? scanDueSubscriptionRenewals;
   const processCycle = dependencies.processCycle ?? processSubscriptionRenewalCycle;
+  const expireTrials = dependencies.expireTrials ?? expireDueWebMembershipTrials;
 
   let beforeRecovery: OutcomeBatch;
   try {
@@ -130,7 +132,7 @@ export async function runRenewalScheduledBatch(
 
   let trialExpiry: Readonly<{ scanned: number; expired: number }>;
   try {
-    trialExpiry = await expireDueWebMembershipTrials(env.D1_01, new Date(), 100, env.D1_04);
+    trialExpiry = await expireTrials(env.D1_01, new Date(), 100, env.D1_04);
   } catch {
     return { status: 'PARTIAL', phase: 'TRIAL_EXPIRY', beforeRecovery };
   }
