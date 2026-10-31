@@ -211,17 +211,19 @@ const requireW01Transport = (request: Request): { userId: string; layer: string;
   return { userId, layer, correlationId, requestId }
 }
 
-const requireW07Transport = (request: Request): { correlationId: string; requestId: string } => {
+const requireW07Transport = (request: Request): { userId: string; correlationId: string; requestId: string } => {
   if (
     request.headers.get('X-LuckRead-Caller') !== 'W07' ||
     request.headers.get('X-LuckRead-Transport-Version') !== '1.0'
   ) throw new ModerationRuntimeError('PERMISSION_DENIED', 403)
+  const userId = request.headers.get('X-LuckRead-Principal-User-Id')?.trim() ?? ''
   const correlationId = request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? ''
   const requestId = request.headers.get('X-LuckRead-Request-Id')?.trim() ?? ''
-  if (!correlationId || !requestId || correlationId.length > 256 || requestId.length > 256) {
+  if (!userId || userId.length > 256 || /[\\u0000-\\u001f\\u007f]/.test(userId) ||
+      !correlationId || correlationId.length > 256 || !requestId || requestId.length > 256) {
     throw new ModerationRuntimeError('UNAUTHENTICATED', 401)
   }
-  return { correlationId, requestId }
+  return { userId, correlationId, requestId }
 }
 
 const parseDecision = (value: unknown): {
@@ -980,6 +982,7 @@ export default {
       let input: SubscriptionPlanUpgradeAppliedAuditInput
       try { input = parseSubscriptionPlanUpgradeAppliedAuditInput(await readBoundedAuditJson(request, 4096)) }
       catch { return json({ error: 'INVALID_SUBSCRIPTION_PLAN_UPGRADE_APPLIED_AUDIT' }, 400) }
+      if (input.subscriberId !== transport.userId) return json({ error: 'PERMISSION_DENIED' }, 403)
       const event: AuditEvent = {
         eventId: input.eventId,
         requestId: transport.requestId,
