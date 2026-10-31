@@ -111,6 +111,20 @@ export function fetchActiveMembershipPlansPage(options: PlanPageOptions = {}) {
 }
 
 
+/** Cancel a WEB trial conversion with an optimistic subscription-version precondition. */
+export function cancelWebMembershipTrial(subscriptionId: string, etag: string) {
+  if (typeof subscriptionId !== 'string' || !/^sub_[a-f0-9]{64}$/.test(subscriptionId)) {
+    throw new RangeError('A canonical subscription ID is required.');
+  }
+  if (typeof etag !== 'string' || !/^"lr-v([1-9]\d*)"$/.test(etag)) {
+    throw new RangeError('A valid subscription version is required.');
+  }
+  return apiRequest<unknown>('/memberships/subscriptions/' + encodeURIComponent(subscriptionId) + '/cancel-trial', {
+    method: 'POST',
+    headers: { 'If-Match': etag },
+  });
+}
+
 /** Start a WEB trial only when W07 confirms an existing active MIT mandate. */
 export function startWebMembershipTrial(planId: string) {
   if (typeof planId !== 'string' || !/^plan_[a-f0-9]{64}$/.test(planId)) {
