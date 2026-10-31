@@ -282,7 +282,7 @@ async function forward(request: Request, context: RouteContext): Promise<Respons
       const denied = await authorizeSubscriptionPermission(request, principal.userId, 'subscription.cancel')
       if (denied) return denied
       const ifMatch = request.headers.get('If-Match') ?? ''
-      const versionMatch = /^"lr-v([1-9]\\d*)"$/.exec(ifMatch)
+      const versionMatch = /^"lr-v([1-9]\d*)"$/.exec(ifMatch)
       const expectedVersion = versionMatch?.[1] ? Number(versionMatch[1]) : Number.NaN
       if (!Number.isSafeInteger(expectedVersion) || expectedVersion < 1) {
         return errorResponse(ifMatch ? 412 : 428, ifMatch ? 'PRECONDITION_FAILED' : 'PRECONDITION_REQUIRED', 'A valid If-Match subscription version is required')
