@@ -391,6 +391,43 @@
       ]
     },
     {
+      "evidenceId": "API_OPERATION:createSubscriptionUpgradeOrder",
+      "subjectType": "API_OPERATION",
+      "subjectId": "createSubscriptionUpgradeOrder",
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "workers/W01-payload/src/app/api/v1/memberships/subscriptions/[[...segments]]/route.ts",
+        "workers/W07-subscription-commerce/src/index.ts",
+        "workers/W07-subscription-commerce/src/subscription-upgrade-checkout.ts",
+        "workers/W07-subscription-commerce/src/paid-membership-order-fulfillment.ts",
+        "workers/W07-subscription-commerce/src/paid-membership-plan-upgrade-application.ts",
+        "workers/W07-subscription-commerce/src/payment-intent-http-runtime.ts",
+        "workers/W07-subscription-commerce/src/payment-webhook-http-runtime.ts",
+        "workers/W07-subscription-commerce/migrations/0006_immediate_subscription_upgrades.sql"
+      ],
+      "testRefs": [
+        "workers/W07-subscription-commerce/src/paid-membership-plan-upgrade-application.test.ts",
+        ".github/workflows/w07-subscription-runtime-ci.yml",
+        "workers/W07-subscription-commerce/src/paid-membership-order-fulfillment.test.ts"
+      ],
+      "schemaEvidenceRefs": [
+        "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json#paidPlanUpgradeApplicationTable"
+      ],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/openapi/v1/operation-policy.json",
+        "contracts/api/api-inventory.v1.json",
+        "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json",
+        "contracts/alignment/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "D1-01 migration 0006 is a reviewed code candidate only and has not been applied; no production entitlement change is admitted until migration postflight is complete.",
+        "Upgrade order creation uses the existing demo/sandbox tax-pricing admission only; live authoritative pricing/tax remains fail-closed and is not represented as production-ready.",
+        "Code-level regression cases were authored but not executed in this feature-first pass; full unit, CI and signed production E2E validation remain deferred until the remaining feature units are complete.",
+        "The read-only plan-change preview draft PR #1445 remains separate and unmerged; the upgrade checkout recomputes the authoritative quote inside W07 and does not trust the preview response."
+      ]
+    },
+    {
       "evidenceId": "API_OPERATION:checkEntitlement",
       "subjectType": "API_OPERATION",
       "subjectId": "checkEntitlement",
