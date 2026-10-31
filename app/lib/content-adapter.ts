@@ -124,7 +124,6 @@ export async function resolvePublicProfileById(
 }
 
 
-
 function resolveMediaUrl(value: unknown): string | null {
   if (typeof value !== 'string' || !value.trim()) return null;
   const reference = value.trim();
