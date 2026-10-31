@@ -446,6 +446,8 @@ export async function getScheduledSubscriptionPlanChange(
   }
 
   let row: (ScheduledPlanChangeRow & {
+    current_plan_id: string;
+    current_plan_version: number;
     name: string;
     tier: string;
     billing_interval: string;
@@ -457,13 +459,14 @@ export async function getScheduledSubscriptionPlanChange(
       'SELECT sc.change_id, sc.subscription_id, sc.subscriber_id, sc.source_plan_id, ' +
       'sc.source_plan_version, sc.target_plan_id, sc.target_plan_version, sc.change_type, ' +
       'sc.effective_at, sc.status, sc.request_hash, sc.version, sc.created_at, sc.updated_at, ' +
+      's.plan_id AS current_plan_id, s.plan_version AS current_plan_version, ' +
       'pv.name, pv.tier, pv.billing_interval, pv.price_minor, pv.currency ' +
       'FROM membership_subscription_plan_changes sc ' +
       'INNER JOIN membership_subscriptions s ON s.subscription_id = sc.subscription_id AND s.subscriber_id = sc.subscriber_id ' +
       'INNER JOIN membership_plan_versions pv ON pv.plan_id = sc.target_plan_id AND pv.plan_version = sc.target_plan_version ' +
-      "WHERE sc.subscription_id = ? AND sc.subscriber_id = ? AND sc.status = 'SCHEDULED' " +
-      'AND s.plan_id = sc.source_plan_id AND s.plan_version = sc.source_plan_version LIMIT 1',
+      "WHERE sc.subscription_id = ? AND sc.subscriber_id = ? AND sc.status = 'SCHEDULED' LIMIT 1",
     ).bind(subscriptionId, subscriberId).first<(ScheduledPlanChangeRow & {
+      current_plan_id: string; current_plan_version: number;
       name: string; tier: string; billing_interval: string; price_minor: number; currency: string;
     })>();
   } catch {
@@ -471,7 +474,10 @@ export async function getScheduledSubscriptionPlanChange(
   }
   if (!row) return null;
   const dto = toPublic(row, 1, false);
-  if (!['DOWNGRADE', 'BILLING_INTERVAL_CHANGE', 'SAME_PRICE_CHANGE'].includes(row.change_type) ||
+  if (row.current_plan_id !== row.source_plan_id ||
+      row.current_plan_version !== row.source_plan_version ||
+      row.status !== 'SCHEDULED' ||
+      !['DOWNGRADE', 'BILLING_INTERVAL_CHANGE', 'SAME_PRICE_CHANGE'].includes(row.change_type) ||
       typeof row.name !== 'string' || !row.name.trim() || row.name.length > 120 ||
       !/^[a-z][a-z0-9_-]{0,63}$/.test(row.tier) ||
       (row.billing_interval !== 'MONTHLY' && row.billing_interval !== 'YEARLY') ||
