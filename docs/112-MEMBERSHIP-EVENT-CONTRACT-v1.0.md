@@ -84,11 +84,12 @@ WEB trial start and cancellation use W01 authorization and immutable W06 audit r
 
 ```text
 membership.subscription.trial_requested
+membership.subscription.trial_cancel_requested
 membership.subscription.trial_started
 membership.subscription.trial_canceled
 ```
 
-The request intent is recorded before W07 writes the D1-01 Subscription and trial row. The start/cancel result uses a stable event ID and source timestamp so a client retry cannot create a conflicting audit event. W06 records describe user intent and subscription lifecycle evidence; they are not payment facts.
+The start intent is recorded before W07 writes the D1-01 Subscription and trial row. The cancellation intent is also recorded before W07 mutates the Subscription and is replayed by stable semantic event identity; the final start/cancel result uses a stable event ID and source timestamp. W06 records describe user intent and subscription lifecycle evidence; they are not payment facts.
 
 App Store and Play Store trial state is reconciled from a current RevenueCat customer snapshot only after W02 verifies the App User ID against the authenticated subscriber and W07 resolves the immutable store-product binding. Store purchase and renewal facts remain under App Store/Google Play and RevenueCat; an unverified webhook body or client field cannot start a trial or grant access.
 
