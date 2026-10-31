@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Pressable,
   RefreshControl,
@@ -14,7 +15,9 @@ import { useRouter } from 'expo-router';
 import { getApiErrorMessage } from '~/lib/api-client';
 import { unwrapApiData } from '~/lib/content-adapter';
 import {
+  cancelWebMembershipTrial,
   fetchMySubscriptionsPage,
+  type MembershipTrialSummary,
   type MySubscription,
   type MySubscriptionPage,
   type SubscriptionStatus,
@@ -25,6 +28,7 @@ const PRIMARY = '#1d9bf0';
 
 const STATUS_LABELS: Record<SubscriptionStatus, string> = {
   PENDING: '待处理',
+  TRIALING: '试用中',
   ACTIVE: '有效',
   PAST_DUE: '付款逾期',
   PAUSED: '已暂停',
@@ -33,6 +37,7 @@ const STATUS_LABELS: Record<SubscriptionStatus, string> = {
 };
 
 const statusClasses: Record<SubscriptionStatus, string> = {
+  TRIALING: 'border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-300',
   PENDING: 'border-neutral-200 bg-neutral-50 text-neutral-700 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300',
   ACTIVE: 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300',
   PAST_DUE: 'border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300',
@@ -51,6 +56,15 @@ function isSubscriptionStatus(value: unknown): value is SubscriptionStatus {
   return typeof value === 'string' && Object.prototype.hasOwnProperty.call(STATUS_LABELS, value);
 }
 
+function isTrialSummary(value: unknown): value is MembershipTrialSummary | null {
+  if (value === null) return true;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const trial = value as Record<string, unknown>;
+  return ['WEB', 'APP_STORE', 'PLAY_STORE'].includes(String(trial.source)) &&
+    ['TRIALING', 'CANCELED', 'PAYMENT_FAILED', 'CONVERTED', 'EXPIRED'].includes(String(trial.status)) &&
+    typeof trial.trialEndsAt === 'string' && Number.isFinite(Date.parse(trial.trialEndsAt));
+}
+
 function isSubscriptionRecord(value: unknown): value is MySubscription {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const item = value as Record<string, unknown>;
@@ -60,7 +74,8 @@ function isSubscriptionRecord(value: unknown): value is MySubscription {
     isSubscriptionStatus(item.status) &&
     typeof item.currentPeriodStart === 'string' &&
     typeof item.currentPeriodEnd === 'string' &&
-    typeof item.etag === 'string' && item.etag.length > 0;
+    typeof item.etag === 'string' && item.etag.length > 0 &&
+    isTrialSummary(item.trial);
 }
 
 function SubscriptionCard({ item }: { item: MySubscription }) {
