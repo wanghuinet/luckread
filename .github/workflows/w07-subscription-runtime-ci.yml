@@ -342,7 +342,7 @@ jobs:
             'target_plan_id':('TEXT',1,0),'target_plan_version':('INTEGER',1,0),
             'expected_subscription_version':('INTEGER',1,0),'current_period_start':('TEXT',1,0),
             'current_period_end':('TEXT',1,0),'order_id':('TEXT',1,0),'payment_id':('TEXT',1,0),
-            'amount_minor':('INTEGER',1,0),'currency':('TEXT',1,0),'request_hash':('TEXT',1,0),
+            'request_hash':('TEXT',1,0),
             'status':('TEXT',1,0),'version':('INTEGER',1,0),'created_at':('TEXT',1,0),'updated_at':('TEXT',1,0),
           }
           if upgrade_cols != expected_upgrade_cols: raise SystemExit(f'unexpected immediate-upgrade application schema: {upgrade_cols!r}')
@@ -362,7 +362,7 @@ jobs:
             raise SystemExit('immediate upgrade bypassed the required paid application')
           except sqlite3.IntegrityError:
             pass
-          db.execute("INSERT INTO membership_subscription_plan_change_applications(application_id,subscription_id,subscriber_id,source_plan_id,source_plan_version,target_plan_id,target_plan_version,expected_subscription_version,current_period_start,current_period_end,order_id,payment_id,amount_minor,currency,request_hash,status,version,created_at,updated_at) VALUES ('spa_cccccccccccccccccccccccccc','sub_upgrade_probe','user_probe','plan_probe',1,'plan_upgrade_target',1,1,'2026-10-01T00:00:00.000Z','2026-10-31T00:00:00.000Z','ord_upgrade_probe','pay_dddddddddddddddddddddddddd',575,'USD','cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc','READY',1,'2026-10-10T10:00:00.000Z','2026-10-10T10:00:00.000Z')")
+          db.execute("INSERT INTO membership_subscription_plan_change_applications(application_id,subscription_id,subscriber_id,source_plan_id,source_plan_version,target_plan_id,target_plan_version,expected_subscription_version,current_period_start,current_period_end,order_id,payment_id,request_hash,status,version,created_at,updated_at) VALUES ('spa_cccccccccccccccccccccccccc','sub_upgrade_probe','user_probe','plan_probe',1,'plan_upgrade_target',1,1,'2026-10-01T00:00:00.000Z','2026-10-31T00:00:00.000Z','ord_upgrade_probe','pay_dddddddddddddddddddddddddd','cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc','READY',1,'2026-10-10T10:00:00.000Z','2026-10-10T10:00:00.000Z')")
           db.execute("UPDATE membership_subscriptions SET plan_id='plan_upgrade_target',plan_version=1,updated_at='2026-10-10T10:00:00.001Z',version=2 WHERE subscription_id='sub_upgrade_probe' AND version=1")
           if db.execute("SELECT status FROM membership_subscription_plan_change_applications WHERE order_id='ord_upgrade_probe'").fetchone() != ('APPLIED',): raise SystemExit('paid upgrade application did not transition to APPLIED')
           if db.execute("SELECT plan_id,version,current_period_start,current_period_end FROM membership_subscriptions WHERE subscription_id='sub_upgrade_probe'").fetchone() != ('plan_upgrade_target',2,'2026-10-01T00:00:00.000Z','2026-10-31T00:00:00.000Z'): raise SystemExit('paid upgrade changed the wrong subscription or billing period')
