@@ -4,7 +4,7 @@ import {
   W07SubscriptionClientError,
 } from '../../../../../../subscription/w07-subscription-client.js'
 import { callW08Creator, W08CreatorClientError } from '../../../../../../auth/w08-creator-client.js'
-import { callW06SubscriptionPlanChangeRequestAudit, W06ModerationClientError } from '../../../../../../moderation/w06-moderation-client.js'
+import { callW06SubscriptionPlanChangeRequestAudit } from '../../../../../../moderation/w06-moderation-client.js'
 
 const errorResponse = (status: number, code: string, message: string) =>
   Response.json({ error: { code, message, details: {} }, requestId: `req_${crypto.randomUUID()}` }, { status, headers: { 'cache-control': 'no-store' } })
@@ -213,6 +213,7 @@ async function forward(request: Request, context: RouteContext): Promise<Respons
     return await callW07Subscription({ request, pathname, method: 'GET', principal })
   } catch (error) {
     if (error instanceof W07SubscriptionClientError) return errorResponse(error.status, error.code, error.message)
+    if (error instanceof W08CreatorClientError) return errorResponse(503, 'AUTHORIZATION_UNAVAILABLE', 'Subscription authorization unavailable')
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Subscription service unavailable')
   }
 }
