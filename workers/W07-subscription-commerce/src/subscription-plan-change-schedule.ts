@@ -317,6 +317,7 @@ export async function scheduleSubscriptionPlanDowngrade(
       preview.prorationBaseMinor !== 0 || preview.effectiveAt !== preview.currentPeriodEnd ||
       preview.targetPlan.billingInterval !== preview.currentPlan.billingInterval ||
       preview.targetPlan.currency !== preview.currentPlan.currency ||
+      preview.targetPlan.priceMinor < 1 ||
       preview.targetPlan.priceMinor >= preview.currentPlan.priceMinor) {
     throw new SubscriptionRuntimeError('INVALID_STATE', 409);
   }
