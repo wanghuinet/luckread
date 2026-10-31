@@ -2537,7 +2537,7 @@
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
     },
     {
-      "operationId": "cancelSubscriptionOp",
+      "operationId": "checkoutSubscriptionPlanUpgrade",
       "auth": {
         "mode": "permission"
       },
