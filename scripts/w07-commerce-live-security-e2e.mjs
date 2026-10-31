@@ -239,6 +239,22 @@ try {
           foreignIdentifiersLeaked: !isolated,
         })
 
+        const fixtureCoverage = {
+          primaryPayment: primaryPages.payment_history.length > 0,
+          foreignPayment: foreignPages.payment_history.length > 0,
+          refundHistory: primaryPages.refund_history.length + foreignPages.refund_history.length > 0,
+          billingDocuments: primaryPages.billing_documents.length + foreignPages.billing_documents.length > 0,
+        }
+        const fixtureCoveragePass = Object.values(fixtureCoverage).every(Boolean)
+        check('qa_fixture_coverage_for_each_billing_security_domain', fixtureCoveragePass, {
+          primaryPaymentCount: primaryPages.payment_history.length,
+          foreignPaymentCount: foreignPages.payment_history.length,
+          refundHistoryCount: primaryPages.refund_history.length + foreignPages.refund_history.length,
+          billingDocumentCount: primaryPages.billing_documents.length + foreignPages.billing_documents.length,
+          missingFixtures: Object.entries(fixtureCoverage).filter(([, present]) => !present).map(([name]) => name),
+        })
+        if (!fixtureCoveragePass) result.status = 'BLOCKED_MISSING_BILLING_SECURITY_FIXTURES'
+
         const foreignPayment = foreignPages.payment_history.find((item) =>
           ['succeeded', 'partially_captured'].includes(item?.status))
         if (!foreignPayment || !/^pay_[A-Za-z0-9]{26}$/.test(foreignPayment.paymentId || '') ||
