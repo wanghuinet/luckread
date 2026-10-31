@@ -367,10 +367,10 @@ export async function createSubscriptionPlanUpgradeCheckout(
     throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
   }
   const now = nowDate.toISOString();
-  if (await hasPendingScheduledPlanDowngrade(env.D1_01, subscriptionId)) {
-    throw new SubscriptionRuntimeError('CONFLICT', 409);
-  }
 
+  // Existing idempotency attempts must replay the original order even if a
+  // later period-end downgrade has since been scheduled. New attempts are
+  // mutually exclusive through the guarded INSERT below.
   let attemptRow = await readAttemptByIdempotency(env.D1_01, subscriberId, keyDigest);
   const replayedAttempt = attemptRow !== null
   if (attemptRow) {
