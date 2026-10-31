@@ -18,6 +18,7 @@ interface RateLimitBinding { limit(input: { key: string }): Promise<{ success: b
 interface Env {
   D1_01: D1Database
   D1_04: D1Database
+  W06_GOVERNANCE?: Fetcher
   HYPERSWITCH_ENVIRONMENT?: string
   COMMERCE_PRICING_MODE?: string
   HYPERSWITCH_API_KEY?: string
