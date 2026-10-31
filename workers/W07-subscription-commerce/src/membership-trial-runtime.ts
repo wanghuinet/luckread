@@ -420,9 +420,9 @@ export async function getMembershipTrialDetails(
  */
 export async function expireDueWebMembershipTrials(
   db: D1Database,
+  d1_04: D1Database,
   now = new Date(),
   limit = 100,
-  d1_04: D1Database,
 ): Promise<Readonly<{ scanned: number; expired: number }>> {
   if (!(now instanceof Date) || !Number.isFinite(now.getTime())) {
     throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
