@@ -3,6 +3,7 @@ import {
   resolveCookieSubscriptionPrincipal,
   W07SubscriptionClientError,
 } from '../../../../../../subscription/w07-subscription-client.js'
+import type { ContentPrincipal } from '../../../../../../content/w03-content-client.js'
 import { callW08Creator, W08CreatorClientError } from '../../../../../../auth/w08-creator-client.js'
 import {
   callW06SubscriptionPlanChangeAudit,
@@ -15,63 +16,55 @@ const errorResponse = (status: number, code: string, message: string) =>
 
 type RouteContext = { params: Promise<{ segments?: string[] }> }
 
-type SubscriptionDto = Readonly<{
-  subscriptionId: string
-  subscriberId: string
-  planId: string
-  planVersion: number
-  creatorId: string | null
-  status: string
-  currentPeriodStart: string
-  currentPeriodEnd: string
-  cancelAt: string | null
-  version: number
-  etag: string
-}>
-
-type PlanDto = Readonly<{
-  planId: string
-  creatorId: string
-  planVersion: number
-  billingInterval: 'MONTHLY' | 'YEARLY'
-  priceMinor: number
-  currency: string
-}>
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value)
-
-function parseSubscription(value: unknown, subscriptionId: string, subscriberId: string): SubscriptionDto | null {
-  if (!isRecord(value)) return null
-  const data = value.data
-  if (!isRecord(data) || data.subscriptionId !== subscriptionId || data.subscriberId !== subscriberId ||
-      typeof data.planId !== 'string' || !/^plan_[a-f0-9]{64}$/.test(data.planId) ||
-      !Number.isSafeInteger(data.planVersion) || Number(data.planVersion) < 1 ||
-      !(data.creatorId === null || (typeof data.creatorId === 'string' && data.creatorId.length > 0)) ||
-      typeof data.status !== 'string' ||
-      typeof data.currentPeriodStart !== 'string' || Number.isNaN(Date.parse(data.currentPeriodStart)) ||
-      typeof data.currentPeriodEnd !== 'string' || Number.isNaN(Date.parse(data.currentPeriodEnd)) ||
-      !(data.cancelAt === null || (typeof data.cancelAt === 'string' && !Number.isNaN(Date.parse(data.cancelAt)))) ||
-      !Number.isSafeInteger(data.version) || Number(data.version) < 1 ||
-      data.etag !== `"lr-v${String(data.version)}"`) return null
-  return data as SubscriptionDto
+const resolveOperation = (method: string, segments: string[] | undefined): { pathname: string } | null => {
+  const parts = segments ?? []
+  if (parts.length === 0 && method === 'GET') return { pathname: '/memberships/subscriptions' }
+  if (parts.length === 0 && method === 'POST') return { pathname: '/memberships/subscriptions' }
+  if (parts.length === 1 && method === 'GET') return { pathname: '/memberships/subscriptions/' + encodeURIComponent(parts[0]!) }
+  if (parts.length === 2 && method === 'POST' && ['cancel', 'pause', 'resume', 'change-plan'].includes(parts[1]!)) {
+    return { pathname: '/memberships/subscriptions/' + encodeURIComponent(parts[0]!) + '/' + parts[1]! }
+  }
+  return null
 }
 
-function parsePlanList(value: unknown): { docs: PlanDto[]; nextCursor: string | null } | null {
-  if (!isRecord(value) || !isRecord(value.data) || !Array.isArray(value.data.docs)) return null
-  const docs: PlanDto[] = []
-  for (const item of value.data.docs) {
-    if (!isRecord(item) || typeof item.planId !== 'string' || !/^plan_[a-f0-9]{64}$/.test(item.planId) ||
-        typeof item.creatorId !== 'string' || !item.creatorId ||
-        !Number.isSafeInteger(item.planVersion) || Number(item.planVersion) < 1 ||
-        (item.billingInterval !== 'MONTHLY' && item.billingInterval !== 'YEARLY') ||
-        !Number.isSafeInteger(item.priceMinor) || Number(item.priceMinor) < 0 ||
-        typeof item.currency !== 'string' || !/^[A-Z]{3}$/.test(item.currency)) return null
-    docs.push(item as PlanDto)
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+async function readBoundedJson(request: Request): Promise<unknown | Response> {
+  const declared = request.headers.get('content-length')
+  if (declared !== null && (!/^\\d+$/.test(declared) || Number(declared) > 16_384)) {
+    return errorResponse(400, 'VALIDATION_FAILED', 'Request body is too large or malformed')
   }
-  const nextCursor = value.data.nextCursor
-  if (!(nextCursor === null || typeof nextCursor === 'string')) return null
-  return { docs, nextCursor }
+  if (!request.body) return errorResponse(400, 'VALIDATION_FAILED', 'A JSON request body is required')
+  const reader = request.body.getReader()
+  const chunks: Uint8Array[] = []
+  let length = 0
+  try {
+    while (true) {
+      const part = await reader.read()
+      if (part.done) break
+      length += part.value.byteLength
+      if (length > 16_384) {
+        await reader.cancel()
+        return errorResponse(400, 'VALIDATION_FAILED', 'Request body is too large')
+      }
+      chunks.push(part.value)
+    }
+  } catch {
+    return errorResponse(400, 'VALIDATION_FAILED', 'A valid JSON request body is required')
+  }
+  const bytes = new Uint8Array(length)
+  let offset = 0
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+  try {
+    return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)) as unknown
+  } catch {
+    return errorResponse(400, 'VALIDATION_FAILED', 'A valid JSON request body is required')
+  }
 }
 
 async function authorizeSubscriptionPlanChange(request: Request, userId: string): Promise<Response | null> {
@@ -100,57 +93,51 @@ async function authorizeSubscriptionPlanChange(request: Request, userId: string)
 }
 
 async function deterministicAuditRequestId(userId: string, subscriptionId: string, idempotencyKey: string): Promise<string> {
-  const material = new TextEncoder().encode('subscription-plan-change-request-v1\\u0000' + userId + '\\u0000' + subscriptionId + '\\u0000' + idempotencyKey)
+  const material = new TextEncoder().encode(
+    'subscription-plan-change-request-v1\\u0000' + userId + '\\u0000' + subscriptionId + '\\u0000' + idempotencyKey,
+  )
   const digest = await crypto.subtle.digest('SHA-256', material)
   const hex = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
   return 'evt_sub_plan_change_request_' + hex.slice(0, 26)
 }
 
-async function findPublicTargetPlan(
-  request: Request,
-  principal: Awaited<ReturnType<typeof resolveCookieSubscriptionPrincipal>> extends infer P ? Exclude<P, Response> : never,
+function validScheduledPlanChangeEnvelope(
+  value: unknown,
+  subscriptionId: string,
   targetPlanId: string,
-): Promise<PlanDto | Response | null> {
-  let cursor: string | null = null
-  for (let page = 0; page < 20; page += 1) {
-    const pathname = '/plans?limit=50' + (cursor ? '&cursor=' + encodeURIComponent(cursor) : '')
-    const response = await callW07Subscription({ request, pathname, method: 'GET', principal })
-    if (!response.ok) return response
-    const value: unknown = await response.json().catch((): null => null)
-    const parsed = parsePlanList(value)
-    if (!parsed) return errorResponse(503, 'PLAN_RESPONSE_INVALID', 'Membership plan catalog response could not be verified')
-    const match = parsed.docs.find((plan) => plan.planId === targetPlanId)
-    if (match) return match
-    if (!parsed.nextCursor) return null
-    cursor = parsed.nextCursor
-  }
-  return errorResponse(503, 'PLAN_CATALOG_LIMIT', 'Membership plan could not be resolved within the bounded catalog scan')
+): value is Record<string, unknown> {
+  if (!isRecord(value) || !isRecord(value.data) ||
+      typeof value.requestId !== 'string' || !/^req_[A-Za-z0-9_-]{1,123}$/.test(value.requestId)) return false
+  const data = value.data
+  return data.subscriptionId === subscriptionId &&
+    typeof data.changeId === 'string' && /^spc_[A-Za-z0-9]{26}$/.test(data.changeId) &&
+    typeof data.sourcePlanId === 'string' && /^plan_[a-f0-9]{64}$/.test(data.sourcePlanId) &&
+    Number.isSafeInteger(data.sourcePlanVersion) && Number(data.sourcePlanVersion) >= 1 &&
+    data.targetPlanId === targetPlanId &&
+    Number.isSafeInteger(data.targetPlanVersion) && Number(data.targetPlanVersion) >= 1 &&
+    ['DOWNGRADE', 'BILLING_INTERVAL_CHANGE', 'SAME_PRICE_CHANGE'].includes(String(data.changeType)) &&
+    data.status === 'SCHEDULED' &&
+    typeof data.effectiveAt === 'string' && !Number.isNaN(Date.parse(data.effectiveAt)) &&
+    Number.isSafeInteger(data.version) && Number(data.version) >= 1 &&
+    Number.isSafeInteger(data.subscriptionVersion) && Number(data.subscriptionVersion) >= 2 &&
+    data.etag === `"lr-v${String(data.subscriptionVersion)}"` &&
+    typeof data.replayed === 'boolean' &&
+    typeof data.createdAt === 'string' && !Number.isNaN(Date.parse(data.createdAt)) &&
+    typeof data.updatedAt === 'string' && !Number.isNaN(Date.parse(data.updatedAt))
 }
-
-const resolveOperation = (method: string, segments: string[] | undefined): { pathname: string; body?: unknown } | Response | null => {
-  const parts = segments ?? []
-  if (parts.length === 0 && method === 'GET') return { pathname: '/memberships/subscriptions' }
-  if (parts.length === 0 && method === 'POST') return { pathname: '/memberships/subscriptions' }
-  if (parts.length === 1 && method === 'GET') return { pathname: '/memberships/subscriptions/' + encodeURIComponent(parts[0]!) }
-  if (parts.length === 2 && method === 'POST' && ['cancel', 'pause', 'resume'].includes(parts[1]!)) {
-    return { pathname: '/memberships/subscriptions/' + encodeURIComponent(parts[0]!) + '/' + parts[1]! }
-  }
-  if (parts.length === 2 && method === 'POST' && parts[1] === 'change-plan') return { pathname: '/memberships/subscriptions/' + encodeURIComponent(parts[0]!) + '/change-plan' }
-  return null
-}
-
 
 async function forward(request: Request, context: RouteContext): Promise<Response> {
   try {
     const params = await context.params
     const operation = resolveOperation(request.method, params.segments)
     if (!operation) return new Response(null, { status: 404 })
-    if (operation instanceof Response) return operation
     const principal = await resolveCookieSubscriptionPrincipal(request)
     if (principal instanceof Response) return principal
 
-    if (request.method === 'POST' && (params.segments ?? []).length === 2 && params.segments?.[1] === 'change-plan') {
-      const subscriptionId = params.segments?.[0] ?? ''
+    const parts = params.segments ?? []
+    const isPlanChangeRequest = request.method === 'POST' && parts.length === 2 && parts[1] === 'change-plan'
+    if (isPlanChangeRequest) {
+      const subscriptionId = parts[0] ?? ''
       if (!/^sub_[A-Za-z0-9_-]{1,128}$/.test(subscriptionId)) {
         return errorResponse(404, 'RESOURCE_NOT_FOUND', 'Subscription not found')
       }
@@ -167,78 +154,21 @@ async function forward(request: Request, context: RouteContext): Promise<Respons
       if (!Number.isSafeInteger(expectedVersion) || expectedVersion < 1) {
         return errorResponse(ifMatch ? 412 : 428, ifMatch ? 'PRECONDITION_FAILED' : 'PRECONDITION_REQUIRED', 'A valid If-Match subscription version is required')
       }
-
-      let inputValue: unknown
-      try { inputValue = await request.json() as unknown } catch { return errorResponse(400, 'VALIDATION_FAILED', 'A valid JSON body is required') }
-      if (!isRecord(inputValue) || Object.keys(inputValue).length !== 1 ||
-          typeof inputValue.planId !== 'string' || !/^plan_[a-f0-9]{64}$/.test(inputValue.planId)) {
+      const input = await readBoundedJson(request)
+      if (input instanceof Response) return input
+      if (!isRecord(input) || Object.keys(input).length !== 1 ||
+          typeof input.planId !== 'string' || !/^plan_[a-f0-9]{64}$/.test(input.planId)) {
         return errorResponse(400, 'VALIDATION_FAILED', 'Only a valid planId may be supplied')
       }
-      const targetPlanId = inputValue.planId
-
-      const currentResponse = await callW07Subscription({
-        request, pathname: '/memberships/subscriptions/' + encodeURIComponent(subscriptionId),
-        method: 'GET', principal,
-      })
-      if (!currentResponse.ok) return currentResponse
-      const currentEnvelope: unknown = await currentResponse.json().catch((): null => null)
-      const current = parseSubscription(currentEnvelope, subscriptionId, principal.userId)
-      if (!current) return errorResponse(503, 'SUBSCRIPTION_RESPONSE_INVALID', 'Subscription response could not be verified')
-      if (current.version !== expectedVersion) return errorResponse(412, 'PRECONDITION_FAILED', 'Subscription version does not match')
-      if (current.status !== 'ACTIVE' || current.cancelAt !== null || Date.parse(current.currentPeriodEnd) <= Date.now()) {
-        return errorResponse(409, 'INVALID_STATE', 'Only an active, uncanceled subscription can schedule a plan change')
-      }
-      if (!current.creatorId) return errorResponse(409, 'INVALID_STATE', 'Platform subscriptions cannot change creator plans')
-
-      const targetResult = await findPublicTargetPlan(request, principal, targetPlanId)
-      if (targetResult instanceof Response) return targetResult
-      if (!targetResult || targetResult.creatorId !== current.creatorId) {
-        return errorResponse(409, 'PLAN_NOT_ACTIVE', 'Target plan is unavailable for this subscription')
-      }
-      if (targetResult.currency !== 'USD' && targetResult.currency !== 'CAD' && targetResult.currency !== currentPlanCurrency(currentEnvelope)) {
-        return errorResponse(409, 'CONFLICT', 'Target plan currency does not match the current subscription')
-      }
-
-      const currentPlanResult = await findPublicTargetPlan(request, principal, current.planId)
-      if (currentPlanResult instanceof Response) return currentPlanResult
-      if (!currentPlanResult || currentPlanResult.creatorId !== current.creatorId ||
-          currentPlanResult.planVersion !== current.planVersion) {
-        return errorResponse(503, 'SUBSCRIPTION_PLAN_SNAPSHOT_INVALID', 'Current subscription plan snapshot could not be verified')
-      }
-      if (targetResult.currency !== currentPlanResult.currency) {
-        return errorResponse(409, 'CONFLICT', 'Target plan currency does not match the current subscription')
-      }
-      if (targetResult.planId === currentPlanResult.planId && targetResult.planVersion === currentPlanResult.planVersion) {
-        return errorResponse(409, 'INVALID_STATE', 'Subscription already uses this plan version')
-      }
-      let changeType: 'DOWNGRADE' | 'BILLING_INTERVAL_CHANGE' | 'SAME_PRICE_CHANGE'
-      if (targetResult.billingInterval !== currentPlanResult.billingInterval) {
-        changeType = 'BILLING_INTERVAL_CHANGE'
-      } else if (targetResult.priceMinor < currentPlanResult.priceMinor) {
-        changeType = 'DOWNGRADE'
-      } else if (targetResult.priceMinor === currentPlanResult.priceMinor) {
-        changeType = 'SAME_PRICE_CHANGE'
-      } else {
-        return errorResponse(409, 'PAYMENT_REQUIRED', 'Plan upgrades require the immediate proration payment flow')
-      }
-
+      const targetPlanId = input.planId
       const requestEventId = await deterministicAuditRequestId(principal.userId, subscriptionId, idempotencyKey)
+
       let requestAudit: Response
       try {
         requestAudit = await callW06SubscriptionPlanChangeRequestAudit({
-          request, principal,
-          body: {
-            eventId: requestEventId,
-            subscriptionId,
-            sourcePlanId: current.planId,
-            sourcePlanVersion: current.planVersion,
-            targetPlanId: targetResult.planId,
-            targetPlanVersion: targetResult.planVersion,
-            changeType,
-            effectiveAt: current.currentPeriodEnd,
-            expectedVersion,
-            idempotencyKey,
-          },
+          request,
+          principal: principal as ContentPrincipal,
+          body: { eventId: requestEventId, subscriptionId, targetPlanId, expectedVersion, idempotencyKey },
         })
       } catch {
         return errorResponse(503, 'AUDIT_UNAVAILABLE', 'Subscription plan-change intent could not be durably recorded')
@@ -254,50 +184,36 @@ async function forward(request: Request, context: RouteContext): Promise<Respons
 
       const w07Response = await callW07Subscription({
         request,
-        pathname: '/memberships/subscriptions/' + encodeURIComponent(subscriptionId) + '/change-plan',
+        pathname: operation.pathname,
         method: 'POST',
         principal,
         body: { planId: targetPlanId },
       })
       if (!w07Response.ok) return w07Response
       const envelopeValue: unknown = await w07Response.clone().json().catch((): null => null)
-      if (!isRecord(envelopeValue) || typeof envelopeValue.requestId !== 'string' ||
-          !isRecord(envelopeValue.data)) {
+      if (!validScheduledPlanChangeEnvelope(envelopeValue, subscriptionId, targetPlanId)) {
         return errorResponse(503, 'PLAN_CHANGE_RESPONSE_INVALID', 'Scheduled plan-change result could not be verified')
       }
-      const data = envelopeValue.data
-      if (data.subscriptionId !== subscriptionId ||
-          data.sourcePlanId !== current.planId || data.sourcePlanVersion !== current.planVersion ||
-          data.targetPlanId !== targetResult.planId || data.targetPlanVersion !== targetResult.planVersion ||
-          data.changeType !== changeType || data.status !== 'SCHEDULED' ||
-          typeof data.changeId !== 'string' || !/^spc_[A-Za-z0-9]{26}$/.test(data.changeId) ||
-          data.effectiveAt !== current.currentPeriodEnd ||
-          !Number.isSafeInteger(data.version) || Number(data.version) < 1 ||
-          !Number.isSafeInteger(data.subscriptionVersion) || Number(data.subscriptionVersion) !== expectedVersion + 1 ||
-          data.etag !== `"lr-v${String(data.subscriptionVersion)}"` ||
-          typeof data.replayed !== 'boolean' ||
-          typeof data.createdAt !== 'string' || Number.isNaN(Date.parse(data.createdAt)) ||
-          typeof data.updatedAt !== 'string' || Number.isNaN(Date.parse(data.updatedAt))) {
-        return errorResponse(503, 'PLAN_CHANGE_RESPONSE_INVALID', 'Scheduled plan-change result could not be verified')
-      }
-      const finalEventId = 'evt_subscription_plan_change_scheduled_' + data.changeId
+      const data = envelopeValue.data as Record<string, unknown>
+      const finalEventId = 'evt_subscription_plan_change_scheduled_' + String(data.changeId)
       let finalAudit: Response
       try {
         finalAudit = await callW06SubscriptionPlanChangeAudit({
-          request, principal,
+          request,
+          principal: principal as ContentPrincipal,
           body: {
             eventId: finalEventId,
-            changeId: data.changeId,
+            changeId: String(data.changeId),
             subscriptionId,
-            sourcePlanId: current.planId,
-            sourcePlanVersion: current.planVersion,
-            targetPlanId: targetResult.planId,
-            targetPlanVersion: targetResult.planVersion,
-            changeType,
-            effectiveAt: current.currentPeriodEnd,
+            sourcePlanId: String(data.sourcePlanId),
+            sourcePlanVersion: Number(data.sourcePlanVersion),
+            targetPlanId,
+            targetPlanVersion: Number(data.targetPlanVersion),
+            changeType: data.changeType as 'DOWNGRADE' | 'BILLING_INTERVAL_CHANGE' | 'SAME_PRICE_CHANGE',
+            effectiveAt: String(data.effectiveAt),
             changeVersion: Number(data.version),
             subscriptionVersion: Number(data.subscriptionVersion),
-            occurredAt: data.updatedAt,
+            occurredAt: String(data.updatedAt),
           },
         })
       } catch {
@@ -313,6 +229,7 @@ async function forward(request: Request, context: RouteContext): Promise<Respons
       }
       return w07Response
     }
+
     if (request.method === 'POST') {
       return errorResponse(
         503,
@@ -320,12 +237,14 @@ async function forward(request: Request, context: RouteContext): Promise<Respons
         'Subscription writes are disabled until a verified payment-provider synchronization flow is available.',
       )
     }
-    const pathname = request.method === 'GET' && (params.segments ?? []).length === 0
+    const pathname = request.method === 'GET' && parts.length === 0
       ? operation.pathname + new URL(request.url).search
       : operation.pathname
     return await callW07Subscription({ request, pathname, method: 'GET', principal })
   } catch (error) {
     if (error instanceof W07SubscriptionClientError) return errorResponse(error.status, error.code, error.message)
+    if (error instanceof W08CreatorClientError) return errorResponse(503, 'AUTHORIZATION_UNAVAILABLE', 'Subscription authorization unavailable')
+    if (error instanceof W06ModerationClientError) return errorResponse(503, 'AUDIT_UNAVAILABLE', 'Subscription audit service unavailable')
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Subscription service unavailable')
   }
 }
