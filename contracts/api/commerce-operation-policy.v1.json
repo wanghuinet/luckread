@@ -75,7 +75,8 @@
         "D1_04_remains_authority_for_order_payment_and_amount",
         "W06_D1_03_audits_request_and_applied_result",
         "production_checkout_fails_closed_without_admitted_tax_pricing",
-        "W01_authorizes_with_W08_audits_request_with_W06_and_forwards_to_W07"
+        "W01_authorizes_with_W08_audits_request_with_W06_and_forwards_to_W07",
+        "pending_scheduled_downgrade_or_reconciliation_blocks_upgrade_checkout"
       ],
       "evidence": {
         "openapi": "PASS",
@@ -448,7 +449,8 @@
         "failed_or_unpaid_renewal_does_not_apply_target_plan",
         "D1_01_stores_schedule_metadata_only_D1_04_remains_financial_authority",
         "W06_D1_03_audits_request_and_applied_transition",
-        "renewal_execution_activation_gate_remains_unchanged"
+        "renewal_execution_activation_gate_remains_unchanged",
+        "pending_upgrade_or_reconciliation_blocks_downgrade_schedule"
       ],
       "evidence": {
         "openapi": "PASS",
