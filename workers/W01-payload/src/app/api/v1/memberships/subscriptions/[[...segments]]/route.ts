@@ -33,7 +33,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 async function readBoundedJson(request: Request): Promise<unknown | Response> {
   const declared = request.headers.get('content-length')
-  if (declared !== null && (!/^\\d+$/.test(declared) || Number(declared) > 16_384)) {
+  if (declared !== null && (!/^\d+$/.test(declared) || Number(declared) > 16_384)) {
     return errorResponse(400, 'VALIDATION_FAILED', 'Request body is too large or malformed')
   }
   if (!request.body) return errorResponse(400, 'VALIDATION_FAILED', 'A JSON request body is required')
@@ -94,7 +94,7 @@ async function authorizeSubscriptionPlanChange(request: Request, userId: string)
 
 async function deterministicAuditRequestId(userId: string, subscriptionId: string, idempotencyKey: string): Promise<string> {
   const material = new TextEncoder().encode(
-    'subscription-plan-change-request-v1\\u0000' + userId + '\\u0000' + subscriptionId + '\\u0000' + idempotencyKey,
+    'subscription-plan-change-request-v1\u0000' + userId + '\u0000' + subscriptionId + '\u0000' + idempotencyKey,
   )
   const digest = await crypto.subtle.digest('SHA-256', material)
   const hex = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
@@ -149,7 +149,7 @@ async function forward(request: Request, context: RouteContext): Promise<Respons
         return errorResponse(428, 'PRECONDITION_REQUIRED', 'A valid Idempotency-Key is required')
       }
       const ifMatch = request.headers.get('If-Match') ?? ''
-      const versionMatch = /^"lr-v([1-9]\\d*)"$/.exec(ifMatch)
+      const versionMatch = /^"lr-v([1-9]\d*)"$/.exec(ifMatch)
       const expectedVersion = versionMatch?.[1] ? Number(versionMatch[1]) : Number.NaN
       if (!Number.isSafeInteger(expectedVersion) || expectedVersion < 1) {
         return errorResponse(ifMatch ? 412 : 428, ifMatch ? 'PRECONDITION_FAILED' : 'PRECONDITION_REQUIRED', 'A valid If-Match subscription version is required')
