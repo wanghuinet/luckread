@@ -16,6 +16,12 @@ type Cycle = Record<string, unknown> & {
 type Subscription = Record<string, unknown> & {
   subscription_id: string; subscriber_id: string; plan_id: string; plan_version: number;
   status: string; current_period_end: string; cancel_at: string | null;
+  scheduled_change_id: string | null;
+  scheduled_source_plan_id: string | null;
+  scheduled_source_plan_version: number | null;
+  scheduled_target_plan_id: string | null;
+  scheduled_target_plan_version: number | null;
+  scheduled_effective_at: string | null;
 };
 
 const baseCycle = (overrides: Partial<Cycle> = {}): Cycle => ({
@@ -39,6 +45,8 @@ const baseSubscription = (overrides: Partial<Subscription> = {}): Subscription =
   subscription_id: SUB_ID, subscriber_id: 'user_1', plan_id: 'plan_1', plan_version: 3,
   status: 'PAST_DUE', current_period_start: '2026-09-28T10:00:00.000Z',
   current_period_end: CYCLE_START, cancel_at: null,
+  scheduled_change_id: null, scheduled_source_plan_id: null, scheduled_source_plan_version: null,
+  scheduled_target_plan_id: null, scheduled_target_plan_version: null, scheduled_effective_at: null,
   updated_at: '2026-10-28T11:00:00.000Z', version: 4,
   ...overrides,
 });
@@ -142,6 +150,91 @@ describe('failed recurring payment recovery', () => {
       .toMatchObject({ action: 'TERMINAL', state: 'FAILED' });
     expect(revokedMandate.d1_04.cycle?.state).toBe('FAILED');
   });
+
+  it('retries a failed scheduled downgrade using the original source plan and exact pending schedule', async () => {
+    const changeId = 'spc_' + 'd'.repeat(26);
+    const targetPlanId = 'plan_2';
+    const cycle = {
+      plan_id: targetPlanId,
+      plan_version: 1,
+      offer_snapshot_json: JSON.stringify({
+        subscriptionId: SUB_ID,
+        subscriberId: 'user_1',
+        creatorId: 'creator_1',
+        planId: targetPlanId,
+        planVersion: 1,
+        name: 'Creator Basic',
+        tier: 'basic',
+        billingInterval: 'MONTHLY',
+        priceMinor: 500,
+        currency: 'USD',
+        benefits: ['member-posts'],
+        planChangeId: changeId,
+        sourcePlanId: 'plan_1',
+        sourcePlanVersion: 3,
+      }),
+    };
+    const subscription = {
+      scheduled_change_id: changeId,
+      scheduled_source_plan_id: 'plan_1',
+      scheduled_source_plan_version: 3,
+      scheduled_target_plan_id: targetPlanId,
+      scheduled_target_plan_version: 1,
+      scheduled_effective_at: CYCLE_START,
+    };
+    const scheduled = setup({ cycle, subscription });
+    const retry = await prepareFailedRenewalCycleRetry(scheduled.env, CYCLE_ID, { now: () => new Date(NOW) })
+    expect(retry).toMatchObject({ state: 'PREPARED', action: 'PREPARED', cycleId: CYCLE_ID })
+    expect(scheduled.d1_04.cycle).toMatchObject({
+      state: 'PREPARED',
+      outcome_code: 'RETRY_PREPARED',
+      plan_id: targetPlanId,
+      plan_version: 1,
+    })
+    expect(scheduled.d1_01.subscription).toMatchObject({
+      plan_id: 'plan_1',
+      plan_version: 3,
+      status: 'PAST_DUE',
+      scheduled_change_id: changeId,
+      scheduled_target_plan_id: targetPlanId,
+    })
+  })
+
+  it('refuses a scheduled downgrade retry when the schedule identity or target version drifted', async () => {
+    const changeId = 'spc_' + 'e'.repeat(26);
+    const cycle = {
+      plan_id: 'plan_2',
+      plan_version: 1,
+      offer_snapshot_json: JSON.stringify({
+        subscriptionId: SUB_ID,
+        subscriberId: 'user_1',
+        planId: 'plan_2',
+        planVersion: 1,
+        name: 'Creator Basic',
+        tier: 'basic',
+        billingInterval: 'MONTHLY',
+        priceMinor: 500,
+        currency: 'USD',
+        benefits: ['member-posts'],
+        planChangeId: changeId,
+        sourcePlanId: 'plan_1',
+        sourcePlanVersion: 3,
+      }),
+    };
+    for (const subscription of [
+      { scheduled_change_id: 'spc_' + 'f'.repeat(26), scheduled_source_plan_id: 'plan_1',
+        scheduled_source_plan_version: 3, scheduled_target_plan_id: 'plan_2',
+        scheduled_target_plan_version: 1, scheduled_effective_at: CYCLE_START },
+      { scheduled_change_id: changeId, scheduled_source_plan_id: 'plan_1',
+        scheduled_source_plan_version: 3, scheduled_target_plan_id: 'plan_2',
+        scheduled_target_plan_version: 2, scheduled_effective_at: CYCLE_START },
+    ]) {
+      const f = setup({ cycle, subscription })
+      const retry = await prepareFailedRenewalCycleRetry(f.env, CYCLE_ID, { now: () => new Date(NOW) })
+      expect(retry).toMatchObject({ state: 'FAILED', action: 'TERMINAL' })
+      expect(f.d1_04.cycle?.state).toBe('FAILED')
+    }
+  })
 
   it('does not retry after cancellation, period movement or plan-version drift', async () => {
     for (const subscription of [
