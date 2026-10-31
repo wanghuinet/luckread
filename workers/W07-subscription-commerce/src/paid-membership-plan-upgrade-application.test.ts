@@ -12,6 +12,7 @@ type State = {
   application: Record<string, unknown> | null;
   batchCount: number;
   insertCount: number;
+  failNextSubscriptionCas: boolean;
 };
 
 function fakeDb(state: State): D1Database {
@@ -95,28 +96,41 @@ function fakeDb(state: State): D1Database {
     },
     async batch(statements: D1PreparedStatement[]) {
       state.batchCount += 1;
-      const attach = statements[0] as unknown as { values: unknown[] };
-      const update = statements[1] as unknown as { values: unknown[] };
-      const v = attach.values;
+      if (!state.application) throw new Error('missing application');
+      const isRecovery = statements.length === 1;
+      const update = (isRecovery ? statements[0] : statements[1]) as unknown as { values: unknown[] };
       const u = update.values;
-      if (!v || !u || statements.length !== 2 || !state.application ||
-          state.application.status !== 'PENDING_PAYMENT' || state.application.payment_id !== null) {
-        throw new Error('unexpected paid upgrade batch');
+      if (!u) throw new Error('missing subscription CAS values');
+      if (isRecovery) {
+        if (state.application.status !== 'READY' || !state.application.payment_id) {
+          throw new Error('only an attached paid reservation may retry');
+        }
+      } else {
+        const attach = statements[0] as unknown as { values: unknown[] };
+        const v = attach.values;
+        if (statements.length !== 2 || !v ||
+            state.application.status !== 'PENDING_PAYMENT' || state.application.payment_id !== null) {
+          throw new Error('unexpected paid upgrade batch');
+        }
+        const [attachedPaymentId, readyAt, applicationId, orderId] = v as [string,string,string,string];
+        if (state.application.application_id !== applicationId || state.application.order_id !== orderId) {
+          return [{ meta: { changes: 0 } }, { meta: { changes: 0 } }];
+        }
+        state.application.payment_id = attachedPaymentId;
+        state.application.status = 'READY';
+        state.application.version = Number(state.application.version) + 1;
+        state.application.updated_at = readyAt;
       }
-      const [attachedPaymentId, readyAt, applicationId, orderId] = v as [string,string,string,string];
-      if (state.application.application_id !== applicationId || state.application.order_id !== orderId) {
-        return [{ meta: { changes: 0 } }, { meta: { changes: 0 } }];
-      }
-      state.application.payment_id = attachedPaymentId;
-      state.application.status = 'READY';
-      state.application.version = Number(state.application.version) + 1;
-      state.application.updated_at = readyAt;
 
       const [
         updateTargetPlanId, updateTargetPlanVersion, updateUpdatedAt,
         updateSubscriptionId, updateSubscriberId, updateSourcePlanId,
         updateSourcePlanVersion, updateExpectedVersion, updatePeriodStart, updatePeriodEnd,
       ] = u as [string,number,string,string,string,string,number,number,string,string];
+      if (state.failNextSubscriptionCas) {
+        state.failNextSubscriptionCas = false;
+        return isRecovery ? [{ meta: { changes: 0 } }] : [{ meta: { changes: 1 } }, { meta: { changes: 0 } }];
+      }
       const current = state.subscription;
       const matches = current.subscription_id === updateSubscriptionId &&
         current.subscriber_id === updateSubscriberId &&
@@ -127,9 +141,7 @@ function fakeDb(state: State): D1Database {
         current.current_period_end === updatePeriodEnd &&
         current.status === 'ACTIVE' && current.cancel_at === null;
       if (!matches) {
-        state.application.status = 'PENDING_PAYMENT';
-        state.application.payment_id = null;
-        return [{ meta: { changes: 1 } }, { meta: { changes: 0 } }];
+        return isRecovery ? [{ meta: { changes: 0 } }] : [{ meta: { changes: 1 } }, { meta: { changes: 0 } }];
       }
       current.plan_id = updateTargetPlanId;
       current.plan_version = updateTargetPlanVersion;
@@ -138,7 +150,7 @@ function fakeDb(state: State): D1Database {
       state.application.status = 'APPLIED';
       state.application.version = Number(state.application.version) + 1;
       state.application.updated_at = updateUpdatedAt;
-      return [{ meta: { changes: 1 } }, { meta: { changes: 1 } }];
+      return isRecovery ? [{ meta: { changes: 1 } }] : [{ meta: { changes: 1 } }, { meta: { changes: 1 } }];
     },
   } as unknown as D1Database;
 }
@@ -209,6 +221,7 @@ function fixture(overrides: Partial<Record<string, unknown>> = {}) {
     application: null,
     batchCount: 0,
     insertCount: 0,
+    failNextSubscriptionCas: Boolean(overrides.failNextSubscriptionCas),
   };
   return { db: fakeDb(state), state };
 }
@@ -242,6 +255,26 @@ describe('paid immediate membership upgrade application', () => {
     expect(replay).toBe('ALREADY_APPLIED');
     expect(f.state.batchCount).toBe(1);
     expect(f.state.subscription.version).toBe(5);
+  });
+
+  it('retries a READY payment reservation when the first subscription CAS did not apply', async () => {
+    const f = fixture({ failNextSubscriptionCas: true });
+    const request = input();
+    await reservePaidMembershipPlanUpgrade(f.db, reservation(), 'line_upgrade_1');
+    await expect(applyPaidMembershipPlanUpgrade(f.db, request, 'line_upgrade_1'))
+      .rejects.toBeInstanceOf(PaidMembershipUpgradeApplicationError);
+    expect(f.state.application).toMatchObject({ status: 'READY', payment_id: request.paymentId });
+    expect(f.state.subscription.version).toBe(4);
+
+    expect(await applyPaidMembershipPlanUpgrade(f.db, request, 'line_upgrade_1')).toBe('APPLIED');
+    expect(f.state.application).toMatchObject({ status: 'APPLIED', payment_id: request.paymentId });
+    expect(f.state.subscription).toMatchObject({
+      plan_id: targetPlanId,
+      version: 5,
+      current_period_start: currentPeriodStart,
+      current_period_end: currentPeriodEnd,
+    });
+    expect(f.state.batchCount).toBe(2);
   });
 
   it('allows only one active upgrade checkout reservation for a subscription', async () => {
