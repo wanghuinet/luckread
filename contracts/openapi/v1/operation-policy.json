@@ -1147,6 +1147,21 @@
       "stateMachine": "none"
     },
     {
+      "operationId": "previewSubscriptionPlanChange",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "subscription.read"
+      ],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/rc-04-06-share-subscription-entitlement.v1.json"
+    },
+    {
       "operationId": "getNotificationPreferences",
       "auth": {
         "mode": "permission"
@@ -2798,21 +2813,6 @@
       "optimisticLockRequired": true,
       "idempotencyRequired": true,
       "stateMachine": "none"
-    },
-    {
-      "operationId": "previewSubscriptionPlanChange",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "subscription.read"
-      ],
-      "auditRequired": false,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none",
-      "x-luckread-contract-status": "DISCOVERY_DRAFT",
-      "x-luckread-source": "contracts/api/rc-04-06-share-subscription-entitlement.v1.json"
     }
   ]
 }
