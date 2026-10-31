@@ -900,11 +900,22 @@ async function prepareFailedCycleRetry(
   let subscription: {
     subscription_id: string; subscriber_id: string; plan_id: string; plan_version: number;
     status: string; current_period_end: string; cancel_at: string | null;
+    scheduled_change_id: string | null;
+    scheduled_source_plan_id: string | null;
+    scheduled_source_plan_version: number | null;
+    scheduled_target_plan_id: string | null;
+    scheduled_target_plan_version: number | null;
+    scheduled_effective_at: string | null;
   } | null;
   try {
     subscription = await env.D1_01.prepare(
-      'SELECT subscription_id, subscriber_id, plan_id, plan_version, status, current_period_end, cancel_at ' +
-      'FROM membership_subscriptions WHERE subscription_id = ? AND subscriber_id = ? LIMIT 1',
+      'SELECT s.subscription_id, s.subscriber_id, s.plan_id, s.plan_version, s.status, s.current_period_end, s.cancel_at, ' +
+      'sc.change_id AS scheduled_change_id, sc.source_plan_id AS scheduled_source_plan_id, ' +
+      'sc.source_plan_version AS scheduled_source_plan_version, sc.target_plan_id AS scheduled_target_plan_id, ' +
+      'sc.target_plan_version AS scheduled_target_plan_version, sc.effective_at AS scheduled_effective_at ' +
+      'FROM membership_subscriptions s LEFT JOIN membership_subscription_plan_changes sc ' +
+      "ON sc.subscription_id = s.subscription_id AND sc.subscriber_id = s.subscriber_id AND sc.status = 'SCHEDULED' " +
+      'WHERE s.subscription_id = ? AND s.subscriber_id = ? LIMIT 1',
     ).bind(cycle.subscription_id, cycle.subscriber_id).first<{
       subscription_id: string;
       subscriber_id: string;
@@ -913,15 +924,33 @@ async function prepareFailedCycleRetry(
       status: string;
       current_period_end: string;
       cancel_at: string | null;
+      scheduled_change_id: string | null;
+      scheduled_source_plan_id: string | null;
+      scheduled_source_plan_version: number | null;
+      scheduled_target_plan_id: string | null;
+      scheduled_target_plan_version: number | null;
+      scheduled_effective_at: string | null;
     }>();
   } catch {
     throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
   }
+  const retryOffer = parseOfferSnapshot(cycle.offer_snapshot_json);
+  const scheduledRetryMatches = !!retryOffer.planChangeId &&
+    subscription?.scheduled_change_id === retryOffer.planChangeId &&
+    subscription.scheduled_source_plan_id === retryOffer.sourcePlanId &&
+    subscription.scheduled_source_plan_version === retryOffer.sourcePlanVersion &&
+    subscription.scheduled_target_plan_id === cycle.plan_id &&
+    subscription.scheduled_target_plan_version === cycle.plan_version &&
+    subscription.scheduled_effective_at === cycle.cycle_start &&
+    subscription.plan_id === retryOffer.sourcePlanId &&
+    subscription.plan_version === retryOffer.sourcePlanVersion;
+  const ordinaryRetryMatches = !retryOffer.planChangeId &&
+    subscription?.plan_id === cycle.plan_id &&
+    subscription?.plan_version === cycle.plan_version;
   if (!subscription ||
       subscription.subscription_id !== cycle.subscription_id ||
       subscription.subscriber_id !== cycle.subscriber_id ||
-      subscription.plan_id !== cycle.plan_id ||
-      subscription.plan_version !== cycle.plan_version ||
+      !(ordinaryRetryMatches || scheduledRetryMatches) ||
       subscription.status !== 'PAST_DUE' ||
       subscription.current_period_end !== cycle.cycle_start ||
       (subscription.cancel_at !== null &&
