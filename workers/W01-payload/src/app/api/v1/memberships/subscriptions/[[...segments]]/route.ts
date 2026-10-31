@@ -112,6 +112,19 @@ async function deterministicTrialRequestId(userId: string, planId: string, idemp
   return 'evt_subscription_trial_request_' + hex.slice(0, 26)
 }
 
+async function deterministicTrialCancelRequestId(
+  userId: string,
+  subscriptionId: string,
+  expectedVersion: number,
+): Promise<string> {
+  const material = new TextEncoder().encode(
+    'subscription-trial-cancel-request-v1\\u0000' + userId + '\\u0000' + subscriptionId + '\\u0000' + expectedVersion,
+  )
+  const digest = await crypto.subtle.digest('SHA-256', material)
+  const hex = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
+  return 'evt_subscription_trial_cancel_request_' + hex.slice(0, 26)
+}
+
 async function deterministicAuditRequestId(userId: string, subscriptionId: string, idempotencyKey: string): Promise<string> {
   const material = new TextEncoder().encode(
     'subscription-plan-change-request-v1\u0000' + userId + '\u0000' + subscriptionId + '\u0000' + idempotencyKey,
@@ -282,6 +295,30 @@ async function forward(request: Request, context: RouteContext): Promise<Respons
       if (request.body !== null) {
         await request.body.cancel().catch(() => undefined)
         return errorResponse(400, 'VALIDATION_FAILED', 'Trial cancellation does not accept a request body')
+      }
+      const requestEventId = await deterministicTrialCancelRequestId(principal.userId, subscriptionId, expectedVersion)
+      let requestAudit: Response
+      try {
+        requestAudit = await callW06SubscriptionTrialAudit({
+          request,
+          principal: principal as ContentPrincipal,
+          body: {
+            eventId: requestEventId,
+            phase: 'CANCEL_REQUESTED',
+            subscriptionId,
+            expectedVersion,
+          },
+        })
+      } catch {
+        return errorResponse(503, 'AUDIT_UNAVAILABLE', 'Trial cancellation intent could not be durably recorded')
+      }
+      const requestAuditValue: unknown = await requestAudit.json().catch((): null => null)
+      if ((requestAudit.status !== 200 && requestAudit.status !== 201) ||
+          !isRecord(requestAuditValue) ||
+          requestAuditValue.eventId !== requestEventId ||
+          requestAuditValue.action !== 'membership.subscription.trial_cancel_requested' ||
+          requestAuditValue.targetId !== subscriptionId) {
+        return errorResponse(503, 'AUDIT_UNAVAILABLE', 'Trial cancellation intent was not durably confirmed')
       }
       const w07Response = await callW07Subscription({
         request,
