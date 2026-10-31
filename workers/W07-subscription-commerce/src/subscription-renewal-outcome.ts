@@ -405,6 +405,20 @@ export async function syncTerminalRenewalCycleToSubscription(
     return reconcile(env, cycle, 'SUBSCRIPTION_UPDATED_AT_INVALID', now);
   }
 
+  const trialHasAnyMetadata = subscription.trial_started_at !== null ||
+    subscription.trial_ends_at !== null || subscription.trial_converted_at !== null;
+  if (subscription.status === 'TRIALING' || (trialHasAnyMetadata && subscription.trial_converted_at === null)) {
+    if (!isCanonicalIso(subscription.trial_started_at) ||
+        !isCanonicalIso(subscription.trial_ends_at) ||
+        subscription.trial_started_at >= subscription.trial_ends_at ||
+        subscription.current_period_start !== subscription.trial_started_at ||
+        subscription.current_period_end !== subscription.trial_ends_at ||
+        subscription.trial_ends_at !== cycle.cycle_start ||
+        subscription.trial_converted_at !== null) {
+      return reconcile(env, cycle, 'TRIAL_PERIOD_BOUNDARY_MISMATCH', now);
+    }
+  }
+
   const scheduledChange = await readScheduledSubscriptionPlanDowngradeForPeriod(
     env.D1_01, cycle.subscription_id, cycle.subscriber_id, cycle.cycle_start, true,
   );
