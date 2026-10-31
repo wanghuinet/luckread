@@ -4916,10 +4916,11 @@
         "workers/W07-subscription-commerce/src/renewal-scheduler.test.ts",
         ".github/workflows/w07-subscription-runtime-ci.yml",
         "workers/W06-governance/src/index.test.ts",
-        "workers/W07-subscription-commerce/src/membership-trial-runtime.test.ts"
+        "workers/W07-subscription-commerce/src/membership-trial-runtime.test.ts",
+        "workers/W07-subscription-commerce/src/revenuecat-subscriber-reconciliation-runtime.test.ts"
       ],
       "schemaEvidenceRefs": [
-        "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json#trial",
+        "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json#membershipSubscriptionTrialTable",
         "workers/W07-subscription-commerce/migrations/0007_membership_trials.sql"
       ],
       "sourceRefs": [
@@ -4963,10 +4964,11 @@
         "workers/W07-subscription-commerce/src/renewal-scheduler.test.ts",
         ".github/workflows/w07-subscription-runtime-ci.yml",
         "workers/W06-governance/src/index.test.ts",
-        "workers/W07-subscription-commerce/src/membership-trial-runtime.test.ts"
+        "workers/W07-subscription-commerce/src/membership-trial-runtime.test.ts",
+        "workers/W07-subscription-commerce/src/revenuecat-subscriber-reconciliation-runtime.test.ts"
       ],
       "schemaEvidenceRefs": [
-        "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json#trial",
+        "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json#membershipSubscriptionTrialTable",
         "workers/W07-subscription-commerce/migrations/0007_membership_trials.sql"
       ],
       "sourceRefs": [
