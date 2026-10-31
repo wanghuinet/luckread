@@ -107,8 +107,27 @@ async function readSubscription(
       'ON v.plan_id = s.plan_id AND v.plan_version = s.plan_version ' +
       'WHERE s.subscription_id = ? AND s.subscriber_id = ? LIMIT 1',
     ).bind(subscriptionId, subscriberId).first<SubscriptionOutcomeRow>();
-  } catch {
-    throw new RenewalOutcomeSyncError('SERVICE_UNAVAILABLE', 503);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!/no such column:\\s*(?:s\\.)?trial_(?:started|ends|converted)_at/i.test(message)) {
+      throw new RenewalOutcomeSyncError('SERVICE_UNAVAILABLE', 503);
+    }
+    // A worker can be deployed ahead of migration 0008. Existing paid renewal
+    // webhook synchronization must continue to work; no trial row can be
+    // created before the migration-backed trial endpoint is available.
+    try {
+      const legacy = await db.prepare(
+        'SELECT s.subscription_id, s.subscriber_id, s.plan_id, s.plan_version, s.creator_id, v.billing_interval, ' +
+        'v.tier, v.price_minor, v.currency, s.status, s.current_period_start, s.current_period_end, ' +
+        's.cancel_at, s.updated_at, s.version ' +
+        'FROM membership_subscriptions s INNER JOIN membership_plan_versions v ' +
+        'ON v.plan_id = s.plan_id AND v.plan_version = s.plan_version ' +
+        'WHERE s.subscription_id = ? AND s.subscriber_id = ? LIMIT 1',
+      ).bind(subscriptionId, subscriberId).first<Omit<SubscriptionOutcomeRow, 'trial_started_at' | 'trial_ends_at' | 'trial_converted_at'>>();
+      return legacy ? { ...legacy, trial_started_at: null, trial_ends_at: null, trial_converted_at: null } : null;
+    } catch {
+      throw new RenewalOutcomeSyncError('SERVICE_UNAVAILABLE', 503);
+    }
   }
 }
 
