@@ -2043,6 +2043,3946 @@ paths:
         '200': { description: Read-only pre-tax proration estimate and proposed effective date; no subscription or payment state is changed. }
         '4XX': { $ref: '#/components/responses/ClientError' }
 
+  /memberships/subscriptions/{subscriptionId}/change-plan/checkout:
+    parameters:
+      - name: subscriptionId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    post:
+      tags: [Users]
+      summary: Create a payment order for an immediate prorated subscription upgrade
+      description: Creates an authoritative order for a same-interval upgrade. The existing subscription and its entitlements remain unchanged until W07 confirms the signed Hyperswitch payment-success webhook and applies the subscription version compare-and-set. The amount is finalized by the configured commerce pricing and tax pipeline.
+      operationId: checkoutSubscriptionPlanUpgrade
+      parameters:
+        - $ref: '#/components/parameters/IfMatchRequired'
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [planId]
+              properties:
+                planId: { type: string, pattern: '^plan_[a-f0-9]{64}  /memberships/subscriptions/{subscriptionId}/cancel:
+    parameters:
+      - name: subscriptionId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    post:
+      tags: [Users]
+      summary: Cancel a subscription
+      operationId: cancelSubscription
+      parameters:
+        - $ref: '#/components/parameters/IfMatchRequired'
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      responses:
+        '200': { description: Subscription canceled. }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /memberships/subscriptions/{subscriptionId}/pause:
+    parameters:
+      - name: subscriptionId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    post:
+      tags: [Users]
+      summary: Pause a subscription
+      operationId: pauseSubscription
+      parameters:
+        - $ref: '#/components/parameters/IfMatchRequired'
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      responses:
+        '200': { description: Subscription paused. }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /memberships/subscriptions/{subscriptionId}/resume:
+    parameters:
+      - name: subscriptionId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    post:
+      tags: [Users]
+      summary: Resume a paused subscription
+      operationId: resumeSubscription
+      parameters:
+        - $ref: '#/components/parameters/IfMatchRequired'
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      responses:
+        '200': { description: Subscription resumed. }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /memberships/subscriptions/{subscriptionId}/change-plan:
+    parameters:
+      - name: subscriptionId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    post:
+      tags: [Users]
+      summary: Change the plan for a subscription
+      operationId: changeSubscriptionPlan
+      parameters:
+        - $ref: '#/components/parameters/IfMatchRequired'
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [planId]
+              properties:
+                planId: { $ref: '#/components/schemas/ResourceId' }
+      responses:
+        '200': { description: Subscription plan changed. }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /entitlements/{subjectId}:
+    parameters:
+      - name: subjectId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    get:
+      tags: [Users]
+      summary: Get effective entitlements
+      operationId: getEntitlements
+      responses:
+        '200': { description: Effective server-derived entitlements. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /entitlements/check:
+    post:
+      tags: [Users]
+      summary: Check an entitlement
+      operationId: checkEntitlement
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [subjectId, entitlement]
+              properties:
+                subjectId: { $ref: '#/components/schemas/ResourceId' }
+                entitlement: { type: string, minLength: 1, maxLength: 256 }
+      responses:
+        '200': { description: Entitlement decision. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /organizations/{organizationId}/members:
+    parameters:
+      - name: organizationId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    get:
+      tags: [Organizations]
+      summary: List organization members
+      operationId: listOrganizationMembers
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200': { description: Organization members. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /organizations/{organizationId}/members/invitations:
+    parameters:
+      - name: organizationId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    post:
+      tags: [Organizations]
+      summary: Invite an organization member
+      operationId: inviteOrganizationMember
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      responses:
+        '201': { description: Organization invitation created. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /organizations/{organizationId}/members/{memberId}:
+    parameters:
+      - name: organizationId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+      - name: memberId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    delete:
+      tags: [Organizations]
+      summary: Remove an organization member
+      operationId: removeOrganizationMember
+      parameters:
+        - $ref: '#/components/parameters/IfMatchRequired'
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      responses:
+        '204': { description: Organization member removed. }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /organizations/{organizationId}/members/{memberId}/role:
+    parameters:
+      - name: organizationId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+      - name: memberId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    post:
+      tags: [Organizations]
+      summary: Change an organization member role
+      operationId: changeOrganizationMemberRole
+      parameters:
+        - $ref: '#/components/parameters/IfMatchRequired'
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role]
+              properties:
+                role: { type: string, minLength: 1, maxLength: 128 }
+      responses:
+        '200': { description: Organization member role changed. }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /ips/{ipId}/contents:
+    parameters:
+      - $ref: '#/components/parameters/IpId'
+    get:
+      tags: [IPs]
+      summary: List content belonging to an IP projection
+      operationId: listIpContents
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200': { description: IP content projection. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /ips/{ipId}/contents/{contentId}:
+    parameters:
+      - $ref: '#/components/parameters/IpId'
+      - $ref: '#/components/parameters/ContentId'
+    get:
+      tags: [IPs]
+      summary: Get an IP content projection
+      operationId: getIpContent
+      responses:
+        '200': { description: IP content projection. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /account/data-export:
+    get:
+      tags: [Admin]
+      summary: Discovery draft for GET undefined
+      operationId: getAccountDataExport
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+    post:
+      tags: [Admin]
+      summary: Discovery draft for POST undefined
+      operationId: exportMyAccountData
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /account/deletion-request:
+    post:
+      tags: [Admin]
+      summary: Discovery draft for POST undefined
+      operationId: postAccountDeletionRequest
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /account/password/change:
+    post:
+      tags: [Auth]
+      summary: Discovery draft for POST undefined
+      operationId: postAccountPasswordChange
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /account/recovery:
+    post:
+      tags: [Auth]
+      summary: Discovery draft for POST undefined
+      operationId: postAccountRecovery
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /account/sessions:
+    get:
+      tags: [Auth]
+      summary: Discovery draft for GET undefined
+      operationId: getAccountSessions
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /account/sessions/{sessionId}:
+    delete:
+      tags: [Auth]
+      summary: Discovery draft for DELETE undefined
+      operationId: deleteAccountSessionsSessionId
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /accounts/{accountId}:
+    get:
+      tags: [Users]
+      summary: Discovery draft for GET undefined
+      operationId: getAccountsAccountId
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+    patch:
+      tags: [Users]
+      summary: Discovery draft for PATCH undefined
+      operationId: patchAccountsAccountId
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /accounts/{accountId}/restore:
+    post:
+      tags: [Users]
+      summary: Discovery draft for POST undefined
+      operationId: postAccountsAccountIdRestore
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /accounts/{accountId}/suspend:
+    post:
+      tags: [Users]
+      summary: Discovery draft for POST undefined
+      operationId: postAccountsAccountIdSuspend
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /analytics/batch:
+    post:
+      tags: [Analytics]
+      summary: Discovery draft for POST undefined
+      operationId: postAnalyticsBatch
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /analytics/events:
+    post:
+      tags: [Analytics]
+      summary: Submit bounded client content telemetry
+      description: |
+        Accepts only allow-listed impression, reading and video measurement events.
+        Social mutations such as likes, comments, shares and follows are not accepted
+        here because their business facts remain authoritative in W05. Optional
+        session authentication is resolved by W01; client-supplied actor identities
+        are never trusted. This operation is rate-limited, bounded to 64 KiB and
+        90 events, and is never served from a shared cache.
+      operationId: postAnalyticsEvents
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [events]
+              properties:
+                events:
+                  type: array
+                  minItems: 1
+                  maxItems: 90
+                  items:
+                    type: object
+                    additionalProperties: false
+                    required: [eventId, dedupeKey, eventName, occurredAt, sessionId, contentId, contentType]
+                    properties:
+                      eventId:
+                        type: string
+                        minLength: 8
+                        maxLength: 160
+                        pattern: '^[A-Za-z0-9][A-Za-z0-9:_-]{7,159}$'
+                      dedupeKey:
+                        type: string
+                        minLength: 8
+                        maxLength: 160
+                        pattern: '^[A-Za-z0-9][A-Za-z0-9:_-]{7,159}$'
+                      eventName:
+                        type: string
+                        enum:
+                          - content_impression
+                          - content_open
+                          - read_start
+                          - read_progress_25
+                          - read_progress_50
+                          - read_progress_75
+                          - read_complete
+                          - read_dwell
+                          - dwell
+                          - complete_view
+                          - video_impression
+                          - video_play_request
+                          - video_play_success
+                          - video_progress_25
+                          - video_progress_50
+                          - video_progress_75
+                          - video_progress_90
+                          - video_complete
+                          - video_replay
+                          - video_watch
+                      occurredAt:
+                        type: string
+                        format: date-time
+                      sessionId:
+                        type: string
+                        minLength: 1
+                        maxLength: 128
+                        pattern: '^[A-Za-z0-9][A-Za-z0-9:_-]{0,127}$'
+                      contentId:
+                        type: string
+                        minLength: 1
+                        maxLength: 128
+                        pattern: '^[A-Za-z0-9][A-Za-z0-9:_-]{0,127}$'
+                      contentType:
+                        type: string
+                        enum: [article, post, video]
+                      durationMs:
+                        type: integer
+                        minimum: 1
+                        maximum: 86400000
+                      position:
+                        type: number
+                        minimum: 0
+                        maximum: 100
+      responses:
+        '200':
+          description: Batch classified and deduplicated by W11. Invalid or late measurements are represented only in aggregate quality counts.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, requestId]
+                properties:
+                  data:
+                    type: object
+                    required: [received, qualityCounts, persistence]
+                    properties:
+                      received:
+                        type: integer
+                        minimum: 0
+                        maximum: 90
+                      qualityCounts:
+                        type: object
+                        required: [VALID, SUSPECT, INVALID, DUPLICATE, LATE, REJECTED]
+                        properties:
+                          VALID: { type: integer, minimum: 0 }
+                          SUSPECT: { type: integer, minimum: 0 }
+                          INVALID: { type: integer, minimum: 0 }
+                          DUPLICATE: { type: integer, minimum: 0 }
+                          LATE: { type: integer, minimum: 0 }
+                          REJECTED: { type: integer, minimum: 0 }
+                      persistence:
+                        type: object
+                        required: [attempted, inserted, duplicates, lateAttempted, lateInserted, lateDuplicates]
+                        properties:
+                          attempted: { type: integer, minimum: 0, maximum: 90 }
+                          inserted: { type: integer, minimum: 0, maximum: 90 }
+                          duplicates: { type: integer, minimum: 0, maximum: 90 }
+                          lateAttempted: { type: integer, minimum: 0, maximum: 90 }
+                          lateInserted: { type: integer, minimum: 0, maximum: 90 }
+                          lateDuplicates: { type: integer, minimum: 0, maximum: 90 }
+                  requestId:
+                    type: string
+        '413':
+          description: Request body is larger than 64 KiB.
+        '415':
+          description: Request Content-Type must be application/json.
+        '422':
+          description: Invalid request fields, forbidden event names, or batch size.
+        '429':
+          description: W01 rate limit exceeded.
+        '503':
+          description: Authentication, Service Binding or analytics storage is unavailable.
+  /articles:
+    post:
+      tags: [Contents]
+      summary: Discovery draft for POST undefined
+      operationId: postArticles
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /articles/{articleId}:
+    get:
+      tags: [Contents]
+      summary: Discovery draft for GET undefined
+      operationId: getArticlesArticleId
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+    patch:
+      tags: [Contents]
+      summary: Discovery draft for PATCH undefined
+      operationId: patchArticlesArticleId
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /audit/events:
+    get:
+      tags: [Admin]
+      summary: Discovery draft for GET undefined
+      operationId: getAuditEvents
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Deprecated compatibility alias for reading the current session
+      description: >-
+        Deprecated. This route does not rotate refresh tokens and must not be
+        used as a token refresh API. Use GET /auth/session with the current
+        cookie or Authorization Bearer session credential instead.
+      deprecated: true
+      operationId: authRefresh
+      security:
+        - sessionCookieAuth: []
+        - bearerAuth: []
+      x-luckread-contract-status: DEPRECATED_COMPATIBILITY_ALIAS
+      responses:
+        '200':
+          description: Current session is valid; response shape matches GET /auth/session.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, requestId]
+                additionalProperties: false
+                properties:
+                  data:
+                    type: object
+                    required: [session, user]
+                    additionalProperties: false
+                    properties:
+                      session:
+                        type: object
+                        required: [id, expiresAt]
+                        additionalProperties: false
+                        properties:
+                          id: { $ref: '#/components/schemas/ResourceId' }
+                          expiresAt: { type: string, format: date-time }
+                      user:
+                        $ref: '#/components/schemas/AuthSessionUser'
+                  requestId: { type: string }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503':
+          description: Authentication service unavailable.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /auth/revoke:
+    post:
+      tags: [Auth]
+      summary: Discovery draft for POST undefined
+      operationId: postAuthRevoke
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /comments/{commentId}:
+    delete:
+      tags: [Interactions]
+      summary: Discovery draft for DELETE undefined
+      operationId: deleteCommentsCommentId
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+    patch:
+      tags: [Interactions]
+      summary: Discovery draft for PATCH undefined
+      operationId: patchCommentsCommentId
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /comments/{commentId}/likes:
+    delete:
+      tags: [Interactions]
+      summary: Discovery draft for DELETE undefined
+      operationId: deleteCommentsCommentIdLikes
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+    post:
+      tags: [Interactions]
+      summary: Discovery draft for POST undefined
+      operationId: postCommentsCommentIdLikes
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /content:
+    post:
+      tags: [Contents]
+      summary: Discovery draft for POST undefined
+      operationId: postContent
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /content/{contentId}:
+    delete:
+      tags: [Contents]
+      summary: Discovery draft for DELETE undefined
+      operationId: deleteContentContentId
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+    get:
+      tags: [Contents]
+      summary: Discovery draft for GET undefined
+      operationId: getContentContentId
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+    patch:
+      tags: [Contents]
+      summary: Discovery draft for PATCH undefined
+      operationId: patchContentContentId
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /content/{contentId}/comments:
+    get:
+      tags: [Interactions]
+      summary: Discovery draft for GET undefined
+      operationId: getContentContentIdComments
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+    post:
+      tags: [Interactions]
+      summary: Discovery draft for POST undefined
+      operationId: postContentContentIdComments
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /content/{contentId}/favorites:
+    delete:
+      tags: [Interactions]
+      summary: Discovery draft for DELETE undefined
+      operationId: deleteContentContentIdFavorites
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+    post:
+      tags: [Interactions]
+      summary: Discovery draft for POST undefined
+      operationId: postContentContentIdFavorites
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /content/{contentId}/likes:
+    delete:
+      tags: [Interactions]
+      summary: Discovery draft for DELETE undefined
+      operationId: deleteContentContentIdLikes
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+    post:
+      tags: [Interactions]
+      summary: Discovery draft for POST undefined
+      operationId: postContentContentIdLikes
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /content/{contentId}/publish:
+    post:
+      tags: [Contents]
+      summary: Discovery draft for POST undefined
+      operationId: postContentContentIdPublish
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /content/{contentId}/related:
+    get:
+      tags: [Feed]
+      summary: Discovery draft for GET undefined
+      operationId: getContentContentIdRelated
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /content/{contentId}/unpublish:
+    post:
+      tags: [Contents]
+      summary: Discovery draft for POST undefined
+      operationId: postContentContentIdUnpublish
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /creator/analytics:
+    get:
+      tags: [Analytics]
+      summary: Discovery draft for GET undefined
+      operationId: getCreatorAnalytics
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /creator/profile:
+    get:
+      tags: [Creators]
+      summary: Discovery draft for GET undefined
+      operationId: getCreatorProfile
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+    patch:
+      tags: [Creators]
+      summary: Discovery draft for PATCH undefined
+      operationId: patchCreatorProfile
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /developer/api-keys:
+    post:
+      tags: [Developer]
+      summary: Discovery draft for POST undefined
+      operationId: postDeveloperApiKeys
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /developer/api-keys/{keyId}:
+    delete:
+      tags: [Developer]
+      summary: Discovery draft for DELETE undefined
+      operationId: deleteDeveloperApiKeysKeyId
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /developer/apps:
+    get:
+      tags: [Developer]
+      summary: Discovery draft for GET undefined
+      operationId: getDeveloperApps
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+    post:
+      tags: [Developer]
+      summary: Discovery draft for POST undefined
+      operationId: postDeveloperApps
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /developer/apps/{appId}:
+    patch:
+      tags: [Developer]
+      summary: Discovery draft for PATCH undefined
+      operationId: patchDeveloperAppsAppId
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /developer/oauth/authorize:
+    post:
+      tags: [Developer]
+      summary: Discovery draft for POST undefined
+      operationId: postDeveloperOauthAuthorize
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /developer/usage:
+    get:
+      tags: [Developer]
+      summary: Discovery draft for GET undefined
+      operationId: getDeveloperUsage
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /developer/webhooks:
+    get:
+      tags: [Developer]
+      summary: Discovery draft for GET undefined
+      operationId: getDeveloperWebhooks
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+    post:
+      tags: [Developer]
+      summary: Discovery draft for POST undefined
+      operationId: postDeveloperWebhooks
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /developer/webhooks/{webhookId}:
+    delete:
+      tags: [Developer]
+      summary: Discovery draft for DELETE undefined
+      operationId: deleteDeveloperWebhooksWebhookId
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /discovery/creators:
+    get:
+      tags: [Search]
+      summary: Discovery draft for GET undefined
+      operationId: getDiscoveryCreators
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /discovery/topics:
+    get:
+      tags: [Search]
+      summary: List trending public topics with recently published content
+      description: >-
+        Returns ACTIVE topics ranked by the count of published content updated
+        within the preceding seven days, then latest content update and topic ID.
+        W01 validates query parameters, rate-limits public reads, and applies a
+        30-second public response cache. W05 owns topic/content relationships;
+        W03 remains authoritative for publication state and update timestamps.
+        No authenticated session is required. Cursor values are opaque.
+      operationId: getDiscoveryTopics
+      security: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          description: Maximum topics returned. Defaults to 20.
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+        - name: cursor
+          in: query
+          required: false
+          description: Opaque ranking cursor from the previous response.
+          schema: { type: string, minLength: 1, maxLength: 2048 }
+      responses:
+        '200':
+          description: Ranked public topics and a continuation cursor.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, requestId]
+                additionalProperties: false
+                properties:
+                  data:
+                    type: object
+                    required: [items, hasMore, nextCursor]
+                    additionalProperties: false
+                    properties:
+                      items:
+                        type: array
+                        maxItems: 50
+                        items:
+                          type: object
+                          required: [topicId, name, displayName, contentCount, latestContentAt]
+                          additionalProperties: false
+                          properties:
+                            topicId: { $ref: '#/components/schemas/ResourceId' }
+                            name: { type: string, minLength: 1, maxLength: 64 }
+                            displayName: { type: string, minLength: 1, maxLength: 64 }
+                            contentCount: { type: integer, minimum: 1 }
+                            latestContentAt: { type: string, format: date-time }
+                      hasMore: { type: boolean }
+                      nextCursor: { type: [string, 'null'], maxLength: 2048 }
+                  requestId: { type: string, minLength: 1 }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503':
+          description: Discovery or W03 published-content service unavailable.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /entitlements:
+    get:
+      tags: [Users]
+      summary: Discovery draft for GET undefined
+      operationId: listEntitlements
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /feed/following:
+    get:
+      tags: [Feed]
+      summary: Discovery draft for GET undefined
+      operationId: getFollowingFeed
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /feed/recommended:
+    get:
+      tags: [Feed]
+      summary: Discovery draft for GET undefined
+      operationId: getFeedRecommended
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /feed/user/{userId}:
+    get:
+      tags: [Feed]
+      summary: Discovery draft for GET undefined
+      operationId: getFeedUserUserId
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /galleries:
+    post:
+      tags: [Contents]
+      summary: Discovery draft for POST undefined
+      operationId: postGalleries
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /galleries/{galleryId}:
+    get:
+      tags: [Contents]
+      summary: Discovery draft for GET undefined
+      operationId: getGalleriesGalleryId
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+    patch:
+      tags: [Contents]
+      summary: Discovery draft for PATCH undefined
+      operationId: patchGalleriesGalleryId
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /ip/assets:
+    get:
+      tags: [Creators]
+      summary: Discovery draft for GET undefined
+      operationId: getIpAssets
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+    post:
+      tags: [Creators]
+      summary: Discovery draft for POST undefined
+      operationId: postIpAssets
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /ip/assets/{assetId}:
+    patch:
+      tags: [Creators]
+      summary: Discovery draft for PATCH undefined
+      operationId: patchIpAssetsAssetId
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /mcn/organizations:
+    get:
+      tags: [Creators]
+      summary: Discovery draft for GET undefined
+      operationId: getMcnOrganizations
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+    post:
+      tags: [Creators]
+      summary: Discovery draft for POST undefined
+      operationId: postMcnOrganizations
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /mcn/organizations/{orgId}:
+    get:
+      tags: [Creators]
+      summary: Discovery draft for GET undefined
+      operationId: getMcnOrganizationsOrgId
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /mcn/organizations/{orgId}/members:
+    post:
+      tags: [Creators]
+      summary: Discovery draft for POST undefined
+      operationId: postMcnOrganizationsOrgIdMembers
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /mcn/organizations/{orgId}/members/{userId}:
+    delete:
+      tags: [Creators]
+      summary: Discovery draft for DELETE undefined
+      operationId: deleteMcnOrganizationsOrgIdMembersUserId
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /media/{mediaId}/playback:
+    get:
+      tags: [Media]
+      summary: Discovery draft for GET undefined
+      operationId: getMediaMediaIdPlayback
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /media/{mediaId}/process:
+    post:
+      tags: [Media]
+      summary: Discovery draft for POST undefined
+      operationId: postMediaMediaIdProcess
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /media/{mediaId}/processing:
+    get:
+      tags: [Media]
+      summary: Discovery draft for GET undefined
+      operationId: getMediaMediaIdProcessing
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /media/{mediaId}/variants:
+    get:
+      tags: [Media]
+      summary: Discovery draft for GET undefined
+      operationId: listMediaVariants
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /media/uploads:
+    post:
+      tags: [Media]
+      summary: Discovery draft for POST undefined
+      operationId: postMediaUploads
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /media/uploads/{uploadId}/complete:
+    post:
+      tags: [Media]
+      summary: Discovery draft for POST undefined
+      operationId: completeUpload
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /notification-preferences:
+    get:
+      tags: [Notifications]
+      summary: Discovery draft for GET undefined
+      operationId: getNotificationPreferences
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+    patch:
+      tags: [Notifications]
+      summary: Discovery draft for PATCH undefined
+      operationId: patchNotificationPreferences
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /notifications/{notificationId}/read:
+    post:
+      tags: [Notifications]
+      summary: Discovery draft for POST undefined
+      operationId: postNotificationsNotificationIdRead
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /notifications/read-all:
+    post:
+      tags: [Notifications]
+      summary: Discovery draft for POST undefined
+      operationId: postNotificationsReadAll
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /webhooks/revenuecat:
+    post:
+      tags: [Commerce]
+      summary: Receive a RevenueCat provider webhook
+      description: >-
+        Public provider callback ingress has no browser-session authentication.
+        W01 preserves the bounded raw payload and the configured RevenueCat
+        Authorization value. W07 always validates Authorization and validates
+        X-RevenueCat-Webhook-Signature HMAC-SHA256 over the exact raw body when
+        HMAC signing is enabled for the integration. A durable receipt does not
+        itself activate a LuckRead subscription or entitlement. New/duplicate
+        events are acknowledged only after the inbox decision is durable.
+      security: []
+      operationId: receiveRevenueCatWebhook
+      x-luckread-runtime-status: IMPLEMENTED_SOURCE_ONLY_PENDING_D1_04_MIGRATION_AND_REVENUECAT_CONFIGURATION
+      x-luckread-max-body-bytes: 1048576
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          description: Exact Authorization header value configured for this RevenueCat webhook integration.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 5000
+        - name: X-RevenueCat-Webhook-Signature
+          in: header
+          required: false
+          description: Required whenever RevenueCat HMAC signing is enabled; t=Unix timestamp and v1=HMAC-SHA256 hex digest over timestamp dot exact raw request bytes.
+          schema:
+            type: string
+            pattern: '^t=[0-9]{1,12},v1=[0-9a-f]{64}$'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [api_version, event]
+              additionalProperties: true
+      responses:
+        '200':
+          description: Durable receipt, duplicate, conflict, or RevenueCat dashboard TEST event acknowledged; no entitlement is granted by this endpoint.
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '400':
+          description: Malformed or unsupported webhook envelope.
+        '401':
+          description: RevenueCat Authorization or enabled HMAC signature is invalid.
+        '413':
+          description: Webhook body exceeds 1 MiB.
+        '503':
+          description: Configuration or durable D1-04 receipt persistence is unavailable.
+
+  /webhooks/hyperswitch:
+    post:
+      tags: [Commerce]
+      summary: Receive a signed Hyperswitch provider webhook
+      description: >-
+        Provider callback ingress has no browser-session authentication. W01
+        preserves the bounded raw payload and signature; W07 validates
+        X-Webhook-Signature-512 using HMAC-SHA512 and durably deduplicates the
+        provider event before acknowledging it. A recorded event does not by
+        itself activate a subscription entitlement.
+      security: []
+      operationId: receiveHyperswitchPaymentWebhook
+      x-luckread-runtime-status: IMPLEMENTED_SOURCE_ONLY_PENDING_D1_04_MIGRATION_AND_SECRETS
+      x-luckread-max-body-bytes: 1048576
+      parameters:
+        - name: X-Webhook-Signature-512
+          in: header
+          required: true
+          description: HMAC-SHA512 hexadecimal digest for the exact raw request bytes.
+          schema:
+            type: string
+            pattern: '^[0-9a-fA-F]{128}$'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Provider envelope; W01 forwards exact serialized bytes without parsing or re-serialization.
+              additionalProperties: true
+      responses:
+        '200':
+          description: Event receipt was applied or a previously processed event was recognized as a duplicate.
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HyperswitchWebhookReceiptResponse' }
+        '202':
+          description: Event was durably recorded but was semantically rejected, requires reconciliation, or contains a payload conflict.
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HyperswitchWebhookReceiptResponse' }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /payments/{paymentId}:
+    get:
+      tags: [Users]
+      summary: Discovery draft for GET undefined
+      operationId: getPaymentsPaymentId
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /payments/intents:
+    post:
+      tags: [Commerce]
+      summary: Create a customer-bound Hyperswitch payment intent for an existing owned order
+      description: >-
+        W01 authenticates the customer session and authorizes order.read before forwarding
+        the order ID to the existing private W07 service binding. Amount, currency, customer
+        and provider credentials are server controlled. The browser receives only the scoped
+        client secret needed by the hosted Hyperswitch Payment Element. Client callbacks and
+        return URLs do not establish payment success or grant subscription entitlement.
+      operationId: postPaymentsIntents
+      x-luckread-contract-status: CONTRACTED_PARTIAL
+      x-luckread-runtime-status: IMPLEMENTED_SOURCE_ONLY_PENDING_D1_04_MIGRATION_AND_SECRETS
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      x-luckread-max-body-bytes: 16384
+      security:
+        - sessionCookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [orderId]
+              properties:
+                orderId: { type: string, pattern: '^ord_[A-Za-z0-9_-]{1,90}$' }
+      responses:
+        '201':
+          description: New unconfirmed payment intent ready for hosted checkout.
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [data, requestId]
+                properties:
+                  data:
+                    type: object
+                    additionalProperties: false
+                    required: [paymentId, orderId, amountMinor, currency, pricingMode, status, version, clientSecret]
+                    properties:
+                      paymentId: { type: string, pattern: '^pay_[a-f0-9]{26}$' }
+                      orderId: { type: string, pattern: '^ord_[A-Za-z0-9_-]{1,90}$' }
+                      amountMinor: { type: integer, minimum: 1, maximum: 2147483647 }
+                      currency: { type: string, pattern: '^[A-Z]{3}$' }
+                      pricingMode: { type: string, enum: [live, demo] }
+                      status: { type: string, enum: [requires_payment_method, requires_confirmation] }
+                      version: { type: integer, minimum: 1 }
+                      clientSecret: { type: string, minLength: 1, maxLength: 4096 }
+                  requestId: { $ref: '#/components/schemas/RequestId' }
+        '200':
+          description: Idempotent replay of the same unconfirmed payment intent.
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [data, requestId]
+                properties:
+                  data:
+                    type: object
+                    additionalProperties: false
+                    required: [paymentId, orderId, amountMinor, currency, pricingMode, status, version, clientSecret]
+                    properties:
+                      paymentId: { type: string, pattern: '^pay_[a-f0-9]{26}$' }
+                      orderId: { type: string, pattern: '^ord_[A-Za-z0-9_-]{1,90}$' }
+                      amountMinor: { type: integer, minimum: 1, maximum: 2147483647 }
+                      currency: { type: string, pattern: '^[A-Z]{3}$' }
+                      pricingMode: { type: string, enum: [live, demo] }
+                      status: { type: string, enum: [requires_payment_method, requires_confirmation] }
+                      version: { type: integer, minimum: 1 }
+                      clientSecret: { type: string, minLength: 1, maxLength: 4096 }
+                  requestId: { $ref: '#/components/schemas/RequestId' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/InvalidState' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+
+  /plans:
+    get:
+      tags: [Creators]
+      summary: List active public creator membership plans
+      operationId: getPlans
+      description: Returns only ACTIVE and PUBLIC creator plans backed by an immutable current version. This catalog does not create subscriptions or grant entitlements.
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+        - name: cursor
+          in: query
+          required: false
+          schema: { type: string, maxLength: 2048 }
+      responses:
+        '200':
+          description: Active public plan catalog.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, requestId]
+                properties:
+                  data:
+                    type: object
+                    required: [docs, limit, hasMore, nextCursor]
+                    properties:
+                      docs:
+                        type: array
+                        items:
+                          type: object
+                          required: [planId, creatorId, planVersion, name, tier, billingInterval, priceMinor, currency, benefits, createdAt, updatedAt]
+                          properties:
+                            planId: { type: string, minLength: 1, maxLength: 256 }
+                            creatorId: { type: string, minLength: 1, maxLength: 256 }
+                            planVersion: { type: integer, minimum: 1 }
+                            name: { type: string, minLength: 1, maxLength: 120 }
+                            tier: { type: string, minLength: 1, maxLength: 64 }
+                            billingInterval: { type: string, enum: [MONTHLY, YEARLY] }
+                            priceMinor: { type: integer, minimum: 0, maximum: 2147483647 }
+                            currency: { type: string, pattern: '^[A-Z]{3}$' }
+                            benefits:
+                              type: array
+                              items: { type: string, minLength: 1, maxLength: 180 }
+                            createdAt: { type: string, format: date-time }
+                            updatedAt: { type: string, format: date-time }
+                      limit: { type: integer, minimum: 1, maximum: 50 }
+                      hasMore: { type: boolean }
+                      nextCursor: { type: [string, 'null'], maxLength: 2048 }
+                  requestId: { $ref: '#/components/schemas/RequestId' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        default: { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /posts:
+    post:
+      tags: [Contents]
+      summary: Discovery draft for POST undefined
+      operationId: postPosts
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /posts/{postId}:
+    get:
+      tags: [Contents]
+      summary: Discovery draft for GET undefined
+      operationId: getPostsPostId
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+    patch:
+      tags: [Contents]
+      summary: Discovery draft for PATCH undefined
+      operationId: patchPostsPostId
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /realtime/presence:
+    post:
+      tags: [Feed]
+      summary: Discovery draft for POST undefined
+      operationId: postRealtimePresence
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /realtime/session:
+    get:
+      tags: [Feed]
+      summary: Discovery draft for GET undefined
+      operationId: getRealtimeSession
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /recommendation/context:
+    get:
+      tags: [Feed]
+      summary: Discovery draft for GET undefined
+      operationId: getRecommendationContext
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /recommendation/feedback:
+    post:
+      tags: [Feed]
+      summary: Discovery draft for POST undefined
+      operationId: postRecommendationFeedback
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /search/suggestions:
+    get:
+      tags: [Search]
+      summary: Discovery draft for GET undefined
+      operationId: getSearchSuggestions
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /search/trending:
+    get:
+      tags: [Search]
+      summary: List recent popular public search terms
+      description: >-
+        Returns a bounded, approximate edge-cache projection derived only from
+        successful public searches with results. A term is only surfaced after three
+        successful searches in the local edge-cache region. Counts are approximate,
+        may be regional, and never include viewer identifiers.
+      operationId: getSearchTrending
+      security: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 20, default: 10 }
+      responses:
+        '200':
+          description: Recent popular search terms.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, requestId]
+                additionalProperties: false
+                properties:
+                  data:
+                    type: object
+                    required: [items, nextCursor, hasMore]
+                    additionalProperties: false
+                    properties:
+                      items:
+                        type: array
+                        maxItems: 20
+                        items:
+                          type: object
+                          required: [term, count, lastSeenAt]
+                          additionalProperties: false
+                          properties:
+                            term: { type: string, minLength: 2, maxLength: 64 }
+                            count: { type: integer, minimum: 1, maximum: 1000000 }
+                            lastSeenAt: { type: string, format: date-time }
+                      nextCursor: { type: [string, 'null'], const: null }
+                      hasMore: { type: boolean, const: false }
+                  requestId: { type: string }
+                  traceId: { type: string }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /subscriptions:
+    get:
+      tags: [Users]
+      summary: Discovery draft for GET undefined
+      operationId: getSubscriptions
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+    post:
+      tags: [Users]
+      summary: Discovery draft for POST undefined
+      operationId: postSubscriptions
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /subscriptions/{subscriptionId}:
+    delete:
+      tags: [Users]
+      summary: Discovery draft for DELETE undefined
+      operationId: deleteSubscriptionsSubscriptionId
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /users/{userId}:
+    get:
+      tags: [Users]
+      summary: Discovery draft for GET undefined
+      operationId: getUserProfile
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+    patch:
+      tags: [Users]
+      summary: Discovery draft for PATCH undefined
+      operationId: patchUsersUserId
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /users/{userId}/follow:
+    delete:
+      tags: [Interactions]
+      summary: Discovery draft for DELETE undefined
+      operationId: deleteUsersUserIdFollow
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+    post:
+      tags: [Interactions]
+      summary: Discovery draft for POST undefined
+      operationId: postUsersUserIdFollow
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /users/{userId}/followers:
+    get:
+      tags: [Users]
+      summary: Discovery draft for GET undefined
+      operationId: getUsersUserIdFollowers
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /users/{userId}/following:
+    get:
+      tags: [Users]
+      summary: Discovery draft for GET undefined
+      operationId: getUsersUserIdFollowing
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+
+  /users/{userId}/profile:
+    get:
+      tags: [Users]
+      summary: Discovery draft for GET undefined
+      operationId: getUsersUserIdProfile
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
+  /admin/moderation/cases/{caseId}:
+    get:
+      tags: [Admin]
+      summary: Read a moderation case within the authenticated reviewer scope.
+      operationId: getModerationCase
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: caseId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
+      responses:
+        '200':
+          description: Moderation case.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ModerationCaseResponse' }
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /admin/moderation/cases/{caseId}/decision:
+    post:
+      tags: [Admin]
+      summary: Record the authoritative moderation decision for a case.
+      operationId: decideModerationCase
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: caseId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+        - $ref: '#/components/parameters/IfMatchRequired'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ModerationDecisionRequest' }
+      responses:
+        '200':
+          description: Authoritative moderation decision result.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ModerationDecisionResponse' }
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+
+  /admin/moderation/queue:
+    get:
+      tags: [Admin]
+      summary: Read the bounded moderation queue for the authenticated reviewer scope.
+      operationId: listModerationQueue
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Bounded moderation queue page.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ModerationQueueResponse' }
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/PermissionDenied'
+        '400':
+          $ref: '#/components/responses/InvalidCursor'
+
+  /creator-applications:
+    get:
+      tags: [Creators]
+      summary: Read the current user's creator qualification application
+      operationId: getMyCreatorApplication
+      security:
+        - sessionCookieAuth: []
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Current user's latest creator application, if any.
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+            ETag:
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, requestId]
+                additionalProperties: false
+                properties:
+                  data:
+                    type: object
+                    required: [application]
+                    properties:
+                      application:
+                        anyOf:
+                          - type: object
+                            required: [application_id, creator_type, status, grant_state, version]
+                            properties:
+                              application_id: { $ref: '#/components/schemas/ResourceId' }
+                              creator_type: { type: string, enum: [PERSONAL, WRITER, VIDEO_CREATOR, DEVELOPER, ARTIST, OTHER] }
+                              statement: { type: string, maxLength: 2000 }
+                              status: { type: string, enum: [PENDING, APPROVED, REJECTED] }
+                              grant_state: { type: string, enum: [NOT_REQUESTED, PENDING, GRANTED] }
+                              version: { type: integer, minimum: 1 }
+                              created_at: { type: string, format: date-time }
+                              updated_at: { type: string, format: date-time }
+                              decided_at: { type: [string, 'null'], format: date-time }
+                              decision_reason: { type: [string, 'null'], maxLength: 500 }
+                          - type: 'null'
+                  requestId: { $ref: '#/components/schemas/RequestId' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '503': { $ref: '#/components/responses/ClientError' }
+    post:
+      tags: [Creators]
+      summary: Apply for a creator identity and L3 publishing eligibility
+      description: >-
+        Only an active, email-verified L2 account may apply. The client cannot
+        choose roles, layers, creator identifiers, reviewer, scope or decision.
+        Approval and the L3 RoleAssignment are committed as separate audited
+        steps; a pending grant is not treated as active creator access.
+      operationId: applyForCreator
+      security:
+        - sessionCookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [creatorType]
+              additionalProperties: false
+              properties:
+                creatorType:
+                  type: string
+                  enum: [PERSONAL, WRITER, VIDEO_CREATOR, DEVELOPER, ARTIST, OTHER]
+                statement:
+                  type: string
+                  maxLength: 2000
+      responses:
+        '201':
+          description: Creator application recorded as pending review.
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+            ETag:
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, requestId]
+                properties:
+                  data:
+                    type: object
+                    required: [applicationId, status, grantState, version]
+                    properties:
+                      applicationId: { $ref: '#/components/schemas/ResourceId' }
+                      status: { type: string, const: PENDING }
+                      grantState: { type: string, const: NOT_REQUESTED }
+                      version: { type: integer, const: 1 }
+                  requestId: { $ref: '#/components/schemas/RequestId' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '409': { $ref: '#/components/responses/InvalidState' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '503': { $ref: '#/components/responses/ClientError' }
+
+  /admin/creator-applications:
+    get:
+      tags: [Creators]
+      summary: List pending creator applications for authorized reviewers
+      operationId: listCreatorApplicationsForReview
+      description: Requires global L7 or L8 authorization.
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 50, default: 25 }
+      security:
+        - sessionCookieAuth: []
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Bounded page of pending applications.
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, requestId]
+                properties:
+                  data:
+                    type: object
+                    required: [data, limit]
+                    properties:
+                      data: { type: array, items: { type: object } }
+                      limit: { type: integer, minimum: 1, maximum: 50 }
+                  requestId: { $ref: '#/components/schemas/RequestId' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '503': { $ref: '#/components/responses/ClientError' }
+    post:
+      tags: [Creators]
+      summary: Approve or reject a creator application
+      operationId: decideCreatorApplication
+      description: >-
+        Requires global L7 or L8 authorization. A reviewer cannot decide their
+        own application. If-Match and Idempotency-Key prevent stale and
+        duplicate decisions. An APPROVED application is not active for L3
+        capabilities until W02 confirms the L3 RoleAssignment.
+      security:
+        - sessionCookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IfMatchRequired'
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [applicationId, decision]
+              additionalProperties: false
+              properties:
+                applicationId: { $ref: '#/components/schemas/ResourceId' }
+                decision: { type: string, enum: [APPROVED, REJECTED] }
+                reason: { type: string, maxLength: 500 }
+      responses:
+        '200':
+          description: Decision persisted; includes grant state.
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, requestId]
+                properties:
+                  data:
+                    type: object
+                    required: [applicationId, status, grantState, version]
+                    properties:
+                      applicationId: { $ref: '#/components/schemas/ResourceId' }
+                      status: { type: string, enum: [APPROVED, REJECTED] }
+                      grantState: { type: string, enum: [PENDING, GRANTED, NOT_REQUESTED] }
+                      version: { type: integer, minimum: 1 }
+                  requestId: { $ref: '#/components/schemas/RequestId' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/InvalidState' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '503': { $ref: '#/components/responses/ClientError' }
+
+  /content/{contentId}/pin:
+    parameters:
+      - $ref: '#/components/parameters/ContentId'
+    post:
+      tags: [Creators]
+      summary: Pin the current creator's published content to their profile.
+      operationId: postContentContentIdPin
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      responses:
+        '200': { description: Profile pin created or confirmed. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+    delete:
+      tags: [Creators]
+      summary: Remove the current creator's profile pin for this content.
+      operationId: deleteContentContentIdPin
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      responses:
+        '204': { description: Profile pin removed or already absent. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+  /content/{contentId}/reposts:
+    parameters:
+      - $ref: '#/components/parameters/ContentId'
+    post:
+      tags: [Interactions]
+      summary: Create a relation to the canonical published content.
+      operationId: postContentContentIdReposts
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      responses:
+        '201': { description: Repost relation created or already present. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+    delete:
+      tags: [Interactions]
+      summary: Remove the current viewer's repost relation.
+      operationId: deleteContentContentIdReposts
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      responses:
+        '204': { description: Repost relation removed or already absent. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+  /users/{userId}/pinned-content:
+    parameters:
+      - name: userId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    get:
+      tags: [Users]
+      summary: Read a user's public pinned published-content reference.
+      security: []
+      operationId: getUsersUserIdPinnedContent
+      responses:
+        '200': { description: Pinned-content reference, or null when no public pin exists. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+  /topics/{topicName}:
+    get:
+      tags: [Search]
+      summary: Read an active public topic and its paginated published content
+      description: >-
+        Normalizes the topic name using Unicode NFKC and case-insensitive matching.
+        Only ACTIVE topics are visible. W01 applies public-read rate limiting and
+        a short-lived public response cache; W05 owns topic relationships, while
+        W03 remains authoritative for published content fields. No session is
+        required. Cursor values are opaque and must be returned unchanged.
+      operationId: getTopicsTopicName
+      security: []
+      parameters:
+        - name: topicName
+          in: path
+          required: true
+          description: Topic display name or normalized name; an optional leading # is ignored.
+          schema: { type: string, minLength: 1, maxLength: 64 }
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of visible published content items returned. Defaults to 20.
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+        - name: cursor
+          in: query
+          required: false
+          description: Opaque continuation cursor returned by a previous page.
+          schema: { type: string, minLength: 1, maxLength: 2048 }
+      responses:
+        '200':
+          description: Active topic and a bounded page of currently published content.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, requestId]
+                additionalProperties: false
+                properties:
+                  data:
+                    type: object
+                    required: [topic, contents, hasMore, nextCursor]
+                    additionalProperties: false
+                    properties:
+                      topic:
+                        type: object
+                        required: [topicId, name, displayName, status]
+                        additionalProperties: false
+                        properties:
+                          topicId: { $ref: '#/components/schemas/ResourceId' }
+                          name: { type: string, minLength: 1, maxLength: 64 }
+                          displayName: { type: string, minLength: 1, maxLength: 64 }
+                          status: { type: string, enum: [ACTIVE] }
+                      contents:
+                        type: array
+                        maxItems: 50
+                        items:
+                          type: object
+                          required: [id, contentType, title, updatedAt]
+                          additionalProperties: false
+                          properties:
+                            id: { $ref: '#/components/schemas/ResourceId' }
+                            contentType: { type: string, enum: [article, post, video] }
+                            title: { type: string }
+                            updatedAt: { type: string, format: date-time }
+                      hasMore: { type: boolean }
+                      nextCursor: { type: [string, 'null'], maxLength: 2048 }
+                  requestId: { type: string, minLength: 1 }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503':
+          description: Social topic or W03 published-content service unavailable.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /users/by-username/{username}:
+    get:
+      tags: [Users]
+      summary: Get a public user profile by username
+      description: >-
+        Returns the minimal public profile projection used to resolve a username
+        to its canonical user ID. Email, locale, timezone, Better Auth identity
+        identifiers and other private account fields are never included. This
+        route is public, applies W01 public-read rate limiting, and caches the
+        projection for 30 seconds with stale-while-revalidate support.
+      operationId: getUsersByUsernameUsername
+      security: []
+      parameters:
+        - name: username
+          in: path
+          required: true
+          description: Username matching the canonical ASCII username format.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 128
+            pattern: '^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$'
+      responses:
+        '200':
+          description: Public profile projection for the requested username.
+          headers:
+            Cache-Control:
+              description: Public cache lifetime with bounded stale-while-revalidate.
+              schema: { type: string, const: 'public, max-age=30, stale-while-revalidate=120' }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, username, displayName, bio, avatar, requestId]
+                additionalProperties: false
+                properties:
+                  id: { $ref: '#/components/schemas/ResourceId' }
+                  username: { type: string, maxLength: 128 }
+                  displayName: { type: [string, 'null'] }
+                  bio: { type: [string, 'null'] }
+                  avatar: { type: [string, 'null'] }
+                  requestId: { type: string, minLength: 1 }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503':
+          description: Public profile service unavailable.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /membership/plans/{planId}:
+    parameters:
+      - name: planId
+        in: path
+        required: true
+        schema: { type: string, pattern: '^plan_[a-f0-9]{64}$' }
+    put:
+      tags: [Creators]
+      summary: Revise the authenticated creator's membership plan terms
+      operationId: updateOwnMembershipPlan
+      description: >-
+        Requires membership.plan.update.own and an ACTIVE creator identity.
+        If-Match must match the current plan ETag. W07 appends a new immutable
+        plan version and conditionally advances the current pointer. Existing
+        subscriptions retain their prior plan version and benefits snapshot.
+        W01 confirms a durable W06 intent before mutation and the immutable
+        update audit afterward. Retired plans cannot be revised.
+      security:
+        - sessionCookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IfMatchRequired'
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [name, tier, billingInterval, priceMinor, currency, benefits]
+              properties:
+                name: { type: string, minLength: 1, maxLength: 120 }
+                tier: { type: string, pattern: '^[a-z][a-z0-9_-]{0,63}$' }
+                billingInterval: { type: string, enum: [MONTHLY, YEARLY] }
+                priceMinor: { type: integer, minimum: 0, maximum: 2147483647 }
+                currency: { type: string, pattern: '^[A-Z]{3}$' }
+                benefits:
+                  type: array
+                  maxItems: 20
+                  uniqueItems: true
+                  items: { type: string, minLength: 1, maxLength: 180 }
+      responses:
+        '200':
+          description: Updated current plan version or exact successful retry.
+          headers:
+            ETag:
+              schema: { $ref: '#/components/schemas/ETag' }
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, requestId]
+                properties:
+                  data:
+                    type: object
+                    required: [planId, creatorId, planVersion, name, tier, billingInterval, priceMinor, currency, benefits, status, visibility, version, etag, replayed, createdAt, updatedAt]
+                    properties:
+                      planId: { type: string, pattern: '^plan_[a-f0-9]{64}$' }
+                      creatorId: { $ref: '#/components/schemas/ResourceId' }
+                      planVersion: { type: integer, minimum: 1 }
+                      name: { type: string, minLength: 1, maxLength: 120 }
+                      tier: { type: string, pattern: '^[a-z][a-z0-9_-]{0,63}$' }
+                      billingInterval: { type: string, enum: [MONTHLY, YEARLY] }
+                      priceMinor: { type: integer, minimum: 0, maximum: 2147483647 }
+                      currency: { type: string, pattern: '^[A-Z]{3}$' }
+                      benefits:
+                        type: array
+                        maxItems: 20
+                        items: { type: string, minLength: 1, maxLength: 180 }
+                      status: { type: string, enum: [DRAFT, ACTIVE, PAUSED] }
+                      visibility: { type: string, enum: [PRIVATE, PUBLIC] }
+                      version: { type: integer, minimum: 1 }
+                      etag: { $ref: '#/components/schemas/ETag' }
+                      replayed: { type: boolean }
+                      createdAt: { type: string, format: date-time }
+                      updatedAt: { type: string, format: date-time }
+                  requestId: { $ref: '#/components/schemas/RequestId' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/InvalidState' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /membership/plans/{planId}/lifecycle:
+    parameters:
+      - name: planId
+        in: path
+        required: true
+        schema: { type: string, pattern: '^plan_[a-f0-9]{64}$' }
+    post:
+      tags: [Creators]
+      summary: Pause, resume, or permanently retire an owned membership plan
+      operationId: transitionOwnMembershipPlanLifecycle
+      description: >-
+        Requires membership.plan.lifecycle.own and an ACTIVE creator identity.
+        If-Match must match the lifecycle ETag. Pause hides the plan from new
+        sales; resume restores ACTIVE/PUBLIC visibility; retire permanently
+        sets a PAUSED/PRIVATE plan to RETIRED/PRIVATE. An active plan must first
+        be paused. No lifecycle action changes existing subscriptions or grants
+        or revokes access. W01 confirms a durable W06 intent before W07's
+        owner-scoped D1-01 CAS and confirms W06's immutable final audit.
+      security:
+        - sessionCookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IfMatchRequired'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [action]
+              properties:
+                action: { type: string, enum: [pause, resume, retire] }
+      responses:
+        '200':
+          description: Plan lifecycle changed or exact retry/no-op was confirmed.
+          headers:
+            ETag:
+              schema: { $ref: '#/components/schemas/ETag' }
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, requestId]
+                properties:
+                  data:
+                    type: object
+                    required: [planId, creatorId, planVersion, status, visibility, version, etag, replayed]
+                    properties:
+                      planId: { type: string, pattern: '^plan_[a-f0-9]{64}$' }
+                      creatorId: { type: string }
+                      planVersion: { type: integer, minimum: 1 }
+                      status: { type: string, enum: [ACTIVE, PAUSED, RETIRED] }
+                      visibility: { type: string, enum: [PUBLIC, PRIVATE] }
+                      version: { type: integer, minimum: 1 }
+                      etag: { $ref: '#/components/schemas/ETag' }
+                      replayed: { type: boolean }
+                  requestId: { $ref: '#/components/schemas/RequestId' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /membership/plans/{planId}/publish:
+    parameters:
+      - name: planId
+        in: path
+        required: true
+        schema: { type: string, pattern: '^plan_[a-f0-9]{64}$' }
+    post:
+      tags: [Creators]
+      summary: Publish the authenticated creator's membership plan draft
+      operationId: publishOwnMembershipPlan
+      description: >-
+        Requires membership.plan.publish.own and an ACTIVE creator identity.
+        If-Match must match the current plan ETag. W07 performs an owner-scoped
+        version-CAS transition from DRAFT/PRIVATE to ACTIVE/PUBLIC only when an
+        immutable current plan version exists. W01 confirms a durable W06
+        publish-intent audit before calling W07 and the immutable published
+        event afterward. Publishing does not create a subscription, order,
+        payment, or entitlement.
+      security:
+        - sessionCookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IfMatchRequired'
+      responses:
+        '200':
+          description: Plan published or exact publication retry confirmed.
+          headers:
+            ETag:
+              schema: { $ref: '#/components/schemas/ETag' }
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, requestId]
+                properties:
+                  data:
+                    type: object
+                    required: [planId, creatorId, planVersion, status, visibility, version, etag, replayed, name, tier, billingInterval, priceMinor, currency, benefits, createdAt, updatedAt]
+                    properties:
+                      planId: { type: string, pattern: '^plan_[a-f0-9]{64}$' }
+                      creatorId: { $ref: '#/components/schemas/ResourceId' }
+                      planVersion: { type: integer, minimum: 1 }
+                      status: { type: string, enum: [ACTIVE] }
+                      visibility: { type: string, enum: [PUBLIC] }
+                      version: { type: integer, minimum: 2 }
+                      etag: { $ref: '#/components/schemas/ETag' }
+                      replayed: { type: boolean }
+                      name: { type: string, minLength: 1, maxLength: 120 }
+                      tier: { type: string, pattern: '^[a-z][a-z0-9_-]{0,63}$' }
+                      billingInterval: { type: string, enum: [MONTHLY, YEARLY] }
+                      priceMinor: { type: integer, minimum: 0, maximum: 2147483647 }
+                      currency: { type: string, pattern: '^[A-Z]{3}$' }
+                      benefits:
+                        type: array
+                        maxItems: 20
+                        items: { type: string, minLength: 1, maxLength: 180 }
+                      createdAt: { type: string, format: date-time }
+                      updatedAt: { type: string, format: date-time }
+                  requestId: { $ref: '#/components/schemas/RequestId' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/InvalidState' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /billing/documents:
+    get:
+      tags: [Commerce]
+      summary: List the authenticated customer invoices and receipts
+      operationId: getBillingDocuments
+      x-luckread-contract-status: CONTRACTED_PARTIAL
+      x-luckread-runtime-status: IMPLEMENTED_SOURCE_ONLY_PENDING_D1_04_MIGRATION
+      x-luckread-source: contracts/api/commerce-operation-policy.v1.json
+      security:
+        - sessionCookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+        - name: cursor
+          in: query
+          required: false
+          schema: { type: string, minLength: 1, maxLength: 512 }
+      responses:
+        '200':
+          description: Customer-owned records returned using bounded keyset pagination.
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema: {"type":"object","additionalProperties":false,"required":["data","requestId"],"properties":{"data":{"type":"object","additionalProperties":false,"required":["items","nextCursor","hasMore"],"properties":{"items":{"type":"array","maxItems":50,"items":{"type":"object","additionalProperties":false,"required":["documentId","documentType","documentNumber","orderId","paymentId","amountMinor","currency","snapshot","issuedAt","createdAt"],"properties":{"documentId":{"type":"string","minLength":1,"maxLength":128},"documentType":{"type":"string","enum":["INVOICE","RECEIPT"]},"documentNumber":{"type":"string","minLength":1,"maxLength":128},"orderId":{"type":"string","pattern":"^ord_[A-Za-z0-9_-]{1,90}$"},"paymentId":{"type":["string","null"],"pattern":"^pay_[A-Za-z0-9]{26}$"},"amountMinor":{"type":"integer","minimum":1,"maximum":9007199254740991},"currency":{"type":"string","pattern":"^[A-Z]{3}$"},"snapshot":{"type":"object","additionalProperties":true},"issuedAt":{"type":"string","format":"date-time"},"createdAt":{"type":"string","format":"date-time"}}}},"nextCursor":{"type":["string","null"],"maxLength":512},"hasMore":{"type":"boolean"}}},"requestId":{"type":"string","pattern":"^req_[A-Za-z0-9_-]{1,123}$"}}}
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /payments/history:
+    get:
+      tags: [Commerce]
+      summary: List the authenticated customer payment history
+      operationId: getPaymentsHistory
+      x-luckread-contract-status: CONTRACTED_PARTIAL
+      x-luckread-runtime-status: IMPLEMENTED_SOURCE_ONLY_PENDING_D1_04_MIGRATION
+      x-luckread-source: contracts/api/commerce-operation-policy.v1.json
+      security:
+        - sessionCookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+        - name: cursor
+          in: query
+          required: false
+          schema: { type: string, minLength: 1, maxLength: 512 }
+      responses:
+        '200':
+          description: Customer-owned records returned using bounded keyset pagination.
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema: {"type":"object","additionalProperties":false,"required":["data","requestId"],"properties":{"data":{"type":"object","additionalProperties":false,"required":["items","nextCursor","hasMore"],"properties":{"items":{"type":"array","maxItems":50,"items":{"type":"object","additionalProperties":false,"required":["paymentId","orderId","amountMinor","currency","status","version","providerUpdatedAt","createdAt","updatedAt","refundedMinor"],"properties":{"paymentId":{"type":"string","pattern":"^pay_[A-Za-z0-9]{26}$"},"orderId":{"type":"string","pattern":"^ord_[A-Za-z0-9_-]{1,90}$"},"amountMinor":{"type":"integer","minimum":1,"maximum":9007199254740991},"currency":{"type":"string","pattern":"^[A-Z]{3}$"},"status":{"type":"string","maxLength":64},"version":{"type":"integer","minimum":1},"providerUpdatedAt":{"type":["string","null"],"format":"date-time"},"createdAt":{"type":"string","format":"date-time"},"updatedAt":{"type":"string","format":"date-time"},"refundedMinor":{"type":"integer","minimum":0,"maximum":9007199254740991}}}},"nextCursor":{"type":["string","null"],"maxLength":512},"hasMore":{"type":"boolean"}}},"requestId":{"type":"string","pattern":"^req_[A-Za-z0-9_-]{1,123}$"}}}
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /payments/refunds:
+    post:
+      tags: [Commerce]
+      summary: Create a full or partial refund for an owned payment
+      description: W01 authorizes the own-Payment permission. W07 verifies D1-04 ownership and Hyperswitch amount_received, reserves a stable refund ID, and waits for a signed webhook to confirm the final refund state.
+      operationId: postPaymentsRefunds
+      x-luckread-contract-status: CONTRACTED_PARTIAL
+      x-luckread-runtime-status: IMPLEMENTED_SOURCE_ONLY_PENDING_D1_04_MIGRATION_AND_SECRETS
+      x-luckread-source: contracts/api/commerce-operation-policy.v1.json
+      security:
+        - sessionCookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"type":"object","additionalProperties":false,"required":["paymentId","amountMinor","currency"],"properties":{"paymentId":{"type":"string","pattern":"^pay_[A-Za-z0-9]{26}$"},"amountMinor":{"type":"integer","minimum":1,"maximum":9007199254740991},"currency":{"type":"string","pattern":"^[A-Z]{3}$"},"reason":{"type":"string","maxLength":255}}}
+      responses:
+        '202':
+          description: Refund submitted or awaiting signed provider confirmation.
+          content:
+            application/json:
+              schema: {"type":"object","additionalProperties":false,"required":["data","requestId"],"properties":{"data":{"type":"object","additionalProperties":false,"required":["refundId","paymentId","orderId","amountMinor","capturedAmountMinor","currency","status","reason","version","providerUpdatedAt","createdAt","updatedAt","replayed"],"properties":{"refundId":{"type":"string","pattern":"^ref_[A-Za-z0-9]{26}$"},"paymentId":{"type":"string","pattern":"^pay_[A-Za-z0-9]{26}$"},"orderId":{"type":"string","pattern":"^ord_[A-Za-z0-9_-]{1,90}$"},"amountMinor":{"type":"integer","minimum":1,"maximum":9007199254740991},"capturedAmountMinor":{"type":"integer","minimum":1,"maximum":9007199254740991},"currency":{"type":"string","pattern":"^[A-Z]{3}$"},"status":{"type":"string","enum":["REQUESTED","PENDING","SUCCEEDED","FAILED","REVIEW","RECONCILIATION_REQUIRED"]},"reason":{"type":["string","null"],"maxLength":255},"version":{"type":"integer","minimum":1},"providerUpdatedAt":{"type":["string","null"],"format":"date-time"},"createdAt":{"type":"string","format":"date-time"},"updatedAt":{"type":"string","format":"date-time"},"replayed":{"type":"boolean"}}},"requestId":{"type":"string","pattern":"^req_[A-Za-z0-9_-]{1,123}$"}}}
+        '200':
+          description: Idempotent replay of a finalized refund.
+          content:
+            application/json:
+              schema: {"type":"object","additionalProperties":false,"required":["data","requestId"],"properties":{"data":{"type":"object","additionalProperties":false,"required":["refundId","paymentId","orderId","amountMinor","capturedAmountMinor","currency","status","reason","version","providerUpdatedAt","createdAt","updatedAt","replayed"],"properties":{"refundId":{"type":"string","pattern":"^ref_[A-Za-z0-9]{26}$"},"paymentId":{"type":"string","pattern":"^pay_[A-Za-z0-9]{26}$"},"orderId":{"type":"string","pattern":"^ord_[A-Za-z0-9_-]{1,90}$"},"amountMinor":{"type":"integer","minimum":1,"maximum":9007199254740991},"capturedAmountMinor":{"type":"integer","minimum":1,"maximum":9007199254740991},"currency":{"type":"string","pattern":"^[A-Z]{3}$"},"status":{"type":"string","enum":["REQUESTED","PENDING","SUCCEEDED","FAILED","REVIEW","RECONCILIATION_REQUIRED"]},"reason":{"type":["string","null"],"maxLength":255},"version":{"type":"integer","minimum":1},"providerUpdatedAt":{"type":["string","null"],"format":"date-time"},"createdAt":{"type":"string","format":"date-time"},"updatedAt":{"type":"string","format":"date-time"},"replayed":{"type":"boolean"}}},"requestId":{"type":"string","pattern":"^req_[A-Za-z0-9_-]{1,123}$"}}}
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/InvalidState' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    get:
+      tags: [Commerce]
+      summary: List the authenticated customer refund history
+      operationId: getPaymentsRefunds
+      x-luckread-contract-status: CONTRACTED_PARTIAL
+      x-luckread-runtime-status: IMPLEMENTED_SOURCE_ONLY_PENDING_D1_04_MIGRATION
+      x-luckread-source: contracts/api/commerce-operation-policy.v1.json
+      security:
+        - sessionCookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+        - name: cursor
+          in: query
+          required: false
+          schema: { type: string, minLength: 1, maxLength: 512 }
+      responses:
+        '200':
+          description: Customer-owned records returned using bounded keyset pagination.
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema: {"type":"object","additionalProperties":false,"required":["data","requestId"],"properties":{"data":{"type":"object","additionalProperties":false,"required":["items","nextCursor","hasMore"],"properties":{"items":{"type":"array","maxItems":50,"items":{"type":"object","additionalProperties":false,"required":["refundId","paymentId","orderId","amountMinor","currency","status","reason","version","providerUpdatedAt","createdAt","updatedAt"],"properties":{"refundId":{"type":"string","pattern":"^ref_[A-Za-z0-9]{26}$"},"paymentId":{"type":"string","pattern":"^pay_[A-Za-z0-9]{26}$"},"orderId":{"type":"string","pattern":"^ord_[A-Za-z0-9_-]{1,90}$"},"amountMinor":{"type":"integer","minimum":1,"maximum":9007199254740991},"currency":{"type":"string","pattern":"^[A-Z]{3}$"},"status":{"type":"string","enum":["REQUESTED","PENDING","SUCCEEDED","FAILED","REVIEW","RECONCILIATION_REQUIRED"]},"reason":{"type":["string","null"],"maxLength":255},"version":{"type":"integer","minimum":1},"providerUpdatedAt":{"type":["string","null"],"format":"date-time"},"createdAt":{"type":"string","format":"date-time"},"updatedAt":{"type":"string","format":"date-time"}}}},"nextCursor":{"type":["string","null"],"maxLength":512},"hasMore":{"type":"boolean"}}},"requestId":{"type":"string","pattern":"^req_[A-Za-z0-9_-]{1,123}$"}}}
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    sessionCookieAuth:
+      type: apiKey
+      in: cookie
+      name: better-auth.session_token
+      description: Browser cookie carrier for the same current session used by bearerAuth.
+  parameters:
+    UserId:
+      name: userId
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/ResourceId' }
+    ContentId:
+      name: contentId
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/ResourceId' }
+    MediaId:
+      name: mediaId
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/ResourceId' }
+    IpId:
+      name: ipId
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/ResourceId' }
+    SessionId:
+      name: sessionId
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/ResourceId' }
+    CredentialId:
+      name: credentialId
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/ResourceId' }
+    Cursor:
+      name: cursor
+      in: query
+      required: false
+      schema: { type: string }
+    Limit:
+      name: limit
+      in: query
+      required: false
+      schema: { type: integer, minimum: 1, maximum: 100 }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      schema: { type: string, minLength: 1, maxLength: 256 }
+    IdempotencyKeyRequired:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, minLength: 1, maxLength: 256 }
+    IfMatchRequired:
+      name: If-Match
+      in: header
+      required: true
+      schema: { $ref: '#/components/schemas/ETag' }
+  responses:
+    Unauthenticated:
+      description: Authentication required.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    ValidationFailed:
+      description: Validation failed.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    RateLimited:
+      description: Rate limited.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    PermissionDenied:
+      description: Permission denied.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    InvalidState:
+      description: Invalid lifecycle transition.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    PreconditionFailed:
+      description: If-Match does not match current ETag.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    PreconditionRequired:
+      description: If-Match is required for this operation.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    IdempotencyKeyRequired:
+      description: Idempotency-Key is required for this mutation.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    UnsupportedMediaType:
+      description: Unsupported media type.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    NotFound:
+      description: Resource not found.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    InvalidCursor:
+      description: Invalid cursor.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    ClientError:
+      description: Client error.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    ServiceUnavailable:
+      description: Service unavailable.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+  schemas:
+    AuthMfaStatus:
+      type: object
+      required: [enabled, verified, enrolledAt]
+      additionalProperties: false
+      properties:
+        enabled: { type: boolean }
+        verified: { type: boolean }
+        enrolledAt: { type: [string, 'null'], format: date-time }
+    AuthMfaChallengeRequired:
+      type: object
+      required: [data, requestId]
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          required: [mfaRequired, availableMethods]
+          additionalProperties: false
+          properties:
+            mfaRequired: { type: boolean, const: true }
+            availableMethods:
+              type: array
+              uniqueItems: true
+              items: { type: string, enum: [totp, recovery_code] }
+        requestId: { type: string }
+    AuthMfaEnrollmentStartRequest:
+      type: object
+      required: [currentPassword]
+      additionalProperties: false
+      properties:
+        currentPassword: { type: string, minLength: 1, writeOnly: true }
+    AuthMfaEnrollmentStartResponse:
+      type: object
+      required: [totpUri, recoveryCodes]
+      additionalProperties: false
+      properties:
+        totpUri: { type: string, format: uri, writeOnly: true }
+        recoveryCodes:
+          type: array
+          minItems: 1
+          items: { type: string, minLength: 8, writeOnly: true }
+    AuthMfaEnrollmentConfirmRequest:
+      type: object
+      required: [code]
+      additionalProperties: false
+      properties:
+        code: { type: string, pattern: '^[0-9]{6}$', writeOnly: true }
+    HyperswitchWebhookReceiptResponse:
+      type: object
+      required: [data, requestId]
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          required: [outcome, eventId, receiptId, state, payloadSha256]
+          additionalProperties: false
+          properties:
+            outcome:
+              type: string
+              enum: [APPLIED, RECONCILIATION_REQUIRED, REJECTED, DUPLICATE, PAYLOAD_CONFLICT]
+            eventId: { type: string, minLength: 1, maxLength: 255 }
+            receiptId: { type: string, minLength: 1, maxLength: 255 }
+            state:
+              type: string
+              enum: [RECEIVED, APPLIED, RECONCILIATION_REQUIRED, REJECTED]
+            payloadSha256: { type: string, pattern: '^[0-9a-f]{64}$' }
+            conflictId: { type: string, minLength: 1, maxLength: 255 }
+        requestId: { type: string, minLength: 1, maxLength: 256 }
+    CommerceOrderCreateRequest:
+      type: object
+      required: [items]
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items:
+            type: object
+            required: [itemRef, quantity]
+            additionalProperties: false
+            properties:
+              itemRef:
+                type: string
+                minLength: 1
+                maxLength: 255
+                description: Opaque item or offer reference; W07 must resolve an authoritative purchasable offer and price.
+              quantity:
+                type: integer
+                minimum: 1
+                maximum: 10000
+    CommerceOrderData:
+      type: object
+      required: [orderId, status, version, currency, subtotalMinor, discountMinor, taxMinor, totalMinor, items, createdAt, updatedAt]
+      additionalProperties: false
+      properties:
+        orderId: { type: string, minLength: 1, maxLength: 255 }
+        status:
+          type: string
+          enum: [CREATED, PENDING_PAYMENT, CONFIRMED, PROCESSING, COMPLETED, CANCELLED, FAILED]
+        version: { type: integer, minimum: 1 }
+        currency: { type: string, pattern: '^[A-Z]{3}$' }
+        subtotalMinor: { type: integer, minimum: 0 }
+        discountMinor: { type: integer, minimum: 0 }
+        taxMinor: { type: integer, minimum: 0 }
+        totalMinor:
+          type: integer
+          minimum: 0
+          description: Must equal subtotalMinor minus discountMinor plus taxMinor.
+        items:
+          type: array
+          maxItems: 50
+          items: { $ref: '#/components/schemas/CommerceOrderLineData' }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    CommerceOrderLineData:
+      type: object
+      required: [itemRef, quantity, unitAmountMinor, lineSubtotalMinor, lineDiscountMinor, lineTaxMinor, lineTotalMinor]
+      additionalProperties: false
+      properties:
+        itemRef: { type: string, minLength: 1, maxLength: 255 }
+        quantity: { type: integer, minimum: 1, maximum: 10000 }
+        unitAmountMinor: { type: integer, minimum: 0 }
+        lineSubtotalMinor:
+          type: integer
+          minimum: 0
+          description: Must equal unitAmountMinor multiplied by quantity.
+        lineDiscountMinor: { type: integer, minimum: 0 }
+        lineTaxMinor: { type: integer, minimum: 0 }
+        lineTotalMinor:
+          type: integer
+          minimum: 0
+          description: Must equal lineSubtotalMinor minus lineDiscountMinor plus lineTaxMinor.
+    CommerceOrderResponse:
+      type: object
+      required: [data, requestId]
+      additionalProperties: false
+      properties:
+        data: { $ref: '#/components/schemas/CommerceOrderData' }
+        requestId: { type: string, minLength: 1 }
+    ResourceId:
+      type: string
+      minLength: 1
+      maxLength: 128
+    Credential:
+      type: object
+      required: [credentialId, kind, active]
+      additionalProperties: false
+      properties:
+        credentialId:
+          $ref: '#/components/schemas/ResourceId'
+        kind:
+          type: string
+          enum: [username, email, phone]
+        active:
+          type: boolean
+    Cursor:
+      $ref: '../../schemas/common/cursor.json'
+    RequestId:
+      $ref: '../../schemas/common/request-id.json'
+    TraceId:
+      $ref: '../../schemas/common/trace-id.json'
+    ETag:
+      type: string
+      minLength: 1
+      maxLength: 256
+    AuthRegistrationConsent:
+      type: object
+      required: [purpose, policyVersion]
+      properties:
+        purpose: { type: string, enum: [ACCOUNT_REGISTRATION] }
+        policyVersion: { type: string }
+      additionalProperties: false
+    AccountState:
+      $ref: '../../enums/account-state.json'
+    ContentState:
+      $ref: '../../enums/content-state.json'
+    ErrorResponse:
+      $ref: '../../schemas/common/error-response.json'
+    ListResponse:
+      $ref: '../../schemas/common/list-response.json'
+    User:
+      type: object
+      required: [id, username, accountState, layer]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        username: { type: string }
+        accountState: { $ref: '#/components/schemas/AccountState' }
+        layer: { type: string, pattern: '^L[0-8]$' }
+    Content:
+      type: object
+      required: [id, state, version, etag]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        state: { $ref: '#/components/schemas/ContentState' }
+        version: { type: integer, minimum: 1 }
+        etag: { $ref: '#/components/schemas/ETag' }
+        creator:
+          description: Optional public author projection included by list endpoints to avoid per-item profile requests.
+          $ref: '#/components/schemas/PublicAuthor'
+    PublicAuthor:
+      type: object
+      required: [id, username, displayName, avatar]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        username: { type: string }
+        displayName: { type: [string, 'null'] }
+        avatar: { type: [string, 'null'] }
+    ContentInput:
+      type: object
+      required: [title, bodyRef]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 512 }
+        bodyRef: { type: string, description: R2 object reference }
+    Media:
+      type: object
+      required: [id, mimeType, size, checksum, status]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        mimeType: { type: string }
+        size: { type: integer, minimum: 1 }
+        checksum: { type: string }
+        status: { enum: [INITIATED, UPLOADING, READY, FAILED, QUARANTINED] }
+    Comment:
+      type: object
+      required: [id, body, state]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        body: { type: string }
+        state: { enum: [PENDING, PUBLISHED, REJECTED] }
+        author:
+          description: Optional public author projection included by list endpoints to avoid per-comment profile requests.
+          $ref: '#/components/schemas/PublicAuthor'
+    ContentPollOption:
+      type: object
+      required: [optionId, text, position, votes]
+      additionalProperties: false
+      properties:
+        optionId: { $ref: '#/components/schemas/ResourceId' }
+        text: { type: string, minLength: 1, maxLength: 50 }
+        position: { type: integer, minimum: 0, maximum: 3 }
+        votes: { type: integer, minimum: 0 }
+    ContentPoll:
+      type: object
+      required: [pollId, contentId, options, durationHours, endsAt, totalVotes, viewerOptionId, closed]
+      additionalProperties: false
+      properties:
+        pollId: { $ref: '#/components/schemas/ResourceId' }
+        contentId: { $ref: '#/components/schemas/ResourceId' }
+        options:
+          type: array
+          minItems: 2
+          maxItems: 4
+          items: { $ref: '#/components/schemas/ContentPollOption' }
+        durationHours: { type: integer, enum: [24, 72, 168] }
+        endsAt: { type: [string, 'null'], format: date-time }
+        totalVotes: { type: integer, minimum: 0 }
+        viewerOptionId: { type: [string, 'null'], maxLength: 128 }
+        closed: { type: boolean }
+    InteractionTarget:
+      type: object
+      required: [targetType, targetId]
+      properties:
+        targetType: { enum: [content, comment, creator, ip] }
+        targetId: { $ref: '#/components/schemas/ResourceId' }
+    Creator:
+      type: object
+      required: [id, userId, displayName]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        userId: { $ref: '#/components/schemas/ResourceId' }
+        displayName: { type: string }
+    IP:
+      type: object
+      required: [id, name]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        name: { type: string }
+    Organization:
+      type: object
+      required: [id, name]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        name: { type: string }
+    ModerationQueueItem:
+      type: object
+      additionalProperties: false
+      required: [caseId, targetType, targetId, policyVersion, state, priority, version, createdAt]
+      properties:
+        caseId: { $ref: '#/components/schemas/ResourceId' }
+        targetType: { type: string, enum: [content, comment, creator, ip, user] }
+        targetId: { $ref: '#/components/schemas/ResourceId' }
+        policyVersion: { type: string, minLength: 1, maxLength: 128 }
+        state: { $ref: '../../enums/moderation-case-state.json' }
+        priority: { type: integer, minimum: 0 }
+        version: { type: integer, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+    ModerationQueueResponse:
+      type: object
+      additionalProperties: false
+      required: [items, nextCursor, hasMore, requestId]
+      properties:
+        items:
+          type: array
+          maxItems: 50
+          items: { $ref: '#/components/schemas/ModerationQueueItem' }
+        nextCursor:
+          type: [string, 'null']
+        hasMore: { type: boolean }
+        requestId: { $ref: '#/components/schemas/RequestId' }
+    ModerationCaseResponse:
+      type: object
+      additionalProperties: false
+      required: [caseId, target, contentReference, policyVersion, currentDecision, evidenceRefs, status, version, createdAt, updatedAt]
+      properties:
+        caseId: { $ref: '#/components/schemas/ResourceId' }
+        target:
+          $ref: '#/components/schemas/ModerationTarget'
+        contentReference:
+          $ref: '#/components/schemas/ModerationContentReference'
+        policyVersion: { type: string, minLength: 1, maxLength: 128 }
+        currentDecision:
+          anyOf:
+            - { $ref: '#/components/schemas/ModerationDecisionSummary' }
+            - { type: 'null' }
+        evidenceRefs:
+          type: array
+          maxItems: 50
+          items: { type: string }
+        status:
+          $ref: '../../enums/moderation-case-state.json'
+        version: { type: integer, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    ModerationTarget:
+      type: object
+      additionalProperties: false
+      required: [targetType, targetId]
+      properties:
+        targetType: { type: string, enum: [content, comment, creator, ip, user] }
+        targetId: { $ref: '#/components/schemas/ResourceId' }
+    ModerationContentReference:
+      type: object
+      additionalProperties: false
+      required: [contentId]
+      properties:
+        contentId: { $ref: '#/components/schemas/ResourceId' }
+    ModerationDecisionSummary:
+      type: object
+      additionalProperties: false
+      required: [decisionId, outcome, policyVersion, effectiveAt]
+      properties:
+        decisionId: { $ref: '#/components/schemas/ResourceId' }
+        outcome: { type: string, enum: [APPROVED, REJECTED] }
+        policyVersion: { type: string, minLength: 1, maxLength: 128 }
+        effectiveAt: { type: string, format: date-time }
+    ModerationDecisionRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedVersion, decision, policyVersion, reasonCode, severity, scope, effectiveAt]
+      properties:
+        expectedVersion: { type: integer, minimum: 1 }
+        decision: { type: string, enum: [APPROVED, REJECTED] }
+        policyVersion: { type: string, minLength: 1, maxLength: 128 }
+        reasonCode: { type: string, minLength: 1, maxLength: 128 }
+        severity: { type: string, minLength: 1, maxLength: 64 }
+        scope: { type: string, minLength: 1, maxLength: 128 }
+        effectiveAt: { type: string, format: date-time }
+        expiresAt:
+          type: [string, 'null']
+          format: date-time
+    ModerationDecisionResponse:
+      type: object
+      additionalProperties: false
+      required: [caseId, decisionId, outcome, version, effectiveAt, requestId]
+      properties:
+        caseId: { $ref: '#/components/schemas/ResourceId' }
+        decisionId: { $ref: '#/components/schemas/ResourceId' }
+        outcome: { type: string, enum: [APPROVED, REJECTED] }
+        version: { type: integer, minimum: 1 }
+        effectiveAt: { type: string, format: date-time }
+        requestId: { $ref: '#/components/schemas/RequestId' }
+    AuthMfaChallengeVerifyRequest:
+      type: object
+      required: [code, method]
+      additionalProperties: false
+      properties:
+        code: { type: string, minLength: 6, maxLength: 128, writeOnly: true }
+        method: { type: string, enum: [totp, recovery_code] }
+    AuthMfaChallengeVerifyResponse:
+      type: object
+      required: [data, requestId]
+      additionalProperties: false
+      properties:
+        data:
+          type: object
+          required: [user]
+          additionalProperties: false
+          properties:
+            user: { $ref: '#/components/schemas/AuthSessionUser' }
+        requestId: { type: string }
+    AuthMfaDisableRequest:
+      type: object
+      required: [currentPassword, code]
+      additionalProperties: false
+      properties:
+        currentPassword: { type: string, minLength: 1, writeOnly: true }
+        code: { type: string, pattern: '^[0-9]{6}$', writeOnly: true }
+    ResourceId:
+      type: string
+      minLength: 1
+      maxLength: 128
+    Credential:
+      type: object
+      required: [credentialId, kind, active]
+      additionalProperties: false
+      properties:
+        credentialId:
+          $ref: '#/components/schemas/ResourceId'
+        kind:
+          type: string
+          enum: [username, email, phone]
+        active:
+          type: boolean
+    Cursor:
+      $ref: '../../schemas/common/cursor.json'
+    RequestId:
+      $ref: '../../schemas/common/request-id.json'
+    TraceId:
+      $ref: '../../schemas/common/trace-id.json'
+    ETag:
+      type: string
+      minLength: 1
+      maxLength: 256
+    AuthRegistrationConsent:
+      type: object
+      required: [purpose, policyVersion]
+      properties:
+        purpose: { type: string, enum: [ACCOUNT_REGISTRATION] }
+        policyVersion: { type: string }
+      additionalProperties: false
+    AccountState:
+      $ref: '../../enums/account-state.json'
+    ContentState:
+      $ref: '../../enums/content-state.json'
+    ErrorResponse:
+      $ref: '../../schemas/common/error-response.json'
+    ListResponse:
+      $ref: '../../schemas/common/list-response.json'
+    User:
+      type: object
+      required: [id, username, accountState, layer]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        username: { type: string }
+        accountState: { $ref: '#/components/schemas/AccountState' }
+        layer: { type: string, pattern: '^L[0-8]$' }
+    Content:
+      type: object
+      required: [id, state, version, etag]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        state: { $ref: '#/components/schemas/ContentState' }
+        version: { type: integer, minimum: 1 }
+        etag: { $ref: '#/components/schemas/ETag' }
+        creator:
+          description: Optional public author projection included by list endpoints to avoid per-item profile requests.
+          $ref: '#/components/schemas/PublicAuthor'
+    PublicAuthor:
+      type: object
+      required: [id, username, displayName, avatar]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        username: { type: string }
+        displayName: { type: [string, 'null'] }
+        avatar: { type: [string, 'null'] }
+    ContentInput:
+      type: object
+      required: [title, bodyRef]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 512 }
+        bodyRef: { type: string, description: R2 object reference }
+    Media:
+      type: object
+      required: [id, mimeType, size, checksum, status]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        mimeType: { type: string }
+        size: { type: integer, minimum: 1 }
+        checksum: { type: string }
+        status: { enum: [INITIATED, UPLOADING, READY, FAILED, QUARANTINED] }
+    Comment:
+      type: object
+      required: [id, body, state]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        body: { type: string }
+        state: { enum: [PENDING, PUBLISHED, REJECTED] }
+        author:
+          description: Optional public author projection included by list endpoints to avoid per-comment profile requests.
+          $ref: '#/components/schemas/PublicAuthor'
+    ContentPollOption:
+      type: object
+      required: [optionId, text, position, votes]
+      additionalProperties: false
+      properties:
+        optionId: { $ref: '#/components/schemas/ResourceId' }
+        text: { type: string, minLength: 1, maxLength: 50 }
+        position: { type: integer, minimum: 0, maximum: 3 }
+        votes: { type: integer, minimum: 0 }
+    ContentPoll:
+      type: object
+      required: [pollId, contentId, options, durationHours, endsAt, totalVotes, viewerOptionId, closed]
+      additionalProperties: false
+      properties:
+        pollId: { $ref: '#/components/schemas/ResourceId' }
+        contentId: { $ref: '#/components/schemas/ResourceId' }
+        options:
+          type: array
+          minItems: 2
+          maxItems: 4
+          items: { $ref: '#/components/schemas/ContentPollOption' }
+        durationHours: { type: integer, enum: [24, 72, 168] }
+        endsAt: { type: [string, 'null'], format: date-time }
+        totalVotes: { type: integer, minimum: 0 }
+        viewerOptionId: { type: [string, 'null'], maxLength: 128 }
+        closed: { type: boolean }
+    InteractionTarget:
+      type: object
+      required: [targetType, targetId]
+      properties:
+        targetType: { enum: [content, comment, creator, ip] }
+        targetId: { $ref: '#/components/schemas/ResourceId' }
+    Creator:
+      type: object
+      required: [id, userId, displayName]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        userId: { $ref: '#/components/schemas/ResourceId' }
+        displayName: { type: string }
+    IP:
+      type: object
+      required: [id, name]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        name: { type: string }
+    Organization:
+      type: object
+      required: [id, name]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        name: { type: string }
+    ModerationQueueItem:
+      type: object
+      additionalProperties: false
+      required: [caseId, targetType, targetId, policyVersion, state, priority, version, createdAt]
+      properties:
+        caseId: { $ref: '#/components/schemas/ResourceId' }
+        targetType: { type: string, enum: [content, comment, creator, ip, user] }
+        targetId: { $ref: '#/components/schemas/ResourceId' }
+        policyVersion: { type: string, minLength: 1, maxLength: 128 }
+        state: { $ref: '../../enums/moderation-case-state.json' }
+        priority: { type: integer, minimum: 0 }
+        version: { type: integer, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+    ModerationQueueResponse:
+      type: object
+      additionalProperties: false
+      required: [items, nextCursor, hasMore, requestId]
+      properties:
+        items:
+          type: array
+          maxItems: 50
+          items: { $ref: '#/components/schemas/ModerationQueueItem' }
+        nextCursor:
+          type: [string, 'null']
+        hasMore: { type: boolean }
+        requestId: { $ref: '#/components/schemas/RequestId' }
+    ModerationCaseResponse:
+      type: object
+      additionalProperties: false
+      required: [caseId, target, contentReference, policyVersion, currentDecision, evidenceRefs, status, version, createdAt, updatedAt]
+      properties:
+        caseId: { $ref: '#/components/schemas/ResourceId' }
+        target:
+          $ref: '#/components/schemas/ModerationTarget'
+        contentReference:
+          $ref: '#/components/schemas/ModerationContentReference'
+        policyVersion: { type: string, minLength: 1, maxLength: 128 }
+        currentDecision:
+          anyOf:
+            - { $ref: '#/components/schemas/ModerationDecisionSummary' }
+            - { type: 'null' }
+        evidenceRefs:
+          type: array
+          maxItems: 50
+          items: { type: string }
+        status:
+          $ref: '../../enums/moderation-case-state.json'
+        version: { type: integer, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    ModerationTarget:
+      type: object
+      additionalProperties: false
+      required: [targetType, targetId]
+      properties:
+        targetType: { type: string, enum: [content, comment, creator, ip, user] }
+        targetId: { $ref: '#/components/schemas/ResourceId' }
+    ModerationContentReference:
+      type: object
+      additionalProperties: false
+      required: [contentId]
+      properties:
+        contentId: { $ref: '#/components/schemas/ResourceId' }
+    ModerationDecisionSummary:
+      type: object
+      additionalProperties: false
+      required: [decisionId, outcome, policyVersion, effectiveAt]
+      properties:
+        decisionId: { $ref: '#/components/schemas/ResourceId' }
+        outcome: { type: string, enum: [APPROVED, REJECTED] }
+        policyVersion: { type: string, minLength: 1, maxLength: 128 }
+        effectiveAt: { type: string, format: date-time }
+    ModerationDecisionRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedVersion, decision, policyVersion, reasonCode, severity, scope, effectiveAt]
+      properties:
+        expectedVersion: { type: integer, minimum: 1 }
+        decision: { type: string, enum: [APPROVED, REJECTED] }
+        policyVersion: { type: string, minLength: 1, maxLength: 128 }
+        reasonCode: { type: string, minLength: 1, maxLength: 128 }
+        severity: { type: string, minLength: 1, maxLength: 64 }
+        scope: { type: string, minLength: 1, maxLength: 128 }
+        effectiveAt: { type: string, format: date-time }
+        expiresAt:
+          type: [string, 'null']
+          format: date-time
+    ModerationDecisionResponse:
+      type: object
+      additionalProperties: false
+      required: [caseId, decisionId, outcome, version, effectiveAt, requestId]
+      properties:
+        caseId: { $ref: '#/components/schemas/ResourceId' }
+        decisionId: { $ref: '#/components/schemas/ResourceId' }
+        outcome: { type: string, enum: [APPROVED, REJECTED] }
+        version: { type: integer, minimum: 1 }
+        effectiveAt: { type: string, format: date-time }
+        requestId: { $ref: '#/components/schemas/RequestId' }
+    AuthMfaRecoveryCodesRotateRequest:
+      type: object
+      required: [currentPassword, code]
+      additionalProperties: false
+      properties:
+        currentPassword: { type: string, minLength: 1, writeOnly: true }
+        code: { type: string, pattern: '^[0-9]{6}$', writeOnly: true }
+    ResourceId:
+      type: string
+      minLength: 1
+      maxLength: 128
+    Credential:
+      type: object
+      required: [credentialId, kind, active]
+      additionalProperties: false
+      properties:
+        credentialId:
+          $ref: '#/components/schemas/ResourceId'
+        kind:
+          type: string
+          enum: [username, email, phone]
+        active:
+          type: boolean
+    Cursor:
+      $ref: '../../schemas/common/cursor.json'
+    RequestId:
+      $ref: '../../schemas/common/request-id.json'
+    TraceId:
+      $ref: '../../schemas/common/trace-id.json'
+    ETag:
+      type: string
+      minLength: 1
+      maxLength: 256
+    AuthRegistrationConsent:
+      type: object
+      required: [purpose, policyVersion]
+      properties:
+        purpose: { type: string, enum: [ACCOUNT_REGISTRATION] }
+        policyVersion: { type: string }
+      additionalProperties: false
+    AccountState:
+      $ref: '../../enums/account-state.json'
+    ContentState:
+      $ref: '../../enums/content-state.json'
+    ErrorResponse:
+      $ref: '../../schemas/common/error-response.json'
+    ListResponse:
+      $ref: '../../schemas/common/list-response.json'
+    User:
+      type: object
+      required: [id, username, accountState, layer]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        username: { type: string }
+        accountState: { $ref: '#/components/schemas/AccountState' }
+        layer: { type: string, pattern: '^L[0-8]$' }
+    Content:
+      type: object
+      required: [id, state, version, etag]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        state: { $ref: '#/components/schemas/ContentState' }
+        version: { type: integer, minimum: 1 }
+        etag: { $ref: '#/components/schemas/ETag' }
+        creator:
+          description: Optional public author projection included by list endpoints to avoid per-item profile requests.
+          $ref: '#/components/schemas/PublicAuthor'
+    PublicAuthor:
+      type: object
+      required: [id, username, displayName, avatar]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        username: { type: string }
+        displayName: { type: [string, 'null'] }
+        avatar: { type: [string, 'null'] }
+    ContentInput:
+      type: object
+      required: [title, bodyRef]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 512 }
+        bodyRef: { type: string, description: R2 object reference }
+    Media:
+      type: object
+      required: [id, mimeType, size, checksum, status]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        mimeType: { type: string }
+        size: { type: integer, minimum: 1 }
+        checksum: { type: string }
+        status: { enum: [INITIATED, UPLOADING, READY, FAILED, QUARANTINED] }
+    Comment:
+      type: object
+      required: [id, body, state]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        body: { type: string }
+        state: { enum: [PENDING, PUBLISHED, REJECTED] }
+        author:
+          description: Optional public author projection included by list endpoints to avoid per-comment profile requests.
+          $ref: '#/components/schemas/PublicAuthor'
+    ContentPollOption:
+      type: object
+      required: [optionId, text, position, votes]
+      additionalProperties: false
+      properties:
+        optionId: { $ref: '#/components/schemas/ResourceId' }
+        text: { type: string, minLength: 1, maxLength: 50 }
+        position: { type: integer, minimum: 0, maximum: 3 }
+        votes: { type: integer, minimum: 0 }
+    ContentPoll:
+      type: object
+      required: [pollId, contentId, options, durationHours, endsAt, totalVotes, viewerOptionId, closed]
+      additionalProperties: false
+      properties:
+        pollId: { $ref: '#/components/schemas/ResourceId' }
+        contentId: { $ref: '#/components/schemas/ResourceId' }
+        options:
+          type: array
+          minItems: 2
+          maxItems: 4
+          items: { $ref: '#/components/schemas/ContentPollOption' }
+        durationHours: { type: integer, enum: [24, 72, 168] }
+        endsAt: { type: [string, 'null'], format: date-time }
+        totalVotes: { type: integer, minimum: 0 }
+        viewerOptionId: { type: [string, 'null'], maxLength: 128 }
+        closed: { type: boolean }
+    InteractionTarget:
+      type: object
+      required: [targetType, targetId]
+      properties:
+        targetType: { enum: [content, comment, creator, ip] }
+        targetId: { $ref: '#/components/schemas/ResourceId' }
+    Creator:
+      type: object
+      required: [id, userId, displayName]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        userId: { $ref: '#/components/schemas/ResourceId' }
+        displayName: { type: string }
+    IP:
+      type: object
+      required: [id, name]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        name: { type: string }
+    Organization:
+      type: object
+      required: [id, name]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        name: { type: string }
+    ModerationQueueItem:
+      type: object
+      additionalProperties: false
+      required: [caseId, targetType, targetId, policyVersion, state, priority, version, createdAt]
+      properties:
+        caseId: { $ref: '#/components/schemas/ResourceId' }
+        targetType: { type: string, enum: [content, comment, creator, ip, user] }
+        targetId: { $ref: '#/components/schemas/ResourceId' }
+        policyVersion: { type: string, minLength: 1, maxLength: 128 }
+        state: { $ref: '../../enums/moderation-case-state.json' }
+        priority: { type: integer, minimum: 0 }
+        version: { type: integer, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+    ModerationQueueResponse:
+      type: object
+      additionalProperties: false
+      required: [items, nextCursor, hasMore, requestId]
+      properties:
+        items:
+          type: array
+          maxItems: 50
+          items: { $ref: '#/components/schemas/ModerationQueueItem' }
+        nextCursor:
+          type: [string, 'null']
+        hasMore: { type: boolean }
+        requestId: { $ref: '#/components/schemas/RequestId' }
+    ModerationCaseResponse:
+      type: object
+      additionalProperties: false
+      required: [caseId, target, contentReference, policyVersion, currentDecision, evidenceRefs, status, version, createdAt, updatedAt]
+      properties:
+        caseId: { $ref: '#/components/schemas/ResourceId' }
+        target:
+          $ref: '#/components/schemas/ModerationTarget'
+        contentReference:
+          $ref: '#/components/schemas/ModerationContentReference'
+        policyVersion: { type: string, minLength: 1, maxLength: 128 }
+        currentDecision:
+          anyOf:
+            - { $ref: '#/components/schemas/ModerationDecisionSummary' }
+            - { type: 'null' }
+        evidenceRefs:
+          type: array
+          maxItems: 50
+          items: { type: string }
+        status:
+          $ref: '../../enums/moderation-case-state.json'
+        version: { type: integer, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    ModerationTarget:
+      type: object
+      additionalProperties: false
+      required: [targetType, targetId]
+      properties:
+        targetType: { type: string, enum: [content, comment, creator, ip, user] }
+        targetId: { $ref: '#/components/schemas/ResourceId' }
+    ModerationContentReference:
+      type: object
+      additionalProperties: false
+      required: [contentId]
+      properties:
+        contentId: { $ref: '#/components/schemas/ResourceId' }
+    ModerationDecisionSummary:
+      type: object
+      additionalProperties: false
+      required: [decisionId, outcome, policyVersion, effectiveAt]
+      properties:
+        decisionId: { $ref: '#/components/schemas/ResourceId' }
+        outcome: { type: string, enum: [APPROVED, REJECTED] }
+        policyVersion: { type: string, minLength: 1, maxLength: 128 }
+        effectiveAt: { type: string, format: date-time }
+    ModerationDecisionRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedVersion, decision, policyVersion, reasonCode, severity, scope, effectiveAt]
+      properties:
+        expectedVersion: { type: integer, minimum: 1 }
+        decision: { type: string, enum: [APPROVED, REJECTED] }
+        policyVersion: { type: string, minLength: 1, maxLength: 128 }
+        reasonCode: { type: string, minLength: 1, maxLength: 128 }
+        severity: { type: string, minLength: 1, maxLength: 64 }
+        scope: { type: string, minLength: 1, maxLength: 128 }
+        effectiveAt: { type: string, format: date-time }
+        expiresAt:
+          type: [string, 'null']
+          format: date-time
+    ModerationDecisionResponse:
+      type: object
+      additionalProperties: false
+      required: [caseId, decisionId, outcome, version, effectiveAt, requestId]
+      properties:
+        caseId: { $ref: '#/components/schemas/ResourceId' }
+        decisionId: { $ref: '#/components/schemas/ResourceId' }
+        outcome: { type: string, enum: [APPROVED, REJECTED] }
+        version: { type: integer, minimum: 1 }
+        effectiveAt: { type: string, format: date-time }
+        requestId: { $ref: '#/components/schemas/RequestId' }
+    AuthMfaRecoveryCodesRotateResponse:
+      type: object
+      required: [recoveryCodes]
+      additionalProperties: false
+      properties:
+        recoveryCodes:
+          type: array
+          minItems: 1
+          items: { type: string, minLength: 8, writeOnly: true }
+    AuthSessionUser:
+      type: object
+      required: [id, email, emailVerified]
+      additionalProperties: false
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        email: { type: string, format: email }
+        name: { type: [string, 'null'] }
+        emailVerified: { type: boolean }
+        image: { type: [string, 'null'], format: uri }
+    ResourceId:
+      type: string
+      minLength: 1
+      maxLength: 128
+    Credential:
+      type: object
+      required: [credentialId, kind, active]
+      additionalProperties: false
+      properties:
+        credentialId:
+          $ref: '#/components/schemas/ResourceId'
+        kind:
+          type: string
+          enum: [username, email, phone]
+        active:
+          type: boolean
+    Cursor:
+      $ref: '../../schemas/common/cursor.json'
+    RequestId:
+      $ref: '../../schemas/common/request-id.json'
+    TraceId:
+      $ref: '../../schemas/common/trace-id.json'
+    ETag:
+      type: string
+      minLength: 1
+      maxLength: 256
+    AuthRegistrationConsent:
+      type: object
+      required: [purpose, policyVersion]
+      properties:
+        purpose: { type: string, enum: [ACCOUNT_REGISTRATION] }
+        policyVersion: { type: string }
+      additionalProperties: false
+    AccountState:
+      $ref: '../../enums/account-state.json'
+    ContentState:
+      $ref: '../../enums/content-state.json'
+    ErrorResponse:
+      $ref: '../../schemas/common/error-response.json'
+    ListResponse:
+      $ref: '../../schemas/common/list-response.json'
+    User:
+      type: object
+      required: [id, username, accountState, layer]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        username: { type: string }
+        accountState: { $ref: '#/components/schemas/AccountState' }
+        layer: { type: string, pattern: '^L[0-8]$' }
+    Content:
+      type: object
+      required: [id, state, version, etag]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        state: { $ref: '#/components/schemas/ContentState' }
+        version: { type: integer, minimum: 1 }
+        etag: { $ref: '#/components/schemas/ETag' }
+        creator:
+          description: Optional public author projection included by list endpoints to avoid per-item profile requests.
+          $ref: '#/components/schemas/PublicAuthor'
+    PublicAuthor:
+      type: object
+      required: [id, username, displayName, avatar]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        username: { type: string }
+        displayName: { type: [string, 'null'] }
+        avatar: { type: [string, 'null'] }
+    ContentInput:
+      type: object
+      required: [title, bodyRef]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 512 }
+        bodyRef: { type: string, description: R2 object reference }
+    Media:
+      type: object
+      required: [id, mimeType, size, checksum, status]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        mimeType: { type: string }
+        size: { type: integer, minimum: 1 }
+        checksum: { type: string }
+        status: { enum: [INITIATED, UPLOADING, READY, FAILED, QUARANTINED] }
+    Comment:
+      type: object
+      required: [id, body, state]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        body: { type: string }
+        state: { enum: [PENDING, PUBLISHED, REJECTED] }
+        author:
+          description: Optional public author projection included by list endpoints to avoid per-comment profile requests.
+          $ref: '#/components/schemas/PublicAuthor'
+    ContentPollOption:
+      type: object
+      required: [optionId, text, position, votes]
+      additionalProperties: false
+      properties:
+        optionId: { $ref: '#/components/schemas/ResourceId' }
+        text: { type: string, minLength: 1, maxLength: 50 }
+        position: { type: integer, minimum: 0, maximum: 3 }
+        votes: { type: integer, minimum: 0 }
+    ContentPoll:
+      type: object
+      required: [pollId, contentId, options, durationHours, endsAt, totalVotes, viewerOptionId, closed]
+      additionalProperties: false
+      properties:
+        pollId: { $ref: '#/components/schemas/ResourceId' }
+        contentId: { $ref: '#/components/schemas/ResourceId' }
+        options:
+          type: array
+          minItems: 2
+          maxItems: 4
+          items: { $ref: '#/components/schemas/ContentPollOption' }
+        durationHours: { type: integer, enum: [24, 72, 168] }
+        endsAt: { type: [string, 'null'], format: date-time }
+        totalVotes: { type: integer, minimum: 0 }
+        viewerOptionId: { type: [string, 'null'], maxLength: 128 }
+        closed: { type: boolean }
+    InteractionTarget:
+      type: object
+      required: [targetType, targetId]
+      properties:
+        targetType: { enum: [content, comment, creator, ip] }
+        targetId: { $ref: '#/components/schemas/ResourceId' }
+    Creator:
+      type: object
+      required: [id, userId, displayName]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        userId: { $ref: '#/components/schemas/ResourceId' }
+        displayName: { type: string }
+    IP:
+      type: object
+      required: [id, name]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        name: { type: string }
+    Organization:
+      type: object
+      required: [id, name]
+      properties:
+        id: { $ref: '#/components/schemas/ResourceId' }
+        name: { type: string }
+    ModerationQueueItem:
+      type: object
+      additionalProperties: false
+      required: [caseId, targetType, targetId, policyVersion, state, priority, version, createdAt]
+      properties:
+        caseId: { $ref: '#/components/schemas/ResourceId' }
+        targetType: { type: string, enum: [content, comment, creator, ip, user] }
+        targetId: { $ref: '#/components/schemas/ResourceId' }
+        policyVersion: { type: string, minLength: 1, maxLength: 128 }
+        state: { $ref: '../../enums/moderation-case-state.json' }
+        priority: { type: integer, minimum: 0 }
+        version: { type: integer, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+    ModerationQueueResponse:
+      type: object
+      additionalProperties: false
+      required: [items, nextCursor, hasMore, requestId]
+      properties:
+        items:
+          type: array
+          maxItems: 50
+          items: { $ref: '#/components/schemas/ModerationQueueItem' }
+        nextCursor:
+          type: [string, 'null']
+        hasMore: { type: boolean }
+        requestId: { $ref: '#/components/schemas/RequestId' }
+    ModerationCaseResponse:
+      type: object
+      additionalProperties: false
+      required: [caseId, target, contentReference, policyVersion, currentDecision, evidenceRefs, status, version, createdAt, updatedAt]
+      properties:
+        caseId: { $ref: '#/components/schemas/ResourceId' }
+        target:
+          $ref: '#/components/schemas/ModerationTarget'
+        contentReference:
+          $ref: '#/components/schemas/ModerationContentReference'
+        policyVersion: { type: string, minLength: 1, maxLength: 128 }
+        currentDecision:
+          anyOf:
+            - { $ref: '#/components/schemas/ModerationDecisionSummary' }
+            - { type: 'null' }
+        evidenceRefs:
+          type: array
+          maxItems: 50
+          items: { type: string }
+        status:
+          $ref: '../../enums/moderation-case-state.json'
+        version: { type: integer, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    ModerationTarget:
+      type: object
+      additionalProperties: false
+      required: [targetType, targetId]
+      properties:
+        targetType: { type: string, enum: [content, comment, creator, ip, user] }
+        targetId: { $ref: '#/components/schemas/ResourceId' }
+    ModerationContentReference:
+      type: object
+      additionalProperties: false
+      required: [contentId]
+      properties:
+        contentId: { $ref: '#/components/schemas/ResourceId' }
+    ModerationDecisionSummary:
+      type: object
+      additionalProperties: false
+      required: [decisionId, outcome, policyVersion, effectiveAt]
+      properties:
+        decisionId: { $ref: '#/components/schemas/ResourceId' }
+        outcome: { type: string, enum: [APPROVED, REJECTED] }
+        policyVersion: { type: string, minLength: 1, maxLength: 128 }
+        effectiveAt: { type: string, format: date-time }
+    ModerationDecisionRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedVersion, decision, policyVersion, reasonCode, severity, scope, effectiveAt]
+      properties:
+        expectedVersion: { type: integer, minimum: 1 }
+        decision: { type: string, enum: [APPROVED, REJECTED] }
+        policyVersion: { type: string, minLength: 1, maxLength: 128 }
+        reasonCode: { type: string, minLength: 1, maxLength: 128 }
+        severity: { type: string, minLength: 1, maxLength: 64 }
+        scope: { type: string, minLength: 1, maxLength: 128 }
+        effectiveAt: { type: string, format: date-time }
+        expiresAt:
+          type: [string, 'null']
+          format: date-time
+    ModerationDecisionResponse:
+      type: object
+      additionalProperties: false
+      required: [caseId, decisionId, outcome, version, effectiveAt, requestId]
+      properties:
+        caseId: { $ref: '#/components/schemas/ResourceId' }
+        decisionId: { $ref: '#/components/schemas/ResourceId' }
+        outcome: { type: string, enum: [APPROVED, REJECTED] }
+        version: { type: integer, minimum: 1 }
+        effectiveAt: { type: string, format: date-time }
+        requestId: { $ref: '#/components/schemas/RequestId' }
+ }
+      responses:
+        '201': { description: Prorated upgrade order created; subscription remains unchanged pending provider confirmation. }
+        '200': { description: Idempotent replay of the same upgrade checkout order. }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
   /memberships/subscriptions/{subscriptionId}/cancel:
     parameters:
       - name: subscriptionId
