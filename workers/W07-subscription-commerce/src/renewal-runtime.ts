@@ -629,8 +629,33 @@ export async function scanDueSubscriptionRenewals(
       now, cursor.cursor_period_end, cursor.cursor_period_end, cursor.cursor_period_end,
       cursor.cursor_subscription_id, limit,
     ).all<RenewalSubscriptionRow>()).results ?? [];
-  } catch {
-    throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!/no such column:\s*(?:s\.)?trial_(?:started|ends)_at/i.test(message)) {
+      throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
+    }
+    // Before migration 0008, only ACTIVE/PAST_DUE subscriptions exist. Keep
+    // the pre-trial renewal scanner fully functional and treat legacy rows as
+    // having no trial metadata; trial creation itself still fails closed.
+    try {
+      const legacy = (await env.D1_01.prepare(
+        'SELECT s.subscription_id, s.subscriber_id, s.plan_id, s.plan_version, s.creator_id, s.status, ' +
+        's.current_period_start, s.current_period_end, s.cancel_at, pv.billing_interval, pv.price_minor, ' +
+        'pv.currency, pv.name, pv.tier, pv.benefits_json ' +
+        'FROM membership_subscriptions s ' +
+        'JOIN membership_plan_versions pv ON pv.plan_id = s.plan_id AND pv.plan_version = s.plan_version ' +
+        "WHERE s.status IN ('ACTIVE','PAST_DUE') AND s.current_period_end <= ? " +
+        'AND (s.cancel_at IS NULL OR s.cancel_at > s.current_period_end) ' +
+        'AND (? IS NULL OR s.current_period_end > ? OR (s.current_period_end = ? AND s.subscription_id > ?)) ' +
+        'ORDER BY s.current_period_end ASC, s.subscription_id ASC LIMIT ?',
+      ).bind(
+        now, cursor.cursor_period_end, cursor.cursor_period_end, cursor.cursor_period_end,
+        cursor.cursor_subscription_id, limit,
+      ).all<Omit<RenewalSubscriptionRow, 'trial_started_at' | 'trial_ends_at'>>()).results ?? [];
+      rows = legacy.map((row) => ({ ...row, trial_started_at: null, trial_ends_at: null }));
+    } catch {
+      throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
+    }
   }
 
   if (rows.length === 0) {
@@ -704,8 +729,20 @@ async function isSubscriptionChargeableForCycle(
       'SELECT subscription_id, subscriber_id, plan_id, plan_version, creator_id, status, current_period_end, trial_started_at, trial_ends_at, cancel_at ' +
       'FROM membership_subscriptions WHERE subscription_id = ? AND subscriber_id = ? LIMIT 1',
     ).bind(cycle.subscription_id, cycle.subscriber_id).first<ChargeSubscriptionRow>();
-  } catch {
-    throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!/no such column:\s*(?:trial_started_at|trial_ends_at)/i.test(message)) {
+      throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
+    }
+    try {
+      const legacy = await env.D1_01.prepare(
+        'SELECT subscription_id, subscriber_id, plan_id, plan_version, creator_id, status, current_period_end, cancel_at ' +
+        'FROM membership_subscriptions WHERE subscription_id = ? AND subscriber_id = ? LIMIT 1',
+      ).bind(cycle.subscription_id, cycle.subscriber_id).first<Omit<ChargeSubscriptionRow, 'trial_started_at' | 'trial_ends_at'>>();
+      subscription = legacy ? { ...legacy, trial_started_at: null, trial_ends_at: null } : null;
+    } catch {
+      throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
+    }
   }
   const retryingPastDue = cycle.outcome_code === 'RETRY_PREPARED' || cycle.attempt_number > 1;
   if (!subscription ||
@@ -872,22 +909,37 @@ async function prepareFailedCycleRetry(
     subscription_id: string; subscriber_id: string; plan_id: string; plan_version: number;
     creator_id: string | null; status: string; current_period_end: string; cancel_at: string | null;
   } | null;
+  const retrySubscriptionShape = {
+    subscription_id: '' as string,
+    subscriber_id: '' as string,
+    plan_id: '' as string,
+    plan_version: 0 as number,
+    creator_id: null as string | null,
+    status: '' as string,
+    current_period_end: '' as string,
+    trial_started_at: null as string | null,
+    trial_ends_at: null as string | null,
+    cancel_at: null as string | null,
+  };
   try {
     subscription = await env.D1_01.prepare(
       'SELECT subscription_id, subscriber_id, plan_id, plan_version, creator_id, status, current_period_end, trial_started_at, trial_ends_at, cancel_at ' +
       'FROM membership_subscriptions WHERE subscription_id = ? AND subscriber_id = ? LIMIT 1',
-    ).bind(cycle.subscription_id, cycle.subscriber_id).first<{
-      subscription_id: string;
-      subscriber_id: string;
-      plan_id: string;
-      plan_version: number;
-      creator_id: string | null;
-      status: string;
-      current_period_end: string;
-      cancel_at: string | null;
-    }>();
-  } catch {
-    throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
+    ).bind(cycle.subscription_id, cycle.subscriber_id).first<typeof retrySubscriptionShape>();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!/no such column:\s*(?:trial_started_at|trial_ends_at)/i.test(message)) {
+      throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
+    }
+    try {
+      const legacy = await env.D1_01.prepare(
+        'SELECT subscription_id, subscriber_id, plan_id, plan_version, creator_id, status, current_period_end, cancel_at ' +
+        'FROM membership_subscriptions WHERE subscription_id = ? AND subscriber_id = ? LIMIT 1',
+      ).bind(cycle.subscription_id, cycle.subscriber_id).first<Omit<typeof retrySubscriptionShape, 'trial_started_at' | 'trial_ends_at'>>();
+      subscription = legacy ? { ...legacy, trial_started_at: null, trial_ends_at: null } : null;
+    } catch {
+      throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
+    }
   }
   if (!subscription ||
       subscription.subscription_id !== cycle.subscription_id ||
