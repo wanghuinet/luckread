@@ -6,33 +6,138 @@
   "x-luckread": {
     "state-field": "status",
     "requires-optimistic-lock": true,
-    "terminal-states": ["EXPIRED", "CANCELED"],
-    "states": ["PENDING", "ACTIVE", "PAST_DUE", "PAUSED", "CANCELED", "EXPIRED"]
+    "terminal-states": [
+      "EXPIRED",
+      "CANCELED"
+    ],
+    "states": [
+      "PENDING",
+      "TRIALING",
+      "ACTIVE",
+      "PAST_DUE",
+      "PAUSED",
+      "CANCELED",
+      "EXPIRED"
+    ]
   },
   "x-transitions": [
-    {"from":"PENDING","to":"ACTIVE","actor":"system|payment"},
-    {"from":"ACTIVE","to":"PAST_DUE","actor":"system|payment"},
-    {"from":"PAST_DUE","to":"ACTIVE","actor":"system|payment"},
-    {"from":"ACTIVE","to":"PAUSED","actor":"user|admin"},
-    {"from":"PAUSED","to":"ACTIVE","actor":"user|admin"},
-    {"from":"ACTIVE","to":"CANCELED","actor":"user|creator|admin|system"},
-    {"from":"PAST_DUE","to":"CANCELED","actor":"admin|system"},
-    {"from":"PAUSED","to":"CANCELED","actor":"user|admin|system"},
-    {"from":"ACTIVE","to":"EXPIRED","actor":"system"},
-    {"from":"PAST_DUE","to":"EXPIRED","actor":"system"},
-    {"from":"PAUSED","to":"EXPIRED","actor":"system"}
+    {
+      "from": "PENDING",
+      "to": "ACTIVE",
+      "actor": "system|payment"
+    },
+    {
+      "from": "ACTIVE",
+      "to": "PAST_DUE",
+      "actor": "system|payment"
+    },
+    {
+      "from": "PAST_DUE",
+      "to": "ACTIVE",
+      "actor": "system|payment"
+    },
+    {
+      "from": "ACTIVE",
+      "to": "PAUSED",
+      "actor": "user|admin"
+    },
+    {
+      "from": "PAUSED",
+      "to": "ACTIVE",
+      "actor": "user|admin"
+    },
+    {
+      "from": "ACTIVE",
+      "to": "CANCELED",
+      "actor": "user|creator|admin|system"
+    },
+    {
+      "from": "PAST_DUE",
+      "to": "CANCELED",
+      "actor": "admin|system"
+    },
+    {
+      "from": "PAUSED",
+      "to": "CANCELED",
+      "actor": "user|admin|system"
+    },
+    {
+      "from": "ACTIVE",
+      "to": "EXPIRED",
+      "actor": "system"
+    },
+    {
+      "from": "PAST_DUE",
+      "to": "EXPIRED",
+      "actor": "system"
+    },
+    {
+      "from": "PAUSED",
+      "to": "EXPIRED",
+      "actor": "system"
+    },
+    {
+      "from": "PENDING",
+      "to": "TRIALING",
+      "actor": "system"
+    },
+    {
+      "from": "TRIALING",
+      "to": "ACTIVE",
+      "actor": "system|payment"
+    },
+    {
+      "from": "TRIALING",
+      "to": "PAST_DUE",
+      "actor": "system|payment"
+    },
+    {
+      "from": "TRIALING",
+      "to": "CANCELED",
+      "actor": "user|admin|system"
+    }
   ],
   "x-forbidden": [
-    {"from":"CANCELED","to":"ACTIVE"},
-    {"from":"CANCELED","to":"PAUSED"},
-    {"from":"EXPIRED","to":"ACTIVE"},
-    {"from":"EXPIRED","to":"CANCELED"},
-    {"from":"EXPIRED","to":"PAUSED"},
-    {"from":"PAUSED","to":"PENDING"}
+    {
+      "from": "CANCELED",
+      "to": "ACTIVE"
+    },
+    {
+      "from": "CANCELED",
+      "to": "PAUSED"
+    },
+    {
+      "from": "EXPIRED",
+      "to": "ACTIVE"
+    },
+    {
+      "from": "EXPIRED",
+      "to": "CANCELED"
+    },
+    {
+      "from": "EXPIRED",
+      "to": "PAUSED"
+    },
+    {
+      "from": "PAUSED",
+      "to": "PENDING"
+    },
+    {
+      "from": "TRIALING",
+      "to": "PENDING"
+    },
+    {
+      "from": "CANCELED",
+      "to": "TRIALING"
+    },
+    {
+      "from": "EXPIRED",
+      "to": "TRIALING"
+    }
   ],
   "reconciliation": {
     "changeControl": "CC-SUBSCRIPTION-STATE-API-RECONCILIATION-2026-10-02",
     "pauseResumeSource": "docs/108-MEMBERSHIP-AND-SUBSCRIPTION-SYSTEM-CONTRACT-v1.0.md; docs/111-MEMBERSHIP-API-CONTRACT-v1.0.md; docs/191-L5-L6-MEMBERSHIP-COMMERCE-ADVERTISING-WALLET-LEDGER-INSTANCE-REGISTRY-v1.0.md",
-    "note": "PAUSED is the machine-readable counterpart of the existing Membership pause/resume capability."
+    "note": "PAUSED is the machine-readable counterpart of the existing Membership pause/resume capability. TRIALING grants creator membership only while current_period_end is in the future; at the trial boundary W07 uses the existing renewal cycle and MIT mandate. If the cycle is AWAITING_MANDATE, status may remain TRIALING while the period is already expired, but W03 access checks deny the expired window; a successful paid cycle transitions TRIALING to ACTIVE, and a failed paid attempt transitions it to PAST_DUE. Renewal execution remains governed by the existing activation gate."
   }
 }
