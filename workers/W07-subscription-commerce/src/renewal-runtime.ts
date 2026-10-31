@@ -478,7 +478,7 @@ async function insertOrReadCycle(
   }
 
   const cycleStart = subscription.current_period_end;
-  const hasScheduledChange = subscription.scheduled_change_id !== null;
+  const hasScheduledChange = subscription.scheduled_change_id != null;
   let planId = subscription.plan_id;
   let planVersion = subscription.plan_version;
   let billingInterval = subscription.billing_interval as 'MONTHLY' | 'YEARLY';
