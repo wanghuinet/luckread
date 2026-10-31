@@ -51,6 +51,8 @@ function createFixture(options: {
   createProviderError?: Error;
   recordIntentError?: Error;
   env?: Record<string, unknown>;
+  orderLines?: Array<Record<string, unknown>>;
+  reservation?: Record<string, unknown> | null;
 } = {}) {
   const calls = {
     createAttempt: [] as unknown[][],
@@ -60,8 +62,31 @@ function createFixture(options: {
 
   const attempt = options.attempt ?? { payment: paymentDto, replayed: false, pricingMode: 'live' };
   const remotePayment = options.providerPayment ?? providerPayment;
+  const d1_04 = {
+    prepare() {
+      return {
+        bind() {
+          return {
+            async all() { return { results: options.orderLines ?? [] }; },
+          };
+        },
+      };
+    },
+  } as unknown as D1Database;
+  const d1_01 = {
+    prepare() {
+      return {
+        bind() {
+          return {
+            async first() { return options.reservation ?? null; },
+          };
+        },
+      };
+    },
+  } as unknown as D1Database;
   const env = {
-    D1_04: {} as D1Database,
+    D1_01: d1_01,
+    D1_04: d1_04,
     HYPERSWITCH_ENVIRONMENT: 'sandbox',
     HYPERSWITCH_API_KEY: 'sandbox-api-key',
     HYPERSWITCH_MERCHANT_ID: MERCHANT_ID,
@@ -130,6 +155,93 @@ describe('W07 internal payment-intent runtime', () => {
     expect(await response?.json()).toMatchObject({ error: { code: 'VALIDATION_FAILED' } });
     expect(fixture.calls.createAttempt).toHaveLength(0);
     expect(fixture.calls.createProviderIntent).toHaveLength(0);
+  });
+
+  it('rejects an upgrade Order without its D1-01 reservation before creating a payment attempt', async () => {
+    const planId = 'plan_' + 'b'.repeat(64);
+    const fixture = createFixture({
+      orderLines: [{
+        order_line_id: 'line_upgrade_1',
+        item_type: 'MEMBERSHIP_PLAN',
+        item_ref: planId,
+        item_version: '2',
+        item_snapshot_json: JSON.stringify({
+          planId,
+          planVersion: 2,
+          membershipUpgrade: {
+            version: 1,
+            subscriptionId: 'sub_upgrade_1',
+            sourcePlanId: 'plan_' + 'a'.repeat(64),
+            sourcePlanVersion: 1,
+            targetPlanId: planId,
+            targetPlanVersion: 2,
+            expectedSubscriptionVersion: 4,
+            currentPeriodStart: '2026-10-01T00:00:00.000Z',
+            currentPeriodEnd: '2026-11-01T00:00:00.000Z',
+            requestHash: 'd'.repeat(64),
+          },
+        }),
+      }],
+    });
+    const response = await handleCommercePaymentIntentRequest(
+      request({ idempotencyKey: CLIENT_IDEMPOTENCY_KEY }),
+      CUSTOMER_ID,
+      fixture.env,
+      fixture.dependencies,
+    );
+    expect(response?.status).toBe(409);
+    expect(await response?.json()).toMatchObject({ error: { code: 'UPGRADE_RESERVATION_REQUIRED' } });
+    expect(fixture.calls.createAttempt).toHaveLength(0);
+    expect(fixture.calls.createProviderIntent).toHaveLength(0);
+  });
+
+  it('permits an upgrade PaymentIntent only when the D1-01 reservation matches the immutable Order snapshot', async () => {
+    const planId = 'plan_' + 'b'.repeat(64);
+    const upgrade = {
+      version: 1,
+      subscriptionId: 'sub_upgrade_1',
+      sourcePlanId: 'plan_' + 'a'.repeat(64),
+      sourcePlanVersion: 1,
+      targetPlanId: planId,
+      targetPlanVersion: 2,
+      expectedSubscriptionVersion: 4,
+      currentPeriodStart: '2026-10-01T00:00:00.000Z',
+      currentPeriodEnd: '2026-11-01T00:00:00.000Z',
+      requestHash: 'd'.repeat(64),
+    };
+    const fixture = createFixture({
+      orderLines: [{
+        order_line_id: 'line_upgrade_1',
+        item_type: 'MEMBERSHIP_PLAN',
+        item_ref: planId,
+        item_version: '2',
+        item_snapshot_json: JSON.stringify({ planId, planVersion: 2, membershipUpgrade: upgrade }),
+      }],
+      reservation: {
+        subscription_id: upgrade.subscriptionId,
+        subscriber_id: CUSTOMER_ID,
+        source_plan_id: upgrade.sourcePlanId,
+        source_plan_version: upgrade.sourcePlanVersion,
+        target_plan_id: upgrade.targetPlanId,
+        target_plan_version: upgrade.targetPlanVersion,
+        expected_subscription_version: upgrade.expectedSubscriptionVersion,
+        current_period_start: upgrade.currentPeriodStart,
+        current_period_end: upgrade.currentPeriodEnd,
+        order_id: ORDER_ID,
+        request_hash: upgrade.requestHash,
+        status: 'PENDING_PAYMENT',
+        payment_id: null,
+      },
+    });
+    const response = await handleCommercePaymentIntentRequest(
+      request({ idempotencyKey: CLIENT_IDEMPOTENCY_KEY }),
+      CUSTOMER_ID,
+      fixture.env,
+      fixture.dependencies,
+    );
+    expect(response?.status).toBe(201);
+    expect(fixture.calls.createAttempt).toHaveLength(1);
+    expect(fixture.calls.createProviderIntent).toHaveLength(1);
   });
 
   it('uses server-owned order totals and a stable provider key, persisting before returning checkout data', async () => {
