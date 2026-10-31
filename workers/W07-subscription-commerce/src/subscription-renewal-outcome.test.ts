@@ -92,15 +92,16 @@ class MemoryD1 {
   async run<T>(sql: string, values: unknown[]): Promise<D1Result<T>> {
     if (sql.includes('UPDATE membership_subscriptions SET')) {
       if (!this.subscription) return result(0) as D1Result<T>;
-      const [status, periodStart, periodEnd, updatedAt, subscriptionId, subscriberId, planId, planVersion,
-        expectedStatus, version, expectedStart, expectedEnd, cancelBoundary] = values;
+      const [planId, planVersion, status, periodStart, periodEnd, updatedAt, subscriptionId, subscriberId,
+        expectedPlanId, expectedPlanVersion, expectedStatus, version, expectedStart, expectedEnd, cancelBoundary] = values;
       const row = this.subscription;
       if (row.subscription_id !== subscriptionId || row.subscriber_id !== subscriberId ||
-          row.plan_id !== planId || row.plan_version !== planVersion ||
+          row.plan_id !== expectedPlanId || row.plan_version !== expectedPlanVersion ||
           row.status !== expectedStatus || row.version !== version ||
           row.current_period_start !== expectedStart || row.current_period_end !== expectedEnd ||
           (row.cancel_at !== null && row.cancel_at <= String(cancelBoundary))) return result(0) as D1Result<T>;
-      this.subscription = { ...row, status: status as Subscription['status'], current_period_start: String(periodStart),
+      this.subscription = { ...row, plan_id: String(planId), plan_version: Number(planVersion),
+        status: status as Subscription['status'], current_period_start: String(periodStart),
         current_period_end: String(periodEnd), updated_at: String(updatedAt), version: row.version + 1 };
       return result(1) as D1Result<T>;
     }
