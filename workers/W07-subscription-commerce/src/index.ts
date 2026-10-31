@@ -12,6 +12,7 @@ import { handleHyperswitchWebhookRequest } from './payment-webhook-http-runtime.
 import { handleRevenueCatWebhookRequest } from './revenuecat-webhook-http-runtime.js'
 import { handleRevenueCatSubscriberReconciliationRequest } from './revenuecat-subscriber-reconciliation-runtime.js'
 import { previewSubscriptionPlanChange } from './subscription-plan-change-preview.js'
+import { createSubscriptionPlanUpgradeCheckout } from './subscription-plan-change-checkout.js'
 
 interface RateLimitBinding { limit(input: { key: string }): Promise<{ success: boolean }> }
 interface Env {
@@ -142,6 +143,7 @@ type Operation =
   | { operation: 'list'; subscriptionId: null }
   | { operation: 'get'; subscriptionId: string }
   | { operation: 'planChangePreview'; subscriptionId: string }
+  | { operation: 'planUpgradeCheckout'; subscriptionId: string }
 
 const toOperation = (method: string, segments: string[]): Operation | null => {
   if (segments.length === 1 && segments[0] === 'plans' && method === 'GET') return { operation: 'listPlans', subscriptionId: null }
@@ -150,6 +152,7 @@ const toOperation = (method: string, segments: string[]): Operation | null => {
   if (segments.length === 2 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && method === 'GET') return { operation: 'list', subscriptionId: null }
   if (segments.length === 3 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && method === 'GET') return { operation: 'get', subscriptionId: segments[2] }
   if (segments.length === 4 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && segments[3] === 'change-plan-preview' && method === 'GET') return { operation: 'planChangePreview', subscriptionId: segments[2] }
+  if (segments.length === 5 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && segments[3] === 'change-plan' && segments[4] === 'checkout' && method === 'POST') return { operation: 'planUpgradeCheckout', subscriptionId: segments[2] }
   return null
 }
 
@@ -269,6 +272,102 @@ export default {
           env.D1_01, principal, operation.subscriptionId, targetPlanId,
         )
         return json({ data: result, requestId: crypto.randomUUID() }, 200, result.etag)
+      }
+      if (operation?.operation === 'planUpgradeCheckout') {
+        requireLayer(request)
+        const checkout = await createSubscriptionPlanUpgradeCheckout(
+          env,
+          principal,
+          operation.subscriptionId,
+          await readJsonBody(request),
+          request.headers.get('Idempotency-Key'),
+          request.headers.get('If-Match'),
+          {
+            resolvePricing: async ({ preview, attempt }) => {
+              const resolved = await resolveCommerceOrderItems(env.D1_01, {
+                items: [{ itemRef: preview.targetPlan.planId, quantity: 1 }],
+              })
+              const item = resolved.items[0]
+              if (!item || resolved.items.length !== 1 ||
+                  item.itemRef !== attempt.targetPlanId ||
+                  item.itemVersion !== String(attempt.targetPlanVersion) ||
+                  item.unitAmountMinor !== preview.targetPlan.priceMinor ||
+                  item.currency !== preview.currency ||
+                  !Number.isSafeInteger(preview.prorationBaseMinor) ||
+                  preview.prorationBaseMinor <= 0 ||
+                  preview.prorationBaseMinor > preview.targetPlan.priceMinor) {
+                throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
+              }
+              let rawSnapshot: unknown
+              try {
+                rawSnapshot = JSON.parse(item.itemSnapshotJson) as unknown
+              } catch {
+                throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
+              }
+              if (!rawSnapshot || typeof rawSnapshot !== 'object' || Array.isArray(rawSnapshot)) {
+                throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
+              }
+              const itemSnapshotJson = JSON.stringify({
+                ...(rawSnapshot as Record<string, unknown>),
+                chargedAmountMinor: preview.prorationBaseMinor,
+                subscriptionChange: {
+                  kind: 'PLAN_UPGRADE',
+                  attemptId: attempt.attemptId,
+                  subscriberId: attempt.subscriberId,
+                  subscriptionId: attempt.subscriptionId,
+                  expectedSubscriptionVersion: attempt.expectedSubscriptionVersion,
+                  expectedPlanId: attempt.expectedPlanId,
+                  expectedPlanVersion: attempt.expectedPlanVersion,
+                  targetPlanId: attempt.targetPlanId,
+                  targetPlanVersion: attempt.targetPlanVersion,
+                  currentPeriodStart: attempt.currentPeriodStart,
+                  currentPeriodEnd: attempt.currentPeriodEnd,
+                  expiresAt: attempt.expiresAt,
+                },
+              })
+              if (new TextEncoder().encode(itemSnapshotJson).byteLength > 65_536) {
+                throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500)
+              }
+              const adjusted = {
+                currency: resolved.currency,
+                items: [{
+                  ...item,
+                  unitAmountMinor: preview.prorationBaseMinor,
+                  itemSnapshotJson,
+                }],
+              }
+              if (isDemoPricingEnabled(env.COMMERCE_PRICING_MODE, env.HYPERSWITCH_ENVIRONMENT)) {
+                if (env.COMMERCE_DEMO_TAX_PROVIDER === 'synthetic') {
+                  return applyDemoTaxPricing(adjusted)
+                }
+                if (env.COMMERCE_DEMO_TAX_PROVIDER === 'taxjar-sandbox') {
+                  try {
+                    return await applyTaxJarSandboxPricing(adjusted, {
+                      apiKey: env.TAXJAR_SANDBOX_API_KEY,
+                      fromAddress: {
+                        street: env.TAXJAR_DEMO_FROM_STREET ?? '',
+                        city: env.TAXJAR_DEMO_FROM_CITY ?? '',
+                        state: env.TAXJAR_DEMO_FROM_STATE ?? '',
+                        zip: env.TAXJAR_DEMO_FROM_ZIP ?? '',
+                      },
+                      toAddress: {
+                        street: env.TAXJAR_DEMO_TO_STREET ?? '',
+                        city: env.TAXJAR_DEMO_TO_CITY ?? '',
+                        state: env.TAXJAR_DEMO_TO_STATE ?? '',
+                        zip: env.TAXJAR_DEMO_TO_ZIP ?? '',
+                      },
+                    })
+                  } catch {
+                    throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
+                  }
+                }
+              }
+              // Live pricing remains fail-closed until an admitted tax decision is wired.
+              throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
+            },
+          },
+        )
+        return json({ data: checkout, requestId: crypto.randomUUID() }, checkout.replayed ? 200 : 201)
       }
       const publishPathMatch = /^\/membership\/plans\/([^/]+)\/publish$/.exec(pathname)
       if (request.method === 'POST' && publishPathMatch) {
