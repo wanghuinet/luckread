@@ -180,6 +180,7 @@ export default function MySubscriptionsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [authRequired, setAuthRequired] = useState(false);
   const [error, setError] = useState('');
+  const [cancelingSubscriptionId, setCancelingSubscriptionId] = useState<string | null>(null);
   const requestRef = useRef<AbortController | null>(null);
 
   const openLogin = useCallback(() => {
