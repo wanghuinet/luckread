@@ -640,6 +640,7 @@ function parseMembershipPlanUpdateAuditInput(value: unknown): MembershipPlanUpda
     (body.visibility !== 'PRIVATE' && body.visibility !== 'PUBLIC') ||
     typeof body.version !== 'number' || !Number.isSafeInteger(body.version) || body.version !== body.expectedVersion + 1 ||
     body.eventId !== 'evt_mpl_updated_' + body.planId + '_v' + body.version ||
+    !Number.isSafeInteger(body.trialDays) || (body.trialDays as number) < 0 || (body.trialDays as number) > 90 ||
     typeof body.occurredAt !== 'string' || !body.occurredAt || Number.isNaN(Date.parse(body.occurredAt))
   ) throw new Error('INVALID_MEMBERSHIP_PLAN_UPDATE_AUDIT')
   parseMembershipPlanUpdateTerms(body)
@@ -649,7 +650,7 @@ function parseMembershipPlanUpdateAuditInput(value: unknown): MembershipPlanUpda
 function parseMembershipPlanPublishAuditInput(value: unknown): MembershipPlanPublishAuditInput {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('INVALID_MEMBERSHIP_PLAN_PUBLISH_AUDIT')
   const body = value as Record<string, unknown>
-  const allowed = new Set(['eventId', 'planId', 'creatorId', 'planVersion', 'status', 'visibility', 'version', 'occurredAt', 'name', 'tier', 'billingInterval', 'priceMinor', 'currency'])
+  const allowed = new Set(['eventId', 'planId', 'creatorId', 'planVersion', 'status', 'visibility', 'version', 'occurredAt', 'name', 'tier', 'billingInterval', 'priceMinor', 'currency', 'trialDays'])
   if (Object.keys(body).some((key) => !allowed.has(key)) || Object.keys(body).length !== allowed.size) {
     throw new Error('INVALID_MEMBERSHIP_PLAN_PUBLISH_AUDIT')
   }
@@ -1122,6 +1123,7 @@ export default {
           priceMinor: input.priceMinor,
           currency: input.currency,
           benefits: input.benefits,
+          ...(input.trialDays === undefined ? {} : { trialDays: input.trialDays }),
         },
         occurredAt: new Date().toISOString(),
       }
@@ -1283,6 +1285,7 @@ export default {
           priceMinor: input.priceMinor,
           currency: input.currency,
           benefits: input.benefits,
+          trialDays: input.trialDays,
         },
         occurredAt: input.occurredAt,
       }
@@ -1334,6 +1337,7 @@ export default {
           billingInterval: input.billingInterval,
           priceMinor: input.priceMinor,
           currency: input.currency,
+          trialDays: input.trialDays,
         },
         occurredAt: input.occurredAt,
       }
