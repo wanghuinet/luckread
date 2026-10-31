@@ -834,7 +834,7 @@ export async function reviseMembershipPlan(
         "AND p.status IN ('DRAFT','ACTIVE','PAUSED') AND p.current_version = ? AND p.version = ?)",
       ).bind(
         planId, nextPlanVersion, revision.name, revision.tier, revision.billingInterval,
-        revision.priceMinor, revision.currency, benefitsJson, revision.trialDays, updatedAt, revision.trialDays,
+        revision.priceMinor, revision.currency, benefitsJson, updatedAt, revision.trialDays,
         planId, creatorId, current.current_version, expectedVersion,
       ),
       db.prepare(
@@ -847,7 +847,7 @@ export async function reviseMembershipPlan(
       ).bind(
         nextPlanVersion, updatedAt, planId, creatorId, current.current_version, expectedVersion,
         nextPlanVersion, revision.name, revision.tier, revision.billingInterval,
-        revision.priceMinor, revision.currency, benefitsJson,
+        revision.priceMinor, revision.currency, benefitsJson, revision.trialDays,
       ),
     ])
   } catch {
