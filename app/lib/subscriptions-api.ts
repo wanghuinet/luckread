@@ -2,11 +2,18 @@ import { apiRequest } from './api-client';
 
 export type SubscriptionStatus =
   | 'PENDING'
+  | 'TRIALING'
   | 'ACTIVE'
   | 'PAST_DUE'
   | 'PAUSED'
   | 'CANCELED'
   | 'EXPIRED';
+
+export type MembershipTrialSummary = {
+  source: 'WEB' | 'APP_STORE' | 'PLAY_STORE';
+  status: 'TRIALING' | 'CANCELED' | 'PAYMENT_FAILED' | 'CONVERTED' | 'EXPIRED';
+  trialEndsAt: string;
+};
 
 export type MySubscription = {
   subscriptionId: string;
@@ -21,6 +28,7 @@ export type MySubscription = {
   cancelAt: string | null;
   updatedAt: string;
   etag: string;
+  trial: MembershipTrialSummary | null;
 };
 
 export type MySubscriptionPage = {
@@ -65,6 +73,7 @@ export type ActiveMembershipPlan = {
   priceMinor: number;
   currency: string;
   benefits: string[];
+  trialDays: number;
   createdAt: string;
   updatedAt: string;
 };
@@ -98,5 +107,31 @@ export function fetchActiveMembershipPlansPage(options: PlanPageOptions = {}) {
   return apiRequest<unknown>('/plans?' + query.toString(), {
     method: 'GET',
     signal: options.signal,
+  });
+}
+
+
+/** Start a WEB trial only when W07 confirms an existing active MIT mandate. */
+export function startWebMembershipTrial(planId: string) {
+  if (typeof planId !== 'string' || !/^plan_[a-f0-9]{64}$/.test(planId)) {
+    throw new RangeError('A canonical membership plan ID is required.');
+  }
+  return apiRequest<unknown>('/memberships/subscriptions/trial', {
+    method: 'POST',
+    body: JSON.stringify({ planId }),
+  });
+}
+
+/** Cancel only a WEB trial conversion; the current trial access remains until its end. */
+export function cancelWebMembershipTrial(subscriptionId: string, etag: string) {
+  if (typeof subscriptionId !== 'string' || !/^sub_[a-f0-9]{64}$/.test(subscriptionId)) {
+    throw new RangeError('A canonical subscription ID is required.');
+  }
+  if (typeof etag !== 'string' || !/^"lr-v([1-9]\\d*)"$/.test(etag)) {
+    throw new RangeError('A valid subscription version is required.');
+  }
+  return apiRequest<unknown>('/memberships/subscriptions/' + encodeURIComponent(subscriptionId) + '/cancel-trial', {
+    method: 'POST',
+    headers: { 'If-Match': etag },
   });
 }
