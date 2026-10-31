@@ -25,6 +25,7 @@ export type RevenueCatSubscriberReconciliationRuntimeDependencies = Readonly<{
   fetchSubscriber?: typeof fetchRevenueCatSubscriber;
   buildCandidates?: typeof buildRevenueCatSubscriberReconciliationCandidates;
   nowMs?: () => number;
+  syncStoreTrials?: typeof syncRevenueCatStoreTrialCandidates;
 }>;
 
 class InvalidRequestError extends Error {
@@ -192,7 +193,8 @@ export async function handleRevenueCatSubscriberReconciliationRequest(
       dependencies.nowMs ? { nowMs: dependencies.nowMs } : undefined,
     );
 
-    const trialSync = await syncRevenueCatStoreTrialCandidates(
+    const syncStoreTrials = dependencies.syncStoreTrials ?? syncRevenueCatStoreTrialCandidates;
+    const trialSync = await syncStoreTrials(
       env.D1_01,
       principalId,
       appId,
