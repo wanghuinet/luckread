@@ -62,6 +62,7 @@ export type MembershipTrialDto = Readonly<{
   trialEndsAt: string;
   status: TrialRow['status'];
   version: number;
+  updatedAt: string;
 }>;
 
 export type StartWebMembershipTrialResult = Readonly<{
@@ -134,6 +135,7 @@ function toTrial(row: TrialRow): MembershipTrialDto {
     trialEndsAt: row.trial_ends_at,
     status: row.status,
     version: row.version,
+    updatedAt: row.updated_at,
   };
 }
 
@@ -209,7 +211,7 @@ export async function startWebMembershipTrial(
   const requestHash = await digest(JSON.stringify({
     version: 1, source: 'WEB', subscriberId, planId, idempotencyKey,
   }));
-  const idempotencyDigest = await digest('membership-web-trial-v1\u0000' + subscriberId + '\u0000' + planId + '\u0000' + idempotencyKey);
+  const idempotencyDigest = await digest('membership-web-trial-v1\u0000' + subscriberId + '\u0000' + idempotencyKey);
   const subscriptionId = 'sub_' + idempotencyDigest;
   const trialId = 'mtr_' + idempotencyDigest.slice(0, 26);
 
@@ -356,9 +358,8 @@ export async function cancelWebMembershipTrial(
   ).bind(subscriptionId, subscriberId).first<TrialSubscriptionRow>();
   if (!subscription) throw new SubscriptionRuntimeError('RESOURCE_NOT_FOUND', 404);
   if (trial.status === 'CANCELED' && subscription.cancel_at === trial.trial_ends_at) {
-    if (subscription.version !== expectedVersion) {
-      throw new SubscriptionRuntimeError('PRECONDITION_FAILED', 412);
-    }
+    // The original ETag may be stale after a first charge already submitted
+    // before cancellation failed and moved the same Subscription to PAST_DUE.
     return { subscription: toSubscription(subscription), trial: toTrial(trial), replayed: true };
   }
   if (subscription.status !== 'TRIALING' || trial.status !== 'TRIALING') {
