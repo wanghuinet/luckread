@@ -227,11 +227,25 @@ describe('v1 subscription adapter', () => {
     expect(creatorMembershipPlans).toContain("RETIRED: '已退役'")
   })
 
-  it('exposes only the canonical subscription lifecycle paths', () => {
+  it('exposes the canonical subscription reads and audited scheduled plan-change path', () => {
     expect(route).toContain("/memberships/subscriptions")
     expect(route).toContain("parts.length === 0 && method === 'GET'")
-    expect(route).toContain("['cancel', 'pause', 'resume']")
-    expect(route).toContain("'change-plan'")
+    expect(route).toContain("['cancel', 'pause', 'resume', 'change-plan']")
+    expect(route).toContain("action: 'subscription.change_plan'")
+    expect(route).toContain('callW06SubscriptionPlanChangeRequestAudit')
+    expect(route).toContain('callW06SubscriptionPlanChangeAudit')
+    expect(route).toContain('callW07Subscription')
     expect(route).not.toContain('entitlement')
+  })
+
+  it('keeps cancel, pause, resume, and create writes closed while allowing only CASL-audited scheduled plan changes', () => {
+    const scheduleBranch = route.indexOf('if (isPlanChangeRequest)')
+    const writeGuard = route.indexOf("if (request.method === 'POST')", scheduleBranch)
+    expect(scheduleBranch).toBeGreaterThan(-1)
+    expect(writeGuard).toBeGreaterThan(scheduleBranch)
+    expect(route).toContain('Subscription writes are disabled until a verified payment-provider synchronization flow is available.')
+    expect(route.indexOf('callW06SubscriptionPlanChangeRequestAudit')).toBeLessThan(
+      route.indexOf("pathname: operation.pathname")
+    )
   })
 })
