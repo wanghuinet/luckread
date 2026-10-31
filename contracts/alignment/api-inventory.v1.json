@@ -1131,6 +1131,21 @@
       ]
     },
     {
+      "operationId": "previewSubscriptionPlanChange",
+      "method": "GET",
+      "path": "/v1/memberships/subscriptions/{subscriptionId}/change-plan-preview",
+      "openapiPath": "/memberships/subscriptions/{subscriptionId}/change-plan-preview",
+      "domain": "subscription_entitlement_payment",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/memberships/subscriptions/{subscriptionId}/change-plan-preview",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
       "operationId": "getNotificationPreferences",
       "method": "GET",
       "path": "/v1/notification-preferences",

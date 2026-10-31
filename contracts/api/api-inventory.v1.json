@@ -238,6 +238,7 @@
         "GET /v1/membership/plans",
         "GET /v1/memberships/subscriptions",
         "GET /v1/memberships/subscriptions/{subscriptionId}",
+        "GET /v1/memberships/subscriptions/{subscriptionId}/change-plan-preview",
         "GET /v1/payments/history",
         "GET /v1/payments/refunds",
         "GET /v1/payments/{paymentId}",

@@ -11,6 +11,7 @@ import { handleCommerceBillingReadRequest } from './billing-read-http-runtime.js
 import { handleHyperswitchWebhookRequest } from './payment-webhook-http-runtime.js'
 import { handleRevenueCatWebhookRequest } from './revenuecat-webhook-http-runtime.js'
 import { handleRevenueCatSubscriberReconciliationRequest } from './revenuecat-subscriber-reconciliation-runtime.js'
+import { previewSubscriptionPlanChange } from './subscription-plan-change-preview.js'
 
 interface RateLimitBinding { limit(input: { key: string }): Promise<{ success: boolean }> }
 interface Env {
@@ -140,6 +141,7 @@ type Operation =
   | { operation: 'createPlan'; subscriptionId: null }
   | { operation: 'list'; subscriptionId: null }
   | { operation: 'get'; subscriptionId: string }
+  | { operation: 'planChangePreview'; subscriptionId: string }
 
 const toOperation = (method: string, segments: string[]): Operation | null => {
   if (segments.length === 1 && segments[0] === 'plans' && method === 'GET') return { operation: 'listPlans', subscriptionId: null }
@@ -147,6 +149,7 @@ const toOperation = (method: string, segments: string[]): Operation | null => {
   if (segments.length === 2 && segments[0] === 'membership' && segments[1] === 'plans' && method === 'POST') return { operation: 'createPlan', subscriptionId: null }
   if (segments.length === 2 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && method === 'GET') return { operation: 'list', subscriptionId: null }
   if (segments.length === 3 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && method === 'GET') return { operation: 'get', subscriptionId: segments[2] }
+  if (segments.length === 4 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && segments[3] === 'change-plan-preview' && method === 'GET') return { operation: 'planChangePreview', subscriptionId: segments[2] }
   return null
 }
 
@@ -259,6 +262,14 @@ export default {
       if (commerceOrderResponse) return commerceOrderResponse
       const pathname = new URL(request.url).pathname
       const operation = toOperation(request.method, parseSegments(pathname))
+      if (operation?.operation === 'planChangePreview') {
+        const targetPlanId = new URL(request.url).searchParams.get('targetPlanId')
+        if (!targetPlanId) throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
+        const result = await previewSubscriptionPlanChange(
+          env.D1_01, principal, operation.subscriptionId, targetPlanId,
+        )
+        return json({ data: result, requestId: crypto.randomUUID() }, 200, result.etag)
+      }
       const publishPathMatch = /^\/membership\/plans\/([^/]+)\/publish$/.exec(pathname)
       if (request.method === 'POST' && publishPathMatch) {
         const segments = parseSegments(pathname)

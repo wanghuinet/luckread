@@ -14,6 +14,7 @@ const resolveOperation = (method: string, segments: string[] | undefined): { pat
   if (parts.length === 0 && method === 'GET') return { pathname: '/memberships/subscriptions' }
   if (parts.length === 0 && method === 'POST') return { pathname: '/memberships/subscriptions' }
   if (parts.length === 1 && method === 'GET') return { pathname: '/memberships/subscriptions/' + encodeURIComponent(parts[0]!) }
+  if (parts.length === 2 && method === 'GET' && parts[1] === 'change-plan-preview') return { pathname: '/memberships/subscriptions/' + encodeURIComponent(parts[0]!) + '/change-plan-preview' }
   if (parts.length === 2 && method === 'POST' && ['cancel', 'pause', 'resume'].includes(parts[1]!)) {
     return { pathname: '/memberships/subscriptions/' + encodeURIComponent(parts[0]!) + '/' + parts[1]! }
   }
@@ -38,7 +39,9 @@ async function forward(request: Request, context: RouteContext): Promise<Respons
         'Subscription writes are disabled until a verified payment-provider synchronization flow is available.',
       )
     }
-    const pathname = request.method === 'GET' && (params.segments ?? []).length === 0
+    const isSubscriptionList = (params.segments ?? []).length === 0
+    const isPlanChangePreview = (params.segments ?? []).length === 2 && params.segments?.[1] === 'change-plan-preview'
+    const pathname = request.method === 'GET' && (isSubscriptionList || isPlanChangePreview)
       ? operation.pathname + new URL(request.url).search
       : operation.pathname
     return await callW07Subscription({ request, pathname, method: 'GET', principal })
