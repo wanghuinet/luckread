@@ -316,8 +316,9 @@ export async function callW06SubscriptionTrialAudit(input: {
   principal: ContentPrincipal
   body: {
     eventId: string
-    phase: 'REQUESTED' | 'STARTED' | 'CANCELED'
-    planId: string
+    phase: 'REQUESTED' | 'CANCEL_REQUESTED' | 'STARTED' | 'CANCELED'
+    planId?: string
+    expectedVersion?: number
     subscriptionId?: string
     trialId?: string
     planVersion?: number
