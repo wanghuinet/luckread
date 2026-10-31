@@ -416,6 +416,14 @@ jobs:
 
           db.execute("INSERT INTO membership_plans(plan_id,owner_type,owner_id,current_version,status,visibility,version,created_at,updated_at) VALUES ('plan_trial_probe','CREATOR','creator_trial_probe',1,'ACTIVE','PUBLIC',1,'2026-10-10T00:00:00.000Z','2026-10-10T00:00:00.000Z')")
           db.execute("INSERT INTO membership_plan_versions(plan_id,plan_version,name,tier,billing_interval,price_minor,currency,benefits_json,created_at,trial_days) VALUES ('plan_trial_probe',1,'Trial Plan','basic','MONTHLY',500,'USD','[]','2026-10-10T00:00:00.000Z',14)")
+          # Every immutable plan-version column, including the newly added trial_days,
+          # is covered by the existing unconditional membership_plan_versions update trigger.
+          try:
+            db.execute("UPDATE membership_plan_versions SET trial_days=15 WHERE plan_id='plan_trial_probe' AND plan_version=1")
+            raise SystemExit('membership plan version unexpectedly allowed trial_days mutation')
+          except sqlite3.IntegrityError:
+            pass
+
           def insert_trial_subscription(subscription_id, subscriber_id):
             db.execute("INSERT INTO membership_subscriptions(subscription_id,subscriber_id,plan_id,plan_version,creator_id,status,started_at,current_period_start,current_period_end,cancel_at,entitlement_snapshot_ref,created_at,updated_at,version) VALUES(?,?,'plan_trial_probe',1,'creator_trial_probe','TRIALING','2026-10-10T00:00:00.000Z','2026-10-10T00:00:00.000Z','2026-10-24T00:00:00.000Z',NULL,NULL,'2026-10-10T00:00:00.000Z','2026-10-10T00:00:00.000Z',1)",(subscription_id,subscriber_id))
           def insert_trial(trial_id, subscription_id, subscriber_id):
@@ -437,6 +445,16 @@ jobs:
           insert_trial('mtr_cccccccccccccccccccccccccc','sub_trial_failed_probe','user_trial_failed_probe')
           db.execute("UPDATE membership_subscriptions SET status='PAST_DUE',updated_at='2026-10-24T00:00:00.001Z',version=2 WHERE subscription_id='sub_trial_failed_probe'")
           if db.execute("SELECT status FROM membership_subscription_trials WHERE subscription_id='sub_trial_failed_probe'").fetchone() != ('PAYMENT_FAILED',): raise SystemExit('failed first MIT conversion did not mark trial payment failure')
+          db.execute("UPDATE membership_subscriptions SET cancel_at='2026-10-24T00:00:00.000Z',updated_at='2026-10-24T00:00:00.002Z',version=3 WHERE subscription_id='sub_trial_failed_probe'")
+          db.execute("UPDATE membership_subscription_trials SET status='CANCELED',version=version+1,updated_at='2026-10-24T00:00:00.002Z' WHERE subscription_id='sub_trial_failed_probe'")
+          if db.execute("SELECT status FROM membership_subscription_trials WHERE subscription_id='sub_trial_failed_probe'").fetchone() != ('CANCELED',): raise SystemExit('failed trial could not be canceled to prevent future retries')
+
+          insert_trial_subscription('sub_trial_cancel_race_probe','user_trial_cancel_race_probe')
+          insert_trial('mtr_dddddddddddddddddddddddddd','sub_trial_cancel_race_probe','user_trial_cancel_race_probe')
+          db.execute("UPDATE membership_subscriptions SET cancel_at='2026-10-24T00:00:00.000Z',updated_at='2026-10-11T00:00:00.000Z',version=2 WHERE subscription_id='sub_trial_cancel_race_probe'")
+          db.execute("UPDATE membership_subscription_trials SET status='CANCELED',version=version+1,updated_at='2026-10-11T00:00:00.000Z' WHERE subscription_id='sub_trial_cancel_race_probe'")
+          db.execute("UPDATE membership_subscriptions SET status='ACTIVE',current_period_start='2026-10-24T00:00:00.000Z',current_period_end='2026-11-24T00:00:00.000Z',updated_at='2026-10-24T00:00:00.001Z',version=3 WHERE subscription_id='sub_trial_cancel_race_probe'")
+          if db.execute("SELECT status FROM membership_subscription_trials WHERE subscription_id='sub_trial_cancel_race_probe'").fetchone() != ('CONVERTED',): raise SystemExit('already-submitted paid conversion could not win cancellation race')
 
           print('MEMBERSHIP_TRIAL_D1_01_STATIC=PASS')
 
