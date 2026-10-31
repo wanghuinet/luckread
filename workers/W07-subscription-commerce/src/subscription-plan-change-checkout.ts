@@ -199,6 +199,21 @@ async function expireAttempt(db: D1Database, row: PlanChangeAttemptRow, now: str
   }
 }
 
+async function expireStalePendingAttempts(
+  db: D1Database,
+  subscriptionId: string,
+  now: string,
+): Promise<void> {
+  try {
+    await db.prepare(
+      "UPDATE membership_subscription_plan_change_attempts SET status = 'EXPIRED', updated_at = ?, " +
+      "version = version + 1 WHERE subscription_id = ? AND status = 'PENDING_PAYMENT' AND expires_at <= ?",
+    ).bind(now, subscriptionId, now).run();
+  } catch {
+    throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
+  }
+}
+
 function assertAttemptMatches(
   row: PlanChangeAttemptRow,
   subscriberId: string,
@@ -426,6 +441,7 @@ export async function createSubscriptionPlanUpgradeCheckout(
   });
 
   if (!attemptRow) {
+    await expireStalePendingAttempts(env.D1_01, subscriptionId, now);
     try {
       const inserted = await env.D1_01.prepare(
         'INSERT INTO membership_subscription_plan_change_attempts ' +
