@@ -2547,6 +2547,27 @@
       ]
     },
     {
+      "operationId": "createSubscriptionUpgradeOrder",
+      "method": "POST",
+      "path": "/v1/memberships/subscriptions/{subscriptionId}/upgrade",
+      "openapiPath": "/memberships/subscriptions/{subscriptionId}/upgrade",
+      "domain": "subscription_entitlement_payment",
+      "status": "IMPLEMENTED",
+      "featureIds": [
+        "MON-003",
+        "MON-005"
+      ],
+      "schemaRef": "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json#paidPlanUpgradeApplicationTable",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/memberships/subscriptions/{subscriptionId}/upgrade",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json",
+        "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json",
+        "workers/W07-subscription-commerce/src/subscription-upgrade-checkout.ts",
+        "workers/W07-subscription-commerce/src/paid-membership-plan-upgrade-application.ts"
+      ]
+    },
+    {
       "operationId": "pauseSubscription",
       "method": "POST",
       "path": "/v1/memberships/subscriptions/{subscriptionId}/pause",
