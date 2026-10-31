@@ -154,7 +154,15 @@ export async function readScheduledSubscriptionPlanDowngradeForPeriod(
       (includeApplied ? "AND status IN ('SCHEDULED', 'APPLIED')" : "AND status = 'SCHEDULED'") +
       ' LIMIT 1',
     ).bind(subscriptionId, effectiveAt).first<ScheduledPlanChangeRow>();
-  } catch {
+  } catch (error) {
+    // Keep pre-migration renewal/webhook behavior unchanged. The new schedule
+    // table is additive; until migration 0006 is applied there cannot be a
+    // persisted downgrade row, so absence of that exact table is equivalent to
+    // no scheduled change. All other D1 failures remain fail-closed.
+    const message = error instanceof Error ? error.message : String(error);
+    if (/no such table:\s*membership_subscription_scheduled_plan_changes/i.test(message)) {
+      return null;
+    }
     throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
   }
   if (!row) return null;
@@ -326,7 +334,8 @@ export async function scheduleSubscriptionPlanDowngrade(
         const same = toScheduledChange(raced);
         if (same.subscriptionId === subscriptionId && same.targetPlanId === targetPlanId) {
           return {
-            changeId: same.changeId, subscriptionId, status: 'SCHEDULED',
+            changeId: same.changeId, subscriptionId,
+            status: same.status === 'APPLIED' ? 'APPLIED' : 'SCHEDULED',
             currentPlanId: same.expectedPlanId, targetPlanId: same.targetPlanId,
             targetPlanVersion: same.targetPlanVersion, effectiveAt: same.effectiveAt, replayed: true,
           };
