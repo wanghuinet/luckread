@@ -15,6 +15,7 @@ const resolveOperation = (method: string, segments: string[] | undefined): { pat
   const parts = segments ?? []
   if (parts.length === 0 && method === 'GET') return { pathname: '/memberships/subscriptions' }
   if (parts.length === 0 && method === 'POST') return { pathname: '/memberships/subscriptions' }
+  if (parts.length === 1 && method === 'POST' && parts[0] === 'trial') return { pathname: '/memberships/subscriptions/trial' }
   if (parts.length === 1 && method === 'GET') return { pathname: '/memberships/subscriptions/' + encodeURIComponent(parts[0]!) }
   if (parts.length === 2 && method === 'GET' && parts[1] === 'change-plan-preview') return { pathname: '/memberships/subscriptions/' + encodeURIComponent(parts[0]!) + '/change-plan-preview' }
   if (parts.length === 2 && method === 'POST' && ['cancel', 'pause', 'resume'].includes(parts[1]!)) {
@@ -102,6 +103,36 @@ async function authorizeSubscriptionPlanChange(
     : undefined
   if (decision === 'ALLOW') return null
   if (decision === 'DENY') return errorResponse(403, 'PERMISSION_DENIED', 'Subscription plan change permission required')
+  return errorResponse(503, 'AUTHORIZATION_UNAVAILABLE', 'Subscription authorization response could not be verified')
+}
+
+async function authorizeSubscriptionCreate(
+  request: Request,
+  principalUserId: string,
+  planId: string,
+): Promise<Response | null> {
+  const headers = new Headers(request.headers)
+  headers.delete('host')
+  headers.delete('content-length')
+  headers.set('content-type', 'application/json; charset=utf-8')
+  const permissionRequest = new Request(request.url, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      action: 'subscription.create',
+      resourceType: 'Subscription',
+      resourceAttributes: { ownerId: principalUserId, subscriberId: principalUserId, planId },
+    }),
+  })
+  const response = await callW08Creator(permissionRequest, '/internal/authz/check-permission', 'POST')
+  if (!response.ok) return errorResponse(503, 'AUTHORIZATION_UNAVAILABLE', 'Subscription authorization unavailable')
+  const value: unknown = await response.json().catch((): null => null)
+  const decision = value && typeof value === 'object'
+    ? (value as { decision?: unknown; data?: { decision?: unknown } }).data?.decision ??
+      (value as { decision?: unknown }).decision
+    : undefined
+  if (decision === 'ALLOW') return null
+  if (decision === 'DENY') return errorResponse(403, 'PERMISSION_DENIED', 'Subscription creation permission required')
   return errorResponse(503, 'AUTHORIZATION_UNAVAILABLE', 'Subscription authorization response could not be verified')
 }
 
@@ -201,8 +232,9 @@ async function forward(request: Request, context: RouteContext): Promise<Respons
       parts[1] === 'change-plan' && parts[2] === 'schedule'
     const isBillingIntervalSchedule = request.method === 'POST' && parts.length === 3 &&
       parts[1] === 'change-plan' && parts[2] === 'interval-schedule'
+    const isTrialStart = request.method === 'POST' && parts.length === 1 && parts[0] === 'trial'
     if (request.method === 'POST') {
-      if (!isPlanUpgradeCheckout && !isPlanDowngradeSchedule && !isBillingIntervalSchedule) {
+      if (!isPlanUpgradeCheckout && !isPlanDowngradeSchedule && !isBillingIntervalSchedule && !isTrialStart) {
         return errorResponse(
           503,
           'SERVICE_UNAVAILABLE',
@@ -224,12 +256,25 @@ async function forward(request: Request, context: RouteContext): Promise<Respons
         return errorResponse(400, 'VALIDATION_FAILED', 'Idempotency-Key is invalid')
       }
       const expectedEtag = request.headers.get('If-Match')
-      if (!expectedEtag) return errorResponse(428, 'PRECONDITION_REQUIRED', 'If-Match is required')
-      if (!/^"lr-v([1-9]\d*)"$/.test(expectedEtag)) {
-        return errorResponse(412, 'PRECONDITION_FAILED', 'Subscription version does not match')
+      if (!isTrialStart) {
+        if (!expectedEtag) return errorResponse(428, 'PRECONDITION_REQUIRED', 'If-Match is required')
+        if (!/^"lr-v([1-9]\d*)"$/.test(expectedEtag)) {
+          return errorResponse(412, 'PRECONDITION_FAILED', 'Subscription version does not match')
+        }
       }
-      const denied = await authorizeSubscriptionPlanChange(request, principal.userId, parts[0]!)
+      const denied = isTrialStart
+        ? await authorizeSubscriptionCreate(request, principal.userId, (body as { planId: string }).planId)
+        : await authorizeSubscriptionPlanChange(request, principal.userId, parts[0]!)
       if (denied) return denied
+      if (isTrialStart) {
+        return await callW07Subscription({
+          request,
+          pathname: operation.pathname,
+          method: 'POST',
+          principal,
+          body,
+        })
+      }
       const changeType = isPlanUpgradeCheckout
         ? 'UPGRADE'
         : isPlanDowngradeSchedule ? 'DOWNGRADE_SCHEDULE' : 'BILLING_INTERVAL_CHANGE_SCHEDULE'
