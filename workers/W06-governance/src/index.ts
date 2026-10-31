@@ -484,7 +484,9 @@ function parseSubscriptionPlanChangeRequestAuditInput(value: unknown): Subscript
     throw new Error('INVALID_SUBSCRIPTION_PLAN_CHANGE_REQUEST_AUDIT')
   }
   if (
-    typeof body.attemptId !== 'string' || !/^suca_[a-f0-9]{64}$/.test(body.attemptId) ||
+    typeof body.attemptId !== 'string' ||
+    (body.changeType === 'UPGRADE' && !/^suca_[a-f0-9]{64}$/.test(body.attemptId)) ||
+    (body.changeType === 'DOWNGRADE_SCHEDULE' && !/^sudc_[a-f0-9]{64}$/.test(body.attemptId)) ||
     (body.changeType !== 'UPGRADE' && body.changeType !== 'DOWNGRADE_SCHEDULE') ||
     body.eventId !== (body.changeType === 'UPGRADE'
       ? 'evt_subscription_plan_upgrade_requested_' + body.attemptId
