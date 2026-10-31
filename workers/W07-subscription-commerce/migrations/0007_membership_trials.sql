@@ -37,7 +37,7 @@ CREATE TABLE membership_subscription_trials (
 CREATE UNIQUE INDEX ux_membership_subscription_trials_subscriber_plan
   ON membership_subscription_trials(subscriber_id, plan_id);
 CREATE UNIQUE INDEX ux_membership_subscription_trials_store_transaction
-  ON membership_subscription_trials(source, provider_app_id, store_transaction_id)
+  ON membership_subscription_trials(source, provider_app_id, subscriber_id, store_transaction_id)
   WHERE store_transaction_id IS NOT NULL;
 CREATE INDEX ix_membership_subscription_trials_status_end
   ON membership_subscription_trials(status, trial_ends_at, subscription_id);
