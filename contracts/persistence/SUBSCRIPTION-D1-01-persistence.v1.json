@@ -521,7 +521,8 @@
       "immediateActivation": "A same-period Subscription plan update is permitted only while an exact READY application proof exists with a verified payment_id. The Subscription update and READY -> APPLIED transition are in one D1-01 batch.",
       "noPeriodReset": "Immediate upgrade preserves current_period_start and current_period_end; it does not add days or create a duplicate Subscription.",
       "idempotency": "Unique Order and Payment references, one active reservation per Subscription, and deterministic application_id prevent parallel upgrade orders and provider webhook replay from applying a second upgrade.",
-      "retention": "Application identity is immutable apart from the one-time null payment_id attachment during PENDING_PAYMENT -> READY; status is PENDING_PAYMENT -> READY -> APPLIED only; application history cannot be deleted."
+      "retention": "Application identity is immutable apart from the one-time null payment_id attachment during PENDING_PAYMENT -> READY; status is PENDING_PAYMENT -> READY -> APPLIED only; application history cannot be deleted.",
+      "mutualExclusion": "A PENDING_PAYMENT or READY upgrade reservation and a SCHEDULED downgrade/billing-interval change cannot coexist for the same Subscription. D1-01 insert guards enforce the exclusion in both write directions to close concurrent request races."
     },
     "migration": "workers/W07-subscription-commerce/migrations/0006_immediate_subscription_upgrades.sql",
     "stateMachineRef": "contracts/state-machines/membership-subscription-plan-upgrade.json"
