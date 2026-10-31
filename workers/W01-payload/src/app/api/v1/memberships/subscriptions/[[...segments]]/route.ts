@@ -3,6 +3,8 @@ import {
   resolveCookieSubscriptionPrincipal,
   W07SubscriptionClientError,
 } from '../../../../../../subscription/w07-subscription-client.js'
+import { callW08Creator, W08CreatorClientError } from '../../../../../../auth/w08-creator-client.js'
+import { callW06SubscriptionPlanChangeRequestAudit, W06ModerationClientError } from '../../../../../../moderation/w06-moderation-client.js'
 
 const errorResponse = (status: number, code: string, message: string) =>
   Response.json({ error: { code, message, details: {} }, requestId: `req_${crypto.randomUUID()}` }, { status, headers: { 'cache-control': 'no-store' } })
@@ -69,6 +71,86 @@ async function readBoundedJson(request: Request): Promise<unknown | Response> {
   }
 }
 
+const PLAN_ID_PATTERN = /^plan_[a-f0-9]{64}$/
+
+async function authorizeSubscriptionPlanChange(
+  request: Request,
+  principalUserId: string,
+  subscriptionId: string,
+): Promise<Response | null> {
+  const headers = new Headers(request.headers)
+  headers.delete('host')
+  headers.delete('content-length')
+  headers.set('content-type', 'application/json; charset=utf-8')
+  const permissionRequest = new Request(request.url, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      action: 'subscription.change_plan',
+      resourceType: 'Subscription',
+      resourceAttributes: { ownerId: principalUserId },
+    }),
+  })
+  const response = await callW08Creator(permissionRequest, '/internal/authz/check-permission', 'POST')
+  if (!response.ok) return errorResponse(503, 'AUTHORIZATION_UNAVAILABLE', 'Subscription authorization unavailable')
+  const value: unknown = await response.json().catch((): null => null)
+  const decision = value && typeof value === 'object'
+    ? (value as { decision?: unknown; data?: { decision?: unknown } }).data?.decision ??
+      (value as { decision?: unknown }).decision
+    : undefined
+  if (decision === 'ALLOW') return null
+  if (decision === 'DENY') return errorResponse(403, 'PERMISSION_DENIED', 'Subscription plan change permission required')
+  return errorResponse(503, 'AUTHORIZATION_UNAVAILABLE', 'Subscription authorization response could not be verified')
+}
+
+async function subscriptionPlanUpgradeAttemptId(subscriberId: string, idempotencyKey: string): Promise<string> {
+  const payload = new TextEncoder().encode(
+    'membership-plan-upgrade-v1\\u0000' + subscriberId + '\\u0000' + idempotencyKey,
+  )
+  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', payload))
+  const hex = Array.from(digest, (byte) => byte.toString(16).padStart(2, '0')).join('')
+  return 'suca_' + hex
+}
+
+async function auditSubscriptionPlanUpgradeRequest(
+  request: Request,
+  principal: { userId: string; layer?: string },
+  subscriptionId: string,
+  targetPlanId: string,
+  expectedEtag: string,
+  attemptId: string,
+): Promise<Response | null> {
+  let response: Response
+  try {
+    response = await callW06SubscriptionPlanChangeRequestAudit({
+      request,
+      principal: { userId: principal.userId, layer: principal.layer } as never,
+      body: {
+        eventId: 'evt_subscription_plan_upgrade_requested_' + attemptId,
+        attemptId,
+        subscriberId: principal.userId,
+        subscriptionId,
+        targetPlanId,
+        expectedEtag,
+        requestedAt: new Date().toISOString(),
+      },
+    })
+  } catch {
+    return errorResponse(503, 'AUDIT_UNAVAILABLE', 'Subscription plan change request could not be durably audited')
+  }
+  const value: unknown = await response.json().catch((): null => null)
+  const result = value && typeof value === 'object' && !Array.isArray(value)
+    ? value as { eventId?: unknown; action?: unknown; targetType?: unknown; targetId?: unknown }
+    : null
+  if ((response.status !== 200 && response.status !== 201) ||
+      result?.eventId !== 'evt_subscription_plan_upgrade_requested_' + attemptId ||
+      result.action !== 'subscription.plan_upgrade.requested' ||
+      result.targetType !== 'Subscription' || result.targetId !== subscriptionId) {
+    return errorResponse(503, 'AUDIT_UNAVAILABLE', 'Subscription plan change intent was not durably confirmed')
+  }
+  return null
+}
+
 async function forward(request: Request, context: RouteContext): Promise<Response> {
   try {
     const params = await context.params
@@ -91,6 +173,30 @@ async function forward(request: Request, context: RouteContext): Promise<Respons
       }
       const body = await readBoundedJson(request)
       if (body instanceof Response) return body
+      if (!body || typeof body !== 'object' || Array.isArray(body) ||
+          Object.keys(body).length !== 1 || !Object.hasOwn(body, 'planId') ||
+          typeof (body as Record<string, unknown>).planId !== 'string' ||
+          !PLAN_ID_PATTERN.test((body as Record<string, unknown>).planId as string)) {
+        return errorResponse(400, 'VALIDATION_FAILED', 'A valid target planId is required')
+      }
+      const idempotencyKey = request.headers.get('Idempotency-Key')
+      if (!idempotencyKey) return errorResponse(428, 'PRECONDITION_REQUIRED', 'Idempotency-Key is required')
+      if (idempotencyKey.length > 256 || idempotencyKey.trim() !== idempotencyKey ||
+          /[\\u0000-\\u001f\\u007f]/.test(idempotencyKey)) {
+        return errorResponse(400, 'VALIDATION_FAILED', 'Idempotency-Key is invalid')
+      }
+      const expectedEtag = request.headers.get('If-Match')
+      if (!expectedEtag) return errorResponse(428, 'PRECONDITION_REQUIRED', 'If-Match is required')
+      if (!/^"lr-v([1-9]\\d*)"$/.test(expectedEtag)) {
+        return errorResponse(412, 'PRECONDITION_FAILED', 'Subscription version does not match')
+      }
+      const denied = await authorizeSubscriptionPlanChange(request, principal.userId, parts[0]!)
+      if (denied) return denied
+      const attemptId = await subscriptionPlanUpgradeAttemptId(principal.userId, idempotencyKey)
+      const auditDenied = await auditSubscriptionPlanUpgradeRequest(
+        request, principal, parts[0]!, (body as { planId: string }).planId, expectedEtag, attemptId,
+      )
+      if (auditDenied) return auditDenied
       return await callW07Subscription({
         request,
         pathname: operation.pathname,
