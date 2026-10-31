@@ -1107,7 +1107,7 @@ describe('read-only D1 subscription migration postflight', () => {
 
   it('fails closed when either integrity query does not return exactly one count', () => {
     expect(() => verifyD1SubscriptionPostflight({
-      ...preflightInput(true, '1', true),
+      ...preflightInput(true, '1', true, true, true, true),
       versionIntegrity: [{ results: [] }],
       planIntegrity: [{ results: [{ invalid_current_plan_versions: 0 }] }],
     })).toThrow('version integrity query did not return exactly one count')
