@@ -231,6 +231,11 @@ describe('W07 internal payment-intent runtime', () => {
         request_hash: upgrade.requestHash,
         status: 'PENDING_PAYMENT',
         payment_id: null,
+        current_plan_id: upgrade.sourcePlanId,
+        current_plan_version: upgrade.sourcePlanVersion,
+        current_subscription_version: upgrade.expectedSubscriptionVersion,
+        subscription_status: 'ACTIVE',
+        subscription_cancel_at: null,
       },
     });
     const response = await handleCommercePaymentIntentRequest(
