@@ -66,7 +66,7 @@ function parsePlanId(input: unknown): string {
 async function trialSubscriptionId(subscriberId: string, key: string): Promise<string> {
   try {
     const digest = await sha256BytesToHex(new TextEncoder().encode(
-      'membership-trial-start-v1\\u0000' + subscriberId + '\\u0000' + key,
+      'membership-trial-start-v1\u0000' + subscriberId + '\u0000' + key,
     ))
     return 'sub_' + digest
   } catch {
