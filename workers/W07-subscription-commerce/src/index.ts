@@ -11,7 +11,8 @@ import { handleCommerceBillingReadRequest } from './billing-read-http-runtime.js
 import { handleHyperswitchWebhookRequest } from './payment-webhook-http-runtime.js'
 import { handleRevenueCatWebhookRequest } from './revenuecat-webhook-http-runtime.js'
 import { handleRevenueCatSubscriberReconciliationRequest } from './revenuecat-subscriber-reconciliation-runtime.js'
-import { getScheduledSubscriptionPlanChange, scheduleSubscriptionPlanChange } from './scheduled-subscription-plan-change.js'\nimport { createSubscriptionUpgradeOrder } from './subscription-upgrade-checkout.js'
+import { getScheduledSubscriptionPlanChange, scheduleSubscriptionPlanChange } from './scheduled-subscription-plan-change.js'
+import { createSubscriptionUpgradeOrder } from './subscription-upgrade-checkout.js'
 
 interface RateLimitBinding { limit(input: { key: string }): Promise<{ success: boolean }> }
 interface Env {
