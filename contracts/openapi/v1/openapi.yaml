@@ -4402,7 +4402,7 @@ paths:
                   maxItems: 20
                   uniqueItems: true
                   items: { type: string, minLength: 1, maxLength: 180 }
-                trialDays: { type: integer, minimum: 0, maximum: 90, default: 0 }
+                trialDays: { type: integer, minimum: 0, maximum: 90, description: 'Optional; omission preserves the current plan version setting.' }
       responses:
         '200':
           description: Updated current plan version or exact successful retry.
