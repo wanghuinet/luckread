@@ -1,0 +1,67 @@
+{
+  "stateMachineId": "membership_subscription_plan_upgrade",
+  "version": "1.0",
+  "authority": "D1-01 membership_subscription_plan_change_applications",
+  "purpose": "Reserve one paid immediate-upgrade checkout for an existing Subscription and apply the higher immutable plan version only after the referenced D1-04 Order and Payment are confirmed through the signed Hyperswitch webhook path.",
+  "states": [
+    {
+      "id": "PENDING_PAYMENT",
+      "terminal": false,
+      "meaning": "D1-04 upgrade Order exists and the exact current Subscription CAS identity is reserved; payment_id is null."
+    },
+    {
+      "id": "READY",
+      "terminal": false,
+      "meaning": "The signed successful Hyperswitch webhook has been verified and the matching D1-04 payment_id is attached; the same-cycle Subscription CAS may be completed or retried."
+    },
+    {
+      "id": "APPLIED",
+      "terminal": true,
+      "meaning": "The existing Subscription now uses the target plan/version and its current paid billing period remains unchanged."
+    }
+  ],
+  "transitions": [
+    {
+      "from": "PENDING_PAYMENT",
+      "to": "READY",
+      "guard": "Verified successful Hyperswitch webhook; D1-04 Payment succeeded; D1-04 Order confirmed; paid amount and currency equal the authoritative order total; exact reservation identity matches; payment_id was previously null.",
+      "effects": [
+        "Attach the exact D1-04 payment_id once",
+        "Increment application version",
+        "Do not change Subscription plan or entitlements yet"
+      ]
+    },
+    {
+      "from": "READY",
+      "to": "APPLIED",
+      "guard": "Subscription remains ACTIVE and uncanceled; source plan/version, subscriber, subscription version and current period exactly match the reserved snapshot; target is the higher immutable same-creator, same-currency and same-interval plan version.",
+      "effects": [
+        "CAS update plan_id and plan_version on the existing Subscription",
+        "Preserve current_period_start and current_period_end",
+        "After-update trigger marks the application APPLIED",
+        "Do not create a second Subscription"
+      ]
+    }
+  ],
+  "invariants": [
+    "At most one PENDING_PAYMENT or READY upgrade reservation exists per Subscription.",
+    "A D1-04 Order without a matching PENDING_PAYMENT D1-01 reservation cannot start a Hyperswitch PaymentIntent.",
+    "No upgrade entitlement becomes effective before a verified successful payment.",
+    "D1-01 stores subscription transition evidence only; Order, Payment, amount and currency remain authoritative in D1-04.",
+    "A READY application may retry the subscription CAS after a transient version race without reattaching or replacing the payment_id.",
+    "APPLIED is terminal and duplicate signed webhook delivery is idempotent."
+  ],
+  "forbiddenTransitions": [
+    "PENDING_PAYMENT -> APPLIED",
+    "READY -> PENDING_PAYMENT",
+    "APPLIED -> any state",
+    "Direct Subscription plan_id/plan_version mutation without a matching READY application or a paid scheduled-period transition"
+  ],
+  "implementationRefs": [
+    "workers/W07-subscription-commerce/src/subscription-upgrade-checkout.ts",
+    "workers/W07-subscription-commerce/src/paid-membership-plan-upgrade-application.ts",
+    "workers/W07-subscription-commerce/src/payment-intent-http-runtime.ts",
+    "workers/W07-subscription-commerce/src/paid-membership-order-fulfillment.ts",
+    "workers/W07-subscription-commerce/migrations/0006_immediate_subscription_upgrades.sql"
+  ]
+}
