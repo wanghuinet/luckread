@@ -15,6 +15,7 @@ import { previewSubscriptionPlanChange } from './subscription-plan-change-previe
 import { createSubscriptionPlanUpgradeCheckout } from './subscription-plan-change-checkout.js'
 import { scheduleSubscriptionPlanDowngrade, scheduleSubscriptionBillingIntervalChange } from './subscription-plan-change-schedule.js'
 import { startSubscriptionTrial } from './subscription-trial-runtime.js'
+import { listOwnedSavedPaymentMethods, revokeOwnedSavedPaymentMethod, PaymentMethodRuntimeError } from './payment-method-runtime.js'
 
 interface RateLimitBinding { limit(input: { key: string }): Promise<{ success: boolean }> }
 interface Env {
@@ -230,6 +231,23 @@ export default {
       requireTransport(request)
       const principal = requirePrincipal(request)
       requireLayer(request)
+      const paymentMethodPath = new URL(request.url).pathname
+      if (request.method === 'GET' && paymentMethodPath === '/payment-methods') {
+        const docs = await listOwnedSavedPaymentMethods(env, principal)
+        return json({ data: { docs }, requestId: crypto.randomUUID() })
+      }
+      const paymentMethodMatch = /^\\/payment-methods\\/(spm_[A-Za-z0-9]{26})$/.exec(paymentMethodPath)
+      if (request.method === 'DELETE' && paymentMethodMatch) {
+        if (request.body !== null) {
+          await request.body.cancel().catch((): void => undefined)
+          throw new PaymentMethodRuntimeError('VALIDATION_FAILED', 400)
+        }
+        const result = await revokeOwnedSavedPaymentMethod(
+          env, principal, paymentMethodMatch[1], request.headers.get('Idempotency-Key'),
+        )
+        return json({ data: result, requestId: crypto.randomUUID() }, result.status === 'REMOVED' ? 200 : 202)
+      }
+
       const paymentIntentResponse = await handleCommercePaymentIntentRequest(request, principal, env)
       if (paymentIntentResponse) return paymentIntentResponse
       const billingReadResponse = await handleCommerceBillingReadRequest(request, principal, env)
@@ -509,6 +527,16 @@ export default {
       const result = await getSubscription(env.D1_01, principal, operation.subscriptionId)
       return json({ data: result, requestId: crypto.randomUUID() }, 200, result.etag)
     } catch (error) {
+      if (error instanceof PaymentMethodRuntimeError) {
+        return new Response(JSON.stringify({
+          error: { code: error.code, message: error.code === 'PRECONDITION_REQUIRED' ? 'precondition required' :
+            error.code === 'RESOURCE_NOT_FOUND' ? 'resource not found' :
+            error.code === 'CONFLICT' || error.code === 'IDEMPOTENCY_KEY_REUSE_CONFLICT' ? 'payment method conflict' :
+            error.code === 'VALIDATION_FAILED' ? 'validation failed' :
+            error.code === 'SERVICE_UNAVAILABLE' ? 'service unavailable' : error.code, details: {} },
+          requestId: crypto.randomUUID(),
+        }), { status: error.status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' } })
+      }
       if (error instanceof SubscriptionRuntimeError) {
         const message = error.code === 'PERMISSION_DENIED' ? 'permission denied' : error.code === 'PRECONDITION_REQUIRED' ? 'precondition required' : error.code === 'PRECONDITION_FAILED' ? 'precondition failed' : error.code === 'RESOURCE_NOT_FOUND' ? 'resource not found' : error.code === 'INVALID_STATE' ? 'invalid subscription state' : error.code === 'PLAN_NOT_ACTIVE' ? 'membership plan is unavailable' : error.code === 'CONFLICT' ? 'subscription conflict' : error.code === 'VALIDATION_FAILED' ? 'validation failed' : error.code === 'RATE_LIMITED' ? 'too many requests' : error.code === 'SERVICE_UNAVAILABLE' ? 'service unavailable' : error.code
         return new Response(JSON.stringify({ error: { code: error.code, message, details: error.code === 'RATE_LIMITED' ? { retryAfter: 60 } : {} }, requestId: crypto.randomUUID() }), { status: error.status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...(error.code === 'RATE_LIMITED' ? { 'retry-after': '60' } : {}) } })
