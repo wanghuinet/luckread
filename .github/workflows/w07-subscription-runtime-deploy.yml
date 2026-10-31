@@ -253,7 +253,7 @@ jobs:
               "domain": "D1-04",
               "databaseUuid": "9bfb89a5-fbb5-45b1-a2ee-eab674b0d736"
             },
-            "migrations": ["0001_membership_subscriptions", "0002_subscription_version_cas", "0003_membership_plans"],
+            "migrations": ["0001_membership_subscriptions", "0002_subscription_version_cas", "0003_membership_plans", "0004_revenuecat_membership_product_bindings", "0005_subscription_plan_changes"],
             "migrationAction": "$MIGRATION_ACTION",
             "remoteMigration": $REMOTE_MIGRATION,
             "confirmation": "DEPLOY_W07_SUBSCRIPTION",
