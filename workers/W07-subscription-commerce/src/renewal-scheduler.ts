@@ -19,6 +19,7 @@ const REQUIRED_D1_01_TABLES = [
   'membership_subscriptions',
   'membership_plans',
   'membership_plan_versions',
+  'membership_subscription_scheduled_plan_changes',
 ] as const;
 
 const REQUIRED_D1_04_TABLES = [
