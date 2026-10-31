@@ -9,6 +9,7 @@ import {
   RevenueCatSubscriberReconciliationError,
 } from './revenuecat-subscriber-reconciliation.js';
 import { RevenueCatSubscriberIdentityError } from './revenuecat-subscriber-identity.js';
+import { syncRevenueCatStoreTrialCandidates } from './membership-trial-runtime.js';
 
 const RECONCILIATION_PATH = '/internal/subscriptions/reconcile-revenuecat';
 const MAX_BODY_BYTES = 2_048;
@@ -189,6 +190,13 @@ export async function handleRevenueCatSubscriberReconciliationRequest(
       dependencies.nowMs ? { nowMs: dependencies.nowMs } : undefined,
     );
 
+    const trialSync = await syncRevenueCatStoreTrialCandidates(
+      env.D1_01,
+      principalId,
+      appId,
+      result.candidates,
+    )
+
     const candidates = result.candidates.map((candidate) => ({
       planId: candidate.planId,
       planVersion: candidate.planVersion,
@@ -201,6 +209,8 @@ export async function handleRevenueCatSubscriberReconciliationRequest(
       purchaseDate: candidate.purchaseDate,
       effectiveExpiresAt: candidate.effectiveExpiresAt,
       gracePeriodExpiresAt: candidate.gracePeriodExpiresAt,
+      periodType: candidate.periodType,
+      originalTransactionId: candidate.originalTransactionId,
     }));
 
     return Response.json(
@@ -208,6 +218,7 @@ export async function handleRevenueCatSubscriberReconciliationRequest(
         data: {
           snapshotRequestDateMs: result.snapshotRequestDateMs,
           customerCreatedOnLookup: result.customerCreatedOnLookup,
+          trialSync,
           candidates,
         },
         requestId: 'req_' + crypto.randomUUID(),
