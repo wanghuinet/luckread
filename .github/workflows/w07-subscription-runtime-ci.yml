@@ -416,6 +416,12 @@ jobs:
 
           db.execute("INSERT INTO membership_plans(plan_id,owner_type,owner_id,current_version,status,visibility,version,created_at,updated_at) VALUES ('plan_trial_probe','CREATOR','creator_trial_probe',1,'ACTIVE','PUBLIC',1,'2026-10-10T00:00:00.000Z','2026-10-10T00:00:00.000Z')")
           db.execute("INSERT INTO membership_plan_versions(plan_id,plan_version,name,tier,billing_interval,price_minor,currency,benefits_json,created_at,trial_days) VALUES ('plan_trial_probe',1,'Trial Plan','basic','MONTHLY',500,'USD','[]','2026-10-10T00:00:00.000Z',14)")
+          db.execute("INSERT INTO membership_plans(plan_id,owner_type,owner_id,current_version,status,visibility,version,created_at,updated_at) VALUES ('plan_trial_zero_price_probe','CREATOR','creator_trial_zero_price_probe',1,'ACTIVE','PUBLIC',1,'2026-10-10T00:00:00.000Z','2026-10-10T00:00:00.000Z')")
+          try:
+            db.execute("INSERT INTO membership_plan_versions(plan_id,plan_version,name,tier,billing_interval,price_minor,currency,benefits_json,created_at,trial_days) VALUES ('plan_trial_zero_price_probe',1,'Invalid Trial','basic','MONTHLY',0,'USD','[]','2026-10-10T00:00:00.000Z',14)")
+            raise SystemExit('zero-price trial plan was admitted')
+          except sqlite3.IntegrityError:
+            pass
           # Every immutable plan-version column, including the newly added trial_days,
           # is covered by the existing unconditional membership_plan_versions update trigger.
           try:
