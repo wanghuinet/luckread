@@ -220,6 +220,19 @@ describe('v1 subscription adapter', () => {
     expect(w08Casl).toContain("grant('subscription.cancel', 'Subscription', selfOwnerCondition(subjectId))")
   })
 
+  it('allows creators to configure immutable trial duration on plan create and revision', () => {
+    expect(openapi).toContain('trialDays: { type: integer, minimum: 0, maximum: 90')
+    expect(creatorMembershipPlans).toContain('trialDays: number')
+    expect(creatorMembershipPlans).toContain('setTrialDays')
+    expect(creatorMembershipPlans).toContain('trialDays,')
+    expect(creatorMembershipPlans).toContain('trialDays: editTrialDays')
+    expect(creatorPlansRoute).toContain('Number.isSafeInteger(plan.trialDays)')
+    expect(updatePlanRoute).toContain("'trialDays'")
+    expect(updatePlanRoute).toContain('fields.trialDays')
+    expect(publishPlanRoute).toContain('trialDays: plan.trialDays')
+    expect(w06Worker).toContain('trialDays: input.trialDays')
+  })
+
   it('shows trial provenance in the subscription page and only offers WEB trial cancellation', () => {
     expect(mySubscriptionsPage).toContain("'PENDING' | 'TRIALING' | 'ACTIVE'")
     expect(mySubscriptionsPage).toContain("item.trial.source === 'WEB'")
