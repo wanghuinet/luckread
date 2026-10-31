@@ -393,6 +393,7 @@ type SubscriptionTrialAuditInput = {
   trialId?: string
   planVersion?: number
   trialEndsAt?: string
+  previousStatus?: 'TRIALING' | 'PAYMENT_FAILED'
   occurredAt?: string
   idempotencyKey?: string
 }
@@ -709,7 +710,7 @@ function parseSubscriptionTrialAuditInput(value: unknown): SubscriptionTrialAudi
     }
     return body as SubscriptionTrialAuditInput
   }
-  const allowed = new Set([...common, 'subscriptionId', 'trialId', 'planVersion', 'trialEndsAt', 'occurredAt'])
+  const allowed = new Set([...common, 'subscriptionId', 'trialId', 'planVersion', 'trialEndsAt', 'previousStatus', 'occurredAt'])
   if (Object.keys(body).some((key) => !allowed.has(key)) || Object.keys(body).length !== allowed.size ||
       typeof body.subscriptionId !== 'string' || !resourceIdPattern.test(body.subscriptionId) ||
       typeof body.trialId !== 'string' || !/^mtr_[A-Za-z0-9]{26}$/.test(body.trialId) ||
@@ -717,6 +718,8 @@ function parseSubscriptionTrialAuditInput(value: unknown): SubscriptionTrialAudi
       typeof body.trialEndsAt !== 'string' || !body.trialEndsAt ||
       Number.isNaN(Date.parse(body.trialEndsAt)) ||
       typeof body.occurredAt !== 'string' || !body.occurredAt || Number.isNaN(Date.parse(body.occurredAt)) ||
+      (phase === 'CANCELED' && body.previousStatus !== 'TRIALING' && body.previousStatus !== 'PAYMENT_FAILED') ||
+      (phase === 'STARTED' && body.previousStatus !== undefined) ||
       body.eventId !== 'evt_subscription_trial_' + (phase === 'STARTED' ? 'started_' : 'canceled_') + body.trialId) {
     throw new Error('INVALID_SUBSCRIPTION_TRIAL_AUDIT')
   }
@@ -1213,7 +1216,7 @@ export default {
             : 'membership.subscription.trial_canceled',
         targetType: requested ? 'MembershipPlan' : 'Subscription',
         targetId: requested ? input.planId : input.subscriptionId!,
-        before: requested ? { status: 'NOT_STARTED' } : { status: input.phase === 'STARTED' ? 'NOT_STARTED' : 'TRIALING' },
+        before: requested ? { status: 'NOT_STARTED' } : { status: input.phase === 'STARTED' ? 'NOT_STARTED' : input.previousStatus },
         after: requested
           ? { planId: input.planId, idempotencyKey: input.idempotencyKey }
           : {
