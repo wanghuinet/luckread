@@ -122,7 +122,7 @@ const EXPECTED_PLAN_UPGRADE_COLUMNS = [
   ['current_period_start', 'TEXT', 1, 0],
   ['current_period_end', 'TEXT', 1, 0],
   ['order_id', 'TEXT', 1, 0],
-  ['payment_id', 'TEXT', 1, 0],
+  ['payment_id', 'TEXT', 0, 0],
   ['request_hash', 'TEXT', 1, 0],
   ['status', 'TEXT', 1, 0],
   ['version', 'INTEGER', 1, 0],
@@ -140,6 +140,7 @@ const EXPECTED_PLAN_UPGRADE_INDEXES = [
 const EXPECTED_PLAN_UPGRADE_TRIGGERS = [
   'membership_subscription_plan_change_applications_insert_guard',
   'membership_subscription_plan_change_applications_identity_immutable',
+  'membership_subscription_plan_change_applications_payment_attach_guard',
   'membership_subscription_plan_change_applications_version_guard',
   'membership_subscription_plan_change_applications_state_guard',
   'membership_subscription_plan_change_applications_applied_guard',
