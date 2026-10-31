@@ -237,6 +237,51 @@
       "adminExposure": "SCOPED",
       "eventExposure": "SCOPED",
       "status": "CONTRACTED_NOT_VERIFIED"
+    },
+    {
+      "fieldId": "ENT-SUBSCRIPTION-F-TRIAL-STARTED-AT",
+      "name": "trialStartedAt",
+      "type": "datetime",
+      "nullable": true,
+      "required": false,
+      "unique": false,
+      "indexed": true,
+      "lifecycle": "immutable",
+      "classification": "LIFECYCLE_METADATA",
+      "apiExposure": "SCOPED",
+      "adminExposure": "SCOPED",
+      "eventExposure": "SCOPED",
+      "status": "CONTRACTED_NOT_VERIFIED"
+    },
+    {
+      "fieldId": "ENT-SUBSCRIPTION-F-TRIAL-ENDS-AT",
+      "name": "trialEndsAt",
+      "type": "datetime",
+      "nullable": true,
+      "required": false,
+      "unique": false,
+      "indexed": true,
+      "lifecycle": "immutable",
+      "classification": "LIFECYCLE_METADATA",
+      "apiExposure": "SCOPED",
+      "adminExposure": "SCOPED",
+      "eventExposure": "SCOPED",
+      "status": "CONTRACTED_NOT_VERIFIED"
+    },
+    {
+      "fieldId": "ENT-SUBSCRIPTION-F-TRIAL-CONVERTED-AT",
+      "name": "trialConvertedAt",
+      "type": "datetime",
+      "nullable": true,
+      "required": false,
+      "unique": false,
+      "indexed": false,
+      "lifecycle": "mutable_with_transition",
+      "classification": "LIFECYCLE_METADATA",
+      "apiExposure": "SCOPED",
+      "adminExposure": "SCOPED",
+      "eventExposure": "SCOPED",
+      "status": "CONTRACTED_NOT_VERIFIED"
     }
   ],
   "invariants": [
@@ -250,7 +295,10 @@
     "Entitlement is derived from valid subscription state but remains the authoritative access decision state in D1-01.",
     "Subscriber privacy is default-deny outside authorized scopes.",
     "Duplicate create/cancel/pause/resume/change-plan commands must converge idempotently under the Membership API contract.",
-    "No field in this entity grants financial, social-graph or content authority."
+    "No field in this entity grants financial, social-graph or content authority.",
+    "TRIALING grants a creator membership only while current_period_end is in the future; current_period_end equals trial_ends_at until a paid renewal succeeds.",
+    "trial_started_at is immutable and the partial unique subscriber_id + creator_id trial index prevents a second lifetime trial for the same creator.",
+    "trial_converted_at is set exactly once, only after D1-04 signed renewal success is synchronized through the D1-01 subscription version CAS; no order, payment or provider facts are stored in D1-01."
   ],
   "stateMachineReconciliation": {
     "ref": "contracts/state-machines/subscription.json",
