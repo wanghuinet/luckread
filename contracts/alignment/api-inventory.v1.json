@@ -2822,6 +2822,48 @@
         "contracts/openapi/v1/openapi.yaml",
         "contracts/api/api-inventory.v1.json"
       ]
+    },
+    {
+      "operationId": "startMembershipTrial",
+      "method": "POST",
+      "path": "/v1/memberships/subscriptions/trial",
+      "openapiPath": "/memberships/subscriptions/trial",
+      "domain": "subscription_entitlement_payment",
+      "status": "IMPLEMENTED",
+      "featureIds": [
+        "MON-003",
+        "MON-005"
+      ],
+      "schemaRef": "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json#membershipSubscriptionTrialTable",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/memberships/subscriptions/trial",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json",
+        "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json",
+        "contracts/state-machines/membership-subscription-trial.json",
+        "contracts/openapi/v1/operation-policy.json"
+      ]
+    },
+    {
+      "operationId": "cancelMembershipTrial",
+      "method": "POST",
+      "path": "/v1/memberships/subscriptions/{subscriptionId}/cancel-trial",
+      "openapiPath": "/memberships/subscriptions/{subscriptionId}/cancel-trial",
+      "domain": "subscription_entitlement_payment",
+      "status": "IMPLEMENTED",
+      "featureIds": [
+        "MON-003",
+        "MON-005"
+      ],
+      "schemaRef": "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json#membershipSubscriptionTrialTable",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/memberships/subscriptions/{subscriptionId}/cancel-trial",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json",
+        "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json",
+        "contracts/state-machines/membership-subscription-trial.json",
+        "contracts/openapi/v1/operation-policy.json"
+      ]
     }
   ]
 }
