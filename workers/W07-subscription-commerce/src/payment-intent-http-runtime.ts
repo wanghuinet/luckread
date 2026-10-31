@@ -174,10 +174,14 @@ async function verifyUpgradeCheckoutReservation(
 
   try {
     const reservation = await env.D1_01.prepare(
-      "SELECT subscription_id, subscriber_id, source_plan_id, source_plan_version, target_plan_id, " +
-      "target_plan_version, expected_subscription_version, current_period_start, current_period_end, " +
-      "order_id, request_hash, status, payment_id FROM membership_subscription_plan_change_applications " +
-      "WHERE order_id = ? AND subscriber_id = ? AND status = 'PENDING_PAYMENT' AND payment_id IS NULL LIMIT 1",
+      "SELECT a.subscription_id, a.subscriber_id, a.source_plan_id, a.source_plan_version, a.target_plan_id, " +
+      "a.target_plan_version, a.expected_subscription_version, a.current_period_start, a.current_period_end, " +
+      "a.order_id, a.request_hash, a.status, a.payment_id, s.plan_id AS current_plan_id, " +
+      "s.plan_version AS current_plan_version, s.version AS current_subscription_version, " +
+      "s.status AS subscription_status, s.cancel_at AS subscription_cancel_at " +
+      "FROM membership_subscription_plan_change_applications a " +
+      "INNER JOIN membership_subscriptions s ON s.subscription_id = a.subscription_id AND s.subscriber_id = a.subscriber_id " +
+      "WHERE a.order_id = ? AND a.subscriber_id = ? AND a.status = 'PENDING_PAYMENT' AND a.payment_id IS NULL LIMIT 1",
     ).bind(orderId, customerId).first<{
       subscription_id: string;
       subscriber_id: string;
@@ -192,6 +196,11 @@ async function verifyUpgradeCheckoutReservation(
       request_hash: string;
       status: string;
       payment_id: string | null;
+      current_plan_id: string;
+      current_plan_version: number;
+      current_subscription_version: number;
+      subscription_status: string;
+      subscription_cancel_at: string | null;
     }>();
     if (!reservation ||
         reservation.subscription_id !== upgrade.subscriptionId ||
@@ -206,7 +215,12 @@ async function verifyUpgradeCheckoutReservation(
         reservation.order_id !== orderId ||
         reservation.request_hash !== upgrade.requestHash ||
         reservation.status !== 'PENDING_PAYMENT' ||
-        reservation.payment_id !== null) {
+        reservation.payment_id !== null ||
+        reservation.current_plan_id !== reservation.source_plan_id ||
+        reservation.current_plan_version !== reservation.source_plan_version ||
+        reservation.current_subscription_version !== reservation.expected_subscription_version ||
+        reservation.subscription_status !== 'ACTIVE' ||
+        reservation.subscription_cancel_at !== null) {
       return errorResponse(409, 'UPGRADE_RESERVATION_REQUIRED', 'Upgrade Order is not reserved for payment');
     }
     return null;
