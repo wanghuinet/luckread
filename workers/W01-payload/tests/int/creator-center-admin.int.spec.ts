@@ -1067,7 +1067,7 @@ describe('Creator Center admin extension', () => {
     expect(page).not.toContain("transition(item, 'cancel')")
     expect(page).not.toContain("transition(item, 'pause')")
     expect(page).not.toContain("transition(item, 'resume')")
-    expect(subscriptionsApi).toContain('Subscription writes are disabled until a verified payment-provider synchronization flow is available.')
+    expect(subscriptionsApi).toContain('Subscription writes are disabled until a verified subscription mutation flow is available.')
     expect(subscriptionsApi).toContain("if (request.method === 'POST')")
     expect(page).toContain("if (response.status === 401)")
     expect(page).toContain("window.location.assign('/login?returnTo=' + encodeURIComponent(returnTo))")

@@ -181,9 +181,10 @@
   "migration": {
     "status": "PREPARED_NOT_APPLIED",
     "candidateMigration": "workers/W07-subscription-commerce/migrations/0002_subscription_version_cas.sql",
-    "rule": "The version-column migration is prepared as a reviewed code candidate only. A physical migration still requires exact artifact hash, read-only confirmation of the target and migration history, controlled target D1-01 execution and post-schema evidence. The paid upgrade attempt reservation is an auxiliary D1-01 workflow table with no financial fields; it remains PREPARED_NOT_APPLIED until exact target migration evidence is recorded.",
+    "rule": "The version-column migration is prepared as a reviewed code candidate only. A physical migration still requires exact artifact hash, read-only confirmation of the target and migration history, controlled target D1-01 execution and post-schema evidence. The paid upgrade attempt reservation is an auxiliary D1-01 workflow table with no financial fields; it remains PREPARED_NOT_APPLIED until exact target migration evidence is recorded. Scheduled downgrade requests add only future-dated lifecycle metadata to D1-01; the physical migration remains source-only until controlled target, migration-history and postflight evidence is admitted.",
     "additionalMigrations": [
-      "workers/W07-subscription-commerce/migrations/0005_membership_subscription_plan_change_attempts.sql"
+      "workers/W07-subscription-commerce/migrations/0005_membership_subscription_plan_change_attempts.sql",
+      "workers/W07-subscription-commerce/migrations/0006_membership_subscription_scheduled_plan_changes.sql"
     ]
   },
   "runtime": {
@@ -216,7 +217,12 @@
     "schema inspection proving membership_subscription_plan_change_attempts columns, CHECK constraints and four indexes",
     "idempotency replay and one-pending-attempt-per-subscription constraint evidence",
     "signed payment-success upgrade CAS and W06 applied-audit retry evidence",
-    "failed or late payment expiry and reconciliation-required no-entitlement-grant evidence"
+    "failed or late payment expiry and reconciliation-required no-entitlement-grant evidence",
+    "schema inspection proving membership_subscription_scheduled_plan_changes columns, CHECK constraints and three indexes",
+    "schedule request owner, If-Match, idempotency replay and one-pending-change-per-subscription evidence",
+    "renewal cycle snapshot uses scheduled immutable target plan version without changing current subscription entitlement",
+    "failed renewal leaves scheduled downgrade unapplied",
+    "signed successful renewal CAS applies target plan and W06 D1-03 audit before marking D1-04 cycle synchronization complete"
   ],
   "promotionRule": "Remain CONTRACTED_NOT_VERIFIED until the physical binding, migration, runtime authority and Evidence Registry evidence are all admitted.",
   "additionalTables": [
@@ -374,6 +380,141 @@
         "order_id is only an opaque reference to D1-04 and does not make D1-01 a financial authority.",
         "No monetary amount, currency, tax, discount, provider ID, payment status, refund or card data is stored in this table.",
         "A paid upgrade applies only after its D1-03 W06 audit event is durably confirmed; otherwise webhook acknowledgement remains retryable."
+      ]
+    },
+    {
+      "name": "membership_subscription_scheduled_plan_changes",
+      "status": "CONTRACTED_NOT_VERIFIED",
+      "purpose": "A subscriber-owned future-dated downgrade request. The current Subscription plan and entitlement remain unchanged until the existing renewal payment succeeds and its D1-04 outcome is synchronized.",
+      "primaryKey": "change_id",
+      "columns": [
+        {
+          "name": "change_id",
+          "type": "TEXT",
+          "nullable": false,
+          "primaryKey": true
+        },
+        {
+          "name": "subscriber_id",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "name": "subscription_id",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "name": "expected_subscription_version",
+          "type": "INTEGER",
+          "nullable": false
+        },
+        {
+          "name": "expected_plan_id",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "name": "expected_plan_version",
+          "type": "INTEGER",
+          "nullable": false
+        },
+        {
+          "name": "target_plan_id",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "name": "target_plan_version",
+          "type": "INTEGER",
+          "nullable": false
+        },
+        {
+          "name": "effective_at",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "name": "idempotency_key_hash",
+          "type": "TEXT",
+          "nullable": false,
+          "classification": "HASHED_IDEMPOTENCY_IDENTITY"
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "nullable": false,
+          "allowed": [
+            "SCHEDULED",
+            "APPLIED",
+            "CANCELLED",
+            "RECONCILIATION_REQUIRED"
+          ]
+        },
+        {
+          "name": "applied_at",
+          "type": "TEXT",
+          "nullable": true
+        },
+        {
+          "name": "applied_subscription_version",
+          "type": "INTEGER",
+          "nullable": true
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "name": "updated_at",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "name": "version",
+          "type": "INTEGER",
+          "nullable": false
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ux_membership_scheduled_plan_changes_idempotency",
+          "unique": true,
+          "columns": [
+            "subscriber_id",
+            "idempotency_key_hash"
+          ]
+        },
+        {
+          "name": "ux_membership_scheduled_plan_changes_pending_subscription",
+          "unique": true,
+          "partial": true,
+          "where": "status = 'SCHEDULED'",
+          "columns": [
+            "subscription_id"
+          ]
+        },
+        {
+          "name": "ix_membership_scheduled_plan_changes_effective",
+          "unique": false,
+          "columns": [
+            "status",
+            "effective_at",
+            "subscription_id"
+          ]
+        }
+      ],
+      "invariants": [
+        "change_id is deterministically derived from subscriber-scoped Idempotency-Key using SHA-256; raw idempotency keys are never stored.",
+        "Only an authenticated subscriber may schedule a downgrade for their own ACTIVE, non-cancelled subscription using If-Match.",
+        "The target plan must belong to the same creator, use the same currency and billing interval, and have a lower immutable plan-version price than the current plan.",
+        "The scheduled change takes effect exactly at the current_period_end boundary; the live membership_subscriptions plan_id, plan_version and entitlement reference are not changed when the request is accepted.",
+        "No Order, PaymentIntent, charge, monetary amount, tax, discount, ledger or provider fact is created or persisted in D1-01 by scheduling a downgrade.",
+        "At most one SCHEDULED downgrade may exist per subscription; the same subscriber and key replays the same change.",
+        "The existing W07 renewal pipeline uses the scheduled target plan version for the next cycle but does not apply it to the Subscription until D1-04 records a signed successful renewal payment.",
+        "D1-01 atomically applies the target plan identity and marks the schedule APPLIED by subscription version CAS; W06 D1-03 audit confirmation is required before D1-04 renewal sync is acknowledged as complete.",
+        "A failed or unpaid renewal does not apply the downgrade; it retains the scheduled target for a verified retry and otherwise remains reconciliation-owned."
       ]
     }
   ]

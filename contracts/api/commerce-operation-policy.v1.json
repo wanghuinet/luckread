@@ -4,24 +4,26 @@
   "source": "LuckRead W07 commerce customer billing and refund contracts",
   "operations": [
     {
-      "operationId": "postPaymentsRefunds",
+      "operationId": "checkoutSubscriptionPlanUpgrade",
       "method": "POST",
-      "path": "/payments/refunds",
+      "path": "/memberships/subscriptions/{subscriptionId}/change-plan/checkout",
       "visibility": "public_authenticated",
-      "capability": "customer_payment_refund",
+      "capability": "subscription_plan_upgrade_checkout",
       "status": "CONTRACTED_PARTIAL",
       "authorization": {
         "required": true,
-        "permission": "payment.refund",
+        "permission": "subscription.change_plan",
         "scope": "self"
       },
       "resource": {
-        "class": "PROVIDER_BACKED_SINGLE_WRITE",
-        "d1ReadMax": 4,
-        "d1WriteMax": 2,
-        "d1ReadRowsMax": 4,
-        "d1WriteRowsMax": 2,
-        "rpcMax": 2
+        "class": "BOUNDED_COMPOSITION",
+        "d1ReadMax": 6,
+        "d1WriteMax": 4,
+        "d1ReadRowsMax": 16,
+        "d1WriteRowsMax": 12,
+        "rpcMax": 3,
+        "requestBodyBytesMax": 16384,
+        "responseBytesMax": 65536
       },
       "cache": {
         "mode": "NO_STORE",
@@ -31,7 +33,7 @@
       "retry": {
         "maxAttempts": 1,
         "clientRetrySafe": true,
-        "requiresOptimisticConcurrency": false
+        "requiresOptimisticConcurrency": true
       },
       "event": {
         "syncConsumersMax": 0,
@@ -45,7 +47,7 @@
         "required": true,
         "scopes": [
           "account",
-          "payment",
+          "subscription",
           "endpoint",
           "global"
         ],
@@ -58,20 +60,100 @@
       "idempotency": {
         "required": true,
         "key": "Idempotency-Key",
-        "semantic": "same customer and semantic refund request reuses the same stable Hyperswitch refund_id; mismatched key reuse conflicts"
+        "semantic": "One stable subscriber-scoped attempt and D1-04 order per idempotency key; replay returns the same order. Concurrent unpaid upgrades on one subscription conflict."
       },
       "security": [
-        "own_payment_only",
-        "provider_captured_amount_is_authoritative",
-        "no_client_supplied_merchant_or_captured_amount",
-        "signed_webhook_only_finalizes_refund",
-        "no_entitlement_mutation"
+        "subscriber_identity_from_W02_session_only",
+        "W08_subscription_change_plan_own_scope_permission",
+        "subscription_owner_and_current_version_checked_by_W07",
+        "If-Match_required_for_subscription_compare_and_set",
+        "client_supplies_plan_id_only",
+        "server_resolves_immutable_target_plan_version",
+        "no_subscription_or_entitlement_change_before_signed_payment_success",
+        "Hyperswitch_signed_success_only_applies_upgrade",
+        "D1_01_stores_only_attempt_and_opaque_D1_04_order_reference",
+        "D1_04_remains_authority_for_order_payment_and_amount",
+        "W06_D1_03_audits_request_and_applied_result",
+        "production_checkout_fails_closed_without_admitted_tax_pricing",
+        "W01_authorizes_with_W08_audits_request_with_W06_and_forwards_to_W07",
+        "pending_scheduled_downgrade_or_reconciliation_blocks_upgrade_checkout"
       ],
       "evidence": {
         "openapi": "PASS",
         "inventory": "PASS",
         "permission": "PASS",
         "state": "PASS",
+        "resource": "PASS",
+        "cache": "PASS",
+        "antiAbuse": "PASS",
+        "integration": "MISSING",
+        "securityE2E": "MISSING"
+      }
+    },
+    {
+      "operationId": "getBillingDocuments",
+      "method": "GET",
+      "path": "/billing/documents",
+      "visibility": "public_authenticated",
+      "capability": "customer_billing_document_read",
+      "status": "CONTRACTED_PARTIAL",
+      "authorization": {
+        "required": true,
+        "permission": "payment.read",
+        "scope": "self"
+      },
+      "resource": {
+        "class": "BOUNDED_KEYSET_READ",
+        "d1ReadMax": 1,
+        "d1WriteMax": 0,
+        "d1ReadRowsMax": 51,
+        "d1WriteRowsMax": 0,
+        "rpcMax": 0
+      },
+      "cache": {
+        "mode": "PRIVATE_NO_STORE",
+        "shared": false,
+        "authorizationBoundary": true
+      },
+      "retry": {
+        "maxAttempts": 1,
+        "clientRetrySafe": true
+      },
+      "event": {
+        "syncConsumersMax": 0,
+        "asyncEventsMax": 0,
+        "fanoutMax": 0
+      },
+      "queue": {
+        "enqueueMax": 0
+      },
+      "antiAbuse": {
+        "required": true,
+        "scopes": [
+          "account",
+          "endpoint",
+          "global"
+        ],
+        "actions": [
+          "ALLOW",
+          "THROTTLE",
+          "BLOCK"
+        ]
+      },
+      "idempotency": {
+        "required": false
+      },
+      "security": [
+        "customer_id_from_session_only",
+        "issued_document_snapshots_immutable",
+        "no_card_or_provider_secret",
+        "bounded_keyset_pagination"
+      ],
+      "evidence": {
+        "openapi": "PASS",
+        "inventory": "PASS",
+        "permission": "PASS",
+        "state": "N/A",
         "resource": "PASS",
         "cache": "PASS",
         "antiAbuse": "PASS",
@@ -220,33 +302,34 @@
       }
     },
     {
-      "operationId": "getBillingDocuments",
-      "method": "GET",
-      "path": "/billing/documents",
+      "operationId": "postPaymentsRefunds",
+      "method": "POST",
+      "path": "/payments/refunds",
       "visibility": "public_authenticated",
-      "capability": "customer_billing_document_read",
+      "capability": "customer_payment_refund",
       "status": "CONTRACTED_PARTIAL",
       "authorization": {
         "required": true,
-        "permission": "payment.read",
+        "permission": "payment.refund",
         "scope": "self"
       },
       "resource": {
-        "class": "BOUNDED_KEYSET_READ",
-        "d1ReadMax": 1,
-        "d1WriteMax": 0,
-        "d1ReadRowsMax": 51,
-        "d1WriteRowsMax": 0,
-        "rpcMax": 0
+        "class": "PROVIDER_BACKED_SINGLE_WRITE",
+        "d1ReadMax": 4,
+        "d1WriteMax": 2,
+        "d1ReadRowsMax": 4,
+        "d1WriteRowsMax": 2,
+        "rpcMax": 2
       },
       "cache": {
-        "mode": "PRIVATE_NO_STORE",
+        "mode": "NO_STORE",
         "shared": false,
         "authorizationBoundary": true
       },
       "retry": {
         "maxAttempts": 1,
-        "clientRetrySafe": true
+        "clientRetrySafe": true,
+        "requiresOptimisticConcurrency": false
       },
       "event": {
         "syncConsumersMax": 0,
@@ -260,6 +343,7 @@
         "required": true,
         "scopes": [
           "account",
+          "payment",
           "endpoint",
           "global"
         ],
@@ -270,19 +354,22 @@
         ]
       },
       "idempotency": {
-        "required": false
+        "required": true,
+        "key": "Idempotency-Key",
+        "semantic": "same customer and semantic refund request reuses the same stable Hyperswitch refund_id; mismatched key reuse conflicts"
       },
       "security": [
-        "customer_id_from_session_only",
-        "issued_document_snapshots_immutable",
-        "no_card_or_provider_secret",
-        "bounded_keyset_pagination"
+        "own_payment_only",
+        "provider_captured_amount_is_authoritative",
+        "no_client_supplied_merchant_or_captured_amount",
+        "signed_webhook_only_finalizes_refund",
+        "no_entitlement_mutation"
       ],
       "evidence": {
         "openapi": "PASS",
         "inventory": "PASS",
         "permission": "PASS",
-        "state": "N/A",
+        "state": "PASS",
         "resource": "PASS",
         "cache": "PASS",
         "antiAbuse": "PASS",
@@ -291,11 +378,11 @@
       }
     },
     {
-      "operationId": "checkoutSubscriptionPlanUpgrade",
+      "operationId": "scheduleSubscriptionPlanDowngrade",
       "method": "POST",
-      "path": "/memberships/subscriptions/{subscriptionId}/change-plan/checkout",
+      "path": "/memberships/subscriptions/{subscriptionId}/change-plan/schedule",
       "visibility": "public_authenticated",
-      "capability": "subscription_plan_upgrade_checkout",
+      "capability": "subscription_plan_downgrade_schedule",
       "status": "CONTRACTED_PARTIAL",
       "authorization": {
         "required": true,
@@ -304,13 +391,13 @@
       },
       "resource": {
         "class": "BOUNDED_COMPOSITION",
-        "d1ReadMax": 6,
-        "d1WriteMax": 4,
-        "d1ReadRowsMax": 16,
-        "d1WriteRowsMax": 12,
+        "d1ReadMax": 3,
+        "d1WriteMax": 1,
+        "d1ReadRowsMax": 4,
+        "d1WriteRowsMax": 1,
         "rpcMax": 3,
         "requestBodyBytesMax": 16384,
-        "responseBytesMax": 65536
+        "responseBytesMax": 32768
       },
       "cache": {
         "mode": "NO_STORE",
@@ -347,22 +434,24 @@
       "idempotency": {
         "required": true,
         "key": "Idempotency-Key",
-        "semantic": "One stable subscriber-scoped attempt and D1-04 order per idempotency key; replay returns the same order. Concurrent unpaid upgrades on one subscription conflict."
+        "semantic": "One subscriber-scoped scheduled downgrade per current subscription period and key. A second distinct pending downgrade on the same subscription conflicts."
       },
       "security": [
         "subscriber_identity_from_W02_session_only",
         "W08_subscription_change_plan_own_scope_permission",
-        "subscription_owner_and_current_version_checked_by_W07",
-        "If-Match_required_for_subscription_compare_and_set",
-        "client_supplies_plan_id_only",
-        "server_resolves_immutable_target_plan_version",
-        "no_subscription_or_entitlement_change_before_signed_payment_success",
-        "Hyperswitch_signed_success_only_applies_upgrade",
-        "D1_01_stores_only_attempt_and_opaque_D1_04_order_reference",
-        "D1_04_remains_authority_for_order_payment_and_amount",
-        "W06_D1_03_audits_request_and_applied_result",
-        "production_checkout_fails_closed_without_admitted_tax_pricing",
-        "W01_authorizes_with_W08_audits_request_with_W06_and_forwards_to_W07"
+        "If-Match_required_and_subscription_version_CAS",
+        "same_creator_same_currency_and_same_billing_interval_only",
+        "target_plan_price_must_be_lower_than_current_plan_price",
+        "no_immediate_order_payment_or_entitlement_mutation",
+        "current_plan_remains_effective_through_current_period_end",
+        "existing_renewal_uses_immutable_scheduled_target_plan_version",
+        "signed_successful_renewal_only_applies_scheduled_downgrade",
+        "failed_or_unpaid_renewal_does_not_apply_target_plan",
+        "D1_01_stores_schedule_metadata_only_D1_04_remains_financial_authority",
+        "W06_D1_03_audits_request_and_applied_transition",
+        "renewal_execution_activation_gate_remains_unchanged",
+        "pending_upgrade_or_reconciliation_blocks_downgrade_schedule",
+        "target_plan_price_must_remain_positive_until_no_payment_activation_is_admitted"
       ],
       "evidence": {
         "openapi": "PASS",

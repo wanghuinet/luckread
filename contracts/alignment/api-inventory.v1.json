@@ -2692,6 +2692,22 @@
       ]
     },
     {
+      "operationId": "scheduleSubscriptionPlanDowngrade",
+      "method": "POST",
+      "path": "/v1/memberships/subscriptions/{subscriptionId}/change-plan/schedule",
+      "openapiPath": "/memberships/subscriptions/{subscriptionId}/change-plan/schedule",
+      "domain": "subscription_entitlement_payment",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/memberships/subscriptions/{subscriptionId}/change-plan/schedule",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json",
+        "contracts/api/commerce-operation-policy.v1.json"
+      ]
+    },
+    {
       "operationId": "searchContent",
       "method": "GET",
       "path": "/v1/search",
