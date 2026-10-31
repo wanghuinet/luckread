@@ -916,6 +916,8 @@ describe('subscription runtime', () => {
     expect(workflow).toContain('Read-only D1-01 migration and schema preflight')
     expect(workflow).toContain("0003_membership_plans.sql")
     expect(workflow).toContain("0005_subscription_plan_changes.sql")
+    expect(workflow).toContain("0006_immediate_subscription_upgrades.sql")
+    expect(workflow).toContain('PRAGMA table_info("membership_subscription_plan_change_applications")')
     expect(workflow).toContain('PRAGMA table_info("membership_subscription_plan_changes")')
     expect(workflow).toContain('ix_membership_subscription_plan_changes_effective')
     expect(workflow).toContain('PRAGMA table_info("membership_subscriptions")')
@@ -1020,8 +1022,19 @@ const planChangeTriggerNames = [
   'membership_subscription_plan_changes_retained',
   'membership_subscriptions_plan_change_requires_scheduled_record',
 ]
+const planUpgradeColumnRows = [
+  ['application_id','TEXT',1,1], ['subscription_id','TEXT',1,0], ['subscriber_id','TEXT',1,0],
+  ['source_plan_id','TEXT',1,0], ['source_plan_version','INTEGER',1,0],
+  ['target_plan_id','TEXT',1,0], ['target_plan_version','INTEGER',1,0],
+  ['expected_subscription_version','INTEGER',1,0], ['current_period_start','TEXT',1,0],
+  ['current_period_end','TEXT',1,0], ['order_id','TEXT',1,0], ['payment_id','TEXT',1,0],
+  ['amount_minor','INTEGER',1,0], ['currency','TEXT',1,0], ['request_hash','TEXT',1,0],
+  ['status','TEXT',1,0], ['version','INTEGER',1,0], ['created_at','TEXT',1,0], ['updated_at','TEXT',1,0],
+]
+const planUpgradeIndexNames = ['ux_membership_plan_change_applications_order','ux_membership_plan_change_applications_payment','ux_membership_plan_change_applications_ready_subscription','ix_membership_plan_change_applications_subscriber_created']
+const planUpgradeTriggerNames = ['membership_subscription_plan_change_applications_insert_guard','membership_subscription_plan_change_applications_identity_immutable','membership_subscription_plan_change_applications_version_guard','membership_subscription_plan_change_applications_state_guard','membership_subscription_plan_change_applications_applied_guard','membership_subscription_plan_change_applications_mark_applied','membership_subscription_plan_change_applications_retained']
 const nameRows = (names) => [{ results: names.map((name,seq) => ({ name,seq })) }]
-const preflightInput = (withVersion = false, versionDefault = '1', withPlans = false, withPlanChanges = withPlans, withRevenueCat = withPlans) => ({
+const preflightInput = (withVersion = false, versionDefault = '1', withPlans = false, withPlanChanges = withPlans, withRevenueCat = withPlans, withPlanUpgrades = false) => ({
   databaseList: preflightDatabaseList,
   migrationState: [{ results: [
     { name: '0001_membership_subscriptions.sql' },
@@ -1029,6 +1042,7 @@ const preflightInput = (withVersion = false, versionDefault = '1', withPlans = f
     ...(withPlans ? [{ name: '0003_membership_plans.sql' }] : []),
     ...(withRevenueCat ? [{ name: '0004_revenuecat_membership_product_bindings.sql' }] : []),
     ...(withPlanChanges ? [{ name: '0005_subscription_plan_changes.sql' }] : []),
+    ...(withPlanUpgrades ? [{ name: '0006_immediate_subscription_upgrades.sql' }] : []),
   ] }],
   subscriptionSchema: preflightSchema(withVersion,versionDefault),
   subscriptionIndexes: preflightIndexes,
@@ -1041,12 +1055,15 @@ const preflightInput = (withVersion = false, versionDefault = '1', withPlans = f
   planChangeSchema: withPlanChanges ? schemaRows(planChangeColumnRows) : [{ results: [] }],
   planChangeIndexes: withPlanChanges ? nameRows(planChangeIndexNames) : [{ results: [] }],
   planChangeTriggers: withPlanChanges ? nameRows(planChangeTriggerNames) : [{ results: [] }],
+  planUpgradeSchema: withPlanUpgrades ? schemaRows(planUpgradeColumnRows) : [{ results: [] }],
+  planUpgradeIndexes: withPlanUpgrades ? nameRows(planUpgradeIndexNames) : [{ results: [] }],
+  planUpgradeTriggers: withPlanUpgrades ? nameRows(planUpgradeTriggerNames) : [{ results: [] }],
 })
 
 describe('read-only D1 subscription migration postflight', () => {
-  it('passes only when migrations 0001, 0002, 0003, 0005, exact schemas, indexes, triggers and integrity checks are verified', () => {
+  it('passes only when migrations 0001 through 0006, exact schemas, indexes, triggers and integrity checks are verified', () => {
     const result = verifyD1SubscriptionPostflight({
-      ...preflightInput(true, '1', true),
+      ...preflightInput(true, '1', true, true, true, true),
       versionIntegrity: [{ results: [{ invalid_versions: 0 }] }],
       planIntegrity: [{ results: [{ invalid_current_plan_versions: 0 }] }],
     })
@@ -1084,7 +1101,7 @@ describe('read-only D1 subscription migration postflight', () => {
       ...preflightInput(true, '1', false),
       versionIntegrity: [{ results: [{ invalid_versions: 0 }] }],
       planIntegrity: [{ results: [{ invalid_current_plan_versions: 0 }] }],
-    } )).toThrow('post-migration verification requires migrations 0001, 0002, 0003, and 0005')
+    } )).toThrow('post-migration verification requires migrations 0001 through 0006')
   })
 
   it('fails closed when either integrity query does not return exactly one count', () => {
@@ -1127,9 +1144,9 @@ describe('read-only D1 subscription migration preflight', () => {
     ])
   })
 
-  it('skips only when scheduled plan-change schema, indexes, triggers and migration history are present', () => {
-    const result = verifyD1SubscriptionPreflight(preflightInput(true, '1', true, true))
-    expect(result.migrationAction).toBe('skip')
+  it('requests migration 0006 when only scheduled plan-change schema is present', () => {
+    const result = verifyD1SubscriptionPreflight(preflightInput(true, '1', true, true, true))
+    expect(result.migrationAction).toBe('apply')
     expect(result.appliedMigrations).toEqual([
       '0001_membership_subscriptions.sql',
       '0002_subscription_version_cas.sql',
@@ -1143,6 +1160,15 @@ describe('read-only D1 subscription migration preflight', () => {
     expect(result.planTriggers).toEqual(planTriggerNames)
     expect(result.planChangeColumns).toEqual(planChangeColumnRows)
     expect(result.planChangeTriggers).toEqual(planChangeTriggerNames)
+  })
+
+  it('skips only when migration 0006 and the immediate-upgrade schema, indexes, and triggers are present', () => {
+    const result = verifyD1SubscriptionPreflight(preflightInput(true, '1', true, true, true, true))
+    expect(result.migrationAction).toBe('skip')
+    expect(result.appliedMigrations).toContain('0006_immediate_subscription_upgrades.sql')
+    expect(result.planUpgradeColumns).toEqual(planUpgradeColumnRows)
+    expect(result.planUpgradeIndexes).toEqual(planUpgradeIndexNames)
+    expect(result.planUpgradeTriggers).toEqual(planUpgradeTriggerNames)
   })
 
   it('fails closed when the target D1 UUID does not match', () => {
