@@ -186,7 +186,8 @@
       "workers/W07-subscription-commerce/migrations/0003_membership_plans.sql",
       "workers/W07-subscription-commerce/migrations/0004_revenuecat_membership_product_bindings.sql",
       "workers/W07-subscription-commerce/migrations/0005_subscription_plan_changes.sql",
-      "workers/W07-subscription-commerce/migrations/0006_immediate_subscription_upgrades.sql"
+      "workers/W07-subscription-commerce/migrations/0006_immediate_subscription_upgrades.sql",
+      "workers/W07-subscription-commerce/migrations/0007_membership_trials.sql"
     ]
   },
   "runtime": {
@@ -195,7 +196,8 @@
     "subscriptionHandlers": "NOT_ADMITTED",
     "evidenceRegistry": "NOT_VERIFIED",
     "scheduledPlanChange": "W07 D1-01 durable schedule; activation only through verified paid-renewal D1-04 -> D1-01 outcome sync; no scheduler activation is implied",
-    "immediatePlanUpgrade": "W07 creates a prorated D1-04 Order from authoritative immutable plan versions; only the verified successful Hyperswitch webhook may create the one-use D1-01 application proof and CAS the existing Subscription plan without resetting the paid billing period."
+    "immediatePlanUpgrade": "W07 creates a prorated D1-04 Order from authoritative immutable plan versions; only the verified successful Hyperswitch webhook may create the one-use D1-01 application proof and CAS the existing Subscription plan without resetting the paid billing period.",
+    "membershipTrialLifecycle": "W07 manages trial start and verified source reconciliation in the existing W07 runtime. D1-01 membership_subscription_trials is the immutable trial lifecycle ledger; membership_subscriptions remains the only access/period authority. WEB starts require an ACTIVE D1-04 Hyperswitch MIT mandate joined to a saved payment method; App Store and Play Store start/conversion/cancellation/expiry are only materialized from W02-verified RevenueCat current-customer snapshots. WEB first charge reuses the existing D1-04 renewal-cycle, order/payment and Hyperswitch MIT flow at current_period_end."
   },
   "forbidden": [
     "Add a second Subscription authority in D1-04.",
@@ -229,7 +231,15 @@
     "Only an authenticated/authorized W01 request may create an idempotent prorated D1-04 order; no client-supplied price or amount is admitted",
     "Only a signed successful Hyperswitch webhook may apply the immediate upgrade; duplicate webhook delivery returns the already-applied result without changing Subscription again",
     "Failed or pending payment leaves the source Subscription plan and entitlements unchanged",
-    "D1-01 insert guards reject a scheduled plan-change record while an immediate upgrade reservation is PENDING_PAYMENT/READY and reject a new upgrade reservation while a scheduled change is active."
+    "D1-01 insert guards reject a scheduled plan-change record while an immediate upgrade reservation is PENDING_PAYMENT/READY and reject a new upgrade reservation while a scheduled change is active.",
+    "D1-01 migration 0007 adds immutable membership_plan_versions.trial_days with integer range 0..90, membership_subscription_trials exact 16-column schema, four indexes and nine triggers; exact migration lineage 0001 through 0007 must be verified read-only after the future deployment",
+    "WEB trial start requires an ACTIVE D1-04 Hyperswitch MIT mandate and saved method bound to the subscriber; D1-01 atomically creates Subscription TRIALING and trial record",
+    "App Store/Play Store trials are created and reconciled only from W02-verified RevenueCat customer snapshots using immutable product bindings and original transaction identity; client/webhook bodies cannot assert trial state",
+    "TRIALING entitlement is limited to current_period_start <= now < current_period_end; cancel_at at trial end suppresses conversion but retains access to the end",
+    "Verified successful first Hyperswitch MIT charge or W02-verified RevenueCat paid period converts the same Subscription to ACTIVE and trial to CONVERTED, including recovery from PAST_DUE or a payment already submitted before cancellation",
+    "Failed first web MIT charge moves Subscription to PAST_DUE and trial to PAYMENT_FAILED; bounded retries preserve the exact cycle and mandate; cancellation prevents a new retry",
+    "Canceled web trial with an in-flight submitted/uncertain payment is not expired before terminal outcome reconciliation; unpaid canceled trial expires at trial_ends_at",
+    "Trial start and cancellation require W01, W08 owner-scoped CASL permission, and durable W06 intent/result audit"
   ],
   "promotionRule": "Remain CONTRACTED_NOT_VERIFIED until the physical binding, migration, runtime authority and Evidence Registry evidence are all admitted.",
   "scheduledPlanChangeTable": {
@@ -527,5 +537,175 @@
     },
     "migration": "workers/W07-subscription-commerce/migrations/0006_immediate_subscription_upgrades.sql",
     "stateMachineRef": "contracts/state-machines/membership-subscription-plan-upgrade.json"
+  },
+  "membershipPlanVersionTrialDuration": {
+    "table": "membership_plan_versions",
+    "column": {
+      "name": "trial_days",
+      "type": "INTEGER",
+      "nullable": false,
+      "default": 0
+    },
+    "constraints": {
+      "range": "0..90",
+      "unit": "days",
+      "immutable": true,
+      "meaning": "Number of free-trial days offered by this exact immutable plan version. Zero disables WEB trial start; existing subscriptions retain the version they started on."
+    },
+    "migration": "workers/W07-subscription-commerce/migrations/0007_membership_trials.sql"
+  },
+  "membershipSubscriptionTrialTable": {
+    "name": "membership_subscription_trials",
+    "purpose": "D1-01 authoritative, immutable trial provenance and lifecycle for an existing Subscription. No payment amounts or provider credentials are stored here.",
+    "primaryKey": "trial_id",
+    "columns": [
+      {
+        "name": "trial_id",
+        "type": "TEXT",
+        "nullable": false,
+        "primaryKey": true
+      },
+      {
+        "name": "subscription_id",
+        "type": "TEXT",
+        "nullable": false,
+        "unique": true
+      },
+      {
+        "name": "subscriber_id",
+        "type": "TEXT",
+        "nullable": false
+      },
+      {
+        "name": "plan_id",
+        "type": "TEXT",
+        "nullable": false
+      },
+      {
+        "name": "plan_version",
+        "type": "INTEGER",
+        "nullable": false
+      },
+      {
+        "name": "source",
+        "type": "TEXT",
+        "nullable": false,
+        "values": [
+          "WEB",
+          "APP_STORE",
+          "PLAY_STORE"
+        ]
+      },
+      {
+        "name": "provider_app_id",
+        "type": "TEXT",
+        "nullable": true
+      },
+      {
+        "name": "product_id",
+        "type": "TEXT",
+        "nullable": true
+      },
+      {
+        "name": "original_transaction_id",
+        "type": "TEXT",
+        "nullable": true
+      },
+      {
+        "name": "started_at",
+        "type": "TEXT",
+        "nullable": false
+      },
+      {
+        "name": "trial_ends_at",
+        "type": "TEXT",
+        "nullable": false
+      },
+      {
+        "name": "status",
+        "type": "TEXT",
+        "nullable": false,
+        "values": [
+          "TRIALING",
+          "CANCELED",
+          "PAYMENT_FAILED",
+          "CONVERTED",
+          "EXPIRED"
+        ]
+      },
+      {
+        "name": "request_hash",
+        "type": "TEXT",
+        "nullable": false
+      },
+      {
+        "name": "version",
+        "type": "INTEGER",
+        "nullable": false,
+        "default": 1
+      },
+      {
+        "name": "created_at",
+        "type": "TEXT",
+        "nullable": false
+      },
+      {
+        "name": "updated_at",
+        "type": "TEXT",
+        "nullable": false
+      }
+    ],
+    "indexes": [
+      {
+        "name": "ux_membership_subscription_trials_subscriber_plan",
+        "columns": [
+          "subscriber_id",
+          "plan_id"
+        ],
+        "unique": true
+      },
+      {
+        "name": "ux_membership_subscription_trials_store_transaction",
+        "columns": [
+          "source",
+          "provider_app_id",
+          "original_transaction_id"
+        ],
+        "unique": true,
+        "partial": "original_transaction_id IS NOT NULL"
+      },
+      {
+        "name": "ix_membership_subscription_trials_status_end",
+        "columns": [
+          "status",
+          "trial_ends_at",
+          "subscription_id"
+        ]
+      },
+      {
+        "name": "ix_membership_subscription_trials_subscriber_created",
+        "columns": [
+          "subscriber_id",
+          "created_at",
+          "trial_id"
+        ]
+      }
+    ],
+    "stateMachineRef": "contracts/state-machines/membership-subscription-trial.json",
+    "constraints": {
+      "authority": "D1-01 only; D1-04 owns order/payment/mandate/renewal-cycle facts.",
+      "subscriptionLink": "Exactly one trial record per subscription; subscription, subscriber, creator plan and immutable plan version must match at insert.",
+      "sourceBinding": "WEB records have no store identifiers; APP_STORE and PLAY_STORE require the verified RevenueCat app ID, product ID and original transaction ID.",
+      "webTrialStart": "A WEB trial can be inserted only if the immutable plan version has trial_days 1..90 and an active D1-04 Hyperswitch MIT mandate is bound to the same subscriber.",
+      "storeTrialStart": "Store trial rows are written only after W02 identity verification and RevenueCat current-customer snapshot/product binding reconciliation.",
+      "accessBoundary": "Subscription current_period_start/current_period_end and status TRIALING control access. cancel_at equal to trial_ends_at suppresses conversion but does not revoke access early.",
+      "paymentConversion": "WEB conversion is only through verified Hyperswitch first MIT renewal outcome sync; store conversion is from the verified RevenueCat NORMAL paid-period snapshot.",
+      "failedPayment": "A failed WEB first charge changes Subscription to PAST_DUE and linked trial to PAYMENT_FAILED. Retry uses the same D1-04 cycle and mandate.",
+      "cancellationRace": "If the first payment was already submitted before cancellation, verified success may transition CANCELED to CONVERTED; otherwise canceled trial expires at trial_ends_at.",
+      "expiry": "WEB trial expiry is scheduled by existing W07 renewal batch only after pending provider outcomes are reconciled. Store expiry is reconciled from RevenueCat current-customer snapshot; the access period end still blocks access when reached.",
+      "idempotency": "WEB trial ID is deterministic from subscriber, plan and Idempotency-Key. Store trial ID is deterministic from source, RevenueCat app ID and original transaction ID.",
+      "retention": "Trial identity/history cannot be deleted; state updates require version increment and increasing updated_at."
+    },
+    "migration": "workers/W07-subscription-commerce/migrations/0007_membership_trials.sql"
   }
 }
