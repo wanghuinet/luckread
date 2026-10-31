@@ -67,9 +67,11 @@ export type SubscriptionPlanChangePreview = Readonly<{
   }>;
   changeType: PlanChangeKind;
   effectiveAt: string;
-  prorationAmountMinor: number;
+  prorationBaseMinor: number;
   currency: string;
   paymentRequired: boolean;
+  prorationBasis: 'LIST_PRICE_DIFFERENCE_BEFORE_DISCOUNTS_AND_TAX';
+  pricingFinalized: false;
   remainingPeriodMs: number;
   periodDurationMs: number;
   computedAt: string;
@@ -177,7 +179,9 @@ export async function previewSubscriptionPlanChange(
   } catch {
     throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
   }
-  if (!subscription) throw new SubscriptionRuntimeError('RESOURCE_NOT_FOUND', 404);
+  if (!subscription || subscription.subscription_id !== subscriptionId || subscription.subscriber_id !== subscriberId) {
+    throw new SubscriptionRuntimeError('RESOURCE_NOT_FOUND', 404);
+  }
 
   if (subscription.status !== 'ACTIVE' || subscription.cancel_at !== null) {
     throw new SubscriptionRuntimeError('INVALID_STATE', 409);
@@ -264,7 +268,7 @@ export async function previewSubscriptionPlanChange(
       targetPlan,
       changeType: 'NO_CHANGE',
       effectiveAt: computedAt,
-      prorationAmountMinor: 0,
+      prorationBaseMinor: 0,
       currency: target.currency,
       paymentRequired: false,
       remainingPeriodMs,
@@ -276,7 +280,7 @@ export async function previewSubscriptionPlanChange(
 
   let changeType: PlanChangeKind;
   let effectiveAt: string;
-  let prorationAmountMinor = 0;
+  let prorationBaseMinor = 0;
 
   if (target.billing_interval !== subscription.current_billing_interval) {
     changeType = 'BILLING_INTERVAL_CHANGE';
@@ -291,7 +295,7 @@ export async function previewSubscriptionPlanChange(
     if (prorated < 1n || prorated > BigInt(Number.MAX_SAFE_INTEGER)) {
       throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
     }
-    prorationAmountMinor = Number(prorated);
+    prorationBaseMinor = Number(prorated);
   } else if (target.price_minor < subscription.current_price_minor) {
     changeType = 'DOWNGRADE';
     effectiveAt = subscription.current_period_end;
@@ -306,9 +310,11 @@ export async function previewSubscriptionPlanChange(
     targetPlan,
     changeType,
     effectiveAt,
-    prorationAmountMinor,
+    prorationBaseMinor,
     currency: target.currency,
-    paymentRequired: prorationAmountMinor > 0,
+    paymentRequired: prorationBaseMinor > 0,
+    prorationBasis: 'LIST_PRICE_DIFFERENCE_BEFORE_DISCOUNTS_AND_TAX',
+    pricingFinalized: false,
     remainingPeriodMs,
     periodDurationMs,
     computedAt,
