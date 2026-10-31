@@ -17,6 +17,7 @@ type MembershipPlan = {
   billingInterval: 'MONTHLY' | 'YEARLY'
   priceMinor: number
   currency: string
+  trialDays: number
   benefits: string[]
   status: PlanStatus
   visibility: 'PRIVATE' | 'PUBLIC'
@@ -41,6 +42,7 @@ const isPlan = (value: unknown): value is MembershipPlan => {
     (plan.billingInterval === 'MONTHLY' || plan.billingInterval === 'YEARLY') &&
     Number.isSafeInteger(plan.priceMinor) && Number(plan.priceMinor) >= 0 && Number(plan.priceMinor) <= 2_147_483_647 &&
     typeof plan.currency === 'string' && /^[A-Z]{3}$/.test(plan.currency) &&
+    Number.isSafeInteger(plan.trialDays) && Number(plan.trialDays) >= 0 && Number(plan.trialDays) <= 90 &&
     Array.isArray(plan.benefits) && plan.benefits.length <= 20 &&
     plan.benefits.every((benefit) => typeof benefit === 'string' && benefit.length > 0 && benefit.length <= 180) &&
     ['DRAFT', 'ACTIVE', 'PAUSED', 'RETIRED'].includes(String(plan.status)) &&
@@ -90,6 +92,8 @@ const copy = (locale: StudioLocale) => locale === 'en-US' ? {
   monthly: 'Monthly',
   yearly: 'Yearly',
   benefits: 'Benefits (one per line)',
+  trialDays: 'Free trial (days, 0 disables)',
+  trialDaysLabel: 'Trial',
   benefitsPlaceholder: 'Member-only posts\nCommunity updates',
   submit: 'Create plan draft',
   validation: 'Enter a valid name, lowercase tier key, and price with up to two decimal places.',
@@ -140,6 +144,8 @@ const copy = (locale: StudioLocale) => locale === 'en-US' ? {
   monthly: '每月',
   yearly: '每年',
   benefits: '会员权益（每行一项）',
+  trialDays: '免费试用天数（0 表示关闭）',
+  trialDaysLabel: '试用',
   benefitsPlaceholder: '会员专属文章\n社区动态',
   submit: '创建方案草稿',
   validation: '请输入有效的名称、小写等级标识，以及最多两位小数的价格。',
@@ -185,6 +191,7 @@ export default function CreatorMembershipPlans({ locale = 'zh-CN' }: { locale?: 
   const [planName, setPlanName] = useState('')
   const [tier, setTier] = useState('supporter')
   const [price, setPrice] = useState('5.00')
+  const [trialDays, setTrialDays] = useState(0)
   const [interval, setInterval] = useState<'MONTHLY' | 'YEARLY'>('MONTHLY')
   const [benefitsText, setBenefitsText] = useState('')
   const [createKey, setCreateKey] = useState('')
@@ -192,6 +199,7 @@ export default function CreatorMembershipPlans({ locale = 'zh-CN' }: { locale?: 
   const [editName, setEditName] = useState('')
   const [editTier, setEditTier] = useState('')
   const [editPrice, setEditPrice] = useState('')
+  const [editTrialDays, setEditTrialDays] = useState(0)
   const [editInterval, setEditInterval] = useState<'MONTHLY' | 'YEARLY'>('MONTHLY')
   const [editBenefitsText, setEditBenefitsText] = useState('')
   const [editKey, setEditKey] = useState('')
@@ -267,7 +275,8 @@ export default function CreatorMembershipPlans({ locale = 'zh-CN' }: { locale?: 
     }
     const [whole, fraction = ''] = price.trim().split('.')
     const priceMinor = Number(whole) * 100 + Number(fraction.padEnd(2, '0'))
-    if (!Number.isSafeInteger(priceMinor) || priceMinor < 0 || priceMinor > 2_147_483_647) {
+    if (!Number.isSafeInteger(priceMinor) || priceMinor < 0 || priceMinor > 2_147_483_647 ||
+        !Number.isSafeInteger(trialDays) || trialDays < 0 || trialDays > 90) {
       setError(labels.validation)
       return
     }
@@ -282,7 +291,7 @@ export default function CreatorMembershipPlans({ locale = 'zh-CN' }: { locale?: 
         headers: { accept: 'application/json', 'content-type': 'application/json', 'Idempotency-Key': key },
         body: JSON.stringify({
           name: planName.trim(), tier: normalizedTier, billingInterval: interval,
-          priceMinor, currency: 'USD', benefits: rawBenefits,
+          priceMinor, currency: 'USD', benefits: rawBenefits, trialDays,
         }),
       })
       if (response.status === 401) { redirectToLogin(); return }
@@ -292,6 +301,7 @@ export default function CreatorMembershipPlans({ locale = 'zh-CN' }: { locale?: 
       setPlans((current) => [data.data!, ...current.filter((item) => item.planId !== data.data!.planId)])
       setMessage(labels.successCreate)
       setPlanName('')
+      setTrialDays(0)
       setBenefitsText('')
       setCreateKey('')
     } catch (caught) {
@@ -306,6 +316,7 @@ export default function CreatorMembershipPlans({ locale = 'zh-CN' }: { locale?: 
     setEditName(plan.name)
     setEditTier(plan.tier)
     setEditPrice(String(Math.floor(plan.priceMinor / 100)) + '.' + String(plan.priceMinor % 100).padStart(2, '0'))
+    setEditTrialDays(plan.trialDays)
     setEditInterval(plan.billingInterval)
     setEditBenefitsText(plan.benefits.join('\n'))
     setEditKey(crypto.randomUUID())
@@ -334,7 +345,8 @@ export default function CreatorMembershipPlans({ locale = 'zh-CN' }: { locale?: 
     }
     const [whole, fraction = ''] = normalizedPrice.split('.')
     const priceMinor = Number(whole) * 100 + Number(fraction.padEnd(2, '0'))
-    if (!Number.isSafeInteger(priceMinor) || priceMinor < 0 || priceMinor > 2_147_483_647) {
+    if (!Number.isSafeInteger(priceMinor) || priceMinor < 0 || priceMinor > 2_147_483_647 ||
+        !Number.isSafeInteger(editTrialDays) || editTrialDays < 0 || editTrialDays > 90) {
       setError(labels.revisionValidation)
       return
     }
@@ -361,6 +373,7 @@ export default function CreatorMembershipPlans({ locale = 'zh-CN' }: { locale?: 
             priceMinor,
             currency: plan.currency,
             benefits: rawBenefits,
+            trialDays: editTrialDays,
           }),
         },
       )
@@ -450,6 +463,11 @@ export default function CreatorMembershipPlans({ locale = 'zh-CN' }: { locale?: 
             className="rounded-xl border border-light-border bg-transparent px-3 py-2 font-normal dark:border-dark-border" />
         </label>
         <label className="flex flex-col gap-1 text-sm font-semibold">
+          {labels.trialDays}
+          <input type="number" min={0} max={90} step={1} value={trialDays} onChange={(event) => setTrialDays(Number(event.target.value))}
+            className="rounded-xl border border-light-border bg-transparent px-3 py-2 font-normal dark:border-dark-border" />
+        </label>
+        <label className="flex flex-col gap-1 text-sm font-semibold">
           {labels.interval}
           <select value={interval} onChange={(event) => setInterval(event.target.value as 'MONTHLY' | 'YEARLY')}
             className="rounded-xl border border-light-border bg-transparent px-3 py-2 font-normal dark:border-dark-border">
@@ -487,6 +505,7 @@ export default function CreatorMembershipPlans({ locale = 'zh-CN' }: { locale?: 
               <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
                 <p><span className="text-light-secondary dark:text-dark-secondary">{labels.priceLabel}: </span><strong>{formatPrice(plan.priceMinor, plan.currency, locale)}</strong></p>
                 <p><span className="text-light-secondary dark:text-dark-secondary">{labels.periodLabel}: </span><strong>{plan.billingInterval === 'MONTHLY' ? labels.monthly : labels.yearly}</strong></p>
+                <p><span className="text-light-secondary dark:text-dark-secondary">{labels.trialDaysLabel}: </span><strong>{plan.trialDays}</strong></p>
                 <p><span className="text-light-secondary dark:text-dark-secondary">{labels.version}: </span><strong>{plan.planVersion}</strong></p>
               </div>
               <div>
@@ -507,6 +526,10 @@ export default function CreatorMembershipPlans({ locale = 'zh-CN' }: { locale?: 
                   <label className="flex flex-col gap-1 text-sm font-semibold">
                     {labels.priceLabel} ({plan.currency})
                     <input required inputMode="decimal" value={editPrice} onChange={(event) => setEditPrice(event.target.value)} pattern="(0|[1-9][0-9]*)(\.[0-9]{1,2})?" className="rounded-xl border border-light-border bg-transparent px-3 py-2 font-normal dark:border-dark-border" />
+                  </label>
+                  <label className="flex flex-col gap-1 text-sm font-semibold">
+                    {labels.trialDays}
+                    <input type="number" min={0} max={90} step={1} value={editTrialDays} onChange={(event) => setEditTrialDays(Number(event.target.value))} className="rounded-xl border border-light-border bg-transparent px-3 py-2 font-normal dark:border-dark-border" />
                   </label>
                   <label className="flex flex-col gap-1 text-sm font-semibold">
                     {labels.interval}
