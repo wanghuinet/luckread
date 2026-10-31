@@ -271,6 +271,8 @@ export async function previewSubscriptionPlanChange(
       prorationBaseMinor: 0,
       currency: target.currency,
       paymentRequired: false,
+      prorationBasis: 'LIST_PRICE_DIFFERENCE_BEFORE_DISCOUNTS_AND_TAX',
+      pricingFinalized: false,
       remainingPeriodMs,
       periodDurationMs,
       computedAt,
