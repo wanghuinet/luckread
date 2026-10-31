@@ -50,6 +50,7 @@ type TrialPlanRow = Readonly<{
   status: string;
   visibility: string;
   trial_days: number;
+  price_minor: number;
 }>;
 
 export type MembershipTrialDto = Readonly<{
@@ -253,7 +254,7 @@ export async function startWebMembershipTrial(
   let plan: TrialPlanRow | null;
   try {
     plan = await d1_01.prepare(
-      'SELECT p.plan_id, p.owner_type, p.owner_id, p.current_version, p.status, p.visibility, v.trial_days ' +
+      'SELECT p.plan_id, p.owner_type, p.owner_id, p.current_version, p.status, p.visibility, v.trial_days, v.price_minor ' +
       'FROM membership_plans p INNER JOIN membership_plan_versions v ' +
       'ON v.plan_id = p.plan_id AND v.plan_version = p.current_version ' +
       'WHERE p.plan_id = ? LIMIT 1',
@@ -265,7 +266,8 @@ export async function startWebMembershipTrial(
     throw new SubscriptionRuntimeError('PLAN_NOT_ACTIVE', 409);
   }
   if (!Number.isSafeInteger(plan.current_version) || plan.current_version < 1 ||
-      !Number.isSafeInteger(plan.trial_days) || plan.trial_days < 1 || plan.trial_days > 90) {
+      !Number.isSafeInteger(plan.trial_days) || plan.trial_days < 1 || plan.trial_days > 90 ||
+      !Number.isSafeInteger(plan.price_minor) || plan.price_minor <= 0) {
     throw new SubscriptionRuntimeError('TRIAL_NOT_AVAILABLE', 409);
   }
   const trialEndsAt = addTrialDays(startedAt, plan.trial_days);
