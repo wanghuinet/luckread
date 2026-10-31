@@ -99,7 +99,7 @@ async function readSubscription(
   db: D1Database, subscriptionId: string, subscriberId: string,
 ): Promise<SubscriptionOutcomeRow | null> {
   try {
-    return await db.prepare(
+    const row = await db.prepare(
       'SELECT s.subscription_id, s.subscriber_id, s.plan_id, s.plan_version, s.creator_id, v.billing_interval, ' +
       'v.tier, v.price_minor, v.currency, s.status, s.current_period_start, s.current_period_end, ' +
       's.trial_started_at, s.trial_ends_at, s.trial_converted_at, s.cancel_at, s.updated_at, s.version ' +
@@ -107,6 +107,12 @@ async function readSubscription(
       'ON v.plan_id = s.plan_id AND v.plan_version = s.plan_version ' +
       'WHERE s.subscription_id = ? AND s.subscriber_id = ? LIMIT 1',
     ).bind(subscriptionId, subscriberId).first<SubscriptionOutcomeRow>();
+    return row ? {
+      ...row,
+      trial_started_at: row.trial_started_at ?? null,
+      trial_ends_at: row.trial_ends_at ?? null,
+      trial_converted_at: row.trial_converted_at ?? null,
+    } : null;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (!/no such column:\s*(?:s\.)?trial_(?:started|ends|converted)_at/i.test(message)) {
