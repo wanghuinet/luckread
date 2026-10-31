@@ -296,6 +296,7 @@ type MembershipPlanAuditInput = {
   billingInterval: 'MONTHLY' | 'YEARLY'
   priceMinor: number
   currency: string
+  trialDays: number
 }
 
 
@@ -324,6 +325,7 @@ type MembershipPlanPublishAuditInput = {
   billingInterval: 'MONTHLY' | 'YEARLY'
   priceMinor: number
   currency: string
+  trialDays: number
 }
 
 
@@ -339,6 +341,7 @@ type MembershipPlanUpdateRequestAuditInput = {
   priceMinor: number
   currency: string
   benefits: string[]
+  trialDays?: number
 }
 
 type MembershipPlanUpdateAuditInput = {
@@ -357,6 +360,7 @@ type MembershipPlanUpdateAuditInput = {
   priceMinor: number
   currency: string
   benefits: string[]
+  trialDays: number
 }
 
 type MembershipPlanLifecycleRequestAuditInput = {
@@ -482,7 +486,7 @@ type StoredAuditEvent = {
 function parseMembershipPlanAuditInput(value: unknown): MembershipPlanAuditInput {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('INVALID_MEMBERSHIP_PLAN_AUDIT')
   const body = value as Record<string, unknown>
-  const allowed = new Set(['eventId', 'planId', 'creatorId', 'planVersion', 'status', 'visibility', 'occurredAt', 'name', 'tier', 'billingInterval', 'priceMinor', 'currency'])
+  const allowed = new Set(['eventId', 'planId', 'creatorId', 'planVersion', 'status', 'visibility', 'occurredAt', 'name', 'tier', 'billingInterval', 'priceMinor', 'currency', 'trialDays'])
   if (Object.keys(body).some((key) => !allowed.has(key)) || Object.keys(body).length !== allowed.size) {
     throw new Error('INVALID_MEMBERSHIP_PLAN_AUDIT')
   }
@@ -496,7 +500,8 @@ function parseMembershipPlanAuditInput(value: unknown): MembershipPlanAuditInput
     typeof body.tier !== 'string' || !/^[a-z][a-z0-9_-]{0,63}$/.test(body.tier) ||
     (body.billingInterval !== 'MONTHLY' && body.billingInterval !== 'YEARLY') ||
     typeof body.priceMinor !== 'number' || !Number.isSafeInteger(body.priceMinor) || body.priceMinor < 0 || body.priceMinor > 2_147_483_647 ||
-    typeof body.currency !== 'string' || !/^[A-Z]{3}$/.test(body.currency)
+    typeof body.currency !== 'string' || !/^[A-Z]{3}$/.test(body.currency) ||
+    !Number.isSafeInteger(body.trialDays) || (body.trialDays as number) < 0 || (body.trialDays as number) > 90
   ) throw new Error('INVALID_MEMBERSHIP_PLAN_AUDIT')
   return body as MembershipPlanAuditInput
 }
@@ -514,14 +519,15 @@ function parseMembershipPlanUpdateTerms(body: Record<string, unknown>): void {
     !Array.isArray(body.benefits) || body.benefits.length > 20 ||
     body.benefits.some((item) => typeof item !== 'string' || item.trim() !== item || item.length < 1 || item.length > 180) ||
     new Set(body.benefits).size !== body.benefits.length ||
-    JSON.stringify(body.benefits).length > 8192
+    JSON.stringify(body.benefits).length > 8192 ||
+    (body.trialDays !== undefined && (!Number.isSafeInteger(body.trialDays) || (body.trialDays as number) < 0 || (body.trialDays as number) > 90))
   ) throw new Error('INVALID_MEMBERSHIP_PLAN_UPDATE_AUDIT')
 }
 
 function parseMembershipPlanUpdateRequestAuditInput(value: unknown): MembershipPlanUpdateRequestAuditInput {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('INVALID_MEMBERSHIP_PLAN_UPDATE_REQUEST_AUDIT')
   const body = value as Record<string, unknown>
-  const allowed = new Set(['eventId', 'planId', 'creatorId', 'expectedVersion', 'idempotencyKey', 'name', 'tier', 'billingInterval', 'priceMinor', 'currency', 'benefits'])
+  const allowed = new Set(['eventId', 'planId', 'creatorId', 'expectedVersion', 'idempotencyKey', 'name', 'tier', 'billingInterval', 'priceMinor', 'currency', 'benefits', 'trialDays'])
   if (Object.keys(body).some((key) => !allowed.has(key)) || Object.keys(body).length !== allowed.size) {
     throw new Error('INVALID_MEMBERSHIP_PLAN_UPDATE_REQUEST_AUDIT')
   }
@@ -621,7 +627,7 @@ function parseSubscriptionPlanChangeAuditInput(value: unknown): SubscriptionPlan
 function parseMembershipPlanUpdateAuditInput(value: unknown): MembershipPlanUpdateAuditInput {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('INVALID_MEMBERSHIP_PLAN_UPDATE_AUDIT')
   const body = value as Record<string, unknown>
-  const allowed = new Set(['eventId', 'planId', 'creatorId', 'expectedVersion', 'planVersion', 'status', 'visibility', 'version', 'occurredAt', 'name', 'tier', 'billingInterval', 'priceMinor', 'currency', 'benefits'])
+  const allowed = new Set(['eventId', 'planId', 'creatorId', 'expectedVersion', 'planVersion', 'status', 'visibility', 'version', 'occurredAt', 'name', 'tier', 'billingInterval', 'priceMinor', 'currency', 'benefits', 'trialDays'])
   if (Object.keys(body).some((key) => !allowed.has(key)) || Object.keys(body).length !== allowed.size) {
     throw new Error('INVALID_MEMBERSHIP_PLAN_UPDATE_AUDIT')
   }
@@ -659,7 +665,8 @@ function parseMembershipPlanPublishAuditInput(value: unknown): MembershipPlanPub
     typeof body.tier !== 'string' || !/^[a-z][a-z0-9_-]{0,63}$/.test(body.tier) ||
     (body.billingInterval !== 'MONTHLY' && body.billingInterval !== 'YEARLY') ||
     typeof body.priceMinor !== 'number' || !Number.isSafeInteger(body.priceMinor) || body.priceMinor < 0 || body.priceMinor > 2_147_483_647 ||
-    typeof body.currency !== 'string' || !/^[A-Z]{3}$/.test(body.currency)
+    typeof body.currency !== 'string' || !/^[A-Z]{3}$/.test(body.currency) ||
+    !Number.isSafeInteger(body.trialDays) || (body.trialDays as number) < 0 || (body.trialDays as number) > 90
   ) throw new Error('INVALID_MEMBERSHIP_PLAN_PUBLISH_AUDIT')
   return body as MembershipPlanPublishAuditInput
 }
@@ -1010,6 +1017,7 @@ export default {
         after: {
           creatorId: input.creatorId,
           planVersion: input.planVersion,
+          trialDays: input.trialDays,
           status: input.status,
           visibility: input.visibility,
           name: input.name,
@@ -1017,6 +1025,7 @@ export default {
           billingInterval: input.billingInterval,
           priceMinor: input.priceMinor,
           currency: input.currency,
+          trialDays: input.trialDays,
         },
         occurredAt: input.occurredAt,
       }
