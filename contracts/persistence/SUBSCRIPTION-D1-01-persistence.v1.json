@@ -96,11 +96,11 @@
         "fieldId": "ENT-SUBSCRIPTION-F-CURRENT-PERIOD-END"
       },
       {
-        "name": "trial_converted_at",
+        "name": "trial_started_at",
         "type": "TEXT",
         "nullable": true,
         "primaryKey": false,
-        "fieldId": "ENT-SUBSCRIPTION-F-TRIAL-CONVERTED-AT"
+        "fieldId": "ENT-SUBSCRIPTION-F-TRIAL-STARTED-AT"
       },
       {
         "name": "trial_ends_at",
@@ -110,11 +110,11 @@
         "fieldId": "ENT-SUBSCRIPTION-F-TRIAL-ENDS-AT"
       },
       {
-        "name": "trial_started_at",
+        "name": "trial_converted_at",
         "type": "TEXT",
         "nullable": true,
         "primaryKey": false,
-        "fieldId": "ENT-SUBSCRIPTION-F-TRIAL-STARTED-AT"
+        "fieldId": "ENT-SUBSCRIPTION-F-TRIAL-CONVERTED-AT"
       },
       {
         "name": "cancel_at",
@@ -143,6 +143,27 @@
         "nullable": false,
         "primaryKey": false,
         "fieldId": "ENT-SUBSCRIPTION-F-UPDATED-AT"
+      },
+      {
+        "name": "trial_started_at",
+        "type": "TEXT",
+        "nullable": true,
+        "primaryKey": false,
+        "fieldId": "ENT-SUBSCRIPTION-F-TRIAL-STARTED-AT"
+      },
+      {
+        "name": "trial_ends_at",
+        "type": "TEXT",
+        "nullable": true,
+        "primaryKey": false,
+        "fieldId": "ENT-SUBSCRIPTION-F-TRIAL-ENDS-AT"
+      },
+      {
+        "name": "trial_converted_at",
+        "type": "TEXT",
+        "nullable": true,
+        "primaryKey": false,
+        "fieldId": "ENT-SUBSCRIPTION-F-TRIAL-CONVERTED-AT"
       }
     ],
     "indexes": [
@@ -229,6 +250,21 @@
       "workers/W07-subscription-commerce/migrations/0006_membership_subscription_scheduled_plan_changes.sql",
       "workers/W07-subscription-commerce/migrations/0007_scheduled_plan_change_type.sql",
       "workers/W07-subscription-commerce/migrations/0008_subscription_trial_lifecycle.sql"
+    ],
+    "additionalColumns": [
+      {
+        "table": "membership_plan_versions",
+        "columns": [
+          {
+            "name": "trial_period_days",
+            "type": "INTEGER",
+            "nullable": false,
+            "default": 0,
+            "check": "typeof(trial_period_days) = 'integer' AND trial_period_days BETWEEN 0 AND 30"
+          }
+        ],
+        "invariant": "The value is stored on each immutable plan version and is never updated in place; a plan edit creates a new plan_version."
+      }
     ]
   },
   "runtime": {
@@ -250,7 +286,7 @@
   "verificationRequirements": [
     "exact D1-01 target UUID evidence",
     "migration artifact hash",
-    "schema inspection proving all 14 columns and nullability",
+    "schema inspection proving all 17 columns and nullability, including trial_started_at, trial_ends_at and trial_converted_at",
     "index inspection",
     "no cross-D1 foreign-key evidence",
     "W07 runtime binding evidence",
@@ -280,7 +316,9 @@
     "trial entitlement denied by period boundary when trial_ends_at has passed, including AWAITING_MANDATE",
     "signed successful first MIT renewal sets trial_converted_at and transitions TRIALING -> ACTIVE by subscription version CAS and W06 audit",
     "failed first paid renewal transitions TRIALING -> PAST_DUE without extending the trial period or granting entitlement",
-    "missing or revoked MIT mandate leaves renewal AWAITING_MANDATE and requires a verified customer-present payment-method consent flow"
+    "missing or revoked MIT mandate leaves renewal AWAITING_MANDATE and requires a verified customer-present payment-method consent flow",
+    "membership_plan_versions.trial_period_days is part of each immutable plan version and legacy plan versions read as zero after migration default",
+    "D1-01 triggers prevent changing trial_started_at/trial_ends_at after creation and prevent rewriting non-null trial_converted_at"
   ],
   "promotionRule": "Remain CONTRACTED_NOT_VERIFIED until the physical binding, migration, runtime authority and Evidence Registry evidence are all admitted.",
   "additionalTables": [
