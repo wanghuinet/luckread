@@ -230,6 +230,7 @@
     "subscription_entitlement_payment": {
       "required": true,
       "endpoint_groups": [
+        "DELETE /v1/payment-methods/{savedPaymentMethodId}",
         "DELETE /v1/subscriptions/{subscriptionId}",
         "GET /v1/billing/documents",
         "GET /v1/commerce/orders/{orderId}",
@@ -239,6 +240,7 @@
         "GET /v1/memberships/subscriptions",
         "GET /v1/memberships/subscriptions/{subscriptionId}",
         "GET /v1/memberships/subscriptions/{subscriptionId}/change-plan-preview",
+        "GET /v1/payment-methods",
         "GET /v1/payments/history",
         "GET /v1/payments/refunds",
         "GET /v1/payments/{paymentId}",
