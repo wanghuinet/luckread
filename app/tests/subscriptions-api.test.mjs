@@ -20,6 +20,27 @@ beforeEach(() => {
   calls.length = 0;
 });
 
+test('pins the Android API level and Kotlin compiler needed by the native checkout SDK', () => {
+  const appConfig = JSON.parse(readFileSync(new URL('../app.json', import.meta.url), 'utf8'));
+  const packageJson = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+  const buildProperties = appConfig.expo.plugins.find(
+    (plugin) => Array.isArray(plugin) && plugin[0] === 'expo-build-properties',
+  );
+
+  expect(packageJson.dependencies['expo-build-properties']).toBe('~0.13.3');
+  expect(buildProperties).toEqual([
+    'expo-build-properties',
+    {
+      android: {
+        buildToolsVersion: '36.0.0',
+        compileSdkVersion: 36,
+        targetSdkVersion: 36,
+        kotlinVersion: '2.1.20',
+      },
+    },
+  ]);
+});
+
 test('loads the signed-in subscriber list through the canonical W01 route', async () => {
   const controller = new AbortController();
   await fetchMySubscriptionsPage({ page: 2, limit: 15, signal: controller.signal });
