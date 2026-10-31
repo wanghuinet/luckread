@@ -515,7 +515,7 @@
       "invariants": [
         "change_id is deterministically derived from subscriber-scoped Idempotency-Key using SHA-256; raw idempotency keys are never stored.",
         "Only an authenticated subscriber may schedule a plan downgrade or billing-interval change for their own ACTIVE, non-cancelled subscription using If-Match.",
-        "change_type is DOWNGRADE or BILLING_INTERVAL_CHANGE. DOWNGRADE requires the same creator, currency, and billing interval with a lower immutable plan-version price; BILLING_INTERVAL_CHANGE requires the same creator and currency with the opposite MONTHLY/YEARLY interval.",
+        "change_type is DOWNGRADE or BILLING_INTERVAL_CHANGE. DOWNGRADE requires the same creator, currency, and billing interval with a lower immutable plan-version price; BILLING_INTERVAL_CHANGE requires the same creator, plan tier and currency with the opposite MONTHLY/YEARLY interval.",
         "The scheduled change takes effect exactly at the current_period_end boundary; the live membership_subscriptions plan_id, plan_version and entitlement reference are not changed when the request is accepted.",
         "No Order, PaymentIntent, charge, monetary amount, tax, discount, ledger or provider fact is created or persisted in D1-01 by scheduling a change.",
         "At most one SCHEDULED plan change may exist per subscription; the same subscriber and key replays the same change.",
