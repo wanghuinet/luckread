@@ -16,8 +16,13 @@ let activeSession: Promise<HyperswitchSession> | null = null;
 
 function readConfiguration(): NativeConfiguration {
   const publishableKey = process.env.EXPO_PUBLIC_HYPERSWITCH_PUBLISHABLE_KEY?.trim() ?? '';
-  const environment = process.env.EXPO_PUBLIC_HYPERSWITCH_ENVIRONMENT?.trim().toUpperCase() ?? '';
-  if (!publishableKey || (environment !== 'PROD' && environment !== 'SANDBOX')) {
+  const configuredEnvironment = process.env.EXPO_PUBLIC_HYPERSWITCH_ENVIRONMENT?.trim().toLowerCase() ?? '';
+  const environment: NativeEnvironment | null = configuredEnvironment === 'production'
+    ? 'PROD'
+    : configuredEnvironment === 'sandbox'
+      ? 'SANDBOX'
+      : null;
+  if (!publishableKey || !environment) {
     throw new Error('Hyperswitch 公钥或明确的 sandbox/production 环境配置缺失，支付入口已安全关闭。');
   }
   return { publishableKey, environment };
