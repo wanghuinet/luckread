@@ -403,6 +403,7 @@ type SubscriptionPlanChangeRequestAuditInput = {
   subscriberId: string
   subscriptionId: string
   targetPlanId: string
+  changeType: 'UPGRADE' | 'DOWNGRADE_SCHEDULE'
   expectedEtag: string
   requestedAt: string
 }
@@ -419,6 +420,21 @@ type SubscriptionPlanUpgradeAppliedAuditInput = {
   toPlanVersion: number
   expectedSubscriptionVersion: number
   appliedSubscriptionVersion: number
+  occurredAt: string
+}
+
+type SubscriptionPlanDowngradeAppliedAuditInput = {
+  eventId: string
+  changeId: string
+  subscriberId: string
+  subscriptionId: string
+  fromPlanId: string
+  fromPlanVersion: number
+  toPlanId: string
+  toPlanVersion: number
+  expectedSubscriptionVersion: number
+  appliedSubscriptionVersion: number
+  effectiveAt: string
   occurredAt: string
 }
 
@@ -463,13 +479,16 @@ async function readBoundedAuditJson(request: Request, maxBytes: number): Promise
 function parseSubscriptionPlanChangeRequestAuditInput(value: unknown): SubscriptionPlanChangeRequestAuditInput {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('INVALID_SUBSCRIPTION_PLAN_CHANGE_REQUEST_AUDIT')
   const body = value as Record<string, unknown>
-  const allowed = new Set(['eventId', 'attemptId', 'subscriberId', 'subscriptionId', 'targetPlanId', 'expectedEtag', 'requestedAt'])
+  const allowed = new Set(['eventId', 'attemptId', 'subscriberId', 'subscriptionId', 'targetPlanId', 'changeType', 'expectedEtag', 'requestedAt'])
   if (Object.keys(body).length !== allowed.size || Object.keys(body).some((key) => !allowed.has(key))) {
     throw new Error('INVALID_SUBSCRIPTION_PLAN_CHANGE_REQUEST_AUDIT')
   }
   if (
     typeof body.attemptId !== 'string' || !/^suca_[a-f0-9]{64}$/.test(body.attemptId) ||
-    body.eventId !== 'evt_subscription_plan_upgrade_requested_' + body.attemptId ||
+    (body.changeType !== 'UPGRADE' && body.changeType !== 'DOWNGRADE_SCHEDULE') ||
+    body.eventId !== (body.changeType === 'UPGRADE'
+      ? 'evt_subscription_plan_upgrade_requested_' + body.attemptId
+      : 'evt_subscription_plan_downgrade_scheduled_' + body.attemptId) ||
     typeof body.subscriberId !== 'string' || body.subscriberId.length < 1 || body.subscriberId.length > 256 ||
     body.subscriberId.trim() !== body.subscriberId || /[\u0000-\u001f\u007f]/.test(body.subscriberId) ||
     typeof body.subscriptionId !== 'string' || body.subscriptionId.length < 1 || body.subscriptionId.length > 256 ||
@@ -509,6 +528,35 @@ function parseSubscriptionPlanUpgradeAppliedAuditInput(value: unknown): Subscrip
   ) throw new Error('INVALID_SUBSCRIPTION_PLAN_UPGRADE_APPLIED_AUDIT')
   return body as SubscriptionPlanUpgradeAppliedAuditInput
 }
+function parseSubscriptionPlanDowngradeAppliedAuditInput(value: unknown): SubscriptionPlanDowngradeAppliedAuditInput {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('INVALID_SUBSCRIPTION_PLAN_DOWNGRADE_APPLIED_AUDIT')
+  const body = value as Record<string, unknown>
+  const allowed = new Set(['eventId', 'changeId', 'subscriberId', 'subscriptionId', 'fromPlanId', 'fromPlanVersion', 'toPlanId', 'toPlanVersion', 'expectedSubscriptionVersion', 'appliedSubscriptionVersion', 'effectiveAt', 'occurredAt'])
+  if (Object.keys(body).length !== allowed.size || Object.keys(body).some((key) => !allowed.has(key))) {
+    throw new Error('INVALID_SUBSCRIPTION_PLAN_DOWNGRADE_APPLIED_AUDIT')
+  }
+  if (
+    typeof body.changeId !== 'string' || !/^sudc_[a-f0-9]{64}$/.test(body.changeId) ||
+    body.eventId !== 'evt_subscription_plan_downgrade_applied_' + body.changeId ||
+    typeof body.subscriberId !== 'string' || body.subscriberId.length < 1 || body.subscriberId.length > 256 ||
+    body.subscriberId.trim() !== body.subscriberId || /[\u0000-\u001f\u007f]/.test(body.subscriberId) ||
+    typeof body.subscriptionId !== 'string' || body.subscriptionId.length < 1 || body.subscriptionId.length > 256 ||
+    body.subscriptionId.trim() !== body.subscriptionId || /[\u0000-\u001f\u007f]/.test(body.subscriptionId) ||
+    typeof body.fromPlanId !== 'string' || !/^plan_[a-f0-9]{64}$/.test(body.fromPlanId) ||
+    !Number.isSafeInteger(body.fromPlanVersion) || (body.fromPlanVersion as number) < 1 ||
+    typeof body.toPlanId !== 'string' || !/^plan_[a-f0-9]{64}$/.test(body.toPlanId) ||
+    !Number.isSafeInteger(body.toPlanVersion) || (body.toPlanVersion as number) < 1 ||
+    !Number.isSafeInteger(body.expectedSubscriptionVersion) || (body.expectedSubscriptionVersion as number) < 1 ||
+    !Number.isSafeInteger(body.appliedSubscriptionVersion) ||
+    body.appliedSubscriptionVersion !== (body.expectedSubscriptionVersion as number) + 1 ||
+    typeof body.effectiveAt !== 'string' || Number.isNaN(Date.parse(body.effectiveAt)) ||
+    new Date(body.effectiveAt).toISOString() !== body.effectiveAt ||
+    typeof body.occurredAt !== 'string' || Number.isNaN(Date.parse(body.occurredAt)) ||
+    new Date(body.occurredAt).toISOString() !== body.occurredAt
+  ) throw new Error('INVALID_SUBSCRIPTION_PLAN_DOWNGRADE_APPLIED_AUDIT')
+  return body as SubscriptionPlanDowngradeAppliedAuditInput
+}
+
 
 function parseCommerceOrderAuditInput(value: unknown): CommerceOrderAuditInput {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('INVALID_COMMERCE_ORDER_AUDIT')
@@ -965,14 +1013,55 @@ export default {
         requestId: principal.requestId,
         traceId: principal.correlationId,
         actor: { actorId: principal.userId, actorType: 'user', layer: principal.layer as AuditEvent['actor']['layer'] },
-        action: 'subscription.plan_upgrade.requested',
+        action: input.changeType === 'UPGRADE'
+          ? 'subscription.plan_upgrade.requested'
+          : 'subscription.plan_downgrade.requested',
         targetType: 'Subscription',
         targetId: input.subscriptionId,
         before: { expectedEtag: input.expectedEtag },
-        after: { attemptId: input.attemptId, targetPlanId: input.targetPlanId },
+        after: {
+          changeId: input.attemptId,
+          targetPlanId: input.targetPlanId,
+          changeType: input.changeType,
+        },
         occurredAt: input.requestedAt,
       }
       return persistIdempotentSubscriptionPlanChangeRequestAudit(env, event)
+    }
+
+    if (request.method === 'POST' && url.pathname === '/internal/audit-events/subscription-plan-downgrade-applied') {
+      let transport: ReturnType<typeof requireW07Transport>
+      try { transport = requireW07Transport(request) }
+      catch (error) { return errorResponse(error, request.headers.get('X-LuckRead-Request-Id')?.trim()) }
+      let input: SubscriptionPlanDowngradeAppliedAuditInput
+      try { input = parseSubscriptionPlanDowngradeAppliedAuditInput(await readBoundedAuditJson(request, 4096)) }
+      catch { return json({ error: 'INVALID_SUBSCRIPTION_PLAN_DOWNGRADE_APPLIED_AUDIT' }, 400) }
+      if (input.subscriberId !== transport.userId) return json({ error: 'PERMISSION_DENIED' }, 403)
+      const event: AuditEvent = {
+        eventId: input.eventId,
+        requestId: transport.requestId,
+        traceId: transport.correlationId,
+        actor: { actorId: 'W07', actorType: 'service' },
+        action: 'subscription.plan_downgraded',
+        targetType: 'Subscription',
+        targetId: input.subscriptionId,
+        before: {
+          subscriberId: input.subscriberId,
+          planId: input.fromPlanId,
+          planVersion: input.fromPlanVersion,
+          subscriptionVersion: input.expectedSubscriptionVersion,
+        },
+        after: {
+          subscriberId: input.subscriberId,
+          planId: input.toPlanId,
+          planVersion: input.toPlanVersion,
+          subscriptionVersion: input.appliedSubscriptionVersion,
+          changeId: input.changeId,
+          effectiveAt: input.effectiveAt,
+        },
+        occurredAt: input.occurredAt,
+      }
+      return persistImmutableAuditEvent(env, event)
     }
 
     if (request.method === 'POST' && url.pathname === '/internal/audit-events/subscription-plan-upgraded') {
