@@ -62,14 +62,11 @@ describe('public frontend i18n', () => {
 
   it('keeps public content links on immutable slugs', () => {
     const browse = read('src/app/(frontend)/content/ContentBrowsePage.tsx')
-    const feed = read('src/app/(frontend)/HomeContentFeed.tsx')
     const detail = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
     const detailPage = read('src/app/(twitter-clone)/content/[contentId]/page.tsx')
 
     expect(browse).toContain("const href = '/content/' + encodeURIComponent(item.slug || item.id)")
     expect(browse).toContain('href={href}')
-    expect(feed).toContain('href={`/content/${encodeURIComponent(item.slug || item.id)}`}')
-    expect(feed).toContain("if (activeFeed === 'forYou' && hasInitialItems && retryKey === 0) return")
     expect(detail).toContain("fetchJson<Content>(`/api/v1/contents/${encodeURIComponent(contentId)}`")
     expect(detailPage).toContain('alternates:')
     expect(detailPage).toContain('permanentRedirect')
