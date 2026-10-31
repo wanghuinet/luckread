@@ -143,7 +143,10 @@ jobs:
             /tmp/w07-plan-change-triggers.json \
             /tmp/w07-plan-upgrade-schema.json \
             /tmp/w07-plan-upgrade-indexes.json \
-            /tmp/w07-plan-upgrade-triggers.json
+            /tmp/w07-plan-upgrade-triggers.json \
+            /tmp/w07-trial-schema.json \
+            /tmp/w07-trial-indexes.json \
+            /tmp/w07-trial-triggers.json
 
       - name: Require D1-04 refund and billing migration readiness
         id: d1_04_deploy_preflight
