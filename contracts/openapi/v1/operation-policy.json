@@ -2552,6 +2552,21 @@
       "x-luckread-source": "contracts/api/commerce-operation-policy.v1.json"
     },
     {
+      "operationId": "scheduleSubscriptionBillingIntervalChange",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "subscription.change_plan"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": true,
+      "idempotencyRequired": true,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "CONTRACTED_PARTIAL",
+      "x-luckread-source": "contracts/api/commerce-operation-policy.v1.json"
+    },
+    {
       "operationId": "scheduleSubscriptionPlanDowngrade",
       "auth": {
         "mode": "permission"

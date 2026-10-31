@@ -15,6 +15,7 @@ const SUBSCRIPTION_ID = 'sub_' + 'c'.repeat(64);
 type Cycle = {
   cycle_id: string; provider: string; merchant_id: string; subscription_id: string;
   subscriber_id: string; plan_id: string; plan_version: number; cycle_start: string; cycle_end: string;
+  billing_interval: 'MONTHLY' | 'YEARLY';
   amount_minor: number | null; order_id: string | null; payment_id: string | null; state: string;
   provider_response_status: string | null; pricing_snapshot_json: string | null;
   subscription_sync_state: 'PENDING' | 'APPLIED' | 'RECONCILIATION_REQUIRED';
@@ -23,6 +24,8 @@ type Cycle = {
 };
 type Subscription = {
   subscription_id: string; subscriber_id: string; plan_id: string; plan_version: number;
+  creator_id: string | null; billing_interval: 'MONTHLY' | 'YEARLY'; tier: string;
+  price_minor: number; currency: string;
   status: 'PENDING' | 'ACTIVE' | 'PAST_DUE' | 'PAUSED' | 'CANCELED' | 'EXPIRED';
   current_period_start: string; current_period_end: string; cancel_at: string | null;
   updated_at: string; version: number;
@@ -31,7 +34,7 @@ type Subscription = {
 const makeCycle = (overrides: Partial<Cycle> = {}): Cycle => ({
   cycle_id: CYCLE_ID, provider: 'hyperswitch', merchant_id: 'merchant_test',
   subscription_id: SUBSCRIPTION_ID, subscriber_id: 'user_1', plan_id: 'plan_1', plan_version: 2,
-  cycle_start: CYCLE_START, cycle_end: CYCLE_END, amount_minor: 1200,
+  cycle_start: CYCLE_START, cycle_end: CYCLE_END, billing_interval: 'MONTHLY', amount_minor: 1200,
   order_id: 'ord_1', payment_id: PAYMENT_ID, state: 'SUCCEEDED',
   provider_response_status: 'succeeded', pricing_snapshot_json: JSON.stringify({ currency: 'USD', items: [] }),
   subscription_sync_state: 'PENDING', subscription_sync_updated_at: null,
@@ -40,7 +43,8 @@ const makeCycle = (overrides: Partial<Cycle> = {}): Cycle => ({
 
 const makeSubscription = (overrides: Partial<Subscription> = {}): Subscription => ({
   subscription_id: SUBSCRIPTION_ID, subscriber_id: 'user_1', plan_id: 'plan_1',
-  plan_version: 2, status: 'ACTIVE', current_period_start: START,
+  plan_version: 2, creator_id: 'creator_1', billing_interval: 'MONTHLY', tier: 'ENTRY',
+  price_minor: 1200, currency: 'USD', status: 'ACTIVE', current_period_start: START,
   current_period_end: CYCLE_START, cancel_at: null, updated_at: START, version: 3, ...overrides,
 });
 
