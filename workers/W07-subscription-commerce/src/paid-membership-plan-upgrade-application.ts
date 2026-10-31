@@ -262,7 +262,8 @@ export async function applyPaidMembershipPlanUpgrade(
     throw new PaidMembershipUpgradeApplicationError();
   }
   if (existing.status === 'APPLIED' && matchesApplication(existing, input)) return 'ALREADY_APPLIED';
-  if (existing.status !== 'PENDING_PAYMENT' || existing.payment_id !== null) {
+  const paymentAlreadyAttached = existing.status === 'READY' && existing.payment_id === input.paymentId;
+  if (!paymentAlreadyAttached && (existing.status !== 'PENDING_PAYMENT' || existing.payment_id !== null)) {
     throw new PaidMembershipUpgradeApplicationError();
   }
 
@@ -292,29 +293,40 @@ export async function applyPaidMembershipPlanUpgrade(
   const subscriptionUpdatedAt = timestampAfterBoth(applicationReadyAt, subscription.updated_at);
   let results: D1Result[];
   try {
-    results = await db.batch([
-      db.prepare(
-        "UPDATE membership_subscription_plan_change_applications SET payment_id = ?, status = 'READY', " +
-        'version = version + 1, updated_at = ? WHERE application_id = ? AND order_id = ? ' +
-        "AND status = 'PENDING_PAYMENT' AND payment_id IS NULL",
-      ).bind(input.paymentId, applicationReadyAt, applicationId, input.orderId),
-      db.prepare(
-        'UPDATE membership_subscriptions SET plan_id = ?, plan_version = ?, updated_at = ?, version = version + 1 ' +
-        'WHERE subscription_id = ? AND subscriber_id = ? AND plan_id = ? AND plan_version = ? ' +
-        "AND status = 'ACTIVE' AND cancel_at IS NULL AND version = ? " +
-        'AND current_period_start = ? AND current_period_end = ?',
-      ).bind(
-        input.targetPlanId, input.targetPlanVersion, subscriptionUpdatedAt,
-        input.subscriptionId, input.subscriberId, input.sourcePlanId, input.sourcePlanVersion,
-        input.expectedSubscriptionVersion, input.currentPeriodStart, input.currentPeriodEnd,
-      ),
-    ]);
+    const subscriptionUpdate = db.prepare(
+      'UPDATE membership_subscriptions SET plan_id = ?, plan_version = ?, updated_at = ?, version = version + 1 ' +
+      'WHERE subscription_id = ? AND subscriber_id = ? AND plan_id = ? AND plan_version = ? ' +
+      "AND status = 'ACTIVE' AND cancel_at IS NULL AND version = ? " +
+      'AND current_period_start = ? AND current_period_end = ?',
+    ).bind(
+      input.targetPlanId, input.targetPlanVersion, subscriptionUpdatedAt,
+      input.subscriptionId, input.subscriberId, input.sourcePlanId, input.sourcePlanVersion,
+      input.expectedSubscriptionVersion, input.currentPeriodStart, input.currentPeriodEnd,
+    );
+    if (paymentAlreadyAttached) {
+      // A previous signed webhook may have durably attached READY but lost the
+      // subscription CAS race. Retry only that CAS; never reattach/change the
+      // same payment reference or increment the application twice.
+      results = await db.batch([subscriptionUpdate]);
+    } else {
+      results = await db.batch([
+        db.prepare(
+          "UPDATE membership_subscription_plan_change_applications SET payment_id = ?, status = 'READY', " +
+          'version = version + 1, updated_at = ? WHERE application_id = ? AND order_id = ? ' +
+          "AND status = 'PENDING_PAYMENT' AND payment_id IS NULL",
+        ).bind(input.paymentId, applicationReadyAt, applicationId, input.orderId),
+        subscriptionUpdate,
+      ]);
+    }
   } catch {
     throw new PaidMembershipUpgradeApplicationError();
   }
 
-  if (results.length !== 2 || Number(results[0]?.meta?.changes ?? 0) !== 1 ||
-      Number(results[1]?.meta?.changes ?? 0) !== 1) {
+  const subscriptionChangeCount = Number(results[paymentAlreadyAttached ? 0 : 1]?.meta?.changes ?? 0);
+  const applicationChangeCount = paymentAlreadyAttached ? 0 : Number(results[0]?.meta?.changes ?? 0);
+  if (results.length !== (paymentAlreadyAttached ? 1 : 2) ||
+      subscriptionChangeCount !== 1 ||
+      (!paymentAlreadyAttached && applicationChangeCount !== 1)) {
     throw new PaidMembershipUpgradeApplicationError();
   }
 
