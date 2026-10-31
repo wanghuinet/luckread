@@ -20,6 +20,8 @@ import { useColorScheme } from "nativewind";
 
 
 
+
+
 const TabBarBackground = () => {
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
@@ -89,7 +91,6 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => <Foundation name="play-circle" size={26} color={'#000'} />,
         }}
       />
-      <Tabs.Screen name="(grok)" options={{ href: null }} />
       <Tabs.Screen
         name="(notifications)"
         options={{
