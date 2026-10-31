@@ -442,7 +442,7 @@ export async function expireDueWebMembershipTrials(
   }>()).results ?? [];
   let expired = 0;
   for (const row of rows) {
-    if (row.trial_source === 'WEB' && ['TRIALING', 'PAYMENT_FAILED'].includes(row.trial_status) && d1_04) {
+    if (row.trial_source === 'WEB' && ['TRIALING', 'CANCELED', 'PAYMENT_FAILED'].includes(row.trial_status) && d1_04) {
       let cycle: { state: string; attempt_number: number; subscription_sync_state: string; mandate_record_id: string | null } | null;
       try {
         cycle = await d1_04.prepare(
@@ -455,14 +455,16 @@ export async function expireDueWebMembershipTrials(
         throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
       }
       if (cycle && (
-        ['SUCCEEDED', 'SUBMITTED', 'SUBMITTING', 'PAYMENT_READY', 'PREPARED', 'RECONCILIATION_REQUIRED'].includes(cycle.state) ||
-        (['SUCCEEDED', 'FAILED'].includes(cycle.state) && cycle.subscription_sync_state !== 'APPLIED')
+        ['SUBMITTED', 'SUBMITTING', 'RECONCILIATION_REQUIRED'].includes(cycle.state) ||
+        (cycle.state === 'SUCCEEDED' && cycle.subscription_sync_state !== 'APPLIED') ||
+        (row.trial_status !== 'CANCELED' && ['PAYMENT_READY', 'PREPARED'].includes(cycle.state)) ||
+        (row.trial_status !== 'CANCELED' && cycle.state === 'FAILED' && cycle.subscription_sync_state !== 'APPLIED')
       )) {
         // Never expire a trial while a submitted payment or uncertain terminal
         // outcome could still convert the same Subscription.
         continue;
       }
-      if (cycle && cycle.state === 'FAILED' && cycle.attempt_number < 5) {
+      if (cycle && row.trial_status !== 'CANCELED' && cycle.state === 'FAILED' && cycle.attempt_number < 5) {
         if (cycle.mandate_record_id) {
           const mandate = await d1_04.prepare(
             'SELECT status FROM payment_mandates WHERE mandate_record_id = ? LIMIT 1',
