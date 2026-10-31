@@ -323,17 +323,54 @@ export async function syncTerminalRenewalCycleToSubscription(
 
   const subscription = await readSubscription(env.D1_01, cycle.subscription_id, cycle.subscriber_id);
   if (!subscription) return reconcile(env, cycle, 'SUBSCRIPTION_NOT_FOUND', now);
-  if (subscription.subscription_id !== cycle.subscription_id || subscription.subscriber_id !== cycle.subscriber_id ||
-      subscription.plan_id !== cycle.plan_id || subscription.plan_version !== cycle.plan_version) {
-    return reconcile(env, cycle, 'SUBSCRIPTION_IDENTITY_OR_PLAN_MISMATCH', now);
+  if (subscription.subscription_id !== cycle.subscription_id || subscription.subscriber_id !== cycle.subscriber_id) {
+    return reconcile(env, cycle, 'SUBSCRIPTION_IDENTITY_MISMATCH', now);
   }
   if (!isCanonicalIso(subscription.updated_at)) {
     return reconcile(env, cycle, 'SUBSCRIPTION_UPDATED_AT_INVALID', now);
   }
 
+  const scheduledChange = await readScheduledSubscriptionPlanDowngradeForPeriod(
+    env.D1_01, cycle.subscription_id, cycle.subscriber_id, cycle.cycle_start, true,
+  );
+  const currentPlanMatchesCycle =
+    subscription.plan_id === cycle.plan_id && subscription.plan_version === cycle.plan_version;
+  const cycleMatchesScheduledTarget = !!scheduledChange &&
+    scheduledChange.expectedPlanId === subscription.plan_id &&
+    scheduledChange.expectedPlanVersion === subscription.plan_version &&
+    scheduledChange.targetPlanId === cycle.plan_id &&
+    scheduledChange.targetPlanVersion === cycle.plan_version;
+  if (!currentPlanMatchesCycle && !(scheduledChange?.status === 'SCHEDULED' && cycleMatchesScheduledTarget)) {
+    return reconcile(env, cycle, 'SUBSCRIPTION_IDENTITY_OR_PLAN_MISMATCH', now);
+  }
+  if (scheduledChange) {
+    if (scheduledChange.effectiveAt !== cycle.cycle_start ||
+        scheduledChange.subscriberId !== cycle.subscriber_id ||
+        scheduledChange.subscriptionId !== cycle.subscription_id) {
+      return reconcile(env, cycle, 'SCHEDULED_PLAN_CHANGE_IDENTITY_MISMATCH', now);
+    }
+    const target = await readScheduledDowngradeTargetPlan(env.D1_01, scheduledChange);
+    if (!target || target.creatorId !== subscription.creator_id) {
+      return reconcile(env, cycle, 'SCHEDULED_PLAN_TARGET_INVALID', now);
+    }
+    if (scheduledChange.status === 'APPLIED' &&
+        (!currentPlanMatchesCycle ||
+         scheduledChange.appliedSubscriptionVersion === null ||
+         scheduledChange.appliedSubscriptionVersion !== subscription.version)) {
+      return reconcile(env, cycle, 'SCHEDULED_PLAN_APPLIED_MARKER_MISMATCH', now);
+    }
+  }
+
   // A matching period proves another concurrent/replayed sync applied this cycle.
   // Preserve any subsequent user lifecycle state; never reactivate canceled/paused subscriptions.
   if (subscription.current_period_start === cycle.cycle_start && subscription.current_period_end === cycle.cycle_end) {
+    if (scheduledChange?.status === 'APPLIED' &&
+        !(await auditAppliedSubscriptionPlanDowngrade(env, cycle, scheduledChange))) {
+      return { cycleId: cycle.cycle_id, subscriptionId: cycle.subscription_id, outcome: 'PENDING_RETRY' };
+    }
+    if (scheduledChange?.status === 'SCHEDULED') {
+      return reconcile(env, cycle, 'SCHEDULED_PLAN_CHANGE_NOT_MARKED_APPLIED', now);
+    }
     const marked = await markCycleSyncState(env.D1_04, cycle, 'APPLIED', null, now);
     return {
       cycleId: cycle.cycle_id, subscriptionId: cycle.subscription_id,
@@ -353,16 +390,31 @@ export async function syncTerminalRenewalCycleToSubscription(
     if (!['ACTIVE', 'PAST_DUE'].includes(subscription.status)) {
       return reconcile(env, cycle, 'SUBSCRIPTION_STATE_FORBIDS_REACTIVATION', now);
     }
+    if (scheduledChange?.status === 'APPLIED') {
+      return reconcile(env, cycle, 'SCHEDULED_PLAN_ALREADY_APPLIED_WITHOUT_PERIOD_ADVANCE', now);
+    }
     const result = await applySubscriptionUpdate(
       env, cycle, subscription, 'ACTIVE', cycle.cycle_start, cycle.cycle_end, now,
+      scheduledChange?.status === 'SCHEDULED' ? scheduledChange : undefined,
     );
     if (result === 'CAS_LOST') return reconcile(env, cycle, 'SUBSCRIPTION_CAS_LOST', now);
+
+    if (scheduledChange?.status === 'SCHEDULED') {
+      const appliedChange = await readScheduledSubscriptionPlanDowngradeForPeriod(
+        env.D1_01, cycle.subscription_id, cycle.subscriber_id, cycle.cycle_start, true,
+      );
+      if (!appliedChange || appliedChange.status !== 'APPLIED' ||
+          !(await auditAppliedSubscriptionPlanDowngrade(env, cycle, appliedChange))) {
+        return { cycleId: cycle.cycle_id, subscriptionId: cycle.subscription_id, outcome: 'PENDING_RETRY' };
+      }
+    }
     const marked = await markCycleSyncState(env.D1_04, cycle, 'APPLIED', null, now);
     return {
       cycleId: cycle.cycle_id, subscriptionId: cycle.subscription_id,
       outcome: !marked ? 'PENDING_RETRY' : result,
     };
   }
+
 
   // A failed renewal moves only ACTIVE -> PAST_DUE. The paid-through period does
   // not advance, and duplicate failure delivery does not increment version twice.
