@@ -2834,7 +2834,7 @@
         "MON-003",
         "MON-005"
       ],
-      "schemaRef": "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json#membershipSubscriptionTrialTable",
+      "schemaRef": "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json#trial",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/memberships/subscriptions/trial",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
@@ -2855,7 +2855,7 @@
         "MON-003",
         "MON-005"
       ],
-      "schemaRef": "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json#membershipSubscriptionTrialTable",
+      "schemaRef": "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json#trial",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/memberships/subscriptions/{subscriptionId}/cancel-trial",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
