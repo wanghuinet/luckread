@@ -174,7 +174,8 @@ export async function POST(request: Request): Promise<Response> {
       typeof plan.tier !== 'string' || !/^[a-z][a-z0-9_-]{0,63}$/.test(plan.tier) ||
       (plan.billingInterval !== 'MONTHLY' && plan.billingInterval !== 'YEARLY') ||
       typeof plan.priceMinor !== 'number' || !Number.isSafeInteger(plan.priceMinor) || plan.priceMinor < 0 || plan.priceMinor > 2_147_483_647 ||
-      typeof plan.currency !== 'string' || !/^[A-Z]{3}$/.test(plan.currency)
+      typeof plan.currency !== 'string' || !/^[A-Z]{3}$/.test(plan.currency) ||
+      typeof plan.trialDays !== 'number' || !Number.isSafeInteger(plan.trialDays) || plan.trialDays < 0 || plan.trialDays > 90
     ) {
       return errorResponse(503, 'PLAN_RESPONSE_INVALID', 'Membership plan result could not be verified')
     }
@@ -197,6 +198,7 @@ export async function POST(request: Request): Promise<Response> {
           billingInterval: plan.billingInterval,
           priceMinor: plan.priceMinor,
           currency: plan.currency,
+          trialDays: plan.trialDays,
         },
       })
     } catch {
