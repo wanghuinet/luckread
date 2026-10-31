@@ -673,6 +673,7 @@ type ChargeSubscriptionRow = Readonly<{
   subscriber_id: string;
   plan_id: string;
   plan_version: number;
+  creator_id: string | null;
   status: string;
   current_period_end: string;
   cancel_at: string | null;
@@ -685,7 +686,7 @@ async function isSubscriptionChargeableForCycle(
   let subscription: ChargeSubscriptionRow | null;
   try {
     subscription = await env.D1_01.prepare(
-      'SELECT subscription_id, subscriber_id, plan_id, plan_version, status, current_period_end, cancel_at ' +
+      'SELECT subscription_id, subscriber_id, plan_id, plan_version, creator_id, status, current_period_end, cancel_at ' +
       'FROM membership_subscriptions WHERE subscription_id = ? AND subscriber_id = ? LIMIT 1',
     ).bind(cycle.subscription_id, cycle.subscriber_id).first<ChargeSubscriptionRow>();
   } catch {
