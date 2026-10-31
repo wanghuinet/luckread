@@ -136,16 +136,3 @@ export function startWebMembershipTrial(planId: string) {
   });
 }
 
-/** Cancel only a WEB trial conversion; the current trial access remains until its end. */
-export function cancelWebMembershipTrial(subscriptionId: string, etag: string) {
-  if (typeof subscriptionId !== 'string' || !/^sub_[a-f0-9]{64}$/.test(subscriptionId)) {
-    throw new RangeError('A canonical subscription ID is required.');
-  }
-  if (typeof etag !== 'string' || !/^"lr-v([1-9]\d*)"$/.test(etag)) {
-    throw new RangeError('A valid subscription version is required.');
-  }
-  return apiRequest<unknown>('/memberships/subscriptions/' + encodeURIComponent(subscriptionId) + '/cancel-trial', {
-    method: 'POST',
-    headers: { 'If-Match': etag },
-  });
-}
