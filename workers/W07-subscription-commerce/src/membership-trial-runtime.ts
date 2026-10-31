@@ -447,3 +447,247 @@ export async function expireDueStoreMembershipTrials(
   }
   return { scanned: rows.length, expired };
 }
+
+
+export type RevenueCatStoreTrialCandidate = Readonly<{
+  planId: string;
+  planVersion: number;
+  creatorId: string;
+  store: 'APP_STORE' | 'PLAY_STORE';
+  productId: string;
+  currentState: 'TRIALING' | 'ACTIVE' | 'EXPIRED' | 'REFUNDED';
+  purchaseDate: string;
+  effectiveExpiresAt: string | null;
+  originalTransactionId: string | number | null;
+  periodType: string | null;
+  unsubscribeDetectedAt: string | null;
+}>;
+
+export type RevenueCatStoreTrialSyncResult = Readonly<{
+  created: number;
+  canceled: number;
+  converted: number;
+  expired: number;
+  unchanged: number;
+}>;
+
+function canonicalDate(value: string): string {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500);
+  return date.toISOString();
+}
+
+async function readStoreTrial(
+  db: D1Database,
+  source: 'APP_STORE' | 'PLAY_STORE',
+  appId: string,
+  originalTransactionId: string,
+): Promise<TrialRow | null> {
+  try {
+    return await db.prepare(
+      'SELECT trial_id, subscription_id, subscriber_id, plan_id, plan_version, source, provider_app_id, ' +
+      'product_id, original_transaction_id, started_at, trial_ends_at, status, request_hash, version, created_at, updated_at ' +
+      'FROM membership_subscription_trials WHERE source = ? AND provider_app_id = ? AND original_transaction_id = ? LIMIT 1',
+    ).bind(source, appId, originalTransactionId).first<TrialRow>();
+  } catch {
+    throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
+  }
+}
+
+async function applyStoreTrialCancellation(
+  db: D1Database,
+  trial: TrialRow,
+  subscription: TrialSubscriptionRow,
+): Promise<boolean> {
+  if (trial.status === 'CANCELED' && subscription.cancel_at === trial.trial_ends_at) return false;
+  if (trial.status !== 'TRIALING' || subscription.status !== 'TRIALING') {
+    throw new SubscriptionRuntimeError('CONFLICT', 409);
+  }
+  const updatedAt = new Date(Math.max(Date.now(), Date.parse(subscription.updated_at) + 1)).toISOString();
+  const results = await db.batch([
+    db.prepare(
+      "UPDATE membership_subscriptions SET cancel_at = ?, updated_at = ?, version = version + 1 " +
+      "WHERE subscription_id = ? AND subscriber_id = ? AND status = 'TRIALING' AND cancel_at IS NULL AND version = ?",
+    ).bind(trial.trial_ends_at, updatedAt, subscription.subscription_id, subscription.subscriber_id, subscription.version),
+    db.prepare(
+      "UPDATE membership_subscription_trials SET status = 'CANCELED', version = version + 1, updated_at = ? " +
+      "WHERE trial_id = ? AND subscriber_id = ? AND status = 'TRIALING' AND version = ?",
+    ).bind(updatedAt, trial.trial_id, trial.subscriber_id, trial.version),
+  ]);
+  if (results.length !== 2 || Number(results[0]?.meta?.changes ?? 0) !== 1 ||
+      Number(results[1]?.meta?.changes ?? 0) !== 1) {
+    throw new SubscriptionRuntimeError('PRECONDITION_FAILED', 412);
+  }
+  return true;
+}
+
+/**
+ * Materializes store trial/renewal lifecycle from a RevenueCat current customer
+ * snapshot whose queried App User ID has already been verified against W02.
+ * This is the only store-trial D1-01 write path; client-supplied purchase data
+ * is never accepted and RevenueCat webhook inbox rows remain receipt-only.
+ */
+export async function syncRevenueCatStoreTrialCandidates(
+  db: D1Database,
+  subscriberIdInput: string,
+  appIdInput: string,
+  candidates: readonly RevenueCatStoreTrialCandidate[],
+): Promise<RevenueCatStoreTrialSyncResult> {
+  const subscriberId = validatePrincipal(subscriberIdInput);
+  if (!boundedText(appIdInput, 255) || !Array.isArray(candidates) || candidates.length > 256) {
+    throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400);
+  }
+
+  let created = 0;
+  let canceled = 0;
+  let converted = 0;
+  let expired = 0;
+  let unchanged = 0;
+
+  for (const candidate of candidates) {
+    if (candidate.currentState === 'TRIALING' && candidate.periodType !== 'TRIAL') {
+      throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500);
+    }
+    if (candidate.periodType !== 'TRIAL' &&
+        candidate.currentState !== 'ACTIVE' &&
+        candidate.currentState !== 'EXPIRED' &&
+        candidate.currentState !== 'REFUNDED') {
+      continue;
+    }
+    const originalTransactionId = candidate.originalTransactionId === null
+      ? ''
+      : String(candidate.originalTransactionId);
+    if (!boundedText(originalTransactionId, 255) ||
+        !boundedText(candidate.productId, 255) ||
+        !PLAN_ID.test(candidate.planId) ||
+        !Number.isSafeInteger(candidate.planVersion) || candidate.planVersion < 1 ||
+        !boundedText(candidate.creatorId) ||
+        (candidate.store !== 'APP_STORE' && candidate.store !== 'PLAY_STORE')) {
+      if (candidate.periodType === 'TRIAL' || candidate.currentState === 'TRIALING') {
+        throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500);
+      }
+      continue;
+    }
+
+    const existing = await readStoreTrial(db, candidate.store, appIdInput, originalTransactionId);
+    if (!existing) {
+      if (candidate.currentState !== 'TRIALING' || candidate.periodType !== 'TRIAL' ||
+          !candidate.effectiveExpiresAt) {
+        unchanged += 1;
+        continue;
+      }
+      const startedAt = canonicalDate(candidate.purchaseDate);
+      const trialEndsAt = canonicalDate(candidate.effectiveExpiresAt);
+      if (Date.parse(trialEndsAt) <= Date.parse(startedAt)) {
+        throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500);
+      }
+      const identityMaterial = 'revenuecat-store-trial-v1\u0000' + candidate.store + '\u0000' +
+        appIdInput + '\u0000' + originalTransactionId;
+      const identityHash = await digest(identityMaterial);
+      const subscriptionId = 'sub_' + identityHash;
+      const trialId = 'mtr_' + identityHash.slice(0, 26);
+      const requestHash = await digest(JSON.stringify({
+        version: 1, subscriberId, appId: appIdInput, source: candidate.store,
+        originalTransactionId, planId: candidate.planId, planVersion: candidate.planVersion,
+      }));
+      const cancelAt = candidate.unsubscribeDetectedAt ? trialEndsAt : null;
+      try {
+        const results = await db.batch([
+          db.prepare(
+            'INSERT INTO membership_subscriptions ' +
+            '(subscription_id, subscriber_id, plan_id, plan_version, creator_id, status, started_at, current_period_start, current_period_end, cancel_at, entitlement_snapshot_ref, created_at, updated_at, version) ' +
+            "VALUES (?, ?, ?, ?, ?, 'TRIALING', ?, ?, ?, ?, NULL, ?, ?, 1)",
+          ).bind(
+            subscriptionId, subscriberId, candidate.planId, candidate.planVersion, candidate.creatorId,
+            startedAt, startedAt, trialEndsAt, cancelAt, startedAt, startedAt,
+          ),
+          db.prepare(
+            'INSERT INTO membership_subscription_trials ' +
+            '(trial_id, subscription_id, subscriber_id, plan_id, plan_version, source, provider_app_id, product_id, original_transaction_id, started_at, trial_ends_at, status, request_hash, version, created_at, updated_at) ' +
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)",
+          ).bind(
+            trialId, subscriptionId, subscriberId, candidate.planId, candidate.planVersion,
+            candidate.store, appIdInput, candidate.productId, originalTransactionId, startedAt,
+            trialEndsAt, cancelAt ? 'CANCELED' : 'TRIALING', requestHash, startedAt, startedAt,
+          ),
+        ]);
+        if (results.length !== 2 || Number(results[0]?.meta?.changes ?? 0) !== 1 ||
+            Number(results[1]?.meta?.changes ?? 0) !== 1) {
+          throw new SubscriptionRuntimeError('CONFLICT', 409);
+        }
+        created += 1;
+        if (cancelAt) canceled += 1;
+      } catch (error) {
+        if (error instanceof SubscriptionRuntimeError) throw error;
+        throw new SubscriptionRuntimeError('CONFLICT', 409);
+      }
+      continue;
+    }
+
+    if (existing.subscriber_id !== subscriberId || existing.plan_id !== candidate.planId ||
+        existing.plan_version !== candidate.planVersion || existing.source !== candidate.store ||
+        existing.provider_app_id !== appIdInput || existing.product_id !== candidate.productId) {
+      throw new SubscriptionRuntimeError('CONFLICT', 409);
+    }
+
+    let subscription: TrialSubscriptionRow | null;
+    try {
+      subscription = await db.prepare(
+        'SELECT * FROM membership_subscriptions WHERE subscription_id = ? AND subscriber_id = ? LIMIT 1',
+      ).bind(existing.subscription_id, subscriberId).first<TrialSubscriptionRow>();
+    } catch {
+      throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
+    }
+    if (!subscription) throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500);
+
+    if (candidate.periodType === 'TRIAL' && candidate.currentState === 'TRIALING') {
+      if (candidate.unsubscribeDetectedAt && existing.status === 'TRIALING') {
+        if (await applyStoreTrialCancellation(db, existing, subscription)) canceled += 1;
+        else unchanged += 1;
+      } else {
+        unchanged += 1;
+      }
+      continue;
+    }
+
+    if (candidate.currentState === 'ACTIVE' && candidate.periodType !== 'TRIAL' &&
+        ['TRIALING','CANCELED','PAYMENT_FAILED'].includes(existing.status)) {
+      if (!candidate.effectiveExpiresAt) throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500);
+      const paidPeriodEnd = canonicalDate(candidate.effectiveExpiresAt);
+      const paidPeriodStart = existing.trial_ends_at;
+      if (Date.parse(paidPeriodEnd) <= Date.parse(paidPeriodStart)) {
+        throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500);
+      }
+      const cancelAt = candidate.unsubscribeDetectedAt ? paidPeriodEnd : null;
+      const updatedAt = new Date(Math.max(Date.now(), Date.parse(subscription.updated_at) + 1)).toISOString();
+      const result = await db.prepare(
+        "UPDATE membership_subscriptions SET status = 'ACTIVE', current_period_start = ?, current_period_end = ?, " +
+        'cancel_at = ?, updated_at = ?, version = version + 1 ' +
+        "WHERE subscription_id = ? AND subscriber_id = ? AND status IN ('TRIALING','PAST_DUE') AND version = ?",
+      ).bind(
+        paidPeriodStart, paidPeriodEnd, cancelAt, updatedAt,
+        subscription.subscription_id, subscriberId, subscription.version,
+      ).run();
+      if (Number(result.meta?.changes ?? 0) !== 1) throw new SubscriptionRuntimeError('PRECONDITION_FAILED', 412);
+      converted += 1;
+      continue;
+    }
+
+    if ((candidate.currentState === 'EXPIRED' || candidate.currentState === 'REFUNDED') &&
+        ['TRIALING','CANCELED','PAYMENT_FAILED'].includes(existing.status) &&
+        subscription.status !== 'EXPIRED') {
+      const updatedAt = new Date(Math.max(Date.now(), Date.parse(subscription.updated_at) + 1)).toISOString();
+      const result = await db.prepare(
+        "UPDATE membership_subscriptions SET status = 'EXPIRED', updated_at = ?, version = version + 1 " +
+        "WHERE subscription_id = ? AND subscriber_id = ? AND status IN ('TRIALING','PAST_DUE') AND version = ?",
+      ).bind(updatedAt, subscription.subscription_id, subscriberId, subscription.version).run();
+      if (Number(result.meta?.changes ?? 0) !== 1) throw new SubscriptionRuntimeError('PRECONDITION_FAILED', 412);
+      expired += 1;
+      continue;
+    }
+
+    unchanged += 1;
+  }
+
+  return { created, canceled, converted, expired, unchanged };
+}
