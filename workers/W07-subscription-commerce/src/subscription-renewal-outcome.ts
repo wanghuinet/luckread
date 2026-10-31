@@ -17,7 +17,7 @@ type RenewalOutcomeCycle = Readonly<{
   cycle_id: string; provider: string; merchant_id: string; subscription_id: string;
   subscriber_id: string; plan_id: string; plan_version: number; cycle_start: string; cycle_end: string;
   amount_minor: number | null; order_id: string | null; payment_id: string | null; state: string;
-  provider_response_status: string | null; pricing_snapshot_json: string | null;
+  provider_response_status: string | null; offer_snapshot_json: string; pricing_snapshot_json: string | null;
   subscription_sync_state: 'PENDING' | 'APPLIED' | 'RECONCILIATION_REQUIRED';
   subscription_sync_updated_at: string | null; subscription_sync_error_code: string | null;
   version: number; updated_at: string;
@@ -28,6 +28,12 @@ type SubscriptionOutcomeRow = Readonly<{
   status: 'PENDING' | 'ACTIVE' | 'PAST_DUE' | 'PAUSED' | 'CANCELED' | 'EXPIRED';
   current_period_start: string; current_period_end: string; cancel_at: string | null;
   updated_at: string; version: number;
+  scheduled_change_id: string | null;
+  scheduled_source_plan_id: string | null;
+  scheduled_source_plan_version: number | null;
+  scheduled_target_plan_id: string | null;
+  scheduled_target_plan_version: number | null;
+  scheduled_effective_at: string | null;
 }>;
 
 export type RenewalOutcomeSyncResult = Readonly<{
@@ -74,7 +80,7 @@ async function readCycleById(db: D1Database, cycleId: string): Promise<RenewalOu
     return await db.prepare(
       'SELECT cycle_id, provider, merchant_id, subscription_id, subscriber_id, plan_id, plan_version, ' +
       'cycle_start, cycle_end, amount_minor, order_id, payment_id, state, provider_response_status, ' +
-      'pricing_snapshot_json, subscription_sync_state, subscription_sync_updated_at, subscription_sync_error_code, ' +
+      'offer_snapshot_json, pricing_snapshot_json, subscription_sync_state, subscription_sync_updated_at, subscription_sync_error_code, ' +
       'version, updated_at FROM subscription_renewal_cycles WHERE cycle_id = ? LIMIT 1',
     ).bind(cycleId).first<RenewalOutcomeCycle>();
   } catch {
@@ -87,9 +93,14 @@ async function readSubscription(
 ): Promise<SubscriptionOutcomeRow | null> {
   try {
     return await db.prepare(
-      'SELECT subscription_id, subscriber_id, plan_id, plan_version, status, current_period_start, ' +
-      'current_period_end, cancel_at, updated_at, version FROM membership_subscriptions ' +
-      'WHERE subscription_id = ? AND subscriber_id = ? LIMIT 1',
+      'SELECT s.subscription_id, s.subscriber_id, s.plan_id, s.plan_version, s.status, s.current_period_start, ' +
+      's.current_period_end, s.cancel_at, s.updated_at, s.version, ' +
+      'pc.change_id AS scheduled_change_id, pc.source_plan_id AS scheduled_source_plan_id, ' +
+      'pc.source_plan_version AS scheduled_source_plan_version, pc.target_plan_id AS scheduled_target_plan_id, ' +
+      'pc.target_plan_version AS scheduled_target_plan_version, pc.effective_at AS scheduled_effective_at ' +
+      'FROM membership_subscriptions s LEFT JOIN membership_subscription_plan_changes pc ' +
+      "ON pc.subscription_id = s.subscription_id AND pc.subscriber_id = s.subscriber_id AND pc.status = 'SCHEDULED' " +
+      'WHERE s.subscription_id = ? AND s.subscriber_id = ? LIMIT 1',
     ).bind(subscriptionId, subscriberId).first<SubscriptionOutcomeRow>();
   } catch {
     throw new RenewalOutcomeSyncError('SERVICE_UNAVAILABLE', 503);
@@ -119,6 +130,34 @@ async function markCycleSyncState(
   }
 }
 
+type CyclePlanChange = Readonly<{
+  changeId: string;
+  sourcePlanId: string;
+  sourcePlanVersion: number;
+}>;
+
+function planChangeFromCycle(cycle: RenewalOutcomeCycle): CyclePlanChange | null | false {
+  let value: unknown;
+  try { value = JSON.parse(cycle.offer_snapshot_json) as unknown; } catch { return false; }
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const snapshot = value as Record<string, unknown>;
+  const hasPlanChange = snapshot.planChangeId !== undefined ||
+    snapshot.sourcePlanId !== undefined || snapshot.sourcePlanVersion !== undefined;
+  if (!hasPlanChange) return null;
+  if (typeof snapshot.planChangeId !== 'string' || !/^spc_[A-Za-z0-9]{26}$/.test(snapshot.planChangeId) ||
+      !isBoundedId(snapshot.sourcePlanId) ||
+      !Number.isSafeInteger(snapshot.sourcePlanVersion) || (snapshot.sourcePlanVersion as number) < 1 ||
+      snapshot.planId !== cycle.plan_id || snapshot.planVersion !== cycle.plan_version ||
+      snapshot.subscriptionId !== cycle.subscription_id || snapshot.subscriberId !== cycle.subscriber_id) {
+    return false;
+  }
+  return {
+    changeId: snapshot.planChangeId,
+    sourcePlanId: snapshot.sourcePlanId,
+    sourcePlanVersion: snapshot.sourcePlanVersion as number,
+  };
+}
+
 function validTerminalCycle(cycle: RenewalOutcomeCycle): boolean {
   if (cycle.provider !== PROVIDER || !CYCLE_ID_PATTERN.test(cycle.cycle_id) ||
       !isBoundedId(cycle.subscription_id) || !isBoundedId(cycle.subscriber_id) ||
@@ -127,6 +166,8 @@ function validTerminalCycle(cycle: RenewalOutcomeCycle): boolean {
       cycle.cycle_end <= cycle.cycle_start ||
       !Number.isSafeInteger(cycle.amount_minor) || (cycle.amount_minor ?? 0) < 1 ||
       !isBoundedId(cycle.order_id, 255) || !cycle.payment_id || !PAYMENT_ID_PATTERN.test(cycle.payment_id) ||
+      !cycle.offer_snapshot_json || cycle.offer_snapshot_json.length > 65_536 ||
+      planChangeFromCycle(cycle) === false ||
       !cycle.pricing_snapshot_json || cycle.pricing_snapshot_json.length > 65_536) return false;
   if (cycle.state === 'SUCCEEDED') return cycle.provider_response_status === 'succeeded';
   if (cycle.state === 'FAILED') return ['failed', 'cancelled', 'expired'].includes(cycle.provider_response_status ?? '');
@@ -144,20 +185,29 @@ async function reconcile(
 
 async function applySubscriptionUpdate(
   env: OutcomeSyncEnv, cycle: RenewalOutcomeCycle, subscription: SubscriptionOutcomeRow,
-  nextStatus: 'ACTIVE' | 'PAST_DUE', nextPeriodStart: string, nextPeriodEnd: string, now: string,
+  nextStatus: 'ACTIVE' | 'PAST_DUE', nextPeriodStart: string, nextPeriodEnd: string,
+  nextPlanId: string, nextPlanVersion: number, planChangeId: string | null, now: string,
 ): Promise<'APPLIED' | 'ALREADY_APPLIED' | 'CAS_LOST'> {
   const updatedAt = strictlyAfter(now, subscription.updated_at);
   let result: D1Result;
   try {
     result = await env.D1_01.prepare(
-      'UPDATE membership_subscriptions SET status = ?, current_period_start = ?, current_period_end = ?, ' +
+      'UPDATE membership_subscriptions SET plan_id = ?, plan_version = ?, status = ?, current_period_start = ?, current_period_end = ?, ' +
       'updated_at = ?, version = version + 1 WHERE subscription_id = ? AND subscriber_id = ? ' +
       'AND plan_id = ? AND plan_version = ? AND status = ? AND version = ? ' +
-      'AND current_period_start = ? AND current_period_end = ? AND (cancel_at IS NULL OR cancel_at > ?)',
+      'AND current_period_start = ? AND current_period_end = ? AND (cancel_at IS NULL OR cancel_at > ?) ' +
+      'AND (? IS NULL OR EXISTS (SELECT 1 FROM membership_subscription_plan_changes pc ' +
+      "WHERE pc.change_id = ? AND pc.subscription_id = membership_subscriptions.subscription_id " +
+      "AND pc.subscriber_id = membership_subscriptions.subscriber_id AND pc.status = 'SCHEDULED' " +
+      'AND pc.source_plan_id = ? AND pc.source_plan_version = ? AND pc.target_plan_id = ? ' +
+      'AND pc.target_plan_version = ? AND pc.effective_at = ?))',
     ).bind(
-      nextStatus, nextPeriodStart, nextPeriodEnd, updatedAt, cycle.subscription_id, cycle.subscriber_id,
-      cycle.plan_id, cycle.plan_version, subscription.status, subscription.version,
-      subscription.current_period_start, subscription.current_period_end, cycle.cycle_start,
+      nextPlanId, nextPlanVersion, nextStatus, nextPeriodStart, nextPeriodEnd, updatedAt,
+      cycle.subscription_id, cycle.subscriber_id, subscription.plan_id, subscription.plan_version,
+      subscription.status, subscription.version, subscription.current_period_start,
+      subscription.current_period_end, cycle.cycle_start,
+      planChangeId, planChangeId, subscription.plan_id, subscription.plan_version,
+      nextPlanId, nextPlanVersion, cycle.cycle_start,
     ).run();
   } catch {
     throw new RenewalOutcomeSyncError('SERVICE_UNAVAILABLE', 503);
@@ -210,22 +260,42 @@ export async function syncTerminalRenewalCycleToSubscription(
 
   const subscription = await readSubscription(env.D1_01, cycle.subscription_id, cycle.subscriber_id);
   if (!subscription) return reconcile(env, cycle, 'SUBSCRIPTION_NOT_FOUND', now);
-  if (subscription.subscription_id !== cycle.subscription_id || subscription.subscriber_id !== cycle.subscriber_id ||
-      subscription.plan_id !== cycle.plan_id || subscription.plan_version !== cycle.plan_version) {
-    return reconcile(env, cycle, 'SUBSCRIPTION_IDENTITY_OR_PLAN_MISMATCH', now);
+  const planChange = planChangeFromCycle(cycle);
+  if (planChange === false) return reconcile(env, cycle, 'CYCLE_PLAN_CHANGE_SNAPSHOT_INVALID', now);
+  if (subscription.subscription_id !== cycle.subscription_id || subscription.subscriber_id !== cycle.subscriber_id) {
+    return reconcile(env, cycle, 'SUBSCRIPTION_IDENTITY_MISMATCH', now);
   }
   if (!isCanonicalIso(subscription.updated_at)) {
     return reconcile(env, cycle, 'SUBSCRIPTION_UPDATED_AT_INVALID', now);
   }
 
-  // A matching period proves another concurrent/replayed sync applied this cycle.
-  // Preserve any subsequent user lifecycle state; never reactivate canceled/paused subscriptions.
+  // Matching target plan + paid period proves a prior successful plan switch.
+  // A plan-change schedule may already be APPLIED and therefore no longer appear
+  // in the scheduled row join; this replay check must run before schedule matching.
   if (subscription.current_period_start === cycle.cycle_start && subscription.current_period_end === cycle.cycle_end) {
+    if (subscription.plan_id !== cycle.plan_id || subscription.plan_version !== cycle.plan_version) {
+      return reconcile(env, cycle, 'APPLIED_PERIOD_PLAN_MISMATCH', now);
+    }
     const marked = await markCycleSyncState(env.D1_04, cycle, 'APPLIED', null, now);
     return {
       cycleId: cycle.cycle_id, subscriptionId: cycle.subscription_id,
       outcome: marked ? 'ALREADY_APPLIED' : 'PENDING_RETRY',
     };
+  }
+
+  if (planChange) {
+    if (subscription.plan_id !== planChange.sourcePlanId ||
+        subscription.plan_version !== planChange.sourcePlanVersion ||
+        subscription.scheduled_change_id !== planChange.changeId ||
+        subscription.scheduled_source_plan_id !== planChange.sourcePlanId ||
+        subscription.scheduled_source_plan_version !== planChange.sourcePlanVersion ||
+        subscription.scheduled_target_plan_id !== cycle.plan_id ||
+        subscription.scheduled_target_plan_version !== cycle.plan_version ||
+        subscription.scheduled_effective_at !== cycle.cycle_start) {
+      return reconcile(env, cycle, 'SCHEDULED_PLAN_CHANGE_MISMATCH', now);
+    }
+  } else if (subscription.plan_id !== cycle.plan_id || subscription.plan_version !== cycle.plan_version) {
+    return reconcile(env, cycle, 'SUBSCRIPTION_IDENTITY_OR_PLAN_MISMATCH', now);
   }
   if (subscription.current_period_end !== cycle.cycle_start ||
       subscription.current_period_start >= cycle.cycle_start) {
@@ -241,7 +311,8 @@ export async function syncTerminalRenewalCycleToSubscription(
       return reconcile(env, cycle, 'SUBSCRIPTION_STATE_FORBIDS_REACTIVATION', now);
     }
     const result = await applySubscriptionUpdate(
-      env, cycle, subscription, 'ACTIVE', cycle.cycle_start, cycle.cycle_end, now,
+      env, cycle, subscription, 'ACTIVE', cycle.cycle_start, cycle.cycle_end,
+      cycle.plan_id, cycle.plan_version, planChange?.changeId ?? null, now,
     );
     if (result === 'CAS_LOST') return reconcile(env, cycle, 'SUBSCRIPTION_CAS_LOST', now);
     const marked = await markCycleSyncState(env.D1_04, cycle, 'APPLIED', null, now);
@@ -265,7 +336,8 @@ export async function syncTerminalRenewalCycleToSubscription(
   }
   const result = await applySubscriptionUpdate(
     env, cycle, subscription, 'PAST_DUE',
-    subscription.current_period_start, subscription.current_period_end, now,
+    subscription.current_period_start, subscription.current_period_end,
+    subscription.plan_id, subscription.plan_version, null, now,
   );
   if (result === 'CAS_LOST') return reconcile(env, cycle, 'SUBSCRIPTION_CAS_LOST', now);
   const marked = await markCycleSyncState(env.D1_04, cycle, 'APPLIED', null, now);
