@@ -1155,7 +1155,7 @@ describe('read-only D1 subscription migration preflight', () => {
     expect(() => verifyD1SubscriptionPreflight({
       ...preflightInput(true),
       migrationState: [{ results: [{ name: '0001_membership_subscriptions.sql' }] }],
-    })).toThrow('migration history and physical Subscription/MembershipPlan schemas do not match')
+    })).toThrow('migration history and physical Subscription/MembershipPlan/PlanChange schemas do not match')
   })
 
   it('fails closed when the version default or expected subscription index is wrong', () => {
@@ -1173,14 +1173,14 @@ describe('read-only D1 subscription migration preflight', () => {
     expect(() => verifyD1SubscriptionPreflight({
       ...state,
       planTriggers: [{ results: planTriggerNames.slice(0,3).map((name,seq) => ({ name,seq })) }],
-    })).toThrow('migration history and physical Subscription/MembershipPlan schemas do not match')
+    })).toThrow('migration history and physical Subscription/MembershipPlan/PlanChange schemas do not match')
     expect(() => verifyD1SubscriptionPreflight({
       ...state,
       planVersionSchema: [{ results: [] }],
-    })).toThrow('migration history and physical Subscription/MembershipPlan schemas do not match')
+    })).toThrow('migration history and physical Subscription/MembershipPlan/PlanChange schemas do not match')
     expect(() => verifyD1SubscriptionPreflight({
       ...state,
       planIndexes: [{ results: [{ seq: 0, name: 'unexpected_index' }] }],
-    })).toThrow('migration history and physical Subscription/MembershipPlan schemas do not match')
+    })).toThrow('migration history and physical Subscription/MembershipPlan/PlanChange schemas do not match')
   })
 })
