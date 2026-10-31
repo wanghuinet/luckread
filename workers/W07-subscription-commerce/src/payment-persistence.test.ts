@@ -234,6 +234,16 @@ class MemoryPaymentD1 {
       });
       return result(1) as D1Result<T>;
     }
+    if (sql.startsWith("UPDATE payment_provider_events SET state = 'RECEIVED'")) {
+      const [provider, merchantId, eventId, payloadHash] = values as [string, string, string, string];
+      const row = this.events.find(e => e.provider === provider && e.merchant_id === merchantId &&
+        e.event_id === eventId && e.payload_sha256 === payloadHash && e.state === 'RECONCILIATION_REQUIRED');
+      if (!row) return result(0) as D1Result<T>;
+      row.state = 'RECEIVED';
+      row.processed_at = null;
+      row.outcome_code = null;
+      return result(1) as D1Result<T>;
+    }
     if (sql.startsWith('UPDATE payment_provider_events SET state = CASE WHEN EXISTS') &&
         sql.includes('FROM payment_mandates m')) {
       const [mandateId, provider, merchantId, providerMandateId, methodId, status, providerTimestamp,
@@ -361,6 +371,10 @@ class MemoryPaymentD1 {
         created_at: createdAt, updated_at: updatedAt,
       });
       return result(1) as D1Result<T>;
+    }
+    if (sql.startsWith("UPDATE payment_method_revocation_requests SET status = 'COMPLETED'")) {
+      // These existing payment-persistence test cases do not seed removal requests.
+      return result(0) as D1Result<T>;
     }
     if (sql.startsWith('INSERT INTO payment_provider_event_conflicts')) {
       // State/count/version are SQL literals ('OPEN', 1, 1), not bound values.
