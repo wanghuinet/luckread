@@ -1007,6 +1007,21 @@
       "action": "update",
       "minLayer": "L1",
       "scope": "own"
+    },
+    {
+      "name": "payment_method.read.self",
+      "resource": "payment_method",
+      "action": "read",
+      "minLayer": "L2",
+      "scope": "own"
+    },
+    {
+      "name": "payment_method.revoke.self",
+      "resource": "payment_method",
+      "action": "revoke",
+      "minLayer": "L2",
+      "scope": "own",
+      "auditRequired": true
     }
   ],
   "x-forbidden-patterns": [
@@ -1066,6 +1081,8 @@
           "order.read",
           "payment.read",
           "payment.refund",
+          "payment_method.read.self",
+          "payment_method.revoke.self",
           "report.create",
           "share.create",
           "social.follow",
@@ -1100,6 +1117,8 @@
           "creator.update.self",
           "media.read.own",
           "media.upload",
+          "payment_method.read.self",
+          "payment_method.revoke.self",
           "revision.create.own",
           "user.mfa.manage",
           "user.mfa.read"
@@ -1225,6 +1244,8 @@
           "order.read",
           "payment.read",
           "payment.refund",
+          "payment_method.read.self",
+          "payment_method.revoke.self",
           "report.create",
           "revision.create.own",
           "role.assign",
@@ -1307,6 +1328,8 @@
           "order.read",
           "payment.read",
           "payment.refund",
+          "payment_method.read.self",
+          "payment_method.revoke.self",
           "report.create",
           "revision.create.own",
           "role.assign",
