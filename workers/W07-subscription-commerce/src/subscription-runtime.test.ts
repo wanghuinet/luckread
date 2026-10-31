@@ -9,7 +9,7 @@ type Statement = { bind: (...values: unknown[]) => Statement; first: <T>() => Pr
 type MembershipPlanRow = { plan_id: string; owner_type: 'CREATOR' | 'COMMUNITY' | 'PLATFORM'; owner_id: string; current_version: number; status: 'DRAFT' | 'ACTIVE' | 'PAUSED' | 'RETIRED'; visibility: 'PRIVATE' | 'PUBLIC'; version: number; has_current_version: boolean; created_at: string; updated_at: string; name: string; tier: string; billing_interval: string; price_minor: number; currency: string; benefits_json: string }
 type PlanVersionRow = { plan_id: string; plan_version: number; name: string; tier: string; billing_interval: string; price_minor: number; currency: string; benefits_json: string; created_at: string }
 
-function fakeDb(rows: SubscriptionRow[], plans: MembershipPlanRow[] = []): D1Database {
+function fakeDb(rows: SubscriptionRow[], plans: MembershipPlanRow[] = [], trials: Array<{ subscription_id: string; source: 'WEB' | 'APP_STORE' | 'PLAY_STORE'; status: 'TRIALING' | 'CANCELED' | 'PAYMENT_FAILED' | 'CONVERTED' | 'EXPIRED'; trial_ends_at: string }> = []): D1Database {
   const state = new Map(rows.map((row) => [row.subscription_id, { ...row }]))
   const planState = new Map(plans.map((plan) => [plan.plan_id, { ...plan }]))
   const planVersionState = new Map<string, PlanVersionRow>()
@@ -63,14 +63,23 @@ function fakeDb(rows: SubscriptionRow[], plans: MembershipPlanRow[] = []): D1Dat
               .filter((plan) => plan !== null)
             return { results: results as unknown as T[] }
           }
-          if (sql.includes('WHERE subscriber_id = ?')) {
+          if (sql.includes('subscriber_id = ?')) {
             const limit = Number(values[1])
             const offset = Number(values[2])
             const results = Array.from(state.values())
               .filter((row) => row.subscriber_id === String(values[0]))
-              .sort((left, right) => right.created_at.localeCompare(left.created_at))
+              .sort((left, right) => right.created_at.localeCompare(left.created_at) || left.subscription_id.localeCompare(right.subscription_id))
               .slice(offset, offset + limit)
-            return { results: results.map((row) => ({ ...row })) as T[] }
+              .map((row) => {
+                const trial = trials.find((item) => item.subscription_id === row.subscription_id)
+                return {
+                  ...row,
+                  trial_source: trial?.source ?? null,
+                  trial_status: trial?.status ?? null,
+                  trial_ends_at: trial?.trial_ends_at ?? null,
+                }
+              })
+            return { results: results as unknown as T[] }
           }
           return { results: [] as T[] }
         },
@@ -662,6 +671,31 @@ describe('subscription runtime', () => {
     expect(result.hasNextPage).toBe(true)
     expect(result.limit).toBe(1)
     expect(result.page).toBe(1)
+  })
+
+  it('lists a subscriber-owned trial summary without leaking provider transaction identifiers', async () => {
+    const db = fakeDb(
+      [baseRow({ status: 'TRIALING', current_period_end: '2026-10-20T00:00:00.000Z' })],
+      [],
+      [{
+        subscription_id: 'sub_existing',
+        source: 'WEB',
+        status: 'CANCELED',
+        trial_ends_at: '2026-10-20T00:00:00.000Z',
+      }],
+    )
+    const result = await listSubscriptions(db, 'user_1')
+    expect(result.docs[0]).toMatchObject({
+      subscriptionId: 'sub_existing',
+      status: 'TRIALING',
+      trial: {
+        source: 'WEB',
+        status: 'CANCELED',
+        trialEndsAt: '2026-10-20T00:00:00.000Z',
+      },
+    })
+    expect(JSON.stringify(result)).not.toContain('original_transaction_id')
+    expect(JSON.stringify(result)).not.toContain('provider_app_id')
   })
 
   it('lists only active public creator plans with stable cursor pagination', async () => {
