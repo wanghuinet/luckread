@@ -110,7 +110,7 @@ async function login(user) {
     status: r.status, emailVerified: account?.emailVerified === true,
     sessionCookiePresent: jar.hasSession(), cookieNames: jar.names(), errorCode: r.errorCode,
   })
-  return pass ? { label: user.label, jar } : null
+  return pass ? { label: user.label, jar, userId: account.id } : null
 }
 
 async function readPage(user, name, path) {
@@ -182,7 +182,13 @@ try {
         await request('POST', '/v1/auth/logout', { jar: user.jar })
       }
       await finish()
+    } else if (primary.userId === foreign.userId) {
+      result.status = 'BLOCKED_QA_ACCOUNTS_RESOLVE_TO_SAME_USER'
+      check('two_distinct_authenticated_user_ids', false)
+      for (const user of [primary, foreign]) await request('POST', '/v1/auth/logout', { jar: user.jar })
+      await finish()
     } else {
+      check('two_distinct_authenticated_user_ids', true)
       const primaryPages = {}
       const foreignPages = {}
       for (const [name, path] of routes) {
@@ -200,6 +206,14 @@ try {
         ])
         const foreignRefunds = values(foreignPages.refund_history, 'refundId')
         const foreignDocuments = values(foreignPages.billing_documents, 'documentId')
+        const primaryPayments = values(primaryPages.payment_history, 'paymentId')
+        const primaryOrders = new Set([
+          ...values(primaryPages.payment_history, 'orderId'),
+          ...values(primaryPages.refund_history, 'orderId'),
+          ...values(primaryPages.billing_documents, 'orderId'),
+        ])
+        const primaryRefunds = values(primaryPages.refund_history, 'refundId')
+        const primaryDocuments = values(primaryPages.billing_documents, 'documentId')
         const isolated =
           !leaks(primaryPages.payment_history, 'paymentId', foreignPayments) &&
           !leaks(primaryPages.payment_history, 'orderId', foreignOrders) &&
@@ -208,14 +222,25 @@ try {
           !leaks(primaryPages.refund_history, 'refundId', foreignRefunds) &&
           !leaks(primaryPages.billing_documents, 'paymentId', foreignPayments) &&
           !leaks(primaryPages.billing_documents, 'orderId', foreignOrders) &&
-          !leaks(primaryPages.billing_documents, 'documentId', foreignDocuments)
+          !leaks(primaryPages.billing_documents, 'documentId', foreignDocuments) &&
+          !leaks(foreignPages.payment_history, 'paymentId', primaryPayments) &&
+          !leaks(foreignPages.payment_history, 'orderId', primaryOrders) &&
+          !leaks(foreignPages.refund_history, 'paymentId', primaryPayments) &&
+          !leaks(foreignPages.refund_history, 'orderId', primaryOrders) &&
+          !leaks(foreignPages.refund_history, 'refundId', primaryRefunds) &&
+          !leaks(foreignPages.billing_documents, 'paymentId', primaryPayments) &&
+          !leaks(foreignPages.billing_documents, 'orderId', primaryOrders) &&
+          !leaks(foreignPages.billing_documents, 'documentId', primaryDocuments)
         check('cross_account_payment_refund_billing_isolation', isolated, {
           primaryCounts: Object.fromEntries(Object.entries(primaryPages).map(([k, v]) => [k, v.length])),
           foreignCounts: Object.fromEntries(Object.entries(foreignPages).map(([k, v]) => [k, v.length])),
+          refundRowsAvailableAcrossQaAccounts: primaryPages.refund_history.length + foreignPages.refund_history.length,
+          billingDocumentsAvailableAcrossQaAccounts: primaryPages.billing_documents.length + foreignPages.billing_documents.length,
           foreignIdentifiersLeaked: !isolated,
         })
 
-        const foreignPayment = foreignPages.payment_history[0]
+        const foreignPayment = foreignPages.payment_history.find((item) =>
+          ['succeeded', 'partially_captured'].includes(item?.status))
         if (!foreignPayment || !/^pay_[A-Za-z0-9]{26}$/.test(foreignPayment.paymentId || '') ||
             !/^[A-Z]{3}$/.test(foreignPayment.currency || '')) {
           result.status = 'BLOCKED_MISSING_FOREIGN_PAYMENT_FIXTURE'
