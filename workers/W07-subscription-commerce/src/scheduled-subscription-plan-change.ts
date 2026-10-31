@@ -414,3 +414,85 @@ export async function scheduleSubscriptionPlanChange(
   }));
   return toPublic(change, expectedVersion + 1, false);
 }
+
+
+export type ScheduledSubscriptionPlanChangeReadDto = Readonly<{
+  changeId: string;
+  status: 'SCHEDULED';
+  changeType: ScheduledPlanChangeRow['change_type'];
+  effectiveAt: string;
+  version: number;
+  targetPlan: Readonly<{
+    planId: string;
+    planVersion: number;
+    name: string;
+    tier: string;
+    billingInterval: 'MONTHLY' | 'YEARLY';
+    priceMinor: number;
+    currency: string;
+  }>;
+}>;
+
+/** Subscriber-owned read of the one pending plan change, if any. */
+export async function getScheduledSubscriptionPlanChange(
+  db: D1Database,
+  subscriberIdInput: string,
+  subscriptionIdInput: string,
+): Promise<ScheduledSubscriptionPlanChangeReadDto | null> {
+  const subscriberId = validatePrincipal(subscriberIdInput);
+  const subscriptionId = subscriptionIdInput.trim();
+  if (subscriptionId !== subscriptionIdInput || !isBoundedText(subscriptionId)) {
+    throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400);
+  }
+
+  let row: (ScheduledPlanChangeRow & {
+    name: string;
+    tier: string;
+    billing_interval: string;
+    price_minor: number;
+    currency: string;
+  }) | null;
+  try {
+    row = await db.prepare(
+      'SELECT sc.change_id, sc.subscription_id, sc.subscriber_id, sc.source_plan_id, ' +
+      'sc.source_plan_version, sc.target_plan_id, sc.target_plan_version, sc.change_type, ' +
+      'sc.effective_at, sc.status, sc.request_hash, sc.version, sc.created_at, sc.updated_at, ' +
+      'pv.name, pv.tier, pv.billing_interval, pv.price_minor, pv.currency ' +
+      'FROM membership_subscription_plan_changes sc ' +
+      'INNER JOIN membership_subscriptions s ON s.subscription_id = sc.subscription_id AND s.subscriber_id = sc.subscriber_id ' +
+      'INNER JOIN membership_plan_versions pv ON pv.plan_id = sc.target_plan_id AND pv.plan_version = sc.target_plan_version ' +
+      "WHERE sc.subscription_id = ? AND sc.subscriber_id = ? AND sc.status = 'SCHEDULED' " +
+      'AND s.plan_id = sc.source_plan_id AND s.plan_version = sc.source_plan_version LIMIT 1',
+    ).bind(subscriptionId, subscriberId).first<(ScheduledPlanChangeRow & {
+      name: string; tier: string; billing_interval: string; price_minor: number; currency: string;
+    })>();
+  } catch {
+    throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
+  }
+  if (!row) return null;
+  const dto = toPublic(row, 1, false);
+  if (!['DOWNGRADE', 'BILLING_INTERVAL_CHANGE', 'SAME_PRICE_CHANGE'].includes(row.change_type) ||
+      typeof row.name !== 'string' || !row.name.trim() || row.name.length > 120 ||
+      !/^[a-z][a-z0-9_-]{0,63}$/.test(row.tier) ||
+      (row.billing_interval !== 'MONTHLY' && row.billing_interval !== 'YEARLY') ||
+      !Number.isSafeInteger(row.price_minor) || row.price_minor < 0 || row.price_minor > MAX_MINOR ||
+      !/^[A-Z]{3}$/.test(row.currency)) {
+    throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
+  }
+  return {
+    changeId: dto.changeId,
+    status: 'SCHEDULED',
+    changeType: dto.changeType,
+    effectiveAt: dto.effectiveAt,
+    version: dto.version,
+    targetPlan: {
+      planId: row.target_plan_id,
+      planVersion: row.target_plan_version,
+      name: row.name,
+      tier: row.tier,
+      billingInterval: row.billing_interval,
+      priceMinor: row.price_minor,
+      currency: row.currency,
+    },
+  };
+}
