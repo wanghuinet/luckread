@@ -11,7 +11,7 @@ import { handleCommerceBillingReadRequest } from './billing-read-http-runtime.js
 import { handleHyperswitchWebhookRequest } from './payment-webhook-http-runtime.js'
 import { handleRevenueCatWebhookRequest } from './revenuecat-webhook-http-runtime.js'
 import { handleRevenueCatSubscriberReconciliationRequest } from './revenuecat-subscriber-reconciliation-runtime.js'
-import { scheduleSubscriptionPlanChange } from './scheduled-subscription-plan-change.js'
+import { getScheduledSubscriptionPlanChange, scheduleSubscriptionPlanChange } from './scheduled-subscription-plan-change.js'
 
 interface RateLimitBinding { limit(input: { key: string }): Promise<{ success: boolean }> }
 interface Env {
@@ -372,7 +372,13 @@ export default {
         return json({ data: result, requestId: crypto.randomUUID() })
       }
       const result = await getSubscription(env.D1_01, principal, operation.subscriptionId)
-      return json({ data: result, requestId: crypto.randomUUID() }, 200, result.etag)
+      const scheduledPlanChange = await getScheduledSubscriptionPlanChange(
+        env.D1_01, principal, operation.subscriptionId,
+      )
+      return json({
+        data: { ...result, scheduledPlanChange },
+        requestId: crypto.randomUUID(),
+      }, 200, result.etag)
     } catch (error) {
       if (error instanceof SubscriptionRuntimeError) {
         const message = error.code === 'PERMISSION_DENIED' ? 'permission denied' : error.code === 'PRECONDITION_REQUIRED' ? 'precondition required' : error.code === 'PRECONDITION_FAILED' ? 'precondition failed' : error.code === 'RESOURCE_NOT_FOUND' ? 'resource not found' : error.code === 'INVALID_STATE' ? 'invalid subscription state' : error.code === 'PLAN_NOT_ACTIVE' ? 'membership plan is unavailable' : error.code === 'CONFLICT' ? 'subscription conflict' : error.code === 'VALIDATION_FAILED' ? 'validation failed' : error.code === 'RATE_LIMITED' ? 'too many requests' : error.code === 'SERVICE_UNAVAILABLE' ? 'service unavailable' : error.code
