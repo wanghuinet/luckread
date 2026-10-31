@@ -2565,21 +2565,6 @@
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
     },
     {
-      "operationId": "startMembershipTrial",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "subscription.start_trial"
-      ],
-      "auditRequired": true,
-      "idempotencyRequired": true,
-      "optimisticLockRequired": false,
-      "stateMachine": "membership_subscription_trial",
-      "x-luckread-contract-status": "CONTRACTED",
-      "x-luckread-source": "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json#membershipSubscriptionTrialTable; contracts/state-machines/membership-subscription-trial.json; contracts/openapi/v1/openapi.yaml#post:/memberships/subscriptions/trial"
-    },
-    {
       "operationId": "createSubscriptionUpgradeOrder",
       "auth": {
         "mode": "permission"
@@ -2593,6 +2578,21 @@
       "stateMachine": "membership_subscription_plan_upgrade",
       "x-luckread-contract-status": "CONTRACTED",
       "x-luckread-source": "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json#paidPlanUpgradeApplicationTable; contracts/state-machines/membership-subscription-plan-upgrade.json; contracts/openapi/v1/openapi.yaml#post:/memberships/subscriptions/{subscriptionId}/upgrade"
+    },
+    {
+      "operationId": "startMembershipTrial",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "subscription.start_trial"
+      ],
+      "auditRequired": true,
+      "idempotencyRequired": true,
+      "optimisticLockRequired": false,
+      "stateMachine": "membership_subscription_trial",
+      "x-luckread-contract-status": "CONTRACTED",
+      "x-luckread-source": "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json#membershipSubscriptionTrialTable; contracts/state-machines/membership-subscription-trial.json; contracts/openapi/v1/openapi.yaml#post:/memberships/subscriptions/trial"
     },
     {
       "operationId": "postNotificationsNotificationIdRead",
