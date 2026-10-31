@@ -4704,6 +4704,17 @@ paths:
         '429': { $ref: '#/components/responses/RateLimited' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
+  /memberships/subscriptions/{subscriptionId}/change-plan/schedule:
+    post:
+      tags: [Users]
+      summary: Discovery draft for POST undefined
+      operationId: scheduleSubscriptionPlanDowngrade
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
+
 components:
   securitySchemes:
     bearerAuth:

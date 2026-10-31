@@ -97,42 +97,12 @@
   },
   "operations": [
     {
-      "operationId": "applyForCreator",
+      "operationId": "deleteAccountSessionsSessionId",
       "auth": {
         "mode": "permission"
       },
-      "permissions": [
-        "creator.application.apply"
-      ],
+      "permissions": [],
       "auditRequired": true,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": true,
-      "stateMachine": "none"
-    },
-    {
-      "operationId": "authCredentialAdd",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "user.credential.manage"
-      ],
-      "auditRequired": true,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": true,
-      "stateMachine": "none",
-      "x-luckread-contract-status": "DISCOVERY_DRAFT",
-      "x-luckread-source": "contracts/api/api-inventory.v1.json"
-    },
-    {
-      "operationId": "authCredentialList",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "user.credential.read"
-      ],
-      "auditRequired": false,
       "optimisticLockRequired": false,
       "idempotencyRequired": false,
       "stateMachine": "none",
@@ -155,223 +125,6 @@
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
     },
     {
-      "operationId": "authCredentialReplace",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "user.credential.manage"
-      ],
-      "auditRequired": true,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": true,
-      "stateMachine": "none",
-      "x-luckread-contract-status": "DISCOVERY_DRAFT",
-      "x-luckread-source": "contracts/api/api-inventory.v1.json"
-    },
-    {
-      "operationId": "authLogin",
-      "auth": {
-        "mode": "public"
-      },
-      "permissions": [],
-      "auditRequired": false,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none"
-    },
-    {
-      "operationId": "authLogout",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "user.session.revoke"
-      ],
-      "auditRequired": true,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none"
-    },
-    {
-      "operationId": "authMfaChallengeVerify",
-      "auth": {
-        "mode": "public"
-      },
-      "permissions": [],
-      "auditRequired": true,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": true,
-      "stateMachine": "none"
-    },
-    {
-      "operationId": "authMfaDisable",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "user.mfa.manage"
-      ],
-      "auditRequired": true,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": true,
-      "stateMachine": "none"
-    },
-    {
-      "operationId": "authMfaEnrollmentConfirm",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "user.mfa.manage"
-      ],
-      "auditRequired": true,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": true,
-      "stateMachine": "none"
-    },
-    {
-      "operationId": "authMfaEnrollmentStart",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "user.mfa.manage"
-      ],
-      "auditRequired": true,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": true,
-      "stateMachine": "none"
-    },
-    {
-      "operationId": "authMfaRecoveryCodesRotate",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "user.mfa.manage"
-      ],
-      "auditRequired": true,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": true,
-      "stateMachine": "none"
-    },
-    {
-      "operationId": "authMfaStatus",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "user.mfa.read"
-      ],
-      "auditRequired": false,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none"
-    },
-    {
-      "operationId": "authPasswordChange",
-      "auth": {
-        "mode": "authenticated"
-      },
-      "permissions": [
-        "user.credential.manage"
-      ],
-      "auditRequired": true,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": true,
-      "stateMachine": "none"
-    },
-    {
-      "operationId": "authPasswordResetConfirm",
-      "auth": {
-        "mode": "public"
-      },
-      "permissions": [],
-      "auditRequired": true,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none"
-    },
-    {
-      "operationId": "authPasswordResetRequest",
-      "auth": {
-        "mode": "public"
-      },
-      "permissions": [],
-      "auditRequired": true,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none"
-    },
-    {
-      "operationId": "authPrincipalGet",
-      "auth": {
-        "mode": "authenticated"
-      },
-      "permissions": [],
-      "auditRequired": false,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none",
-      "x-luckread-contract-status": "DISCOVERY_DRAFT",
-      "x-luckread-source": "contracts/api/api-inventory.v1.json"
-    },
-    {
-      "operationId": "authRefresh",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "user.session.refresh"
-      ],
-      "auditRequired": true,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none",
-      "x-luckread-contract-status": "DISCOVERY_DRAFT",
-      "x-luckread-source": "contracts/api/auth-operation-policy.v1.json"
-    },
-    {
-      "operationId": "authRegister",
-      "auth": {
-        "mode": "public"
-      },
-      "permissions": [],
-      "auditRequired": false,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none"
-    },
-    {
-      "operationId": "authSessionGet",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "user.session.read"
-      ],
-      "auditRequired": false,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none",
-      "x-luckread-contract-status": "DISCOVERY_DRAFT",
-      "x-luckread-source": "contracts/api/auth-operation-policy.v1.json"
-    },
-    {
-      "operationId": "authSessionList",
-      "auth": {
-        "mode": "authenticated"
-      },
-      "permissions": [
-        "user.session.read"
-      ],
-      "auditRequired": false,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none"
-    },
-    {
       "operationId": "authSessionRevoke",
       "auth": {
         "mode": "authenticated"
@@ -383,301 +136,6 @@
       "optimisticLockRequired": false,
       "idempotencyRequired": true,
       "stateMachine": "none"
-    },
-    {
-      "operationId": "batchUpdateNotifications",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "user.update.self"
-      ],
-      "auditRequired": true,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none"
-    },
-    {
-      "operationId": "blockUser",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "interaction.block"
-      ],
-      "auditRequired": true,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": true,
-      "stateMachine": "none",
-      "x-luckread-source": "contracts/api/block-mute.v1.json"
-    },
-    {
-      "operationId": "cancelSubscription",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "subscription.cancel"
-      ],
-      "auditRequired": true,
-      "optimisticLockRequired": true,
-      "idempotencyRequired": true,
-      "stateMachine": "none"
-    },
-    {
-      "operationId": "cancelSubscriptionOp",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "subscription.change_plan"
-      ],
-      "auditRequired": true,
-      "optimisticLockRequired": true,
-      "idempotencyRequired": true,
-      "stateMachine": "none",
-      "x-luckread-contract-status": "CONTRACTED_PARTIAL",
-      "x-luckread-source": "contracts/api/commerce-operation-policy.v1.json"
-    },
-    {
-      "operationId": "changeOrganizationMemberRole",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "organization.role.manage"
-      ],
-      "auditRequired": true,
-      "optimisticLockRequired": true,
-      "idempotencyRequired": true,
-      "stateMachine": "none"
-    },
-    {
-      "operationId": "changeSubscriptionPlan",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [],
-      "auditRequired": true,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none",
-      "x-luckread-contract-status": "DISCOVERY_DRAFT",
-      "x-luckread-source": "contracts/api/api-inventory.v1.json"
-    },
-    {
-      "operationId": "checkEntitlement",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "entitlement.check"
-      ],
-      "auditRequired": false,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none",
-      "x-luckread-source": "contracts/api/rc-04-06-share-subscription-entitlement.v1.json"
-    },
-    {
-      "operationId": "completeUpload",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "media.upload"
-      ],
-      "auditRequired": true,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": true,
-      "stateMachine": "none",
-      "x-luckread-contract-status": "DISCOVERY_DRAFT",
-      "x-luckread-source": "contracts/api/media-operation-policy.v1.json"
-    },
-    {
-      "operationId": "createAppeal",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "appeal.create"
-      ],
-      "auditRequired": true,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": true,
-      "stateMachine": "none"
-    },
-    {
-      "operationId": "createComment",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "comment.create"
-      ],
-      "auditRequired": true,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none"
-    },
-    {
-      "operationId": "createCommerceOrder",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "order.create"
-      ],
-      "auditRequired": true,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": true,
-      "stateMachine": "none"
-    },
-    {
-      "operationId": "createContent",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "content.create"
-      ],
-      "auditRequired": true,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none"
-    },
-    {
-      "operationId": "createIp",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "ip.create"
-      ],
-      "auditRequired": true,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none"
-    },
-    {
-      "operationId": "createMedia",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "media.upload"
-      ],
-      "auditRequired": true,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none"
-    },
-    {
-      "operationId": "createOrganization",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "org.create"
-      ],
-      "auditRequired": true,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none"
-    },
-    {
-      "operationId": "createOwnMembershipPlanDraft",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "membership.plan.create.own"
-      ],
-      "auditRequired": true,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": true,
-      "stateMachine": "none"
-    },
-    {
-      "operationId": "createReport",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "report.create"
-      ],
-      "auditRequired": true,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": true,
-      "stateMachine": "none"
-    },
-    {
-      "operationId": "createShare",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "share.create"
-      ],
-      "auditRequired": false,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": true,
-      "stateMachine": "none",
-      "x-luckread-source": "contracts/api/rc-04-06-share-subscription-entitlement.v1.json"
-    },
-    {
-      "operationId": "createSubscription",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "subscription.create"
-      ],
-      "auditRequired": true,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": true,
-      "stateMachine": "none"
-    },
-    {
-      "operationId": "decideCreatorApplication",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "creator.application.review"
-      ],
-      "auditRequired": true,
-      "optimisticLockRequired": true,
-      "idempotencyRequired": true,
-      "stateMachine": "none"
-    },
-    {
-      "operationId": "decideModerationCase",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "moderation.decide"
-      ],
-      "auditRequired": true,
-      "optimisticLockRequired": true,
-      "idempotencyRequired": true,
-      "stateMachine": "none",
-      "x-luckread-contract-status": "DISCOVERY_DRAFT",
-      "x-luckread-source": "contracts/api/moderation-operation-policy.v1.json"
-    },
-    {
-      "operationId": "deleteAccountSessionsSessionId",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [],
-      "auditRequired": true,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none",
-      "x-luckread-contract-status": "DISCOVERY_DRAFT",
-      "x-luckread-source": "contracts/api/api-inventory.v1.json"
     },
     {
       "operationId": "deleteCommentsCommentId",
@@ -704,19 +162,6 @@
       "stateMachine": "none",
       "x-luckread-contract-status": "DISCOVERY_DRAFT",
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
-    },
-    {
-      "operationId": "deleteContent",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "content.delete.own"
-      ],
-      "auditRequired": true,
-      "optimisticLockRequired": true,
-      "idempotencyRequired": false,
-      "stateMachine": "none"
     },
     {
       "operationId": "deleteContentContentId",
@@ -784,6 +229,19 @@
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
     },
     {
+      "operationId": "deleteContent",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "content.delete.own"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": true,
+      "idempotencyRequired": false,
+      "stateMachine": "none"
+    },
+    {
       "operationId": "deleteContentsContentIdPoll",
       "auth": {
         "mode": "authenticated"
@@ -823,6 +281,60 @@
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
     },
     {
+      "operationId": "unblockUser",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "interaction.block"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": true,
+      "stateMachine": "none",
+      "x-luckread-source": "contracts/api/block-mute.v1.json"
+    },
+    {
+      "operationId": "unlike",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "interaction.like"
+      ],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none"
+    },
+    {
+      "operationId": "unmuteUser",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "interaction.mute"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": true,
+      "stateMachine": "none",
+      "x-luckread-source": "contracts/api/block-mute.v1.json"
+    },
+    {
+      "operationId": "removeIpMember",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "ip.member.remove"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none"
+    },
+    {
       "operationId": "deleteMcnOrganizationsOrgIdMembersUserId",
       "auth": {
         "mode": "permission"
@@ -851,6 +363,32 @@
       "x-luckread-source": "contracts/api/media-operation-policy.v1.json"
     },
     {
+      "operationId": "removeOrganizationMember",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "organization.member.manage"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": true,
+      "idempotencyRequired": true,
+      "stateMachine": "none"
+    },
+    {
+      "operationId": "unfollow",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "social.follow"
+      ],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none"
+    },
+    {
       "operationId": "deleteSubscriptionsSubscriptionId",
       "auth": {
         "mode": "permission"
@@ -877,35 +415,20 @@
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
     },
     {
-      "operationId": "exportMyAccountData",
+      "operationId": "getAccountDataExport",
       "auth": {
         "mode": "permission"
       },
-      "permissions": [
-        "account.export.self"
-      ],
-      "auditRequired": true,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": true,
-      "stateMachine": "none",
-      "x-luckread-contract-status": "DISCOVERY_DRAFT",
-      "x-luckread-source": "contracts/api/user-account-operation-policy.v1.json"
-    },
-    {
-      "operationId": "follow",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "social.follow"
-      ],
+      "permissions": [],
       "auditRequired": false,
       "optimisticLockRequired": false,
       "idempotencyRequired": false,
-      "stateMachine": "none"
+      "stateMachine": "none",
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/api-inventory.v1.json"
     },
     {
-      "operationId": "getAccountDataExport",
+      "operationId": "getAccountSessions",
       "auth": {
         "mode": "permission"
       },
@@ -931,17 +454,60 @@
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
     },
     {
-      "operationId": "getAccountSessions",
+      "operationId": "listCreatorApplicationsForReview",
       "auth": {
         "mode": "permission"
       },
-      "permissions": [],
+      "permissions": [
+        "creator.application.review"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none"
+    },
+    {
+      "operationId": "listModerationCases",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "moderation.read"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none"
+    },
+    {
+      "operationId": "getModerationCase",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "moderation.case.read"
+      ],
       "auditRequired": false,
       "optimisticLockRequired": false,
       "idempotencyRequired": false,
       "stateMachine": "none",
       "x-luckread-contract-status": "DISCOVERY_DRAFT",
-      "x-luckread-source": "contracts/api/api-inventory.v1.json"
+      "x-luckread-source": "contracts/api/moderation-operation-policy.v1.json"
+    },
+    {
+      "operationId": "listModerationQueue",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "moderation.queue.read"
+      ],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/moderation-operation-policy.v1.json"
     },
     {
       "operationId": "getArticlesArticleId",
@@ -970,6 +536,75 @@
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
     },
     {
+      "operationId": "authCredentialList",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "user.credential.read"
+      ],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/api-inventory.v1.json"
+    },
+    {
+      "operationId": "authMfaStatus",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "user.mfa.read"
+      ],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none"
+    },
+    {
+      "operationId": "authPrincipalGet",
+      "auth": {
+        "mode": "authenticated"
+      },
+      "permissions": [],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/api-inventory.v1.json"
+    },
+    {
+      "operationId": "authSessionGet",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "user.session.read"
+      ],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/auth-operation-policy.v1.json"
+    },
+    {
+      "operationId": "authSessionList",
+      "auth": {
+        "mode": "authenticated"
+      },
+      "permissions": [
+        "user.session.read"
+      ],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none"
+    },
+    {
       "operationId": "getBillingDocuments",
       "auth": {
         "mode": "permission"
@@ -991,19 +626,6 @@
       },
       "permissions": [
         "order.read"
-      ],
-      "auditRequired": false,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none"
-    },
-    {
-      "operationId": "getContent",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "content.read.public"
       ],
       "auditRequired": false,
       "optimisticLockRequired": false,
@@ -1050,6 +672,72 @@
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
     },
     {
+      "operationId": "listContents",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "content.read.public"
+      ],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none"
+    },
+    {
+      "operationId": "getContent",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "content.read.public"
+      ],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none"
+    },
+    {
+      "operationId": "listComments",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "content.read.public"
+      ],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none"
+    },
+    {
+      "operationId": "getContentsContentIdPoll",
+      "auth": {
+        "mode": "public"
+      },
+      "permissions": [],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/api-inventory.v1.json"
+    },
+    {
+      "operationId": "listContentRevisions",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "content.revision.read"
+      ],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none",
+      "x-luckread-source": "contracts/api/revision.v1.json"
+    },
+    {
       "operationId": "getContentRevision",
       "auth": {
         "mode": "permission"
@@ -1064,17 +752,17 @@
       "x-luckread-source": "contracts/api/revision.v1.json"
     },
     {
-      "operationId": "getContentsContentIdPoll",
+      "operationId": "getMyCreatorApplication",
       "auth": {
-        "mode": "public"
+        "mode": "authenticated"
       },
-      "permissions": [],
+      "permissions": [
+        "creator.application.read.own"
+      ],
       "auditRequired": false,
       "optimisticLockRequired": false,
       "idempotencyRequired": false,
-      "stateMachine": "none",
-      "x-luckread-contract-status": "DISCOVERY_DRAFT",
-      "x-luckread-source": "contracts/api/api-inventory.v1.json"
+      "stateMachine": "none"
     },
     {
       "operationId": "getCreatorAnalytics",
@@ -1101,6 +789,19 @@
       "stateMachine": "none",
       "x-luckread-contract-status": "DISCOVERY_DRAFT",
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
+    },
+    {
+      "operationId": "getMyCreator",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "user.read.self"
+      ],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none"
     },
     {
       "operationId": "getDeveloperApps",
@@ -1168,6 +869,19 @@
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
     },
     {
+      "operationId": "listEntitlements",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "entitlement.read"
+      ],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none"
+    },
+    {
       "operationId": "getEntitlements",
       "auth": {
         "mode": "permission"
@@ -1193,6 +907,21 @@
       "idempotencyRequired": false,
       "stateMachine": "none",
       "x-luckread-source": "contracts/api/feed-delivery.v1.json"
+    },
+    {
+      "operationId": "getFollowingFeed",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "feed.read"
+      ],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/feed-operation-policy.v1.json"
     },
     {
       "operationId": "getFeedRecommended",
@@ -1221,21 +950,6 @@
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
     },
     {
-      "operationId": "getFollowingFeed",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "feed.read"
-      ],
-      "auditRequired": false,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none",
-      "x-luckread-contract-status": "DISCOVERY_DRAFT",
-      "x-luckread-source": "contracts/api/feed-operation-policy.v1.json"
-    },
-    {
       "operationId": "getGalleriesGalleryId",
       "auth": {
         "mode": "permission"
@@ -1249,6 +963,36 @@
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
     },
     {
+      "operationId": "listBlockedUsers",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "interaction.block"
+      ],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/interaction-operation-policy.v1.json"
+    },
+    {
+      "operationId": "listMutedUsers",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "interaction.mute"
+      ],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/interaction-operation-policy.v1.json"
+    },
+    {
       "operationId": "getIpAssets",
       "auth": {
         "mode": "permission"
@@ -1260,6 +1004,17 @@
       "stateMachine": "none",
       "x-luckread-contract-status": "DISCOVERY_DRAFT",
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
+    },
+    {
+      "operationId": "listIpContents",
+      "auth": {
+        "mode": "public"
+      },
+      "permissions": [],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none"
     },
     {
       "operationId": "getIpContent",
@@ -1297,19 +1052,6 @@
       "stateMachine": "none",
       "x-luckread-contract-status": "DISCOVERY_DRAFT",
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
-    },
-    {
-      "operationId": "getMe",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "user.read.self"
-      ],
-      "auditRequired": false,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none"
     },
     {
       "operationId": "getMedia",
@@ -1351,22 +1093,89 @@
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
     },
     {
-      "operationId": "getModerationCase",
+      "operationId": "listMediaVariants",
       "auth": {
         "mode": "permission"
       },
       "permissions": [
-        "moderation.case.read"
+        "media.read"
       ],
       "auditRequired": false,
       "optimisticLockRequired": false,
       "idempotencyRequired": false,
       "stateMachine": "none",
       "x-luckread-contract-status": "DISCOVERY_DRAFT",
-      "x-luckread-source": "contracts/api/moderation-operation-policy.v1.json"
+      "x-luckread-source": "contracts/api/media-operation-policy.v1.json"
     },
     {
-      "operationId": "getMyCreator",
+      "operationId": "listOwnMembershipPlans",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "membership.plan.read.own"
+      ],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none"
+    },
+    {
+      "operationId": "listMembershipSubscriptions",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "subscription.read"
+      ],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none"
+    },
+    {
+      "operationId": "getSubscription",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "subscription.read"
+      ],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none"
+    },
+    {
+      "operationId": "previewSubscriptionPlanChange",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "subscription.read"
+      ],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/rc-04-06-share-subscription-entitlement.v1.json"
+    },
+    {
+      "operationId": "getNotificationPreferences",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/api-inventory.v1.json"
+    },
+    {
+      "operationId": "listNotifications",
       "auth": {
         "mode": "permission"
       },
@@ -1379,12 +1188,12 @@
       "stateMachine": "none"
     },
     {
-      "operationId": "getMyCreatorApplication",
+      "operationId": "listOrganizationMembers",
       "auth": {
-        "mode": "authenticated"
+        "mode": "permission"
       },
       "permissions": [
-        "creator.application.read.own"
+        "organization.member.read"
       ],
       "auditRequired": false,
       "optimisticLockRequired": false,
@@ -1392,7 +1201,7 @@
       "stateMachine": "none"
     },
     {
-      "operationId": "getNotificationPreferences",
+      "operationId": "getPaymentsPaymentId",
       "auth": {
         "mode": "permission"
       },
@@ -1418,19 +1227,6 @@
       "stateMachine": "none",
       "x-luckread-contract-status": "CONTRACTED_PARTIAL",
       "x-luckread-source": "contracts/api/commerce-operation-policy.v1.json"
-    },
-    {
-      "operationId": "getPaymentsPaymentId",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [],
-      "auditRequired": false,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none",
-      "x-luckread-contract-status": "DISCOVERY_DRAFT",
-      "x-luckread-source": "contracts/api/api-inventory.v1.json"
     },
     {
       "operationId": "getPaymentsRefunds",
@@ -1500,6 +1296,19 @@
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
     },
     {
+      "operationId": "searchContent",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "content.read.public"
+      ],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none"
+    },
+    {
       "operationId": "getSearchSuggestions",
       "auth": {
         "mode": "permission"
@@ -1524,17 +1333,16 @@
       "stateMachine": "none"
     },
     {
-      "operationId": "getSubscription",
+      "operationId": "resolveShare",
       "auth": {
-        "mode": "permission"
+        "mode": "public"
       },
-      "permissions": [
-        "subscription.read"
-      ],
+      "permissions": [],
       "auditRequired": false,
       "optimisticLockRequired": false,
       "idempotencyRequired": false,
-      "stateMachine": "none"
+      "stateMachine": "none",
+      "x-luckread-source": "contracts/api/rc-04-06-share-subscription-entitlement.v1.json"
     },
     {
       "operationId": "getSubscriptions",
@@ -1576,21 +1384,6 @@
       "stateMachine": "none",
       "x-luckread-contract-status": "DISCOVERY_DRAFT",
       "x-luckread-source": "contracts/api/user-account-operation-policy.v1.json"
-    },
-    {
-      "operationId": "getUsersByUsernameUsername",
-      "auth": {
-        "mode": "public"
-      },
-      "permissions": [
-        "user.read.public"
-      ],
-      "auditRequired": false,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none",
-      "x-luckread-contract-status": "DISCOVERY_DRAFT",
-      "x-luckread-source": "contracts/api/api-inventory.v1.json"
     },
     {
       "operationId": "getUsersUserIdFollowers",
@@ -1647,209 +1440,22 @@
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
     },
     {
-      "operationId": "inviteIpMember",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "ip.member.invite"
-      ],
-      "auditRequired": true,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none"
-    },
-    {
-      "operationId": "inviteOrganizationMember",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "organization.member.manage"
-      ],
-      "auditRequired": true,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": true,
-      "stateMachine": "none"
-    },
-    {
-      "operationId": "like",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "interaction.like"
-      ],
-      "auditRequired": false,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none"
-    },
-    {
-      "operationId": "listBlockedUsers",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "interaction.block"
-      ],
-      "auditRequired": false,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none",
-      "x-luckread-contract-status": "DISCOVERY_DRAFT",
-      "x-luckread-source": "contracts/api/interaction-operation-policy.v1.json"
-    },
-    {
-      "operationId": "listComments",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "content.read.public"
-      ],
-      "auditRequired": false,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none"
-    },
-    {
-      "operationId": "listContentRevisions",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "content.revision.read"
-      ],
-      "auditRequired": false,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none",
-      "x-luckread-source": "contracts/api/revision.v1.json"
-    },
-    {
-      "operationId": "listContents",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "content.read.public"
-      ],
-      "auditRequired": false,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none"
-    },
-    {
-      "operationId": "listCreatorApplicationsForReview",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "creator.application.review"
-      ],
-      "auditRequired": true,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none"
-    },
-    {
-      "operationId": "listEntitlements",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "entitlement.read"
-      ],
-      "auditRequired": false,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none"
-    },
-    {
-      "operationId": "listIpContents",
+      "operationId": "getUsersByUsernameUsername",
       "auth": {
         "mode": "public"
       },
-      "permissions": [],
-      "auditRequired": false,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none"
-    },
-    {
-      "operationId": "listMediaVariants",
-      "auth": {
-        "mode": "permission"
-      },
       "permissions": [
-        "media.read"
+        "user.read.public"
       ],
       "auditRequired": false,
       "optimisticLockRequired": false,
       "idempotencyRequired": false,
       "stateMachine": "none",
       "x-luckread-contract-status": "DISCOVERY_DRAFT",
-      "x-luckread-source": "contracts/api/media-operation-policy.v1.json"
+      "x-luckread-source": "contracts/api/api-inventory.v1.json"
     },
     {
-      "operationId": "listMembershipSubscriptions",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "subscription.read"
-      ],
-      "auditRequired": false,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none"
-    },
-    {
-      "operationId": "listModerationCases",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "moderation.read"
-      ],
-      "auditRequired": true,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none"
-    },
-    {
-      "operationId": "listModerationQueue",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "moderation.queue.read"
-      ],
-      "auditRequired": false,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none",
-      "x-luckread-contract-status": "DISCOVERY_DRAFT",
-      "x-luckread-source": "contracts/api/moderation-operation-policy.v1.json"
-    },
-    {
-      "operationId": "listMutedUsers",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "interaction.mute"
-      ],
-      "auditRequired": false,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none",
-      "x-luckread-contract-status": "DISCOVERY_DRAFT",
-      "x-luckread-source": "contracts/api/interaction-operation-policy.v1.json"
-    },
-    {
-      "operationId": "listNotifications",
+      "operationId": "getMe",
       "auth": {
         "mode": "permission"
       },
@@ -1860,46 +1466,6 @@
       "optimisticLockRequired": false,
       "idempotencyRequired": false,
       "stateMachine": "none"
-    },
-    {
-      "operationId": "listOrganizationMembers",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "organization.member.read"
-      ],
-      "auditRequired": false,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none"
-    },
-    {
-      "operationId": "listOwnMembershipPlans",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "membership.plan.read.own"
-      ],
-      "auditRequired": false,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none"
-    },
-    {
-      "operationId": "muteUser",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "interaction.mute"
-      ],
-      "auditRequired": true,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": true,
-      "stateMachine": "none",
-      "x-luckread-source": "contracts/api/block-mute.v1.json"
     },
     {
       "operationId": "patchAccountsAccountId",
@@ -1952,6 +1518,19 @@
       "stateMachine": "none",
       "x-luckread-contract-status": "DISCOVERY_DRAFT",
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
+    },
+    {
+      "operationId": "updateContent",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "content.update.own"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": true,
+      "idempotencyRequired": false,
+      "stateMachine": "none"
     },
     {
       "operationId": "patchCreatorProfile",
@@ -2019,6 +1598,19 @@
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
     },
     {
+      "operationId": "batchUpdateNotifications",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "user.update.self"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none"
+    },
+    {
       "operationId": "patchPostsPostId",
       "auth": {
         "mode": "permission"
@@ -2045,17 +1637,32 @@
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
     },
     {
-      "operationId": "pauseSubscription",
+      "operationId": "updateMe",
       "auth": {
         "mode": "permission"
       },
-      "permissions": [],
+      "permissions": [
+        "user.update.self"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": true,
+      "idempotencyRequired": false,
+      "stateMachine": "none"
+    },
+    {
+      "operationId": "exportMyAccountData",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "account.export.self"
+      ],
       "auditRequired": true,
       "optimisticLockRequired": false,
-      "idempotencyRequired": false,
+      "idempotencyRequired": true,
       "stateMachine": "none",
       "x-luckread-contract-status": "DISCOVERY_DRAFT",
-      "x-luckread-source": "contracts/api/api-inventory.v1.json"
+      "x-luckread-source": "contracts/api/user-account-operation-policy.v1.json"
     },
     {
       "operationId": "postAccountDeletionRequest",
@@ -2123,6 +1730,34 @@
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
     },
     {
+      "operationId": "decideCreatorApplication",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "creator.application.review"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": true,
+      "idempotencyRequired": true,
+      "stateMachine": "none"
+    },
+    {
+      "operationId": "decideModerationCase",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "moderation.decide"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": true,
+      "idempotencyRequired": true,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/moderation-operation-policy.v1.json"
+    },
+    {
       "operationId": "postAnalyticsBatch",
       "auth": {
         "mode": "permission"
@@ -2149,6 +1784,19 @@
       "x-luckread-source": "contracts/api/analytics-operation-policy.v1.json"
     },
     {
+      "operationId": "createAppeal",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "appeal.create"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": true,
+      "stateMachine": "none"
+    },
+    {
       "operationId": "postArticles",
       "auth": {
         "mode": "permission"
@@ -2160,6 +1808,169 @@
       "stateMachine": "none",
       "x-luckread-contract-status": "DISCOVERY_DRAFT",
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
+    },
+    {
+      "operationId": "authCredentialAdd",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "user.credential.manage"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": true,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/api-inventory.v1.json"
+    },
+    {
+      "operationId": "authLogin",
+      "auth": {
+        "mode": "public"
+      },
+      "permissions": [],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none"
+    },
+    {
+      "operationId": "authLogout",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "user.session.revoke"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none"
+    },
+    {
+      "operationId": "authMfaChallengeVerify",
+      "auth": {
+        "mode": "public"
+      },
+      "permissions": [],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": true,
+      "stateMachine": "none"
+    },
+    {
+      "operationId": "authMfaDisable",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "user.mfa.manage"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": true,
+      "stateMachine": "none"
+    },
+    {
+      "operationId": "authMfaEnrollmentStart",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "user.mfa.manage"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": true,
+      "stateMachine": "none"
+    },
+    {
+      "operationId": "authMfaEnrollmentConfirm",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "user.mfa.manage"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": true,
+      "stateMachine": "none"
+    },
+    {
+      "operationId": "authMfaRecoveryCodesRotate",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "user.mfa.manage"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": true,
+      "stateMachine": "none"
+    },
+    {
+      "operationId": "authPasswordChange",
+      "auth": {
+        "mode": "authenticated"
+      },
+      "permissions": [
+        "user.credential.manage"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": true,
+      "stateMachine": "none"
+    },
+    {
+      "operationId": "authPasswordResetConfirm",
+      "auth": {
+        "mode": "public"
+      },
+      "permissions": [],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none"
+    },
+    {
+      "operationId": "authPasswordResetRequest",
+      "auth": {
+        "mode": "public"
+      },
+      "permissions": [],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none"
+    },
+    {
+      "operationId": "authRefresh",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "user.session.refresh"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/auth-operation-policy.v1.json"
+    },
+    {
+      "operationId": "authRegister",
+      "auth": {
+        "mode": "public"
+      },
+      "permissions": [],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none"
     },
     {
       "operationId": "postAuthRevoke",
@@ -2186,6 +1997,19 @@
       "stateMachine": "none",
       "x-luckread-contract-status": "DISCOVERY_DRAFT",
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
+    },
+    {
+      "operationId": "createCommerceOrder",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "order.create"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": true,
+      "stateMachine": "none"
     },
     {
       "operationId": "postContent",
@@ -2279,6 +2103,20 @@
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
     },
     {
+      "operationId": "createShare",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "share.create"
+      ],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": true,
+      "stateMachine": "none",
+      "x-luckread-source": "contracts/api/rc-04-06-share-subscription-entitlement.v1.json"
+    },
+    {
       "operationId": "postContentContentIdUnpublish",
       "auth": {
         "mode": "permission"
@@ -2290,6 +2128,32 @@
       "stateMachine": "none",
       "x-luckread-contract-status": "DISCOVERY_DRAFT",
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
+    },
+    {
+      "operationId": "createContent",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "content.create"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none"
+    },
+    {
+      "operationId": "createComment",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "comment.create"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none"
     },
     {
       "operationId": "postContentsContentIdPoll",
@@ -2316,6 +2180,44 @@
       "stateMachine": "none",
       "x-luckread-contract-status": "DISCOVERY_DRAFT",
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
+    },
+    {
+      "operationId": "rollbackContentRevision",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "content.revision.rollback"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": true,
+      "idempotencyRequired": true,
+      "stateMachine": "none",
+      "x-luckread-source": "contracts/api/revision.v1.json"
+    },
+    {
+      "operationId": "transitionContentState",
+      "auth": {
+        "mode": "state-machine"
+      },
+      "permissions": [],
+      "auditRequired": true,
+      "optimisticLockRequired": true,
+      "idempotencyRequired": true,
+      "stateMachine": "content"
+    },
+    {
+      "operationId": "applyForCreator",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "creator.application.apply"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": true,
+      "stateMachine": "none"
     },
     {
       "operationId": "postDeveloperApiKeys",
@@ -2370,6 +2272,20 @@
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
     },
     {
+      "operationId": "checkEntitlement",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "entitlement.check"
+      ],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none",
+      "x-luckread-source": "contracts/api/rc-04-06-share-subscription-entitlement.v1.json"
+    },
+    {
       "operationId": "postGalleries",
       "auth": {
         "mode": "permission"
@@ -2383,6 +2299,47 @@
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
     },
     {
+      "operationId": "blockUser",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "interaction.block"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": true,
+      "stateMachine": "none",
+      "x-luckread-source": "contracts/api/block-mute.v1.json"
+    },
+    {
+      "operationId": "like",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "interaction.like"
+      ],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none"
+    },
+    {
+      "operationId": "muteUser",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "interaction.mute"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": true,
+      "stateMachine": "none",
+      "x-luckread-source": "contracts/api/block-mute.v1.json"
+    },
+    {
       "operationId": "postIpAssets",
       "auth": {
         "mode": "permission"
@@ -2394,6 +2351,32 @@
       "stateMachine": "none",
       "x-luckread-contract-status": "DISCOVERY_DRAFT",
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
+    },
+    {
+      "operationId": "createIp",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "ip.create"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none"
+    },
+    {
+      "operationId": "inviteIpMember",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "ip.member.invite"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none"
     },
     {
       "operationId": "postMcnOrganizations",
@@ -2422,6 +2405,19 @@
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
     },
     {
+      "operationId": "createMedia",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "media.upload"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none"
+    },
+    {
       "operationId": "postMediaMediaIdProcess",
       "auth": {
         "mode": "permission"
@@ -2436,6 +2432,155 @@
     },
     {
       "operationId": "postMediaUploads",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/api-inventory.v1.json"
+    },
+    {
+      "operationId": "completeUpload",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "media.upload"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": true,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/media-operation-policy.v1.json"
+    },
+    {
+      "operationId": "createOwnMembershipPlanDraft",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "membership.plan.create.own"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": true,
+      "stateMachine": "none"
+    },
+    {
+      "operationId": "transitionOwnMembershipPlanLifecycle",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "membership.plan.lifecycle.own"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": true,
+      "idempotencyRequired": false,
+      "stateMachine": "none"
+    },
+    {
+      "operationId": "publishOwnMembershipPlan",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "membership.plan.publish.own"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": true,
+      "idempotencyRequired": false,
+      "stateMachine": "none"
+    },
+    {
+      "operationId": "createSubscription",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "subscription.create"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": true,
+      "stateMachine": "none"
+    },
+    {
+      "operationId": "cancelSubscription",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "subscription.cancel"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": true,
+      "idempotencyRequired": true,
+      "stateMachine": "none"
+    },
+    {
+      "operationId": "changeSubscriptionPlan",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/api-inventory.v1.json"
+    },
+    {
+      "operationId": "cancelSubscriptionOp",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "subscription.change_plan"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": true,
+      "idempotencyRequired": true,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "CONTRACTED_PARTIAL",
+      "x-luckread-source": "contracts/api/commerce-operation-policy.v1.json"
+    },
+    {
+      "operationId": "scheduleSubscriptionPlanDowngrade",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "subscription.change_plan"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": true,
+      "idempotencyRequired": true,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "CONTRACTED_PARTIAL",
+      "x-luckread-source": "contracts/api/commerce-operation-policy.v1.json"
+    },
+    {
+      "operationId": "pauseSubscription",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/api-inventory.v1.json"
+    },
+    {
+      "operationId": "resumeSubscription",
       "auth": {
         "mode": "permission"
       },
@@ -2472,6 +2617,45 @@
       "stateMachine": "none",
       "x-luckread-contract-status": "DISCOVERY_DRAFT",
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
+    },
+    {
+      "operationId": "createOrganization",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "org.create"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none"
+    },
+    {
+      "operationId": "changeOrganizationMemberRole",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "organization.role.manage"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": true,
+      "idempotencyRequired": true,
+      "stateMachine": "none"
+    },
+    {
+      "operationId": "inviteOrganizationMember",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "organization.member.manage"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": true,
+      "stateMachine": "none"
     },
     {
       "operationId": "postPaymentsIntents",
@@ -2543,6 +2727,32 @@
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
     },
     {
+      "operationId": "createReport",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "report.create"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": true,
+      "stateMachine": "none"
+    },
+    {
+      "operationId": "follow",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "social.follow"
+      ],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none"
+    },
+    {
       "operationId": "postSubscriptions",
       "auth": {
         "mode": "permission"
@@ -2556,6 +2766,17 @@
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
     },
     {
+      "operationId": "transitionAccountState",
+      "auth": {
+        "mode": "state-machine"
+      },
+      "permissions": [],
+      "auditRequired": true,
+      "optimisticLockRequired": true,
+      "idempotencyRequired": false,
+      "stateMachine": "account"
+    },
+    {
       "operationId": "postUsersUserIdFollow",
       "auth": {
         "mode": "permission"
@@ -2567,34 +2788,6 @@
       "stateMachine": "none",
       "x-luckread-contract-status": "DISCOVERY_DRAFT",
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
-    },
-    {
-      "operationId": "previewSubscriptionPlanChange",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "subscription.read"
-      ],
-      "auditRequired": false,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none",
-      "x-luckread-contract-status": "DISCOVERY_DRAFT",
-      "x-luckread-source": "contracts/api/rc-04-06-share-subscription-entitlement.v1.json"
-    },
-    {
-      "operationId": "publishOwnMembershipPlan",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "membership.plan.publish.own"
-      ],
-      "auditRequired": true,
-      "optimisticLockRequired": true,
-      "idempotencyRequired": false,
-      "stateMachine": "none"
     },
     {
       "operationId": "receiveHyperswitchPaymentWebhook",
@@ -2624,212 +2817,19 @@
       "x-luckread-idempotency": "app_id + event.id + raw payload SHA-256; same payload is an idempotent duplicate, changed payload is retained separately as a durable conflict."
     },
     {
-      "operationId": "removeIpMember",
+      "operationId": "authCredentialReplace",
       "auth": {
         "mode": "permission"
       },
       "permissions": [
-        "ip.member.remove"
+        "user.credential.manage"
       ],
       "auditRequired": true,
       "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none"
-    },
-    {
-      "operationId": "removeOrganizationMember",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "organization.member.manage"
-      ],
-      "auditRequired": true,
-      "optimisticLockRequired": true,
       "idempotencyRequired": true,
-      "stateMachine": "none"
-    },
-    {
-      "operationId": "resolveShare",
-      "auth": {
-        "mode": "public"
-      },
-      "permissions": [],
-      "auditRequired": false,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none",
-      "x-luckread-source": "contracts/api/rc-04-06-share-subscription-entitlement.v1.json"
-    },
-    {
-      "operationId": "resumeSubscription",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [],
-      "auditRequired": true,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
       "stateMachine": "none",
       "x-luckread-contract-status": "DISCOVERY_DRAFT",
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
-    },
-    {
-      "operationId": "rollbackContentRevision",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "content.revision.rollback"
-      ],
-      "auditRequired": true,
-      "optimisticLockRequired": true,
-      "idempotencyRequired": true,
-      "stateMachine": "none",
-      "x-luckread-source": "contracts/api/revision.v1.json"
-    },
-    {
-      "operationId": "scheduleSubscriptionPlanDowngrade",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "subscription.change_plan"
-      ],
-      "auditRequired": true,
-      "optimisticLockRequired": true,
-      "idempotencyRequired": true,
-      "stateMachine": "none",
-      "x-luckread-contract-status": "CONTRACTED_PARTIAL",
-      "x-luckread-source": "contracts/api/commerce-operation-policy.v1.json"
-    },
-    {
-      "operationId": "searchContent",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "content.read.public"
-      ],
-      "auditRequired": false,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none"
-    },
-    {
-      "operationId": "transitionAccountState",
-      "auth": {
-        "mode": "state-machine"
-      },
-      "permissions": [],
-      "auditRequired": true,
-      "optimisticLockRequired": true,
-      "idempotencyRequired": false,
-      "stateMachine": "account"
-    },
-    {
-      "operationId": "transitionContentState",
-      "auth": {
-        "mode": "state-machine"
-      },
-      "permissions": [],
-      "auditRequired": true,
-      "optimisticLockRequired": true,
-      "idempotencyRequired": true,
-      "stateMachine": "content"
-    },
-    {
-      "operationId": "transitionOwnMembershipPlanLifecycle",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "membership.plan.lifecycle.own"
-      ],
-      "auditRequired": true,
-      "optimisticLockRequired": true,
-      "idempotencyRequired": false,
-      "stateMachine": "none"
-    },
-    {
-      "operationId": "unblockUser",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "interaction.block"
-      ],
-      "auditRequired": true,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": true,
-      "stateMachine": "none",
-      "x-luckread-source": "contracts/api/block-mute.v1.json"
-    },
-    {
-      "operationId": "unfollow",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "social.follow"
-      ],
-      "auditRequired": false,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none"
-    },
-    {
-      "operationId": "unlike",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "interaction.like"
-      ],
-      "auditRequired": false,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none"
-    },
-    {
-      "operationId": "unmuteUser",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "interaction.mute"
-      ],
-      "auditRequired": true,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": true,
-      "stateMachine": "none",
-      "x-luckread-source": "contracts/api/block-mute.v1.json"
-    },
-    {
-      "operationId": "updateContent",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "content.update.own"
-      ],
-      "auditRequired": true,
-      "optimisticLockRequired": true,
-      "idempotencyRequired": false,
-      "stateMachine": "none"
-    },
-    {
-      "operationId": "updateMe",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "user.update.self"
-      ],
-      "auditRequired": true,
-      "optimisticLockRequired": true,
-      "idempotencyRequired": false,
-      "stateMachine": "none"
     },
     {
       "operationId": "updateOwnMembershipPlan",
