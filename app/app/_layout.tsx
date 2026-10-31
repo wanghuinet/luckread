@@ -65,7 +65,6 @@ export default function RootLayout() {
             <Stack.Screen name="forgot-password" options={{ headerShown: false }} />
             <Stack.Screen name="verify-email" options={{ headerShown: false }} />
             <Stack.Screen name="publish" options={{ headerShown: false, presentation: 'modal', animation: 'slide_from_bottom' }} />
-            <Stack.Screen name="modal" options={{ title: 'Modal', presentation: 'modal' }} />
           </Stack>
           {(!isLoaded || !isThemeLoaded || status === 'loading') ? (
             <View className="flex-1" style={styles.splash} pointerEvents="auto">
