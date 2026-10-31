@@ -391,7 +391,7 @@
       },
       "resource": {
         "class": "BOUNDED_COMPOSITION",
-        "d1ReadMax": 2,
+        "d1ReadMax": 3,
         "d1WriteMax": 1,
         "d1ReadRowsMax": 4,
         "d1WriteRowsMax": 1,
