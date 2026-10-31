@@ -107,7 +107,7 @@ jobs:
           set -euo pipefail
           npx --yes wrangler@4.116.0 d1 list --json --config wrangler.jsonc > /tmp/w07-d1-list.json
           node scripts/verify-d1-04-binding.mjs /tmp/w07-d1-list.json
-          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command="SELECT name FROM d1_migrations WHERE name IN ('0001_membership_subscriptions.sql','0002_subscription_version_cas.sql','0003_membership_plans.sql','0005_subscription_plan_changes.sql') ORDER BY name" --json > /tmp/w07-d1-migrations.json
+          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command="SELECT name FROM d1_migrations WHERE name IN ('0001_membership_subscriptions.sql','0002_subscription_version_cas.sql','0003_membership_plans.sql','0004_revenuecat_membership_product_bindings.sql','0005_subscription_plan_changes.sql') ORDER BY name" --json > /tmp/w07-d1-migrations.json
           npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA table_info("membership_subscriptions")' --json > /tmp/w07-subscription-schema.json
           npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA index_list("membership_subscriptions")' --json > /tmp/w07-subscription-indexes.json
           npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA foreign_key_list("membership_subscriptions")' --json > /tmp/w07-subscription-foreign-keys.json
@@ -195,7 +195,7 @@ jobs:
           set -euo pipefail
           npx --yes wrangler@4.116.0 d1 list --json --config wrangler.jsonc > /tmp/w07-post-d1-list.json
           node scripts/verify-d1-04-binding.mjs /tmp/w07-post-d1-list.json
-          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command="SELECT name FROM d1_migrations WHERE name IN ('0001_membership_subscriptions.sql','0002_subscription_version_cas.sql','0003_membership_plans.sql','0005_subscription_plan_changes.sql') ORDER BY name" --json > /tmp/w07-post-d1-migrations.json
+          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command="SELECT name FROM d1_migrations WHERE name IN ('0001_membership_subscriptions.sql','0002_subscription_version_cas.sql','0003_membership_plans.sql','0004_revenuecat_membership_product_bindings.sql','0005_subscription_plan_changes.sql') ORDER BY name" --json > /tmp/w07-post-d1-migrations.json
           npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA table_info("membership_subscriptions")' --json > /tmp/w07-post-subscription-schema.json
           npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA index_list("membership_subscriptions")' --json > /tmp/w07-post-subscription-indexes.json
           npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA foreign_key_list("membership_subscriptions")' --json > /tmp/w07-post-subscription-foreign-keys.json
