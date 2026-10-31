@@ -23,6 +23,9 @@ type TestOptions = Readonly<{
   recoveryResults?: Array<typeof cleanRecovery>;
   cycleResult?: RenewalProcessResult;
   scanCalls?: { count: number };
+  trialExpiry?: { scanned: number; expired: number };
+  trialExpiryError?: boolean;
+  expiryCalls?: { count: number };
 }>;
 
 function dependencies(options: TestOptions = {}): RenewalScheduledDependencies {
@@ -32,6 +35,11 @@ function dependencies(options: TestOptions = {}): RenewalScheduledDependencies {
   return {
     readTableNames: async (_db, expected) => new Set(expected),
     syncPending: async () => recoveryResults[Math.min(recoveryCall++, recoveryResults.length - 1)],
+    expireTrials: async () => {
+      if (options.expiryCalls) options.expiryCalls.count += 1;
+      if (options.trialExpiryError) throw new Error('trial expiry unavailable');
+      return options.trialExpiry ?? { scanned: 0, expired: 0 };
+    },
     scanDue: async (): Promise<RenewalScanResult> => {
       if (options.scanCalls) options.scanCalls.count += 1;
       return {
@@ -56,6 +64,35 @@ describe('W07 renewal scheduler completion status', () => {
       expect(result.afterRecovery?.reconciliationRequired).toBe(0);
       expect(result.afterRecovery?.pendingRetry).toBe(0);
     }
+  });
+
+  it('runs the bounded web-trial expiry after outcome recovery and reports the expiry result', async () => {
+    const expiryCalls = { count: 0 };
+    const result = await runRenewalScheduledBatch(env, dependencies({
+      expiryCalls,
+      trialExpiry: { scanned: 3, expired: 2 },
+    }));
+
+    expect(result.status).toBe('COMPLETED');
+    expect(expiryCalls.count).toBe(1);
+    if ('trialExpiry' in result) {
+      expect(result.trialExpiry).toEqual({ scanned: 3, expired: 2 });
+    }
+  });
+
+  it('stops before scanning when the trial expiry phase fails', async () => {
+    const scanCalls = { count: 0 };
+    const result = await runRenewalScheduledBatch(env, dependencies({
+      scanCalls,
+      trialExpiryError: true,
+    }));
+
+    expect(result).toMatchObject({
+      status: 'PARTIAL',
+      phase: 'TRIAL_EXPIRY',
+      beforeRecovery: cleanRecovery,
+    });
+    expect(scanCalls.count).toBe(0);
   });
 
   it('reports PARTIAL when the pre-scan pass requires reconciliation even if the second pass is clear', async () => {
