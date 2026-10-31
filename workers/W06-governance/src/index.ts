@@ -1253,7 +1253,7 @@ export default {
               },
         occurredAt: requested || cancelRequested ? new Date().toISOString() : input.occurredAt!,
       }
-      return requested
+      return requested || cancelRequested
         ? persistMembershipPlanMutationRequestAudit(env, event)
         : persistImmutableAuditEvent(env, event)
     }
