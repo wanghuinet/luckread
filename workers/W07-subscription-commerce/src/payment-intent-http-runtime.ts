@@ -19,6 +19,7 @@ type ResolvedProviderConfig = Readonly<{
 }>;
 
 type PaymentIntentRuntimeEnv = Readonly<{
+  D1_01?: D1Database;
   D1_04: D1Database;
   HYPERSWITCH_ENVIRONMENT?: string | null;
   HYPERSWITCH_API_KEY?: string | null;
@@ -93,6 +94,127 @@ function resolveRoute(request: Request): { orderId: string } | Response | null {
   return { orderId };
 }
 
+async function verifyUpgradeCheckoutReservation(
+  env: PaymentIntentRuntimeEnv,
+  customerId: string,
+  orderId: string,
+): Promise<Response | null> {
+  let lines: Array<{
+    order_line_id: string;
+    item_type: string;
+    item_ref: string;
+    item_version: string;
+    item_snapshot_json: string;
+  }>;
+  try {
+    const result = await env.D1_04.prepare(
+      'SELECT order_line_id, item_type, item_ref, item_version, item_snapshot_json ' +
+      'FROM order_lines WHERE order_id = ? ORDER BY order_line_id ASC',
+    ).bind(orderId).all<{
+      order_line_id: string;
+      item_type: string;
+      item_ref: string;
+      item_version: string;
+      item_snapshot_json: string;
+    }>();
+    lines = result.results ?? [];
+  } catch {
+    return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Upgrade checkout reservation could not be verified');
+  }
+
+  const upgradeLines: Array<{
+    line: (typeof lines)[number];
+    snapshot: Record<string, unknown>;
+    upgrade: Record<string, unknown>;
+  }> = [];
+  for (const line of lines) {
+    if (line.item_type !== 'MEMBERSHIP_PLAN') continue;
+    let snapshot: unknown;
+    try { snapshot = JSON.parse(line.item_snapshot_json) as unknown; } catch {
+      return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Membership Order snapshot could not be verified');
+    }
+    if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) {
+      return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Membership Order snapshot could not be verified');
+    }
+    const value = snapshot as Record<string, unknown>;
+    if (value.membershipUpgrade === undefined) continue;
+    if (!value.membershipUpgrade || typeof value.membershipUpgrade !== 'object' ||
+        Array.isArray(value.membershipUpgrade)) {
+      return errorResponse(409, 'UPGRADE_RESERVATION_REQUIRED', 'Upgrade Order is not reserved for payment');
+    }
+    upgradeLines.push({
+      line,
+      snapshot: value,
+      upgrade: value.membershipUpgrade as Record<string, unknown>,
+    });
+  }
+  if (upgradeLines.length === 0) return null;
+  if (upgradeLines.length !== 1 || lines.length !== 1 || !env.D1_01) {
+    return errorResponse(409, 'UPGRADE_RESERVATION_REQUIRED', 'Upgrade Order is not reserved for payment');
+  }
+
+  const { line, snapshot, upgrade } = upgradeLines[0]!;
+  if (upgrade.version !== 1 ||
+      typeof upgrade.subscriptionId !== 'string' ||
+      typeof upgrade.sourcePlanId !== 'string' ||
+      !/^plan_[a-f0-9]{64}$/.test(upgrade.sourcePlanId) ||
+      !Number.isSafeInteger(upgrade.sourcePlanVersion) ||
+      typeof upgrade.targetPlanId !== 'string' ||
+      upgrade.targetPlanId !== line.item_ref ||
+      upgrade.targetPlanId !== snapshot.planId ||
+      !Number.isSafeInteger(upgrade.targetPlanVersion) ||
+      String(upgrade.targetPlanVersion) !== line.item_version ||
+      !Number.isSafeInteger(upgrade.expectedSubscriptionVersion) ||
+      typeof upgrade.currentPeriodStart !== 'string' ||
+      typeof upgrade.currentPeriodEnd !== 'string' ||
+      typeof upgrade.requestHash !== 'string' ||
+      !/^[a-f0-9]{64}$/.test(upgrade.requestHash)) {
+    return errorResponse(409, 'UPGRADE_RESERVATION_REQUIRED', 'Upgrade Order is not reserved for payment');
+  }
+
+  try {
+    const reservation = await env.D1_01.prepare(
+      "SELECT subscription_id, subscriber_id, source_plan_id, source_plan_version, target_plan_id, " +
+      "target_plan_version, expected_subscription_version, current_period_start, current_period_end, " +
+      "order_id, request_hash, status, payment_id FROM membership_subscription_plan_change_applications " +
+      "WHERE order_id = ? AND subscriber_id = ? AND status = 'PENDING_PAYMENT' AND payment_id IS NULL LIMIT 1",
+    ).bind(orderId, customerId).first<{
+      subscription_id: string;
+      subscriber_id: string;
+      source_plan_id: string;
+      source_plan_version: number;
+      target_plan_id: string;
+      target_plan_version: number;
+      expected_subscription_version: number;
+      current_period_start: string;
+      current_period_end: string;
+      order_id: string;
+      request_hash: string;
+      status: string;
+      payment_id: string | null;
+    }>();
+    if (!reservation ||
+        reservation.subscription_id !== upgrade.subscriptionId ||
+        reservation.subscriber_id !== customerId ||
+        reservation.source_plan_id !== upgrade.sourcePlanId ||
+        reservation.source_plan_version !== upgrade.sourcePlanVersion ||
+        reservation.target_plan_id !== upgrade.targetPlanId ||
+        reservation.target_plan_version !== upgrade.targetPlanVersion ||
+        reservation.expected_subscription_version !== upgrade.expectedSubscriptionVersion ||
+        reservation.current_period_start !== upgrade.currentPeriodStart ||
+        reservation.current_period_end !== upgrade.currentPeriodEnd ||
+        reservation.order_id !== orderId ||
+        reservation.request_hash !== upgrade.requestHash ||
+        reservation.status !== 'PENDING_PAYMENT' ||
+        reservation.payment_id !== null) {
+      return errorResponse(409, 'UPGRADE_RESERVATION_REQUIRED', 'Upgrade Order is not reserved for payment');
+    }
+    return null;
+  } catch {
+    return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Upgrade checkout reservation could not be verified');
+  }
+}
+
 function mapPersistenceError(error: PaymentPersistenceError): Response {
   const message =
     error.code === 'PRECONDITION_REQUIRED' ? 'Idempotency-Key is required' :
@@ -143,6 +265,9 @@ export async function handleCommercePaymentIntentRequest(
   if (!providerConfig) {
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Payment provider is not configured');
   }
+
+  const reservationFailure = await verifyUpgradeCheckoutReservation(env, customerId, route.orderId);
+  if (reservationFailure) return reservationFailure;
 
   try {
     const createAttempt = dependencies.createAttempt ?? createPaymentAttempt;
