@@ -216,6 +216,7 @@ function addL2Rules(
   grant('report.create', 'Report')
   grant('notification.read.self', 'Notification', selfOwnerCondition(subjectId))
   grant('notification.update.self', 'Notification', selfOwnerCondition(subjectId))
+  grant('subscription.change_plan', 'Subscription', selfOwnerCondition(subjectId))
 }
 
 function addL3Rules(
