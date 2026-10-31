@@ -219,7 +219,7 @@ const requireW07Transport = (request: Request): { userId: string; correlationId:
   const userId = request.headers.get('X-LuckRead-Principal-User-Id')?.trim() ?? ''
   const correlationId = request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? ''
   const requestId = request.headers.get('X-LuckRead-Request-Id')?.trim() ?? ''
-  if (!userId || userId.length > 256 || /[\\u0000-\\u001f\\u007f]/.test(userId) ||
+  if (!userId || userId.length > 256 || /[\u0000-\u001f\u007f]/.test(userId) ||
       !correlationId || correlationId.length > 256 || !requestId || requestId.length > 256) {
     throw new ModerationRuntimeError('UNAUTHENTICATED', 401)
   }
