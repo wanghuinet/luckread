@@ -462,13 +462,13 @@ async function insertOrReadCycle(
     env.D1_01, subscription.subscription_id, subscription.subscriber_id, cycleStart, false,
   );
   let cyclePlan = {
-    planId: cyclePlan.planId,
-    planVersion: cyclePlan.planVersion,
-    name: cyclePlan.name,
-    tier: cyclePlan.tier,
-    billingInterval: cyclePlan.billingInterval as 'MONTHLY' | 'YEARLY',
-    priceMinor: cyclePlan.priceMinor,
-    currency: cyclePlan.currency,
+    planId: subscription.plan_id,
+    planVersion: subscription.plan_version,
+    name: subscription.name,
+    tier: subscription.tier,
+    billingInterval: subscription.billing_interval,
+    priceMinor: subscription.price_minor,
+    currency: subscription.currency,
     benefitsJson: subscription.benefits_json,
   };
   if (scheduledChange) {
@@ -524,13 +524,13 @@ async function insertOrReadCycle(
     subscriptionId: subscription.subscription_id,
     subscriberId: subscription.subscriber_id,
     creatorId: subscription.creator_id,
-    planId: subscription.plan_id,
-    planVersion: subscription.plan_version,
-    name: subscription.name,
-    tier: subscription.tier,
-    billingInterval: subscription.billing_interval,
-    priceMinor: subscription.price_minor,
-    currency: subscription.currency,
+    planId: cyclePlan.planId,
+    planVersion: cyclePlan.planVersion,
+    name: cyclePlan.name,
+    tier: cyclePlan.tier,
+    billingInterval: cyclePlan.billingInterval as 'MONTHLY' | 'YEARLY',
+    priceMinor: cyclePlan.priceMinor,
+    currency: cyclePlan.currency,
     benefits: benefits as string[],
   };
   const offerSnapshotJson = JSON.stringify(offer);
