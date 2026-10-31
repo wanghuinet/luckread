@@ -236,7 +236,7 @@ export default {
         const docs = await listOwnedSavedPaymentMethods(env, principal)
         return json({ data: { docs }, requestId: crypto.randomUUID() })
       }
-      const paymentMethodMatch = /^\\/payment-methods\\/(spm_[A-Za-z0-9]{26})$/.exec(paymentMethodPath)
+      const paymentMethodMatch = /^\/payment-methods\/(spm_[A-Za-z0-9]{26})$/.exec(paymentMethodPath)
       if (request.method === 'DELETE' && paymentMethodMatch) {
         if (request.body !== null) {
           await request.body.cancel().catch((): void => undefined)
