@@ -2105,6 +2105,37 @@ paths:
         '428': { $ref: '#/components/responses/PreconditionRequired' }
         '4XX': { $ref: '#/components/responses/ClientError' }
 
+  /memberships/subscriptions/{subscriptionId}/change-plan/interval-schedule:
+    parameters:
+      - name: subscriptionId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    post:
+      tags: [Users]
+      summary: Schedule a monthly/yearly billing interval change for the current period end
+      description: Schedules a target creator plan whose billing interval is the opposite MONTHLY/YEARLY interval. The current plan and entitlement remain active through the already-paid period. No immediate order, payment, proration, refund or entitlement mutation is created. At the current period end, the existing W07 renewal pipeline charges the target plan's recurring price and, only after signed successful renewal payment and subscription version compare-and-set, starts the next period using the target billing interval.
+      operationId: scheduleSubscriptionBillingIntervalChange
+      parameters:
+        - $ref: '#/components/parameters/IfMatchRequired'
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [planId]
+              properties:
+                planId: { type: string, pattern: '^plan_[a-f0-9]{64}$' }
+      responses:
+        '201': { description: Billing interval change scheduled for the current period end; no immediate payment or entitlement mutation occurs. }
+        '200': { description: Idempotent replay of the same scheduled billing interval change. }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
   /memberships/subscriptions/{subscriptionId}/cancel:
     parameters:
       - name: subscriptionId
