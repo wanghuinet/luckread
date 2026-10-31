@@ -356,6 +356,9 @@ export async function cancelWebMembershipTrial(
   ).bind(subscriptionId, subscriberId).first<TrialSubscriptionRow>();
   if (!subscription) throw new SubscriptionRuntimeError('RESOURCE_NOT_FOUND', 404);
   if (trial.status === 'CANCELED' && subscription.cancel_at === trial.trial_ends_at) {
+    if (subscription.version !== expectedVersion) {
+      throw new SubscriptionRuntimeError('PRECONDITION_FAILED', 412);
+    }
     return { subscription: toSubscription(subscription), trial: toTrial(trial), replayed: true };
   }
   if (subscription.status !== 'TRIALING' || trial.status !== 'TRIALING') {
@@ -439,7 +442,7 @@ export async function expireDueWebMembershipTrials(
   }>()).results ?? [];
   let expired = 0;
   for (const row of rows) {
-    if (row.trial_source === 'WEB' && row.trial_status === 'TRIALING' && d1_04) {
+    if (row.trial_source === 'WEB' && ['TRIALING', 'PAYMENT_FAILED'].includes(row.trial_status) && d1_04) {
       let cycle: { state: string; attempt_number: number; subscription_sync_state: string; mandate_record_id: string | null } | null;
       try {
         cycle = await d1_04.prepare(
