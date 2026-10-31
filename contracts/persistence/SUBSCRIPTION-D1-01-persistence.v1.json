@@ -181,10 +181,11 @@
   "migration": {
     "status": "PREPARED_NOT_APPLIED",
     "candidateMigration": "workers/W07-subscription-commerce/migrations/0002_subscription_version_cas.sql",
-    "rule": "The version-column migration is prepared as a reviewed code candidate only. A physical migration still requires exact artifact hash, read-only confirmation of the target and migration history, controlled target D1-01 execution and post-schema evidence. The paid upgrade attempt reservation is an auxiliary D1-01 workflow table with no financial fields; it remains PREPARED_NOT_APPLIED until exact target migration evidence is recorded. Scheduled downgrade requests add only future-dated lifecycle metadata to D1-01; the physical migration remains source-only until controlled target, migration-history and postflight evidence is admitted.",
+    "rule": "The version-column migration is prepared as a reviewed code candidate only. A physical migration still requires exact artifact hash, read-only confirmation of the target and migration history, controlled target D1-01 execution and post-schema evidence. The paid upgrade attempt reservation is an auxiliary D1-01 workflow table with no financial fields; it remains PREPARED_NOT_APPLIED until exact target migration evidence is recorded. Scheduled downgrade requests add only future-dated lifecycle metadata to D1-01; the physical migration remains source-only until controlled target, migration-history and postflight evidence is admitted. Migration 0007 adds the typed DOWNGRADE/BILLING_INTERVAL_CHANGE discriminator to the scheduled-change metadata; it remains source-only until separately admitted and applied after 0006.",
     "additionalMigrations": [
       "workers/W07-subscription-commerce/migrations/0005_membership_subscription_plan_change_attempts.sql",
-      "workers/W07-subscription-commerce/migrations/0006_membership_subscription_scheduled_plan_changes.sql"
+      "workers/W07-subscription-commerce/migrations/0006_membership_subscription_scheduled_plan_changes.sql",
+      "workers/W07-subscription-commerce/migrations/0007_scheduled_plan_change_type.sql"
     ]
   },
   "runtime": {
@@ -222,7 +223,12 @@
     "schedule request owner, If-Match, idempotency replay and one-pending-change-per-subscription evidence",
     "renewal cycle snapshot uses scheduled immutable target plan version without changing current subscription entitlement",
     "failed renewal leaves scheduled downgrade unapplied",
-    "signed successful renewal CAS applies target plan and W06 D1-03 audit before marking D1-04 cycle synchronization complete"
+    "signed successful renewal CAS applies target plan and W06 D1-03 audit before marking D1-04 cycle synchronization complete",
+    "schema inspection proving scheduled-plan-change change_type CHECK permits only DOWNGRADE and BILLING_INTERVAL_CHANGE",
+    "interval-change request requires opposite MONTHLY/YEARLY target interval with same creator and currency",
+    "renewal cycle period-end is calculated from the immutable scheduled target plan billing interval and charge amount",
+    "failed monthly/yearly interval-change renewal retains the current plan and original period while preserving the scheduled change for retry",
+    "signed successful renewal advances current_period_end by the scheduled target billing interval, atomically applies target plan version and records W06 D1-03 audit"
   ],
   "promotionRule": "Remain CONTRACTED_NOT_VERIFIED until the physical binding, migration, runtime authority and Evidence Registry evidence are all admitted.",
   "additionalTables": [
@@ -385,7 +391,7 @@
     {
       "name": "membership_subscription_scheduled_plan_changes",
       "status": "CONTRACTED_NOT_VERIFIED",
-      "purpose": "A subscriber-owned future-dated downgrade request. The current Subscription plan and entitlement remain unchanged until the existing renewal payment succeeds and its D1-04 outcome is synchronized.",
+      "purpose": "Subscriber-owned future-dated plan downgrade or monthly/yearly billing-interval change. The current Subscription plan and entitlement remain unchanged until the existing renewal payment succeeds and its D1-04 outcome is synchronized.",
       "primaryKey": "change_id",
       "columns": [
         {
@@ -475,6 +481,16 @@
           "name": "version",
           "type": "INTEGER",
           "nullable": false
+        },
+        {
+          "name": "change_type",
+          "type": "TEXT",
+          "nullable": false,
+          "default": "DOWNGRADE",
+          "allowed": [
+            "DOWNGRADE",
+            "BILLING_INTERVAL_CHANGE"
+          ]
         }
       ],
       "indexes": [
@@ -507,14 +523,14 @@
       ],
       "invariants": [
         "change_id is deterministically derived from subscriber-scoped Idempotency-Key using SHA-256; raw idempotency keys are never stored.",
-        "Only an authenticated subscriber may schedule a downgrade for their own ACTIVE, non-cancelled subscription using If-Match.",
-        "The target plan must belong to the same creator, use the same currency and billing interval, and have a lower immutable plan-version price than the current plan.",
+        "Only an authenticated subscriber may schedule a plan downgrade or billing-interval change for their own ACTIVE, non-cancelled subscription using If-Match.",
+        "change_type is DOWNGRADE or BILLING_INTERVAL_CHANGE. DOWNGRADE requires the same creator, currency, and billing interval with a lower immutable plan-version price; BILLING_INTERVAL_CHANGE requires the same creator, plan tier and currency with the opposite MONTHLY/YEARLY interval.",
         "The scheduled change takes effect exactly at the current_period_end boundary; the live membership_subscriptions plan_id, plan_version and entitlement reference are not changed when the request is accepted.",
-        "No Order, PaymentIntent, charge, monetary amount, tax, discount, ledger or provider fact is created or persisted in D1-01 by scheduling a downgrade.",
-        "At most one SCHEDULED downgrade may exist per subscription; the same subscriber and key replays the same change.",
-        "The existing W07 renewal pipeline uses the scheduled target plan version for the next cycle but does not apply it to the Subscription until D1-04 records a signed successful renewal payment.",
-        "D1-01 atomically applies the target plan identity and marks the schedule APPLIED by subscription version CAS; W06 D1-03 audit confirmation is required before D1-04 renewal sync is acknowledged as complete.",
-        "A failed or unpaid renewal does not apply the downgrade; it retains the scheduled target for a verified retry and otherwise remains reconciliation-owned."
+        "No Order, PaymentIntent, charge, monetary amount, tax, discount, ledger or provider fact is created or persisted in D1-01 by scheduling a change.",
+        "At most one SCHEDULED plan change may exist per subscription; the same subscriber and key replays the same change.",
+        "The existing W07 renewal pipeline uses the scheduled immutable target plan version for the next cycle amount and billing interval; the selected target interval determines cycle_end while the current paid period remains unchanged.",
+        "A failed or unpaid renewal does not apply the scheduled change; it retains the target for a verified retry and otherwise remains reconciliation-owned.",
+        "D1-01 atomically applies the target plan identity, advances the period using the target interval, and marks the schedule APPLIED by subscription version CAS; W06 D1-03 audit confirmation is required before D1-04 renewal sync is acknowledged as complete."
       ]
     }
   ]

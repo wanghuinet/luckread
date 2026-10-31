@@ -23,6 +23,7 @@ const resolveOperation = (method: string, segments: string[] | undefined): { pat
   if (parts.length === 2 && method === 'POST' && parts[1] === 'change-plan') return { pathname: '/memberships/subscriptions/' + encodeURIComponent(parts[0]!) + '/change-plan' }
   if (parts.length === 3 && method === 'POST' && parts[1] === 'change-plan' && parts[2] === 'checkout') return { pathname: '/memberships/subscriptions/' + encodeURIComponent(parts[0]!) + '/change-plan/checkout' }
   if (parts.length === 3 && method === 'POST' && parts[1] === 'change-plan' && parts[2] === 'schedule') return { pathname: '/memberships/subscriptions/' + encodeURIComponent(parts[0]!) + '/change-plan/schedule' }
+  if (parts.length === 3 && method === 'POST' && parts[1] === 'change-plan' && parts[2] === 'interval-schedule') return { pathname: '/memberships/subscriptions/' + encodeURIComponent(parts[0]!) + '/change-plan/interval-schedule' }
   return null
 }
 
@@ -122,6 +123,15 @@ async function subscriptionPlanDowngradeChangeId(subscriberId: string, idempoten
   return 'sudc_' + hex
 }
 
+async function subscriptionBillingIntervalChangeId(subscriberId: string, idempotencyKey: string): Promise<string> {
+  const payload = new TextEncoder().encode(
+    'membership-billing-interval-change-v1\u0000' + subscriberId + '\u0000' + idempotencyKey,
+  )
+  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', payload))
+  const hex = Array.from(digest, (byte) => byte.toString(16).padStart(2, '0')).join('')
+  return 'sudc_' + hex
+}
+
 async function auditSubscriptionPlanChangeRequest(
   request: Request,
   principal: Parameters<typeof callW06SubscriptionPlanChangeRequestAudit>[0]['principal'],
@@ -129,14 +139,18 @@ async function auditSubscriptionPlanChangeRequest(
   targetPlanId: string,
   expectedEtag: string,
   changeId: string,
-  changeType: 'UPGRADE' | 'DOWNGRADE_SCHEDULE',
+  changeType: 'UPGRADE' | 'DOWNGRADE_SCHEDULE' | 'BILLING_INTERVAL_CHANGE_SCHEDULE',
 ): Promise<Response | null> {
   const eventId = changeType === 'UPGRADE'
     ? 'evt_subscription_plan_upgrade_requested_' + changeId
-    : 'evt_subscription_plan_downgrade_scheduled_' + changeId
+    : changeType === 'DOWNGRADE_SCHEDULE'
+      ? 'evt_subscription_plan_downgrade_scheduled_' + changeId
+      : 'evt_subscription_billing_interval_change_requested_' + changeId
   const action = changeType === 'UPGRADE'
     ? 'subscription.plan_upgrade.requested'
-    : 'subscription.plan_downgrade.requested'
+    : changeType === 'DOWNGRADE_SCHEDULE'
+      ? 'subscription.plan_downgrade.requested'
+      : 'subscription.billing_interval_change.requested'
   let response: Response
   try {
     response = await callW06SubscriptionPlanChangeRequestAudit({
@@ -185,8 +199,10 @@ async function forward(request: Request, context: RouteContext): Promise<Respons
       parts[1] === 'change-plan' && parts[2] === 'checkout'
     const isPlanDowngradeSchedule = request.method === 'POST' && parts.length === 3 &&
       parts[1] === 'change-plan' && parts[2] === 'schedule'
+    const isBillingIntervalSchedule = request.method === 'POST' && parts.length === 3 &&
+      parts[1] === 'change-plan' && parts[2] === 'interval-schedule'
     if (request.method === 'POST') {
-      if (!isPlanUpgradeCheckout && !isPlanDowngradeSchedule) {
+      if (!isPlanUpgradeCheckout && !isPlanDowngradeSchedule && !isBillingIntervalSchedule) {
         return errorResponse(
           503,
           'SERVICE_UNAVAILABLE',
@@ -214,10 +230,14 @@ async function forward(request: Request, context: RouteContext): Promise<Respons
       }
       const denied = await authorizeSubscriptionPlanChange(request, principal.userId, parts[0]!)
       if (denied) return denied
-      const changeType = isPlanUpgradeCheckout ? 'UPGRADE' : 'DOWNGRADE_SCHEDULE'
+      const changeType = isPlanUpgradeCheckout
+        ? 'UPGRADE'
+        : isPlanDowngradeSchedule ? 'DOWNGRADE_SCHEDULE' : 'BILLING_INTERVAL_CHANGE_SCHEDULE'
       const changeId = isPlanUpgradeCheckout
         ? await subscriptionPlanUpgradeAttemptId(principal.userId, idempotencyKey)
-        : await subscriptionPlanDowngradeChangeId(principal.userId, idempotencyKey)
+        : isPlanDowngradeSchedule
+          ? await subscriptionPlanDowngradeChangeId(principal.userId, idempotencyKey)
+          : await subscriptionBillingIntervalChangeId(principal.userId, idempotencyKey)
       const auditDenied = await auditSubscriptionPlanChangeRequest(
         request, principal, parts[0]!, (body as { planId: string }).planId,
         expectedEtag, changeId, changeType,

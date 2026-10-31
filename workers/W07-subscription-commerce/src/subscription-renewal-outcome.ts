@@ -21,6 +21,7 @@ export class RenewalOutcomeSyncError extends Error {
 type RenewalOutcomeCycle = Readonly<{
   cycle_id: string; provider: string; merchant_id: string; subscription_id: string;
   subscriber_id: string; plan_id: string; plan_version: number; cycle_start: string; cycle_end: string;
+  billing_interval: 'MONTHLY' | 'YEARLY';
   amount_minor: number | null; order_id: string | null; payment_id: string | null; state: string;
   provider_response_status: string | null; pricing_snapshot_json: string | null;
   subscription_sync_state: 'PENDING' | 'APPLIED' | 'RECONCILIATION_REQUIRED';
@@ -31,6 +32,10 @@ type RenewalOutcomeCycle = Readonly<{
 type SubscriptionOutcomeRow = Readonly<{
   subscription_id: string; subscriber_id: string; plan_id: string; plan_version: number;
   creator_id: string | null;
+  billing_interval: 'MONTHLY' | 'YEARLY';
+  tier: string;
+  price_minor: number;
+  currency: string;
   status: 'PENDING' | 'ACTIVE' | 'PAST_DUE' | 'PAUSED' | 'CANCELED' | 'EXPIRED';
   current_period_start: string; current_period_end: string; cancel_at: string | null;
   updated_at: string; version: number;
@@ -79,7 +84,7 @@ async function readCycleById(db: D1Database, cycleId: string): Promise<RenewalOu
   try {
     return await db.prepare(
       'SELECT cycle_id, provider, merchant_id, subscription_id, subscriber_id, plan_id, plan_version, ' +
-      'cycle_start, cycle_end, amount_minor, order_id, payment_id, state, provider_response_status, ' +
+      'cycle_start, cycle_end, billing_interval, amount_minor, order_id, payment_id, state, provider_response_status, ' +
       'pricing_snapshot_json, subscription_sync_state, subscription_sync_updated_at, subscription_sync_error_code, ' +
       'version, updated_at FROM subscription_renewal_cycles WHERE cycle_id = ? LIMIT 1',
     ).bind(cycleId).first<RenewalOutcomeCycle>();
@@ -93,9 +98,11 @@ async function readSubscription(
 ): Promise<SubscriptionOutcomeRow | null> {
   try {
     return await db.prepare(
-      'SELECT subscription_id, subscriber_id, plan_id, plan_version, creator_id, status, current_period_start, ' +
-      'current_period_end, cancel_at, updated_at, version FROM membership_subscriptions ' +
-      'WHERE subscription_id = ? AND subscriber_id = ? LIMIT 1',
+      'SELECT s.subscription_id, s.subscriber_id, s.plan_id, s.plan_version, s.creator_id, v.billing_interval, ' +
+      'v.tier, v.price_minor, v.currency, s.status, s.current_period_start, s.current_period_end, s.cancel_at, s.updated_at, s.version ' +
+      'FROM membership_subscriptions s INNER JOIN membership_plan_versions v ' +
+      'ON v.plan_id = s.plan_id AND v.plan_version = s.plan_version ' +
+      'WHERE s.subscription_id = ? AND s.subscriber_id = ? LIMIT 1',
     ).bind(subscriptionId, subscriberId).first<SubscriptionOutcomeRow>();
   } catch {
     throw new RenewalOutcomeSyncError('SERVICE_UNAVAILABLE', 503);
@@ -130,6 +137,7 @@ function validTerminalCycle(cycle: RenewalOutcomeCycle): boolean {
       !isBoundedId(cycle.subscription_id) || !isBoundedId(cycle.subscriber_id) ||
       !isBoundedId(cycle.plan_id) || !Number.isSafeInteger(cycle.plan_version) || cycle.plan_version < 1 ||
       !isCanonicalIso(cycle.cycle_start) || !isCanonicalIso(cycle.cycle_end) ||
+      (cycle.billing_interval !== 'MONTHLY' && cycle.billing_interval !== 'YEARLY') ||
       cycle.cycle_end <= cycle.cycle_start ||
       !Number.isSafeInteger(cycle.amount_minor) || (cycle.amount_minor ?? 0) < 1 ||
       !isBoundedId(cycle.order_id, 255) || !cycle.payment_id || !PAYMENT_ID_PATTERN.test(cycle.payment_id) ||
@@ -148,18 +156,24 @@ async function reconcile(
     : { cycleId: cycle.cycle_id, subscriptionId: cycle.subscription_id, outcome: 'PENDING_RETRY' };
 }
 
-async function auditAppliedSubscriptionPlanDowngrade(
+async function auditAppliedSubscriptionPlanChange(
   env: OutcomeSyncEnv,
   cycle: RenewalOutcomeCycle,
   change: ScheduledSubscriptionPlanDowngrade,
 ): Promise<boolean> {
   if (!env.W06_GOVERNANCE || change.status !== 'APPLIED' ||
       !change.appliedAt || !change.appliedSubscriptionVersion) return false;
-  const eventId = 'evt_subscription_plan_downgrade_applied_' + change.changeId;
+  const eventId = change.changeType === 'DOWNGRADE'
+    ? 'evt_subscription_plan_downgrade_applied_' + change.changeId
+    : 'evt_subscription_billing_interval_changed_' + change.changeId;
+  const action = change.changeType === 'DOWNGRADE'
+    ? 'subscription.plan_downgraded'
+    : 'subscription.billing_interval_changed';
   const requestId = 'req_' + change.changeId.slice('sudc_'.length);
   const payload = {
     eventId,
     changeId: change.changeId,
+    changeType: change.changeType,
     subscriberId: change.subscriberId,
     subscriptionId: change.subscriptionId,
     fromPlanId: change.expectedPlanId,
@@ -173,13 +187,13 @@ async function auditAppliedSubscriptionPlanDowngrade(
   };
   try {
     const response = await env.W06_GOVERNANCE.fetch(new Request(
-      'https://luckread-w06.internal/internal/audit-events/subscription-plan-downgrade-applied',
+      'https://luckread-w06.internal/internal/audit-events/subscription-plan-change-applied',
       {
         method: 'POST',
         headers: {
           'X-LuckRead-Caller': 'W07',
           'X-LuckRead-Transport-Version': '1.0',
-          'X-LuckRead-Correlation-Id': 'subscription-downgrade:' + change.changeId,
+          'X-LuckRead-Correlation-Id': 'subscription-plan-change:' + change.changeId,
           'X-LuckRead-Request-Id': requestId,
           'X-LuckRead-Principal-User-Id': change.subscriberId,
           'content-type': 'application/json; charset=utf-8',
@@ -191,7 +205,7 @@ async function auditAppliedSubscriptionPlanDowngrade(
     return (response.status === 200 || response.status === 201) &&
       !!result && typeof result === 'object' && !Array.isArray(result) &&
       (result as { eventId?: unknown }).eventId === eventId &&
-      (result as { action?: unknown }).action === 'subscription.plan_downgraded' &&
+      (result as { action?: unknown }).action === action &&
       (result as { targetType?: unknown }).targetType === 'Subscription' &&
       (result as { targetId?: unknown }).targetId === change.subscriptionId;
   } catch {
@@ -350,7 +364,18 @@ export async function syncTerminalRenewalCycleToSubscription(
       return reconcile(env, cycle, 'SCHEDULED_PLAN_CHANGE_IDENTITY_MISMATCH', now);
     }
     const target = await readScheduledDowngradeTargetPlan(env.D1_01, scheduledChange);
-    if (!target || target.creatorId !== subscription.creator_id) {
+    const validScheduledChange = scheduledChange.status === 'APPLIED'
+      ? target?.billingInterval === subscription.billing_interval &&
+        target.tier === subscription.tier && target.currency === subscription.currency
+      : scheduledChange.changeType === 'DOWNGRADE'
+        ? target?.billingInterval === subscription.billing_interval &&
+          target.currency === subscription.currency && target.priceMinor < subscription.price_minor
+        : scheduledChange.changeType === 'BILLING_INTERVAL_CHANGE'
+          ? !!target && target.billingInterval !== subscription.billing_interval &&
+            target.tier === subscription.tier && target.currency === subscription.currency
+          : false;
+    if (!target || target.creatorId !== subscription.creator_id ||
+        target.billingInterval !== cycle.billing_interval || !validScheduledChange) {
       return reconcile(env, cycle, 'SCHEDULED_PLAN_TARGET_INVALID', now);
     }
     if (scheduledChange.status === 'APPLIED' &&
@@ -365,7 +390,7 @@ export async function syncTerminalRenewalCycleToSubscription(
   // Preserve any subsequent user lifecycle state; never reactivate canceled/paused subscriptions.
   if (subscription.current_period_start === cycle.cycle_start && subscription.current_period_end === cycle.cycle_end) {
     if (scheduledChange?.status === 'APPLIED' &&
-        !(await auditAppliedSubscriptionPlanDowngrade(env, cycle, scheduledChange))) {
+        !(await auditAppliedSubscriptionPlanChange(env, cycle, scheduledChange))) {
       return { cycleId: cycle.cycle_id, subscriptionId: cycle.subscription_id, outcome: 'PENDING_RETRY' };
     }
     if (scheduledChange?.status === 'SCHEDULED') {
@@ -404,7 +429,7 @@ export async function syncTerminalRenewalCycleToSubscription(
         env.D1_01, cycle.subscription_id, cycle.subscriber_id, cycle.cycle_start, true,
       );
       if (!appliedChange || appliedChange.status !== 'APPLIED' ||
-          !(await auditAppliedSubscriptionPlanDowngrade(env, cycle, appliedChange))) {
+          !(await auditAppliedSubscriptionPlanChange(env, cycle, appliedChange))) {
         return { cycleId: cycle.cycle_id, subscriptionId: cycle.subscription_id, outcome: 'PENDING_RETRY' };
       }
     }

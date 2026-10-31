@@ -261,7 +261,8 @@
         "POST /v1/subscriptions",
         "POST /v1/webhooks/hyperswitch",
         "POST /v1/webhooks/revenuecat",
-        "PUT /v1/membership/plans/{planId}"
+        "PUT /v1/membership/plans/{planId}",
+        "POST /v1/memberships/subscriptions/{subscriptionId}/change-plan/interval-schedule"
       ]
     },
     "audit_compliance": {

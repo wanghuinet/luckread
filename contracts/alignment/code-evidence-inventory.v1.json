@@ -4926,6 +4926,43 @@
         "workers/W01-payload/src/collections/Users.ts:field:username"
       ],
       "blockers": []
+    },
+    {
+      "evidenceId": "API_OPERATION:scheduleSubscriptionBillingIntervalChange",
+      "subjectType": "API_OPERATION",
+      "subjectId": "scheduleSubscriptionBillingIntervalChange",
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "workers/W01-payload/src/app/api/v1/memberships/subscriptions/[[...segments]]/route.ts",
+        "workers/W01-payload/src/moderation/w06-moderation-client.ts",
+        "workers/W08-creator/src/authz/casl-policy.ts",
+        "workers/W06-governance/src/index.ts",
+        "workers/W07-subscription-commerce/src/index.ts",
+        "workers/W07-subscription-commerce/src/subscription-plan-change-preview.ts",
+        "workers/W07-subscription-commerce/src/subscription-plan-change-schedule.ts",
+        "workers/W07-subscription-commerce/src/renewal-runtime.ts",
+        "workers/W07-subscription-commerce/src/subscription-renewal-outcome.ts",
+        "workers/W07-subscription-commerce/src/renewal-scheduler.ts",
+        "workers/W07-subscription-commerce/migrations/0007_scheduled_plan_change_type.sql"
+      ],
+      "testRefs": [],
+      "schemaEvidenceRefs": [
+        "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json"
+      ],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/openapi/v1/operation-policy.json",
+        "contracts/api/commerce-operation-policy.v1.json",
+        "contracts/api/api-inventory.v1.json",
+        "contracts/authz/permissions.json",
+        "contracts/state-machines/subscription.json"
+      ],
+      "blockers": [
+        "D1-01 migration 0007 depends on scheduled-plan-change table migration 0006; both are source-only and have not been applied to the remote database.",
+        "W07 Cron/renewal execution remains disabled by the existing activation gate; no Cron, Queue or Worker topology changes are included.",
+        "Production recurring-price/tax admission and Hyperswitch live renewal activation are not verified; target-plan recurring charge must remain fail-closed until the existing renewal activation contract is admitted.",
+        "Integration, signed successful/failed renewal webhook, retry, monthly-to-yearly/yearly-to-monthly period-boundary and security E2E validation are deferred to the later consolidated test phase."
+      ]
     }
   ]
 }
