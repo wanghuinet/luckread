@@ -142,7 +142,8 @@ type Operation =
   | { operation: 'createPlan'; subscriptionId: null }
   | { operation: 'list'; subscriptionId: null }
   | { operation: 'get'; subscriptionId: string }
-  | { operation: 'schedulePlanChange'; subscriptionId: string }\n  | { operation: 'upgradePlan'; subscriptionId: string }
+  | { operation: 'schedulePlanChange'; subscriptionId: string }
+  | { operation: 'upgradePlan'; subscriptionId: string }
 
 const toOperation = (method: string, segments: string[]): Operation | null => {
   if (segments.length === 1 && segments[0] === 'plans' && method === 'GET') return { operation: 'listPlans', subscriptionId: null }
@@ -150,7 +151,8 @@ const toOperation = (method: string, segments: string[]): Operation | null => {
   if (segments.length === 2 && segments[0] === 'membership' && segments[1] === 'plans' && method === 'POST') return { operation: 'createPlan', subscriptionId: null }
   if (segments.length === 2 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && method === 'GET') return { operation: 'list', subscriptionId: null }
   if (segments.length === 3 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && method === 'GET') return { operation: 'get', subscriptionId: segments[2] }
-  if (segments.length === 4 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && segments[3] === 'change-plan' && method === 'POST') return { operation: 'schedulePlanChange', subscriptionId: segments[2] }\n  if (segments.length === 4 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && segments[3] === 'upgrade' && method === 'POST') return { operation: 'upgradePlan', subscriptionId: segments[2] }
+  if (segments.length === 4 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && segments[3] === 'change-plan' && method === 'POST') return { operation: 'schedulePlanChange', subscriptionId: segments[2] }
+  if (segments.length === 4 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && segments[3] === 'upgrade' && method === 'POST') return { operation: 'upgradePlan', subscriptionId: segments[2] }
   return null
 }
 
