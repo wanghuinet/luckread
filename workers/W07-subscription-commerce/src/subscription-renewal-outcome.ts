@@ -33,6 +33,7 @@ type SubscriptionOutcomeRow = Readonly<{
   subscription_id: string; subscriber_id: string; plan_id: string; plan_version: number;
   creator_id: string | null;
   billing_interval: 'MONTHLY' | 'YEARLY';
+  tier: string;
   price_minor: number;
   currency: string;
   status: 'PENDING' | 'ACTIVE' | 'PAST_DUE' | 'PAUSED' | 'CANCELED' | 'EXPIRED';
@@ -98,7 +99,7 @@ async function readSubscription(
   try {
     return await db.prepare(
       'SELECT s.subscription_id, s.subscriber_id, s.plan_id, s.plan_version, s.creator_id, v.billing_interval, ' +
-      'v.price_minor, v.currency, s.status, s.current_period_start, s.current_period_end, s.cancel_at, s.updated_at, s.version ' +
+      'v.tier, v.price_minor, v.currency, s.status, s.current_period_start, s.current_period_end, s.cancel_at, s.updated_at, s.version ' +
       'FROM membership_subscriptions s INNER JOIN membership_plan_versions v ' +
       'ON v.plan_id = s.plan_id AND v.plan_version = s.plan_version ' +
       'WHERE s.subscription_id = ? AND s.subscriber_id = ? LIMIT 1',
@@ -365,13 +366,13 @@ export async function syncTerminalRenewalCycleToSubscription(
     const target = await readScheduledDowngradeTargetPlan(env.D1_01, scheduledChange);
     const validScheduledChange = scheduledChange.status === 'APPLIED'
       ? target?.billingInterval === subscription.billing_interval &&
-        target.currency === subscription.currency
+        target.tier === subscription.tier && target.currency === subscription.currency
       : scheduledChange.changeType === 'DOWNGRADE'
         ? target?.billingInterval === subscription.billing_interval &&
           target.currency === subscription.currency && target.priceMinor < subscription.price_minor
         : scheduledChange.changeType === 'BILLING_INTERVAL_CHANGE'
           ? !!target && target.billingInterval !== subscription.billing_interval &&
-            target.currency === subscription.currency
+            target.tier === subscription.tier && target.currency === subscription.currency
           : false;
     if (!target || target.creatorId !== subscription.creator_id ||
         target.billingInterval !== cycle.billing_interval || !validScheduledChange) {
