@@ -63,7 +63,7 @@ async function getHyperswitchSession(configuration: NativeConfiguration): Promis
  */
 export async function presentNativeMembershipPayment(
   sdkAuthorization: string,
-): Promise<PaymentResult> {
+): Promise<{ status: 'completed' | 'canceled' | 'failed' }> {
   if (Platform.OS === 'web') {
     throw new Error('原生 Hyperswitch 支付表单不能在 Web 运行环境中启动。');
   }
@@ -80,10 +80,11 @@ export async function presentNativeMembershipPayment(
   const configuration = readConfiguration();
   const hyperswitch = await getHyperswitchSession(configuration);
   const paymentSession = await hyperswitch.initPaymentSession({ sdkAuthorization });
-  return paymentSession.presentPaymentSheet({
+  const result: PaymentResult = await paymentSession.presentPaymentSheet({
     merchantDisplayName: 'LuckRead',
     displaySavedPaymentMethodsCheckbox: true,
     appearance: { theme: 'Light' },
     locale: 'en',
   });
+  return { status: result.status };
 }
