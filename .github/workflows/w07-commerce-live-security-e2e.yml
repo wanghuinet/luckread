@@ -1,6 +1,11 @@
 name: W07 Commerce Live Security E2E
 
 on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/w07-commerce-live-security-e2e.yml'
+      - 'scripts/w07-commerce-live-security-e2e.mjs'
   workflow_dispatch:
     inputs:
       confirm:
