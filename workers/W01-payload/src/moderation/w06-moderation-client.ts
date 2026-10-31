@@ -306,3 +306,28 @@ export async function callW06Moderation(input: {
     },
   })
 }
+
+
+/** Immutable audit path for a W01-authorized membership trial lifecycle event. */
+export async function callW06SubscriptionTrialAudit(input: {
+  request: Request
+  principal: ContentPrincipal
+  body: {
+    eventId: string
+    phase: 'REQUESTED' | 'STARTED' | 'CANCELED'
+    planId: string
+    subscriptionId?: string
+    trialId?: string
+    planVersion?: number
+    trialEndsAt?: string
+    idempotencyKey?: string
+  }
+}): Promise<Response> {
+  return callW06Moderation({
+    request: input.request,
+    pathname: '/internal/audit-events/subscription-trial',
+    method: 'POST',
+    principal: input.principal,
+    body: input.body,
+  })
+}
