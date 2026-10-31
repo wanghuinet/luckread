@@ -2524,6 +2524,21 @@
       "x-luckread-source": "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json; contracts/state-machines/membership-subscription-plan-change.json"
     },
     {
+      "operationId": "createSubscriptionUpgradeOrder",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "subscription.change_plan"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": true,
+      "idempotencyRequired": true,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "CONTRACTED",
+      "x-luckread-source": "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json#paidPlanUpgradeApplicationTable; contracts/openapi/v1/openapi.yaml#post:/memberships/subscriptions/{subscriptionId}/upgrade"
+    },
+    {
       "operationId": "pauseSubscription",
       "auth": {
         "mode": "permission"
