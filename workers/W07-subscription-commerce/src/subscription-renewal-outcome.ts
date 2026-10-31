@@ -25,7 +25,7 @@ type RenewalOutcomeCycle = Readonly<{
 
 type SubscriptionOutcomeRow = Readonly<{
   subscription_id: string; subscriber_id: string; plan_id: string; plan_version: number;
-  status: 'PENDING' | 'ACTIVE' | 'PAST_DUE' | 'PAUSED' | 'CANCELED' | 'EXPIRED';
+  status: 'PENDING' | 'TRIALING' | 'ACTIVE' | 'PAST_DUE' | 'PAUSED' | 'CANCELED' | 'EXPIRED';
   current_period_start: string; current_period_end: string; cancel_at: string | null;
   updated_at: string; version: number;
   scheduled_change_id: string | null;
@@ -307,7 +307,7 @@ export async function syncTerminalRenewalCycleToSubscription(
   }
 
   if (cycle.state === 'SUCCEEDED') {
-    if (!['ACTIVE', 'PAST_DUE'].includes(subscription.status)) {
+    if (!['TRIALING', 'ACTIVE', 'PAST_DUE'].includes(subscription.status)) {
       return reconcile(env, cycle, 'SUBSCRIPTION_STATE_FORBIDS_REACTIVATION', now);
     }
     const result = await applySubscriptionUpdate(
@@ -331,7 +331,7 @@ export async function syncTerminalRenewalCycleToSubscription(
       outcome: marked ? 'ALREADY_APPLIED' : 'PENDING_RETRY',
     };
   }
-  if (subscription.status !== 'ACTIVE') {
+  if (subscription.status !== 'ACTIVE' && subscription.status !== 'TRIALING') {
     return reconcile(env, cycle, 'SUBSCRIPTION_STATE_FORBIDS_PAST_DUE_TRANSITION', now);
   }
   const result = await applySubscriptionUpdate(
