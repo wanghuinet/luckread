@@ -410,13 +410,14 @@ export async function getMembershipTrialDetails(
 
 /**
  * Store trials are authoritative in App Store / Google Play via RevenueCat.
- * Expiry merely closes D1-01 access after the store-reported trial term ends;
- * it never creates or charges a web order.
+ * This bounded expiry closes ended store trials and canceled/uncharged web trials;
+ * a web trial with an in-flight or retryable MIT payment is retained for outcome sync.
  */
 export async function expireDueStoreMembershipTrials(
   db: D1Database,
   now = new Date(),
   limit = 100,
+  d1_04?: D1Database,
 ): Promise<Readonly<{ scanned: number; expired: number }>> {
   if (!(now instanceof Date) || !Number.isFinite(now.getTime())) {
     throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
@@ -424,20 +425,58 @@ export async function expireDueStoreMembershipTrials(
   const safeLimit = Number.isSafeInteger(limit) ? Math.min(Math.max(limit, 1), 200) : 100;
   const nowIsoValue = now.toISOString();
   const rows = (await db.prepare(
-    "SELECT t.trial_id, t.subscription_id, t.subscriber_id, t.status AS trial_status, t.version AS trial_version, " +
+    "SELECT t.trial_id, t.subscription_id, t.subscriber_id, t.source AS trial_source, t.trial_ends_at, t.status AS trial_status, t.version AS trial_version, " +
     "s.version AS subscription_version, s.status AS subscription_status, s.updated_at AS subscription_updated_at " +
     "FROM membership_subscription_trials t INNER JOIN membership_subscriptions s " +
     "ON s.subscription_id = t.subscription_id AND s.subscriber_id = t.subscriber_id " +
-    "WHERE t.source IN ('APP_STORE','PLAY_STORE') AND t.status IN ('TRIALING','CANCELED','PAYMENT_FAILED') " +
+    "WHERE ((t.source IN ('APP_STORE','PLAY_STORE') AND t.status IN ('TRIALING','CANCELED','PAYMENT_FAILED')) " +
+    "OR (t.source = 'WEB' AND t.status IN ('TRIALING','CANCELED','PAYMENT_FAILED'))) " +
     "AND t.trial_ends_at <= ? AND s.status IN ('TRIALING','PAST_DUE') " +
     "ORDER BY t.trial_ends_at ASC, t.trial_id ASC LIMIT ?",
   ).bind(nowIsoValue, safeLimit).all<{
-    trial_id: string; subscription_id: string; subscriber_id: string;
+    trial_id: string; subscription_id: string; subscriber_id: string; trial_source: TrialRow['source']; trial_ends_at: string;
     trial_status: TrialRow['status']; trial_version: number;
     subscription_version: number; subscription_status: string; subscription_updated_at: string;
   }>()).results ?? [];
   let expired = 0;
   for (const row of rows) {
+    if (row.trial_source === 'WEB' && row.trial_status === 'TRIALING' && d1_04) {
+      let cycle: { state: string; attempt_number: number; subscription_sync_state: string; mandate_record_id: string | null } | null;
+      try {
+        cycle = await d1_04.prepare(
+          'SELECT state, attempt_number, subscription_sync_state, mandate_record_id ' +
+          'FROM subscription_renewal_cycles WHERE subscription_id = ? AND cycle_start = ? LIMIT 1',
+        ).bind(row.subscription_id, row.trial_ends_at).first<{
+          state: string; attempt_number: number; subscription_sync_state: string; mandate_record_id: string | null;
+        }>();
+      } catch {
+        throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
+      }
+      if (cycle && (
+        cycle.state === 'SUCCEEDED' ||
+        cycle.state === 'SUBMITTED' ||
+        cycle.state === 'SUBMITTING' ||
+        cycle.state === 'PAYMENT_READY' ||
+        cycle.state === 'PREPARED' ||
+        cycle.state === 'RECONCILIATION_REQUIRED' ||
+        cycle.subscription_sync_state !== 'APPLIED'
+      )) {
+        // Never expire a trial while a submitted payment or uncertain terminal
+        // outcome could still convert the same Subscription.
+        continue;
+      }
+      if (cycle && cycle.state === 'FAILED' && cycle.attempt_number < 5) {
+        if (cycle.mandate_record_id) {
+          const mandate = await d1_04.prepare(
+            'SELECT status FROM payment_mandates WHERE mandate_record_id = ? LIMIT 1',
+          ).bind(cycle.mandate_record_id).first<{ status: string }>();
+          if (mandate?.status === 'ACTIVE') continue;
+        }
+      }
+      if (cycle && cycle.state === 'FAILED' && cycle.attempt_number >= 5) {
+        // Retry budget has been exhausted; the paid-through trial has ended.
+      }
+    }
     const updatedAt = new Date(Math.max(Date.parse(nowIsoValue), Date.parse(row.subscription_updated_at) + 1)).toISOString();
     const result = await db.prepare(
       "UPDATE membership_subscriptions SET status = 'EXPIRED', updated_at = ?, version = version + 1 " +
