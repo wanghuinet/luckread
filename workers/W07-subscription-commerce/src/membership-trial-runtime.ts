@@ -415,6 +415,45 @@ export async function getMembershipTrialDetails(
   return row ? toTrial(row) : null;
 }
 
+export type WebTrialExpiryCycle = Readonly<{
+  state: string;
+  attempt_number: number;
+  subscription_sync_state: string;
+  mandate_record_id: string | null;
+  outcome_code: string | null;
+  payment_id: string | null;
+  order_id: string | null;
+}>;
+
+export function shouldDeferWebTrialExpiry(
+  trialStatus: TrialRow['status'],
+  cycle: WebTrialExpiryCycle | null,
+  hasActiveMandate: boolean,
+): boolean {
+  if (!cycle) return false;
+  if (cycle.state === 'SUBMITTED' || cycle.state === 'SUBMITTING') return true;
+  if ((cycle.state === 'SUCCEEDED' || cycle.state === 'FAILED') &&
+      cycle.subscription_sync_state !== 'APPLIED') return true;
+  if (cycle.state === 'RECONCILIATION_REQUIRED') {
+    const preSubmitCodes = new Set([
+      'SUBSCRIPTION_NOT_CHARGEABLE_BEFORE_ORDER',
+      'SUBSCRIPTION_NOT_CHARGEABLE_AT_SUBMISSION',
+      'MANDATE_NOT_ACTIVE',
+      'MANDATE_NOT_ACTIVE_AT_SUBMISSION',
+      'PREPARED_SNAPSHOT_INCOMPLETE',
+    ]);
+    const provenNoCharge = preSubmitCodes.has(cycle.outcome_code ?? '') &&
+      cycle.subscription_sync_state === 'PENDING';
+    return !provenNoCharge;
+  }
+  if (trialStatus !== 'CANCELED' &&
+      ['AWAITING_PRICING', 'PAYMENT_READY', 'PREPARED'].includes(cycle.state)) return true;
+  if (trialStatus !== 'CANCELED' && cycle.state === 'AWAITING_MANDATE') return hasActiveMandate;
+  if (trialStatus !== 'CANCELED' && cycle.state === 'FAILED' &&
+      cycle.attempt_number < 5 && hasActiveMandate) return true;
+  return false;
+}
+
 /**
  * Store trial termination is recorded only from the W02-verified RevenueCat snapshot.
  * This bounded expiry closes canceled/uncharged web trials; a submitted or retryable
@@ -447,37 +486,39 @@ export async function expireDueWebMembershipTrials(
   let expired = 0;
   for (const row of rows) {
     if (row.trial_source === 'WEB' && ['TRIALING', 'CANCELED', 'PAYMENT_FAILED'].includes(row.trial_status)) {
-      let cycle: { state: string; attempt_number: number; subscription_sync_state: string; mandate_record_id: string | null } | null;
+      let cycle: WebTrialExpiryCycle | null;
       try {
         cycle = await d1_04.prepare(
-          'SELECT state, attempt_number, subscription_sync_state, mandate_record_id ' +
+          'SELECT state, attempt_number, subscription_sync_state, mandate_record_id, outcome_code, payment_id, order_id ' +
           'FROM subscription_renewal_cycles WHERE subscription_id = ? AND cycle_start = ? LIMIT 1',
         ).bind(row.subscription_id, row.trial_ends_at).first<{
           state: string; attempt_number: number; subscription_sync_state: string; mandate_record_id: string | null;
+          outcome_code: string | null; payment_id: string | null; order_id: string | null;
         }>();
       } catch {
         throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
       }
-      if (cycle && (
-        ['SUBMITTED', 'SUBMITTING', 'RECONCILIATION_REQUIRED'].includes(cycle.state) ||
-        (cycle.state === 'SUCCEEDED' && cycle.subscription_sync_state !== 'APPLIED') ||
-        (row.trial_status !== 'CANCELED' && ['AWAITING_PRICING', 'PAYMENT_READY', 'PREPARED'].includes(cycle.state)) ||
-        (row.trial_status !== 'CANCELED' && cycle.state === 'FAILED' && cycle.subscription_sync_state !== 'APPLIED')
-      )) {
-        // Never expire a trial while a submitted payment or uncertain terminal
-        // outcome could still convert the same Subscription.
+      let activeMandate = false;
+      if (cycle?.state === 'FAILED' && cycle.attempt_number < 5 && row.trial_status !== 'CANCELED' &&
+          cycle.mandate_record_id) {
+        const mandate = await d1_04.prepare(
+          'SELECT status FROM payment_mandates WHERE mandate_record_id = ? LIMIT 1',
+        ).bind(cycle.mandate_record_id).first<{ status: string }>();
+        activeMandate = mandate?.status === 'ACTIVE';
+      } else if (cycle?.state === 'AWAITING_MANDATE' && row.trial_status !== 'CANCELED') {
+        const mandate = await d1_04.prepare(
+          "SELECT m.mandate_record_id FROM payment_mandates m " +
+          "INNER JOIN saved_payment_methods s ON s.provider = m.provider AND s.merchant_id = m.merchant_id " +
+          "AND s.customer_id = m.customer_id AND s.payment_method_id = m.payment_method_id " +
+          "WHERE m.provider = 'hyperswitch' AND m.customer_id = ? AND m.status = 'ACTIVE' " +
+          "AND m.provider_mandate_id IS NOT NULL LIMIT 1",
+        ).bind(row.subscriber_id).first<{ mandate_record_id: string }>();
+        activeMandate = mandate !== null;
+      }
+      if (shouldDeferWebTrialExpiry(row.trial_status, cycle, activeMandate)) {
+        // Provider-submitted or uncertain outcomes must be synchronized before
+        // access closes. Proven pre-submit stops have no charge to reconcile.
         continue;
-      }
-      if (cycle && row.trial_status !== 'CANCELED' && cycle.state === 'FAILED' && cycle.attempt_number < 5) {
-        if (cycle.mandate_record_id) {
-          const mandate = await d1_04.prepare(
-            'SELECT status FROM payment_mandates WHERE mandate_record_id = ? LIMIT 1',
-          ).bind(cycle.mandate_record_id).first<{ status: string }>();
-          if (mandate?.status === 'ACTIVE') continue;
-        }
-      }
-      if (cycle && cycle.state === 'FAILED' && cycle.attempt_number >= 5) {
-        // Retry budget has been exhausted; the paid-through trial has ended.
       }
     }
     const updatedAt = new Date(Math.max(Date.parse(nowIsoValue), Date.parse(row.subscription_updated_at) + 1)).toISOString();
