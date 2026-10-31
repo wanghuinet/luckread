@@ -2739,6 +2739,22 @@
       ]
     },
     {
+      "operationId": "startSubscriptionTrial",
+      "method": "POST",
+      "path": "/v1/memberships/subscriptions/trial",
+      "openapiPath": "/memberships/subscriptions/trial",
+      "domain": "subscription_entitlement_payment",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/memberships/subscriptions/trial",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json",
+        "contracts/api/commerce-operation-policy.v1.json"
+      ]
+    },
+    {
       "operationId": "transitionAccountState",
       "method": "POST",
       "path": "/v1/users/{userId}/account-state",
