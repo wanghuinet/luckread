@@ -370,10 +370,8 @@ type MembershipPlanLifecycleAuditInput = {
 }
 
 type SubscriptionPlanChangeRequestAuditInput = {
-  eventId: string; subscriptionId: string; sourcePlanId: string; sourcePlanVersion: number
-  targetPlanId: string; targetPlanVersion: number
-  changeType: 'DOWNGRADE' | 'BILLING_INTERVAL_CHANGE' | 'SAME_PRICE_CHANGE'
-  effectiveAt: string; expectedVersion: number; idempotencyKey: string
+  eventId: string; subscriptionId: string; targetPlanId: string
+  expectedVersion: number; idempotencyKey: string
 }
 
 type SubscriptionPlanChangeAuditInput = {
@@ -567,23 +565,14 @@ function parseMembershipPlanLifecycleAuditInput(value: unknown): MembershipPlanL
 function parseSubscriptionPlanChangeRequestAuditInput(value: unknown): SubscriptionPlanChangeRequestAuditInput {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('INVALID_SUBSCRIPTION_PLAN_CHANGE_REQUEST_AUDIT')
   const body = value as Record<string, unknown>
-  const allowed = new Set([
-    'eventId', 'subscriptionId', 'sourcePlanId', 'sourcePlanVersion',
-    'targetPlanId', 'targetPlanVersion', 'changeType', 'effectiveAt',
-    'expectedVersion', 'idempotencyKey',
-  ])
+  const allowed = new Set(['eventId', 'subscriptionId', 'targetPlanId', 'expectedVersion', 'idempotencyKey'])
   if (Object.keys(body).some((key) => !allowed.has(key)) || Object.keys(body).length !== allowed.size) {
     throw new Error('INVALID_SUBSCRIPTION_PLAN_CHANGE_REQUEST_AUDIT')
   }
   if (
     typeof body.eventId !== 'string' || !/^evt_sub_plan_change_request_[a-f0-9]{26}$/.test(body.eventId) ||
     typeof body.subscriptionId !== 'string' || !resourceIdPattern.test(body.subscriptionId) ||
-    typeof body.sourcePlanId !== 'string' || !/^plan_[a-f0-9]{64}$/.test(body.sourcePlanId) ||
     typeof body.targetPlanId !== 'string' || !/^plan_[a-f0-9]{64}$/.test(body.targetPlanId) ||
-    !Number.isSafeInteger(body.sourcePlanVersion) || (body.sourcePlanVersion as number) < 1 ||
-    !Number.isSafeInteger(body.targetPlanVersion) || (body.targetPlanVersion as number) < 1 ||
-    (body.changeType !== 'DOWNGRADE' && body.changeType !== 'BILLING_INTERVAL_CHANGE' && body.changeType !== 'SAME_PRICE_CHANGE') ||
-    typeof body.effectiveAt !== 'string' || !body.effectiveAt || Number.isNaN(Date.parse(body.effectiveAt)) ||
     !Number.isSafeInteger(body.expectedVersion) || (body.expectedVersion as number) < 1 ||
     typeof body.idempotencyKey !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(body.idempotencyKey)
   ) throw new Error('INVALID_SUBSCRIPTION_PLAN_CHANGE_REQUEST_AUDIT')
@@ -1104,16 +1093,9 @@ export default {
         action: 'membership.subscription.plan_change_requested',
         targetType: 'Subscription',
         targetId: input.subscriptionId,
-        before: {
-          sourcePlanId: input.sourcePlanId,
-          sourcePlanVersion: input.sourcePlanVersion,
-          expectedVersion: input.expectedVersion,
-        },
+        before: { expectedVersion: input.expectedVersion },
         after: {
           targetPlanId: input.targetPlanId,
-          targetPlanVersion: input.targetPlanVersion,
-          changeType: input.changeType,
-          effectiveAt: input.effectiveAt,
           idempotencyKey: input.idempotencyKey,
         },
         occurredAt: new Date().toISOString(),
