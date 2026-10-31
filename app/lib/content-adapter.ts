@@ -1,5 +1,6 @@
 import type { FeedContent, FeedMediaAttachment } from '~/components/FeedItem';
 import { apiRequest, fetchContentBodyReference, getApiBaseUrl } from './api-client';
+import { firstNonNegativeInteger } from './api-value';
 
 export type ApiAuthor = {
   id?: string;
@@ -122,13 +123,7 @@ export async function resolvePublicProfileById(
   return null;
 }
 
-function nonNegativeCount(...values: unknown[]): number | undefined {
-  for (const value of values) {
-    const parsed = typeof value === 'number' ? value : typeof value === 'string' && value.trim() ? Number(value) : Number.NaN;
-    if (Number.isFinite(parsed) && parsed >= 0) return Math.floor(parsed);
-  }
-  return undefined;
-}
+
 
 function resolveMediaUrl(value: unknown): string | null {
   if (typeof value !== 'string' || !value.trim()) return null;
@@ -234,14 +229,14 @@ export function mapContentToFeedContent(
     message,
     media_url: cover || mediaItems[0]?.src,
     media_items: mediaItems,
-    like_count: nonNegativeCount(counts?.likes, item.likeCount, item.like_count),
-    retweet_count: nonNegativeCount(counts?.retweets, counts?.reposts, item.retweetCount, item.retweet_count),
-    reply_count: nonNegativeCount(counts?.comments, counts?.replies, item.replyCount, item.reply_count),
+    like_count: firstNonNegativeInteger(counts?.likes, item.likeCount, item.like_count),
+    retweet_count: firstNonNegativeInteger(counts?.retweets, counts?.reposts, item.retweetCount, item.retweet_count),
+    reply_count: firstNonNegativeInteger(counts?.comments, counts?.replies, item.replyCount, item.reply_count),
     view_count: (() => {
-      const count = nonNegativeCount(counts?.views, item.viewCount, item.view_count);
+      const count = firstNonNegativeInteger(counts?.views, item.viewCount, item.view_count);
       return count === undefined ? undefined : String(count);
     })(),
-    save_count: nonNegativeCount(counts?.favorites, counts?.saves, item.saveCount, item.save_count),
+    save_count: firstNonNegativeInteger(counts?.favorites, counts?.saves, item.saveCount, item.save_count),
   };
 }
 
