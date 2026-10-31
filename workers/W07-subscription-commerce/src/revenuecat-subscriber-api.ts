@@ -47,6 +47,7 @@ export type RevenueCatSubscriberSubscription = Readonly<{
   refunded_at?: string | null;
   store?: string;
   store_transaction_id?: string | number | null;
+  original_transaction_id?: string | null;
   unsubscribe_detected_at?: string | null;
 }>;
 
@@ -185,6 +186,7 @@ function parseSubscriptions(value: unknown): Record<string, RevenueCatSubscriber
       original_purchase_date?: string | null;
       ownership_type?: string;
       period_type?: string;
+      original_transaction_id?: string | null;
       purchase_date: string;
       refunded_at?: string | null;
       store?: string;
@@ -208,6 +210,9 @@ function parseSubscriptions(value: unknown): Record<string, RevenueCatSubscriber
         throw new RevenueCatSubscriberApiError('INVALID_RESPONSE', false);
       }
       parsed.is_sandbox = raw.is_sandbox;
+    }
+    if (Object.hasOwn(raw, 'original_transaction_id')) {
+      parsed.original_transaction_id = optionalNullableText(raw, 'original_transaction_id', 255) ?? null;
     }
     if (Object.hasOwn(raw, 'store_transaction_id')) {
       const transactionId = raw.store_transaction_id;
