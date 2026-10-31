@@ -1992,7 +1992,7 @@ paths:
           required: false
           schema: { type: integer, minimum: 1, maximum: 10000, default: 1 }
       responses:
-        '200': { description: Paginated subscriptions visible to the current principal. }
+        '200': { description: Paginated subscriptions visible only to the current principal. Each item contains a nullable trial summary with source, lifecycle status, and trial end; provider transaction IDs, store customer IDs and payment credentials are never returned. }
         '4XX': { $ref: '#/components/responses/ClientError' }
     post:
       tags: [Users]
