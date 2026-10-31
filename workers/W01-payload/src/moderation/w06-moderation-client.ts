@@ -181,7 +181,7 @@ export async function callW06SubscriptionPlanChangeRequestAudit(input: {
     subscriberId: string
     subscriptionId: string
     targetPlanId: string
-    changeType: 'UPGRADE' | 'DOWNGRADE_SCHEDULE'
+    changeType: 'UPGRADE' | 'DOWNGRADE_SCHEDULE' | 'BILLING_INTERVAL_CHANGE_SCHEDULE'
     expectedEtag: string
     requestedAt: string
   }
