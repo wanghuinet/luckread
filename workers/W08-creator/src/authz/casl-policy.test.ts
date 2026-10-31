@@ -536,7 +536,7 @@ describe('CASL L0-L8 authorization policy', () => {
 
 describe('saved payment method authorization', () => {
   it('allows L2+ principals to manage only their own saved payment methods', () => {
-    for (const layer of ['L2', 'L3', 'L4', 'L7', 'L8']) {
+    for (const layer of ['L2', 'L3', 'L4', 'L7', 'L8'] as const) {
       for (const action of ['payment_method.read.self', 'payment_method.revoke.self']) {
         expect(evaluate({
           layer,
