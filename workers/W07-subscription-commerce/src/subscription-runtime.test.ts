@@ -698,7 +698,7 @@ describe('subscription runtime', () => {
         trialEndsAt: '2026-10-20T00:00:00.000Z',
       },
     })
-    expect(JSON.stringify(result)).not.toContain('original_transaction_id')
+    expect(JSON.stringify(result)).not.toContain('store_transaction_id')
     expect(JSON.stringify(result)).not.toContain('provider_app_id')
   })
 
@@ -1079,7 +1079,7 @@ const planVersionColumnRowsWithTrial = [
 const trialColumnRows = [
   ['trial_id','TEXT',1,1], ['subscription_id','TEXT',1,0], ['subscriber_id','TEXT',1,0],
   ['plan_id','TEXT',1,0], ['plan_version','INTEGER',1,0], ['source','TEXT',1,0],
-  ['provider_app_id','TEXT',0,0], ['product_id','TEXT',0,0], ['original_transaction_id','TEXT',0,0],
+  ['provider_app_id','TEXT',0,0], ['product_id','TEXT',0,0], ['store_transaction_id','TEXT',0,0],
   ['started_at','TEXT',1,0], ['trial_ends_at','TEXT',1,0], ['status','TEXT',1,0],
   ['request_hash','TEXT',1,0], ['version','INTEGER',1,0], ['created_at','TEXT',1,0], ['updated_at','TEXT',1,0],
 ]
