@@ -914,6 +914,9 @@ describe('subscription runtime', () => {
     expect(workflow).not.toContain('"sourceSha": "${{ inputs.source_sha }}"')
     expect(workflow).toContain('Read-only D1-01 migration and schema preflight')
     expect(workflow).toContain("0003_membership_plans.sql")
+    expect(workflow).toContain("0005_subscription_plan_changes.sql")
+    expect(workflow).toContain('PRAGMA table_info("membership_subscription_plan_changes")')
+    expect(workflow).toContain('ix_membership_subscription_plan_changes_effective')
     expect(workflow).toContain('PRAGMA table_info("membership_subscriptions")')
     expect(workflow).toContain('PRAGMA foreign_key_list("membership_subscriptions")')
     expect(workflow).toContain('PRAGMA table_info("membership_plans")')
@@ -993,13 +996,37 @@ const planTriggerNames = [
   'membership_plans_owner_immutable_update',
   'membership_plans_current_version_forward_only',
 ]
+const planChangeColumnRows = [
+  ['change_id','TEXT',1,1], ['subscription_id','TEXT',1,0], ['subscriber_id','TEXT',1,0],
+  ['source_plan_id','TEXT',1,0], ['source_plan_version','INTEGER',1,0],
+  ['target_plan_id','TEXT',1,0], ['target_plan_version','INTEGER',1,0],
+  ['change_type','TEXT',1,0], ['effective_at','TEXT',1,0], ['status','TEXT',1,0],
+  ['request_hash','TEXT',1,0], ['version','INTEGER',1,0], ['created_at','TEXT',1,0],
+  ['updated_at','TEXT',1,0],
+]
+const planChangeIndexNames = [
+  'ux_membership_subscription_plan_changes_one_scheduled',
+  'ix_membership_subscription_plan_changes_subscriber_created',
+  'ix_membership_subscription_plan_changes_effective',
+]
+const planChangeTriggerNames = [
+  'membership_subscription_plan_changes_identity_immutable',
+  'membership_subscription_plan_changes_version_guard',
+  'membership_subscription_plan_changes_state_transition_guard',
+  'membership_subscription_plan_changes_applied_guard',
+  'membership_subscription_plan_changes_mark_applied',
+  'membership_subscription_plan_changes_cancel_on_lifecycle_change',
+  'membership_subscription_plan_changes_retained',
+  'membership_subscriptions_plan_change_requires_scheduled_record',
+]
 const nameRows = (names) => [{ results: names.map((name,seq) => ({ name,seq })) }]
-const preflightInput = (withVersion = false, versionDefault = '1', withPlans = false) => ({
+const preflightInput = (withVersion = false, versionDefault = '1', withPlans = false, withPlanChanges = withPlans) => ({
   databaseList: preflightDatabaseList,
   migrationState: [{ results: [
     { name: '0001_membership_subscriptions.sql' },
     ...(withVersion ? [{ name: '0002_subscription_version_cas.sql' }] : []),
     ...(withPlans ? [{ name: '0003_membership_plans.sql' }] : []),
+    ...(withPlanChanges ? [{ name: '0005_subscription_plan_changes.sql' }] : []),
   ] }],
   subscriptionSchema: preflightSchema(withVersion,versionDefault),
   subscriptionIndexes: preflightIndexes,
@@ -1009,10 +1036,13 @@ const preflightInput = (withVersion = false, versionDefault = '1', withPlans = f
   planIndexes: withPlans ? nameRows(planIndexNames) : [{ results: [] }],
   planVersionIndexes: withPlans ? nameRows(planVersionIndexNames) : [{ results: [] }],
   planTriggers: withPlans ? nameRows(planTriggerNames) : [{ results: [] }],
+  planChangeSchema: withPlanChanges ? schemaRows(planChangeColumnRows) : [{ results: [] }],
+  planChangeIndexes: withPlanChanges ? nameRows(planChangeIndexNames) : [{ results: [] }],
+  planChangeTriggers: withPlanChanges ? nameRows(planChangeTriggerNames) : [{ results: [] }],
 })
 
 describe('read-only D1 subscription migration postflight', () => {
-  it('passes only when all three migrations, exact table shapes, indexes, triggers and integrity checks are verified', () => {
+  it('passes only when migrations 0001, 0002, 0003, 0005, exact schemas, indexes, triggers and integrity checks are verified', () => {
     const result = verifyD1SubscriptionPostflight({
       ...preflightInput(true, '1', true),
       versionIntegrity: [{ results: [{ invalid_versions: 0 }] }],
@@ -1026,6 +1056,7 @@ describe('read-only D1 subscription migration postflight', () => {
       '0001_membership_subscriptions.sql',
       '0002_subscription_version_cas.sql',
       '0003_membership_plans.sql',
+      '0005_subscription_plan_changes.sql',
     ])
   })
 
@@ -1050,7 +1081,7 @@ describe('read-only D1 subscription migration postflight', () => {
       ...preflightInput(true, '1', false),
       versionIntegrity: [{ results: [{ invalid_versions: 0 }] }],
       planIntegrity: [{ results: [{ invalid_current_plan_versions: 0 }] }],
-    })).toThrow('post-migration verification requires migrations 0001, 0002, and 0003')
+    } )).toThrow('post-migration verification requires migrations 0001, 0002, 0003, and 0005')
   })
 
   it('fails closed when either integrity query does not return exactly one count', () => {
@@ -1082,18 +1113,31 @@ describe('read-only D1 subscription migration preflight', () => {
     expect(result.planColumns).toEqual([])
   })
 
-  it('skips all migrations only when migration 0003 and exact plan schema are present', () => {
-    const result = verifyD1SubscriptionPreflight(preflightInput(true, '1', true))
-    expect(result.migrationAction).toBe('skip')
+  it('continues migration when MembershipPlan exists but scheduled plan-change migration is pending', () => {
+    const result = verifyD1SubscriptionPreflight(preflightInput(true, '1', true, false))
+    expect(result.migrationAction).toBe('apply')
     expect(result.appliedMigrations).toEqual([
       '0001_membership_subscriptions.sql',
       '0002_subscription_version_cas.sql',
       '0003_membership_plans.sql',
     ])
+  })
+
+  it('skips only when scheduled plan-change schema, indexes, triggers and migration history are present', () => {
+    const result = verifyD1SubscriptionPreflight(preflightInput(true, '1', true, true))
+    expect(result.migrationAction).toBe('skip')
+    expect(result.appliedMigrations).toEqual([
+      '0001_membership_subscriptions.sql',
+      '0002_subscription_version_cas.sql',
+      '0003_membership_plans.sql',
+      '0005_subscription_plan_changes.sql',
+    ])
     expect(result.columns.at(-1)).toEqual(['version','INTEGER',1,0])
     expect(result.planColumns).toEqual(planColumnRows)
     expect(result.planVersionColumns).toEqual(planVersionColumnRows)
     expect(result.planTriggers).toEqual(planTriggerNames)
+    expect(result.planChangeColumns).toEqual(planChangeColumnRows)
+    expect(result.planChangeTriggers).toEqual(planChangeTriggerNames)
   })
 
   it('fails closed when the target D1 UUID does not match', () => {
