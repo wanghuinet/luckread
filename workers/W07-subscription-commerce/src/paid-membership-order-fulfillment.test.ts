@@ -101,6 +101,7 @@ function fixture(overrides: {
     quantity: 1,
     unit_amount_minor: 500,
     line_total_minor: 500,
+    line_discount_minor: 0,
     item_snapshot_json: JSON.stringify(snapshot),
     ...overrides.line,
   };
