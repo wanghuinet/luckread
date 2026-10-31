@@ -257,43 +257,53 @@ export default function MySubscriptionsScreen() {
     return () => requestRef.current?.abort();
   }, [authStatus, loadPage]);
 
-  const cancelTrial = useCallback(async (item: MySubscription) => {
+  const cancelTrial = useCallback((item: MySubscription) => {
     if (cancelingSubscriptionId) return;
-    setCancelingSubscriptionId(item.subscriptionId);
-    setError('');
-    try {
-      const result = await cancelWebMembershipTrial(item.subscriptionId, item.etag);
-      if (!result.response.ok) {
-        throw new Error(result.error?.message || getApiErrorMessage(
-          result.data,
-          '试用自动续费取消失败，请刷新订阅后重试。',
-          result.response.status,
-        ));
+    const performCancel = async () => {
+      setCancelingSubscriptionId(item.subscriptionId);
+      setError('');
+      try {
+        const result = await cancelWebMembershipTrial(item.subscriptionId, item.etag);
+        if (!result.response.ok) {
+          throw new Error(result.error?.message || getApiErrorMessage(
+            result.data,
+            '试用自动续费取消失败，请刷新订阅后重试。',
+            result.response.status,
+          ));
+        }
+        const value = unwrapApiData<unknown>(result.data);
+        if (!value || typeof value !== 'object' || Array.isArray(value)) {
+          throw new Error('取消结果格式无效，请刷新我的订阅确认状态。');
+        }
+        const record = value as Record<string, unknown>;
+        const trial = record.trial;
+        const subscription = record.subscription;
+        if (!trial || typeof trial !== 'object' || Array.isArray(trial) ||
+            !subscription || typeof subscription !== 'object' || Array.isArray(subscription)) {
+          throw new Error('取消结果缺少试用或订阅状态，请刷新确认。');
+        }
+        const trialRecord = trial as Record<string, unknown>;
+        const subscriptionRecord = subscription as Record<string, unknown>;
+        if (trialRecord.status !== 'CANCELED' || trialRecord.source !== 'WEB' ||
+            subscriptionRecord.subscriptionId !== item.subscriptionId ||
+            subscriptionRecord.cancelAt !== item.trial?.trialEndsAt) {
+          throw new Error('取消结果与原试用记录不匹配，请刷新我的订阅。');
+        }
+        await loadPage(1, false);
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : '试用取消失败，请稍后重试。');
+      } finally {
+        setCancelingSubscriptionId(null);
       }
-      const value = unwrapApiData<unknown>(result.data);
-      if (!value || typeof value !== 'object' || Array.isArray(value)) {
-        throw new Error('取消结果格式无效，请刷新我的订阅确认状态。');
-      }
-      const record = value as Record<string, unknown>;
-      const trial = record.trial;
-      const subscription = record.subscription;
-      if (!trial || typeof trial !== 'object' || Array.isArray(trial) ||
-          !subscription || typeof subscription !== 'object' || Array.isArray(subscription)) {
-        throw new Error('取消结果缺少试用或订阅状态，请刷新确认。');
-      }
-      const trialRecord = trial as Record<string, unknown>;
-      const subscriptionRecord = subscription as Record<string, unknown>;
-      if (trialRecord.status !== 'CANCELED' || trialRecord.source !== 'WEB' ||
-          subscriptionRecord.subscriptionId !== item.subscriptionId ||
-          subscriptionRecord.cancelAt !== item.trial?.trialEndsAt) {
-        throw new Error('取消结果与原试用记录不匹配，请刷新我的订阅。');
-      }
-      await loadPage(1, false);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : '试用取消失败，请稍后重试。');
-    } finally {
-      setCancelingSubscriptionId(null);
-    }
+    };
+    Alert.alert(
+      '停止试用后的自动扣款？',
+      '当前试用权益不会立即取消，仍可使用至试用期结束；系统将停止未来的试用转付费扣款。若首笔扣款已提交，银行仍可能完成该笔付款。',
+      [
+        { text: '继续试用', style: 'cancel' },
+        { text: '停止自动扣款', style: 'destructive', onPress: () => { void performCancel(); } },
+      ],
+    );
   }, [cancelingSubscriptionId, loadPage]);
 
   if (authStatus === 'loading') {
