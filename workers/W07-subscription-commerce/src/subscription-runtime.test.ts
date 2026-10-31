@@ -1023,6 +1023,34 @@ const planChangeTriggerNames = [
   'membership_subscription_plan_changes_block_when_upgrade_reserved',
   'membership_subscriptions_plan_change_requires_scheduled_record',
 ]
+const planVersionColumnRowsWithTrial = [
+  ...planVersionColumnRows,
+  ['trial_days','INTEGER',1,0],
+]
+const trialColumnRows = [
+  ['trial_id','TEXT',1,1], ['subscription_id','TEXT',1,0], ['subscriber_id','TEXT',1,0],
+  ['plan_id','TEXT',1,0], ['plan_version','INTEGER',1,0], ['source','TEXT',1,0],
+  ['provider_app_id','TEXT',0,0], ['product_id','TEXT',0,0], ['original_transaction_id','TEXT',0,0],
+  ['started_at','TEXT',1,0], ['trial_ends_at','TEXT',1,0], ['status','TEXT',1,0],
+  ['request_hash','TEXT',1,0], ['version','INTEGER',1,0], ['created_at','TEXT',1,0], ['updated_at','TEXT',1,0],
+]
+const trialIndexNames = [
+  'ux_membership_subscription_trials_subscriber_plan',
+  'ux_membership_subscription_trials_store_transaction',
+  'ix_membership_subscription_trials_status_end',
+  'ix_membership_subscription_trials_subscriber_created',
+]
+const trialTriggerNames = [
+  'membership_subscription_trials_insert_guard',
+  'membership_subscription_trials_identity_immutable',
+  'membership_subscription_trials_version_guard',
+  'membership_subscription_trials_state_guard',
+  'membership_subscription_trials_transition_evidence_guard',
+  'membership_subscriptions_trial_failed_sync',
+  'membership_subscriptions_trial_converted_sync',
+  'membership_subscriptions_trial_expired_sync',
+  'membership_subscription_trials_retained',
+]
 const planUpgradeColumnRows = [
   ['application_id','TEXT',1,1], ['subscription_id','TEXT',1,0], ['subscriber_id','TEXT',1,0],
   ['source_plan_id','TEXT',1,0], ['source_plan_version','INTEGER',1,0],
@@ -1035,7 +1063,7 @@ const planUpgradeColumnRows = [
 const planUpgradeIndexNames = ['ux_membership_plan_change_applications_order','ux_membership_plan_change_applications_payment','ux_membership_plan_change_applications_ready_subscription','ix_membership_plan_change_applications_subscriber_created']
 const planUpgradeTriggerNames = ['membership_subscription_plan_change_applications_insert_guard','membership_subscription_plan_change_applications_identity_immutable','membership_subscription_plan_change_applications_payment_attach_guard','membership_subscription_plan_change_applications_version_guard','membership_subscription_plan_change_applications_state_guard','membership_subscription_plan_change_applications_applied_guard','membership_subscription_plan_change_applications_mark_applied','membership_subscription_plan_change_applications_retained']
 const nameRows = (names) => [{ results: names.map((name,seq) => ({ name,seq })) }]
-const preflightInput = (withVersion = false, versionDefault = '1', withPlans = false, withPlanChanges = withPlans, withRevenueCat = withPlans, withPlanUpgrades = false) => ({
+const preflightInput = (withVersion = false, versionDefault = '1', withPlans = false, withPlanChanges = withPlans, withRevenueCat = withPlans, withPlanUpgrades = false, withTrials = false) => ({
   databaseList: preflightDatabaseList,
   migrationState: [{ results: [
     { name: '0001_membership_subscriptions.sql' },
@@ -1044,6 +1072,7 @@ const preflightInput = (withVersion = false, versionDefault = '1', withPlans = f
     ...(withRevenueCat ? [{ name: '0004_revenuecat_membership_product_bindings.sql' }] : []),
     ...(withPlanChanges ? [{ name: '0005_subscription_plan_changes.sql' }] : []),
     ...(withPlanUpgrades ? [{ name: '0006_immediate_subscription_upgrades.sql' }] : []),
+    ...(withTrials ? [{ name: '0007_membership_trials.sql' }] : []),
   ] }],
   subscriptionSchema: preflightSchema(withVersion,versionDefault),
   subscriptionIndexes: preflightIndexes,
@@ -1059,12 +1088,16 @@ const preflightInput = (withVersion = false, versionDefault = '1', withPlans = f
   planUpgradeSchema: withPlanUpgrades ? schemaRows(planUpgradeColumnRows) : [{ results: [] }],
   planUpgradeIndexes: withPlanUpgrades ? nameRows(planUpgradeIndexNames) : [{ results: [] }],
   planUpgradeTriggers: withPlanUpgrades ? nameRows(planUpgradeTriggerNames) : [{ results: [] }],
+  trialSchema: withTrials ? schemaRows(trialColumnRows) : [{ results: [] }],
+  trialIndexes: withTrials ? nameRows(trialIndexNames) : [{ results: [] }],
+  trialTriggers: withTrials ? nameRows(trialTriggerNames) : [{ results: [] }],
+  ...(withTrials ? { planVersionSchema: schemaRows(planVersionColumnRowsWithTrial) } : {}),
 })
 
 describe('read-only D1 subscription migration postflight', () => {
-  it('passes only when migrations 0001 through 0006, exact schemas, indexes, triggers and integrity checks are verified', () => {
+  it('passes only when migrations 0001 through 0007, exact schemas, indexes, triggers and integrity checks are verified', () => {
     const result = verifyD1SubscriptionPostflight({
-      ...preflightInput(true, '1', true, true, true, true),
+      ...preflightInput(true, '1', true, true, true, true, true),
       versionIntegrity: [{ results: [{ invalid_versions: 0 }] }],
       planIntegrity: [{ results: [{ invalid_current_plan_versions: 0 }] }],
     })
@@ -1079,6 +1112,7 @@ describe('read-only D1 subscription migration postflight', () => {
       '0004_revenuecat_membership_product_bindings.sql',
       '0005_subscription_plan_changes.sql',
       '0006_immediate_subscription_upgrades.sql',
+      '0007_membership_trials.sql',
     ])
   })
 
@@ -1103,7 +1137,7 @@ describe('read-only D1 subscription migration postflight', () => {
       ...preflightInput(true, '1', false),
       versionIntegrity: [{ results: [{ invalid_versions: 0 }] }],
       planIntegrity: [{ results: [{ invalid_current_plan_versions: 0 }] }],
-    } )).toThrow('post-migration verification requires migrations 0001 through 0006')
+    } )).toThrow('post-migration verification requires migrations 0001 through 0007')
   })
 
   it('fails closed when either integrity query does not return exactly one count', () => {
@@ -1164,13 +1198,21 @@ describe('read-only D1 subscription migration preflight', () => {
     expect(result.planChangeTriggers).toEqual(planChangeTriggerNames)
   })
 
-  it('skips only when migration 0006 and the immediate-upgrade schema, indexes, and triggers are present', () => {
+  it('requests migration 0007 when only immediate-upgrade schema is present', () => {
     const result = verifyD1SubscriptionPreflight(preflightInput(true, '1', true, true, true, true))
-    expect(result.migrationAction).toBe('skip')
+    expect(result.migrationAction).toBe('apply')
     expect(result.appliedMigrations).toContain('0006_immediate_subscription_upgrades.sql')
     expect(result.planUpgradeColumns).toEqual(planUpgradeColumnRows)
-    expect(result.planUpgradeIndexes).toEqual(planUpgradeIndexNames)
-    expect(result.planUpgradeTriggers).toEqual(planUpgradeTriggerNames)
+  })
+
+  it('skips only when migration 0007 and the trial schema, indexes, and triggers are present', () => {
+    const result = verifyD1SubscriptionPreflight(preflightInput(true, '1', true, true, true, true, true))
+    expect(result.migrationAction).toBe('skip')
+    expect(result.appliedMigrations).toContain('0007_membership_trials.sql')
+    expect(result.planVersionColumns).toEqual(planVersionColumnRowsWithTrial)
+    expect(result.trialColumns).toEqual(trialColumnRows)
+    expect(result.trialIndexes).toEqual(trialIndexNames)
+    expect(result.trialTriggers).toEqual(trialTriggerNames)
   })
 
   it('fails closed when the target D1 UUID does not match', () => {
