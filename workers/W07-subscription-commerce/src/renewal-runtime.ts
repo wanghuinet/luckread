@@ -852,17 +852,18 @@ async function prepareFailedCycleRetry(
 
   let subscription: {
     subscription_id: string; subscriber_id: string; plan_id: string; plan_version: number;
-    status: string; current_period_end: string; cancel_at: string | null;
+    creator_id: string | null; status: string; current_period_end: string; cancel_at: string | null;
   } | null;
   try {
     subscription = await env.D1_01.prepare(
-      'SELECT subscription_id, subscriber_id, plan_id, plan_version, status, current_period_end, cancel_at ' +
+      'SELECT subscription_id, subscriber_id, plan_id, plan_version, creator_id, status, current_period_end, cancel_at ' +
       'FROM membership_subscriptions WHERE subscription_id = ? AND subscriber_id = ? LIMIT 1',
     ).bind(cycle.subscription_id, cycle.subscriber_id).first<{
       subscription_id: string;
       subscriber_id: string;
       plan_id: string;
       plan_version: number;
+      creator_id: string | null;
       status: string;
       current_period_end: string;
       cancel_at: string | null;
@@ -873,13 +874,30 @@ async function prepareFailedCycleRetry(
   if (!subscription ||
       subscription.subscription_id !== cycle.subscription_id ||
       subscription.subscriber_id !== cycle.subscriber_id ||
-      subscription.plan_id !== cycle.plan_id ||
-      subscription.plan_version !== cycle.plan_version ||
       subscription.status !== 'PAST_DUE' ||
       subscription.current_period_end !== cycle.cycle_start ||
       (subscription.cancel_at !== null &&
         (!isCanonicalIso(subscription.cancel_at) || subscription.cancel_at <= cycle.cycle_start))) {
     return 'TERMINAL';
+  }
+
+  const originalPlanMatches =
+    subscription.plan_id === cycle.plan_id && subscription.plan_version === cycle.plan_version;
+  if (!originalPlanMatches) {
+    const scheduled = await readScheduledSubscriptionPlanDowngradeForPeriod(
+      env.D1_01, cycle.subscription_id, cycle.subscriber_id, cycle.cycle_start, false,
+    );
+    if (!scheduled || scheduled.status !== 'SCHEDULED' ||
+        scheduled.expectedPlanId !== subscription.plan_id ||
+        scheduled.expectedPlanVersion !== subscription.plan_version ||
+        scheduled.targetPlanId !== cycle.plan_id ||
+        scheduled.targetPlanVersion !== cycle.plan_version ||
+        scheduled.effectiveAt !== cycle.cycle_start) return 'TERMINAL';
+    const target = await readScheduledDowngradeTargetPlan(env.D1_01, scheduled);
+    if (!target || target.creatorId !== subscription.creator_id ||
+        target.billingInterval !== cycle.billing_interval || target.currency !== cycle.currency) {
+      return 'TERMINAL';
+    }
   }
   // A retry may reuse only the exact same still-active saved method/mandate.
   // A revoked mandate requires a new customer-present consent flow and is never
