@@ -65,3 +65,14 @@ Feed/Recommendation eligibility
 ```
 
 Downstream failures must not rewrite membership authority.
+
+## 6. Durable plan-change audit actions (W06)
+
+The following request/result actions are persisted as immutable W06 audit records, not treated as payment facts or as entitlement transitions:
+
+```text
+membership.subscription.plan_change_requested
+membership.subscription.plan_change_scheduled
+```
+
+A scheduled record remains pending until a verified successful renewal payment advances the Subscription period. A failed payment leaves the source plan in force and preserves the scheduled record for a retry; pause/cancel/expiration cancels the schedule.
