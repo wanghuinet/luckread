@@ -123,7 +123,10 @@ function buildCurrentState(
   gracePeriodExpiresAt: string | null;
 } {
   const hasNonExpiringEntitlement = entries.some(({ entitlement }) => entitlement.expires_date === null);
-  const latestExpiry = laterDate(entries.map(({ entitlement }) => entitlement.expires_date));
+  const latestExpiry = laterDate([
+    ...entries.map(({ entitlement }) => entitlement.expires_date),
+    subscription.expires_date,
+  ]);
   const gracePeriodExpiresAt = laterDate(entries.map(({ entitlement }) =>
     entitlement.grace_period_expires_date !== undefined
       ? entitlement.grace_period_expires_date
@@ -258,31 +261,23 @@ export async function buildRevenueCatSubscriberReconciliationCandidates(
     };
   }
 
+  // Subscription records are the candidate base, not the currently active
+  // entitlement map. RevenueCat may omit an expired product from entitlements
+  // while retaining its subscription expiry and original transaction identity.
   const groups = new Map<string, ProductGroup>();
+  for (const [productId, subscription] of Object.entries(input.snapshot.subscriptions)) {
+    groups.set(productId, {
+      productId,
+      store: requireStore(subscription.store),
+      subscription,
+      entitlementEntries: [],
+    });
+  }
   for (const [entitlementId, entitlement] of Object.entries(input.snapshot.entitlements)) {
     const productId = entitlement.product_identifier;
-    const subscription = Object.hasOwn(input.snapshot.subscriptions, productId)
-      ? input.snapshot.subscriptions[productId]
-      : undefined;
-    if (!subscription) {
-      throw new RevenueCatSubscriberReconciliationError('SUBSCRIPTION_NOT_FOUND');
-    }
-
-    const store = requireStore(subscription.store);
     const group = groups.get(productId);
-    if (group) {
-      if (group.store !== store || group.subscription !== subscription) {
-        throw new RevenueCatSubscriberReconciliationError('INVALID_SNAPSHOT');
-      }
-      group.entitlementEntries.push({ entitlementId, entitlement });
-    } else {
-      groups.set(productId, {
-        productId,
-        store,
-        subscription,
-        entitlementEntries: [{ entitlementId, entitlement }],
-      });
-    }
+    if (!group) throw new RevenueCatSubscriberReconciliationError('SUBSCRIPTION_NOT_FOUND');
+    group.entitlementEntries.push({ entitlementId, entitlement });
   }
 
   const candidates: RevenueCatMembershipCurrentStateCandidate[] = [];
