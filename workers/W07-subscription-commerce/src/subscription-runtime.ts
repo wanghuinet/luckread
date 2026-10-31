@@ -552,7 +552,8 @@ export function normalizeMembershipPlanDraft(value: unknown, defaultTrialDays = 
   if (typeof priceMinor !== 'number' || !Number.isSafeInteger(priceMinor) || priceMinor < 0 || priceMinor > 2_147_483_647) {
     throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
   }
-  if (typeof trialDays !== 'number' || !Number.isSafeInteger(trialDays) || trialDays < 0 || trialDays > 90) {
+  if (typeof trialDays !== 'number' || !Number.isSafeInteger(trialDays) || trialDays < 0 || trialDays > 90 ||
+      (trialDays > 0 && priceMinor === 0)) {
     throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
   }
   if (!Array.isArray(rawBenefits) || rawBenefits.length > 20 ||
