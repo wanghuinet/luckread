@@ -1027,12 +1027,12 @@ const planUpgradeColumnRows = [
   ['source_plan_id','TEXT',1,0], ['source_plan_version','INTEGER',1,0],
   ['target_plan_id','TEXT',1,0], ['target_plan_version','INTEGER',1,0],
   ['expected_subscription_version','INTEGER',1,0], ['current_period_start','TEXT',1,0],
-  ['current_period_end','TEXT',1,0], ['order_id','TEXT',1,0], ['payment_id','TEXT',1,0],
+  ['current_period_end','TEXT',1,0], ['order_id','TEXT',1,0], ['payment_id','TEXT',0,0],
   ['request_hash','TEXT',1,0],
   ['status','TEXT',1,0], ['version','INTEGER',1,0], ['created_at','TEXT',1,0], ['updated_at','TEXT',1,0],
 ]
 const planUpgradeIndexNames = ['ux_membership_plan_change_applications_order','ux_membership_plan_change_applications_payment','ux_membership_plan_change_applications_ready_subscription','ix_membership_plan_change_applications_subscriber_created']
-const planUpgradeTriggerNames = ['membership_subscription_plan_change_applications_insert_guard','membership_subscription_plan_change_applications_identity_immutable','membership_subscription_plan_change_applications_version_guard','membership_subscription_plan_change_applications_state_guard','membership_subscription_plan_change_applications_applied_guard','membership_subscription_plan_change_applications_mark_applied','membership_subscription_plan_change_applications_retained']
+const planUpgradeTriggerNames = ['membership_subscription_plan_change_applications_insert_guard','membership_subscription_plan_change_applications_identity_immutable','membership_subscription_plan_change_applications_payment_attach_guard','membership_subscription_plan_change_applications_version_guard','membership_subscription_plan_change_applications_state_guard','membership_subscription_plan_change_applications_applied_guard','membership_subscription_plan_change_applications_mark_applied','membership_subscription_plan_change_applications_retained']
 const nameRows = (names) => [{ results: names.map((name,seq) => ({ name,seq })) }]
 const preflightInput = (withVersion = false, versionDefault = '1', withPlans = false, withPlanChanges = withPlans, withRevenueCat = withPlans, withPlanUpgrades = false) => ({
   databaseList: preflightDatabaseList,
