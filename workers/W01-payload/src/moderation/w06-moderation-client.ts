@@ -322,6 +322,7 @@ export async function callW06SubscriptionTrialAudit(input: {
     trialId?: string
     planVersion?: number
     trialEndsAt?: string
+    previousStatus?: 'TRIALING' | 'PAYMENT_FAILED'
     occurredAt?: string
     idempotencyKey?: string
   }
