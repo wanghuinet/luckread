@@ -250,6 +250,7 @@
         "POST /v1/membership/plans/{planId}/lifecycle",
         "POST /v1/membership/plans/{planId}/publish",
         "POST /v1/memberships/subscriptions",
+        "POST /v1/memberships/subscriptions/trial",
         "POST /v1/memberships/subscriptions/{subscriptionId}/cancel",
         "POST /v1/memberships/subscriptions/{subscriptionId}/change-plan",
         "POST /v1/memberships/subscriptions/{subscriptionId}/change-plan/checkout",
