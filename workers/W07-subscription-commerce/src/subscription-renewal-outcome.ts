@@ -187,25 +187,26 @@ async function applySubscriptionUpdate(
   env: OutcomeSyncEnv, cycle: RenewalOutcomeCycle, subscription: SubscriptionOutcomeRow,
   nextStatus: 'ACTIVE' | 'PAST_DUE', nextPeriodStart: string, nextPeriodEnd: string,
   nextPlanId: string, nextPlanVersion: number, planChangeId: string | null, now: string,
+  nextCancelAt: string | null = subscription.cancel_at,
 ): Promise<'APPLIED' | 'ALREADY_APPLIED' | 'CAS_LOST'> {
   const updatedAt = strictlyAfter(now, subscription.updated_at);
   let result: D1Result;
   try {
     result = await env.D1_01.prepare(
       'UPDATE membership_subscriptions SET plan_id = ?, plan_version = ?, status = ?, current_period_start = ?, current_period_end = ?, ' +
-      'updated_at = ?, version = version + 1 WHERE subscription_id = ? AND subscriber_id = ? ' +
+      'cancel_at = ?, updated_at = ?, version = version + 1 WHERE subscription_id = ? AND subscriber_id = ? ' +
       'AND plan_id = ? AND plan_version = ? AND status = ? AND version = ? ' +
-      'AND current_period_start = ? AND current_period_end = ? AND (cancel_at IS NULL OR cancel_at > ?) ' +
+      'AND current_period_start = ? AND current_period_end = ? AND cancel_at IS ? ' +
       'AND (? IS NULL OR EXISTS (SELECT 1 FROM membership_subscription_plan_changes pc ' +
       "WHERE pc.change_id = ? AND pc.subscription_id = membership_subscriptions.subscription_id " +
       "AND pc.subscriber_id = membership_subscriptions.subscriber_id AND pc.status = 'SCHEDULED' " +
       'AND pc.source_plan_id = ? AND pc.source_plan_version = ? AND pc.target_plan_id = ? ' +
       'AND pc.target_plan_version = ? AND pc.effective_at = ?))',
     ).bind(
-      nextPlanId, nextPlanVersion, nextStatus, nextPeriodStart, nextPeriodEnd, updatedAt,
+      nextPlanId, nextPlanVersion, nextStatus, nextPeriodStart, nextPeriodEnd, nextCancelAt, updatedAt,
       cycle.subscription_id, cycle.subscriber_id, subscription.plan_id, subscription.plan_version,
       subscription.status, subscription.version, subscription.current_period_start,
-      subscription.current_period_end, cycle.cycle_start,
+      subscription.current_period_end, subscription.cancel_at,
       planChangeId, planChangeId, subscription.plan_id, subscription.plan_version,
       nextPlanId, nextPlanVersion, cycle.cycle_start,
     ).run();
@@ -301,9 +302,26 @@ export async function syncTerminalRenewalCycleToSubscription(
       subscription.current_period_start >= cycle.cycle_start) {
     return reconcile(env, cycle, 'SUBSCRIPTION_PERIOD_CAS_MISMATCH', now);
   }
-  if (subscription.cancel_at !== null &&
-      (!isCanonicalIso(subscription.cancel_at) || subscription.cancel_at <= cycle.cycle_start)) {
-    return reconcile(env, cycle, 'SUBSCRIPTION_CANCELLED_BEFORE_RENEWAL_PERIOD', now);
+  let cancellationAtPaidBoundary = false;
+  if (subscription.cancel_at !== null) {
+    if (!isCanonicalIso(subscription.cancel_at) || subscription.cancel_at < cycle.cycle_start) {
+      return reconcile(env, cycle, 'SUBSCRIPTION_CANCELLED_BEFORE_RENEWAL_PERIOD', now);
+    }
+    cancellationAtPaidBoundary = subscription.cancel_at === cycle.cycle_start;
+  }
+
+  // A cancellation at the trial boundary stops an unsubmitted/failed renewal.
+  // If the provider confirms that the already-submitted payment succeeded,
+  // record that paid cycle and move the existing cancellation boundary forward
+  // to the end of the now-paid period; otherwise access would be cut off while
+  // captured funds were retained.
+  if (cancellationAtPaidBoundary && cycle.state === 'FAILED') {
+    const marked = await markCycleSyncState(env.D1_04, cycle, 'APPLIED', null, now);
+    return {
+      cycleId: cycle.cycle_id,
+      subscriptionId: cycle.subscription_id,
+      outcome: marked ? 'APPLIED' : 'PENDING_RETRY',
+    };
   }
 
   if (cycle.state === 'SUCCEEDED') {
@@ -313,6 +331,7 @@ export async function syncTerminalRenewalCycleToSubscription(
     const result = await applySubscriptionUpdate(
       env, cycle, subscription, 'ACTIVE', cycle.cycle_start, cycle.cycle_end,
       cycle.plan_id, cycle.plan_version, planChange?.changeId ?? null, now,
+      cancellationAtPaidBoundary ? cycle.cycle_end : subscription.cancel_at,
     );
     if (result === 'CAS_LOST') return reconcile(env, cycle, 'SUBSCRIPTION_CAS_LOST', now);
     const marked = await markCycleSyncState(env.D1_04, cycle, 'APPLIED', null, now);
