@@ -1,8 +1,6 @@
 import { Tabs } from 'expo-router';
-import { Text, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { BlurView } from 'expo-blur';
-
-import { TabBarIcon } from '~/components/TabBarIcon';
 
 import Home from "~/assets/svg/tabs/home.svg"
 import FilledHome from "~/assets/svg/tabs/filled/home.svg"
@@ -16,6 +14,8 @@ import Foundation from '@expo/vector-icons/Foundation';
 import { Platform } from 'react-native';
 import { View } from 'react-native';
 import { useColorScheme } from "nativewind";
+
+
 
 
 
@@ -105,9 +105,3 @@ export default function TabLayout() {
     </Tabs>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-});
