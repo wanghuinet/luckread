@@ -1112,7 +1112,7 @@ describe('read-only D1 subscription migration postflight', () => {
       planIntegrity: [{ results: [{ invalid_current_plan_versions: 0 }] }],
     })).toThrow('version integrity query did not return exactly one count')
     expect(() => verifyD1SubscriptionPostflight({
-      ...preflightInput(true, '1', true),
+      ...preflightInput(true, '1', true, true, true, true),
       versionIntegrity: [{ results: [{ invalid_versions: 0 }] }],
       planIntegrity: [{ results: [] }],
     })).toThrow('membership plan integrity query did not return exactly one count')
