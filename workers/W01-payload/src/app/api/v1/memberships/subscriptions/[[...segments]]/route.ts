@@ -230,9 +230,16 @@ async function forward(request: Request, context: RouteContext): Promise<Respons
         Date.parse(subscription.currentPeriodStart) >= Date.parse(String(trial.trialEndsAt)) &&
         typeof subscription.currentPeriodEnd === 'string' &&
         Date.parse(subscription.currentPeriodEnd) > Date.parse(subscription.currentPeriodStart)
-      const unconvertedPeriodValid = trial.status !== 'CONVERTED' &&
-        typeof subscription.currentPeriodEnd === 'string' &&
-        subscription.currentPeriodEnd === trial.trialEndsAt
+      const unconvertedPeriodValid = typeof subscription.currentPeriodEnd === 'string' &&
+        subscription.currentPeriodEnd === trial.trialEndsAt &&
+        (
+          (trial.status === 'TRIALING' && subscription.status === 'TRIALING' && subscription.cancelAt === null) ||
+          (trial.status === 'CANCELED' && ['TRIALING', 'PAST_DUE'].includes(String(subscription.status)) &&
+            subscription.cancelAt === trial.trialEndsAt) ||
+          (trial.status === 'PAYMENT_FAILED' && subscription.status === 'PAST_DUE' &&
+            (subscription.cancelAt === null || subscription.cancelAt === trial.trialEndsAt)) ||
+          (trial.status === 'EXPIRED' && subscription.status === 'EXPIRED')
+        )
       if (typeof subscription.subscriptionId !== 'string' || !/^sub_[a-f0-9]{64}$/.test(subscription.subscriptionId) ||
           subscription.subscriberId !== principal.userId || subscription.planId !== planId ||
           !allowedSubscriptionStates.includes(String(subscription.status)) ||
@@ -336,8 +343,10 @@ async function forward(request: Request, context: RouteContext): Promise<Respons
       const trial = envelope.data.trial
       const replayed = envelope.data.replayed === true
       if (subscription.subscriptionId !== subscriptionId || subscription.subscriberId !== principal.userId ||
-          !['TRIALING', 'PAST_DUE'].includes(String(subscription.status)) || typeof subscription.version !== 'number' ||
-          (!replayed && subscription.version !== expectedVersion + 1) ||
+          !['TRIALING', 'PAST_DUE'].includes(String(subscription.status)) ||
+          typeof subscription.version !== 'number' || !Number.isSafeInteger(subscription.version) ||
+          (replayed ? subscription.version < expectedVersion + 1 : subscription.version !== expectedVersion + 1) ||
+          typeof envelope.data.replayed !== 'boolean' ||
           typeof subscription.currentPeriodEnd !== 'string' || subscription.cancelAt !== subscription.currentPeriodEnd ||
           trial.subscriptionId !== subscriptionId || trial.source !== 'WEB' || trial.status !== 'CANCELED' ||
           trial.trialEndsAt !== subscription.currentPeriodEnd ||
@@ -358,7 +367,6 @@ async function forward(request: Request, context: RouteContext): Promise<Respons
             trialId: String(trial.trialId),
             planVersion: Number(trial.planVersion),
             trialEndsAt: String(trial.trialEndsAt),
-            previousStatus: subscription.status === 'PAST_DUE' ? 'PAYMENT_FAILED' : 'TRIALING',
             occurredAt: String(trial.updatedAt),
           },
         })
