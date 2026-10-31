@@ -87,6 +87,8 @@ const successDependencies = (
       unsubscribeDetectedAt: null,
       billingIssuesDetectedAt: null,
       autoResumeDate: null,
+      periodType: 'NORMAL',
+      originalTransactionId: null,
     }],
   })) as unknown as typeof import('./revenuecat-subscriber-reconciliation.js').buildRevenueCatSubscriberReconciliationCandidates,
   ...overrides,
