@@ -220,6 +220,17 @@ describe('v1 subscription adapter', () => {
     expect(w08Casl).toContain("grant('subscription.cancel', 'Subscription', selfOwnerCondition(subjectId))")
   })
 
+  it('shows trial provenance in the subscription page and only offers WEB trial cancellation', () => {
+    expect(mySubscriptionsPage).toContain("'PENDING' | 'TRIALING' | 'ACTIVE'")
+    expect(mySubscriptionsPage).toContain("item.trial.source === 'WEB'")
+    expect(mySubscriptionsPage).toContain("'/cancel-trial'")
+    expect(mySubscriptionsPage).toContain("'If-Match': item.etag")
+    expect(mySubscriptionsPage).toContain("item.trial.source !== 'WEB'")
+    expect(mySubscriptionsPage).toContain('manageStoreTrial')
+    expect(mySubscriptionsPage).toContain('trialEndsAt')
+    expect(mySubscriptionsPage).toContain("item.trial.status === 'PAYMENT_FAILED'")
+  })
+
   it('declares the existing subscription collection list operation', () => {
     expect(openapi).toContain('operationId: listMembershipSubscriptions')
     expect(apiInventory.domains.subscription_entitlement_payment.endpoint_groups)
