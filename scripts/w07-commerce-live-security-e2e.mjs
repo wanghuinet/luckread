@@ -114,21 +114,36 @@ async function login(user) {
 }
 
 async function readPage(user, name, path) {
-  const r = await request('GET', path + '?limit=50', { jar: user.jar })
-  const data = r.json?.data
-  const pass = r.status === 200 && data && Array.isArray(data.items) &&
-    data.items.length <= 50 && typeof data.hasMore === 'boolean' &&
-    (data.nextCursor === null || typeof data.nextCursor === 'string') &&
-    typeof r.cacheControl === 'string' && r.cacheControl.toLowerCase().includes('no-store') &&
-    data.hasMore === false
-  check(\`\${user.label}_\${name}\`, pass, {
-    status: r.status, itemCount: Array.isArray(data?.items) ? data.items.length : null,
-    cacheNoStore: typeof r.cacheControl === 'string' && r.cacheControl.toLowerCase().includes('no-store'),
-    firstPageComplete: data?.hasMore === false, errorCode: r.errorCode,
+  const items = []
+  let cursor = null
+  let pages = 0
+  let hasMore = true
+  let pass = true
+  let finalStatus = null
+  let cacheNoStore = true
+  while (hasMore && pages < 5) {
+    const query = new URLSearchParams({ limit: '50' })
+    if (cursor) query.set('cursor', cursor)
+    const r = await request('GET', path + '?' + query.toString(), { jar: user.jar })
+    finalStatus = r.status
+    pages += 1
+    cacheNoStore &&= typeof r.cacheControl === 'string' && r.cacheControl.toLowerCase().includes('no-store')
+    const data = r.json?.data
+    const valid = r.status === 200 && data && Array.isArray(data.items) &&
+      data.items.length <= 50 && typeof data.hasMore === 'boolean' &&
+      (data.nextCursor === null || (typeof data.nextCursor === 'string' && data.nextCursor.length > 0 && data.nextCursor.length <= 512))
+    if (!valid) { pass = false; break }
+    items.push(...data.items)
+    hasMore = data.hasMore
+    cursor = data.nextCursor
+    if (hasMore && !cursor) pass = false
+  }
+  const passed = pass && !hasMore && finalStatus === 200 && cacheNoStore && pages <= 5
+  check(`${user.label}_${name}`, passed, {
+    status: finalStatus, pages, itemCount: items.length, cacheNoStore, paginationComplete: !hasMore,
   })
-  return pass ? data.items : null
+  return passed ? items : null
 }
-
 const values = (items, key) => new Set(items.map((item) => item?.[key]).filter((v) => typeof v === 'string' && v.length > 0))
 const leaks = (items, key, foreign) => items.some((item) => typeof item?.[key] === 'string' && foreign.has(item[key]))
 
@@ -163,6 +178,9 @@ try {
     const [primary, foreign] = await Promise.all(users.map(login))
     if (!primary || !foreign) {
       result.status = 'BLOCKED_QA_LOGIN_OR_VERIFICATION'
+      for (const user of [primary, foreign].filter(Boolean)) {
+        await request('POST', '/v1/auth/logout', { jar: user.jar })
+      }
       await finish()
     } else {
       const primaryPages = {}
