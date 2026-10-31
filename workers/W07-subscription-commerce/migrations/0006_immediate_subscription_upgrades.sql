@@ -104,7 +104,7 @@ BEGIN SELECT RAISE(ABORT, 'paid upgrade application requires version CAS and inc
 
 CREATE TRIGGER membership_subscription_plan_change_applications_state_guard
 BEFORE UPDATE OF status ON membership_subscription_plan_change_applications
-WHEN NOT ((OLD.status = 'PENDING_PAYMENT' AND NEW.status = 'READY') OR (OLD.status = 'READY' AND NEW.status = 'APPLIED'))
+WHEN NOT ((OLD.status = 'PENDING_PAYMENT' AND NEW.status = 'READY' AND OLD.payment_id IS NULL AND NEW.payment_id IS NOT NULL) OR (OLD.status = 'READY' AND NEW.status = 'APPLIED'))
 BEGIN SELECT RAISE(ABORT, 'paid upgrade application has an invalid state transition'); END;
 
 CREATE TRIGGER membership_subscription_plan_change_applications_applied_guard
