@@ -263,7 +263,7 @@ export default {
       const pathname = new URL(request.url).pathname
       const operation = toOperation(request.method, parseSegments(pathname))
       if (operation?.operation === 'planChangePreview') {
-        const targetPlanId = new URL(request.url).searchParams.get('planId')
+        const targetPlanId = new URL(request.url).searchParams.get('targetPlanId')
         if (!targetPlanId) throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
         const result = await previewSubscriptionPlanChange(
           env.D1_01, principal, operation.subscriptionId, targetPlanId,
