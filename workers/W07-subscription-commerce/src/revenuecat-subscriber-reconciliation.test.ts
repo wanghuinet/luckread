@@ -373,6 +373,41 @@ describe('RevenueCat current subscriber reconciliation candidates', () => {
     expect(statements).toHaveLength(1);
   });
 
+  it('ignores unrelated non-mobile subscriptions without entitlements while keeping mobile trial candidates', async () => {
+    const base = baseSnapshot();
+    const snapshot: RevenueCatSubscriberSnapshot = {
+      ...base,
+      entitlements: {},
+      subscriptions: {
+        ...base.subscriptions,
+        'web.creator:monthly': {
+          expires_date: '2026-11-02T00:00:00.000Z',
+          purchase_date: '2026-10-02T00:00:00.000Z',
+          store: 'stripe',
+          original_transaction_id: 'web-order-reference',
+        },
+        [PRODUCT_ID]: {
+          ...base.subscriptions[PRODUCT_ID]!,
+          period_type: 'TRIAL',
+          original_transaction_id: '2000000999999999',
+        },
+      },
+    };
+    const { db } = fakeDb();
+    const result = await buildRevenueCatSubscriberReconciliationCandidates(
+      db,
+      { ...options, snapshot },
+      { nowMs: () => NOW },
+    );
+    expect(result.candidates).toHaveLength(1);
+    expect(result.candidates[0]).toMatchObject({
+      store: 'APP_STORE',
+      productId: PRODUCT_ID,
+      periodType: 'TRIAL',
+      currentState: 'TRIALING',
+    });
+  });
+
   it('rejects unsupported stores and entitlements without a subscription snapshot', async () => {
     const base = baseSnapshot();
     const unsupported: RevenueCatSubscriberSnapshot = {
