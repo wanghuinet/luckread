@@ -381,6 +381,17 @@ type SubscriptionPlanChangeAuditInput = {
   effectiveAt: string; changeVersion: number; subscriptionVersion: number; occurredAt: string
 }
 
+type SubscriptionTrialAuditInput = {
+  eventId: string
+  phase: 'REQUESTED' | 'STARTED' | 'CANCELED'
+  planId: string
+  subscriptionId?: string
+  trialId?: string
+  planVersion?: number
+  trialEndsAt?: string
+  idempotencyKey?: string
+}
+
 type CommerceOrderAuditInput = {
   eventId: string
   orderId: string
@@ -669,6 +680,37 @@ function parseMembershipPlanPublishRequestAuditInput(value: unknown): Membership
     body.eventId !== 'evt_mpl_publish_requested_' + body.planId + '_v' + body.expectedVersion
   ) throw new Error('INVALID_MEMBERSHIP_PLAN_PUBLISH_REQUEST_AUDIT')
   return body as MembershipPlanPublishRequestAuditInput
+}
+
+function parseSubscriptionTrialAuditInput(value: unknown): SubscriptionTrialAuditInput {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('INVALID_SUBSCRIPTION_TRIAL_AUDIT')
+  const body = value as Record<string, unknown>
+  const phase = body.phase
+  const common = ['eventId', 'phase', 'planId']
+  if (typeof body.planId !== 'string' || !/^plan_[a-f0-9]{64}$/.test(body.planId) ||
+      (phase !== 'REQUESTED' && phase !== 'STARTED' && phase !== 'CANCELED')) {
+    throw new Error('INVALID_SUBSCRIPTION_TRIAL_AUDIT')
+  }
+  if (phase === 'REQUESTED') {
+    const allowed = new Set([...common, 'idempotencyKey'])
+    if (Object.keys(body).some((key) => !allowed.has(key)) || Object.keys(body).length !== allowed.size ||
+        typeof body.eventId !== 'string' || !/^evt_subscription_trial_request_[a-f0-9]{26}$/.test(body.eventId) ||
+        typeof body.idempotencyKey !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(body.idempotencyKey)) {
+      throw new Error('INVALID_SUBSCRIPTION_TRIAL_AUDIT')
+    }
+    return body as SubscriptionTrialAuditInput
+  }
+  const allowed = new Set([...common, 'subscriptionId', 'trialId', 'planVersion', 'trialEndsAt'])
+  if (Object.keys(body).some((key) => !allowed.has(key)) || Object.keys(body).length !== allowed.size ||
+      typeof body.subscriptionId !== 'string' || !resourceIdPattern.test(body.subscriptionId) ||
+      typeof body.trialId !== 'string' || !/^mtr_[A-Za-z0-9]{26}$/.test(body.trialId) ||
+      !Number.isSafeInteger(body.planVersion) || (body.planVersion as number) < 1 ||
+      typeof body.trialEndsAt !== 'string' || !body.trialEndsAt ||
+      Number.isNaN(Date.parse(body.trialEndsAt)) ||
+      body.eventId !== 'evt_subscription_trial_' + (phase === 'STARTED' ? 'started_' : 'canceled_') + body.trialId) {
+    throw new Error('INVALID_SUBSCRIPTION_TRIAL_AUDIT')
+  }
+  return body as SubscriptionTrialAuditInput
 }
 
 function matchesMembershipPlanMutationRequestAudit(existing: StoredAuditEvent, expected: AuditEvent): boolean {
@@ -1135,6 +1177,44 @@ export default {
         occurredAt: input.occurredAt,
       }
       return persistImmutableAuditEvent(env, event)
+    }
+
+    if (request.method === 'POST' && url.pathname === '/internal/audit-events/subscription-trial') {
+      let principal: ReturnType<typeof requireW01Transport>
+      try { principal = requireW01Transport(request) }
+      catch (error) { return errorResponse(error, request.headers.get('X-LuckRead-Request-Id')?.trim()) }
+      if (!/^L[2-8]$/.test(principal.layer)) return json({ error: 'PERMISSION_DENIED' }, 403)
+      let input: SubscriptionTrialAuditInput
+      try { input = parseSubscriptionTrialAuditInput(await readBoundedAuditJson(request, 2048)) }
+      catch { return json({ error: 'INVALID_SUBSCRIPTION_TRIAL_AUDIT' }, 400) }
+      const requested = input.phase === 'REQUESTED'
+      const event: AuditEvent = {
+        eventId: input.eventId,
+        requestId: principal.requestId,
+        traceId: principal.correlationId,
+        actor: { actorId: principal.userId, actorType: 'user', layer: principal.layer as AuditEvent['actor']['layer'] },
+        action: requested
+          ? 'membership.subscription.trial_requested'
+          : input.phase === 'STARTED'
+            ? 'membership.subscription.trial_started'
+            : 'membership.subscription.trial_canceled',
+        targetType: requested ? 'MembershipPlan' : 'Subscription',
+        targetId: requested ? input.planId : input.subscriptionId!,
+        before: requested ? { status: 'NOT_STARTED' } : { status: input.phase === 'STARTED' ? 'NOT_STARTED' : 'TRIALING' },
+        after: requested
+          ? { planId: input.planId, idempotencyKey: input.idempotencyKey }
+          : {
+              trialId: input.trialId,
+              planId: input.planId,
+              planVersion: input.planVersion,
+              status: input.phase === 'STARTED' ? 'TRIALING' : 'CANCELED',
+              trialEndsAt: input.trialEndsAt,
+            },
+        occurredAt: new Date().toISOString(),
+      }
+      return requested
+        ? persistMembershipPlanMutationRequestAudit(env, event)
+        : persistImmutableAuditEvent(env, event)
     }
 
     if (request.method === 'POST' && url.pathname === '/internal/audit-events/membership-plan-lifecycle-changed') {
