@@ -3,6 +3,7 @@
 import { createCommerceOrder, type AuthoritativelyPricedOrder, type CreateOrderResult } from './order-persistence.js';
 import type { ResolvedCommerceOrderItems } from './order-item-resolution.js';
 import { issueInvoiceForOrder } from './billing-persistence.js';
+import { reservePaidMembershipPlanUpgrade } from './paid-membership-plan-upgrade-application.js';
 import { SubscriptionRuntimeError, validatePrincipal, etagForVersion } from './subscription-runtime.js';
 
 type UpgradeSubscriptionRow = Readonly<{
@@ -265,17 +266,15 @@ export async function createSubscriptionUpgradeOrder(
     () => dependencies.resolvePricing(resolved),
   );
 
-  await issueInvoiceForOrder(d1_04, subscriberId, orderResult.data.orderId);
-
   // Verify a replay still points at this exact subscription and source version;
   // never hand a stale order to checkout after the subscription has changed.
   let storedSnapshot: unknown;
   try {
     const line = await d1_04.prepare(
-      'SELECT item_snapshot_json, unit_amount_minor FROM order_lines WHERE order_id = ? AND item_ref = ? LIMIT 1',
-    ).bind(orderResult.data.orderId, target.plan_id).first<{ item_snapshot_json: string; unit_amount_minor: number }>();
+      'SELECT order_line_id, item_snapshot_json, unit_amount_minor FROM order_lines WHERE order_id = ? AND item_ref = ? LIMIT 1',
+    ).bind(orderResult.data.orderId, target.plan_id).first<{ order_line_id: string; item_snapshot_json: string; unit_amount_minor: number }>();
     if (!line) throw new SubscriptionRuntimeError('CONFLICT', 409);
-    storedSnapshot = { ...(JSON.parse(line.item_snapshot_json) as Record<string, unknown>), _storedUnitAmountMinor: line.unit_amount_minor };
+    storedSnapshot = { ...(JSON.parse(line.item_snapshot_json) as Record<string, unknown>), _storedUnitAmountMinor: line.unit_amount_minor, orderLineId: line.order_line_id };
   } catch (error) {
     if (error instanceof SubscriptionRuntimeError) throw error;
     throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
@@ -307,6 +306,32 @@ export async function createSubscriptionUpgradeOrder(
       (!orderResult.replayed && (persistedUpgrade.requestHash !== requestHash || persistedProration !== prorationBaseMinor))) {
     throw new SubscriptionRuntimeError('CONFLICT', 409);
   }
+
+  const persistedUpgradeRecord = persistedUpgrade;
+  if (typeof persistedUpgradeRecord.requestHash !== 'string' ||
+      typeof persistedUpgradeRecord.quotedAt !== 'string' ||
+      !canonicalUtc(persistedUpgradeRecord.quotedAt)) {
+    throw new SubscriptionRuntimeError('CONFLICT', 409);
+  }
+  try {
+    await reservePaidMembershipPlanUpgrade(d1_01, {
+      subscriptionId,
+      subscriberId,
+      sourcePlanId: subscription.plan_id,
+      sourcePlanVersion: subscription.plan_version,
+      targetPlanId: target.plan_id,
+      targetPlanVersion: target.current_version,
+      expectedSubscriptionVersion: subscription.version,
+      currentPeriodStart: subscription.current_period_start,
+      currentPeriodEnd: subscription.current_period_end,
+      orderId: orderResult.data.orderId,
+      requestHash: persistedUpgradeRecord.requestHash,
+      createdAt: persistedUpgradeRecord.quotedAt,
+    }, (storedSnapshot as Record<string, unknown>).orderLineId as string);
+  } catch {
+    throw new SubscriptionRuntimeError('CONFLICT', 409);
+  }
+  await issueInvoiceForOrder(d1_04, subscriberId, orderResult.data.orderId);
 
   return {
     order: orderResult.data,
