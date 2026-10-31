@@ -191,6 +191,7 @@ class ScanDatabase {
   }
 
   async first<T>(sql: string, values: unknown[]): Promise<T | null> {
+    if (sql.includes('FROM membership_subscription_scheduled_plan_changes')) return null;
     if (this.role !== 'scheduler') throw new Error('Unexpected D1-01 first() query: ' + sql);
     if (sql.includes('FROM subscription_renewal_scheduler_state')) {
       return this.cursor ? structuredClone(this.cursor) as T : null;

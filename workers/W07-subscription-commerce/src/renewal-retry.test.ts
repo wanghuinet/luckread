@@ -61,6 +61,7 @@ class MemoryD1 {
   ) {}
   prepare(sql: string) { return new Statement(this, sql) as unknown as D1PreparedStatement; }
   async first<T>(sql: string, values: unknown[]): Promise<T | null> {
+    if (sql.includes('FROM membership_subscription_scheduled_plan_changes')) return null;
     if (sql.includes('FROM subscription_renewal_cycles') && sql.includes('WHERE cycle_id = ?')) {
       return this.cycle ? structuredClone(this.cycle) as T : null;
     }

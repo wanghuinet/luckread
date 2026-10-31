@@ -2073,6 +2073,37 @@ paths:
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
         '4XX': { $ref: '#/components/responses/ClientError' }
+  /memberships/subscriptions/{subscriptionId}/change-plan/schedule:
+    parameters:
+      - name: subscriptionId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    post:
+      tags: [Users]
+      summary: Schedule a subscription downgrade for the current period end
+      description: Records a same-interval, lower-price creator plan for the next billing period. The current plan and entitlement remain active through the current period. No immediate order or payment is created. W07 applies the target plan only after the existing renewal pipeline confirms the signed successful renewal payment and performs the subscription version compare-and-set.
+      operationId: scheduleSubscriptionPlanDowngrade
+      parameters:
+        - $ref: '#/components/parameters/IfMatchRequired'
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [planId]
+              properties:
+                planId: { type: string, pattern: '^plan_[a-f0-9]{64}$' }
+      responses:
+        '201': { description: Downgrade scheduled for the current period end; no immediate payment or entitlement mutation occurs. }
+        '200': { description: Idempotent replay of the same scheduled downgrade. }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
   /memberships/subscriptions/{subscriptionId}/cancel:
     parameters:
       - name: subscriptionId

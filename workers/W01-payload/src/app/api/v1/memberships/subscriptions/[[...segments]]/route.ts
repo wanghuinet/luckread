@@ -22,6 +22,7 @@ const resolveOperation = (method: string, segments: string[] | undefined): { pat
   }
   if (parts.length === 2 && method === 'POST' && parts[1] === 'change-plan') return { pathname: '/memberships/subscriptions/' + encodeURIComponent(parts[0]!) + '/change-plan' }
   if (parts.length === 3 && method === 'POST' && parts[1] === 'change-plan' && parts[2] === 'checkout') return { pathname: '/memberships/subscriptions/' + encodeURIComponent(parts[0]!) + '/change-plan/checkout' }
+  if (parts.length === 3 && method === 'POST' && parts[1] === 'change-plan' && parts[2] === 'schedule') return { pathname: '/memberships/subscriptions/' + encodeURIComponent(parts[0]!) + '/change-plan/schedule' }
   return null
 }
 
@@ -112,25 +113,42 @@ async function subscriptionPlanUpgradeAttemptId(subscriberId: string, idempotenc
   return 'suca_' + hex
 }
 
-async function auditSubscriptionPlanUpgradeRequest(
+async function subscriptionPlanDowngradeChangeId(subscriberId: string, idempotencyKey: string): Promise<string> {
+  const payload = new TextEncoder().encode(
+    'membership-plan-downgrade-v1\u0000' + subscriberId + '\u0000' + idempotencyKey,
+  )
+  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', payload))
+  const hex = Array.from(digest, (byte) => byte.toString(16).padStart(2, '0')).join('')
+  return 'sudc_' + hex
+}
+
+async function auditSubscriptionPlanChangeRequest(
   request: Request,
   principal: Parameters<typeof callW06SubscriptionPlanChangeRequestAudit>[0]['principal'],
   subscriptionId: string,
   targetPlanId: string,
   expectedEtag: string,
-  attemptId: string,
+  changeId: string,
+  changeType: 'UPGRADE' | 'DOWNGRADE_SCHEDULE',
 ): Promise<Response | null> {
+  const eventId = changeType === 'UPGRADE'
+    ? 'evt_subscription_plan_upgrade_requested_' + changeId
+    : 'evt_subscription_plan_downgrade_scheduled_' + changeId
+  const action = changeType === 'UPGRADE'
+    ? 'subscription.plan_upgrade.requested'
+    : 'subscription.plan_downgrade.requested'
   let response: Response
   try {
     response = await callW06SubscriptionPlanChangeRequestAudit({
       request,
       principal,
       body: {
-        eventId: 'evt_subscription_plan_upgrade_requested_' + attemptId,
-        attemptId,
+        eventId,
+        attemptId: changeId,
         subscriberId: principal.userId,
         subscriptionId,
         targetPlanId,
+        changeType,
         expectedEtag,
         requestedAt: new Date().toISOString(),
       },
@@ -140,14 +158,13 @@ async function auditSubscriptionPlanUpgradeRequest(
   }
   const value: unknown = await response.json().catch((): null => null)
   if (response.status === 409) {
-    return errorResponse(409, 'CONFLICT', 'Idempotency key conflicts with an existing subscription upgrade request')
+    return errorResponse(409, 'CONFLICT', 'Idempotency key conflicts with an existing subscription change request')
   }
   const result = value && typeof value === 'object' && !Array.isArray(value)
     ? value as { eventId?: unknown; action?: unknown; targetType?: unknown; targetId?: unknown }
     : null
   if ((response.status !== 200 && response.status !== 201) ||
-      result?.eventId !== 'evt_subscription_plan_upgrade_requested_' + attemptId ||
-      result.action !== 'subscription.plan_upgrade.requested' ||
+      result?.eventId !== eventId || result.action !== action ||
       result.targetType !== 'Subscription' || result.targetId !== subscriptionId) {
     return errorResponse(503, 'AUDIT_UNAVAILABLE', 'Subscription plan change intent was not durably confirmed')
   }
@@ -166,12 +183,14 @@ async function forward(request: Request, context: RouteContext): Promise<Respons
     const parts = params.segments ?? []
     const isPlanUpgradeCheckout = request.method === 'POST' && parts.length === 3 &&
       parts[1] === 'change-plan' && parts[2] === 'checkout'
+    const isPlanDowngradeSchedule = request.method === 'POST' && parts.length === 3 &&
+      parts[1] === 'change-plan' && parts[2] === 'schedule'
     if (request.method === 'POST') {
-      if (!isPlanUpgradeCheckout) {
+      if (!isPlanUpgradeCheckout && !isPlanDowngradeSchedule) {
         return errorResponse(
           503,
           'SERVICE_UNAVAILABLE',
-          'Subscription writes are disabled until a verified payment-provider synchronization flow is available.',
+          'Subscription writes are disabled until a verified subscription mutation flow is available.',
         )
       }
       const body = await readBoundedJson(request)
@@ -195,9 +214,13 @@ async function forward(request: Request, context: RouteContext): Promise<Respons
       }
       const denied = await authorizeSubscriptionPlanChange(request, principal.userId, parts[0]!)
       if (denied) return denied
-      const attemptId = await subscriptionPlanUpgradeAttemptId(principal.userId, idempotencyKey)
-      const auditDenied = await auditSubscriptionPlanUpgradeRequest(
-        request, principal, parts[0]!, (body as { planId: string }).planId, expectedEtag, attemptId,
+      const changeType = isPlanUpgradeCheckout ? 'UPGRADE' : 'DOWNGRADE_SCHEDULE'
+      const changeId = isPlanUpgradeCheckout
+        ? await subscriptionPlanUpgradeAttemptId(principal.userId, idempotencyKey)
+        : await subscriptionPlanDowngradeChangeId(principal.userId, idempotencyKey)
+      const auditDenied = await auditSubscriptionPlanChangeRequest(
+        request, principal, parts[0]!, (body as { planId: string }).planId,
+        expectedEtag, changeId, changeType,
       )
       if (auditDenied) return auditDenied
       return await callW07Subscription({

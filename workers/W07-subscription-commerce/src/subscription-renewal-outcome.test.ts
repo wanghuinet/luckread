@@ -67,6 +67,7 @@ class MemoryD1 {
   ) {}
   prepare(sql: string) { return new MemoryStatement(this, sql) as unknown as D1PreparedStatement; }
   async first<T>(sql: string, values: unknown[]): Promise<T | null> {
+    if (sql.includes('FROM membership_subscription_scheduled_plan_changes')) return null;
     if (this.missingRenewalCycleTable && sql.includes('FROM subscription_renewal_cycles')) {
       throw new Error('D1_ERROR: no such table: subscription_renewal_cycles');
     }
