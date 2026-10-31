@@ -103,30 +103,6 @@ async function authorizeSubscriptionPlanChange(request: Request, userId: string)
 }
 
 
-  const headers = new Headers(request.headers)
-  headers.delete('host')
-  headers.delete('content-length')
-  headers.set('content-type', 'application/json; charset=utf-8')
-  const permissionRequest = new Request(request.url, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      action: 'subscription.change_plan',
-      resourceType: 'Subscription',
-      resourceAttributes: { ownerId: userId },
-    }),
-  })
-  const response = await callW08Creator(permissionRequest, '/internal/authz/check-permission', 'POST')
-  if (!response.ok) return errorResponse(503, 'AUTHORIZATION_UNAVAILABLE', 'Subscription authorization unavailable')
-  const value: unknown = await response.json().catch((): null => null)
-  const decision = value && typeof value === 'object'
-    ? (value as { data?: { decision?: unknown } }).data?.decision
-    : undefined
-  if (decision === 'ALLOW') return null
-  if (decision === 'DENY') return errorResponse(403, 'PERMISSION_DENIED', 'Subscription plan-change permission required')
-  return errorResponse(503, 'AUTHORIZATION_UNAVAILABLE', 'Subscription authorization response could not be verified')
-}
-
 async function deterministicTrialRequestId(userId: string, planId: string, idempotencyKey: string): Promise<string> {
   const material = new TextEncoder().encode(
     'subscription-trial-request-v1\\u0000' + userId + '\\u0000' + planId + '\\u0000' + idempotencyKey,
