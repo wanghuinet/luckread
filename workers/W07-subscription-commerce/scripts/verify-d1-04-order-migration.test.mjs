@@ -176,7 +176,7 @@ test('an applied Order migration can advance pending Payment, mandate and renewa
     migrationState: wrapMigrationState([ORDER_MIGRATION_ID]),
   })
   assert.equal(result.action, 'APPLY')
-  assert.deepEqual(result.pendingMigrationIds, [PAYMENT_MIGRATION_ID, SAVED_METHOD_MIGRATION_ID, RENEWAL_MIGRATION_ID, REVENUECAT_WEBHOOK_MIGRATION_ID, REFUNDS_BILLING_MIGRATION_ID])
+  assert.deepEqual(result.pendingMigrationIds, [PAYMENT_MIGRATION_ID, SAVED_METHOD_MIGRATION_ID, RENEWAL_MIGRATION_ID, REVENUECAT_WEBHOOK_MIGRATION_ID, REFUNDS_BILLING_MIGRATION_ID, PAYMENT_METHOD_REVOCATION_MIGRATION_ID])
   assert.equal(result.writesPerformed, false)
 })
 
@@ -241,9 +241,9 @@ test('postflight validates both migrations, all tables/columns/indexes/triggers,
   assert.equal(report.result, 'POSTFLIGHT_PASS')
   assert.equal(report.baselineSchemaPreserved, true)
   assert.deepEqual(report.appliedMigrations, REQUIRED_MIGRATION_IDS)
-  assert.equal(report.verifiedTables.length, 14)
-  assert.equal(report.verifiedIndexes.length, 29)
-  assert.equal(report.verifiedTriggers.length, 65)
+  assert.equal(report.verifiedTables.length, 15)
+  assert.equal(report.verifiedIndexes.length, 31)
+  assert.equal(report.verifiedTriggers.length, 72)
   assert.equal(report.databaseRowsExported, false)
 })
 
