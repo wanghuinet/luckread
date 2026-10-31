@@ -125,7 +125,7 @@ async function subscriptionPlanDowngradeChangeId(subscriberId: string, idempoten
 
 async function subscriptionBillingIntervalChangeId(subscriberId: string, idempotencyKey: string): Promise<string> {
   const payload = new TextEncoder().encode(
-    'membership-billing-interval-change-v1\\u0000' + subscriberId + '\\u0000' + idempotencyKey,
+    'membership-billing-interval-change-v1\u0000' + subscriberId + '\u0000' + idempotencyKey,
   )
   const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', payload))
   const hex = Array.from(digest, (byte) => byte.toString(16).padStart(2, '0')).join('')
