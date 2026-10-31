@@ -109,7 +109,7 @@ async function readSubscription(
     ).bind(subscriptionId, subscriberId).first<SubscriptionOutcomeRow>();
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    if (!/no such column:\\s*(?:s\\.)?trial_(?:started|ends|converted)_at/i.test(message)) {
+    if (!/no such column:\s*(?:s\.)?trial_(?:started|ends|converted)_at/i.test(message)) {
       throw new RenewalOutcomeSyncError('SERVICE_UNAVAILABLE', 503);
     }
     // A worker can be deployed ahead of migration 0008. Existing paid renewal
