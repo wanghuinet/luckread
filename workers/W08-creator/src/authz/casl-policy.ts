@@ -217,6 +217,8 @@ function addL2Rules(
   grant('notification.read.self', 'Notification', selfOwnerCondition(subjectId))
   grant('notification.update.self', 'Notification', selfOwnerCondition(subjectId))
   grant('subscription.change_plan', 'Subscription', selfOwnerCondition(subjectId))
+  grant('subscription.cancel', 'Subscription', selfOwnerCondition(subjectId))
+  grant('subscription.start_trial', 'Subscription', selfOwnerCondition(subjectId))
 }
 
 function addL3Rules(
