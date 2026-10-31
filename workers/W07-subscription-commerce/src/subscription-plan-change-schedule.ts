@@ -160,15 +160,35 @@ export async function readScheduledSubscriptionPlanDowngradeForPeriod(
       ' LIMIT 1',
     ).bind(subscriptionId, effectiveAt).first<ScheduledPlanChangeRow>();
   } catch (error) {
-    // Keep pre-migration renewal/webhook behavior unchanged. The new schedule
-    // table is additive; until migration 0006 is applied there cannot be a
-    // persisted downgrade row, so absence of that exact table is equivalent to
-    // no scheduled change. All other D1 failures remain fail-closed.
+    // Migrations 0006 and 0007 are additive. Before 0006, no scheduled change
+    // can exist. Between 0006 and 0007, the only supported legacy schedule is a
+    // same-interval downgrade; map that legacy row to DOWNGRADE so existing
+    // renewals continue to work. All other D1 errors remain fail-closed.
     const message = error instanceof Error ? error.message : String(error);
     if (/no such table:\s*membership_subscription_scheduled_plan_changes/i.test(message)) {
       return null;
     }
-    throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
+    if (/no such column:\s*change_type/i.test(message)) {
+      try {
+        const legacy = await db.prepare(
+          'SELECT change_id, subscriber_id, subscription_id, expected_subscription_version, expected_plan_id, ' +
+          'expected_plan_version, target_plan_id, target_plan_version, effective_at, idempotency_key_hash, status, ' +
+          'applied_at, applied_subscription_version, created_at, updated_at, version ' +
+          'FROM membership_subscription_scheduled_plan_changes WHERE subscription_id = ? AND effective_at = ? ' +
+          (includeApplied ? "AND status IN ('SCHEDULED', 'APPLIED')" : "AND status = 'SCHEDULED'") +
+          ' LIMIT 1',
+        ).bind(subscriptionId, effectiveAt).first<Omit<ScheduledPlanChangeRow, 'change_type'>>();
+        row = legacy ? { ...legacy, change_type: 'DOWNGRADE' } : null;
+      } catch (legacyError) {
+        const legacyMessage = legacyError instanceof Error ? legacyError.message : String(legacyError);
+        if (/no such table:\s*membership_subscription_scheduled_plan_changes/i.test(legacyMessage)) {
+          return null;
+        }
+        throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
+      }
+    } else {
+      throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
+    }
   }
   if (!row) return null;
   const change = toScheduledChange(row);
