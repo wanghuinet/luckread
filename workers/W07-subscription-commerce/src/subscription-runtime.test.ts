@@ -1077,12 +1077,13 @@ describe('read-only D1 subscription migration postflight', () => {
       '0003_membership_plans.sql',
       '0004_revenuecat_membership_product_bindings.sql',
       '0005_subscription_plan_changes.sql',
+      '0006_immediate_subscription_upgrades.sql',
     ])
   })
 
   it('fails closed when any existing subscription has an invalid version', () => {
     expect(() => verifyD1SubscriptionPostflight({
-      ...preflightInput(true, '1', true),
+      ...preflightInput(true, '1', true, true, true, true),
       versionIntegrity: [{ results: [{ invalid_versions: 1 }] }],
       planIntegrity: [{ results: [{ invalid_current_plan_versions: 0 }] }],
     })).toThrow('existing subscription versions include invalid or non-positive values')
