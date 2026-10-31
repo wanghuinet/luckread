@@ -364,6 +364,11 @@ jobs:
           except sqlite3.IntegrityError:
             pass
           db.execute("INSERT INTO membership_subscription_plan_change_applications(application_id,subscription_id,subscriber_id,source_plan_id,source_plan_version,target_plan_id,target_plan_version,expected_subscription_version,current_period_start,current_period_end,order_id,payment_id,request_hash,status,version,created_at,updated_at) VALUES ('spa_cccccccccccccccccccccccccc','sub_upgrade_probe','user_probe','plan_probe',1,'plan_upgrade_target',1,1,'2026-10-01T00:00:00.000Z','2026-10-31T00:00:00.000Z','ord_upgrade_probe',NULL,'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc','PENDING_PAYMENT',1,'2026-10-10T10:00:00.000Z','2026-10-10T10:00:00.000Z')")
+          try:
+            db.execute("INSERT INTO membership_subscription_plan_changes(change_id,subscription_id,subscriber_id,source_plan_id,source_plan_version,target_plan_id,target_plan_version,change_type,effective_at,status,request_hash,version,created_at,updated_at) VALUES ('spc_eeeeeeeeeeeeeeeeeeeeeeeeee','sub_upgrade_probe','user_probe','plan_probe',1,'plan_upgrade_target',1,'DOWNGRADE','2026-10-31T00:00:00.000Z','SCHEDULED','eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',1,'2026-10-10T10:00:00.000Z','2026-10-10T10:00:00.000Z')")
+            raise SystemExit('scheduled plan change was admitted while a paid upgrade reservation was active')
+          except sqlite3.IntegrityError:
+            pass
           db.execute("UPDATE membership_subscription_plan_change_applications SET payment_id='pay_dddddddddddddddddddddddddd',status='READY',version=version+1,updated_at='2026-10-10T10:00:00.001Z' WHERE order_id='ord_upgrade_probe' AND status='PENDING_PAYMENT'")
           db.execute("UPDATE membership_subscriptions SET plan_id='plan_upgrade_target',plan_version=1,updated_at='2026-10-10T10:00:00.002Z',version=2 WHERE subscription_id='sub_upgrade_probe' AND version=1")
           if db.execute("SELECT status FROM membership_subscription_plan_change_applications WHERE order_id='ord_upgrade_probe'").fetchone() != ('APPLIED',): raise SystemExit('paid upgrade application did not transition to APPLIED')
@@ -376,6 +381,14 @@ jobs:
           try:
             db.execute("DELETE FROM membership_subscription_plan_change_applications WHERE order_id='ord_upgrade_probe'")
             raise SystemExit('paid upgrade application history was deletable')
+          except sqlite3.IntegrityError:
+            pass
+
+          db.execute("INSERT INTO membership_subscriptions (subscription_id,subscriber_id,plan_id,plan_version,creator_id,status,started_at,current_period_start,current_period_end,cancel_at,entitlement_snapshot_ref,created_at,updated_at,version) VALUES ('sub_scheduled_probe','user_probe','plan_probe',1,'creator_probe','ACTIVE','2026-10-01T00:00:00.000Z','2026-10-01T00:00:00.000Z','2026-10-31T00:00:00.000Z',NULL,NULL,'2026-10-01T00:00:00.000Z','2026-10-01T00:00:00.000Z',1)")
+          db.execute("INSERT INTO membership_subscription_plan_changes(change_id,subscription_id,subscriber_id,source_plan_id,source_plan_version,target_plan_id,target_plan_version,change_type,effective_at,status,request_hash,version,created_at,updated_at) VALUES ('spc_ffffffffffffffffffffffffff','sub_scheduled_probe','user_probe','plan_probe',1,'plan_upgrade_target',1,'DOWNGRADE','2026-10-31T00:00:00.000Z','SCHEDULED','ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff',1,'2026-10-10T10:00:00.000Z','2026-10-10T10:00:00.000Z')")
+          try:
+            db.execute("INSERT INTO membership_subscription_plan_change_applications(application_id,subscription_id,subscriber_id,source_plan_id,source_plan_version,target_plan_id,target_plan_version,expected_subscription_version,current_period_start,current_period_end,order_id,payment_id,request_hash,status,version,created_at,updated_at) VALUES ('spa_gggggggggggggggggggggggggg','sub_scheduled_probe','user_probe','plan_probe',1,'plan_upgrade_target',1,1,'2026-10-01T00:00:00.000Z','2026-10-31T00:00:00.000Z','ord_scheduled_probe',NULL,'gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg','PENDING_PAYMENT',1,'2026-10-10T10:00:00.000Z','2026-10-10T10:00:00.000Z')")
+            raise SystemExit('upgrade reservation was admitted while a scheduled plan change was active')
           except sqlite3.IntegrityError:
             pass
 
