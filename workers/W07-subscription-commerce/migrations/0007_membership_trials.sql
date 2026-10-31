@@ -112,7 +112,7 @@ CREATE TRIGGER membership_subscription_trials_state_guard
 BEFORE UPDATE OF status ON membership_subscription_trials
 WHEN NOT (
   (OLD.status = 'TRIALING' AND NEW.status IN ('CANCELED','PAYMENT_FAILED','CONVERTED','EXPIRED'))
-  OR (OLD.status = 'CANCELED' AND NEW.status = 'EXPIRED')
+  OR (OLD.status = 'CANCELED' AND NEW.status IN ('CONVERTED','EXPIRED'))
   OR (OLD.status = 'PAYMENT_FAILED' AND NEW.status IN ('CONVERTED','EXPIRED'))
 )
 BEGIN SELECT RAISE(ABORT, 'membership trial has an invalid state transition'); END;
@@ -162,13 +162,13 @@ END;
 
 CREATE TRIGGER membership_subscriptions_trial_converted_sync
 AFTER UPDATE OF status, current_period_start ON membership_subscriptions
-WHEN OLD.status = 'TRIALING' AND NEW.status = 'ACTIVE'
+WHEN OLD.status IN ('TRIALING','PAST_DUE') AND NEW.status = 'ACTIVE'
   AND NEW.current_period_start >= OLD.current_period_end
 BEGIN
   UPDATE membership_subscription_trials
   SET status = 'CONVERTED', version = version + 1, updated_at = NEW.updated_at
   WHERE subscription_id = NEW.subscription_id AND subscriber_id = NEW.subscriber_id
-    AND status IN ('TRIALING','PAYMENT_FAILED');
+    AND status IN ('TRIALING','CANCELED','PAYMENT_FAILED');
 END;
 
 CREATE TRIGGER membership_subscriptions_trial_expired_sync
