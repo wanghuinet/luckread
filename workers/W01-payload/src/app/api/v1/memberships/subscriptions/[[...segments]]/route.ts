@@ -115,7 +115,7 @@ async function subscriptionPlanUpgradeAttemptId(subscriberId: string, idempotenc
 
 async function subscriptionPlanDowngradeChangeId(subscriberId: string, idempotencyKey: string): Promise<string> {
   const payload = new TextEncoder().encode(
-    'membership-plan-downgrade-v1\\u0000' + subscriberId + '\\u0000' + idempotencyKey,
+    'membership-plan-downgrade-v1\u0000' + subscriberId + '\u0000' + idempotencyKey,
   )
   const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', payload))
   const hex = Array.from(digest, (byte) => byte.toString(16).padStart(2, '0')).join('')
@@ -204,12 +204,12 @@ async function forward(request: Request, context: RouteContext): Promise<Respons
       const idempotencyKey = request.headers.get('Idempotency-Key')
       if (!idempotencyKey) return errorResponse(428, 'PRECONDITION_REQUIRED', 'Idempotency-Key is required')
       if (idempotencyKey.length > 256 || idempotencyKey.trim() !== idempotencyKey ||
-          /[\\u0000-\\u001f\\u007f]/.test(idempotencyKey)) {
+          /[\u0000-\u001f\u007f]/.test(idempotencyKey)) {
         return errorResponse(400, 'VALIDATION_FAILED', 'Idempotency-Key is invalid')
       }
       const expectedEtag = request.headers.get('If-Match')
       if (!expectedEtag) return errorResponse(428, 'PRECONDITION_REQUIRED', 'If-Match is required')
-      if (!/^"lr-v([1-9]\\d*)"$/.test(expectedEtag)) {
+      if (!/^"lr-v([1-9]\d*)"$/.test(expectedEtag)) {
         return errorResponse(412, 'PRECONDITION_FAILED', 'Subscription version does not match')
       }
       const denied = await authorizeSubscriptionPlanChange(request, principal.userId, parts[0]!)
