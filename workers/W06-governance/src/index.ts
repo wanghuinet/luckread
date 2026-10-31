@@ -808,6 +808,35 @@ async function persistImmutableAuditEvent(env: Env, event: AuditEvent): Promise<
   }
 }
 
+/**
+ * The request audit is keyed by the caller's idempotency-derived attempt ID.
+ * Retries may arrive with a later wall-clock timestamp; preserve the first
+ * durable timestamp while requiring every business field and actor to match.
+ */
+async function persistIdempotentSubscriptionPlanChangeRequestAudit(
+  env: Env,
+  event: AuditEvent,
+): Promise<Response> {
+  let existing: StoredAuditEvent | null
+  try {
+    existing = await findAuditEvent(env.D1_03, event.eventId)
+  } catch {
+    return json({ error: 'AUDIT_EVENT_LOOKUP_FAILED' }, 503)
+  }
+  if (!existing) return persistImmutableAuditEvent(env, event)
+  const stable = { ...event, occurredAt: existing.occurred_at }
+  if (!matchesImmutableAuditEvent(existing, stable)) {
+    return json({ error: 'AUDIT_EVENT_CONFLICT' }, 409)
+  }
+  return json({
+    eventId: event.eventId,
+    action: event.action,
+    targetType: event.targetType,
+    targetId: event.targetId,
+    replayed: true,
+  }, 200)
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     try {
@@ -941,7 +970,7 @@ export default {
         after: { attemptId: input.attemptId, targetPlanId: input.targetPlanId },
         occurredAt: input.requestedAt,
       }
-      return persistImmutableAuditEvent(env, event)
+      return persistIdempotentSubscriptionPlanChangeRequestAudit(env, event)
     }
 
     if (request.method === 'POST' && url.pathname === '/internal/audit-events/subscription-plan-upgraded') {
