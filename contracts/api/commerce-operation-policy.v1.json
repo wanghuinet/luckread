@@ -525,7 +525,7 @@
         "subscriber_identity_from_W02_session_only",
         "W08_subscription_change_plan_own_scope_permission",
         "If-Match_required_and_subscription_version_CAS",
-        "same_creator_same_currency_and_opposite_MONTHLY_YEARLY_billing_interval_only",
+        "same_creator_same_tier_same_currency_and_opposite_MONTHLY_YEARLY_billing_interval_only",
         "target_plan_and_immutable_target_plan_version_resolved_by_W07",
         "no_immediate_order_payment_proration_refund_or_entitlement_mutation",
         "current_plan_and_entitlement_remain_effective_through_current_period_end",
