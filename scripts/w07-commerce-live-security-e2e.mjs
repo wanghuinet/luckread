@@ -8,7 +8,7 @@ const runId = process.env.GITHUB_RUN_ID || 'local'
 const runAttempt = process.env.GITHUB_RUN_ATTEMPT || '1'
 const sourceSha = process.env.GITHUB_SHA || 'unknown'
 const outDir = resolve('artifacts/w07-commerce-live-security-e2e')
-const outFile = resolve(outDir, \`w07-commerce-live-security-e2e-\${runId}-\${runAttempt}.json\`)
+const outFile = resolve(outDir, `w07-commerce-live-security-e2e-${runId}-${runAttempt}.json`)
 const users = [
   { label: 'primary', email: process.env.LUCKREAD_APP_AUTH_SMOKE_EMAIL || '', password: process.env.LUCKREAD_APP_AUTH_SMOKE_PASSWORD || '' },
   { label: 'foreign_fixture_owner', email: process.env.LUCKREAD_CREATOR_E2E_APPLICANT_EMAIL || '', password: process.env.LUCKREAD_CREATOR_E2E_APPLICANT_PASSWORD || '' },
@@ -37,7 +37,7 @@ const result = {
 
 function check(name, pass, facts = {}) {
   result.checks.push({ name, pass, ...facts })
-  console.log(\`\${pass ? 'PASS' : 'FAIL'} \${name}\`)
+  console.log(`${pass ? 'PASS' : 'FAIL'} ${name}`)
 }
 
 function errorCode(json) {
@@ -58,7 +58,7 @@ class CookieJar {
       else this.#values.set(name, value)
     }
   }
-  header() { return [...this.#values].map(([name, value]) => \`\${name}=\${value}\`).join('; ') }
+  header() { return [...this.#values].map(([name, value]) => `${name}=${value}`).join('; ') }
   names() { return [...this.#values.keys()].sort() }
   hasSession() { return this.names().some((name) => /better-auth\.session_token/i.test(name)) }
 }
@@ -106,7 +106,7 @@ async function login(user) {
     typeof account.email === 'string' &&
     account.email.trim().toLowerCase() === user.email.trim().toLowerCase() &&
     account.emailVerified === true && jar.hasSession()
-  check(\`\${user.label}_login_verified_cookie_session\`, pass, {
+  check(`${user.label}_login_verified_cookie_session`, pass, {
     status: r.status, emailVerified: account?.emailVerified === true,
     sessionCookiePresent: jar.hasSession(), cookieNames: jar.names(), errorCode: r.errorCode,
   })
@@ -153,8 +153,8 @@ async function finish() {
   if (result.status === 'PENDING') result.status = failed.length === 0 ? 'PASS' : 'FAIL'
   await mkdir(outDir, { recursive: true })
   await writeFile(outFile, JSON.stringify(result, null, 2) + '\n', { mode: 0o600 })
-  console.log(\`Sanitized evidence written: \${outFile}\`)
-  console.log(\`Summary: \${result.summary.passed}/\${result.summary.total}; \${result.status}\`)
+  console.log(`Sanitized evidence written: ${outFile}`)
+  console.log(`Summary: ${result.summary.passed}/${result.summary.total}; ${result.status}`)
   if (result.status !== 'PASS') process.exitCode = 1
 }
 
@@ -253,7 +253,7 @@ try {
             jar: primary.jar,
             headers: {
               'content-type': 'application/json',
-              'Idempotency-Key': \`w07-e2e-cross-account-\${randomUUID()}\`,
+              'Idempotency-Key': `w07-e2e-cross-account-${randomUUID()}`,
             },
             body: JSON.stringify({
               paymentId: foreignPayment.paymentId,
@@ -274,14 +274,14 @@ try {
 
       for (const [name, path] of routes) {
         const r = await request('GET', path + '?limit=1')
-        check(\`anonymous_\${name}_denied\`, r.status === 401 || r.status === 403, {
+        check(`anonymous_${name}_denied`, r.status === 401 || r.status === 403, {
           status: r.status, errorCode: r.errorCode,
         })
       }
       const anonymousRefund = await request('POST', '/v1/payments/refunds', {
         headers: {
           'content-type': 'application/json',
-          'Idempotency-Key': \`w07-e2e-anon-\${randomUUID()}\`,
+          'Idempotency-Key': `w07-e2e-anon-${randomUUID()}`,
         },
         body: JSON.stringify({
           paymentId: 'pay_aaaaaaaaaaaaaaaaaaaaaaaaaa',
@@ -294,7 +294,7 @@ try {
 
       for (const user of [primary, foreign]) {
         const logout = await request('POST', '/v1/auth/logout', { jar: user.jar })
-        check(\`\${user.label}_logout_cleanup\`, logout.status === 204, {
+        check(`${user.label}_logout_cleanup`, logout.status === 204, {
           status: logout.status,
           sessionCookieCleared: logout.setCookies.some((v) =>
             /better-auth\.session_token/i.test(v) && /max-age=0|expires=/i.test(v)),
