@@ -4914,7 +4914,8 @@
         "workers/W01-payload/tests/int/subscription-v1-adapter.int.spec.ts",
         "workers/W08-creator/src/authz/casl-policy.test.ts",
         "workers/W07-subscription-commerce/src/renewal-scheduler.test.ts",
-        ".github/workflows/w07-subscription-runtime-ci.yml"
+        ".github/workflows/w07-subscription-runtime-ci.yml",
+        "workers/W06-governance/src/index.test.ts"
       ],
       "schemaEvidenceRefs": [
         "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json#membershipSubscriptionTrialTable",
@@ -4958,7 +4959,8 @@
         "workers/W01-payload/tests/int/subscription-v1-adapter.int.spec.ts",
         "workers/W08-creator/src/authz/casl-policy.test.ts",
         "workers/W07-subscription-commerce/src/renewal-scheduler.test.ts",
-        ".github/workflows/w07-subscription-runtime-ci.yml"
+        ".github/workflows/w07-subscription-runtime-ci.yml",
+        "workers/W06-governance/src/index.test.ts"
       ],
       "schemaEvidenceRefs": [
         "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json#membershipSubscriptionTrialTable",
