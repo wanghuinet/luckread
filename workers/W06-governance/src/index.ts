@@ -698,11 +698,13 @@ function parseSubscriptionTrialAuditInput(value: unknown): SubscriptionTrialAudi
   const body = value as Record<string, unknown>
   const phase = body.phase
   const common = ['eventId', 'phase', 'planId']
-  if (typeof body.planId !== 'string' || !/^plan_[a-f0-9]{64}$/.test(body.planId) ||
-      (phase !== 'REQUESTED' && phase !== 'CANCEL_REQUESTED' && phase !== 'STARTED' && phase !== 'CANCELED')) {
+  if (phase !== 'REQUESTED' && phase !== 'CANCEL_REQUESTED' && phase !== 'STARTED' && phase !== 'CANCELED') {
     throw new Error('INVALID_SUBSCRIPTION_TRIAL_AUDIT')
   }
   if (phase === 'REQUESTED') {
+    if (typeof body.planId !== 'string' || !/^plan_[a-f0-9]{64}$/.test(body.planId)) {
+      throw new Error('INVALID_SUBSCRIPTION_TRIAL_AUDIT')
+    }
     const allowed = new Set([...common, 'idempotencyKey'])
     if (Object.keys(body).some((key) => !allowed.has(key)) || Object.keys(body).length !== allowed.size ||
         typeof body.eventId !== 'string' || !/^evt_subscription_trial_request_[a-f0-9]{26}$/.test(body.eventId) ||
@@ -720,6 +722,9 @@ function parseSubscriptionTrialAuditInput(value: unknown): SubscriptionTrialAudi
       throw new Error('INVALID_SUBSCRIPTION_TRIAL_AUDIT')
     }
     return body as SubscriptionTrialAuditInput
+  }
+  if (typeof body.planId !== 'string' || !/^plan_[a-f0-9]{64}$/.test(body.planId)) {
+    throw new Error('INVALID_SUBSCRIPTION_TRIAL_AUDIT')
   }
   const allowed = new Set([...common, 'subscriptionId', 'trialId', 'planVersion', 'trialEndsAt', 'previousStatus', 'occurredAt'])
   if (Object.keys(body).some((key) => !allowed.has(key)) || Object.keys(body).length !== allowed.size ||
