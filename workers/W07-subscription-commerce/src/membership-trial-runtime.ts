@@ -422,7 +422,7 @@ export async function expireDueWebMembershipTrials(
   db: D1Database,
   now = new Date(),
   limit = 100,
-  d1_04?: D1Database,
+  d1_04: D1Database,
 ): Promise<Readonly<{ scanned: number; expired: number }>> {
   if (!(now instanceof Date) || !Number.isFinite(now.getTime())) {
     throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
@@ -444,7 +444,7 @@ export async function expireDueWebMembershipTrials(
   }>()).results ?? [];
   let expired = 0;
   for (const row of rows) {
-    if (row.trial_source === 'WEB' && ['TRIALING', 'CANCELED', 'PAYMENT_FAILED'].includes(row.trial_status) && d1_04) {
+    if (row.trial_source === 'WEB' && ['TRIALING', 'CANCELED', 'PAYMENT_FAILED'].includes(row.trial_status)) {
       let cycle: { state: string; attempt_number: number; subscription_sync_state: string; mandate_record_id: string | null } | null;
       try {
         cycle = await d1_04.prepare(
