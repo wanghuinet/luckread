@@ -4915,7 +4915,8 @@
         "workers/W08-creator/src/authz/casl-policy.test.ts",
         "workers/W07-subscription-commerce/src/renewal-scheduler.test.ts",
         ".github/workflows/w07-subscription-runtime-ci.yml",
-        "workers/W06-governance/src/index.test.ts"
+        "workers/W06-governance/src/index.test.ts",
+        "workers/W07-subscription-commerce/src/membership-trial-runtime.test.ts"
       ],
       "schemaEvidenceRefs": [
         "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json#trial",
@@ -4932,7 +4933,8 @@
       "blockers": [
         "D1-01 migration 0007 is a reviewed code candidate only and has not been applied to the remote database.",
         "Trial lifecycle, CASL, scheduler and migration regression cases were authored but intentionally not executed during this feature-first pass; full unit, CI and signed production E2E validation remain deferred until feature implementation is complete.",
-        "Store trial synchronization depends on a W02-authenticated RevenueCat current-customer snapshot and exact product binding; the end-to-end store purchase, cancellation and conversion flow remains for the later validation phase."
+        "Store trial synchronization depends on a W02-authenticated RevenueCat current-customer snapshot and exact product binding; the end-to-end store purchase, cancellation and conversion flow remains for the later validation phase.",
+        "RevenueCat auto-renew restoration clears a prior store-period cancel_at so a paid renewal does not remain scheduled for expiry; regression coverage is authored but not executed."
       ]
     },
     {
@@ -4960,7 +4962,8 @@
         "workers/W08-creator/src/authz/casl-policy.test.ts",
         "workers/W07-subscription-commerce/src/renewal-scheduler.test.ts",
         ".github/workflows/w07-subscription-runtime-ci.yml",
-        "workers/W06-governance/src/index.test.ts"
+        "workers/W06-governance/src/index.test.ts",
+        "workers/W07-subscription-commerce/src/membership-trial-runtime.test.ts"
       ],
       "schemaEvidenceRefs": [
         "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json#trial",
@@ -4977,7 +4980,8 @@
       "blockers": [
         "D1-01 migration 0007 is a reviewed code candidate only and has not been applied to the remote database.",
         "Trial lifecycle, CASL, scheduler and migration regression cases were authored but intentionally not executed during this feature-first pass; full unit, CI and signed production E2E validation remain deferred until feature implementation is complete.",
-        "Store trial synchronization depends on a W02-authenticated RevenueCat current-customer snapshot and exact product binding; the end-to-end store purchase, cancellation and conversion flow remains for the later validation phase."
+        "Store trial synchronization depends on a W02-authenticated RevenueCat current-customer snapshot and exact product binding; the end-to-end store purchase, cancellation and conversion flow remains for the later validation phase.",
+        "RevenueCat auto-renew restoration clears a prior store-period cancel_at so a paid renewal does not remain scheduled for expiry; regression coverage is authored but not executed."
       ]
     }
   ]
