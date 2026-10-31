@@ -1867,7 +1867,7 @@ paths:
                         type: array
                         items:
                           type: object
-                          required: [planId, creatorId, planVersion, name, tier, billingInterval, priceMinor, currency, benefits, status, visibility, version, createdAt, updatedAt, etag]
+                          required: [planId, creatorId, planVersion, name, tier, billingInterval, priceMinor, currency, benefits, trialDays, status, visibility, version, createdAt, updatedAt, etag]
                           properties:
                             planId: { type: string }
                             creatorId: { type: string }
@@ -1878,6 +1878,7 @@ paths:
                             priceMinor: { type: integer, minimum: 0, maximum: 2147483647 }
                             currency: { type: string, pattern: '^[A-Z]{3}$' }
                             benefits: { type: array, items: { type: string, minLength: 1, maxLength: 180 } }
+                            trialDays: { type: integer, minimum: 0, maximum: 90 }
                             status: { type: string, enum: [DRAFT, ACTIVE, PAUSED, RETIRED] }
                             visibility: { type: string, enum: [PRIVATE, PUBLIC] }
                             version: { type: integer, minimum: 1 }
@@ -1930,7 +1931,7 @@ paths:
                 properties:
                   data:
                     type: object
-                    required: [planId, creatorId, planVersion, name, tier, billingInterval, priceMinor, currency, benefits, status, visibility, version, createdAt, updatedAt, etag, replayed]
+                    required: [planId, creatorId, planVersion, name, tier, billingInterval, priceMinor, currency, benefits, trialDays, status, visibility, version, createdAt, updatedAt, etag, replayed]
                     properties:
                       planId: { type: string }
                       creatorId: { type: string }
@@ -2021,7 +2022,7 @@ paths:
       summary: Get a subscription
       operationId: getSubscription
       responses:
-        '200': { description: Subscription and optional scheduled next-period plan change; current entitlements remain on the source plan until successful renewal payment. }
+        '200': { description: Subscription, optional trial details and optional scheduled next-period plan change. A TRIALING Subscription grants access only through its authoritative current_period_end, and a scheduled next-period plan change does not alter current entitlements. }
         '4XX': { $ref: '#/components/responses/ClientError' }
 
   /memberships/subscriptions/{subscriptionId}/cancel:
@@ -2110,6 +2111,54 @@ paths:
         '409': { description: Invalid state, conflicting schedule, or an upgrade requiring the separate immediate-proration payment flow. }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /memberships/subscriptions/trial:
+    post:
+      tags: [Users]
+      summary: Start a web membership trial using an active MIT mandate
+      description: W07 starts a TRIALING Subscription only when the immutable MembershipPlan version has trialDays greater than zero and D1-04 contains an active Hyperswitch merchant-initiated mandate backed by a saved payment method. The first charge is submitted by the existing renewal flow at trialEndsAt; no client amount, payment method, store transaction or entitlement claim is accepted. App Store and Play Store trials are reconciled from W02-verified RevenueCat snapshots instead.
+      operationId: startMembershipTrial
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [planId]
+              properties:
+                planId: { $ref: '#/components/schemas/ResourceId' }
+      responses:
+        '201': { description: Trial started. Access remains limited to the trial's effective period. }
+        '200': { description: Idempotent replay of the original trial and Subscription. }
+        '409': { description: Trial is unavailable, an existing creator subscription exists, or no active Hyperswitch MIT mandate is available. }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /memberships/subscriptions/{subscriptionId}/cancel-trial:
+    parameters:
+      - name: subscriptionId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    post:
+      tags: [Users]
+      summary: Cancel trial conversion while preserving access through the trial end
+      description: Cancels the future trial-to-paid conversion by setting cancelAt to trialEndsAt. The Subscription remains TRIALING and current access is not revoked before the recorded trial end. Store trials are canceled through the App Store or Google Play billing controls and reconciled from RevenueCat.
+      operationId: cancelMembershipTrial
+      parameters:
+        - $ref: '#/components/parameters/IfMatchRequired'
+      responses:
+        '200': { description: Trial conversion canceled; access remains until trialEndsAt. }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: Subscription is not an active web trial. }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
         '4XX': { $ref: '#/components/responses/ClientError' }
 
   /memberships/subscriptions/{subscriptionId}/upgrade:
@@ -3574,7 +3623,7 @@ paths:
                         type: array
                         items:
                           type: object
-                          required: [planId, creatorId, planVersion, name, tier, billingInterval, priceMinor, currency, benefits, createdAt, updatedAt]
+                          required: [planId, creatorId, planVersion, name, tier, billingInterval, priceMinor, currency, benefits, trialDays, createdAt, updatedAt]
                           properties:
                             planId: { type: string, minLength: 1, maxLength: 256 }
                             creatorId: { type: string, minLength: 1, maxLength: 256 }
@@ -3587,6 +3636,9 @@ paths:
                             benefits:
                               type: array
                               items: { type: string, minLength: 1, maxLength: 180 }
+                            trialDays: { type: integer, minimum: 0, maximum: 90 }
+                      trialDays: { type: integer, minimum: 0, maximum: 90 }
+                trialDays: { type: integer, minimum: 0, maximum: 90, default: 0 }
                             createdAt: { type: string, format: date-time }
                             updatedAt: { type: string, format: date-time }
                       limit: { type: integer, minimum: 1, maximum: 50 }
@@ -4502,7 +4554,7 @@ paths:
                 properties:
                   data:
                     type: object
-                    required: [planId, creatorId, planVersion, status, visibility, version, etag, replayed, name, tier, billingInterval, priceMinor, currency, benefits, createdAt, updatedAt]
+                    required: [planId, creatorId, planVersion, status, visibility, version, etag, replayed, name, tier, billingInterval, priceMinor, currency, benefits, trialDays, createdAt, updatedAt]
                     properties:
                       planId: { type: string, pattern: '^plan_[a-f0-9]{64}$' }
                       creatorId: { $ref: '#/components/schemas/ResourceId' }
