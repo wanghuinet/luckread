@@ -1524,6 +1524,26 @@
       "blockers": []
     },
     {
+      "evidenceId": "API_OPERATION:previewSubscriptionPlanChange",
+      "subjectType": "API_OPERATION",
+      "subjectId": "previewSubscriptionPlanChange",
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "workers/W01-payload/src/app/api/v1/memberships/subscriptions/[[...segments]]/route.ts",
+        "workers/W07-subscription-commerce/src/index.ts",
+        "workers/W07-subscription-commerce/src/subscription-plan-change-preview.ts"
+      ],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/alignment/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Read-only quote only; order creation, final tax/proration pricing, payment confirmation and subscription mutation are not part of this endpoint."
+      ]
+    },
+    {
       "evidenceId": "API_OPERATION:getSubscriptions",
       "subjectType": "API_OPERATION",
       "subjectId": "getSubscriptions",
