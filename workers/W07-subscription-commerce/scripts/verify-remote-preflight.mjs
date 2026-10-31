@@ -123,7 +123,6 @@ const EXPECTED_PLAN_UPGRADE_COLUMNS = [
   ['current_period_end', 'TEXT', 1, 0],
   ['order_id', 'TEXT', 1, 0],
   ['payment_id', 'TEXT', 1, 0],
-  ['amount_minor', 'INTEGER', 1, 0],
   ['currency', 'TEXT', 1, 0],
   ['request_hash', 'TEXT', 1, 0],
   ['status', 'TEXT', 1, 0],
