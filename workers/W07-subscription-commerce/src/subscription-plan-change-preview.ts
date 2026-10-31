@@ -47,6 +47,8 @@ type PlanChangeKind =
 
 export type SubscriptionPlanChangePreview = Readonly<{
   subscriptionId: string;
+  currentPeriodStart: string;
+  currentPeriodEnd: string;
   currentPlan: Readonly<{
     planId: string;
     planVersion: number;
@@ -264,6 +266,8 @@ export async function previewSubscriptionPlanChange(
   if (target.plan_id === subscription.plan_id && target.current_version === subscription.plan_version) {
     return {
       subscriptionId,
+      currentPeriodStart: subscription.current_period_start,
+      currentPeriodEnd: subscription.current_period_end,
       currentPlan,
       targetPlan,
       changeType: 'NO_CHANGE',
@@ -308,6 +312,8 @@ export async function previewSubscriptionPlanChange(
 
   return {
     subscriptionId,
+    currentPeriodStart: subscription.current_period_start,
+    currentPeriodEnd: subscription.current_period_end,
     currentPlan,
     targetPlan,
     changeType,
