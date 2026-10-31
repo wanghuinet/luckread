@@ -324,11 +324,17 @@ export function verifyD1SubscriptionPreflight({
   const trialTriggerNames = new Set(collectObjects(trialTriggers)
     .filter((item) => typeof item.name === 'string')
     .map((item) => item.name))
-  const noTrialTable = trialShape.length === 0 && trialIndexNames.size === 0 && EXPECTED_TRIAL_TRIGGERS.every((name) => !trialTriggerNames.has(name))
+  const trialSpecificTriggerNames = new Set([...trialTriggerNames].filter((name) =>
+    name.startsWith('membership_subscription_trials_') ||
+    name.startsWith('membership_subscriptions_trial_')))
+  const noTrialTable = trialShape.length === 0 && trialIndexNames.size === 0 &&
+    trialSpecificTriggerNames.size === 0
   const allTrialObjectsPresent =
     JSON.stringify(trialShape) === JSON.stringify(EXPECTED_TRIAL_COLUMNS) &&
+    trialIndexNames.size === EXPECTED_TRIAL_INDEXES.length &&
     EXPECTED_TRIAL_INDEXES.every((name) => trialIndexNames.has(name)) &&
-    EXPECTED_TRIAL_TRIGGERS.every((name) => trialTriggerNames.has(name)) &&
+    trialSpecificTriggerNames.size === EXPECTED_TRIAL_TRIGGERS.length &&
+    EXPECTED_TRIAL_TRIGGERS.every((name) => trialSpecificTriggerNames.has(name)) &&
     JSON.stringify(planVersionShape) === JSON.stringify(EXPECTED_PLAN_VERSION_COLUMNS_WITH_TRIAL)
 
   const legacySubscriptionShape = JSON.stringify(shape) === JSON.stringify(LEGACY_COLUMNS)
