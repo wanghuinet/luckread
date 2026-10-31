@@ -308,7 +308,7 @@
         "d1WriteMax": 4,
         "d1ReadRowsMax": 16,
         "d1WriteRowsMax": 12,
-        "rpcMax": 2,
+        "rpcMax": 3,
         "requestBodyBytesMax": 16384,
         "responseBytesMax": 65536
       },
@@ -361,7 +361,8 @@
         "D1_01_stores_only_attempt_and_opaque_D1_04_order_reference",
         "D1_04_remains_authority_for_order_payment_and_amount",
         "W06_D1_03_audits_request_and_applied_result",
-        "production_checkout_fails_closed_without_admitted_tax_pricing"
+        "production_checkout_fails_closed_without_admitted_tax_pricing",
+        "W01_authorizes_with_W08_audits_request_with_W06_and_forwards_to_W07"
       ],
       "evidence": {
         "openapi": "PASS",
