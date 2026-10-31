@@ -1,0 +1,66 @@
+name: W07 Commerce Live Security E2E
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: Run read-only billing security probes and a non-mutating cross-account refund denial probe
+        required: true
+        type: choice
+        options:
+          - CANCEL
+          - RUN_W07_COMMERCE_SECURITY_E2E
+        default: CANCEL
+
+permissions:
+  contents: read
+
+concurrency:
+  group: w07-commerce-live-security-e2e
+  cancel-in-progress: false
+
+jobs:
+  security-e2e:
+    if: \${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.confirm == 'RUN_W07_COMMERCE_SECURITY_E2E' }}
+    name: Verify production payment and billing ownership boundaries
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      LUCKREAD_API_BASE_URL: https://api.luckread.com
+      LUCKREAD_BROWSER_ORIGIN: https://luckread.com
+      LUCKREAD_APP_AUTH_SMOKE_EMAIL: \${{ secrets.LUCKREAD_APP_AUTH_SMOKE_EMAIL }}
+      LUCKREAD_APP_AUTH_SMOKE_PASSWORD: \${{ secrets.LUCKREAD_APP_AUTH_SMOKE_PASSWORD }}
+      LUCKREAD_CREATOR_E2E_APPLICANT_EMAIL: \${{ secrets.LUCKREAD_CREATOR_E2E_APPLICANT_EMAIL }}
+      LUCKREAD_CREATOR_E2E_APPLICANT_PASSWORD: \${{ secrets.LUCKREAD_CREATOR_E2E_APPLICANT_PASSWORD }}
+    steps:
+      - name: Require protected main and deployed W07 source
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/heads/main"
+          test "$GITHUB_SHA" = "4c49cec1d3c6d026e30c05e059f66f036cd4fd3d" || {
+            echo "::error::This E2E is pinned to the W07 source deployed by run 41148669333; update only after a reviewed subsequent W07 deployment."
+            exit 1
+          }
+
+      - name: Checkout main
+        uses: actions/checkout@v4
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Validate live security harness
+        run: node --check scripts/w07-commerce-live-security-e2e.mjs
+
+      - name: Probe authenticated billing reads, cross-account isolation and refund denial
+        run: node scripts/w07-commerce-live-security-e2e.mjs
+
+      - name: Upload sanitized production security evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: w07-commerce-live-security-e2e-\${{ github.run_id }}-\${{ github.run_attempt }}
+          path: artifacts/w07-commerce-live-security-e2e/*.json
+          if-no-files-found: warn
+          retention-days: 30
