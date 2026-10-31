@@ -25,6 +25,7 @@ type SubscriptionPlanChangeSourceRow = Readonly<{
   billing_interval: string;
   price_minor: number;
   currency: string;
+  has_active_upgrade: number;
 }>;
 
 type SubscriptionPlanChangeTargetRow = Readonly<{
@@ -265,7 +266,8 @@ export async function scheduleSubscriptionPlanChange(
     source = await db.prepare(
       'SELECT s.subscription_id, s.subscriber_id, s.plan_id, s.plan_version, s.creator_id, s.status, ' +
       's.current_period_start, s.current_period_end, s.cancel_at, s.updated_at, s.version, ' +
-      'v.name, v.tier, v.billing_interval, v.price_minor, v.currency ' +
+      'v.name, v.tier, v.billing_interval, v.price_minor, v.currency, ' +
+      "EXISTS (SELECT 1 FROM membership_subscription_plan_change_applications a WHERE a.subscription_id = s.subscription_id AND a.status IN ('PENDING_PAYMENT','READY')) AS has_active_upgrade " +
       'FROM membership_subscriptions s ' +
       'INNER JOIN membership_plan_versions v ON v.plan_id = s.plan_id AND v.plan_version = s.plan_version ' +
       'WHERE s.subscription_id = ? AND s.subscriber_id = ? LIMIT 1',
@@ -275,7 +277,7 @@ export async function scheduleSubscriptionPlanChange(
   }
   if (!source) throw new SubscriptionRuntimeError('RESOURCE_NOT_FOUND', 404);
   if (source.version !== expectedVersion) throw new SubscriptionRuntimeError('PRECONDITION_FAILED', 412);
-  if (source.status !== 'ACTIVE' || source.cancel_at !== null ||
+  if (source.status !== 'ACTIVE' || source.cancel_at !== null || source.has_active_upgrade === 1 ||
       !isCanonicalIso(source.current_period_start) || !isCanonicalIso(source.current_period_end) ||
       source.current_period_end <= now || source.current_period_start >= source.current_period_end ||
       !isCanonicalIso(source.updated_at) ||
