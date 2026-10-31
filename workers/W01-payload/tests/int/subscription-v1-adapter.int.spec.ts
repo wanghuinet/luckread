@@ -199,6 +199,26 @@ describe('v1 subscription adapter', () => {
     expect(mySubscriptionsPage).toContain("fetchJson<ListResponse>('/api/v1/memberships/subscriptions?limit=20&page='")
   })
 
+  it('exposes audited WEB trial start and cancellation through W01 W08 W07 and W06', () => {
+    expect(openapi).toContain('operationId: startMembershipTrial')
+    expect(openapi).toContain('operationId: cancelMembershipTrial')
+    expect(apiInventory.domains.subscription_entitlement_payment.endpoint_groups)
+      .toContain('POST /v1/memberships/subscriptions/trial')
+    expect(apiInventory.domains.subscription_entitlement_payment.endpoint_groups)
+      .toContain('POST /v1/memberships/subscriptions/{subscriptionId}/cancel-trial')
+    expect(route).toContain("parts[0] === 'trial'")
+    expect(route).toContain("parts[1] === 'cancel-trial'")
+    expect(route).toContain("'subscription.start_trial'")
+    expect(route).toContain("'subscription.cancel'")
+    expect(route).toContain('callW06SubscriptionTrialAudit')
+    expect(route).toContain("'/internal/audit-events/subscription-trial'")
+    expect(w07Worker).toContain('startWebMembershipTrial')
+    expect(w07Worker).toContain('cancelWebMembershipTrial')
+    expect(w07Worker).toContain('getMembershipTrialDetails')
+    expect(w08Casl).toContain("grant('subscription.start_trial', 'Subscription', selfOwnerCondition(subjectId))")
+    expect(w08Casl).toContain("grant('subscription.cancel', 'Subscription', selfOwnerCondition(subjectId))")
+  })
+
   it('declares the existing subscription collection list operation', () => {
     expect(openapi).toContain('operationId: listMembershipSubscriptions')
     expect(apiInventory.domains.subscription_entitlement_payment.endpoint_groups)
@@ -230,7 +250,7 @@ describe('v1 subscription adapter', () => {
   it('exposes the canonical subscription reads and audited scheduled plan-change path', () => {
     expect(route).toContain("/memberships/subscriptions")
     expect(route).toContain("parts.length === 0 && method === 'GET'")
-    expect(route).toContain("['cancel', 'pause', 'resume', 'change-plan']")
+    expect(route).toContain("['cancel', 'pause', 'resume', 'change-plan', 'upgrade', 'cancel-trial']")
     expect(route).toContain("action: 'subscription.change_plan'")
     expect(route).toContain('callW06SubscriptionPlanChangeRequestAudit')
     expect(route).toContain('callW06SubscriptionPlanChangeAudit')
