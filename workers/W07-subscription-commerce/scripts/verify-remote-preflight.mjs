@@ -107,6 +107,7 @@ const EXPECTED_PLAN_CHANGE_TRIGGERS = [
   'membership_subscription_plan_changes_mark_applied',
   'membership_subscription_plan_changes_cancel_on_lifecycle_change',
   'membership_subscription_plan_changes_retained',
+  'membership_subscription_plan_changes_block_when_upgrade_reserved',
   'membership_subscriptions_plan_change_requires_scheduled_record',
 ]
 
