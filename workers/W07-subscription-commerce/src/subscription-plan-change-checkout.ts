@@ -474,7 +474,7 @@ export async function createSubscriptionPlanUpgradeCheckout(
         "AND current_version = ? AND status = 'ACTIVE' AND visibility = 'PUBLIC')";
       const guardedInsertSql = insertSql +
         " AND NOT EXISTS (SELECT 1 FROM membership_subscription_scheduled_plan_changes " +
-        "WHERE subscription_id = ? AND status = 'SCHEDULED')";
+        "WHERE subscription_id = ? AND status IN ('SCHEDULED', 'RECONCILIATION_REQUIRED'))";
       let inserted: D1Result;
       try {
         inserted = await env.D1_01.prepare(guardedInsertSql).bind(...insertValues, candidate.subscription_id).run();
