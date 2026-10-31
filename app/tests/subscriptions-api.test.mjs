@@ -100,12 +100,15 @@ test('keeps subscription mutations and mobile checkout disabled until store bill
   expect(plansScreen).toContain('presentNativeMembershipPayment');
   expect(plansScreen).toContain('服务端验证 Hyperswitch 支付 Webhook');
   expect(plansScreen).toContain('item.priceMinor === 0');
-  const nativePayment = readFileSync(new URL('../lib/hyperswitch-payment.ts', import.meta.url), 'utf8');
+  const nativePayment = readFileSync(new URL('../lib/hyperswitch-payment.native.ts', import.meta.url), 'utf8');
+  const webPayment = readFileSync(new URL('../lib/hyperswitch-payment.ts', import.meta.url), 'utf8');
   expect(nativePayment).toContain('Hyperswitch.init');
   expect(nativePayment).toContain('initPaymentSession({ sdkAuthorization })');
   expect(nativePayment).toContain('displaySavedPaymentMethodsCheckbox: true');
-  expect(nativePayment).toContain("paymentSession.presentPaymentSheet");
+  expect(nativePayment).toContain('paymentSession.presentPaymentSheet');
   expect(nativePayment).not.toContain('HYPERSWITCH_API_KEY');
   expect(nativePayment).not.toContain('client_secret');
+  expect(webPayment).not.toContain('@juspay-tech/react-native-hyperswitch');
+
   expect(drawer).toContain("router.push('/membership-plans' as never)");
 });
