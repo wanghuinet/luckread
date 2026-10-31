@@ -15,9 +15,9 @@ CREATE TABLE membership_subscription_plan_change_applications (
   current_period_start TEXT NOT NULL CHECK (length(current_period_start) BETWEEN 1 AND 64),
   current_period_end TEXT NOT NULL CHECK (length(current_period_end) BETWEEN 1 AND 64 AND current_period_end > current_period_start),
   order_id TEXT NOT NULL CHECK (length(order_id) BETWEEN 1 AND 255),
-  payment_id TEXT NOT NULL CHECK (length(payment_id) = 30 AND substr(payment_id, 1, 4) = 'pay_' AND substr(payment_id, 5) NOT GLOB '*[^A-Za-z0-9]*'),
+  payment_id TEXT CHECK (payment_id IS NULL OR (length(payment_id) = 30 AND substr(payment_id, 1, 4) = 'pay_' AND substr(payment_id, 5) NOT GLOB '*[^A-Za-z0-9]*')),
   request_hash TEXT NOT NULL CHECK (length(request_hash) = 64 AND request_hash NOT GLOB '*[^a-f0-9]*'),
-  status TEXT NOT NULL CHECK (status IN ('READY','APPLIED')),
+  status TEXT NOT NULL CHECK (status IN ('PENDING_PAYMENT','READY','APPLIED')),
   version INTEGER NOT NULL DEFAULT 1 CHECK (typeof(version) = 'integer' AND version >= 1),
   created_at TEXT NOT NULL CHECK (length(created_at) BETWEEN 1 AND 64),
   updated_at TEXT NOT NULL CHECK (length(updated_at) BETWEEN 1 AND 64 AND updated_at >= created_at),
@@ -32,7 +32,7 @@ CREATE UNIQUE INDEX ux_membership_plan_change_applications_payment
   ON membership_subscription_plan_change_applications(payment_id);
 CREATE UNIQUE INDEX ux_membership_plan_change_applications_ready_subscription
   ON membership_subscription_plan_change_applications(subscription_id)
-  WHERE status = 'READY';
+  WHERE status IN ('PENDING_PAYMENT','READY');
 CREATE INDEX ix_membership_plan_change_applications_subscriber_created
   ON membership_subscription_plan_change_applications(subscriber_id, created_at, application_id);
 
@@ -45,7 +45,9 @@ WHEN NOT EXISTS (
   INNER JOIN membership_plan_versions sv ON sv.plan_id = sp.plan_id AND sv.plan_version = NEW.source_plan_version
   INNER JOIN membership_plans tp ON tp.plan_id = NEW.target_plan_id
   INNER JOIN membership_plan_versions tv ON tv.plan_id = tp.plan_id AND tv.plan_version = NEW.target_plan_version
-  WHERE s.subscription_id = NEW.subscription_id
+  WHERE NEW.status = 'PENDING_PAYMENT'
+    AND NEW.payment_id IS NULL
+    AND s.subscription_id = NEW.subscription_id
     AND s.subscriber_id = NEW.subscriber_id
     AND s.plan_id = NEW.source_plan_id
     AND s.plan_version = NEW.source_plan_version
@@ -68,7 +70,7 @@ BEGIN SELECT RAISE(ABORT, 'paid upgrade application does not match the current s
 CREATE TRIGGER membership_subscription_plan_change_applications_identity_immutable
 BEFORE UPDATE OF application_id, subscription_id, subscriber_id, source_plan_id, source_plan_version,
   target_plan_id, target_plan_version, expected_subscription_version, current_period_start,
-  current_period_end, order_id, payment_id, request_hash, created_at
+  current_period_end, order_id, request_hash, created_at
 ON membership_subscription_plan_change_applications
 WHEN NEW.application_id IS NOT OLD.application_id
   OR NEW.subscription_id IS NOT OLD.subscription_id
@@ -81,10 +83,19 @@ WHEN NEW.application_id IS NOT OLD.application_id
   OR NEW.current_period_start IS NOT OLD.current_period_start
   OR NEW.current_period_end IS NOT OLD.current_period_end
   OR NEW.order_id IS NOT OLD.order_id
-  OR NEW.payment_id IS NOT OLD.payment_id
   OR NEW.request_hash IS NOT OLD.request_hash
   OR NEW.created_at IS NOT OLD.created_at
 BEGIN SELECT RAISE(ABORT, 'paid upgrade application identity is immutable'); END;
+
+CREATE TRIGGER membership_subscription_plan_change_applications_payment_attach_guard
+BEFORE UPDATE OF payment_id ON membership_subscription_plan_change_applications
+WHEN NOT (
+  OLD.status = 'PENDING_PAYMENT'
+  AND OLD.payment_id IS NULL
+  AND NEW.status = 'READY'
+  AND NEW.payment_id IS NOT NULL
+)
+BEGIN SELECT RAISE(ABORT, 'a payment may be attached only to a pending paid-upgrade reservation'); END;
 
 CREATE TRIGGER membership_subscription_plan_change_applications_version_guard
 BEFORE UPDATE ON membership_subscription_plan_change_applications
@@ -93,7 +104,7 @@ BEGIN SELECT RAISE(ABORT, 'paid upgrade application requires version CAS and inc
 
 CREATE TRIGGER membership_subscription_plan_change_applications_state_guard
 BEFORE UPDATE OF status ON membership_subscription_plan_change_applications
-WHEN NOT (OLD.status = 'READY' AND NEW.status = 'APPLIED')
+WHEN NOT ((OLD.status = 'PENDING_PAYMENT' AND NEW.status = 'READY') OR (OLD.status = 'READY' AND NEW.status = 'APPLIED'))
 BEGIN SELECT RAISE(ABORT, 'paid upgrade application has an invalid state transition'); END;
 
 CREATE TRIGGER membership_subscription_plan_change_applications_applied_guard
