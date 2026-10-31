@@ -10,6 +10,7 @@ const PLAN_MIGRATION = '0003_membership_plans.sql'
 const REVENUECAT_MIGRATION = '0004_revenuecat_membership_product_bindings.sql'
 const PLAN_CHANGE_MIGRATION = '0005_subscription_plan_changes.sql'
 const PLAN_UPGRADE_MIGRATION = '0006_immediate_subscription_upgrades.sql'
+const TRIAL_MIGRATION = '0007_membership_trials.sql'
 
 const EXPECTED_INDEXES = [
   'ix_membership_subscriptions_subscriber_status_period',
@@ -58,6 +59,10 @@ const EXPECTED_PLAN_VERSION_COLUMNS = [
   ['currency', 'TEXT', 1, 0],
   ['benefits_json', 'TEXT', 1, 0],
   ['created_at', 'TEXT', 1, 0],
+]
+const EXPECTED_PLAN_VERSION_COLUMNS_WITH_TRIAL = [
+  ...EXPECTED_PLAN_VERSION_COLUMNS,
+  ['trial_days', 'INTEGER', 1, 0],
 ]
 
 const EXPECTED_PLAN_INDEXES = [
@@ -149,6 +154,44 @@ const EXPECTED_PLAN_UPGRADE_TRIGGERS = [
   'membership_subscription_plan_change_applications_retained',
 ]
 
+const EXPECTED_TRIAL_COLUMNS = [
+  ['trial_id', 'TEXT', 1, 1],
+  ['subscription_id', 'TEXT', 1, 0],
+  ['subscriber_id', 'TEXT', 1, 0],
+  ['plan_id', 'TEXT', 1, 0],
+  ['plan_version', 'INTEGER', 1, 0],
+  ['source', 'TEXT', 1, 0],
+  ['provider_app_id', 'TEXT', 0, 0],
+  ['product_id', 'TEXT', 0, 0],
+  ['original_transaction_id', 'TEXT', 0, 0],
+  ['started_at', 'TEXT', 1, 0],
+  ['trial_ends_at', 'TEXT', 1, 0],
+  ['status', 'TEXT', 1, 0],
+  ['request_hash', 'TEXT', 1, 0],
+  ['version', 'INTEGER', 1, 0],
+  ['created_at', 'TEXT', 1, 0],
+  ['updated_at', 'TEXT', 1, 0],
+]
+
+const EXPECTED_TRIAL_INDEXES = [
+  'ux_membership_subscription_trials_subscriber_plan',
+  'ux_membership_subscription_trials_store_transaction',
+  'ix_membership_subscription_trials_status_end',
+  'ix_membership_subscription_trials_subscriber_created',
+]
+
+const EXPECTED_TRIAL_TRIGGERS = [
+  'membership_subscription_trials_insert_guard',
+  'membership_subscription_trials_identity_immutable',
+  'membership_subscription_trials_version_guard',
+  'membership_subscription_trials_state_guard',
+  'membership_subscription_trials_transition_evidence_guard',
+  'membership_subscriptions_trial_failed_sync',
+  'membership_subscriptions_trial_converted_sync',
+  'membership_subscriptions_trial_expired_sync',
+  'membership_subscription_trials_retained',
+]
+
 const fail = (message) => {
   throw new Error('READ_ONLY_PREFLIGHT_FAILED: ' + message)
 }
@@ -199,6 +242,9 @@ export function verifyD1SubscriptionPreflight({
   planUpgradeSchema = [],
   planUpgradeIndexes = [],
   planUpgradeTriggers = [],
+  trialSchema = [],
+  trialIndexes = [],
+  trialTriggers = [],
   expectedDatabaseName = EXPECTED_DATABASE_NAME,
   expectedDatabaseId = EXPECTED_DATABASE_ID,
 }) {
@@ -211,7 +257,7 @@ export function verifyD1SubscriptionPreflight({
   const appliedMigrations = [...new Set(collectObjects(migrationState)
     .filter((item) => item.name === BASELINE_MIGRATION || item.name === VERSION_MIGRATION ||
       item.name === PLAN_MIGRATION || item.name === REVENUECAT_MIGRATION || item.name === PLAN_CHANGE_MIGRATION ||
-      item.name === PLAN_UPGRADE_MIGRATION)
+      item.name === PLAN_UPGRADE_MIGRATION || item.name === TRIAL_MIGRATION)
     .map((item) => item.name))].sort()
   if (!appliedMigrations.includes(BASELINE_MIGRATION)) {
     fail('baseline migration 0001 is not recorded as applied')
@@ -240,7 +286,8 @@ export function verifyD1SubscriptionPreflight({
   const noPlanTables = planShape.length === 0 && planVersionShape.length === 0 &&
     planIndexNames.size === 0 && planVersionIndexNames.size === 0 && planTriggerNames.size === 0
   const allPlanTablesPresent = JSON.stringify(planShape) === JSON.stringify(EXPECTED_PLAN_COLUMNS) &&
-    JSON.stringify(planVersionShape) === JSON.stringify(EXPECTED_PLAN_VERSION_COLUMNS) &&
+    (JSON.stringify(planVersionShape) === JSON.stringify(EXPECTED_PLAN_VERSION_COLUMNS) ||
+      JSON.stringify(planVersionShape) === JSON.stringify(EXPECTED_PLAN_VERSION_COLUMNS_WITH_TRIAL)) &&
     EXPECTED_PLAN_INDEXES.every((name) => planIndexNames.has(name)) &&
     EXPECTED_PLAN_VERSION_INDEXES.every((name) => planVersionIndexNames.has(name)) &&
     planTriggerNames.size === EXPECTED_PLAN_TRIGGERS.length &&
@@ -271,6 +318,19 @@ export function verifyD1SubscriptionPreflight({
     EXPECTED_PLAN_UPGRADE_INDEXES.every((name) => planUpgradeIndexNames.has(name)) &&
     EXPECTED_PLAN_UPGRADE_TRIGGERS.every((name) => planUpgradeTriggerNames.has(name))
 
+  const trialShape = columnsFrom(trialSchema).map(({ name, type, notnull, primaryKey }) =>
+    [name, type, notnull, primaryKey])
+  const trialIndexNames = indexNamesFrom(trialIndexes)
+  const trialTriggerNames = new Set(collectObjects(trialTriggers)
+    .filter((item) => typeof item.name === 'string')
+    .map((item) => item.name))
+  const noTrialTable = trialShape.length === 0 && trialIndexNames.size === 0 && trialTriggerNames.size === 0
+  const allTrialObjectsPresent =
+    JSON.stringify(trialShape) === JSON.stringify(EXPECTED_TRIAL_COLUMNS) &&
+    EXPECTED_TRIAL_INDEXES.every((name) => trialIndexNames.has(name)) &&
+    EXPECTED_TRIAL_TRIGGERS.every((name) => trialTriggerNames.has(name)) &&
+    JSON.stringify(planVersionShape) === JSON.stringify(EXPECTED_PLAN_VERSION_COLUMNS_WITH_TRIAL)
+
   const legacySubscriptionShape = JSON.stringify(shape) === JSON.stringify(LEGACY_COLUMNS)
   const currentSubscriptionShape = JSON.stringify(shape) === JSON.stringify(CURRENT_COLUMNS)
   const versionColumn = columns.find((column) => column.name === 'version')
@@ -294,6 +354,10 @@ export function verifyD1SubscriptionPreflight({
     BASELINE_MIGRATION, VERSION_MIGRATION, PLAN_MIGRATION, REVENUECAT_MIGRATION, PLAN_CHANGE_MIGRATION,
     PLAN_UPGRADE_MIGRATION,
   ])
+  const hasTrialMigration = JSON.stringify(appliedMigrations) === JSON.stringify([
+    BASELINE_MIGRATION, VERSION_MIGRATION, PLAN_MIGRATION, REVENUECAT_MIGRATION, PLAN_CHANGE_MIGRATION,
+    PLAN_UPGRADE_MIGRATION, TRIAL_MIGRATION,
+  ])
 
   if (hasOnlyBaseline && legacySubscriptionShape && noPlanTables && noPlanChangeTable) {
     migrationAction = 'apply'
@@ -310,7 +374,12 @@ export function verifyD1SubscriptionPreflight({
     // Scheduled changes are present; the paid-upgrade application migration is pending.
     migrationAction = 'apply'
   } else if (hasPlanUpgradeMigration && currentSubscriptionShape && allPlanTablesPresent &&
-      allPlanChangeObjectsPresent && allPlanUpgradeObjectsPresent) {
+      allPlanChangeObjectsPresent && allPlanUpgradeObjectsPresent && noTrialTable &&
+      JSON.stringify(planVersionShape) === JSON.stringify(EXPECTED_PLAN_VERSION_COLUMNS)) {
+    // Subscription, scheduled changes and paid upgrades are present; trials are next.
+    migrationAction = 'apply'
+  } else if (hasTrialMigration && currentSubscriptionShape && allPlanTablesPresent &&
+      allPlanChangeObjectsPresent && allPlanUpgradeObjectsPresent && allTrialObjectsPresent) {
     migrationAction = 'skip'
   } else {
     fail('migration history and physical Subscription/MembershipPlan/PlanChange schemas do not match an admitted state')
@@ -335,13 +404,16 @@ export function verifyD1SubscriptionPreflight({
     planUpgradeColumns: planUpgradeShape,
     planUpgradeIndexes: EXPECTED_PLAN_UPGRADE_INDEXES.filter((name) => planUpgradeIndexNames.has(name)),
     planUpgradeTriggers: EXPECTED_PLAN_UPGRADE_TRIGGERS.filter((name) => planUpgradeTriggerNames.has(name)),
+    trialColumns: trialShape,
+    trialIndexes: EXPECTED_TRIAL_INDEXES.filter((name) => trialIndexNames.has(name)),
+    trialTriggers: EXPECTED_TRIAL_TRIGGERS.filter((name) => trialTriggerNames.has(name)),
   }
 }
 
 export function verifyD1SubscriptionPostflight(input) {
   const report = verifyD1SubscriptionPreflight(input)
   if (report.migrationAction !== 'skip') {
-    fail('post-migration verification requires migrations 0001 through 0006 with exact Subscription, MembershipPlan, scheduled-change, and paid-upgrade schemas')
+    fail('post-migration verification requires migrations 0001 through 0007 with exact Subscription, MembershipPlan, scheduled-change, paid-upgrade, and trial schemas')
   }
 
   const integrityRows = collectObjects(input.versionIntegrity)
@@ -369,9 +441,9 @@ function main() {
   const [mode, ...filePaths] = process.argv.slice(2)
   const isPostflight = mode === 'postflight'
   if (!isPostflight && mode !== 'preflight') {
-    throw new Error('Usage: node scripts/verify-remote-preflight.mjs <preflight|postflight> <database-list.json> <migration-state.json> <subscription-schema.json> <subscription-indexes.json> <subscription-foreign-keys.json> <plan-schema.json> <plan-version-schema.json> <plan-indexes.json> <plan-version-indexes.json> <plan-triggers.json> <plan-change-schema.json> <plan-change-indexes.json> <plan-change-triggers.json> <plan-upgrade-schema.json> <plan-upgrade-indexes.json> <plan-upgrade-triggers.json> [version-integrity.json plan-integrity.json]')
+    throw new Error('Usage: node scripts/verify-remote-preflight.mjs <preflight|postflight> <database-list.json> <migration-state.json> <subscription-schema.json> <subscription-indexes.json> <subscription-foreign-keys.json> <plan-schema.json> <plan-version-schema.json> <plan-indexes.json> <plan-version-indexes.json> <plan-triggers.json> <plan-change-schema.json> <plan-change-indexes.json> <plan-change-triggers.json> <plan-upgrade-schema.json> <plan-upgrade-indexes.json> <plan-upgrade-triggers.json> <trial-schema.json> <trial-indexes.json> <trial-triggers.json> [version-integrity.json plan-integrity.json]')
   }
-  const requiredCount = isPostflight ? 18 : 16
+  const requiredCount = isPostflight ? 21 : 19
   if (filePaths.length !== requiredCount || filePaths.some((value) => !value)) {
     throw new Error('Invalid arguments for D1 subscription preflight verification')
   }
@@ -381,6 +453,7 @@ function main() {
     planSchemaPath, planVersionSchemaPath, planIndexesPath, planVersionIndexesPath, planTriggersPath,
     planChangeSchemaPath, planChangeIndexesPath, planChangeTriggersPath,
     planUpgradeSchemaPath, planUpgradeIndexesPath, planUpgradeTriggersPath,
+    trialSchemaPath, trialIndexesPath, trialTriggersPath,
     versionIntegrityPath, planIntegrityPath,
   ] = filePaths
   const input = {
@@ -400,6 +473,9 @@ function main() {
     planUpgradeSchema: readJson(path.resolve(planUpgradeSchemaPath)),
     planUpgradeIndexes: readJson(path.resolve(planUpgradeIndexesPath)),
     planUpgradeTriggers: readJson(path.resolve(planUpgradeTriggersPath)),
+    trialSchema: readJson(path.resolve(trialSchemaPath)),
+    trialIndexes: readJson(path.resolve(trialIndexesPath)),
+    trialTriggers: readJson(path.resolve(trialTriggersPath)),
   }
   if (isPostflight) {
     const report = verifyD1SubscriptionPostflight({
