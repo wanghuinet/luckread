@@ -474,6 +474,7 @@ export type MembershipPlanDraftInput = {
   priceMinor: number
   currency: string
   benefits: string[]
+  trialPeriodDays: number
 }
 
 type MembershipPlanStoredRow = {
@@ -491,6 +492,7 @@ type MembershipPlanStoredRow = {
   price_minor: number
   currency: string
   benefits_json: string
+  trial_period_days: number
 }
 
 const canonicalBenefitsJson = (benefits: string[]): string => JSON.stringify(benefits)
@@ -500,7 +502,7 @@ export function normalizeMembershipPlanDraft(value: unknown): MembershipPlanDraf
     throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
   }
   const source = value as Record<string, unknown>
-  const allowedKeys = new Set(['name', 'tier', 'billingInterval', 'priceMinor', 'currency', 'benefits'])
+  const allowedKeys = new Set(['name', 'tier', 'billingInterval', 'priceMinor', 'currency', 'benefits', 'trialPeriodDays'])
   if (Object.keys(source).some((key) => !allowedKeys.has(key))) {
     throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
   }
@@ -511,12 +513,16 @@ export function normalizeMembershipPlanDraft(value: unknown): MembershipPlanDraf
   const currency = typeof source.currency === 'string' ? source.currency.trim() : ''
   const priceMinor = source.priceMinor
   const rawBenefits = source.benefits
+  const trialPeriodDays = source.trialPeriodDays === undefined ? 0 : source.trialPeriodDays
 
   if (name.length < 1 || name.length > 120) throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
   if (!/^[a-z][a-z0-9_-]{0,63}$/.test(tier)) throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
   if (billingInterval !== 'MONTHLY' && billingInterval !== 'YEARLY') throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
   if (!/^[A-Z]{3}$/.test(currency)) throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
   if (typeof priceMinor !== 'number' || !Number.isSafeInteger(priceMinor) || priceMinor < 0 || priceMinor > 2_147_483_647) {
+    throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
+  }
+  if (typeof trialPeriodDays !== 'number' || !Number.isSafeInteger(trialPeriodDays) || trialPeriodDays < 0 || trialPeriodDays > 30) {
     throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
   }
   if (!Array.isArray(rawBenefits) || rawBenefits.length > 20 ||
@@ -528,7 +534,7 @@ export function normalizeMembershipPlanDraft(value: unknown): MembershipPlanDraf
     throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
   }
 
-  return { name, tier, billingInterval, priceMinor: priceMinor as number, currency, benefits }
+  return { name, tier, billingInterval, priceMinor: priceMinor as number, currency, benefits, trialPeriodDays }
 }
 
 const membershipPlanIdFromIdempotency = async (creatorId: string, idempotencyKey: string): Promise<string> => {
@@ -555,6 +561,7 @@ const mapMembershipPlan = (row: MembershipPlanStoredRow, replayed?: boolean) => 
     !Number.isSafeInteger(row.version) || row.version < 1 ||
     !Number.isSafeInteger(row.price_minor) || row.price_minor < 0 || row.price_minor > 2_147_483_647 ||
     !/^[A-Z]{3}$/.test(row.currency) ||
+    !Number.isSafeInteger(row.trial_period_days) || row.trial_period_days < 0 || row.trial_period_days > 30 ||
     (row.billing_interval !== 'MONTHLY' && row.billing_interval !== 'YEARLY') ||
     !/^[a-z][a-z0-9_-]{0,63}$/.test(row.tier) ||
     typeof row.name !== 'string' || row.name.trim().length < 1 || row.name.length > 120
@@ -571,6 +578,7 @@ const mapMembershipPlan = (row: MembershipPlanStoredRow, replayed?: boolean) => 
     priceMinor: row.price_minor,
     currency: row.currency,
     benefits,
+    trialPeriodDays: row.trial_period_days,
     status: row.status,
     visibility: row.visibility,
     version: row.version,
@@ -610,7 +618,7 @@ export async function createMembershipPlanDraft(
     if (
       existing.owner_id !== creatorId || existing.name !== plan.name || existing.tier !== plan.tier ||
       existing.billing_interval !== plan.billingInterval || existing.price_minor !== plan.priceMinor ||
-      existing.currency !== plan.currency || existing.benefits_json !== benefitsJson
+      existing.currency !== plan.currency || existing.benefits_json !== benefitsJson || existing.trial_period_days !== plan.trialPeriodDays
     ) throw new SubscriptionRuntimeError('CONFLICT', 409)
     // Return the immutable original create result, not current mutable plan state.
     return mapMembershipPlan({ ...existing, current_version: 1, status: 'DRAFT', visibility: 'PRIVATE', version: 1, updated_at: existing.created_at }, true)
@@ -623,9 +631,9 @@ export async function createMembershipPlanDraft(
       "VALUES (?, 'CREATOR', ?, 1, 'DRAFT', 'PRIVATE', 1, ?, ?)",
     ).bind(planId, creatorId, now, now),
     db.prepare(
-      'INSERT OR IGNORE INTO membership_plan_versions (plan_id, plan_version, name, tier, billing_interval, price_minor, currency, benefits_json, created_at) ' +
-      'VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?)',
-    ).bind(planId, plan.name, plan.tier, plan.billingInterval, plan.priceMinor, plan.currency, benefitsJson, now),
+      'INSERT OR IGNORE INTO membership_plan_versions (plan_id, plan_version, name, tier, billing_interval, price_minor, currency, benefits_json, trial_period_days, created_at) ' +
+      'VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?)',
+    ).bind(planId, plan.name, plan.tier, plan.billingInterval, plan.priceMinor, plan.currency, benefitsJson, plan.trialPeriodDays, now),
   ])
   if (Number(results[0]?.meta?.changes ?? 0) !== 1 || Number(results[1]?.meta?.changes ?? 0) !== 1) {
     const raced = await db.prepare(
@@ -638,7 +646,7 @@ export async function createMembershipPlanDraft(
     if (
       raced.owner_id !== creatorId || raced.name !== plan.name || raced.tier !== plan.tier ||
       raced.billing_interval !== plan.billingInterval || raced.price_minor !== plan.priceMinor ||
-      raced.currency !== plan.currency || raced.benefits_json !== benefitsJson
+      raced.currency !== plan.currency || raced.benefits_json !== benefitsJson || raced.trial_period_days !== plan.trialPeriodDays
     ) throw new SubscriptionRuntimeError('CONFLICT', 409)
     return mapMembershipPlan({ ...raced, current_version: 1, status: 'DRAFT', visibility: 'PRIVATE', version: 1, updated_at: raced.created_at }, true)
   }
@@ -654,6 +662,7 @@ export async function createMembershipPlanDraft(
     priceMinor: plan.priceMinor,
     currency: plan.currency,
     benefits: plan.benefits,
+    trialPeriodDays: plan.trialPeriodDays,
     status: 'DRAFT',
     visibility: 'PRIVATE',
     version: 1,
