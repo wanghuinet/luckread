@@ -120,7 +120,7 @@ function toTrial(row: TrialRow): MembershipTrialDto {
   if (!TRIAL_ID.test(row.trial_id) || !boundedText(row.subscription_id) ||
       !boundedText(row.subscriber_id) || !PLAN_ID.test(row.plan_id) ||
       !Number.isSafeInteger(row.plan_version) || row.plan_version < 1 ||
-      !canonicalUtc(row.started_at) || !canonicalUtc(row.trial_ends_at) ||
+      !canonicalUtc(row.started_at) || !canonicalUtc(row.trial_ends_at) || !canonicalUtc(row.created_at) || !canonicalUtc(row.updated_at) ||
       Date.parse(row.trial_ends_at) <= Date.parse(row.started_at) ||
       !Number.isSafeInteger(row.version) || row.version < 1) {
     throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500);
