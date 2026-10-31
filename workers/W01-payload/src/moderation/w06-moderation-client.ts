@@ -171,6 +171,59 @@ export async function callW06MembershipPlanLifecycleAudit(input: {
   return callW06Moderation({ request: input.request, pathname: '/internal/audit-events/membership-plan-lifecycle-changed', method: 'POST', principal: input.principal, body: input.body })
 }
 
+/** Durable request intent before a subscriber schedules their next-period plan. */
+export async function callW06SubscriptionPlanChangeRequestAudit(input: {
+  request: Request
+  principal: ContentPrincipal
+  body: {
+    eventId: string
+    subscriptionId: string
+    sourcePlanId: string
+    sourcePlanVersion: number
+    targetPlanId: string
+    targetPlanVersion: number
+    changeType: 'DOWNGRADE' | 'BILLING_INTERVAL_CHANGE' | 'SAME_PRICE_CHANGE'
+    effectiveAt: string
+    expectedVersion: number
+    idempotencyKey: string
+  }
+}): Promise<Response> {
+  return callW06Moderation({
+    request: input.request,
+    pathname: '/internal/audit-events/subscription-plan-change-requested',
+    method: 'POST',
+    principal: input.principal,
+    body: input.body,
+  })
+}
+
+/** Immutable confirmation of a durably persisted D1-01 scheduled plan change. */
+export async function callW06SubscriptionPlanChangeAudit(input: {
+  request: Request
+  principal: ContentPrincipal
+  body: {
+    eventId: string
+    changeId: string
+    subscriptionId: string
+    sourcePlanId: string
+    sourcePlanVersion: number
+    targetPlanId: string
+    targetPlanVersion: number
+    changeType: 'DOWNGRADE' | 'BILLING_INTERVAL_CHANGE' | 'SAME_PRICE_CHANGE'
+    effectiveAt: string
+    version: number
+    occurredAt: string
+  }
+}): Promise<Response> {
+  return callW06Moderation({
+    request: input.request,
+    pathname: '/internal/audit-events/subscription-plan-change-scheduled',
+    method: 'POST',
+    principal: input.principal,
+    body: input.body,
+  })
+}
+
 /** Dedicated durable audit path for a validated, newly created W07 Order DTO. */
 export async function callW06CommerceOrderAudit(input: {
   request: Request
