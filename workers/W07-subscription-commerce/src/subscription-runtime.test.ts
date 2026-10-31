@@ -26,6 +26,7 @@ function fakeDb(rows: SubscriptionRow[], plans: MembershipPlanRow[] = []): D1Dat
       const statement: Statement = {
         bind(...args) { values = args; return statement },
         async first<T>() {
+          if (sql.includes('FROM membership_subscription_plan_changes sc')) return null
           if (sql.includes('WHERE subscription_id = ? AND subscriber_id = ?')) {
             const row = state.get(String(values[0]))
             return (row && row.subscriber_id === String(values[1]) ? { ...row } : null) as T | null
