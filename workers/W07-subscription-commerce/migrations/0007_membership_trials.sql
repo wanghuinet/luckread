@@ -50,14 +50,31 @@ WHEN NOT EXISTS (
   SELECT 1
   FROM membership_subscriptions s
   INNER JOIN membership_plan_versions v ON v.plan_id = NEW.plan_id AND v.plan_version = NEW.plan_version
+  INNER JOIN membership_plans p ON p.plan_id = NEW.plan_id
   WHERE s.subscription_id = NEW.subscription_id
     AND s.subscriber_id = NEW.subscriber_id
     AND s.plan_id = NEW.plan_id
     AND s.plan_version = NEW.plan_version
     AND s.status = 'TRIALING'
+    AND s.creator_id = p.owner_id
+    AND p.owner_type = 'CREATOR'
     AND s.started_at = NEW.started_at
     AND s.current_period_start = NEW.started_at
     AND s.current_period_end = NEW.trial_ends_at
+    AND (
+      (NEW.status = 'TRIALING' AND s.cancel_at IS NULL)
+      OR
+      (NEW.status = 'CANCELED' AND s.cancel_at = NEW.trial_ends_at)
+    )
+    AND NOT EXISTS (
+      SELECT 1 FROM membership_subscriptions other
+      WHERE other.subscriber_id = NEW.subscriber_id
+        AND other.creator_id = p.owner_id
+        AND other.subscription_id <> NEW.subscription_id
+        AND other.status IN ('TRIALING','ACTIVE','PAST_DUE')
+        AND other.current_period_end > NEW.started_at
+        AND (other.cancel_at IS NULL OR other.cancel_at > NEW.started_at)
+    )
     AND (
       (NEW.source = 'WEB' AND v.trial_days BETWEEN 1 AND 90)
       OR
