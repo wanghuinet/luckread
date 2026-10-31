@@ -523,6 +523,7 @@
       "idempotency": "Unique Order and Payment references, one active reservation per Subscription, and deterministic application_id prevent parallel upgrade orders and provider webhook replay from applying a second upgrade.",
       "retention": "Application identity is immutable apart from the one-time null payment_id attachment during PENDING_PAYMENT -> READY; status is PENDING_PAYMENT -> READY -> APPLIED only; application history cannot be deleted."
     },
-    "migration": "workers/W07-subscription-commerce/migrations/0006_immediate_subscription_upgrades.sql"
+    "migration": "workers/W07-subscription-commerce/migrations/0006_immediate_subscription_upgrades.sql",
+    "stateMachineRef": "contracts/state-machines/membership-subscription-plan-upgrade.json"
   }
 }
