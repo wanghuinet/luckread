@@ -265,10 +265,23 @@ export async function buildRevenueCatSubscriberReconciliationCandidates(
   // entitlement map. RevenueCat may omit an expired product from entitlements
   // while retaining its subscription expiry and original transaction identity.
   const groups = new Map<string, ProductGroup>();
+  const productsWithEntitlements = new Set(
+    Object.values(input.snapshot.entitlements).map((entitlement) => entitlement.product_identifier),
+  );
   for (const [productId, subscription] of Object.entries(input.snapshot.subscriptions)) {
+    let store: RevenueCatStore;
+    try {
+      store = requireStore(subscription.store);
+    } catch (error) {
+      // RevenueCat may return Stripe or other non-mobile-store subscriptions
+      // for the same customer. Ignore those only when they carry no mapped
+      // mobile entitlement; an entitlement on an unsupported store fails closed.
+      if (productsWithEntitlements.has(productId)) throw error;
+      continue;
+    }
     groups.set(productId, {
       productId,
-      store: requireStore(subscription.store),
+      store,
       subscription,
       entitlementEntries: [],
     });
