@@ -17,7 +17,7 @@ CREATE TABLE membership_subscription_trials (
   source TEXT NOT NULL CHECK (source IN ('WEB','APP_STORE','PLAY_STORE')),
   provider_app_id TEXT CHECK (provider_app_id IS NULL OR length(provider_app_id) BETWEEN 1 AND 255),
   product_id TEXT CHECK (product_id IS NULL OR length(product_id) BETWEEN 1 AND 255),
-  original_transaction_id TEXT CHECK (original_transaction_id IS NULL OR length(original_transaction_id) BETWEEN 1 AND 255),
+  store_transaction_id TEXT CHECK (store_transaction_id IS NULL OR length(store_transaction_id) BETWEEN 1 AND 255),
   started_at TEXT NOT NULL CHECK (length(started_at) BETWEEN 1 AND 64),
   trial_ends_at TEXT NOT NULL CHECK (length(trial_ends_at) BETWEEN 1 AND 64 AND trial_ends_at > started_at),
   status TEXT NOT NULL CHECK (status IN ('TRIALING','CANCELED','PAYMENT_FAILED','CONVERTED','EXPIRED')),
@@ -26,9 +26,9 @@ CREATE TABLE membership_subscription_trials (
   created_at TEXT NOT NULL CHECK (length(created_at) BETWEEN 1 AND 64),
   updated_at TEXT NOT NULL CHECK (length(updated_at) BETWEEN 1 AND 64 AND updated_at >= created_at),
   CHECK (
-    (source = 'WEB' AND provider_app_id IS NULL AND product_id IS NULL AND original_transaction_id IS NULL)
+    (source = 'WEB' AND provider_app_id IS NULL AND product_id IS NULL AND store_transaction_id IS NULL)
     OR
-    (source IN ('APP_STORE','PLAY_STORE') AND provider_app_id IS NOT NULL AND product_id IS NOT NULL AND original_transaction_id IS NOT NULL)
+    (source IN ('APP_STORE','PLAY_STORE') AND provider_app_id IS NOT NULL AND product_id IS NOT NULL AND store_transaction_id IS NOT NULL)
   ),
   FOREIGN KEY (subscription_id) REFERENCES membership_subscriptions(subscription_id) ON DELETE RESTRICT,
   FOREIGN KEY (plan_id, plan_version) REFERENCES membership_plan_versions(plan_id, plan_version) ON DELETE RESTRICT
@@ -37,8 +37,8 @@ CREATE TABLE membership_subscription_trials (
 CREATE UNIQUE INDEX ux_membership_subscription_trials_subscriber_plan
   ON membership_subscription_trials(subscriber_id, plan_id);
 CREATE UNIQUE INDEX ux_membership_subscription_trials_store_transaction
-  ON membership_subscription_trials(source, provider_app_id, original_transaction_id)
-  WHERE original_transaction_id IS NOT NULL;
+  ON membership_subscription_trials(source, provider_app_id, store_transaction_id)
+  WHERE store_transaction_id IS NOT NULL;
 CREATE INDEX ix_membership_subscription_trials_status_end
   ON membership_subscription_trials(status, trial_ends_at, subscription_id);
 CREATE INDEX ix_membership_subscription_trials_subscriber_created
@@ -78,14 +78,14 @@ WHEN NOT EXISTS (
     AND (
       (NEW.source = 'WEB' AND v.trial_days BETWEEN 1 AND 90 AND v.price_minor > 0)
       OR
-      (NEW.source IN ('APP_STORE','PLAY_STORE') AND NEW.provider_app_id IS NOT NULL AND NEW.product_id IS NOT NULL AND NEW.original_transaction_id IS NOT NULL)
+      (NEW.source IN ('APP_STORE','PLAY_STORE') AND NEW.provider_app_id IS NOT NULL AND NEW.product_id IS NOT NULL AND NEW.store_transaction_id IS NOT NULL)
     )
 )
 BEGIN SELECT RAISE(ABORT, 'trial record must match a trialing subscription and immutable plan version'); END;
 
 CREATE TRIGGER membership_subscription_trials_identity_immutable
 BEFORE UPDATE OF trial_id, subscription_id, subscriber_id, plan_id, plan_version, source,
-  provider_app_id, product_id, original_transaction_id, started_at, trial_ends_at,
+  provider_app_id, product_id, store_transaction_id, started_at, trial_ends_at,
   request_hash, created_at
 ON membership_subscription_trials
 WHEN NEW.trial_id IS NOT OLD.trial_id
@@ -96,7 +96,7 @@ WHEN NEW.trial_id IS NOT OLD.trial_id
   OR NEW.source IS NOT OLD.source
   OR NEW.provider_app_id IS NOT OLD.provider_app_id
   OR NEW.product_id IS NOT OLD.product_id
-  OR NEW.original_transaction_id IS NOT OLD.original_transaction_id
+  OR NEW.store_transaction_id IS NOT OLD.store_transaction_id
   OR NEW.started_at IS NOT OLD.started_at
   OR NEW.trial_ends_at IS NOT OLD.trial_ends_at
   OR NEW.request_hash IS NOT OLD.request_hash
