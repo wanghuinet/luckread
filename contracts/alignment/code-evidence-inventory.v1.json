@@ -390,6 +390,42 @@
       ]
     },
     {
+      "evidenceId": "API_OPERATION:checkoutSubscriptionPlanUpgrade",
+      "subjectType": "API_OPERATION",
+      "subjectId": "checkoutSubscriptionPlanUpgrade",
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "workers/W01-payload/src/app/api/v1/memberships/subscriptions/[[...segments]]/route.ts",
+        "workers/W01-payload/src/auth/w08-creator-client.ts",
+        "workers/W01-payload/src/moderation/w06-moderation-client.ts",
+        "workers/W08-creator/src/authz/casl-policy.ts",
+        "workers/W06-governance/src/index.ts",
+        "workers/W07-subscription-commerce/src/index.ts",
+        "workers/W07-subscription-commerce/src/subscription-plan-change-preview.ts",
+        "workers/W07-subscription-commerce/src/subscription-plan-change-checkout.ts",
+        "workers/W07-subscription-commerce/src/paid-membership-order-fulfillment.ts",
+        "workers/W07-subscription-commerce/src/payment-webhook-http-runtime.ts",
+        "workers/W07-subscription-commerce/migrations/0005_membership_subscription_plan_change_attempts.sql"
+      ],
+      "testRefs": [],
+      "schemaEvidenceRefs": [
+        "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json"
+      ],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/openapi/v1/operation-policy.json",
+        "contracts/api/commerce-operation-policy.v1.json",
+        "contracts/api/api-inventory.v1.json",
+        "contracts/authz/permissions.json"
+      ],
+      "blockers": [
+        "D1-01 migration 0005 is prepared in source but has not been applied to the remote database.",
+        "Live production upgrade checkout remains fail-closed until an admitted production tax/pricing configuration is available; demo/sandbox pricing only.",
+        "W01/W07/W06 production deployment and Service Binding verification are pending.",
+        "Integration, signed-webhook, replay, and security E2E validation are intentionally deferred to the later test-validation phase."
+      ]
+    },
+    {
       "evidenceId": "API_OPERATION:completeUpload",
       "subjectType": "API_OPERATION",
       "subjectId": "completeUpload",
@@ -794,6 +830,1822 @@
       ],
       "blockers": [
         "Runtime API implementation evidence is not yet mechanically discovered"
+      ]
+    },
+    {
+      "evidenceId": "ENTITY:ENT-CONSENT",
+      "subjectType": "ENTITY",
+      "subjectId": "ENT-CONSENT",
+      "implementationStatus": "CONTRACT_ONLY",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-catalog.v1.json",
+        "contracts/entity/entity-implementation-evidence.v1.json"
+      ],
+      "blockers": [
+        "PRIV-002 concrete consent contract is admitted, but runtime implementation and physical persistence evidence are not yet verified.",
+        "AUTH-001 registration consent transaction, withdrawal propagation, security/privacy E2E, and Evidence Registry admission remain pending.",
+        "Final Mapping 0 / Five-Way validation remains NOT_GREEN."
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-CONSENT-F-ACTOR-SUBJECT-ID",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-CONSENT-F-ACTOR-SUBJECT-ID",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-CONSENT-F-CREATED-AT",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-CONSENT-F-CREATED-AT",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-CONSENT-F-ID",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-CONSENT-F-ID",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-CONSENT-F-LEGAL-BASIS",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-CONSENT-F-LEGAL-BASIS",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-CONSENT-F-LEGAL-HOLD-REF",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-CONSENT-F-LEGAL-HOLD-REF",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-CONSENT-F-OWNER-SUBJECT-ID",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-CONSENT-F-OWNER-SUBJECT-ID",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-CONSENT-F-POLICY-VERSION",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-CONSENT-F-POLICY-VERSION",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-CONSENT-F-PURPOSE",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-CONSENT-F-PURPOSE",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-CONSENT-F-RESOURCE-ID",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-CONSENT-F-RESOURCE-ID",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-CONSENT-F-RESOURCE-TYPE",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-CONSENT-F-RESOURCE-TYPE",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-CONSENT-F-RETENTION-CLASS",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-CONSENT-F-RETENTION-CLASS",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-CONSENT-F-RETENTION-UNTIL",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-CONSENT-F-RETENTION-UNTIL",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-CONSENT-F-SOURCE-AUTHORITY",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-CONSENT-F-SOURCE-AUTHORITY",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-CONSENT-F-STATE",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-CONSENT-F-STATE",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-CONSENT-F-UPDATED-AT",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-CONSENT-F-UPDATED-AT",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-CONSENT-F-WITHDRAWN-AT",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-CONSENT-F-WITHDRAWN-AT",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "ENTITY:ENT-CREDENTIAL",
+      "subjectType": "ENTITY",
+      "subjectId": "ENT-CREDENTIAL",
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "workers/W02-identity/src/credentials/credential-add.ts",
+        "workers/W02-identity/migrations/0004_auth_003_credentials.sql",
+        "workers/W02-identity/src/credentials/credential-list.ts",
+        "workers/W02-identity/src/credentials/credential-lifecycle.ts"
+      ],
+      "testRefs": [],
+      "schemaEvidenceRefs": [
+        "https://github.com/wanghuinet/luckread/actions/runs/36298629648"
+      ],
+      "sourceRefs": [
+        "contracts/entity/entity-catalog.v1.json",
+        "contracts/entity/entity-implementation-evidence.v1.json"
+      ],
+      "blockers": [
+        "ENT-CREDENTIAL runtime/persistence evidence is complete for the admitted AUTH-003 List/Add/Replace/Remove slice.",
+        "Canonical catalog promotion remains blocked because ENT-IDENTITY is still PROPOSED and final Mapping 0 / Five-Way reconciliation is NOT_GREEN.",
+        "No promotion is inferred from the credential entity's dependency on auth_identities."
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-CREDENTIAL-F-ACTIVE",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-CREDENTIAL-F-ACTIVE",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-CREDENTIAL-F-CREATED-AT",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-CREDENTIAL-F-CREATED-AT",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-CREDENTIAL-F-ID",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-CREDENTIAL-F-ID",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-CREDENTIAL-F-IDENTITY-ID",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-CREDENTIAL-F-IDENTITY-ID",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-CREDENTIAL-F-KIND",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-CREDENTIAL-F-KIND",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-CREDENTIAL-F-NORMALIZED-VALUE",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-CREDENTIAL-F-NORMALIZED-VALUE",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-CREDENTIAL-F-UPDATED-AT",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-CREDENTIAL-F-UPDATED-AT",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-CREDENTIAL-F-VALUE-HASH",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-CREDENTIAL-F-VALUE-HASH",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-CREDENTIAL-F-VERIFIED-AT",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-CREDENTIAL-F-VERIFIED-AT",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "ENTITY:ENT-DEVICE-RECORD",
+      "subjectType": "ENTITY",
+      "subjectId": "ENT-DEVICE-RECORD",
+      "implementationStatus": "CONTRACT_ONLY",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-catalog.v1.json",
+        "contracts/entity/entity-implementation-evidence.v1.json"
+      ],
+      "blockers": [
+        "No concrete implementation evidence recorded."
+      ]
+    },
+    {
+      "evidenceId": "ENTITY:ENT-ENTITLEMENT-GRANT",
+      "subjectType": "ENTITY",
+      "subjectId": "ENT-ENTITLEMENT-GRANT",
+      "implementationStatus": "CONTRACT_ONLY",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-catalog.v1.json",
+        "contracts/entity/entity-implementation-evidence.v1.json"
+      ],
+      "blockers": [
+        "No concrete implementation evidence recorded."
+      ]
+    },
+    {
+      "evidenceId": "ENTITY:ENT-IDENTITY",
+      "subjectType": "ENTITY",
+      "subjectId": "ENT-IDENTITY",
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "workers/W02-identity/src/account/registration-materializer.ts"
+      ],
+      "testRefs": [],
+      "schemaEvidenceRefs": [
+        "https://github.com/wanghuinet/luckread/actions/runs/36298629648"
+      ],
+      "sourceRefs": [
+        "contracts/entity/entity-catalog.v1.json",
+        "contracts/entity/entity-implementation-evidence.v1.json"
+      ],
+      "blockers": [
+        "AUTH-001 W02 scheduled registration materializer now provides exact-SHA executable identity materialization evidence; no independent public identity CRUD lifecycle is claimed by this admission.",
+        "Canonical entity catalog promotion remains blocked because ENT-IDENTITY is still PROPOSED and global Mapping 0 / Five-Way remains NOT_GREEN."
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-IDENTITY-F-EMAIL",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-IDENTITY-F-EMAIL",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-IDENTITY-F-EMAIL-NORMALIZED",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-IDENTITY-F-EMAIL-NORMALIZED",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-IDENTITY-F-ID",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-IDENTITY-F-ID",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-IDENTITY-F-NORMALIZATION-VERSION",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-IDENTITY-F-NORMALIZATION-VERSION",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-IDENTITY-F-PHONE",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-IDENTITY-F-PHONE",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-IDENTITY-F-PHONE-NORMALIZED",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-IDENTITY-F-PHONE-NORMALIZED",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-IDENTITY-F-USER-ID",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-IDENTITY-F-USER-ID",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-IDENTITY-F-USERNAME",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-IDENTITY-F-USERNAME",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-IDENTITY-F-USERNAME-NORMALIZED",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-IDENTITY-F-USERNAME-NORMALIZED",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "ENTITY:ENT-MODERATION-CASE",
+      "subjectType": "ENTITY",
+      "subjectId": "ENT-MODERATION-CASE",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-catalog.v1.json"
+      ],
+      "blockers": [
+        "Missing entity implementation evidence"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-MODERATION-CASE-F-ASSIGNED-REVIEWER-ID",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-MODERATION-CASE-F-ASSIGNED-REVIEWER-ID",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-MODERATION-CASE-F-CASE-ID",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-MODERATION-CASE-F-CASE-ID",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-MODERATION-CASE-F-CREATED-AT",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-MODERATION-CASE-F-CREATED-AT",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-MODERATION-CASE-F-CURRENT-DECISION-ID",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-MODERATION-CASE-F-CURRENT-DECISION-ID",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-MODERATION-CASE-F-EVIDENCE-BUNDLE-REF",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-MODERATION-CASE-F-EVIDENCE-BUNDLE-REF",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-MODERATION-CASE-F-POLICY-VERSION",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-MODERATION-CASE-F-POLICY-VERSION",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-MODERATION-CASE-F-PRIORITY",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-MODERATION-CASE-F-PRIORITY",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-MODERATION-CASE-F-STATE",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-MODERATION-CASE-F-STATE",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-MODERATION-CASE-F-TARGET-ID",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-MODERATION-CASE-F-TARGET-ID",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-MODERATION-CASE-F-TARGET-TYPE",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-MODERATION-CASE-F-TARGET-TYPE",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-MODERATION-CASE-F-TARGET-VERSION",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-MODERATION-CASE-F-TARGET-VERSION",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-MODERATION-CASE-F-UPDATED-AT",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-MODERATION-CASE-F-UPDATED-AT",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-MODERATION-CASE-F-VERSION",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-MODERATION-CASE-F-VERSION",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
+      ]
+    },
+    {
+      "evidenceId": "ENTITY:ENT-MODERATION-DECISION",
+      "subjectType": "ENTITY",
+      "subjectId": "ENT-MODERATION-DECISION",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-catalog.v1.json"
+      ],
+      "blockers": [
+        "Missing entity implementation evidence"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-MODERATION-DECISION-F-CASE-ID",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-MODERATION-DECISION-F-CASE-ID",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-MODERATION-DECISION-F-CASE-VERSION",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-MODERATION-DECISION-F-CASE-VERSION",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-MODERATION-DECISION-F-CREATED-AT",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-MODERATION-DECISION-F-CREATED-AT",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-MODERATION-DECISION-F-DECISION-ID",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-MODERATION-DECISION-F-DECISION-ID",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-MODERATION-DECISION-F-EFFECTIVE-AT",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-MODERATION-DECISION-F-EFFECTIVE-AT",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-MODERATION-DECISION-F-EXPIRES-AT",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-MODERATION-DECISION-F-EXPIRES-AT",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-MODERATION-DECISION-F-OUTCOME",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-MODERATION-DECISION-F-OUTCOME",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-MODERATION-DECISION-F-POLICY-VERSION",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-MODERATION-DECISION-F-POLICY-VERSION",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-MODERATION-DECISION-F-REASON-CODE",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-MODERATION-DECISION-F-REASON-CODE",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-MODERATION-DECISION-F-REQUEST-ID",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-MODERATION-DECISION-F-REQUEST-ID",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-MODERATION-DECISION-F-REVIEWER-ID",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-MODERATION-DECISION-F-REVIEWER-ID",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-MODERATION-DECISION-F-REVIEWER-LAYER",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-MODERATION-DECISION-F-REVIEWER-LAYER",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-MODERATION-DECISION-F-SCOPE",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-MODERATION-DECISION-F-SCOPE",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-MODERATION-DECISION-F-SEVERITY",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-MODERATION-DECISION-F-SEVERITY",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-MODERATION-DECISION-F-SOURCE-KIND",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-MODERATION-DECISION-F-SOURCE-KIND",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-MODERATION-DECISION-F-TARGET-ID",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-MODERATION-DECISION-F-TARGET-ID",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-MODERATION-DECISION-F-TARGET-TYPE",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-MODERATION-DECISION-F-TARGET-TYPE",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-MODERATION-DECISION-F-TARGET-VERSION",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-MODERATION-DECISION-F-TARGET-VERSION",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
+      ]
+    },
+    {
+      "evidenceId": "ENTITY:ENT-ORG-MEMBERSHIP",
+      "subjectType": "ENTITY",
+      "subjectId": "ENT-ORG-MEMBERSHIP",
+      "implementationStatus": "CONTRACT_ONLY",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-catalog.v1.json",
+        "contracts/entity/entity-implementation-evidence.v1.json"
+      ],
+      "blockers": [
+        "No concrete implementation evidence recorded."
+      ]
+    },
+    {
+      "evidenceId": "ENTITY:ENT-ROLE-ASSIGNMENT",
+      "subjectType": "ENTITY",
+      "subjectId": "ENT-ROLE-ASSIGNMENT",
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "workers/W02-identity/src/authz/role-assignment.ts",
+        "workers/W02-identity/src/index.ts"
+      ],
+      "testRefs": [],
+      "schemaEvidenceRefs": [
+        "workers/W02-identity/migrations/0001_role_assignments.sql"
+      ],
+      "sourceRefs": [
+        "contracts/entity/entity-catalog.v1.json",
+        "contracts/entity/entity-implementation-evidence.v1.json"
+      ],
+      "blockers": [
+        "Controlled authLogin/authRefresh runtime evidence is pending.",
+        "Controlled authLogin/authRefresh runtime evidence and W01 Service Binding deployment evidence are pending."
+      ]
+    },
+    {
+      "evidenceId": "ENTITY:ENT-SESSION",
+      "subjectType": "ENTITY",
+      "subjectId": "ENT-SESSION",
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "workers/W02-identity/src/session/session-runtime.ts",
+        "workers/W02-identity/src/index.ts",
+        "workers/W01-payload/src/app/auth/login/route.ts",
+        "workers/W01-payload/src/app/auth/refresh/route.ts",
+        "workers/W01-payload/src/app/auth/logout/route.ts"
+      ],
+      "testRefs": [],
+      "schemaEvidenceRefs": [
+        "workers/W01-payload/src/migrations/20260921_003203_MIG_AUTH_002_SESSION_V1.ts",
+        "contracts/persistence/AUTH-002-minimum-session-extension-persistence-contract.v1.1.json",
+        "artifacts/mapping-0/auth-002-e6-runtime-evidence-reconciliation-2026-09-26.json"
+      ],
+      "sourceRefs": [
+        "contracts/entity/entity-catalog.v1.json",
+        "contracts/entity/entity-implementation-evidence.v1.json"
+      ],
+      "blockers": [
+        "Gate-1 schema, native session runtime, security-negative, concurrency and extension-correlation evidence are now VERIFIED at the exact tested source 5c3b7830b146f8bd998a0fab52bb1fb6ddeb0f55.",
+        "ENT-SESSION catalog promotion remains blocked pending final Mapping 0 / Five-Way admission."
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-SESSION-F-CREATED-AT",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-SESSION-F-CREATED-AT",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-SESSION-F-DEVICE-ID",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-SESSION-F-DEVICE-ID",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-SESSION-F-EXPIRES-AT",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-SESSION-F-EXPIRES-AT",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-SESSION-F-ID",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-SESSION-F-ID",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-SESSION-F-LAST-SEEN-AT",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-SESSION-F-LAST-SEEN-AT",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-SESSION-F-REFRESH-CREDENTIAL-HASH",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-SESSION-F-REFRESH-CREDENTIAL-HASH",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-SESSION-F-REVOKED-AT",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-SESSION-F-REVOKED-AT",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-SESSION-F-TOKEN-VERSION",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-SESSION-F-TOKEN-VERSION",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-SESSION-F-USER-ID",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-SESSION-F-USER-ID",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "ENTITY:ENT-SOCIAL-FOLLOW",
+      "subjectType": "ENTITY",
+      "subjectId": "ENT-SOCIAL-FOLLOW",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-catalog.v1.json"
+      ],
+      "blockers": [
+        "Missing entity implementation evidence"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-SOCIAL-FOLLOW-F-CREATED-AT",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-SOCIAL-FOLLOW-F-CREATED-AT",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-SOCIAL-FOLLOW-F-FOLLOWER-USER-ID",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-SOCIAL-FOLLOW-F-FOLLOWER-USER-ID",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-SOCIAL-FOLLOW-F-RELATIONSHIP-ID",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-SOCIAL-FOLLOW-F-RELATIONSHIP-ID",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-SOCIAL-FOLLOW-F-TARGET-USER-ID",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-SOCIAL-FOLLOW-F-TARGET-USER-ID",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
+      ]
+    },
+    {
+      "evidenceId": "ENTITY:ENT-SUBSCRIPTION",
+      "subjectType": "ENTITY",
+      "subjectId": "ENT-SUBSCRIPTION",
+      "implementationStatus": "BLOCKED",
+      "implementationRefs": [
+        "workers/W07-subscription-commerce/src/index.ts",
+        "workers/W07-subscription-commerce/src/subscription-runtime.ts",
+        "workers/W07-subscription-commerce/src/subscription-runtime.test.ts",
+        "workers/W07-subscription-commerce/migrations/0002_subscription_version_cas.sql",
+        "docs/change-control/CC-MON-SUBSCRIPTION-VERSION-CAS-IMPLEMENTATION-2026-10-27.md"
+      ],
+      "testRefs": [],
+      "schemaEvidenceRefs": [
+        "contracts/entity/SUBSCRIPTION-ENTITY-CONTRACT.v1.json",
+        "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json",
+        "workers/W07-subscription-commerce/migrations/0001_membership_subscriptions.sql",
+        "workers/W07-subscription-commerce/migrations/0002_subscription_version_cas.sql",
+        "docs/change-control/CC-MON-SUBSCRIPTION-VERSION-CAS-IMPLEMENTATION-2026-10-27.md"
+      ],
+      "sourceRefs": [
+        "contracts/entity/entity-catalog.v1.json",
+        "contracts/entity/entity-implementation-evidence.v1.json"
+      ],
+      "blockers": [
+        "The current PR candidate implements monotonic version CAS and has passing W07 Subscription Runtime CI, but the change is not merged and production-runtime evidence has not been admitted.",
+        "Migration 0001 is the historical baseline; migration 0002 adds version INTEGER NOT NULL DEFAULT 1 as a candidate only. The exact D1-01 migration history and post-migration schema have not been read-only verified, and no remote migration has been executed.",
+        "The version-CAS candidate has tests for version increments, stale-version rejection, and idempotent convergence; production concurrency E2E and deployed W07 revision evidence remain absent.",
+        "Payment-confirmed subscription transitions and entitlement grant/revoke enforcement still lack an admitted provider integration, runtime, and Evidence Registry proof.",
+        "Current W07 source uses one INSERT...SELECT to bind only an ACTIVE, PUBLIC CREATOR-owned plan to its immutable current plan_version; runtime unit tests verify it snapshots current_version. This source-level evidence does not prove a production D1-01 migration or deployment."
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-SUBSCRIPTION-F-CANCEL-AT",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-SUBSCRIPTION-F-CANCEL-AT",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-SUBSCRIPTION-F-CREATED-AT",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-SUBSCRIPTION-F-CREATED-AT",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-SUBSCRIPTION-F-CREATOR-ID",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-SUBSCRIPTION-F-CREATOR-ID",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-SUBSCRIPTION-F-CURRENT-PERIOD-END",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-SUBSCRIPTION-F-CURRENT-PERIOD-END",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-SUBSCRIPTION-F-CURRENT-PERIOD-START",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-SUBSCRIPTION-F-CURRENT-PERIOD-START",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-SUBSCRIPTION-F-ENTITLEMENT-SNAPSHOT-REF",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-SUBSCRIPTION-F-ENTITLEMENT-SNAPSHOT-REF",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-SUBSCRIPTION-F-PLAN-ID",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-SUBSCRIPTION-F-PLAN-ID",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-SUBSCRIPTION-F-PLAN-VERSION",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-SUBSCRIPTION-F-PLAN-VERSION",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-SUBSCRIPTION-F-STARTED-AT",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-SUBSCRIPTION-F-STARTED-AT",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-SUBSCRIPTION-F-STATUS",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-SUBSCRIPTION-F-STATUS",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-SUBSCRIPTION-F-SUBSCRIBER-ID",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-SUBSCRIPTION-F-SUBSCRIBER-ID",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-SUBSCRIPTION-F-SUBSCRIPTION-ID",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-SUBSCRIPTION-F-SUBSCRIPTION-ID",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-SUBSCRIPTION-F-UPDATED-AT",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-SUBSCRIPTION-F-UPDATED-AT",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field implementation evidence is incomplete"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-SUBSCRIPTION-F-VERSION",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-SUBSCRIPTION-F-VERSION",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [
+        "workers/W07-subscription-commerce/src/subscription-runtime.ts",
+        "workers/W07-subscription-commerce/src/index.ts"
+      ],
+      "testRefs": [
+        "workers/W07-subscription-commerce/src/subscription-runtime.test.ts",
+        ".github/workflows/w07-subscription-runtime-ci.yml"
+      ],
+      "schemaEvidenceRefs": [
+        "contracts/entity/SUBSCRIPTION-ENTITY-CONTRACT.v1.json",
+        "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json",
+        "workers/W07-subscription-commerce/migrations/0002_subscription_version_cas.sql"
+      ],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Implementation candidate and automated tests are present on an unmerged PR; W07 Subscription Runtime CI passes for its tested revision, but this is not proof of main or production execution.",
+        "D1-01 migration 0002 has not been executed remotely; production schema, migration history, artifact hash, and deployed W07 revision are not verified.",
+        "Field remains UNRESOLVED until the PR is merged, exact D1-01 schema/migration evidence is collected, and production runtime/concurrency evidence is admitted."
+      ]
+    },
+    {
+      "evidenceId": "ENTITY:ENT-USER",
+      "subjectType": "ENTITY",
+      "subjectId": "ENT-USER",
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "workers/W01-payload/src/collections/Users.ts",
+        "workers/W01-payload/src/payload.config.ts"
+      ],
+      "testRefs": [],
+      "schemaEvidenceRefs": [
+        "workers/W01-payload/src/collections/Users.ts"
+      ],
+      "sourceRefs": [
+        "contracts/entity/entity-catalog.v1.json",
+        "contracts/entity/entity-implementation-evidence.v1.json"
+      ],
+      "blockers": [
+        "AUTH-002 native session runtime, extension correlation, and final Evidence Registry promotion remain open."
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-USER-F-ACCOUNT-STATE",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-USER-F-ACCOUNT-STATE",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-USER-F-ACCOUNT-STATE-VERSION",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-USER-F-ACCOUNT-STATE-VERSION",
+      "implementationStatus": "UNRESOLVED",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": [
+        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
+      ]
+    },
+    {
+      "evidenceId": "FIELD:ENT-USER-F-AVATAR",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-USER-F-AVATAR",
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "workers/W01-payload/src/collections/Users.ts"
+      ],
+      "testRefs": [],
+      "schemaEvidenceRefs": [
+        "workers/W01-payload/src/collections/Users.ts"
+      ],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": []
+    },
+    {
+      "evidenceId": "FIELD:ENT-USER-F-BIO",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-USER-F-BIO",
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "workers/W01-payload/src/collections/Users.ts"
+      ],
+      "testRefs": [],
+      "schemaEvidenceRefs": [
+        "workers/W01-payload/src/collections/Users.ts"
+      ],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": []
+    },
+    {
+      "evidenceId": "FIELD:ENT-USER-F-DISPLAY-NAME",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-USER-F-DISPLAY-NAME",
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "workers/W01-payload/src/collections/Users.ts"
+      ],
+      "testRefs": [],
+      "schemaEvidenceRefs": [
+        "workers/W01-payload/src/collections/Users.ts"
+      ],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": []
+    },
+    {
+      "evidenceId": "FIELD:ENT-USER-F-IDENTITY-ID",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-USER-F-IDENTITY-ID",
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "workers/W01-payload/src/collections/Users.ts"
+      ],
+      "testRefs": [],
+      "schemaEvidenceRefs": [
+        "workers/W01-payload/src/collections/Users.ts"
+      ],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": []
+    },
+    {
+      "evidenceId": "FIELD:ENT-USER-F-LOCALE",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-USER-F-LOCALE",
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "workers/W01-payload/src/collections/Users.ts"
+      ],
+      "testRefs": [],
+      "schemaEvidenceRefs": [
+        "workers/W01-payload/src/collections/Users.ts"
+      ],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": []
+    },
+    {
+      "evidenceId": "FIELD:ENT-USER-F-TIMEZONE",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-USER-F-TIMEZONE",
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "workers/W01-payload/src/collections/Users.ts"
+      ],
+      "testRefs": [],
+      "schemaEvidenceRefs": [
+        "workers/W01-payload/src/collections/Users.ts"
+      ],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": []
+    },
+    {
+      "evidenceId": "FIELD:ENT-USER-F-USERNAME",
+      "subjectType": "FIELD",
+      "subjectId": "ENT-USER-F-USERNAME",
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "workers/W01-payload/src/collections/Users.ts"
+      ],
+      "testRefs": [],
+      "schemaEvidenceRefs": [
+        "workers/W01-payload/src/collections/Users.ts"
+      ],
+      "sourceRefs": [
+        "contracts/entity/entity-field-contract.v1.json"
+      ],
+      "blockers": []
+    },
+    {
+      "evidenceId": "ENTITY:ENT-VERIFICATION",
+      "subjectType": "ENTITY",
+      "subjectId": "ENT-VERIFICATION",
+      "implementationStatus": "CONTRACT_ONLY",
+      "implementationRefs": [],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/entity/entity-catalog.v1.json",
+        "contracts/entity/entity-implementation-evidence.v1.json"
+      ],
+      "blockers": [
+        "No concrete implementation evidence recorded."
       ]
     },
     {
@@ -1524,26 +3376,6 @@
       "blockers": []
     },
     {
-      "evidenceId": "API_OPERATION:previewSubscriptionPlanChange",
-      "subjectType": "API_OPERATION",
-      "subjectId": "previewSubscriptionPlanChange",
-      "implementationStatus": "IMPLEMENTED",
-      "implementationRefs": [
-        "workers/W01-payload/src/app/api/v1/memberships/subscriptions/[[...segments]]/route.ts",
-        "workers/W07-subscription-commerce/src/index.ts",
-        "workers/W07-subscription-commerce/src/subscription-plan-change-preview.ts"
-      ],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/alignment/api-inventory.v1.json"
-      ],
-      "blockers": [
-        "Read-only quote only; order creation, final tax/proration pricing, payment confirmation and subscription mutation are not part of this endpoint."
-      ]
-    },
-    {
       "evidenceId": "API_OPERATION:getSubscriptions",
       "subjectType": "API_OPERATION",
       "subjectId": "getSubscriptions",
@@ -1869,6 +3701,42 @@
       "blockers": [
         "Runtime API implementation evidence is not yet mechanically discovered"
       ]
+    },
+    {
+      "evidenceId": "PAYLOAD_COLLECTION:media",
+      "subjectType": "PAYLOAD_COLLECTION",
+      "subjectId": "media",
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "workers/W01-payload/src/collections/Media.ts:Media"
+      ],
+      "testRefs": [],
+      "schemaEvidenceRefs": [
+        "workers/W01-payload/src/collections/Media.ts:Media"
+      ],
+      "sourceRefs": [
+        "contracts/alignment/payload-inventory.v1.json",
+        "workers/W01-payload/src/collections/Media.ts:Media"
+      ],
+      "blockers": []
+    },
+    {
+      "evidenceId": "PAYLOAD_FIELD:media:alt",
+      "subjectType": "PAYLOAD_FIELD",
+      "subjectId": "media.alt",
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "workers/W01-payload/src/collections/Media.ts:field:alt"
+      ],
+      "testRefs": [],
+      "schemaEvidenceRefs": [
+        "workers/W01-payload/src/collections/Media.ts:field:alt"
+      ],
+      "sourceRefs": [
+        "contracts/alignment/payload-inventory.v1.json",
+        "workers/W01-payload/src/collections/Media.ts:field:alt"
+      ],
+      "blockers": []
     },
     {
       "evidenceId": "API_OPERATION:muteUser",
@@ -2640,6 +4508,26 @@
       ]
     },
     {
+      "evidenceId": "API_OPERATION:previewSubscriptionPlanChange",
+      "subjectType": "API_OPERATION",
+      "subjectId": "previewSubscriptionPlanChange",
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "workers/W01-payload/src/app/api/v1/memberships/subscriptions/[[...segments]]/route.ts",
+        "workers/W07-subscription-commerce/src/index.ts",
+        "workers/W07-subscription-commerce/src/subscription-plan-change-preview.ts"
+      ],
+      "testRefs": [],
+      "schemaEvidenceRefs": [],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/alignment/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "Read-only quote only; order creation, final tax/proration pricing, payment confirmation and subscription mutation are not part of this endpoint."
+      ]
+    },
+    {
       "evidenceId": "API_OPERATION:removeIpMember",
       "subjectType": "API_OPERATION",
       "subjectId": "removeIpMember",
@@ -2876,1840 +4764,6 @@
       ]
     },
     {
-      "evidenceId": "ENTITY:ENT-CONSENT",
-      "subjectType": "ENTITY",
-      "subjectId": "ENT-CONSENT",
-      "implementationStatus": "CONTRACT_ONLY",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-catalog.v1.json",
-        "contracts/entity/entity-implementation-evidence.v1.json"
-      ],
-      "blockers": [
-        "PRIV-002 concrete consent contract is admitted, but runtime implementation and physical persistence evidence are not yet verified.",
-        "AUTH-001 registration consent transaction, withdrawal propagation, security/privacy E2E, and Evidence Registry admission remain pending.",
-        "Final Mapping 0 / Five-Way validation remains NOT_GREEN."
-      ]
-    },
-    {
-      "evidenceId": "ENTITY:ENT-CREDENTIAL",
-      "subjectType": "ENTITY",
-      "subjectId": "ENT-CREDENTIAL",
-      "implementationStatus": "IMPLEMENTED",
-      "implementationRefs": [
-        "workers/W02-identity/src/credentials/credential-add.ts",
-        "workers/W02-identity/migrations/0004_auth_003_credentials.sql",
-        "workers/W02-identity/src/credentials/credential-list.ts",
-        "workers/W02-identity/src/credentials/credential-lifecycle.ts"
-      ],
-      "testRefs": [],
-      "schemaEvidenceRefs": [
-        "https://github.com/wanghuinet/luckread/actions/runs/36298629648"
-      ],
-      "sourceRefs": [
-        "contracts/entity/entity-catalog.v1.json",
-        "contracts/entity/entity-implementation-evidence.v1.json"
-      ],
-      "blockers": [
-        "ENT-CREDENTIAL runtime/persistence evidence is complete for the admitted AUTH-003 List/Add/Replace/Remove slice.",
-        "Canonical catalog promotion remains blocked because ENT-IDENTITY is still PROPOSED and final Mapping 0 / Five-Way reconciliation is NOT_GREEN.",
-        "No promotion is inferred from the credential entity's dependency on auth_identities."
-      ]
-    },
-    {
-      "evidenceId": "ENTITY:ENT-DEVICE-RECORD",
-      "subjectType": "ENTITY",
-      "subjectId": "ENT-DEVICE-RECORD",
-      "implementationStatus": "CONTRACT_ONLY",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-catalog.v1.json",
-        "contracts/entity/entity-implementation-evidence.v1.json"
-      ],
-      "blockers": [
-        "No concrete implementation evidence recorded."
-      ]
-    },
-    {
-      "evidenceId": "ENTITY:ENT-ENTITLEMENT-GRANT",
-      "subjectType": "ENTITY",
-      "subjectId": "ENT-ENTITLEMENT-GRANT",
-      "implementationStatus": "CONTRACT_ONLY",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-catalog.v1.json",
-        "contracts/entity/entity-implementation-evidence.v1.json"
-      ],
-      "blockers": [
-        "No concrete implementation evidence recorded."
-      ]
-    },
-    {
-      "evidenceId": "ENTITY:ENT-IDENTITY",
-      "subjectType": "ENTITY",
-      "subjectId": "ENT-IDENTITY",
-      "implementationStatus": "IMPLEMENTED",
-      "implementationRefs": [
-        "workers/W02-identity/src/account/registration-materializer.ts"
-      ],
-      "testRefs": [],
-      "schemaEvidenceRefs": [
-        "https://github.com/wanghuinet/luckread/actions/runs/36298629648"
-      ],
-      "sourceRefs": [
-        "contracts/entity/entity-catalog.v1.json",
-        "contracts/entity/entity-implementation-evidence.v1.json"
-      ],
-      "blockers": [
-        "AUTH-001 W02 scheduled registration materializer now provides exact-SHA executable identity materialization evidence; no independent public identity CRUD lifecycle is claimed by this admission.",
-        "Canonical entity catalog promotion remains blocked because ENT-IDENTITY is still PROPOSED and global Mapping 0 / Five-Way remains NOT_GREEN."
-      ]
-    },
-    {
-      "evidenceId": "ENTITY:ENT-MODERATION-CASE",
-      "subjectType": "ENTITY",
-      "subjectId": "ENT-MODERATION-CASE",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-catalog.v1.json"
-      ],
-      "blockers": [
-        "Missing entity implementation evidence"
-      ]
-    },
-    {
-      "evidenceId": "ENTITY:ENT-MODERATION-DECISION",
-      "subjectType": "ENTITY",
-      "subjectId": "ENT-MODERATION-DECISION",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-catalog.v1.json"
-      ],
-      "blockers": [
-        "Missing entity implementation evidence"
-      ]
-    },
-    {
-      "evidenceId": "ENTITY:ENT-ORG-MEMBERSHIP",
-      "subjectType": "ENTITY",
-      "subjectId": "ENT-ORG-MEMBERSHIP",
-      "implementationStatus": "CONTRACT_ONLY",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-catalog.v1.json",
-        "contracts/entity/entity-implementation-evidence.v1.json"
-      ],
-      "blockers": [
-        "No concrete implementation evidence recorded."
-      ]
-    },
-    {
-      "evidenceId": "ENTITY:ENT-ROLE-ASSIGNMENT",
-      "subjectType": "ENTITY",
-      "subjectId": "ENT-ROLE-ASSIGNMENT",
-      "implementationStatus": "IMPLEMENTED",
-      "implementationRefs": [
-        "workers/W02-identity/src/authz/role-assignment.ts",
-        "workers/W02-identity/src/index.ts"
-      ],
-      "testRefs": [],
-      "schemaEvidenceRefs": [
-        "workers/W02-identity/migrations/0001_role_assignments.sql"
-      ],
-      "sourceRefs": [
-        "contracts/entity/entity-catalog.v1.json",
-        "contracts/entity/entity-implementation-evidence.v1.json"
-      ],
-      "blockers": [
-        "Controlled authLogin/authRefresh runtime evidence is pending.",
-        "Controlled authLogin/authRefresh runtime evidence and W01 Service Binding deployment evidence are pending."
-      ]
-    },
-    {
-      "evidenceId": "ENTITY:ENT-SESSION",
-      "subjectType": "ENTITY",
-      "subjectId": "ENT-SESSION",
-      "implementationStatus": "IMPLEMENTED",
-      "implementationRefs": [
-        "workers/W02-identity/src/session/session-runtime.ts",
-        "workers/W02-identity/src/index.ts",
-        "workers/W01-payload/src/app/auth/login/route.ts",
-        "workers/W01-payload/src/app/auth/refresh/route.ts",
-        "workers/W01-payload/src/app/auth/logout/route.ts"
-      ],
-      "testRefs": [],
-      "schemaEvidenceRefs": [
-        "workers/W01-payload/src/migrations/20260921_003203_MIG_AUTH_002_SESSION_V1.ts",
-        "contracts/persistence/AUTH-002-minimum-session-extension-persistence-contract.v1.1.json",
-        "artifacts/mapping-0/auth-002-e6-runtime-evidence-reconciliation-2026-09-26.json"
-      ],
-      "sourceRefs": [
-        "contracts/entity/entity-catalog.v1.json",
-        "contracts/entity/entity-implementation-evidence.v1.json"
-      ],
-      "blockers": [
-        "Gate-1 schema, native session runtime, security-negative, concurrency and extension-correlation evidence are now VERIFIED at the exact tested source 5c3b7830b146f8bd998a0fab52bb1fb6ddeb0f55.",
-        "ENT-SESSION catalog promotion remains blocked pending final Mapping 0 / Five-Way admission."
-      ]
-    },
-    {
-      "evidenceId": "ENTITY:ENT-SOCIAL-FOLLOW",
-      "subjectType": "ENTITY",
-      "subjectId": "ENT-SOCIAL-FOLLOW",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-catalog.v1.json"
-      ],
-      "blockers": [
-        "Missing entity implementation evidence"
-      ]
-    },
-    {
-      "evidenceId": "ENTITY:ENT-SUBSCRIPTION",
-      "subjectType": "ENTITY",
-      "subjectId": "ENT-SUBSCRIPTION",
-      "implementationStatus": "BLOCKED",
-      "implementationRefs": [
-        "workers/W07-subscription-commerce/src/index.ts",
-        "workers/W07-subscription-commerce/src/subscription-runtime.ts",
-        "workers/W07-subscription-commerce/src/subscription-runtime.test.ts",
-        "workers/W07-subscription-commerce/migrations/0002_subscription_version_cas.sql",
-        "docs/change-control/CC-MON-SUBSCRIPTION-VERSION-CAS-IMPLEMENTATION-2026-10-27.md"
-      ],
-      "testRefs": [],
-      "schemaEvidenceRefs": [
-        "contracts/entity/SUBSCRIPTION-ENTITY-CONTRACT.v1.json",
-        "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json",
-        "workers/W07-subscription-commerce/migrations/0001_membership_subscriptions.sql",
-        "workers/W07-subscription-commerce/migrations/0002_subscription_version_cas.sql",
-        "docs/change-control/CC-MON-SUBSCRIPTION-VERSION-CAS-IMPLEMENTATION-2026-10-27.md"
-      ],
-      "sourceRefs": [
-        "contracts/entity/entity-catalog.v1.json",
-        "contracts/entity/entity-implementation-evidence.v1.json"
-      ],
-      "blockers": [
-        "The current PR candidate implements monotonic version CAS and has passing W07 Subscription Runtime CI, but the change is not merged and production-runtime evidence has not been admitted.",
-        "Migration 0001 is the historical baseline; migration 0002 adds version INTEGER NOT NULL DEFAULT 1 as a candidate only. The exact D1-01 migration history and post-migration schema have not been read-only verified, and no remote migration has been executed.",
-        "The version-CAS candidate has tests for version increments, stale-version rejection, and idempotent convergence; production concurrency E2E and deployed W07 revision evidence remain absent.",
-        "Payment-confirmed subscription transitions and entitlement grant/revoke enforcement still lack an admitted provider integration, runtime, and Evidence Registry proof.",
-        "Current W07 source uses one INSERT...SELECT to bind only an ACTIVE, PUBLIC CREATOR-owned plan to its immutable current plan_version; runtime unit tests verify it snapshots current_version. This source-level evidence does not prove a production D1-01 migration or deployment."
-      ]
-    },
-    {
-      "evidenceId": "ENTITY:ENT-USER",
-      "subjectType": "ENTITY",
-      "subjectId": "ENT-USER",
-      "implementationStatus": "IMPLEMENTED",
-      "implementationRefs": [
-        "workers/W01-payload/src/collections/Users.ts",
-        "workers/W01-payload/src/payload.config.ts"
-      ],
-      "testRefs": [],
-      "schemaEvidenceRefs": [
-        "workers/W01-payload/src/collections/Users.ts"
-      ],
-      "sourceRefs": [
-        "contracts/entity/entity-catalog.v1.json",
-        "contracts/entity/entity-implementation-evidence.v1.json"
-      ],
-      "blockers": [
-        "AUTH-002 native session runtime, extension correlation, and final Evidence Registry promotion remain open."
-      ]
-    },
-    {
-      "evidenceId": "ENTITY:ENT-VERIFICATION",
-      "subjectType": "ENTITY",
-      "subjectId": "ENT-VERIFICATION",
-      "implementationStatus": "CONTRACT_ONLY",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-catalog.v1.json",
-        "contracts/entity/entity-implementation-evidence.v1.json"
-      ],
-      "blockers": [
-        "No concrete implementation evidence recorded."
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-CONSENT-F-ACTOR-SUBJECT-ID",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-CONSENT-F-ACTOR-SUBJECT-ID",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field implementation evidence is incomplete"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-CONSENT-F-CREATED-AT",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-CONSENT-F-CREATED-AT",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field implementation evidence is incomplete"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-CONSENT-F-ID",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-CONSENT-F-ID",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field implementation evidence is incomplete"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-CONSENT-F-LEGAL-BASIS",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-CONSENT-F-LEGAL-BASIS",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field implementation evidence is incomplete"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-CONSENT-F-LEGAL-HOLD-REF",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-CONSENT-F-LEGAL-HOLD-REF",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field implementation evidence is incomplete"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-CONSENT-F-OWNER-SUBJECT-ID",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-CONSENT-F-OWNER-SUBJECT-ID",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field implementation evidence is incomplete"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-CONSENT-F-POLICY-VERSION",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-CONSENT-F-POLICY-VERSION",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field implementation evidence is incomplete"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-CONSENT-F-PURPOSE",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-CONSENT-F-PURPOSE",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field implementation evidence is incomplete"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-CONSENT-F-RESOURCE-ID",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-CONSENT-F-RESOURCE-ID",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field implementation evidence is incomplete"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-CONSENT-F-RESOURCE-TYPE",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-CONSENT-F-RESOURCE-TYPE",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field implementation evidence is incomplete"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-CONSENT-F-RETENTION-CLASS",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-CONSENT-F-RETENTION-CLASS",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field implementation evidence is incomplete"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-CONSENT-F-RETENTION-UNTIL",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-CONSENT-F-RETENTION-UNTIL",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field implementation evidence is incomplete"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-CONSENT-F-SOURCE-AUTHORITY",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-CONSENT-F-SOURCE-AUTHORITY",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field implementation evidence is incomplete"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-CONSENT-F-STATE",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-CONSENT-F-STATE",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field implementation evidence is incomplete"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-CONSENT-F-UPDATED-AT",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-CONSENT-F-UPDATED-AT",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field implementation evidence is incomplete"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-CONSENT-F-WITHDRAWN-AT",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-CONSENT-F-WITHDRAWN-AT",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field implementation evidence is incomplete"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-CREDENTIAL-F-ACTIVE",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-CREDENTIAL-F-ACTIVE",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field implementation evidence is incomplete"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-CREDENTIAL-F-CREATED-AT",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-CREDENTIAL-F-CREATED-AT",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field implementation evidence is incomplete"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-CREDENTIAL-F-ID",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-CREDENTIAL-F-ID",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field implementation evidence is incomplete"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-CREDENTIAL-F-IDENTITY-ID",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-CREDENTIAL-F-IDENTITY-ID",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field implementation evidence is incomplete"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-CREDENTIAL-F-KIND",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-CREDENTIAL-F-KIND",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field implementation evidence is incomplete"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-CREDENTIAL-F-NORMALIZED-VALUE",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-CREDENTIAL-F-NORMALIZED-VALUE",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field implementation evidence is incomplete"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-CREDENTIAL-F-UPDATED-AT",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-CREDENTIAL-F-UPDATED-AT",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field implementation evidence is incomplete"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-CREDENTIAL-F-VALUE-HASH",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-CREDENTIAL-F-VALUE-HASH",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field implementation evidence is incomplete"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-CREDENTIAL-F-VERIFIED-AT",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-CREDENTIAL-F-VERIFIED-AT",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field implementation evidence is incomplete"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-IDENTITY-F-EMAIL",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-IDENTITY-F-EMAIL",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field implementation evidence is incomplete"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-IDENTITY-F-EMAIL-NORMALIZED",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-IDENTITY-F-EMAIL-NORMALIZED",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field implementation evidence is incomplete"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-IDENTITY-F-ID",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-IDENTITY-F-ID",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field implementation evidence is incomplete"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-IDENTITY-F-NORMALIZATION-VERSION",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-IDENTITY-F-NORMALIZATION-VERSION",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field implementation evidence is incomplete"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-IDENTITY-F-PHONE",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-IDENTITY-F-PHONE",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field implementation evidence is incomplete"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-IDENTITY-F-PHONE-NORMALIZED",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-IDENTITY-F-PHONE-NORMALIZED",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field implementation evidence is incomplete"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-IDENTITY-F-USER-ID",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-IDENTITY-F-USER-ID",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field implementation evidence is incomplete"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-IDENTITY-F-USERNAME",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-IDENTITY-F-USERNAME",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field implementation evidence is incomplete"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-IDENTITY-F-USERNAME-NORMALIZED",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-IDENTITY-F-USERNAME-NORMALIZED",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field implementation evidence is incomplete"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-MODERATION-CASE-F-ASSIGNED-REVIEWER-ID",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-MODERATION-CASE-F-ASSIGNED-REVIEWER-ID",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-MODERATION-CASE-F-CASE-ID",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-MODERATION-CASE-F-CASE-ID",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-MODERATION-CASE-F-CREATED-AT",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-MODERATION-CASE-F-CREATED-AT",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-MODERATION-CASE-F-CURRENT-DECISION-ID",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-MODERATION-CASE-F-CURRENT-DECISION-ID",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-MODERATION-CASE-F-EVIDENCE-BUNDLE-REF",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-MODERATION-CASE-F-EVIDENCE-BUNDLE-REF",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-MODERATION-CASE-F-POLICY-VERSION",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-MODERATION-CASE-F-POLICY-VERSION",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-MODERATION-CASE-F-PRIORITY",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-MODERATION-CASE-F-PRIORITY",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-MODERATION-CASE-F-STATE",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-MODERATION-CASE-F-STATE",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-MODERATION-CASE-F-TARGET-ID",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-MODERATION-CASE-F-TARGET-ID",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-MODERATION-CASE-F-TARGET-TYPE",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-MODERATION-CASE-F-TARGET-TYPE",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-MODERATION-CASE-F-TARGET-VERSION",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-MODERATION-CASE-F-TARGET-VERSION",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-MODERATION-CASE-F-UPDATED-AT",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-MODERATION-CASE-F-UPDATED-AT",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-MODERATION-CASE-F-VERSION",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-MODERATION-CASE-F-VERSION",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-MODERATION-DECISION-F-CASE-ID",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-MODERATION-DECISION-F-CASE-ID",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-MODERATION-DECISION-F-CASE-VERSION",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-MODERATION-DECISION-F-CASE-VERSION",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-MODERATION-DECISION-F-CREATED-AT",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-MODERATION-DECISION-F-CREATED-AT",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-MODERATION-DECISION-F-DECISION-ID",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-MODERATION-DECISION-F-DECISION-ID",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-MODERATION-DECISION-F-EFFECTIVE-AT",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-MODERATION-DECISION-F-EFFECTIVE-AT",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-MODERATION-DECISION-F-EXPIRES-AT",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-MODERATION-DECISION-F-EXPIRES-AT",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-MODERATION-DECISION-F-OUTCOME",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-MODERATION-DECISION-F-OUTCOME",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-MODERATION-DECISION-F-POLICY-VERSION",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-MODERATION-DECISION-F-POLICY-VERSION",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-MODERATION-DECISION-F-REASON-CODE",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-MODERATION-DECISION-F-REASON-CODE",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-MODERATION-DECISION-F-REQUEST-ID",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-MODERATION-DECISION-F-REQUEST-ID",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-MODERATION-DECISION-F-REVIEWER-ID",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-MODERATION-DECISION-F-REVIEWER-ID",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-MODERATION-DECISION-F-REVIEWER-LAYER",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-MODERATION-DECISION-F-REVIEWER-LAYER",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-MODERATION-DECISION-F-SCOPE",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-MODERATION-DECISION-F-SCOPE",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-MODERATION-DECISION-F-SEVERITY",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-MODERATION-DECISION-F-SEVERITY",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-MODERATION-DECISION-F-SOURCE-KIND",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-MODERATION-DECISION-F-SOURCE-KIND",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-MODERATION-DECISION-F-TARGET-ID",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-MODERATION-DECISION-F-TARGET-ID",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-MODERATION-DECISION-F-TARGET-TYPE",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-MODERATION-DECISION-F-TARGET-TYPE",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-MODERATION-DECISION-F-TARGET-VERSION",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-MODERATION-DECISION-F-TARGET-VERSION",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-SESSION-F-CREATED-AT",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-SESSION-F-CREATED-AT",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field implementation evidence is incomplete"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-SESSION-F-DEVICE-ID",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-SESSION-F-DEVICE-ID",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field implementation evidence is incomplete"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-SESSION-F-EXPIRES-AT",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-SESSION-F-EXPIRES-AT",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field implementation evidence is incomplete"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-SESSION-F-ID",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-SESSION-F-ID",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field implementation evidence is incomplete"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-SESSION-F-LAST-SEEN-AT",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-SESSION-F-LAST-SEEN-AT",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field implementation evidence is incomplete"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-SESSION-F-REFRESH-CREDENTIAL-HASH",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-SESSION-F-REFRESH-CREDENTIAL-HASH",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field implementation evidence is incomplete"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-SESSION-F-REVOKED-AT",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-SESSION-F-REVOKED-AT",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field implementation evidence is incomplete"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-SESSION-F-TOKEN-VERSION",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-SESSION-F-TOKEN-VERSION",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field implementation evidence is incomplete"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-SESSION-F-USER-ID",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-SESSION-F-USER-ID",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field implementation evidence is incomplete"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-SOCIAL-FOLLOW-F-CREATED-AT",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-SOCIAL-FOLLOW-F-CREATED-AT",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-SOCIAL-FOLLOW-F-FOLLOWER-USER-ID",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-SOCIAL-FOLLOW-F-FOLLOWER-USER-ID",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-SOCIAL-FOLLOW-F-RELATIONSHIP-ID",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-SOCIAL-FOLLOW-F-RELATIONSHIP-ID",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-SOCIAL-FOLLOW-F-TARGET-USER-ID",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-SOCIAL-FOLLOW-F-TARGET-USER-ID",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-SUBSCRIPTION-F-CANCEL-AT",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-SUBSCRIPTION-F-CANCEL-AT",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field implementation evidence is incomplete"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-SUBSCRIPTION-F-CREATED-AT",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-SUBSCRIPTION-F-CREATED-AT",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field implementation evidence is incomplete"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-SUBSCRIPTION-F-CREATOR-ID",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-SUBSCRIPTION-F-CREATOR-ID",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field implementation evidence is incomplete"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-SUBSCRIPTION-F-CURRENT-PERIOD-END",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-SUBSCRIPTION-F-CURRENT-PERIOD-END",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field implementation evidence is incomplete"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-SUBSCRIPTION-F-CURRENT-PERIOD-START",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-SUBSCRIPTION-F-CURRENT-PERIOD-START",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field implementation evidence is incomplete"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-SUBSCRIPTION-F-ENTITLEMENT-SNAPSHOT-REF",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-SUBSCRIPTION-F-ENTITLEMENT-SNAPSHOT-REF",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field implementation evidence is incomplete"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-SUBSCRIPTION-F-PLAN-ID",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-SUBSCRIPTION-F-PLAN-ID",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field implementation evidence is incomplete"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-SUBSCRIPTION-F-PLAN-VERSION",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-SUBSCRIPTION-F-PLAN-VERSION",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field implementation evidence is incomplete"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-SUBSCRIPTION-F-STARTED-AT",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-SUBSCRIPTION-F-STARTED-AT",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field implementation evidence is incomplete"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-SUBSCRIPTION-F-STATUS",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-SUBSCRIPTION-F-STATUS",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field implementation evidence is incomplete"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-SUBSCRIPTION-F-SUBSCRIBER-ID",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-SUBSCRIPTION-F-SUBSCRIBER-ID",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field implementation evidence is incomplete"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-SUBSCRIPTION-F-SUBSCRIPTION-ID",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-SUBSCRIPTION-F-SUBSCRIPTION-ID",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field implementation evidence is incomplete"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-SUBSCRIPTION-F-UPDATED-AT",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-SUBSCRIPTION-F-UPDATED-AT",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field implementation evidence is incomplete"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-SUBSCRIPTION-F-VERSION",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-SUBSCRIPTION-F-VERSION",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [
-        "workers/W07-subscription-commerce/src/subscription-runtime.ts",
-        "workers/W07-subscription-commerce/src/index.ts"
-      ],
-      "testRefs": [
-        "workers/W07-subscription-commerce/src/subscription-runtime.test.ts",
-        ".github/workflows/w07-subscription-runtime-ci.yml"
-      ],
-      "schemaEvidenceRefs": [
-        "contracts/entity/SUBSCRIPTION-ENTITY-CONTRACT.v1.json",
-        "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json",
-        "workers/W07-subscription-commerce/migrations/0002_subscription_version_cas.sql"
-      ],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Implementation candidate and automated tests are present on an unmerged PR; W07 Subscription Runtime CI passes for its tested revision, but this is not proof of main or production execution.",
-        "D1-01 migration 0002 has not been executed remotely; production schema, migration history, artifact hash, and deployed W07 revision are not verified.",
-        "Field remains UNRESOLVED until the PR is merged, exact D1-01 schema/migration evidence is collected, and production runtime/concurrency evidence is admitted."
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-USER-F-ACCOUNT-STATE",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-USER-F-ACCOUNT-STATE",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-USER-F-ACCOUNT-STATE-VERSION",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-USER-F-ACCOUNT-STATE-VERSION",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
-      "testRefs": [],
-      "schemaEvidenceRefs": [],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": [
-        "Field sourceRef does not resolve to an active repository source; implementation evidence is not promoted"
-      ]
-    },
-    {
-      "evidenceId": "FIELD:ENT-USER-F-AVATAR",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-USER-F-AVATAR",
-      "implementationStatus": "IMPLEMENTED",
-      "implementationRefs": [
-        "workers/W01-payload/src/collections/Users.ts"
-      ],
-      "testRefs": [],
-      "schemaEvidenceRefs": [
-        "workers/W01-payload/src/collections/Users.ts"
-      ],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": []
-    },
-    {
-      "evidenceId": "FIELD:ENT-USER-F-BIO",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-USER-F-BIO",
-      "implementationStatus": "IMPLEMENTED",
-      "implementationRefs": [
-        "workers/W01-payload/src/collections/Users.ts"
-      ],
-      "testRefs": [],
-      "schemaEvidenceRefs": [
-        "workers/W01-payload/src/collections/Users.ts"
-      ],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": []
-    },
-    {
-      "evidenceId": "FIELD:ENT-USER-F-DISPLAY-NAME",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-USER-F-DISPLAY-NAME",
-      "implementationStatus": "IMPLEMENTED",
-      "implementationRefs": [
-        "workers/W01-payload/src/collections/Users.ts"
-      ],
-      "testRefs": [],
-      "schemaEvidenceRefs": [
-        "workers/W01-payload/src/collections/Users.ts"
-      ],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": []
-    },
-    {
-      "evidenceId": "FIELD:ENT-USER-F-IDENTITY-ID",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-USER-F-IDENTITY-ID",
-      "implementationStatus": "IMPLEMENTED",
-      "implementationRefs": [
-        "workers/W01-payload/src/collections/Users.ts"
-      ],
-      "testRefs": [],
-      "schemaEvidenceRefs": [
-        "workers/W01-payload/src/collections/Users.ts"
-      ],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": []
-    },
-    {
-      "evidenceId": "FIELD:ENT-USER-F-LOCALE",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-USER-F-LOCALE",
-      "implementationStatus": "IMPLEMENTED",
-      "implementationRefs": [
-        "workers/W01-payload/src/collections/Users.ts"
-      ],
-      "testRefs": [],
-      "schemaEvidenceRefs": [
-        "workers/W01-payload/src/collections/Users.ts"
-      ],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": []
-    },
-    {
-      "evidenceId": "FIELD:ENT-USER-F-TIMEZONE",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-USER-F-TIMEZONE",
-      "implementationStatus": "IMPLEMENTED",
-      "implementationRefs": [
-        "workers/W01-payload/src/collections/Users.ts"
-      ],
-      "testRefs": [],
-      "schemaEvidenceRefs": [
-        "workers/W01-payload/src/collections/Users.ts"
-      ],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": []
-    },
-    {
-      "evidenceId": "FIELD:ENT-USER-F-USERNAME",
-      "subjectType": "FIELD",
-      "subjectId": "ENT-USER-F-USERNAME",
-      "implementationStatus": "IMPLEMENTED",
-      "implementationRefs": [
-        "workers/W01-payload/src/collections/Users.ts"
-      ],
-      "testRefs": [],
-      "schemaEvidenceRefs": [
-        "workers/W01-payload/src/collections/Users.ts"
-      ],
-      "sourceRefs": [
-        "contracts/entity/entity-field-contract.v1.json"
-      ],
-      "blockers": []
-    },
-    {
-      "evidenceId": "PAYLOAD_COLLECTION:media",
-      "subjectType": "PAYLOAD_COLLECTION",
-      "subjectId": "media",
-      "implementationStatus": "IMPLEMENTED",
-      "implementationRefs": [
-        "workers/W01-payload/src/collections/Media.ts:Media"
-      ],
-      "testRefs": [],
-      "schemaEvidenceRefs": [
-        "workers/W01-payload/src/collections/Media.ts:Media"
-      ],
-      "sourceRefs": [
-        "contracts/alignment/payload-inventory.v1.json",
-        "workers/W01-payload/src/collections/Media.ts:Media"
-      ],
-      "blockers": []
-    },
-    {
       "evidenceId": "PAYLOAD_COLLECTION:users",
       "subjectType": "PAYLOAD_COLLECTION",
       "subjectId": "users",
@@ -4724,24 +4778,6 @@
       "sourceRefs": [
         "contracts/alignment/payload-inventory.v1.json",
         "workers/W01-payload/src/collections/Users.ts:Users"
-      ],
-      "blockers": []
-    },
-    {
-      "evidenceId": "PAYLOAD_FIELD:media:alt",
-      "subjectType": "PAYLOAD_FIELD",
-      "subjectId": "media.alt",
-      "implementationStatus": "IMPLEMENTED",
-      "implementationRefs": [
-        "workers/W01-payload/src/collections/Media.ts:field:alt"
-      ],
-      "testRefs": [],
-      "schemaEvidenceRefs": [
-        "workers/W01-payload/src/collections/Media.ts:field:alt"
-      ],
-      "sourceRefs": [
-        "contracts/alignment/payload-inventory.v1.json",
-        "workers/W01-payload/src/collections/Media.ts:field:alt"
       ],
       "blockers": []
     },

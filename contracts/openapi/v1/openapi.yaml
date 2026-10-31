@@ -2043,6 +2043,36 @@ paths:
         '200': { description: Read-only pre-tax proration estimate and proposed effective date; no subscription or payment state is changed. }
         '4XX': { $ref: '#/components/responses/ClientError' }
 
+  /memberships/subscriptions/{subscriptionId}/change-plan/checkout:
+    parameters:
+      - name: subscriptionId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    post:
+      tags: [Users]
+      summary: Create a payment order for an immediate prorated subscription upgrade
+      description: Creates an authoritative order for a same-interval upgrade. The existing subscription and its entitlements remain unchanged until W07 confirms the signed Hyperswitch payment-success webhook and applies the subscription version compare-and-set. The amount is finalized by the configured commerce pricing and tax pipeline.
+      operationId: checkoutSubscriptionPlanUpgrade
+      parameters:
+        - $ref: '#/components/parameters/IfMatchRequired'
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [planId]
+              properties:
+                planId: { type: string, pattern: '^plan_[a-f0-9]{64}$' }
+      responses:
+        '201': { description: Prorated upgrade order created; subscription remains unchanged pending provider confirmation. }
+        '200': { description: Idempotent replay of the same upgrade checkout order. }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '4XX': { $ref: '#/components/responses/ClientError' }
   /memberships/subscriptions/{subscriptionId}/cancel:
     parameters:
       - name: subscriptionId

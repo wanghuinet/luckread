@@ -83,7 +83,7 @@ function fixture(options: {
     HYPERSWITCH_WEBHOOK_SECRET: SECRET,
     HYPERSWITCH_MERCHANT_ID: MERCHANT,
   };
-  return { env, calls, syncCalls, pendingRecoveryCalls, purchaseFulfillmentCalls, receiptCalls, dependencies: { receive, syncRenewalOutcome, syncPendingOutcomes, fulfillPaidOrder, issueReceipt } };
+  return { env, calls, syncCalls, pendingRecoveryCalls, purchaseFulfillmentCalls, receiptCalls, dependencies: { receive, syncRenewalOutcome, syncPendingOutcomes, fulfillPaidOrder, issueReceipt, expirePendingPlanUpgrade: async () => {} } };
 }
 
 function request(options: {

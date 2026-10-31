@@ -357,6 +357,7 @@ function buildLayerAbility(input: CaslPermissionInput) {
     grant('order.read', 'Order', selfOwnerCondition(input.subjectId))
     grant('payment.read', 'Payment', selfOwnerCondition(input.subjectId))
     grant('payment.refund', 'Payment', selfOwnerCondition(input.subjectId))
+    grant('subscription.change_plan', 'Subscription', selfOwnerCondition(input.subjectId))
   }
 
   // Creator application creation is deliberately L2-only; it is not inherited

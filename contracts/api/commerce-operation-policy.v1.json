@@ -289,6 +289,92 @@
         "integration": "PASS",
         "securityE2E": "MISSING"
       }
+    },
+    {
+      "operationId": "checkoutSubscriptionPlanUpgrade",
+      "method": "POST",
+      "path": "/memberships/subscriptions/{subscriptionId}/change-plan/checkout",
+      "visibility": "public_authenticated",
+      "capability": "subscription_plan_upgrade_checkout",
+      "status": "CONTRACTED_PARTIAL",
+      "authorization": {
+        "required": true,
+        "permission": "subscription.change_plan",
+        "scope": "self"
+      },
+      "resource": {
+        "class": "BOUNDED_COMPOSITION",
+        "d1ReadMax": 6,
+        "d1WriteMax": 4,
+        "d1ReadRowsMax": 16,
+        "d1WriteRowsMax": 12,
+        "rpcMax": 3,
+        "requestBodyBytesMax": 16384,
+        "responseBytesMax": 65536
+      },
+      "cache": {
+        "mode": "NO_STORE",
+        "shared": false,
+        "authorizationBoundary": true
+      },
+      "retry": {
+        "maxAttempts": 1,
+        "clientRetrySafe": true,
+        "requiresOptimisticConcurrency": true
+      },
+      "event": {
+        "syncConsumersMax": 0,
+        "asyncEventsMax": 0,
+        "fanoutMax": 0
+      },
+      "queue": {
+        "enqueueMax": 0
+      },
+      "antiAbuse": {
+        "required": true,
+        "scopes": [
+          "account",
+          "subscription",
+          "endpoint",
+          "global"
+        ],
+        "actions": [
+          "ALLOW",
+          "THROTTLE",
+          "BLOCK"
+        ]
+      },
+      "idempotency": {
+        "required": true,
+        "key": "Idempotency-Key",
+        "semantic": "One stable subscriber-scoped attempt and D1-04 order per idempotency key; replay returns the same order. Concurrent unpaid upgrades on one subscription conflict."
+      },
+      "security": [
+        "subscriber_identity_from_W02_session_only",
+        "W08_subscription_change_plan_own_scope_permission",
+        "subscription_owner_and_current_version_checked_by_W07",
+        "If-Match_required_for_subscription_compare_and_set",
+        "client_supplies_plan_id_only",
+        "server_resolves_immutable_target_plan_version",
+        "no_subscription_or_entitlement_change_before_signed_payment_success",
+        "Hyperswitch_signed_success_only_applies_upgrade",
+        "D1_01_stores_only_attempt_and_opaque_D1_04_order_reference",
+        "D1_04_remains_authority_for_order_payment_and_amount",
+        "W06_D1_03_audits_request_and_applied_result",
+        "production_checkout_fails_closed_without_admitted_tax_pricing",
+        "W01_authorizes_with_W08_audits_request_with_W06_and_forwards_to_W07"
+      ],
+      "evidence": {
+        "openapi": "PASS",
+        "inventory": "PASS",
+        "permission": "PASS",
+        "state": "PASS",
+        "resource": "PASS",
+        "cache": "PASS",
+        "antiAbuse": "PASS",
+        "integration": "MISSING",
+        "securityE2E": "MISSING"
+      }
     }
   ]
 }

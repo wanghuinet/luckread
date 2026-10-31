@@ -181,7 +181,10 @@
   "migration": {
     "status": "PREPARED_NOT_APPLIED",
     "candidateMigration": "workers/W07-subscription-commerce/migrations/0002_subscription_version_cas.sql",
-    "rule": "The version-column migration is prepared as a reviewed code candidate only. A physical migration still requires exact artifact hash, read-only confirmation of the target and migration history, controlled target D1-01 execution and post-schema evidence."
+    "rule": "The version-column migration is prepared as a reviewed code candidate only. A physical migration still requires exact artifact hash, read-only confirmation of the target and migration history, controlled target D1-01 execution and post-schema evidence. The paid upgrade attempt reservation is an auxiliary D1-01 workflow table with no financial fields; it remains PREPARED_NOT_APPLIED until exact target migration evidence is recorded.",
+    "additionalMigrations": [
+      "workers/W07-subscription-commerce/migrations/0005_membership_subscription_plan_change_attempts.sql"
+    ]
   },
   "runtime": {
     "w07Binding": "NOT_VERIFIED",
@@ -209,7 +212,169 @@
     "optimistic-lock source binding evidence",
     "active-subscription uniqueness policy decision",
     "Subscription runtime positive/duplicate/cancel/pause/resume/change-plan evidence",
-    "Evidence Registry record tied to validating commit SHA"
+    "Evidence Registry record tied to validating commit SHA",
+    "schema inspection proving membership_subscription_plan_change_attempts columns, CHECK constraints and four indexes",
+    "idempotency replay and one-pending-attempt-per-subscription constraint evidence",
+    "signed payment-success upgrade CAS and W06 applied-audit retry evidence",
+    "failed or late payment expiry and reconciliation-required no-entitlement-grant evidence"
   ],
-  "promotionRule": "Remain CONTRACTED_NOT_VERIFIED until the physical binding, migration, runtime authority and Evidence Registry evidence are all admitted."
+  "promotionRule": "Remain CONTRACTED_NOT_VERIFIED until the physical binding, migration, runtime authority and Evidence Registry evidence are all admitted.",
+  "additionalTables": [
+    {
+      "name": "membership_subscription_plan_change_attempts",
+      "status": "CONTRACTED_NOT_VERIFIED",
+      "purpose": "Durable single-pending paid upgrade reservation and idempotency linkage. This is workflow metadata only and never an authority for price, tax, payment, refund or entitlement.",
+      "primaryKey": "attempt_id",
+      "columns": [
+        {
+          "name": "attempt_id",
+          "type": "TEXT",
+          "nullable": false,
+          "primaryKey": true
+        },
+        {
+          "name": "subscriber_id",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "name": "subscription_id",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "name": "expected_subscription_version",
+          "type": "INTEGER",
+          "nullable": false
+        },
+        {
+          "name": "expected_plan_id",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "name": "expected_plan_version",
+          "type": "INTEGER",
+          "nullable": false
+        },
+        {
+          "name": "target_plan_id",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "name": "target_plan_version",
+          "type": "INTEGER",
+          "nullable": false
+        },
+        {
+          "name": "current_period_start",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "name": "current_period_end",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "name": "idempotency_key_hash",
+          "type": "TEXT",
+          "nullable": false,
+          "classification": "HASHED_IDEMPOTENCY_IDENTITY"
+        },
+        {
+          "name": "order_id",
+          "type": "TEXT",
+          "nullable": true,
+          "classification": "OPAQUE_D1_04_REFERENCE_ONLY"
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "nullable": false,
+          "allowed": [
+            "PENDING_PAYMENT",
+            "APPLIED",
+            "EXPIRED",
+            "RECONCILIATION_REQUIRED"
+          ]
+        },
+        {
+          "name": "expires_at",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "name": "applied_at",
+          "type": "TEXT",
+          "nullable": true
+        },
+        {
+          "name": "applied_subscription_version",
+          "type": "INTEGER",
+          "nullable": true
+        },
+        {
+          "name": "created_at",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "name": "updated_at",
+          "type": "TEXT",
+          "nullable": false
+        },
+        {
+          "name": "version",
+          "type": "INTEGER",
+          "nullable": false
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ux_membership_plan_change_attempts_idempotency",
+          "unique": true,
+          "columns": [
+            "subscriber_id",
+            "idempotency_key_hash"
+          ]
+        },
+        {
+          "name": "ux_membership_plan_change_attempts_pending_subscription",
+          "unique": true,
+          "partial": true,
+          "where": "status = 'PENDING_PAYMENT'",
+          "columns": [
+            "subscription_id"
+          ]
+        },
+        {
+          "name": "ix_membership_plan_change_attempts_order_status",
+          "unique": false,
+          "columns": [
+            "order_id",
+            "status"
+          ]
+        },
+        {
+          "name": "ix_membership_plan_change_attempts_expiry",
+          "unique": false,
+          "columns": [
+            "status",
+            "expires_at"
+          ]
+        }
+      ],
+      "invariants": [
+        "attempt_id is deterministically derived from subscriber-scoped Idempotency-Key using a one-way SHA-256 digest; raw idempotency keys are never stored.",
+        "At most one PENDING_PAYMENT upgrade attempt may exist per subscription.",
+        "A replay with the same subscriber and key returns the same opaque order reference; a semantically different replay conflicts.",
+        "Subscription mutation requires verified D1-04 payment success and a compare-and-set against expected subscription version, current plan/version and billing period.",
+        "order_id is only an opaque reference to D1-04 and does not make D1-01 a financial authority.",
+        "No monetary amount, currency, tax, discount, provider ID, payment status, refund or card data is stored in this table.",
+        "A paid upgrade applies only after its D1-03 W06 audit event is durably confirmed; otherwise webhook acknowledgement remains retryable."
+      ]
+    }
+  ]
 }
