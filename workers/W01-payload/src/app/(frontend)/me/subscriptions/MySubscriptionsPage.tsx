@@ -36,7 +36,7 @@ type ListResponse = {
 const copy = (locale: PublicLocale) => locale === 'en'
   ? {
       eyebrow: 'LUCKREAD · MEMBERSHIP',
-      description: 'Review subscription status and billing periods. Subscription records do not prove payment completion or access entitlement. Pause, resume, and cancellation are temporarily unavailable until verified payment-provider synchronization is admitted.',
+      description: 'Review subscription status and billing periods. Subscription records do not prove payment completion or access entitlement. Paid-subscription changes remain gated; WEB trial conversion can be canceled here, while store trials are managed by their app store.',
       discover: 'Explore content',
       refresh: 'Refresh',
       refreshing: 'Refreshing…',
@@ -76,7 +76,7 @@ const copy = (locale: PublicLocale) => locale === 'en'
   : locale === 'tw'
     ? {
         eyebrow: 'LUCKREAD · 會員訂閱',
-        description: '查看訂閱狀態與週期。訂閱記錄本身不代表付款完成或已取得內容權益；暫停、恢復及取消操作將在付款服務商同步驗證通過後開放。',
+        description: '查看訂閱狀態與週期。訂閱記錄本身不代表付款完成或已取得內容權益；付費訂閱變更仍受付款同步門禁限制，WEB 試用可在此取消續訂，商店試用請回商店管理。',
         discover: '探索內容',
         refresh: '重新整理',
         refreshing: '正在重新整理…',
@@ -115,7 +115,7 @@ const copy = (locale: PublicLocale) => locale === 'en'
       }
     : {
         eyebrow: 'LUCKREAD · 会员订阅',
-        description: '查看订阅状态与周期。订阅记录不代表付款完成或内容权益；暂停、恢复与取消操作将在付款服务商同步验证通过后开放。',
+        description: '查看订阅状态与周期。订阅记录不代表付款完成或内容权益；付费订阅变更仍受付款同步门禁限制，WEB 试用可在此取消续订，商店试用请回商店管理。',
         discover: '发现内容',
         refresh: '刷新',
         refreshing: '刷新中…',
