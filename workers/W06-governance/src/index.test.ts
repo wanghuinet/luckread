@@ -414,6 +414,16 @@ describe('W06 runtime', () => {
     subscriptionId: trialSubscriptionId,
     expectedVersion: 7,
   }
+  const trialCanceledEventInput = {
+    eventId: 'evt_subscription_trial_canceled_' + 'b'.repeat(26),
+    phase: 'CANCELED',
+    planId: 'plan_' + 'd'.repeat(64),
+    subscriptionId: trialSubscriptionId,
+    trialId: 'mtr_' + 'e'.repeat(26),
+    planVersion: 3,
+    trialEndsAt: '2026-11-01T00:00:00.000Z',
+    occurredAt: '2026-10-20T12:00:00.000Z',
+  }
   const trialCancelAuditRequest = (
     body: unknown,
     requestId = 'req_trial_cancel_intent_1',
@@ -527,6 +537,68 @@ describe('W06 runtime', () => {
     expect(response.status).toBe(409)
     expect(await response.json()).toEqual({ error: 'AUDIT_EVENT_CONFLICT' })
     expect(rows.size).toBe(1)
+  })
+
+  const trialCanceledAuditRequest = (
+    body: unknown,
+    requestId = 'req_trial_canceled_1',
+    layer = 'L2',
+  ) => new Request('https://w06.internal/internal/audit-events/subscription-trial', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'X-LuckRead-Caller': 'W01',
+      'X-LuckRead-Transport-Version': '1.0',
+      'X-LuckRead-Principal-User-Id': 'buyer_user_001',
+      'X-LuckRead-Principal-Layer': layer,
+      'X-LuckRead-Correlation-Id': 'trial-canceled-correlation',
+      'X-LuckRead-Request-Id': requestId,
+    },
+    body: JSON.stringify(body),
+  })
+
+  it('persists a stable trial-canceled result without depending on the post-cancel subscription state', async () => {
+    const { db, rows } = createPlanAuditDb()
+    const runtime = await import('./index')
+    const first = await runtime.default.fetch(
+      trialCanceledAuditRequest(trialCanceledEventInput),
+      { D1_03: db },
+    )
+    const replay = await runtime.default.fetch(
+      trialCanceledAuditRequest(trialCanceledEventInput, 'req_trial_canceled_retry'),
+      { D1_03: db },
+    )
+    expect(first.status).toBe(201)
+    expect(replay.status).toBe(200)
+    expect(await replay.json()).toMatchObject({
+      eventId: trialCanceledEventInput.eventId,
+      action: 'membership.subscription.trial_canceled',
+      replayed: true,
+    })
+    expect(rows.get(trialCanceledEventInput.eventId)).toMatchObject({
+      action: 'membership.subscription.trial_canceled',
+      target_type: 'Subscription',
+      target_id: trialSubscriptionId,
+      before_json: JSON.stringify({ status: 'TRIALING_OR_PAYMENT_FAILED' }),
+      after_json: JSON.stringify({
+        trialId: trialCanceledEventInput.trialId,
+        planId: trialCanceledEventInput.planId,
+        planVersion: 3,
+        status: 'CANCELED',
+        trialEndsAt: trialCanceledEventInput.trialEndsAt,
+      }),
+      occurred_at: trialCanceledEventInput.occurredAt,
+    })
+  })
+
+  it('rejects the removed mutable previousStatus field on a trial-canceled audit result', async () => {
+    const { db } = createPlanAuditDb()
+    const runtime = await import('./index')
+    const response = await runtime.default.fetch(
+      trialCanceledAuditRequest({ ...trialCanceledEventInput, previousStatus: 'PAYMENT_FAILED' }),
+      { D1_03: db },
+    )
+    expect(response.status).toBe(400)
   })
 
   it('requires the private W01 transport for membership-plan audit writes', async () => {
