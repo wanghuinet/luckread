@@ -195,13 +195,13 @@ export async function assertSubscriptionUpgradeOrderPayable(
 
   let subscription: {
     subscriber_id: string; plan_id: string; plan_version: number; creator_id: string | null;
-    status: string; current_period_start: string; current_period_end: string; cancel_at: string | null; version: number;
+    status: string; current_period_start: string; current_period_end: string; cancel_at: string | null; version: number; pending_plan_id: string | null;
   } | null;
   let receipt: { change_request_id: string } | null;
   try {
     subscription = await env.D1_01.prepare(
       'SELECT subscriber_id, plan_id, plan_version, creator_id, status, current_period_start, ' +
-      'current_period_end, cancel_at, version FROM membership_subscriptions WHERE subscription_id = ? LIMIT 1',
+      'current_period_end, cancel_at, version, pending_plan_id FROM membership_subscriptions WHERE subscription_id = ? LIMIT 1',
     ).bind(change.subscriptionId).first();
     receipt = await env.D1_01.prepare(
       'SELECT change_request_id FROM membership_subscription_plan_change_receipts WHERE change_request_id = ? LIMIT 1',
@@ -235,7 +235,7 @@ export async function assertSubscriptionUpgradeOrderPayable(
   }
   if (!subscription || !subscription.creator_id || subscription.subscriber_id !== customerId ||
       subscription.creator_id !== targetPlan.owner_id ||
-      subscription.status !== 'ACTIVE' || subscription.cancel_at !== null ||
+      subscription.status !== 'ACTIVE' || subscription.cancel_at !== null || subscription.pending_plan_id !== null ||
       subscription.version !== change.sourceSubscriptionVersion ||
       subscription.plan_id !== change.sourcePlanId ||
       subscription.plan_version !== change.sourcePlanVersion ||

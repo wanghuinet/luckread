@@ -66,6 +66,35 @@ export async function callW06SubscriptionPlanChangeAudit(input: {
   })
 }
 
+/** Durable immutable audit for a period-end Subscription downgrade schedule. */
+export async function callW06SubscriptionPlanScheduledAudit(input: {
+  request: Request
+  principal: ContentPrincipal
+  body: {
+    eventId: string
+    changeRequestId: string
+    subscriptionId: string
+    sourceSubscriptionVersion: number
+    scheduledSubscriptionVersion: number
+    sourcePlanId: string
+    sourcePlanVersion: number
+    targetPlanId: string
+    targetPlanVersion: number
+    currentPeriodStart: string
+    currentPeriodEnd: string
+    effectiveAt: string
+    occurredAt: string
+  }
+}): Promise<Response> {
+  return callW06Moderation({
+    request: input.request,
+    pathname: '/internal/audit-events/membership-subscription-plan-scheduled',
+    method: 'POST',
+    principal: input.principal,
+    body: input.body,
+  })
+}
+
 /** Dedicated fixed route for the durable membership-plan audit record. */
 export async function callW06MembershipPlanAudit(input: {
   request: Request

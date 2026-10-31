@@ -2,6 +2,7 @@
 
 import { quoteSubscriptionPlanChange } from './subscription-plan-change-quote.js'
 import { createSubscriptionPlanUpgradeOrder } from './subscription-plan-change-checkout.js'
+import { scheduleSubscriptionPlanDowngrade } from './subscription-plan-change-schedule.js'
 import { createMembershipPlanDraft, reviseMembershipPlan, getSubscription, hasActiveCreatorMembership, listActiveMembershipPlans, listCreatorMembershipPlans, listSubscriptions, parseBoundedPositiveInt, publishMembershipPlan, transitionMembershipPlanLifecycle, SubscriptionRuntimeError, validatePrincipal } from './subscription-runtime.js'
 import { handleCommerceOrderRequest } from './order-http-runtime.js'
 import { resolveCommerceOrderItems } from './order-item-resolution.js'
@@ -144,6 +145,7 @@ type Operation =
   | { operation: 'get'; subscriptionId: string }
   | { operation: 'quotePlanChange'; subscriptionId: string }
   | { operation: 'changePlan'; subscriptionId: string }
+  | { operation: 'schedulePlanChange'; subscriptionId: string }
 
 const toOperation = (method: string, segments: string[]): Operation | null => {
   if (segments.length === 1 && segments[0] === 'plans' && method === 'GET') return { operation: 'listPlans', subscriptionId: null }
@@ -152,6 +154,7 @@ const toOperation = (method: string, segments: string[]): Operation | null => {
   if (segments.length === 2 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && method === 'GET') return { operation: 'list', subscriptionId: null }
   if (segments.length === 3 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && method === 'GET') return { operation: 'get', subscriptionId: segments[2] }
   if (segments.length === 5 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && segments[3] === 'change-plan' && segments[4] === 'quote' && method === 'GET') return { operation: 'quotePlanChange', subscriptionId: segments[2] }
+  if (segments.length === 5 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && segments[3] === 'change-plan' && segments[4] === 'schedule' && method === 'POST') return { operation: 'schedulePlanChange', subscriptionId: segments[2] }
   if (segments.length === 4 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && segments[3] === 'change-plan' && method === 'POST') return { operation: 'changePlan', subscriptionId: segments[2] }
   return null
 }
@@ -213,7 +216,7 @@ export default {
         const allowed = await hasActiveCreatorMembership(env.D1_01, subscriberId, creatorId)
         return json({
           data: { allowed, reason: allowed ? 'ACTIVE_CREATOR_MEMBERSHIP' : 'MEMBERSHIP_REQUIRED' },
-          requestId: crypto.randomUUID(),
+          requestId: `req_${crypto.randomUUID()}`,
         })
       }
 
@@ -273,12 +276,12 @@ export default {
         }
         if (request.body !== null) {
           await request.body.cancel().catch(() => undefined)
-          return json({ error: { code: 'VALIDATION_FAILED', message: 'Plan publish does not accept a request body', details: {} }, requestId: crypto.randomUUID() }, 400)
+          return json({ error: { code: 'VALIDATION_FAILED', message: 'Plan publish does not accept a request body', details: {} }, requestId: `req_${crypto.randomUUID()}` }, 400)
         }
         requireCreatorLayer(request)
         const creatorId = requireVerifiedCreatorId(request)
         const result = await publishMembershipPlan(env.D1_01, creatorId, segments[2]!, request.headers.get('If-Match'))
-        return json({ data: result, requestId: crypto.randomUUID() }, 200, result.etag)
+        return json({ data: result, requestId: `req_${crypto.randomUUID()}` }, 200, result.etag)
       }
       const planRevisionMatch = /^\/membership\/plans\/([^/]+)$/.exec(pathname)
       if (request.method === 'PUT' && planRevisionMatch) {
@@ -292,7 +295,7 @@ export default {
         const result = await reviseMembershipPlan(
           env.D1_01, creatorId, segments[2]!, request.headers.get('If-Match'), input,
         )
-        return json({ data: result, requestId: crypto.randomUUID() }, 200, result.etag)
+        return json({ data: result, requestId: `req_${crypto.randomUUID()}` }, 200, result.etag)
       }
       const planLifecycleMatch = /^\/membership\/plans\/([^/]+)\/lifecycle$/.exec(pathname)
       if (request.method === 'POST' && planLifecycleMatch) {
@@ -313,7 +316,24 @@ export default {
           env.D1_01, creatorId, segments[2]!, request.headers.get('If-Match'),
           (value as { action: 'pause' | 'resume' | 'retire' }).action,
         )
-        return json({ data: result, requestId: crypto.randomUUID() }, 200, result.etag)
+        return json({ data: result, requestId: `req_${crypto.randomUUID()}` }, 200, result.etag)
+      }
+      if (operation?.operation === 'schedulePlanChange') {
+        const value = await readJsonBody(request)
+        if (!value || typeof value !== 'object' || Array.isArray(value) ||
+            Object.keys(value as Record<string, unknown>).length !== 1 ||
+            !Object.hasOwn(value, 'planId') ||
+            typeof (value as { planId?: unknown }).planId !== 'string') {
+          throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
+        }
+        const result = await scheduleSubscriptionPlanDowngrade(env, principal, {
+          subscriptionId: operation.subscriptionId,
+          planId: (value as { planId: string }).planId,
+          ifMatch: request.headers.get('If-Match') ?? '',
+          idempotencyKey: request.headers.get('Idempotency-Key') ?? '',
+          actorLayer: request.headers.get('X-LuckRead-Principal-Layer') ?? '',
+        })
+        return json({ data: result, requestId: `req_${crypto.randomUUID()}` }, result.replayed ? 200 : 201)
       }
       if (operation?.operation === 'changePlan') {
         const value = await readJsonBody(request)
@@ -330,7 +350,7 @@ export default {
           idempotencyKey: request.headers.get('Idempotency-Key') ?? '',
           actorLayer: request.headers.get('X-LuckRead-Principal-Layer') ?? '',
         })
-        return json({ data: result, requestId: crypto.randomUUID() }, result.replayed ? 200 : 201)
+        return json({ data: result, requestId: `req_${crypto.randomUUID()}` }, result.replayed ? 200 : 201)
       }
       if (request.method === 'POST' && operation?.operation !== 'createPlan') {
         return json({
@@ -339,7 +359,7 @@ export default {
             message: 'Subscription writes are disabled until verified payment-provider synchronization is available.',
             details: {},
           },
-          requestId: crypto.randomUUID(),
+          requestId: `req_${crypto.randomUUID()}`,
         }, 503)
       }
       if (!operation) return new Response(null, { status: 404 })
@@ -353,7 +373,7 @@ export default {
           await readJsonBody(request),
           request.headers.get('Idempotency-Key'),
         )
-        return json({ data: result, requestId: crypto.randomUUID() }, result.replayed ? 200 : 201, result.etag)
+        return json({ data: result, requestId: `req_${crypto.randomUUID()}` }, result.replayed ? 200 : 201, result.etag)
       }
       if (operation.operation === 'listOwnedPlans') {
         requireCreatorLayer(request)
@@ -361,20 +381,20 @@ export default {
         const url = new URL(request.url)
         const requestedLimit = parseBoundedPositiveInt(url.searchParams.get('limit'), 20, 50)
         const result = await listCreatorMembershipPlans(env.D1_01, creatorId, requestedLimit, url.searchParams.get('cursor'))
-        return json({ data: result, requestId: crypto.randomUUID() })
+        return json({ data: result, requestId: `req_${crypto.randomUUID()}` })
       }
       if (operation.operation === 'listPlans') {
         const url = new URL(request.url)
         const requestedLimit = parseBoundedPositiveInt(url.searchParams.get('limit'), 20, 50)
         const result = await listActiveMembershipPlans(env.D1_01, requestedLimit, url.searchParams.get('cursor'))
-        return json({ data: result, requestId: crypto.randomUUID() })
+        return json({ data: result, requestId: `req_${crypto.randomUUID()}` })
       }
       if (operation.operation === 'list') {
         const url = new URL(request.url)
         const requestedLimit = parseBoundedPositiveInt(url.searchParams.get('limit'), 20, 50)
         const requestedPage = parseBoundedPositiveInt(url.searchParams.get('page'), 1, 10000)
         const result = await listSubscriptions(env.D1_01, principal, requestedLimit, requestedPage)
-        return json({ data: result, requestId: crypto.randomUUID() })
+        return json({ data: result, requestId: `req_${crypto.randomUUID()}` })
       }
       if (operation.operation === 'quotePlanChange') {
         const url = new URL(request.url)
@@ -383,17 +403,17 @@ export default {
         const quote = await quoteSubscriptionPlanChange(
           env.D1_01, principal, operation.subscriptionId, { planId }, request.headers.get('If-Match') ?? '',
         )
-        return json({ data: quote, requestId: crypto.randomUUID() })
+        return json({ data: quote, requestId: `req_${crypto.randomUUID()}` })
       }
       const result = await getSubscription(env.D1_01, principal, operation.subscriptionId)
-      return json({ data: result, requestId: crypto.randomUUID() }, 200, result.etag)
+      return json({ data: result, requestId: `req_${crypto.randomUUID()}` }, 200, result.etag)
     } catch (error) {
       if (error instanceof SubscriptionRuntimeError) {
         const message = error.code === 'PERMISSION_DENIED' ? 'permission denied' : error.code === 'PRECONDITION_REQUIRED' ? 'precondition required' : error.code === 'PRECONDITION_FAILED' ? 'precondition failed' : error.code === 'RESOURCE_NOT_FOUND' ? 'resource not found' : error.code === 'INVALID_STATE' ? 'invalid subscription state' : error.code === 'PLAN_NOT_ACTIVE' ? 'membership plan is unavailable' : error.code === 'CONFLICT' ? 'subscription conflict' : error.code === 'VALIDATION_FAILED' ? 'validation failed' : error.code === 'RATE_LIMITED' ? 'too many requests' : error.code === 'SERVICE_UNAVAILABLE' ? 'service unavailable' : error.code
-        return new Response(JSON.stringify({ error: { code: error.code, message, details: error.code === 'RATE_LIMITED' ? { retryAfter: 60 } : {} }, requestId: crypto.randomUUID() }), { status: error.status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...(error.code === 'RATE_LIMITED' ? { 'retry-after': '60' } : {}) } })
+        return new Response(JSON.stringify({ error: { code: error.code, message, details: error.code === 'RATE_LIMITED' ? { retryAfter: 60 } : {} }, requestId: `req_${crypto.randomUUID()}` }), { status: error.status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...(error.code === 'RATE_LIMITED' ? { 'retry-after': '60' } : {}) } })
       }
       console.error(error)
-      return json({ error: { code: 'INTERNAL_ERROR', message: 'Internal error', details: {} }, requestId: crypto.randomUUID() }, 500)
+      return json({ error: { code: 'INTERNAL_ERROR', message: 'Internal error', details: {} }, requestId: `req_${crypto.randomUUID()}` }, 500)
     }
   },
 }

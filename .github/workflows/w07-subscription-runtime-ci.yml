@@ -158,18 +158,22 @@ jobs:
           migration_3 = Path('workers/W07-subscription-commerce/migrations/0003_membership_plans.sql').read_text()
           migration_4 = Path('workers/W07-subscription-commerce/migrations/0004_revenuecat_membership_product_bindings.sql').read_text()
           migration_5 = Path('workers/W07-subscription-commerce/migrations/0005_membership_subscription_plan_change_receipts.sql').read_text()
+          migration_6 = Path('workers/W07-subscription-commerce/migrations/0006_membership_scheduled_plan_changes.sql').read_text()
           db.executescript(migration_1)
           db.execute("""INSERT INTO membership_subscriptions (subscription_id, subscriber_id, plan_id, plan_version, creator_id, status, started_at, current_period_start, current_period_end, cancel_at, entitlement_snapshot_ref, created_at, updated_at) VALUES ('sub_migration_probe', 'user_migration_probe', 'plan_test', 1, NULL, 'PENDING', '2026-10-27T00:00:00.000Z', '2026-10-27T00:00:00.000Z', '2026-10-27T00:00:00.000Z', NULL, NULL, '2026-10-27T00:00:00.000Z', '2026-10-27T00:00:00.000Z')""")
           db.executescript(migration_2)
           db.executescript(migration_3)
           db.executescript(migration_4)
           db.executescript(migration_5)
+          db.executescript(migration_6)
           cols = db.execute('PRAGMA table_info("membership_subscriptions")').fetchall()
           expected = {
             'subscription_id':('TEXT',1,1),'subscriber_id':('TEXT',1,0),'plan_id':('TEXT',1,0),'plan_version':('INTEGER',1,0),
             'creator_id':('TEXT',0,0),'status':('TEXT',1,0),'started_at':('TEXT',1,0),'current_period_start':('TEXT',1,0),
             'current_period_end':('TEXT',1,0),'cancel_at':('TEXT',0,0),'entitlement_snapshot_ref':('TEXT',0,0),
             'created_at':('TEXT',1,0),'updated_at':('TEXT',1,0),'version':('INTEGER',1,0),
+            'pending_plan_id':('TEXT',0,0),'pending_plan_version':('INTEGER',0,0),
+            'pending_plan_effective_at':('TEXT',0,0),'pending_plan_change_id':('TEXT',0,0),
           }
           got = {r[1]:(r[2],r[3],r[5]) for r in cols}
           if got != expected: raise SystemExit(f'unexpected schema: {got!r}')
@@ -325,7 +329,52 @@ jobs:
             raise SystemExit('plan change receipt with non-consecutive subscription version was accepted')
           except sqlite3.IntegrityError:
             pass
-          print('SUBSCRIPTION_D1_01_AND_MEMBERSHIP_PLAN_AND_CHANGE_RECEIPT_MIGRATIONS_STATIC=PASS')
+          scheduled_receipt_cols = {r[1]:(r[2],r[3],r[5]) for r in db.execute('PRAGMA table_info("membership_subscription_scheduled_plan_change_receipts")').fetchall()}
+          expected_scheduled_receipts = {
+            'change_request_id':('TEXT',1,1),'subscription_id':('TEXT',1,0),'subscriber_id':('TEXT',1,0),
+            'source_subscription_version':('INTEGER',1,0),'scheduled_subscription_version':('INTEGER',1,0),
+            'source_plan_id':('TEXT',1,0),'source_plan_version':('INTEGER',1,0),
+            'target_plan_id':('TEXT',1,0),'target_plan_version':('INTEGER',1,0),
+            'current_period_start':('TEXT',1,0),'current_period_end':('TEXT',1,0),
+            'effective_at':('TEXT',1,0),'scheduled_at':('TEXT',1,0),
+          }
+          if scheduled_receipt_cols != expected_scheduled_receipts: raise SystemExit(f'unexpected scheduled plan-change receipt schema: {scheduled_receipt_cols!r}')
+          if 'ix_membership_subscriptions_pending_plan_effective' not in {r[1] for r in db.execute('PRAGMA index_list("membership_subscriptions")').fetchall()}: raise SystemExit('missing pending plan effective index')
+          if 'ix_membership_subscription_scheduled_plan_changes_subscription' not in {r[1] for r in db.execute('PRAGMA index_list("membership_subscription_scheduled_plan_change_receipts")').fetchall()}: raise SystemExit('missing scheduled plan-change receipt index')
+          scheduled_triggers = {r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='trigger' AND tbl_name='membership_subscription_scheduled_plan_change_receipts'").fetchall()}
+          if scheduled_triggers != {'membership_subscription_scheduled_plan_change_receipts_immutable_update','membership_subscription_scheduled_plan_change_receipts_immutable_delete'}: raise SystemExit(f'unexpected scheduled receipt triggers: {scheduled_triggers!r}')
+          pending_triggers = {r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='trigger' AND tbl_name='membership_subscriptions' AND name LIKE 'membership_subscriptions_pending_plan_change_%'").fetchall()}
+          if pending_triggers != {'membership_subscriptions_pending_plan_change_insert_guard','membership_subscriptions_pending_plan_change_update_guard'}: raise SystemExit(f'unexpected pending plan change guards: {pending_triggers!r}')
+          db.execute("INSERT INTO membership_plans(plan_id,owner_type,owner_id,current_version,status,visibility,version,created_at,updated_at) VALUES ('plan_target_probe','CREATOR','creator_probe',1,'ACTIVE','PUBLIC',1,'2026-10-27T00:00:00.000Z','2026-10-27T00:00:00.000Z')")
+          db.execute("INSERT INTO membership_plan_versions(plan_id,plan_version,name,tier,billing_interval,price_minor,currency,benefits_json,created_at) VALUES ('plan_target_probe',1,'Probe lower','basic','MONTHLY',50,'USD','[]','2026-10-27T00:00:00.000Z')")
+          db.execute("""INSERT INTO membership_subscriptions (subscription_id, subscriber_id, plan_id, plan_version, creator_id, status, started_at, current_period_start, current_period_end, cancel_at, entitlement_snapshot_ref, created_at, updated_at)
+            VALUES ('sub_schedule_probe','user_schedule_probe','plan_probe',1,'creator_probe','ACTIVE','2026-10-01T00:00:00.000Z','2026-10-01T00:00:00.000Z','2026-11-01T00:00:00.000Z',NULL,NULL,'2026-10-01T00:00:00.000Z','2026-10-01T00:00:00.000Z')""")
+          schedule_id = 'sps_' + 'c' * 60
+          db.execute("""INSERT INTO membership_subscription_scheduled_plan_change_receipts
+            (change_request_id,subscription_id,subscriber_id,source_subscription_version,scheduled_subscription_version,
+             source_plan_id,source_plan_version,target_plan_id,target_plan_version,current_period_start,current_period_end,effective_at,scheduled_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (schedule_id,'sub_schedule_probe','user_schedule_probe',1,2,'plan_probe',1,'plan_target_probe',1,
+             '2026-10-01T00:00:00.000Z','2026-11-01T00:00:00.000Z','2026-11-01T00:00:00.000Z','2026-10-31T00:00:00.000Z'))
+          db.execute("""UPDATE membership_subscriptions SET pending_plan_id='plan_target_probe',pending_plan_version=1,
+            pending_plan_effective_at='2026-11-01T00:00:00.000Z',pending_plan_change_id=?
+            WHERE subscription_id='sub_schedule_probe'""", (schedule_id,))
+          try:
+            db.execute("UPDATE membership_subscriptions SET pending_plan_effective_at='2026-11-02T00:00:00.000Z' WHERE subscription_id='sub_schedule_probe'")
+            raise SystemExit('scheduled plan effective time different from current period end was accepted')
+          except sqlite3.IntegrityError:
+            pass
+          try:
+            db.execute("UPDATE membership_subscription_scheduled_plan_change_receipts SET target_plan_version=2 WHERE change_request_id=?", (schedule_id,))
+            raise SystemExit('scheduled plan-change receipt mutation was not blocked')
+          except sqlite3.IntegrityError:
+            pass
+          try:
+            db.execute("DELETE FROM membership_subscription_scheduled_plan_change_receipts WHERE change_request_id=?", (schedule_id,))
+            raise SystemExit('scheduled plan-change receipt deletion was not blocked')
+          except sqlite3.IntegrityError:
+            pass
+          print('SUBSCRIPTION_D1_01_AND_MEMBERSHIP_PLAN_AND_PLAN_CHANGE_AND_SCHEDULED_DOWNGRADE_MIGRATIONS_STATIC=PASS')
           PY
 
       - name: Verify isolated D1-04 Order migration candidate

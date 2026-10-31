@@ -122,6 +122,30 @@
         "nullable": false,
         "primaryKey": false,
         "fieldId": "ENT-SUBSCRIPTION-F-UPDATED-AT"
+      },
+      {
+        "name": "pending_plan_id",
+        "type": "TEXT",
+        "nullable": true,
+        "primaryKey": false
+      },
+      {
+        "name": "pending_plan_version",
+        "type": "INTEGER",
+        "nullable": true,
+        "primaryKey": false
+      },
+      {
+        "name": "pending_plan_effective_at",
+        "type": "TEXT",
+        "nullable": true,
+        "primaryKey": false
+      },
+      {
+        "name": "pending_plan_change_id",
+        "type": "TEXT",
+        "nullable": true,
+        "primaryKey": false
       }
     ],
     "indexes": [
@@ -181,7 +205,7 @@
   "migration": {
     "status": "PREPARED_NOT_APPLIED",
     "candidateMigration": "workers/W07-subscription-commerce/migrations/0002_subscription_version_cas.sql",
-    "rule": "The version-column migration is prepared as a reviewed code candidate only. A physical migration still requires exact artifact hash, read-only confirmation of the target and migration history, controlled target D1-01 execution and post-schema evidence.",
+    "rule": "The version-column and membership plan migrations are reviewed source candidates only. Candidate migrations 0003 through 0006 still require exact artifact hash, read-only confirmation of target and migration history, controlled target D1-01 execution and post-schema evidence. No candidate is treated as remotely applied.",
     "additionalCandidates": [
       {
         "file": "workers/W07-subscription-commerce/migrations/0003_membership_plans.sql",
@@ -198,6 +222,12 @@
       {
         "file": "workers/W07-subscription-commerce/migrations/0005_membership_subscription_plan_change_receipts.sql",
         "id": "0005_membership_subscription_plan_change_receipts",
+        "targetBinding": "D1_01",
+        "appliedRemotely": false
+      },
+      {
+        "file": "workers/W07-subscription-commerce/migrations/0006_membership_scheduled_plan_changes.sql",
+        "id": "0006_membership_scheduled_plan_changes",
         "targetBinding": "D1_01",
         "appliedRemotely": false
       }
@@ -235,7 +265,10 @@
     "read-only verification of RevenueCat immutable product-binding schema, index and retirement/immutability triggers",
     "read-only verification of immutable paid plan-change receipt schema, indexes and immutable triggers",
     "migration history must include 0001 through 0005 in order before runtime deployment",
-    "a paid plan change must bind exact D1-04 payment/order facts to the D1-01 subscription source-version CAS and immutable change receipt"
+    "a paid plan change must bind exact D1-04 payment/order facts to the D1-01 subscription source-version CAS and immutable change receipt",
+    "read-only verification of scheduled plan-change receipt schema, indexes and immutable triggers",
+    "migration history must include 0001 through 0006 in order before runtime deployment",
+    "a scheduled downgrade must preserve the current plan and entitlement until the next billing-cycle payment is verified as successful; failed renewal preserves the pending schedule for retry"
   ],
   "promotionRule": "Remain CONTRACTED_NOT_VERIFIED until the physical binding, migration, runtime authority and Evidence Registry evidence are all admitted.",
   "additionalTables": [
@@ -373,6 +406,92 @@
       "immutable": "Updates and deletes are rejected by D1 triggers. The Subscription CAS and receipt insert run in one D1-01 batch transaction.",
       "migration": "workers/W07-subscription-commerce/migrations/0005_membership_subscription_plan_change_receipts.sql",
       "status": "SOURCE_CANDIDATE_NOT_APPLIED"
+    },
+    {
+      "name": "membership_subscription_scheduled_plan_change_receipts",
+      "purpose": "Immutable idempotent replay/audit receipt for a period-end Subscription downgrade schedule; not an independent Subscription or Entitlement authority and contains no payment credentials.",
+      "authority": "W07 / D1-01",
+      "primaryKey": "change_request_id",
+      "columns": [
+        {
+          "name": "change_request_id",
+          "type": "TEXT",
+          "nullable": false,
+          "primaryKey": true
+        },
+        {
+          "name": "subscription_id",
+          "type": "TEXT",
+          "nullable": false,
+          "primaryKey": false
+        },
+        {
+          "name": "subscriber_id",
+          "type": "TEXT",
+          "nullable": false,
+          "primaryKey": false
+        },
+        {
+          "name": "source_subscription_version",
+          "type": "INTEGER",
+          "nullable": false,
+          "primaryKey": false
+        },
+        {
+          "name": "scheduled_subscription_version",
+          "type": "INTEGER",
+          "nullable": false,
+          "primaryKey": false
+        },
+        {
+          "name": "source_plan_id",
+          "type": "TEXT",
+          "nullable": false,
+          "primaryKey": false
+        },
+        {
+          "name": "source_plan_version",
+          "type": "INTEGER",
+          "nullable": false,
+          "primaryKey": false
+        },
+        {
+          "name": "target_plan_id",
+          "type": "TEXT",
+          "nullable": false,
+          "primaryKey": false
+        },
+        {
+          "name": "target_plan_version",
+          "type": "INTEGER",
+          "nullable": false,
+          "primaryKey": false
+        },
+        {
+          "name": "current_period_start",
+          "type": "TEXT",
+          "nullable": false,
+          "primaryKey": false
+        },
+        {
+          "name": "current_period_end",
+          "type": "TEXT",
+          "nullable": false,
+          "primaryKey": false
+        },
+        {
+          "name": "effective_at",
+          "type": "TEXT",
+          "nullable": false,
+          "primaryKey": false
+        },
+        {
+          "name": "scheduled_at",
+          "type": "TEXT",
+          "nullable": false,
+          "primaryKey": false
+        }
+      ]
     }
   ]
 }

@@ -2151,6 +2151,46 @@ paths:
         '503': { description: Live pricing/tax or payment dependencies are not admitted or unavailable. }
         '4XX': { $ref: '#/components/responses/ClientError' }
 
+  /memberships/subscriptions/{subscriptionId}/change-plan/schedule:
+    parameters:
+      - name: subscriptionId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    post:
+      tags: [Users]
+      summary: Schedule a subscription downgrade at current period end
+      operationId: scheduleSubscriptionPlanDowngrade
+      description: >
+        Persists one idempotent downgrade schedule against the current
+        Subscription version. The current plan and entitlement remain active
+        for the current paid-through period. W07 pins the target immutable plan
+        version for the next cycle; only verified successful renewal payment
+        applies the target and clears the schedule. Failed renewal preserves
+        the schedule and follows the existing PAST_DUE retry state machine.
+      parameters:
+        - $ref: '#/components/parameters/IfMatchRequired'
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [planId]
+              properties:
+                planId: { $ref: '#/components/schemas/ResourceId' }
+      responses:
+        '201': { description: Downgrade scheduled; current Subscription and Entitlement remain unchanged. }
+        '200': { description: Exact idempotent replay of the existing schedule receipt. }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '409': { description: Unsupported target, existing schedule, pending upgrade or invalid lifecycle state. }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '503': { description: W07 or durable W06 audit dependency unavailable. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
   /entitlements/{subjectId}:
     parameters:
       - name: subjectId

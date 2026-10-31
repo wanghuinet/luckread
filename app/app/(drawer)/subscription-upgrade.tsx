@@ -19,6 +19,7 @@ import {
   fetchActiveMembershipPlansPage,
   fetchMySubscriptionsPage,
   fetchSubscriptionPlanChangeQuote,
+  scheduleSubscriptionPlanDowngrade,
   type ActiveMembershipPlan,
   type MySubscription,
   type MySubscriptionPage,
@@ -258,7 +259,7 @@ export default function SubscriptionUpgradeScreen() {
   );
 
   const choosePlan = useCallback(async (plan: ActiveMembershipPlan) => {
-    if (!subscription || orderCreated || loadingQuote || creatingOrder) return;
+    if (!subscription || subscription.scheduledPlanChange || orderCreated || loadingQuote || creatingOrder) return;
     setSelectedPlanId(plan.planId);
     setQuote(null);
     setError('');
@@ -311,6 +312,83 @@ export default function SubscriptionUpgradeScreen() {
       setCreatingOrder(false);
     }
   }, [orderId, creatingOrder, loadData, subscription]);
+
+  const startScheduleDowngrade = useCallback(async () => {
+    if (!subscription || !selectedPlan || !quote || quote.direction !== 'DOWNGRADE' ||
+        quote.paymentRequired || creatingOrder || subscription.scheduledPlanChange) return;
+    setCreatingOrder(true);
+    setError('');
+    setMessage('');
+    try {
+      const storageKey = 'lr.plan-schedule.' + subscription.subscriptionId + '.v' + String(subscription.version);
+      let stored: { targetPlanId: string; idempotencyKey: string } | null = null;
+      try {
+        const raw: unknown = JSON.parse((await SecureStore.getItemAsync(storageKey)) ?? 'null');
+        if (isRecord(raw) && typeof raw.targetPlanId === 'string' &&
+            /^plan_[a-f0-9]{64}$/.test(raw.targetPlanId) &&
+            typeof raw.idempotencyKey === 'string' && raw.idempotencyKey.length > 0 &&
+            raw.idempotencyKey.length <= 256) {
+          stored = { targetPlanId: raw.targetPlanId, idempotencyKey: raw.idempotencyKey };
+        }
+      } catch {
+        stored = null;
+      }
+      if (stored && stored.targetPlanId !== selectedPlan.planId) {
+        throw new Error('此订阅版本已有另一项降级预约请求，请先处理原请求。');
+      }
+      const key = stored?.idempotencyKey ?? createIdempotencyKey();
+      if (!stored) {
+        try {
+          await SecureStore.setItemAsync(storageKey, JSON.stringify({
+            targetPlanId: selectedPlan.planId,
+            idempotencyKey: key,
+          }));
+        } catch {
+          throw new Error('无法安全保存降级预约凭证，请检查设备安全存储后重试。');
+        }
+      }
+      const result = await scheduleSubscriptionPlanDowngrade({
+        subscriptionId: subscription.subscriptionId,
+        targetPlanId: selectedPlan.planId,
+        etag: subscription.etag,
+        idempotencyKey: key,
+      });
+      if (!result.response.ok) {
+        throw new Error(result.error?.message || getApiErrorMessage(result.data, '无法预约套餐降级。', result.response.status));
+      }
+      const scheduled = unwrapApiData<unknown>(result.data);
+      if (!isRecord(scheduled) || scheduled.status !== 'SCHEDULED' ||
+          typeof scheduled.changeRequestId !== 'string' || !/^sps_[a-f0-9]{60}$/.test(scheduled.changeRequestId) ||
+          scheduled.subscriptionId !== subscription.subscriptionId ||
+          !Number.isSafeInteger(scheduled.sourceSubscriptionVersion) ||
+          scheduled.sourceSubscriptionVersion !== subscription.version ||
+          !Number.isSafeInteger(scheduled.scheduledSubscriptionVersion) ||
+          scheduled.scheduledSubscriptionVersion !== subscription.version + 1 ||
+          !isRecord(scheduled.sourcePlan) ||
+          scheduled.sourcePlan.planId !== subscription.planId ||
+          !Number.isSafeInteger(scheduled.sourcePlan.planVersion) ||
+          !isRecord(scheduled.targetPlan) ||
+          scheduled.targetPlan.planId !== selectedPlan.planId ||
+          !Number.isSafeInteger(scheduled.targetPlan.planVersion) ||
+          scheduled.effectiveAt !== quote.effectiveAt ||
+          scheduled.currentPeriodEnd !== quote.effectiveAt ||
+          scheduled.entitlementChanged !== false ||
+          typeof scheduled.replayed !== 'boolean' ||
+          scheduled.mutationPerformed !== !scheduled.replayed) {
+        throw new Error('降级预约结果未通过完整性校验。');
+      }
+      setMessage('已预约于 ' + dateLabel(String(scheduled.effectiveAt)) + ' 降级。本周期仍保留当前套餐权益；只有下一周期续费成功后才切换。');
+      setQuote(null);
+      const refreshed = await loadData();
+      if (refreshed?.scheduledPlanChange?.changeRequestId !== scheduled.changeRequestId) {
+        setMessage('降级预约已由 W07 保存并审计；刷新订阅记录后即可查看最终状态。当前套餐权益未改变。');
+      }
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : '无法预约套餐降级。');
+    } finally {
+      setCreatingOrder(false);
+    }
+  }, [subscription, selectedPlan, quote, creatingOrder, loadData]);
 
   const startUpgradeCheckout = useCallback(async () => {
     if (orderId) {
@@ -441,6 +519,11 @@ export default function SubscriptionUpgradeScreen() {
           <Text className="mt-2 text-xs text-neutral-500">
             当前周期：{dateLabel(subscription.currentPeriodStart)} — {dateLabel(subscription.currentPeriodEnd)}
           </Text>
+          {subscription.scheduledPlanChange ? (
+            <Text className="mt-2 text-xs font-semibold text-sky-700 dark:text-sky-300">
+              已预约周期末降级至 {subscription.scheduledPlanChange.planId}，在续费成功前当前权益保持不变。
+            </Text>
+          ) : null}
         </View>
       ) : null}
 
@@ -506,7 +589,9 @@ export default function SubscriptionUpgradeScreen() {
           <Text className="mt-1 text-xs leading-5 text-neutral-500">
             {quote.direction === 'UPGRADE'
               ? '这是本周期剩余时间的税前差价估算。实际税额由结账时已配置的服务端计税方式计算。'
-              : '当前版本只提供时间点预览，降级排程和账期切换能力仍在开发中，尚不会提交变更。'}
+              : quote.direction === 'DOWNGRADE'
+              ? '当前周期继续保留原套餐权益；只有周期末的下一笔续费成功后，才切换为目标套餐。'
+              : '同价套餐调整暂不自动执行；目前仅提供预览，不会修改订阅或权益。'}
           </Text>
           <Text className="mt-2 text-xs text-neutral-500">预计生效：{dateLabel(quote.effectiveAt)}</Text>
           {quote.direction === 'UPGRADE' && quote.paymentRequired ? (
@@ -524,9 +609,24 @@ export default function SubscriptionUpgradeScreen() {
                 <Text className="font-bold text-white">{creatingOrder ? '正在准备支付…' : '创建升级订单并前往安全支付'}</Text>
               </Pressable>
             )
+          ) : quote.direction === 'DOWNGRADE' ? (
+            subscription?.scheduledPlanChange ? (
+              <Text className="mt-3 text-xs font-semibold text-sky-700 dark:text-sky-300">
+                已有降级预约：{subscription.scheduledPlanChange.planId}，预计 {dateLabel(subscription.scheduledPlanChange.effectiveAt)} 生效。
+              </Text>
+            ) : (
+              <Pressable
+                accessibilityRole="button"
+                disabled={creatingOrder}
+                onPress={() => void startScheduleDowngrade()}
+                className="mt-4 items-center rounded-full bg-sky-500 px-5 py-3"
+              >
+                <Text className="font-bold text-white">{creatingOrder ? '正在保存预约…' : '预约在周期末降级'}</Text>
+              </Pressable>
+            )
           ) : (
             <Text className="mt-3 text-xs font-semibold text-amber-700 dark:text-amber-300">
-              此类型的自动变更尚未开放，不会修改订阅或权益。
+              同价套餐调整暂未开放，不会修改订阅或权益。
             </Text>
           )}
         </View>

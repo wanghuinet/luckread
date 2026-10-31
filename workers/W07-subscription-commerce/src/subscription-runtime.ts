@@ -19,6 +19,10 @@ export type SubscriptionRow = {
   created_at: string
   updated_at: string
   version: number
+  pending_plan_id?: string | null
+  pending_plan_version?: number | null
+  pending_plan_effective_at?: string | null
+  pending_plan_change_id?: string | null
 }
 
 export class SubscriptionRuntimeError extends Error {
@@ -137,6 +141,12 @@ const toPublic = (row: SubscriptionRow) => ({
   updatedAt: row.updated_at,
   version: row.version,
   etag: etagForVersion(row.version),
+  scheduledPlanChange: row.pending_plan_id ? {
+    changeRequestId: row.pending_plan_change_id ?? null,
+    planId: row.pending_plan_id,
+    planVersion: row.pending_plan_version ?? null,
+    effectiveAt: row.pending_plan_effective_at ?? null,
+  } : null,
 })
 
 const readSubscriptionRow = async (db: D1Database, subscriptionId: string, subscriberId?: string): Promise<SubscriptionRow> => {
@@ -273,7 +283,10 @@ export async function transitionSubscription(db: D1Database, subscriberId: strin
   }
   if (!transitionTargets[operation].includes(row.status)) throw new SubscriptionRuntimeError('INVALID_STATE', 409)
   const updatedAt = nextUpdatedAt(row.updated_at)
-  const result = await db.prepare('UPDATE membership_subscriptions SET status = ?, cancel_at = ?, updated_at = ?, version = version + 1 WHERE subscription_id = ? AND subscriber_id = ? AND version = ?')
+  const clearScheduledPlan = operation === 'cancel'
+    ? 'pending_plan_id = NULL, pending_plan_version = NULL, pending_plan_effective_at = NULL, pending_plan_change_id = NULL, '
+    : ''
+  const result = await db.prepare('UPDATE membership_subscriptions SET status = ?, cancel_at = ?, ' + clearScheduledPlan + 'updated_at = ?, version = version + 1 WHERE subscription_id = ? AND subscriber_id = ? AND version = ?')
     .bind(nextState(operation), operation === 'cancel' ? updatedAt : row.cancel_at, updatedAt, row.subscription_id, subscriber, expectedVersion).run()
   if (Number(result.meta?.changes ?? 0) !== 1) throw new SubscriptionRuntimeError('PRECONDITION_FAILED', 412)
   const updated = await readSubscriptionRow(db, row.subscription_id, subscriber)
@@ -291,7 +304,7 @@ export async function changeSubscriptionPlan(db: D1Database, subscriberId: strin
     if (row.plan_id === nextPlanId) return toPublic(row)
     throw new SubscriptionRuntimeError('PRECONDITION_FAILED', 412)
   }
-  if (!['ACTIVE', 'PAUSED', 'PAST_DUE'].includes(row.status)) throw new SubscriptionRuntimeError('INVALID_STATE', 409)
+  if (!['ACTIVE', 'PAUSED', 'PAST_DUE'].includes(row.status) || row.pending_plan_id != null) throw new SubscriptionRuntimeError('INVALID_STATE', 409)
   if (row.plan_id === nextPlanId) return toPublic(row)
 
   const updatedAt = nextUpdatedAt(row.updated_at)

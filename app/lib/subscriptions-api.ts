@@ -20,7 +20,14 @@ export type MySubscription = {
   currentPeriodEnd: string;
   cancelAt: string | null;
   updatedAt: string;
+  version: number;
   etag: string;
+  scheduledPlanChange?: {
+    changeRequestId: string;
+    planId: string;
+    planVersion: number;
+    effectiveAt: string;
+  } | null;
 };
 
 export type MySubscriptionPage = {
@@ -176,6 +183,56 @@ export function createSubscriptionPlanUpgradeCheckout(options: {
   }
   return apiRequest<SubscriptionPlanUpgradeCheckout>(
     '/memberships/subscriptions/' + encodeURIComponent(subscriptionId) + '/change-plan',
+    {
+      method: 'POST',
+      headers: { 'If-Match': etag, 'Idempotency-Key': idempotencyKey },
+      body: JSON.stringify({ planId: targetPlanId }),
+      signal: options.signal,
+    },
+  );
+}
+
+export type ScheduledSubscriptionPlanChange = {
+  status: 'SCHEDULED';
+  changeRequestId: string;
+  replayed: boolean;
+  subscriptionId: string;
+  sourceSubscriptionVersion: number;
+  scheduledSubscriptionVersion: number;
+  sourcePlan: { planId: string; planVersion: number };
+  targetPlan: { planId: string; planVersion: number };
+  currentPeriodStart: string;
+  currentPeriodEnd: string;
+  effectiveAt: string;
+  scheduledAt: string;
+  mutationPerformed: boolean;
+  entitlementChanged: false;
+};
+
+/** Schedule a downgrade for the current period end; does not change current access or initiate payment. */
+export function scheduleSubscriptionPlanDowngrade(options: {
+  subscriptionId: string;
+  targetPlanId: string;
+  etag: string;
+  idempotencyKey: string;
+  signal?: AbortSignal;
+}) {
+  const { subscriptionId, targetPlanId, etag, idempotencyKey } = options;
+  if (!subscriptionId || subscriptionId.length > 256 || subscriptionId.trim() !== subscriptionId) {
+    throw new RangeError('Subscription identifier is invalid.');
+  }
+  if (!/^plan_[a-f0-9]{64}$/.test(targetPlanId)) {
+    throw new RangeError('Target membership plan identifier is invalid.');
+  }
+  if (!/^"lr-v[1-9]\\d*"$/.test(etag) || etag.length > 256) {
+    throw new RangeError('Subscription version tag is invalid.');
+  }
+  if (!idempotencyKey || idempotencyKey.length > 256 || idempotencyKey.trim() !== idempotencyKey ||
+      /[\\u0000-\\u001f\\u007f]/.test(idempotencyKey)) {
+    throw new RangeError('Idempotency-Key is invalid.');
+  }
+  return apiRequest<ScheduledSubscriptionPlanChange>(
+    '/memberships/subscriptions/' + encodeURIComponent(subscriptionId) + '/change-plan/schedule',
     {
       method: 'POST',
       headers: { 'If-Match': etag, 'Idempotency-Key': idempotencyKey },

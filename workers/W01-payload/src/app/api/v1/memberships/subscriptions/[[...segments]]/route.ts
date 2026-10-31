@@ -10,7 +10,7 @@ import {
   validateCreatedCommerceOrderEnvelope,
   validateOrderIdempotencyKey,
 } from '../../../../../../commerce/w07-commerce-client.js'
-import { callW06CommerceOrderAudit, W06ModerationClientError } from '../../../../../../moderation/w06-moderation-client.js'
+import { callW06CommerceOrderAudit, callW06SubscriptionPlanScheduledAudit, W06ModerationClientError } from '../../../../../../moderation/w06-moderation-client.js'
 import { W08CreatorClientError } from '../../../../../../auth/w08-creator-client.js'
 
 const errorResponse = (status: number, code: string, message: string) =>
@@ -26,6 +26,7 @@ const resolveOperation = (method: string, segments: string[] | undefined): { pat
   if (parts.length === 2 && method === 'POST' && ['cancel', 'pause', 'resume'].includes(parts[1]!)) {
     return { pathname: '/memberships/subscriptions/' + encodeURIComponent(parts[0]!) + '/' + parts[1]! }
   }
+  if (parts.length === 3 && method === 'POST' && parts[1] === 'change-plan' && parts[2] === 'schedule') return { pathname: '/memberships/subscriptions/' + encodeURIComponent(parts[0]!) + '/change-plan/schedule' }
   if (parts.length === 2 && method === 'POST' && parts[1] === 'change-plan') return { pathname: '/memberships/subscriptions/' + encodeURIComponent(parts[0]!) + '/change-plan' }
   if (parts.length === 3 && method === 'GET' && parts[1] === 'change-plan' && parts[2] === 'quote') {
     return { pathname: '/memberships/subscriptions/' + encodeURIComponent(parts[0]!) + '/change-plan/quote' }
@@ -45,7 +46,9 @@ async function forward(request: Request, context: RouteContext): Promise<Respons
 
     if (request.method === 'POST') {
       const segments = params.segments ?? []
-      if (segments.length !== 2 || segments[1] !== 'change-plan') {
+      const isSchedule = segments.length === 3 && segments[1] === 'change-plan' && segments[2] === 'schedule'
+      const isUpgrade = segments.length === 2 && segments[1] === 'change-plan'
+      if (!isSchedule && !isUpgrade) {
         return errorResponse(
           503,
           'SERVICE_UNAVAILABLE',
@@ -96,6 +99,70 @@ async function forward(request: Request, context: RouteContext): Promise<Respons
         return orderAdapterError(503, 'PLAN_CHANGE_RESPONSE_INVALID', 'Subscription plan change result could not be verified')
       }
       const data = checkout as Record<string, unknown>
+      if (isSchedule) {
+        const sourcePlan = data.sourcePlan
+        const targetPlan = data.targetPlan
+        const positiveInt = (value: unknown): value is number => typeof value === 'number' && Number.isSafeInteger(value) && value > 0
+        const canonicalDate = (value: unknown): value is string =>
+          typeof value === 'string' && Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value
+        if (
+          data.status !== 'SCHEDULED' ||
+          typeof data.changeRequestId !== 'string' || !/^sps_[a-f0-9]{60}$/.test(data.changeRequestId) ||
+          typeof data.replayed !== 'boolean' ||
+          typeof data.subscriptionId !== 'string' ||
+          !positiveInt(data.sourceSubscriptionVersion) ||
+          !positiveInt(data.scheduledSubscriptionVersion) ||
+          data.scheduledSubscriptionVersion !== data.sourceSubscriptionVersion + 1 ||
+          !sourcePlan || typeof sourcePlan !== 'object' || Array.isArray(sourcePlan) ||
+          !targetPlan || typeof targetPlan !== 'object' || Array.isArray(targetPlan) ||
+          typeof (sourcePlan as Record<string, unknown>).planId !== 'string' ||
+          !/^plan_[a-f0-9]{64}$/.test(String((sourcePlan as Record<string, unknown>).planId)) ||
+          !positiveInt((sourcePlan as Record<string, unknown>).planVersion) ||
+          typeof (targetPlan as Record<string, unknown>).planId !== 'string' ||
+          !/^plan_[a-f0-9]{64}$/.test(String((targetPlan as Record<string, unknown>).planId)) ||
+          !positiveInt((targetPlan as Record<string, unknown>).planVersion) ||
+          !canonicalDate(data.currentPeriodStart) ||
+          !canonicalDate(data.currentPeriodEnd) ||
+          data.currentPeriodEnd <= data.currentPeriodStart ||
+          data.effectiveAt !== data.currentPeriodEnd ||
+          !canonicalDate(data.scheduledAt) ||
+          data.mutationPerformed !== !data.replayed ||
+          data.entitlementChanged !== false
+        ) {
+          return orderAdapterError(503, 'PLAN_CHANGE_SCHEDULE_INVALID', 'Scheduled subscription plan change could not be verified')
+        }
+        const auditResponse = await callW06SubscriptionPlanScheduledAudit({
+          request,
+          principal,
+          body: {
+            eventId: 'evt_sps_' + data.changeRequestId,
+            changeRequestId: data.changeRequestId,
+            subscriptionId: data.subscriptionId,
+            sourceSubscriptionVersion: data.sourceSubscriptionVersion,
+            scheduledSubscriptionVersion: data.scheduledSubscriptionVersion,
+            sourcePlanId: (sourcePlan as Record<string, unknown>).planId as string,
+            sourcePlanVersion: (sourcePlan as Record<string, unknown>).planVersion as number,
+            targetPlanId: (targetPlan as Record<string, unknown>).planId as string,
+            targetPlanVersion: (targetPlan as Record<string, unknown>).planVersion as number,
+            currentPeriodStart: data.currentPeriodStart,
+            currentPeriodEnd: data.currentPeriodEnd,
+            effectiveAt: data.effectiveAt,
+            occurredAt: data.scheduledAt,
+          },
+        })
+        const auditValue: unknown = await auditResponse.json().catch((): null => null)
+        if (
+          (auditResponse.status !== 200 && auditResponse.status !== 201) ||
+          !auditValue || typeof auditValue !== 'object' ||
+          (auditValue as { eventId?: unknown }).eventId !== 'evt_sps_' + data.changeRequestId ||
+          (auditValue as { action?: unknown }).action !== 'membership.subscription.plan_change_scheduled' ||
+          (auditValue as { targetType?: unknown }).targetType !== 'Subscription' ||
+          (auditValue as { targetId?: unknown }).targetId !== data.subscriptionId
+        ) {
+          return orderAdapterError(503, 'AUDIT_UNAVAILABLE', 'Scheduled subscription plan change audit was not durably confirmed')
+        }
+        return w07Response
+      }
       if (data.status !== 'PAYMENT_REQUIRED' || data.paymentRequired !== true ||
           typeof data.changeRequestId !== 'string' || !/^scr_[a-f0-9]{60}$/.test(data.changeRequestId) ||
           typeof data.replayed !== 'boolean' ||

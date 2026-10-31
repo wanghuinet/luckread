@@ -375,6 +375,45 @@
       "d1WriteMax": 0,
       "cache": "PRIVATE_NO_SHARED_CACHE",
       "auditRequired": true
+    },
+    {
+      "operationId": "auditSubscriptionPlanScheduled",
+      "method": "POST",
+      "publicPath": "/api/v1/memberships/subscriptions/{subscriptionId}/change-plan/schedule",
+      "internalPath": "/internal/audit-events/membership-subscription-plan-scheduled",
+      "principalRequired": true,
+      "actorAuthority": "W06 derives actor identity and layer from the trusted W01 private transport headers; the schedule receipt contains no client-supplied actor identity.",
+      "eventId": "Deterministic evt_sps_{changeRequestId}; one immutable D1-03 event per period-end plan schedule.",
+      "targetType": "Subscription",
+      "auditRequired": true,
+      "idempotency": "Stable event ID from the immutable W07 D1-01 schedule receipt; exact retry confirms the same before/after state.",
+      "successPolicy": "W01 returns schedule success only after W07 state CAS and W06 durable audit confirmation. W06 unavailable returns 503; the client retries with the same Idempotency-Key.",
+      "cache": "NO_STORE",
+      "auditedFields": [
+        "subscriptionId",
+        "changeRequestId",
+        "sourceSubscriptionVersion",
+        "scheduledSubscriptionVersion",
+        "sourcePlanId",
+        "sourcePlanVersion",
+        "targetPlanId",
+        "targetPlanVersion",
+        "currentPeriodStart",
+        "currentPeriodEnd",
+        "effectiveAt",
+        "occurredAt"
+      ],
+      "sensitiveDataExcluded": [
+        "payment credentials",
+        "raw request body",
+        "provider credentials"
+      ],
+      "topologyConstraints": {
+        "newWorker": false,
+        "newDatabase": false,
+        "newServiceBinding": false,
+        "crossD1Transactions": 0
+      }
     }
   ],
   "headers": {

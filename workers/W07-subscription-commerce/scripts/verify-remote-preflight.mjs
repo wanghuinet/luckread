@@ -9,6 +9,7 @@ const VERSION_MIGRATION = '0002_subscription_version_cas.sql'
 const PLAN_MIGRATION = '0003_membership_plans.sql'
 const REVENUECAT_BINDING_MIGRATION = '0004_revenuecat_membership_product_bindings.sql'
 const PLAN_CHANGE_RECEIPT_MIGRATION = '0005_membership_subscription_plan_change_receipts.sql'
+const SCHEDULED_PLAN_CHANGE_MIGRATION = '0006_membership_scheduled_plan_changes.sql'
 
 const EXPECTED_INDEXES = [
   'ix_membership_subscriptions_subscriber_status_period',
@@ -34,6 +35,12 @@ const LEGACY_COLUMNS = [
 ]
 
 const CURRENT_COLUMNS = [...LEGACY_COLUMNS, ['version', 'INTEGER', 1, 0]]
+const SCHEDULED_CURRENT_COLUMNS = [...CURRENT_COLUMNS,
+  ['pending_plan_id', 'TEXT', 0, 0],
+  ['pending_plan_version', 'INTEGER', 0, 0],
+  ['pending_plan_effective_at', 'TEXT', 0, 0],
+  ['pending_plan_change_id', 'TEXT', 0, 0],
+]
 
 const EXPECTED_PLAN_COLUMNS = [
   ['plan_id', 'TEXT', 1, 1],
@@ -120,6 +127,36 @@ const EXPECTED_PLAN_CHANGE_RECEIPT_TRIGGERS = [
   'membership_subscription_plan_change_receipts_immutable_delete',
 ]
 
+const EXPECTED_SCHEDULED_PLAN_CHANGE_RECEIPT_COLUMNS = [
+  ['change_request_id', 'TEXT', 1, 1],
+  ['subscription_id', 'TEXT', 1, 0],
+  ['subscriber_id', 'TEXT', 1, 0],
+  ['source_subscription_version', 'INTEGER', 1, 0],
+  ['scheduled_subscription_version', 'INTEGER', 1, 0],
+  ['source_plan_id', 'TEXT', 1, 0],
+  ['source_plan_version', 'INTEGER', 1, 0],
+  ['target_plan_id', 'TEXT', 1, 0],
+  ['target_plan_version', 'INTEGER', 1, 0],
+  ['current_period_start', 'TEXT', 1, 0],
+  ['current_period_end', 'TEXT', 1, 0],
+  ['effective_at', 'TEXT', 1, 0],
+  ['scheduled_at', 'TEXT', 1, 0],
+]
+const EXPECTED_SCHEDULED_PLAN_CHANGE_RECEIPT_INDEXES = [
+  'ix_membership_subscription_scheduled_plan_changes_subscription',
+]
+const EXPECTED_SCHEDULED_PLAN_CHANGE_RECEIPT_TRIGGERS = [
+  'membership_subscription_scheduled_plan_change_receipts_immutable_update',
+  'membership_subscription_scheduled_plan_change_receipts_immutable_delete',
+]
+const EXPECTED_SCHEDULED_PLAN_CHANGE_INDEXES = [
+  'ix_membership_subscriptions_pending_plan_effective',
+]
+const EXPECTED_SCHEDULED_PLAN_CHANGE_TRIGGERS = [
+  'membership_subscriptions_pending_plan_change_insert_guard',
+  'membership_subscriptions_pending_plan_change_update_guard',
+]
+
 const fail = (message) => {
   throw new Error('READ_ONLY_PREFLIGHT_FAILED: ' + message)
 }
@@ -170,6 +207,11 @@ export function verifyD1SubscriptionPreflight({
   planChangeReceiptSchema = [],
   planChangeReceiptIndexes = [],
   planChangeReceiptTriggers = [],
+  scheduledPlanChangeReceiptSchema = [],
+  scheduledPlanChangeReceiptIndexes = [],
+  scheduledPlanChangeReceiptTriggers = [],
+  scheduledPlanChangeIndexes = [],
+  scheduledPlanChangeTriggers = [],
   expectedDatabaseName = EXPECTED_DATABASE_NAME,
   expectedDatabaseId = EXPECTED_DATABASE_ID,
 }) {
@@ -181,7 +223,7 @@ export function verifyD1SubscriptionPreflight({
 
   const migrationNames = new Set([
     BASELINE_MIGRATION, VERSION_MIGRATION, PLAN_MIGRATION,
-    REVENUECAT_BINDING_MIGRATION, PLAN_CHANGE_RECEIPT_MIGRATION,
+    REVENUECAT_BINDING_MIGRATION, PLAN_CHANGE_RECEIPT_MIGRATION, SCHEDULED_PLAN_CHANGE_MIGRATION,
   ])
   const appliedMigrations = [...new Set(collectObjects(migrationState)
     .filter((item) => migrationNames.has(item.name))
@@ -245,10 +287,35 @@ export function verifyD1SubscriptionPreflight({
     receiptTriggerNames.size === EXPECTED_PLAN_CHANGE_RECEIPT_TRIGGERS.length &&
     EXPECTED_PLAN_CHANGE_RECEIPT_TRIGGERS.every((name) => receiptTriggerNames.has(name))
 
+  const scheduledReceiptShape = columnsFrom(scheduledPlanChangeReceiptSchema).map(({ name, type, notnull, primaryKey }) => [name, type, notnull, primaryKey])
+  const scheduledReceiptIndexNames = indexNamesFrom(scheduledPlanChangeReceiptIndexes)
+  const scheduledReceiptTriggerNames = new Set(collectObjects(scheduledPlanChangeReceiptTriggers)
+    .filter((item) => typeof item.name === 'string')
+    .map((item) => item.name))
+  const noScheduledPlanChangeReceipts = scheduledReceiptShape.length === 0 &&
+    scheduledReceiptIndexNames.size === 0 && scheduledReceiptTriggerNames.size === 0
+  const allScheduledPlanChangeReceiptsPresent =
+    JSON.stringify(scheduledReceiptShape) === JSON.stringify(EXPECTED_SCHEDULED_PLAN_CHANGE_RECEIPT_COLUMNS) &&
+    EXPECTED_SCHEDULED_PLAN_CHANGE_RECEIPT_INDEXES.every((name) => scheduledReceiptIndexNames.has(name)) &&
+    scheduledReceiptTriggerNames.size === EXPECTED_SCHEDULED_PLAN_CHANGE_RECEIPT_TRIGGERS.length &&
+    EXPECTED_SCHEDULED_PLAN_CHANGE_RECEIPT_TRIGGERS.every((name) => scheduledReceiptTriggerNames.has(name))
+  const scheduledColumnNames = new Set(columns.map((item) => item.name))
+  const scheduledSubscriptionColumnsPresent = SCHEDULED_CURRENT_COLUMNS.slice(CURRENT_COLUMNS.length)
+    .every(([name]) => scheduledColumnNames.has(name))
+  const scheduledSubscriptionIndexes = indexNamesFrom(scheduledPlanChangeIndexes)
+  const scheduledSubscriptionTriggers = new Set(collectObjects(scheduledPlanChangeTriggers)
+    .filter((item) => typeof item.name === 'string').map((item) => item.name))
+  const noScheduledSubscriptionObjects = !EXPECTED_SCHEDULED_PLAN_CHANGE_INDEXES.some((name) => scheduledSubscriptionIndexes.has(name)) && scheduledSubscriptionTriggers.size === 0
+  const allScheduledSubscriptionObjectsPresent =
+    EXPECTED_SCHEDULED_PLAN_CHANGE_INDEXES.every((name) => scheduledSubscriptionIndexes.has(name)) &&
+    scheduledSubscriptionTriggers.size === EXPECTED_SCHEDULED_PLAN_CHANGE_TRIGGERS.length &&
+    EXPECTED_SCHEDULED_PLAN_CHANGE_TRIGGERS.every((name) => scheduledSubscriptionTriggers.has(name))
+
   const legacySubscriptionShape = JSON.stringify(shape) === JSON.stringify(LEGACY_COLUMNS)
   const currentSubscriptionShape = JSON.stringify(shape) === JSON.stringify(CURRENT_COLUMNS)
+  const scheduledSubscriptionShape = JSON.stringify(shape) === JSON.stringify(SCHEDULED_CURRENT_COLUMNS)
   const versionColumn = columns.find((column) => column.name === 'version')
-  if (currentSubscriptionShape && (!versionColumn || versionColumn.type !== 'INTEGER' ||
+  if ((currentSubscriptionShape || scheduledSubscriptionShape) && (!versionColumn || versionColumn.type !== 'INTEGER' ||
       versionColumn.notnull !== 1 || versionColumn.primaryKey !== 0 ||
       ![1, '1'].includes(versionColumn.defaultValue))) {
     fail('version column does not satisfy INTEGER NOT NULL DEFAULT 1')
@@ -261,6 +328,7 @@ export function verifyD1SubscriptionPreflight({
   const hasPlanMigration = JSON.stringify(coreMigrations) === JSON.stringify([BASELINE_MIGRATION, VERSION_MIGRATION, PLAN_MIGRATION])
   const hasRevenueCatMigration = appliedMigrations.includes(REVENUECAT_BINDING_MIGRATION)
   const hasPlanChangeReceiptMigration = appliedMigrations.includes(PLAN_CHANGE_RECEIPT_MIGRATION)
+  const hasScheduledPlanChangeMigration = appliedMigrations.includes(SCHEDULED_PLAN_CHANGE_MIGRATION)
 
   let migrationAction
   if (hasOnlyBaseline && legacySubscriptionShape && noPlanTables &&
@@ -271,7 +339,7 @@ export function verifyD1SubscriptionPreflight({
       noRevenueCatBinding && noPlanChangeReceipts &&
       !hasRevenueCatMigration && !hasPlanChangeReceiptMigration) {
     migrationAction = 'apply'
-  } else if (hasPlanMigration && currentSubscriptionShape && allPlanTablesPresent) {
+  } else if (hasPlanMigration && (currentSubscriptionShape || scheduledSubscriptionShape) && allPlanTablesPresent) {
     if (!hasRevenueCatMigration && noRevenueCatBinding &&
         !hasPlanChangeReceiptMigration && noPlanChangeReceipts) {
       // Both bounded D1-01 candidate migrations remain pending; apply only
@@ -284,7 +352,17 @@ export function verifyD1SubscriptionPreflight({
       migrationAction = 'apply'
     } else if (hasRevenueCatMigration && allRevenueCatBindingPresent &&
         hasPlanChangeReceiptMigration && allPlanChangeReceiptsPresent) {
-      migrationAction = 'skip'
+      if (hasScheduledPlanChangeMigration && scheduledSubscriptionShape &&
+          scheduledSubscriptionColumnsPresent && allScheduledPlanChangeReceiptsPresent &&
+          allScheduledSubscriptionObjectsPresent) {
+        migrationAction = 'skip'
+      } else if (!hasScheduledPlanChangeMigration && currentSubscriptionShape &&
+          noScheduledPlanChangeReceipts && noScheduledSubscriptionObjects) {
+        // The downgrade schedule migration is the only remaining candidate.
+        migrationAction = 'apply'
+      } else {
+        fail('D1-01 scheduled plan-change migration history and physical schemas do not match an admitted state')
+      }
     } else {
       fail('D1-01 RevenueCat or subscription plan-change receipt migration history and physical schemas do not match an admitted state')
     }
@@ -311,13 +389,19 @@ export function verifyD1SubscriptionPreflight({
     planChangeReceiptColumns: receiptShape,
     planChangeReceiptIndexes: EXPECTED_PLAN_CHANGE_RECEIPT_INDEXES.filter((name) => receiptIndexNames.has(name)),
     planChangeReceiptTriggers: EXPECTED_PLAN_CHANGE_RECEIPT_TRIGGERS.filter((name) => receiptTriggerNames.has(name)),
+    scheduledPlanChangeReceiptColumns: scheduledReceiptShape,
+    scheduledPlanChangeReceiptIndexes: EXPECTED_SCHEDULED_PLAN_CHANGE_RECEIPT_INDEXES.filter((name) => scheduledReceiptIndexNames.has(name)),
+    scheduledPlanChangeReceiptTriggers: EXPECTED_SCHEDULED_PLAN_CHANGE_RECEIPT_TRIGGERS.filter((name) => scheduledReceiptTriggerNames.has(name)),
+    scheduledSubscriptionColumnsPresent,
+    scheduledSubscriptionIndexes: EXPECTED_SCHEDULED_PLAN_CHANGE_INDEXES.filter((name) => scheduledSubscriptionIndexes.has(name)),
+    scheduledSubscriptionTriggers: EXPECTED_SCHEDULED_PLAN_CHANGE_TRIGGERS.filter((name) => scheduledSubscriptionTriggers.has(name)),
   }
 }
 
 export function verifyD1SubscriptionPostflight(input) {
   const report = verifyD1SubscriptionPreflight(input)
   if (report.migrationAction !== 'skip') {
-    fail('post-migration verification requires migrations 0001 through 0005 with exact current D1-01 schemas')
+    fail('post-migration verification requires migrations 0001 through 0006 with exact current D1-01 schemas')
   }
 
   const integrityRows = collectObjects(input.versionIntegrity)
@@ -344,7 +428,15 @@ export function verifyD1SubscriptionPostflight(input) {
     fail('subscription plan-change receipt records contain invalid version or financial references')
   }
 
-  return { ...report, invalidVersions, invalidCurrentPlanVersions, invalidPlanChangeReceipts, postflight: 'PASS' }
+  const scheduledIntegrityRows = collectObjects(input.scheduledPlanChangeIntegrity)
+    .filter((item) => Object.prototype.hasOwnProperty.call(item, 'invalid_scheduled_plan_changes'))
+  if (scheduledIntegrityRows.length !== 1) fail('scheduled plan-change integrity query did not return exactly one count')
+  const invalidScheduledPlanChanges = Number(scheduledIntegrityRows[0].invalid_scheduled_plan_changes)
+  if (!Number.isSafeInteger(invalidScheduledPlanChanges) || invalidScheduledPlanChanges !== 0) {
+    fail('scheduled subscription plan-change records contain invalid source/target version or period references')
+  }
+
+  return { ...report, invalidVersions, invalidCurrentPlanVersions, invalidPlanChangeReceipts, invalidScheduledPlanChanges, postflight: 'PASS' }
 }
 
 const readJson = (filePath) => JSON.parse(fs.readFileSync(filePath, 'utf8'))
@@ -353,9 +445,9 @@ function main() {
   const [mode, ...filePaths] = process.argv.slice(2)
   const isPostflight = mode === 'postflight'
   if (!isPostflight && mode !== 'preflight') {
-    throw new Error('Usage: node scripts/verify-remote-preflight.mjs <preflight|postflight> <database-list.json> <migration-state.json> <subscription-schema.json> <subscription-indexes.json> <subscription-foreign-keys.json> <plan-schema.json> <plan-version-schema.json> <plan-indexes.json> <plan-version-indexes.json> <plan-triggers.json> <revenuecat-binding-schema.json> <revenuecat-binding-indexes.json> <revenuecat-binding-triggers.json> <plan-change-receipt-schema.json> <plan-change-receipt-indexes.json> <plan-change-receipt-triggers.json> [version-integrity.json plan-integrity.json plan-change-receipt-integrity.json]')
+    throw new Error('Usage: node scripts/verify-remote-preflight.mjs <preflight|postflight> <database-list.json> <migration-state.json> <subscription-schema.json> <subscription-indexes.json> <subscription-foreign-keys.json> <plan-schema.json> <plan-version-schema.json> <plan-indexes.json> <plan-version-indexes.json> <plan-triggers.json> <revenuecat-binding-schema.json> <revenuecat-binding-indexes.json> <revenuecat-binding-triggers.json> <plan-change-receipt-schema.json> <plan-change-receipt-indexes.json> <plan-change-receipt-triggers.json> <scheduled-plan-change-receipt-schema.json> <scheduled-plan-change-receipt-indexes.json> <scheduled-plan-change-receipt-triggers.json> <scheduled-subscription-indexes.json> <scheduled-subscription-triggers.json> [version-integrity.json plan-integrity.json plan-change-receipt-integrity.json scheduled-plan-change-integrity.json]')
   }
-  const requiredCount = isPostflight ? 19 : 16
+  const requiredCount = isPostflight ? 25 : 21
   if (filePaths.length !== requiredCount || filePaths.some((value) => !value)) {
     throw new Error('Invalid arguments for D1 subscription preflight verification')
   }
@@ -365,7 +457,9 @@ function main() {
     planSchemaPath, planVersionSchemaPath, planIndexesPath, planVersionIndexesPath, planTriggersPath,
     revenueCatBindingSchemaPath, revenueCatBindingIndexesPath, revenueCatBindingTriggersPath,
     planChangeReceiptSchemaPath, planChangeReceiptIndexesPath, planChangeReceiptTriggersPath,
-    versionIntegrityPath, planIntegrityPath, planChangeReceiptIntegrityPath,
+    scheduledPlanChangeReceiptSchemaPath, scheduledPlanChangeReceiptIndexesPath, scheduledPlanChangeReceiptTriggersPath,
+    scheduledSubscriptionIndexesPath, scheduledSubscriptionTriggersPath,
+    versionIntegrityPath, planIntegrityPath, planChangeReceiptIntegrityPath, scheduledPlanChangeIntegrityPath,
   ] = filePaths
   const input = {
     databaseList: readJson(path.resolve(databaseListPath)),
@@ -384,6 +478,11 @@ function main() {
     planChangeReceiptSchema: readJson(path.resolve(planChangeReceiptSchemaPath)),
     planChangeReceiptIndexes: readJson(path.resolve(planChangeReceiptIndexesPath)),
     planChangeReceiptTriggers: readJson(path.resolve(planChangeReceiptTriggersPath)),
+    scheduledPlanChangeReceiptSchema: readJson(path.resolve(scheduledPlanChangeReceiptSchemaPath)),
+    scheduledPlanChangeReceiptIndexes: readJson(path.resolve(scheduledPlanChangeReceiptIndexesPath)),
+    scheduledPlanChangeReceiptTriggers: readJson(path.resolve(scheduledPlanChangeReceiptTriggersPath)),
+    scheduledPlanChangeIndexes: readJson(path.resolve(scheduledSubscriptionIndexesPath)),
+    scheduledPlanChangeTriggers: readJson(path.resolve(scheduledSubscriptionTriggersPath)),
   }
   if (isPostflight) {
     const report = verifyD1SubscriptionPostflight({
@@ -391,6 +490,7 @@ function main() {
       versionIntegrity: readJson(path.resolve(versionIntegrityPath)),
       planIntegrity: readJson(path.resolve(planIntegrityPath)),
       planChangeReceiptIntegrity: readJson(path.resolve(planChangeReceiptIntegrityPath)),
+      scheduledPlanChangeIntegrity: readJson(path.resolve(scheduledPlanChangeIntegrityPath)),
     })
     console.log(JSON.stringify({ readOnlyPostflight: 'PASS', ...report }))
     return

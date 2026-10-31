@@ -33,6 +33,7 @@ type SubscriptionSnapshotRow = Readonly<{
   current_period_end: string;
   cancel_at: string | null;
   version: number;
+  pending_plan_id: string | null;
 }>;
 
 const MAX_ID = 256;
@@ -102,14 +103,14 @@ export async function quoteSubscriptionPlanChange(
 
   const subscription = await db.prepare(
     'SELECT subscription_id, subscriber_id, plan_id, plan_version, creator_id, status, ' +
-    'current_period_start, current_period_end, cancel_at, version ' +
+    'current_period_start, current_period_end, cancel_at, version, pending_plan_id ' +
     'FROM membership_subscriptions WHERE subscription_id = ? AND subscriber_id = ? LIMIT 1',
   ).bind(subscriptionId, subscriberId).first<SubscriptionSnapshotRow>();
   if (!subscription) throw new SubscriptionRuntimeError('RESOURCE_NOT_FOUND', 404);
   if (subscription.version !== expectedVersion) {
     throw new SubscriptionRuntimeError('PRECONDITION_FAILED', 412);
   }
-  if (subscription.status !== 'ACTIVE' || subscription.cancel_at !== null) {
+  if (subscription.status !== 'ACTIVE' || subscription.cancel_at !== null || subscription.pending_plan_id !== null) {
     throw new SubscriptionRuntimeError('INVALID_STATE', 409);
   }
   if (subscription.plan_id === targetPlanId) {

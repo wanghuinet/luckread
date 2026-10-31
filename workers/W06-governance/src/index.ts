@@ -381,6 +381,21 @@ type CommerceOrderAuditInput = {
   taxMinor: number
   totalMinor: number
 }
+type MembershipSubscriptionPlanScheduledAuditInput = {
+  eventId: string
+  changeRequestId: string
+  subscriptionId: string
+  sourceSubscriptionVersion: number
+  scheduledSubscriptionVersion: number
+  sourcePlanId: string
+  sourcePlanVersion: number
+  targetPlanId: string
+  targetPlanVersion: number
+  currentPeriodStart: string
+  currentPeriodEnd: string
+  effectiveAt: string
+  occurredAt: string
+}
 type MembershipSubscriptionPlanChangeAuditInput = {
   eventId: string
   changeRequestId: string
@@ -503,6 +518,46 @@ function parseMembershipSubscriptionPlanChangeAuditInput(value: unknown): Member
     !canonicalDate(body.occurredAt)
   ) throw new Error('INVALID_MEMBERSHIP_SUBSCRIPTION_PLAN_CHANGE_AUDIT')
   return body as MembershipSubscriptionPlanChangeAuditInput
+}
+
+function parseMembershipSubscriptionPlanScheduledAuditInput(value: unknown): MembershipSubscriptionPlanScheduledAuditInput {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('INVALID_MEMBERSHIP_SUBSCRIPTION_PLAN_SCHEDULED_AUDIT')
+  }
+  const body = value as Record<string, unknown>
+  const allowed = new Set([
+    'eventId', 'changeRequestId', 'subscriptionId', 'sourceSubscriptionVersion',
+    'scheduledSubscriptionVersion', 'sourcePlanId', 'sourcePlanVersion',
+    'targetPlanId', 'targetPlanVersion', 'currentPeriodStart', 'currentPeriodEnd',
+    'effectiveAt', 'occurredAt',
+  ])
+  if (Object.keys(body).length !== allowed.size || Object.keys(body).some((key) => !allowed.has(key))) {
+    throw new Error('INVALID_MEMBERSHIP_SUBSCRIPTION_PLAN_SCHEDULED_AUDIT')
+  }
+  const positiveInt = (input: unknown): input is number =>
+    typeof input === 'number' && Number.isSafeInteger(input) && input > 0
+  const canonicalDate = (input: unknown): input is string =>
+    typeof input === 'string' && input.length <= 64 &&
+    Number.isFinite(Date.parse(input)) && new Date(input).toISOString() === input
+  if (
+    typeof body.changeRequestId !== 'string' || !/^sps_[a-f0-9]{60}$/.test(body.changeRequestId) ||
+    body.eventId !== 'evt_sps_' + body.changeRequestId ||
+    typeof body.subscriptionId !== 'string' || !resourceIdPattern.test(body.subscriptionId) ||
+    !positiveInt(body.sourceSubscriptionVersion) ||
+    !positiveInt(body.scheduledSubscriptionVersion) ||
+    body.scheduledSubscriptionVersion !== body.sourceSubscriptionVersion + 1 ||
+    typeof body.sourcePlanId !== 'string' || !/^plan_[a-f0-9]{64}$/.test(body.sourcePlanId) ||
+    !positiveInt(body.sourcePlanVersion) ||
+    typeof body.targetPlanId !== 'string' || !/^plan_[a-f0-9]{64}$/.test(body.targetPlanId) ||
+    body.targetPlanId === body.sourcePlanId ||
+    !positiveInt(body.targetPlanVersion) ||
+    !canonicalDate(body.currentPeriodStart) ||
+    !canonicalDate(body.currentPeriodEnd) ||
+    body.currentPeriodEnd <= body.currentPeriodStart ||
+    body.effectiveAt !== body.currentPeriodEnd ||
+    !canonicalDate(body.occurredAt)
+  ) throw new Error('INVALID_MEMBERSHIP_SUBSCRIPTION_PLAN_SCHEDULED_AUDIT')
+  return body as MembershipSubscriptionPlanScheduledAuditInput
 }
 
 type StoredAuditEvent = {
@@ -890,6 +945,57 @@ export default {
       } catch (error) {
         return errorResponse(error, request.headers.get('X-LuckRead-Request-Id')?.trim())
       }
+    }
+
+    if (request.method === 'POST' && url.pathname === '/internal/audit-events/membership-subscription-plan-scheduled') {
+      let principal: ReturnType<typeof requireW01Transport>
+      try { principal = requireW01Transport(request) }
+      catch (error) { return errorResponse(error, request.headers.get('X-LuckRead-Request-Id')?.trim()) }
+      if (!/^L[2-8]$/.test(principal.layer)) {
+        return json({ error: 'PERMISSION_DENIED' }, 403)
+      }
+
+      let input: MembershipSubscriptionPlanScheduledAuditInput
+      try {
+        input = parseMembershipSubscriptionPlanScheduledAuditInput(await readBoundedAuditJson(request, 4096))
+      } catch {
+        return json({ error: 'INVALID_MEMBERSHIP_SUBSCRIPTION_PLAN_SCHEDULED_AUDIT' }, 400)
+      }
+
+      const event: AuditEvent = {
+        eventId: input.eventId,
+        requestId: principal.requestId,
+        traceId: principal.correlationId,
+        actor: {
+          actorId: principal.userId,
+          actorType: 'user',
+          layer: principal.layer as AuditEvent['actor']['layer'],
+        },
+        action: 'membership.subscription.plan_change_scheduled',
+        targetType: 'Subscription',
+        targetId: input.subscriptionId,
+        before: {
+          version: input.sourceSubscriptionVersion,
+          planId: input.sourcePlanId,
+          planVersion: input.sourcePlanVersion,
+          status: 'ACTIVE',
+          currentPeriodStart: input.currentPeriodStart,
+          currentPeriodEnd: input.currentPeriodEnd,
+        },
+        after: {
+          version: input.scheduledSubscriptionVersion,
+          planId: input.sourcePlanId,
+          planVersion: input.sourcePlanVersion,
+          pendingPlanId: input.targetPlanId,
+          pendingPlanVersion: input.targetPlanVersion,
+          pendingEffectiveAt: input.effectiveAt,
+          status: 'ACTIVE',
+          currentPeriodStart: input.currentPeriodStart,
+          currentPeriodEnd: input.currentPeriodEnd,
+        },
+        occurredAt: input.occurredAt,
+      }
+      return persistImmutableAuditEvent(env, event)
     }
 
     if (request.method === 'POST' && url.pathname === '/internal/audit-events/membership-subscription-plan-changed') {
