@@ -415,7 +415,7 @@ describe('W06 runtime', () => {
     expectedVersion: 7,
   }
   const trialCanceledEventInput = {
-    eventId: 'evt_subscription_trial_canceled_' + 'b'.repeat(26),
+    eventId: 'evt_subscription_trial_canceled_mtr_' + 'e'.repeat(26),
     phase: 'CANCELED',
     planId: 'plan_' + 'd'.repeat(64),
     subscriptionId: trialSubscriptionId,
