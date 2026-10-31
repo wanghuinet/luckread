@@ -63,10 +63,10 @@ describe('Twitter Clone UI reuse through LuckRead API adapters', () => {
   })
 
   it('uses the reusable social post card in both homepage and discovery for dynamic content', () => {
-    const homeFeed = read('src/app/(frontend)/HomeContentFeed.tsx')
     const contentBrowse = read('src/app/(frontend)/content/ContentBrowsePage.tsx')
+    const homeFeed = read('src/app/(twitter-clone)/TwitterCloneHomeFeed.tsx')
 
-    for (const page of [homeFeed, contentBrowse]) {
+    for (const page of [contentBrowse]) {
       expect(page).toContain("import LuckReadSocialPostCard from")
       expect(page).toContain("item.contentType === 'post'")
       expect(page).toContain('<LuckReadSocialPostCard')
@@ -75,6 +75,8 @@ describe('Twitter Clone UI reuse through LuckRead API adapters', () => {
       expect(page).toContain('mediaRefs={item.mediaRefs}')
       expect(page).toContain('locale={locale}')
     }
+    expect(homeFeed).toContain('LuckReadSocialPostCard')
+    expect(homeFeed).toContain('presentation="x-timeline"')
   })
 
   it('renders bounded, de-duplicated photo and video attachments in the post card', () => {
