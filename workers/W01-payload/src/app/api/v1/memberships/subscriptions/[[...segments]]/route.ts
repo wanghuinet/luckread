@@ -8,6 +8,7 @@ import { callW08Creator, W08CreatorClientError } from '../../../../../../auth/w0
 import {
   callW06SubscriptionPlanChangeAudit,
   callW06SubscriptionPlanChangeRequestAudit,
+  callW06SubscriptionTrialAudit,
   W06ModerationClientError,
 } from '../../../../../../moderation/w06-moderation-client.js'
 
@@ -21,7 +22,8 @@ const resolveOperation = (method: string, segments: string[] | undefined): { pat
   if (parts.length === 0 && method === 'GET') return { pathname: '/memberships/subscriptions' }
   if (parts.length === 0 && method === 'POST') return { pathname: '/memberships/subscriptions' }
   if (parts.length === 1 && method === 'GET') return { pathname: '/memberships/subscriptions/' + encodeURIComponent(parts[0]!) }
-  if (parts.length === 2 && method === 'POST' && ['cancel', 'pause', 'resume', 'change-plan', 'upgrade'].includes(parts[1]!)) {
+  if (parts.length === 1 && parts[0] === 'trial' && method === 'POST') return { pathname: '/memberships/subscriptions/trial' }
+  if (parts.length === 2 && method === 'POST' && ['cancel', 'pause', 'resume', 'change-plan', 'upgrade', 'cancel-trial'].includes(parts[1]!)) {
     return { pathname: '/memberships/subscriptions/' + encodeURIComponent(parts[0]!) + '/' + parts[1]! }
   }
   return null
@@ -67,7 +69,40 @@ async function readBoundedJson(request: Request): Promise<unknown | Response> {
   }
 }
 
+async function authorizeSubscriptionPermission(
+  request: Request,
+  userId: string,
+  action: 'subscription.change_plan' | 'subscription.start_trial' | 'subscription.cancel',
+): Promise<Response | null> {
+  const headers = new Headers(request.headers)
+  headers.delete('host')
+  headers.delete('content-length')
+  headers.set('content-type', 'application/json; charset=utf-8')
+  const permissionRequest = new Request(request.url, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      action,
+      resourceType: 'Subscription',
+      resourceAttributes: { ownerId: userId },
+    }),
+  })
+  const response = await callW08Creator(permissionRequest, '/internal/authz/check-permission', 'POST')
+  if (!response.ok) return errorResponse(503, 'AUTHORIZATION_UNAVAILABLE', 'Subscription authorization unavailable')
+  const value: unknown = await response.json().catch((): null => null)
+  const decision = value && typeof value === 'object'
+    ? (value as { data?: { decision?: unknown } }).data?.decision
+    : undefined
+  if (decision === 'ALLOW') return null
+  if (decision === 'DENY') return errorResponse(403, 'PERMISSION_DENIED', 'Subscription permission required')
+  return errorResponse(503, 'AUTHORIZATION_UNAVAILABLE', 'Subscription authorization response could not be verified')
+}
+
 async function authorizeSubscriptionPlanChange(request: Request, userId: string): Promise<Response | null> {
+  return authorizeSubscriptionPermission(request, userId, 'subscription.change_plan')
+}
+
+
   const headers = new Headers(request.headers)
   headers.delete('host')
   headers.delete('content-length')
@@ -90,6 +125,15 @@ async function authorizeSubscriptionPlanChange(request: Request, userId: string)
   if (decision === 'ALLOW') return null
   if (decision === 'DENY') return errorResponse(403, 'PERMISSION_DENIED', 'Subscription plan-change permission required')
   return errorResponse(503, 'AUTHORIZATION_UNAVAILABLE', 'Subscription authorization response could not be verified')
+}
+
+async function deterministicTrialRequestId(userId: string, planId: string, idempotencyKey: string): Promise<string> {
+  const material = new TextEncoder().encode(
+    'subscription-trial-request-v1\\u0000' + userId + '\\u0000' + planId + '\\u0000' + idempotencyKey,
+  )
+  const digest = await crypto.subtle.digest('SHA-256', material)
+  const hex = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
+  return 'evt_subscription_trial_request_' + hex.slice(0, 26)
 }
 
 async function deterministicAuditRequestId(userId: string, subscriptionId: string, idempotencyKey: string): Promise<string> {
@@ -135,6 +179,169 @@ async function forward(request: Request, context: RouteContext): Promise<Respons
     if (principal instanceof Response) return principal
 
     const parts = params.segments ?? []
+    const isTrialStartRequest = request.method === 'POST' && parts.length === 1 && parts[0] === 'trial'
+    const isTrialCancelRequest = request.method === 'POST' && parts.length === 2 && parts[1] === 'cancel-trial'
+
+    if (isTrialStartRequest) {
+      const denied = await authorizeSubscriptionPermission(request, principal.userId, 'subscription.start_trial')
+      if (denied) return denied
+      const idempotencyKey = request.headers.get('Idempotency-Key') ?? ''
+      if (!/^[A-Za-z0-9_-]{1,128}$/.test(idempotencyKey)) {
+        return errorResponse(428, 'PRECONDITION_REQUIRED', 'A valid Idempotency-Key is required')
+      }
+      const input = await readBoundedJson(request)
+      if (input instanceof Response) return input
+      if (!isRecord(input) || Object.keys(input).length !== 1 ||
+          typeof input.planId !== 'string' || !/^plan_[a-f0-9]{64}$/.test(input.planId)) {
+        return errorResponse(400, 'VALIDATION_FAILED', 'Only a valid planId may be supplied')
+      }
+      const planId = input.planId
+      const requestEventId = await deterministicTrialRequestId(principal.userId, planId, idempotencyKey)
+      let requestAudit: Response
+      try {
+        requestAudit = await callW06SubscriptionTrialAudit({
+          request,
+          principal: principal as ContentPrincipal,
+          body: { eventId: requestEventId, phase: 'REQUESTED', planId, idempotencyKey },
+        })
+      } catch {
+        return errorResponse(503, 'AUDIT_UNAVAILABLE', 'Trial start intent could not be durably recorded')
+      }
+      const requestAuditValue: unknown = await requestAudit.json().catch((): null => null)
+      if ((requestAudit.status !== 200 && requestAudit.status !== 201) ||
+          !isRecord(requestAuditValue) ||
+          requestAuditValue.eventId !== requestEventId ||
+          requestAuditValue.action !== 'membership.subscription.trial_requested' ||
+          requestAuditValue.targetId !== planId) {
+        return errorResponse(503, 'AUDIT_UNAVAILABLE', 'Trial start intent was not durably confirmed')
+      }
+
+      const w07Response = await callW07Subscription({
+        request,
+        pathname: operation.pathname,
+        method: 'POST',
+        principal,
+        body: { planId },
+      })
+      if (!w07Response.ok) return w07Response
+      const envelope: unknown = await w07Response.clone().json().catch((): null => null)
+      if (!isRecord(envelope) || !isRecord(envelope.data) ||
+          typeof envelope.requestId !== 'string' ||
+          !isRecord(envelope.data.subscription) || !isRecord(envelope.data.trial)) {
+        return errorResponse(503, 'TRIAL_RESPONSE_INVALID', 'Trial start result could not be verified')
+      }
+      const subscription = envelope.data.subscription
+      const trial = envelope.data.trial
+      if (typeof subscription.subscriptionId !== 'string' || !/^sub_[a-f0-9]{64}$/.test(subscription.subscriptionId) ||
+          subscription.subscriberId !== principal.userId || subscription.planId !== planId ||
+          subscription.status !== 'TRIALING' ||
+          typeof subscription.planVersion !== 'number' || !Number.isSafeInteger(subscription.planVersion) ||
+          typeof subscription.currentPeriodEnd !== 'string' || Number.isNaN(Date.parse(subscription.currentPeriodEnd)) ||
+          trial.source !== 'WEB' || trial.status !== 'TRIALING' ||
+          typeof trial.trialId !== 'string' || !/^mtr_[A-Za-z0-9]{26}$/.test(trial.trialId) ||
+          trial.subscriptionId !== subscription.subscriptionId || trial.planId !== planId ||
+          trial.planVersion !== subscription.planVersion || trial.trialEndsAt !== subscription.currentPeriodEnd ||
+          typeof envelope.data.replayed !== 'boolean' ||
+          envelope.data.etag !== subscription.etag) {
+        return errorResponse(503, 'TRIAL_RESPONSE_INVALID', 'Trial start result could not be verified')
+      }
+      const finalEventId = 'evt_subscription_trial_started_' + trial.trialId
+      let finalAudit: Response
+      try {
+        finalAudit = await callW06SubscriptionTrialAudit({
+          request,
+          principal: principal as ContentPrincipal,
+          body: {
+            eventId: finalEventId,
+            phase: 'STARTED',
+            planId,
+            subscriptionId: subscription.subscriptionId,
+            trialId: trial.trialId,
+            planVersion: trial.planVersion,
+            trialEndsAt: trial.trialEndsAt,
+          },
+        })
+      } catch {
+        return errorResponse(503, 'AUDIT_UNAVAILABLE', 'Trial start audit service unavailable')
+      }
+      const finalAuditValue: unknown = await finalAudit.json().catch((): null => null)
+      if ((finalAudit.status !== 200 && finalAudit.status !== 201) ||
+          !isRecord(finalAuditValue) || finalAuditValue.eventId !== finalEventId ||
+          finalAuditValue.action !== 'membership.subscription.trial_started' ||
+          finalAuditValue.targetId !== subscription.subscriptionId) {
+        return errorResponse(503, 'AUDIT_UNAVAILABLE', 'Trial start audit was not durably confirmed')
+      }
+      return w07Response
+    }
+
+    if (isTrialCancelRequest) {
+      const subscriptionId = parts[0] ?? ''
+      if (!/^sub_[a-f0-9]{64}$/.test(subscriptionId)) {
+        return errorResponse(404, 'RESOURCE_NOT_FOUND', 'Subscription not found')
+      }
+      const denied = await authorizeSubscriptionPermission(request, principal.userId, 'subscription.cancel')
+      if (denied) return denied
+      const ifMatch = request.headers.get('If-Match') ?? ''
+      const versionMatch = /^"lr-v([1-9]\\d*)"$/.exec(ifMatch)
+      const expectedVersion = versionMatch?.[1] ? Number(versionMatch[1]) : Number.NaN
+      if (!Number.isSafeInteger(expectedVersion) || expectedVersion < 1) {
+        return errorResponse(ifMatch ? 412 : 428, ifMatch ? 'PRECONDITION_FAILED' : 'PRECONDITION_REQUIRED', 'A valid If-Match subscription version is required')
+      }
+      if (request.body !== null) {
+        await request.body.cancel().catch(() => undefined)
+        return errorResponse(400, 'VALIDATION_FAILED', 'Trial cancellation does not accept a request body')
+      }
+      const w07Response = await callW07Subscription({
+        request,
+        pathname: operation.pathname,
+        method: 'POST',
+        principal,
+      })
+      if (!w07Response.ok) return w07Response
+      const envelope: unknown = await w07Response.clone().json().catch((): null => null)
+      if (!isRecord(envelope) || !isRecord(envelope.data) ||
+          !isRecord(envelope.data.subscription) || !isRecord(envelope.data.trial)) {
+        return errorResponse(503, 'TRIAL_RESPONSE_INVALID', 'Trial cancellation result could not be verified')
+      }
+      const subscription = envelope.data.subscription
+      const trial = envelope.data.trial
+      if (subscription.subscriptionId !== subscriptionId || subscription.subscriberId !== principal.userId ||
+          subscription.status !== 'TRIALING' || typeof subscription.version !== 'number' ||
+          subscription.version !== expectedVersion + (envelope.data.replayed === true ? 0 : 1) ||
+          typeof subscription.currentPeriodEnd !== 'string' || subscription.cancelAt !== subscription.currentPeriodEnd ||
+          trial.subscriptionId !== subscriptionId || trial.source !== 'WEB' || trial.status !== 'CANCELED' ||
+          trial.trialEndsAt !== subscription.currentPeriodEnd) {
+        return errorResponse(503, 'TRIAL_RESPONSE_INVALID', 'Trial cancellation result could not be verified')
+      }
+      const finalEventId = 'evt_subscription_trial_canceled_' + String(trial.trialId)
+      let finalAudit: Response
+      try {
+        finalAudit = await callW06SubscriptionTrialAudit({
+          request,
+          principal: principal as ContentPrincipal,
+          body: {
+            eventId: finalEventId,
+            phase: 'CANCELED',
+            planId: String(trial.planId),
+            subscriptionId,
+            trialId: String(trial.trialId),
+            planVersion: Number(trial.planVersion),
+            trialEndsAt: String(trial.trialEndsAt),
+          },
+        })
+      } catch {
+        return errorResponse(503, 'AUDIT_UNAVAILABLE', 'Trial cancellation audit service unavailable')
+      }
+      const finalAuditValue: unknown = await finalAudit.json().catch((): null => null)
+      if ((finalAudit.status !== 200 && finalAudit.status !== 201) ||
+          !isRecord(finalAuditValue) || finalAuditValue.eventId !== finalEventId ||
+          finalAuditValue.action !== 'membership.subscription.trial_canceled' ||
+          finalAuditValue.targetId !== subscriptionId) {
+        return errorResponse(503, 'AUDIT_UNAVAILABLE', 'Trial cancellation audit was not durably confirmed')
+      }
+      return w07Response
+    }
+
     const isPlanChangeRequest = request.method === 'POST' && parts.length === 2 && parts[1] === 'change-plan'
     const isPlanUpgradeRequest = request.method === 'POST' && parts.length === 2 && parts[1] === 'upgrade'
     if (isPlanUpgradeRequest) {
