@@ -14,7 +14,7 @@ import {
 } from './membership-store-product-binding.js';
 import { SubscriptionRuntimeError } from './subscription-runtime.js';
 
-export type RevenueCatMembershipCurrentState = 'ACTIVE' | 'EXPIRED' | 'REFUNDED';
+export type RevenueCatMembershipCurrentState = 'TRIALING' | 'ACTIVE' | 'EXPIRED' | 'REFUNDED';
 
 export type RevenueCatMembershipCurrentStateCandidate = Readonly<
   RevenueCatMembershipProductBinding & {
@@ -32,6 +32,8 @@ export type RevenueCatMembershipCurrentStateCandidate = Readonly<
     unsubscribeDetectedAt: string | null;
     billingIssuesDetectedAt: string | null;
     autoResumeDate: string | null;
+    periodType: string | null;
+    originalTransactionId: string | null;
   }
 >;
 
@@ -138,7 +140,7 @@ function buildCurrentState(
   const refundedAt = subscription.refunded_at ?? null;
   return {
     currentState: active
-      ? 'ACTIVE'
+      ? subscription.period_type === 'TRIAL' ? 'TRIALING' : 'ACTIVE'
       : refundedAt !== null && Date.parse(refundedAt) <= nowMs
         ? 'REFUNDED'
         : 'EXPIRED',
@@ -194,7 +196,10 @@ function validateSnapshot(snapshot: RevenueCatSubscriberSnapshot): void {
             subscription.store_transaction_id < 0)) ||
         (typeof subscription.store_transaction_id === 'string' &&
           subscription.store_transaction_id.length > MAX_PROVIDER_ID_LENGTH) ||
-        (subscription.is_sandbox !== undefined && typeof subscription.is_sandbox !== 'boolean')) {
+        (subscription.is_sandbox !== undefined && typeof subscription.is_sandbox !== 'boolean') ||
+        (subscription.period_type !== undefined && !isBoundedCanonicalText(subscription.period_type, 128)) ||
+        (subscription.original_transaction_id !== undefined && subscription.original_transaction_id !== null &&
+          !isBoundedCanonicalText(subscription.original_transaction_id, MAX_PROVIDER_ID_LENGTH))) {
       throw new RevenueCatSubscriberReconciliationError('INVALID_SNAPSHOT');
     }
   }
@@ -316,6 +321,8 @@ export async function buildRevenueCatSubscriberReconciliationCandidates(
       unsubscribeDetectedAt: group.subscription.unsubscribe_detected_at ?? null,
       billingIssuesDetectedAt: group.subscription.billing_issues_detected_at ?? null,
       autoResumeDate: group.subscription.auto_resume_date ?? null,
+      periodType: group.subscription.period_type ?? null,
+      originalTransactionId: group.subscription.original_transaction_id ?? null,
     });
   }
 
