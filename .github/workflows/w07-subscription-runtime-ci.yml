@@ -402,7 +402,7 @@ jobs:
           expected_trial_cols = {
             'trial_id':('TEXT',1,1),'subscription_id':('TEXT',1,0),'subscriber_id':('TEXT',1,0),
             'plan_id':('TEXT',1,0),'plan_version':('INTEGER',1,0),'source':('TEXT',1,0),
-            'provider_app_id':('TEXT',0,0),'product_id':('TEXT',0,0),'original_transaction_id':('TEXT',0,0),
+            'provider_app_id':('TEXT',0,0),'product_id':('TEXT',0,0),'store_transaction_id':('TEXT',0,0),
             'started_at':('TEXT',1,0),'trial_ends_at':('TEXT',1,0),'status':('TEXT',1,0),
             'request_hash':('TEXT',1,0),'version':('INTEGER',1,0),'created_at':('TEXT',1,0),'updated_at':('TEXT',1,0),
           }
@@ -433,7 +433,7 @@ jobs:
           def insert_trial_subscription(subscription_id, subscriber_id):
             db.execute("INSERT INTO membership_subscriptions(subscription_id,subscriber_id,plan_id,plan_version,creator_id,status,started_at,current_period_start,current_period_end,cancel_at,entitlement_snapshot_ref,created_at,updated_at,version) VALUES(?,?,'plan_trial_probe',1,'creator_trial_probe','TRIALING','2026-10-10T00:00:00.000Z','2026-10-10T00:00:00.000Z','2026-10-24T00:00:00.000Z',NULL,NULL,'2026-10-10T00:00:00.000Z','2026-10-10T00:00:00.000Z',1)",(subscription_id,subscriber_id))
           def insert_trial(trial_id, subscription_id, subscriber_id):
-            db.execute("INSERT INTO membership_subscription_trials(trial_id,subscription_id,subscriber_id,plan_id,plan_version,source,provider_app_id,product_id,original_transaction_id,started_at,trial_ends_at,status,request_hash,version,created_at,updated_at) VALUES(?,?,?, 'plan_trial_probe',1,'WEB',NULL,NULL,NULL,'2026-10-10T00:00:00.000Z','2026-10-24T00:00:00.000Z','TRIALING',?,1,'2026-10-10T00:00:00.000Z','2026-10-10T00:00:00.000Z')",(trial_id,subscription_id,subscriber_id,'a'*64))
+            db.execute("INSERT INTO membership_subscription_trials(trial_id,subscription_id,subscriber_id,plan_id,plan_version,source,provider_app_id,product_id,store_transaction_id,started_at,trial_ends_at,status,request_hash,version,created_at,updated_at) VALUES(?,?,?, 'plan_trial_probe',1,'WEB',NULL,NULL,NULL,'2026-10-10T00:00:00.000Z','2026-10-24T00:00:00.000Z','TRIALING',?,1,'2026-10-10T00:00:00.000Z','2026-10-10T00:00:00.000Z')",(trial_id,subscription_id,subscriber_id,'a'*64))
           insert_trial_subscription('sub_trial_cancel_probe','user_trial_cancel_probe')
           insert_trial('mtr_aaaaaaaaaaaaaaaaaaaaaaaaaa','sub_trial_cancel_probe','user_trial_cancel_probe')
           db.execute("UPDATE membership_subscriptions SET cancel_at='2026-10-24T00:00:00.000Z',updated_at='2026-10-11T00:00:00.000Z',version=2 WHERE subscription_id='sub_trial_cancel_probe'")
