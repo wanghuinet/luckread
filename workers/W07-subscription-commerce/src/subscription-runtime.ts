@@ -631,7 +631,7 @@ export async function createMembershipPlanDraft(
   if (Number(results[0]?.meta?.changes ?? 0) !== 1 || Number(results[1]?.meta?.changes ?? 0) !== 1) {
     const raced = await db.prepare(
       'SELECT p.plan_id, p.owner_id, p.current_version, p.status, p.visibility, p.version, p.created_at, p.updated_at, ' +
-      'v.name, v.tier, v.billing_interval, v.price_minor, v.currency, v.benefits_json ' +
+      'v.name, v.tier, v.billing_interval, v.price_minor, v.currency, v.benefits_json, v.trial_days ' +
       'FROM membership_plans AS p INNER JOIN membership_plan_versions AS v ' +
       'ON v.plan_id = p.plan_id AND v.plan_version = 1 WHERE p.plan_id = ? LIMIT 1',
     ).bind(planId).first<MembershipPlanStoredRow>()
@@ -695,7 +695,7 @@ export async function publishMembershipPlan(
   const readOwnedPlan = async (): Promise<MembershipPlanStoredRow | null> =>
     db.prepare(
       'SELECT p.plan_id, p.owner_id, p.current_version, p.status, p.visibility, p.version, p.created_at, p.updated_at, ' +
-      'v.name, v.tier, v.billing_interval, v.price_minor, v.currency, v.benefits_json ' +
+      'v.name, v.tier, v.billing_interval, v.price_minor, v.currency, v.benefits_json, v.trial_days ' +
       'FROM membership_plans AS p INNER JOIN membership_plan_versions AS v ' +
       'ON v.plan_id = p.plan_id AND v.plan_version = p.current_version ' +
       "WHERE p.plan_id = ? AND p.owner_type = 'CREATOR' AND p.owner_id = ? LIMIT 1",
@@ -789,7 +789,7 @@ export async function reviseMembershipPlan(
   const readOwnedPlan = async (): Promise<MembershipPlanStoredRow | null> =>
     db.prepare(
       'SELECT p.plan_id, p.owner_id, p.current_version, p.status, p.visibility, p.version, p.created_at, p.updated_at, ' +
-      'v.name, v.tier, v.billing_interval, v.price_minor, v.currency, v.benefits_json ' +
+      'v.name, v.tier, v.billing_interval, v.price_minor, v.currency, v.benefits_json, v.trial_days ' +
       'FROM membership_plans AS p INNER JOIN membership_plan_versions AS v ' +
       'ON v.plan_id = p.plan_id AND v.plan_version = p.current_version ' +
       "WHERE p.plan_id = ? AND p.owner_type = 'CREATOR' AND p.owner_id = ? LIMIT 1",
@@ -902,7 +902,7 @@ export async function transitionMembershipPlanLifecycle(
   const readOwnedPlan = async (): Promise<MembershipPlanStoredRow | null> =>
     db.prepare(
       'SELECT p.plan_id, p.owner_id, p.current_version, p.status, p.visibility, p.version, p.created_at, p.updated_at, ' +
-      'v.name, v.tier, v.billing_interval, v.price_minor, v.currency, v.benefits_json ' +
+      'v.name, v.tier, v.billing_interval, v.price_minor, v.currency, v.benefits_json, v.trial_days ' +
       'FROM membership_plans AS p INNER JOIN membership_plan_versions AS v ' +
       'ON v.plan_id = p.plan_id AND v.plan_version = p.current_version ' +
       "WHERE p.plan_id = ? AND p.owner_type = 'CREATOR' AND p.owner_id = ? LIMIT 1",
@@ -975,7 +975,7 @@ export async function listCreatorMembershipPlans(
   const cursor = decodePlanListCursor(cursorValue)
   const baseSql =
     'SELECT p.plan_id, p.owner_id, p.current_version, p.status, p.visibility, p.version, p.created_at, p.updated_at, ' +
-    'v.name, v.tier, v.billing_interval, v.price_minor, v.currency, v.benefits_json ' +
+    'v.name, v.tier, v.billing_interval, v.price_minor, v.currency, v.benefits_json, v.trial_days ' +
     'FROM membership_plans AS p INNER JOIN membership_plan_versions AS v ' +
     'ON v.plan_id = p.plan_id AND v.plan_version = p.current_version ' +
     "WHERE p.owner_type = 'CREATOR' AND p.owner_id = ? "
@@ -1029,7 +1029,7 @@ export async function resolvePurchasableMembershipPlanOffers(
   try {
     result = await db.prepare(
       'SELECT p.plan_id, p.owner_id, p.current_version, p.status, p.visibility, p.version, p.created_at, p.updated_at, ' +
-      'v.name, v.tier, v.billing_interval, v.price_minor, v.currency, v.benefits_json ' +
+      'v.name, v.tier, v.billing_interval, v.price_minor, v.currency, v.benefits_json, v.trial_days ' +
       'FROM membership_plans AS p ' +
       'INNER JOIN membership_plan_versions AS v ON v.plan_id = p.plan_id AND v.plan_version = p.current_version ' +
       "WHERE p.owner_type = 'CREATOR' AND p.status = 'ACTIVE' AND p.visibility = 'PUBLIC' " +
