@@ -562,6 +562,17 @@ function canonicalDate(value: string): string {
   return date.toISOString();
 }
 
+/** Maps the current RevenueCat auto-renew cancellation signal to the exact current period end. */
+export function resolveRevenueCatCancelAt(
+  periodEnd: string,
+  unsubscribeDetectedAt: string | null,
+): string | null {
+  const canonicalEnd = canonicalDate(periodEnd);
+  if (unsubscribeDetectedAt === null) return null;
+  canonicalDate(unsubscribeDetectedAt);
+  return canonicalEnd;
+}
+
 async function readStoreTrial(
   db: D1Database,
   source: 'APP_STORE' | 'PLAY_STORE',
@@ -684,7 +695,7 @@ export async function syncRevenueCatStoreTrialCandidates(
         version: 1, subscriberId, appId: appIdInput, source: candidate.store,
         storeTransactionId, planId: candidate.planId, planVersion: candidate.planVersion,
       }));
-      const cancelAt = candidate.unsubscribeDetectedAt ? trialEndsAt : null;
+      const cancelAt = resolveRevenueCatCancelAt(trialEndsAt, candidate.unsubscribeDetectedAt);
       try {
         const statements = [
           db.prepare(
@@ -766,7 +777,7 @@ export async function syncRevenueCatStoreTrialCandidates(
       if (Date.parse(paidPeriodEnd) <= Date.parse(paidPeriodStart)) {
         throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500);
       }
-      const cancelAt = candidate.unsubscribeDetectedAt ? paidPeriodEnd : null;
+      const cancelAt = resolveRevenueCatCancelAt(paidPeriodEnd, candidate.unsubscribeDetectedAt);
       const updatedAt = new Date(Math.max(Date.now(), Date.parse(subscription.updated_at) + 1)).toISOString();
       const result = await db.prepare(
         "UPDATE membership_subscriptions SET status = 'ACTIVE', current_period_start = ?, current_period_end = ?, " +
@@ -800,7 +811,7 @@ export async function syncRevenueCatStoreTrialCandidates(
         if (nextPeriodEndMs <= Date.parse(nextPeriodStart)) {
           throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500);
         }
-        const cancelAt = candidate.unsubscribeDetectedAt ? nextPeriodEnd : null;
+        const cancelAt = resolveRevenueCatCancelAt(nextPeriodEnd, candidate.unsubscribeDetectedAt);
         const updatedAt = new Date(Math.max(Date.now(), Date.parse(subscription.updated_at) + 1)).toISOString();
         const result = await db.prepare(
           "UPDATE membership_subscriptions SET current_period_start = ?, current_period_end = ?, " +
