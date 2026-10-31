@@ -669,6 +669,7 @@
         "columns": [
           "source",
           "provider_app_id",
+          "subscriber_id",
           "store_transaction_id"
         ],
         "unique": true,
@@ -695,7 +696,7 @@
     "constraints": {
       "authority": "D1-01 only; D1-04 owns order/payment/mandate/renewal-cycle facts.",
       "subscriptionLink": "Exactly one trial record per subscription; subscription, subscriber, creator plan and immutable plan version must match at insert.",
-      "sourceBinding": "WEB records have no store identifiers; APP_STORE and PLAY_STORE require the verified RevenueCat app ID, product ID and store transaction ID.",
+      "sourceBinding": "WEB records have no store identifiers; APP_STORE and PLAY_STORE require the verified RevenueCat app ID, subscriber ID, product ID and store transaction ID. Store transaction uniqueness is scoped to the verified subscriber because RevenueCat transaction identifiers are not assumed globally unique across sandbox accounts.",
       "webTrialStart": "A WEB trial can be inserted only if the immutable plan version has trial_days 1..90 and an active D1-04 Hyperswitch MIT mandate is bound to the same subscriber.",
       "storeTrialStart": "Store trial rows are written only after W02 identity verification and RevenueCat current-customer snapshot/product binding reconciliation.",
       "accessBoundary": "Subscription current_period_start/current_period_end and status TRIALING control access. cancel_at equal to trial_ends_at suppresses conversion but does not revoke access early.",
@@ -703,7 +704,7 @@
       "failedPayment": "A failed WEB first charge changes Subscription to PAST_DUE and linked trial to PAYMENT_FAILED. Retry uses the same D1-04 cycle and mandate.",
       "cancellationRace": "If the first payment was already submitted before cancellation, verified success may transition CANCELED to CONVERTED; otherwise canceled trial expires at trial_ends_at.",
       "expiry": "WEB trial expiry is scheduled by existing W07 renewal batch only after pending provider outcomes are reconciled. Store expiry is reconciled from RevenueCat current-customer snapshot; the access period end still blocks access when reached.",
-      "idempotency": "WEB trial ID is deterministic from subscriber, plan and Idempotency-Key. Store trial ID is deterministic from source, RevenueCat app ID and store transaction ID.",
+      "idempotency": "WEB trial ID is deterministic from subscriber, plan and Idempotency-Key. Store trial ID is deterministic from authenticated subscriber, source, RevenueCat app ID and store transaction ID; snapshot reconciliation also falls back to the same subscriber, plan and product because store_transaction_id may change across store renewals.",
       "retention": "Trial identity/history cannot be deleted; state updates require version increment and increasing updated_at.",
       "cancellation": "A WEB trial in TRIALING or PAYMENT_FAILED may be canceled using If-Match. Subscription.cancel_at is set to trial_ends_at without changing the current TRIALING/PAST_DUE state; D1-01 transitions the trial row to CANCELED. This stops new retries but preserves current-period access. If a payment was already submitted, its verified success may still convert CANCELED to CONVERTED.",
       "retry": "A failed WEB first charge moves Subscription to PAST_DUE and linked trial to PAYMENT_FAILED. Retry uses the same D1-04 cycle and mandate; if the subscriber cancels while PAYMENT_FAILED, no new retry is prepared."
