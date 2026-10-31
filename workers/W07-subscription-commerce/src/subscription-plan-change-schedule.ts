@@ -173,6 +173,38 @@ export async function readScheduledSubscriptionPlanDowngradeForPeriod(
   return change;
 }
 
+/** Returns true while an unpaid immediate upgrade reservation exists for this subscription. */
+export async function hasPendingMembershipPlanUpgrade(
+  db: D1Database,
+  subscriptionId: string,
+): Promise<boolean> {
+  try {
+    const row = await db.prepare(
+      "SELECT attempt_id FROM membership_subscription_plan_change_attempts WHERE subscription_id = ? AND status = 'PENDING_PAYMENT' LIMIT 1",
+    ).bind(subscriptionId).first<{ attempt_id: string }>();
+    return row !== null;
+  } catch {
+    throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
+  }
+}
+
+/** Returns true while a period-end downgrade is scheduled and not yet applied. */
+export async function hasPendingScheduledPlanDowngrade(
+  db: D1Database,
+  subscriptionId: string,
+): Promise<boolean> {
+  try {
+    const row = await db.prepare(
+      "SELECT change_id FROM membership_subscription_scheduled_plan_changes WHERE subscription_id = ? AND status = 'SCHEDULED' LIMIT 1",
+    ).bind(subscriptionId).first<{ change_id: string }>();
+    return row !== null;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    // Migration 0006 is additive. Before it is applied, no scheduled downgrade can exist.
+    if (/no such table:\\s*membership_subscription_scheduled_plan_changes/i.test(message)) return false;
+    throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
+  }
+}
 export async function readScheduledDowngradeTargetPlan(
   db: D1Database,
   change: ScheduledSubscriptionPlanDowngrade,
@@ -319,14 +351,16 @@ export async function scheduleSubscriptionPlanDowngrade(
       'AND s.current_period_start = ? AND s.current_period_end = ?) ' +
       'AND EXISTS (SELECT 1 FROM membership_plans p WHERE p.plan_id = ? AND p.owner_type = \'CREATOR\' ' +
       'AND p.owner_id = (SELECT creator_id FROM membership_subscriptions WHERE subscription_id = ? AND subscriber_id = ?) ' +
-      "AND p.status = 'ACTIVE' AND p.visibility = 'PUBLIC')",
+      "AND p.status = 'ACTIVE' AND p.visibility = 'PUBLIC') " +
+      "AND NOT EXISTS (SELECT 1 FROM membership_subscription_plan_change_attempts a " +
+      "WHERE a.subscription_id = ? AND a.status = 'PENDING_PAYMENT')",
     ).bind(
       changeId, subscriberId, subscriptionId, expectedVersion, preview.currentPlan.planId,
       preview.currentPlan.planVersion, preview.targetPlan.planId, preview.targetPlan.planVersion,
       preview.currentPeriodEnd, keyDigest, now, now,
       subscriptionId, subscriberId, expectedVersion, preview.currentPlan.planId,
       preview.currentPlan.planVersion, preview.currentPeriodStart, preview.currentPeriodEnd,
-      preview.targetPlan.planId, subscriptionId, subscriberId,
+      preview.targetPlan.planId, subscriptionId, subscriberId, subscriptionId,
     ).run();
     if (Number(inserted.meta?.changes ?? 0) !== 1) {
       const raced = await readScheduledChangeByIdempotency(env.D1_01, subscriberId, keyDigest);
