@@ -419,7 +419,8 @@
         "contracts/openapi/v1/operation-policy.json",
         "contracts/api/api-inventory.v1.json",
         "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json",
-        "contracts/alignment/api-inventory.v1.json"
+        "contracts/alignment/api-inventory.v1.json",
+        "contracts/state-machines/membership-subscription-plan-upgrade.json"
       ],
       "blockers": [
         "D1-01 migration 0006 is a reviewed code candidate only and has not been applied; no production entitlement change is admitted until migration postflight is complete.",
