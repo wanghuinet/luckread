@@ -1020,12 +1020,13 @@ const planChangeTriggerNames = [
   'membership_subscriptions_plan_change_requires_scheduled_record',
 ]
 const nameRows = (names) => [{ results: names.map((name,seq) => ({ name,seq })) }]
-const preflightInput = (withVersion = false, versionDefault = '1', withPlans = false, withPlanChanges = withPlans) => ({
+const preflightInput = (withVersion = false, versionDefault = '1', withPlans = false, withPlanChanges = withPlans, withRevenueCat = withPlans) => ({
   databaseList: preflightDatabaseList,
   migrationState: [{ results: [
     { name: '0001_membership_subscriptions.sql' },
     ...(withVersion ? [{ name: '0002_subscription_version_cas.sql' }] : []),
     ...(withPlans ? [{ name: '0003_membership_plans.sql' }] : []),
+    ...(withRevenueCat ? [{ name: '0004_revenuecat_membership_product_bindings.sql' }] : []),
     ...(withPlanChanges ? [{ name: '0005_subscription_plan_changes.sql' }] : []),
   ] }],
   subscriptionSchema: preflightSchema(withVersion,versionDefault),
@@ -1056,6 +1057,7 @@ describe('read-only D1 subscription migration postflight', () => {
       '0001_membership_subscriptions.sql',
       '0002_subscription_version_cas.sql',
       '0003_membership_plans.sql',
+      '0004_revenuecat_membership_product_bindings.sql',
       '0005_subscription_plan_changes.sql',
     ])
   })
@@ -1114,12 +1116,13 @@ describe('read-only D1 subscription migration preflight', () => {
   })
 
   it('continues migration when MembershipPlan exists but scheduled plan-change migration is pending', () => {
-    const result = verifyD1SubscriptionPreflight(preflightInput(true, '1', true, false))
+    const result = verifyD1SubscriptionPreflight(preflightInput(true, '1', true, false, true))
     expect(result.migrationAction).toBe('apply')
     expect(result.appliedMigrations).toEqual([
       '0001_membership_subscriptions.sql',
       '0002_subscription_version_cas.sql',
       '0003_membership_plans.sql',
+      '0004_revenuecat_membership_product_bindings.sql',
     ])
   })
 
@@ -1130,6 +1133,7 @@ describe('read-only D1 subscription migration preflight', () => {
       '0001_membership_subscriptions.sql',
       '0002_subscription_version_cas.sql',
       '0003_membership_plans.sql',
+      '0004_revenuecat_membership_product_bindings.sql',
       '0005_subscription_plan_changes.sql',
     ])
     expect(result.columns.at(-1)).toEqual(['version','INTEGER',1,0])
