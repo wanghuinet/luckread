@@ -298,7 +298,7 @@ export default function MySubscriptionsScreen() {
                 }
                 await loadPaymentMethods();
                 if (result.response.status === 202) {
-                  Alert.alert('撤销处理中', '新的自动续费扣款已暂缓。待 Hyperswitch 的签名确认事件到达后，该付款方式会从列表移除。');
+                  Alert.alert('撤销处理中', '新的自动续费扣款已暂缓。收到 Hyperswitch 的签名确认事件后，请返回此页点击“重试移除”，完成支付渠道中的付款方式删除。');
                 } else {
                   paymentMethodIdempotencyKeys.current.delete(method.savedPaymentMethodId);
                   Alert.alert('已移除', '付款方式已从支付渠道确认移除。');
