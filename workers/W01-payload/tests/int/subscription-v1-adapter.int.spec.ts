@@ -27,6 +27,7 @@ describe('v1 subscription adapter', () => {
   const w08Worker = readFileSync(resolve(process.cwd(), '../W08-creator/src/worker.ts'), 'utf8')
   const w08Casl = readFileSync(resolve(process.cwd(), '../W08-creator/src/authz/casl-policy.ts'), 'utf8')
   const w06Worker = readFileSync(resolve(process.cwd(), '../W06-governance/src/index.ts'), 'utf8')
+  const w07Worker = readFileSync(resolve(process.cwd(), '../W07-subscription-commerce/src/index.ts'), 'utf8')
   const w06Client = readFileSync(resolve(process.cwd(), 'src/moderation/w06-moderation-client.ts'), 'utf8')
   const client = readFileSync(resolve(process.cwd(), 'src/subscription/w07-subscription-client.ts'), 'utf8')
   const wrangler = readFileSync(resolve(process.cwd(), 'wrangler.jsonc'), 'utf8')
