@@ -2112,6 +2112,39 @@ paths:
         '428': { $ref: '#/components/responses/PreconditionRequired' }
         '4XX': { $ref: '#/components/responses/ClientError' }
 
+  /memberships/subscriptions/{subscriptionId}/upgrade:
+    parameters:
+      - name: subscriptionId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    post:
+      tags: [Users]
+      summary: Create a prorated immediate subscription upgrade order
+      description: Calculates the remaining-period price difference from immutable W07 plan versions and creates an idempotent D1-04 Order. The current subscription plan and entitlements remain unchanged until a signed, successful Hyperswitch payment webhook is verified and the D1-01 paid-upgrade application is committed.
+      operationId: createSubscriptionUpgradeOrder
+      parameters:
+        - $ref: '#/components/parameters/IfMatchRequired'
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [planId]
+              properties:
+                planId: { $ref: '#/components/schemas/ResourceId' }
+      responses:
+        '201': { description: Prorated upgrade Order created. Use the returned orderId with the existing payment-intent endpoint; no entitlement is changed yet. }
+        '200': { description: Idempotent replay of the original upgrade Order and original proration quote. }
+        '409': { description: Subscription is not upgradeable, target plan is not a higher same-currency same-interval plan, or a scheduled change exists. }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '503': { description: Authoritative pricing/tax or commerce persistence is unavailable; no order is confirmed. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
   /entitlements/{subjectId}:
     parameters:
       - name: subjectId
