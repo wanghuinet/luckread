@@ -2858,6 +2858,21 @@
       "optimisticLockRequired": true,
       "idempotencyRequired": true,
       "stateMachine": "none"
+    },
+    {
+      "operationId": "startSubscriptionTrial",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "subscription.create"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": true,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "CONTRACTED_PARTIAL",
+      "x-luckread-source": "contracts/api/commerce-operation-policy.v1.json"
     }
   ]
 }
