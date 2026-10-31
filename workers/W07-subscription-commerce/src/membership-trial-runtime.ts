@@ -206,6 +206,32 @@ export async function startWebMembershipTrial(
   }
   const startedAt = nowDate.toISOString();
 
+  const requestHash = await digest(JSON.stringify({
+    version: 1, source: 'WEB', subscriberId, planId, idempotencyKey,
+  }));
+  const idempotencyDigest = await digest('membership-web-trial-v1\u0000' + subscriberId + '\u0000' + planId + '\u0000' + idempotencyKey);
+  const subscriptionId = 'sub_' + idempotencyDigest;
+  const trialId = 'mtr_' + idempotencyDigest.slice(0, 26);
+
+  const existing = await readTrialBySubscription(d1_01, subscriptionId);
+  if (existing) {
+    if (existing.subscriber_id !== subscriberId || existing.plan_id !== planId ||
+        existing.request_hash !== requestHash || existing.source !== 'WEB') {
+      throw new SubscriptionRuntimeError('CONFLICT', 409);
+    }
+    const subscription = await d1_01.prepare(
+      'SELECT * FROM membership_subscriptions WHERE subscription_id = ? AND subscriber_id = ? LIMIT 1',
+    ).bind(subscriptionId, subscriberId).first<TrialSubscriptionRow>();
+    if (!subscription) throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
+    return {
+      subscription: toSubscription(subscription),
+      trial: toTrial(existing),
+      replayed: true,
+      etag: etagForVersion(subscription.version),
+    };
+  }
+
+
   let mandate: { mandate_record_id: string } | null;
   try {
     mandate = await d1_04.prepare(
@@ -241,30 +267,6 @@ export async function startWebMembershipTrial(
     throw new SubscriptionRuntimeError('TRIAL_NOT_AVAILABLE', 409);
   }
   const trialEndsAt = addTrialDays(startedAt, plan.trial_days);
-  const requestHash = await digest(JSON.stringify({
-    version: 1, source: 'WEB', subscriberId, planId, idempotencyKey,
-  }));
-  const idempotencyDigest = await digest('membership-web-trial-v1\u0000' + subscriberId + '\u0000' + planId + '\u0000' + idempotencyKey);
-  const subscriptionId = 'sub_' + idempotencyDigest;
-  const trialId = 'mtr_' + idempotencyDigest.slice(0, 26);
-
-  const existing = await readTrialBySubscription(d1_01, subscriptionId);
-  if (existing) {
-    if (existing.subscriber_id !== subscriberId || existing.plan_id !== planId ||
-        existing.request_hash !== requestHash || existing.source !== 'WEB') {
-      throw new SubscriptionRuntimeError('CONFLICT', 409);
-    }
-    const subscription = await d1_01.prepare(
-      'SELECT * FROM membership_subscriptions WHERE subscription_id = ? AND subscriber_id = ? LIMIT 1',
-    ).bind(subscriptionId, subscriberId).first<TrialSubscriptionRow>();
-    if (!subscription) throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
-    return {
-      subscription: toSubscription(subscription),
-      trial: toTrial(existing),
-      replayed: true,
-      etag: etagForVersion(subscription.version),
-    };
-  }
 
   let prior: { subscription_id: string } | null;
   try {
