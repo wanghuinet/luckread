@@ -211,7 +211,7 @@ export async function createSubscriptionUpgradeOrder(
     expectedSubscriptionVersion: subscription.version,
     currentPeriodStart: subscription.current_period_start,
     currentPeriodEnd: subscription.current_period_end,
-    prorationBaseMinor: Number(persistedProration),
+    prorationBaseMinor,
     currency: target.currency,
   }));
 
