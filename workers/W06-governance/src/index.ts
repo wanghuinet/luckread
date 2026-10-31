@@ -393,6 +393,7 @@ type SubscriptionTrialAuditInput = {
   trialId?: string
   planVersion?: number
   trialEndsAt?: string
+  occurredAt?: string
   idempotencyKey?: string
 }
 
@@ -708,13 +709,14 @@ function parseSubscriptionTrialAuditInput(value: unknown): SubscriptionTrialAudi
     }
     return body as SubscriptionTrialAuditInput
   }
-  const allowed = new Set([...common, 'subscriptionId', 'trialId', 'planVersion', 'trialEndsAt'])
+  const allowed = new Set([...common, 'subscriptionId', 'trialId', 'planVersion', 'trialEndsAt', 'occurredAt'])
   if (Object.keys(body).some((key) => !allowed.has(key)) || Object.keys(body).length !== allowed.size ||
       typeof body.subscriptionId !== 'string' || !resourceIdPattern.test(body.subscriptionId) ||
       typeof body.trialId !== 'string' || !/^mtr_[A-Za-z0-9]{26}$/.test(body.trialId) ||
       !Number.isSafeInteger(body.planVersion) || (body.planVersion as number) < 1 ||
       typeof body.trialEndsAt !== 'string' || !body.trialEndsAt ||
       Number.isNaN(Date.parse(body.trialEndsAt)) ||
+      typeof body.occurredAt !== 'string' || !body.occurredAt || Number.isNaN(Date.parse(body.occurredAt)) ||
       body.eventId !== 'evt_subscription_trial_' + (phase === 'STARTED' ? 'started_' : 'canceled_') + body.trialId) {
     throw new Error('INVALID_SUBSCRIPTION_TRIAL_AUDIT')
   }
@@ -1221,7 +1223,7 @@ export default {
               status: input.phase === 'STARTED' ? 'TRIALING' : 'CANCELED',
               trialEndsAt: input.trialEndsAt,
             },
-        occurredAt: new Date().toISOString(),
+        occurredAt: requested ? new Date().toISOString() : input.occurredAt!,
       }
       return requested
         ? persistMembershipPlanMutationRequestAudit(env, event)
