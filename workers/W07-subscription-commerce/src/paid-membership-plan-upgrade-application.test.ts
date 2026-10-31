@@ -55,8 +55,8 @@ function fakeDb(state: State): D1Database {
         applicationId, subscriptionId, subscriberId, sourcePlanId, sourcePlanVersion,
         targetPlanId, targetPlanVersion, expectedSubscriptionVersion,
         currentPeriodStart, currentPeriodEnd, orderId, paymentId,
-        amountMinor, currency, requestHash, createdAt, applicationUpdatedAt,
-      ] = v as [string,string,string,string,number,string,number,number,string,string,string,string,number,string,string,string,string];
+        requestHash, createdAt, applicationUpdatedAt,
+      ] = v as [string,string,string,string,number,string,number,number,string,string,string,string,string,string,string];
       state.application = {
         application_id: applicationId,
         subscription_id: subscriptionId,
@@ -70,8 +70,6 @@ function fakeDb(state: State): D1Database {
         current_period_end: currentPeriodEnd,
         order_id: orderId,
         payment_id: paymentId,
-        amount_minor: amountMinor,
-        currency,
         request_hash: requestHash,
         status: 'READY',
         version: 1,
@@ -177,8 +175,6 @@ describe('paid immediate membership upgrade application', () => {
     expect(f.state.application).toMatchObject({
       order_id: request.orderId,
       payment_id: request.paymentId,
-      amount_minor: request.amountMinor,
-      currency: request.currency,
       status: 'APPLIED',
       version: 2,
     });
@@ -197,11 +193,11 @@ describe('paid immediate membership upgrade application', () => {
     expect(f.state.batchCount).toBe(0);
   });
 
-  it('rejects reuse of an order or payment reference with a different paid-upgrade identity', async () => {
+  it('rejects reuse of an order or payment reference with a different paid-upgrade quote identity', async () => {
     const f = fixture();
     const request = input();
     await applyPaidMembershipPlanUpgrade(f.db, request, 'line_upgrade_1');
-    await expect(applyPaidMembershipPlanUpgrade(f.db, input({ amountMinor: 999 }), 'line_upgrade_1'))
+    await expect(applyPaidMembershipPlanUpgrade(f.db, input({ requestHash: 'e'.repeat(64) }), 'line_upgrade_1'))
       .rejects.toBeInstanceOf(PaidMembershipUpgradeApplicationError);
     expect(f.state.batchCount).toBe(1);
   });
