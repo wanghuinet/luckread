@@ -99,6 +99,9 @@ function receiptResponse(
             outcome: purchaseFulfillment.outcome,
             fulfilledCount: purchaseFulfillment.fulfilledCount,
           },
+          ...(purchaseFulfillment.subscriptionPlanChangeAudit
+            ? { subscriptionPlanChangeAudit: purchaseFulfillment.subscriptionPlanChangeAudit }
+            : {}),
         } : {}),
       },
       requestId: 'req_' + crypto.randomUUID(),

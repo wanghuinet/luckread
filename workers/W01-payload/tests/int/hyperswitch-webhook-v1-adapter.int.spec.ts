@@ -24,6 +24,15 @@ describe('Hyperswitch provider webhook ingress', () => {
     expect(route).not.toContain('resolveCookieSubscriptionPrincipal')
   })
 
+  it('requires W06 durable audit before acknowledging a paid subscription plan change webhook', () => {
+    expect(route).toContain('callW06SubscriptionPlanChangeAudit')
+    expect(route).toContain('membershipPurchaseFulfillment')
+    expect(route).toContain('subscriptionPlanChangeAudit')
+    expect(route).toContain('delete fulfillmentObject.subscriptionPlanChangeAudit')
+    expect(route).toContain('AUDIT_UNAVAILABLE')
+    expect(route).toContain('evt_spc_')
+  })
+
   it('forwards only the exact body, signature and fixed transport metadata', () => {
     expect(client).toContain('/internal/webhooks/hyperswitch')
     expect(client).toContain("input.request.headers.get('X-Webhook-Signature-512')")

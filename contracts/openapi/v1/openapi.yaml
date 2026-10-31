@@ -2081,6 +2081,35 @@ paths:
         '428': { $ref: '#/components/responses/PreconditionRequired' }
         '4XX': { $ref: '#/components/responses/ClientError' }
 
+  /memberships/subscriptions/{subscriptionId}/change-plan/quote:
+    parameters:
+      - name: subscriptionId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    get:
+      tags: [Users]
+      summary: Preview a subscription plan change without applying it
+      operationId: getSubscriptionPlanChangeQuote
+      description: >
+        Returns a read-only, pre-tax quote based on immutable MembershipPlan
+        versions and the current subscription period. The quote does not
+        create an order, initiate payment, mutate subscription state or change
+        entitlement. Billing-interval changes are not included.
+      parameters:
+        - name: planId
+          in: query
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
+        - $ref: '#/components/parameters/IfMatchRequired'
+      responses:
+        '200': { description: Read-only pre-tax plan-change quote; tax is not calculated and no payment action is available. }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: Target plan is unavailable or the plan change is not supported for this subscription. }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
   /memberships/subscriptions/{subscriptionId}/change-plan:
     parameters:
       - name: subscriptionId
@@ -2089,8 +2118,16 @@ paths:
         schema: { $ref: '#/components/schemas/ResourceId' }
     post:
       tags: [Users]
-      summary: Change the plan for a subscription
+      summary: Create a payment-required subscription upgrade order
       operationId: changeSubscriptionPlan
+      description: >
+        Creates or replays one server-priced upgrade Order for the remaining
+        current billing term. The endpoint does not mutate Subscription or
+        Entitlement. The client must complete the existing payment-intent
+        flow; only a verified Hyperswitch payment_succeeded webhook may apply
+        the D1-01 subscription version CAS. Until a live pricing/tax adapter
+        is admitted, production checkout fails closed. Downgrades and billing
+        interval changes are not applied by this operation.
       parameters:
         - $ref: '#/components/parameters/IfMatchRequired'
         - $ref: '#/components/parameters/IdempotencyKeyRequired'
@@ -2105,9 +2142,13 @@ paths:
               properties:
                 planId: { $ref: '#/components/schemas/ResourceId' }
       responses:
-        '200': { description: Subscription plan changed. }
+        '201': { description: Payment-required upgrade Order created; subscription and entitlement unchanged. }
+        '200': { description: Idempotent replay of the existing upgrade Order. }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '409': { description: Stale state, unsupported change, unavailable plan or conflicting idempotency request. }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '503': { description: Live pricing/tax or payment dependencies are not admitted or unavailable. }
         '4XX': { $ref: '#/components/responses/ClientError' }
 
   /entitlements/{subjectId}:

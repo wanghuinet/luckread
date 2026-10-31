@@ -42,6 +42,25 @@ type MembershipPlanVersionRow = Readonly<{
   benefits_json: string;
 }>;
 
+type SubscriptionPlanChangeReceiptRow = Readonly<{
+  change_request_id: string;
+  subscription_id: string;
+  subscriber_id: string;
+  source_subscription_version: number;
+  applied_subscription_version: number;
+  source_plan_id: string;
+  source_plan_version: number;
+  target_plan_id: string;
+  target_plan_version: number;
+  order_id: string;
+  payment_id: string;
+  currency: string;
+  amount_before_tax_minor: number;
+  current_period_start: string;
+  current_period_end: string;
+  applied_at: string;
+}>;
+
 type ExistingSubscriptionRow = Readonly<{
   subscription_id: string;
   subscriber_id: string;
@@ -52,12 +71,55 @@ type ExistingSubscriptionRow = Readonly<{
   started_at: string;
   current_period_start: string;
   current_period_end: string;
+  cancel_at: string | null;
   entitlement_snapshot_ref: string | null;
+  updated_at: string;
+  version: number;
+}>;
+
+type PaidSubscriptionPlanChangeSnapshot = Readonly<{
+  changeRequestId: string;
+  changeType: 'UPGRADE';
+  actorLayer: 'L2' | 'L3' | 'L4' | 'L5' | 'L6' | 'L7' | 'L8';
+  subscriptionId: string;
+  subscriberId: string;
+  sourceSubscriptionVersion: number;
+  sourcePlanId: string;
+  sourcePlanVersion: number;
+  targetPlanId: string;
+  targetPlanVersion: number;
+  currentPeriodStart: string;
+  currentPeriodEnd: string;
+  amountDueBeforeTaxMinor: number;
+  currency: string;
+  effectiveAt: string;
+}>;
+
+export type PaidSubscriptionPlanChangeAudit = Readonly<{
+  eventId: string;
+  actorUserId: string;
+  actorLayer: 'L2' | 'L3' | 'L4' | 'L5' | 'L6' | 'L7' | 'L8';
+  changeRequestId: string;
+  subscriptionId: string;
+  sourceSubscriptionVersion: number;
+  appliedSubscriptionVersion: number;
+  sourcePlanId: string;
+  sourcePlanVersion: number;
+  targetPlanId: string;
+  targetPlanVersion: number;
+  orderId: string;
+  paymentId: string;
+  currency: string;
+  amountBeforeTaxMinor: number;
+  currentPeriodStart: string;
+  currentPeriodEnd: string;
+  occurredAt: string;
 }>;
 
 export type PaidMembershipPurchaseFulfillmentResult = Readonly<{
   outcome: 'APPLIED' | 'ALREADY_APPLIED' | 'NOT_APPLICABLE';
   fulfilledCount: number;
+  subscriptionPlanChangeAudit?: PaidSubscriptionPlanChangeAudit;
 }>;
 
 export class PaidMembershipPurchaseFulfillmentError extends Error {
@@ -78,6 +140,7 @@ type MembershipOfferSnapshot = Readonly<{
   priceMinor: number;
   currency: string;
   benefits: string[];
+  subscriptionChange?: PaidSubscriptionPlanChangeSnapshot;
 }>;
 
 const PAYMENT_ID_PATTERN = /^pay_[A-Za-z0-9]{26}$/;
@@ -113,6 +176,37 @@ function parseSnapshot(raw: string, line: PaidOrderLineRow, orderCurrency: strin
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return failClosed();
   const value = parsed as Record<string, unknown>;
   const benefits = value.benefits;
+  let subscriptionChange: PaidSubscriptionPlanChangeSnapshot | undefined;
+  if (Object.hasOwn(value, 'subscriptionChange')) {
+    const change = value.subscriptionChange;
+    if (!change || typeof change !== 'object' || Array.isArray(change)) return failClosed();
+    const candidate = change as Record<string, unknown>;
+    if (
+      typeof candidate.changeRequestId !== 'string' ||
+      !/^scr_[a-f0-9]{60}$/.test(candidate.changeRequestId) ||
+      candidate.changeType !== 'UPGRADE' ||
+      typeof candidate.actorLayer !== 'string' || !/^L[2-8]$/.test(candidate.actorLayer) ||
+      !boundedId(candidate.subscriptionId) ||
+      !boundedId(candidate.subscriberId) ||
+      !Number.isSafeInteger(candidate.sourceSubscriptionVersion) ||
+      (candidate.sourceSubscriptionVersion as number) < 1 ||
+      typeof candidate.sourcePlanId !== 'string' || !PLAN_ID_PATTERN.test(candidate.sourcePlanId) ||
+      !Number.isSafeInteger(candidate.sourcePlanVersion) || (candidate.sourcePlanVersion as number) < 1 ||
+      candidate.targetPlanId !== value.planId ||
+      candidate.targetPlanVersion !== value.planVersion ||
+      !Number.isSafeInteger(candidate.targetPlanVersion) || (candidate.targetPlanVersion as number) < 1 ||
+      !canonicalIso(candidate.currentPeriodStart) ||
+      !canonicalIso(candidate.currentPeriodEnd) ||
+      candidate.currentPeriodEnd <= candidate.currentPeriodStart ||
+      !safeMinor(candidate.amountDueBeforeTaxMinor) || candidate.amountDueBeforeTaxMinor < 1 ||
+      candidate.currency !== orderCurrency ||
+      !canonicalIso(candidate.effectiveAt)
+    ) return failClosed();
+    subscriptionChange = candidate as unknown as PaidSubscriptionPlanChangeSnapshot;
+  }
+  const expectedLineAmount = subscriptionChange
+    ? subscriptionChange.amountDueBeforeTaxMinor
+    : value.priceMinor;
   if (
     typeof value.planId !== 'string' || !PLAN_ID_PATTERN.test(value.planId) ||
     value.planId !== line.item_ref ||
@@ -123,7 +217,7 @@ function parseSnapshot(raw: string, line: PaidOrderLineRow, orderCurrency: strin
     typeof value.tier !== 'string' || !/^[a-z][a-z0-9_-]{0,63}$/.test(value.tier) ||
     (value.billingInterval !== 'MONTHLY' && value.billingInterval !== 'YEARLY') ||
     !safeMinor(value.priceMinor) || value.priceMinor < 1 ||
-    value.priceMinor !== line.unit_amount_minor ||
+    !safeMinor(expectedLineAmount) || expectedLineAmount !== line.unit_amount_minor ||
     value.currency !== orderCurrency ||
     !Array.isArray(benefits) || benefits.length > 20 ||
     benefits.some((item) => typeof item !== 'string' || item.length < 1 || item.length > 180) ||
@@ -142,6 +236,7 @@ function parseSnapshot(raw: string, line: PaidOrderLineRow, orderCurrency: strin
     priceMinor: value.priceMinor,
     currency: value.currency,
     benefits: benefits as string[],
+    ...(subscriptionChange ? { subscriptionChange } : {}),
   };
 }
 
@@ -268,12 +363,151 @@ async function readExistingSubscription(
   try {
     return await db.prepare(
       'SELECT subscription_id, subscriber_id, plan_id, plan_version, creator_id, status, started_at, ' +
-      'current_period_start, current_period_end, entitlement_snapshot_ref ' +
+      'current_period_start, current_period_end, cancel_at, entitlement_snapshot_ref, updated_at, version ' +
       'FROM membership_subscriptions WHERE subscription_id = ? LIMIT 1',
     ).bind(subscriptionId).first<ExistingSubscriptionRow>();
   } catch {
     return failClosed();
   }
+}
+
+async function applyPaidSubscriptionPlanChange(
+  db: D1Database,
+  input: Readonly<{
+    snapshot: MembershipOfferSnapshot;
+    subscriberId: string;
+    orderId: string;
+    paymentId: string;
+    amountBeforeTaxMinor: number;
+  }>,
+): Promise<Readonly<{ outcome: 'APPLIED' | 'ALREADY_APPLIED'; audit: PaidSubscriptionPlanChangeAudit }>> {
+  const change = input.snapshot.subscriptionChange;
+  if (!change || change.subscriberId !== input.subscriberId ||
+      change.targetPlanId !== input.snapshot.planId ||
+      change.targetPlanVersion !== input.snapshot.planVersion ||
+      change.currency !== input.snapshot.currency ||
+      change.amountDueBeforeTaxMinor !== input.amountBeforeTaxMinor) {
+    return failClosed();
+  }
+
+  const auditFor = (occurredAt: string): PaidSubscriptionPlanChangeAudit => ({
+    eventId: 'evt_spc_' + change.changeRequestId,
+    actorUserId: change.subscriberId,
+    actorLayer: change.actorLayer,
+    changeRequestId: change.changeRequestId,
+    subscriptionId: change.subscriptionId,
+    sourceSubscriptionVersion: change.sourceSubscriptionVersion,
+    appliedSubscriptionVersion: change.sourceSubscriptionVersion + 1,
+    sourcePlanId: change.sourcePlanId,
+    sourcePlanVersion: change.sourcePlanVersion,
+    targetPlanId: change.targetPlanId,
+    targetPlanVersion: change.targetPlanVersion,
+    orderId: input.orderId,
+    paymentId: input.paymentId,
+    currency: change.currency,
+    amountBeforeTaxMinor: change.amountDueBeforeTaxMinor,
+    currentPeriodStart: change.currentPeriodStart,
+    currentPeriodEnd: change.currentPeriodEnd,
+    occurredAt,
+  });
+
+  // Immutable receipt makes a provider duplicate safe even after later
+  // legitimate subscription mutations have advanced the current row again.
+  let receipt: SubscriptionPlanChangeReceiptRow | null;
+  try {
+    receipt = await db.prepare(
+      'SELECT change_request_id, subscription_id, subscriber_id, source_subscription_version, ' +
+      'applied_subscription_version, source_plan_id, source_plan_version, target_plan_id, target_plan_version, ' +
+      'order_id, payment_id, currency, amount_before_tax_minor, current_period_start, current_period_end, applied_at ' +
+      'FROM membership_subscription_plan_change_receipts WHERE change_request_id = ? LIMIT 1',
+    ).bind(change.changeRequestId).first<SubscriptionPlanChangeReceiptRow>();
+  } catch {
+    return failClosed();
+  }
+  if (receipt) {
+    if (receipt.subscription_id !== change.subscriptionId ||
+        receipt.subscriber_id !== change.subscriberId ||
+        receipt.source_subscription_version !== change.sourceSubscriptionVersion ||
+        receipt.applied_subscription_version !== change.sourceSubscriptionVersion + 1 ||
+        receipt.source_plan_id !== change.sourcePlanId ||
+        receipt.source_plan_version !== change.sourcePlanVersion ||
+        receipt.target_plan_id !== change.targetPlanId ||
+        receipt.target_plan_version !== change.targetPlanVersion ||
+        receipt.order_id !== input.orderId ||
+        receipt.payment_id !== input.paymentId ||
+        receipt.currency !== change.currency ||
+        receipt.amount_before_tax_minor !== change.amountDueBeforeTaxMinor ||
+        receipt.current_period_start !== change.currentPeriodStart ||
+        receipt.current_period_end !== change.currentPeriodEnd ||
+        !canonicalIso(receipt.applied_at)) return failClosed();
+    return { outcome: 'ALREADY_APPLIED', audit: auditFor(receipt.applied_at) };
+  }
+
+  const row = await readExistingSubscription(db, change.subscriptionId);
+  if (!row || row.subscriber_id !== change.subscriberId ||
+      row.creator_id !== input.snapshot.creatorId ||
+      row.current_period_start !== change.currentPeriodStart ||
+      row.current_period_end !== change.currentPeriodEnd ||
+      row.status !== 'ACTIVE' || row.cancel_at !== null ||
+      row.version !== change.sourceSubscriptionVersion ||
+      row.plan_id !== change.sourcePlanId ||
+      row.plan_version !== change.sourcePlanVersion ||
+      Date.parse(change.currentPeriodEnd) <= Date.now()) {
+    return failClosed();
+  }
+
+  const previousUpdatedAt = Date.parse(row.updated_at);
+  if (!Number.isFinite(previousUpdatedAt)) return failClosed();
+  const updatedAt = new Date(Math.max(Date.now(), previousUpdatedAt + 1)).toISOString();
+  let results: D1Result[];
+  try {
+    // D1 batch is one transaction. The second statement deliberately inserts
+    // NULL into the NOT NULL receipt primary key when the CAS updated no row;
+    // that constraint failure rolls back the preceding subscription update.
+    results = await db.batch([
+      db.prepare(
+        'UPDATE membership_subscriptions SET plan_id = ?, plan_version = ?, updated_at = ?, version = version + 1 ' +
+        'WHERE subscription_id = ? AND subscriber_id = ? AND creator_id = ? AND plan_id = ? AND plan_version = ? ' +
+        'AND version = ? AND status = \'ACTIVE\' AND cancel_at IS NULL ' +
+        'AND current_period_start = ? AND current_period_end = ?',
+      ).bind(
+        change.targetPlanId, change.targetPlanVersion, updatedAt,
+        change.subscriptionId, change.subscriberId, input.snapshot.creatorId,
+        change.sourcePlanId, change.sourcePlanVersion, change.sourceSubscriptionVersion,
+        change.currentPeriodStart, change.currentPeriodEnd,
+      ),
+      db.prepare(
+        'INSERT INTO membership_subscription_plan_change_receipts ' +
+        '(change_request_id, subscription_id, subscriber_id, source_subscription_version, applied_subscription_version, ' +
+        'source_plan_id, source_plan_version, target_plan_id, target_plan_version, order_id, payment_id, currency, ' +
+        'amount_before_tax_minor, current_period_start, current_period_end, applied_at) ' +
+        'SELECT CASE WHEN changes() = 1 THEN ? ELSE NULL END, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?',
+      ).bind(
+        change.changeRequestId, change.subscriptionId, change.subscriberId,
+        change.sourceSubscriptionVersion, change.sourceSubscriptionVersion + 1,
+        change.sourcePlanId, change.sourcePlanVersion, change.targetPlanId, change.targetPlanVersion,
+        input.orderId, input.paymentId, change.currency, change.amountDueBeforeTaxMinor,
+        change.currentPeriodStart, change.currentPeriodEnd, updatedAt,
+      ),
+    ]);
+  } catch {
+    return failClosed();
+  }
+
+  if (results.length !== 2 ||
+      Number(results[0]?.meta?.changes ?? 0) !== 1 ||
+      Number(results[1]?.meta?.changes ?? 0) !== 1) return failClosed();
+
+  console.log(JSON.stringify({
+    event: 'membership.subscription.plan_upgrade.applied',
+    changeRequestId: change.changeRequestId,
+    subscriptionId: change.subscriptionId,
+    subscriberId: change.subscriberId,
+    previousPlanId: change.sourcePlanId,
+    planId: change.targetPlanId,
+    planVersion: change.targetPlanVersion,
+  }));
+  return { outcome: 'APPLIED', audit: auditFor(updatedAt) };
 }
 
 async function createOrReplayPaidSubscription(
@@ -366,6 +600,26 @@ export async function fulfillPaidMembershipOrder(
   if (!boundedId(line.order_line_id, 255) || !PLAN_ID_PATTERN.test(line.item_ref)) return failClosed();
   const snapshot = parseSnapshot(line.item_snapshot_json, line, order.order_currency);
   await readPlanVersion(env.D1_01, snapshot);
+
+  if (snapshot.subscriptionChange) {
+    if (snapshot.subscriptionChange.subscriberId !== order.customer_id ||
+        snapshot.subscriptionChange.amountDueBeforeTaxMinor !== line.unit_amount_minor ||
+        snapshot.subscriptionChange.currency !== order.payment_currency) {
+      return failClosed();
+    }
+    const applied = await applyPaidSubscriptionPlanChange(env.D1_01, {
+      snapshot,
+      subscriberId: order.customer_id,
+      orderId: order.order_id,
+      paymentId,
+      amountBeforeTaxMinor: line.unit_amount_minor,
+    });
+    return {
+      outcome: applied.outcome,
+      fulfilledCount: 1,
+      subscriptionPlanChangeAudit: applied.audit,
+    };
+  }
 
   const periodStart = order.confirmed_at!;
   let periodEnd: string;

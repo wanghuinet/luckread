@@ -100,6 +100,7 @@ const RESTRICTED_ACCOUNT_WRITE_DENIES = new Set([
   'media.upload',
   'comment.create',
   'subscription.manage.any',
+  'subscription.change_plan',
   'order.create',
   'payment.refund',
   'membership.plan.create.own',
@@ -357,6 +358,7 @@ function buildLayerAbility(input: CaslPermissionInput) {
     grant('order.read', 'Order', selfOwnerCondition(input.subjectId))
     grant('payment.read', 'Payment', selfOwnerCondition(input.subjectId))
     grant('payment.refund', 'Payment', selfOwnerCondition(input.subjectId))
+    grant('subscription.change_plan', 'Subscription', selfOwnerCondition(input.subjectId))
   }
 
   // Creator application creation is deliberately L2-only; it is not inherited

@@ -381,6 +381,24 @@ type CommerceOrderAuditInput = {
   taxMinor: number
   totalMinor: number
 }
+type MembershipSubscriptionPlanChangeAuditInput = {
+  eventId: string
+  changeRequestId: string
+  subscriptionId: string
+  sourceSubscriptionVersion: number
+  appliedSubscriptionVersion: number
+  sourcePlanId: string
+  sourcePlanVersion: number
+  targetPlanId: string
+  targetPlanVersion: number
+  orderId: string
+  paymentId: string
+  currency: string
+  amountBeforeTaxMinor: number
+  currentPeriodStart: string
+  currentPeriodEnd: string
+  occurredAt: string
+}
 
 async function readBoundedAuditJson(request: Request, maxBytes: number): Promise<unknown> {
   const declaredLength = request.headers.get('content-length')
@@ -443,6 +461,48 @@ function parseCommerceOrderAuditInput(value: unknown): CommerceOrderAuditInput {
     body.totalMinor !== body.subtotalMinor - body.discountMinor + body.taxMinor
   ) throw new Error('INVALID_COMMERCE_ORDER_AUDIT')
   return body as CommerceOrderAuditInput
+}
+
+function parseMembershipSubscriptionPlanChangeAuditInput(value: unknown): MembershipSubscriptionPlanChangeAuditInput {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('INVALID_MEMBERSHIP_SUBSCRIPTION_PLAN_CHANGE_AUDIT')
+  }
+  const body = value as Record<string, unknown>
+  const allowed = new Set([
+    'eventId', 'changeRequestId', 'subscriptionId', 'sourceSubscriptionVersion',
+    'appliedSubscriptionVersion', 'sourcePlanId', 'sourcePlanVersion',
+    'targetPlanId', 'targetPlanVersion', 'orderId', 'paymentId', 'currency',
+    'amountBeforeTaxMinor', 'currentPeriodStart', 'currentPeriodEnd', 'occurredAt',
+  ])
+  if (Object.keys(body).length !== allowed.size || Object.keys(body).some((key) => !allowed.has(key))) {
+    throw new Error('INVALID_MEMBERSHIP_SUBSCRIPTION_PLAN_CHANGE_AUDIT')
+  }
+  const positiveInt = (input: unknown): input is number =>
+    typeof input === 'number' && Number.isSafeInteger(input) && input > 0
+  const canonicalDate = (input: unknown): input is string =>
+    typeof input === 'string' && input.length <= 64 &&
+    Number.isFinite(Date.parse(input)) && new Date(input).toISOString() === input
+  if (
+    typeof body.changeRequestId !== 'string' || !/^scr_[a-f0-9]{60}$/.test(body.changeRequestId) ||
+    body.eventId !== 'evt_spc_' + body.changeRequestId ||
+    typeof body.subscriptionId !== 'string' || !resourceIdPattern.test(body.subscriptionId) ||
+    !positiveInt(body.sourceSubscriptionVersion) ||
+    !positiveInt(body.appliedSubscriptionVersion) ||
+    body.appliedSubscriptionVersion !== body.sourceSubscriptionVersion + 1 ||
+    typeof body.sourcePlanId !== 'string' || !/^plan_[a-f0-9]{64}$/.test(body.sourcePlanId) ||
+    !positiveInt(body.sourcePlanVersion) ||
+    typeof body.targetPlanId !== 'string' || !/^plan_[a-f0-9]{64}$/.test(body.targetPlanId) ||
+    !positiveInt(body.targetPlanVersion) ||
+    typeof body.orderId !== 'string' || !/^ord_[A-Za-z0-9_-]{1,90}$/.test(body.orderId) ||
+    typeof body.paymentId !== 'string' || !/^pay_[A-Za-z0-9]{26}$/.test(body.paymentId) ||
+    typeof body.currency !== 'string' || !/^[A-Z]{3}$/.test(body.currency) ||
+    !positiveInt(body.amountBeforeTaxMinor) ||
+    !canonicalDate(body.currentPeriodStart) ||
+    !canonicalDate(body.currentPeriodEnd) ||
+    body.currentPeriodEnd <= body.currentPeriodStart ||
+    !canonicalDate(body.occurredAt)
+  ) throw new Error('INVALID_MEMBERSHIP_SUBSCRIPTION_PLAN_CHANGE_AUDIT')
+  return body as MembershipSubscriptionPlanChangeAuditInput
 }
 
 type StoredAuditEvent = {
@@ -830,6 +890,58 @@ export default {
       } catch (error) {
         return errorResponse(error, request.headers.get('X-LuckRead-Request-Id')?.trim())
       }
+    }
+
+    if (request.method === 'POST' && url.pathname === '/internal/audit-events/membership-subscription-plan-changed') {
+      let principal: ReturnType<typeof requireW01Transport>
+      try { principal = requireW01Transport(request) }
+      catch (error) { return errorResponse(error, request.headers.get('X-LuckRead-Request-Id')?.trim()) }
+      if (!/^L[2-8]$/.test(principal.layer)) {
+        return json({ error: 'PERMISSION_DENIED' }, 403)
+      }
+
+      let input: MembershipSubscriptionPlanChangeAuditInput
+      try {
+        input = parseMembershipSubscriptionPlanChangeAuditInput(await readBoundedAuditJson(request, 4096))
+      } catch {
+        return json({ error: 'INVALID_MEMBERSHIP_SUBSCRIPTION_PLAN_CHANGE_AUDIT' }, 400)
+      }
+
+      const event: AuditEvent = {
+        eventId: input.eventId,
+        requestId: principal.requestId,
+        traceId: principal.correlationId,
+        actor: {
+          actorId: principal.userId,
+          actorType: 'user',
+          layer: principal.layer as AuditEvent['actor']['layer'],
+        },
+        action: 'membership.subscription.plan_changed',
+        targetType: 'Subscription',
+        targetId: input.subscriptionId,
+        before: {
+          version: input.sourceSubscriptionVersion,
+          planId: input.sourcePlanId,
+          planVersion: input.sourcePlanVersion,
+          status: 'ACTIVE',
+          currentPeriodStart: input.currentPeriodStart,
+          currentPeriodEnd: input.currentPeriodEnd,
+        },
+        after: {
+          version: input.appliedSubscriptionVersion,
+          planId: input.targetPlanId,
+          planVersion: input.targetPlanVersion,
+          status: 'ACTIVE',
+          orderId: input.orderId,
+          paymentId: input.paymentId,
+          currency: input.currency,
+          amountBeforeTaxMinor: input.amountBeforeTaxMinor,
+          currentPeriodStart: input.currentPeriodStart,
+          currentPeriodEnd: input.currentPeriodEnd,
+        },
+        occurredAt: input.occurredAt,
+      }
+      return persistImmutableAuditEvent(env, event)
     }
 
     if (request.method === 'POST' && url.pathname === '/internal/audit-events/commerce-order-created') {

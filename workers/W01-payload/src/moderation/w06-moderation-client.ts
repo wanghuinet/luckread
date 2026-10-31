@@ -34,6 +34,38 @@ const requestId = (request: Request): string => {
     : `req_${crypto.randomUUID().replaceAll('-', '')}`
 }
 
+/** Durable final audit for a subscription plan change applied by a verified W07 payment webhook. */
+export async function callW06SubscriptionPlanChangeAudit(input: {
+  request: Request
+  principal: ContentPrincipal
+  body: {
+    eventId: string
+    changeRequestId: string
+    subscriptionId: string
+    sourceSubscriptionVersion: number
+    appliedSubscriptionVersion: number
+    sourcePlanId: string
+    sourcePlanVersion: number
+    targetPlanId: string
+    targetPlanVersion: number
+    orderId: string
+    paymentId: string
+    currency: string
+    amountBeforeTaxMinor: number
+    currentPeriodStart: string
+    currentPeriodEnd: string
+    occurredAt: string
+  }
+}): Promise<Response> {
+  return callW06Moderation({
+    request: input.request,
+    pathname: '/internal/audit-events/membership-subscription-plan-changed',
+    method: 'POST',
+    principal: input.principal,
+    body: input.body,
+  })
+}
+
 /** Dedicated fixed route for the durable membership-plan audit record. */
 export async function callW06MembershipPlanAudit(input: {
   request: Request

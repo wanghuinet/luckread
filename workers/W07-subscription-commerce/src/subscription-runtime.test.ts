@@ -993,13 +993,43 @@ const planTriggerNames = [
   'membership_plans_owner_immutable_update',
   'membership_plans_current_version_forward_only',
 ]
+const revenueCatBindingColumnRows = [
+  ['revenuecat_app_id','TEXT',1,1], ['store','TEXT',1,2], ['product_id','TEXT',1,3],
+  ['plan_id','TEXT',1,0], ['plan_version','INTEGER',1,0], ['status','TEXT',1,0],
+  ['created_at','TEXT',1,0], ['retired_at','TEXT',0,0],
+]
+const revenueCatBindingIndexNames = ['ix_membership_revenuecat_bindings_plan_version']
+const revenueCatBindingTriggerNames = [
+  'membership_revenuecat_bindings_immutable_update',
+  'membership_revenuecat_bindings_immutable_delete',
+]
+const planChangeReceiptColumnRows = [
+  ['change_request_id','TEXT',1,1], ['subscription_id','TEXT',1,0], ['subscriber_id','TEXT',1,0],
+  ['source_subscription_version','INTEGER',1,0], ['applied_subscription_version','INTEGER',1,0],
+  ['source_plan_id','TEXT',1,0], ['source_plan_version','INTEGER',1,0], ['target_plan_id','TEXT',1,0],
+  ['target_plan_version','INTEGER',1,0], ['order_id','TEXT',1,0], ['payment_id','TEXT',1,0],
+  ['currency','TEXT',1,0], ['amount_before_tax_minor','INTEGER',1,0],
+  ['current_period_start','TEXT',1,0], ['current_period_end','TEXT',1,0], ['applied_at','TEXT',1,0],
+]
+const planChangeReceiptIndexNames = [
+  'ix_membership_subscription_plan_change_receipts_subscription',
+  'ix_membership_subscription_plan_change_receipts_payment',
+]
+const planChangeReceiptTriggerNames = [
+  'membership_subscription_plan_change_receipts_immutable_update',
+  'membership_subscription_plan_change_receipts_immutable_delete',
+]
 const nameRows = (names) => [{ results: names.map((name,seq) => ({ name,seq })) }]
-const preflightInput = (withVersion = false, versionDefault = '1', withPlans = false) => ({
+const preflightInput = (withVersion = false, versionDefault = '1', withPlans = false, withLatest = false) => ({
   databaseList: preflightDatabaseList,
   migrationState: [{ results: [
     { name: '0001_membership_subscriptions.sql' },
     ...(withVersion ? [{ name: '0002_subscription_version_cas.sql' }] : []),
     ...(withPlans ? [{ name: '0003_membership_plans.sql' }] : []),
+    ...(withLatest ? [
+      { name: '0004_revenuecat_membership_product_bindings.sql' },
+      { name: '0005_membership_subscription_plan_change_receipts.sql' },
+    ] : []),
   ] }],
   subscriptionSchema: preflightSchema(withVersion,versionDefault),
   subscriptionIndexes: preflightIndexes,
@@ -1009,39 +1039,51 @@ const preflightInput = (withVersion = false, versionDefault = '1', withPlans = f
   planIndexes: withPlans ? nameRows(planIndexNames) : [{ results: [] }],
   planVersionIndexes: withPlans ? nameRows(planVersionIndexNames) : [{ results: [] }],
   planTriggers: withPlans ? nameRows(planTriggerNames) : [{ results: [] }],
+  revenueCatBindingSchema: withLatest ? schemaRows(revenueCatBindingColumnRows) : [{ results: [] }],
+  revenueCatBindingIndexes: withLatest ? nameRows(revenueCatBindingIndexNames) : [{ results: [] }],
+  revenueCatBindingTriggers: withLatest ? nameRows(revenueCatBindingTriggerNames) : [{ results: [] }],
+  planChangeReceiptSchema: withLatest ? schemaRows(planChangeReceiptColumnRows) : [{ results: [] }],
+  planChangeReceiptIndexes: withLatest ? nameRows(planChangeReceiptIndexNames) : [{ results: [] }],
+  planChangeReceiptTriggers: withLatest ? nameRows(planChangeReceiptTriggerNames) : [{ results: [] }],
 })
 
 describe('read-only D1 subscription migration postflight', () => {
   it('passes only when all three migrations, exact table shapes, indexes, triggers and integrity checks are verified', () => {
     const result = verifyD1SubscriptionPostflight({
-      ...preflightInput(true, '1', true),
+      ...preflightInput(true, '1', true, true),
       versionIntegrity: [{ results: [{ invalid_versions: 0 }] }],
       planIntegrity: [{ results: [{ invalid_current_plan_versions: 0 }] }],
+      planChangeReceiptIntegrity: [{ results: [{ invalid_plan_change_receipts: 0 }] }],
     })
     expect(result.migrationAction).toBe('skip')
     expect(result.invalidVersions).toBe(0)
     expect(result.invalidCurrentPlanVersions).toBe(0)
+    expect(result.invalidPlanChangeReceipts).toBe(0)
     expect(result.postflight).toBe('PASS')
     expect(result.appliedMigrations).toEqual([
       '0001_membership_subscriptions.sql',
       '0002_subscription_version_cas.sql',
       '0003_membership_plans.sql',
+      '0004_revenuecat_membership_product_bindings.sql',
+      '0005_membership_subscription_plan_change_receipts.sql',
     ])
   })
 
   it('fails closed when any existing subscription has an invalid version', () => {
     expect(() => verifyD1SubscriptionPostflight({
-      ...preflightInput(true, '1', true),
+      ...preflightInput(true, '1', true, true),
       versionIntegrity: [{ results: [{ invalid_versions: 1 }] }],
       planIntegrity: [{ results: [{ invalid_current_plan_versions: 0 }] }],
+      planChangeReceiptIntegrity: [{ results: [{ invalid_plan_change_receipts: 0 }] }],
     })).toThrow('existing subscription versions include invalid or non-positive values')
   })
 
   it('fails closed when any plan points to a missing immutable current version', () => {
     expect(() => verifyD1SubscriptionPostflight({
-      ...preflightInput(true, '1', true),
+      ...preflightInput(true, '1', true, true),
       versionIntegrity: [{ results: [{ invalid_versions: 0 }] }],
       planIntegrity: [{ results: [{ invalid_current_plan_versions: 1 }] }],
+      planChangeReceiptIntegrity: [{ results: [{ invalid_plan_change_receipts: 0 }] }],
     })).toThrow('membership plans include a missing or invalid current immutable version')
   })
 
@@ -1050,19 +1092,30 @@ describe('read-only D1 subscription migration postflight', () => {
       ...preflightInput(true, '1', false),
       versionIntegrity: [{ results: [{ invalid_versions: 0 }] }],
       planIntegrity: [{ results: [{ invalid_current_plan_versions: 0 }] }],
-    })).toThrow('post-migration verification requires migrations 0001, 0002, and 0003')
+    })).toThrow('post-migration verification requires migrations 0001 through 0005')
+  })
+
+  it('fails closed when any immutable plan-change receipt has invalid persisted facts', () => {
+    expect(() => verifyD1SubscriptionPostflight({
+      ...preflightInput(true, '1', true, true),
+      versionIntegrity: [{ results: [{ invalid_versions: 0 }] }],
+      planIntegrity: [{ results: [{ invalid_current_plan_versions: 0 }] }],
+      planChangeReceiptIntegrity: [{ results: [{ invalid_plan_change_receipts: 1 }] }],
+    })).toThrow('subscription plan-change receipt records contain invalid version or financial references')
   })
 
   it('fails closed when either integrity query does not return exactly one count', () => {
     expect(() => verifyD1SubscriptionPostflight({
-      ...preflightInput(true, '1', true),
+      ...preflightInput(true, '1', true, true),
       versionIntegrity: [{ results: [] }],
       planIntegrity: [{ results: [{ invalid_current_plan_versions: 0 }] }],
+      planChangeReceiptIntegrity: [{ results: [{ invalid_plan_change_receipts: 0 }] }],
     })).toThrow('version integrity query did not return exactly one count')
     expect(() => verifyD1SubscriptionPostflight({
-      ...preflightInput(true, '1', true),
+      ...preflightInput(true, '1', true, true),
       versionIntegrity: [{ results: [{ invalid_versions: 0 }] }],
       planIntegrity: [{ results: [] }],
+      planChangeReceiptIntegrity: [{ results: [{ invalid_plan_change_receipts: 0 }] }],
     })).toThrow('membership plan integrity query did not return exactly one count')
   })
 })
@@ -1082,18 +1135,30 @@ describe('read-only D1 subscription migration preflight', () => {
     expect(result.planColumns).toEqual([])
   })
 
-  it('skips all migrations only when migration 0003 and exact plan schema are present', () => {
+  it('keeps migrations 0004 and 0005 pending until RevenueCat and plan-change receipt schema are verified', () => {
     const result = verifyD1SubscriptionPreflight(preflightInput(true, '1', true))
-    expect(result.migrationAction).toBe('skip')
+    expect(result.migrationAction).toBe('apply')
     expect(result.appliedMigrations).toEqual([
       '0001_membership_subscriptions.sql',
       '0002_subscription_version_cas.sql',
       '0003_membership_plans.sql',
     ])
-    expect(result.columns.at(-1)).toEqual(['version','INTEGER',1,0])
-    expect(result.planColumns).toEqual(planColumnRows)
-    expect(result.planVersionColumns).toEqual(planVersionColumnRows)
-    expect(result.planTriggers).toEqual(planTriggerNames)
+  })
+
+  it('skips migrations only when all five D1-01 migrations and every physical schema object are present', () => {
+    const result = verifyD1SubscriptionPreflight(preflightInput(true, '1', true, true))
+    expect(result.migrationAction).toBe('skip')
+    expect(result.appliedMigrations).toEqual([
+      '0001_membership_subscriptions.sql',
+      '0002_subscription_version_cas.sql',
+      '0003_membership_plans.sql',
+      '0004_revenuecat_membership_product_bindings.sql',
+      '0005_membership_subscription_plan_change_receipts.sql',
+    ])
+    expect(result.revenueCatBindingColumns).toEqual(revenueCatBindingColumnRows)
+    expect(result.revenueCatBindingTriggers).toEqual(revenueCatBindingTriggerNames)
+    expect(result.planChangeReceiptColumns).toEqual(planChangeReceiptColumnRows)
+    expect(result.planChangeReceiptTriggers).toEqual(planChangeReceiptTriggerNames)
   })
 
   it('fails closed when the target D1 UUID does not match', () => {

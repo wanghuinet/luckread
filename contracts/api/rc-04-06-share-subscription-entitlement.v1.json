@@ -199,12 +199,76 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 256
+          },
+          "Idempotency-Key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        }
+      },
+      "success": {
+        "status": 201,
+        "replayStatus": 200,
+        "idempotent": true,
+        "response": "Payment-required checkout Order; subscription state and entitlement remain unchanged until verified successful Hyperswitch webhook fulfillment."
+      },
+      "errors": [
+        "AUTH_REQUIRED",
+        "PERMISSION_DENIED",
+        "RESOURCE_NOT_FOUND",
+        "PRECONDITION_REQUIRED",
+        "PRECONDITION_FAILED",
+        "INVALID_STATE",
+        "VALIDATION_FAILED",
+        "CONFLICT",
+        "PAYMENT_REQUIRED",
+        "SERVICE_UNAVAILABLE",
+        "BILLING_INTERVAL_CHANGE_REQUIRED"
+      ],
+      "concurrency": {
+        "strategy": "ETAG_COMPARE_AND_SWAP",
+        "idempotency": "SUBSCRIPTION_SOURCE_VERSION_BOUND_ORDER"
+      },
+      "fulfillment": {
+        "paymentAuthority": "W07 D1-04 confirmed Order + Payment + immutable OrderLine snapshot",
+        "subscriptionAuthority": "W07 applies D1-01 subscription version CAS and immutable plan-change receipt only after verified payment_succeeded",
+        "auditAuthority": "W01 persists the final membership.subscription.plan_changed audit in W06 D1-03 before acknowledging the provider webhook",
+        "failure": "Failed, pending, stale or ambiguous payment leaves the current Subscription and Entitlement unchanged; missing W06 confirmation leaves the webhook retryable",
+        "duplicate": "Immutable D1-01 plan-change receipt and deterministic W06 event ID make provider replay idempotent"
+      }
+    },
+    {
+      "operationId": "getSubscriptionPlanChangeQuote",
+      "method": "GET",
+      "path": "/memberships/subscriptions/{subscriptionId}/change-plan/quote",
+      "auth": {
+        "required": true,
+        "permission": "subscription.read",
+        "scope": "self"
+      },
+      "request": {
+        "query": {
+          "planId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        },
+        "headers": {
+          "If-Match": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
           }
         }
       },
       "success": {
         "status": 200,
-        "idempotent": true
+        "readOnly": true,
+        "quoteOnly": true,
+        "noPaymentOrEntitlementMutation": true,
+        "taxStatus": "NOT_CALCULATED"
       },
       "errors": [
         "AUTH_REQUIRED",
@@ -217,7 +281,7 @@
         "CONFLICT"
       ],
       "concurrency": {
-        "strategy": "ETAG_COMPARE_AND_SWAP"
+        "strategy": "ETAG_VERSION_PRECONDITION"
       }
     },
     {

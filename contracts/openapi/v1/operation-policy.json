@@ -1147,6 +1147,21 @@
       "stateMachine": "none"
     },
     {
+      "operationId": "getSubscriptionPlanChangeQuote",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "subscription.read"
+      ],
+      "auditRequired": false,
+      "optimisticLockRequired": true,
+      "idempotencyRequired": false,
+      "stateMachine": "none",
+      "x-luckread-read-only": true,
+      "x-luckread-no-commerce-mutation": true
+    },
+    {
       "operationId": "getNotificationPreferences",
       "auth": {
         "mode": "permission"
@@ -2513,13 +2528,13 @@
       "auth": {
         "mode": "permission"
       },
-      "permissions": [],
+      "permissions": [
+        "subscription.change_plan"
+      ],
       "auditRequired": true,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none",
-      "x-luckread-contract-status": "DISCOVERY_DRAFT",
-      "x-luckread-source": "contracts/api/api-inventory.v1.json"
+      "optimisticLockRequired": true,
+      "idempotencyRequired": true,
+      "stateMachine": "none"
     },
     {
       "operationId": "pauseSubscription",

@@ -28,6 +28,7 @@ describe('v1 subscription adapter', () => {
   const w08Casl = readFileSync(resolve(process.cwd(), '../W08-creator/src/authz/casl-policy.ts'), 'utf8')
   const w06Worker = readFileSync(resolve(process.cwd(), '../W06-governance/src/index.ts'), 'utf8')
   const w06Client = readFileSync(resolve(process.cwd(), 'src/moderation/w06-moderation-client.ts'), 'utf8')
+  const commerceClient = readFileSync(resolve(process.cwd(), 'src/commerce/w07-commerce-client.ts'), 'utf8')
   const client = readFileSync(resolve(process.cwd(), 'src/subscription/w07-subscription-client.ts'), 'utf8')
   const wrangler = readFileSync(resolve(process.cwd(), 'wrangler.jsonc'), 'utf8')
 
@@ -178,15 +179,31 @@ describe('v1 subscription adapter', () => {
     expect(route).toContain('callW07Subscription')
   })
 
-  it('fails closed on subscription writes until verified billing synchronization is available', () => {
-    const writeGuard = route.indexOf("if (request.method === 'POST')")
-    const transportCall = route.indexOf('callW07Subscription({ request, pathname, method:')
-    expect(writeGuard).toBeGreaterThan(-1)
-    expect(transportCall).toBeGreaterThan(writeGuard)
-    expect(route).toContain("'SERVICE_UNAVAILABLE'")
-    expect(route).toContain('verified payment-provider synchronization flow')
-    expect(route).not.toContain("requireHeader(request, 'Idempotency-Key')")
-    expect(route).not.toContain("requireHeader(request, 'If-Match')")
+  it('enables only the paid plan upgrade path and keeps other subscription writes fail-closed', () => {
+    expect(route).toContain("segments[1] !== 'change-plan'")
+    expect(route).toContain("authorizeSubscriptionChangePlanPermission(request, principal)")
+    expect(route).toContain("request.headers.get('If-Match')")
+    expect(route).toContain("validateOrderIdempotencyKey(request.headers.get('Idempotency-Key'))")
+    expect(route).toContain('callW06CommerceOrderAudit')
+    expect(route.indexOf('authorizeSubscriptionChangePlanPermission'))
+      .toBeLessThan(route.indexOf('callW07Subscription({'))
+    expect(route.indexOf('callW07Subscription({'))
+      .toBeLessThan(route.indexOf('callW06CommerceOrderAudit'))
+    expect(route).toContain('This subscription write is not enabled.')
+    expect(commerceClient).toContain("action: 'subscription.change_plan'")
+    expect(commerceClient).toContain("resourceType: 'Subscription'")
+    expect(commerceClient).toContain("resourceAttributes: { ownerId: principal.userId }")
+    expect(route).not.toContain('request body creatorId')
+  })
+
+  it('connects the read-only quote and subscription upgrade checkout endpoints to W07', () => {
+    expect(route).toContain("'change-plan/quote'")
+    expect(route).toContain('forwardsQuery')
+    expect(route).toContain('callW07Subscription')
+    expect(openapi).toContain('operationId: getSubscriptionPlanChangeQuote')
+    expect(openapi).toContain('operationId: changeSubscriptionPlan')
+    expect(apiInventory.domains.subscription_entitlement_payment.endpoint_groups)
+      .toContain('POST /v1/memberships/subscriptions/{subscriptionId}/change-plan')
   })
 
   it('keeps subscription management read-only while verified provider synchronization is gated', () => {

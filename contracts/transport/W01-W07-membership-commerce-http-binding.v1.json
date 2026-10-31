@@ -543,6 +543,70 @@
         "crossD1Transactions": 0
       },
       "idempotency": "Idempotency-Key"
+    },
+    {
+      "operationId": "getSubscriptionPlanChangeQuote",
+      "method": "GET",
+      "publicPath": "/api/v1/memberships/subscriptions/{subscriptionId}/change-plan/quote",
+      "internalPath": "/memberships/subscriptions/{subscriptionId}/change-plan/quote",
+      "principalRequired": true,
+      "permission": "subscription.read",
+      "minimumGlobalLayer": "L2",
+      "ownerScope": "W07 queries the D1-01 subscription by both subscriptionId and the W02-derived subscriberId; the target plan must belong to the same creator and be ACTIVE/PUBLIC.",
+      "precondition": "If-Match",
+      "queryParameters": [
+        "planId"
+      ],
+      "responsePolicy": "Read-only preview. Returns current/target immutable plan-version snapshots, direction, effective time and a pre-tax prorated estimate. It does not write D1-01/D1-04, create an Order/Payment, call a provider, or change Entitlement. Tax remains NOT_CALCULATED; the returned estimate is not a payable amount.",
+      "cache": "NO_STORE",
+      "idempotency": "Not required; GET only.",
+      "topologyConstraints": {
+        "newWorker": false,
+        "newDatabase": false,
+        "newQueue": false,
+        "newServiceBinding": false,
+        "crossD1Transactions": 0
+      }
+    },
+    {
+      "operationId": "changeSubscriptionPlan",
+      "method": "POST",
+      "publicPath": "/api/v1/memberships/subscriptions/{subscriptionId}/change-plan",
+      "internalPath": "/memberships/subscriptions/{subscriptionId}/change-plan",
+      "principalRequired": true,
+      "permission": "subscription.change_plan",
+      "minimumGlobalLayer": "L2",
+      "ownerScope": "W07 reads by subscriptionId + W02-derived subscriberId; the target plan must be ACTIVE/PUBLIC and owned by the subscription's existing creator.",
+      "precondition": "If-Match",
+      "idempotency": "Idempotency-Key; server-scoped to subscriber + subscription + source version; one upgrade checkout Order per source version",
+      "requestBody": {
+        "required": [
+          "planId"
+        ],
+        "additionalProperties": false,
+        "forbidden": [
+          "priceMinor",
+          "currency",
+          "amountMinor",
+          "subscriberId",
+          "creatorId",
+          "paymentStatus",
+          "entitlement"
+        ]
+      },
+      "pricing": "Quote uses W07 D1-01 immutable current and target plan versions and the unused current billing period. The Order amount is the prorated upgrade difference before tax. A live production tax/pricing adapter must be explicitly admitted; until then W07 fails closed outside the existing Demo + Hyperswitch sandbox pricing gate.",
+      "orderPersistence": "Existing W07 Commerce Order/OrderLine and D1-04 idempotency are reused; no new payment/order system is created.",
+      "payment": "Client calls the existing /api/v1/payments/intents endpoint with the returned Order ID and a separate Idempotency-Key; W07 derives amount/currency exclusively from D1-04 Order.",
+      "fulfillment": "Only a verified Hyperswitch payment_succeeded webhook against the exact D1-04 Payment + Order + immutable OrderLine snapshot may perform the D1-01 Subscription If-Match CAS and insert its immutable plan-change receipt in the same D1-01 batch. W07 returns the stable applied audit facts to W01 over the private Service Binding; W01 must persist membership.subscription.plan_changed in W06 D1-03 before acknowledging the provider webhook. W06 failure returns 503 so the provider retry replays the immutable W07 receipt and W01 repeats the same W06 event ID. Failed/pending/ambiguous payment never changes Subscription or Entitlement.",
+      "auditRequired": true,
+      "cache": "NO_STORE",
+      "topologyConstraints": {
+        "newWorker": false,
+        "newDatabase": false,
+        "newQueue": false,
+        "newServiceBinding": false,
+        "crossD1Transactions": 0
+      }
     }
   ],
   "trustBoundary": {

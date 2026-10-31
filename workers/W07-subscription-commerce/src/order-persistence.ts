@@ -139,8 +139,10 @@ export type CreateOrderResult = Readonly<{
 export type OrderPersistenceDependencies = Readonly<{
   now?: () => Date;
   createId?: (kind: 'order' | 'line' | 'idempotency') => string;
-  /** Internal recurring-cycle orders use a durable key beyond the default 24h interactive-order window. */
+  /** Internal recurring-cycle or domain-workflow orders may use a durable key beyond the default 24h window. */
   idempotencyExpiresAt?: string;
+  /** Server-derived domain scope bound into the existing order idempotency fingerprint. */
+  idempotencyContext?: string;
 }>;
 
 const defaultId = (kind: 'order' | 'line' | 'idempotency'): string =>
@@ -190,12 +192,19 @@ const canonicalRequestPayload = (request: CreateCommerceOrderRequest) => ({
     .sort((left, right) => left.itemRef < right.itemRef ? -1 : left.itemRef > right.itemRef ? 1 : 0),
 });
 
-const orderRequestHash = async (request: CreateCommerceOrderRequest): Promise<string> => {
+const orderRequestHash = async (request: CreateCommerceOrderRequest, context?: string): Promise<string> => {
   // Existing PAY-002 rows store the bare 64-character hex digest. Preserve that
   // persisted format while delegating canonical JSON and SHA-256 to W10.
+  // Internal domain workflows may bind an additional server-derived scope into
+  // the fingerprint without exposing that scope as a client-writable order field.
+  if (context !== undefined && (typeof context !== 'string' || context.length < 1 || context.length > 4096)) {
+    throw new OrderPersistenceError('VALIDATION_FAILED', 400);
+  }
+  const canonical = canonicalRequestPayload(request);
+  const payload = context === undefined ? canonical : { ...canonical, idempotencyContext: context };
   const fingerprint = await sha256CanonicalJsonForIdempotency(
-    canonicalRequestPayload(request),
-    MAX_ORDER_CANONICAL_REQUEST_BYTES,
+    payload,
+    MAX_ORDER_CANONICAL_REQUEST_BYTES + 4096,
   );
   return fingerprint.slice('sha256:'.length);
 };
@@ -489,7 +498,7 @@ export async function createCommerceOrder(
     throw new OrderPersistenceError(validation.error.code, validation.error.status);
   }
   const request = validation.value;
-  const requestHash = await orderRequestHash(request);
+  const requestHash = await orderRequestHash(request, dependencies.idempotencyContext);
   const nowFn = dependencies.now ?? (() => new Date());
   const nowDate = nowFn();
   if (!Number.isFinite(nowDate.getTime())) throw new OrderPersistenceError('INTEGRITY_VIOLATION', 500);

@@ -24,32 +24,34 @@
   },
   "operations": [
     {
-      "operationId": "submitCreatorApplication",
+      "operationId": "checkMembershipPlanPermission",
       "method": "POST",
-      "publicPath": "/api/v1/creator-applications",
-      "internalPath": "/api/v1/creator-applications",
+      "publicPath": "/api/v1/membership/plans",
+      "internalPath": "/internal/authz/check-permission",
+      "principalRequired": true,
+      "minimumGlobalLayer": "L3",
+      "cache": "NO_STORE",
+      "bodyAuthority": "Only action, resourceType, and resourceAttributes are accepted; W08 resolves actor, layer, account state, and roles through W02/D1-01 and CASL."
+    },
+    {
+      "operationId": "checkSubscriberOwnedSubscriptionPlanChangePermission",
+      "method": "POST",
+      "publicPath": "/api/v1/memberships/subscriptions/{subscriptionId}/change-plan",
+      "internalPath": "/internal/authz/check-permission",
       "principalRequired": true,
       "minimumGlobalLayer": "L2",
-      "idempotency": "Idempotency-Key",
-      "bodyAuthority": "creatorType and statement only; caller cannot set role, layer, decision, creator id, status, scope, or approver"
-    },
-    {
-      "operationId": "readMyCreatorApplication",
-      "method": "GET",
-      "publicPath": "/api/v1/creator-applications",
-      "internalPath": "/api/v1/creator-applications/me",
-      "principalRequired": true,
-      "cache": "NO_STORE"
-    },
-    {
-      "operationId": "listCreatorApplicationsForReview",
-      "method": "GET",
-      "publicPath": "/api/v1/admin/creator-applications",
-      "internalPath": "/api/v1/admin/creator-applications",
-      "principalRequired": true,
-      "minimumGlobalLayer": "L7",
-      "maxPageSize": 50,
-      "cache": "NO_STORE"
+      "permission": "subscription.change_plan",
+      "resourceType": "Subscription",
+      "resourceAttributes": {
+        "ownerId": "W02-derived subscriber user ID only"
+      },
+      "bodyAuthority": "W01 sends only action, resourceType and resourceAttributes. W08 independently resolves the actor, account state, layer and scoped roles through W02/D1-01. Subscription ownership is compared against the W02 subject; client-supplied subject/layer/account-state/permission fields are rejected.",
+      "cache": "NO_STORE",
+      "failurePolicy": {
+        "deny": "403",
+        "invalidPermissionRequest": "400",
+        "W02OrD1Unavailable": "503"
+      }
     },
     {
       "operationId": "decideCreatorApplication",
@@ -63,6 +65,24 @@
       "audit": "decision actor, reason, timestamp and application version are persisted by W08"
     },
     {
+      "operationId": "listCreatorApplicationsForReview",
+      "method": "GET",
+      "publicPath": "/api/v1/admin/creator-applications",
+      "internalPath": "/api/v1/admin/creator-applications",
+      "principalRequired": true,
+      "minimumGlobalLayer": "L7",
+      "maxPageSize": 50,
+      "cache": "NO_STORE"
+    },
+    {
+      "operationId": "readMyCreatorApplication",
+      "method": "GET",
+      "publicPath": "/api/v1/creator-applications",
+      "internalPath": "/api/v1/creator-applications/me",
+      "principalRequired": true,
+      "cache": "NO_STORE"
+    },
+    {
       "operationId": "resolveActiveCreatorIdentityForMembershipPlans",
       "method": "GET",
       "publicPath": "/api/v1/membership/plans",
@@ -73,14 +93,14 @@
       "bodyAuthority": "No client body or creator ID is accepted; W08 derives the creator ID from the W02 principal and requires an ACTIVE creator record."
     },
     {
-      "operationId": "checkMembershipPlanPermission",
+      "operationId": "submitCreatorApplication",
       "method": "POST",
-      "publicPath": "/api/v1/membership/plans",
-      "internalPath": "/internal/authz/check-permission",
+      "publicPath": "/api/v1/creator-applications",
+      "internalPath": "/api/v1/creator-applications",
       "principalRequired": true,
-      "minimumGlobalLayer": "L3",
-      "cache": "NO_STORE",
-      "bodyAuthority": "Only action, resourceType, and resourceAttributes are accepted; W08 resolves actor, layer, account state, and roles through W02/D1-01 and CASL."
+      "minimumGlobalLayer": "L2",
+      "idempotency": "Idempotency-Key",
+      "bodyAuthority": "creatorType and statement only; caller cannot set role, layer, decision, creator id, status, scope, or approver"
     }
   ],
   "trustBoundary": {

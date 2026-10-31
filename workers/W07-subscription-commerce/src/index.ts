@@ -1,5 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import { quoteSubscriptionPlanChange } from './subscription-plan-change-quote.js'
+import { createSubscriptionPlanUpgradeOrder } from './subscription-plan-change-checkout.js'
 import { createMembershipPlanDraft, reviseMembershipPlan, getSubscription, hasActiveCreatorMembership, listActiveMembershipPlans, listCreatorMembershipPlans, listSubscriptions, parseBoundedPositiveInt, publishMembershipPlan, transitionMembershipPlanLifecycle, SubscriptionRuntimeError, validatePrincipal } from './subscription-runtime.js'
 import { handleCommerceOrderRequest } from './order-http-runtime.js'
 import { resolveCommerceOrderItems } from './order-item-resolution.js'
@@ -140,6 +142,8 @@ type Operation =
   | { operation: 'createPlan'; subscriptionId: null }
   | { operation: 'list'; subscriptionId: null }
   | { operation: 'get'; subscriptionId: string }
+  | { operation: 'quotePlanChange'; subscriptionId: string }
+  | { operation: 'changePlan'; subscriptionId: string }
 
 const toOperation = (method: string, segments: string[]): Operation | null => {
   if (segments.length === 1 && segments[0] === 'plans' && method === 'GET') return { operation: 'listPlans', subscriptionId: null }
@@ -147,6 +151,8 @@ const toOperation = (method: string, segments: string[]): Operation | null => {
   if (segments.length === 2 && segments[0] === 'membership' && segments[1] === 'plans' && method === 'POST') return { operation: 'createPlan', subscriptionId: null }
   if (segments.length === 2 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && method === 'GET') return { operation: 'list', subscriptionId: null }
   if (segments.length === 3 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && method === 'GET') return { operation: 'get', subscriptionId: segments[2] }
+  if (segments.length === 5 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && segments[3] === 'change-plan' && segments[4] === 'quote' && method === 'GET') return { operation: 'quotePlanChange', subscriptionId: segments[2] }
+  if (segments.length === 4 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && segments[3] === 'change-plan' && method === 'POST') return { operation: 'changePlan', subscriptionId: segments[2] }
   return null
 }
 
@@ -309,6 +315,23 @@ export default {
         )
         return json({ data: result, requestId: crypto.randomUUID() }, 200, result.etag)
       }
+      if (operation?.operation === 'changePlan') {
+        const value = await readJsonBody(request)
+        if (!value || typeof value !== 'object' || Array.isArray(value) ||
+            Object.keys(value as Record<string, unknown>).length !== 1 ||
+            !Object.hasOwn(value, 'planId') ||
+            typeof (value as { planId?: unknown }).planId !== 'string') {
+          throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
+        }
+        const result = await createSubscriptionPlanUpgradeOrder(env, principal, {
+          subscriptionId: operation.subscriptionId,
+          planId: (value as { planId: string }).planId,
+          ifMatch: request.headers.get('If-Match') ?? '',
+          idempotencyKey: request.headers.get('Idempotency-Key') ?? '',
+          actorLayer: request.headers.get('X-LuckRead-Principal-Layer') ?? '',
+        })
+        return json({ data: result, requestId: crypto.randomUUID() }, result.replayed ? 200 : 201)
+      }
       if (request.method === 'POST' && operation?.operation !== 'createPlan') {
         return json({
           error: {
@@ -352,6 +375,15 @@ export default {
         const requestedPage = parseBoundedPositiveInt(url.searchParams.get('page'), 1, 10000)
         const result = await listSubscriptions(env.D1_01, principal, requestedLimit, requestedPage)
         return json({ data: result, requestId: crypto.randomUUID() })
+      }
+      if (operation.operation === 'quotePlanChange') {
+        const url = new URL(request.url)
+        const planId = url.searchParams.get('planId')
+        if (!planId) throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
+        const quote = await quoteSubscriptionPlanChange(
+          env.D1_01, principal, operation.subscriptionId, { planId }, request.headers.get('If-Match') ?? '',
+        )
+        return json({ data: quote, requestId: crypto.randomUUID() })
       }
       const result = await getSubscription(env.D1_01, principal, operation.subscriptionId)
       return json({ data: result, requestId: crypto.randomUUID() }, 200, result.etag)

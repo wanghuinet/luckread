@@ -954,6 +954,132 @@ describe('W06 runtime', () => {
     expect(await response.json()).toEqual({ error: 'AUDIT_EVENT_PERSISTENCE_FAILED' })
   })
 
+  it('persists and idempotently replays the final paid subscription plan change audit', async () => {
+    const { db, rows } = createPlanAuditDb()
+    const runtime = await import('./index')
+    const changeRequestId = 'scr_' + 'c'.repeat(60)
+    const input = {
+      eventId: 'evt_spc_' + changeRequestId,
+      changeRequestId,
+      subscriptionId: 'sub_paid_upgrade_1',
+      sourceSubscriptionVersion: 3,
+      appliedSubscriptionVersion: 4,
+      sourcePlanId: 'plan_' + 'a'.repeat(64),
+      sourcePlanVersion: 2,
+      targetPlanId: 'plan_' + 'b'.repeat(64),
+      targetPlanVersion: 1,
+      orderId: 'ord_upgrade_1',
+      paymentId: 'pay_' + 'p'.repeat(26),
+      currency: 'USD',
+      amountBeforeTaxMinor: 875,
+      currentPeriodStart: '2026-10-01T00:00:00.000Z',
+      currentPeriodEnd: '2026-11-01T00:00:00.000Z',
+      occurredAt: '2026-10-15T12:00:00.000Z',
+    }
+    const makeRequest = (body: unknown, layer = 'L2', requestId = 'req_subscription_plan_change_1') =>
+      new Request('https://w06.internal/internal/audit-events/membership-subscription-plan-changed', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'X-LuckRead-Caller': 'W01',
+          'X-LuckRead-Transport-Version': '1.0',
+          'X-LuckRead-Principal-User-Id': 'buyer_user_001',
+          'X-LuckRead-Principal-Layer': layer,
+          'X-LuckRead-Correlation-Id': 'subscription-plan-change-correlation',
+          'X-LuckRead-Request-Id': requestId,
+        },
+        body: JSON.stringify(body),
+      })
+
+    const response = await runtime.default.fetch(makeRequest(input), { D1_03: db })
+    expect(response.status).toBe(201)
+    expect(await response.json()).toMatchObject({
+      eventId: input.eventId,
+      action: 'membership.subscription.plan_changed',
+      targetType: 'Subscription',
+      targetId: input.subscriptionId,
+      replayed: false,
+    })
+    expect(rows.get(input.eventId)).toMatchObject({
+      actor_json: JSON.stringify({ actorId: 'buyer_user_001', actorType: 'user', layer: 'L2' }),
+      action: 'membership.subscription.plan_changed',
+      target_type: 'Subscription',
+      target_id: input.subscriptionId,
+      before_json: JSON.stringify({
+        version: 3,
+        planId: input.sourcePlanId,
+        planVersion: 2,
+        status: 'ACTIVE',
+        currentPeriodStart: input.currentPeriodStart,
+        currentPeriodEnd: input.currentPeriodEnd,
+      }),
+      after_json: JSON.stringify({
+        version: 4,
+        planId: input.targetPlanId,
+        planVersion: 1,
+        status: 'ACTIVE',
+        orderId: input.orderId,
+        paymentId: input.paymentId,
+        currency: 'USD',
+        amountBeforeTaxMinor: 875,
+        currentPeriodStart: input.currentPeriodStart,
+        currentPeriodEnd: input.currentPeriodEnd,
+      }),
+      occurred_at: input.occurredAt,
+    })
+
+    const replay = await runtime.default.fetch(
+      makeRequest(input, 'L2', 'req_subscription_plan_change_retry'),
+      { D1_03: db },
+    )
+    expect(replay.status).toBe(200)
+    expect(await replay.json()).toMatchObject({ eventId: input.eventId, replayed: true })
+    expect(rows.size).toBe(1)
+  })
+
+  it('rejects an invalid plan change version increment before writing audit', async () => {
+    const { db, prepare } = createPlanAuditDb()
+    const runtime = await import('./index')
+    const changeRequestId = 'scr_' + 'd'.repeat(60)
+    const input = {
+      eventId: 'evt_spc_' + changeRequestId,
+      changeRequestId,
+      subscriptionId: 'sub_paid_upgrade_2',
+      sourceSubscriptionVersion: 3,
+      appliedSubscriptionVersion: 5,
+      sourcePlanId: 'plan_' + 'a'.repeat(64),
+      sourcePlanVersion: 2,
+      targetPlanId: 'plan_' + 'b'.repeat(64),
+      targetPlanVersion: 1,
+      orderId: 'ord_upgrade_2',
+      paymentId: 'pay_' + 'q'.repeat(26),
+      currency: 'USD',
+      amountBeforeTaxMinor: 875,
+      currentPeriodStart: '2026-10-01T00:00:00.000Z',
+      currentPeriodEnd: '2026-11-01T00:00:00.000Z',
+      occurredAt: '2026-10-15T12:00:00.000Z',
+    }
+    const response = await runtime.default.fetch(new Request(
+      'https://w06.internal/internal/audit-events/membership-subscription-plan-changed',
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'X-LuckRead-Caller': 'W01',
+          'X-LuckRead-Transport-Version': '1.0',
+          'X-LuckRead-Principal-User-Id': 'buyer_user_001',
+          'X-LuckRead-Principal-Layer': 'L2',
+          'X-LuckRead-Correlation-Id': 'subscription-plan-change-correlation',
+          'X-LuckRead-Request-Id': 'req_subscription_plan_change_invalid',
+        },
+        body: JSON.stringify(input),
+      },
+    ), { D1_03: db })
+    expect(response.status).toBe(400)
+    expect(await response.json()).toEqual({ error: 'INVALID_MEMBERSHIP_SUBSCRIPTION_PLAN_CHANGE_AUDIT' })
+    expect(prepare).not.toHaveBeenCalled()
+  })
+
   it('persists a canonical AUTH-013 account-state AuditEvent', async () => {
     const { db, prepare, bind, run } = createDb(true)
     const runtime = await import('./index')

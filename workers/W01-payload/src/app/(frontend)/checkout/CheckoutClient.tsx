@@ -125,6 +125,14 @@ export default function CheckoutClient({ orderId }: { orderId: string }) {
           },
           body: JSON.stringify({ orderId }),
         })
+        if (response.status === 401) {
+          // The native APP never passes its SecureStore bearer token to a browser.
+          // When this browser has no W02 cookie session, sign in here and return
+          // to this exact server-owned order after authentication.
+          const returnTo = '/checkout?orderId=' + encodeURIComponent(orderId)
+          window.location.assign('/login?returnTo=' + encodeURIComponent(returnTo))
+          return
+        }
         const result: unknown = await response.json().catch((): null => null)
         const envelope = result && typeof result === 'object' ? result as ApiEnvelope : null
         const parsed = response.ok ? readPaymentIntent(result, orderId) : null

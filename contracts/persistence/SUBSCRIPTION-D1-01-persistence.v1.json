@@ -181,7 +181,27 @@
   "migration": {
     "status": "PREPARED_NOT_APPLIED",
     "candidateMigration": "workers/W07-subscription-commerce/migrations/0002_subscription_version_cas.sql",
-    "rule": "The version-column migration is prepared as a reviewed code candidate only. A physical migration still requires exact artifact hash, read-only confirmation of the target and migration history, controlled target D1-01 execution and post-schema evidence."
+    "rule": "The version-column migration is prepared as a reviewed code candidate only. A physical migration still requires exact artifact hash, read-only confirmation of the target and migration history, controlled target D1-01 execution and post-schema evidence.",
+    "additionalCandidates": [
+      {
+        "file": "workers/W07-subscription-commerce/migrations/0003_membership_plans.sql",
+        "id": "0003_membership_plans",
+        "targetBinding": "D1_01",
+        "appliedRemotely": false
+      },
+      {
+        "file": "workers/W07-subscription-commerce/migrations/0004_revenuecat_membership_product_bindings.sql",
+        "id": "0004_revenuecat_membership_product_bindings",
+        "targetBinding": "D1_01",
+        "appliedRemotely": false
+      },
+      {
+        "file": "workers/W07-subscription-commerce/migrations/0005_membership_subscription_plan_change_receipts.sql",
+        "id": "0005_membership_subscription_plan_change_receipts",
+        "targetBinding": "D1_01",
+        "appliedRemotely": false
+      }
+    ]
   },
   "runtime": {
     "w07Binding": "NOT_VERIFIED",
@@ -197,7 +217,9 @@
     "Create a speculative active-subscription uniqueness constraint.",
     "Introduce a standalone version field without a field-contract change.",
     "Treat cache, projection or analytics data as Subscription authority.",
-    "Execute or claim migration success from this logical contract."
+    "Execute or claim migration success from this logical contract.",
+    "Apply the RevenueCat product-binding or plan-change receipt candidate migrations outside the exact-SHA controlled D1-01 migration gate.",
+    "Treat a plan-change receipt as payment, ledger, or entitlement authority; it is a replay/audit journal only."
   ],
   "verificationRequirements": [
     "exact D1-01 target UUID evidence",
@@ -209,7 +231,148 @@
     "optimistic-lock source binding evidence",
     "active-subscription uniqueness policy decision",
     "Subscription runtime positive/duplicate/cancel/pause/resume/change-plan evidence",
-    "Evidence Registry record tied to validating commit SHA"
+    "Evidence Registry record tied to validating commit SHA",
+    "read-only verification of RevenueCat immutable product-binding schema, index and retirement/immutability triggers",
+    "read-only verification of immutable paid plan-change receipt schema, indexes and immutable triggers",
+    "migration history must include 0001 through 0005 in order before runtime deployment",
+    "a paid plan change must bind exact D1-04 payment/order facts to the D1-01 subscription source-version CAS and immutable change receipt"
   ],
-  "promotionRule": "Remain CONTRACTED_NOT_VERIFIED until the physical binding, migration, runtime authority and Evidence Registry evidence are all admitted."
+  "promotionRule": "Remain CONTRACTED_NOT_VERIFIED until the physical binding, migration, runtime authority and Evidence Registry evidence are all admitted.",
+  "additionalTables": [
+    {
+      "name": "membership_revenuecat_product_bindings",
+      "purpose": "Immutable mapping from a store product to one creator MembershipPlan immutable version; retirement preserves historical transaction reconciliation.",
+      "authority": "W07 / D1-01",
+      "primaryKey": [
+        "revenuecat_app_id",
+        "store",
+        "product_id"
+      ],
+      "migration": "workers/W07-subscription-commerce/migrations/0004_revenuecat_membership_product_bindings.sql",
+      "status": "SOURCE_CANDIDATE_NOT_APPLIED"
+    },
+    {
+      "name": "membership_subscription_plan_change_receipts",
+      "purpose": "Immutable application receipt for a paid subscription plan change. This is a bounded child journal of ENT-SUBSCRIPTION used to make a verified D1-01 version-CAS replay-safe; it is not an independent Subscription/Entitlement authority and contains no payment credentials.",
+      "authority": "W07 / D1-01",
+      "primaryKey": "change_request_id",
+      "columns": [
+        {
+          "name": "change_request_id",
+          "type": "TEXT",
+          "nullable": false,
+          "primaryKey": true
+        },
+        {
+          "name": "subscription_id",
+          "type": "TEXT",
+          "nullable": false,
+          "primaryKey": false
+        },
+        {
+          "name": "subscriber_id",
+          "type": "TEXT",
+          "nullable": false,
+          "primaryKey": false
+        },
+        {
+          "name": "source_subscription_version",
+          "type": "INTEGER",
+          "nullable": false,
+          "primaryKey": false
+        },
+        {
+          "name": "applied_subscription_version",
+          "type": "INTEGER",
+          "nullable": false,
+          "primaryKey": false
+        },
+        {
+          "name": "source_plan_id",
+          "type": "TEXT",
+          "nullable": false,
+          "primaryKey": false
+        },
+        {
+          "name": "source_plan_version",
+          "type": "INTEGER",
+          "nullable": false,
+          "primaryKey": false
+        },
+        {
+          "name": "target_plan_id",
+          "type": "TEXT",
+          "nullable": false,
+          "primaryKey": false
+        },
+        {
+          "name": "target_plan_version",
+          "type": "INTEGER",
+          "nullable": false,
+          "primaryKey": false
+        },
+        {
+          "name": "order_id",
+          "type": "TEXT",
+          "nullable": false,
+          "primaryKey": false
+        },
+        {
+          "name": "payment_id",
+          "type": "TEXT",
+          "nullable": false,
+          "primaryKey": false
+        },
+        {
+          "name": "currency",
+          "type": "TEXT",
+          "nullable": false,
+          "primaryKey": false
+        },
+        {
+          "name": "amount_before_tax_minor",
+          "type": "INTEGER",
+          "nullable": false,
+          "primaryKey": false
+        },
+        {
+          "name": "current_period_start",
+          "type": "TEXT",
+          "nullable": false,
+          "primaryKey": false
+        },
+        {
+          "name": "current_period_end",
+          "type": "TEXT",
+          "nullable": false,
+          "primaryKey": false
+        },
+        {
+          "name": "applied_at",
+          "type": "TEXT",
+          "nullable": false,
+          "primaryKey": false
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ix_membership_subscription_plan_change_receipts_subscription",
+          "columns": [
+            "subscription_id",
+            "applied_at",
+            "change_request_id"
+          ]
+        },
+        {
+          "name": "ix_membership_subscription_plan_change_receipts_payment",
+          "columns": [
+            "payment_id"
+          ]
+        }
+      ],
+      "immutable": "Updates and deletes are rejected by D1 triggers. The Subscription CAS and receipt insert run in one D1-01 batch transaction.",
+      "migration": "workers/W07-subscription-commerce/migrations/0005_membership_subscription_plan_change_receipts.sql",
+      "status": "SOURCE_CANDIDATE_NOT_APPLIED"
+    }
+  ]
 }

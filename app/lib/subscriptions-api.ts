@@ -55,6 +55,158 @@ export function fetchMySubscriptionsPage(options: PageOptions = {}) {
 }
 
 
+export type SubscriptionPlanChangeQuote = {
+  quoteStatus: 'PREVIEW_ONLY';
+  subscriptionId: string;
+  subscriptionVersion: number;
+  subscriptionEtag: string;
+  currentPlan: {
+    planId: string;
+    planVersion: number;
+    name: string;
+    tier: string;
+    billingInterval: 'MONTHLY' | 'YEARLY';
+    priceMinor: number;
+    currency: string;
+  };
+  targetPlan: {
+    planId: string;
+    planVersion: number;
+    name: string;
+    tier: string;
+    billingInterval: 'MONTHLY' | 'YEARLY';
+    priceMinor: number;
+    currency: string;
+  };
+  direction: 'UPGRADE' | 'DOWNGRADE' | 'CROSSGRADE';
+  effectiveAt: string;
+  currentPeriodStart: string;
+  currentPeriodEnd: string;
+  remainingPeriodMilliseconds: number;
+  totalPeriodMilliseconds: number;
+  amountDueBeforeTaxMinor: number;
+  currency: string;
+  taxStatus: 'NOT_CALCULATED';
+  paymentRequired: boolean;
+  paymentActionAvailable: false;
+  mutationPerformed: false;
+  entitlementChanged: false;
+  generatedAt: string;
+};
+
+/** Read-only server quote; requesting it never mutates subscription or initiates payment. */
+export function fetchSubscriptionPlanChangeQuote(options: {
+  subscriptionId: string;
+  targetPlanId: string;
+  etag: string;
+  signal?: AbortSignal;
+}) {
+  const { subscriptionId, targetPlanId, etag } = options;
+  if (!subscriptionId || subscriptionId.length > 256 || subscriptionId.trim() !== subscriptionId) {
+    throw new RangeError('Subscription identifier is invalid.');
+  }
+  if (!/^plan_[a-f0-9]{64}$/.test(targetPlanId)) {
+    throw new RangeError('Target membership plan identifier is invalid.');
+  }
+  if (!/^"lr-v[1-9]\d*"$/.test(etag) || etag.length > 256) {
+    throw new RangeError('Subscription version tag is invalid.');
+  }
+  const query = new URLSearchParams({ planId: targetPlanId });
+  return apiRequest<SubscriptionPlanChangeQuote>(
+    '/memberships/subscriptions/' + encodeURIComponent(subscriptionId) + '/change-plan/quote?' + query.toString(),
+    {
+      method: 'GET',
+      headers: { 'If-Match': etag },
+      signal: options.signal,
+    },
+  );
+}
+
+export type SubscriptionPlanUpgradeCheckout = {
+  changeRequestId: string;
+  status: 'PAYMENT_REQUIRED';
+  paymentRequired: true;
+  order: {
+    orderId: string;
+    status: 'CREATED';
+    version: number;
+    currency: string;
+    subtotalMinor: number;
+    discountMinor: number;
+    taxMinor: number;
+    totalMinor: number;
+    items: Array<{
+      itemRef: string;
+      quantity: number;
+      unitAmountMinor: number;
+      lineSubtotalMinor: number;
+      lineDiscountMinor: number;
+      lineTaxMinor: number;
+      lineTotalMinor: number;
+    }>;
+    createdAt: string;
+    updatedAt: string;
+  };
+  replayed: boolean;
+  paymentIntentPath: '/api/v1/payments/intents';
+  quote?: SubscriptionPlanChangeQuote;
+};
+
+/** Create/replay the single upgrade order bound to this subscription source version. */
+export function createSubscriptionPlanUpgradeCheckout(options: {
+  subscriptionId: string;
+  targetPlanId: string;
+  etag: string;
+  idempotencyKey: string;
+  signal?: AbortSignal;
+}) {
+  const { subscriptionId, targetPlanId, etag, idempotencyKey } = options;
+  if (!subscriptionId || subscriptionId.length > 256 || subscriptionId.trim() !== subscriptionId) {
+    throw new RangeError('Subscription identifier is invalid.');
+  }
+  if (!/^plan_[a-f0-9]{64}$/.test(targetPlanId)) {
+    throw new RangeError('Target membership plan identifier is invalid.');
+  }
+  if (!/^"lr-v[1-9]\d*"$/.test(etag) || etag.length > 256) {
+    throw new RangeError('Subscription version tag is invalid.');
+  }
+  if (!idempotencyKey || idempotencyKey.length > 256 || idempotencyKey.trim() !== idempotencyKey ||
+      /[\u0000-\u001f\u007f]/.test(idempotencyKey)) {
+    throw new RangeError('Idempotency-Key is invalid.');
+  }
+  return apiRequest<SubscriptionPlanUpgradeCheckout>(
+    '/memberships/subscriptions/' + encodeURIComponent(subscriptionId) + '/change-plan',
+    {
+      method: 'POST',
+      headers: { 'If-Match': etag, 'Idempotency-Key': idempotencyKey },
+      body: JSON.stringify({ planId: targetPlanId }),
+      signal: options.signal,
+    },
+  );
+}
+
+/** Start the existing customer-present Hyperswitch checkout for a persisted Order. */
+export function createCommercePaymentIntent(options: {
+  orderId: string;
+  idempotencyKey: string;
+  signal?: AbortSignal;
+}) {
+  const { orderId, idempotencyKey } = options;
+  if (!/^ord_[A-Za-z0-9_-]{1,90}$/.test(orderId)) {
+    throw new RangeError('Commerce order identifier is invalid.');
+  }
+  if (!idempotencyKey || idempotencyKey.length > 256 || idempotencyKey.trim() !== idempotencyKey ||
+      /[\u0000-\u001f\u007f]/.test(idempotencyKey)) {
+    throw new RangeError('Idempotency-Key is invalid.');
+  }
+  return apiRequest<unknown>('/payments/intents', {
+    method: 'POST',
+    headers: { 'Idempotency-Key': idempotencyKey },
+    body: JSON.stringify({ orderId }),
+    signal: options.signal,
+  });
+}
+
 export type ActiveMembershipPlan = {
   planId: string;
   creatorId: string;

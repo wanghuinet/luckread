@@ -4,6 +4,8 @@ import {
   createHyperswitchCustomerInitiatedSetupIntent,
   HyperswitchClientError,
 } from './hyperswitch-client.js';
+import { assertSubscriptionUpgradeOrderPayable } from './subscription-plan-change-checkout.js';
+import { SubscriptionRuntimeError } from './subscription-runtime.js';
 import {
   createPaymentAttempt,
   recordUnconfirmedHyperswitchIntent,
@@ -19,6 +21,7 @@ type ResolvedProviderConfig = Readonly<{
 }>;
 
 type PaymentIntentRuntimeEnv = Readonly<{
+  D1_01?: D1Database;
   D1_04: D1Database;
   HYPERSWITCH_ENVIRONMENT?: string | null;
   HYPERSWITCH_API_KEY?: string | null;
@@ -145,6 +148,11 @@ export async function handleCommercePaymentIntentRequest(
   }
 
   try {
+    // Revalidate a subscription-upgrade source version immediately before
+    // persisting a new PaymentAttempt or contacting Hyperswitch. Ordinary
+    // orders pass through unchanged; stale upgrade orders fail closed.
+    await assertSubscriptionUpgradeOrderPayable(env, customerId, route.orderId);
+
     const createAttempt = dependencies.createAttempt ?? createPaymentAttempt;
     const attempt: PaymentAttemptCreation = await createAttempt(
       env.D1_04,
@@ -207,6 +215,13 @@ export async function handleCommercePaymentIntentRequest(
       { status: attempt.replayed ? 200 : 201, headers: { 'cache-control': 'no-store' } },
     );
   } catch (error) {
+    if (error instanceof SubscriptionRuntimeError) {
+      const message = error.code === 'PRECONDITION_FAILED' ? 'Subscription changed after the upgrade order was created' :
+        error.code === 'INVALID_STATE' ? 'The upgrade order is no longer payable' :
+        error.code === 'CONFLICT' ? 'The upgrade order conflicts with the current subscription state' :
+        error.code === 'VALIDATION_FAILED' ? 'Payment-intent request validation failed' : 'Subscription upgrade is unavailable';
+      return errorResponse(error.status, error.code, message);
+    }
     if (error instanceof PaymentPersistenceError) return mapPersistenceError(error);
     if (error instanceof HyperswitchClientError) {
       if (error.code === 'REQUEST_INVALID') {

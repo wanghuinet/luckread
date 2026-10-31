@@ -3,6 +3,35 @@ import type { ContentPrincipal } from '../content/w03-content-client.js'
 
 export type OrderPermission = 'order.create' | 'order.read'
 
+/** Subscriber-owned plan changes require the canonical W08 CASL own-scope grant. */
+export async function authorizeSubscriptionChangePlanPermission(
+  request: Request,
+  principal: ContentPrincipal,
+): Promise<Response | null> {
+  const headers = new Headers(request.headers)
+  headers.delete('host')
+  headers.delete('content-length')
+  headers.set('content-type', 'application/json; charset=utf-8')
+  const permissionRequest = new Request(request.url, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      action: 'subscription.change_plan',
+      resourceType: 'Subscription',
+      resourceAttributes: { ownerId: principal.userId },
+    }),
+  })
+  const response = await callW08Creator(permissionRequest, '/internal/authz/check-permission', 'POST')
+  if (!response.ok) return errorResponse(503, 'AUTHORIZATION_UNAVAILABLE', 'Subscription authorization unavailable')
+  const value: unknown = await response.json().catch((): null => null)
+  const decision = value && typeof value === 'object'
+    ? (value as { data?: { decision?: unknown } }).data?.decision
+    : undefined
+  if (decision === 'ALLOW') return null
+  if (decision === 'DENY') return errorResponse(403, 'PERMISSION_DENIED', 'Subscription plan change permission required')
+  return errorResponse(503, 'AUTHORIZATION_UNAVAILABLE', 'Subscription authorization response could not be verified')
+}
+
 const errorResponse = (status: number, code: string, message: string): Response =>
   Response.json(
     { error: { code, message, details: {} }, requestId: `req_${crypto.randomUUID()}` },

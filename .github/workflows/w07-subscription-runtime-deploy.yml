@@ -74,6 +74,8 @@ jobs:
           test -f migrations/0001_membership_subscriptions.sql
           test -f migrations/0002_subscription_version_cas.sql
           test -f migrations/0003_membership_plans.sql
+          test -f migrations/0004_revenuecat_membership_product_bindings.sql
+          test -f migrations/0005_membership_subscription_plan_change_receipts.sql
           test -f migrations-d1-04/0001_order_commerce.sql
           test -f migrations-d1-04/0006_refunds_billing_documents.sql
           test -f src/index.ts
@@ -106,7 +108,7 @@ jobs:
           set -euo pipefail
           npx --yes wrangler@4.116.0 d1 list --json --config wrangler.jsonc > /tmp/w07-d1-list.json
           node scripts/verify-d1-04-binding.mjs /tmp/w07-d1-list.json
-          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command="SELECT name FROM d1_migrations WHERE name IN ('0001_membership_subscriptions.sql','0002_subscription_version_cas.sql','0003_membership_plans.sql') ORDER BY name" --json > /tmp/w07-d1-migrations.json
+          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command="SELECT name FROM d1_migrations WHERE name IN ('0001_membership_subscriptions.sql','0002_subscription_version_cas.sql','0003_membership_plans.sql','0004_revenuecat_membership_product_bindings.sql','0005_membership_subscription_plan_change_receipts.sql') ORDER BY name" --json > /tmp/w07-d1-migrations.json
           npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA table_info("membership_subscriptions")' --json > /tmp/w07-subscription-schema.json
           npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA index_list("membership_subscriptions")' --json > /tmp/w07-subscription-indexes.json
           npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA foreign_key_list("membership_subscriptions")' --json > /tmp/w07-subscription-foreign-keys.json
@@ -115,6 +117,12 @@ jobs:
           npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA index_list("membership_plans")' --json > /tmp/w07-plan-indexes.json
           npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA index_list("membership_plan_versions")' --json > /tmp/w07-plan-version-indexes.json
           npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command="SELECT name FROM sqlite_master WHERE type = 'trigger' AND tbl_name IN ('membership_plans','membership_plan_versions') ORDER BY name" --json > /tmp/w07-plan-triggers.json
+          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA table_info("membership_revenuecat_product_bindings")' --json > /tmp/w07-revenuecat-binding-schema.json
+          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA index_list("membership_revenuecat_product_bindings")' --json > /tmp/w07-revenuecat-binding-indexes.json
+          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command="SELECT name FROM sqlite_master WHERE type = 'trigger' AND tbl_name = 'membership_revenuecat_product_bindings' ORDER BY name" --json > /tmp/w07-revenuecat-binding-triggers.json
+          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA table_info("membership_subscription_plan_change_receipts")' --json > /tmp/w07-plan-change-receipt-schema.json
+          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA index_list("membership_subscription_plan_change_receipts")' --json > /tmp/w07-plan-change-receipt-indexes.json
+          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command="SELECT name FROM sqlite_master WHERE type = 'trigger' AND tbl_name = 'membership_subscription_plan_change_receipts' ORDER BY name" --json > /tmp/w07-plan-change-receipt-triggers.json
           node scripts/verify-remote-preflight.mjs preflight \
             /tmp/w07-d1-list.json \
             /tmp/w07-d1-migrations.json \
@@ -125,7 +133,13 @@ jobs:
             /tmp/w07-plan-version-schema.json \
             /tmp/w07-plan-indexes.json \
             /tmp/w07-plan-version-indexes.json \
-            /tmp/w07-plan-triggers.json
+            /tmp/w07-plan-triggers.json \
+            /tmp/w07-revenuecat-binding-schema.json \
+            /tmp/w07-revenuecat-binding-indexes.json \
+            /tmp/w07-revenuecat-binding-triggers.json \
+            /tmp/w07-plan-change-receipt-schema.json \
+            /tmp/w07-plan-change-receipt-indexes.json \
+            /tmp/w07-plan-change-receipt-triggers.json
 
       - name: Require D1-04 refund and billing migration readiness
         id: d1_04_deploy_preflight
@@ -188,7 +202,7 @@ jobs:
           set -euo pipefail
           npx --yes wrangler@4.116.0 d1 list --json --config wrangler.jsonc > /tmp/w07-post-d1-list.json
           node scripts/verify-d1-04-binding.mjs /tmp/w07-post-d1-list.json
-          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command="SELECT name FROM d1_migrations WHERE name IN ('0001_membership_subscriptions.sql','0002_subscription_version_cas.sql','0003_membership_plans.sql') ORDER BY name" --json > /tmp/w07-post-d1-migrations.json
+          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command="SELECT name FROM d1_migrations WHERE name IN ('0001_membership_subscriptions.sql','0002_subscription_version_cas.sql','0003_membership_plans.sql','0004_revenuecat_membership_product_bindings.sql','0005_membership_subscription_plan_change_receipts.sql') ORDER BY name" --json > /tmp/w07-post-d1-migrations.json
           npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA table_info("membership_subscriptions")' --json > /tmp/w07-post-subscription-schema.json
           npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA index_list("membership_subscriptions")' --json > /tmp/w07-post-subscription-indexes.json
           npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA foreign_key_list("membership_subscriptions")' --json > /tmp/w07-post-subscription-foreign-keys.json
@@ -197,8 +211,15 @@ jobs:
           npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA index_list("membership_plans")' --json > /tmp/w07-post-plan-indexes.json
           npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA index_list("membership_plan_versions")' --json > /tmp/w07-post-plan-version-indexes.json
           npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command="SELECT name FROM sqlite_master WHERE type = 'trigger' AND tbl_name IN ('membership_plans','membership_plan_versions') ORDER BY name" --json > /tmp/w07-post-plan-triggers.json
+          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA table_info("membership_revenuecat_product_bindings")' --json > /tmp/w07-post-revenuecat-binding-schema.json
+          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA index_list("membership_revenuecat_product_bindings")' --json > /tmp/w07-post-revenuecat-binding-indexes.json
+          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command="SELECT name FROM sqlite_master WHERE type = 'trigger' AND tbl_name = 'membership_revenuecat_product_bindings' ORDER BY name" --json > /tmp/w07-post-revenuecat-binding-triggers.json
+          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA table_info("membership_subscription_plan_change_receipts")' --json > /tmp/w07-post-plan-change-receipt-schema.json
+          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA index_list("membership_subscription_plan_change_receipts")' --json > /tmp/w07-post-plan-change-receipt-indexes.json
+          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command="SELECT name FROM sqlite_master WHERE type = 'trigger' AND tbl_name = 'membership_subscription_plan_change_receipts' ORDER BY name" --json > /tmp/w07-post-plan-change-receipt-triggers.json
           npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command="SELECT COUNT(*) AS invalid_versions FROM membership_subscriptions WHERE version IS NULL OR version < 1 OR typeof(version) <> 'integer'" --json > /tmp/w07-post-subscription-version-integrity.json
           npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command="SELECT COUNT(*) AS invalid_current_plan_versions FROM membership_plans p LEFT JOIN membership_plan_versions pv ON pv.plan_id = p.plan_id AND pv.plan_version = p.current_version WHERE pv.plan_id IS NULL OR p.current_version < 1 OR typeof(p.current_version) <> 'integer'" --json > /tmp/w07-post-plan-integrity.json
+          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command="SELECT COUNT(*) AS invalid_plan_change_receipts FROM membership_subscription_plan_change_receipts WHERE applied_subscription_version <> source_subscription_version + 1 OR amount_before_tax_minor <= 0 OR current_period_end <= current_period_start" --json > /tmp/w07-post-plan-change-receipt-integrity.json
           node scripts/verify-remote-preflight.mjs postflight \
             /tmp/w07-post-d1-list.json \
             /tmp/w07-post-d1-migrations.json \
@@ -210,8 +231,15 @@ jobs:
             /tmp/w07-post-plan-indexes.json \
             /tmp/w07-post-plan-version-indexes.json \
             /tmp/w07-post-plan-triggers.json \
+            /tmp/w07-post-revenuecat-binding-schema.json \
+            /tmp/w07-post-revenuecat-binding-indexes.json \
+            /tmp/w07-post-revenuecat-binding-triggers.json \
+            /tmp/w07-post-plan-change-receipt-schema.json \
+            /tmp/w07-post-plan-change-receipt-indexes.json \
+            /tmp/w07-post-plan-change-receipt-triggers.json \
             /tmp/w07-post-subscription-version-integrity.json \
-            /tmp/w07-post-plan-integrity.json
+            /tmp/w07-post-plan-integrity.json \
+            /tmp/w07-post-plan-change-receipt-integrity.json
 
       - name: Deploy W07
         working-directory: workers/W07-subscription-commerce
@@ -240,7 +268,7 @@ jobs:
               "domain": "D1-04",
               "databaseUuid": "9bfb89a5-fbb5-45b1-a2ee-eab674b0d736"
             },
-            "migrations": ["0001_membership_subscriptions", "0002_subscription_version_cas", "0003_membership_plans"],
+            "migrations": ["0001_membership_subscriptions", "0002_subscription_version_cas", "0003_membership_plans", "0004_revenuecat_membership_product_bindings", "0005_membership_subscription_plan_change_receipts"],
             "migrationAction": "$MIGRATION_ACTION",
             "remoteMigration": $REMOTE_MIGRATION,
             "confirmation": "DEPLOY_W07_SUBSCRIPTION",

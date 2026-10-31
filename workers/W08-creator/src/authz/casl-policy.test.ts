@@ -395,6 +395,40 @@ describe('CASL L0-L8 authorization policy', () => {
     }).decision).toBe('DENY')
   })
 
+  it('authorizes subscription plan changes only for the authenticated subscriber at L2+', () => {
+    for (const layer of ['L2', 'L3', 'L4', 'L7', 'L8'] as const) {
+      expect(evaluate({
+        layer,
+        action: 'subscription.change_plan',
+        resourceType: 'Subscription',
+        resourceAttributes: { ownerId: 'user-1' },
+      })).toMatchObject({ decision: 'ALLOW' })
+    }
+
+    expect(evaluate({
+      layer: 'L2',
+      action: 'subscription.change_plan',
+      resourceType: 'Subscription',
+      resourceAttributes: { ownerId: 'user-2' },
+    })).toMatchObject({ decision: 'DENY', reasonCode: 'PERMISSION_DENIED' })
+
+    expect(evaluate({
+      layer: 'L1',
+      action: 'subscription.change_plan',
+      resourceType: 'Subscription',
+      resourceAttributes: { ownerId: 'user-1' },
+    })).toMatchObject({ decision: 'DENY' })
+
+    for (const accountState of ['RESTRICTED', 'FROZEN']) {
+      expect(evaluate({
+        accountState,
+        action: 'subscription.change_plan',
+        resourceType: 'Subscription',
+        resourceAttributes: { ownerId: 'user-1' },
+      })).toMatchObject({ decision: 'DENY' })
+    }
+  })
+
   it('authorizes owner-scoped commerce orders for L2+ and fails closed for unsafe accounts', () => {
     expect(evaluate({
       action: 'order.create',

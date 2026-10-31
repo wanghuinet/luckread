@@ -63,7 +63,7 @@ function isSubscriptionRecord(value: unknown): value is MySubscription {
     typeof item.etag === 'string' && item.etag.length > 0;
 }
 
-function SubscriptionCard({ item }: { item: MySubscription }) {
+function SubscriptionCard({ item, onUpgrade }: { item: MySubscription; onUpgrade: (item: MySubscription) => void }) {
   return (
     <View className="mx-4 mb-3 rounded-2xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-950">
       <View className="flex-row items-start justify-between gap-3">
@@ -116,6 +116,15 @@ function SubscriptionCard({ item }: { item: MySubscription }) {
       <Text selectable className="mt-3 text-[11px] leading-4 text-neutral-400">
         订阅 ID：{item.subscriptionId}
       </Text>
+      {item.status === 'ACTIVE' && item.creatorId && !item.cancelAt ? (
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => onUpgrade(item)}
+          className="mt-4 items-center rounded-full border border-sky-500 px-4 py-2.5"
+        >
+          <Text className="font-bold text-sky-600">升级套餐</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -135,6 +144,10 @@ export default function MySubscriptionsScreen() {
 
   const openLogin = useCallback(() => {
     router.push(('/login?returnTo=' + encodeURIComponent('/subscriptions')) as never);
+  }, [router]);
+
+  const openUpgrade = useCallback((item: MySubscription) => {
+    router.push(('/subscription-upgrade?subscriptionId=' + encodeURIComponent(item.subscriptionId)) as never);
   }, [router]);
 
   const loadPage = useCallback(async (page: number, append: boolean, pullRefresh = false) => {
@@ -256,7 +269,7 @@ export default function MySubscriptionsScreen() {
 
       <View className="border-b border-neutral-100 bg-white px-4 py-3 dark:border-neutral-800 dark:bg-black">
         <Text className="text-xs leading-5 text-neutral-500 dark:text-neutral-400">
-          订阅状态由 W07 提供。订阅记录本身不证明付款已完成或内容权益已生效；在支付渠道、续费与退款同步通过验收前，APP 仅提供真实记录查询，不开放暂停、恢复或取消操作。
+          订阅状态由 W07 提供。有效且未安排取消的创作者订阅可发起同创作者套餐升级；升级只有在服务端验证支付 Webhook 并完成权益同步后才会生效。暂停、恢复、取消和降级仍未开放。
         </Text>
       </View>
 
@@ -274,7 +287,7 @@ export default function MySubscriptionsScreen() {
         keyExtractor={(item) => item.subscriptionId}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void loadPage(1, false, true)} />}
         contentContainerStyle={{ paddingTop: 14, paddingBottom: 36, flexGrow: 1 }}
-        renderItem={({ item }) => <SubscriptionCard item={item} />}
+        renderItem={({ item }) => <SubscriptionCard item={item} onUpgrade={openUpgrade} />}
         ListEmptyComponent={(
           <View className="flex-1 items-center justify-center px-8 py-12">
             {loading ? <ActivityIndicator size="large" color={PRIMARY} /> : (
