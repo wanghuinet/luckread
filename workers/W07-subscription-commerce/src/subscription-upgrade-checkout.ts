@@ -210,7 +210,7 @@ export async function createSubscriptionUpgradeOrder(
     expectedSubscriptionVersion: subscription.version,
     currentPeriodStart: subscription.current_period_start,
     currentPeriodEnd: subscription.current_period_end,
-    prorationBaseMinor,
+    prorationBaseMinor: Number(persistedProration),
     currency: target.currency,
   }));
 
@@ -271,10 +271,8 @@ export async function createSubscriptionUpgradeOrder(
     const line = await d1_04.prepare(
       'SELECT item_snapshot_json, unit_amount_minor FROM order_lines WHERE order_id = ? AND item_ref = ? LIMIT 1',
     ).bind(orderResult.data.orderId, target.plan_id).first<{ item_snapshot_json: string; unit_amount_minor: number }>();
-    if (!line || line.unit_amount_minor !== prorationBaseMinor) {
-      throw new SubscriptionRuntimeError('CONFLICT', 409);
-    }
-    storedSnapshot = JSON.parse(line.item_snapshot_json) as unknown;
+    if (!line) throw new SubscriptionRuntimeError('CONFLICT', 409);
+    storedSnapshot = { ...(JSON.parse(line.item_snapshot_json) as Record<string, unknown>), _storedUnitAmountMinor: line.unit_amount_minor };
   } catch (error) {
     if (error instanceof SubscriptionRuntimeError) throw error;
     throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
@@ -284,14 +282,26 @@ export async function createSubscriptionUpgradeOrder(
     throw new SubscriptionRuntimeError('CONFLICT', 409);
   }
   const storedUpgrade = (storedSnapshot as Record<string, unknown>).membershipUpgrade;
-  if (!storedUpgrade || typeof storedUpgrade !== 'object' || Array.isArray(storedUpgrade) ||
-      (storedUpgrade as Record<string, unknown>).subscriptionId !== subscriptionId ||
-      (storedUpgrade as Record<string, unknown>).sourcePlanId !== subscription.plan_id ||
-      (storedUpgrade as Record<string, unknown>).sourcePlanVersion !== subscription.plan_version ||
-      (storedUpgrade as Record<string, unknown>).expectedSubscriptionVersion !== subscription.version ||
-      (storedUpgrade as Record<string, unknown>).targetPlanId !== target.plan_id ||
-      (storedUpgrade as Record<string, unknown>).targetPlanVersion !== target.current_version ||
-      (storedUpgrade as Record<string, unknown>).requestHash !== requestHash) {
+  if (!storedUpgrade || typeof storedUpgrade !== 'object' || Array.isArray(storedUpgrade)) {
+    throw new SubscriptionRuntimeError('CONFLICT', 409);
+  }
+  const persistedUpgrade = storedUpgrade as Record<string, unknown>;
+  const persistedProration = persistedUpgrade.prorationBaseMinor;
+  const persistedQuotedAt = persistedUpgrade.quotedAt;
+  const storedUnitAmount = (storedSnapshot as Record<string, unknown>)._storedUnitAmountMinor;
+  if (persistedUpgrade.subscriptionId !== subscriptionId ||
+      persistedUpgrade.sourcePlanId !== subscription.plan_id ||
+      persistedUpgrade.sourcePlanVersion !== subscription.plan_version ||
+      persistedUpgrade.expectedSubscriptionVersion !== subscription.version ||
+      persistedUpgrade.targetPlanId !== target.plan_id ||
+      persistedUpgrade.targetPlanVersion !== target.current_version ||
+      persistedUpgrade.currentPeriodStart !== subscription.current_period_start ||
+      persistedUpgrade.currentPeriodEnd !== subscription.current_period_end ||
+      !Number.isSafeInteger(persistedProration) || Number(persistedProration) < 1 ||
+      storedUnitAmount !== persistedProration ||
+      !canonicalUtc(persistedQuotedAt) ||
+      Date.parse(persistedQuotedAt) < periodStartMs || Date.parse(persistedQuotedAt) >= periodEndMs ||
+      (!orderResult.replayed && (persistedUpgrade.requestHash !== requestHash || persistedProration !== prorationBaseMinor))) {
     throw new SubscriptionRuntimeError('CONFLICT', 409);
   }
 
