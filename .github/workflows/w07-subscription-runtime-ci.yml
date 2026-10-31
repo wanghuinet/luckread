@@ -410,6 +410,8 @@ jobs:
           trial_indexes = {r[1] for r in db.execute('PRAGMA index_list("membership_subscription_trials")').fetchall()}
           required_trial_indexes = {'ux_membership_subscription_trials_subscriber_plan','ux_membership_subscription_trials_store_transaction','ix_membership_subscription_trials_status_end','ix_membership_subscription_trials_subscriber_created'}
           if not required_trial_indexes.issubset(trial_indexes): raise SystemExit(f'missing membership trial indexes: {trial_indexes!r}')
+          trial_transaction_index_cols = [r[2] for r in db.execute('PRAGMA index_info("ux_membership_subscription_trials_store_transaction")').fetchall()]
+          if trial_transaction_index_cols != ['source','provider_app_id','subscriber_id','store_transaction_id']: raise SystemExit(f'unexpected trial transaction dedupe scope: {trial_transaction_index_cols!r}')
           trial_triggers = {r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='trigger' AND tbl_name IN ('membership_subscription_trials','membership_subscriptions')").fetchall()}
           required_trial_triggers = {'membership_subscription_trials_insert_guard','membership_subscription_trials_identity_immutable','membership_subscription_trials_version_guard','membership_subscription_trials_state_guard','membership_subscription_trials_transition_evidence_guard','membership_subscriptions_trial_failed_sync','membership_subscriptions_trial_converted_sync','membership_subscriptions_trial_expired_sync','membership_subscription_trials_retained'}
           if not required_trial_triggers.issubset(trial_triggers): raise SystemExit(f'missing membership trial triggers: {trial_triggers!r}')
