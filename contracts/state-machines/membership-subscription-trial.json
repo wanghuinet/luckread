@@ -107,12 +107,13 @@
   "reconciliation": {
     "persistence": "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json#membershipSubscriptionTrialTable",
     "webStart": "Only an active Hyperswitch MIT mandate joined to a saved payment method permits W07 to start a web trial; D1-01 creates Subscription and trial record atomically.",
-    "storeStart": "App Store and Play Store trial state is created only by W07 reconciliation of a current RevenueCat snapshot after W02 confirms the App User ID maps to the authenticated subscriber. Client-supplied store claims and webhook raw bodies do not grant access.",
+    "storeStart": "App Store and Play Store trial state is created only by W07 reconciliation of a current RevenueCat snapshot after W02 confirms the App User ID maps to the authenticated subscriber and exact store-product binding. The D1-01 store transaction key is scoped to the verified subscriber and RevenueCat app; it is not assumed globally unique across sandbox users.",
     "firstCharge": "WEB first charge reuses the existing W07 renewal-cycle, D1-04 Order/Payment and Hyperswitch MIT pipeline at trial_ends_at; no separate trial billing service or duplicate subscription is created.",
     "storeConversion": "Store trial-to-paid conversion is reconciled from RevenueCat current entitlement period_type and effective expiration, not charged by W07.",
     "cancellation": "Canceling a web trial in TRIALING or PAYMENT_FAILED suppresses future conversion/retry and preserves access until trial_ends_at. If an already-submitted first payment later succeeds, its verified outcome may still convert CANCELED to CONVERTED.",
     "retry": "A failed first MIT attempt moves WEB Subscription to PAST_DUE and trial record to PAYMENT_FAILED; the same renewal cycle may retry against the same mandate and cannot be expired while retryable.",
     "expiry": "Store trials expire only from W02-verified RevenueCat snapshot; WEB trials expire in the existing bounded renewal scheduler only after checking for pending/submitted/retryable D1-04 cycles.",
-    "noEarlyEntitlement": "No trial, paid conversion or expiry transition may be claimed from client input or an unverified webhook."
+    "noEarlyEntitlement": "No trial, paid conversion or expiry transition may be claimed from client input or an unverified webhook.",
+    "storeIdentity": "RevenueCat store_transaction_id can change across renewals and may collide across sandbox accounts. W07 derives the first trial identity from verified subscriber, source, app ID and the observed transaction ID; subsequent snapshots locate the existing trial by the same subscriber, immutable plan and product when the transaction ID has changed."
   }
 }
