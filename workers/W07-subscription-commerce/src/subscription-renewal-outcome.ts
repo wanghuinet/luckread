@@ -272,7 +272,7 @@ async function auditAppliedSubscriptionTrialConversion(
           'X-LuckRead-Caller': 'W07',
           'X-LuckRead-Transport-Version': '1.0',
           'X-LuckRead-Correlation-Id': 'subscription-trial-conversion:' + subscription.subscription_id,
-          'X-LuckRead-Request-Id': 'req_' + subscription.subscription_id.replace(/[^A-Za-z0-9_-]/g, '').slice(0, 90),
+          'X-LuckRead-Request-Id': 'req_' + subscription.subscription_id.slice('sub_'.length),
           'X-LuckRead-Principal-User-Id': subscription.subscriber_id,
           'content-type': 'application/json; charset=utf-8',
         },
