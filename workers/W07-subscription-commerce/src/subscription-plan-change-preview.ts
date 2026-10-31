@@ -141,10 +141,11 @@ export async function previewSubscriptionPlanChange(
   dependencies: SubscriptionPlanChangePreviewDependencies = {},
 ): Promise<SubscriptionPlanChangePreview> {
   const subscriberId = validatePrincipal(subscriberIdInput);
-  const subscriptionId = subscriberIdInput === '' ? '' : subscriptionIdInput.trim();
+  const subscriptionId = subscriptionIdInput.trim();
   const targetPlanId = targetPlanIdInput.trim();
 
-  if (!isBoundedId(subscriptionId) || subscriptionId.length > MAX_ID ||
+  if (subscriptionId !== subscriptionIdInput || targetPlanId !== targetPlanIdInput ||
+      !isBoundedId(subscriptionId) || subscriptionId.length > MAX_ID ||
       !PLAN_ID_PATTERN.test(targetPlanId)) {
     throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400);
   }
