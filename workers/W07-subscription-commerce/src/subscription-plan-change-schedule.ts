@@ -188,7 +188,7 @@ export async function hasPendingScheduledPlanDowngrade(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     // Migration 0006 is additive. Before it is applied, no scheduled downgrade can exist.
-    if (/no such table:\\s*membership_subscription_scheduled_plan_changes/i.test(message)) return false;
+    if (/no such table:\s*membership_subscription_scheduled_plan_changes/i.test(message)) return false;
     throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
   }
 }
