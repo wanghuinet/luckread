@@ -56,6 +56,10 @@ WHEN NOT EXISTS (
     AND s.version = NEW.expected_subscription_version
     AND s.current_period_start = NEW.current_period_start
     AND s.current_period_end = NEW.current_period_end
+    AND NOT EXISTS (
+      SELECT 1 FROM membership_subscription_plan_changes pc
+      WHERE pc.subscription_id = NEW.subscription_id AND pc.status = 'SCHEDULED'
+    )
     AND NEW.created_at >= s.current_period_start
     AND NEW.created_at < s.current_period_end
     AND sp.owner_type = 'CREATOR'
@@ -180,3 +184,12 @@ END;
 CREATE TRIGGER membership_subscription_plan_change_applications_retained
 BEFORE DELETE ON membership_subscription_plan_change_applications
 BEGIN SELECT RAISE(ABORT, 'paid upgrade application history is retained'); END;
+
+CREATE TRIGGER membership_subscription_plan_changes_block_when_upgrade_reserved
+BEFORE INSERT ON membership_subscription_plan_changes
+WHEN EXISTS (
+  SELECT 1 FROM membership_subscription_plan_change_applications a
+  WHERE a.subscription_id = NEW.subscription_id
+    AND a.status IN ('PENDING_PAYMENT','READY')
+)
+BEGIN SELECT RAISE(ABORT, 'scheduled plan change conflicts with an active paid upgrade checkout'); END;
