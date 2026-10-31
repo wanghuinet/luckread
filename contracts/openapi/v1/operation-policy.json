@@ -2513,13 +2513,15 @@
       "auth": {
         "mode": "permission"
       },
-      "permissions": [],
+      "permissions": [
+        "subscription.change_plan"
+      ],
       "auditRequired": true,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none",
-      "x-luckread-contract-status": "DISCOVERY_DRAFT",
-      "x-luckread-source": "contracts/api/api-inventory.v1.json"
+      "optimisticLockRequired": true,
+      "idempotencyRequired": true,
+      "stateMachine": "membership_subscription_plan_change",
+      "x-luckread-contract-status": "CONTRACTED",
+      "x-luckread-source": "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json; contracts/state-machines/membership-subscription-plan-change.json"
     },
     {
       "operationId": "pauseSubscription",
