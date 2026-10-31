@@ -173,20 +173,6 @@ export async function readScheduledSubscriptionPlanDowngradeForPeriod(
   return change;
 }
 
-/** Returns true while an unpaid immediate upgrade reservation exists for this subscription. */
-export async function hasPendingMembershipPlanUpgrade(
-  db: D1Database,
-  subscriptionId: string,
-): Promise<boolean> {
-  try {
-    const row = await db.prepare(
-      "SELECT attempt_id FROM membership_subscription_plan_change_attempts WHERE subscription_id = ? AND status = 'PENDING_PAYMENT' LIMIT 1",
-    ).bind(subscriptionId).first<{ attempt_id: string }>();
-    return row !== null;
-  } catch {
-    throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
-  }
-}
 
 /** Returns true while a period-end downgrade is scheduled and not yet applied. */
 export async function hasPendingScheduledPlanDowngrade(
