@@ -2522,7 +2522,7 @@
       "optimisticLockRequired": true,
       "stateMachine": "membership_subscription_trial",
       "x-luckread-contract-status": "CONTRACTED",
-      "x-luckread-source": "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json#membershipSubscriptionTrialTable; contracts/state-machines/membership-subscription-trial.json; contracts/openapi/v1/openapi.yaml#post:/memberships/subscriptions/{subscriptionId}/cancel-trial"
+      "x-luckread-source": "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json#trial; contracts/state-machines/membership-subscription-trial.json; contracts/openapi/v1/openapi.yaml#post:/memberships/subscriptions/{subscriptionId}/cancel-trial"
     },
     {
       "operationId": "changeSubscriptionPlan",
@@ -2593,7 +2593,7 @@
       "optimisticLockRequired": false,
       "stateMachine": "membership_subscription_trial",
       "x-luckread-contract-status": "CONTRACTED",
-      "x-luckread-source": "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json#membershipSubscriptionTrialTable; contracts/state-machines/membership-subscription-trial.json; contracts/openapi/v1/openapi.yaml#post:/memberships/subscriptions/trial"
+      "x-luckread-source": "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json#trial; contracts/state-machines/membership-subscription-trial.json; contracts/openapi/v1/openapi.yaml#post:/memberships/subscriptions/trial"
     },
     {
       "operationId": "postNotificationsNotificationIdRead",
