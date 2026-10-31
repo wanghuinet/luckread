@@ -103,9 +103,9 @@ class MemoryD1 {
     if (sql.includes('UPDATE membership_subscriptions SET')) {
       if (!this.subscription) return result(0) as D1Result<T>;
       const [
-        nextPlanId, nextPlanVersion, status, periodStart, periodEnd, updatedAt,
+        nextPlanId, nextPlanVersion, status, periodStart, periodEnd, nextCancelAt, updatedAt,
         subscriptionId, subscriberId, expectedPlanId, expectedPlanVersion, expectedStatus, version,
-        expectedStart, expectedEnd, cancelBoundary, planChangeId, expectedChangeId,
+        expectedStart, expectedEnd, expectedCancelAt, planChangeId, expectedChangeId,
         sourcePlanId, sourcePlanVersion, targetPlanId, targetPlanVersion, effectiveAt,
       ] = values;
       const row = this.subscription;
@@ -113,7 +113,7 @@ class MemoryD1 {
           row.plan_id !== expectedPlanId || row.plan_version !== expectedPlanVersion ||
           row.status !== expectedStatus || row.version !== version ||
           row.current_period_start !== expectedStart || row.current_period_end !== expectedEnd ||
-          (row.cancel_at !== null && row.cancel_at <= String(cancelBoundary))) return result(0) as D1Result<T>;
+          row.cancel_at !== expectedCancelAt) return result(0) as D1Result<T>;
       if (planChangeId !== null && (
         row.scheduled_change_id !== expectedChangeId ||
         row.scheduled_source_plan_id !== sourcePlanId ||
@@ -129,6 +129,7 @@ class MemoryD1 {
         status: status as Subscription['status'],
         current_period_start: String(periodStart),
         current_period_end: String(periodEnd),
+        cancel_at: nextCancelAt === null ? null : String(nextCancelAt),
         updated_at: String(updatedAt),
         version: row.version + 1,
         ...(planChangeId !== null ? {
@@ -297,6 +298,40 @@ describe('D1-04 renewal outcome to D1-01 Subscription synchronization', () => {
       scheduled_change_id: changeId,
       scheduled_target_plan_id: targetPlanId,
     });
+  });
+
+  it('converts an in-flight paid trial after cancellation and retains cancellation at paid-period end', async () => {
+    const e = env(
+      makeCycle(),
+      makeSubscription({ status: 'TRIALING', cancel_at: CYCLE_START }),
+    );
+    const sync = await syncTerminalRenewalCycleToSubscription(e.value, CYCLE_ID, { now: () => new Date(NOW) });
+    expect(sync.outcome).toBe('APPLIED');
+    expect(e.d1_01.subscription).toMatchObject({
+      status: 'ACTIVE',
+      current_period_start: CYCLE_START,
+      current_period_end: CYCLE_END,
+      cancel_at: CYCLE_END,
+      version: 4,
+    });
+    expect(e.d1_04.cycle).toMatchObject({ subscription_sync_state: 'APPLIED' });
+  });
+
+  it('marks a failed in-flight trial payment resolved after cancellation without moving the subscription period', async () => {
+    const e = env(
+      makeCycle({ state: 'FAILED', provider_response_status: 'failed' }),
+      makeSubscription({ status: 'TRIALING', cancel_at: CYCLE_START }),
+    );
+    const sync = await syncTerminalRenewalCycleToSubscription(e.value, CYCLE_ID, { now: () => new Date(NOW) });
+    expect(sync.outcome).toBe('APPLIED');
+    expect(e.d1_01.subscription).toMatchObject({
+      status: 'TRIALING',
+      current_period_start: START,
+      current_period_end: CYCLE_START,
+      cancel_at: CYCLE_START,
+      version: 3,
+    });
+    expect(e.d1_04.cycle).toMatchObject({ subscription_sync_state: 'APPLIED' });
   });
 
   it('does not reactivate canceled or paused subscriptions after a late successful payment', async () => {
