@@ -1251,7 +1251,7 @@ export default {
                 status: input.phase === 'STARTED' ? 'TRIALING' : 'CANCELED',
                 trialEndsAt: input.trialEndsAt,
               },
-        occurredAt: requested ? new Date().toISOString() : input.occurredAt!,
+        occurredAt: requested || cancelRequested ? new Date().toISOString() : input.occurredAt!,
       }
       return requested
         ? persistMembershipPlanMutationRequestAudit(env, event)
