@@ -65,7 +65,7 @@ export type SubscriptionUpgradeCheckoutDependencies = Readonly<{
 
 const PLAN_ID_PATTERN = /^plan_[a-f0-9]{64}$/;
 const IDEMPOTENCY_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
-const MAX_MINOR = 2_147_483_647;
+const MAX_MINOR = Number.MAX_SAFE_INTEGER;
 
 function boundedId(value: unknown): value is string {
   return typeof value === 'string' && value.length > 0 && value.length <= 256 &&
