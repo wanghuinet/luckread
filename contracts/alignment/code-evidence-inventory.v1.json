@@ -4669,6 +4669,47 @@
       ]
     },
     {
+      "evidenceId": "API_OPERATION:startSubscriptionTrial",
+      "subjectType": "API_OPERATION",
+      "subjectId": "startSubscriptionTrial",
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "workers/W01-payload/src/app/api/v1/memberships/subscriptions/[[...segments]]/route.ts",
+        "workers/W01-payload/src/subscription/w07-subscription-client.ts",
+        "workers/W07-subscription-commerce/src/index.ts",
+        "workers/W07-subscription-commerce/src/subscription-trial-runtime.ts",
+        "workers/W07-subscription-commerce/src/subscription-runtime.ts",
+        "workers/W07-subscription-commerce/src/renewal-runtime.ts",
+        "workers/W07-subscription-commerce/src/renewal-scheduler.ts",
+        "workers/W07-subscription-commerce/src/subscription-renewal-outcome.ts",
+        "workers/W06-governance/src/index.ts",
+        "workers/W08-creator/src/authz/casl-policy.ts",
+        "workers/W07-subscription-commerce/migrations/0008_subscription_trial_lifecycle.sql"
+      ],
+      "testRefs": [],
+      "schemaEvidenceRefs": [
+        "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json",
+        "contracts/entity/SUBSCRIPTION-ENTITY-CONTRACT.v1.json",
+        "contracts/entity/entity-field-contract.v1.json",
+        "contracts/state-machines/subscription.json"
+      ],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/openapi/v1/operation-policy.json",
+        "contracts/api/commerce-operation-policy.v1.json",
+        "contracts/api/api-inventory.v1.json",
+        "contracts/authz/permissions.json",
+        "contracts/state-machines/subscription.json"
+      ],
+      "blockers": [
+        "D1-01 migration 0008 remains source-only and has not been applied or postflight inspected.",
+        "W07 Cron/renewal execution remains disabled by the existing activation gate; there is no automatic trial-end processing in production until that gate is admitted.",
+        "Production recurring pricing/tax admission and live Hyperswitch MIT renewal are not verified; first paid trial cycle remains fail-closed under existing renewal gates.",
+        "A trial without an active saved payment mandate expires by time and loses content access; its first renewal remains AWAITING_MANDATE until a valid customer-consented mandate is available.",
+        "Unit/integration, signed successful/failed webhook, replay, missing/revoked mandate, trial-end boundary and security E2E validation are deferred to the consolidated test phase."
+      ]
+    },
+    {
       "evidenceId": "API_OPERATION:transitionAccountState",
       "subjectType": "API_OPERATION",
       "subjectId": "transitionAccountState",

@@ -36,8 +36,10 @@ type SubscriptionOutcomeRow = Readonly<{
   tier: string;
   price_minor: number;
   currency: string;
-  status: 'PENDING' | 'ACTIVE' | 'PAST_DUE' | 'PAUSED' | 'CANCELED' | 'EXPIRED';
-  current_period_start: string; current_period_end: string; cancel_at: string | null;
+  status: 'PENDING' | 'TRIALING' | 'ACTIVE' | 'PAST_DUE' | 'PAUSED' | 'CANCELED' | 'EXPIRED';
+  current_period_start: string; current_period_end: string;
+  trial_started_at: string | null; trial_ends_at: string | null; trial_converted_at: string | null;
+  cancel_at: string | null;
   updated_at: string; version: number;
 }>;
 
@@ -97,15 +99,41 @@ async function readSubscription(
   db: D1Database, subscriptionId: string, subscriberId: string,
 ): Promise<SubscriptionOutcomeRow | null> {
   try {
-    return await db.prepare(
+    const row = await db.prepare(
       'SELECT s.subscription_id, s.subscriber_id, s.plan_id, s.plan_version, s.creator_id, v.billing_interval, ' +
-      'v.tier, v.price_minor, v.currency, s.status, s.current_period_start, s.current_period_end, s.cancel_at, s.updated_at, s.version ' +
+      'v.tier, v.price_minor, v.currency, s.status, s.current_period_start, s.current_period_end, ' +
+      's.trial_started_at, s.trial_ends_at, s.trial_converted_at, s.cancel_at, s.updated_at, s.version ' +
       'FROM membership_subscriptions s INNER JOIN membership_plan_versions v ' +
       'ON v.plan_id = s.plan_id AND v.plan_version = s.plan_version ' +
       'WHERE s.subscription_id = ? AND s.subscriber_id = ? LIMIT 1',
     ).bind(subscriptionId, subscriberId).first<SubscriptionOutcomeRow>();
-  } catch {
-    throw new RenewalOutcomeSyncError('SERVICE_UNAVAILABLE', 503);
+    return row ? {
+      ...row,
+      trial_started_at: row.trial_started_at ?? null,
+      trial_ends_at: row.trial_ends_at ?? null,
+      trial_converted_at: row.trial_converted_at ?? null,
+    } : null;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!/no such column:\s*(?:s\.)?trial_(?:started|ends|converted)_at/i.test(message)) {
+      throw new RenewalOutcomeSyncError('SERVICE_UNAVAILABLE', 503);
+    }
+    // A worker can be deployed ahead of migration 0008. Existing paid renewal
+    // webhook synchronization must continue to work; no trial row can be
+    // created before the migration-backed trial endpoint is available.
+    try {
+      const legacy = await db.prepare(
+        'SELECT s.subscription_id, s.subscriber_id, s.plan_id, s.plan_version, s.creator_id, v.billing_interval, ' +
+        'v.tier, v.price_minor, v.currency, s.status, s.current_period_start, s.current_period_end, ' +
+        's.cancel_at, s.updated_at, s.version ' +
+        'FROM membership_subscriptions s INNER JOIN membership_plan_versions v ' +
+        'ON v.plan_id = s.plan_id AND v.plan_version = s.plan_version ' +
+        'WHERE s.subscription_id = ? AND s.subscriber_id = ? LIMIT 1',
+      ).bind(subscriptionId, subscriberId).first<Omit<SubscriptionOutcomeRow, 'trial_started_at' | 'trial_ends_at' | 'trial_converted_at'>>();
+      return legacy ? { ...legacy, trial_started_at: null, trial_ends_at: null, trial_converted_at: null } : null;
+    } catch {
+      throw new RenewalOutcomeSyncError('SERVICE_UNAVAILABLE', 503);
+    }
   }
 }
 
@@ -213,6 +241,62 @@ async function auditAppliedSubscriptionPlanChange(
   }
 }
 
+
+
+async function auditAppliedSubscriptionTrialConversion(
+  env: OutcomeSyncEnv,
+  cycle: RenewalOutcomeCycle,
+  subscription: SubscriptionOutcomeRow,
+): Promise<boolean> {
+  if (!env.W06_GOVERNANCE || !subscription.trial_started_at || !subscription.trial_ends_at ||
+      !subscription.trial_converted_at || subscription.trial_ends_at !== cycle.cycle_start ||
+      subscription.trial_converted_at !== cycle.cycle_start || cycle.state !== 'SUCCEEDED' ||
+      !cycle.order_id || !cycle.payment_id) return false;
+  const eventId = 'evt_subscription_trial_converted_' + subscription.subscription_id;
+  const payload = {
+    eventId,
+    subscriptionId: subscription.subscription_id,
+    subscriberId: subscription.subscriber_id,
+    creatorId: subscription.creator_id,
+    planId: subscription.plan_id,
+    planVersion: subscription.plan_version,
+    trialStartedAt: subscription.trial_started_at,
+    trialEndsAt: subscription.trial_ends_at,
+    convertedAt: subscription.trial_converted_at,
+    paidPeriodStartedAt: cycle.cycle_start,
+    paidPeriodEndsAt: cycle.cycle_end,
+    orderId: cycle.order_id,
+    paymentId: cycle.payment_id,
+    cycleId: cycle.cycle_id,
+  };
+  try {
+    const response = await env.W06_GOVERNANCE.fetch(new Request(
+      'https://luckread-w06.internal/internal/audit-events/subscription-trial-converted',
+      {
+        method: 'POST',
+        headers: {
+          'X-LuckRead-Caller': 'W07',
+          'X-LuckRead-Transport-Version': '1.0',
+          'X-LuckRead-Correlation-Id': 'subscription-trial-conversion:' + subscription.subscription_id,
+          'X-LuckRead-Request-Id': 'req_' + subscription.subscription_id.slice('sub_'.length),
+          'X-LuckRead-Principal-User-Id': subscription.subscriber_id,
+          'content-type': 'application/json; charset=utf-8',
+        },
+        body: JSON.stringify(payload),
+      },
+    ));
+    const result: unknown = await response.json().catch((): null => null);
+    return (response.status === 200 || response.status === 201) &&
+      !!result && typeof result === 'object' && !Array.isArray(result) &&
+      (result as { eventId?: unknown }).eventId === eventId &&
+      (result as { action?: unknown }).action === 'subscription.trial_converted' &&
+      (result as { targetType?: unknown }).targetType === 'Subscription' &&
+      (result as { targetId?: unknown }).targetId === subscription.subscription_id;
+  } catch {
+    return false;
+  }
+}
+
 async function applySubscriptionUpdate(
   env: OutcomeSyncEnv,
   cycle: RenewalOutcomeCycle,
@@ -224,6 +308,8 @@ async function applySubscriptionUpdate(
   scheduledChange?: ScheduledSubscriptionPlanDowngrade,
 ): Promise<'APPLIED' | 'ALREADY_APPLIED' | 'CAS_LOST'> {
   const updatedAt = strictlyAfter(now, subscription.updated_at);
+  const convertedAt = nextStatus === 'ACTIVE' && subscription.trial_started_at !== null &&
+    subscription.trial_converted_at === null ? nextPeriodStart : subscription.trial_converted_at;
   const nextPlanId = scheduledChange && nextStatus === 'ACTIVE'
     ? scheduledChange.targetPlanId
     : subscription.plan_id;
@@ -235,7 +321,7 @@ async function applySubscriptionUpdate(
       const results = await env.D1_01.batch([
         env.D1_01.prepare(
           'UPDATE membership_subscriptions SET plan_id = ?, plan_version = ?, status = ?, ' +
-          'current_period_start = ?, current_period_end = ?, updated_at = ?, version = version + 1 ' +
+          'current_period_start = ?, current_period_end = ?, trial_converted_at = ?, updated_at = ?, version = version + 1 ' +
           'WHERE subscription_id = ? AND subscriber_id = ? AND plan_id = ? AND plan_version = ? ' +
           'AND status = ? AND version = ? AND current_period_start = ? AND current_period_end = ? ' +
           'AND (cancel_at IS NULL OR cancel_at > ?) ' +
@@ -244,7 +330,7 @@ async function applySubscriptionUpdate(
           'AND c.expected_plan_id = ? AND c.expected_plan_version = ? AND c.target_plan_id = ? ' +
           'AND c.target_plan_version = ? AND c.effective_at = ?)',
         ).bind(
-          nextPlanId, nextPlanVersion, nextStatus, nextPeriodStart, nextPeriodEnd, updatedAt,
+          nextPlanId, nextPlanVersion, nextStatus, nextPeriodStart, nextPeriodEnd, convertedAt, updatedAt,
           cycle.subscription_id, cycle.subscriber_id, subscription.plan_id, subscription.plan_version,
           subscription.status, subscription.version, subscription.current_period_start,
           subscription.current_period_end, cycle.cycle_start,
@@ -275,12 +361,12 @@ async function applySubscriptionUpdate(
     } else {
       const result = await env.D1_01.prepare(
         'UPDATE membership_subscriptions SET plan_id = ?, plan_version = ?, status = ?, ' +
-        'current_period_start = ?, current_period_end = ?, updated_at = ?, version = version + 1 ' +
+        'current_period_start = ?, current_period_end = ?, trial_converted_at = ?, updated_at = ?, version = version + 1 ' +
         'WHERE subscription_id = ? AND subscriber_id = ? AND plan_id = ? AND plan_version = ? ' +
         'AND status = ? AND version = ? AND current_period_start = ? AND current_period_end = ? ' +
         'AND (cancel_at IS NULL OR cancel_at > ?)',
       ).bind(
-        nextPlanId, nextPlanVersion, nextStatus, nextPeriodStart, nextPeriodEnd, updatedAt,
+        nextPlanId, nextPlanVersion, nextStatus, nextPeriodStart, nextPeriodEnd, convertedAt, updatedAt,
         cycle.subscription_id, cycle.subscriber_id, subscription.plan_id, subscription.plan_version,
         subscription.status, subscription.version, subscription.current_period_start,
         subscription.current_period_end, cycle.cycle_start,
@@ -344,6 +430,20 @@ export async function syncTerminalRenewalCycleToSubscription(
     return reconcile(env, cycle, 'SUBSCRIPTION_UPDATED_AT_INVALID', now);
   }
 
+  const trialHasAnyMetadata = subscription.trial_started_at !== null ||
+    subscription.trial_ends_at !== null || subscription.trial_converted_at !== null;
+  if (subscription.status === 'TRIALING' || (trialHasAnyMetadata && subscription.trial_converted_at === null)) {
+    if (!isCanonicalIso(subscription.trial_started_at) ||
+        !isCanonicalIso(subscription.trial_ends_at) ||
+        subscription.trial_started_at >= subscription.trial_ends_at ||
+        subscription.current_period_start !== subscription.trial_started_at ||
+        subscription.current_period_end !== subscription.trial_ends_at ||
+        subscription.trial_ends_at !== cycle.cycle_start ||
+        subscription.trial_converted_at !== null) {
+      return reconcile(env, cycle, 'TRIAL_PERIOD_BOUNDARY_MISMATCH', now);
+    }
+  }
+
   const scheduledChange = await readScheduledSubscriptionPlanDowngradeForPeriod(
     env.D1_01, cycle.subscription_id, cycle.subscriber_id, cycle.cycle_start, true,
   );
@@ -389,6 +489,11 @@ export async function syncTerminalRenewalCycleToSubscription(
   // A matching period proves another concurrent/replayed sync applied this cycle.
   // Preserve any subsequent user lifecycle state; never reactivate canceled/paused subscriptions.
   if (subscription.current_period_start === cycle.cycle_start && subscription.current_period_end === cycle.cycle_end) {
+    if (subscription.trial_started_at && subscription.trial_ends_at === cycle.cycle_start &&
+        subscription.trial_converted_at === cycle.cycle_start &&
+        !(await auditAppliedSubscriptionTrialConversion(env, cycle, subscription))) {
+      return { cycleId: cycle.cycle_id, subscriptionId: cycle.subscription_id, outcome: 'PENDING_RETRY' };
+    }
     if (scheduledChange?.status === 'APPLIED' &&
         !(await auditAppliedSubscriptionPlanChange(env, cycle, scheduledChange))) {
       return { cycleId: cycle.cycle_id, subscriptionId: cycle.subscription_id, outcome: 'PENDING_RETRY' };
@@ -412,7 +517,7 @@ export async function syncTerminalRenewalCycleToSubscription(
   }
 
   if (cycle.state === 'SUCCEEDED') {
-    if (!['ACTIVE', 'PAST_DUE'].includes(subscription.status)) {
+    if (!['TRIALING', 'ACTIVE', 'PAST_DUE'].includes(subscription.status)) {
       return reconcile(env, cycle, 'SUBSCRIPTION_STATE_FORBIDS_REACTIVATION', now);
     }
     if (scheduledChange?.status === 'APPLIED') {
@@ -424,6 +529,12 @@ export async function syncTerminalRenewalCycleToSubscription(
     );
     if (result === 'CAS_LOST') return reconcile(env, cycle, 'SUBSCRIPTION_CAS_LOST', now);
 
+    const appliedSubscription = await readSubscription(env.D1_01, cycle.subscription_id, cycle.subscriber_id);
+    if (appliedSubscription?.trial_started_at && appliedSubscription.trial_ends_at === cycle.cycle_start &&
+        appliedSubscription.trial_converted_at === cycle.cycle_start &&
+        !(await auditAppliedSubscriptionTrialConversion(env, cycle, appliedSubscription))) {
+      return { cycleId: cycle.cycle_id, subscriptionId: cycle.subscription_id, outcome: 'PENDING_RETRY' };
+    }
     if (scheduledChange?.status === 'SCHEDULED') {
       const appliedChange = await readScheduledSubscriptionPlanDowngradeForPeriod(
         env.D1_01, cycle.subscription_id, cycle.subscriber_id, cycle.cycle_start, true,
@@ -450,7 +561,7 @@ export async function syncTerminalRenewalCycleToSubscription(
       outcome: marked ? 'ALREADY_APPLIED' : 'PENDING_RETRY',
     };
   }
-  if (subscription.status !== 'ACTIVE') {
+  if (subscription.status !== 'ACTIVE' && subscription.status !== 'TRIALING') {
     return reconcile(env, cycle, 'SUBSCRIPTION_STATE_FORBIDS_PAST_DUE_TRANSITION', now);
   }
   const result = await applySubscriptionUpdate(
