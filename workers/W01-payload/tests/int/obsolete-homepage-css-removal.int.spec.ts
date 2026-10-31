@@ -8,7 +8,7 @@ const read = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8'
 describe('obsolete homepage CSS removal', () => {
   it('removes unused standalone homepage layouts while preserving active content-feed styles', () => {
     const styles = read('src/app/(frontend)/styles.css')
-    const contentFeed = read('src/app/(frontend)/HomeContentFeed.tsx')
+    const activeFeed = read('src/app/(twitter-clone)/TwitterCloneHomeFeed.tsx')
 
     for (const selector of [
       '.home-shell {',
@@ -34,7 +34,7 @@ describe('obsolete homepage CSS removal', () => {
     expect(styles).toContain('.content-feed {')
     expect(styles).toContain('.content-feed-card {')
     expect(styles).toContain('.content-feed-cover {')
-    expect(contentFeed).toContain('className="content-feed"')
-    expect(contentFeed).toContain('className="content-feed-card"')
+    expect(activeFeed).toContain('LuckReadSocialPostCard')
+    expect(activeFeed).toContain('presentation="x-timeline"')
   })
 })

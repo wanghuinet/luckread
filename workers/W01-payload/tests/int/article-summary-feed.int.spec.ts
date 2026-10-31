@@ -110,8 +110,7 @@ describe('article summary card preview', () => {
     expect(route).not.toContain('fetch(record.bodyRef)')
   })
 
-  it('adds the summary component to both home and discovery cards without replacing the content API', () => {
-    const home = read('src/app/(frontend)/HomeContentFeed.tsx')
+  it('adds the summary component to discovery cards without replacing the content API', () => {
     const discovery = read('src/app/(frontend)/content/ContentBrowsePage.tsx')
     const detail = read('src/app/(twitter-clone)/content/[contentId]/page.tsx')
     const api = read('src/app/api/v1/contents/route.ts')
@@ -119,9 +118,6 @@ describe('article summary card preview', () => {
     const component = read('src/components/ArticleSummaryPreview.tsx')
     const detailClient = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
 
-    expect(home).toContain("import ArticleSummaryPreview from '../../components/ArticleSummaryPreview.js'")
-    expect(home).toContain("item.contentType === 'article'")
-    expect(home).toContain('bodyRef={item.bodyRef}')
     expect(discovery).toContain("import ArticleSummaryPreview from '../../../components/ArticleSummaryPreview.js'")
     expect(discovery).toContain("item.contentType === 'article'")
     expect(discovery).toContain('bodyRef={item.bodyRef}')
@@ -140,7 +136,6 @@ describe('article summary card preview', () => {
     expect(component).not.toContain('ArticleSummaryPreview.module.css')
     expect(existsSync(resolve(process.cwd(), 'src/components/ArticleSummaryPreview.module.css'))).toBe(false)
     expect(component).not.toContain("fetch('/api/v1/contents?'")
-    expect(home).toContain('/content/')
     expect(discovery).toContain('/content/')
   })
 

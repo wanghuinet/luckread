@@ -42,18 +42,18 @@ describe('v1 following feed adapter and home timeline', () => {
     expect(route).toContain('(?:[1-9]|[1-4][0-9]|50)')
   })
 
-  it('switches the home timeline while reusing existing LuckRead cards and styles', () => {
-    const feed = read('src/app/(frontend)/HomeContentFeed.tsx')
-    expect(feed).toContain("useState<'forYou' | 'following'>('forYou')")
-    expect(feed).toContain("'/api/v1/feed/following?limit=6'")
-    expect(feed).toContain('role="tablist"')
-    expect(feed).toContain('role="tab"')
+  it('uses the active server-backed home timeline and following-feed pagination', () => {
+    const feed = read('src/app/(twitter-clone)/TwitterCloneHomeFeed.tsx')
+    const page = read('src/app/(twitter-clone)/home/page.tsx')
+    expect(feed).toContain("export type HomeFeedMode = 'for-you' | 'following'")
+    expect(feed).toContain("feedMode !== 'following'")
+    expect(feed).toContain("'/api/v1/feed/following?'")
     expect(feed).toContain('LuckReadSocialPostCard')
-    expect(feed).toContain('creator-profile-tabs')
+    expect(feed).toContain('presentation="x-timeline"')
     expect(feed).toContain('nextCursor')
     expect(feed).toContain('loadMore')
     expect(feed).toContain('candidateWindowTruncated')
-    expect(feed).toContain('up to 500 followed accounts')
+    expect(page).toContain('<TwitterCloneHomeFeed key={feedMode} initialPage={initialPage} locale={locale} feedMode={feedMode} />')
   })
 })
 
