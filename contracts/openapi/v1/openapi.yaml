@@ -2024,6 +2024,25 @@ paths:
         '200': { description: Subscription. }
         '4XX': { $ref: '#/components/responses/ClientError' }
 
+  /memberships/subscriptions/{subscriptionId}/change-plan-preview:
+    parameters:
+      - name: subscriptionId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ResourceId' }
+    get:
+      tags: [Users]
+      summary: Preview a subscription plan change
+      operationId: previewSubscriptionPlanChange
+      parameters:
+        - name: targetPlanId
+          in: query
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
+      responses:
+        '200': { description: Read-only pre-tax proration estimate and proposed effective date; no subscription or payment state is changed. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
   /memberships/subscriptions/{subscriptionId}/cancel:
     parameters:
       - name: subscriptionId
