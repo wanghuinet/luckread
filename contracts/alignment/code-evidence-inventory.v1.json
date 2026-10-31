@@ -4889,6 +4889,94 @@
         "workers/W01-payload/src/collections/Users.ts:field:username"
       ],
       "blockers": []
+    },
+    {
+      "evidenceId": "API_OPERATION:startMembershipTrial",
+      "subjectType": "API_OPERATION",
+      "subjectId": "startMembershipTrial",
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "workers/W01-payload/src/app/api/v1/memberships/subscriptions/[[...segments]]/route.ts",
+        "workers/W01-payload/src/moderation/w06-moderation-client.ts",
+        "workers/W07-subscription-commerce/src/index.ts",
+        "workers/W07-subscription-commerce/src/membership-trial-runtime.ts",
+        "workers/W07-subscription-commerce/src/renewal-runtime.ts",
+        "workers/W07-subscription-commerce/src/renewal-scheduler.ts",
+        "workers/W07-subscription-commerce/src/subscription-renewal-outcome.ts",
+        "workers/W07-subscription-commerce/src/revenuecat-subscriber-reconciliation-runtime.ts",
+        "workers/W07-subscription-commerce/src/revenuecat-subscriber-reconciliation.ts",
+        "workers/W07-subscription-commerce/src/revenuecat-subscriber-api.ts",
+        "workers/W07-subscription-commerce/migrations/0007_membership_trials.sql",
+        "workers/W06-governance/src/index.ts",
+        "workers/W08-creator/src/authz/casl-policy.ts"
+      ],
+      "testRefs": [
+        "workers/W01-payload/tests/int/subscription-v1-adapter.int.spec.ts",
+        "workers/W08-creator/src/authz/casl-policy.test.ts",
+        "workers/W07-subscription-commerce/src/renewal-scheduler.test.ts",
+        ".github/workflows/w07-subscription-runtime-ci.yml"
+      ],
+      "schemaEvidenceRefs": [
+        "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json#membershipSubscriptionTrialTable",
+        "workers/W07-subscription-commerce/migrations/0007_membership_trials.sql"
+      ],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json",
+        "contracts/openapi/v1/operation-policy.json",
+        "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json",
+        "contracts/state-machines/membership-subscription-trial.json",
+        "contracts/alignment/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "D1-01 migration 0007 is a reviewed code candidate only and has not been applied to the remote database.",
+        "Trial lifecycle, CASL, scheduler and migration regression cases were authored but intentionally not executed during this feature-first pass; full unit, CI and signed production E2E validation remain deferred until feature implementation is complete.",
+        "Store trial synchronization depends on a W02-authenticated RevenueCat current-customer snapshot and exact product binding; the end-to-end store purchase, cancellation and conversion flow remains for the later validation phase."
+      ]
+    },
+    {
+      "evidenceId": "API_OPERATION:cancelMembershipTrial",
+      "subjectType": "API_OPERATION",
+      "subjectId": "cancelMembershipTrial",
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "workers/W01-payload/src/app/api/v1/memberships/subscriptions/[[...segments]]/route.ts",
+        "workers/W01-payload/src/moderation/w06-moderation-client.ts",
+        "workers/W07-subscription-commerce/src/index.ts",
+        "workers/W07-subscription-commerce/src/membership-trial-runtime.ts",
+        "workers/W07-subscription-commerce/src/renewal-runtime.ts",
+        "workers/W07-subscription-commerce/src/renewal-scheduler.ts",
+        "workers/W07-subscription-commerce/src/subscription-renewal-outcome.ts",
+        "workers/W07-subscription-commerce/src/revenuecat-subscriber-reconciliation-runtime.ts",
+        "workers/W07-subscription-commerce/src/revenuecat-subscriber-reconciliation.ts",
+        "workers/W07-subscription-commerce/src/revenuecat-subscriber-api.ts",
+        "workers/W07-subscription-commerce/migrations/0007_membership_trials.sql",
+        "workers/W06-governance/src/index.ts",
+        "workers/W08-creator/src/authz/casl-policy.ts"
+      ],
+      "testRefs": [
+        "workers/W01-payload/tests/int/subscription-v1-adapter.int.spec.ts",
+        "workers/W08-creator/src/authz/casl-policy.test.ts",
+        "workers/W07-subscription-commerce/src/renewal-scheduler.test.ts",
+        ".github/workflows/w07-subscription-runtime-ci.yml"
+      ],
+      "schemaEvidenceRefs": [
+        "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json#membershipSubscriptionTrialTable",
+        "workers/W07-subscription-commerce/migrations/0007_membership_trials.sql"
+      ],
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json",
+        "contracts/openapi/v1/operation-policy.json",
+        "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json",
+        "contracts/state-machines/membership-subscription-trial.json",
+        "contracts/alignment/api-inventory.v1.json"
+      ],
+      "blockers": [
+        "D1-01 migration 0007 is a reviewed code candidate only and has not been applied to the remote database.",
+        "Trial lifecycle, CASL, scheduler and migration regression cases were authored but intentionally not executed during this feature-first pass; full unit, CI and signed production E2E validation remain deferred until feature implementation is complete.",
+        "Store trial synchronization depends on a W02-authenticated RevenueCat current-customer snapshot and exact product binding; the end-to-end store purchase, cancellation and conversion flow remains for the later validation phase."
+      ]
     }
   ]
 }
