@@ -7,6 +7,7 @@ const EXPECTED_DATABASE_ID = '2f80471e-3756-49f9-8db1-7707a433ad64'
 const BASELINE_MIGRATION = '0001_membership_subscriptions.sql'
 const VERSION_MIGRATION = '0002_subscription_version_cas.sql'
 const PLAN_MIGRATION = '0003_membership_plans.sql'
+const REVENUECAT_MIGRATION = '0004_revenuecat_membership_product_bindings.sql'
 const PLAN_CHANGE_MIGRATION = '0005_subscription_plan_changes.sql'
 
 const EXPECTED_INDEXES = [
@@ -166,7 +167,7 @@ export function verifyD1SubscriptionPreflight({
 
   const appliedMigrations = [...new Set(collectObjects(migrationState)
     .filter((item) => item.name === BASELINE_MIGRATION || item.name === VERSION_MIGRATION ||
-      item.name === PLAN_MIGRATION || item.name === PLAN_CHANGE_MIGRATION)
+      item.name === PLAN_MIGRATION || item.name === REVENUECAT_MIGRATION || item.name === PLAN_CHANGE_MIGRATION)
     .map((item) => item.name))].sort()
   if (!appliedMigrations.includes(BASELINE_MIGRATION)) {
     fail('baseline migration 0001 is not recorded as applied')
@@ -227,8 +228,11 @@ export function verifyD1SubscriptionPreflight({
   const hasOnlyBaseline = JSON.stringify(appliedMigrations) === JSON.stringify([BASELINE_MIGRATION])
   const hasVersionMigration = JSON.stringify(appliedMigrations) === JSON.stringify([BASELINE_MIGRATION, VERSION_MIGRATION])
   const hasPlanMigration = JSON.stringify(appliedMigrations) === JSON.stringify([BASELINE_MIGRATION, VERSION_MIGRATION, PLAN_MIGRATION])
+  const hasRevenueCatMigration = JSON.stringify(appliedMigrations) === JSON.stringify([
+    BASELINE_MIGRATION, VERSION_MIGRATION, PLAN_MIGRATION, REVENUECAT_MIGRATION,
+  ])
   const hasPlanChangeMigration = JSON.stringify(appliedMigrations) === JSON.stringify([
-    BASELINE_MIGRATION, VERSION_MIGRATION, PLAN_MIGRATION, PLAN_CHANGE_MIGRATION,
+    BASELINE_MIGRATION, VERSION_MIGRATION, PLAN_MIGRATION, REVENUECAT_MIGRATION, PLAN_CHANGE_MIGRATION,
   ])
 
   if (hasOnlyBaseline && legacySubscriptionShape && noPlanTables && noPlanChangeTable) {
@@ -236,8 +240,10 @@ export function verifyD1SubscriptionPreflight({
   } else if (hasVersionMigration && currentSubscriptionShape && noPlanTables && noPlanChangeTable) {
     // The runner applies the remaining ordered D1-01 migrations.
     migrationAction = 'apply'
-  } else if (hasPlanMigration && currentSubscriptionShape && allPlanTablesPresent && noPlanChangeTable) {
-    // MembershipPlan is present; only the scheduled-plan-change table remains.
+  } else if ((hasPlanMigration || hasRevenueCatMigration) && currentSubscriptionShape &&
+      allPlanTablesPresent && noPlanChangeTable) {
+    // MembershipPlan and optional RevenueCat bindings are present; the
+    // scheduled-plan-change migration remains pending.
     migrationAction = 'apply'
   } else if (hasPlanChangeMigration && currentSubscriptionShape && allPlanTablesPresent && allPlanChangeObjectsPresent) {
     migrationAction = 'skip'
