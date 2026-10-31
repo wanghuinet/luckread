@@ -289,7 +289,6 @@ test('workflow is manual-only, gates exact SHA/name/confirmation, and never depl
   assert.match(workflow, /0004_subscription_renewal_cycles\.sql/)
   assert.match(workflow, /0005_revenuecat_webhook_inbox\.sql/)
   assert.ok(workflow.includes('PRAGMA table_info("payment_method_revocation_requests")'))
-  assert.match(workflow, /PRAGMA table_info\\(\"payment_method_revocation_requests\"\\)/)
   assert.match(paymentMethodRevocationMigration, /CREATE TABLE payment_method_revocation_requests/)
   assert.match(paymentMethodRevocationMigration, /payment_method_revocation_request_completion_guard/)
   assert.match(workflow, /0006_refunds_billing_documents\.sql/)
