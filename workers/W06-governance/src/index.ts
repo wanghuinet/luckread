@@ -403,7 +403,7 @@ type SubscriptionPlanChangeRequestAuditInput = {
   subscriberId: string
   subscriptionId: string
   targetPlanId: string
-  changeType: 'UPGRADE' | 'DOWNGRADE_SCHEDULE'
+  changeType: 'UPGRADE' | 'DOWNGRADE_SCHEDULE' | 'BILLING_INTERVAL_CHANGE_SCHEDULE'
   expectedEtag: string
   requestedAt: string
 }
@@ -423,9 +423,10 @@ type SubscriptionPlanUpgradeAppliedAuditInput = {
   occurredAt: string
 }
 
-type SubscriptionPlanDowngradeAppliedAuditInput = {
+type SubscriptionPlanChangeAppliedAuditInput = {
   eventId: string
   changeId: string
+  changeType: 'DOWNGRADE' | 'BILLING_INTERVAL_CHANGE'
   subscriberId: string
   subscriptionId: string
   fromPlanId: string
@@ -486,11 +487,15 @@ function parseSubscriptionPlanChangeRequestAuditInput(value: unknown): Subscript
   if (
     typeof body.attemptId !== 'string' ||
     (body.changeType === 'UPGRADE' && !/^suca_[a-f0-9]{64}$/.test(body.attemptId)) ||
-    (body.changeType === 'DOWNGRADE_SCHEDULE' && !/^sudc_[a-f0-9]{64}$/.test(body.attemptId)) ||
-    (body.changeType !== 'UPGRADE' && body.changeType !== 'DOWNGRADE_SCHEDULE') ||
+    ((body.changeType === 'DOWNGRADE_SCHEDULE' || body.changeType === 'BILLING_INTERVAL_CHANGE_SCHEDULE') &&
+      !/^sudc_[a-f0-9]{64}$/.test(body.attemptId)) ||
+    (body.changeType !== 'UPGRADE' && body.changeType !== 'DOWNGRADE_SCHEDULE' &&
+      body.changeType !== 'BILLING_INTERVAL_CHANGE_SCHEDULE') ||
     body.eventId !== (body.changeType === 'UPGRADE'
       ? 'evt_subscription_plan_upgrade_requested_' + body.attemptId
-      : 'evt_subscription_plan_downgrade_scheduled_' + body.attemptId) ||
+      : body.changeType === 'DOWNGRADE_SCHEDULE'
+        ? 'evt_subscription_plan_downgrade_scheduled_' + body.attemptId
+        : 'evt_subscription_billing_interval_change_requested_' + body.attemptId) ||
     typeof body.subscriberId !== 'string' || body.subscriberId.length < 1 || body.subscriberId.length > 256 ||
     body.subscriberId.trim() !== body.subscriberId || /[\u0000-\u001f\u007f]/.test(body.subscriberId) ||
     typeof body.subscriptionId !== 'string' || body.subscriptionId.length < 1 || body.subscriptionId.length > 256 ||
@@ -530,16 +535,19 @@ function parseSubscriptionPlanUpgradeAppliedAuditInput(value: unknown): Subscrip
   ) throw new Error('INVALID_SUBSCRIPTION_PLAN_UPGRADE_APPLIED_AUDIT')
   return body as SubscriptionPlanUpgradeAppliedAuditInput
 }
-function parseSubscriptionPlanDowngradeAppliedAuditInput(value: unknown): SubscriptionPlanDowngradeAppliedAuditInput {
+function parseSubscriptionPlanChangeAppliedAuditInput(value: unknown): SubscriptionPlanChangeAppliedAuditInput {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('INVALID_SUBSCRIPTION_PLAN_DOWNGRADE_APPLIED_AUDIT')
   const body = value as Record<string, unknown>
-  const allowed = new Set(['eventId', 'changeId', 'subscriberId', 'subscriptionId', 'fromPlanId', 'fromPlanVersion', 'toPlanId', 'toPlanVersion', 'expectedSubscriptionVersion', 'appliedSubscriptionVersion', 'effectiveAt', 'occurredAt'])
+  const allowed = new Set(['eventId', 'changeId', 'changeType', 'subscriberId', 'subscriptionId', 'fromPlanId', 'fromPlanVersion', 'toPlanId', 'toPlanVersion', 'expectedSubscriptionVersion', 'appliedSubscriptionVersion', 'effectiveAt', 'occurredAt'])
   if (Object.keys(body).length !== allowed.size || Object.keys(body).some((key) => !allowed.has(key))) {
     throw new Error('INVALID_SUBSCRIPTION_PLAN_DOWNGRADE_APPLIED_AUDIT')
   }
   if (
     typeof body.changeId !== 'string' || !/^sudc_[a-f0-9]{64}$/.test(body.changeId) ||
-    body.eventId !== 'evt_subscription_plan_downgrade_applied_' + body.changeId ||
+    (body.changeType !== 'DOWNGRADE' && body.changeType !== 'BILLING_INTERVAL_CHANGE') ||
+    body.eventId !== (body.changeType === 'DOWNGRADE'
+      ? 'evt_subscription_plan_downgrade_applied_' + body.changeId
+      : 'evt_subscription_billing_interval_changed_' + body.changeId) ||
     typeof body.subscriberId !== 'string' || body.subscriberId.length < 1 || body.subscriberId.length > 256 ||
     body.subscriberId.trim() !== body.subscriberId || /[\u0000-\u001f\u007f]/.test(body.subscriberId) ||
     typeof body.subscriptionId !== 'string' || body.subscriptionId.length < 1 || body.subscriptionId.length > 256 ||
@@ -556,7 +564,7 @@ function parseSubscriptionPlanDowngradeAppliedAuditInput(value: unknown): Subscr
     typeof body.occurredAt !== 'string' || Number.isNaN(Date.parse(body.occurredAt)) ||
     new Date(body.occurredAt).toISOString() !== body.occurredAt
   ) throw new Error('INVALID_SUBSCRIPTION_PLAN_DOWNGRADE_APPLIED_AUDIT')
-  return body as SubscriptionPlanDowngradeAppliedAuditInput
+  return body as SubscriptionPlanChangeAppliedAuditInput
 }
 
 
@@ -1017,7 +1025,9 @@ export default {
         actor: { actorId: principal.userId, actorType: 'user', layer: principal.layer as AuditEvent['actor']['layer'] },
         action: input.changeType === 'UPGRADE'
           ? 'subscription.plan_upgrade.requested'
-          : 'subscription.plan_downgrade.requested',
+          : input.changeType === 'DOWNGRADE_SCHEDULE'
+            ? 'subscription.plan_downgrade.requested'
+            : 'subscription.billing_interval_change.requested',
         targetType: 'Subscription',
         targetId: input.subscriptionId,
         before: { expectedEtag: input.expectedEtag },
@@ -1031,20 +1041,22 @@ export default {
       return persistIdempotentSubscriptionPlanChangeRequestAudit(env, event)
     }
 
-    if (request.method === 'POST' && url.pathname === '/internal/audit-events/subscription-plan-downgrade-applied') {
+    if (request.method === 'POST' && url.pathname === '/internal/audit-events/subscription-plan-change-applied') {
       let transport: ReturnType<typeof requireW07Transport>
       try { transport = requireW07Transport(request) }
       catch (error) { return errorResponse(error, request.headers.get('X-LuckRead-Request-Id')?.trim()) }
-      let input: SubscriptionPlanDowngradeAppliedAuditInput
-      try { input = parseSubscriptionPlanDowngradeAppliedAuditInput(await readBoundedAuditJson(request, 4096)) }
-      catch { return json({ error: 'INVALID_SUBSCRIPTION_PLAN_DOWNGRADE_APPLIED_AUDIT' }, 400) }
+      let input: SubscriptionPlanChangeAppliedAuditInput
+      try { input = parseSubscriptionPlanChangeAppliedAuditInput(await readBoundedAuditJson(request, 4096)) }
+      catch { return json({ error: 'INVALID_SUBSCRIPTION_PLAN_CHANGE_APPLIED_AUDIT' }, 400) }
       if (input.subscriberId !== transport.userId) return json({ error: 'PERMISSION_DENIED' }, 403)
       const event: AuditEvent = {
         eventId: input.eventId,
         requestId: transport.requestId,
         traceId: transport.correlationId,
         actor: { actorId: 'W07', actorType: 'service' },
-        action: 'subscription.plan_downgraded',
+        action: input.changeType === 'DOWNGRADE'
+          ? 'subscription.plan_downgraded'
+          : 'subscription.billing_interval_changed',
         targetType: 'Subscription',
         targetId: input.subscriptionId,
         before: {
@@ -1059,6 +1071,7 @@ export default {
           planVersion: input.toPlanVersion,
           subscriptionVersion: input.appliedSubscriptionVersion,
           changeId: input.changeId,
+          changeType: input.changeType,
           effectiveAt: input.effectiveAt,
         },
         occurredAt: input.occurredAt,
