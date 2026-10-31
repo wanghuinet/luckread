@@ -184,13 +184,13 @@ describe('v1 subscription adapter', () => {
     expect(writeGuard).toBeGreaterThan(-1)
     expect(transportCall).toBeGreaterThan(writeGuard)
     expect(route).toContain("'SERVICE_UNAVAILABLE'")
-    expect(route).toContain('verified payment-provider synchronization flow')
+    expect(route).toContain('verified subscription mutation flow')
     expect(route).not.toContain("requireHeader(request, 'Idempotency-Key')")
     expect(route).not.toContain("requireHeader(request, 'If-Match')")
   })
 
   it('keeps subscription management read-only while verified provider synchronization is gated', () => {
-    expect(route).toContain('Subscription writes are disabled until a verified payment-provider synchronization flow is available.')
+    expect(route).toContain('Subscription writes are disabled until a verified subscription mutation flow is available.')
     expect(mySubscriptionsPage).toContain('mutationsUnavailable')
     expect(mySubscriptionsPage).not.toContain("transition(item, 'pause')")
     expect(mySubscriptionsPage).not.toContain("transition(item, 'resume')")
