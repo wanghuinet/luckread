@@ -68,6 +68,12 @@
       "to": "EXPIRED",
       "actor": "system",
       "guard": "The renewal retry budget is exhausted or no valid MIT mandate remains, and trial_ends_at has passed."
+    },
+    {
+      "from": "CANCELED",
+      "to": "CONVERTED",
+      "actor": "system|payment|store",
+      "guard": "A first paid period already submitted before the cancellation request is subsequently confirmed by a signed Hyperswitch outcome or W02-verified RevenueCat NORMAL period; this records the unavoidable payment race and does not initiate a new charge."
     }
   ],
   "x-forbidden": [
@@ -89,10 +95,6 @@
     },
     {
       "from": "EXPIRED",
-      "to": "CONVERTED"
-    },
-    {
-      "from": "CANCELED",
       "to": "CONVERTED"
     }
   ],
