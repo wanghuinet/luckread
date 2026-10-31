@@ -136,6 +136,7 @@ function validTerminalCycle(cycle: RenewalOutcomeCycle): boolean {
       !isBoundedId(cycle.subscription_id) || !isBoundedId(cycle.subscriber_id) ||
       !isBoundedId(cycle.plan_id) || !Number.isSafeInteger(cycle.plan_version) || cycle.plan_version < 1 ||
       !isCanonicalIso(cycle.cycle_start) || !isCanonicalIso(cycle.cycle_end) ||
+      (cycle.billing_interval !== 'MONTHLY' && cycle.billing_interval !== 'YEARLY') ||
       cycle.cycle_end <= cycle.cycle_start ||
       !Number.isSafeInteger(cycle.amount_minor) || (cycle.amount_minor ?? 0) < 1 ||
       !isBoundedId(cycle.order_id, 255) || !cycle.payment_id || !PAYMENT_ID_PATTERN.test(cycle.payment_id) ||
@@ -239,6 +240,7 @@ async function applySubscriptionUpdate(
           'AND (cancel_at IS NULL OR cancel_at > ?) ' +
           "AND EXISTS (SELECT 1 FROM membership_subscription_scheduled_plan_changes c WHERE c.change_id = ? " +
           "AND c.status = 'SCHEDULED' AND c.subscription_id = ? AND c.subscriber_id = ? " +
+          'AND c.change_type = ? ' +
           'AND c.expected_plan_id = ? AND c.expected_plan_version = ? AND c.target_plan_id = ? ' +
           'AND c.target_plan_version = ? AND c.effective_at = ?)',
         ).bind(
@@ -249,13 +251,14 @@ async function applySubscriptionUpdate(
           scheduledChange.changeId, scheduledChange.subscriptionId, scheduledChange.subscriberId,
           scheduledChange.expectedPlanId, scheduledChange.expectedPlanVersion,
           scheduledChange.targetPlanId, scheduledChange.targetPlanVersion, scheduledChange.effectiveAt,
+          scheduledChange.changeType,
         ),
         env.D1_01.prepare(
           "UPDATE membership_subscription_scheduled_plan_changes SET status = 'APPLIED', " +
           'applied_at = ?, applied_subscription_version = ?, updated_at = ?, version = version + 1 ' +
           "WHERE change_id = ? AND status = 'SCHEDULED' AND subscription_id = ? AND subscriber_id = ? " +
           'AND expected_plan_id = ? AND expected_plan_version = ? AND target_plan_id = ? ' +
-          'AND target_plan_version = ? AND effective_at = ? ' +
+          'AND target_plan_version = ? AND effective_at = ? AND change_type = ? ' +
           'AND EXISTS (SELECT 1 FROM membership_subscriptions s WHERE s.subscription_id = ? ' +
           'AND s.subscriber_id = ? AND s.plan_id = ? AND s.plan_version = ? ' +
           'AND s.version = ? AND s.current_period_start = ? AND s.current_period_end = ?)',
@@ -264,6 +267,7 @@ async function applySubscriptionUpdate(
           scheduledChange.changeId, scheduledChange.subscriptionId, scheduledChange.subscriberId,
           scheduledChange.expectedPlanId, scheduledChange.expectedPlanVersion,
           scheduledChange.targetPlanId, scheduledChange.targetPlanVersion, scheduledChange.effectiveAt,
+          scheduledChange.changeType,
           cycle.subscription_id, cycle.subscriber_id, nextPlanId, nextPlanVersion,
           subscription.version + 1, nextPeriodStart, nextPeriodEnd,
         ),
