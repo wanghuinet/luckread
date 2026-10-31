@@ -1917,6 +1917,7 @@ paths:
                   type: array
                   maxItems: 20
                   items: { type: string, minLength: 1, maxLength: 180 }
+                trialDays: { type: integer, minimum: 0, maximum: 90, default: 0 }
       responses:
         '201':
           description: Private draft created.
@@ -1942,6 +1943,7 @@ paths:
                       priceMinor: { type: integer, minimum: 0, maximum: 2147483647 }
                       currency: { type: string, pattern: '^[A-Z]{3}$' }
                       benefits: { type: array, items: { type: string } }
+                      trialDays: { type: integer, minimum: 0, maximum: 90 }
                       status: { type: string, const: DRAFT }
                       visibility: { type: string, const: PRIVATE }
                       version: { type: integer, const: 1 }
@@ -3637,8 +3639,6 @@ paths:
                               type: array
                               items: { type: string, minLength: 1, maxLength: 180 }
                             trialDays: { type: integer, minimum: 0, maximum: 90 }
-                      trialDays: { type: integer, minimum: 0, maximum: 90 }
-                trialDays: { type: integer, minimum: 0, maximum: 90, default: 0 }
                             createdAt: { type: string, format: date-time }
                             updatedAt: { type: string, format: date-time }
                       limit: { type: integer, minimum: 1, maximum: 50 }
@@ -4402,6 +4402,7 @@ paths:
                   maxItems: 20
                   uniqueItems: true
                   items: { type: string, minLength: 1, maxLength: 180 }
+                trialDays: { type: integer, minimum: 0, maximum: 90, default: 0 }
       responses:
         '200':
           description: Updated current plan version or exact successful retry.
@@ -4418,7 +4419,7 @@ paths:
                 properties:
                   data:
                     type: object
-                    required: [planId, creatorId, planVersion, name, tier, billingInterval, priceMinor, currency, benefits, status, visibility, version, etag, replayed, createdAt, updatedAt]
+                    required: [planId, creatorId, planVersion, name, tier, billingInterval, priceMinor, currency, benefits, trialDays, status, visibility, version, etag, replayed, createdAt, updatedAt]
                     properties:
                       planId: { type: string, pattern: '^plan_[a-f0-9]{64}$' }
                       creatorId: { $ref: '#/components/schemas/ResourceId' }
@@ -4432,6 +4433,7 @@ paths:
                         type: array
                         maxItems: 20
                         items: { type: string, minLength: 1, maxLength: 180 }
+                      trialDays: { type: integer, minimum: 0, maximum: 90 }
                       status: { type: string, enum: [DRAFT, ACTIVE, PAUSED] }
                       visibility: { type: string, enum: [PRIVATE, PUBLIC] }
                       version: { type: integer, minimum: 1 }
@@ -4573,6 +4575,7 @@ paths:
                         type: array
                         maxItems: 20
                         items: { type: string, minLength: 1, maxLength: 180 }
+                      trialDays: { type: integer, minimum: 0, maximum: 90 }
                       createdAt: { type: string, format: date-time }
                       updatedAt: { type: string, format: date-time }
                   requestId: { $ref: '#/components/schemas/RequestId' }
