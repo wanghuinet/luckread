@@ -4918,7 +4918,7 @@
         "workers/W06-governance/src/index.test.ts"
       ],
       "schemaEvidenceRefs": [
-        "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json#membershipSubscriptionTrialTable",
+        "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json#trial",
         "workers/W07-subscription-commerce/migrations/0007_membership_trials.sql"
       ],
       "sourceRefs": [
@@ -4963,7 +4963,7 @@
         "workers/W06-governance/src/index.test.ts"
       ],
       "schemaEvidenceRefs": [
-        "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json#membershipSubscriptionTrialTable",
+        "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json#trial",
         "workers/W07-subscription-commerce/migrations/0007_membership_trials.sql"
       ],
       "sourceRefs": [
