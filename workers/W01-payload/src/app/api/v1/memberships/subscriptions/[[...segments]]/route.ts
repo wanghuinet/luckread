@@ -88,7 +88,7 @@ async function authorizeSubscriptionPlanChange(
     body: JSON.stringify({
       action: 'subscription.change_plan',
       resourceType: 'Subscription',
-      resourceAttributes: { ownerId: principalUserId },
+      resourceAttributes: { ownerId: principalUserId, subscriptionId },
     }),
   })
   const response = await callW08Creator(permissionRequest, '/internal/authz/check-permission', 'POST')
@@ -139,6 +139,9 @@ async function auditSubscriptionPlanUpgradeRequest(
     return errorResponse(503, 'AUDIT_UNAVAILABLE', 'Subscription plan change request could not be durably audited')
   }
   const value: unknown = await response.json().catch((): null => null)
+  if (response.status === 409) {
+    return errorResponse(409, 'CONFLICT', 'Idempotency key conflicts with an existing subscription upgrade request')
+  }
   const result = value && typeof value === 'object' && !Array.isArray(value)
     ? value as { eventId?: unknown; action?: unknown; targetType?: unknown; targetId?: unknown }
     : null
