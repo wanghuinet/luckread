@@ -20,6 +20,7 @@ type ScheduledPlanChangeRow = Readonly<{
   change_id: string;
   subscriber_id: string;
   subscription_id: string;
+  change_type: 'DOWNGRADE' | 'BILLING_INTERVAL_CHANGE';
   expected_subscription_version: number;
   expected_plan_id: string;
   expected_plan_version: number;
@@ -39,6 +40,7 @@ export type ScheduledSubscriptionPlanDowngrade = Readonly<{
   changeId: string;
   subscriberId: string;
   subscriptionId: string;
+  changeType: 'DOWNGRADE' | 'BILLING_INTERVAL_CHANGE';
   expectedSubscriptionVersion: number;
   expectedPlanId: string;
   expectedPlanVersion: number;
@@ -54,6 +56,7 @@ export type ScheduledSubscriptionPlanDowngradeResult = Readonly<{
   changeId: string;
   subscriptionId: string;
   status: 'SCHEDULED' | 'APPLIED';
+  changeType: 'DOWNGRADE' | 'BILLING_INTERVAL_CHANGE';
   currentPlanId: string;
   targetPlanId: string;
   targetPlanVersion: number;
@@ -90,6 +93,7 @@ function parseRequest(value: unknown): string {
 
 function toScheduledChange(row: ScheduledPlanChangeRow): ScheduledSubscriptionPlanDowngrade {
   if (!CHANGE_ID_PATTERN.test(row.change_id) ||
+      (row.change_type !== 'DOWNGRADE' && row.change_type !== 'BILLING_INTERVAL_CHANGE') ||
       !isBoundedText(row.subscriber_id) || !isBoundedText(row.subscription_id) ||
       !Number.isSafeInteger(row.expected_subscription_version) || row.expected_subscription_version < 1 ||
       !PLAN_ID_PATTERN.test(row.expected_plan_id) ||
@@ -108,6 +112,7 @@ function toScheduledChange(row: ScheduledPlanChangeRow): ScheduledSubscriptionPl
     changeId: row.change_id,
     subscriberId: row.subscriber_id,
     subscriptionId: row.subscription_id,
+    changeType: row.change_type,
     expectedSubscriptionVersion: row.expected_subscription_version,
     expectedPlanId: row.expected_plan_id,
     expectedPlanVersion: row.expected_plan_version,
@@ -127,7 +132,7 @@ async function readScheduledChangeByIdempotency(
 ): Promise<ScheduledPlanChangeRow | null> {
   try {
     return await db.prepare(
-      'SELECT change_id, subscriber_id, subscription_id, expected_subscription_version, expected_plan_id, ' +
+      'SELECT change_id, subscriber_id, subscription_id, change_type, expected_subscription_version, expected_plan_id, ' +
       'expected_plan_version, target_plan_id, target_plan_version, effective_at, idempotency_key_hash, status, ' +
       'applied_at, applied_subscription_version, created_at, updated_at, version ' +
       'FROM membership_subscription_scheduled_plan_changes WHERE subscriber_id = ? AND idempotency_key_hash = ? LIMIT 1',
@@ -147,7 +152,7 @@ export async function readScheduledSubscriptionPlanDowngradeForPeriod(
   let row: ScheduledPlanChangeRow | null;
   try {
     row = await db.prepare(
-      'SELECT change_id, subscriber_id, subscription_id, expected_subscription_version, expected_plan_id, ' +
+      'SELECT change_id, subscriber_id, subscription_id, change_type, expected_subscription_version, expected_plan_id, ' +
       'expected_plan_version, target_plan_id, target_plan_version, effective_at, idempotency_key_hash, status, ' +
       'applied_at, applied_subscription_version, created_at, updated_at, version ' +
       'FROM membership_subscription_scheduled_plan_changes WHERE subscription_id = ? AND effective_at = ? ' +
@@ -242,13 +247,14 @@ export async function readScheduledDowngradeTargetPlan(
  * existing renewal pipeline confirms the next cycle payment and CAS-updates
  * the authoritative Subscription period.
  */
-export async function scheduleSubscriptionPlanDowngrade(
+async function scheduleSubscriptionPlanChange(
   env: ScheduledPlanDowngradeEnv,
   subscriberIdInput: string,
   subscriptionIdInput: string,
   input: unknown,
   idempotencyKeyInput: string | null,
   ifMatchInput: string | null,
+  expectedChangeType: 'DOWNGRADE' | 'BILLING_INTERVAL_CHANGE',
   dependencies: ScheduledPlanDowngradeDependencies = {},
 ): Promise<ScheduledSubscriptionPlanDowngradeResult> {
   const subscriberId = validatePrincipal(subscriberIdInput);
@@ -257,8 +263,11 @@ export async function scheduleSubscriptionPlanDowngrade(
   const targetPlanId = parseRequest(input);
   const idempotencyKey = validateIdempotencyKey(idempotencyKeyInput);
   const ifMatch = validateIfMatch(ifMatchInput);
+  const keyNamespace = expectedChangeType === 'DOWNGRADE'
+    ? 'membership-plan-downgrade-v1'
+    : 'membership-billing-interval-change-v1';
   const keyDigest = await sha256BytesToHex(new TextEncoder().encode(
-    'membership-plan-downgrade-v1\u0000' + subscriberId + '\u0000' + idempotencyKey,
+    keyNamespace + '\u0000' + subscriberId + '\u0000' + idempotencyKey,
   )).catch(() => { throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503); });
   const changeId = 'sudc_' + keyDigest;
 
@@ -270,7 +279,8 @@ export async function scheduleSubscriptionPlanDowngrade(
   const existing = await readScheduledChangeByIdempotency(env.D1_01, subscriberId, keyDigest);
   if (existing) {
     const change = toScheduledChange(existing);
-    if (change.subscriptionId !== subscriptionId || change.targetPlanId !== targetPlanId) {
+    if (change.subscriptionId !== subscriptionId || change.targetPlanId !== targetPlanId ||
+        change.changeType !== expectedChangeType) {
       throw new SubscriptionRuntimeError('CONFLICT', 409);
     }
     if (ifMatch !== etagForVersion(change.expectedSubscriptionVersion)) {
@@ -283,6 +293,7 @@ export async function scheduleSubscriptionPlanDowngrade(
       changeId: change.changeId,
       subscriptionId,
       status: change.status === 'APPLIED' ? 'APPLIED' : 'SCHEDULED',
+      changeType: change.changeType,
       currentPlanId: change.expectedPlanId,
       targetPlanId: change.targetPlanId,
       targetPlanVersion: change.targetPlanVersion,
@@ -294,11 +305,15 @@ export async function scheduleSubscriptionPlanDowngrade(
   const preview = await previewSubscriptionPlanChange(
     env.D1_01, subscriberId, subscriptionId, targetPlanId, { now: () => nowDate },
   );
-  if (preview.changeType !== 'DOWNGRADE' || preview.paymentRequired ||
-      preview.prorationBaseMinor !== 0 || preview.effectiveAt !== preview.currentPeriodEnd ||
-      preview.targetPlan.billingInterval !== preview.currentPlan.billingInterval ||
-      preview.targetPlan.currency !== preview.currentPlan.currency ||
-      preview.targetPlan.priceMinor >= preview.currentPlan.priceMinor) {
+  const previewMatches = preview.changeType === expectedChangeType &&
+    !preview.paymentRequired && preview.prorationBaseMinor === 0 &&
+    preview.effectiveAt === preview.currentPeriodEnd &&
+    preview.targetPlan.currency === preview.currentPlan.currency &&
+    (expectedChangeType === 'DOWNGRADE'
+      ? preview.targetPlan.billingInterval === preview.currentPlan.billingInterval &&
+        preview.targetPlan.priceMinor < preview.currentPlan.priceMinor
+      : preview.targetPlan.billingInterval !== preview.currentPlan.billingInterval);
+  if (!previewMatches) {
     throw new SubscriptionRuntimeError('INVALID_STATE', 409);
   }
   if (preview.etag !== ifMatch) throw new SubscriptionRuntimeError('PRECONDITION_FAILED', 412);
@@ -310,10 +325,10 @@ export async function scheduleSubscriptionPlanDowngrade(
   try {
     const inserted = await env.D1_01.prepare(
       'INSERT INTO membership_subscription_scheduled_plan_changes ' +
-      '(change_id, subscriber_id, subscription_id, expected_subscription_version, expected_plan_id, ' +
+      '(change_id, subscriber_id, subscription_id, change_type, expected_subscription_version, expected_plan_id, ' +
       'expected_plan_version, target_plan_id, target_plan_version, effective_at, idempotency_key_hash, ' +
       'status, applied_at, applied_subscription_version, created_at, updated_at, version) ' +
-      "SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'SCHEDULED', NULL, NULL, ?, ?, 1 " +
+      "SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'SCHEDULED', NULL, NULL, ?, ?, 1 " +
       'WHERE EXISTS (SELECT 1 FROM membership_subscriptions s WHERE s.subscription_id = ? AND s.subscriber_id = ? ' +
       "AND s.status = 'ACTIVE' AND s.cancel_at IS NULL AND s.version = ? AND s.plan_id = ? AND s.plan_version = ? " +
       'AND s.current_period_start = ? AND s.current_period_end = ?) ' +
@@ -321,7 +336,7 @@ export async function scheduleSubscriptionPlanDowngrade(
       'AND p.owner_id = (SELECT creator_id FROM membership_subscriptions WHERE subscription_id = ? AND subscriber_id = ?) ' +
       "AND p.status = 'ACTIVE' AND p.visibility = 'PUBLIC')",
     ).bind(
-      changeId, subscriberId, subscriptionId, expectedVersion, preview.currentPlan.planId,
+      changeId, subscriberId, subscriptionId, expectedChangeType, expectedVersion, preview.currentPlan.planId,
       preview.currentPlan.planVersion, preview.targetPlan.planId, preview.targetPlan.planVersion,
       preview.currentPeriodEnd, keyDigest, now, now,
       subscriptionId, subscriberId, expectedVersion, preview.currentPlan.planId,
@@ -332,10 +347,12 @@ export async function scheduleSubscriptionPlanDowngrade(
       const raced = await readScheduledChangeByIdempotency(env.D1_01, subscriberId, keyDigest);
       if (raced) {
         const same = toScheduledChange(raced);
-        if (same.subscriptionId === subscriptionId && same.targetPlanId === targetPlanId) {
+        if (same.subscriptionId === subscriptionId && same.targetPlanId === targetPlanId &&
+            same.changeType === expectedChangeType) {
           return {
             changeId: same.changeId, subscriptionId,
             status: same.status === 'APPLIED' ? 'APPLIED' : 'SCHEDULED',
+            changeType: same.changeType,
             currentPlanId: same.expectedPlanId, targetPlanId: same.targetPlanId,
             targetPlanVersion: same.targetPlanVersion, effectiveAt: same.effectiveAt, replayed: true,
           };
@@ -354,10 +371,36 @@ export async function scheduleSubscriptionPlanDowngrade(
     changeId,
     subscriptionId,
     status: 'SCHEDULED',
+    changeType: expectedChangeType,
     currentPlanId: preview.currentPlan.planId,
     targetPlanId: preview.targetPlan.planId,
     targetPlanVersion: preview.targetPlan.planVersion,
     effectiveAt: preview.currentPeriodEnd,
     replayed: false,
   };
+}
+
+
+export function scheduleSubscriptionPlanDowngrade(
+  env: ScheduledPlanDowngradeEnv,
+  subscriberId: string,
+  subscriptionId: string,
+  input: unknown,
+  idempotencyKey: string | null,
+  ifMatch: string | null,
+  dependencies: ScheduledPlanDowngradeDependencies = {},
+): Promise<ScheduledSubscriptionPlanDowngradeResult> {
+  return scheduleSubscriptionPlanChange(env, subscriberId, subscriptionId, input, idempotencyKey, ifMatch, 'DOWNGRADE', dependencies);
+}
+
+export function scheduleSubscriptionBillingIntervalChange(
+  env: ScheduledPlanDowngradeEnv,
+  subscriberId: string,
+  subscriptionId: string,
+  input: unknown,
+  idempotencyKey: string | null,
+  ifMatch: string | null,
+  dependencies: ScheduledPlanDowngradeDependencies = {},
+): Promise<ScheduledSubscriptionPlanDowngradeResult> {
+  return scheduleSubscriptionPlanChange(env, subscriberId, subscriptionId, input, idempotencyKey, ifMatch, 'BILLING_INTERVAL_CHANGE', dependencies);
 }
