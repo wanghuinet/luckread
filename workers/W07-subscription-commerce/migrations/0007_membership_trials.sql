@@ -113,7 +113,7 @@ BEFORE UPDATE OF status ON membership_subscription_trials
 WHEN NOT (
   (OLD.status = 'TRIALING' AND NEW.status IN ('CANCELED','PAYMENT_FAILED','CONVERTED','EXPIRED'))
   OR (OLD.status = 'CANCELED' AND NEW.status IN ('CONVERTED','EXPIRED'))
-  OR (OLD.status = 'PAYMENT_FAILED' AND NEW.status IN ('CONVERTED','EXPIRED'))
+  OR (OLD.status = 'PAYMENT_FAILED' AND NEW.status IN ('CANCELED','CONVERTED','EXPIRED'))
 )
 BEGIN SELECT RAISE(ABORT, 'membership trial has an invalid state transition'); END;
 
@@ -124,7 +124,7 @@ WHEN
     SELECT 1 FROM membership_subscriptions s
     WHERE s.subscription_id = NEW.subscription_id AND s.subscriber_id = NEW.subscriber_id
       AND s.cancel_at = NEW.trial_ends_at
-      AND s.status = 'TRIALING'
+      AND s.status IN ('TRIALING','PAST_DUE')
   ))
   OR
   (NEW.status = 'PAYMENT_FAILED' AND NOT EXISTS (
