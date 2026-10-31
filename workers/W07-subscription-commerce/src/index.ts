@@ -14,6 +14,7 @@ import { handleRevenueCatSubscriberReconciliationRequest } from './revenuecat-su
 import { previewSubscriptionPlanChange } from './subscription-plan-change-preview.js'
 import { createSubscriptionPlanUpgradeCheckout } from './subscription-plan-change-checkout.js'
 import { scheduleSubscriptionPlanDowngrade, scheduleSubscriptionBillingIntervalChange } from './subscription-plan-change-schedule.js'
+import { startSubscriptionTrial } from './subscription-trial-runtime.js'
 
 interface RateLimitBinding { limit(input: { key: string }): Promise<{ success: boolean }> }
 interface Env {
@@ -148,12 +149,14 @@ type Operation =
   | { operation: 'planUpgradeCheckout'; subscriptionId: string }
   | { operation: 'planDowngradeSchedule'; subscriptionId: string }
   | { operation: 'planBillingIntervalSchedule'; subscriptionId: string }
+  | { operation: 'trialStart'; subscriptionId: null }
 
 const toOperation = (method: string, segments: string[]): Operation | null => {
   if (segments.length === 1 && segments[0] === 'plans' && method === 'GET') return { operation: 'listPlans', subscriptionId: null }
   if (segments.length === 2 && segments[0] === 'membership' && segments[1] === 'plans' && method === 'GET') return { operation: 'listOwnedPlans', subscriptionId: null }
   if (segments.length === 2 && segments[0] === 'membership' && segments[1] === 'plans' && method === 'POST') return { operation: 'createPlan', subscriptionId: null }
   if (segments.length === 2 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && method === 'GET') return { operation: 'list', subscriptionId: null }
+  if (segments.length === 3 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && segments[2] === 'trial' && method === 'POST') return { operation: 'trialStart', subscriptionId: null }
   if (segments.length === 3 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && method === 'GET') return { operation: 'get', subscriptionId: segments[2] }
   if (segments.length === 4 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && segments[3] === 'change-plan-preview' && method === 'GET') return { operation: 'planChangePreview', subscriptionId: segments[2] }
   if (segments.length === 5 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && segments[3] === 'change-plan' && segments[4] === 'checkout' && method === 'POST') return { operation: 'planUpgradeCheckout', subscriptionId: segments[2] }
@@ -271,6 +274,16 @@ export default {
       if (commerceOrderResponse) return commerceOrderResponse
       const pathname = new URL(request.url).pathname
       const operation = toOperation(request.method, parseSegments(pathname))
+      if (operation?.operation === 'trialStart') {
+        requireLayer(request)
+        const result = await startSubscriptionTrial(
+          env,
+          principal,
+          await readJsonBody(request),
+          request.headers.get('Idempotency-Key'),
+        )
+        return json({ data: result, requestId: crypto.randomUUID() }, result.replayed ? 200 : 201, result.etag)
+      }
       if (operation?.operation === 'planChangePreview') {
         const targetPlanId = new URL(request.url).searchParams.get('targetPlanId')
         if (!targetPlanId) throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
