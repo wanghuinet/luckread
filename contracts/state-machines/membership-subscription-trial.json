@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/state-machines/membership-subscription-trial.json",
+  "title": "Membership Subscription Trial Lifecycle",
+  "type": "object",
+  "x-luckread": {
+    "state-field": "status",
+    "authority": "D1-01 membership_subscription_trials",
+    "subscriptionAuthority": "D1-01 membership_subscriptions",
+    "requires-optimistic-lock": true,
+    "terminal-states": [
+      "CONVERTED",
+      "EXPIRED"
+    ],
+    "states": [
+      "TRIALING",
+      "CANCELED",
+      "PAYMENT_FAILED",
+      "CONVERTED",
+      "EXPIRED"
+    ],
+    "sourceKinds": [
+      "WEB",
+      "APP_STORE",
+      "PLAY_STORE"
+    ],
+    "effective-boundary": "trial_ends_at is the only trial access boundary; canceling conversion does not remove access before that time."
+  },
+  "x-transitions": [
+    {
+      "from": "TRIALING",
+      "to": "CANCELED",
+      "actor": "user|store",
+      "guard": "Web subscriber cancellation sets Subscription.cancel_at to trial_ends_at with If-Match; store cancellation is accepted only from the W02-verified RevenueCat current customer snapshot with unsubscribe_detected_at. Subscription remains TRIALING through trial_ends_at."
+    },
+    {
+      "from": "TRIALING",
+      "to": "PAYMENT_FAILED",
+      "actor": "system|payment",
+      "guard": "Only a verified failed Hyperswitch first MIT renewal outcome may move a WEB trial Subscription from TRIALING to PAST_DUE; D1-01 synchronizes its linked trial record."
+    },
+    {
+      "from": "TRIALING",
+      "to": "CONVERTED",
+      "actor": "system|payment",
+      "guard": "A verified successful Hyperswitch first MIT renewal for WEB or a W02-verified RevenueCat NORMAL paid period for store trial advances the existing Subscription current_period_start to trial_ends_at or later and sets ACTIVE."
+    },
+    {
+      "from": "TRIALING",
+      "to": "EXPIRED",
+      "actor": "system|store",
+      "guard": "The store expiry state is confirmed by W02-verified RevenueCat current customer snapshot; a WEB trial expires only after trial_ends_at and only when no in-flight, uncertain, or still-retryable first MIT renewal exists."
+    },
+    {
+      "from": "CANCELED",
+      "to": "EXPIRED",
+      "actor": "system|store",
+      "guard": "The trial_ends_at boundary has passed and source authority confirms there is no paid conversion."
+    },
+    {
+      "from": "PAYMENT_FAILED",
+      "to": "CONVERTED",
+      "actor": "system|payment",
+      "guard": "A later bounded Hyperswitch retry succeeds and advances the same Subscription into a paid ACTIVE period."
+    },
+    {
+      "from": "PAYMENT_FAILED",
+      "to": "EXPIRED",
+      "actor": "system",
+      "guard": "The renewal retry budget is exhausted or no valid MIT mandate remains, and trial_ends_at has passed."
+    }
+  ],
+  "x-forbidden": [
+    {
+      "from": "CONVERTED",
+      "to": "TRIALING"
+    },
+    {
+      "from": "CONVERTED",
+      "to": "CANCELED"
+    },
+    {
+      "from": "CONVERTED",
+      "to": "PAYMENT_FAILED"
+    },
+    {
+      "from": "EXPIRED",
+      "to": "TRIALING"
+    },
+    {
+      "from": "EXPIRED",
+      "to": "CONVERTED"
+    },
+    {
+      "from": "CANCELED",
+      "to": "CONVERTED"
+    }
+  ],
+  "reconciliation": {
+    "persistence": "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json#membershipSubscriptionTrialTable",
+    "webStart": "Only an active Hyperswitch MIT mandate joined to a saved payment method permits W07 to start a web trial; D1-01 creates Subscription and trial record atomically.",
+    "storeStart": "App Store and Play Store trial state is created only by W07 reconciliation of a current RevenueCat snapshot after W02 confirms the App User ID maps to the authenticated subscriber. Client-supplied store claims and webhook raw bodies do not grant access.",
+    "firstCharge": "WEB first charge reuses the existing W07 renewal-cycle, D1-04 Order/Payment and Hyperswitch MIT pipeline at trial_ends_at; no separate trial billing service or duplicate subscription is created.",
+    "storeConversion": "Store trial-to-paid conversion is reconciled from RevenueCat current entitlement period_type and effective expiration, not charged by W07.",
+    "cancellation": "Canceling a web trial suppresses future conversion but preserves access until trial_ends_at; store cancellation remains under App Store/Google Play controls and RevenueCat status.",
+    "retry": "A failed first MIT attempt moves WEB Subscription to PAST_DUE and trial record to PAYMENT_FAILED; the same renewal cycle may retry against the same mandate and cannot be expired while retryable.",
+    "expiry": "Store trials expire only from W02-verified RevenueCat snapshot; WEB trials expire in the existing bounded renewal scheduler only after checking for pending/submitted/retryable D1-04 cycles.",
+    "noEarlyEntitlement": "No trial, paid conversion or expiry transition may be claimed from client input or an unverified webhook."
+  }
+}
