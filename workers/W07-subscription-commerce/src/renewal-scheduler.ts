@@ -130,13 +130,6 @@ export async function runRenewalScheduledBatch(
     };
   }
 
-  let trialExpiry: Readonly<{ scanned: number; expired: number }>;
-  try {
-    trialExpiry = await expireTrials(env.D1_01, new Date(), 100, env.D1_04);
-  } catch {
-    return { status: 'PARTIAL', phase: 'TRIAL_EXPIRY', beforeRecovery };
-  }
-
   let dueScan: RenewalScanResult;
   try {
     dueScan = await scanDue(env, { limit: MAX_CYCLES_PER_TICK });
@@ -174,6 +167,18 @@ export async function runRenewalScheduledBatch(
     afterRecovery.reconciliationRequired > 0 ||
     cycleResults.some((result) => result.state === 'RECONCILIATION_REQUIRED');
   const outcomeSyncPending = afterRecovery.pendingRetry > 0;
+
+  // Scan and process due renewals before considering trial expiry. The first
+  // web-trial renewal cycle may not exist until this exact tick; expiring the
+  // TRIALING Subscription first would suppress the initial MIT charge.
+  let trialExpiry: Readonly<{ scanned: number; expired: number }> = { scanned: 0, expired: 0 };
+  if (!reconciliationRequired && !outcomeSyncPending) {
+    try {
+      trialExpiry = await expireTrials(env.D1_01, new Date(), 100, env.D1_04);
+    } catch {
+      return { status: 'PARTIAL', phase: 'TRIAL_EXPIRY', beforeRecovery };
+    }
+  }
 
   return {
     status: processFailures === 0 && !reconciliationRequired && !outcomeSyncPending
