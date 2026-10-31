@@ -2,7 +2,7 @@
 
 import { sha256BytesToHex } from '../../W10-async/src/canonical-json-idempotency.js';
 
-export type SubscriptionStatus = 'PENDING' | 'ACTIVE' | 'PAST_DUE' | 'PAUSED' | 'CANCELED' | 'EXPIRED'
+export type SubscriptionStatus = 'PENDING' | 'TRIALING' | 'ACTIVE' | 'PAST_DUE' | 'PAUSED' | 'CANCELED' | 'EXPIRED'
 
 export type SubscriptionRow = {
   subscription_id: string
@@ -14,6 +14,9 @@ export type SubscriptionRow = {
   started_at: string
   current_period_start: string
   current_period_end: string
+  trial_started_at: string | null
+  trial_ends_at: string | null
+  trial_converted_at: string | null
   cancel_at: string | null
   entitlement_snapshot_ref: string | null
   created_at: string
@@ -132,6 +135,9 @@ const toPublic = (row: SubscriptionRow) => ({
   startedAt: row.started_at,
   currentPeriodStart: row.current_period_start,
   currentPeriodEnd: row.current_period_end,
+  trialStartedAt: row.trial_started_at,
+  trialEndsAt: row.trial_ends_at,
+  trialConvertedAt: row.trial_converted_at,
   cancelAt: row.cancel_at,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
@@ -219,7 +225,7 @@ export async function hasActiveCreatorMembership(
   try {
     row = await db.prepare(
       "SELECT subscription_id FROM membership_subscriptions " +
-      "WHERE subscriber_id = ? AND creator_id = ? AND status = 'ACTIVE' " +
+      "WHERE subscriber_id = ? AND creator_id = ? AND status IN ('ACTIVE','TRIALING') " +
       "AND current_period_start <= ? AND current_period_end > ? " +
       "AND (cancel_at IS NULL OR cancel_at > ?) " +
       "ORDER BY current_period_end DESC, subscription_id ASC LIMIT 1",
@@ -316,6 +322,7 @@ export async function changeSubscriptionPlan(db: D1Database, subscriberId: strin
 }
 
 export type ActiveMembershipPlanRow = {
+  trial_period_days: number
   plan_id: string
   owner_id: string
   current_version: number
@@ -384,6 +391,7 @@ export async function listActiveMembershipPlans(
     billingInterval: string
     priceMinor: number
     currency: string
+    trialPeriodDays: number
     benefits: unknown
     createdAt: string
     updatedAt: string
@@ -396,7 +404,7 @@ export async function listActiveMembershipPlans(
   const cursor = decodePlanListCursor(cursorValue)
   const baseSql =
     'SELECT p.plan_id, p.owner_id, p.current_version, p.created_at, p.updated_at, ' +
-    'v.name, v.tier, v.billing_interval, v.price_minor, v.currency, v.benefits_json ' +
+    'v.name, v.tier, v.billing_interval, v.price_minor, v.currency, v.benefits_json, v.trial_period_days ' +
     'FROM membership_plans AS p ' +
     'INNER JOIN membership_plan_versions AS v ON v.plan_id = p.plan_id AND v.plan_version = p.current_version ' +
     "WHERE p.owner_type = 'CREATOR' AND p.status = 'ACTIVE' AND p.visibility = 'PUBLIC' "
@@ -428,6 +436,7 @@ export async function listActiveMembershipPlans(
       !Number.isSafeInteger(row.current_version) || row.current_version < 1 ||
       !Number.isSafeInteger(row.price_minor) || row.price_minor < 0 || row.price_minor > 2_147_483_647 ||
       !/^[A-Z]{3}$/.test(row.currency) ||
+      !Number.isSafeInteger(row.trial_period_days) || row.trial_period_days < 0 || row.trial_period_days > 30 ||
       (row.billing_interval !== 'MONTHLY' && row.billing_interval !== 'YEARLY') ||
       !/^[a-z][a-z0-9_-]{0,63}$/.test(row.tier) ||
       typeof row.name !== 'string' || row.name.trim().length < 1 || row.name.length > 120
@@ -443,6 +452,7 @@ export async function listActiveMembershipPlans(
       billingInterval: row.billing_interval,
       priceMinor: row.price_minor,
       currency: row.currency,
+      trialPeriodDays: row.trial_period_days,
       benefits,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
@@ -592,7 +602,7 @@ export async function createMembershipPlanDraft(
 
   const existing = await db.prepare(
     'SELECT p.plan_id, p.owner_id, p.current_version, p.status, p.visibility, p.version, p.created_at, p.updated_at, ' +
-    'v.name, v.tier, v.billing_interval, v.price_minor, v.currency, v.benefits_json ' +
+    'v.name, v.tier, v.billing_interval, v.price_minor, v.currency, v.benefits_json, v.trial_period_days ' +
     'FROM membership_plans AS p INNER JOIN membership_plan_versions AS v ' +
     'ON v.plan_id = p.plan_id AND v.plan_version = 1 WHERE p.plan_id = ? LIMIT 1',
   ).bind(planId).first<MembershipPlanStoredRow>()
@@ -620,7 +630,7 @@ export async function createMembershipPlanDraft(
   if (Number(results[0]?.meta?.changes ?? 0) !== 1 || Number(results[1]?.meta?.changes ?? 0) !== 1) {
     const raced = await db.prepare(
       'SELECT p.plan_id, p.owner_id, p.current_version, p.status, p.visibility, p.version, p.created_at, p.updated_at, ' +
-      'v.name, v.tier, v.billing_interval, v.price_minor, v.currency, v.benefits_json ' +
+      'v.name, v.tier, v.billing_interval, v.price_minor, v.currency, v.benefits_json, v.trial_period_days ' +
       'FROM membership_plans AS p INNER JOIN membership_plan_versions AS v ' +
       'ON v.plan_id = p.plan_id AND v.plan_version = 1 WHERE p.plan_id = ? LIMIT 1',
     ).bind(planId).first<MembershipPlanStoredRow>()
@@ -683,7 +693,7 @@ export async function publishMembershipPlan(
   const readOwnedPlan = async (): Promise<MembershipPlanStoredRow | null> =>
     db.prepare(
       'SELECT p.plan_id, p.owner_id, p.current_version, p.status, p.visibility, p.version, p.created_at, p.updated_at, ' +
-      'v.name, v.tier, v.billing_interval, v.price_minor, v.currency, v.benefits_json ' +
+      'v.name, v.tier, v.billing_interval, v.price_minor, v.currency, v.benefits_json, v.trial_period_days ' +
       'FROM membership_plans AS p INNER JOIN membership_plan_versions AS v ' +
       'ON v.plan_id = p.plan_id AND v.plan_version = p.current_version ' +
       "WHERE p.plan_id = ? AND p.owner_type = 'CREATOR' AND p.owner_id = ? LIMIT 1",
@@ -777,7 +787,7 @@ export async function reviseMembershipPlan(
   const readOwnedPlan = async (): Promise<MembershipPlanStoredRow | null> =>
     db.prepare(
       'SELECT p.plan_id, p.owner_id, p.current_version, p.status, p.visibility, p.version, p.created_at, p.updated_at, ' +
-      'v.name, v.tier, v.billing_interval, v.price_minor, v.currency, v.benefits_json ' +
+      'v.name, v.tier, v.billing_interval, v.price_minor, v.currency, v.benefits_json, v.trial_period_days ' +
       'FROM membership_plans AS p INNER JOIN membership_plan_versions AS v ' +
       'ON v.plan_id = p.plan_id AND v.plan_version = p.current_version ' +
       "WHERE p.plan_id = ? AND p.owner_type = 'CREATOR' AND p.owner_id = ? LIMIT 1",
@@ -889,7 +899,7 @@ export async function transitionMembershipPlanLifecycle(
   const readOwnedPlan = async (): Promise<MembershipPlanStoredRow | null> =>
     db.prepare(
       'SELECT p.plan_id, p.owner_id, p.current_version, p.status, p.visibility, p.version, p.created_at, p.updated_at, ' +
-      'v.name, v.tier, v.billing_interval, v.price_minor, v.currency, v.benefits_json ' +
+      'v.name, v.tier, v.billing_interval, v.price_minor, v.currency, v.benefits_json, v.trial_period_days ' +
       'FROM membership_plans AS p INNER JOIN membership_plan_versions AS v ' +
       'ON v.plan_id = p.plan_id AND v.plan_version = p.current_version ' +
       "WHERE p.plan_id = ? AND p.owner_type = 'CREATOR' AND p.owner_id = ? LIMIT 1",
@@ -962,7 +972,7 @@ export async function listCreatorMembershipPlans(
   const cursor = decodePlanListCursor(cursorValue)
   const baseSql =
     'SELECT p.plan_id, p.owner_id, p.current_version, p.status, p.visibility, p.version, p.created_at, p.updated_at, ' +
-    'v.name, v.tier, v.billing_interval, v.price_minor, v.currency, v.benefits_json ' +
+    'v.name, v.tier, v.billing_interval, v.price_minor, v.currency, v.benefits_json, v.trial_period_days ' +
     'FROM membership_plans AS p INNER JOIN membership_plan_versions AS v ' +
     'ON v.plan_id = p.plan_id AND v.plan_version = p.current_version ' +
     "WHERE p.owner_type = 'CREATOR' AND p.owner_id = ? "
@@ -1016,7 +1026,7 @@ export async function resolvePurchasableMembershipPlanOffers(
   try {
     result = await db.prepare(
       'SELECT p.plan_id, p.owner_id, p.current_version, p.status, p.visibility, p.version, p.created_at, p.updated_at, ' +
-      'v.name, v.tier, v.billing_interval, v.price_minor, v.currency, v.benefits_json ' +
+      'v.name, v.tier, v.billing_interval, v.price_minor, v.currency, v.benefits_json, v.trial_period_days ' +
       'FROM membership_plans AS p ' +
       'INNER JOIN membership_plan_versions AS v ON v.plan_id = p.plan_id AND v.plan_version = p.current_version ' +
       "WHERE p.owner_type = 'CREATOR' AND p.status = 'ACTIVE' AND p.visibility = 'PUBLIC' " +
