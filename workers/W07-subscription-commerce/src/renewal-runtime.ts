@@ -65,6 +65,8 @@ type RenewalSubscriptionRow = Readonly<{
   status: string;
   current_period_start: string;
   current_period_end: string;
+  trial_started_at: string | null;
+  trial_ends_at: string | null;
   cancel_at: string | null;
   billing_interval: string;
   price_minor: number;
@@ -442,13 +444,18 @@ async function insertOrReadCycle(
   merchantId: string,
   now: string,
 ): Promise<RenewalCycleRow> {
-  if (!['ACTIVE', 'PAST_DUE'].includes(subscription.status) ||
+  if (!['TRIALING', 'ACTIVE', 'PAST_DUE'].includes(subscription.status) ||
       !isBoundedText(subscription.subscription_id) ||
       !isBoundedText(subscription.subscriber_id) ||
       !isBoundedText(subscription.plan_id) ||
       !Number.isSafeInteger(subscription.plan_version) || subscription.plan_version < 1 ||
       !isCanonicalIso(subscription.current_period_end) ||
       !isCanonicalIso(subscription.current_period_start) ||
+      (subscription.status === 'TRIALING' &&
+        (!isCanonicalIso(subscription.trial_started_at) ||
+         !isCanonicalIso(subscription.trial_ends_at) ||
+         subscription.trial_ends_at !== subscription.current_period_end ||
+         subscription.current_period_start !== subscription.trial_started_at)) ||
       (subscription.billing_interval !== 'MONTHLY' && subscription.billing_interval !== 'YEARLY') ||
       !isSafeMinor(subscription.price_minor, true) ||
       typeof subscription.currency !== 'string' || !/^[A-Z]{3}$/.test(subscription.currency)) {
@@ -610,11 +617,11 @@ export async function scanDueSubscriptionRenewals(
   try {
     rows = (await env.D1_01.prepare(
       'SELECT s.subscription_id, s.subscriber_id, s.plan_id, s.plan_version, s.creator_id, s.status, ' +
-      's.current_period_start, s.current_period_end, s.cancel_at, pv.billing_interval, pv.price_minor, ' +
+      's.current_period_start, s.current_period_end, s.trial_started_at, s.trial_ends_at, s.cancel_at, pv.billing_interval, pv.price_minor, ' +
       'pv.currency, pv.name, pv.tier, pv.benefits_json ' +
       'FROM membership_subscriptions s ' +
       'JOIN membership_plan_versions pv ON pv.plan_id = s.plan_id AND pv.plan_version = s.plan_version ' +
-      "WHERE s.status IN ('ACTIVE','PAST_DUE') AND s.current_period_end <= ? " +
+      "WHERE s.status IN ('TRIALING','ACTIVE','PAST_DUE') AND s.current_period_end <= ? " +
       'AND (s.cancel_at IS NULL OR s.cancel_at > s.current_period_end) ' +
       'AND (? IS NULL OR s.current_period_end > ? OR (s.current_period_end = ? AND s.subscription_id > ?)) ' +
       'ORDER BY s.current_period_end ASC, s.subscription_id ASC LIMIT ?',
@@ -682,6 +689,8 @@ type ChargeSubscriptionRow = Readonly<{
   creator_id: string | null;
   status: string;
   current_period_end: string;
+  trial_started_at: string | null;
+  trial_ends_at: string | null;
   cancel_at: string | null;
 }>;
 
@@ -692,7 +701,7 @@ async function isSubscriptionChargeableForCycle(
   let subscription: ChargeSubscriptionRow | null;
   try {
     subscription = await env.D1_01.prepare(
-      'SELECT subscription_id, subscriber_id, plan_id, plan_version, creator_id, status, current_period_end, cancel_at ' +
+      'SELECT subscription_id, subscriber_id, plan_id, plan_version, creator_id, status, current_period_end, trial_started_at, trial_ends_at, cancel_at ' +
       'FROM membership_subscriptions WHERE subscription_id = ? AND subscriber_id = ? LIMIT 1',
     ).bind(cycle.subscription_id, cycle.subscriber_id).first<ChargeSubscriptionRow>();
   } catch {
@@ -703,7 +712,10 @@ async function isSubscriptionChargeableForCycle(
       subscription.subscription_id !== cycle.subscription_id ||
       subscription.subscriber_id !== cycle.subscriber_id ||
       subscription.current_period_end !== cycle.cycle_start ||
-      !(subscription.status === 'ACTIVE' || (retryingPastDue && subscription.status === 'PAST_DUE')) ||
+      !(subscription.status === 'ACTIVE' ||
+        (subscription.status === 'TRIALING' && cycle.attempt_number === 0 &&
+          subscription.trial_started_at !== null && subscription.trial_ends_at === cycle.cycle_start) ||
+        (retryingPastDue && subscription.status === 'PAST_DUE')) ||
       !(subscription.cancel_at === null ||
         (isCanonicalIso(subscription.cancel_at) && subscription.cancel_at > cycle.cycle_start))) return false;
   if (subscription.plan_id === cycle.plan_id && subscription.plan_version === cycle.plan_version) return true;
@@ -862,7 +874,7 @@ async function prepareFailedCycleRetry(
   } | null;
   try {
     subscription = await env.D1_01.prepare(
-      'SELECT subscription_id, subscriber_id, plan_id, plan_version, creator_id, status, current_period_end, cancel_at ' +
+      'SELECT subscription_id, subscriber_id, plan_id, plan_version, creator_id, status, current_period_end, trial_started_at, trial_ends_at, cancel_at ' +
       'FROM membership_subscriptions WHERE subscription_id = ? AND subscriber_id = ? LIMIT 1',
     ).bind(cycle.subscription_id, cycle.subscriber_id).first<{
       subscription_id: string;
