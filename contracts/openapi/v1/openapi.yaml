@@ -3560,9 +3560,10 @@ paths:
       description: >-
         W01 authenticates the customer session and authorizes order.read before forwarding
         the order ID to the existing private W07 service binding. Amount, currency, customer
-        and provider credentials are server controlled. The browser receives only the scoped
-        client secret needed by the hosted Hyperswitch Payment Element. Client callbacks and
-        return URLs do not establish payment success or grant subscription entitlement.
+        and provider credentials are server controlled. Web clients receive the scoped
+        client secret for the hosted Hyperswitch Payment Element; native clients receive the
+        scoped sdkAuthorization required by the official Hyperswitch React Native PaymentSession.
+        Client callbacks and return URLs do not establish payment success or grant entitlement.
       operationId: postPaymentsIntents
       x-luckread-contract-status: CONTRACTED_PARTIAL
       x-luckread-runtime-status: IMPLEMENTED_SOURCE_ONLY_PENDING_D1_04_MIGRATION_AND_SECRETS
@@ -3599,7 +3600,7 @@ paths:
                   data:
                     type: object
                     additionalProperties: false
-                    required: [paymentId, orderId, amountMinor, currency, pricingMode, status, version, clientSecret]
+                    required: [paymentId, orderId, amountMinor, currency, pricingMode, status, version, clientSecret, sdkAuthorization]
                     properties:
                       paymentId: { type: string, pattern: '^pay_[a-f0-9]{26}$' }
                       orderId: { type: string, pattern: '^ord_[A-Za-z0-9_-]{1,90}$' }
@@ -3609,6 +3610,7 @@ paths:
                       status: { type: string, enum: [requires_payment_method, requires_confirmation] }
                       version: { type: integer, minimum: 1 }
                       clientSecret: { type: string, minLength: 1, maxLength: 4096 }
+                      sdkAuthorization: { type: string, minLength: 1, maxLength: 4096 }
                   requestId: { $ref: '#/components/schemas/RequestId' }
         '200':
           description: Idempotent replay of the same unconfirmed payment intent.
@@ -3625,7 +3627,7 @@ paths:
                   data:
                     type: object
                     additionalProperties: false
-                    required: [paymentId, orderId, amountMinor, currency, pricingMode, status, version, clientSecret]
+                    required: [paymentId, orderId, amountMinor, currency, pricingMode, status, version, clientSecret, sdkAuthorization]
                     properties:
                       paymentId: { type: string, pattern: '^pay_[a-f0-9]{26}$' }
                       orderId: { type: string, pattern: '^ord_[A-Za-z0-9_-]{1,90}$' }
@@ -3635,6 +3637,7 @@ paths:
                       status: { type: string, enum: [requires_payment_method, requires_confirmation] }
                       version: { type: integer, minimum: 1 }
                       clientSecret: { type: string, minLength: 1, maxLength: 4096 }
+                      sdkAuthorization: { type: string, minLength: 1, maxLength: 4096 }
                   requestId: { $ref: '#/components/schemas/RequestId' }
         '400': { $ref: '#/components/responses/ValidationFailed' }
         '401': { $ref: '#/components/responses/Unauthenticated' }
