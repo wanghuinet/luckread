@@ -14,13 +14,15 @@ describe('Umami content navigation event reuse', () => {
     expect(home).not.toContain('umami.track(')
   })
 
-  it('reuses the upstream data-attribute tracker for homepage content cards', () => {
-    const feed = read('src/app/(frontend)/HomeContentFeed.tsx')
-    expect(feed).toContain('data-umami-event="content-open"')
-    expect(feed).toContain('data-umami-event-content-type={item.contentType}')
-    expect(feed).not.toContain('umami.track(')
-    expect(feed).not.toContain('data-umami-event-content-id')
-    expect(feed).not.toContain('data-umami-event-title')
+  it('uses the active timeline and shared social-card tracker for homepage content', () => {
+    const feed = read('src/app/(twitter-clone)/TwitterCloneHomeFeed.tsx')
+    const card = read('src/app/(frontend)/components/reuse/LuckReadSocialPostCard.tsx')
+    expect(feed).toContain('LuckReadSocialPostCard')
+    expect(feed).toContain('presentation="x-timeline"')
+    expect(card).toContain('data-umami-event="content-open"')
+    expect(card).not.toContain('umami.track(')
+    expect(card).not.toContain('data-umami-event-content-id')
+    expect(card).not.toContain('data-umami-event-title')
   })
 
   it('reuses the upstream data-attribute tracker for the public discovery list', () => {
