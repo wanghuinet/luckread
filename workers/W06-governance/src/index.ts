@@ -469,11 +469,11 @@ function parseSubscriptionPlanChangeRequestAuditInput(value: unknown): Subscript
     typeof body.attemptId !== 'string' || !/^suca_[a-f0-9]{64}$/.test(body.attemptId) ||
     body.eventId !== 'evt_subscription_plan_upgrade_requested_' + body.attemptId ||
     typeof body.subscriberId !== 'string' || body.subscriberId.length < 1 || body.subscriberId.length > 256 ||
-    body.subscriberId.trim() !== body.subscriberId || /[\\u0000-\\u001f\\u007f]/.test(body.subscriberId) ||
+    body.subscriberId.trim() !== body.subscriberId || /[\u0000-\u001f\u007f]/.test(body.subscriberId) ||
     typeof body.subscriptionId !== 'string' || body.subscriptionId.length < 1 || body.subscriptionId.length > 256 ||
-    body.subscriptionId.trim() !== body.subscriptionId || /[\\u0000-\\u001f\\u007f]/.test(body.subscriptionId) ||
+    body.subscriptionId.trim() !== body.subscriptionId || /[\u0000-\u001f\u007f]/.test(body.subscriptionId) ||
     typeof body.targetPlanId !== 'string' || !/^plan_[a-f0-9]{64}$/.test(body.targetPlanId) ||
-    typeof body.expectedEtag !== 'string' || !/^"lr-v([1-9]\\d*)"$/.test(body.expectedEtag) ||
+    typeof body.expectedEtag !== 'string' || !/^"lr-v([1-9]\d*)"$/.test(body.expectedEtag) ||
     typeof body.requestedAt !== 'string' || Number.isNaN(Date.parse(body.requestedAt)) ||
     new Date(body.requestedAt).toISOString() !== body.requestedAt
   ) throw new Error('INVALID_SUBSCRIPTION_PLAN_CHANGE_REQUEST_AUDIT')
@@ -491,9 +491,9 @@ function parseSubscriptionPlanUpgradeAppliedAuditInput(value: unknown): Subscrip
     typeof body.attemptId !== 'string' || !/^suca_[a-f0-9]{64}$/.test(body.attemptId) ||
     body.eventId !== 'evt_subscription_plan_upgraded_' + body.attemptId ||
     typeof body.subscriberId !== 'string' || body.subscriberId.length < 1 || body.subscriberId.length > 256 ||
-    body.subscriberId.trim() !== body.subscriberId || /[\\u0000-\\u001f\\u007f]/.test(body.subscriberId) ||
+    body.subscriberId.trim() !== body.subscriberId || /[\u0000-\u001f\u007f]/.test(body.subscriberId) ||
     typeof body.subscriptionId !== 'string' || body.subscriptionId.length < 1 || body.subscriptionId.length > 256 ||
-    body.subscriptionId.trim() !== body.subscriptionId || /[\\u0000-\\u001f\\u007f]/.test(body.subscriptionId) ||
+    body.subscriptionId.trim() !== body.subscriptionId || /[\u0000-\u001f\u007f]/.test(body.subscriptionId) ||
     typeof body.orderId !== 'string' || !/^ord_[A-Za-z0-9_-]{1,90}$/.test(body.orderId) ||
     typeof body.fromPlanId !== 'string' || !/^plan_[a-f0-9]{64}$/.test(body.fromPlanId) ||
     !Number.isSafeInteger(body.fromPlanVersion) || (body.fromPlanVersion as number) < 1 ||
