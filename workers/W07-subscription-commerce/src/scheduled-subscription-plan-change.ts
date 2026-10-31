@@ -230,6 +230,9 @@ export async function scheduleSubscriptionPlanChange(
   if (!ifMatch) throw new SubscriptionRuntimeError('PRECONDITION_REQUIRED', 428);
   const expectedVersion = versionFromIfMatch(ifMatch);
   const idempotencyKey = validateIdempotencyKey(idempotencyKeyInput);
+  if (idempotencyKey !== idempotencyKeyInput || /[\\u0000-\\u001f\\u007f]/.test(idempotencyKey)) {
+    throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400);
+  }
 
   const ids = await idsForRequest(subscriberId, subscriptionId, targetPlanId, idempotencyKey);
   const existing = await readChangeById(db, ids.changeId);
