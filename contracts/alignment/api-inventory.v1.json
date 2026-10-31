@@ -2564,7 +2564,8 @@
         "contracts/api/api-inventory.v1.json",
         "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json",
         "workers/W07-subscription-commerce/src/subscription-upgrade-checkout.ts",
-        "workers/W07-subscription-commerce/src/paid-membership-plan-upgrade-application.ts"
+        "workers/W07-subscription-commerce/src/paid-membership-plan-upgrade-application.ts",
+        "contracts/state-machines/membership-subscription-plan-upgrade.json"
       ]
     },
     {
