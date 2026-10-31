@@ -450,7 +450,8 @@
         "D1_01_stores_schedule_metadata_only_D1_04_remains_financial_authority",
         "W06_D1_03_audits_request_and_applied_transition",
         "renewal_execution_activation_gate_remains_unchanged",
-        "pending_upgrade_or_reconciliation_blocks_downgrade_schedule"
+        "pending_upgrade_or_reconciliation_blocks_downgrade_schedule",
+        "target_plan_price_must_remain_positive_until_no_payment_activation_is_admitted"
       ],
       "evidence": {
         "openapi": "PASS",
