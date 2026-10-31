@@ -126,6 +126,7 @@ function fakeDb(rows: SubscriptionRow[], plans: MembershipPlanRow[] = []): D1Dat
               plan_version: plan.current_version, creator_id: plan.owner_id, status: 'PENDING',
               started_at: String(values[2]), current_period_start: start,
               current_period_end: addBillingPeriod(start, plan.billing_interval as 'MONTHLY' | 'YEARLY'),
+              trial_started_at: null, trial_ends_at: null, trial_converted_at: null,
               cancel_at: null, entitlement_snapshot_ref: null, created_at: String(values[6]), updated_at: String(values[7]), version: 1,
             }
             if (state.has(row.subscription_id)) throw new Error('UNIQUE constraint failed')
@@ -221,6 +222,7 @@ const activePlan = (planId = 'plan_basic', overrides: Partial<MembershipPlanRow>
 const baseRow = (overrides: Partial<SubscriptionRow> = {}): SubscriptionRow => ({
   subscription_id: 'sub_existing', subscriber_id: 'user_1', plan_id: 'plan_basic', plan_version: 1, creator_id: null, status: 'ACTIVE',
   started_at: '2026-10-02T12:00:00.000Z', current_period_start: '2026-10-02T12:00:00.000Z', current_period_end: '2026-11-01T12:00:00.000Z',
+  trial_started_at: null, trial_ends_at: null, trial_converted_at: null,
   cancel_at: null, entitlement_snapshot_ref: null, created_at: '2026-10-02T12:00:00.000Z', updated_at: '2026-10-02T12:00:00.000Z', version: 1, ...overrides
 })
 
