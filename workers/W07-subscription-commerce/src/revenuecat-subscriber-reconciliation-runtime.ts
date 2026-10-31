@@ -115,12 +115,14 @@ async function readAppId(request: Request): Promise<string> {
 }
 
 /**
- * W01-only, user-scoped read path. The principal comes only from the
- * W02-authenticated transport header; appId merely selects an allowlisted
+ * W01-only, user-scoped reconciliation path. The principal comes only from
+ * the W02-authenticated transport header; appId merely selects an allowlisted
  * product-binding namespace and is never an identity or purchase authority.
  *
- * This endpoint re-reads RevenueCat and returns sanitized candidates only.
- * It never writes D1, creates subscriptions/payments, or grants entitlements.
+ * This endpoint re-reads RevenueCat, resolves exact immutable product bindings,
+ * and synchronizes only store-trial provenance/period state into D1-01. It does
+ * not create Orders or Payments, initiate charges, or grant access from client
+ * input. The Subscription row remains the only access authority.
  */
 export async function handleRevenueCatSubscriberReconciliationRequest(
   request: Request,
