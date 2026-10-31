@@ -520,6 +520,37 @@ describe('CASL L0-L8 authorization policy', () => {
     })).toMatchObject({ decision: 'DENY', reasonCode: 'ACCOUNT_FROZEN_READ_ONLY' })
   })
 
+  it('allows subscribers to change only their own subscription plan at L2+', () => {
+    expect(evaluate({
+      layer: 'L2',
+      action: 'subscription.change_plan',
+      resourceType: 'Subscription',
+      resourceAttributes: { ownerId: 'user-1' },
+    })).toMatchObject({ decision: 'ALLOW' })
+
+    expect(evaluate({
+      layer: 'L2',
+      action: 'subscription.change_plan',
+      resourceType: 'Subscription',
+      resourceAttributes: { ownerId: 'user-2' },
+    })).toMatchObject({ decision: 'DENY', reasonCode: 'PERMISSION_DENIED' })
+
+    expect(evaluate({
+      layer: 'L1',
+      action: 'subscription.change_plan',
+      resourceType: 'Subscription',
+      resourceAttributes: { ownerId: 'user-1' },
+    })).toMatchObject({ decision: 'DENY' })
+
+    expect(evaluate({
+      layer: 'L2',
+      accountState: 'FROZEN',
+      action: 'subscription.change_plan',
+      resourceType: 'Subscription',
+      resourceAttributes: { ownerId: 'user-1' },
+    })).toMatchObject({ decision: 'DENY', reasonCode: 'ACCOUNT_FROZEN_READ_ONLY' })
+  })
+
   it('denies unknown permissions, unsupported subjects, and malformed attributes', () => {
     expect(evaluate({ action: 'permission.not.registered' })).toMatchObject({ decision: 'DENY', reasonCode: 'UNKNOWN_PERMISSION' })
     expect(evaluate({
