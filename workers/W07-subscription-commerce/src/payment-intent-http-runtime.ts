@@ -183,7 +183,9 @@ export async function handleCommercePaymentIntentRequest(
 
     if (
       typeof providerPayment.clientSecret !== 'string' ||
-      !validBoundedText(providerPayment.clientSecret, 4096)
+      !validBoundedText(providerPayment.clientSecret, 4096) ||
+      typeof providerPayment.sdkAuthorization !== 'string' ||
+      !validBoundedText(providerPayment.sdkAuthorization, 4096)
     ) {
       // Never report checkout as ready without a usable secret. The provider
       // intent remains recoverable using the same persisted payment ID/key.
@@ -201,6 +203,7 @@ export async function handleCommercePaymentIntentRequest(
           status: persisted.status,
           version: persisted.version,
           clientSecret: providerPayment.clientSecret,
+          sdkAuthorization: providerPayment.sdkAuthorization,
         },
         requestId: 'req_' + crypto.randomUUID(),
       },
