@@ -71,7 +71,8 @@
               "account",
               "content",
               "creator",
-              "none"
+              "none",
+              "membership_subscription_trial"
             ]
           }
         }
