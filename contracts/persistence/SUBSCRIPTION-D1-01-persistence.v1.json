@@ -228,7 +228,8 @@
     "Immediate upgrade proof binds the same subscriber, source/target immutable plan versions, Subscription version, unchanged billing period and D1-04 order/payment references; paid amount and currency are verified from D1-04 only",
     "Only an authenticated/authorized W01 request may create an idempotent prorated D1-04 order; no client-supplied price or amount is admitted",
     "Only a signed successful Hyperswitch webhook may apply the immediate upgrade; duplicate webhook delivery returns the already-applied result without changing Subscription again",
-    "Failed or pending payment leaves the source Subscription plan and entitlements unchanged"
+    "Failed or pending payment leaves the source Subscription plan and entitlements unchanged",
+    "D1-01 insert guards reject a scheduled plan-change record while an immediate upgrade reservation is PENDING_PAYMENT/READY and reject a new upgrade reservation while a scheduled change is active."
   ],
   "promotionRule": "Remain CONTRACTED_NOT_VERIFIED until the physical binding, migration, runtime authority and Evidence Registry evidence are all admitted.",
   "scheduledPlanChangeTable": {
