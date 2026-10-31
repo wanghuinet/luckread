@@ -127,7 +127,7 @@ jobs:
             /tmp/w07-plan-version-indexes.json \
             /tmp/w07-plan-triggers.json
 
-      - name: Require D1-04 refund and billing migration readiness
+      - name: Require D1-04 commerce, billing, and saved-method migration readiness
         id: d1_04_deploy_preflight
         working-directory: workers/W07-subscription-commerce
         env:
@@ -138,6 +138,7 @@ jobs:
           test -n "$CLOUDFLARE_ACCOUNT_ID"
           test -n "$CLOUDFLARE_API_TOKEN"
           test -s /tmp/w07-d1-list.json
+          test -f migrations-d1-04/0007_payment_method_revocation_requests.sql
 
           D1_04_NAME="$(node --input-type=commonjs - <<'NODE'
           const fs = require('node:fs')
@@ -166,11 +167,11 @@ jobs:
 
           ACTION="$(node -p "require('/tmp/w07-d1-04-deploy-report.json').action")"
           if [[ "$ACTION" != "VERIFY_ONLY" ]]; then
-            echo "::error::D1-04 refund and billing migrations are pending or inconsistent. Complete the separate explicit D1-04 migration workflow and postflight before deploying W07."
+            echo "::error::D1-04 commerce, billing, or saved-payment-method migrations are pending or inconsistent. Complete the separate explicit D1-04 migration workflow and postflight before deploying W07."
             node -e "const r=require('/tmp/w07-d1-04-deploy-report.json'); console.error('Pending migrations:', (r.pendingMigrationIds || []).join(', '))"
             exit 1
           fi
-          echo "D1-04 deployment preflight passed: all reviewed commerce migrations and schema objects are already present."
+          echo "D1-04 deployment preflight passed: all reviewed commerce, billing, and saved-payment-method migrations and schema objects are already present."
 
       - name: Apply D1-01 Subscription migration
         if: steps.d1_preflight.outputs.migration_action == 'apply'
