@@ -208,6 +208,38 @@ describe('RevenueCat current subscriber reconciliation candidates', () => {
     expect(result.candidates[0]?.effectiveExpiresAt).toBe('2026-10-31T00:00:00.000Z');
   });
 
+  it('keeps an expired store subscription candidate when RevenueCat no longer returns an active entitlement', async () => {
+    const base = baseSnapshot();
+    const snapshot: RevenueCatSubscriberSnapshot = {
+      ...base,
+      entitlements: {},
+      subscriptions: {
+        ...base.subscriptions,
+        [PRODUCT_ID]: {
+          ...base.subscriptions[PRODUCT_ID]!,
+          expires_date: '2026-10-29T00:00:00.000Z',
+          grace_period_expires_date: null,
+          period_type: 'TRIAL',
+          original_transaction_id: '2000000999999999',
+        },
+      },
+    };
+    const { db } = fakeDb();
+    const result = await buildRevenueCatSubscriberReconciliationCandidates(
+      db,
+      { ...options, snapshot },
+      { nowMs: () => NOW },
+    );
+    expect(result.candidates).toHaveLength(1);
+    expect(result.candidates[0]).toMatchObject({
+      currentState: 'EXPIRED',
+      periodType: 'TRIAL',
+      effectiveExpiresAt: '2026-10-29T00:00:00.000Z',
+      entitlementIds: [],
+      originalTransactionId: '2000000999999999',
+    });
+  });
+
   it('marks an expired entitlement inactive based on the current snapshot', async () => {
     const base = baseSnapshot();
     const snapshot: RevenueCatSubscriberSnapshot = {
