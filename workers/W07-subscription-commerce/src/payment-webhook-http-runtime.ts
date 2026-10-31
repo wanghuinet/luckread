@@ -21,6 +21,7 @@ import { expirePendingSubscriptionPlanUpgradeForPayment } from './subscription-p
 type HyperswitchWebhookRuntimeEnv = Readonly<{
   D1_01: D1Database;
   D1_04: D1Database;
+  W06_GOVERNANCE?: Fetcher;
   HYPERSWITCH_WEBHOOK_SECRET?: string | null;
   HYPERSWITCH_MERCHANT_ID?: string | null;
 }>;
@@ -203,7 +204,7 @@ export async function handleHyperswitchWebhookRequest(
     }
     if (paymentId) {
       const sync = dependencies.syncRenewalOutcome ?? syncRenewalCycleOutcomeForPayment;
-      const renewalEnv = { D1_01: env.D1_01, D1_04: env.D1_04 };
+      const renewalEnv = { D1_01: env.D1_01, D1_04: env.D1_04, W06_GOVERNANCE: env.W06_GOVERNANCE };
       subscriptionSync = await sync(
         renewalEnv,
         paymentId,
