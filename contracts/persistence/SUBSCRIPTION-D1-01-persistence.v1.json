@@ -225,7 +225,7 @@
     "scheduled plan-change table schema, three indexes, seven table triggers, and one Subscription plan-write guard are verified by read-only D1-01 postflight",
     "positive, idempotent replay, conflicting idempotency, downgrade, interval change, failed-renewal retry, paid-application, pause/cancel cancellation, and direct-plan-write rejection evidence",
     "D1-01 migration 0006 immediate-upgrade application table, four indexes, seven application triggers, and replacement Subscription plan-write guard are verified by read-only postflight",
-    "Immediate upgrade proof binds the same subscriber, source/target immutable plan versions, Subscription version, unchanged billing period, D1-04 order/payment references, paid amount and currency",
+    "Immediate upgrade proof binds the same subscriber, source/target immutable plan versions, Subscription version, unchanged billing period and D1-04 order/payment references; paid amount and currency are verified from D1-04 only",
     "Only an authenticated/authorized W01 request may create an idempotent prorated D1-04 order; no client-supplied price or amount is admitted",
     "Only a signed successful Hyperswitch webhook may apply the immediate upgrade; duplicate webhook delivery returns the already-applied result without changing Subscription again",
     "Failed or pending payment leaves the source Subscription plan and entitlements unchanged"
@@ -361,7 +361,7 @@
   },
   "paidPlanUpgradeApplicationTable": {
     "name": "membership_subscription_plan_change_applications",
-    "purpose": "One-use D1-01 application proof that an existing Subscription may switch to a higher same-currency, same-billing-interval immutable plan version within the current paid period after its referenced D1-04 Order/Payment has succeeded through the signed Hyperswitch webhook path.",
+    "purpose": "One-use D1-01 application proof that an existing Subscription may switch to a higher same-currency, same-billing-interval immutable plan version within the current paid period after its referenced D1-04 Order/Payment has succeeded through the signed Hyperswitch webhook path. Financial amount and currency remain exclusively authoritative in D1-04.",
     "primaryKey": "application_id",
     "authority": "D1-01 stores the guarded plan transition proof only; D1-04 remains authoritative for Order, Payment, paid amount, currency and provider references.",
     "columns": [
@@ -433,18 +433,6 @@
       },
       {
         "name": "payment_id",
-        "type": "TEXT",
-        "nullable": false,
-        "primaryKey": false
-      },
-      {
-        "name": "amount_minor",
-        "type": "INTEGER",
-        "nullable": false,
-        "primaryKey": false
-      },
-      {
-        "name": "currency",
         "type": "TEXT",
         "nullable": false,
         "primaryKey": false
@@ -527,7 +515,7 @@
     "constraints": {
       "sourceAndTarget": "Source and target must be immutable versions of creator-owned plans from the same creator, same currency and billing interval; target list price must be higher.",
       "subscriptionCas": "The source plan/version, subscriber, Subscription version and current paid period must exactly match at insert and at the subsequent CAS update.",
-      "paymentEvidence": "order_id and payment_id are references to D1-04 facts. W07 creates the proof only from the signed Hyperswitch success-webhook fulfillment after verifying succeeded Payment and confirmed Order.",
+      "paymentEvidence": "order_id and payment_id are references to D1-04 facts. W07 verifies the succeeded Payment amount/currency against the confirmed Order in D1-04 before creating the application proof; D1-01 does not copy financial facts.",
       "immediateActivation": "A same-period Subscription plan update is permitted only while an exact READY application proof exists. The Subscription update and READY -> APPLIED transition are in one D1-01 batch.",
       "noPeriodReset": "Immediate upgrade preserves current_period_start and current_period_end; it does not add days or create a duplicate Subscription.",
       "idempotency": "Unique Order and Payment references plus deterministic application_id prevent a paid order or provider webhook replay from applying a second upgrade.",
