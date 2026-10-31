@@ -138,7 +138,7 @@ jobs:
       - name: Install repository typecheck dependencies from lockfile
         run: npm ci --ignore-scripts --no-audit --fund=false
       - name: Typecheck PAY-002 order modules
-        run: npx tsc --noEmit --strict --skipLibCheck --target ES2022 --module ESNext --moduleResolution Bundler --lib ES2022,DOM --types @cloudflare/workers-types workers/W07-subscription-commerce/src/order-item-resolution.ts workers/W07-subscription-commerce/src/order-persistence.ts workers/W07-subscription-commerce/src/order-http-runtime.ts workers/W07-subscription-commerce/src/billing-persistence.ts workers/W07-subscription-commerce/src/billing-read-http-runtime.ts workers/W07-subscription-commerce/src/demo-tax-pricing.ts workers/W07-subscription-commerce/src/taxjar-sandbox-pricing.ts workers/W07-subscription-commerce/src/payment-persistence.ts workers/W07-subscription-commerce/src/refund-persistence.ts workers/W07-subscription-commerce/src/refund-webhook-persistence.ts workers/W07-subscription-commerce/src/refund-http-runtime.ts workers/W07-subscription-commerce/src/payment-intent-http-runtime.ts workers/W07-subscription-commerce/src/renewal-runtime.ts workers/W07-subscription-commerce/src/subscription-renewal-outcome.ts workers/W07-subscription-commerce/src/payment-webhook-http-runtime.ts workers/W07-subscription-commerce/src/paid-membership-order-fulfillment.ts workers/W07-subscription-commerce/src/membership-store-product-binding.ts workers/W07-subscription-commerce/src/revenuecat-webhook-signature.ts workers/W07-subscription-commerce/src/revenuecat-subscriber-api.ts workers/W07-subscription-commerce/src/revenuecat-webhook-persistence.ts workers/W07-subscription-commerce/src/provider-webhook-body.ts workers/W07-subscription-commerce/src/revenuecat-webhook-http-runtime.ts workers/W07-subscription-commerce/src/revenuecat-subscriber-identity.ts workers/W07-subscription-commerce/src/revenuecat-subscriber-reconciliation.ts workers/W07-subscription-commerce/src/revenuecat-subscriber-reconciliation-runtime.ts workers/W07-subscription-commerce/src/revenuecat-subscriber-reconciliation-runtime.test.ts workers/W07-subscription-commerce/src/index.ts
+        run: npx tsc --noEmit --strict --skipLibCheck --target ES2022 --module ESNext --moduleResolution Bundler --lib ES2022,DOM --types @cloudflare/workers-types workers/W07-subscription-commerce/src/order-item-resolution.ts workers/W07-subscription-commerce/src/order-persistence.ts workers/W07-subscription-commerce/src/order-http-runtime.ts workers/W07-subscription-commerce/src/billing-persistence.ts workers/W07-subscription-commerce/src/billing-read-http-runtime.ts workers/W07-subscription-commerce/src/demo-tax-pricing.ts workers/W07-subscription-commerce/src/taxjar-sandbox-pricing.ts workers/W07-subscription-commerce/src/payment-persistence.ts workers/W07-subscription-commerce/src/refund-persistence.ts workers/W07-subscription-commerce/src/refund-webhook-persistence.ts workers/W07-subscription-commerce/src/refund-http-runtime.ts workers/W07-subscription-commerce/src/payment-intent-http-runtime.ts workers/W07-subscription-commerce/src/renewal-runtime.ts workers/W07-subscription-commerce/src/scheduled-subscription-plan-change.ts workers/W07-subscription-commerce/src/subscription-renewal-outcome.ts workers/W07-subscription-commerce/src/payment-webhook-http-runtime.ts workers/W07-subscription-commerce/src/paid-membership-order-fulfillment.ts workers/W07-subscription-commerce/src/membership-store-product-binding.ts workers/W07-subscription-commerce/src/revenuecat-webhook-signature.ts workers/W07-subscription-commerce/src/revenuecat-subscriber-api.ts workers/W07-subscription-commerce/src/revenuecat-webhook-persistence.ts workers/W07-subscription-commerce/src/provider-webhook-body.ts workers/W07-subscription-commerce/src/revenuecat-webhook-http-runtime.ts workers/W07-subscription-commerce/src/revenuecat-subscriber-identity.ts workers/W07-subscription-commerce/src/revenuecat-subscriber-reconciliation.ts workers/W07-subscription-commerce/src/revenuecat-subscriber-reconciliation-runtime.ts workers/W07-subscription-commerce/src/revenuecat-subscriber-reconciliation-runtime.test.ts workers/W07-subscription-commerce/src/index.ts
       - name: Run W07 subscription-commerce unit tests
         working-directory: workers/W01-payload
         run: LUCKREAD_VITEST_SCOPE=w07-unit pnpm exec vitest run --config workers/W01-payload/vitest.config.mts --root ../..
@@ -157,11 +157,13 @@ jobs:
           migration_2 = Path('workers/W07-subscription-commerce/migrations/0002_subscription_version_cas.sql').read_text()
           migration_3 = Path('workers/W07-subscription-commerce/migrations/0003_membership_plans.sql').read_text()
           migration_4 = Path('workers/W07-subscription-commerce/migrations/0004_revenuecat_membership_product_bindings.sql').read_text()
+          migration_5 = Path('workers/W07-subscription-commerce/migrations/0005_subscription_plan_changes.sql').read_text()
           db.executescript(migration_1)
           db.execute("""INSERT INTO membership_subscriptions (subscription_id, subscriber_id, plan_id, plan_version, creator_id, status, started_at, current_period_start, current_period_end, cancel_at, entitlement_snapshot_ref, created_at, updated_at) VALUES ('sub_migration_probe', 'user_migration_probe', 'plan_test', 1, NULL, 'PENDING', '2026-10-27T00:00:00.000Z', '2026-10-27T00:00:00.000Z', '2026-10-27T00:00:00.000Z', NULL, NULL, '2026-10-27T00:00:00.000Z', '2026-10-27T00:00:00.000Z')""")
           db.executescript(migration_2)
           db.executescript(migration_3)
           db.executescript(migration_4)
+          db.executescript(migration_5)
           cols = db.execute('PRAGMA table_info("membership_subscriptions")').fetchall()
           expected = {
             'subscription_id':('TEXT',1,1),'subscriber_id':('TEXT',1,0),'plan_id':('TEXT',1,0),'plan_version':('INTEGER',1,0),
@@ -279,6 +281,56 @@ jobs:
             raise SystemExit('RevenueCat binding history was deletable')
           except sqlite3.IntegrityError:
             pass
+          # Scheduled plan-change schema is D1-01 authority. A direct plan switch
+          # is rejected; failed renewal preserves the schedule; only the paid
+          # period-boundary CAS applies it. Pause/cancel cancels pending changes.
+          change_cols = {r[1]:(r[2],r[3],r[5]) for r in db.execute('PRAGMA table_info("membership_subscription_plan_changes")').fetchall()}
+          expected_change_cols = {
+            'change_id':('TEXT',1,1),'subscription_id':('TEXT',1,0),'subscriber_id':('TEXT',1,0),
+            'source_plan_id':('TEXT',1,0),'source_plan_version':('INTEGER',1,0),
+            'target_plan_id':('TEXT',1,0),'target_plan_version':('INTEGER',1,0),
+            'change_type':('TEXT',1,0),'effective_at':('TEXT',1,0),'status':('TEXT',1,0),
+            'request_hash':('TEXT',1,0),'version':('INTEGER',1,0),'created_at':('TEXT',1,0),'updated_at':('TEXT',1,0),
+          }
+          if change_cols != expected_change_cols: raise SystemExit(f'unexpected scheduled plan-change schema: {change_cols!r}')
+          change_indexes = {r[1] for r in db.execute('PRAGMA index_list("membership_subscription_plan_changes")').fetchall()}
+          required_change_indexes = {
+            'ux_membership_subscription_plan_changes_one_scheduled',
+            'ix_membership_subscription_plan_changes_subscriber_created',
+            'ix_membership_subscription_plan_changes_effective',
+          }
+          if not required_change_indexes.issubset(change_indexes): raise SystemExit(f'missing scheduled plan-change indexes: {change_indexes!r}')
+          change_triggers = {r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='trigger' AND tbl_name IN ('membership_subscription_plan_changes','membership_subscriptions')").fetchall()}
+          required_change_triggers = {
+            'membership_subscription_plan_changes_identity_immutable',
+            'membership_subscription_plan_changes_version_guard',
+            'membership_subscription_plan_changes_state_transition_guard',
+            'membership_subscription_plan_changes_applied_guard',
+            'membership_subscription_plan_changes_mark_applied',
+            'membership_subscription_plan_changes_cancel_on_lifecycle_change',
+            'membership_subscription_plan_changes_retained',
+            'membership_subscriptions_plan_change_requires_scheduled_record',
+          }
+          if not required_change_triggers.issubset(change_triggers): raise SystemExit(f'missing scheduled plan-change triggers: {change_triggers!r}')
+
+          db.execute("INSERT INTO membership_plans(plan_id,owner_type,owner_id,current_version,status,visibility,version,created_at,updated_at) VALUES ('plan_target','CREATOR','creator_probe',1,'ACTIVE','PUBLIC',1,'2026-10-27T00:00:00.000Z','2026-10-27T00:00:00.000Z')")
+          db.execute("INSERT INTO membership_plan_versions(plan_id,plan_version,name,tier,billing_interval,price_minor,currency,benefits_json,created_at) VALUES ('plan_target',1,'Target','basic','MONTHLY',50,'USD','[]','2026-10-27T00:00:00.000Z')")
+          db.execute("""INSERT INTO membership_subscriptions (subscription_id,subscriber_id,plan_id,plan_version,creator_id,status,started_at,current_period_start,current_period_end,cancel_at,entitlement_snapshot_ref,created_at,updated_at,version) VALUES ('sub_plan_change_probe','user_probe','plan_probe',1,'creator_probe','ACTIVE','2026-10-01T00:00:00.000Z','2026-10-01T00:00:00.000Z','2026-10-31T00:00:00.000Z',NULL,NULL,'2026-10-01T00:00:00.000Z','2026-10-01T00:00:00.000Z',1)""")
+          try:
+            db.execute("UPDATE membership_subscriptions SET plan_id='plan_target',plan_version=1,current_period_start='2026-10-31T00:00:00.000Z',updated_at='2026-10-31T00:01:00.000Z',version=2 WHERE subscription_id='sub_plan_change_probe'")
+            raise SystemExit('direct subscription plan mutation bypassed the schedule gate')
+          except sqlite3.IntegrityError:
+            pass
+          db.execute("""INSERT INTO membership_subscription_plan_changes(change_id,subscription_id,subscriber_id,source_plan_id,source_plan_version,target_plan_id,target_plan_version,change_type,effective_at,status,request_hash,version,created_at,updated_at) VALUES ('spc_aaaaaaaaaaaaaaaaaaaaaaaaaa','sub_plan_change_probe','user_probe','plan_probe',1,'plan_target',1,'DOWNGRADE','2026-10-31T00:00:00.000Z','SCHEDULED','aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',1,'2026-10-30T00:00:00.000Z','2026-10-30T00:00:00.000Z')""")
+          db.execute("UPDATE membership_subscriptions SET status='PAST_DUE',updated_at='2026-10-31T00:01:00.000Z',version=2 WHERE subscription_id='sub_plan_change_probe'")
+          if db.execute("SELECT status FROM membership_subscription_plan_changes WHERE change_id='spc_aaaaaaaaaaaaaaaaaaaaaaaaaa'").fetchone() != ('SCHEDULED',): raise SystemExit('failed renewal incorrectly canceled scheduled downgrade')
+          db.execute("UPDATE membership_subscriptions SET plan_id='plan_target',plan_version=1,current_period_start='2026-10-31T00:00:00.000Z',current_period_end='2026-11-30T00:00:00.000Z',status='ACTIVE',updated_at='2026-10-31T01:00:00.000Z',version=3 WHERE subscription_id='sub_plan_change_probe'")
+          if db.execute("SELECT status FROM membership_subscription_plan_changes WHERE change_id='spc_aaaaaaaaaaaaaaaaaaaaaaaaaa'").fetchone() != ('APPLIED',): raise SystemExit('paid period-boundary plan change was not applied')
+          db.execute("""INSERT INTO membership_subscriptions (subscription_id,subscriber_id,plan_id,plan_version,creator_id,status,started_at,current_period_start,current_period_end,cancel_at,entitlement_snapshot_ref,created_at,updated_at,version) VALUES ('sub_plan_cancel_probe','user_probe','plan_probe',1,'creator_probe','ACTIVE','2026-10-01T00:00:00.000Z','2026-10-01T00:00:00.000Z','2026-10-31T00:00:00.000Z',NULL,NULL,'2026-10-01T00:00:00.000Z','2026-10-01T00:00:00.000Z',1)""")
+          db.execute("""INSERT INTO membership_subscription_plan_changes(change_id,subscription_id,subscriber_id,source_plan_id,source_plan_version,target_plan_id,target_plan_version,change_type,effective_at,status,request_hash,version,created_at,updated_at) VALUES ('spc_bbbbbbbbbbbbbbbbbbbbbbbbbb','sub_plan_cancel_probe','user_probe','plan_probe',1,'plan_target',1,'DOWNGRADE','2026-10-31T00:00:00.000Z','SCHEDULED','bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',1,'2026-10-30T00:00:00.000Z','2026-10-30T00:00:00.000Z')""")
+          db.execute("UPDATE membership_subscriptions SET status='PAUSED',updated_at='2026-10-31T02:00:00.000Z',version=2 WHERE subscription_id='sub_plan_cancel_probe'")
+          if db.execute("SELECT status FROM membership_subscription_plan_changes WHERE change_id='spc_bbbbbbbbbbbbbbbbbbbbbbbbbb'").fetchone() != ('CANCELED',): raise SystemExit('pause failed to cancel a pending plan change')
+
           print('SUBSCRIPTION_D1_01_AND_MEMBERSHIP_PLAN_MIGRATIONS_STATIC=PASS')
           PY
 
