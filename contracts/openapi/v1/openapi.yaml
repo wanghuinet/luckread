@@ -2066,7 +2066,14 @@ paths:
               additionalProperties: false
               required: [planId]
               properties:
-                planId: { type: string, pattern: '^plan_[a-f0-9]{64}  /memberships/subscriptions/{subscriptionId}/cancel:
+                planId: { type: string, pattern: '^plan_[a-f0-9]{64}$' }
+      responses:
+        '201': { description: Prorated upgrade order created; subscription remains unchanged pending provider confirmation. }
+        '200': { description: Idempotent replay of the same upgrade checkout order. }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+  /memberships/subscriptions/{subscriptionId}/cancel:
     parameters:
       - name: subscriptionId
         in: path
