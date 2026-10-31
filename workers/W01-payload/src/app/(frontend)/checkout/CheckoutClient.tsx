@@ -13,6 +13,7 @@ type PaymentIntentData = {
   status: 'requires_payment_method' | 'requires_confirmation'
   version: number
   clientSecret: string
+  sdkAuthorization: string
 }
 type ApiEnvelope = { data?: unknown; error?: { message?: unknown }; requestId?: unknown }
 type HyperswitchPaymentElement = {
@@ -55,7 +56,7 @@ function readPaymentIntent(value: unknown, orderId: string): PaymentIntentData |
   if (!data || typeof data !== 'object' || Array.isArray(data)) return null
   const intent = data as Record<string, unknown>
   if (
-    Object.keys(intent).length !== 8 ||
+    Object.keys(intent).length !== 9 ||
     typeof intent.paymentId !== 'string' || !/^pay_[a-f0-9]{26}$/.test(intent.paymentId) ||
     intent.orderId !== orderId ||
     typeof intent.amountMinor !== 'number' || !Number.isSafeInteger(intent.amountMinor) || intent.amountMinor <= 0 ||
@@ -65,7 +66,10 @@ function readPaymentIntent(value: unknown, orderId: string): PaymentIntentData |
     typeof intent.version !== 'number' || !Number.isSafeInteger(intent.version) || intent.version < 1 ||
     typeof intent.clientSecret !== 'string' || intent.clientSecret.length < 1 ||
     intent.clientSecret.length > 4096 || intent.clientSecret.trim() !== intent.clientSecret ||
-    /[\u0000-\u001f\u007f]/.test(intent.clientSecret)
+    /[\u0000-\u001f\u007f]/.test(intent.clientSecret) ||
+    typeof intent.sdkAuthorization !== 'string' || intent.sdkAuthorization.length < 1 ||
+    intent.sdkAuthorization.length > 4096 || intent.sdkAuthorization.trim() !== intent.sdkAuthorization ||
+    /[\u0000-\u001f\u007f]/.test(intent.sdkAuthorization)
   ) return null
   return intent as PaymentIntentData
 }
