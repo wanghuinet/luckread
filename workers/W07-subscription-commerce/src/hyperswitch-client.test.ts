@@ -30,6 +30,7 @@ const responsePayment = (overrides: Record<string, unknown> = {}) => ({
   currency: input.currency,
   status: 'requires_payment_method',
   client_secret: 'pay_test_secret_only',
+  sdk_authorization: 'cHJvZmlsZV9pZD10ZXN0',
   ...overrides,
 })
 const jsonResponse = (body: unknown, status = 200, headers: HeadersInit = {}) =>
@@ -73,6 +74,7 @@ describe('Hyperswitch server-side payment intent client', () => {
       currency: 'USD',
       status: 'requires_payment_method',
       clientSecret: 'pay_test_secret_only',
+      sdkAuthorization: 'cHJvZmlsZV9pZD10ZXN0',
       paymentMethodId: null,
     })
   })
