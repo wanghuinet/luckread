@@ -76,3 +76,20 @@ membership.subscription.plan_change_scheduled
 ```
 
 A scheduled record remains pending until a verified successful renewal payment advances the Subscription period. A failed payment leaves the source plan in force and preserves the scheduled record for a retry; pause/cancel/expiration cancels the schedule.
+
+
+## 7. Durable trial lifecycle audit actions (W06)
+
+WEB trial start and cancellation use W01 authorization and immutable W06 audit records:
+
+```text
+membership.subscription.trial_requested
+membership.subscription.trial_started
+membership.subscription.trial_canceled
+```
+
+The request intent is recorded before W07 writes the D1-01 Subscription and trial row. The start/cancel result uses a stable event ID and source timestamp so a client retry cannot create a conflicting audit event. W06 records describe user intent and subscription lifecycle evidence; they are not payment facts.
+
+App Store and Play Store trial state is reconciled from a current RevenueCat customer snapshot only after W02 verifies the App User ID against the authenticated subscriber and W07 resolves the immutable store-product binding. Store purchase and renewal facts remain under App Store/Google Play and RevenueCat; an unverified webhook body or client field cannot start a trial or grant access.
+
+A WEB trial may be canceled while TRIALING or after its first MIT attempt has moved the Subscription to PAST_DUE. Cancellation sets cancel_at to trial_ends_at and blocks new retries while keeping access through the trial period. If a payment was already submitted before cancellation and the signed provider outcome later succeeds, the same Subscription may still convert to CONVERTED/ACTIVE; otherwise it expires at the trial boundary.
