@@ -240,7 +240,6 @@ async function applySubscriptionUpdate(
           'AND (cancel_at IS NULL OR cancel_at > ?) ' +
           "AND EXISTS (SELECT 1 FROM membership_subscription_scheduled_plan_changes c WHERE c.change_id = ? " +
           "AND c.status = 'SCHEDULED' AND c.subscription_id = ? AND c.subscriber_id = ? " +
-          'AND c.change_type = ? ' +
           'AND c.expected_plan_id = ? AND c.expected_plan_version = ? AND c.target_plan_id = ? ' +
           'AND c.target_plan_version = ? AND c.effective_at = ?)',
         ).bind(
@@ -249,7 +248,6 @@ async function applySubscriptionUpdate(
           subscription.status, subscription.version, subscription.current_period_start,
           subscription.current_period_end, cycle.cycle_start,
           scheduledChange.changeId, scheduledChange.subscriptionId, scheduledChange.subscriberId,
-          scheduledChange.changeType,
           scheduledChange.expectedPlanId, scheduledChange.expectedPlanVersion,
           scheduledChange.targetPlanId, scheduledChange.targetPlanVersion, scheduledChange.effectiveAt,
         ),
@@ -258,7 +256,7 @@ async function applySubscriptionUpdate(
           'applied_at = ?, applied_subscription_version = ?, updated_at = ?, version = version + 1 ' +
           "WHERE change_id = ? AND status = 'SCHEDULED' AND subscription_id = ? AND subscriber_id = ? " +
           'AND expected_plan_id = ? AND expected_plan_version = ? AND target_plan_id = ? ' +
-          'AND target_plan_version = ? AND effective_at = ? AND change_type = ? ' +
+          'AND target_plan_version = ? AND effective_at = ? ' +
           'AND EXISTS (SELECT 1 FROM membership_subscriptions s WHERE s.subscription_id = ? ' +
           'AND s.subscriber_id = ? AND s.plan_id = ? AND s.plan_version = ? ' +
           'AND s.version = ? AND s.current_period_start = ? AND s.current_period_end = ?)',
@@ -267,7 +265,6 @@ async function applySubscriptionUpdate(
           scheduledChange.changeId, scheduledChange.subscriptionId, scheduledChange.subscriberId,
           scheduledChange.expectedPlanId, scheduledChange.expectedPlanVersion,
           scheduledChange.targetPlanId, scheduledChange.targetPlanVersion, scheduledChange.effectiveAt,
-          scheduledChange.changeType,
           cycle.subscription_id, cycle.subscriber_id, nextPlanId, nextPlanVersion,
           subscription.version + 1, nextPeriodStart, nextPeriodEnd,
         ),
