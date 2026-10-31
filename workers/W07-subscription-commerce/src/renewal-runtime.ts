@@ -18,6 +18,10 @@ import {
   type PaymentAttemptDto,
 } from './payment-persistence.js';
 import {
+  readScheduledSubscriptionPlanDowngradeForPeriod,
+  readScheduledDowngradeTargetPlan,
+} from './subscription-plan-change-schedule.js';
+import {
   createHyperswitchMerchantInitiatedPayment,
   HyperswitchClientError,
   type HyperswitchClientConfig,
@@ -454,12 +458,51 @@ async function insertOrReadCycle(
   const cycleEnd = addBillingPeriod(cycleStart, subscription.billing_interval);
   const cycleId = await renewalCycleIdFor(subscription.subscription_id, cycleStart, cycleEnd);
 
+  const scheduledChange = await readScheduledSubscriptionPlanDowngradeForPeriod(
+    env.D1_01, subscription.subscription_id, subscription.subscriber_id, cycleStart, false,
+  );
+  let cyclePlan = {
+    planId: cyclePlan.planId,
+    planVersion: cyclePlan.planVersion,
+    name: cyclePlan.name,
+    tier: cyclePlan.tier,
+    billingInterval: cyclePlan.billingInterval as 'MONTHLY' | 'YEARLY',
+    priceMinor: cyclePlan.priceMinor,
+    currency: cyclePlan.currency,
+    benefitsJson: subscription.benefits_json,
+  };
+  if (scheduledChange) {
+    if (scheduledChange.status !== 'SCHEDULED' ||
+        scheduledChange.expectedPlanId !== subscription.plan_id ||
+        scheduledChange.expectedPlanVersion !== subscription.plan_version ||
+        scheduledChange.effectiveAt !== cycleStart) {
+      throw new RenewalRuntimeError('SCHEDULED_PLAN_CHANGE_MISMATCH', 503);
+    }
+    const target = await readScheduledDowngradeTargetPlan(env.D1_01, scheduledChange);
+    if (!target || target.creatorId !== subscription.creator_id ||
+        target.billingInterval !== subscription.billing_interval ||
+        target.currency !== subscription.currency ||
+        target.priceMinor >= subscription.price_minor) {
+      throw new RenewalRuntimeError('SCHEDULED_PLAN_TARGET_INVALID', 503);
+    }
+    cyclePlan = {
+      planId: target.planId,
+      planVersion: target.planVersion,
+      name: target.name,
+      tier: target.tier,
+      billingInterval: target.billingInterval,
+      priceMinor: target.priceMinor,
+      currency: target.currency,
+      benefitsJson: JSON.stringify(target.benefits),
+    };
+  }
+
   // PAST_DUE may only resume a previously recorded cycle; never synthesize a
   // second cycle to "repair" a missing paid-cycle record.
   if (subscription.status === 'PAST_DUE') {
     const existing = await readCycleByPeriod(env.D1_04, subscription.subscription_id, cycleStart);
     if (!existing || existing.cycle_id !== cycleId || existing.cycle_end !== cycleEnd ||
-        existing.plan_id !== subscription.plan_id || existing.plan_version !== subscription.plan_version ||
+        existing.plan_id !== cyclePlan.planId || existing.plan_version !== cyclePlan.planVersion ||
         existing.subscriber_id !== subscription.subscriber_id) {
       throw new RenewalRuntimeError('PAST_DUE_CYCLE_MISSING_OR_MISMATCHED', 503);
     }
@@ -468,7 +511,7 @@ async function insertOrReadCycle(
 
   let benefits: unknown;
   try {
-    benefits = JSON.parse(subscription.benefits_json) as unknown;
+    benefits = JSON.parse(cyclePlan.benefitsJson) as unknown;
   } catch {
     throw new RenewalRuntimeError('SUBSCRIPTION_SNAPSHOT_INVALID', 503);
   }
@@ -505,8 +548,8 @@ async function insertOrReadCycle(
   ).run();
   const cycle = await readCycleByPeriod(env.D1_04, subscription.subscription_id, cycleStart);
   if (!cycle) throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
-  if (cycle.cycle_end !== cycleEnd || cycle.plan_id !== subscription.plan_id ||
-      cycle.plan_version !== subscription.plan_version || cycle.subscriber_id !== subscription.subscriber_id) {
+  if (cycle.cycle_end !== cycleEnd || cycle.plan_id !== cyclePlan.planId ||
+      cycle.plan_version !== cyclePlan.planVersion || cycle.subscriber_id !== subscription.subscriber_id) {
     throw new RenewalRuntimeError('CYCLE_IDENTITY_CONFLICT', 409);
   }
   return cycle;
@@ -649,15 +692,26 @@ async function isSubscriptionChargeableForCycle(
     throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
   }
   const retryingPastDue = cycle.outcome_code === 'RETRY_PREPARED' || cycle.attempt_number > 1;
-  return !!subscription &&
-    subscription.subscription_id === cycle.subscription_id &&
-    subscription.subscriber_id === cycle.subscriber_id &&
-    subscription.plan_id === cycle.plan_id &&
-    subscription.plan_version === cycle.plan_version &&
-    subscription.current_period_end === cycle.cycle_start &&
-    (subscription.status === 'ACTIVE' || (retryingPastDue && subscription.status === 'PAST_DUE')) &&
-    (subscription.cancel_at === null ||
-      (isCanonicalIso(subscription.cancel_at) && subscription.cancel_at > cycle.cycle_start));
+  if (!subscription ||
+      subscription.subscription_id !== cycle.subscription_id ||
+      subscription.subscriber_id !== cycle.subscriber_id ||
+      subscription.current_period_end !== cycle.cycle_start ||
+      !(subscription.status === 'ACTIVE' || (retryingPastDue && subscription.status === 'PAST_DUE')) ||
+      !(subscription.cancel_at === null ||
+        (isCanonicalIso(subscription.cancel_at) && subscription.cancel_at > cycle.cycle_start))) return false;
+  if (subscription.plan_id === cycle.plan_id && subscription.plan_version === cycle.plan_version) return true;
+
+  const scheduled = await readScheduledSubscriptionPlanDowngradeForPeriod(
+    env.D1_01, cycle.subscription_id, cycle.subscriber_id, cycle.cycle_start, false,
+  );
+  if (!scheduled || scheduled.status !== 'SCHEDULED' ||
+      scheduled.expectedPlanId !== subscription.plan_id ||
+      scheduled.expectedPlanVersion !== subscription.plan_version ||
+      scheduled.targetPlanId !== cycle.plan_id ||
+      scheduled.targetPlanVersion !== cycle.plan_version) return false;
+  const target = await readScheduledDowngradeTargetPlan(env.D1_01, scheduled);
+  return !!target && target.creatorId === subscription.creator_id &&
+    target.billingInterval === cycle.billing_interval && target.currency === cycle.currency;
 }
 
 async function writeCycleReconciliation(
