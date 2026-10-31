@@ -2531,13 +2531,19 @@
       "path": "/v1/memberships/subscriptions/{subscriptionId}/change-plan",
       "openapiPath": "/memberships/subscriptions/{subscriptionId}/change-plan",
       "domain": "subscription_entitlement_payment",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
+      "status": "IMPLEMENTED",
+      "featureIds": [
+        "MON-003",
+        "MON-005"
+      ],
+      "schemaRef": "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json#scheduledPlanChangeTable",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/memberships/subscriptions/{subscriptionId}/change-plan",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
+        "contracts/api/api-inventory.v1.json",
+        "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json",
+        "contracts/state-machines/membership-subscription-plan-change.json",
+        "docs/112-MEMBERSHIP-EVENT-CONTRACT-v1.0.md"
       ]
     },
     {
