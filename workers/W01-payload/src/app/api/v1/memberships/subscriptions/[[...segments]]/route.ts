@@ -345,6 +345,7 @@ async function forward(request: Request, context: RouteContext): Promise<Respons
             trialId: String(trial.trialId),
             planVersion: Number(trial.planVersion),
             trialEndsAt: String(trial.trialEndsAt),
+            previousStatus: subscription.status === 'PAST_DUE' ? 'PAYMENT_FAILED' : 'TRIALING',
             occurredAt: String(trial.updatedAt),
           },
         })
