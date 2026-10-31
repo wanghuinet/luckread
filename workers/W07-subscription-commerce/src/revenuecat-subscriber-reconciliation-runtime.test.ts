@@ -62,6 +62,7 @@ const successDependencies = (
   overrides: Partial<RevenueCatSubscriberReconciliationRuntimeDependencies> = {},
 ): RevenueCatSubscriberReconciliationRuntimeDependencies => ({
   fetchSubscriber: vi.fn(async () => snapshot) as unknown as typeof import('./revenuecat-subscriber-api.js').fetchRevenueCatSubscriber,
+  syncStoreTrials: vi.fn(async () => ({ created: 0, canceled: 0, converted: 0, expired: 0, unchanged: 0 })) as unknown as typeof import('./membership-trial-runtime.js').syncRevenueCatStoreTrialCandidates,
   buildCandidates: vi.fn(async () => ({
     appUserId: USER_ID,
     originalAppUserId: USER_ID,
