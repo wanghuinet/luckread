@@ -49,7 +49,8 @@
     "No upgrade entitlement becomes effective before a verified successful payment.",
     "D1-01 stores subscription transition evidence only; Order, Payment, amount and currency remain authoritative in D1-04.",
     "A READY application may retry the subscription CAS after a transient version race without reattaching or replacing the payment_id.",
-    "APPLIED is terminal and duplicate signed webhook delivery is idempotent."
+    "APPLIED is terminal and duplicate signed webhook delivery is idempotent.",
+    "A pending immediate upgrade checkout and a scheduled next-period plan change cannot coexist; both D1-01 insert guards enforce mutual exclusion."
   ],
   "forbiddenTransitions": [
     "PENDING_PAYMENT -> APPLIED",
