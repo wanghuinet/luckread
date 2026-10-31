@@ -1867,7 +1867,7 @@ paths:
                         type: array
                         items:
                           type: object
-                          required: [planId, creatorId, planVersion, name, tier, billingInterval, priceMinor, currency, benefits, status, visibility, version, createdAt, updatedAt, etag]
+                          required: [planId, creatorId, planVersion, name, tier, billingInterval, priceMinor, currency, benefits, trialPeriodDays, status, visibility, version, createdAt, updatedAt, etag]
                           properties:
                             planId: { type: string }
                             creatorId: { type: string }
@@ -1878,6 +1878,7 @@ paths:
                             priceMinor: { type: integer, minimum: 0, maximum: 2147483647 }
                             currency: { type: string, pattern: '^[A-Z]{3}$' }
                             benefits: { type: array, items: { type: string, minLength: 1, maxLength: 180 } }
+                            trialPeriodDays: { type: integer, minimum: 0, maximum: 30 }
                             status: { type: string, enum: [DRAFT, ACTIVE, PAUSED, RETIRED] }
                             visibility: { type: string, enum: [PRIVATE, PUBLIC] }
                             version: { type: integer, minimum: 1 }
@@ -1895,7 +1896,7 @@ paths:
       tags: [Creators]
       summary: Create a private membership plan draft
       operationId: createOwnMembershipPlanDraft
-      description: Requires membership.plan.create.own. Creator ID, plan ID, version, status and visibility are server-controlled. No subscription, payment or entitlement is created.
+      description: Requires membership.plan.create.own. Creator ID, plan ID, version, status and visibility are server-controlled. trialPeriodDays configures a 1-30 day free trial; omitted or zero disables trials. No subscription, payment or entitlement is created.
       parameters:
         - $ref: '#/components/parameters/IdempotencyKeyRequired'
       requestBody:
@@ -1916,6 +1917,7 @@ paths:
                   type: array
                   maxItems: 20
                   items: { type: string, minLength: 1, maxLength: 180 }
+                trialPeriodDays: { type: integer, minimum: 0, maximum: 30, default: 0 }
       responses:
         '201':
           description: Private draft created.
@@ -1930,7 +1932,7 @@ paths:
                 properties:
                   data:
                     type: object
-                    required: [planId, creatorId, planVersion, name, tier, billingInterval, priceMinor, currency, benefits, status, visibility, version, createdAt, updatedAt, etag, replayed]
+                    required: [planId, creatorId, planVersion, name, tier, billingInterval, priceMinor, currency, benefits, trialPeriodDays, status, visibility, version, createdAt, updatedAt, etag, replayed]
                     properties:
                       planId: { type: string }
                       creatorId: { type: string }
@@ -1941,6 +1943,7 @@ paths:
                       priceMinor: { type: integer, minimum: 0, maximum: 2147483647 }
                       currency: { type: string, pattern: '^[A-Z]{3}$' }
                       benefits: { type: array, items: { type: string } }
+                      trialPeriodDays: { type: integer, minimum: 0, maximum: 30 }
                       status: { type: string, const: DRAFT }
                       visibility: { type: string, const: PRIVATE }
                       version: { type: integer, const: 1 }
@@ -2008,6 +2011,31 @@ paths:
                 planId: { $ref: '#/components/schemas/ResourceId' }
       responses:
         '201': { description: Subscription created. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
+  /memberships/subscriptions/trial:
+    post:
+      tags: [Users]
+      summary: Start a creator-configured free trial
+      description: Starts the immutable trial period configured on the selected active public creator plan. Only one trial may be claimed per subscriber and creator. The trial grants access only until trialEndsAt; no Order, PaymentIntent or immediate charge is created. At trial end, the existing W07 renewal pipeline uses an active saved payment mandate to create the first paid cycle. If no active mandate is available, the cycle remains AWAITING_MANDATE and the expired trial does not continue granting content access.
+      operationId: startSubscriptionTrial
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [planId]
+              properties:
+                planId: { type: string, pattern: '^plan_[a-f0-9]{64}$' }
+      responses:
+        '201': { description: Trial started after the W06 audit event is durably confirmed; no immediate payment or Order is created. }
+        '200': { description: Idempotent replay of the same trial request. }
+        '409': { description: Trial is not configured for the plan, or the subscriber already has an active creator membership or a prior trial for this creator. }
+        '428': { description: Idempotency-Key is required. }
         '4XX': { $ref: '#/components/responses/ClientError' }
 
   /memberships/subscriptions/{subscriptionId}:
@@ -4397,7 +4425,8 @@ paths:
       description: >-
         Requires membership.plan.update.own and an ACTIVE creator identity.
         If-Match must match the current plan ETag. W07 appends a new immutable
-        plan version and conditionally advances the current pointer. Existing
+        plan version and conditionally advances the current pointer. trialPeriodDays
+        is optional; when omitted, the current version's setting is retained. Existing
         subscriptions retain their prior plan version and benefits snapshot.
         W01 confirms a durable W06 intent before mutation and the immutable
         update audit afterward. Retired plans cannot be revised.
@@ -4426,6 +4455,7 @@ paths:
                   maxItems: 20
                   uniqueItems: true
                   items: { type: string, minLength: 1, maxLength: 180 }
+                trialPeriodDays: { type: integer, minimum: 0, maximum: 30 }
       responses:
         '200':
           description: Updated current plan version or exact successful retry.
@@ -4442,7 +4472,7 @@ paths:
                 properties:
                   data:
                     type: object
-                    required: [planId, creatorId, planVersion, name, tier, billingInterval, priceMinor, currency, benefits, status, visibility, version, etag, replayed, createdAt, updatedAt]
+                    required: [planId, creatorId, planVersion, name, tier, billingInterval, priceMinor, currency, benefits, trialPeriodDays, status, visibility, version, etag, replayed, createdAt, updatedAt]
                     properties:
                       planId: { type: string, pattern: '^plan_[a-f0-9]{64}$' }
                       creatorId: { $ref: '#/components/schemas/ResourceId' }
@@ -4456,6 +4486,7 @@ paths:
                         type: array
                         maxItems: 20
                         items: { type: string, minLength: 1, maxLength: 180 }
+                      trialPeriodDays: { type: integer, minimum: 0, maximum: 30 }
                       status: { type: string, enum: [DRAFT, ACTIVE, PAUSED] }
                       visibility: { type: string, enum: [PRIVATE, PUBLIC] }
                       version: { type: integer, minimum: 1 }
