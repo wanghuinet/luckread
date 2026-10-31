@@ -100,3 +100,26 @@ export function fetchActiveMembershipPlansPage(options: PlanPageOptions = {}) {
     signal: options.signal,
   });
 }
+
+
+/** Create a customer-owned order for one immutable membership plan version. Price and tax remain server-resolved. */
+export function createMembershipOrder(planId: string) {
+  if (typeof planId !== 'string' || !/^plan_[a-f0-9]{64}$/.test(planId)) {
+    throw new TypeError('A valid published membership plan ID is required.');
+  }
+  return apiRequest<unknown>('/commerce/orders', {
+    method: 'POST',
+    body: JSON.stringify({ items: [{ itemRef: planId, quantity: 1 }] }),
+  });
+}
+
+/** Create an unconfirmed Hyperswitch intent for an existing customer-owned order. */
+export function createMembershipPaymentIntent(orderId: string) {
+  if (typeof orderId !== 'string' || !/^ord_[A-Za-z0-9_-]{1,90}$/.test(orderId)) {
+    throw new TypeError('A valid membership order ID is required.');
+  }
+  return apiRequest<unknown>('/payments/intents', {
+    method: 'POST',
+    body: JSON.stringify({ orderId }),
+  });
+}
