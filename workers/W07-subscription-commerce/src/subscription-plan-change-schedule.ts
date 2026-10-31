@@ -137,8 +137,25 @@ async function readScheduledChangeByIdempotency(
       'applied_at, applied_subscription_version, created_at, updated_at, version ' +
       'FROM membership_subscription_scheduled_plan_changes WHERE subscriber_id = ? AND idempotency_key_hash = ? LIMIT 1',
     ).bind(subscriberId, keyHash).first<ScheduledPlanChangeRow>();
-  } catch {
-    throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
+  } catch (error) {
+    // Migration 0007 adds change_type after the 0006 schedule table. During
+    // that controlled transition window, legacy rows are necessarily
+    // DOWNGRADE records; preserve their idempotent replay semantics.
+    const message = error instanceof Error ? error.message : String(error);
+    if (!/no such column:\s*change_type/i.test(message)) {
+      throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
+    }
+    try {
+      const legacy = await db.prepare(
+        'SELECT change_id, subscriber_id, subscription_id, expected_subscription_version, expected_plan_id, ' +
+        'expected_plan_version, target_plan_id, target_plan_version, effective_at, idempotency_key_hash, status, ' +
+        'applied_at, applied_subscription_version, created_at, updated_at, version ' +
+        'FROM membership_subscription_scheduled_plan_changes WHERE subscriber_id = ? AND idempotency_key_hash = ? LIMIT 1',
+      ).bind(subscriberId, keyHash).first<Omit<ScheduledPlanChangeRow, 'change_type'>>();
+      return legacy ? { ...legacy, change_type: 'DOWNGRADE' } : null;
+    } catch {
+      throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
+    }
   }
 }
 
