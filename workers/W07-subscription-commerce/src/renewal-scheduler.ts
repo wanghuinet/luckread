@@ -11,6 +11,7 @@ import {
   syncPendingRenewalOutcomes,
   type RenewalOutcomeSyncResult,
 } from './subscription-renewal-outcome.js';
+import { expireDueWebMembershipTrials } from './membership-trial-runtime.js';
 
 const MAX_CYCLES_PER_TICK = 5;
 const MAX_OUTCOMES_PER_TICK = 10;
@@ -19,6 +20,7 @@ const REQUIRED_D1_01_TABLES = [
   'membership_subscriptions',
   'membership_plans',
   'membership_plan_versions',
+  'membership_subscription_trials',
 ] as const;
 
 const REQUIRED_D1_04_TABLES = [
@@ -41,7 +43,7 @@ export type RenewalScheduledBatchResult =
     }>
   | Readonly<{
       status: 'PARTIAL';
-      phase: 'OUTCOME_SYNC_BEFORE' | 'DUE_SCAN' | 'OUTCOME_SYNC_AFTER';
+      phase: 'OUTCOME_SYNC_BEFORE' | 'TRIAL_EXPIRY' | 'DUE_SCAN' | 'OUTCOME_SYNC_AFTER';
       beforeRecovery?: OutcomeBatch;
     }>
   | Readonly<{
@@ -51,6 +53,7 @@ export type RenewalScheduledBatchResult =
       processFailures: number;
       cycleResults: readonly RenewalProcessResult[];
       beforeRecovery: OutcomeBatch;
+      trialExpiry: Readonly<{ scanned: number; expired: number }>;
       afterRecovery: OutcomeBatch | null;
     }>;
 
@@ -125,6 +128,13 @@ export async function runRenewalScheduledBatch(
     };
   }
 
+  let trialExpiry: Readonly<{ scanned: number; expired: number }>;
+  try {
+    trialExpiry = await expireDueWebMembershipTrials(env.D1_01, new Date(), 100, env.D1_04);
+  } catch {
+    return { status: 'PARTIAL', phase: 'TRIAL_EXPIRY', beforeRecovery };
+  }
+
   let dueScan: RenewalScanResult;
   try {
     dueScan = await scanDue(env, { limit: MAX_CYCLES_PER_TICK });
@@ -172,6 +182,7 @@ export async function runRenewalScheduledBatch(
     processFailures,
     cycleResults,
     beforeRecovery,
+    trialExpiry,
     afterRecovery,
   };
 }
