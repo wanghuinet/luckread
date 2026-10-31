@@ -625,13 +625,15 @@ async function applyPaidSubscriptionPlanUpgrade(
         "UPDATE membership_subscription_plan_change_attempts SET status = 'APPLIED', applied_at = ?, " +
         'applied_subscription_version = ?, updated_at = ?, version = version + 1 ' +
         "WHERE attempt_id = ? AND subscriber_id = ? AND subscription_id = ? AND order_id = ? AND status = 'PENDING_PAYMENT' " +
-        'AND expected_subscription_version = ? AND target_plan_id = ? AND target_plan_version = ? AND expires_at >= ? ' +
+        'AND expected_subscription_version = ? AND expected_plan_id = ? AND expected_plan_version = ? ' +
+        'AND target_plan_id = ? AND target_plan_version = ? AND current_period_start = ? AND current_period_end = ? AND expires_at >= ? ' +
         'AND EXISTS (SELECT 1 FROM membership_subscriptions s WHERE s.subscription_id = ? AND s.subscriber_id = ? ' +
         'AND s.plan_id = ? AND s.plan_version = ? AND s.version = ? AND s.entitlement_snapshot_ref = ?)',
       ).bind(
         order.confirmed_at!, change.expectedSubscriptionVersion + 1, updatedAt,
         attempt.attempt_id, change.subscriberId, change.subscriptionId, order.order_id,
-        change.expectedSubscriptionVersion, change.targetPlanId, change.targetPlanVersion, order.confirmed_at!,
+        change.expectedSubscriptionVersion, change.expectedPlanId, change.expectedPlanVersion,
+        change.targetPlanId, change.targetPlanVersion, change.currentPeriodStart, change.currentPeriodEnd, order.confirmed_at!,
         change.subscriptionId, change.subscriberId, change.targetPlanId, change.targetPlanVersion,
         change.expectedSubscriptionVersion + 1, entitlementRef,
       ),
