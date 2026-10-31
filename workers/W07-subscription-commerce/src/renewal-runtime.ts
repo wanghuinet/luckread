@@ -455,9 +455,6 @@ async function insertOrReadCycle(
     throw new RenewalRuntimeError('SUBSCRIPTION_SNAPSHOT_INVALID', 503);
   }
   const cycleStart = subscription.current_period_end;
-  const cycleEnd = addBillingPeriod(cycleStart, subscription.billing_interval);
-  const cycleId = await renewalCycleIdFor(subscription.subscription_id, cycleStart, cycleEnd);
-
   const scheduledChange = await readScheduledSubscriptionPlanDowngradeForPeriod(
     env.D1_01, subscription.subscription_id, subscription.subscriber_id, cycleStart, false,
   );
@@ -479,10 +476,14 @@ async function insertOrReadCycle(
       throw new RenewalRuntimeError('SCHEDULED_PLAN_CHANGE_MISMATCH', 503);
     }
     const target = await readScheduledDowngradeTargetPlan(env.D1_01, scheduledChange);
+    const validChangeType = scheduledChange.changeType === 'DOWNGRADE'
+      ? target?.billingInterval === subscription.billing_interval &&
+        target.priceMinor < subscription.price_minor
+      : scheduledChange.changeType === 'BILLING_INTERVAL_CHANGE'
+        ? target?.billingInterval !== subscription.billing_interval
+        : false;
     if (!target || target.creatorId !== subscription.creator_id ||
-        target.billingInterval !== subscription.billing_interval ||
-        target.currency !== subscription.currency ||
-        target.priceMinor >= subscription.price_minor) {
+        !validChangeType || target.currency !== subscription.currency) {
       throw new RenewalRuntimeError('SCHEDULED_PLAN_TARGET_INVALID', 503);
     }
     cyclePlan = {
@@ -496,6 +497,11 @@ async function insertOrReadCycle(
       benefitsJson: JSON.stringify(target.benefits),
     };
   }
+  // The cycle's immutable target offer controls both its charge and the next
+  // period length. This is required for MONTHLY <-> YEARLY changes; the
+  // existing active period remains untouched until this renewal succeeds.
+  const cycleEnd = addBillingPeriod(cycleStart, cyclePlan.billingInterval);
+  const cycleId = await renewalCycleIdFor(subscription.subscription_id, cycleStart, cycleEnd);
 
   // PAST_DUE may only resume a previously recorded cycle; never synthesize a
   // second cycle to "repair" a missing paid-cycle record.
