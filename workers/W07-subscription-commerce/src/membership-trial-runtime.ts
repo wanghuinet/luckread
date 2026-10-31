@@ -800,7 +800,7 @@ export async function syncRevenueCatStoreTrialCandidates(
         if (nextPeriodEndMs <= Date.parse(nextPeriodStart)) {
           throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500);
         }
-        const cancelAt = candidate.unsubscribeDetectedAt ? nextPeriodEnd : subscription.cancel_at;
+        const cancelAt = candidate.unsubscribeDetectedAt ? nextPeriodEnd : null;
         const updatedAt = new Date(Math.max(Date.now(), Date.parse(subscription.updated_at) + 1)).toISOString();
         const result = await db.prepare(
           "UPDATE membership_subscriptions SET current_period_start = ?, current_period_end = ?, " +
@@ -817,6 +817,17 @@ export async function syncRevenueCatStoreTrialCandidates(
         const result = await db.prepare(
           "UPDATE membership_subscriptions SET cancel_at = current_period_end, updated_at = ?, version = version + 1 " +
           "WHERE subscription_id = ? AND subscriber_id = ? AND status = 'ACTIVE' AND version = ? AND cancel_at IS NULL",
+        ).bind(updatedAt, subscription.subscription_id, subscriberId, subscription.version).run();
+        if (Number(result.meta?.changes ?? 0) !== 1) throw new SubscriptionRuntimeError('PRECONDITION_FAILED', 412);
+      } else if (!candidate.unsubscribeDetectedAt && subscription.cancel_at === subscription.current_period_end) {
+        // RevenueCat reports that auto-renew was re-enabled. Remove the prior
+        // period-end cancellation instead of accidentally expiring the newly
+        // extended paid period.
+        const updatedAt = new Date(Math.max(Date.now(), Date.parse(subscription.updated_at) + 1)).toISOString();
+        const result = await db.prepare(
+          "UPDATE membership_subscriptions SET cancel_at = NULL, updated_at = ?, version = version + 1 " +
+          "WHERE subscription_id = ? AND subscriber_id = ? AND status = 'ACTIVE' AND version = ? " +
+          "AND cancel_at = current_period_end",
         ).bind(updatedAt, subscription.subscription_id, subscriberId, subscription.version).run();
         if (Number(result.meta?.changes ?? 0) !== 1) throw new SubscriptionRuntimeError('PRECONDITION_FAILED', 412);
       }
