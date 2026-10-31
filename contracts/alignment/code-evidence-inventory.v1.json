@@ -408,7 +408,8 @@
       "testRefs": [
         "workers/W07-subscription-commerce/src/paid-membership-plan-upgrade-application.test.ts",
         ".github/workflows/w07-subscription-runtime-ci.yml",
-        "workers/W07-subscription-commerce/src/paid-membership-order-fulfillment.test.ts"
+        "workers/W07-subscription-commerce/src/paid-membership-order-fulfillment.test.ts",
+        "workers/W07-subscription-commerce/src/payment-intent-http-runtime.test.ts"
       ],
       "schemaEvidenceRefs": [
         "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json#paidPlanUpgradeApplicationTable"
@@ -424,7 +425,8 @@
         "D1-01 migration 0006 is a reviewed code candidate only and has not been applied; no production entitlement change is admitted until migration postflight is complete.",
         "Upgrade order creation uses the existing demo/sandbox tax-pricing admission only; live authoritative pricing/tax remains fail-closed and is not represented as production-ready.",
         "Code-level regression cases were authored but not executed in this feature-first pass; full unit, CI and signed production E2E validation remain deferred until the remaining feature units are complete.",
-        "The read-only plan-change preview draft PR #1445 remains separate and unmerged; the upgrade checkout recomputes the authoritative quote inside W07 and does not trust the preview response."
+        "The read-only plan-change preview draft PR #1445 remains separate and unmerged; the upgrade checkout recomputes the authoritative quote inside W07 and does not trust the preview response.",
+        "One active PENDING_PAYMENT/READY upgrade reservation is enforced per Subscription; reservations remain associated with their D1-04 Order and must be resumed or reconciled if a customer abandons checkout."
       ]
     },
     {
