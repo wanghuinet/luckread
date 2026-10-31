@@ -15,8 +15,6 @@ type ApplicationRow = Readonly<{
   current_period_end: string;
   order_id: string;
   payment_id: string;
-  amount_minor: number;
-  currency: string;
   request_hash: string;
   status: 'READY' | 'APPLIED';
 }>;
@@ -107,8 +105,6 @@ function matchesApplication(row: ApplicationRow, input: PaidMembershipUpgradeApp
     row.current_period_end === input.currentPeriodEnd &&
     row.order_id === input.orderId &&
     row.payment_id === input.paymentId &&
-    row.amount_minor === input.amountMinor &&
-    row.currency === input.currency &&
     row.request_hash === input.requestHash;
 }
 
@@ -147,7 +143,7 @@ export async function applyPaidMembershipPlanUpgrade(
     existing = await db.prepare(
       'SELECT application_id, subscription_id, subscriber_id, source_plan_id, source_plan_version, ' +
       'target_plan_id, target_plan_version, expected_subscription_version, current_period_start, ' +
-      'current_period_end, order_id, payment_id, amount_minor, currency, request_hash, status ' +
+      'current_period_end, order_id, payment_id, request_hash, status ' +
       'FROM membership_subscription_plan_change_applications WHERE order_id = ? OR payment_id = ? LIMIT 1',
     ).bind(input.orderId, input.paymentId).first<ApplicationRow>();
   } catch {
@@ -191,13 +187,13 @@ export async function applyPaidMembershipPlanUpgrade(
         'INSERT INTO membership_subscription_plan_change_applications ' +
         '(application_id, subscription_id, subscriber_id, source_plan_id, source_plan_version, ' +
         'target_plan_id, target_plan_version, expected_subscription_version, current_period_start, ' +
-        'current_period_end, order_id, payment_id, amount_minor, currency, request_hash, status, version, created_at, updated_at) ' +
+        'current_period_end, order_id, payment_id, request_hash, status, version, created_at, updated_at) ' +
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'READY', 1, ?, ?)",
       ).bind(
         applicationId, input.subscriptionId, input.subscriberId, input.sourcePlanId, input.sourcePlanVersion,
         input.targetPlanId, input.targetPlanVersion, input.expectedSubscriptionVersion,
         input.currentPeriodStart, input.currentPeriodEnd, input.orderId, input.paymentId,
-        input.amountMinor, input.currency, input.requestHash, input.confirmedAt, input.confirmedAt,
+        input.requestHash, input.confirmedAt, input.confirmedAt,
       ),
       db.prepare(
         'UPDATE membership_subscriptions SET plan_id = ?, plan_version = ?, updated_at = ?, version = version + 1 ' +
@@ -225,7 +221,7 @@ export async function applyPaidMembershipPlanUpgrade(
     applied = await db.prepare(
       'SELECT application_id, subscription_id, subscriber_id, source_plan_id, source_plan_version, ' +
       'target_plan_id, target_plan_version, expected_subscription_version, current_period_start, ' +
-      'current_period_end, order_id, payment_id, amount_minor, currency, request_hash, status ' +
+      'current_period_end, order_id, payment_id, request_hash, status ' +
       'FROM membership_subscription_plan_change_applications WHERE application_id = ? LIMIT 1',
     ).bind(applicationId).first<ApplicationRow>();
     latest = await db.prepare(
