@@ -32,7 +32,7 @@ type TrialRow = Readonly<{
   source: 'WEB' | 'APP_STORE' | 'PLAY_STORE';
   provider_app_id: string | null;
   product_id: string | null;
-  original_transaction_id: string | null;
+  store_transaction_id: string | null;
   started_at: string;
   trial_ends_at: string;
   status: 'TRIALING' | 'CANCELED' | 'PAYMENT_FAILED' | 'CONVERTED' | 'EXPIRED';
@@ -170,7 +170,7 @@ async function readTrialBySubscription(db: D1Database, subscriptionId: string): 
   try {
     return await db.prepare(
       'SELECT trial_id, subscription_id, subscriber_id, plan_id, plan_version, source, provider_app_id, ' +
-      'product_id, original_transaction_id, started_at, trial_ends_at, status, request_hash, version, created_at, updated_at ' +
+      'product_id, store_transaction_id, started_at, trial_ends_at, status, request_hash, version, created_at, updated_at ' +
       'FROM membership_subscription_trials WHERE subscription_id = ? LIMIT 1',
     ).bind(subscriptionId).first<TrialRow>();
   } catch {
@@ -301,7 +301,7 @@ export async function startWebMembershipTrial(
       ),
       d1_01.prepare(
         'INSERT INTO membership_subscription_trials ' +
-        '(trial_id, subscription_id, subscriber_id, plan_id, plan_version, source, provider_app_id, product_id, original_transaction_id, started_at, trial_ends_at, status, request_hash, version, created_at, updated_at) ' +
+        '(trial_id, subscription_id, subscriber_id, plan_id, plan_version, source, provider_app_id, product_id, store_transaction_id, started_at, trial_ends_at, status, request_hash, version, created_at, updated_at) ' +
         "VALUES (?, ?, ?, ?, ?, 'WEB', NULL, NULL, NULL, ?, ?, 'TRIALING', ?, 1, ?, ?)",
       ).bind(
         trialId, subscriptionId, subscriberId, planId, plan.current_version,
@@ -406,7 +406,7 @@ export async function getMembershipTrialDetails(
   try {
     row = await db.prepare(
       'SELECT trial_id, subscription_id, subscriber_id, plan_id, plan_version, source, provider_app_id, ' +
-      'product_id, original_transaction_id, started_at, trial_ends_at, status, request_hash, version, created_at, updated_at ' +
+      'product_id, store_transaction_id, started_at, trial_ends_at, status, request_hash, version, created_at, updated_at ' +
       'FROM membership_subscription_trials WHERE subscription_id = ? AND subscriber_id = ? LIMIT 1',
     ).bind(subscriptionIdInput, subscriberId).first<TrialRow>();
   } catch {
@@ -543,7 +543,7 @@ export type RevenueCatStoreTrialCandidate = Readonly<{
   currentState: 'TRIALING' | 'ACTIVE' | 'EXPIRED' | 'REFUNDED';
   purchaseDate: string;
   effectiveExpiresAt: string | null;
-  originalTransactionId: string | number | null;
+  storeTransactionId: string | number | null;
   periodType: string | null;
   unsubscribeDetectedAt: string | null;
 }>;
@@ -566,14 +566,19 @@ async function readStoreTrial(
   db: D1Database,
   source: 'APP_STORE' | 'PLAY_STORE',
   appId: string,
-  originalTransactionId: string,
+  storeTransactionId: string,
+  subscriberId: string,
+  planId: string,
+  productId: string,
 ): Promise<TrialRow | null> {
   try {
     return await db.prepare(
       'SELECT trial_id, subscription_id, subscriber_id, plan_id, plan_version, source, provider_app_id, ' +
-      'product_id, original_transaction_id, started_at, trial_ends_at, status, request_hash, version, created_at, updated_at ' +
-      'FROM membership_subscription_trials WHERE source = ? AND provider_app_id = ? AND original_transaction_id = ? LIMIT 1',
-    ).bind(source, appId, originalTransactionId).first<TrialRow>();
+      'product_id, store_transaction_id, started_at, trial_ends_at, status, request_hash, version, created_at, updated_at ' +
+      'FROM membership_subscription_trials WHERE source = ? AND provider_app_id = ? AND ' +
+      '(store_transaction_id = ? OR (subscriber_id = ? AND plan_id = ? AND product_id = ?)) ' +
+      'ORDER BY CASE WHEN store_transaction_id = ? THEN 0 ELSE 1 END LIMIT 1',
+    ).bind(source, appId, storeTransactionId, subscriberId, planId, productId, storeTransactionId).first<TrialRow>();
   } catch {
     throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
   }
@@ -639,10 +644,10 @@ export async function syncRevenueCatStoreTrialCandidates(
         candidate.currentState !== 'REFUNDED') {
       continue;
     }
-    const originalTransactionId = candidate.originalTransactionId === null
+    const storeTransactionId = candidate.storeTransactionId === null
       ? ''
-      : String(candidate.originalTransactionId);
-    if (!boundedText(originalTransactionId, 255) ||
+      : String(candidate.storeTransactionId);
+    if (!boundedText(storeTransactionId, 255) ||
         !boundedText(candidate.productId, 255) ||
         !PLAN_ID.test(candidate.planId) ||
         !Number.isSafeInteger(candidate.planVersion) || candidate.planVersion < 1 ||
@@ -654,7 +659,9 @@ export async function syncRevenueCatStoreTrialCandidates(
       continue;
     }
 
-    const existing = await readStoreTrial(db, candidate.store, appIdInput, originalTransactionId);
+    const existing = await readStoreTrial(
+      db, candidate.store, appIdInput, storeTransactionId, subscriberId, candidate.planId, candidate.productId,
+    );
     if (!existing) {
       const isLiveTrial = candidate.currentState === 'TRIALING' && candidate.periodType === 'TRIAL';
       const isAlreadyExpiredTrial = ['EXPIRED', 'REFUNDED'].includes(candidate.currentState) &&
@@ -669,13 +676,13 @@ export async function syncRevenueCatStoreTrialCandidates(
         throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500);
       }
       const identityMaterial = 'revenuecat-store-trial-v1\u0000' + candidate.store + '\u0000' +
-        appIdInput + '\u0000' + originalTransactionId;
+        appIdInput + '\u0000' + storeTransactionId;
       const identityHash = await digest(identityMaterial);
       const subscriptionId = 'sub_' + identityHash;
       const trialId = 'mtr_' + identityHash.slice(0, 26);
       const requestHash = await digest(JSON.stringify({
         version: 1, subscriberId, appId: appIdInput, source: candidate.store,
-        originalTransactionId, planId: candidate.planId, planVersion: candidate.planVersion,
+        storeTransactionId, planId: candidate.planId, planVersion: candidate.planVersion,
       }));
       const cancelAt = candidate.unsubscribeDetectedAt ? trialEndsAt : null;
       try {
@@ -690,11 +697,11 @@ export async function syncRevenueCatStoreTrialCandidates(
           ),
           db.prepare(
             'INSERT INTO membership_subscription_trials ' +
-            '(trial_id, subscription_id, subscriber_id, plan_id, plan_version, source, provider_app_id, product_id, original_transaction_id, started_at, trial_ends_at, status, request_hash, version, created_at, updated_at) ' +
+            '(trial_id, subscription_id, subscriber_id, plan_id, plan_version, source, provider_app_id, product_id, store_transaction_id, started_at, trial_ends_at, status, request_hash, version, created_at, updated_at) ' +
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)",
           ).bind(
             trialId, subscriptionId, subscriberId, candidate.planId, candidate.planVersion,
-            candidate.store, appIdInput, candidate.productId, originalTransactionId, startedAt,
+            candidate.store, appIdInput, candidate.productId, storeTransactionId, startedAt,
             trialEndsAt, cancelAt ? 'CANCELED' : 'TRIALING', requestHash, startedAt, startedAt,
           ),
         ];
