@@ -107,9 +107,12 @@ class MemoryPaymentD1 {
       row = this.conflicts.find(c => c.provider === provider && c.merchant_id === merchantId &&
         c.event_id === eventId && c.incoming_payload_sha256 === incomingHash);
     } else if (sql.includes('FROM payment_mandates')) {
-      const [provider, merchantId, mandateId, methodId] = values;
+      const [provider, merchantId, methodId, providerMandateId, sourcePaymentId] = values as
+        [string, string, string, string, string];
       row = this.mandates.find(m => m.provider === provider && m.merchant_id === merchantId &&
-        m.provider_mandate_id === mandateId && m.payment_method_id === methodId);
+        m.payment_method_id === methodId &&
+        (m.provider_mandate_id === providerMandateId ||
+          (m.provider_mandate_id === null && m.source_payment_id === sourcePaymentId)));
     } else if (sql.includes('FROM subscription_renewal_cycles')) {
       // Payment-webhook tests without a seeded renewal cycle model the normal
       // customer-present payment path; no cycle-specific state update is expected.
