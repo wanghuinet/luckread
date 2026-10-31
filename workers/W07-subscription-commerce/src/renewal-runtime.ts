@@ -507,7 +507,7 @@ async function insertOrReadCycle(
   // The cycle's immutable target offer controls both its charge and the next
   // period length. This is required for MONTHLY <-> YEARLY changes; the
   // existing active period remains untouched until this renewal succeeds.
-  const cycleEnd = addBillingPeriod(cycleStart, cyclePlan.billingInterval);
+  const cycleEnd = addBillingPeriod(cycleStart, cyclePlan.billingInterval as 'MONTHLY' | 'YEARLY');
   const cycleId = await renewalCycleIdFor(subscription.subscription_id, cycleStart, cycleEnd);
 
   // PAST_DUE may only resume a previously recorded cycle; never synthesize a
@@ -907,7 +907,8 @@ async function prepareFailedCycleRetry(
 
   let subscription: {
     subscription_id: string; subscriber_id: string; plan_id: string; plan_version: number;
-    creator_id: string | null; status: string; current_period_end: string; cancel_at: string | null;
+    creator_id: string | null; status: string; current_period_end: string;
+    trial_started_at: string | null; trial_ends_at: string | null; cancel_at: string | null;
   } | null;
   const retrySubscriptionShape = {
     subscription_id: '' as string,
