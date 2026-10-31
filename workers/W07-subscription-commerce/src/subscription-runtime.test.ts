@@ -1118,7 +1118,7 @@ describe('read-only D1 subscription migration postflight', () => {
 
   it('fails closed when any existing subscription has an invalid version', () => {
     expect(() => verifyD1SubscriptionPostflight({
-      ...preflightInput(true, '1', true, true, true, true),
+      ...preflightInput(true, '1', true, true, true, true, true),
       versionIntegrity: [{ results: [{ invalid_versions: 1 }] }],
       planIntegrity: [{ results: [{ invalid_current_plan_versions: 0 }] }],
     })).toThrow('existing subscription versions include invalid or non-positive values')
@@ -1126,7 +1126,7 @@ describe('read-only D1 subscription migration postflight', () => {
 
   it('fails closed when any plan points to a missing immutable current version', () => {
     expect(() => verifyD1SubscriptionPostflight({
-      ...preflightInput(true, '1', true, true, true, true),
+      ...preflightInput(true, '1', true, true, true, true, true),
       versionIntegrity: [{ results: [{ invalid_versions: 0 }] }],
       planIntegrity: [{ results: [{ invalid_current_plan_versions: 1 }] }],
     })).toThrow('membership plans include a missing or invalid current immutable version')
@@ -1142,12 +1142,12 @@ describe('read-only D1 subscription migration postflight', () => {
 
   it('fails closed when either integrity query does not return exactly one count', () => {
     expect(() => verifyD1SubscriptionPostflight({
-      ...preflightInput(true, '1', true, true, true, true),
+      ...preflightInput(true, '1', true, true, true, true, true),
       versionIntegrity: [{ results: [] }],
       planIntegrity: [{ results: [{ invalid_current_plan_versions: 0 }] }],
     })).toThrow('version integrity query did not return exactly one count')
     expect(() => verifyD1SubscriptionPostflight({
-      ...preflightInput(true, '1', true, true, true, true),
+      ...preflightInput(true, '1', true, true, true, true, true),
       versionIntegrity: [{ results: [{ invalid_versions: 0 }] }],
       planIntegrity: [{ results: [] }],
     })).toThrow('membership plan integrity query did not return exactly one count')
@@ -1201,7 +1201,15 @@ describe('read-only D1 subscription migration preflight', () => {
   it('requests migration 0007 when only immediate-upgrade schema is present', () => {
     const result = verifyD1SubscriptionPreflight(preflightInput(true, '1', true, true, true, true))
     expect(result.migrationAction).toBe('apply')
-    expect(result.appliedMigrations).toContain('0006_immediate_subscription_upgrades.sql')
+    expect(result.appliedMigrations).toEqual([
+      '0001_membership_subscriptions.sql',
+      '0002_subscription_version_cas.sql',
+      '0003_membership_plans.sql',
+      '0004_revenuecat_membership_product_bindings.sql',
+      '0005_subscription_plan_changes.sql',
+      '0006_immediate_subscription_upgrades.sql',
+    ])
+    expect(result.planVersionColumns).toEqual(planVersionColumnRows)
     expect(result.planUpgradeColumns).toEqual(planUpgradeColumnRows)
   })
 
