@@ -116,7 +116,7 @@ function validScheduledPlanChangeEnvelope(
     data.targetPlanId === targetPlanId &&
     Number.isSafeInteger(data.targetPlanVersion) && Number(data.targetPlanVersion) >= 1 &&
     ['DOWNGRADE', 'BILLING_INTERVAL_CHANGE', 'SAME_PRICE_CHANGE'].includes(String(data.changeType)) &&
-    data.status === 'SCHEDULED' &&
+    ['SCHEDULED', 'APPLIED', 'CANCELED'].includes(String(data.status)) &&
     typeof data.effectiveAt === 'string' && !Number.isNaN(Date.parse(data.effectiveAt)) &&
     Number.isSafeInteger(data.version) && Number(data.version) >= 1 &&
     Number.isSafeInteger(data.subscriptionVersion) && Number(data.subscriptionVersion) >= 2 &&
@@ -211,9 +211,9 @@ async function forward(request: Request, context: RouteContext): Promise<Respons
             targetPlanVersion: Number(data.targetPlanVersion),
             changeType: data.changeType as 'DOWNGRADE' | 'BILLING_INTERVAL_CHANGE' | 'SAME_PRICE_CHANGE',
             effectiveAt: String(data.effectiveAt),
-            changeVersion: Number(data.version),
-            subscriptionVersion: Number(data.subscriptionVersion),
-            occurredAt: String(data.updatedAt),
+            changeVersion: 1,
+            subscriptionVersion: expectedVersion + 1,
+            occurredAt: String(data.createdAt),
           },
         })
       } catch {
