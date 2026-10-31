@@ -913,7 +913,7 @@ describe('subscription runtime', () => {
     expect(workflow).toContain('"sourceSha": "$SOURCE_SHA"')
     expect(workflow).not.toContain('"sourceSha": "${{ inputs.source_sha }}"')
     expect(workflow).toContain('Read-only D1-01 migration and schema preflight')
-    expect(workflow).toContain("0003_membership_plans")
+    expect(workflow).toContain("0003_membership_plans.sql")
     expect(workflow).toContain('PRAGMA table_info("membership_subscriptions")')
     expect(workflow).toContain('PRAGMA foreign_key_list("membership_subscriptions")')
     expect(workflow).toContain('PRAGMA table_info("membership_plans")')
@@ -997,9 +997,9 @@ const nameRows = (names) => [{ results: names.map((name,seq) => ({ name,seq })) 
 const preflightInput = (withVersion = false, versionDefault = '1', withPlans = false) => ({
   databaseList: preflightDatabaseList,
   migrationState: [{ results: [
-    { name: '0001_membership_subscriptions' },
-    ...(withVersion ? [{ name: '0002_subscription_version_cas' }] : []),
-    ...(withPlans ? [{ name: '0003_membership_plans' }] : []),
+    { name: '0001_membership_subscriptions.sql' },
+    ...(withVersion ? [{ name: '0002_subscription_version_cas.sql' }] : []),
+    ...(withPlans ? [{ name: '0003_membership_plans.sql' }] : []),
   ] }],
   subscriptionSchema: preflightSchema(withVersion,versionDefault),
   subscriptionIndexes: preflightIndexes,
@@ -1023,9 +1023,9 @@ describe('read-only D1 subscription migration postflight', () => {
     expect(result.invalidCurrentPlanVersions).toBe(0)
     expect(result.postflight).toBe('PASS')
     expect(result.appliedMigrations).toEqual([
-      '0001_membership_subscriptions',
-      '0002_subscription_version_cas',
-      '0003_membership_plans',
+      '0001_membership_subscriptions.sql',
+      '0002_subscription_version_cas.sql',
+      '0003_membership_plans.sql',
     ])
   })
 
@@ -1071,14 +1071,14 @@ describe('read-only D1 subscription migration preflight', () => {
   it('requests migration for the exact legacy schema with only migration 0001 applied', () => {
     const result = verifyD1SubscriptionPreflight(preflightInput())
     expect(result.migrationAction).toBe('apply')
-    expect(result.appliedMigrations).toEqual(['0001_membership_subscriptions'])
+    expect(result.appliedMigrations).toEqual(['0001_membership_subscriptions.sql'])
     expect(result.columns.map((column) => column[0])).not.toContain('version')
   })
 
   it('requests migration 0003 when subscription migration 0002 is already present but plan tables are absent', () => {
     const result = verifyD1SubscriptionPreflight(preflightInput(true))
     expect(result.migrationAction).toBe('apply')
-    expect(result.appliedMigrations).toEqual(['0001_membership_subscriptions','0002_subscription_version_cas'])
+    expect(result.appliedMigrations).toEqual(['0001_membership_subscriptions.sql','0002_subscription_version_cas.sql'])
     expect(result.planColumns).toEqual([])
   })
 
@@ -1086,9 +1086,9 @@ describe('read-only D1 subscription migration preflight', () => {
     const result = verifyD1SubscriptionPreflight(preflightInput(true, '1', true))
     expect(result.migrationAction).toBe('skip')
     expect(result.appliedMigrations).toEqual([
-      '0001_membership_subscriptions',
-      '0002_subscription_version_cas',
-      '0003_membership_plans',
+      '0001_membership_subscriptions.sql',
+      '0002_subscription_version_cas.sql',
+      '0003_membership_plans.sql',
     ])
     expect(result.columns.at(-1)).toEqual(['version','INTEGER',1,0])
     expect(result.planColumns).toEqual(planColumnRows)
@@ -1106,7 +1106,7 @@ describe('read-only D1 subscription migration preflight', () => {
   it('fails closed on unexpected migration/schema combinations', () => {
     expect(() => verifyD1SubscriptionPreflight({
       ...preflightInput(true),
-      migrationState: [{ results: [{ name: '0001_membership_subscriptions' }] }],
+      migrationState: [{ results: [{ name: '0001_membership_subscriptions.sql' }] }],
     })).toThrow('migration history and physical Subscription/MembershipPlan schemas do not match')
   })
 

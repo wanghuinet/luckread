@@ -4,9 +4,9 @@ import { pathToFileURL } from 'node:url'
 
 const EXPECTED_DATABASE_NAME = 'luckread'
 const EXPECTED_DATABASE_ID = '2f80471e-3756-49f9-8db1-7707a433ad64'
-const BASELINE_MIGRATION = '0001_membership_subscriptions'
-const VERSION_MIGRATION = '0002_subscription_version_cas'
-const PLAN_MIGRATION = '0003_membership_plans'
+const BASELINE_MIGRATION = '0001_membership_subscriptions.sql'
+const VERSION_MIGRATION = '0002_subscription_version_cas.sql'
+const PLAN_MIGRATION = '0003_membership_plans.sql'
 
 const EXPECTED_INDEXES = [
   'ix_membership_subscriptions_subscriber_status_period',
