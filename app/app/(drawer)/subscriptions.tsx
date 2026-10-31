@@ -345,7 +345,7 @@ export default function MySubscriptionsScreen() {
 
       <View className="border-b border-neutral-100 bg-white px-4 py-3 dark:border-neutral-800 dark:bg-black">
         <Text className="text-xs leading-5 text-neutral-500 dark:text-neutral-400">
-          订阅状态由 W07 提供。订阅记录本身不证明付款已完成或内容权益已生效；在支付渠道、续费与退款同步通过验收前，APP 仅提供真实记录查询，不开放暂停、恢复或取消操作。
+          订阅状态与试用来源由 W07 提供。WEB 试用可停止后续自动扣款，但当前试用权益会保留到截止时间；App Store / Google Play 试用仍由商店管理。普通付费订阅的购买、暂停和取消暂不在此页开放。
         </Text>
       </View>
 
@@ -363,7 +363,7 @@ export default function MySubscriptionsScreen() {
         keyExtractor={(item) => item.subscriptionId}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void loadPage(1, false, true)} />}
         contentContainerStyle={{ paddingTop: 14, paddingBottom: 36, flexGrow: 1 }}
-        renderItem={({ item }) => <SubscriptionCard item={item} />}
+        renderItem={({ item }) => <SubscriptionCard item={item} onCancelTrial={cancelTrial} canceling={cancelingSubscriptionId === item.subscriptionId} />}
         ListEmptyComponent={(
           <View className="flex-1 items-center justify-center px-8 py-12">
             {loading ? <ActivityIndicator size="large" color={PRIMARY} /> : (
