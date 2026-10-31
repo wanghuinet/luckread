@@ -312,7 +312,7 @@ try {
         const preLogoutCookie = user.jar.header()
         const logout = await request('POST', '/v1/auth/logout', { jar: user.jar })
         const sessionCookieCleared = logout.setCookies.some((v) =>
-          /better-auth\\.session_token/i.test(v) && /max-age=0|expires=/i.test(v))
+          /better-auth\.session_token/i.test(v) && /max-age=0|expires=/i.test(v))
         const revokedSession = await request('GET', '/v1/auth/session', {
           headers: { cookie: preLogoutCookie },
         })
