@@ -15,6 +15,7 @@ import { getApiErrorMessage } from '~/lib/api-client';
 import { unwrapApiData } from '~/lib/content-adapter';
 import {
   fetchActiveMembershipPlansPage,
+  startWebMembershipTrial,
   type ActiveMembershipPlan,
   type ActiveMembershipPlanPage,
 } from '~/lib/subscriptions-api';
@@ -35,6 +36,7 @@ function isMembershipPlan(value: unknown): value is ActiveMembershipPlan {
     typeof item.priceMinor === 'number' && Number.isSafeInteger(item.priceMinor) &&
     item.priceMinor >= 0 && item.priceMinor <= 2_147_483_647 &&
     typeof item.currency === 'string' && /^[A-Z]{3}$/.test(item.currency) &&
+    typeof item.trialDays === 'number' && Number.isSafeInteger(item.trialDays) && item.trialDays >= 0 && item.trialDays <= 90 &&
     Array.isArray(item.benefits) && item.benefits.length <= 20 &&
     item.benefits.every((benefit) => typeof benefit === 'string' && benefit.trim() === benefit &&
       benefit.length > 0 && benefit.length <= 180) &&
@@ -70,7 +72,7 @@ function formatPrice(priceMinor: number, currency: string): string {
   }
 }
 
-function PlanCard({ item }: { item: ActiveMembershipPlan }) {
+function PlanCard({ item, onStartTrial, starting }: { item: ActiveMembershipPlan; onStartTrial: (plan: ActiveMembershipPlan) => void; starting: boolean }) {
   const interval = item.billingInterval === 'MONTHLY' ? '每月' : '每年';
   return (
     <View className="mx-4 mb-3 rounded-2xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-950">
@@ -95,6 +97,17 @@ function PlanCard({ item }: { item: ActiveMembershipPlan }) {
         <Text className="text-sm text-neutral-500">{interval}</Text>
       </View>
 
+      {item.trialDays > 0 ? (
+        <View className="mt-3 rounded-xl border border-sky-100 bg-sky-50 px-3 py-2 dark:border-sky-900 dark:bg-sky-950/30">
+          <Text className="text-sm font-bold text-sky-800 dark:text-sky-200">
+            {item.trialDays} 天免费试用
+          </Text>
+          <Text className="mt-1 text-xs leading-5 text-sky-700 dark:text-sky-300">
+            试用期结束后按上方方案价格自动续订。开始前需要账户已有有效的 Hyperswitch 自动续费授权。
+          </Text>
+        </View>
+      ) : null}
+
       {item.benefits.length > 0 ? (
         <View className="mt-4 border-t border-neutral-100 pt-3 dark:border-neutral-800">
           <Text className="mb-2 text-xs font-bold text-neutral-500">会员权益</Text>
@@ -110,6 +123,18 @@ function PlanCard({ item }: { item: ActiveMembershipPlan }) {
       ) : (
         <Text className="mt-4 text-sm text-neutral-500">该方案尚未填写具体权益说明。</Text>
       )}
+      {item.trialDays > 0 ? (
+        <Pressable
+          accessibilityRole="button"
+          disabled={starting}
+          onPress={() => onStartTrial(item)}
+          className="mt-4 items-center rounded-full bg-sky-500 px-4 py-3"
+        >
+          {starting ? <ActivityIndicator color="#ffffff" /> : (
+            <Text className="font-bold text-white">开始 {item.trialDays} 天网页试用</Text>
+          )}
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -125,6 +150,7 @@ export default function MembershipPlansScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [authRequired, setAuthRequired] = useState(false);
   const [error, setError] = useState('');
+  const [startingTrialPlanId, setStartingTrialPlanId] = useState<string | null>(null);
   const requestRef = useRef<AbortController | null>(null);
 
   const loadPage = useCallback(async (cursor: string | null, append: boolean, pullRefresh = false) => {
@@ -199,6 +225,46 @@ export default function MembershipPlansScreen() {
     return () => requestRef.current?.abort();
   }, [authStatus, loadPage]);
 
+  const startTrial = useCallback(async (plan: ActiveMembershipPlan) => {
+    if (startingTrialPlanId) return
+    setStartingTrialPlanId(plan.planId)
+    setError('')
+    try {
+      const result = await startWebMembershipTrial(plan.planId)
+      if (!result.response.ok) {
+        throw new Error(result.error?.message || getApiErrorMessage(
+          result.data,
+          '暂时无法开始试用。请确认账户已有有效的自动续费付款授权。',
+          result.response.status,
+        ))
+      }
+      const payload = unwrapApiData<unknown>(result.data)
+      if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+        throw new Error('试用服务返回的数据格式无效，请刷新后检查订阅状态。')
+      }
+      const value = payload as Record<string, unknown>
+      const subscription = value.subscription
+      const trial = value.trial
+      if (!subscription || typeof subscription !== 'object' || Array.isArray(subscription) ||
+          !trial || typeof trial !== 'object' || Array.isArray(trial)) {
+        throw new Error('试用服务未返回有效的订阅记录。')
+      }
+      const sub = subscription as Record<string, unknown>
+      const trialRecord = trial as Record<string, unknown>
+      if (sub.status !== 'TRIALING' || sub.planId !== plan.planId ||
+          trialRecord.source !== 'WEB' || trialRecord.status !== 'TRIALING' ||
+          trialRecord.planId !== plan.planId || trialRecord.subscriptionId !== sub.subscriptionId ||
+          trialRecord.trialEndsAt !== sub.currentPeriodEnd) {
+        throw new Error('服务端试用状态与套餐不匹配，请刷新我的订阅。')
+      }
+      router.push('/subscriptions' as never)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : '试用申请失败，请稍后重试。')
+    } finally {
+      setStartingTrialPlanId(null)
+    }
+  }, [router, startingTrialPlanId])
+
   const openLogin = useCallback(() => {
     router.push(('/login?returnTo=' + encodeURIComponent('/membership-plans')) as never);
   }, [router]);
@@ -250,7 +316,7 @@ export default function MembershipPlansScreen() {
 
       <View className="border-b border-neutral-100 bg-white px-4 py-3 dark:border-neutral-800 dark:bg-black">
         <Text className="text-xs leading-5 text-neutral-500 dark:text-neutral-400">
-          以下方案来自 W07 已发布的公开会员目录，价格和权益以服务端记录为准。当前页面仅提供真实方案浏览；移动端购买需先完成对应应用商店的支付通道接入与服务器验证，暂不开放购买操作。
+          以下方案来自 W07 已发布的公开会员目录。具备试用天数的方案可申请网页试用，但必须已有有效的自动续费付款授权；试用期结束后会按方案价格扣款。App Store / Google Play 购买仍由商店支付通道处理，本页不模拟商店购买。
         </Text>
       </View>
 
@@ -268,7 +334,7 @@ export default function MembershipPlansScreen() {
         keyExtractor={(item) => item.planId}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void loadPage(null, false, true)} />}
         contentContainerStyle={{ paddingTop: 14, paddingBottom: 36, flexGrow: 1 }}
-        renderItem={({ item }) => <PlanCard item={item} />}
+        renderItem={({ item }) => <PlanCard item={item} onStartTrial={startTrial} starting={startingTrialPlanId === item.planId} />}
         ListEmptyComponent={(
           <View className="flex-1 items-center justify-center px-8 py-12">
             {loading ? <ActivityIndicator size="large" color={PRIMARY} /> : (
