@@ -21,7 +21,7 @@ const resolveOperation = (method: string, segments: string[] | undefined): { pat
   if (parts.length === 0 && method === 'GET') return { pathname: '/memberships/subscriptions' }
   if (parts.length === 0 && method === 'POST') return { pathname: '/memberships/subscriptions' }
   if (parts.length === 1 && method === 'GET') return { pathname: '/memberships/subscriptions/' + encodeURIComponent(parts[0]!) }
-  if (parts.length === 2 && method === 'POST' && ['cancel', 'pause', 'resume', 'change-plan'].includes(parts[1]!)) {
+  if (parts.length === 2 && method === 'POST' && ['cancel', 'pause', 'resume', 'change-plan', 'upgrade'].includes(parts[1]!)) {
     return { pathname: '/memberships/subscriptions/' + encodeURIComponent(parts[0]!) + '/' + parts[1]! }
   }
   return null
@@ -136,6 +136,83 @@ async function forward(request: Request, context: RouteContext): Promise<Respons
 
     const parts = params.segments ?? []
     const isPlanChangeRequest = request.method === 'POST' && parts.length === 2 && parts[1] === 'change-plan'
+    const isPlanUpgradeRequest = request.method === 'POST' && parts.length === 2 && parts[1] === 'upgrade'
+    if (isPlanUpgradeRequest) {
+      const subscriptionId = parts[0] ?? ''
+      if (!/^sub_[A-Za-z0-9_-]{1,128}$/.test(subscriptionId)) {
+        return errorResponse(404, 'RESOURCE_NOT_FOUND', 'Subscription not found')
+      }
+      const denied = await authorizeSubscriptionPlanChange(request, principal.userId)
+      if (denied) return denied
+
+      const idempotencyKey = request.headers.get('Idempotency-Key') ?? ''
+      if (!/^[A-Za-z0-9_-]{1,128}$/.test(idempotencyKey)) {
+        return errorResponse(428, 'PRECONDITION_REQUIRED', 'A valid Idempotency-Key is required')
+      }
+      const ifMatch = request.headers.get('If-Match') ?? ''
+      const versionMatch = /^"lr-v([1-9]\d*)"$/.exec(ifMatch)
+      const expectedVersion = versionMatch?.[1] ? Number(versionMatch[1]) : Number.NaN
+      if (!Number.isSafeInteger(expectedVersion) || expectedVersion < 1) {
+        return errorResponse(ifMatch ? 412 : 428, ifMatch ? 'PRECONDITION_FAILED' : 'PRECONDITION_REQUIRED', 'A valid If-Match subscription version is required')
+      }
+      const input = await readBoundedJson(request)
+      if (input instanceof Response) return input
+      if (!isRecord(input) || Object.keys(input).length !== 1 ||
+          typeof input.planId !== 'string' || !/^plan_[a-f0-9]{64}$/.test(input.planId)) {
+        return errorResponse(400, 'VALIDATION_FAILED', 'Only a valid planId may be supplied')
+      }
+      const targetPlanId = input.planId
+      const requestEventId = await deterministicAuditRequestId(principal.userId, subscriptionId, idempotencyKey)
+      let requestAudit: Response
+      try {
+        requestAudit = await callW06SubscriptionPlanChangeRequestAudit({
+          request,
+          principal: principal as ContentPrincipal,
+          body: { eventId: requestEventId, subscriptionId, targetPlanId, expectedVersion, idempotencyKey },
+        })
+      } catch {
+        return errorResponse(503, 'AUDIT_UNAVAILABLE', 'Subscription upgrade intent could not be durably recorded')
+      }
+      const requestAuditValue: unknown = await requestAudit.json().catch((): null => null)
+      if ((requestAudit.status !== 200 && requestAudit.status !== 201) ||
+          !isRecord(requestAuditValue) ||
+          requestAuditValue.eventId !== requestEventId ||
+          requestAuditValue.action !== 'membership.subscription.plan_change_requested' ||
+          requestAuditValue.targetId !== subscriptionId) {
+        return errorResponse(503, 'AUDIT_UNAVAILABLE', 'Subscription upgrade intent was not durably confirmed')
+      }
+
+      const w07Response = await callW07Subscription({
+        request,
+        pathname: operation.pathname,
+        method: 'POST',
+        principal,
+        body: { planId: targetPlanId },
+      })
+      if (!w07Response.ok) return w07Response
+      const envelopeValue: unknown = await w07Response.clone().json().catch((): null => null)
+      if (!isRecord(envelopeValue) || !isRecord(envelopeValue.data) ||
+          typeof envelopeValue.requestId !== 'string' ||
+          envelopeValue.data.subscriptionId !== subscriptionId ||
+          envelopeValue.data.targetPlanId !== targetPlanId ||
+          envelopeValue.data.changeType !== 'UPGRADE' ||
+          envelopeValue.data.activation !== 'AFTER_VERIFIED_PAYMENT_SUCCESS' ||
+          !isRecord(envelopeValue.data.order) ||
+          typeof envelopeValue.data.order.orderId !== 'string' ||
+          !/^ord_[A-Za-z0-9_-]{1,251}$/.test(envelopeValue.data.order.orderId) ||
+          typeof envelopeValue.data.order.currency !== 'string' ||
+          !/^[A-Z]{3}$/.test(envelopeValue.data.order.currency) ||
+          !Number.isSafeInteger(envelopeValue.data.order.totalMinor) ||
+          Number(envelopeValue.data.order.totalMinor) <= 0 ||
+          !Number.isSafeInteger(envelopeValue.data.prorationBaseMinor) ||
+          Number(envelopeValue.data.prorationBaseMinor) <= 0 ||
+          envelopeValue.data.etag !== ifMatch ||
+          typeof envelopeValue.data.replayed !== 'boolean') {
+        return errorResponse(503, 'UPGRADE_ORDER_RESPONSE_INVALID', 'Subscription upgrade order could not be verified')
+      }
+      return w07Response
+    }
+
     if (isPlanChangeRequest) {
       const subscriptionId = parts[0] ?? ''
       if (!/^sub_[A-Za-z0-9_-]{1,128}$/.test(subscriptionId)) {
