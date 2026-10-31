@@ -51,6 +51,7 @@ export async function callW06MembershipPlanAudit(input: {
     billingInterval: 'MONTHLY' | 'YEARLY'
     priceMinor: number
     currency: string
+    trialDays: number
   }
 }): Promise<Response> {
   return callW06Moderation({
@@ -104,6 +105,7 @@ export async function callW06MembershipPlanPublishAudit(input: {
     billingInterval: 'MONTHLY' | 'YEARLY'
     priceMinor: number
     currency: string
+    trialDays: number
   }
 }): Promise<Response> {
   return callW06Moderation({
@@ -123,7 +125,7 @@ export async function callW06MembershipPlanUpdateRequestAudit(input: {
   body: {
     eventId: string; planId: string; creatorId: string; expectedVersion: number; idempotencyKey: string
     name: string; tier: string; billingInterval: 'MONTHLY' | 'YEARLY'
-    priceMinor: number; currency: string; benefits: string[]
+    priceMinor: number; currency: string; benefits: string[]; trialDays?: number
   }
 }): Promise<Response> {
   return callW06Moderation({
@@ -143,7 +145,7 @@ export async function callW06MembershipPlanUpdateAudit(input: {
     eventId: string; planId: string; creatorId: string; expectedVersion: number
     planVersion: number; status: 'DRAFT' | 'ACTIVE' | 'PAUSED'; visibility: 'PRIVATE' | 'PUBLIC'
     version: number; occurredAt: string; name: string; tier: string
-    billingInterval: 'MONTHLY' | 'YEARLY'; priceMinor: number; currency: string; benefits: string[]
+    billingInterval: 'MONTHLY' | 'YEARLY'; priceMinor: number; currency: string; benefits: string[]; trialDays: number
   }
 }): Promise<Response> {
   return callW06Moderation({
