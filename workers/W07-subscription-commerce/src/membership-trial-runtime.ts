@@ -89,8 +89,6 @@ export type StartWebMembershipTrialResult = Readonly<{
 
 const PLAN_ID = /^plan_[a-f0-9]{64}$/;
 const TRIAL_ID = /^mtr_[A-Za-z0-9]{26}$/;
-const SUBSCRIPTION_ID = /^sub_[a-f0-9]{64}$/;
-const HASH = /^[a-f0-9]{64}$/;
 
 function boundedText(value: unknown, max = 256): value is string {
   return typeof value === 'string' && value.length > 0 && value.length <= max &&
