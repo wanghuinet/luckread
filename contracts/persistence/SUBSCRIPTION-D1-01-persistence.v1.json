@@ -143,27 +143,6 @@
         "nullable": false,
         "primaryKey": false,
         "fieldId": "ENT-SUBSCRIPTION-F-UPDATED-AT"
-      },
-      {
-        "name": "trial_started_at",
-        "type": "TEXT",
-        "nullable": true,
-        "primaryKey": false,
-        "fieldId": "ENT-SUBSCRIPTION-F-TRIAL-STARTED-AT"
-      },
-      {
-        "name": "trial_ends_at",
-        "type": "TEXT",
-        "nullable": true,
-        "primaryKey": false,
-        "fieldId": "ENT-SUBSCRIPTION-F-TRIAL-ENDS-AT"
-      },
-      {
-        "name": "trial_converted_at",
-        "type": "TEXT",
-        "nullable": true,
-        "primaryKey": false,
-        "fieldId": "ENT-SUBSCRIPTION-F-TRIAL-CONVERTED-AT"
       }
     ],
     "indexes": [
