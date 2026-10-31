@@ -220,9 +220,16 @@ export async function reservePaidMembershipPlanUpgrade(
     ).run();
     if (Number(result.meta?.changes ?? 0) !== 1) throw new PaidMembershipUpgradeApplicationError();
   } catch {
-    // A different order may have won the unique active-reservation race. Do not
-    // expose the losing D1-04 Order to the customer; the payment-intent gate
-    // independently rejects it because it has no matching reservation.
+    // Concurrent retries for the same D1-04 Order may race on the unique
+    // reservation insert. Recover only when the winner is the identical
+    // deterministic application; a different Order remains a hard conflict.
+    const raced = await readApplication(db, input.orderId, input.subscriptionId);
+    if (raced && raced.application_id === applicationId &&
+        raced.order_id === input.orderId &&
+        matchesReservation(raced, input) &&
+        ['PENDING_PAYMENT', 'READY', 'APPLIED'].includes(raced.status)) {
+      return 'ALREADY_RESERVED';
+    }
     throw new PaidMembershipUpgradeApplicationError();
   }
 
