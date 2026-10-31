@@ -550,6 +550,95 @@
         "integration": "MISSING",
         "securityE2E": "MISSING"
       }
+    },
+    {
+      "operationId": "startSubscriptionTrial",
+      "method": "POST",
+      "path": "/memberships/subscriptions/trial",
+      "visibility": "public_authenticated",
+      "capability": "subscription_trial_start",
+      "status": "CONTRACTED_PARTIAL",
+      "authorization": {
+        "required": true,
+        "permission": "subscription.create",
+        "scope": "self"
+      },
+      "resource": {
+        "class": "BOUNDED_COMPOSITION",
+        "d1ReadMax": 3,
+        "d1WriteMax": 1,
+        "d1ReadRowsMax": 8,
+        "d1WriteRowsMax": 1,
+        "rpcMax": 3,
+        "requestBodyBytesMax": 16384,
+        "responseBytesMax": 32768
+      },
+      "cache": {
+        "mode": "NO_STORE",
+        "shared": false,
+        "authorizationBoundary": true
+      },
+      "retry": {
+        "maxAttempts": 1,
+        "clientRetrySafe": true,
+        "requiresOptimisticConcurrency": false
+      },
+      "event": {
+        "syncConsumersMax": 0,
+        "asyncEventsMax": 0,
+        "fanoutMax": 0
+      },
+      "queue": {
+        "enqueueMax": 0
+      },
+      "antiAbuse": {
+        "required": true,
+        "scopes": [
+          "account",
+          "subscription",
+          "endpoint",
+          "global"
+        ],
+        "actions": [
+          "ALLOW",
+          "THROTTLE",
+          "BLOCK"
+        ]
+      },
+      "idempotency": {
+        "required": true,
+        "key": "Idempotency-Key",
+        "semantic": "One idempotent trial request per subscriber key. A partial unique D1-01 index permits one lifetime trial per subscriber and creator; a second key or another plan from the same creator conflicts."
+      },
+      "security": [
+        "subscriber_identity_from_W02_session_only",
+        "W08_subscription_create_own_scope_permission",
+        "creator_plan_must_be_active_public_and_immutable_current_version_is_snapshotted",
+        "trial_period_days_is_1_to_30_and_server_configured_on_plan_version",
+        "one_lifetime_trial_per_subscriber_creator",
+        "existing_active_trial_past_due_or_paused_creator_membership_blocks_trial",
+        "D1_01_TRIALING_status_and_trial_window_are_subscription_authority",
+        "W03_membership_access_is_granted_only_while_current_period_end_is_in_the_future",
+        "no_order_payment_intent_charge_tax_or_provider_fact_is_created_at_trial_start",
+        "W06_D1_03_audits_trial_started_before_TRIALING_activation",
+        "trial_end_reuses_existing_W07_MIT_renewal_and_D1_04_order_payment_authority",
+        "signed_successful_first_renewal_sets_trial_converted_at_and_transitions_to_ACTIVE_by_CAS",
+        "failed_first_renewal_transitions_to_PAST_DUE_without_extending_trial_access",
+        "missing_or_revoked_mandate_leaves_cycle_AWAITING_MANDATE_and_expired_trial_has_no_access",
+        "W06_D1_03_audits_paid_trial_conversion_before_D1_04_sync_is_acknowledged",
+        "W07_renewal_execution_activation_gate_remains_unchanged"
+      ],
+      "evidence": {
+        "openapi": "PASS",
+        "inventory": "PASS",
+        "permission": "PASS",
+        "state": "PASS",
+        "resource": "PASS",
+        "cache": "PASS",
+        "antiAbuse": "PASS",
+        "integration": "MISSING",
+        "securityE2E": "MISSING"
+      }
     }
   ]
 }
