@@ -459,7 +459,7 @@ export async function expireDueWebMembershipTrials(
       if (cycle && (
         ['SUBMITTED', 'SUBMITTING', 'RECONCILIATION_REQUIRED'].includes(cycle.state) ||
         (cycle.state === 'SUCCEEDED' && cycle.subscription_sync_state !== 'APPLIED') ||
-        (row.trial_status !== 'CANCELED' && ['PAYMENT_READY', 'PREPARED'].includes(cycle.state)) ||
+        (row.trial_status !== 'CANCELED' && ['AWAITING_PRICING', 'PAYMENT_READY', 'PREPARED'].includes(cycle.state)) ||
         (row.trial_status !== 'CANCELED' && cycle.state === 'FAILED' && cycle.subscription_sync_state !== 'APPLIED')
       )) {
         // Never expire a trial while a submitted payment or uncertain terminal
