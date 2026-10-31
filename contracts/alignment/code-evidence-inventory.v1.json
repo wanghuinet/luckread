@@ -4648,7 +4648,8 @@
         "D1-01 migration 0006 is source-only and has not been applied to the remote database.",
         "W07 Cron/renewal execution remains disabled by the existing activation gate; no Cron, Queue or Worker topology changes are included.",
         "Production renewal price/tax admission and Hyperswitch live renewal activation are not verified; the new next-period charge must remain fail-closed until the existing renewal activation contract is admitted.",
-        "Integration, signed renewal webhook, replay and security E2E validation are deferred to the later consolidated test phase."
+        "Integration, signed renewal webhook, replay and security E2E validation are deferred to the later consolidated test phase.",
+        "Zero-price downgrade is rejected because no-payment renewal activation is outside this module."
       ]
     },
     {
