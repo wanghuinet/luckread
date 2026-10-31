@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/state-machines/membership-subscription-plan-change.json",
+  "title": "Membership Subscription Plan Change State Machine",
+  "type": "object",
+  "x-luckread": {
+    "state-field": "status",
+    "authority": "D1-01",
+    "requires-optimistic-lock": true,
+    "terminal-states": ["APPLIED", "CANCELED"],
+    "states": ["SCHEDULED", "APPLIED", "CANCELED"],
+    "effective-boundary": "current_period_end of the source Subscription",
+    "payment-gate": "The target plan is applied only after a verified successful Hyperswitch renewal payment advances the paid period."
+  },
+  "x-transitions": [
+    {
+      "from": "SCHEDULED",
+      "to": "APPLIED",
+      "actor": "system|payment",
+      "guard": "A signed successful Hyperswitch renewal outcome advances the Subscription to the target immutable plan version and a new period at or after effective_at in the same D1-01 transaction."
+    },
+    {
+      "from": "SCHEDULED",
+      "to": "CANCELED",
+      "actor": "system|user",
+      "guard": "The subscriber pauses, cancels, or expires the Subscription before the scheduled effective boundary, or a separately admitted cancellation action is recorded."
+    }
+  ],
+  "x-forbidden": [
+    { "from": "APPLIED", "to": "SCHEDULED" },
+    { "from": "APPLIED", "to": "CANCELED" },
+    { "from": "CANCELED", "to": "SCHEDULED" },
+    { "from": "CANCELED", "to": "APPLIED" }
+  ],
+  "reconciliation": {
+    "persistence": "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json#scheduledPlanChangeTable",
+    "renewalOfferSnapshot": "D1-04 is a durable snapshot of the target offer for one exact renewal cycle, not the schedule authority.",
+    "failedPayment": "The Subscription remains on the source plan and transitions ACTIVE to PAST_DUE; the scheduled change remains SCHEDULED for an idempotent retry of the exact cycle.",
+    "pauseOrCancel": "A D1-01 trigger cancels a pending schedule when Subscription lifecycle state makes the next paid period ineligible.",
+    "noEarlyEntitlement": "Scheduling does not mutate the Subscription plan or current entitlement; the paid outcome sync is the only plan-application path."
+  }
+}
