@@ -387,8 +387,9 @@ type SubscriptionPlanChangeAuditInput = {
 
 type SubscriptionTrialAuditInput = {
   eventId: string
-  phase: 'REQUESTED' | 'STARTED' | 'CANCELED'
-  planId: string
+  phase: 'REQUESTED' | 'CANCEL_REQUESTED' | 'STARTED' | 'CANCELED'
+  planId?: string
+  expectedVersion?: number
   subscriptionId?: string
   trialId?: string
   planVersion?: number
@@ -698,7 +699,7 @@ function parseSubscriptionTrialAuditInput(value: unknown): SubscriptionTrialAudi
   const phase = body.phase
   const common = ['eventId', 'phase', 'planId']
   if (typeof body.planId !== 'string' || !/^plan_[a-f0-9]{64}$/.test(body.planId) ||
-      (phase !== 'REQUESTED' && phase !== 'STARTED' && phase !== 'CANCELED')) {
+      (phase !== 'REQUESTED' && phase !== 'CANCEL_REQUESTED' && phase !== 'STARTED' && phase !== 'CANCELED')) {
     throw new Error('INVALID_SUBSCRIPTION_TRIAL_AUDIT')
   }
   if (phase === 'REQUESTED') {
@@ -706,6 +707,16 @@ function parseSubscriptionTrialAuditInput(value: unknown): SubscriptionTrialAudi
     if (Object.keys(body).some((key) => !allowed.has(key)) || Object.keys(body).length !== allowed.size ||
         typeof body.eventId !== 'string' || !/^evt_subscription_trial_request_[a-f0-9]{26}$/.test(body.eventId) ||
         typeof body.idempotencyKey !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(body.idempotencyKey)) {
+      throw new Error('INVALID_SUBSCRIPTION_TRIAL_AUDIT')
+    }
+    return body as SubscriptionTrialAuditInput
+  }
+  if (phase === 'CANCEL_REQUESTED') {
+    const allowed = new Set(['eventId', 'phase', 'subscriptionId', 'expectedVersion'])
+    if (Object.keys(body).some((key) => !allowed.has(key)) || Object.keys(body).length !== allowed.size ||
+        typeof body.subscriptionId !== 'string' || !resourceIdPattern.test(body.subscriptionId) ||
+        !Number.isSafeInteger(body.expectedVersion) || (body.expectedVersion as number) < 1 ||
+        typeof body.eventId !== 'string' || !/^evt_subscription_trial_cancel_request_[a-f0-9]{26}$/.test(body.eventId)) {
       throw new Error('INVALID_SUBSCRIPTION_TRIAL_AUDIT')
     }
     return body as SubscriptionTrialAuditInput
@@ -1204,6 +1215,7 @@ export default {
       try { input = parseSubscriptionTrialAuditInput(await readBoundedAuditJson(request, 2048)) }
       catch { return json({ error: 'INVALID_SUBSCRIPTION_TRIAL_AUDIT' }, 400) }
       const requested = input.phase === 'REQUESTED'
+      const cancelRequested = input.phase === 'CANCEL_REQUESTED'
       const event: AuditEvent = {
         eventId: input.eventId,
         requestId: principal.requestId,
@@ -1211,21 +1223,29 @@ export default {
         actor: { actorId: principal.userId, actorType: 'user', layer: principal.layer as AuditEvent['actor']['layer'] },
         action: requested
           ? 'membership.subscription.trial_requested'
-          : input.phase === 'STARTED'
-            ? 'membership.subscription.trial_started'
-            : 'membership.subscription.trial_canceled',
+          : cancelRequested
+            ? 'membership.subscription.trial_cancel_requested'
+            : input.phase === 'STARTED'
+              ? 'membership.subscription.trial_started'
+              : 'membership.subscription.trial_canceled',
         targetType: requested ? 'MembershipPlan' : 'Subscription',
-        targetId: requested ? input.planId : input.subscriptionId!,
-        before: requested ? { status: 'NOT_STARTED' } : { status: input.phase === 'STARTED' ? 'NOT_STARTED' : input.previousStatus },
+        targetId: requested ? input.planId! : input.subscriptionId!,
+        before: requested
+          ? { status: 'NOT_STARTED' }
+          : cancelRequested
+            ? { status: 'TRIALING_OR_PAYMENT_FAILED', version: input.expectedVersion }
+            : { status: input.phase === 'STARTED' ? 'NOT_STARTED' : input.previousStatus },
         after: requested
           ? { planId: input.planId, idempotencyKey: input.idempotencyKey }
-          : {
-              trialId: input.trialId,
-              planId: input.planId,
-              planVersion: input.planVersion,
-              status: input.phase === 'STARTED' ? 'TRIALING' : 'CANCELED',
-              trialEndsAt: input.trialEndsAt,
-            },
+          : cancelRequested
+            ? { cancellationRequested: true, expectedVersion: input.expectedVersion }
+            : {
+                trialId: input.trialId,
+                planId: input.planId,
+                planVersion: input.planVersion,
+                status: input.phase === 'STARTED' ? 'TRIALING' : 'CANCELED',
+                trialEndsAt: input.trialEndsAt,
+              },
         occurredAt: requested ? new Date().toISOString() : input.occurredAt!,
       }
       return requested
