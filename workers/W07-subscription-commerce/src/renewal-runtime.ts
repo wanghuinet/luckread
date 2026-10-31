@@ -458,12 +458,21 @@ async function insertOrReadCycle(
   const scheduledChange = await readScheduledSubscriptionPlanDowngradeForPeriod(
     env.D1_01, subscription.subscription_id, subscription.subscriber_id, cycleStart, false,
   );
-  let cyclePlan = {
+  let cyclePlan: {
+    planId: string;
+    planVersion: number;
+    name: string;
+    tier: string;
+    billingInterval: 'MONTHLY' | 'YEARLY';
+    priceMinor: number;
+    currency: string;
+    benefitsJson: string;
+  } = {
     planId: subscription.plan_id,
     planVersion: subscription.plan_version,
     name: subscription.name,
     tier: subscription.tier,
-    billingInterval: subscription.billing_interval,
+    billingInterval: subscription.billing_interval as 'MONTHLY' | 'YEARLY',
     priceMinor: subscription.price_minor,
     currency: subscription.currency,
     benefitsJson: subscription.benefits_json,
@@ -502,45 +511,6 @@ async function insertOrReadCycle(
   // existing active period remains untouched until this renewal succeeds.
   const cycleEnd = addBillingPeriod(cycleStart, cyclePlan.billingInterval);
   const cycleId = await renewalCycleIdFor(subscription.subscription_id, cycleStart, cycleEnd);
-
-  const scheduledChange = await readScheduledSubscriptionPlanDowngradeForPeriod(
-    env.D1_01, subscription.subscription_id, subscription.subscriber_id, cycleStart, false,
-  );
-  let cyclePlan = {
-    planId: subscription.plan_id,
-    planVersion: subscription.plan_version,
-    name: subscription.name,
-    tier: subscription.tier,
-    billingInterval: subscription.billing_interval,
-    priceMinor: subscription.price_minor,
-    currency: subscription.currency,
-    benefitsJson: subscription.benefits_json,
-  };
-  if (scheduledChange) {
-    if (scheduledChange.status !== 'SCHEDULED' ||
-        scheduledChange.expectedPlanId !== subscription.plan_id ||
-        scheduledChange.expectedPlanVersion !== subscription.plan_version ||
-        scheduledChange.effectiveAt !== cycleStart) {
-      throw new RenewalRuntimeError('SCHEDULED_PLAN_CHANGE_MISMATCH', 503);
-    }
-    const target = await readScheduledDowngradeTargetPlan(env.D1_01, scheduledChange);
-    if (!target || target.creatorId !== subscription.creator_id ||
-        target.billingInterval !== subscription.billing_interval ||
-        target.currency !== subscription.currency ||
-        target.priceMinor >= subscription.price_minor) {
-      throw new RenewalRuntimeError('SCHEDULED_PLAN_TARGET_INVALID', 503);
-    }
-    cyclePlan = {
-      planId: target.planId,
-      planVersion: target.planVersion,
-      name: target.name,
-      tier: target.tier,
-      billingInterval: target.billingInterval,
-      priceMinor: target.priceMinor,
-      currency: target.currency,
-      benefitsJson: JSON.stringify(target.benefits),
-    };
-  }
 
   // PAST_DUE may only resume a previously recorded cycle; never synthesize a
   // second cycle to "repair" a missing paid-cycle record.
