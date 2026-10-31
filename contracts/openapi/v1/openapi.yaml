@@ -2010,6 +2010,31 @@ paths:
         '201': { description: Subscription created. }
         '4XX': { $ref: '#/components/responses/ClientError' }
 
+  /memberships/subscriptions/trial:
+    post:
+      tags: [Users]
+      summary: Start a creator-configured free trial
+      description: Starts the immutable trial period configured on the selected active public creator plan. Only one trial may be claimed per subscriber and creator. The trial grants access only until trialEndsAt; no Order, PaymentIntent or immediate charge is created. At trial end, the existing W07 renewal pipeline uses an active saved payment mandate to create the first paid cycle. If no active mandate is available, the cycle remains AWAITING_MANDATE and the expired trial does not continue granting content access.
+      operationId: startSubscriptionTrial
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [planId]
+              properties:
+                planId: { type: string, pattern: '^plan_[a-f0-9]{64}$' }
+      responses:
+        '201': { description: Trial started after the W06 audit event is durably confirmed; no immediate payment or Order is created. }
+        '200': { description: Idempotent replay of the same trial request. }
+        '409': { description: Trial is not configured for the plan, or the subscriber already has an active creator membership or a prior trial for this creator. }
+        '428': { description: Idempotency-Key is required. }
+        '4XX': { $ref: '#/components/responses/ClientError' }
+
   /memberships/subscriptions/{subscriptionId}:
     parameters:
       - name: subscriptionId
