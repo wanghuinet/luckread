@@ -1028,7 +1028,7 @@ const planUpgradeColumnRows = [
   ['target_plan_id','TEXT',1,0], ['target_plan_version','INTEGER',1,0],
   ['expected_subscription_version','INTEGER',1,0], ['current_period_start','TEXT',1,0],
   ['current_period_end','TEXT',1,0], ['order_id','TEXT',1,0], ['payment_id','TEXT',1,0],
-  ['amount_minor','INTEGER',1,0], ['currency','TEXT',1,0], ['request_hash','TEXT',1,0],
+  ['request_hash','TEXT',1,0],
   ['status','TEXT',1,0], ['version','INTEGER',1,0], ['created_at','TEXT',1,0], ['updated_at','TEXT',1,0],
 ]
 const planUpgradeIndexNames = ['ux_membership_plan_change_applications_order','ux_membership_plan_change_applications_payment','ux_membership_plan_change_applications_ready_subscription','ix_membership_plan_change_applications_subscriber_created']
@@ -1091,7 +1091,7 @@ describe('read-only D1 subscription migration postflight', () => {
 
   it('fails closed when any plan points to a missing immutable current version', () => {
     expect(() => verifyD1SubscriptionPostflight({
-      ...preflightInput(true, '1', true),
+      ...preflightInput(true, '1', true, true, true, true),
       versionIntegrity: [{ results: [{ invalid_versions: 0 }] }],
       planIntegrity: [{ results: [{ invalid_current_plan_versions: 1 }] }],
     })).toThrow('membership plans include a missing or invalid current immutable version')
