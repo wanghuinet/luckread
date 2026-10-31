@@ -296,7 +296,7 @@ export default function MembershipPlansScreen() {
         ((intent as Record<string, unknown>).sdkAuthorization as string).length < 1 ||
         ((intent as Record<string, unknown>).sdkAuthorization as string).length > 4096 ||
         ((intent as Record<string, unknown>).sdkAuthorization as string).trim() !== (intent as Record<string, unknown>).sdkAuthorization ||
-        /[\\u0000-\\u001f\\u007f]/.test((intent as Record<string, unknown>).sdkAuthorization as string)
+        /[\u0000-\u001f\u007f]/.test((intent as Record<string, unknown>).sdkAuthorization as string)
       ) {
         throw new Error('支付服务没有返回与当前订单匹配的有效支付会话，支付已停止。');
       }
