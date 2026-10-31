@@ -340,14 +340,16 @@ export async function scheduleSubscriptionPlanDowngrade(
       'AND p.owner_id = (SELECT creator_id FROM membership_subscriptions WHERE subscription_id = ? AND subscriber_id = ?) ' +
       "AND p.status = 'ACTIVE' AND p.visibility = 'PUBLIC') " +
       "AND NOT EXISTS (SELECT 1 FROM membership_subscription_plan_change_attempts a " +
-      "WHERE a.subscription_id = ? AND a.status IN ('PENDING_PAYMENT', 'RECONCILIATION_REQUIRED'))",
+       "WHERE a.subscription_id = ? AND a.status IN ('PENDING_PAYMENT', 'RECONCILIATION_REQUIRED')) " +
+       "AND NOT EXISTS (SELECT 1 FROM membership_subscription_scheduled_plan_changes c " +
+       "WHERE c.subscription_id = ? AND c.status IN ('SCHEDULED', 'RECONCILIATION_REQUIRED'))",
     ).bind(
       changeId, subscriberId, subscriptionId, expectedVersion, preview.currentPlan.planId,
       preview.currentPlan.planVersion, preview.targetPlan.planId, preview.targetPlan.planVersion,
       preview.currentPeriodEnd, keyDigest, now, now,
       subscriptionId, subscriberId, expectedVersion, preview.currentPlan.planId,
       preview.currentPlan.planVersion, preview.currentPeriodStart, preview.currentPeriodEnd,
-      preview.targetPlan.planId, subscriptionId, subscriberId, subscriptionId,
+      preview.targetPlan.planId, subscriptionId, subscriberId, subscriptionId, subscriptionId,
     ).run();
     if (Number(inserted.meta?.changes ?? 0) !== 1) {
       const raced = await readScheduledChangeByIdempotency(env.D1_01, subscriberId, keyDigest);
