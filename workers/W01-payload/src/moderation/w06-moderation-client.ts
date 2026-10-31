@@ -171,6 +171,29 @@ export async function callW06MembershipPlanLifecycleAudit(input: {
   return callW06Moderation({ request: input.request, pathname: '/internal/audit-events/membership-plan-lifecycle-changed', method: 'POST', principal: input.principal, body: input.body })
 }
 
+/** Durable audit of an authenticated subscriber's requested paid plan upgrade. */
+export async function callW06SubscriptionPlanChangeRequestAudit(input: {
+  request: Request
+  principal: ContentPrincipal
+  body: {
+    eventId: string
+    attemptId: string
+    subscriberId: string
+    subscriptionId: string
+    targetPlanId: string
+    expectedEtag: string
+    requestedAt: string
+  }
+}): Promise<Response> {
+  return callW06Moderation({
+    request: input.request,
+    pathname: '/internal/audit-events/subscription-plan-change-requested',
+    method: 'POST',
+    principal: input.principal,
+    body: input.body,
+  })
+}
+
 /** Dedicated durable audit path for a validated, newly created W07 Order DTO. */
 export async function callW06CommerceOrderAudit(input: {
   request: Request
