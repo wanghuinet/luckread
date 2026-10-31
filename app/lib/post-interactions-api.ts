@@ -1,4 +1,5 @@
 import { apiRequest, getApiErrorMessage } from './api-client';
+import { firstNonNegativeInteger } from './api-value';
 
 export type ContentLike = {
   userId: string;
@@ -51,17 +52,7 @@ function unwrap(value: unknown): RecordLike | null {
   return record;
 }
 
-function asCount(...values: unknown[]): number | undefined {
-  for (const value of values) {
-    const parsed = typeof value === 'number'
-      ? value
-      : typeof value === 'string' && value.trim()
-        ? Number(value)
-        : Number.NaN;
-    if (Number.isFinite(parsed) && parsed >= 0) return Math.floor(parsed);
-  }
-  return undefined;
-}
+
 
 export async function fetchContentLikesPage(
   contentId: string,
@@ -153,10 +144,10 @@ export async function fetchPostInteractionSummary(
   const counts = { ...contentCounts, ...embeddedCounts, ...socialCounts };
 
   const summary: PostInteractionSummary = {};
-  const likes = asCount(counts.likes, content.likeCount, content.like_count);
-  const reposts = asCount(counts.reposts, counts.retweets, content.repostCount, content.retweetCount, content.retweet_count);
-  const replies = asCount(counts.replies, counts.comments, content.replyCount, content.reply_count);
-  const views = asCount(counts.views, content.viewCount, content.view_count);
+  const likes = firstNonNegativeInteger(counts.likes, content.likeCount, content.like_count);
+  const reposts = firstNonNegativeInteger(counts.reposts, counts.retweets, content.repostCount, content.retweetCount, content.retweet_count);
+  const replies = firstNonNegativeInteger(counts.replies, counts.comments, content.replyCount, content.reply_count);
+  const views = firstNonNegativeInteger(counts.views, content.viewCount, content.view_count);
 
   if (likes !== undefined) summary.likeCount = likes;
   if (reposts !== undefined) summary.repostCount = reposts;
