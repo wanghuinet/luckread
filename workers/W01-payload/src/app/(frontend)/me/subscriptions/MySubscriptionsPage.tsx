@@ -10,7 +10,12 @@ import type { PublicLocale } from '../../i18n/public-locale'
 type Subscription = {
   subscriptionId: string
   planId: string
-  status: 'PENDING' | 'ACTIVE' | 'PAST_DUE' | 'PAUSED' | 'CANCELED' | 'EXPIRED'
+  status: 'PENDING' | 'TRIALING' | 'ACTIVE' | 'PAST_DUE' | 'PAUSED' | 'CANCELED' | 'EXPIRED'
+  trial?: {
+    source: 'WEB' | 'APP_STORE' | 'PLAY_STORE'
+    status: 'TRIALING' | 'CANCELED' | 'PAYMENT_FAILED' | 'CONVERTED' | 'EXPIRED'
+    trialEndsAt: string
+  } | null
   creatorId?: string | null
   currentPeriodStart: string
   currentPeriodEnd: string
@@ -45,6 +50,13 @@ const copy = (locale: PublicLocale) => locale === 'en'
       id: 'Subscription ID',
       period: 'Current period',
       cancelAt: 'Cancellation date',
+      trialEnds: 'Trial ends',
+      trialCanceled: 'Trial cancellation is scheduled. Access remains available through the trial end date.',
+      trialPaymentFailed: 'The first trial-ending payment failed. You can cancel now to stop further retries while keeping access through the trial end date.',
+      manageStoreTrial: 'Manage trial renewal in the App Store or Google Play. LuckRead cannot cancel store billing for you.',
+      cancelTrial: 'Cancel trial and stop renewal',
+      cancelTrialConfirm: 'Cancel the trial conversion? Access remains available until the trial end date.',
+      cancelingTrial: 'Canceling trial…',
       mutationsUnavailable: 'Subscription changes are temporarily unavailable while verified payment-provider synchronization is being admitted. Your status and billing-period records remain available.',
       loadMore: 'Load more subscriptions',
       loadingMore: 'Loading more…',
@@ -53,6 +65,7 @@ const copy = (locale: PublicLocale) => locale === 'en'
       sessionExpired: 'Your session has expired. Sign in again.',
       status: {
         PENDING: 'Pending',
+        TRIALING: 'Trial',
         ACTIVE: 'Active',
         PAST_DUE: 'Past due',
         PAUSED: 'Paused',
@@ -77,6 +90,13 @@ const copy = (locale: PublicLocale) => locale === 'en'
         id: '訂閱 ID',
         period: '目前週期',
         cancelAt: '取消時間',
+        trialEnds: '試用結束',
+        trialCanceled: '試用已設定取消；試用期結束前仍可使用會員內容。',
+        trialPaymentFailed: '試用結束時的首次扣款失敗。現在取消可停止後續重試，試用期結束前仍可使用會員內容。',
+        manageStoreTrial: '請在 App Store 或 Google Play 管理試用續訂；LuckRead 無法代替商店取消帳單。',
+        cancelTrial: '取消試用並停止續訂',
+        cancelTrialConfirm: '要取消試用轉付費嗎？試用期結束前仍可使用會員內容。',
+        cancelingTrial: '正在取消試用…',
         mutationsUnavailable: '付款服務商同步驗證尚未通過，暫時無法變更訂閱；目前仍可查看狀態與週期記錄。',
         loadMore: '載入更多訂閱',
         loadingMore: '載入中…',
@@ -85,6 +105,7 @@ const copy = (locale: PublicLocale) => locale === 'en'
         sessionExpired: '登入已失效，請重新登入。',
         status: {
           PENDING: '待處理',
+          TRIALING: '試用中',
           ACTIVE: '有效',
           PAST_DUE: '逾期',
           PAUSED: '已暫停',
@@ -108,6 +129,13 @@ const copy = (locale: PublicLocale) => locale === 'en'
         id: '订阅 ID',
         period: '当前周期',
         cancelAt: '取消时间',
+        trialEnds: '试用结束',
+        trialCanceled: '试用已设置取消；试用期结束前仍可使用会员内容。',
+        trialPaymentFailed: '试用结束时的首次扣款失败。现在取消可停止后续重试，试用期结束前仍可使用会员内容。',
+        manageStoreTrial: '请在 App Store 或 Google Play 管理试用续订；LuckRead 无法代替商店取消账单。',
+        cancelTrial: '取消试用并停止续订',
+        cancelTrialConfirm: '要取消试用转付费吗？试用期结束前仍可使用会员内容。',
+        cancelingTrial: '正在取消试用…',
         mutationsUnavailable: '付款服务商同步验证尚未通过，暂时无法变更订阅；目前仍可查看状态与周期记录。',
         loadMore: '加载更多订阅',
         loadingMore: '加载中…',
@@ -116,6 +144,7 @@ const copy = (locale: PublicLocale) => locale === 'en'
         sessionExpired: '登录已失效，请重新登录。',
         status: {
           PENDING: '待处理',
+          TRIALING: '试用中',
           ACTIVE: '有效',
           PAST_DUE: '逾期',
           PAUSED: '已暂停',
@@ -131,6 +160,7 @@ const formatDate = (value: string, locale: PublicLocale) => {
 }
 
 const statusClass = (status: Subscription['status']) => {
+  if (status === 'TRIALING') return 'bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-200'
   if (status === 'ACTIVE') return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200'
   if (status === 'PAST_DUE') return 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-200'
   if (status === 'PAUSED') return 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200'
@@ -146,6 +176,8 @@ export default function MySubscriptionsPage() {
   const [pageNumber, setPageNumber] = useState(1)
   const [hasNextPage, setHasNextPage] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
+  const [cancelingTrialId, setCancelingTrialId] = useState<string | null>(null)
+  const [trialActionError, setTrialActionError] = useState('')
 
   async function load(page = 1, append = false) {
     if (append) setLoadingMore(true)
@@ -176,6 +208,42 @@ export default function MySubscriptionsPage() {
     }
   }
 
+  async function cancelTrial(item: Subscription) {
+    if (!item.trial || item.trial.source !== 'WEB' ||
+        !['TRIALING', 'PAYMENT_FAILED'].includes(item.trial.status)) return
+    if (!window.confirm(labels.cancelTrialConfirm)) return
+    setCancelingTrialId(item.subscriptionId)
+    setTrialActionError('')
+    try {
+      const { response, data } = await fetchJson<{
+        data?: { subscription?: { subscriptionId?: string }; trial?: { status?: string } }
+        error?: { code?: string; message?: string }
+      }>('/api/v1/memberships/subscriptions/' + encodeURIComponent(item.subscriptionId) + '/cancel-trial', {
+        method: 'POST',
+        credentials: 'include',
+        cache: 'no-store',
+        headers: {
+          accept: 'application/json',
+          'If-Match': item.etag,
+        },
+      })
+      if (response.status === 401) {
+        const returnTo = window.location.pathname + window.location.search + window.location.hash
+        window.location.assign('/login?returnTo=' + encodeURIComponent(returnTo))
+        return
+      }
+      if (!response.ok || data?.data?.subscription?.subscriptionId !== item.subscriptionId ||
+          data.data.trial?.status !== 'CANCELED') {
+        throw new Error(getApiErrorMessage(data, labels.updateError))
+      }
+      await load(pageNumber, false)
+    } catch (caught) {
+      setTrialActionError(caught instanceof Error ? caught.message : labels.updateError)
+    } finally {
+      setCancelingTrialId(null)
+    }
+  }
+
   useEffect(() => {
     const timer = window.setTimeout(() => { void load() }, 0)
     return () => window.clearTimeout(timer)
@@ -199,6 +267,7 @@ export default function MySubscriptionsPage() {
       </header>
 
       {error ? <p className="border-b border-light-border px-4 py-3 text-sm text-rose-700 dark:border-dark-border dark:text-rose-300" role="alert">{error}</p> : null}
+      {trialActionError ? <p className="border-b border-light-border px-4 py-3 text-sm text-rose-700 dark:border-dark-border dark:text-rose-300" role="alert">{trialActionError}</p> : null}
 
       {loading && items.length === 0 ? (
         <section className="px-4 py-6 text-sm text-light-secondary dark:text-dark-secondary" role="status">{labels.loading}</section>
@@ -247,7 +316,46 @@ export default function MySubscriptionsPage() {
               ) : null}
             </dl>
 
-            {['ACTIVE', 'PAST_DUE', 'PAUSED'].includes(item.status) ? (
+            {item.trial ? (
+              <section className="mt-4 rounded-xl border border-light-border px-4 py-3 dark:border-dark-border">
+                <dl className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <div>
+                    <dt className="text-xs text-light-secondary dark:text-dark-secondary">{labels.trialEnds}</dt>
+                    <dd className="mt-1 text-sm font-medium">{formatDate(item.trial.trialEndsAt, locale)}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-light-secondary dark:text-dark-secondary">{locale === 'en' ? 'Trial source' : locale === 'tw' ? '試用來源' : '试用来源'}</dt>
+                    <dd className="mt-1 text-sm font-medium">
+                      {item.trial.source === 'WEB' ? 'LuckRead' : item.trial.source === 'APP_STORE' ? 'App Store' : 'Google Play'}
+                    </dd>
+                  </div>
+                </dl>
+                {item.trial.source === 'WEB' && item.trial.status === 'CANCELED' ? (
+                  <p className="mt-3 text-xs leading-5 text-light-secondary dark:text-dark-secondary">{labels.trialCanceled}</p>
+                ) : null}
+                {item.trial.source === 'WEB' && item.trial.status === 'PAYMENT_FAILED' ? (
+                  <p className="mt-3 text-xs leading-5 text-light-secondary dark:text-dark-secondary">{labels.trialPaymentFailed}</p>
+                ) : null}
+                {item.trial.source !== 'WEB' && ['TRIALING', 'CANCELED'].includes(item.trial.status) ? (
+                  <p className="mt-3 text-xs leading-5 text-light-secondary dark:text-dark-secondary">{labels.manageStoreTrial}</p>
+                ) : null}
+                {item.trial.source === 'WEB' &&
+                  ['TRIALING', 'PAYMENT_FAILED'].includes(item.trial.status) &&
+                  ['TRIALING', 'PAST_DUE'].includes(item.status) &&
+                  !item.cancelAt ? (
+                    <button
+                      className="mt-3 rounded-full border border-light-border px-4 py-2 text-sm font-bold hover:bg-light-primary/10 disabled:opacity-50 dark:border-dark-border dark:hover:bg-dark-primary/10"
+                      disabled={cancelingTrialId !== null || loading}
+                      onClick={() => void cancelTrial(item)}
+                      type="button"
+                    >
+                      {cancelingTrialId === item.subscriptionId ? labels.cancelingTrial : labels.cancelTrial}
+                    </button>
+                  ) : null}
+              </section>
+            ) : null}
+
+            {['ACTIVE', 'PAST_DUE', 'PAUSED'].includes(item.status) && !item.trial ? (
               <p className="mt-4 rounded-xl border border-light-border px-4 py-3 text-xs leading-5 text-light-secondary dark:border-dark-border dark:text-dark-secondary">
                 {labels.mutationsUnavailable}
               </p>
