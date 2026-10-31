@@ -23,7 +23,7 @@
       "from": "SCHEDULED",
       "to": "CANCELED",
       "actor": "system|user",
-      "guard": "The subscriber pauses, cancels, or expires the Subscription before the scheduled effective boundary, or a separately admitted cancellation action is recorded."
+      "guard": "The Subscription is paused, canceled, or expired, or its cancel_at becomes non-null before the scheduled plan is applied."
     }
   ],
   "x-forbidden": [
