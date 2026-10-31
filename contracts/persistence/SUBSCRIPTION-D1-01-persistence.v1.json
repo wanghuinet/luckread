@@ -361,7 +361,7 @@
   },
   "paidPlanUpgradeApplicationTable": {
     "name": "membership_subscription_plan_change_applications",
-    "purpose": "One-use D1-01 application proof that an existing Subscription may switch to a higher same-currency, same-billing-interval immutable plan version within the current paid period after its referenced D1-04 Order/Payment has succeeded through the signed Hyperswitch webhook path. Financial amount and currency remain exclusively authoritative in D1-04.",
+    "purpose": "A single active D1-01 upgrade-checkout reservation and one-use application proof. PENDING_PAYMENT reserves the existing Subscription while its D1-04 Order awaits customer-present payment; a verified successful Hyperswitch webhook attaches the D1-04 Payment reference and transitions through READY to APPLIED. Financial amount and currency remain exclusively authoritative in D1-04.",
     "primaryKey": "application_id",
     "authority": "D1-01 stores the guarded plan transition proof only; D1-04 remains authoritative for Order, Payment, paid amount, currency and provider references.",
     "columns": [
@@ -434,7 +434,7 @@
       {
         "name": "payment_id",
         "type": "TEXT",
-        "nullable": false,
+        "nullable": true,
         "primaryKey": false
       },
       {
@@ -489,7 +489,7 @@
           "subscription_id"
         ],
         "unique": true,
-        "partial": "status = 'READY'"
+        "partial": "status IN ('PENDING_PAYMENT','READY')"
       },
       {
         "name": "ix_membership_plan_change_applications_subscriber_created",
@@ -502,10 +502,12 @@
     ],
     "stateMachine": {
       "states": [
+        "PENDING_PAYMENT",
         "READY",
         "APPLIED"
       ],
       "transitions": [
+        "PENDING_PAYMENT -> READY",
         "READY -> APPLIED"
       ],
       "terminal": [
@@ -514,12 +516,12 @@
     },
     "constraints": {
       "sourceAndTarget": "Source and target must be immutable versions of creator-owned plans from the same creator, same currency and billing interval; target list price must be higher.",
-      "subscriptionCas": "The source plan/version, subscriber, Subscription version and current paid period must exactly match at insert and at the subsequent CAS update.",
-      "paymentEvidence": "order_id and payment_id are references to D1-04 facts. W07 verifies the succeeded Payment amount/currency against the confirmed Order in D1-04 before creating the application proof; D1-01 does not copy financial facts.",
-      "immediateActivation": "A same-period Subscription plan update is permitted only while an exact READY application proof exists. The Subscription update and READY -> APPLIED transition are in one D1-01 batch.",
+      "subscriptionCas": "The source plan/version, subscriber, Subscription version and current paid period must exactly match when the checkout reservation is created and at the subsequent CAS update.",
+      "paymentEvidence": "order_id and payment_id are references to D1-04 facts. A PENDING_PAYMENT reservation has a null payment_id and blocks any second active upgrade checkout for that Subscription. W07 verifies the succeeded Payment amount/currency against the confirmed Order in D1-04 before attaching the Payment reference and transitioning the reservation to READY; D1-01 does not copy financial facts.",
+      "immediateActivation": "A same-period Subscription plan update is permitted only while an exact READY application proof exists with a verified payment_id. The Subscription update and READY -> APPLIED transition are in one D1-01 batch.",
       "noPeriodReset": "Immediate upgrade preserves current_period_start and current_period_end; it does not add days or create a duplicate Subscription.",
-      "idempotency": "Unique Order and Payment references plus deterministic application_id prevent a paid order or provider webhook replay from applying a second upgrade.",
-      "retention": "Application identity is immutable; status is READY -> APPLIED only; application history cannot be deleted."
+      "idempotency": "Unique Order and Payment references, one active reservation per Subscription, and deterministic application_id prevent parallel upgrade orders and provider webhook replay from applying a second upgrade.",
+      "retention": "Application identity is immutable apart from the one-time null payment_id attachment during PENDING_PAYMENT -> READY; status is PENDING_PAYMENT -> READY -> APPLIED only; application history cannot be deleted."
     },
     "migration": "workers/W07-subscription-commerce/migrations/0006_immediate_subscription_upgrades.sql"
   }
