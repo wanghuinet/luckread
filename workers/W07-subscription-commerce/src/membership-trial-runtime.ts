@@ -409,11 +409,11 @@ export async function getMembershipTrialDetails(
 }
 
 /**
- * Store trials are authoritative in App Store / Google Play via RevenueCat.
- * This bounded expiry closes ended store trials and canceled/uncharged web trials;
- * a web trial with an in-flight or retryable MIT payment is retained for outcome sync.
+ * Store trial termination is recorded only from the W02-verified RevenueCat snapshot.
+ * This bounded expiry closes canceled/uncharged web trials; a submitted or retryable
+ * MIT payment is retained for outcome sync and normal renewal recovery.
  */
-export async function expireDueStoreMembershipTrials(
+export async function expireDueWebMembershipTrials(
   db: D1Database,
   now = new Date(),
   limit = 100,
@@ -429,8 +429,7 @@ export async function expireDueStoreMembershipTrials(
     "s.version AS subscription_version, s.status AS subscription_status, s.updated_at AS subscription_updated_at " +
     "FROM membership_subscription_trials t INNER JOIN membership_subscriptions s " +
     "ON s.subscription_id = t.subscription_id AND s.subscriber_id = t.subscriber_id " +
-    "WHERE ((t.source IN ('APP_STORE','PLAY_STORE') AND t.status IN ('TRIALING','CANCELED','PAYMENT_FAILED')) " +
-    "OR (t.source = 'WEB' AND t.status IN ('TRIALING','CANCELED','PAYMENT_FAILED'))) " +
+    "WHERE t.source = 'WEB' AND t.status IN ('TRIALING','CANCELED','PAYMENT_FAILED') " +
     "AND t.trial_ends_at <= ? AND s.status IN ('TRIALING','PAST_DUE') " +
     "ORDER BY t.trial_ends_at ASC, t.trial_id ASC LIMIT ?",
   ).bind(nowIsoValue, safeLimit).all<{
@@ -453,13 +452,8 @@ export async function expireDueStoreMembershipTrials(
         throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
       }
       if (cycle && (
-        cycle.state === 'SUCCEEDED' ||
-        cycle.state === 'SUBMITTED' ||
-        cycle.state === 'SUBMITTING' ||
-        cycle.state === 'PAYMENT_READY' ||
-        cycle.state === 'PREPARED' ||
-        cycle.state === 'RECONCILIATION_REQUIRED' ||
-        cycle.subscription_sync_state !== 'APPLIED'
+        ['SUCCEEDED', 'SUBMITTED', 'SUBMITTING', 'PAYMENT_READY', 'PREPARED', 'RECONCILIATION_REQUIRED'].includes(cycle.state) ||
+        (['SUCCEEDED', 'FAILED'].includes(cycle.state) && cycle.subscription_sync_state !== 'APPLIED')
       )) {
         // Never expire a trial while a submitted payment or uncertain terminal
         // outcome could still convert the same Subscription.
