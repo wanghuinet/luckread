@@ -542,7 +542,7 @@ function parseSubscriptionPlanChangeAppliedAuditInput(value: unknown): Subscript
   const legacyAllowed = new Set(['eventId', 'changeId', 'subscriberId', 'subscriptionId', 'fromPlanId', 'fromPlanVersion', 'toPlanId', 'toPlanVersion', 'expectedSubscriptionVersion', 'appliedSubscriptionVersion', 'effectiveAt', 'occurredAt'])
   const keys = Object.keys(body)
   if (!((keys.length === allowed.size && keys.every((key) => allowed.has(key))) ||
-        (keys.length === legacyAllowed.size && keys.every((key) => legacyAllowed.has(key)))) {
+        (keys.length === legacyAllowed.size && keys.every((key) => legacyAllowed.has(key))))) {
     throw new Error('INVALID_SUBSCRIPTION_PLAN_DOWNGRADE_APPLIED_AUDIT')
   }
   const changeType = body.changeType ?? 'DOWNGRADE'
