@@ -584,10 +584,10 @@ async function readStoreTrial(
     return await db.prepare(
       'SELECT trial_id, subscription_id, subscriber_id, plan_id, plan_version, source, provider_app_id, ' +
       'product_id, store_transaction_id, started_at, trial_ends_at, status, request_hash, version, created_at, updated_at ' +
-      'FROM membership_subscription_trials WHERE source = ? AND provider_app_id = ? AND ' +
-      '(store_transaction_id = ? OR (subscriber_id = ? AND plan_id = ? AND product_id = ?)) ' +
+      'FROM membership_subscription_trials WHERE source = ? AND provider_app_id = ? AND subscriber_id = ? AND ' +
+      '(store_transaction_id = ? OR (plan_id = ? AND product_id = ?)) ' +
       'ORDER BY CASE WHEN store_transaction_id = ? THEN 0 ELSE 1 END LIMIT 1',
-    ).bind(source, appId, storeTransactionId, subscriberId, planId, productId, storeTransactionId).first<TrialRow>();
+    ).bind(source, appId, subscriberId, storeTransactionId, planId, productId, storeTransactionId).first<TrialRow>();
   } catch {
     throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
   }
@@ -684,8 +684,8 @@ export async function syncRevenueCatStoreTrialCandidates(
       if (Date.parse(trialEndsAt) <= Date.parse(startedAt)) {
         throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500);
       }
-      const identityMaterial = 'revenuecat-store-trial-v1\u0000' + candidate.store + '\u0000' +
-        appIdInput + '\u0000' + storeTransactionId;
+      const identityMaterial = 'revenuecat-store-trial-v1\\u0000' + subscriberId + '\\u0000' + candidate.store + '\\u0000' +
+        appIdInput + '\\u0000' + storeTransactionId;
       const identityHash = await digest(identityMaterial);
       const subscriptionId = 'sub_' + identityHash;
       const trialId = 'mtr_' + identityHash.slice(0, 26);
