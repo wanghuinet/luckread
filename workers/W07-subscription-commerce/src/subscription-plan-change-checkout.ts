@@ -74,7 +74,7 @@ export type SubscriptionPlanUpgradeCheckoutResult = Readonly<{
     basis: 'LIST_PRICE_DIFFERENCE_BEFORE_DISCOUNTS_AND_TAX';
     pricingFinalized: true;
   }>;
-  effectiveAt: string;
+  effectiveAt: string | null;
   expiresAt: string;
   replayed: boolean;
 }>;
@@ -264,7 +264,7 @@ function toCheckoutResult(
       basis: 'LIST_PRICE_DIFFERENCE_BEFORE_DISCOUNTS_AND_TAX',
       pricingFinalized: true,
     },
-    effectiveAt: attempt.created_at,
+    effectiveAt: attempt.applied_at,
     expiresAt: attempt.expires_at,
     replayed,
   };
@@ -368,6 +368,7 @@ export async function createSubscriptionPlanUpgradeCheckout(
   const now = nowDate.toISOString();
 
   let attemptRow = await readAttemptByIdempotency(env.D1_01, subscriberId, keyDigest);
+  const replayedAttempt = attemptRow !== null
   if (attemptRow) {
     assertAttemptMatches(attemptRow, subscriberId, subscriptionId, targetPlanId);
     if (ifMatch !== etagForVersion(attemptRow.expected_subscription_version)) {
@@ -492,7 +493,7 @@ export async function createSubscriptionPlanUpgradeCheckout(
   return createOrReadOrder(env, subscriberId, attemptRow, preview, {
     ...dependencies,
     resolvePricing: async () => pricing,
-  }, Boolean(attemptRow.order_id));
+  }, replayedAttempt || Boolean(attemptRow.order_id));
 }
 
 /**
