@@ -266,15 +266,18 @@ class MemoryPaymentD1 {
       receipt.outcome_code = applied ? 'MANDATE_STATUS_APPLIED' : 'MANDATE_STATUS_CAS_LOST_OR_OUT_OF_ORDER';
       return result(1) as D1Result<T>;
     }
-    if (sql.startsWith('UPDATE payment_mandates SET status = ?')) {
-      const [status, providerUpdatedAt, updatedAt, mandateId, provider, merchantId, providerMandateId,
-        methodId, version, oldStatus, timestampGuard, activeStatus, revokedStatus, eventProvider,
-        eventMerchant, eventId, payloadHash] = values as
-        [Mandate['status'], string, string, string, string, string, string, string, number, Mandate['status'],
-         string, Mandate['status'], Mandate['status'], string, string, string, string];
+    if (sql.startsWith('UPDATE payment_mandates SET provider_mandate_id = COALESCE')) {
+      const [providerMandateId, status, providerUpdatedAt, updatedAt, mandateId, provider, merchantId,
+        matchedMandateId, sourcePaymentId, methodId, version, oldStatus, timestampGuard,
+        activeStatus, revokedStatus, eventProvider, eventMerchant, eventId, payloadHash] = values as
+        [string, Mandate['status'], string, string, string, string, string, string, string,
+         string, number, Mandate['status'], string, Mandate['status'], Mandate['status'],
+         string, string, string, string];
       const mandate = this.mandates.find(m => m.mandate_record_id === mandateId && m.provider === provider &&
-        m.merchant_id === merchantId && m.provider_mandate_id === providerMandateId &&
-        m.payment_method_id === methodId && m.version === version && m.status === oldStatus &&
+        m.merchant_id === merchantId && m.payment_method_id === methodId &&
+        (m.provider_mandate_id === matchedMandateId ||
+          (m.provider_mandate_id === null && m.source_payment_id === sourcePaymentId)) &&
+        m.version === version && m.status === oldStatus &&
         (m.provider_updated_at === null || m.provider_updated_at < timestampGuard));
       const receipt = this.events.find(e => e.provider === eventProvider && e.merchant_id === eventMerchant &&
         e.event_id === eventId && e.payload_sha256 === payloadHash && e.state === 'RECEIVED');
@@ -284,6 +287,7 @@ class MemoryPaymentD1 {
           ? ['PENDING_PROVIDER_CONFIRMATION', 'ACTIVE', 'REVOKED'].includes(oldStatus)
           : false;
       if (!mandate || !receipt || !transitionAllowed) return result(0) as D1Result<T>;
+      mandate.provider_mandate_id = providerMandateId;
       mandate.status = status;
       mandate.provider_updated_at = providerUpdatedAt;
       mandate.updated_at = updatedAt;
