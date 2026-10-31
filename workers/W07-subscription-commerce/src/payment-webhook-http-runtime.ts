@@ -16,6 +16,7 @@ import {
   type PaidMembershipPurchaseFulfillmentResult,
 } from './paid-membership-order-fulfillment.js';
 import { issueReceiptForPaidPayment } from './billing-persistence.js';
+import { expirePendingSubscriptionPlanUpgradeForPayment } from './subscription-plan-change-checkout.js';
 
 type HyperswitchWebhookRuntimeEnv = Readonly<{
   D1_01: D1Database;
@@ -44,6 +45,7 @@ type HyperswitchWebhookRuntimeDependencies = Readonly<{
   ) => Promise<RenewalPendingRecoveryResult>;
   fulfillPaidOrder?: typeof fulfillPaidMembershipOrder;
   issueReceipt?: typeof issueReceiptForPaidPayment;
+  expirePendingPlanUpgrade?: typeof expirePendingSubscriptionPlanUpgradeForPayment;
 }>;
 
 const WEBHOOK_PATH = '/internal/webhooks/hyperswitch';
@@ -77,7 +79,8 @@ function receiptResponse(
     subscriptionSync?.outcome === 'PENDING_RETRY';
   const pendingRecoveryNeedsWork = (pendingRecovery?.reconciliationRequired ?? 0) > 0 ||
     (pendingRecovery?.pendingRetry ?? 0) > 0;
-  const status = !subscriptionSyncNeedsWork && !pendingRecoveryNeedsWork &&
+  const purchaseFulfillmentNeedsWork = purchaseFulfillment?.outcome === 'RECONCILIATION_REQUIRED';
+  const status = !subscriptionSyncNeedsWork && !pendingRecoveryNeedsWork && !purchaseFulfillmentNeedsWork &&
     (result.outcome === 'APPLIED' || result.outcome === 'DUPLICATE') ? 200 : 202;
   return Response.json(
     {
@@ -98,6 +101,7 @@ function receiptResponse(
           membershipPurchaseFulfillment: {
             outcome: purchaseFulfillment.outcome,
             fulfilledCount: purchaseFulfillment.fulfilledCount,
+            ...(purchaseFulfillment.reasonCode ? { reasonCode: purchaseFulfillment.reasonCode } : {}),
           },
         } : {}),
       },
@@ -205,6 +209,12 @@ export async function handleHyperswitchWebhookRequest(
         paymentId,
         env.HYPERSWITCH_MERCHANT_ID,
       );
+
+      // Signed provider outcomes are already durable in D1-04. Expire only a
+      // matching unpaid plan-upgrade reservation when the stored Payment is terminally failed.
+      const expireUpgrade = dependencies.expirePendingPlanUpgrade ??
+        expirePendingSubscriptionPlanUpgradeForPayment;
+      await expireUpgrade(renewalEnv, paymentId, env.HYPERSWITCH_MERCHANT_ID);
 
       // Initial creator-membership purchases have no renewal-cycle row. Only a
       // verified payment_succeeded event may fulfill one, and fulfillment reads
