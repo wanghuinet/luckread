@@ -181,7 +181,8 @@ export async function hasPendingScheduledPlanDowngrade(
 ): Promise<boolean> {
   try {
     const row = await db.prepare(
-      "SELECT change_id FROM membership_subscription_scheduled_plan_changes WHERE subscription_id = ? AND status = 'SCHEDULED' LIMIT 1",
+      "SELECT change_id FROM membership_subscription_scheduled_plan_changes WHERE subscription_id = ? " +
+      "AND status IN ('SCHEDULED', 'RECONCILIATION_REQUIRED') LIMIT 1",
     ).bind(subscriptionId).first<{ change_id: string }>();
     return row !== null;
   } catch (error) {
@@ -339,7 +340,7 @@ export async function scheduleSubscriptionPlanDowngrade(
       'AND p.owner_id = (SELECT creator_id FROM membership_subscriptions WHERE subscription_id = ? AND subscriber_id = ?) ' +
       "AND p.status = 'ACTIVE' AND p.visibility = 'PUBLIC') " +
       "AND NOT EXISTS (SELECT 1 FROM membership_subscription_plan_change_attempts a " +
-      "WHERE a.subscription_id = ? AND a.status = 'PENDING_PAYMENT')",
+      "WHERE a.subscription_id = ? AND a.status IN ('PENDING_PAYMENT', 'RECONCILIATION_REQUIRED'))",
     ).bind(
       changeId, subscriberId, subscriptionId, expectedVersion, preview.currentPlan.planId,
       preview.currentPlan.planVersion, preview.targetPlan.planId, preview.targetPlan.planVersion,
