@@ -253,6 +253,7 @@
         "POST /v1/memberships/subscriptions/{subscriptionId}/cancel",
         "POST /v1/memberships/subscriptions/{subscriptionId}/change-plan",
         "POST /v1/memberships/subscriptions/{subscriptionId}/change-plan/checkout",
+        "POST /v1/memberships/subscriptions/{subscriptionId}/change-plan/interval-schedule",
         "POST /v1/memberships/subscriptions/{subscriptionId}/change-plan/schedule",
         "POST /v1/memberships/subscriptions/{subscriptionId}/pause",
         "POST /v1/memberships/subscriptions/{subscriptionId}/resume",
