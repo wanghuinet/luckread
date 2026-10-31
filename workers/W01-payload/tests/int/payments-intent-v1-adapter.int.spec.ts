@@ -41,6 +41,7 @@ describe('public Hyperswitch payment intent adapter', () => {
     expect(route).toContain('data.amountMinor')
     expect(route).toContain('data.currency')
     expect(route).toContain('data.clientSecret.length > 4096')
+    expect(route).toContain('data.sdkAuthorization.length > 4096')
     expect(route).toContain("headers.set('cache-control', 'no-store')")
     expect(route).toContain("headers.set('pragma', 'no-cache')")
   })
@@ -90,12 +91,14 @@ describe('public Hyperswitch payment intent adapter', () => {
     expect(paymentBlock).toContain('x-luckread-contract-status: CONTRACTED_PARTIAL')
     expect(paymentBlock).toContain("required: [orderId]")
     expect(paymentBlock).toContain('clientSecret')
+    expect(paymentBlock).toContain('sdkAuthorization')
     expect(paymentBlock).toContain('pricingMode')
     expect(paymentBlock.toLowerCase()).toContain('cache-control')
     const operation = binding.operations.find((item: { operationId: string }) => item.operationId === 'postPaymentsIntents')
     expect(operation).toBeDefined()
     expect(operation.publicPath).toBe('/api/v1/payments/intents')
     expect(operation.responseFields).toContain('pricingMode')
+    expect(operation.responseFields).toContain('sdkAuthorization')
     expect(operation.internalPath).toBe('/commerce/orders/{orderId}/payment-intent')
     expect(operation.topologyConstraints).toMatchObject({
       newWorker: false,
