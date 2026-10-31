@@ -613,8 +613,10 @@ export async function syncRevenueCatStoreTrialCandidates(
 
     const existing = await readStoreTrial(db, candidate.store, appIdInput, originalTransactionId);
     if (!existing) {
-      if (candidate.currentState !== 'TRIALING' || candidate.periodType !== 'TRIAL' ||
-          !candidate.effectiveExpiresAt) {
+      const isLiveTrial = candidate.currentState === 'TRIALING' && candidate.periodType === 'TRIAL';
+      const isAlreadyExpiredTrial = ['EXPIRED', 'REFUNDED'].includes(candidate.currentState) &&
+        candidate.periodType === 'TRIAL';
+      if ((!isLiveTrial && !isAlreadyExpiredTrial) || !candidate.effectiveExpiresAt) {
         unchanged += 1;
         continue;
       }
@@ -634,7 +636,7 @@ export async function syncRevenueCatStoreTrialCandidates(
       }));
       const cancelAt = candidate.unsubscribeDetectedAt ? trialEndsAt : null;
       try {
-        const results = await db.batch([
+        const statements = [
           db.prepare(
             'INSERT INTO membership_subscriptions ' +
             '(subscription_id, subscriber_id, plan_id, plan_version, creator_id, status, started_at, current_period_start, current_period_end, cancel_at, entitlement_snapshot_ref, created_at, updated_at, version) ' +
@@ -652,13 +654,27 @@ export async function syncRevenueCatStoreTrialCandidates(
             candidate.store, appIdInput, candidate.productId, originalTransactionId, startedAt,
             trialEndsAt, cancelAt ? 'CANCELED' : 'TRIALING', requestHash, startedAt, startedAt,
           ),
-        ]);
-        if (results.length !== 2 || Number(results[0]?.meta?.changes ?? 0) !== 1 ||
-            Number(results[1]?.meta?.changes ?? 0) !== 1) {
+        ];
+        if (isAlreadyExpiredTrial) {
+          statements.push(db.prepare(
+            "UPDATE membership_subscriptions SET status = 'EXPIRED', updated_at = ?, version = version + 1 " +
+            "WHERE subscription_id = ? AND subscriber_id = ? AND status = 'TRIALING' AND version = 1",
+          ).bind(
+            new Date(Math.max(Date.now(), Date.parse(startedAt) + 1)).toISOString(),
+            subscriptionId,
+            subscriberId,
+          ));
+        }
+        const results = await db.batch(statements);
+        if (results.length !== statements.length ||
+            Number(results[0]?.meta?.changes ?? 0) !== 1 ||
+            Number(results[1]?.meta?.changes ?? 0) !== 1 ||
+            (isAlreadyExpiredTrial && Number(results[2]?.meta?.changes ?? 0) !== 1)) {
           throw new SubscriptionRuntimeError('CONFLICT', 409);
         }
         created += 1;
         if (cancelAt) canceled += 1;
+        if (isAlreadyExpiredTrial) expired += 1;
       } catch (error) {
         if (error instanceof SubscriptionRuntimeError) throw error;
         throw new SubscriptionRuntimeError('CONFLICT', 409);
