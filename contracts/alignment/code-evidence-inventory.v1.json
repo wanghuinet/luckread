@@ -4935,7 +4935,9 @@
         "D1-01 migration 0007 is a reviewed code candidate only and has not been applied to the remote database.",
         "Trial lifecycle, CASL, scheduler and migration regression cases were authored but intentionally not executed during this feature-first pass; full unit, CI and signed production E2E validation remain deferred until feature implementation is complete.",
         "Store trial synchronization depends on a W02-authenticated RevenueCat current-customer snapshot and exact product binding; the end-to-end store purchase, cancellation and conversion flow remains for the later validation phase.",
-        "RevenueCat auto-renew restoration clears a prior store-period cancel_at so a paid renewal does not remain scheduled for expiry; regression coverage is authored but not executed."
+        "RevenueCat auto-renew restoration clears a prior store-period cancel_at so a paid renewal does not remain scheduled for expiry; regression coverage is authored but not executed.",
+        "Web-trial first MIT conversion is wired to the existing W07 renewal-cycle pipeline, but scheduled/async renewal execution remains behind its existing activation gate; production scheduler execution has not been enabled by this feature change.",
+        "Production-authoritative pricing and tax calculation for renewal orders remains gated; sandbox/demo pricing evidence is not a production payment readiness claim."
       ]
     },
     {
@@ -4983,7 +4985,9 @@
         "D1-01 migration 0007 is a reviewed code candidate only and has not been applied to the remote database.",
         "Trial lifecycle, CASL, scheduler and migration regression cases were authored but intentionally not executed during this feature-first pass; full unit, CI and signed production E2E validation remain deferred until feature implementation is complete.",
         "Store trial synchronization depends on a W02-authenticated RevenueCat current-customer snapshot and exact product binding; the end-to-end store purchase, cancellation and conversion flow remains for the later validation phase.",
-        "RevenueCat auto-renew restoration clears a prior store-period cancel_at so a paid renewal does not remain scheduled for expiry; regression coverage is authored but not executed."
+        "RevenueCat auto-renew restoration clears a prior store-period cancel_at so a paid renewal does not remain scheduled for expiry; regression coverage is authored but not executed.",
+        "Web-trial first MIT conversion is wired to the existing W07 renewal-cycle pipeline, but scheduled/async renewal execution remains behind its existing activation gate; production scheduler execution has not been enabled by this feature change.",
+        "Production-authoritative pricing and tax calculation for renewal orders remains gated; sandbox/demo pricing evidence is not a production payment readiness claim."
       ]
     }
   ]
