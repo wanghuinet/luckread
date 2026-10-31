@@ -362,7 +362,8 @@ export async function cancelWebMembershipTrial(
     // before cancellation failed and moved the same Subscription to PAST_DUE.
     return { subscription: toSubscription(subscription), trial: toTrial(trial), replayed: true };
   }
-  if (subscription.status !== 'TRIALING' || trial.status !== 'TRIALING') {
+  if (!['TRIALING', 'PAST_DUE'].includes(subscription.status) ||
+      !['TRIALING', 'PAYMENT_FAILED'].includes(trial.status)) {
     throw new SubscriptionRuntimeError('INVALID_STATE', 409);
   }
   if (subscription.version !== expectedVersion) throw new SubscriptionRuntimeError('PRECONDITION_FAILED', 412);
@@ -370,11 +371,11 @@ export async function cancelWebMembershipTrial(
   const results = await db.batch([
     db.prepare(
       "UPDATE membership_subscriptions SET cancel_at = ?, updated_at = ?, version = version + 1 " +
-      "WHERE subscription_id = ? AND subscriber_id = ? AND status = 'TRIALING' AND cancel_at IS NULL AND version = ?",
+      "WHERE subscription_id = ? AND subscriber_id = ? AND status IN ('TRIALING','PAST_DUE') AND cancel_at IS NULL AND version = ?",
     ).bind(trial.trial_ends_at, updatedAt, subscriptionId, subscriberId, expectedVersion),
     db.prepare(
       "UPDATE membership_subscription_trials SET status = 'CANCELED', version = version + 1, updated_at = ? " +
-      "WHERE trial_id = ? AND subscriber_id = ? AND status = 'TRIALING' AND version = ?",
+      "WHERE trial_id = ? AND subscriber_id = ? AND status IN ('TRIALING','PAYMENT_FAILED') AND version = ?",
     ).bind(updatedAt, trial.trial_id, subscriberId, trial.version),
   ]);
   if (results.length !== 2 || Number(results[0]?.meta?.changes ?? 0) !== 1 ||
