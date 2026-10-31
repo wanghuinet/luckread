@@ -176,7 +176,7 @@ export async function createSubscription(db: D1Database, subscriberId: string, i
       "NULL, NULL, ?, ?, 1 " +
       "FROM membership_plans AS p " +
       "INNER JOIN membership_plan_versions AS pv ON pv.plan_id = p.plan_id AND pv.plan_version = p.current_version " +
-      "WHERE p.plan_id = ? AND p.owner_type = 'CREATOR' AND p.status IN ('ACTIVE','TRIALING') AND p.visibility = 'PUBLIC' " +
+      "WHERE p.plan_id = ? AND p.owner_type = 'CREATOR' AND p.status = 'ACTIVE' AND p.visibility = 'PUBLIC' " +
       "LIMIT 1",
     ).bind(subscriptionId, subscriber, now, now, addBillingPeriod(now, 'MONTHLY'), addBillingPeriod(now, 'YEARLY'), now, now, planId).run()
   } catch (error) {
