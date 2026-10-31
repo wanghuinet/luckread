@@ -81,7 +81,7 @@ function fakeDb(rows: SubscriptionRow[], plans: MembershipPlanRow[] = []): D1Dat
               plan_id: planId, owner_type: 'CREATOR', owner_id: String(values[1]), current_version: 1,
               status: 'DRAFT', visibility: 'PRIVATE', version: 1, has_current_version: false,
               created_at: String(values[2]), updated_at: String(values[3]),
-              name: '', tier: '', billing_interval: 'MONTHLY', price_minor: 0, currency: 'USD', benefits_json: '[]',
+              name: '', tier: '', billing_interval: 'MONTHLY', price_minor: 0, currency: 'USD', benefits_json: '[]', trial_period_days: 0,
             })
             return { meta: { changes: 1 } }
           }
@@ -106,7 +106,7 @@ function fakeDb(rows: SubscriptionRow[], plans: MembershipPlanRow[] = []): D1Dat
             const version: PlanVersionRow = {
               plan_id: String(values[0]), plan_version: 1, name: String(values[1]), tier: String(values[2]),
               billing_interval: String(values[3]), price_minor: Number(values[4]), currency: String(values[5]),
-              benefits_json: String(values[6]), created_at: String(values[7]),
+              benefits_json: String(values[6]), trial_period_days: 0, created_at: String(values[7]),
             }
             planVersionState.set(key, version)
             const plan = planState.get(version.plan_id)
