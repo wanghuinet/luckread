@@ -75,6 +75,7 @@ function validPublishedPlan(value: unknown, expectedPlanId: string, expectedCrea
     (plan.billingInterval === 'MONTHLY' || plan.billingInterval === 'YEARLY') &&
     Number.isSafeInteger(plan.priceMinor) && Number(plan.priceMinor) >= 0 && Number(plan.priceMinor) <= 2_147_483_647 &&
     typeof plan.currency === 'string' && /^[A-Z]{3}$/.test(plan.currency) &&
+    Number.isSafeInteger(plan.trialDays) && Number(plan.trialDays) >= 0 && Number(plan.trialDays) <= 90 &&
     Array.isArray(plan.benefits) && plan.benefits.length <= 20 &&
     plan.benefits.every((item) => typeof item === 'string' && item.length >= 1 && item.length <= 180) &&
     new Set(plan.benefits).size === plan.benefits.length &&
@@ -181,6 +182,7 @@ export async function POST(request: Request, context: RouteContext): Promise<Res
           billingInterval: plan.billingInterval as 'MONTHLY' | 'YEARLY',
           priceMinor: plan.priceMinor as number,
           currency: plan.currency as string,
+          trialDays: plan.trialDays as number,
         },
       })
     } catch {
