@@ -327,7 +327,8 @@ async function forward(request: Request, context: RouteContext): Promise<Respons
           (!replayed && subscription.version !== expectedVersion + 1) ||
           typeof subscription.currentPeriodEnd !== 'string' || subscription.cancelAt !== subscription.currentPeriodEnd ||
           trial.subscriptionId !== subscriptionId || trial.source !== 'WEB' || trial.status !== 'CANCELED' ||
-          trial.trialEndsAt !== subscription.currentPeriodEnd) {
+          trial.trialEndsAt !== subscription.currentPeriodEnd ||
+          typeof trial.updatedAt !== 'string' || Number.isNaN(Date.parse(trial.updatedAt))) {
         return errorResponse(503, 'TRIAL_RESPONSE_INVALID', 'Trial cancellation result could not be verified')
       }
       const finalEventId = 'evt_subscription_trial_canceled_' + String(trial.trialId)
