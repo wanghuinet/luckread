@@ -2537,6 +2537,23 @@
       "stateMachine": "none"
     },
     {
+      "operationId": "scheduleSubscriptionPlanDowngrade",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "subscription.change_plan"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": true,
+      "idempotencyRequired": true,
+      "stateMachine": "none",
+      "x-luckread-period-end-only": true,
+      "x-luckread-entitlement-change": "No entitlement mutation during scheduling; apply the pinned target version only after verified successful renewal payment.",
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/api-inventory.v1.json"
+    },
+    {
       "operationId": "pauseSubscription",
       "auth": {
         "mode": "permission"
@@ -2813,23 +2830,6 @@
       "optimisticLockRequired": true,
       "idempotencyRequired": true,
       "stateMachine": "none"
-    },
-    {
-      "operationId": "scheduleSubscriptionPlanDowngrade",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [
-        "subscription.change_plan"
-      ],
-      "auditRequired": true,
-      "optimisticLockRequired": true,
-      "idempotencyRequired": true,
-      "stateMachine": "none",
-      "x-luckread-period-end-only": true,
-      "x-luckread-entitlement-change": "No entitlement mutation during scheduling; apply the pinned target version only after verified successful renewal payment.",
-      "x-luckread-contract-status": "DISCOVERY_DRAFT",
-      "x-luckread-source": "contracts/api/api-inventory.v1.json"
     }
   ]
 }
