@@ -27,7 +27,9 @@ type Subscription = {
   creator_id: string | null; billing_interval: 'MONTHLY' | 'YEARLY'; tier: string;
   price_minor: number; currency: string;
   status: 'PENDING' | 'ACTIVE' | 'PAST_DUE' | 'PAUSED' | 'CANCELED' | 'EXPIRED';
-  current_period_start: string; current_period_end: string; cancel_at: string | null;
+  current_period_start: string; current_period_end: string;
+  trial_started_at: string | null; trial_ends_at: string | null; trial_converted_at: string | null;
+  cancel_at: string | null;
   updated_at: string; version: number;
 };
 
@@ -45,7 +47,8 @@ const makeSubscription = (overrides: Partial<Subscription> = {}): Subscription =
   subscription_id: SUBSCRIPTION_ID, subscriber_id: 'user_1', plan_id: 'plan_1',
   plan_version: 2, creator_id: 'creator_1', billing_interval: 'MONTHLY', tier: 'ENTRY',
   price_minor: 1200, currency: 'USD', status: 'ACTIVE', current_period_start: START,
-  current_period_end: CYCLE_START, cancel_at: null, updated_at: START, version: 3, ...overrides,
+  current_period_end: CYCLE_START, trial_started_at: null, trial_ends_at: null, trial_converted_at: null,
+  cancel_at: null, updated_at: START, version: 3, ...overrides,
 });
 
 const result = (changes: number): D1Result => ({ success: true, meta: { changes } }) as D1Result;
@@ -96,7 +99,7 @@ class MemoryD1 {
   async run<T>(sql: string, values: unknown[]): Promise<D1Result<T>> {
     if (sql.includes('UPDATE membership_subscriptions SET')) {
       if (!this.subscription) return result(0) as D1Result<T>;
-      const [planId, planVersion, status, periodStart, periodEnd, updatedAt, subscriptionId, subscriberId,
+      const [planId, planVersion, status, periodStart, periodEnd, convertedAt, updatedAt, subscriptionId, subscriberId,
         expectedPlanId, expectedPlanVersion, expectedStatus, version, expectedStart, expectedEnd, cancelBoundary] = values;
       const row = this.subscription;
       if (row.subscription_id !== subscriptionId || row.subscriber_id !== subscriberId ||
@@ -106,7 +109,9 @@ class MemoryD1 {
           (row.cancel_at !== null && row.cancel_at <= String(cancelBoundary))) return result(0) as D1Result<T>;
       this.subscription = { ...row, plan_id: String(planId), plan_version: Number(planVersion),
         status: status as Subscription['status'], current_period_start: String(periodStart),
-        current_period_end: String(periodEnd), updated_at: String(updatedAt), version: row.version + 1 };
+        current_period_end: String(periodEnd),
+        trial_converted_at: convertedAt === null ? row.trial_converted_at : String(convertedAt),
+        updated_at: String(updatedAt), version: row.version + 1 };
       return result(1) as D1Result<T>;
     }
     if (sql.includes('UPDATE subscription_renewal_cycles SET subscription_sync_state')) {
