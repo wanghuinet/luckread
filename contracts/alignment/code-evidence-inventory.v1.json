@@ -373,7 +373,8 @@
         "workers/W07-subscription-commerce/src/subscription-runtime.test.ts",
         "workers/W07-subscription-commerce/src/subscription-renewal-outcome.test.ts",
         "workers/W08-creator/src/authz/casl-policy.test.ts",
-        ".github/workflows/w07-subscription-runtime-ci.yml"
+        ".github/workflows/w07-subscription-runtime-ci.yml",
+        "workers/W07-subscription-commerce/src/renewal-retry.test.ts"
       ],
       "schemaEvidenceRefs": [
         "contracts/persistence/SUBSCRIPTION-D1-01-persistence.v1.json#scheduledPlanChangeTable"
