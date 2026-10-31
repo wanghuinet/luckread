@@ -174,7 +174,7 @@ export async function runRenewalScheduledBatch(
   let trialExpiry: Readonly<{ scanned: number; expired: number }> = { scanned: 0, expired: 0 };
   if (!reconciliationRequired && !outcomeSyncPending) {
     try {
-      trialExpiry = await expireTrials(env.D1_01, new Date(), 100, env.D1_04);
+      trialExpiry = await expireTrials(env.D1_01, env.D1_04, new Date(), 100);
     } catch {
       return { status: 'PARTIAL', phase: 'TRIAL_EXPIRY', beforeRecovery };
     }
