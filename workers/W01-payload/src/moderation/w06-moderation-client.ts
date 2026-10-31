@@ -322,6 +322,7 @@ export async function callW06SubscriptionTrialAudit(input: {
     trialId?: string
     planVersion?: number
     trialEndsAt?: string
+    occurredAt?: string
     idempotencyKey?: string
   }
 }): Promise<Response> {
