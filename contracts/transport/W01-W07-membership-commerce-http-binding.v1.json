@@ -279,9 +279,10 @@
         "pricingMode",
         "status",
         "version",
-        "clientSecret"
+        "clientSecret",
+        "sdkAuthorization"
       ],
-      "responsePolicy": "Return only an unconfirmed, owner-matched intent and the scoped clientSecret needed by the hosted SDK. Cache-Control no-store; never return provider API keys or raw payment credentials.",
+      "responsePolicy": "Return only an unconfirmed, owner-matched intent and the scoped clientSecret required by the hosted Web Payment Element plus the short-lived sdkAuthorization required by the official native PaymentSession. Cache-Control no-store; never return provider API keys or raw payment credentials.",
       "failurePolicy": {
         "missingPrincipal": "401",
         "CASLDeny": "403",
@@ -290,7 +291,7 @@
         "keyReuseWithDifferentOrder": "409",
         "invalidProviderResponse": "503"
       },
-      "successRule": "W01 validates the bounded W07 response and order identity before returning the scoped SDK clientSecret. W07 D1-04 remains authoritative for payment attempts; neither client confirmation nor redirect grants subscription entitlement.",
+      "successRule": "W01 validates the bounded W07 response and order identity before returning the scoped clientSecret and native sdkAuthorization. W07 D1-04 remains authoritative for payment attempts; neither client confirmation, SDK result nor redirect grants subscription entitlement.",
       "cache": "NO_STORE",
       "topologyConstraints": {
         "newWorker": false,
