@@ -74,6 +74,12 @@
       "to": "CONVERTED",
       "actor": "system|payment|store",
       "guard": "A first paid period already submitted before the cancellation request is subsequently confirmed by a signed Hyperswitch outcome or W02-verified RevenueCat NORMAL period; this records the unavoidable payment race and does not initiate a new charge."
+    },
+    {
+      "from": "PAYMENT_FAILED",
+      "to": "CANCELED",
+      "actor": "user",
+      "guard": "The subscriber cancels future retries after a failed first WEB MIT attempt by setting Subscription.cancel_at to trial_ends_at with If-Match. Current trial-period access remains until the boundary; no new renewal attempt may be submitted."
     }
   ],
   "x-forbidden": [
@@ -104,7 +110,7 @@
     "storeStart": "App Store and Play Store trial state is created only by W07 reconciliation of a current RevenueCat snapshot after W02 confirms the App User ID maps to the authenticated subscriber. Client-supplied store claims and webhook raw bodies do not grant access.",
     "firstCharge": "WEB first charge reuses the existing W07 renewal-cycle, D1-04 Order/Payment and Hyperswitch MIT pipeline at trial_ends_at; no separate trial billing service or duplicate subscription is created.",
     "storeConversion": "Store trial-to-paid conversion is reconciled from RevenueCat current entitlement period_type and effective expiration, not charged by W07.",
-    "cancellation": "Canceling a web trial suppresses future conversion but preserves access until trial_ends_at; store cancellation remains under App Store/Google Play controls and RevenueCat status.",
+    "cancellation": "Canceling a web trial in TRIALING or PAYMENT_FAILED suppresses future conversion/retry and preserves access until trial_ends_at. If an already-submitted first payment later succeeds, its verified outcome may still convert CANCELED to CONVERTED.",
     "retry": "A failed first MIT attempt moves WEB Subscription to PAST_DUE and trial record to PAYMENT_FAILED; the same renewal cycle may retry against the same mandate and cannot be expired while retryable.",
     "expiry": "Store trials expire only from W02-verified RevenueCat snapshot; WEB trials expire in the existing bounded renewal scheduler only after checking for pending/submitted/retryable D1-04 cycles.",
     "noEarlyEntitlement": "No trial, paid conversion or expiry transition may be claimed from client input or an unverified webhook."
