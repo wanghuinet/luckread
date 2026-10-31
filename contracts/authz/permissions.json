@@ -805,6 +805,14 @@
       "auditRequired": true
     },
     {
+      "name": "subscription.start_trial",
+      "resource": "subscription",
+      "action": "start_trial",
+      "minLayer": "L2",
+      "scope": "own",
+      "auditRequired": true
+    },
+    {
       "name": "subscription.manage.any",
       "resource": "subscription",
       "action": "manage",
