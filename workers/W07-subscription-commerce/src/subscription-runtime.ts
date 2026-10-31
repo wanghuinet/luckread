@@ -230,13 +230,25 @@ export async function hasActiveCreatorMembership(
   return row !== null && typeof row.subscription_id === 'string' && row.subscription_id.length > 0
 }
 
+type SubscriptionListRow = SubscriptionRow & {
+  trial_source: 'WEB' | 'APP_STORE' | 'PLAY_STORE' | null;
+  trial_status: 'TRIALING' | 'CANCELED' | 'PAYMENT_FAILED' | 'CONVERTED' | 'EXPIRED' | null;
+  trial_ends_at: string | null;
+};
+
+export type SubscriptionTrialSummary = Readonly<{
+  source: 'WEB' | 'APP_STORE' | 'PLAY_STORE';
+  status: 'TRIALING' | 'CANCELED' | 'PAYMENT_FAILED' | 'CONVERTED' | 'EXPIRED';
+  trialEndsAt: string;
+}>;
+
 export async function listSubscriptions(
   db: D1Database,
   subscriberId: string,
   limit = 20,
   page = 1,
 ): Promise<{
-  docs: ReturnType<typeof toPublic>[]
+  docs: Array<ReturnType<typeof toPublic> & { trial: SubscriptionTrialSummary | null }>
   limit: number
   page: number
   hasNextPage: boolean
@@ -246,9 +258,29 @@ export async function listSubscriptions(
   const safePage = Number.isFinite(page) ? Math.min(Math.max(Math.trunc(page), 1), 10000) : 1
   const offset = (safePage - 1) * safeLimit
   const rows = await db.prepare(
-    'SELECT * FROM membership_subscriptions WHERE subscriber_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?',
-  ).bind(subscriber, safeLimit + 1, offset).all<SubscriptionRow>()
-  const docs = (rows.results ?? []).slice(0, safeLimit).map(toPublic)
+    'SELECT s.*, t.source AS trial_source, t.status AS trial_status, t.trial_ends_at AS trial_ends_at ' +
+    'FROM membership_subscriptions s LEFT JOIN membership_subscription_trials t ' +
+    'ON t.subscription_id = s.subscription_id AND t.subscriber_id = s.subscriber_id ' +
+    'WHERE s.subscriber_id = ? ORDER BY s.created_at DESC, s.subscription_id ASC LIMIT ? OFFSET ?',
+  ).bind(subscriber, safeLimit + 1, offset).all<SubscriptionListRow>()
+  const docs = (rows.results ?? []).slice(0, safeLimit).map((row) => {
+    let trial: SubscriptionTrialSummary | null = null
+    if (row.trial_source !== null) {
+      if (!['WEB', 'APP_STORE', 'PLAY_STORE'].includes(String(row.trial_source)) ||
+          !['TRIALING', 'CANCELED', 'PAYMENT_FAILED', 'CONVERTED', 'EXPIRED'].includes(String(row.trial_status)) ||
+          typeof row.trial_ends_at !== 'string' || !Number.isFinite(Date.parse(row.trial_ends_at))) {
+        throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500)
+      }
+      trial = {
+        source: row.trial_source,
+        status: row.trial_status!,
+        trialEndsAt: row.trial_ends_at,
+      }
+    } else if (row.trial_status !== null || row.trial_ends_at !== null) {
+      throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500)
+    }
+    return { ...toPublic(row), trial }
+  })
   return {
     docs,
     limit: safeLimit,
