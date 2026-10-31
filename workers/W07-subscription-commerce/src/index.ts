@@ -13,6 +13,7 @@ import { handleRevenueCatWebhookRequest } from './revenuecat-webhook-http-runtim
 import { handleRevenueCatSubscriberReconciliationRequest } from './revenuecat-subscriber-reconciliation-runtime.js'
 import { getScheduledSubscriptionPlanChange, scheduleSubscriptionPlanChange } from './scheduled-subscription-plan-change.js'
 import { createSubscriptionUpgradeOrder } from './subscription-upgrade-checkout.js'
+import { cancelWebMembershipTrial, getMembershipTrialDetails, startWebMembershipTrial } from './membership-trial-runtime.js'
 
 interface RateLimitBinding { limit(input: { key: string }): Promise<{ success: boolean }> }
 interface Env {
@@ -144,6 +145,8 @@ type Operation =
   | { operation: 'get'; subscriptionId: string }
   | { operation: 'schedulePlanChange'; subscriptionId: string }
   | { operation: 'upgradePlan'; subscriptionId: string }
+  | { operation: 'startTrial'; subscriptionId: null }
+  | { operation: 'cancelTrial'; subscriptionId: string }
 
 const toOperation = (method: string, segments: string[]): Operation | null => {
   if (segments.length === 1 && segments[0] === 'plans' && method === 'GET') return { operation: 'listPlans', subscriptionId: null }
@@ -153,6 +156,8 @@ const toOperation = (method: string, segments: string[]): Operation | null => {
   if (segments.length === 3 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && method === 'GET') return { operation: 'get', subscriptionId: segments[2] }
   if (segments.length === 4 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && segments[3] === 'change-plan' && method === 'POST') return { operation: 'schedulePlanChange', subscriptionId: segments[2] }
   if (segments.length === 4 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && segments[3] === 'upgrade' && method === 'POST') return { operation: 'upgradePlan', subscriptionId: segments[2] }
+  if (segments.length === 3 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && segments[2] === 'trial' && method === 'POST') return { operation: 'startTrial', subscriptionId: null }
+  if (segments.length === 4 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && segments[3] === 'cancel-trial' && method === 'POST') return { operation: 'cancelTrial', subscriptionId: segments[2] }
   return null
 }
 
@@ -315,6 +320,32 @@ export default {
         )
         return json({ data: result, requestId: crypto.randomUUID() }, 200, result.etag)
       }
+      if (operation?.operation === 'startTrial') {
+        const input = await readJsonBody(request)
+        if (!input || typeof input !== 'object' || Array.isArray(input) ||
+            Object.keys(input as Record<string, unknown>).length !== 1 ||
+            !Object.hasOwn(input, 'planId') ||
+            typeof (input as { planId?: unknown }).planId !== 'string') {
+          throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
+        }
+        const result = await startWebMembershipTrial(
+          env.D1_01, env.D1_04, principal,
+          (input as { planId: string }).planId,
+          env.HYPERSWITCH_MERCHANT_ID,
+          request.headers.get('Idempotency-Key'),
+        )
+        return json({ data: result, requestId: crypto.randomUUID() }, result.replayed ? 200 : 201, result.etag)
+      }
+      if (operation?.operation === 'cancelTrial') {
+        if (request.body !== null) {
+          await request.body.cancel().catch(() => undefined)
+          throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
+        }
+        const result = await cancelWebMembershipTrial(
+          env.D1_01, principal, operation.subscriptionId, request.headers.get('If-Match'),
+        )
+        return json({ data: result, requestId: crypto.randomUUID() }, 200, result.subscription.etag)
+      }
       if (operation?.operation === 'upgradePlan') {
         const input = await readJsonBody(request)
         if (!input || typeof input !== 'object' || Array.isArray(input) ||
@@ -423,8 +454,9 @@ export default {
       const scheduledPlanChange = await getScheduledSubscriptionPlanChange(
         env.D1_01, principal, operation.subscriptionId,
       )
+      const trial = await getMembershipTrialDetails(env.D1_01, principal, operation.subscriptionId)
       return json({
-        data: { ...result, scheduledPlanChange },
+        data: { ...result, scheduledPlanChange, trial },
         requestId: crypto.randomUUID(),
       }, 200, result.etag)
     } catch (error) {
