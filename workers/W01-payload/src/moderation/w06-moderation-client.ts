@@ -178,12 +178,7 @@ export async function callW06SubscriptionPlanChangeRequestAudit(input: {
   body: {
     eventId: string
     subscriptionId: string
-    sourcePlanId: string
-    sourcePlanVersion: number
     targetPlanId: string
-    targetPlanVersion: number
-    changeType: 'DOWNGRADE' | 'BILLING_INTERVAL_CHANGE' | 'SAME_PRICE_CHANGE'
-    effectiveAt: string
     expectedVersion: number
     idempotencyKey: string
   }
