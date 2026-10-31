@@ -180,7 +180,7 @@ describe('Hyperswitch server-side payment intent client', () => {
     await expect(createHyperswitchPaymentIntent(config, input, streamed.fetcher))
       .rejects.toMatchObject({ code: 'UPSTREAM_INVALID_RESPONSE' })
 
-    for (const sdkAuthorization of ['', ' authorization ', 'bad\\nvalue', 'x'.repeat(4097)]) {
+    for (const sdkAuthorization of ['', ' authorization ', 'bad\nvalue', 'x'.repeat(4097)]) {
       const malformedSdk = fakeFetch(jsonResponse(responsePayment({ sdk_authorization: sdkAuthorization })))
       await expect(createHyperswitchPaymentIntent(config, input, malformedSdk.fetcher))
         .rejects.toMatchObject({ code: 'UPSTREAM_INVALID_RESPONSE' })
