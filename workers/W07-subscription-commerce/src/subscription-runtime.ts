@@ -218,11 +218,16 @@ export async function hasActiveCreatorMembership(
   let row: { subscription_id: string } | null
   try {
     row = await db.prepare(
-      "SELECT subscription_id FROM membership_subscriptions " +
-      "WHERE subscriber_id = ? AND creator_id = ? AND status IN ('ACTIVE','TRIALING') " +
-      "AND current_period_start <= ? AND current_period_end > ? " +
-      "AND (cancel_at IS NULL OR cancel_at > ?) " +
-      "ORDER BY current_period_end DESC, subscription_id ASC LIMIT 1",
+      "SELECT s.subscription_id FROM membership_subscriptions s " +
+      "WHERE s.subscriber_id = ? AND s.creator_id = ? " +
+      "AND s.status IN ('ACTIVE','TRIALING') " +
+      "AND s.current_period_start <= ? AND s.current_period_end > ? " +
+      "AND (s.cancel_at IS NULL OR s.cancel_at > ?) " +
+      "AND (s.status = 'ACTIVE' OR EXISTS (" +
+      "SELECT 1 FROM membership_subscription_trials t WHERE t.subscription_id = s.subscription_id " +
+      "AND t.subscriber_id = s.subscriber_id AND t.status IN ('TRIALING','CANCELED') " +
+      "AND t.trial_ends_at = s.current_period_end)) " +
+      "ORDER BY s.current_period_end DESC, s.subscription_id ASC LIMIT 1",
     ).bind(subscriberId, creatorId, nowValue, nowValue, nowValue).first<{ subscription_id: string }>()
   } catch {
     throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
