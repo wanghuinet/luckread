@@ -2089,7 +2089,7 @@ paths:
         schema: { $ref: '#/components/schemas/ResourceId' }
     post:
       tags: [Users]
-      summary: Change the plan for a subscription
+      summary: Schedule a subscription plan change for the next paid billing period
       operationId: changeSubscriptionPlan
       parameters:
         - $ref: '#/components/parameters/IfMatchRequired'
@@ -2105,7 +2105,9 @@ paths:
               properties:
                 planId: { $ref: '#/components/schemas/ResourceId' }
       responses:
-        '200': { description: Subscription plan changed. }
+        '202': { description: Plan change durably scheduled for the next paid billing period. Current entitlements remain unchanged. }
+        '200': { description: Idempotent replay of the plan-change schedule. }
+        '409': { description: Invalid state, conflicting schedule, or an upgrade requiring the separate immediate-proration payment flow. }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
         '4XX': { $ref: '#/components/responses/ClientError' }
