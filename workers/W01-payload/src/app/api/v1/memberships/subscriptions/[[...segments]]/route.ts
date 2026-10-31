@@ -105,7 +105,7 @@ async function authorizeSubscriptionPlanChange(
 
 async function subscriptionPlanUpgradeAttemptId(subscriberId: string, idempotencyKey: string): Promise<string> {
   const payload = new TextEncoder().encode(
-    'membership-plan-upgrade-v1\\u0000' + subscriberId + '\\u0000' + idempotencyKey,
+    'membership-plan-upgrade-v1\u0000' + subscriberId + '\u0000' + idempotencyKey,
   )
   const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', payload))
   const hex = Array.from(digest, (byte) => byte.toString(16).padStart(2, '0')).join('')
@@ -114,7 +114,7 @@ async function subscriptionPlanUpgradeAttemptId(subscriberId: string, idempotenc
 
 async function auditSubscriptionPlanUpgradeRequest(
   request: Request,
-  principal: { userId: string; layer?: string },
+  principal: Parameters<typeof callW06SubscriptionPlanChangeRequestAudit>[0]['principal'],
   subscriptionId: string,
   targetPlanId: string,
   expectedEtag: string,
@@ -124,7 +124,7 @@ async function auditSubscriptionPlanUpgradeRequest(
   try {
     response = await callW06SubscriptionPlanChangeRequestAudit({
       request,
-      principal: { userId: principal.userId, layer: principal.layer } as never,
+      principal,
       body: {
         eventId: 'evt_subscription_plan_upgrade_requested_' + attemptId,
         attemptId,
