@@ -26,12 +26,17 @@ const resolveOperation = (method: string, segments: string[] | undefined): { pat
 
 async function readBoundedJson(request: Request): Promise<unknown | Response> {
   const contentType = request.headers.get('content-type') ?? ''
-  if (!/^application\\/json(?:\\s*;|$)/i.test(contentType)) {
+  const mediaType = contentType.split(';', 1)[0]?.trim().toLowerCase()
+  if (mediaType !== 'application/json') {
     return errorResponse(400, 'VALIDATION_FAILED', 'A JSON request body is required')
   }
   const declaredLength = request.headers.get('content-length')
-  if (declaredLength !== null && (!/^\\d+$/.test(declaredLength) || Number(declaredLength) > 16_384)) {
-    return errorResponse(400, 'VALIDATION_FAILED', 'Request body is too large or malformed')
+  if (declaredLength !== null) {
+    const hasNonDigit = Array.from(declaredLength).some((character) => character < '0' || character > '9')
+    const length = Number(declaredLength)
+    if (!declaredLength || hasNonDigit || !Number.isSafeInteger(length) || length > 16_384) {
+      return errorResponse(400, 'VALIDATION_FAILED', 'Request body is too large or malformed')
+    }
   }
   if (!request.body) return errorResponse(400, 'VALIDATION_FAILED', 'A JSON request body is required')
   const reader = request.body.getReader()
