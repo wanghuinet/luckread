@@ -190,6 +190,7 @@ describe('W06 runtime', () => {
     billingInterval: 'MONTHLY',
     priceMinor: 500,
     currency: 'USD',
+    trialDays: 0,
   }
   const planAuditRequest = (body: unknown, withTransport = true, requestId = 'req_plan_audit_1', layer = 'L3') => new Request(
     'https://w06.internal/internal/audit-events/membership-plan-created',
@@ -224,6 +225,7 @@ describe('W06 runtime', () => {
     billingInterval: 'MONTHLY',
     priceMinor: 500,
     currency: 'USD',
+    trialDays: 0,
   }
   const planPublishAuditRequest = (body: unknown, withTransport = true, requestId = 'req_plan_publish_audit_1', layer = 'L3') => new Request(
     'https://w06.internal/internal/audit-events/membership-plan-published',
@@ -280,6 +282,7 @@ describe('W06 runtime', () => {
     priceMinor: 900,
     currency: 'USD',
     benefits: ['member-posts', 'monthly-live'],
+    trialDays: 14,
   }
   const planUpdateRequestAuditInput = {
     eventId: 'evt_mpl_update_requested_' + planId + '_update_key_1',
@@ -591,6 +594,7 @@ describe('W06 runtime', () => {
         billingInterval: 'MONTHLY',
         priceMinor: 500,
         currency: 'USD',
+        trialDays: 0,
       }),
       occurred_at: planAuditInput.occurredAt,
     })
@@ -898,6 +902,7 @@ describe('W06 runtime', () => {
         billingInterval: 'MONTHLY',
         priceMinor: 500,
         currency: 'USD',
+        trialDays: 0,
       }),
       occurred_at: publishAuditInput.occurredAt,
     })
