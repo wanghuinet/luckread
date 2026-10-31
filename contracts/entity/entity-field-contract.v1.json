@@ -884,6 +884,51 @@
           "adminExposure": "SCOPED",
           "eventExposure": "SCOPED",
           "status": "CONTRACTED_NOT_VERIFIED"
+        },
+        {
+          "fieldId": "ENT-SUBSCRIPTION-F-TRIAL-STARTED-AT",
+          "name": "trialStartedAt",
+          "type": "datetime",
+          "nullable": true,
+          "required": false,
+          "unique": false,
+          "indexed": true,
+          "lifecycle": "immutable",
+          "classification": "LIFECYCLE_METADATA",
+          "apiExposure": "SCOPED",
+          "adminExposure": "SCOPED",
+          "eventExposure": "SCOPED",
+          "status": "CONTRACTED_NOT_VERIFIED"
+        },
+        {
+          "fieldId": "ENT-SUBSCRIPTION-F-TRIAL-ENDS-AT",
+          "name": "trialEndsAt",
+          "type": "datetime",
+          "nullable": true,
+          "required": false,
+          "unique": false,
+          "indexed": true,
+          "lifecycle": "immutable",
+          "classification": "LIFECYCLE_METADATA",
+          "apiExposure": "SCOPED",
+          "adminExposure": "SCOPED",
+          "eventExposure": "SCOPED",
+          "status": "CONTRACTED_NOT_VERIFIED"
+        },
+        {
+          "fieldId": "ENT-SUBSCRIPTION-F-TRIAL-CONVERTED-AT",
+          "name": "trialConvertedAt",
+          "type": "datetime",
+          "nullable": true,
+          "required": false,
+          "unique": false,
+          "indexed": false,
+          "lifecycle": "mutable_with_transition",
+          "classification": "LIFECYCLE_METADATA",
+          "apiExposure": "SCOPED",
+          "adminExposure": "SCOPED",
+          "eventExposure": "SCOPED",
+          "status": "CONTRACTED_NOT_VERIFIED"
         }
       ],
       "evidenceRefs": [
