@@ -439,6 +439,37 @@ type SubscriptionPlanChangeAppliedAuditInput = {
   occurredAt: string
 }
 
+
+type SubscriptionTrialStartedAuditInput = {
+  eventId: string
+  subscriptionId: string
+  subscriberId: string
+  creatorId: string
+  planId: string
+  planVersion: number
+  trialStartedAt: string
+  trialEndsAt: string
+  trialPeriodDays: number
+  occurredAt: string
+}
+
+type SubscriptionTrialConvertedAuditInput = {
+  eventId: string
+  subscriptionId: string
+  subscriberId: string
+  creatorId: string
+  planId: string
+  planVersion: number
+  trialStartedAt: string
+  trialEndsAt: string
+  convertedAt: string
+  paidPeriodStartedAt: string
+  paidPeriodEndsAt: string
+  orderId: string
+  paymentId: string
+  cycleId: string
+}
+
 async function readBoundedAuditJson(request: Request, maxBytes: number): Promise<unknown> {
   const declaredLength = request.headers.get('content-length')
   if (declaredLength !== null && (!/^\d+$/.test(declaredLength) || Number(declaredLength) > maxBytes)) {
@@ -475,6 +506,72 @@ async function readBoundedAuditJson(request: Request, maxBytes: number): Promise
   } catch {
     throw new Error('INVALID_COMMERCE_ORDER_AUDIT')
   }
+}
+
+
+function parseSubscriptionTrialStartedAuditInput(value: unknown): SubscriptionTrialStartedAuditInput {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('INVALID_SUBSCRIPTION_TRIAL_STARTED_AUDIT')
+  }
+  const body = value as Record<string, unknown>
+  const allowed = new Set(['eventId', 'subscriptionId', 'subscriberId', 'creatorId', 'planId', 'planVersion', 'trialStartedAt', 'trialEndsAt', 'trialPeriodDays', 'occurredAt'])
+  if (Object.keys(body).length !== allowed.size || Object.keys(body).some((key) => !allowed.has(key))) {
+    throw new Error('INVALID_SUBSCRIPTION_TRIAL_STARTED_AUDIT')
+  }
+  const validId = (input: unknown): input is string =>
+    typeof input === 'string' && input.length >= 1 && input.length <= 256 &&
+    input.trim() === input && !(/[\u0000-\u001f\u007f]/.test(input))
+  const canonicalIso = (input: unknown): input is string =>
+    typeof input === 'string' && !Number.isNaN(Date.parse(input)) && new Date(input).toISOString() === input
+  if (
+    typeof body.subscriptionId !== 'string' || !/^sub_[a-f0-9]{64}$/.test(body.subscriptionId) ||
+    body.eventId !== 'evt_subscription_trial_started_' + body.subscriptionId ||
+    !validId(body.subscriberId) || !validId(body.creatorId) ||
+    typeof body.planId !== 'string' || !/^plan_[a-f0-9]{64}$/.test(body.planId) ||
+    !Number.isSafeInteger(body.planVersion) || (body.planVersion as number) < 1 ||
+    !Number.isSafeInteger(body.trialPeriodDays) || (body.trialPeriodDays as number) < 1 || (body.trialPeriodDays as number) > 30 ||
+    !canonicalIso(body.trialStartedAt) || !canonicalIso(body.trialEndsAt) ||
+    Date.parse(body.trialEndsAt) - Date.parse(body.trialStartedAt) !== (body.trialPeriodDays as number) * 86_400_000 ||
+    body.occurredAt !== body.trialStartedAt
+  ) throw new Error('INVALID_SUBSCRIPTION_TRIAL_STARTED_AUDIT')
+  return body as SubscriptionTrialStartedAuditInput
+}
+
+function parseSubscriptionTrialConvertedAuditInput(value: unknown): SubscriptionTrialConvertedAuditInput {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('INVALID_SUBSCRIPTION_TRIAL_CONVERTED_AUDIT')
+  }
+  const body = value as Record<string, unknown>
+  const allowed = new Set([
+    'eventId', 'subscriptionId', 'subscriberId', 'creatorId', 'planId', 'planVersion',
+    'trialStartedAt', 'trialEndsAt', 'convertedAt', 'paidPeriodStartedAt', 'paidPeriodEndsAt',
+    'orderId', 'paymentId', 'cycleId',
+  ])
+  if (Object.keys(body).length !== allowed.size || Object.keys(body).some((key) => !allowed.has(key))) {
+    throw new Error('INVALID_SUBSCRIPTION_TRIAL_CONVERTED_AUDIT')
+  }
+  const validId = (input: unknown): input is string =>
+    typeof input === 'string' && input.length >= 1 && input.length <= 256 &&
+    input.trim() === input && !(/[\u0000-\u001f\u007f]/.test(input))
+  const canonicalIso = (input: unknown): input is string =>
+    typeof input === 'string' && !Number.isNaN(Date.parse(input)) && new Date(input).toISOString() === input
+  if (
+    typeof body.subscriptionId !== 'string' || !/^sub_[a-f0-9]{64}$/.test(body.subscriptionId) ||
+    body.eventId !== 'evt_subscription_trial_converted_' + body.subscriptionId ||
+    !validId(body.subscriberId) || !validId(body.creatorId) ||
+    typeof body.planId !== 'string' || !/^plan_[a-f0-9]{64}$/.test(body.planId) ||
+    !Number.isSafeInteger(body.planVersion) || (body.planVersion as number) < 1 ||
+    !canonicalIso(body.trialStartedAt) || !canonicalIso(body.trialEndsAt) ||
+    !canonicalIso(body.convertedAt) || !canonicalIso(body.paidPeriodStartedAt) ||
+    !canonicalIso(body.paidPeriodEndsAt) ||
+    body.trialStartedAt >= body.trialEndsAt ||
+    body.trialEndsAt !== body.convertedAt || body.convertedAt !== body.paidPeriodStartedAt ||
+    body.paidPeriodEndsAt <= body.paidPeriodStartedAt ||
+    typeof body.orderId !== 'string' || !/^ord_[A-Za-z0-9_-]{1,90}$/.test(body.orderId) ||
+    typeof body.paymentId !== 'string' || !/^pay_[A-Za-z0-9]{26}$/.test(body.paymentId) ||
+    typeof body.cycleId !== 'string' || !/^rcy_[A-Za-z0-9]{26}$/.test(body.cycleId)
+  ) throw new Error('INVALID_SUBSCRIPTION_TRIAL_CONVERTED_AUDIT')
+  return body as SubscriptionTrialConvertedAuditInput
 }
 
 function parseSubscriptionPlanChangeRequestAuditInput(value: unknown): SubscriptionPlanChangeRequestAuditInput {
@@ -1011,6 +1108,82 @@ export default {
       } catch (error) {
         return errorResponse(error, request.headers.get('X-LuckRead-Request-Id')?.trim())
       }
+    }
+
+
+    if (request.method === 'POST' && url.pathname === '/internal/audit-events/subscription-trial-started') {
+      let transport: ReturnType<typeof requireW07Transport>
+      try { transport = requireW07Transport(request) }
+      catch (error) { return errorResponse(error, request.headers.get('X-LuckRead-Request-Id')?.trim()) }
+      let input: SubscriptionTrialStartedAuditInput
+      try { input = parseSubscriptionTrialStartedAuditInput(await readBoundedAuditJson(request, 4096)) }
+      catch { return json({ error: 'INVALID_SUBSCRIPTION_TRIAL_STARTED_AUDIT' }, 400) }
+      if (input.subscriberId !== transport.userId) return json({ error: 'PERMISSION_DENIED' }, 403)
+      const event: AuditEvent = {
+        eventId: input.eventId,
+        requestId: transport.requestId,
+        traceId: transport.correlationId,
+        actor: { actorId: 'W07', actorType: 'service' },
+        action: 'subscription.trial_started',
+        targetType: 'Subscription',
+        targetId: input.subscriptionId,
+        before: { status: 'NONE' },
+        after: {
+          subscriberId: input.subscriberId,
+          creatorId: input.creatorId,
+          planId: input.planId,
+          planVersion: input.planVersion,
+          status: 'TRIALING',
+          trialStartedAt: input.trialStartedAt,
+          trialEndsAt: input.trialEndsAt,
+          trialPeriodDays: input.trialPeriodDays,
+        },
+        occurredAt: input.occurredAt,
+      }
+      return persistImmutableAuditEvent(env, event)
+    }
+
+    if (request.method === 'POST' && url.pathname === '/internal/audit-events/subscription-trial-converted') {
+      let transport: ReturnType<typeof requireW07Transport>
+      try { transport = requireW07Transport(request) }
+      catch (error) { return errorResponse(error, request.headers.get('X-LuckRead-Request-Id')?.trim()) }
+      let input: SubscriptionTrialConvertedAuditInput
+      try { input = parseSubscriptionTrialConvertedAuditInput(await readBoundedAuditJson(request, 4096)) }
+      catch { return json({ error: 'INVALID_SUBSCRIPTION_TRIAL_CONVERTED_AUDIT' }, 400) }
+      if (input.subscriberId !== transport.userId) return json({ error: 'PERMISSION_DENIED' }, 403)
+      const event: AuditEvent = {
+        eventId: input.eventId,
+        requestId: transport.requestId,
+        traceId: transport.correlationId,
+        actor: { actorId: 'W07', actorType: 'service' },
+        action: 'subscription.trial_converted',
+        targetType: 'Subscription',
+        targetId: input.subscriptionId,
+        before: {
+          subscriberId: input.subscriberId,
+          creatorId: input.creatorId,
+          planId: input.planId,
+          planVersion: input.planVersion,
+          status: 'TRIALING',
+          trialStartedAt: input.trialStartedAt,
+          trialEndsAt: input.trialEndsAt,
+        },
+        after: {
+          subscriberId: input.subscriberId,
+          creatorId: input.creatorId,
+          planId: input.planId,
+          planVersion: input.planVersion,
+          status: 'ACTIVE',
+          convertedAt: input.convertedAt,
+          paidPeriodStartedAt: input.paidPeriodStartedAt,
+          paidPeriodEndsAt: input.paidPeriodEndsAt,
+          orderId: input.orderId,
+          paymentId: input.paymentId,
+          cycleId: input.cycleId,
+        },
+        occurredAt: input.convertedAt,
+      }
+      return persistImmutableAuditEvent(env, event)
     }
 
     if (request.method === 'POST' && url.pathname === '/internal/audit-events/subscription-plan-change-requested') {
