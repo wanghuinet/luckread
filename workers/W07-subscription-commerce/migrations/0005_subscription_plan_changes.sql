@@ -77,6 +77,26 @@ BEGIN SELECT RAISE(ABORT, 'plan change is applied only after the paid subscripti
 -- A plan switch in D1-01 can only be marked applied after the same authoritative
 -- Subscription update has moved to the scheduled target at/after the effective
 -- period boundary. The update and audit-row transition are one SQLite transaction.
+-- No caller may change a Subscription's commercial plan by writing D1-01
+-- directly. A matching, still-scheduled change at the paid period boundary is
+-- required; the W07 webhook outcome sync performs that single CAS update.
+CREATE TRIGGER membership_subscriptions_plan_change_requires_scheduled_record
+BEFORE UPDATE OF plan_id, plan_version ON membership_subscriptions
+WHEN (NEW.plan_id <> OLD.plan_id OR NEW.plan_version <> OLD.plan_version)
+  AND NOT EXISTS (
+    SELECT 1 FROM membership_subscription_plan_changes pc
+    WHERE pc.subscription_id = OLD.subscription_id
+      AND pc.subscriber_id = OLD.subscriber_id
+      AND pc.source_plan_id = OLD.plan_id
+      AND pc.source_plan_version = OLD.plan_version
+      AND pc.target_plan_id = NEW.plan_id
+      AND pc.target_plan_version = NEW.plan_version
+      AND pc.status = 'SCHEDULED'
+      AND pc.effective_at <= NEW.current_period_start
+      AND NEW.current_period_start > OLD.current_period_start
+  )
+BEGIN SELECT RAISE(ABORT, 'subscription plan can only change after a scheduled paid period transition'); END;
+
 CREATE TRIGGER membership_subscription_plan_changes_mark_applied
 AFTER UPDATE OF plan_id, plan_version ON membership_subscriptions
 WHEN NEW.plan_id <> OLD.plan_id OR NEW.plan_version <> OLD.plan_version
