@@ -232,17 +232,32 @@ async function forward(request: Request, context: RouteContext): Promise<Respons
       }
       const subscription = envelope.data.subscription
       const trial = envelope.data.trial
+      const replayed = envelope.data.replayed === true
+      const allowedTrialStates = ['TRIALING', 'CANCELED', 'PAYMENT_FAILED', 'CONVERTED', 'EXPIRED']
+      const allowedSubscriptionStates = ['TRIALING', 'PAST_DUE', 'ACTIVE', 'EXPIRED']
+      const convertedPeriodValid = trial.status === 'CONVERTED' &&
+        subscription.status === 'ACTIVE' &&
+        typeof subscription.currentPeriodStart === 'string' &&
+        Date.parse(subscription.currentPeriodStart) >= Date.parse(String(trial.trialEndsAt)) &&
+        typeof subscription.currentPeriodEnd === 'string' &&
+        Date.parse(subscription.currentPeriodEnd) > Date.parse(subscription.currentPeriodStart)
+      const unconvertedPeriodValid = trial.status !== 'CONVERTED' &&
+        typeof subscription.currentPeriodEnd === 'string' &&
+        subscription.currentPeriodEnd === trial.trialEndsAt
       if (typeof subscription.subscriptionId !== 'string' || !/^sub_[a-f0-9]{64}$/.test(subscription.subscriptionId) ||
           subscription.subscriberId !== principal.userId || subscription.planId !== planId ||
-          subscription.status !== 'TRIALING' ||
+          !allowedSubscriptionStates.includes(String(subscription.status)) ||
           typeof subscription.planVersion !== 'number' || !Number.isSafeInteger(subscription.planVersion) ||
           typeof subscription.currentPeriodEnd !== 'string' || Number.isNaN(Date.parse(subscription.currentPeriodEnd)) ||
-          trial.source !== 'WEB' || trial.status !== 'TRIALING' ||
+          trial.source !== 'WEB' || !allowedTrialStates.includes(String(trial.status)) ||
           typeof trial.trialId !== 'string' || !/^mtr_[A-Za-z0-9]{26}$/.test(trial.trialId) ||
           trial.subscriptionId !== subscription.subscriptionId || trial.planId !== planId ||
-          trial.planVersion !== subscription.planVersion || trial.trialEndsAt !== subscription.currentPeriodEnd ||
+          trial.planVersion !== subscription.planVersion ||
+          (replayed ? !(convertedPeriodValid || unconvertedPeriodValid) :
+            (subscription.status !== 'TRIALING' || trial.status !== 'TRIALING' || !unconvertedPeriodValid)) ||
           typeof envelope.data.replayed !== 'boolean' ||
-          envelope.data.etag !== subscription.etag) {
+          envelope.data.etag !== subscription.etag ||
+          typeof trial.startedAt !== 'string' || Number.isNaN(Date.parse(trial.startedAt))) {
         return errorResponse(503, 'TRIAL_RESPONSE_INVALID', 'Trial start result could not be verified')
       }
       const finalEventId = 'evt_subscription_trial_started_' + trial.trialId
@@ -259,6 +274,7 @@ async function forward(request: Request, context: RouteContext): Promise<Respons
             trialId: trial.trialId,
             planVersion: trial.planVersion,
             trialEndsAt: trial.trialEndsAt,
+            occurredAt: trial.startedAt,
           },
         })
       } catch {
@@ -305,9 +321,10 @@ async function forward(request: Request, context: RouteContext): Promise<Respons
       }
       const subscription = envelope.data.subscription
       const trial = envelope.data.trial
+      const replayed = envelope.data.replayed === true
       if (subscription.subscriptionId !== subscriptionId || subscription.subscriberId !== principal.userId ||
-          subscription.status !== 'TRIALING' || typeof subscription.version !== 'number' ||
-          subscription.version !== expectedVersion + (envelope.data.replayed === true ? 0 : 1) ||
+          !['TRIALING', 'PAST_DUE'].includes(String(subscription.status)) || typeof subscription.version !== 'number' ||
+          (!replayed && subscription.version !== expectedVersion + 1) ||
           typeof subscription.currentPeriodEnd !== 'string' || subscription.cancelAt !== subscription.currentPeriodEnd ||
           trial.subscriptionId !== subscriptionId || trial.source !== 'WEB' || trial.status !== 'CANCELED' ||
           trial.trialEndsAt !== subscription.currentPeriodEnd) {
@@ -327,6 +344,7 @@ async function forward(request: Request, context: RouteContext): Promise<Respons
             trialId: String(trial.trialId),
             planVersion: Number(trial.planVersion),
             trialEndsAt: String(trial.trialEndsAt),
+            occurredAt: String(trial.updatedAt),
           },
         })
       } catch {
