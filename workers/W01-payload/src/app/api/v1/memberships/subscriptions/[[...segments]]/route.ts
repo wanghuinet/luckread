@@ -109,6 +109,7 @@ async function forward(request: Request, context: RouteContext): Promise<Respons
           data.status !== 'SCHEDULED' ||
           typeof data.changeRequestId !== 'string' || !/^sps_[a-f0-9]{60}$/.test(data.changeRequestId) ||
           typeof data.replayed !== 'boolean' ||
+          (data.changeKind !== 'DOWNGRADE' && data.changeKind !== 'BILLING_INTERVAL_CHANGE') ||
           typeof data.subscriptionId !== 'string' ||
           !positiveInt(data.sourceSubscriptionVersion) ||
           !positiveInt(data.scheduledSubscriptionVersion) ||
@@ -144,6 +145,7 @@ async function forward(request: Request, context: RouteContext): Promise<Respons
             sourcePlanVersion: (sourcePlan as Record<string, unknown>).planVersion as number,
             targetPlanId: (targetPlan as Record<string, unknown>).planId as string,
             targetPlanVersion: (targetPlan as Record<string, unknown>).planVersion as number,
+            changeKind: data.changeKind as 'DOWNGRADE' | 'BILLING_INTERVAL_CHANGE',
             currentPeriodStart: data.currentPeriodStart,
             currentPeriodEnd: data.currentPeriodEnd,
             effectiveAt: data.effectiveAt,

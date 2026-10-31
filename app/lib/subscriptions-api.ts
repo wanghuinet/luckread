@@ -26,6 +26,7 @@ export type MySubscription = {
     changeRequestId: string;
     planId: string;
     planVersion: number;
+    changeKind: 'DOWNGRADE' | 'BILLING_INTERVAL_CHANGE' | null;
     effectiveAt: string;
   } | null;
 };
@@ -85,7 +86,7 @@ export type SubscriptionPlanChangeQuote = {
     priceMinor: number;
     currency: string;
   };
-  direction: 'UPGRADE' | 'DOWNGRADE' | 'CROSSGRADE';
+  direction: 'UPGRADE' | 'DOWNGRADE' | 'CROSSGRADE' | 'BILLING_INTERVAL_CHANGE';
   effectiveAt: string;
   currentPeriodStart: string;
   currentPeriodEnd: string;
@@ -195,6 +196,7 @@ export function createSubscriptionPlanUpgradeCheckout(options: {
 export type ScheduledSubscriptionPlanChange = {
   status: 'SCHEDULED';
   changeRequestId: string;
+  changeKind: 'DOWNGRADE' | 'BILLING_INTERVAL_CHANGE';
   replayed: boolean;
   subscriptionId: string;
   sourceSubscriptionVersion: number;
@@ -209,8 +211,8 @@ export type ScheduledSubscriptionPlanChange = {
   entitlementChanged: false;
 };
 
-/** Schedule a downgrade for the current period end; does not change current access or initiate payment. */
-export function scheduleSubscriptionPlanDowngrade(options: {
+/** Schedule a downgrade or monthly/yearly billing-interval switch for the paid-through period end. */
+export function scheduleSubscriptionPlanChangeAtPeriodEnd(options: {
   subscriptionId: string;
   targetPlanId: string;
   etag: string;
@@ -224,11 +226,11 @@ export function scheduleSubscriptionPlanDowngrade(options: {
   if (!/^plan_[a-f0-9]{64}$/.test(targetPlanId)) {
     throw new RangeError('Target membership plan identifier is invalid.');
   }
-  if (!/^"lr-v[1-9]\\d*"$/.test(etag) || etag.length > 256) {
+  if (!/^"lr-v[1-9]\d*"$/.test(etag) || etag.length > 256) {
     throw new RangeError('Subscription version tag is invalid.');
   }
   if (!idempotencyKey || idempotencyKey.length > 256 || idempotencyKey.trim() !== idempotencyKey ||
-      /[\\u0000-\\u001f\\u007f]/.test(idempotencyKey)) {
+      /[\u0000-\u001f\u007f]/.test(idempotencyKey)) {
     throw new RangeError('Idempotency-Key is invalid.');
   }
   return apiRequest<ScheduledSubscriptionPlanChange>(

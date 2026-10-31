@@ -19,7 +19,7 @@ import {
   fetchActiveMembershipPlansPage,
   fetchMySubscriptionsPage,
   fetchSubscriptionPlanChangeQuote,
-  scheduleSubscriptionPlanDowngrade,
+  scheduleSubscriptionPlanChangeAtPeriodEnd,
   type ActiveMembershipPlan,
   type MySubscription,
   type MySubscriptionPage,
@@ -278,7 +278,7 @@ export default function SubscriptionUpgradeScreen() {
       if (!isRecord(value) || value.quoteStatus !== 'PREVIEW_ONLY' ||
           value.subscriptionId !== subscription.subscriptionId ||
           !isRecord(value.targetPlan) || value.targetPlan.planId !== plan.planId ||
-          !['UPGRADE', 'DOWNGRADE', 'CROSSGRADE'].includes(String(value.direction)) ||
+          !['UPGRADE', 'DOWNGRADE', 'CROSSGRADE', 'BILLING_INTERVAL_CHANGE'].includes(String(value.direction)) ||
           typeof value.amountDueBeforeTaxMinor !== 'number' ||
           typeof value.currency !== 'string' ||
           value.paymentActionAvailable !== false ||
@@ -313,8 +313,9 @@ export default function SubscriptionUpgradeScreen() {
     }
   }, [orderId, creatingOrder, loadData, subscription]);
 
-  const startScheduleDowngrade = useCallback(async () => {
-    if (!subscription || !selectedPlan || !quote || quote.direction !== 'DOWNGRADE' ||
+  const startSchedulePlanChange = useCallback(async () => {
+    if (!subscription || !selectedPlan || !quote ||
+        !['DOWNGRADE', 'BILLING_INTERVAL_CHANGE'].includes(quote.direction) ||
         quote.paymentRequired || creatingOrder || subscription.scheduledPlanChange) return;
     setCreatingOrder(true);
     setError('');
@@ -334,7 +335,7 @@ export default function SubscriptionUpgradeScreen() {
         stored = null;
       }
       if (stored && stored.targetPlanId !== selectedPlan.planId) {
-        throw new Error('此订阅版本已有另一项降级预约请求，请先处理原请求。');
+        throw new Error('此订阅版本已有另一项套餐变更预约请求，请先处理原请求。');
       }
       const key = stored?.idempotencyKey ?? createIdempotencyKey();
       if (!stored) {
@@ -344,22 +345,23 @@ export default function SubscriptionUpgradeScreen() {
             idempotencyKey: key,
           }));
         } catch {
-          throw new Error('无法安全保存降级预约凭证，请检查设备安全存储后重试。');
+          throw new Error('无法安全保存套餐变更预约凭证，请检查设备安全存储后重试。');
         }
       }
-      const result = await scheduleSubscriptionPlanDowngrade({
+      const result = await scheduleSubscriptionPlanChangeAtPeriodEnd({
         subscriptionId: subscription.subscriptionId,
         targetPlanId: selectedPlan.planId,
         etag: subscription.etag,
         idempotencyKey: key,
       });
       if (!result.response.ok) {
-        throw new Error(result.error?.message || getApiErrorMessage(result.data, '无法预约套餐降级。', result.response.status));
+        throw new Error(result.error?.message || getApiErrorMessage(result.data, '无法预约套餐变更。', result.response.status));
       }
       const scheduled = unwrapApiData<unknown>(result.data);
       if (!isRecord(scheduled) || scheduled.status !== 'SCHEDULED' ||
           typeof scheduled.changeRequestId !== 'string' || !/^sps_[a-f0-9]{60}$/.test(scheduled.changeRequestId) ||
           scheduled.subscriptionId !== subscription.subscriptionId ||
+          scheduled.changeKind !== (quote.direction === 'BILLING_INTERVAL_CHANGE' ? 'BILLING_INTERVAL_CHANGE' : 'DOWNGRADE') ||
           !Number.isSafeInteger(scheduled.sourceSubscriptionVersion) ||
           scheduled.sourceSubscriptionVersion !== subscription.version ||
           !Number.isSafeInteger(scheduled.scheduledSubscriptionVersion) ||
@@ -375,13 +377,17 @@ export default function SubscriptionUpgradeScreen() {
           scheduled.entitlementChanged !== false ||
           typeof scheduled.replayed !== 'boolean' ||
           scheduled.mutationPerformed !== !scheduled.replayed) {
-        throw new Error('降级预约结果未通过完整性校验。');
+        throw new Error('套餐变更预约结果未通过完整性校验。');
       }
-      setMessage('已预约于 ' + dateLabel(String(scheduled.effectiveAt)) + ' 降级。本周期仍保留当前套餐权益；只有下一周期续费成功后才切换。');
+      setMessage(quote.direction === 'BILLING_INTERVAL_CHANGE'
+        ? '已预约于 ' + dateLabel(String(scheduled.effectiveAt)) + ' 切换为' +
+          (quote.targetPlan.billingInterval === 'YEARLY' ? '年付' : '月付') +
+          '。当前已付期限及权益不变；下一周期将按目标方案金额续费，只有付款成功后才切换。'
+        : '已预约于 ' + dateLabel(String(scheduled.effectiveAt)) + ' 降级。本周期仍保留当前套餐权益；只有下一周期续费成功后才切换。');
       setQuote(null);
       const refreshed = await loadData();
       if (refreshed?.scheduledPlanChange?.changeRequestId !== scheduled.changeRequestId) {
-        setMessage('降级预约已由 W07 保存并审计；刷新订阅记录后即可查看最终状态。当前套餐权益未改变。');
+        setMessage('套餐变更预约已由 W07 保存并审计；刷新订阅记录后即可查看最终状态。当前套餐权益未改变。');
       }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '无法预约套餐降级。');
@@ -509,7 +515,7 @@ export default function SubscriptionUpgradeScreen() {
         <Pressable accessibilityRole="button" accessibilityLabel="返回" onPress={() => router.back()} className="mr-3 rounded-full p-1">
           <Feather name="arrow-left" size={23} color="#667085" />
         </Pressable>
-        <Text className="text-xl font-extrabold text-neutral-900 dark:text-white">升级订阅</Text>
+        <Text className="text-xl font-extrabold text-neutral-900 dark:text-white">订阅套餐变更</Text>
       </View>
 
       {subscription ? (
@@ -521,7 +527,7 @@ export default function SubscriptionUpgradeScreen() {
           </Text>
           {subscription.scheduledPlanChange ? (
             <Text className="mt-2 text-xs font-semibold text-sky-700 dark:text-sky-300">
-              已预约周期末降级至 {subscription.scheduledPlanChange.planId}，在续费成功前当前权益保持不变。
+              已预约周期末{subscription.scheduledPlanChange.changeKind === 'BILLING_INTERVAL_CHANGE' ? '切换账期' : '降级'}至 {subscription.scheduledPlanChange.planId}，在续费成功前当前权益保持不变。
             </Text>
           ) : null}
         </View>
@@ -581,19 +587,30 @@ export default function SubscriptionUpgradeScreen() {
         <View className="mx-4 mb-4 rounded-2xl border border-sky-200 bg-white p-4 dark:border-sky-900 dark:bg-neutral-950">
           <Text className="text-sm font-extrabold text-neutral-900 dark:text-white">套餐变更报价</Text>
           <Text className="mt-2 text-xs text-neutral-500">
-            {quote.direction === 'UPGRADE' ? '立即升级' : quote.direction === 'DOWNGRADE' ? '周期末降级预览' : '周期末同价变更预览'}
+            {quote.direction === 'UPGRADE' ? '立即升级' :
+              quote.direction === 'DOWNGRADE' ? '周期末降级预览' :
+              quote.direction === 'BILLING_INTERVAL_CHANGE' ? '周期末切换月付/年付' : '周期末同价变更预览'}
           </Text>
           <Text className="mt-1 text-2xl font-extrabold text-neutral-900 dark:text-white">
-            {money(quote.amountDueBeforeTaxMinor, quote.currency)}
+            {quote.direction === 'UPGRADE' ? money(quote.amountDueBeforeTaxMinor, quote.currency) : '本期不收取套餐差价'}
           </Text>
           <Text className="mt-1 text-xs leading-5 text-neutral-500">
             {quote.direction === 'UPGRADE'
               ? '这是本周期剩余时间的税前差价估算。实际税额由结账时已配置的服务端计税方式计算。'
               : quote.direction === 'DOWNGRADE'
               ? '当前周期继续保留原套餐权益；只有周期末的下一笔续费成功后，才切换为目标套餐。'
+              : quote.direction === 'BILLING_INTERVAL_CHANGE'
+              ? '当前已付周期不会缩短或重新计费。到期后按目标' +
+                (quote.targetPlan.billingInterval === 'YEARLY' ? '年付' : '月付') +
+                '周期生成下一期续费；支付成功后才切换套餐与权益。'
               : '同价套餐调整暂不自动执行；目前仅提供预览，不会修改订阅或权益。'}
           </Text>
           <Text className="mt-2 text-xs text-neutral-500">预计生效：{dateLabel(quote.effectiveAt)}</Text>
+          {quote.direction === 'BILLING_INTERVAL_CHANGE' ? (
+            <Text className="mt-1 text-xs font-semibold text-neutral-600 dark:text-neutral-300">
+              下期续费金额：{money(quote.targetPlan.priceMinor, quote.targetPlan.currency)} / {quote.targetPlan.billingInterval === 'YEARLY' ? '年' : '月'}
+            </Text>
+          ) : null}
           {quote.direction === 'UPGRADE' && quote.paymentRequired ? (
             orderCreated ? (
               <Text className="mt-3 text-xs font-semibold text-sky-700 dark:text-sky-300">
@@ -609,19 +626,20 @@ export default function SubscriptionUpgradeScreen() {
                 <Text className="font-bold text-white">{creatingOrder ? '正在准备支付…' : '创建升级订单并前往安全支付'}</Text>
               </Pressable>
             )
-          ) : quote.direction === 'DOWNGRADE' ? (
+          ) : quote.direction === 'DOWNGRADE' || quote.direction === 'BILLING_INTERVAL_CHANGE' ? (
             subscription?.scheduledPlanChange ? (
               <Text className="mt-3 text-xs font-semibold text-sky-700 dark:text-sky-300">
-                已有降级预约：{subscription.scheduledPlanChange.planId}，预计 {dateLabel(subscription.scheduledPlanChange.effectiveAt)} 生效。
+                已有套餐变更预约：{subscription.scheduledPlanChange.planId}，预计 {dateLabel(subscription.scheduledPlanChange.effectiveAt)} 生效。
               </Text>
             ) : (
               <Pressable
                 accessibilityRole="button"
                 disabled={creatingOrder}
-                onPress={() => void startScheduleDowngrade()}
+                onPress={() => void startSchedulePlanChange()}
                 className="mt-4 items-center rounded-full bg-sky-500 px-5 py-3"
               >
-                <Text className="font-bold text-white">{creatingOrder ? '正在保存预约…' : '预约在周期末降级'}</Text>
+                <Text className="font-bold text-white">{creatingOrder ? '正在保存预约…' :
+                  quote.direction === 'BILLING_INTERVAL_CHANGE' ? '预约账期变更' : '预约在周期末降级'}</Text>
               </Pressable>
             )
           ) : (

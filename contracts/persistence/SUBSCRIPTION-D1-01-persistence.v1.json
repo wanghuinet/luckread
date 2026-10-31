@@ -268,7 +268,9 @@
     "a paid plan change must bind exact D1-04 payment/order facts to the D1-01 subscription source-version CAS and immutable change receipt",
     "read-only verification of scheduled plan-change receipt schema, indexes and immutable triggers",
     "migration history must include 0001 through 0006 in order before runtime deployment",
-    "a scheduled downgrade must preserve the current plan and entitlement until the next billing-cycle payment is verified as successful; failed renewal preserves the pending schedule for retry"
+    "a scheduled downgrade must preserve the current plan and entitlement until the next billing-cycle payment is verified as successful; failed renewal preserves the pending schedule for retry",
+    "D1-01 scheduled plan-change receipts distinguish same-interval DOWNGRADE from cross-interval BILLING_INTERVAL_CHANGE.",
+    "A monthly/yearly billing-interval change preserves the current paid-through period and applies only after successful next-cycle payment; retries retain the source entitlement until payment succeeds."
   ],
   "promotionRule": "Remain CONTRACTED_NOT_VERIFIED until the physical binding, migration, runtime authority and Evidence Registry evidence are all admitted.",
   "additionalTables": [
@@ -409,7 +411,7 @@
     },
     {
       "name": "membership_subscription_scheduled_plan_change_receipts",
-      "purpose": "Immutable idempotent replay/audit receipt for a period-end Subscription downgrade schedule; not an independent Subscription or Entitlement authority and contains no payment credentials.",
+      "purpose": "Immutable idempotent replay/audit receipt for a period-end Subscription downgrade or MONTHLY/YEARLY billing-interval change; not an independent Subscription or Entitlement authority and contains no payment credentials.",
       "authority": "W07 / D1-01",
       "primaryKey": "change_request_id",
       "columns": [
@@ -466,6 +468,13 @@
           "type": "INTEGER",
           "nullable": false,
           "primaryKey": false
+        },
+        {
+          "name": "change_kind",
+          "type": "TEXT",
+          "nullable": false,
+          "primaryKey": false,
+          "check": "DOWNGRADE | BILLING_INTERVAL_CHANGE"
         },
         {
           "name": "current_period_start",

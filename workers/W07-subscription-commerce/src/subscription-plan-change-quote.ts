@@ -76,12 +76,11 @@ function validatePlanSnapshot(row: PlanSnapshotRow): void {
 }
 
 /**
- * Read-only quote for a same-currency, same-billing-interval plan change.
+ * Read-only quote for a same-currency plan change.
  *
- * Upgrades are priced only for the unused part of the current term using
- * ceiling-to-minor-unit rounding. Downgrades and same-price crossgrades are
- * effective at the current period end. This endpoint never changes the
- * subscription, creates an order, requests a payment, or grants entitlement.
+ * Same-interval upgrades use the existing remaining-term proration. Downgrades
+ * and monthly/yearly switches are scheduled for the paid-through period end;
+ * they do not shorten the current term or collect an immediate payment.
  * Tax is explicitly excluded; the quote is not a payable amount.
  */
 export async function quoteSubscriptionPlanChange(
@@ -151,9 +150,7 @@ export async function quoteSubscriptionPlanChange(
       currentPlan.currency !== targetPlan.currency) {
     throw new SubscriptionRuntimeError('CONFLICT', 409);
   }
-  if (currentPlan.billing_interval !== targetPlan.billing_interval) {
-    throw new SubscriptionRuntimeError('BILLING_INTERVAL_CHANGE_REQUIRED', 409);
-  }
+  const billingIntervalChanges = currentPlan.billing_interval !== targetPlan.billing_interval;
 
   const periodStartMs = Date.parse(subscription.current_period_start);
   const periodEndMs = Date.parse(subscription.current_period_end);
@@ -166,11 +163,14 @@ export async function quoteSubscriptionPlanChange(
   }
 
   const priceDifference = targetPlan.price_minor - currentPlan.price_minor;
-  let direction: 'UPGRADE' | 'DOWNGRADE' | 'CROSSGRADE';
+  let direction: 'UPGRADE' | 'DOWNGRADE' | 'CROSSGRADE' | 'BILLING_INTERVAL_CHANGE';
   let effectiveAt: string;
   let amountDueBeforeTaxMinor = 0;
 
-  if (priceDifference > 0) {
+  if (billingIntervalChanges) {
+    direction = 'BILLING_INTERVAL_CHANGE';
+    effectiveAt = subscription.current_period_end;
+  } else if (priceDifference > 0) {
     direction = 'UPGRADE';
     effectiveAt = nowIso;
     const numerator = BigInt(priceDifference) * BigInt(remainingMs);

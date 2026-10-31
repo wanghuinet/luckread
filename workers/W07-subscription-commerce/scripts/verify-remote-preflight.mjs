@@ -137,6 +137,7 @@ const EXPECTED_SCHEDULED_PLAN_CHANGE_RECEIPT_COLUMNS = [
   ['source_plan_version', 'INTEGER', 1, 0],
   ['target_plan_id', 'TEXT', 1, 0],
   ['target_plan_version', 'INTEGER', 1, 0],
+  ['change_kind', 'TEXT', 1, 0],
   ['current_period_start', 'TEXT', 1, 0],
   ['current_period_end', 'TEXT', 1, 0],
   ['effective_at', 'TEXT', 1, 0],

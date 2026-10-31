@@ -23,6 +23,7 @@ export type SubscriptionRow = {
   pending_plan_version?: number | null
   pending_plan_effective_at?: string | null
   pending_plan_change_id?: string | null
+  pending_change_kind?: 'DOWNGRADE' | 'BILLING_INTERVAL_CHANGE' | null
 }
 
 export class SubscriptionRuntimeError extends Error {
@@ -145,13 +146,16 @@ const toPublic = (row: SubscriptionRow) => ({
     changeRequestId: row.pending_plan_change_id ?? null,
     planId: row.pending_plan_id,
     planVersion: row.pending_plan_version ?? null,
+    changeKind: row.pending_change_kind ?? null,
     effectiveAt: row.pending_plan_effective_at ?? null,
   } : null,
 })
 
 const readSubscriptionRow = async (db: D1Database, subscriptionId: string, subscriberId?: string): Promise<SubscriptionRow> => {
   const id = ensureId(subscriptionId)
-  const sql = subscriberId === undefined ? 'SELECT * FROM membership_subscriptions WHERE subscription_id = ? LIMIT 1' : 'SELECT * FROM membership_subscriptions WHERE subscription_id = ? AND subscriber_id = ? LIMIT 1'
+  const sql = subscriberId === undefined
+    ? 'SELECT s.*, r.change_kind AS pending_change_kind FROM membership_subscriptions s LEFT JOIN membership_subscription_scheduled_plan_change_receipts r ON r.change_request_id = s.pending_plan_change_id WHERE s.subscription_id = ? LIMIT 1'
+    : 'SELECT s.*, r.change_kind AS pending_change_kind FROM membership_subscriptions s LEFT JOIN membership_subscription_scheduled_plan_change_receipts r ON r.change_request_id = s.pending_plan_change_id WHERE s.subscription_id = ? AND s.subscriber_id = ? LIMIT 1'
   const args = subscriberId === undefined ? [id] : [id, ensureId(subscriberId)]
   const row = await db.prepare(sql).bind(...args).first<SubscriptionRow>()
   if (!row) throw new SubscriptionRuntimeError('RESOURCE_NOT_FOUND', 404)
@@ -166,7 +170,7 @@ export async function createSubscription(db: D1Database, subscriberId: string, i
 
   // Replay first: idempotency preserves the original result even if the plan
   // was retired after the first successful request.
-  const existing = await db.prepare('SELECT * FROM membership_subscriptions WHERE subscription_id = ? LIMIT 1').bind(subscriptionId).first<SubscriptionRow>()
+  const existing = await db.prepare('SELECT s.*, r.change_kind AS pending_change_kind FROM membership_subscriptions s LEFT JOIN membership_subscription_scheduled_plan_change_receipts r ON r.change_request_id = s.pending_plan_change_id WHERE s.subscription_id = ? LIMIT 1').bind(subscriptionId).first<SubscriptionRow>()
   if (existing) {
     if (existing.subscriber_id !== subscriber || existing.plan_id !== planId) throw new SubscriptionRuntimeError('CONFLICT', 409)
     return toPublic(existing)
@@ -256,7 +260,9 @@ export async function listSubscriptions(
   const safePage = Number.isFinite(page) ? Math.min(Math.max(Math.trunc(page), 1), 10000) : 1
   const offset = (safePage - 1) * safeLimit
   const rows = await db.prepare(
-    'SELECT * FROM membership_subscriptions WHERE subscriber_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?',
+    'SELECT s.*, r.change_kind AS pending_change_kind FROM membership_subscriptions s ' +
+    'LEFT JOIN membership_subscription_scheduled_plan_change_receipts r ON r.change_request_id = s.pending_plan_change_id ' +
+    'WHERE s.subscriber_id = ? ORDER BY s.created_at DESC LIMIT ? OFFSET ?',
   ).bind(subscriber, safeLimit + 1, offset).all<SubscriptionRow>()
   const docs = (rows.results ?? []).slice(0, safeLimit).map(toPublic)
   return {

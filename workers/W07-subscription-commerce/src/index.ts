@@ -2,7 +2,7 @@
 
 import { quoteSubscriptionPlanChange } from './subscription-plan-change-quote.js'
 import { createSubscriptionPlanUpgradeOrder } from './subscription-plan-change-checkout.js'
-import { scheduleSubscriptionPlanDowngrade } from './subscription-plan-change-schedule.js'
+import { scheduleSubscriptionPlanChangeAtPeriodEnd } from './subscription-plan-change-schedule.js'
 import { createMembershipPlanDraft, reviseMembershipPlan, getSubscription, hasActiveCreatorMembership, listActiveMembershipPlans, listCreatorMembershipPlans, listSubscriptions, parseBoundedPositiveInt, publishMembershipPlan, transitionMembershipPlanLifecycle, SubscriptionRuntimeError, validatePrincipal } from './subscription-runtime.js'
 import { handleCommerceOrderRequest } from './order-http-runtime.js'
 import { resolveCommerceOrderItems } from './order-item-resolution.js'
@@ -326,7 +326,7 @@ export default {
             typeof (value as { planId?: unknown }).planId !== 'string') {
           throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
         }
-        const result = await scheduleSubscriptionPlanDowngrade(env, principal, {
+        const result = await scheduleSubscriptionPlanChangeAtPeriodEnd(env, principal, {
           subscriptionId: operation.subscriptionId,
           planId: (value as { planId: string }).planId,
           ifMatch: request.headers.get('If-Match') ?? '',

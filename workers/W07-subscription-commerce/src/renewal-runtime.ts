@@ -66,6 +66,7 @@ type RenewalSubscriptionRow = Readonly<{
   pending_plan_version: number | null;
   pending_plan_effective_at: string | null;
   pending_plan_change_id: string | null;
+  pending_change_kind: 'DOWNGRADE' | 'BILLING_INTERVAL_CHANGE' | null;
   billing_interval: string;
   price_minor: number;
   currency: string;
@@ -469,10 +470,13 @@ async function insertOrReadCycle(
       subscription.pending_plan_effective_at !== subscription.current_period_end ||
       !isBoundedText(subscription.pending_plan_change_id, 64) ||
       !/^sps_[a-f0-9]{60}$/.test(subscription.pending_plan_change_id) ||
-      subscription.pending_billing_interval !== subscription.billing_interval ||
+      !['MONTHLY', 'YEARLY'].includes(subscription.pending_billing_interval ?? '') ||
       !isSafeMinor(subscription.pending_price_minor, true) ||
-      subscription.pending_price_minor! >= subscription.price_minor ||
       subscription.pending_currency !== subscription.currency ||
+      (subscription.pending_billing_interval !== subscription.billing_interval
+        ? subscription.pending_change_kind !== 'BILLING_INTERVAL_CHANGE'
+        : subscription.pending_change_kind !== 'DOWNGRADE' ||
+          subscription.pending_price_minor! >= subscription.price_minor) ||
       !isBoundedText(subscription.pending_name, 120) ||
       !isBoundedText(subscription.pending_tier, 64) ||
       typeof subscription.pending_benefits_json !== 'string' ||
@@ -602,10 +606,12 @@ export async function scanDueSubscriptionRenewals(
       's.pending_plan_effective_at, s.pending_plan_change_id, pv.billing_interval, pv.price_minor, ' +
       'pv.currency, pv.name, pv.tier, pv.benefits_json, pending_pv.billing_interval AS pending_billing_interval, ' +
       'pending_pv.price_minor AS pending_price_minor, pending_pv.currency AS pending_currency, ' +
-      'pending_pv.name AS pending_name, pending_pv.tier AS pending_tier, pending_pv.benefits_json AS pending_benefits_json ' +
+      'pending_pv.name AS pending_name, pending_pv.tier AS pending_tier, pending_pv.benefits_json AS pending_benefits_json, ' +
+      'pending_change.change_kind AS pending_change_kind ' +
       'FROM membership_subscriptions s ' +
       'JOIN membership_plan_versions pv ON pv.plan_id = s.plan_id AND pv.plan_version = s.plan_version ' +
       'LEFT JOIN membership_plan_versions pending_pv ON pending_pv.plan_id = s.pending_plan_id AND pending_pv.plan_version = s.pending_plan_version ' +
+      'LEFT JOIN membership_subscription_scheduled_plan_change_receipts pending_change ON pending_change.change_request_id = s.pending_plan_change_id ' +
       "WHERE s.status IN ('ACTIVE','PAST_DUE') AND s.current_period_end <= ? " +
       'AND (s.cancel_at IS NULL OR s.cancel_at > s.current_period_end) ' +
       'AND (? IS NULL OR s.current_period_end > ? OR (s.current_period_end = ? AND s.subscription_id > ?)) ' +

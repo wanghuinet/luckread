@@ -609,14 +609,14 @@
       }
     },
     {
-      "operationId": "scheduleSubscriptionPlanDowngrade",
+      "operationId": "scheduleSubscriptionPlanChangeAtPeriodEnd",
       "method": "POST",
       "publicPath": "/api/v1/memberships/subscriptions/{subscriptionId}/change-plan/schedule",
       "internalPath": "/memberships/subscriptions/{subscriptionId}/change-plan/schedule",
       "principalRequired": true,
       "permission": "subscription.change_plan",
       "minimumGlobalLayer": "L2",
-      "ownerScope": "W07 reads subscriptionId + W02-derived subscriberId. Target must be lower-priced, same creator, same billing interval and currency, and ACTIVE/PUBLIC at schedule time.",
+      "ownerScope": "W07 reads subscriptionId + W02-derived subscriberId. Target must belong to the same creator and currency and be ACTIVE/PUBLIC at schedule time. A same-interval DOWNGRADE must be lower-priced; a BILLING_INTERVAL_CHANGE must switch MONTHLY <-> YEARLY. Cross-interval price is not prorated against the already-paid current term.",
       "precondition": "If-Match",
       "idempotency": "Idempotency-Key bound to subscriber + subscription + source version + target plan.",
       "requestBody": {
@@ -634,10 +634,10 @@
           "entitlement"
         ]
       },
-      "effect": "Stores an immutable schedule receipt and pending target on the existing D1-01 Subscription row. Current plan, current period and entitlements are unchanged. The renewal cycle uses the pinned target plan snapshot; only verified renewal payment success applies the target and clears the schedule. Failed renewal preserves the schedule and follows existing PAST_DUE retry.",
+      "effect": "Stores an immutable schedule receipt and pinned target on the existing D1-01 Subscription row. Current plan, current period and entitlements remain unchanged until the paid-through period end. For MONTHLY/YEARLY switches the next cycle uses the target immutable plan version and target billing interval. Only verified successful renewal payment applies the target and clears the schedule; failed renewal preserves the schedule and follows existing PAST_DUE retry.",
       "auditRequired": true,
       "auditTransportBinding": "W01-W06-moderation-http-binding.v1",
-      "successRule": "W01 validates the W07 schedule receipt and waits for W06 D1-03 immutable schedule audit confirmation before returning 2xx. Exact retries reuse the schedule receipt/event ID.",
+      "successRule": "W01 validates the W07 schedule receipt including changeKind DOWNGRADE or BILLING_INTERVAL_CHANGE and waits for W06 D1-03 immutable schedule audit confirmation before returning 2xx. Exact retries reuse the schedule receipt/event ID.",
       "cache": "NO_STORE",
       "topologyConstraints": {
         "newWorker": false,

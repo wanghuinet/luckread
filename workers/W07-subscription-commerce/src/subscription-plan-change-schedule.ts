@@ -20,6 +20,7 @@ type ScheduledPlanChangeReceipt = Readonly<{
   source_plan_version: number;
   target_plan_id: string;
   target_plan_version: number;
+  change_kind: 'DOWNGRADE' | 'BILLING_INTERVAL_CHANGE';
   current_period_start: string;
   current_period_end: string;
   effective_at: string;
@@ -68,6 +69,7 @@ function responseFromReceipt(receipt: ScheduledPlanChangeReceipt, replayed: bool
     scheduledSubscriptionVersion: receipt.scheduled_subscription_version,
     sourcePlan: { planId: receipt.source_plan_id, planVersion: receipt.source_plan_version },
     targetPlan: { planId: receipt.target_plan_id, planVersion: receipt.target_plan_version },
+    changeKind: receipt.change_kind,
     currentPeriodStart: receipt.current_period_start,
     currentPeriodEnd: receipt.current_period_end,
     effectiveAt: receipt.effective_at,
@@ -79,6 +81,7 @@ function responseFromReceipt(receipt: ScheduledPlanChangeReceipt, replayed: bool
 
 function validReceipt(receipt: ScheduledPlanChangeReceipt): boolean {
   return /^sps_[a-f0-9]{60}$/.test(receipt.change_request_id) &&
+    (receipt.change_kind === 'DOWNGRADE' || receipt.change_kind === 'BILLING_INTERVAL_CHANGE') &&
     receipt.scheduled_subscription_version === receipt.source_subscription_version + 1 &&
     Number.isSafeInteger(receipt.source_subscription_version) && receipt.source_subscription_version > 0 &&
     Number.isSafeInteger(receipt.target_plan_version) && receipt.target_plan_version > 0 &&
@@ -91,11 +94,11 @@ function validReceipt(receipt: ScheduledPlanChangeReceipt): boolean {
 }
 
 /**
- * Persist one period-end downgrade schedule in the existing D1-01 Subscription
- * authority. A bounded immutable receipt makes retries and the W06 audit relay
- * replay-safe; it is not a second subscription or entitlement authority.
+ * Persist one period-end plan-change schedule in the existing D1-01
+ * Subscription authority. Same-interval downgrades and monthly/yearly switches
+ * share the existing immutable receipt and renewal pipeline.
  */
-export async function scheduleSubscriptionPlanDowngrade(
+export async function scheduleSubscriptionPlanChangeAtPeriodEnd(
   env: Env,
   subscriberIdInput: string,
   input: Readonly<{
@@ -178,7 +181,10 @@ export async function scheduleSubscriptionPlanDowngrade(
   const quote = await quoteSubscriptionPlanChange(
     env.D1_01, subscriberId, subscriptionId, { planId: targetPlanId, now }, input.ifMatch,
   );
-  if (quote.direction !== 'DOWNGRADE' || quote.paymentRequired !== false ||
+  const changeKind = quote.direction === 'BILLING_INTERVAL_CHANGE'
+    ? 'BILLING_INTERVAL_CHANGE'
+    : quote.direction === 'DOWNGRADE' ? 'DOWNGRADE' : null;
+  if (!changeKind || quote.paymentRequired !== false ||
       quote.amountDueBeforeTaxMinor !== 0 || quote.effectiveAt !== subscription.current_period_end ||
       quote.subscriptionVersion !== sourceVersion ||
       quote.targetPlan === null || typeof quote.targetPlan !== 'object') {
@@ -228,9 +234,9 @@ export async function scheduleSubscriptionPlanDowngrade(
     'INSERT OR IGNORE INTO membership_subscription_scheduled_plan_change_receipts ' +
     '(change_request_id, subscription_id, subscriber_id, source_subscription_version, ' +
     'scheduled_subscription_version, source_plan_id, source_plan_version, target_plan_id, ' +
-    'target_plan_version, current_period_start, current_period_end, effective_at, scheduled_at) ' +
+    'target_plan_version, change_kind, current_period_start, current_period_end, effective_at, scheduled_at) ' +
     'SELECT ?, s.subscription_id, s.subscriber_id, s.version, s.version + 1, s.plan_id, s.plan_version, ' +
-    'tp.plan_id, tp.current_version, s.current_period_start, s.current_period_end, s.current_period_end, ? ' +
+    'tp.plan_id, tp.current_version, ?, s.current_period_start, s.current_period_end, s.current_period_end, ? ' +
     'FROM membership_subscriptions s ' +
     'JOIN membership_plans tp ON tp.plan_id = ? AND tp.owner_type = \'CREATOR\' ' +
     'AND tp.owner_id = s.creator_id AND tp.status = \'ACTIVE\' AND tp.visibility = \'PUBLIC\' ' +
@@ -239,11 +245,12 @@ export async function scheduleSubscriptionPlanDowngrade(
     'WHERE s.subscription_id = ? AND s.subscriber_id = ? AND s.version = ? ' +
     'AND s.status = \'ACTIVE\' AND s.cancel_at IS NULL AND s.pending_plan_id IS NULL ' +
     'AND s.plan_id = ? AND s.plan_version = ? AND s.current_period_end = ? ' +
-    'AND tp.current_version = ? ' +
-    'AND tv.billing_interval = sv.billing_interval AND tv.currency = sv.currency AND tv.price_minor < sv.price_minor',
+    'AND tp.current_version = ? AND tv.currency = sv.currency ' +
+    'AND ((? = \'DOWNGRADE\' AND tv.billing_interval = sv.billing_interval AND tv.price_minor < sv.price_minor) ' +
+    'OR (? = \'BILLING_INTERVAL_CHANGE\' AND tv.billing_interval <> sv.billing_interval))',
   ).bind(
-    changeRequestId, nowIso, targetPlanId, subscriptionId, subscriberId, sourceVersion,
-    subscription.plan_id, subscription.plan_version, subscription.current_period_end, targetVersion,
+    changeRequestId, changeKind, nowIso, targetPlanId, subscriptionId, subscriberId, sourceVersion,
+    subscription.plan_id, subscription.plan_version, subscription.current_period_end, targetVersion, changeKind, changeKind,
   );
   const subscriptionUpdate = env.D1_01.prepare(
     'UPDATE membership_subscriptions SET pending_plan_id = ?, pending_plan_version = ?, ' +

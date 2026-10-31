@@ -391,6 +391,7 @@ type MembershipSubscriptionPlanScheduledAuditInput = {
   sourcePlanVersion: number
   targetPlanId: string
   targetPlanVersion: number
+  changeKind: 'DOWNGRADE' | 'BILLING_INTERVAL_CHANGE'
   currentPeriodStart: string
   currentPeriodEnd: string
   effectiveAt: string
@@ -528,7 +529,7 @@ function parseMembershipSubscriptionPlanScheduledAuditInput(value: unknown): Mem
   const allowed = new Set([
     'eventId', 'changeRequestId', 'subscriptionId', 'sourceSubscriptionVersion',
     'scheduledSubscriptionVersion', 'sourcePlanId', 'sourcePlanVersion',
-    'targetPlanId', 'targetPlanVersion', 'currentPeriodStart', 'currentPeriodEnd',
+    'targetPlanId', 'targetPlanVersion', 'changeKind', 'currentPeriodStart', 'currentPeriodEnd',
     'effectiveAt', 'occurredAt',
   ])
   if (Object.keys(body).length !== allowed.size || Object.keys(body).some((key) => !allowed.has(key))) {
@@ -551,6 +552,7 @@ function parseMembershipSubscriptionPlanScheduledAuditInput(value: unknown): Mem
     typeof body.targetPlanId !== 'string' || !/^plan_[a-f0-9]{64}$/.test(body.targetPlanId) ||
     body.targetPlanId === body.sourcePlanId ||
     !positiveInt(body.targetPlanVersion) ||
+    (body.changeKind !== 'DOWNGRADE' && body.changeKind !== 'BILLING_INTERVAL_CHANGE') ||
     !canonicalDate(body.currentPeriodStart) ||
     !canonicalDate(body.currentPeriodEnd) ||
     body.currentPeriodEnd <= body.currentPeriodStart ||
@@ -988,6 +990,7 @@ export default {
           planVersion: input.sourcePlanVersion,
           pendingPlanId: input.targetPlanId,
           pendingPlanVersion: input.targetPlanVersion,
+          changeKind: input.changeKind,
           pendingEffectiveAt: input.effectiveAt,
           status: 'ACTIVE',
           currentPeriodStart: input.currentPeriodStart,

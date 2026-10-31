@@ -80,6 +80,7 @@ export async function callW06SubscriptionPlanScheduledAudit(input: {
     sourcePlanVersion: number
     targetPlanId: string
     targetPlanVersion: number
+    changeKind: 'DOWNGRADE' | 'BILLING_INTERVAL_CHANGE'
     currentPeriodStart: string
     currentPeriodEnd: string
     effectiveAt: string

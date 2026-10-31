@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS membership_subscription_scheduled_plan_change_receipt
   target_plan_id TEXT NOT NULL CHECK (length(target_plan_id) BETWEEN 1 AND 256),
   target_plan_version INTEGER NOT NULL
     CHECK (typeof(target_plan_version) = 'integer' AND target_plan_version > 0),
+  change_kind TEXT NOT NULL CHECK (change_kind IN ('DOWNGRADE','BILLING_INTERVAL_CHANGE')),
   current_period_start TEXT NOT NULL CHECK (length(current_period_start) BETWEEN 1 AND 64),
   current_period_end TEXT NOT NULL CHECK (length(current_period_end) BETWEEN 1 AND 64 AND current_period_end > current_period_start),
   effective_at TEXT NOT NULL CHECK (effective_at = current_period_end),
@@ -54,6 +55,16 @@ WHEN NOT (
       AND target_version.plan_version = NEW.pending_plan_version
      JOIN membership_plans target_plan
        ON target_plan.plan_id = target_version.plan_id
+     JOIN membership_subscription_scheduled_plan_change_receipts schedule_receipt
+       ON schedule_receipt.change_request_id = NEW.pending_plan_change_id
+      AND schedule_receipt.subscription_id = NEW.subscription_id
+      AND schedule_receipt.subscriber_id = NEW.subscriber_id
+      AND schedule_receipt.source_subscription_version + 1 = NEW.version
+      AND schedule_receipt.source_plan_id = NEW.plan_id
+      AND schedule_receipt.source_plan_version = NEW.plan_version
+      AND schedule_receipt.target_plan_id = NEW.pending_plan_id
+      AND schedule_receipt.target_plan_version = NEW.pending_plan_version
+      AND schedule_receipt.effective_at = NEW.pending_plan_effective_at
      WHERE source_version.plan_id = NEW.plan_id
        AND source_version.plan_version = NEW.plan_version
        AND target_plan.owner_type = 'CREATOR'
@@ -61,9 +72,15 @@ WHEN NOT (
        AND target_plan.status = 'ACTIVE'
        AND target_plan.visibility = 'PUBLIC'
        AND target_plan.current_version = target_version.plan_version
-       AND target_version.billing_interval = source_version.billing_interval
        AND target_version.currency = source_version.currency
-       AND target_version.price_minor < source_version.price_minor
+       AND (
+         (schedule_receipt.change_kind = 'DOWNGRADE' AND
+          target_version.billing_interval = source_version.billing_interval AND
+          target_version.price_minor < source_version.price_minor)
+         OR
+         (schedule_receipt.change_kind = 'BILLING_INTERVAL_CHANGE' AND
+          target_version.billing_interval <> source_version.billing_interval)
+       )
    )
   )
 )
@@ -92,6 +109,16 @@ WHEN NOT (
       AND target_version.plan_version = NEW.pending_plan_version
      JOIN membership_plans target_plan
        ON target_plan.plan_id = target_version.plan_id
+     JOIN membership_subscription_scheduled_plan_change_receipts schedule_receipt
+       ON schedule_receipt.change_request_id = NEW.pending_plan_change_id
+      AND schedule_receipt.subscription_id = NEW.subscription_id
+      AND schedule_receipt.subscriber_id = NEW.subscriber_id
+      AND schedule_receipt.source_subscription_version + 1 = NEW.version
+      AND schedule_receipt.source_plan_id = NEW.plan_id
+      AND schedule_receipt.source_plan_version = NEW.plan_version
+      AND schedule_receipt.target_plan_id = NEW.pending_plan_id
+      AND schedule_receipt.target_plan_version = NEW.pending_plan_version
+      AND schedule_receipt.effective_at = NEW.pending_plan_effective_at
      WHERE source_version.plan_id = NEW.plan_id
        AND source_version.plan_version = NEW.plan_version
        AND target_plan.owner_type = 'CREATOR'
@@ -99,9 +126,15 @@ WHEN NOT (
        AND target_plan.status = 'ACTIVE'
        AND target_plan.visibility = 'PUBLIC'
        AND target_plan.current_version = target_version.plan_version
-       AND target_version.billing_interval = source_version.billing_interval
        AND target_version.currency = source_version.currency
-       AND target_version.price_minor < source_version.price_minor
+       AND (
+         (schedule_receipt.change_kind = 'DOWNGRADE' AND
+          target_version.billing_interval = source_version.billing_interval AND
+          target_version.price_minor < source_version.price_minor)
+         OR
+         (schedule_receipt.change_kind = 'BILLING_INTERVAL_CHANGE' AND
+          target_version.billing_interval <> source_version.billing_interval)
+       )
    )
   )
 )

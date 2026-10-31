@@ -2537,7 +2537,7 @@
       "stateMachine": "none"
     },
     {
-      "operationId": "scheduleSubscriptionPlanDowngrade",
+      "operationId": "scheduleSubscriptionPlanChangeAtPeriodEnd",
       "auth": {
         "mode": "permission"
       },
@@ -2549,9 +2549,13 @@
       "idempotencyRequired": true,
       "stateMachine": "none",
       "x-luckread-period-end-only": true,
-      "x-luckread-entitlement-change": "No entitlement mutation during scheduling; apply the pinned target version only after verified successful renewal payment.",
+      "x-luckread-entitlement-change": "No entitlement mutation during scheduling; next cycle uses the pinned target interval and plan version. Apply only after verified successful renewal payment.",
       "x-luckread-contract-status": "DISCOVERY_DRAFT",
-      "x-luckread-source": "contracts/api/api-inventory.v1.json"
+      "x-luckread-source": "contracts/api/api-inventory.v1.json",
+      "x-luckread-change-kinds": [
+        "DOWNGRADE",
+        "BILLING_INTERVAL_CHANGE"
+      ]
     },
     {
       "operationId": "pauseSubscription",
