@@ -181,13 +181,19 @@
   "migration": {
     "status": "PREPARED_NOT_APPLIED",
     "candidateMigration": "workers/W07-subscription-commerce/migrations/0002_subscription_version_cas.sql",
-    "rule": "The version-column migration is prepared as a reviewed code candidate only. A physical migration still requires exact artifact hash, read-only confirmation of the target and migration history, controlled target D1-01 execution and post-schema evidence."
+    "rule": "The version-column migration is prepared as a reviewed code candidate only. A physical migration still requires exact artifact hash, read-only confirmation of the target and migration history, controlled target D1-01 execution and post-schema evidence.",
+    "additionalCandidateMigrations": [
+      "workers/W07-subscription-commerce/migrations/0003_membership_plans.sql",
+      "workers/W07-subscription-commerce/migrations/0004_revenuecat_membership_product_bindings.sql",
+      "workers/W07-subscription-commerce/migrations/0005_subscription_plan_changes.sql"
+    ]
   },
   "runtime": {
     "w07Binding": "NOT_VERIFIED",
     "d1Execution": "NOT_VERIFIED",
     "subscriptionHandlers": "NOT_ADMITTED",
-    "evidenceRegistry": "NOT_VERIFIED"
+    "evidenceRegistry": "NOT_VERIFIED",
+    "scheduledPlanChange": "W07 D1-01 durable schedule; activation only through verified paid-renewal D1-04 -> D1-01 outcome sync; no scheduler activation is implied"
   },
   "forbidden": [
     "Add a second Subscription authority in D1-04.",
@@ -197,7 +203,9 @@
     "Create a speculative active-subscription uniqueness constraint.",
     "Introduce a standalone version field without a field-contract change.",
     "Treat cache, projection or analytics data as Subscription authority.",
-    "Execute or claim migration success from this logical contract."
+    "Execute or claim migration success from this logical contract.",
+    "Apply a scheduled target plan before the corresponding renewal Payment is verified successful.",
+    "Store scheduled plan-change authority in D1-04 or in a projection."
   ],
   "verificationRequirements": [
     "exact D1-01 target UUID evidence",
@@ -209,7 +217,138 @@
     "optimistic-lock source binding evidence",
     "active-subscription uniqueness policy decision",
     "Subscription runtime positive/duplicate/cancel/pause/resume/change-plan evidence",
-    "Evidence Registry record tied to validating commit SHA"
+    "Evidence Registry record tied to validating commit SHA",
+    "migration lineage includes 0003 MembershipPlan, 0004 RevenueCat product bindings, and 0005 scheduled plan changes in order",
+    "scheduled plan-change table schema, three indexes, seven table triggers, and one Subscription plan-write guard are verified by read-only D1-01 postflight",
+    "positive, idempotent replay, conflicting idempotency, downgrade, interval change, failed-renewal retry, paid-application, pause/cancel cancellation, and direct-plan-write rejection evidence"
   ],
-  "promotionRule": "Remain CONTRACTED_NOT_VERIFIED until the physical binding, migration, runtime authority and Evidence Registry evidence are all admitted."
+  "promotionRule": "Remain CONTRACTED_NOT_VERIFIED until the physical binding, migration, runtime authority and Evidence Registry evidence are all admitted.",
+  "scheduledPlanChangeTable": {
+    "name": "membership_subscription_plan_changes",
+    "purpose": "Immutable source/target plan identity and durable scheduling state for a subscriber plan change. The schedule remains in D1-01 and is applied only by the verified paid renewal outcome that advances the authoritative Subscription period.",
+    "primaryKey": "change_id",
+    "columns": [
+      {
+        "name": "change_id",
+        "type": "TEXT",
+        "nullable": false,
+        "primaryKey": true
+      },
+      {
+        "name": "subscription_id",
+        "type": "TEXT",
+        "nullable": false
+      },
+      {
+        "name": "subscriber_id",
+        "type": "TEXT",
+        "nullable": false
+      },
+      {
+        "name": "source_plan_id",
+        "type": "TEXT",
+        "nullable": false
+      },
+      {
+        "name": "source_plan_version",
+        "type": "INTEGER",
+        "nullable": false
+      },
+      {
+        "name": "target_plan_id",
+        "type": "TEXT",
+        "nullable": false
+      },
+      {
+        "name": "target_plan_version",
+        "type": "INTEGER",
+        "nullable": false
+      },
+      {
+        "name": "change_type",
+        "type": "TEXT",
+        "nullable": false,
+        "values": [
+          "DOWNGRADE",
+          "BILLING_INTERVAL_CHANGE",
+          "SAME_PRICE_CHANGE"
+        ]
+      },
+      {
+        "name": "effective_at",
+        "type": "TEXT",
+        "nullable": false
+      },
+      {
+        "name": "status",
+        "type": "TEXT",
+        "nullable": false,
+        "values": [
+          "SCHEDULED",
+          "APPLIED",
+          "CANCELED"
+        ]
+      },
+      {
+        "name": "request_hash",
+        "type": "TEXT",
+        "nullable": false
+      },
+      {
+        "name": "version",
+        "type": "INTEGER",
+        "nullable": false,
+        "default": 1
+      },
+      {
+        "name": "created_at",
+        "type": "TEXT",
+        "nullable": false
+      },
+      {
+        "name": "updated_at",
+        "type": "TEXT",
+        "nullable": false
+      }
+    ],
+    "indexes": [
+      {
+        "name": "ux_membership_subscription_plan_changes_one_scheduled",
+        "columns": [
+          "subscription_id"
+        ],
+        "unique": true,
+        "partial": "status = 'SCHEDULED'"
+      },
+      {
+        "name": "ix_membership_subscription_plan_changes_subscriber_created",
+        "columns": [
+          "subscriber_id",
+          "created_at",
+          "change_id"
+        ]
+      },
+      {
+        "name": "ix_membership_subscription_plan_changes_effective",
+        "columns": [
+          "status",
+          "effective_at",
+          "subscription_id"
+        ]
+      }
+    ],
+    "stateMachineRef": "contracts/state-machines/membership-subscription-plan-change.json",
+    "constraints": {
+      "authority": "D1-01 only; D1-04 stores immutable renewal-cycle offer snapshots, never a second scheduled-change authority.",
+      "oneScheduledChangePerSubscription": "A partial unique index allows at most one SCHEDULED change for a Subscription.",
+      "sourceAndTarget": "Source and target plan versions reference immutable membership_plan_versions in the same D1-01 database.",
+      "effectiveBoundary": "effective_at equals the source Subscription current_period_end; target price and billing interval are used only for the next renewal cycle.",
+      "paidActivation": "Only a verified successful Hyperswitch renewal outcome may CAS the Subscription to the target plan and advance the paid period; the same D1-01 transaction changes SCHEDULED to APPLIED.",
+      "failedRenewal": "A failed renewal preserves the source plan and SCHEDULED record while Subscription transitions to PAST_DUE.",
+      "cancellation": "Pause, cancellation, expiration, or a non-null cancel_at cancels a pending plan change.",
+      "noEarlyEntitlement": "Scheduling a downgrade never changes current plan fields or current entitlement.",
+      "idempotency": "change_id is deterministic from subscriber and idempotency key; request_hash rejects reuse with a different semantic request.",
+      "versioning": "Every schedule status update increments version exactly once and advances updated_at."
+    }
+  }
 }
