@@ -370,7 +370,7 @@ export async function syncTerminalRenewalCycleToSubscription(
         ? target?.billingInterval === subscription.billing_interval &&
           target.currency === subscription.currency && target.priceMinor < subscription.price_minor
         : scheduledChange.changeType === 'BILLING_INTERVAL_CHANGE'
-          ? target?.billingInterval !== subscription.billing_interval &&
+          ? !!target && target.billingInterval !== subscription.billing_interval &&
             target.currency === subscription.currency
           : false;
     if (!target || target.creatorId !== subscription.creator_id ||
