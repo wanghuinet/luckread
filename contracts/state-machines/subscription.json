@@ -6,33 +6,126 @@
   "x-luckread": {
     "state-field": "status",
     "requires-optimistic-lock": true,
-    "terminal-states": ["EXPIRED", "CANCELED"],
-    "states": ["PENDING", "ACTIVE", "PAST_DUE", "PAUSED", "CANCELED", "EXPIRED"]
+    "terminal-states": [
+      "EXPIRED",
+      "CANCELED"
+    ],
+    "states": [
+      "PENDING",
+      "TRIALING",
+      "ACTIVE",
+      "PAST_DUE",
+      "PAUSED",
+      "CANCELED",
+      "EXPIRED"
+    ],
+    "trialLifecycleRef": "contracts/state-machines/membership-subscription-trial.json"
   },
   "x-transitions": [
-    {"from":"PENDING","to":"ACTIVE","actor":"system|payment"},
-    {"from":"ACTIVE","to":"PAST_DUE","actor":"system|payment"},
-    {"from":"PAST_DUE","to":"ACTIVE","actor":"system|payment"},
-    {"from":"ACTIVE","to":"PAUSED","actor":"user|admin"},
-    {"from":"PAUSED","to":"ACTIVE","actor":"user|admin"},
-    {"from":"ACTIVE","to":"CANCELED","actor":"user|creator|admin|system"},
-    {"from":"PAST_DUE","to":"CANCELED","actor":"admin|system"},
-    {"from":"PAUSED","to":"CANCELED","actor":"user|admin|system"},
-    {"from":"ACTIVE","to":"EXPIRED","actor":"system"},
-    {"from":"PAST_DUE","to":"EXPIRED","actor":"system"},
-    {"from":"PAUSED","to":"EXPIRED","actor":"system"}
+    {
+      "from": "PENDING",
+      "to": "ACTIVE",
+      "actor": "system|payment"
+    },
+    {
+      "from": "ACTIVE",
+      "to": "PAST_DUE",
+      "actor": "system|payment"
+    },
+    {
+      "from": "PAST_DUE",
+      "to": "ACTIVE",
+      "actor": "system|payment"
+    },
+    {
+      "from": "ACTIVE",
+      "to": "PAUSED",
+      "actor": "user|admin"
+    },
+    {
+      "from": "PAUSED",
+      "to": "ACTIVE",
+      "actor": "user|admin"
+    },
+    {
+      "from": "ACTIVE",
+      "to": "CANCELED",
+      "actor": "user|creator|admin|system"
+    },
+    {
+      "from": "PAST_DUE",
+      "to": "CANCELED",
+      "actor": "admin|system"
+    },
+    {
+      "from": "PAUSED",
+      "to": "CANCELED",
+      "actor": "user|admin|system"
+    },
+    {
+      "from": "ACTIVE",
+      "to": "EXPIRED",
+      "actor": "system"
+    },
+    {
+      "from": "PAST_DUE",
+      "to": "EXPIRED",
+      "actor": "system"
+    },
+    {
+      "from": "PAUSED",
+      "to": "EXPIRED",
+      "actor": "system"
+    },
+    {
+      "from": "TRIALING",
+      "to": "ACTIVE",
+      "actor": "system|payment",
+      "guard": "A verified successful WEB first Hyperswitch MIT payment or a W02-verified RevenueCat paid-period snapshot advances the same Subscription beyond its trial period."
+    },
+    {
+      "from": "TRIALING",
+      "to": "PAST_DUE",
+      "actor": "system|payment",
+      "guard": "A verified failed WEB first MIT payment leaves the same Subscription past due and eligible for bounded retry; the trial ledger changes to PAYMENT_FAILED."
+    },
+    {
+      "from": "TRIALING",
+      "to": "EXPIRED",
+      "actor": "system|store",
+      "guard": "The trial period ended and authoritative payment/RevenueCat state confirms no paid conversion; pending or submitted provider outcomes are reconciled first."
+    }
   ],
   "x-forbidden": [
-    {"from":"CANCELED","to":"ACTIVE"},
-    {"from":"CANCELED","to":"PAUSED"},
-    {"from":"EXPIRED","to":"ACTIVE"},
-    {"from":"EXPIRED","to":"CANCELED"},
-    {"from":"EXPIRED","to":"PAUSED"},
-    {"from":"PAUSED","to":"PENDING"}
+    {
+      "from": "CANCELED",
+      "to": "ACTIVE"
+    },
+    {
+      "from": "CANCELED",
+      "to": "PAUSED"
+    },
+    {
+      "from": "EXPIRED",
+      "to": "ACTIVE"
+    },
+    {
+      "from": "EXPIRED",
+      "to": "CANCELED"
+    },
+    {
+      "from": "EXPIRED",
+      "to": "PAUSED"
+    },
+    {
+      "from": "PAUSED",
+      "to": "PENDING"
+    }
   ],
   "reconciliation": {
     "changeControl": "CC-SUBSCRIPTION-STATE-API-RECONCILIATION-2026-10-02",
     "pauseResumeSource": "docs/108-MEMBERSHIP-AND-SUBSCRIPTION-SYSTEM-CONTRACT-v1.0.md; docs/111-MEMBERSHIP-API-CONTRACT-v1.0.md; docs/191-L5-L6-MEMBERSHIP-COMMERCE-ADVERTISING-WALLET-LEDGER-INSTANCE-REGISTRY-v1.0.md",
-    "note": "PAUSED is the machine-readable counterpart of the existing Membership pause/resume capability."
+    "note": "PAUSED is the machine-readable counterpart of the existing Membership pause/resume capability.",
+    "trialLifecycle": "TRIALING grants access only while current_period_start <= now < current_period_end. cancel_at equal to current_period_end suppresses future conversion without early access revocation. A verified first paid renewal converts the same Subscription to ACTIVE; failed WEB MIT moves to PAST_DUE and remains eligible for bounded retry. Trial provenance/status is held in D1-01 membership_subscription_trials."
   }
 }
