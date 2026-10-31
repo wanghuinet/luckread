@@ -480,7 +480,7 @@ async function insertOrReadCycle(
       ? target?.billingInterval === subscription.billing_interval &&
         target.priceMinor < subscription.price_minor
       : scheduledChange.changeType === 'BILLING_INTERVAL_CHANGE'
-        ? target?.billingInterval !== subscription.billing_interval
+        ? target?.billingInterval !== subscription.billing_interval && target?.tier === subscription.tier
         : false;
     if (!target || target.creatorId !== subscription.creator_id ||
         !validChangeType || target.currency !== subscription.currency) {
