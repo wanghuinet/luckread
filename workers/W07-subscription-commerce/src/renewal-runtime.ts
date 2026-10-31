@@ -68,6 +68,9 @@ type RenewalSubscriptionRow = Readonly<{
   name: string;
   tier: string;
   benefits_json: string;
+  trial_source: 'WEB' | 'APP_STORE' | 'PLAY_STORE' | null;
+  trial_status: string | null;
+  trial_ends_at: string | null;
   scheduled_change_id: string | null;
   scheduled_source_plan_id: string | null;
   scheduled_source_plan_version: number | null;
@@ -464,7 +467,10 @@ async function insertOrReadCycle(
   merchantId: string,
   now: string,
 ): Promise<RenewalCycleRow> {
-  if (!['ACTIVE', 'PAST_DUE'].includes(subscription.status) ||
+  const webTrialAtBoundary = subscription.status === 'TRIALING' &&
+    subscription.trial_source === 'WEB' && subscription.trial_status === 'TRIALING' &&
+    subscription.trial_ends_at === subscription.current_period_end;
+  if ((!['ACTIVE', 'PAST_DUE'].includes(subscription.status) && !webTrialAtBoundary) ||
       !isBoundedText(subscription.subscription_id) ||
       !isBoundedText(subscription.subscriber_id) ||
       !isBoundedText(subscription.plan_id) ||
@@ -635,6 +641,7 @@ export async function scanDueSubscriptionRenewals(
       'SELECT s.subscription_id, s.subscriber_id, s.plan_id, s.plan_version, s.creator_id, s.status, ' +
       's.current_period_start, s.current_period_end, s.cancel_at, pv.billing_interval, pv.price_minor, ' +
       'pv.currency, pv.name, pv.tier, pv.benefits_json, ' +
+      't.source AS trial_source, t.status AS trial_status, t.trial_ends_at AS trial_ends_at, ' +
       'sc.change_id AS scheduled_change_id, sc.source_plan_id AS scheduled_source_plan_id, ' +
       'sc.source_plan_version AS scheduled_source_plan_version, sc.target_plan_id AS scheduled_target_plan_id, ' +
       'sc.target_plan_version AS scheduled_target_plan_version, sc.change_type AS scheduled_change_type, ' +
@@ -643,9 +650,11 @@ export async function scanDueSubscriptionRenewals(
       'tpv.tier AS scheduled_tier, tpv.benefits_json AS scheduled_benefits_json ' +
       'FROM membership_subscriptions s ' +
       'JOIN membership_plan_versions pv ON pv.plan_id = s.plan_id AND pv.plan_version = s.plan_version ' +
+      'LEFT JOIN membership_subscription_trials t ON t.subscription_id = s.subscription_id AND t.subscriber_id = s.subscriber_id ' +
       "LEFT JOIN membership_subscription_plan_changes sc ON sc.subscription_id = s.subscription_id AND sc.subscriber_id = s.subscriber_id AND sc.status = 'SCHEDULED' AND sc.source_plan_id = s.plan_id AND sc.source_plan_version = s.plan_version AND sc.effective_at = s.current_period_end " +
       'LEFT JOIN membership_plan_versions tpv ON tpv.plan_id = sc.target_plan_id AND tpv.plan_version = sc.target_plan_version ' +
-      "WHERE s.status IN ('ACTIVE','PAST_DUE') AND s.current_period_end <= ? " +
+      "WHERE (s.status IN ('ACTIVE','PAST_DUE') OR (s.status = 'TRIALING' AND t.source = 'WEB' AND t.status = 'TRIALING' AND t.trial_ends_at = s.current_period_end)) " +
+      'AND s.current_period_end <= ? ' +
       'AND (s.cancel_at IS NULL OR s.cancel_at > s.current_period_end) ' +
       'AND (? IS NULL OR s.current_period_end > ? OR (s.current_period_end = ? AND s.subscription_id > ?)) ' +
       'ORDER BY s.current_period_end ASC, s.subscription_id ASC LIMIT ?'    ).bind(
@@ -718,6 +727,9 @@ type ChargeSubscriptionRow = Readonly<{
   scheduled_target_plan_id: string | null;
   scheduled_target_plan_version: number | null;
   scheduled_effective_at: string | null;
+  trial_source: 'WEB' | 'APP_STORE' | 'PLAY_STORE' | null;
+  trial_status: string | null;
+  trial_ends_at: string | null;
 }>;
 
 async function isSubscriptionChargeableForCycle(
@@ -730,8 +742,11 @@ async function isSubscriptionChargeableForCycle(
       'SELECT s.subscription_id, s.subscriber_id, s.plan_id, s.plan_version, s.status, s.current_period_end, s.cancel_at, ' +
       'sc.change_id AS scheduled_change_id, sc.source_plan_id AS scheduled_source_plan_id, ' +
       'sc.source_plan_version AS scheduled_source_plan_version, sc.target_plan_id AS scheduled_target_plan_id, ' +
-      'sc.target_plan_version AS scheduled_target_plan_version, sc.effective_at AS scheduled_effective_at ' +
-      'FROM membership_subscriptions s LEFT JOIN membership_subscription_plan_changes sc ' +
+      'sc.target_plan_version AS scheduled_target_plan_version, sc.effective_at AS scheduled_effective_at, ' +
+      't.source AS trial_source, t.status AS trial_status, t.trial_ends_at AS trial_ends_at ' +
+      'FROM membership_subscriptions s LEFT JOIN membership_subscription_trials t ' +
+      'ON t.subscription_id = s.subscription_id AND t.subscriber_id = s.subscriber_id ' +
+      'LEFT JOIN membership_subscription_plan_changes sc ' +
       "ON sc.subscription_id = s.subscription_id AND sc.subscriber_id = s.subscriber_id AND sc.status = 'SCHEDULED' " +
       'WHERE s.subscription_id = ? AND s.subscriber_id = ? LIMIT 1',
     ).bind(cycle.subscription_id, cycle.subscriber_id).first<ChargeSubscriptionRow>();
@@ -752,12 +767,19 @@ async function isSubscriptionChargeableForCycle(
   const ordinaryCycleValid = !offer.planChangeId &&
     subscription?.plan_id === cycle.plan_id &&
     subscription?.plan_version === cycle.plan_version;
+  const webTrialCycleValid = !offer.planChangeId &&
+    subscription?.status === 'TRIALING' &&
+    subscription?.trial_source === 'WEB' &&
+    subscription?.trial_status === 'TRIALING' &&
+    subscription?.trial_ends_at === cycle.cycle_start;
+  const statusChargeable = subscription?.status === 'ACTIVE' ||
+    (retryingPastDue && subscription?.status === 'PAST_DUE') || webTrialCycleValid;
   return !!subscription &&
     subscription.subscription_id === cycle.subscription_id &&
     subscription.subscriber_id === cycle.subscriber_id &&
     (ordinaryCycleValid || scheduledChangeValid) &&
     subscription.current_period_end === cycle.cycle_start &&
-    (subscription.status === 'ACTIVE' || (retryingPastDue && subscription.status === 'PAST_DUE')) &&
+    statusChargeable &&
     (subscription.cancel_at === null ||
       (isCanonicalIso(subscription.cancel_at) && subscription.cancel_at > cycle.cycle_start));
 }
@@ -906,14 +928,20 @@ async function prepareFailedCycleRetry(
     scheduled_target_plan_id: string | null;
     scheduled_target_plan_version: number | null;
     scheduled_effective_at: string | null;
+    trial_source: 'WEB' | 'APP_STORE' | 'PLAY_STORE' | null;
+    trial_status: string | null;
+    trial_ends_at: string | null;
   } | null;
   try {
     subscription = await env.D1_01.prepare(
       'SELECT s.subscription_id, s.subscriber_id, s.plan_id, s.plan_version, s.status, s.current_period_end, s.cancel_at, ' +
       'sc.change_id AS scheduled_change_id, sc.source_plan_id AS scheduled_source_plan_id, ' +
       'sc.source_plan_version AS scheduled_source_plan_version, sc.target_plan_id AS scheduled_target_plan_id, ' +
-      'sc.target_plan_version AS scheduled_target_plan_version, sc.effective_at AS scheduled_effective_at ' +
-      'FROM membership_subscriptions s LEFT JOIN membership_subscription_plan_changes sc ' +
+      'sc.target_plan_version AS scheduled_target_plan_version, sc.effective_at AS scheduled_effective_at, ' +
+      't.source AS trial_source, t.status AS trial_status, t.trial_ends_at AS trial_ends_at ' +
+      'FROM membership_subscriptions s LEFT JOIN membership_subscription_trials t ' +
+      'ON t.subscription_id = s.subscription_id AND t.subscriber_id = s.subscriber_id ' +
+      'LEFT JOIN membership_subscription_plan_changes sc ' +
       "ON sc.subscription_id = s.subscription_id AND sc.subscriber_id = s.subscriber_id AND sc.status = 'SCHEDULED' " +
       'WHERE s.subscription_id = ? AND s.subscriber_id = ? LIMIT 1',
     ).bind(cycle.subscription_id, cycle.subscriber_id).first<{
@@ -930,6 +958,9 @@ async function prepareFailedCycleRetry(
       scheduled_target_plan_id: string | null;
       scheduled_target_plan_version: number | null;
       scheduled_effective_at: string | null;
+      trial_source: 'WEB' | 'APP_STORE' | 'PLAY_STORE' | null;
+      trial_status: string | null;
+      trial_ends_at: string | null;
     }>();
   } catch {
     throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
