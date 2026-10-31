@@ -502,13 +502,34 @@ export async function expirePendingSubscriptionPlanUpgradeForPayment(
   }
   if (!payment || !isBoundedText(payment.order_id, 255) ||
       !['failed', 'cancelled', 'expired'].includes(payment.status)) return;
-  const now = new Date().toISOString();
+  let lines: { item_snapshot_json: string }[]
+  try {
+    const result = await env.D1_04.prepare(
+      "SELECT item_snapshot_json FROM order_lines WHERE order_id = ? AND item_type = 'MEMBERSHIP_PLAN' LIMIT 2",
+    ).bind(payment.order_id).all<{ item_snapshot_json: string }>()
+    lines = result.results ?? []
+  } catch {
+    throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
+  }
+  if (lines.length !== 1) return
+  let snapshot: unknown
+  try {
+    snapshot = JSON.parse(lines[0]!.item_snapshot_json) as unknown
+  } catch {
+    throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
+  }
+  if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) return
+  const change = (snapshot as Record<string, unknown>).subscriptionChange
+  if (!change || typeof change !== 'object' || Array.isArray(change)) return
+  const attemptId = (change as Record<string, unknown>).attemptId
+  if (typeof attemptId !== 'string' || !ATTEMPT_ID_PATTERN.test(attemptId)) return
+  const now = new Date().toISOString()
   try {
     await env.D1_01.prepare(
       "UPDATE membership_subscription_plan_change_attempts SET status = 'EXPIRED', updated_at = ?, " +
-      "version = version + 1 WHERE order_id = ? AND status = 'PENDING_PAYMENT'",
-    ).bind(now, payment.order_id).run();
+      "version = version + 1 WHERE attempt_id = ? AND order_id = ? AND status = 'PENDING_PAYMENT'",
+    ).bind(now, attemptId, payment.order_id).run()
   } catch {
-    throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
+    throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
   }
 }
