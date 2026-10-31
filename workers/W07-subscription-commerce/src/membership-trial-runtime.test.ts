@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { shouldDeferWebTrialExpiry, type WebTrialExpiryCycle } from './membership-trial-runtime.js';
+import { resolveRevenueCatCancelAt, shouldDeferWebTrialExpiry, type WebTrialExpiryCycle } from './membership-trial-runtime.js';
 
 function cycle(overrides: Partial<WebTrialExpiryCycle> = {}): WebTrialExpiryCycle {
   return {
@@ -13,6 +13,19 @@ function cycle(overrides: Partial<WebTrialExpiryCycle> = {}): WebTrialExpiryCycl
     ...overrides,
   };
 }
+
+describe('RevenueCat trial auto-renew cancellation state', () => {
+  it('sets cancellation only at the current period end when the store reports unsubscribe', () => {
+    expect(resolveRevenueCatCancelAt(
+      '2026-11-24T00:00:00.000Z',
+      '2026-10-20T12:00:00.000Z',
+    )).toBe('2026-11-24T00:00:00.000Z');
+  });
+
+  it('clears a stale cancellation marker when RevenueCat reports auto-renew restored', () => {
+    expect(resolveRevenueCatCancelAt('2026-12-24T00:00:00.000Z', null)).toBeNull();
+  });
+});
 
 describe('web trial expiry and renewal payment safety', () => {
   it('expires an ended trial when no renewal cycle exists', () => {
