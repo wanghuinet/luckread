@@ -11,7 +11,7 @@ import { handleCommerceBillingReadRequest } from './billing-read-http-runtime.js
 import { handleHyperswitchWebhookRequest } from './payment-webhook-http-runtime.js'
 import { handleRevenueCatWebhookRequest } from './revenuecat-webhook-http-runtime.js'
 import { handleRevenueCatSubscriberReconciliationRequest } from './revenuecat-subscriber-reconciliation-runtime.js'
-import { getScheduledSubscriptionPlanChange, scheduleSubscriptionPlanChange } from './scheduled-subscription-plan-change.js'
+import { getScheduledSubscriptionPlanChange, scheduleSubscriptionPlanChange } from './scheduled-subscription-plan-change.js'\nimport { createSubscriptionUpgradeOrder } from './subscription-upgrade-checkout.js'
 
 interface RateLimitBinding { limit(input: { key: string }): Promise<{ success: boolean }> }
 interface Env {
@@ -141,7 +141,7 @@ type Operation =
   | { operation: 'createPlan'; subscriptionId: null }
   | { operation: 'list'; subscriptionId: null }
   | { operation: 'get'; subscriptionId: string }
-  | { operation: 'schedulePlanChange'; subscriptionId: string }
+  | { operation: 'schedulePlanChange'; subscriptionId: string }\n  | { operation: 'upgradePlan'; subscriptionId: string }
 
 const toOperation = (method: string, segments: string[]): Operation | null => {
   if (segments.length === 1 && segments[0] === 'plans' && method === 'GET') return { operation: 'listPlans', subscriptionId: null }
@@ -149,7 +149,7 @@ const toOperation = (method: string, segments: string[]): Operation | null => {
   if (segments.length === 2 && segments[0] === 'membership' && segments[1] === 'plans' && method === 'POST') return { operation: 'createPlan', subscriptionId: null }
   if (segments.length === 2 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && method === 'GET') return { operation: 'list', subscriptionId: null }
   if (segments.length === 3 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && method === 'GET') return { operation: 'get', subscriptionId: segments[2] }
-  if (segments.length === 4 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && segments[3] === 'change-plan' && method === 'POST') return { operation: 'schedulePlanChange', subscriptionId: segments[2] }
+  if (segments.length === 4 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && segments[3] === 'change-plan' && method === 'POST') return { operation: 'schedulePlanChange', subscriptionId: segments[2] }\n  if (segments.length === 4 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && segments[3] === 'upgrade' && method === 'POST') return { operation: 'upgradePlan', subscriptionId: segments[2] }
   return null
 }
 
@@ -311,6 +311,51 @@ export default {
           (value as { action: 'pause' | 'resume' | 'retire' }).action,
         )
         return json({ data: result, requestId: crypto.randomUUID() }, 200, result.etag)
+      }
+      if (operation?.operation === 'upgradePlan') {
+        const input = await readJsonBody(request)
+        if (!input || typeof input !== 'object' || Array.isArray(input) ||
+            Object.keys(input as Record<string, unknown>).length !== 1 ||
+            !Object.hasOwn(input, 'planId') ||
+            typeof (input as { planId?: unknown }).planId !== 'string') {
+          throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
+        }
+        const resolveUpgradePricing = async (resolved: Parameters<typeof applyDemoTaxPricing>[0]) => {
+          if (!isDemoPricingEnabled(env.COMMERCE_PRICING_MODE, env.HYPERSWITCH_ENVIRONMENT)) {
+            throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
+          }
+          if (env.COMMERCE_DEMO_TAX_PROVIDER === 'synthetic') return applyDemoTaxPricing(resolved)
+          if (env.COMMERCE_DEMO_TAX_PROVIDER === 'taxjar-sandbox') {
+            try {
+              return await applyTaxJarSandboxPricing(resolved, {
+                apiKey: env.TAXJAR_SANDBOX_API_KEY,
+                fromAddress: {
+                  street: env.TAXJAR_DEMO_FROM_STREET ?? '',
+                  city: env.TAXJAR_DEMO_FROM_CITY ?? '',
+                  state: env.TAXJAR_DEMO_FROM_STATE ?? '',
+                  zip: env.TAXJAR_DEMO_FROM_ZIP ?? '',
+                },
+                toAddress: {
+                  street: env.TAXJAR_DEMO_TO_STREET ?? '',
+                  city: env.TAXJAR_DEMO_TO_CITY ?? '',
+                  state: env.TAXJAR_DEMO_TO_STATE ?? '',
+                  zip: env.TAXJAR_DEMO_TO_ZIP ?? '',
+                },
+              })
+            } catch {
+              throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
+            }
+          }
+          throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
+        }
+        const result = await createSubscriptionUpgradeOrder(
+          env.D1_01, env.D1_04, principal, operation.subscriptionId,
+          (input as { planId: string }).planId,
+          request.headers.get('If-Match'),
+          request.headers.get('Idempotency-Key'),
+          { resolvePricing: resolveUpgradePricing },
+        )
+        return json({ data: result, requestId: crypto.randomUUID() }, result.replayed ? 200 : 201, result.etag)
       }
       if (operation?.operation === 'schedulePlanChange') {
         const input = await readJsonBody(request)
