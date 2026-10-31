@@ -11,6 +11,7 @@ import { handleCommerceBillingReadRequest } from './billing-read-http-runtime.js
 import { handleHyperswitchWebhookRequest } from './payment-webhook-http-runtime.js'
 import { handleRevenueCatWebhookRequest } from './revenuecat-webhook-http-runtime.js'
 import { handleRevenueCatSubscriberReconciliationRequest } from './revenuecat-subscriber-reconciliation-runtime.js'
+import { scheduleSubscriptionPlanChange } from './scheduled-subscription-plan-change.js'
 
 interface RateLimitBinding { limit(input: { key: string }): Promise<{ success: boolean }> }
 interface Env {
@@ -140,6 +141,7 @@ type Operation =
   | { operation: 'createPlan'; subscriptionId: null }
   | { operation: 'list'; subscriptionId: null }
   | { operation: 'get'; subscriptionId: string }
+  | { operation: 'schedulePlanChange'; subscriptionId: string }
 
 const toOperation = (method: string, segments: string[]): Operation | null => {
   if (segments.length === 1 && segments[0] === 'plans' && method === 'GET') return { operation: 'listPlans', subscriptionId: null }
@@ -147,6 +149,7 @@ const toOperation = (method: string, segments: string[]): Operation | null => {
   if (segments.length === 2 && segments[0] === 'membership' && segments[1] === 'plans' && method === 'POST') return { operation: 'createPlan', subscriptionId: null }
   if (segments.length === 2 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && method === 'GET') return { operation: 'list', subscriptionId: null }
   if (segments.length === 3 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && method === 'GET') return { operation: 'get', subscriptionId: segments[2] }
+  if (segments.length === 4 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && segments[3] === 'change-plan' && method === 'POST') return { operation: 'schedulePlanChange', subscriptionId: segments[2] }
   return null
 }
 
@@ -308,6 +311,21 @@ export default {
           (value as { action: 'pause' | 'resume' | 'retire' }).action,
         )
         return json({ data: result, requestId: crypto.randomUUID() }, 200, result.etag)
+      }
+      if (operation?.operation === 'schedulePlanChange') {
+        const input = await readJsonBody(request)
+        if (!input || typeof input !== 'object' || Array.isArray(input) ||
+            Object.keys(input as Record<string, unknown>).length !== 1 ||
+            !Object.hasOwn(input, 'planId') || typeof (input as { planId?: unknown }).planId !== 'string') {
+          throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
+        }
+        const result = await scheduleSubscriptionPlanChange(
+          env.D1_01, principal, operation.subscriptionId,
+          (input as { planId: string }).planId,
+          request.headers.get('If-Match'),
+          request.headers.get('Idempotency-Key'),
+        )
+        return json({ data: result, requestId: crypto.randomUUID() }, result.replayed ? 200 : 202, result.etag)
       }
       if (request.method === 'POST' && operation?.operation !== 'createPlan') {
         return json({
