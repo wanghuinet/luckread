@@ -6,8 +6,8 @@ import w07 from './index.js'
 import { verifyD1SubscriptionPostflight, verifyD1SubscriptionPreflight } from '../scripts/verify-remote-preflight.mjs'
 
 type Statement = { bind: (...values: unknown[]) => Statement; first: <T>() => Promise<T | null>; all: <T>() => Promise<{ results: T[] }>; run: () => Promise<{ meta: { changes: number } }> }
-type MembershipPlanRow = { plan_id: string; owner_type: 'CREATOR' | 'COMMUNITY' | 'PLATFORM'; owner_id: string; current_version: number; status: 'DRAFT' | 'ACTIVE' | 'PAUSED' | 'RETIRED'; visibility: 'PRIVATE' | 'PUBLIC'; version: number; has_current_version: boolean; created_at: string; updated_at: string; name: string; tier: string; billing_interval: string; price_minor: number; currency: string; benefits_json: string }
-type PlanVersionRow = { plan_id: string; plan_version: number; name: string; tier: string; billing_interval: string; price_minor: number; currency: string; benefits_json: string; created_at: string }
+type MembershipPlanRow = { plan_id: string; owner_type: 'CREATOR' | 'COMMUNITY' | 'PLATFORM'; owner_id: string; current_version: number; status: 'DRAFT' | 'ACTIVE' | 'PAUSED' | 'RETIRED'; visibility: 'PRIVATE' | 'PUBLIC'; version: number; has_current_version: boolean; created_at: string; updated_at: string; name: string; tier: string; billing_interval: string; price_minor: number; currency: string; benefits_json: string; trial_period_days: number }
+type PlanVersionRow = { plan_id: string; plan_version: number; name: string; tier: string; billing_interval: string; price_minor: number; currency: string; benefits_json: string; trial_period_days: number; created_at: string }
 
 function fakeDb(rows: SubscriptionRow[], plans: MembershipPlanRow[] = []): D1Database {
   const state = new Map(rows.map((row) => [row.subscription_id, { ...row }]))
@@ -17,7 +17,7 @@ function fakeDb(rows: SubscriptionRow[], plans: MembershipPlanRow[] = []): D1Dat
     if (plan.has_current_version) planVersionState.set(plan.plan_id + ':' + plan.current_version, {
       plan_id: plan.plan_id, plan_version: plan.current_version, name: plan.name, tier: plan.tier,
       billing_interval: plan.billing_interval, price_minor: plan.price_minor, currency: plan.currency,
-      benefits_json: plan.benefits_json, created_at: plan.created_at,
+      benefits_json: plan.benefits_json, trial_period_days: plan.trial_period_days, created_at: plan.created_at,
     })
   }
   return {
@@ -86,9 +86,9 @@ function fakeDb(rows: SubscriptionRow[], plans: MembershipPlanRow[] = []): D1Dat
             return { meta: { changes: 1 } }
           }
           if (sql.includes('INSERT OR IGNORE INTO membership_plan_versions') && sql.includes('SELECT')) {
-            const [planId, planVersion, name, tier, billingInterval, priceMinor, currency, benefitsJson, createdAt,
+            const [planId, planVersion, name, tier, billingInterval, priceMinor, currency, benefitsJson, trialPeriodDays, createdAt,
               guardPlanId, ownerId, currentVersion, lifecycleVersion] = values as
-              [string, number, string, string, string, number, string, string, string, string, string, number, number]
+              [string, number, string, string, string, number, string, string, number, string, string, string, number, number]
             const plan = planState.get(guardPlanId)
             if (!plan || planId !== guardPlanId || plan.owner_type !== 'CREATOR' || plan.owner_id !== ownerId ||
                 !['DRAFT', 'ACTIVE', 'PAUSED'].includes(plan.status) || plan.current_version !== currentVersion ||
@@ -96,7 +96,8 @@ function fakeDb(rows: SubscriptionRow[], plans: MembershipPlanRow[] = []): D1Dat
             const key = planId + ':' + planVersion
             if (planVersionState.has(key)) return { meta: { changes: 0 } }
             planVersionState.set(key, { plan_id: planId, plan_version: planVersion, name, tier,
-              billing_interval: billingInterval, price_minor: priceMinor, currency, benefits_json: benefitsJson, created_at: createdAt })
+              billing_interval: billingInterval, price_minor: priceMinor, currency, benefits_json: benefitsJson,
+              trial_period_days: trialPeriodDays, created_at: createdAt })
             return { meta: { changes: 1 } }
           }
           if (sql.includes('INSERT OR IGNORE INTO membership_plan_versions')) {
@@ -133,15 +134,16 @@ function fakeDb(rows: SubscriptionRow[], plans: MembershipPlanRow[] = []): D1Dat
           }
           if (sql.includes('UPDATE membership_plans SET current_version = ?')) {
             const [nextVersion, updatedAt, planId, ownerId, currentVersion, lifecycleVersion,
-              versionForCheck, name, tier, billingInterval, priceMinor, currency, benefitsJson] = values as
-              [number, string, string, string, number, number, number, string, string, string, number, string, string]
+              versionForCheck, name, tier, billingInterval, priceMinor, currency, benefitsJson, trialPeriodDays] = values as
+              [number, string, string, string, number, number, number, string, string, string, number, string, string, number]
             const plan = planState.get(planId)
             const target = planVersionState.get(planId + ':' + versionForCheck)
             if (!plan || plan.owner_type !== 'CREATOR' || plan.owner_id !== ownerId ||
                 !['DRAFT', 'ACTIVE', 'PAUSED'].includes(plan.status) || plan.current_version !== currentVersion ||
                 plan.version !== lifecycleVersion || nextVersion !== currentVersion + 1 ||
                 !target || target.name !== name || target.tier !== tier || target.billing_interval !== billingInterval ||
-                target.price_minor !== priceMinor || target.currency !== currency || target.benefits_json !== benefitsJson) {
+                target.price_minor !== priceMinor || target.currency !== currency || target.benefits_json !== benefitsJson ||
+                target.trial_period_days !== trialPeriodDays) {
               return { meta: { changes: 0 } }
             }
             plan.current_version = nextVersion
@@ -150,6 +152,7 @@ function fakeDb(rows: SubscriptionRow[], plans: MembershipPlanRow[] = []): D1Dat
             const latest = planVersionState.get(plan.plan_id + ':' + nextVersion)!
             plan.name = latest.name; plan.tier = latest.tier; plan.billing_interval = latest.billing_interval
             plan.price_minor = latest.price_minor; plan.currency = latest.currency; plan.benefits_json = latest.benefits_json
+            plan.trial_period_days = latest.trial_period_days
             plan.has_current_version = true
             return { meta: { changes: 1 } }
           }
@@ -211,7 +214,7 @@ function fakeDb(rows: SubscriptionRow[], plans: MembershipPlanRow[] = []): D1Dat
 const activePlan = (planId = 'plan_basic', overrides: Partial<MembershipPlanRow> = {}): MembershipPlanRow => ({
   plan_id: planId, owner_type: 'CREATOR', owner_id: 'creator_1', current_version: 3, status: 'ACTIVE', visibility: 'PUBLIC', version: 1,
   has_current_version: true, created_at: '2026-10-02T12:00:00.000Z', updated_at: '2026-10-02T12:00:00.000Z',
-  name: 'Creator Basic', tier: 'basic', billing_interval: 'MONTHLY', price_minor: 500, currency: 'USD', benefits_json: '["member-posts"]',
+  name: 'Creator Basic', tier: 'basic', billing_interval: 'MONTHLY', price_minor: 500, currency: 'USD', benefits_json: '["member-posts"]', trial_period_days: 0,
   ...overrides,
 })
 
@@ -302,7 +305,7 @@ describe('subscription runtime', () => {
     await expect(response.json()).resolves.toMatchObject({
       data: { allowed: true, reason: 'ACTIVE_CREATOR_MEMBERSHIP' },
     })
-    expect(lastSql).toContain("status = 'ACTIVE'")
+    expect(lastSql).toContain("status IN ('ACTIVE','TRIALING')")
     expect(lastSql).toContain('current_period_start <= ?')
     expect(lastSql).toContain('current_period_end > ?')
     expect(lastSql).toContain('(cancel_at IS NULL OR cancel_at > ?)')
