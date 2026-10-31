@@ -812,7 +812,8 @@ export async function reviseMembershipPlan(
     row.billing_interval === revision.billingInterval &&
     row.price_minor === revision.priceMinor &&
     row.currency === revision.currency &&
-    row.benefits_json === benefitsJson
+    row.benefits_json === benefitsJson &&
+    row.trial_period_days === revision.trialPeriodDays
 
   if (current.version !== expectedVersion) {
     if (current.version === expectedVersion + 1 && current.current_version > 1 && matchesRevision(current)) {
@@ -834,13 +835,13 @@ export async function reviseMembershipPlan(
     results = await db.batch([
       db.prepare(
         'INSERT OR IGNORE INTO membership_plan_versions ' +
-        '(plan_id, plan_version, name, tier, billing_interval, price_minor, currency, benefits_json, created_at) ' +
-        'SELECT ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (' +
+        '(plan_id, plan_version, name, tier, billing_interval, price_minor, currency, benefits_json, trial_period_days, created_at) ' +
+        'SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (' +
         "SELECT 1 FROM membership_plans p WHERE p.plan_id = ? AND p.owner_type = 'CREATOR' AND p.owner_id = ? " +
         "AND p.status IN ('DRAFT','ACTIVE','PAUSED') AND p.current_version = ? AND p.version = ?)",
       ).bind(
         planId, nextPlanVersion, revision.name, revision.tier, revision.billingInterval,
-        revision.priceMinor, revision.currency, benefitsJson, updatedAt,
+        revision.priceMinor, revision.currency, benefitsJson, revision.trialPeriodDays, updatedAt,
         planId, creatorId, current.current_version, expectedVersion,
       ),
       db.prepare(
@@ -849,11 +850,11 @@ export async function reviseMembershipPlan(
         'AND current_version = ? AND version = ? AND EXISTS (' +
         'SELECT 1 FROM membership_plan_versions v WHERE v.plan_id = membership_plans.plan_id ' +
         'AND v.plan_version = ? AND v.name = ? AND v.tier = ? AND v.billing_interval = ? ' +
-        'AND v.price_minor = ? AND v.currency = ? AND v.benefits_json = ?)',
+        'AND v.price_minor = ? AND v.currency = ? AND v.benefits_json = ? AND v.trial_period_days = ?)',
       ).bind(
         nextPlanVersion, updatedAt, planId, creatorId, current.current_version, expectedVersion,
         nextPlanVersion, revision.name, revision.tier, revision.billingInterval,
-        revision.priceMinor, revision.currency, benefitsJson,
+        revision.priceMinor, revision.currency, benefitsJson, revision.trialPeriodDays,
       ),
     ])
   } catch {
