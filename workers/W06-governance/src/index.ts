@@ -520,7 +520,7 @@ function parseSubscriptionTrialStartedAuditInput(value: unknown): SubscriptionTr
   }
   const validId = (input: unknown): input is string =>
     typeof input === 'string' && input.length >= 1 && input.length <= 256 &&
-    input.trim() === input && !(/[\\u0000-\\u001f\\u007f]/.test(input))
+    input.trim() === input && !(/[\u0000-\u001f\u007f]/.test(input))
   const canonicalIso = (input: unknown): input is string =>
     typeof input === 'string' && !Number.isNaN(Date.parse(input)) && new Date(input).toISOString() === input
   if (
@@ -552,7 +552,7 @@ function parseSubscriptionTrialConvertedAuditInput(value: unknown): Subscription
   }
   const validId = (input: unknown): input is string =>
     typeof input === 'string' && input.length >= 1 && input.length <= 256 &&
-    input.trim() === input && !(/[\\u0000-\\u001f\\u007f]/.test(input))
+    input.trim() === input && !(/[\u0000-\u001f\u007f]/.test(input))
   const canonicalIso = (input: unknown): input is string =>
     typeof input === 'string' && !Number.isNaN(Date.parse(input)) && new Date(input).toISOString() === input
   if (
