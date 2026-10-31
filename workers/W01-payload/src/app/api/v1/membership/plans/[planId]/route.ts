@@ -109,6 +109,7 @@ function validUpdatedPlan(value: unknown, expectedPlanId: string, expectedCreato
     (plan.billingInterval === 'MONTHLY' || plan.billingInterval === 'YEARLY') &&
     Number.isSafeInteger(plan.priceMinor) && Number(plan.priceMinor) >= 0 && Number(plan.priceMinor) <= 2_147_483_647 &&
     typeof plan.currency === 'string' && /^[A-Z]{3}$/.test(plan.currency) &&
+    Number.isSafeInteger(plan.trialDays) && Number(plan.trialDays) >= 0 && Number(plan.trialDays) <= 90 &&
     Array.isArray(plan.benefits) && plan.benefits.length <= 20 &&
     plan.benefits.every((item) => typeof item === 'string' && item.length >= 1 && item.length <= 180) &&
     new Set(plan.benefits).size === plan.benefits.length &&
@@ -146,10 +147,11 @@ export async function PUT(request: Request, context: RouteContext): Promise<Resp
       return errorResponse(400, 'VALIDATION_FAILED', 'A valid JSON plan body is required')
     }
     const fields = body as Record<string, unknown>
+    const allowedFields = new Set(['name', 'tier', 'billingInterval', 'priceMinor', 'currency', 'benefits', 'trialDays'])
     if (
-      Object.keys(fields).length !== 6 ||
+      Object.keys(fields).some((key) => !allowedFields.has(key)) ||
       !['name', 'tier', 'billingInterval', 'priceMinor', 'currency', 'benefits'].every((key) => Object.hasOwn(fields, key))
-    ) return errorResponse(400, 'VALIDATION_FAILED', 'Only plan commercial terms may be updated')
+    ) return errorResponse(400, 'VALIDATION_FAILED', 'Only plan commercial terms and optional trialDays may be updated')
     if (
       typeof fields.name !== 'string' || fields.name !== fields.name.trim() || fields.name.length < 1 || fields.name.length > 120 ||
       typeof fields.tier !== 'string' || !/^[a-z][a-z0-9_-]{0,63}$/.test(fields.tier) ||
@@ -159,7 +161,8 @@ export async function PUT(request: Request, context: RouteContext): Promise<Resp
       !Array.isArray(fields.benefits) || fields.benefits.length > 20 ||
       fields.benefits.some((item) => typeof item !== 'string' || item !== item.trim() || item.length < 1 || item.length > 180) ||
       new Set(fields.benefits).size !== fields.benefits.length ||
-      JSON.stringify(fields.benefits).length > 8192
+      JSON.stringify(fields.benefits).length > 8192 ||
+      (fields.trialDays !== undefined && (!Number.isSafeInteger(fields.trialDays) || Number(fields.trialDays) < 0 || Number(fields.trialDays) > 90))
     ) return errorResponse(400, 'VALIDATION_FAILED', 'Membership plan terms are invalid')
     const terms = {
       name: fields.name,
@@ -168,6 +171,7 @@ export async function PUT(request: Request, context: RouteContext): Promise<Resp
       priceMinor: fields.priceMinor,
       currency: fields.currency,
       benefits: fields.benefits as string[],
+      ...(fields.trialDays === undefined ? {} : { trialDays: fields.trialDays as number }),
     }
 
     const intentEventId = 'evt_mpl_update_requested_' + planId + '_' + idempotencyKey
@@ -219,6 +223,7 @@ export async function PUT(request: Request, context: RouteContext): Promise<Resp
           billingInterval: plan.billingInterval as 'MONTHLY' | 'YEARLY',
           priceMinor: plan.priceMinor as number, currency: plan.currency as string,
           benefits: plan.benefits as string[],
+          trialDays: plan.trialDays as number,
         },
       })
     } catch {
