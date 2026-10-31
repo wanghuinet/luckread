@@ -13,6 +13,7 @@ import { handleRevenueCatWebhookRequest } from './revenuecat-webhook-http-runtim
 import { handleRevenueCatSubscriberReconciliationRequest } from './revenuecat-subscriber-reconciliation-runtime.js'
 import { previewSubscriptionPlanChange } from './subscription-plan-change-preview.js'
 import { createSubscriptionPlanUpgradeCheckout } from './subscription-plan-change-checkout.js'
+import { scheduleSubscriptionPlanDowngrade } from './subscription-plan-change-schedule.js'
 
 interface RateLimitBinding { limit(input: { key: string }): Promise<{ success: boolean }> }
 interface Env {
@@ -145,6 +146,7 @@ type Operation =
   | { operation: 'get'; subscriptionId: string }
   | { operation: 'planChangePreview'; subscriptionId: string }
   | { operation: 'planUpgradeCheckout'; subscriptionId: string }
+  | { operation: 'planDowngradeSchedule'; subscriptionId: string }
 
 const toOperation = (method: string, segments: string[]): Operation | null => {
   if (segments.length === 1 && segments[0] === 'plans' && method === 'GET') return { operation: 'listPlans', subscriptionId: null }
@@ -154,6 +156,7 @@ const toOperation = (method: string, segments: string[]): Operation | null => {
   if (segments.length === 3 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && method === 'GET') return { operation: 'get', subscriptionId: segments[2] }
   if (segments.length === 4 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && segments[3] === 'change-plan-preview' && method === 'GET') return { operation: 'planChangePreview', subscriptionId: segments[2] }
   if (segments.length === 5 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && segments[3] === 'change-plan' && segments[4] === 'checkout' && method === 'POST') return { operation: 'planUpgradeCheckout', subscriptionId: segments[2] }
+  if (segments.length === 5 && segments[0] === 'memberships' && segments[1] === 'subscriptions' && segments[3] === 'change-plan' && segments[4] === 'schedule' && method === 'POST') return { operation: 'planDowngradeSchedule', subscriptionId: segments[2] }
   return null
 }
 
@@ -273,6 +276,18 @@ export default {
           env.D1_01, principal, operation.subscriptionId, targetPlanId,
         )
         return json({ data: result, requestId: crypto.randomUUID() }, 200, result.etag)
+      }
+      if (operation?.operation === 'planDowngradeSchedule') {
+        requireLayer(request)
+        const scheduled = await scheduleSubscriptionPlanDowngrade(
+          env,
+          principal,
+          operation.subscriptionId,
+          await readJsonBody(request),
+          request.headers.get('Idempotency-Key'),
+          request.headers.get('If-Match'),
+        )
+        return json({ data: scheduled, requestId: crypto.randomUUID() }, scheduled.replayed ? 200 : 201)
       }
       if (operation?.operation === 'planUpgradeCheckout') {
         requireLayer(request)
