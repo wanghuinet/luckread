@@ -497,7 +497,7 @@ type MembershipPlanStoredRow = {
 
 const canonicalBenefitsJson = (benefits: string[]): string => JSON.stringify(benefits)
 
-export function normalizeMembershipPlanDraft(value: unknown): MembershipPlanDraftInput {
+export function normalizeMembershipPlanDraft(value: unknown, defaultTrialPeriodDays = 0): MembershipPlanDraftInput {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
   }
@@ -513,7 +513,7 @@ export function normalizeMembershipPlanDraft(value: unknown): MembershipPlanDraf
   const currency = typeof source.currency === 'string' ? source.currency.trim() : ''
   const priceMinor = source.priceMinor
   const rawBenefits = source.benefits
-  const trialPeriodDays = source.trialPeriodDays === undefined ? 0 : source.trialPeriodDays
+  const trialPeriodDays = source.trialPeriodDays === undefined ? defaultTrialPeriodDays : source.trialPeriodDays
 
   if (name.length < 1 || name.length > 120) throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
   if (!/^[a-z][a-z0-9_-]{0,63}$/.test(tier)) throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
@@ -790,8 +790,6 @@ export async function reviseMembershipPlan(
   const creatorId = validatePrincipal(verifiedCreatorId)
   const planId = ensureId(planIdInput)
   const expectedVersion = planVersionFromEtag(validateIfMatch(ifMatchInput))
-  const revision = normalizeMembershipPlanDraft(input)
-  const benefitsJson = canonicalBenefitsJson(revision.benefits)
 
   const readOwnedPlan = async (): Promise<MembershipPlanStoredRow | null> =>
     db.prepare(
@@ -805,6 +803,8 @@ export async function reviseMembershipPlan(
   const current = await readOwnedPlan()
   if (!current) throw new SubscriptionRuntimeError('RESOURCE_NOT_FOUND', 404)
   if (current.status === 'RETIRED') throw new SubscriptionRuntimeError('INVALID_STATE', 409)
+  const revision = normalizeMembershipPlanDraft(input, current.trial_period_days)
+  const benefitsJson = canonicalBenefitsJson(revision.benefits)
 
   const matchesRevision = (row: MembershipPlanStoredRow): boolean =>
     row.name === revision.name &&
