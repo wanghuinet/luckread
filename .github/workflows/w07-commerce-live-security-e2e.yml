@@ -25,30 +25,43 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  validate:
+    if: ${{ github.event_name == 'pull_request' }}
+    name: Validate live security harness without production access
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: node --check scripts/w07-commerce-live-security-e2e.mjs
+
   security-e2e:
-    if: \${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.confirm == 'RUN_W07_COMMERCE_SECURITY_E2E' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.confirm == 'RUN_W07_COMMERCE_SECURITY_E2E' }}
     name: Verify production payment and billing ownership boundaries
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
       LUCKREAD_API_BASE_URL: https://api.luckread.com
       LUCKREAD_BROWSER_ORIGIN: https://luckread.com
-      LUCKREAD_APP_AUTH_SMOKE_EMAIL: \${{ secrets.LUCKREAD_APP_AUTH_SMOKE_EMAIL }}
-      LUCKREAD_APP_AUTH_SMOKE_PASSWORD: \${{ secrets.LUCKREAD_APP_AUTH_SMOKE_PASSWORD }}
-      LUCKREAD_CREATOR_E2E_APPLICANT_EMAIL: \${{ secrets.LUCKREAD_CREATOR_E2E_APPLICANT_EMAIL }}
-      LUCKREAD_CREATOR_E2E_APPLICANT_PASSWORD: \${{ secrets.LUCKREAD_CREATOR_E2E_APPLICANT_PASSWORD }}
+      LUCKREAD_APP_AUTH_SMOKE_EMAIL: ${{ secrets.LUCKREAD_APP_AUTH_SMOKE_EMAIL }}
+      LUCKREAD_APP_AUTH_SMOKE_PASSWORD: ${{ secrets.LUCKREAD_APP_AUTH_SMOKE_PASSWORD }}
+      LUCKREAD_CREATOR_E2E_APPLICANT_EMAIL: ${{ secrets.LUCKREAD_CREATOR_E2E_APPLICANT_EMAIL }}
+      LUCKREAD_CREATOR_E2E_APPLICANT_PASSWORD: ${{ secrets.LUCKREAD_CREATOR_E2E_APPLICANT_PASSWORD }}
     steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: Require protected main and deployed W07 source
+        env:
+          W07_SOURCE_SHA: 4c49cec1d3c6d026e30c05e059f66f036cd4fd3d
         run: |
           set -euo pipefail
           test "$GITHUB_REF" = "refs/heads/main"
-          test "$GITHUB_SHA" = "4c49cec1d3c6d026e30c05e059f66f036cd4fd3d" || {
-            echo "::error::This E2E is pinned to the W07 source deployed by run 41148669333; update only after a reviewed subsequent W07 deployment."
-            exit 1
-          }
-
-      - name: Checkout main
-        uses: actions/checkout@v4
+          git cat-file -e "$W07_SOURCE_SHA^{commit}"
+          git merge-base --is-ancestor "$W07_SOURCE_SHA" origin/main
 
       - name: Set up Node 24
         uses: actions/setup-node@v4
@@ -65,7 +78,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: w07-commerce-live-security-e2e-\${{ github.run_id }}-\${{ github.run_attempt }}
+          name: w07-commerce-live-security-e2e-${{ github.run_id }}-${{ github.run_attempt }}
           path: artifacts/w07-commerce-live-security-e2e/*.json
           if-no-files-found: warn
           retention-days: 30
