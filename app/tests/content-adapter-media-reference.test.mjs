@@ -10,7 +10,7 @@ mock.module('../lib/api-client.ts', () => ({
   },
 }));
 
-const { resolveNativeMediaSource } = await import('../lib/content-adapter.ts');
+const { mapContentToFeedContent, resolveNativeMediaSource } = await import('../lib/content-adapter.ts');
 
 test('resolves same-origin media paths through the configured W01 API origin', () => {
   expect(resolveNativeMediaSource('/api/media/file/photo.webp')).toEqual({
@@ -47,4 +47,26 @@ test('never forwards a session token to the public media delivery hosts', () => 
     uri: 'https://api.luckread.com/api/media/file/photo.webp',
     headers: { Authorization: 'Bearer session-secret' },
   });
+});
+
+test('maps counts with the same non-negative integer normalization used by detail summaries', () => {
+  const item = mapContentToFeedContent({
+    id: 'count-normalization-post',
+    counts: {
+      likes: '-1',
+      retweets: '4.9',
+      comments: 'not-a-count',
+      replies: '3',
+      views: 0,
+      favorites: Number.POSITIVE_INFINITY,
+    },
+    likeCount: 7,
+    saveCount: 5,
+  });
+
+  expect(item.like_count).toBe(7);
+  expect(item.retweet_count).toBe(4);
+  expect(item.reply_count).toBe(3);
+  expect(item.view_count).toBe('0');
+  expect(item.save_count).toBe(5);
 });

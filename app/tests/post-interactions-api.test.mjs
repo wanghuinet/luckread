@@ -134,3 +134,36 @@ test('rejects a response for a different content ID', async () => {
     'The content service did not return the requested post.',
   );
 });
+
+test('normalizes malformed and fractional counts consistently before falling back to alternate fields', async () => {
+  respond = async (path) => {
+    if (path === '/contents/post-counts') {
+      return {
+        response: { ok: true, status: 200 },
+        data: {
+          data: {
+            id: 'post-counts',
+            counts: {
+              likes: '-1',
+              reposts: '4.9',
+              replies: 'invalid',
+              comments: '5',
+              views: '-3',
+            },
+            likeCount: 7,
+            view_count: '8.2',
+          },
+        },
+        error: null,
+      };
+    }
+    throw new Error('Unexpected request: ' + path);
+  };
+
+  await expect(fetchPostInteractionSummary('post-counts')).resolves.toEqual({
+    likeCount: 7,
+    repostCount: 4,
+    replyCount: 5,
+    viewCount: 8,
+  });
+});
