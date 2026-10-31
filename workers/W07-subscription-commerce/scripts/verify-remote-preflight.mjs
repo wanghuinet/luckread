@@ -324,7 +324,7 @@ export function verifyD1SubscriptionPreflight({
   const trialTriggerNames = new Set(collectObjects(trialTriggers)
     .filter((item) => typeof item.name === 'string')
     .map((item) => item.name))
-  const noTrialTable = trialShape.length === 0 && trialIndexNames.size === 0 && trialTriggerNames.size === 0
+  const noTrialTable = trialShape.length === 0 && trialIndexNames.size === 0 && EXPECTED_TRIAL_TRIGGERS.every((name) => !trialTriggerNames.has(name))
   const allTrialObjectsPresent =
     JSON.stringify(trialShape) === JSON.stringify(EXPECTED_TRIAL_COLUMNS) &&
     EXPECTED_TRIAL_INDEXES.every((name) => trialIndexNames.has(name)) &&
