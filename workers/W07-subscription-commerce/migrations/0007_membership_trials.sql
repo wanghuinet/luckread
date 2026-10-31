@@ -4,7 +4,7 @@
 
 ALTER TABLE membership_plan_versions
   ADD COLUMN trial_days INTEGER NOT NULL DEFAULT 0
-  CHECK (typeof(trial_days) = 'integer' AND trial_days BETWEEN 0 AND 90);
+  CHECK (typeof(trial_days) = 'integer' AND trial_days BETWEEN 0 AND 90 AND (trial_days = 0 OR price_minor > 0));
 
 CREATE TABLE membership_subscription_trials (
   trial_id TEXT PRIMARY KEY NOT NULL
@@ -76,7 +76,7 @@ WHEN NOT EXISTS (
         AND (other.cancel_at IS NULL OR other.cancel_at > NEW.started_at)
     )
     AND (
-      (NEW.source = 'WEB' AND v.trial_days BETWEEN 1 AND 90)
+      (NEW.source = 'WEB' AND v.trial_days BETWEEN 1 AND 90 AND v.price_minor > 0)
       OR
       (NEW.source IN ('APP_STORE','PLAY_STORE') AND NEW.provider_app_id IS NOT NULL AND NEW.product_id IS NOT NULL AND NEW.original_transaction_id IS NOT NULL)
     )
