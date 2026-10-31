@@ -2,6 +2,7 @@
 
 import { createCommerceOrder, type AuthoritativelyPricedOrder, type CreateOrderResult } from './order-persistence.js';
 import type { ResolvedCommerceOrderItems } from './order-item-resolution.js';
+import { issueInvoiceForOrder } from './billing-persistence.js';
 import { SubscriptionRuntimeError, validatePrincipal, etagForVersion } from './subscription-runtime.js';
 
 type UpgradeSubscriptionRow = Readonly<{
@@ -263,6 +264,8 @@ export async function createSubscriptionUpgradeOrder(
     { items: [{ itemRef: target.plan_id, quantity: 1 }] },
     () => dependencies.resolvePricing(resolved),
   );
+
+  await issueInvoiceForOrder(d1_04, subscriberId, orderResult.data.orderId);
 
   // Verify a replay still points at this exact subscription and source version;
   // never hand a stale order to checkout after the subscription has changed.
