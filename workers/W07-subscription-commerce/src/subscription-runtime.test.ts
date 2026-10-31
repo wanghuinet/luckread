@@ -312,7 +312,11 @@ describe('subscription runtime', () => {
     await expect(response.json()).resolves.toMatchObject({
       data: { allowed: true, reason: 'ACTIVE_CREATOR_MEMBERSHIP' },
     })
-    expect(lastSql).toContain("status = 'ACTIVE'")
+    expect(lastSql).toContain("status IN ('ACTIVE','TRIALING')")
+    expect(lastSql).toContain("s.status = 'ACTIVE' OR EXISTS (")
+    expect(lastSql).toContain('FROM membership_subscription_trials t')
+    expect(lastSql).toContain("t.status IN ('TRIALING','CANCELED')")
+    expect(lastSql).toContain('t.trial_ends_at = s.current_period_end')
     expect(lastSql).toContain('current_period_start <= ?')
     expect(lastSql).toContain('current_period_end > ?')
     expect(lastSql).toContain('(cancel_at IS NULL OR cancel_at > ?)')
@@ -886,6 +890,17 @@ describe('subscription runtime', () => {
     const retired = fakeDb([], [activePlan('plan_lifecycle_retired', { status: 'RETIRED', version: 3 })])
     await expect(transitionMembershipPlanLifecycle(retired, 'creator_1', 'plan_lifecycle_retired', '"lr-plan-v3"', 'pause'))
       .rejects.toMatchObject({ code: 'INVALID_STATE', status: 409 })
+  })
+
+  it('rejects a zero-price plan with trialDays and preserves zero-trial legacy defaults', () => {
+    expect(normalizeMembershipPlanDraft({
+      name: 'Free', tier: 'free', billingInterval: 'MONTHLY',
+      priceMinor: 0, currency: 'USD', benefits: [], trialDays: 14,
+    })).toEqual(expect.objectContaining({ trialDays: 0 }))
+    expect(() => normalizeMembershipPlanDraft({
+      name: 'Free Trial', tier: 'free', billingInterval: 'MONTHLY',
+      priceMinor: 0, currency: 'USD', benefits: [], trialDays: 14,
+    })).toThrowError(expect.objectContaining({ code: 'VALIDATION_FAILED', status: 400 }))
   })
 
   it('rejects client-controlled owner, lifecycle state, malformed currency, and unsafe price values', () => {
