@@ -78,7 +78,7 @@ function isSubscriptionRecord(value: unknown): value is MySubscription {
     isTrialSummary(item.trial);
 }
 
-function SubscriptionCard({ item }: { item: MySubscription }) {
+function SubscriptionCard({ item, onCancelTrial, canceling }: { item: MySubscription; onCancelTrial: (item: MySubscription) => void; canceling: boolean }) {
   return (
     <View className="mx-4 mb-3 rounded-2xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-950">
       <View className="flex-row items-start justify-between gap-3">
@@ -127,6 +127,40 @@ function SubscriptionCard({ item }: { item: MySubscription }) {
           </View>
         ) : null}
       </View>
+
+      {item.trial ? (
+        <View className="mt-3 rounded-xl border border-sky-100 bg-sky-50 px-3 py-3 dark:border-sky-900 dark:bg-sky-950/30">
+          <Text className="text-sm font-bold text-sky-800 dark:text-sky-200">
+            {item.trial.source === 'WEB' ? '网页试用' : item.trial.source === 'APP_STORE' ? 'App Store 试用' : 'Google Play 试用'}
+          </Text>
+          <Text className="mt-1 text-xs text-sky-700 dark:text-sky-300">
+            {item.trial.status === 'TRIALING' ? '试用有效期至' :
+              item.trial.status === 'CANCELED' ? '已停止试用后的自动续费，使用权保留至' :
+              item.trial.status === 'PAYMENT_FAILED' ? '首笔自动续费付款未成功，当前试用权益截止于' :
+              item.trial.status === 'CONVERTED' ? '已转为付费订阅，原试用结束于' : '试用已结束于'}
+            {' '}{formatDate(item.trial.trialEndsAt)}
+          </Text>
+          {item.trial.source !== 'WEB' &&
+           (item.trial.status === 'TRIALING' || item.trial.status === 'CANCELED') ? (
+            <Text className="mt-2 text-xs leading-5 text-sky-700 dark:text-sky-300">
+              商店试用与续订由对应应用商店管理；LuckRead 只同步商店确认的状态。
+            </Text>
+          ) : item.trial.source === 'WEB' &&
+            (item.trial.status === 'TRIALING' || item.trial.status === 'PAYMENT_FAILED') &&
+            (item.status === 'TRIALING' || item.status === 'PAST_DUE') ? (
+            <Pressable
+              accessibilityRole="button"
+              disabled={canceling}
+              onPress={() => onCancelTrial(item)}
+              className="mt-3 items-center rounded-full border border-sky-300 px-4 py-2 dark:border-sky-700"
+            >
+              {canceling ? <ActivityIndicator color={PRIMARY} /> : (
+                <Text className="text-sm font-bold text-sky-700 dark:text-sky-300">停止试用后的自动扣款</Text>
+              )}
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
 
       <Text selectable className="mt-3 text-[11px] leading-4 text-neutral-400">
         订阅 ID：{item.subscriptionId}
