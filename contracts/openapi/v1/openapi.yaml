@@ -2021,7 +2021,7 @@ paths:
       summary: Get a subscription
       operationId: getSubscription
       responses:
-        '200': { description: Subscription. }
+        '200': { description: Subscription and optional scheduled next-period plan change; current entitlements remain on the source plan until successful renewal payment. }
         '4XX': { $ref: '#/components/responses/ClientError' }
 
   /memberships/subscriptions/{subscriptionId}/cancel:
