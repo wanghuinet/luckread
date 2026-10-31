@@ -93,6 +93,25 @@ BEGIN
     AND effective_at <= NEW.current_period_start;
 END;
 
+-- Cancel an un-applied future plan change if the subscriber pauses or cancels
+-- before the period boundary. PAST_DUE does not cancel it: a successful retry may
+-- still apply the scheduled target plan after payment confirmation.
+CREATE TRIGGER membership_subscription_plan_changes_cancel_on_lifecycle_change
+AFTER UPDATE OF status, cancel_at ON membership_subscriptions
+WHEN (
+  NEW.status IN ('PAUSED','CANCELED','EXPIRED') OR NEW.cancel_at IS NOT NULL
+) AND (
+  NEW.status <> OLD.status OR NEW.cancel_at IS NOT OLD.cancel_at
+)
+BEGIN
+  UPDATE membership_subscription_plan_changes
+  SET status = 'CANCELED', version = version + 1, updated_at = NEW.updated_at
+  WHERE subscription_id = NEW.subscription_id
+    AND subscriber_id = NEW.subscriber_id
+    AND status = 'SCHEDULED'
+    AND updated_at < NEW.updated_at;
+END;
+
 CREATE TRIGGER membership_subscription_plan_changes_retained
 BEFORE DELETE ON membership_subscription_plan_changes
 BEGIN SELECT RAISE(ABORT, 'subscription plan-change history is retained'); END;
