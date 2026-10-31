@@ -2,6 +2,7 @@
 
 import { sha256BytesToHex } from '../../W10-async/src/canonical-json-idempotency.js';
 import { addBillingPeriod } from './subscription-runtime.js';
+import { applyPaidMembershipPlanUpgrade, type PaidMembershipUpgradeApplicationInput } from './paid-membership-plan-upgrade-application.js';
 
 type PaidOrderRow = Readonly<{
   payment_id: string;
@@ -26,6 +27,7 @@ type PaidOrderLineRow = Readonly<{
   quantity: number;
   unit_amount_minor: number;
   line_total_minor: number;
+  line_discount_minor: number;
   item_snapshot_json: string;
 }>;
 
@@ -78,6 +80,7 @@ type MembershipOfferSnapshot = Readonly<{
   priceMinor: number;
   currency: string;
   benefits: string[];
+  upgrade?: PaidMembershipUpgradeApplicationInput;
 }>;
 
 const PAYMENT_ID_PATTERN = /^pay_[A-Za-z0-9]{26}$/;
@@ -105,14 +108,48 @@ function failClosed(): never {
 
 function parseSnapshot(raw: string, line: PaidOrderLineRow, orderCurrency: string): MembershipOfferSnapshot {
   let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw) as unknown;
-  } catch {
-    return failClosed();
-  }
+  try { parsed = JSON.parse(raw) as unknown; } catch { return failClosed(); }
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return failClosed();
   const value = parsed as Record<string, unknown>;
   const benefits = value.benefits;
+  const upgradeValue = value.membershipUpgrade;
+  let upgrade: PaidMembershipUpgradeApplicationInput | undefined;
+  if (upgradeValue !== undefined) {
+    if (!upgradeValue || typeof upgradeValue !== 'object' || Array.isArray(upgradeValue)) return failClosed();
+    const candidate = upgradeValue as Record<string, unknown>;
+    if (candidate.version !== 1 ||
+        !boundedId(candidate.subscriptionId) ||
+        typeof candidate.sourcePlanId !== 'string' || !PLAN_ID_PATTERN.test(candidate.sourcePlanId) ||
+        !Number.isSafeInteger(candidate.sourcePlanVersion) || Number(candidate.sourcePlanVersion) < 1 ||
+        candidate.targetPlanId !== value.planId ||
+        candidate.targetPlanVersion !== value.planVersion ||
+        !Number.isSafeInteger(candidate.expectedSubscriptionVersion) || Number(candidate.expectedSubscriptionVersion) < 1 ||
+        !canonicalIso(candidate.currentPeriodStart) || !canonicalIso(candidate.currentPeriodEnd) ||
+        Date.parse(candidate.currentPeriodEnd) <= Date.parse(candidate.currentPeriodStart) ||
+        !safeMinor(candidate.prorationBaseMinor) || candidate.prorationBaseMinor < 1 ||
+        candidate.prorationBaseMinor !== line.unit_amount_minor ||
+        typeof candidate.requestHash !== 'string' || !/^[a-f0-9]{64}$/.test(candidate.requestHash) ||
+        !canonicalIso(candidate.quotedAt) ||
+        Date.parse(candidate.quotedAt) < Date.parse(candidate.currentPeriodStart) ||
+        Date.parse(candidate.quotedAt) >= Date.parse(candidate.currentPeriodEnd)) return failClosed();
+    upgrade = {
+      subscriptionId: candidate.subscriptionId,
+      subscriberId: '', // Bound to the paid Order customer after parsing below.
+      sourcePlanId: candidate.sourcePlanId,
+      sourcePlanVersion: candidate.sourcePlanVersion as number,
+      targetPlanId: value.planId as string,
+      targetPlanVersion: value.planVersion as number,
+      expectedSubscriptionVersion: candidate.expectedSubscriptionVersion as number,
+      currentPeriodStart: candidate.currentPeriodStart,
+      currentPeriodEnd: candidate.currentPeriodEnd,
+      orderId: '', // Bound to the paid Order after parsing below.
+      paymentId: '', // Bound to the signed payment after parsing below.
+      amountMinor: 0, // Bound to the paid Order after parsing below.
+      currency: orderCurrency,
+      requestHash: candidate.requestHash,
+      confirmedAt: '', // Bound to the verified Order confirmation timestamp below.
+    };
+  }
   if (
     typeof value.planId !== 'string' || !PLAN_ID_PATTERN.test(value.planId) ||
     value.planId !== line.item_ref ||
@@ -123,13 +160,15 @@ function parseSnapshot(raw: string, line: PaidOrderLineRow, orderCurrency: strin
     typeof value.tier !== 'string' || !/^[a-z][a-z0-9_-]{0,63}$/.test(value.tier) ||
     (value.billingInterval !== 'MONTHLY' && value.billingInterval !== 'YEARLY') ||
     !safeMinor(value.priceMinor) || value.priceMinor < 1 ||
-    value.priceMinor !== line.unit_amount_minor ||
     value.currency !== orderCurrency ||
     !Array.isArray(benefits) || benefits.length > 20 ||
     benefits.some((item) => typeof item !== 'string' || item.length < 1 || item.length > 180) ||
     new Set(benefits).size !== benefits.length ||
     !Number.isSafeInteger(line.quantity) || line.quantity !== 1 ||
-    !safeMinor(line.line_total_minor) || line.line_total_minor < 1
+    !safeMinor(line.unit_amount_minor) || line.unit_amount_minor < 1 ||
+    (upgrade ? line.unit_amount_minor !== upgrade.prorationBaseMinor : line.unit_amount_minor !== value.priceMinor) ||
+    !safeMinor(line.line_total_minor) || line.line_total_minor < 1 ||
+    !safeMinor(line.line_discount_minor) || line.line_discount_minor > line.unit_amount_minor
   ) return failClosed();
 
   return {
@@ -142,6 +181,7 @@ function parseSnapshot(raw: string, line: PaidOrderLineRow, orderCurrency: strin
     priceMinor: value.priceMinor,
     currency: value.currency,
     benefits: benefits as string[],
+    ...(upgrade ? { upgrade } : {}),
   };
 }
 
@@ -180,7 +220,7 @@ async function readOrderLines(db: D1Database, orderId: string): Promise<PaidOrde
   try {
     const rows = await db.prepare(
       'SELECT order_line_id, item_type, item_ref, item_version, quantity, unit_amount_minor, ' +
-      'line_total_minor, item_snapshot_json FROM order_lines WHERE order_id = ? ORDER BY order_line_id ASC',
+      'line_total_minor, line_discount_minor, item_snapshot_json FROM order_lines WHERE order_id = ? ORDER BY order_line_id ASC',
     ).bind(orderId).all<PaidOrderLineRow>();
     return rows.results ?? [];
   } catch {
@@ -364,8 +404,21 @@ export async function fulfillPaidMembershipOrder(
 
   const line = membershipLines[0]!;
   if (!boundedId(line.order_line_id, 255) || !PLAN_ID_PATTERN.test(line.item_ref)) return failClosed();
-  const snapshot = parseSnapshot(line.item_snapshot_json, line, order.order_currency);
+  let snapshot = parseSnapshot(line.item_snapshot_json, line, order.order_currency);
   await readPlanVersion(env.D1_01, snapshot);
+  if (snapshot.upgrade) {
+    const upgrade: PaidMembershipUpgradeApplicationInput = {
+      ...snapshot.upgrade,
+      subscriberId: order.customer_id,
+      orderId: order.order_id,
+      paymentId,
+      amountMinor: order.total_minor,
+      currency: order.order_currency,
+      confirmedAt: order.confirmed_at!,
+    };
+    const outcome = await applyPaidMembershipPlanUpgrade(env.D1_01, upgrade, line.order_line_id);
+    return { outcome, fulfilledCount: 1 };
+  }
 
   const periodStart = order.confirmed_at!;
   let periodEnd: string;
