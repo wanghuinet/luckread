@@ -309,11 +309,21 @@ try {
       })
 
       for (const user of [primary, foreign]) {
+        const preLogoutCookie = user.jar.header()
         const logout = await request('POST', '/v1/auth/logout', { jar: user.jar })
-        check(`${user.label}_logout_cleanup`, logout.status === 204, {
+        const sessionCookieCleared = logout.setCookies.some((v) =>
+          /better-auth\\.session_token/i.test(v) && /max-age=0|expires=/i.test(v))
+        const revokedSession = await request('GET', '/v1/auth/session', {
+          headers: { cookie: preLogoutCookie },
+        })
+        check(`${user.label}_logout_cleanup`, logout.status === 204 &&
+          sessionCookieCleared && revokedSession.status === 401 &&
+          revokedSession.errorCode === 'UNAUTHENTICATED', {
           status: logout.status,
-          sessionCookieCleared: logout.setCookies.some((v) =>
-            /better-auth\.session_token/i.test(v) && /max-age=0|expires=/i.test(v)),
+          sessionCookieCleared,
+          oldSessionRejected: revokedSession.status === 401 &&
+            revokedSession.errorCode === 'UNAUTHENTICATED',
+          oldSessionStatus: revokedSession.status,
         })
       }
       if (result.status === 'PENDING') result.status = result.checks.every((x) => x.pass) ? 'PASS' : 'FAIL'
