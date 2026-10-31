@@ -2858,6 +2858,21 @@
       "stateMachine": "none",
       "x-luckread-contract-status": "CONTRACTED_PARTIAL",
       "x-luckread-source": "contracts/api/commerce-operation-policy.v1.json"
+    },
+    {
+      "operationId": "startSubscriptionTrial",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "subscription.create"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": true,
+      "stateMachine": "subscription",
+      "x-luckread-contract-status": "CONTRACTED_PARTIAL",
+      "x-luckread-source": "contracts/api/commerce-operation-policy.v1.json"
     }
   ]
 }
