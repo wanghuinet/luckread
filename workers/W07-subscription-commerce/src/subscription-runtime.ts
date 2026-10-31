@@ -417,6 +417,7 @@ export async function listActiveMembershipPlans(
   const hasMore = candidates.length > safeLimit
   const page = candidates.slice(0, safeLimit)
   const docs = page.map((row) => {
+    const trialPeriodDays = row.trial_period_days === undefined || row.trial_period_days === null ? 0 : row.trial_period_days;
     let benefits: unknown
     try {
       benefits = JSON.parse(row.benefits_json) as unknown
@@ -436,7 +437,7 @@ export async function listActiveMembershipPlans(
       !Number.isSafeInteger(row.current_version) || row.current_version < 1 ||
       !Number.isSafeInteger(row.price_minor) || row.price_minor < 0 || row.price_minor > 2_147_483_647 ||
       !/^[A-Z]{3}$/.test(row.currency) ||
-      !Number.isSafeInteger(row.trial_period_days) || row.trial_period_days < 0 || row.trial_period_days > 30 ||
+      !Number.isSafeInteger(trialPeriodDays) || trialPeriodDays < 0 || trialPeriodDays > 30 ||
       (row.billing_interval !== 'MONTHLY' && row.billing_interval !== 'YEARLY') ||
       !/^[a-z][a-z0-9_-]{0,63}$/.test(row.tier) ||
       typeof row.name !== 'string' || row.name.trim().length < 1 || row.name.length > 120
@@ -452,7 +453,7 @@ export async function listActiveMembershipPlans(
       billingInterval: row.billing_interval,
       priceMinor: row.price_minor,
       currency: row.currency,
-      trialPeriodDays: row.trial_period_days,
+      trialPeriodDays,
       benefits,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
@@ -545,6 +546,7 @@ const membershipPlanIdFromIdempotency = async (creatorId: string, idempotencyKey
 }
 
 const mapMembershipPlan = (row: MembershipPlanStoredRow, replayed?: boolean) => {
+  const trialPeriodDays = row.trial_period_days === undefined || row.trial_period_days === null ? 0 : row.trial_period_days;
   let benefits: unknown
   try {
     benefits = JSON.parse(row.benefits_json) as unknown
@@ -561,7 +563,7 @@ const mapMembershipPlan = (row: MembershipPlanStoredRow, replayed?: boolean) => 
     !Number.isSafeInteger(row.version) || row.version < 1 ||
     !Number.isSafeInteger(row.price_minor) || row.price_minor < 0 || row.price_minor > 2_147_483_647 ||
     !/^[A-Z]{3}$/.test(row.currency) ||
-    !Number.isSafeInteger(row.trial_period_days) || row.trial_period_days < 0 || row.trial_period_days > 30 ||
+    !Number.isSafeInteger(trialPeriodDays) || trialPeriodDays < 0 || trialPeriodDays > 30 ||
     (row.billing_interval !== 'MONTHLY' && row.billing_interval !== 'YEARLY') ||
     !/^[a-z][a-z0-9_-]{0,63}$/.test(row.tier) ||
     typeof row.name !== 'string' || row.name.trim().length < 1 || row.name.length > 120
@@ -578,7 +580,7 @@ const mapMembershipPlan = (row: MembershipPlanStoredRow, replayed?: boolean) => 
     priceMinor: row.price_minor,
     currency: row.currency,
     benefits,
-    trialPeriodDays: row.trial_period_days,
+    trialPeriodDays,
     status: row.status,
     visibility: row.visibility,
     version: row.version,
@@ -618,7 +620,7 @@ export async function createMembershipPlanDraft(
     if (
       existing.owner_id !== creatorId || existing.name !== plan.name || existing.tier !== plan.tier ||
       existing.billing_interval !== plan.billingInterval || existing.price_minor !== plan.priceMinor ||
-      existing.currency !== plan.currency || existing.benefits_json !== benefitsJson || existing.trial_period_days !== plan.trialPeriodDays
+      existing.currency !== plan.currency || existing.benefits_json !== benefitsJson || (existing.trial_period_days ?? 0) !== plan.trialPeriodDays
     ) throw new SubscriptionRuntimeError('CONFLICT', 409)
     // Return the immutable original create result, not current mutable plan state.
     return mapMembershipPlan({ ...existing, current_version: 1, status: 'DRAFT', visibility: 'PRIVATE', version: 1, updated_at: existing.created_at }, true)
@@ -646,7 +648,7 @@ export async function createMembershipPlanDraft(
     if (
       raced.owner_id !== creatorId || raced.name !== plan.name || raced.tier !== plan.tier ||
       raced.billing_interval !== plan.billingInterval || raced.price_minor !== plan.priceMinor ||
-      raced.currency !== plan.currency || raced.benefits_json !== benefitsJson || raced.trial_period_days !== plan.trialPeriodDays
+      raced.currency !== plan.currency || raced.benefits_json !== benefitsJson || (raced.trial_period_days ?? 0) !== plan.trialPeriodDays
     ) throw new SubscriptionRuntimeError('CONFLICT', 409)
     return mapMembershipPlan({ ...raced, current_version: 1, status: 'DRAFT', visibility: 'PRIVATE', version: 1, updated_at: raced.created_at }, true)
   }
@@ -813,7 +815,7 @@ export async function reviseMembershipPlan(
     row.price_minor === revision.priceMinor &&
     row.currency === revision.currency &&
     row.benefits_json === benefitsJson &&
-    row.trial_period_days === revision.trialPeriodDays
+    (row.trial_period_days ?? 0) === revision.trialPeriodDays
 
   if (current.version !== expectedVersion) {
     if (current.version === expectedVersion + 1 && current.current_version > 1 && matchesRevision(current)) {
