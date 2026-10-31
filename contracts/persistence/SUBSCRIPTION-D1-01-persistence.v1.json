@@ -21,7 +21,7 @@
   },
   "table": {
     "name": "membership_subscriptions",
-    "purpose": "Authoritative durable Subscription lifecycle state for Membership/Subscription access.",
+    "purpose": "Authoritative durable Subscription lifecycle state for Membership/Subscription access. Includes nullable immutable trial window metadata; TRIALING authorization remains period-bounded.",
     "primaryKey": "subscription_id",
     "columns": [
       {
@@ -96,6 +96,27 @@
         "fieldId": "ENT-SUBSCRIPTION-F-CURRENT-PERIOD-END"
       },
       {
+        "name": "trial_converted_at",
+        "type": "TEXT",
+        "nullable": true,
+        "primaryKey": false,
+        "fieldId": "ENT-SUBSCRIPTION-F-TRIAL-CONVERTED-AT"
+      },
+      {
+        "name": "trial_ends_at",
+        "type": "TEXT",
+        "nullable": true,
+        "primaryKey": false,
+        "fieldId": "ENT-SUBSCRIPTION-F-TRIAL-ENDS-AT"
+      },
+      {
+        "name": "trial_started_at",
+        "type": "TEXT",
+        "nullable": true,
+        "primaryKey": false,
+        "fieldId": "ENT-SUBSCRIPTION-F-TRIAL-STARTED-AT"
+      },
+      {
         "name": "cancel_at",
         "type": "TEXT",
         "nullable": true,
@@ -152,6 +173,27 @@
         "columns": [
           "updated_at"
         ]
+      },
+      {
+        "name": "ux_membership_subscriptions_trial_per_subscriber_creator",
+        "unique": true,
+        "partial": true,
+        "where": "trial_started_at IS NOT NULL",
+        "columns": [
+          "subscriber_id",
+          "creator_id"
+        ]
+      },
+      {
+        "name": "ix_membership_subscriptions_trial_end",
+        "unique": false,
+        "partial": true,
+        "where": "trial_started_at IS NOT NULL",
+        "columns": [
+          "status",
+          "trial_ends_at",
+          "subscription_id"
+        ]
       }
     ]
   },
@@ -181,11 +223,12 @@
   "migration": {
     "status": "PREPARED_NOT_APPLIED",
     "candidateMigration": "workers/W07-subscription-commerce/migrations/0002_subscription_version_cas.sql",
-    "rule": "The version-column migration is prepared as a reviewed code candidate only. A physical migration still requires exact artifact hash, read-only confirmation of the target and migration history, controlled target D1-01 execution and post-schema evidence. The paid upgrade attempt reservation is an auxiliary D1-01 workflow table with no financial fields; it remains PREPARED_NOT_APPLIED until exact target migration evidence is recorded. Scheduled downgrade requests add only future-dated lifecycle metadata to D1-01; the physical migration remains source-only until controlled target, migration-history and postflight evidence is admitted. Migration 0007 adds the typed DOWNGRADE/BILLING_INTERVAL_CHANGE discriminator to the scheduled-change metadata; it remains source-only until separately admitted and applied after 0006.",
+    "rule": "The version-column migration is prepared as a reviewed code candidate only. A physical migration still requires exact artifact hash, read-only confirmation of the target and migration history, controlled target D1-01 execution and post-schema evidence. The paid upgrade attempt reservation is an auxiliary D1-01 workflow table with no financial fields; it remains PREPARED_NOT_APPLIED until exact target migration evidence is recorded. Scheduled downgrade requests add only future-dated lifecycle metadata to D1-01; the physical migration remains source-only until controlled target, migration-history and postflight evidence is admitted. Migration 0007 adds the typed DOWNGRADE/BILLING_INTERVAL_CHANGE discriminator to the scheduled-change metadata; it remains source-only until separately admitted and applied after 0006. Migration 0008 adds immutable trial duration to membership_plan_versions and nullable trial lifecycle timestamps to membership_subscriptions, plus one-trial-per-subscriber/creator and trial-end indexes; it remains source-only until controlled D1-01 migration evidence is admitted.",
     "additionalMigrations": [
       "workers/W07-subscription-commerce/migrations/0005_membership_subscription_plan_change_attempts.sql",
       "workers/W07-subscription-commerce/migrations/0006_membership_subscription_scheduled_plan_changes.sql",
-      "workers/W07-subscription-commerce/migrations/0007_scheduled_plan_change_type.sql"
+      "workers/W07-subscription-commerce/migrations/0007_scheduled_plan_change_type.sql",
+      "workers/W07-subscription-commerce/migrations/0008_subscription_trial_lifecycle.sql"
     ]
   },
   "runtime": {
@@ -228,7 +271,16 @@
     "interval-change request requires opposite MONTHLY/YEARLY target interval with same creator and currency",
     "renewal cycle period-end is calculated from the immutable scheduled target plan billing interval and charge amount",
     "failed monthly/yearly interval-change renewal retains the current plan and original period while preserving the scheduled change for retry",
-    "signed successful renewal advances current_period_end by the scheduled target billing interval, atomically applies target plan version and records W06 D1-03 audit"
+    "signed successful renewal advances current_period_end by the scheduled target billing interval, atomically applies target plan version and records W06 D1-03 audit",
+    "schema inspection proving membership_plan_versions.trial_period_days is integer NOT NULL DEFAULT 0 with CHECK 0..30",
+    "schema inspection proving membership_subscriptions trial_started_at, trial_ends_at and trial_converted_at nullable columns and trial indexes",
+    "creator immutable plan version trialPeriodDays bounds 0..30 and idempotent plan revision evidence",
+    "one subscriber lifetime trial per creator uniqueness and active membership conflict evidence",
+    "trial start PENDING -> TRIALING after W06 immutable audit confirmation with no D1-04 order/payment creation",
+    "trial entitlement denied by period boundary when trial_ends_at has passed, including AWAITING_MANDATE",
+    "signed successful first MIT renewal sets trial_converted_at and transitions TRIALING -> ACTIVE by subscription version CAS and W06 audit",
+    "failed first paid renewal transitions TRIALING -> PAST_DUE without extending the trial period or granting entitlement",
+    "missing or revoked MIT mandate leaves renewal AWAITING_MANDATE and requires a verified customer-present payment-method consent flow"
   ],
   "promotionRule": "Remain CONTRACTED_NOT_VERIFIED until the physical binding, migration, runtime authority and Evidence Registry evidence are all admitted.",
   "additionalTables": [
