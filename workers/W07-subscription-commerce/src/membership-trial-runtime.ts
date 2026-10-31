@@ -731,13 +731,56 @@ export async function syncRevenueCatStoreTrialCandidates(
       continue;
     }
 
+    // After trial conversion, keep the same store-backed Subscription period
+    // aligned to RevenueCat renewals. The trial ledger remains CONVERTED; this
+    // is a paid-period read-model update in the existing D1-01 authority.
+    if (candidate.currentState === 'ACTIVE' && candidate.periodType !== 'TRIAL' &&
+        existing.status === 'CONVERTED' && subscription.status === 'ACTIVE') {
+      if (!candidate.effectiveExpiresAt) {
+        throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500);
+      }
+      const nextPeriodEnd = canonicalDate(candidate.effectiveExpiresAt);
+      const currentPeriodEndMs = Date.parse(subscription.current_period_end);
+      const nextPeriodEndMs = Date.parse(nextPeriodEnd);
+      if (nextPeriodEndMs > currentPeriodEndMs) {
+        const observedPurchaseAt = canonicalDate(candidate.purchaseDate);
+        const nextPeriodStart = Date.parse(observedPurchaseAt) > currentPeriodEndMs
+          ? observedPurchaseAt
+          : subscription.current_period_end;
+        if (nextPeriodEndMs <= Date.parse(nextPeriodStart)) {
+          throw new SubscriptionRuntimeError('INTEGRITY_VIOLATION', 500);
+        }
+        const cancelAt = candidate.unsubscribeDetectedAt ? nextPeriodEnd : subscription.cancel_at;
+        const updatedAt = new Date(Math.max(Date.now(), Date.parse(subscription.updated_at) + 1)).toISOString();
+        const result = await db.prepare(
+          "UPDATE membership_subscriptions SET current_period_start = ?, current_period_end = ?, " +
+          "cancel_at = ?, updated_at = ?, version = version + 1 " +
+          "WHERE subscription_id = ? AND subscriber_id = ? AND status = 'ACTIVE' AND version = ? " +
+          "AND current_period_end = ?",
+        ).bind(
+          nextPeriodStart, nextPeriodEnd, cancelAt, updatedAt,
+          subscription.subscription_id, subscriberId, subscription.version, subscription.current_period_end,
+        ).run();
+        if (Number(result.meta?.changes ?? 0) !== 1) throw new SubscriptionRuntimeError('PRECONDITION_FAILED', 412);
+      } else if (candidate.unsubscribeDetectedAt && subscription.cancel_at !== subscription.current_period_end) {
+        const updatedAt = new Date(Math.max(Date.now(), Date.parse(subscription.updated_at) + 1)).toISOString();
+        const result = await db.prepare(
+          "UPDATE membership_subscriptions SET cancel_at = current_period_end, updated_at = ?, version = version + 1 " +
+          "WHERE subscription_id = ? AND subscriber_id = ? AND status = 'ACTIVE' AND version = ? AND cancel_at IS NULL",
+        ).bind(updatedAt, subscription.subscription_id, subscriberId, subscription.version).run();
+        if (Number(result.meta?.changes ?? 0) !== 1) throw new SubscriptionRuntimeError('PRECONDITION_FAILED', 412);
+      }
+      unchanged += 1;
+      continue;
+    }
+
     if ((candidate.currentState === 'EXPIRED' || candidate.currentState === 'REFUNDED') &&
-        ['TRIALING','CANCELED','PAYMENT_FAILED'].includes(existing.status) &&
+        ['TRIALING','CANCELED','PAYMENT_FAILED','CONVERTED'].includes(existing.status) &&
         subscription.status !== 'EXPIRED') {
       const updatedAt = new Date(Math.max(Date.now(), Date.parse(subscription.updated_at) + 1)).toISOString();
       const result = await db.prepare(
         "UPDATE membership_subscriptions SET status = 'EXPIRED', updated_at = ?, version = version + 1 " +
-        "WHERE subscription_id = ? AND subscriber_id = ? AND status IN ('TRIALING','PAST_DUE') AND version = ?",
+        "WHERE subscription_id = ? AND subscriber_id = ? AND status IN ('TRIALING','PAST_DUE','ACTIVE') AND version = ?",
       ).bind(updatedAt, subscription.subscription_id, subscriberId, subscription.version).run();
       if (Number(result.meta?.changes ?? 0) !== 1) throw new SubscriptionRuntimeError('PRECONDITION_FAILED', 412);
       expired += 1;
