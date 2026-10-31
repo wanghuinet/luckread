@@ -219,7 +219,7 @@ export async function hasActiveCreatorMembership(
   try {
     row = await db.prepare(
       "SELECT subscription_id FROM membership_subscriptions " +
-      "WHERE subscriber_id = ? AND creator_id = ? AND status = 'ACTIVE' " +
+      "WHERE subscriber_id = ? AND creator_id = ? AND status IN ('ACTIVE','TRIALING') " +
       "AND current_period_start <= ? AND current_period_end > ? " +
       "AND (cancel_at IS NULL OR cancel_at > ?) " +
       "ORDER BY current_period_end DESC, subscription_id ASC LIMIT 1",
