@@ -163,7 +163,7 @@ const EXPECTED_TRIAL_COLUMNS = [
   ['source', 'TEXT', 1, 0],
   ['provider_app_id', 'TEXT', 0, 0],
   ['product_id', 'TEXT', 0, 0],
-  ['original_transaction_id', 'TEXT', 0, 0],
+  ['store_transaction_id', 'TEXT', 0, 0],
   ['started_at', 'TEXT', 1, 0],
   ['trial_ends_at', 'TEXT', 1, 0],
   ['status', 'TEXT', 1, 0],
