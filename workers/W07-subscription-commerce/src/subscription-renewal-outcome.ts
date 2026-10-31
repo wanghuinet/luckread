@@ -249,9 +249,9 @@ async function applySubscriptionUpdate(
           subscription.status, subscription.version, subscription.current_period_start,
           subscription.current_period_end, cycle.cycle_start,
           scheduledChange.changeId, scheduledChange.subscriptionId, scheduledChange.subscriberId,
+          scheduledChange.changeType,
           scheduledChange.expectedPlanId, scheduledChange.expectedPlanVersion,
           scheduledChange.targetPlanId, scheduledChange.targetPlanVersion, scheduledChange.effectiveAt,
-          scheduledChange.changeType,
         ),
         env.D1_01.prepare(
           "UPDATE membership_subscription_scheduled_plan_changes SET status = 'APPLIED', " +
@@ -366,13 +366,16 @@ export async function syncTerminalRenewalCycleToSubscription(
       return reconcile(env, cycle, 'SCHEDULED_PLAN_CHANGE_IDENTITY_MISMATCH', now);
     }
     const target = await readScheduledDowngradeTargetPlan(env.D1_01, scheduledChange);
-    const validScheduledChange = scheduledChange.changeType === 'DOWNGRADE'
+    const validScheduledChange = scheduledChange.status === 'APPLIED'
       ? target?.billingInterval === subscription.billing_interval &&
-        target.currency === subscription.currency && target.priceMinor < subscription.price_minor
-      : scheduledChange.changeType === 'BILLING_INTERVAL_CHANGE'
-        ? target?.billingInterval !== subscription.billing_interval &&
-          target.currency === subscription.currency
-        : false;
+        target.currency === subscription.currency
+      : scheduledChange.changeType === 'DOWNGRADE'
+        ? target?.billingInterval === subscription.billing_interval &&
+          target.currency === subscription.currency && target.priceMinor < subscription.price_minor
+        : scheduledChange.changeType === 'BILLING_INTERVAL_CHANGE'
+          ? target?.billingInterval !== subscription.billing_interval &&
+            target.currency === subscription.currency
+          : false;
     if (!target || target.creatorId !== subscription.creator_id ||
         target.billingInterval !== cycle.billing_interval || !validScheduledChange) {
       return reconcile(env, cycle, 'SCHEDULED_PLAN_TARGET_INVALID', now);
