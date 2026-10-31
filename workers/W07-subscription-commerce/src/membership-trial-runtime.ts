@@ -242,8 +242,7 @@ export async function startWebMembershipTrial(
   }
   const trialEndsAt = addTrialDays(startedAt, plan.trial_days);
   const requestHash = await digest(JSON.stringify({
-    version: 1, source: 'WEB', subscriberId, planId, planVersion: plan.current_version,
-    trialDays: plan.trial_days, startedAt,
+    version: 1, source: 'WEB', subscriberId, planId, idempotencyKey,
   }));
   const idempotencyDigest = await digest('membership-web-trial-v1\u0000' + subscriberId + '\u0000' + planId + '\u0000' + idempotencyKey);
   const subscriptionId = 'sub_' + idempotencyDigest;
@@ -438,17 +437,13 @@ export async function expireDueStoreMembershipTrials(
   let expired = 0;
   for (const row of rows) {
     const updatedAt = new Date(Math.max(Date.parse(nowIsoValue), Date.parse(row.subscription_updated_at) + 1)).toISOString();
-    const results = await db.batch([
-      db.prepare(
-        "UPDATE membership_subscriptions SET status = 'EXPIRED', updated_at = ?, version = version + 1 " +
-        "WHERE subscription_id = ? AND subscriber_id = ? AND status IN ('TRIALING','PAST_DUE') AND version = ?",
-      ).bind(updatedAt, row.subscription_id, row.subscriber_id, row.subscription_version),
-      db.prepare(
-        "UPDATE membership_subscription_trials SET status = 'EXPIRED', version = version + 1, updated_at = ? " +
-        "WHERE trial_id = ? AND subscriber_id = ? AND status = ? AND version = ?",
-      ).bind(updatedAt, row.trial_id, row.subscriber_id, row.trial_status, row.trial_version),
-    ]);
-    if (Number(results[0]?.meta?.changes ?? 0) === 1 && Number(results[1]?.meta?.changes ?? 0) === 1) expired += 1;
+    const result = await db.prepare(
+      "UPDATE membership_subscriptions SET status = 'EXPIRED', updated_at = ?, version = version + 1 " +
+      "WHERE subscription_id = ? AND subscriber_id = ? AND status IN ('TRIALING','PAST_DUE') AND version = ?",
+    ).bind(updatedAt, row.subscription_id, row.subscriber_id, row.subscription_version).run();
+    // The D1-01 AFTER UPDATE trigger transitions the linked trial record in the
+    // same database statement; do not race it with a second explicit update.
+    if (Number(result.meta?.changes ?? 0) === 1) expired += 1;
   }
   return { scanned: rows.length, expired };
 }
