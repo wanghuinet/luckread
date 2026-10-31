@@ -68,7 +68,7 @@ export class PaidMembershipPurchaseFulfillmentError extends Error {
   }
 }
 
-type FulfillmentEnv = Readonly<{ D1_01: D1Database; D1_04: D1Database }>;
+type FulfillmentEnv = Readonly<{ D1_01: D1Database; D1_04: D1Database; W06_GOVERNANCE?: Fetcher }>;
 type SubscriptionPlanUpgradeSnapshot = Readonly<{
   kind: 'PLAN_UPGRADE';
   attemptId: string;
@@ -476,6 +476,58 @@ async function markUpgradeReconciliation(
   }
 }
 
+async function auditAppliedSubscriptionPlanUpgrade(
+  env: FulfillmentEnv,
+  order: PaidOrderRow,
+  line: PaidOrderLineRow,
+  snapshot: MembershipOfferSnapshot,
+): Promise<boolean> {
+  const change = snapshot.subscriptionChange
+  if (!change || !env.W06_GOVERNANCE) return false
+  const eventId = 'evt_subscription_plan_upgraded_' + change.attemptId
+  const requestId = 'req_' + change.attemptId.slice('suca_'.length)
+  const payload = {
+    eventId,
+    attemptId: change.attemptId,
+    subscriberId: change.subscriberId,
+    subscriptionId: change.subscriptionId,
+    orderId: order.order_id,
+    fromPlanId: change.expectedPlanId,
+    fromPlanVersion: change.expectedPlanVersion,
+    toPlanId: change.targetPlanId,
+    toPlanVersion: change.targetPlanVersion,
+    expectedSubscriptionVersion: change.expectedSubscriptionVersion,
+    appliedSubscriptionVersion: change.expectedSubscriptionVersion + 1,
+    occurredAt: order.confirmed_at!,
+  }
+  try {
+    const response = await env.W06_GOVERNANCE.fetch(new Request(
+      'https://luckread-w06.internal/internal/audit-events/subscription-plan-upgraded',
+      {
+        method: 'POST',
+        headers: {
+          'X-LuckRead-Caller': 'W07',
+          'X-LuckRead-Transport-Version': '1.0',
+          'X-LuckRead-Correlation-Id': 'subscription-upgrade:' + change.attemptId,
+          'X-LuckRead-Request-Id': requestId,
+          'X-LuckRead-Principal-User-Id': change.subscriberId,
+          'content-type': 'application/json; charset=utf-8',
+        },
+        body: JSON.stringify(payload),
+      },
+    ))
+    const result: unknown = await response.json().catch((): null => null)
+    return (response.status === 200 || response.status === 201) &&
+      !!result && typeof result === 'object' && !Array.isArray(result) &&
+      (result as { eventId?: unknown }).eventId === eventId &&
+      (result as { action?: unknown }).action === 'subscription.plan_upgraded' &&
+      (result as { targetType?: unknown }).targetType === 'Subscription' &&
+      (result as { targetId?: unknown }).targetId === change.subscriptionId
+  } catch {
+    return false
+  }
+}
+
 function isAppliedUpgradeSubscription(
   subscription: UpgradeSubscriptionRow,
   change: SubscriptionPlanUpgradeSnapshot,
@@ -541,9 +593,12 @@ async function applyPaidSubscriptionPlanUpgrade(
   const attempt = await readUpgradeAttempt(env.D1_01, change.attemptId);
   if (!attempt) return { outcome: 'RECONCILIATION_REQUIRED', reasonCode: 'UPGRADE_ATTEMPT_NOT_FOUND' };
   if (attempt.status === 'APPLIED') {
-    return attempt.order_id === order.order_id
+    if (attempt.order_id !== order.order_id) {
+      return { outcome: 'RECONCILIATION_REQUIRED', reasonCode: 'UPGRADE_ATTEMPT_ORDER_MISMATCH' }
+    }
+    return await auditAppliedSubscriptionPlanUpgrade(env, order, line, snapshot)
       ? { outcome: 'ALREADY_APPLIED' }
-      : { outcome: 'RECONCILIATION_REQUIRED', reasonCode: 'UPGRADE_ATTEMPT_ORDER_MISMATCH' };
+      : { outcome: 'RECONCILIATION_REQUIRED', reasonCode: 'UPGRADE_AUDIT_PENDING' }
   }
 
   const mismatch =
@@ -580,9 +635,17 @@ async function applyPaidSubscriptionPlanUpgrade(
       env.D1_01, attempt, change, order.order_id, line.order_line_id, order.confirmed_at!,
       new Date(Math.max(Date.parse(subscription.updated_at) + 1, Date.parse(attempt.updated_at) + 1, Date.parse(order.confirmed_at!))).toISOString(),
     );
-    if (recovered) return { outcome: 'APPLIED' };
+    if (recovered) {
+      return await auditAppliedSubscriptionPlanUpgrade(env, order, line, snapshot)
+        ? { outcome: 'APPLIED' }
+        : { outcome: 'RECONCILIATION_REQUIRED', reasonCode: 'UPGRADE_AUDIT_PENDING' }
+    }
     const latest = await readUpgradeAttempt(env.D1_01, change.attemptId);
-    if (latest?.status === 'APPLIED' && latest.order_id === order.order_id) return { outcome: 'ALREADY_APPLIED' };
+    if (latest?.status === 'APPLIED' && latest.order_id === order.order_id) {
+      return await auditAppliedSubscriptionPlanUpgrade(env, order, line, snapshot)
+        ? { outcome: 'ALREADY_APPLIED' }
+        : { outcome: 'RECONCILIATION_REQUIRED', reasonCode: 'UPGRADE_AUDIT_PENDING' }
+    }
     return { outcome: 'RECONCILIATION_REQUIRED', reasonCode: 'UPGRADE_APPLIED_MARKER_RECOVERY_FAILED' };
   }
 
@@ -639,19 +702,25 @@ async function applyPaidSubscriptionPlanUpgrade(
       ),
     ]);
     if (Number(results[0]?.meta?.changes ?? 0) === 1 && Number(results[1]?.meta?.changes ?? 0) === 1) {
-      return { outcome: 'APPLIED' };
+      return await auditAppliedSubscriptionPlanUpgrade(env, order, line, snapshot)
+        ? { outcome: 'APPLIED' }
+        : { outcome: 'RECONCILIATION_REQUIRED', reasonCode: 'UPGRADE_AUDIT_PENDING' }
     }
   } catch {
     const latestAttempt = await readUpgradeAttempt(env.D1_01, change.attemptId);
     if (latestAttempt?.status === 'APPLIED' && latestAttempt.order_id === order.order_id) {
-      return { outcome: 'ALREADY_APPLIED' };
+      return await auditAppliedSubscriptionPlanUpgrade(env, order, line, snapshot)
+        ? { outcome: 'ALREADY_APPLIED' }
+        : { outcome: 'RECONCILIATION_REQUIRED', reasonCode: 'UPGRADE_AUDIT_PENDING' }
     }
     return failClosed() as never;
   }
 
   const latestAttempt = await readUpgradeAttempt(env.D1_01, change.attemptId);
   if (latestAttempt?.status === 'APPLIED' && latestAttempt.order_id === order.order_id) {
-    return { outcome: 'ALREADY_APPLIED' };
+    return await auditAppliedSubscriptionPlanUpgrade(env, order, line, snapshot)
+      ? { outcome: 'ALREADY_APPLIED' }
+      : { outcome: 'RECONCILIATION_REQUIRED', reasonCode: 'UPGRADE_AUDIT_PENDING' }
   }
   const latestSubscription = await readUpgradeSubscription(env.D1_01, change.subscriptionId, change.subscriberId);
   if (latestAttempt && latestSubscription &&
@@ -659,10 +728,16 @@ async function applyPaidSubscriptionPlanUpgrade(
     const recovered = await markUpgradeApplied(
       env.D1_01, latestAttempt, change, order.order_id, line.order_line_id, order.confirmed_at!, updatedAt,
     );
-    if (recovered) return { outcome: 'APPLIED' };
+    if (recovered) {
+      return await auditAppliedSubscriptionPlanUpgrade(env, order, line, snapshot)
+        ? { outcome: 'APPLIED' }
+        : { outcome: 'RECONCILIATION_REQUIRED', reasonCode: 'UPGRADE_AUDIT_PENDING' }
+    }
     const afterRecovery = await readUpgradeAttempt(env.D1_01, change.attemptId);
     if (afterRecovery?.status === 'APPLIED' && afterRecovery.order_id === order.order_id) {
-      return { outcome: 'ALREADY_APPLIED' };
+      return await auditAppliedSubscriptionPlanUpgrade(env, order, line, snapshot)
+        ? { outcome: 'ALREADY_APPLIED' }
+        : { outcome: 'RECONCILIATION_REQUIRED', reasonCode: 'UPGRADE_AUDIT_PENDING' }
     }
   }
 
