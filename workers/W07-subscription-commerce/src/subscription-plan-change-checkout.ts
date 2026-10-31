@@ -481,7 +481,7 @@ export async function createSubscriptionPlanUpgradeCheckout(
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         // Before migration 0006 no downgrade record can exist; preserve the #1446 upgrade path.
-        if (!/no such table:\\s*membership_subscription_scheduled_plan_changes/i.test(message)) throw error;
+        if (!/no such table:\s*membership_subscription_scheduled_plan_changes/i.test(message)) throw error;
         inserted = await env.D1_01.prepare(insertSql).bind(...insertValues).run();
       }
       if (Number(inserted.meta?.changes ?? 0) !== 1) {
