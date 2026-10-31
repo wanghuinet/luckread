@@ -131,7 +131,8 @@ function parseSnapshot(raw: string, line: PaidOrderLineRow, orderCurrency: strin
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return failClosed();
   const value = parsed as Record<string, unknown>;
   const benefits = value.benefits;
-  const chargedAmountMinor = value.chargedAmountMinor === undefined ? value.priceMinor : value.chargedAmountMinor;
+  const priceMinor = value.priceMinor;
+  const chargedAmountMinor = value.chargedAmountMinor === undefined ? priceMinor : value.chargedAmountMinor;
   let subscriptionChange: SubscriptionPlanUpgradeSnapshot | null = null;
   if (Object.prototype.hasOwnProperty.call(value, 'subscriptionChange')) {
     const rawChange = value.subscriptionChange;
@@ -176,9 +177,9 @@ function parseSnapshot(raw: string, line: PaidOrderLineRow, orderCurrency: strin
     typeof value.name !== 'string' || value.name.trim().length < 1 || value.name.length > 120 ||
     typeof value.tier !== 'string' || !/^[a-z][a-z0-9_-]{0,63}$/.test(value.tier) ||
     (value.billingInterval !== 'MONTHLY' && value.billingInterval !== 'YEARLY') ||
-    !safeMinor(value.priceMinor) || value.priceMinor < 1 ||
+    !safeMinor(priceMinor) || priceMinor < 1 ||
     !safeMinor(chargedAmountMinor) || chargedAmountMinor < 1 ||
-    chargedAmountMinor > value.priceMinor ||
+    chargedAmountMinor > priceMinor ||
     chargedAmountMinor !== line.unit_amount_minor ||
     value.currency !== orderCurrency ||
     !Array.isArray(benefits) || benefits.length > 20 ||
@@ -199,7 +200,7 @@ function parseSnapshot(raw: string, line: PaidOrderLineRow, orderCurrency: strin
     name: value.name,
     tier: value.tier,
     billingInterval: value.billingInterval,
-    priceMinor: value.priceMinor,
+    priceMinor,
     chargedAmountMinor,
     currency: value.currency,
     benefits: benefits as string[],
@@ -464,11 +465,12 @@ async function markUpgradeReconciliation(
   now: string,
 ): Promise<void> {
   if (attempt.status !== 'PENDING_PAYMENT') return;
+  const updatedAt = new Date(Math.max(Date.parse(attempt.updated_at) + 1, Date.parse(now))).toISOString();
   try {
     await db.prepare(
       "UPDATE membership_subscription_plan_change_attempts SET status = 'RECONCILIATION_REQUIRED', " +
       'updated_at = ?, version = version + 1 WHERE attempt_id = ? AND order_id = ? AND status = ?',
-    ).bind(now, attempt.attempt_id, attempt.order_id, 'PENDING_PAYMENT').run();
+    ).bind(updatedAt, attempt.attempt_id, attempt.order_id, 'PENDING_PAYMENT').run();
   } catch {
     return failClosed();
   }
@@ -491,10 +493,11 @@ async function markUpgradeApplied(
   attempt: UpgradeAttemptRow,
   change: SubscriptionPlanUpgradeSnapshot,
   orderId: string,
+  lineId: string,
   appliedAt: string,
   updatedAt: string,
 ): Promise<boolean> {
-  const entitlementRef = 'commerce-plan-upgrade:' + orderId;
+  const entitlementRef = 'commerce-plan-upgrade:' + orderId + ':line:' + lineId;
   try {
     const result = await db.prepare(
       "UPDATE membership_subscription_plan_change_attempts SET status = 'APPLIED', applied_at = ?, " +
@@ -508,7 +511,7 @@ async function markUpgradeApplied(
       attempt.attempt_id, change.subscriberId, change.subscriptionId, orderId,
       change.expectedSubscriptionVersion, change.targetPlanId, change.targetPlanVersion, appliedAt,
       change.subscriptionId, change.subscriberId, change.targetPlanId, change.targetPlanVersion,
-      change.expectedSubscriptionVersion + 1, entitlementRef + ':line:' + '',
+      change.expectedSubscriptionVersion + 1, entitlementRef,
     ).run();
     return Number(result.meta?.changes ?? 0) === 1;
   } catch {
@@ -572,8 +575,8 @@ async function applyPaidSubscriptionPlanUpgrade(
   const entitlementRef = 'commerce-plan-upgrade:' + order.order_id + ':line:' + line.order_line_id;
   if (isAppliedUpgradeSubscription(subscription, change, order.order_id, line.order_line_id)) {
     const recovered = await markUpgradeApplied(
-      env.D1_01, attempt, change, order.order_id, order.confirmed_at!,
-      new Date(Math.max(Date.parse(subscription.updated_at) + 1, Date.parse(order.confirmed_at!))).toISOString(),
+      env.D1_01, attempt, change, order.order_id, line.order_line_id, order.confirmed_at!,
+      new Date(Math.max(Date.parse(subscription.updated_at) + 1, Date.parse(attempt.updated_at) + 1, Date.parse(order.confirmed_at!))).toISOString(),
     );
     if (recovered) return { outcome: 'APPLIED' };
     const latest = await readUpgradeAttempt(env.D1_01, change.attemptId);
@@ -650,7 +653,7 @@ async function applyPaidSubscriptionPlanUpgrade(
   if (latestAttempt && latestSubscription &&
       isAppliedUpgradeSubscription(latestSubscription, change, order.order_id, line.order_line_id)) {
     const recovered = await markUpgradeApplied(
-      env.D1_01, latestAttempt, change, order.order_id, order.confirmed_at!, updatedAt,
+      env.D1_01, latestAttempt, change, order.order_id, line.order_line_id, order.confirmed_at!, updatedAt,
     );
     if (recovered) return { outcome: 'APPLIED' };
     const afterRecovery = await readUpgradeAttempt(env.D1_01, change.attemptId);
