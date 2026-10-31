@@ -404,6 +404,31 @@ describe('W06 runtime', () => {
       body: JSON.stringify(body),
     },
   )
+  const trialSubscriptionId = 'sub_' + 'c'.repeat(64)
+  const trialCancelRequestInput = {
+    eventId: 'evt_subscription_trial_cancel_request_' + 'a'.repeat(26),
+    phase: 'CANCEL_REQUESTED',
+    subscriptionId: trialSubscriptionId,
+    expectedVersion: 7,
+  }
+  const trialCancelAuditRequest = (
+    body: unknown,
+    requestId = 'req_trial_cancel_intent_1',
+    layer = 'L2',
+  ) => new Request('https://w06.internal/internal/audit-events/subscription-trial', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'X-LuckRead-Caller': 'W01',
+      'X-LuckRead-Transport-Version': '1.0',
+      'X-LuckRead-Principal-User-Id': 'buyer_user_001',
+      'X-LuckRead-Principal-Layer': layer,
+      'X-LuckRead-Correlation-Id': 'trial-cancel-intent-correlation',
+      'X-LuckRead-Request-Id': requestId,
+    },
+    body: JSON.stringify(body),
+  })
+
   const createPlanAuditDb = (writeSuccess = true) => {
     const rows = new Map<string, Record<string, unknown>>()
     const prepare = vi.fn((sql: string) => {
@@ -440,6 +465,66 @@ describe('W06 runtime', () => {
     })
     return { db: { prepare } as unknown as D1Database, prepare, rows }
   }
+
+  it('persists an owner-authorized trial cancellation intent as a durable W06 semantic request event', async () => {
+    const { db, rows, prepare } = createPlanAuditDb()
+    const runtime = await import('./index')
+    const response = await runtime.default.fetch(
+      trialCancelAuditRequest(trialCancelRequestInput),
+      { D1_03: db },
+    )
+    expect(response.status).toBe(201)
+    expect(await response.json()).toMatchObject({
+      eventId: trialCancelRequestInput.eventId,
+      action: 'membership.subscription.trial_cancel_requested',
+      targetType: 'Subscription',
+      targetId: trialSubscriptionId,
+      replayed: false,
+    })
+    expect(prepare).toHaveBeenCalledTimes(2)
+    expect(rows.get(trialCancelRequestInput.eventId)).toMatchObject({
+      actor_json: JSON.stringify({ actorId: 'buyer_user_001', actorType: 'user', layer: 'L2' }),
+      action: 'membership.subscription.trial_cancel_requested',
+      target_type: 'Subscription',
+      target_id: trialSubscriptionId,
+      before_json: JSON.stringify({ status: 'TRIALING_OR_PAYMENT_FAILED', version: 7 }),
+      after_json: JSON.stringify({ cancellationRequested: true, expectedVersion: 7 }),
+    })
+  })
+
+  it('replays a trial cancellation intent with a new transport timestamp without duplicating or conflicting', async () => {
+    const { db, rows } = createPlanAuditDb()
+    const runtime = await import('./index')
+    const first = await runtime.default.fetch(
+      trialCancelAuditRequest(trialCancelRequestInput),
+      { D1_03: db },
+    )
+    const replay = await runtime.default.fetch(
+      trialCancelAuditRequest(trialCancelRequestInput, 'req_trial_cancel_retry'),
+      { D1_03: db },
+    )
+    expect(first.status).toBe(201)
+    expect(replay.status).toBe(200)
+    expect(await replay.json()).toMatchObject({
+      eventId: trialCancelRequestInput.eventId,
+      action: 'membership.subscription.trial_cancel_requested',
+      replayed: true,
+    })
+    expect(rows.size).toBe(1)
+  })
+
+  it('rejects a conflicting trial cancellation intent that reuses the same audit event identity', async () => {
+    const { db, rows } = createPlanAuditDb()
+    const runtime = await import('./index')
+    await runtime.default.fetch(trialCancelAuditRequest(trialCancelRequestInput), { D1_03: db })
+    const response = await runtime.default.fetch(
+      trialCancelAuditRequest({ ...trialCancelRequestInput, expectedVersion: 8 }),
+      { D1_03: db },
+    )
+    expect(response.status).toBe(409)
+    expect(await response.json()).toEqual({ error: 'AUDIT_EVENT_CONFLICT' })
+    expect(rows.size).toBe(1)
+  })
 
   it('requires the private W01 transport for membership-plan audit writes', async () => {
     const { db, prepare } = createPlanAuditDb()
