@@ -1345,9 +1345,12 @@ async function receiveHyperswitchMandateWebhook(
     };
   }
   if (stored.state === 'RECEIVED') throw new PaymentPersistenceError('SERVICE_UNAVAILABLE', 503);
+  const eventWasAccepted =
+    Number(batchResults[0]?.meta?.changes ?? 0) === 1 ||
+    Number(batchResults[1]?.meta?.changes ?? 0) === 1
   if (
     stored.state === 'APPLIED' &&
-    Number(batchResults[1]?.meta?.changes ?? 0) === 1 &&
+    eventWasAccepted &&
     Number(batchResults[updateReceiptIndex]?.meta?.changes ?? 0) === 1
   ) return resultFromProviderEvent(stored, payloadSha256, 'APPLIED');
   return resultFromProviderEvent(stored, payloadSha256, stored.state === 'APPLIED' ? 'DUPLICATE' : undefined);
