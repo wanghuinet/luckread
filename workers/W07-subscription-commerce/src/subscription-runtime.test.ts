@@ -895,7 +895,7 @@ describe('subscription runtime', () => {
   it('rejects a zero-price plan with trialDays and preserves zero-trial legacy defaults', () => {
     expect(normalizeMembershipPlanDraft({
       name: 'Free', tier: 'free', billingInterval: 'MONTHLY',
-      priceMinor: 0, currency: 'USD', benefits: [], trialDays: 14,
+      priceMinor: 0, currency: 'USD', benefits: [],
     })).toEqual(expect.objectContaining({ trialDays: 0 }))
     expect(() => normalizeMembershipPlanDraft({
       name: 'Free Trial', tier: 'free', billingInterval: 'MONTHLY',
