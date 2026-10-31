@@ -332,7 +332,8 @@ async function scheduleSubscriptionPlanChange(
     (expectedChangeType === 'DOWNGRADE'
       ? preview.targetPlan.billingInterval === preview.currentPlan.billingInterval &&
         preview.targetPlan.priceMinor < preview.currentPlan.priceMinor
-      : preview.targetPlan.billingInterval !== preview.currentPlan.billingInterval);
+      : preview.targetPlan.billingInterval !== preview.currentPlan.billingInterval &&
+        preview.targetPlan.tier === preview.currentPlan.tier);
   if (!previewMatches) {
     throw new SubscriptionRuntimeError('INVALID_STATE', 409);
   }
