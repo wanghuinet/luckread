@@ -131,11 +131,13 @@ const getContentBundle = cache(async (contentId: string): Promise<ContentBundle>
     content.author?.userId,
   ].filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
 
-  for (const ownerId of [...new Set(ownerIds)]) {
-    const author = await getPublicAuthorById(ownerId)
-    if (author?.username) return { content, author }
-  }
-  return { content, author: null }
+  const authors = await Promise.all(
+    [...new Set(ownerIds)].map((ownerId) => getPublicAuthorById(ownerId)),
+  )
+  const author = authors.find((candidate): candidate is PublicAuthor =>
+    Boolean(candidate?.username),
+  )
+  return { content, author: author ?? null }
 })
 
 const routeTypeForContent = (content: PublicContent, requested?: PublicContentRouteType): PublicContentRouteType => {
@@ -206,7 +208,7 @@ export async function renderCanonicalContentRoute(input: {
   const canonicalType = routeTypeForContent(content, input.routeType)
 
   if (
-    requestedUsername.toLowerCase() !== canonicalUsername.toLowerCase() ||
+    requestedUsername !== canonicalUsername ||
     input.routeType !== canonicalType ||
     input.contentId !== content.id
   ) permanentRedirect(canonical)
