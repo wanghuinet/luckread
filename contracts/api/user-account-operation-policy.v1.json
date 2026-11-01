@@ -317,10 +317,10 @@
       },
       "resource": {
         "class": "SINGLE_AUTHORITATIVE_WRITE",
-        "d1ReadMax": 1,
+        "d1ReadMax": 2,
         "d1WriteMax": 1,
         "d1ReadRowsMax": 2,
-        "d1WriteRowsMax": 2,
+        "d1WriteRowsMax": 3,
         "rpcMax": 0
       },
       "cache": {
@@ -360,14 +360,23 @@
         ]
       },
       "idempotency": {
-        "required": true
+        "required": true,
+        "key": "Idempotency-Key",
+        "fingerprint": "SHA-256(normalizedUsername + exact display value + If-Match)",
+        "durableResult": "auth_username_change_history",
+        "sameKeyDifferentIntent": "409 IDEMPOTENCY_KEY_REUSE_CONFLICT"
       },
       "security": [
         "uniqueness_atomic",
         "reserved_name_policy",
         "rename_cooldown",
         "audit_required",
-        "self_scope_only"
+        "self_scope_only",
+        "active_better_auth_session",
+        "historical_username_never_reused",
+        "idempotency_result_durable",
+        "username_version_optimistic_concurrency",
+        "display_name_unchanged"
       ],
       "evidence": {
         "openapi": "MISSING",
@@ -378,6 +387,20 @@
         "antiAbuse": "MISSING",
         "integration": "MISSING",
         "securityE2E": "MISSING"
+      },
+      "concurrency": {
+        "required": true,
+        "header": "If-Match",
+        "etag": "\"username-v{version}\"",
+        "initialVersion": 0,
+        "stale": "412 PRECONDITION_FAILED"
+      },
+      "usernamePolicy": {
+        "normalization": "trim -> Unicode NFC -> casefold",
+        "syntax": "ASCII alphanumeric, 6-32 characters",
+        "cooldownDays": 30,
+        "previousNames": "permanently unavailable for reuse",
+        "reservationPolicyRef": "contracts/security/username-reservation-policy.v1.json"
       }
     },
     {
