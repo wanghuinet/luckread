@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       source_sha:
-        description: Exact source commit containing W03 migrations 0001-0012 (leave blank to use this workflow revision)
+        description: Exact source commit containing W03 migrations 0001-0013 (leave blank to use this workflow revision)
         required: false
         default: ""
         type: string
@@ -75,12 +75,13 @@ jobs:
             '0010_collection_membership_ordering.sql',
             '0011_content_scheduled_publish.sql',
             '0012_content_snowflake_id_allocator.sql',
+            '0013_content_access_mode.sql',
           ];
           const actual = fs.readdirSync('workers/W03-content/migrations')
             .filter((name) => /^\d{4}_.+\.sql$/.test(name))
             .sort();
           if (JSON.stringify(actual) !== JSON.stringify(expected)) {
-            throw new Error('W03 migration chain differs from the reviewed 0001-0011 sequence: ' + JSON.stringify(actual));
+            throw new Error('W03 migration chain differs from the reviewed 0001-0013 sequence: ' + JSON.stringify(actual));
           }
           console.log(JSON.stringify({
             sourceSha: process.env.SOURCE_SHA,
@@ -110,8 +111,12 @@ jobs:
           for path in files:
               db.executescript(path.read_text())
           required = {
-              'contents': {'slug', 'scheduled_at', 'media_refs_json'},
-              'content_revisions': {'id', 'content_id', 'revision', 'slug', 'etag'},
+              'contents': {'id', 'content_type', 'owner_user_id', 'creator_id', 'ip_id', 'state',
+                  'version', 'revision', 'slug', 'scheduled_at', 'title', 'body_ref',
+                  'media_refs_json', 'cover_ref', 'etag', 'created_at', 'updated_at', 'access_mode'},
+              'content_revisions': {'id', 'content_id', 'revision', 'content_version', 'actor_user_id',
+                  'operation', 'state', 'slug', 'title', 'body_ref', 'media_refs_json',
+                  'cover_ref', 'etag', 'correlation_id', 'created_at', 'access_mode'},
               'content_relationships': {'relationship_id', 'relation_type', 'position'},
               'content_series': {'id', 'owner_user_id', 'state'},
               'content_collections': {'id', 'owner_user_id', 'state'},
@@ -125,7 +130,7 @@ jobs:
           allocator = db.execute('SELECT id, last_timestamp_ms, sequence FROM content_id_snowflake_state').fetchall()
           if allocator != [(1, -1, 4095)]:
               raise SystemExit(f'unexpected initial Snowflake allocator state: {allocator!r}')
-          print('W03_MIGRATIONS_0001_0012_STATIC=PASS')
+          print('W03_MIGRATIONS_0001_0013_STATIC=PASS')
           PY
 
       - name: Capture remote migration history and schema
@@ -197,6 +202,7 @@ jobs:
             '0010_collection_membership_ordering.sql',
             '0011_content_scheduled_publish.sql',
             '0012_content_snowflake_id_allocator.sql',
+            '0013_content_access_mode.sql',
           ];
           function rowsFrom(file) {
             const root = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -230,11 +236,14 @@ jobs:
           const tables = new Set(schemaRows.filter((row) => row.column_name === '__TABLE__').map((row) => row.table_name));
           const triggers = new Set(schemaRows.filter((row) => row.column_name === '__TRIGGER__').map((row) => row.table_name));
           const columns = (table) => new Set(schemaRows.filter((row) => row.table_name === table && !String(row.column_name).startsWith('__')).map((row) => row.column_name));
+          const hasAccessMode = columns('contents').has('access_mode') || columns('content_revisions').has('access_mode');
           const alreadyFullyMigrated = applied.length === expected.length;
           if (alreadyFullyMigrated) {
             const needed = {
-              contents: ['slug', 'scheduled_at'],
-              content_revisions: ['id', 'content_id', 'revision', 'slug', 'etag'],
+              contents: ['id','content_type','owner_user_id','creator_id','ip_id','state','version','revision',
+                'slug','scheduled_at','title','body_ref','media_refs_json','cover_ref','etag','created_at','updated_at','access_mode'],
+              content_revisions: ['id','content_id','revision','content_version','actor_user_id','operation','state',
+                'slug','title','body_ref','media_refs_json','cover_ref','etag','correlation_id','created_at','access_mode'],
               content_relationships: ['relationship_id', 'relation_type', 'position'],
               content_series: ['id', 'owner_user_id'],
               content_collections: ['id', 'owner_user_id'],
@@ -246,11 +255,10 @@ jobs:
             fs.appendFileSync(process.env.GITHUB_ENV, 'W03_MIGRATION_ACTION=none\n');
             fs.appendFileSync(process.env.GITHUB_OUTPUT, 'action=none\n');
           } else if (applied.length === 11) {
-            // Production D1-02 already has W03 migrations 0001-0011. Admit only
-            // migration 0012, and only when the schema exactly meets the reviewed
-            // post-0011 requirements and the allocator table is not unledgered.
+            // Production D1-02 has the reviewed W03 0001-0011 prefix. Admit
+            // migrations 0012-0013 only when the post-0011 schema is exact.
             const needed = {
-              contents: ['id','content_type','owner_user_id','creator_id','state','version','revision','slug','scheduled_at','title','body_ref','media_refs_json','etag','created_at','updated_at'],
+              contents: ['id','content_type','owner_user_id','creator_id','ip_id','state','version','revision','slug','scheduled_at','title','body_ref','media_refs_json','cover_ref','etag','created_at','updated_at'],
               content_revisions: ['id','content_id','revision','content_version','actor_user_id','operation','state','slug','title','body_ref','media_refs_json','etag','correlation_id','created_at'],
               content_relationships: ['relationship_id','source_id','target_id','relation_type','position','status'],
               content_series: ['id','owner_user_id','creator_id','state'],
@@ -260,9 +268,34 @@ jobs:
               !tables.has(table) ? [table + ' table'] : names.filter((name) => !columns(table).has(name)).map((name) => table + '.' + name));
             const missingBaselineTables = ['contents','content_mutation_idempotency','content_outbox_events','content_txn_guard'].filter((table) => !tables.has(table));
             const missingBaselineTriggers = ['contents_after_insert_outbox','contents_after_update_outbox'].filter((trigger) => !triggers.has(trigger));
-            if (missing.length || missingBaselineTables.length || missingBaselineTriggers.length || tables.has('content_id_snowflake_state')) {
+            if (missing.length || missingBaselineTables.length || missingBaselineTriggers.length ||
+                tables.has('content_id_snowflake_state') || hasAccessMode) {
               throw new Error('Refusing remote mutation because live schema does not match the reviewed post-0011 state: ' +
-                JSON.stringify({missing,missingBaselineTables,missingBaselineTriggers,unrecordedAllocatorTable:tables.has('content_id_snowflake_state')}));
+                JSON.stringify({missing,missingBaselineTables,missingBaselineTriggers,
+                  unrecordedAllocatorTable:tables.has('content_id_snowflake_state'),hasAccessMode}));
+            }
+            fs.appendFileSync(process.env.GITHUB_ENV, 'W03_MIGRATION_ACTION=apply\n');
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, 'action=apply\n');
+          } else if (applied.length === 12) {
+            // The remote schema is at the reviewed post-0012 state. Migration
+            // 0013 adds default-PUBLIC access mode to contents and revisions.
+            const needed = {
+              contents: ['id','content_type','owner_user_id','creator_id','ip_id','state','version','revision',
+                'slug','scheduled_at','title','body_ref','media_refs_json','cover_ref','etag','created_at','updated_at'],
+              content_revisions: ['id','content_id','revision','content_version','actor_user_id','operation','state',
+                'slug','title','body_ref','media_refs_json','cover_ref','etag','correlation_id','created_at'],
+              content_relationships: ['relationship_id','source_id','target_id','relation_type','position','status'],
+              content_series: ['id','owner_user_id','creator_id','state'],
+              content_collections: ['id','owner_user_id','creator_id','state'],
+              content_id_snowflake_state: ['id','last_timestamp_ms','sequence'],
+            };
+            const missing = Object.entries(needed).flatMap(([table, names]) =>
+              !tables.has(table) ? [table + ' table'] : names.filter((name) => !columns(table).has(name)).map((name) => table + '.' + name));
+            const missingBaselineTables = ['contents','content_mutation_idempotency','content_outbox_events','content_txn_guard'].filter((table) => !tables.has(table));
+            const missingBaselineTriggers = ['contents_after_insert_outbox','contents_after_update_outbox'].filter((trigger) => !triggers.has(trigger));
+            if (missing.length || missingBaselineTables.length || missingBaselineTriggers.length || hasAccessMode) {
+              throw new Error('Refusing remote mutation because live schema does not match the reviewed post-0012 state: ' +
+                JSON.stringify({missing,missingBaselineTables,missingBaselineTriggers,hasAccessMode}));
             }
             fs.appendFileSync(process.env.GITHUB_ENV, 'W03_MIGRATION_ACTION=apply\n');
             fs.appendFileSync(process.env.GITHUB_OUTPUT, 'action=apply\n');
@@ -271,15 +304,15 @@ jobs:
             // whose W03 migration history is 0001-0002 or 0001-0003 only.
             // Any other partial/out-of-order history fails closed.
             if (![2, 3].includes(applied.length)) {
-              throw new Error('Refusing remote mutation: only W03 migrations 0001-0002, 0001-0003, or verified 0001-0011 with 0012 pending are admitted; current W03 history=' + JSON.stringify(applied));
+              throw new Error('Refusing remote mutation: only reviewed W03 migration prefixes 0001-0002, 0001-0003, 0001-0011, 0001-0012, or 0001-0013 are admitted; current W03 history=' + JSON.stringify(applied));
             }
             const missingTables = ['content_revisions','content_relationships','content_series','content_collections','content_id_snowflake_state'].filter((table) => tables.has(table));
             const contentCols = columns('contents');
-            const unexpectedColumns = ['slug','scheduled_at'].filter((name) => contentCols.has(name));
+            const unexpectedColumns = ['slug','scheduled_at','access_mode'].filter((name) => contentCols.has(name));
             if (!tables.has('contents') || !tables.has('content_mutation_idempotency') ||
                 !tables.has('content_outbox_events') || !tables.has('content_txn_guard') ||
                 !triggers.has('contents_after_insert_outbox') || !triggers.has('contents_after_update_outbox') ||
-                missingTables.length || unexpectedColumns.length) {
+                missingTables.length || unexpectedColumns.length || hasAccessMode) {
               throw new Error('Refusing remote mutation because live schema does not match the observed pre-0004 state: ' +
                 JSON.stringify({missingBaselineTables:['contents','content_mutation_idempotency','content_outbox_events','content_txn_guard'].filter((table) => !tables.has(table)),
                   missingBaselineTriggers:['contents_after_insert_outbox','contents_after_update_outbox'].filter((trigger) => !triggers.has(trigger)),
@@ -351,6 +384,7 @@ jobs:
             '0010_collection_membership_ordering.sql',
             '0011_content_scheduled_publish.sql',
             '0012_content_snowflake_id_allocator.sql',
+            '0013_content_access_mode.sql',
           ];
           function rowsFrom(file) {
             const root = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -379,8 +413,10 @@ jobs:
           const tables = new Set(rows.filter((row) => row.column_name === '__TABLE__').map((row) => row.table_name));
           const columns = (table) => new Set(rows.filter((row) => row.table_name === table && !String(row.column_name).startsWith('__')).map((row) => row.column_name));
           const requirements = {
-            contents: ['slug','scheduled_at','media_refs_json'],
-            content_revisions: ['id','content_id','revision','content_version','actor_user_id','operation','state','slug','title','body_ref','media_refs_json','etag','correlation_id','created_at'],
+            contents: ['id','content_type','owner_user_id','creator_id','ip_id','state','version','revision',
+              'slug','scheduled_at','title','body_ref','media_refs_json','cover_ref','etag','created_at','updated_at','access_mode'],
+            content_revisions: ['id','content_id','revision','content_version','actor_user_id','operation','state',
+              'slug','title','body_ref','media_refs_json','cover_ref','etag','correlation_id','created_at','access_mode'],
             content_relationships: ['relationship_id','source_id','target_id','relation_type','position','status'],
             content_series: ['id','owner_user_id','creator_id','state'],
             content_collections: ['id','owner_user_id','creator_id','state'],

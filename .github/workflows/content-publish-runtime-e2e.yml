@@ -149,8 +149,8 @@ jobs:
           const tables = new Set(rows.filter((row) => row.column_name === '__TABLE__').map((row) => row.table_name));
           const requiredTables = ['contents', 'content_revisions', 'content_mutation_idempotency', 'content_txn_guard'];
           const requirements = {
-            contents: ['id', 'content_type', 'owner_user_id', 'state', 'version', 'revision', 'slug', 'title', 'body_ref', 'media_refs_json', 'cover_ref', 'etag', 'created_at', 'updated_at'],
-            content_revisions: ['id', 'content_id', 'revision', 'content_version', 'actor_user_id', 'source_revision', 'operation', 'state', 'slug', 'title', 'body_ref', 'media_refs_json', 'cover_ref', 'etag', 'reason', 'correlation_id', 'created_at'],
+            contents: ['id', 'content_type', 'owner_user_id', 'creator_id', 'ip_id', 'state', 'version', 'revision', 'slug', 'title', 'body_ref', 'media_refs_json', 'cover_ref', 'etag', 'created_at', 'updated_at', 'scheduled_at', 'access_mode'],
+            content_revisions: ['id', 'content_id', 'revision', 'content_version', 'actor_user_id', 'source_revision', 'operation', 'state', 'slug', 'title', 'body_ref', 'media_refs_json', 'cover_ref', 'etag', 'reason', 'correlation_id', 'created_at', 'access_mode'],
             content_mutation_idempotency: ['id', 'owner_user_id', 'operation_id', 'idempotency_key', 'request_hash', 'status', 'response_status', 'response_json', 'created_at', 'expires_at'],
             content_txn_guard: ['id', 'successful'],
           };
