@@ -15,11 +15,11 @@ test('renewal scheduling runs only through the existing W10 durable Workflow', (
   assert.equal(w07.triggers?.crons, undefined, 'W07 must not own a direct Cron trigger');
   assert.equal(w07.queues, undefined, 'W07 must not bind a new or unrelated Queue');
   assert.equal(w07.vars?.MEMBERSHIP_RENEWAL_ENABLED, 'false', 'W07 activation must default off');
-  assert.doesNotMatch(w07Entry, /scheduled\\s*\\(controller:\\s*ScheduledController/, 'W07 must not expose a scheduled handler');
-  assert.match(w07Entry, /internal\\/renewals\\/w10\\/scheduled-batch/);
-  assert.match(w07Entry, /requireTransport\\(request, 'W10'\\)/);
-  assert.match(w07Entry, /MEMBERSHIP_RENEWAL_ENABLED !== 'true'/);
-  assert.match(w07Entry, /runRenewalScheduledBatch\\(env/);
+  assert.equal(w07Entry.includes('scheduled(controller:'), false, 'W07 must not expose a scheduled handler');
+  assert.equal(w07Entry.includes('/internal/renewals/w10/scheduled-batch'), true);
+  assert.equal(w07Entry.includes("requireTransport(request, 'W10')"), true);
+  assert.equal(w07Entry.includes("MEMBERSHIP_RENEWAL_ENABLED !== 'true'"), true);
+  assert.equal(w07Entry.includes('runRenewalScheduledBatch(env'), true);
 
   assert.equal(w10.name, 'luckread-w10', 'reuse the already-provisioned W10 Worker');
   assert.equal(w10.queues, undefined, 'the Workflow path must not create or reuse a Queue');
@@ -29,18 +29,18 @@ test('renewal scheduling runs only through the existing W10 durable Workflow', (
   assert.equal(w10.workflows?.length, 1);
   assert.equal(w10.workflows?.[0]?.class_name, 'MembershipRenewalWorkflow');
   assert.deepEqual(w10.workflows?.[0]?.schedules, ['* * * * *']);
-  assert.match(w10Entry, /MembershipRenewalWorkflow/);
-  assert.match(workflowRuntime, /backoff: 'exponential'/);
-  assert.match(workflowRuntime, /limit: 3/);
+  assert.equal(w10Entry.includes('MembershipRenewalWorkflow'), true);
+  assert.equal(workflowRuntime.includes("backoff: 'exponential'"), true);
+  assert.equal(workflowRuntime.includes('limit: 3'), true);
 });
 
 test('W07 internal renewal entrypoint remains non-public and sandbox/demo-only', () => {
   assert.equal(w07.workers_dev, false);
-  assert.match(w07Entry, /HYPERSWITCH_ENVIRONMENT/);
-  assert.match(w07Entry, /isDemoPricingEnabled\\(env.COMMERCE_PRICING_MODE, env.HYPERSWITCH_ENVIRONMENT\\)/);
-  assert.match(w07Entry, /taxjar-sandbox/);
-  assert.match(w07Entry, /synthetic/);
-  assert.match(workflowRuntime, /https:\\/\\/luckread-w07\\.internal\\/internal\\/renewals\\/w10\\/scheduled-batch/);
+  assert.equal(w07Entry.includes('HYPERSWITCH_ENVIRONMENT'), true);
+  assert.equal(w07Entry.includes('isDemoPricingEnabled(env.COMMERCE_PRICING_MODE, env.HYPERSWITCH_ENVIRONMENT)'), true);
+  assert.equal(w07Entry.includes('taxjar-sandbox'), true);
+  assert.equal(w07Entry.includes('synthetic'), true);
+  assert.equal(workflowRuntime.includes('https://luckread-w07.internal/internal/renewals/w10/scheduled-batch'), true);
 });
 
 test('no direct-W07 Cron deployment workflow is allowed', () => {
