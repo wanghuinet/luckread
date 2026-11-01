@@ -381,6 +381,7 @@ export async function listActiveMembershipPlans(
   db: D1Database,
   limit = 20,
   cursorValue: string | null = null,
+  creatorIdInput: string | null = null,
 ): Promise<{
   docs: Array<{
     planId: string
@@ -402,16 +403,20 @@ export async function listActiveMembershipPlans(
 }> {
   const safeLimit = Number.isSafeInteger(limit) ? Math.min(Math.max(limit, 1), 50) : 20
   const cursor = decodePlanListCursor(cursorValue)
+  const creatorId = creatorIdInput === null ? null : ensureId(creatorIdInput)
   const baseSql =
     'SELECT p.plan_id, p.owner_id, p.current_version, p.created_at, p.updated_at, ' +
     'v.name, v.tier, v.billing_interval, v.price_minor, v.currency, v.benefits_json, v.trial_period_days ' +
     'FROM membership_plans AS p ' +
     'INNER JOIN membership_plan_versions AS v ON v.plan_id = p.plan_id AND v.plan_version = p.current_version ' +
     "WHERE p.owner_type = 'CREATOR' AND p.status = 'ACTIVE' AND p.visibility = 'PUBLIC' "
+  const creatorFilterSql = creatorId ? 'AND p.owner_id = ? ' : ''
+  const creatorBindings = creatorId ? [creatorId] : []
   const statement = cursor
-    ? db.prepare(baseSql + 'AND (p.created_at < ? OR (p.created_at = ? AND p.plan_id < ?)) ORDER BY p.created_at DESC, p.plan_id DESC LIMIT ?')
-      .bind(cursor.createdAt, cursor.createdAt, cursor.planId, safeLimit + 1)
-    : db.prepare(baseSql + 'ORDER BY p.created_at DESC, p.plan_id DESC LIMIT ?').bind(safeLimit + 1)
+    ? db.prepare(baseSql + creatorFilterSql + 'AND (p.created_at < ? OR (p.created_at = ? AND p.plan_id < ?)) ORDER BY p.created_at DESC, p.plan_id DESC LIMIT ?')
+      .bind(...creatorBindings, cursor.createdAt, cursor.createdAt, cursor.planId, safeLimit + 1)
+    : db.prepare(baseSql + creatorFilterSql + 'ORDER BY p.created_at DESC, p.plan_id DESC LIMIT ?')
+      .bind(...creatorBindings, safeLimit + 1)
   const rows = await statement.all<ActiveMembershipPlanRow>()
   const candidates = rows.results ?? []
   const hasMore = candidates.length > safeLimit
