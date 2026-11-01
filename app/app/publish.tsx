@@ -439,7 +439,16 @@ export default function PublishScreen() {
         if (!result.response.ok) {
           throw new Error(apiFailureDiagnostic(result, 'Unable to save post changes.'));
         }
-        router.replace(('/?published=' + encodeURIComponent(contentId) + '&refresh=' + Date.now()) as never);
+        Alert.alert('保存成功', '你的动态修改已保存。', [
+          {
+            text: '查看动态',
+            onPress: () => router.replace(('/post/' + encodeURIComponent(contentId)) as never),
+          },
+          {
+            text: '完成',
+            onPress: () => router.replace(('/?published=' + encodeURIComponent(contentId) + '&refresh=' + Date.now()) as never),
+          },
+        ]);
         return;
       }
 
@@ -552,7 +561,18 @@ export default function PublishScreen() {
 
       submitAttemptRef.current = null;
       recordRef.current = null;
-      router.replace(('/?published=' + encodeURIComponent(draft.id) + '&refresh=' + Date.now()) as never);
+      const publishedId = draft.id;
+      setStatusMessage('发布成功');
+      Alert.alert('发布成功', '你的动态已发布，现在可以在公开信息流中查看。', [
+        {
+          text: '查看动态',
+          onPress: () => router.replace(('/post/' + encodeURIComponent(publishedId)) as never),
+        },
+        {
+          text: '完成',
+          onPress: () => router.replace(('/?published=' + encodeURIComponent(publishedId) + '&refresh=' + Date.now()) as never),
+        },
+      ]);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Publishing failed. Please retry.');
       setStatusMessage('');
