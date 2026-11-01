@@ -1723,7 +1723,7 @@ export async function transitionContentState(
   ifMatch: string,
   idempotencyKey: string,
   now = new Date(),
-  options: { scheduledAt?: string | null; preflight?: unknown } = {},
+  options: { scheduledAt?: string | null; preflight?: unknown; verifiedCreatorId?: string } = {},
 ): Promise<{ from: ContentState; to: ContentState; version: number; etag: string; scheduledAt?: string | null }> {
   assertResourceId(principalUserId)
   assertResourceId(contentId)
@@ -1758,6 +1758,11 @@ export async function transitionContentState(
     return replay.body as { from: ContentState; to: ContentState; version: number; etag: string }
   }
   if (!content) throw new ContentRuntimeError('NOT_FOUND', 404)
+
+  if ((to === 'PUBLISHED' || to === 'SCHEDULED') && content.accessMode === 'MEMBERS_ONLY' &&
+      (!options.verifiedCreatorId || options.verifiedCreatorId !== content.creatorId)) {
+    throw new ContentRuntimeError('PERMISSION_DENIED', 403)
+  }
 
   assertEtag(content.etag, ifMatch)
   const ownsContent = content.ownerUserId === principalUserId
