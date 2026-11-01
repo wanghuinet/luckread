@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 import { fetchJson, getApiErrorMessage } from '../../../../lib/client-api.js'
+import { buildPublicContentHref } from '../../../../lib/public-content-url.js'
 import { usePublicLocale } from '../../i18n/PublicLanguageToggle'
 import TwitterCloneSecondaryPageLayout from '../../../(twitter-clone)/TwitterCloneSecondaryPageLayout'
 import TwitterCloneProfileHeader from './TwitterCloneProfileHeader'
@@ -616,7 +617,12 @@ export default function PublicProfilePage({
           : []
 
   function getContentHref(item: PublicContent) {
-    return '/content/' + encodeURIComponent(item.slug || item.id)
+    return buildPublicContentHref({
+      id: item.id,
+      slug: item.slug,
+      contentType: item.contentType,
+      authorUsername: profile?.username,
+    })
   }
 
   return (
