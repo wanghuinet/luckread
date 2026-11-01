@@ -638,7 +638,7 @@ export default function SubscriptionChangeScreen() {
 
         {message ? (
           <View className="mx-4 mt-4 rounded-xl border border-sky-200 bg-sky-50 p-3 dark:border-sky-900 dark:bg-sky-950/30">
-            <Text accessibilityRole="status" className="text-sm leading-6 text-sky-800 dark:text-sky-200">{message}</Text>
+            <Text accessibilityLiveRegion="polite" className="text-sm leading-6 text-sky-800 dark:text-sky-200">{message}</Text>
           </View>
         ) : null}
 
