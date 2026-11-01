@@ -7,6 +7,10 @@ type UsernameRedirectResponse = {
 }
 
 export async function middleware(request: NextRequest): Promise<Response> {
+  // Redirect only browser-safe navigation requests. Do not rewrite Server Actions
+  // or other POST requests that may target a canonical content page.
+  if (request.method !== 'GET' && request.method !== 'HEAD') return NextResponse.next()
+
   const route = parseUsernameRoutePath(request.nextUrl.pathname)
   if (!route) return NextResponse.next()
 
