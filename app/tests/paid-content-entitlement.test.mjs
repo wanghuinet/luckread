@@ -88,6 +88,7 @@ test('connects the paywall detail CTA to creator plans and returns through W03 e
     new URL('../app/(drawer)/(tabs)/(index,search,messages,grok,video,notifications)/post/[id].tsx', import.meta.url),
     'utf8',
   );
+  const composer = readFileSync(new URL('../app/publish.tsx', import.meta.url), 'utf8');
   const plans = readFileSync(new URL('../app/(drawer)/membership-plans.tsx', import.meta.url), 'utf8');
   const feedItem = readFileSync(new URL('../components/FeedItem.tsx', import.meta.url), 'utf8');
 
@@ -98,6 +99,11 @@ test('connects the paywall detail CTA to creator plans and returns through W03 e
   expect(detail).toContain("returnTo: '/post/' + postId");
   expect(detail).toContain('查看创作者会员方案');
   expect(detail).toContain('membershipRequired ? undefined : handleScrollToComments');
+
+  expect(composer).toContain("setAccessMode('MEMBERS_ONLY')");
+  expect(composer).toContain("originalAccessModeRef.current === 'MEMBERS_ONLY'");
+  expect(composer).toContain('accessMode, pollEnabled');
+  expect(composer).toContain('仅通过服务端创作者身份验证的账号可以发布会员专享内容');
 
   expect(plans).toContain('useLocalSearchParams');
   expect(plans).toContain('creatorId,');
