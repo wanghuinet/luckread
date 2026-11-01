@@ -193,7 +193,7 @@ export const Users: CollectionConfig = {
       required: true,
       unique: true,
       index: true,
-      validate: (value) => normalizeUsernameRedirectHandle(value) ? true : 'Invalid username',
+      validate: (value: unknown) => normalizeUsernameRedirectHandle(value) ? true : 'Invalid username',
     },
     { name: 'displayName', type: 'text' },
     { name: 'bio', type: 'textarea' },
