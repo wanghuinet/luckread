@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from 'vitest';
 import { resolveDemoCommercePricing } from './demo-commerce-pricing-resolver.js';
 import type { ResolvedCommerceOrderItems } from './order-item-resolution.js';
 import type { AuthoritativelyPricedOrder } from './order-persistence.js';
-import type { SubscriptionRuntimeError } from './subscription-runtime.js';
 
 const d1 = { marker: 'D1-01' } as unknown as D1Database;
 const input = { items: [{ itemRef: 'plan_' + 'a'.repeat(64), quantity: 1 }] };
@@ -71,7 +70,7 @@ describe('shared Demo commerce pricing resolver', () => {
       env({ HYPERSWITCH_ENVIRONMENT: 'production' }),
       input,
       { resolveItems, applyTaxJar },
-    )).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE' } satisfies Partial<SubscriptionRuntimeError>);
+    )).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE' });
 
     expect(resolveItems).not.toHaveBeenCalled();
     expect(applyTaxJar).not.toHaveBeenCalled();
