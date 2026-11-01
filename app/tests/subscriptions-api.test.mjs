@@ -172,7 +172,7 @@ test('revokes a saved payment method through the dedicated payment-method resour
   await revokeSavedPaymentMethod('spm_' + 'a'.repeat(26), 'revoke_attempt_1');
   expect(calls).toHaveLength(1);
   expect(calls[0]?.path).toBe('/payment-methods/' + 'spm_' + 'a'.repeat(26));
-  expect(calls[0]?.options.method).toBe('POST');
+  expect(calls[0]?.options.method).toBe('DELETE');
   expect(calls[0]?.options.idempotencyKey).toBe('revoke_attempt_1');
 });
 
