@@ -160,7 +160,7 @@ function resolveMediaUrl(value: unknown): string | null {
   }
 }
 
-/** Resolve a media reference for native image/video views without leaking auth off-origin. */
+/** Resolve native media and send sessions only to API or first-party W01 delivery origins. */
 export function resolveNativeMediaSource(
   value: unknown,
   sessionToken?: string | null,
@@ -171,7 +171,10 @@ export function resolveNativeMediaSource(
 
   try {
     const baseOrigin = new URL(getApiBaseUrl()).origin;
-    if (new URL(uri).origin !== baseOrigin) return { uri };
+    const target = new URL(uri);
+    const trustedMediaDeliveryHost = target.protocol === 'https:' &&
+      ['img.luckread.com', 'video.luckread.com'].includes(target.hostname);
+    if (target.origin !== baseOrigin && !trustedMediaDeliveryHost) return { uri };
     return { uri, headers: { Authorization: 'Bearer ' + sessionToken } };
   } catch {
     return { uri };
