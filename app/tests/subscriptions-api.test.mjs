@@ -151,7 +151,7 @@ test('rejects invalid order and plan identifiers before making a mutation', () =
   expect(() => createMembershipOrder('plan_invalid')).toThrow('valid published membership plan ID');
   expect(() => createMembershipPaymentIntent('ord_invalid/other')).toThrow('valid membership order ID');
   expect(() => fetchMySubscription('invalid_subscription')).toThrow('valid subscription ID');
-  expect(() => fetchSubscriptionPlanChangePreview('sub_invalid', 'plan_invalid')).toThrow('valid subscription ID');
+  expect(() => fetchSubscriptionPlanChangePreview('invalid_sub_id', 'plan_invalid')).toThrow('valid subscription ID');
   expect(() => createSubscriptionPlanUpgradeCheckout('sub_' + 'a'.repeat(64), 'plan_invalid', '"lr-v1"', 'key_1'))
     .toThrow('valid published membership plan ID');
   expect(() => scheduleSubscriptionPlanDowngrade('sub_' + 'a'.repeat(64), 'plan_' + 'b'.repeat(64), 'bad-etag', 'key_1'))
