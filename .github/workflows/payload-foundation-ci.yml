@@ -65,7 +65,7 @@ jobs:
         run: node ../../scripts/w01-remote-migration-admission.mjs --check-state
 
       - name: Generate local-only username redirect migration candidate
-        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.number == 1481 }}
+        if: ${{ (github.event_name == 'pull_request' && github.event.pull_request.number == 1481) || (github.event_name == 'push' && github.ref == 'refs/heads/feature/unified-username-301-redirects') }}
         working-directory: workers/W01-payload
         env:
           NODE_ENV: development
@@ -75,9 +75,9 @@ jobs:
           set -euo pipefail
           artifact_dir="../../artifacts/evidence/w01-username-redirect-migration-generation"
           mkdir -p "$artifact_dir"
-          find src/migrations -maxdepth 1 -type f -printf '%f\\n' | sort > "$artifact_dir/before-files.txt"
+          find src/migrations -maxdepth 1 -type f -printf '%f\n' | sort > "$artifact_dir/before-files.txt"
           pnpm exec payload migrate:create username_redirects --force-accept-warning
-          find src/migrations -maxdepth 1 -type f -printf '%f\\n' | sort > "$artifact_dir/after-files.txt"
+          find src/migrations -maxdepth 1 -type f -printf '%f\n' | sort > "$artifact_dir/after-files.txt"
           comm -13 "$artifact_dir/before-files.txt" "$artifact_dir/after-files.txt" > "$artifact_dir/generated-files.txt"
           if [ ! -s "$artifact_dir/generated-files.txt" ]; then
             echo "Payload did not produce a migration candidate"
@@ -90,7 +90,7 @@ jobs:
           git status --short -- src/migrations > "$artifact_dir/worktree-status.txt"
 
       - name: Upload local-only username redirect migration candidate
-        if: ${{ always() && github.event_name == 'pull_request' && github.event.pull_request.number == 1481 }}
+        if: ${{ always() && ((github.event_name == 'pull_request' && github.event.pull_request.number == 1481) || (github.event_name == 'push' && github.ref == 'refs/heads/feature/unified-username-301-redirects')) }}
         uses: actions/upload-artifact@v4
         with:
           name: w01-username-redirect-migration-candidate-${{ github.run_id }}
