@@ -46,14 +46,15 @@ export async function POST(
     const preconditionError = requireStatePreconditions(request)
     if (preconditionError) return preconditionError
     const submitted = await request.json()
-    const boundSubmission = await bindPreflightToStoredPost(request, contentId, principal, submitted, errorResponse)
-    if (boundSubmission instanceof Response) return boundSubmission
+    const binding = await bindPreflightToStoredPost(request, contentId, principal, submitted, errorResponse)
+    if (binding instanceof Response) return binding
     const response = await callW03Content({
       request,
       pathname: `/internal/content/contents/${encodeURIComponent(contentId)}/state`,
       method: 'POST',
-      body: boundSubmission,
+      body: binding.body,
       principal,
+      verifiedCreatorId: binding.verifiedCreatorId,
     })
     if (response.ok) {
       await invalidatePublicContentComments(contentId)
