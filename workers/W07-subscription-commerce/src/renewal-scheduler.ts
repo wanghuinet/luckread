@@ -6,6 +6,7 @@ import {
   type RenewalRuntimeEnv,
   type RenewalScanResult,
   type RenewalProcessResult,
+  type RenewalRuntimeDependencies,
 } from './renewal-runtime.js';
 import {
   syncPendingRenewalOutcomes,
@@ -60,6 +61,8 @@ export type RenewalScheduledDependencies = Readonly<{
   syncPending?: typeof syncPendingRenewalOutcomes;
   scanDue?: typeof scanDueSubscriptionRenewals;
   processCycle?: typeof processSubscriptionRenewalCycle;
+  /** Reuse the admitted owning-domain price/tax resolver for each cycle. */
+  resolvePricing?: RenewalRuntimeDependencies['resolvePricing'];
 }>;
 
 async function readTableNames(db: D1Database, expected: readonly string[]): Promise<Set<string>> {
@@ -128,7 +131,9 @@ export async function runRenewalScheduledBatch(
 
   let dueScan: RenewalScanResult;
   try {
-    dueScan = await scanDue(env, { limit: MAX_CYCLES_PER_TICK });
+    dueScan = dependencies.resolvePricing
+      ? await scanDue(env, { limit: MAX_CYCLES_PER_TICK }, { resolvePricing: dependencies.resolvePricing })
+      : await scanDue(env, { limit: MAX_CYCLES_PER_TICK });
   } catch {
     return { status: 'PARTIAL', phase: 'DUE_SCAN' };
   }
@@ -137,7 +142,9 @@ export async function runRenewalScheduledBatch(
   let processFailures = 0;
   for (const cycleId of dueScan.cycleIds.slice(0, MAX_CYCLES_PER_TICK)) {
     try {
-      cycleResults.push(await processCycle(env, cycleId));
+      cycleResults.push(dependencies.resolvePricing
+        ? await processCycle(env, cycleId, { resolvePricing: dependencies.resolvePricing })
+        : await processCycle(env, cycleId));
     } catch (error) {
       processFailures += 1;
       console.error(JSON.stringify({
