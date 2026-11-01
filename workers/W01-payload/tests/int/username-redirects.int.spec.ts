@@ -1,4 +1,7 @@
-import { describe, expect, it } from 'vitest'
+import { NextRequest } from 'next/server'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+
+import { middleware } from '../../src/middleware'
 
 import {
   buildUsernameRedirectPathname,
@@ -36,3 +39,92 @@ describe('username 301 URL rules', () => {
     expect(parseUsernameRoutePath('/@bad%2Fhandle/post/42')).toBeNull()
   })
 })
+
+
+describe('username redirect middleware', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('issues a no-store 301 and preserves the complete content path and query', async () => {
+    const resolverFetch = vi.fn().mockResolvedValue(
+      Response.json({ targetUsername: 'HuiXin' }, { status: 200 }),
+    )
+    vi.stubGlobal('fetch', resolverFetch)
+
+    const response = await middleware(new NextRequest(
+      'https://luckread.com/@huihui/post/2116861177622433792?lang=zh-CN&view=full',
+    ))
+
+    expect(response.status).toBe(301)
+    expect(response.headers.get('location')).toBe(
+      'https://luckread.com/@HuiXin/post/2116861177622433792?lang=zh-CN&view=full',
+    )
+    expect(response.headers.get('cache-control')).toBe('no-store')
+    expect(resolverFetch).toHaveBeenCalledTimes(1)
+    const [resolverURL, options] = resolverFetch.mock.calls[0] as [URL, RequestInit]
+    expect(resolverURL.pathname).toBe('/api/v1/redirects/username/huihui')
+    expect(options.method).toBe('GET')
+    expect(options.cache).toBe('no-store')
+  })
+
+  it('preserves article, video, and short content IDs while replacing only the username', async () => {
+    for (const kind of ['article', 'video', 'short']) {
+      const resolverFetch = vi.fn().mockResolvedValue(
+        Response.json({ targetUsername: 'huixin' }, { status: 200 }),
+      )
+      vi.stubGlobal('fetch', resolverFetch)
+
+      const response = await middleware(new NextRequest(
+        'https://luckread.com/@huihui/' + kind + '/2116861177622433792',
+      ))
+
+      expect(response.status).toBe(301)
+      expect(new URL(response.headers.get('location') ?? '').pathname).toBe(
+        '/@huixin/' + kind + '/2116861177622433792',
+      )
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('does not invoke the resolver for POST requests', async () => {
+    const resolverFetch = vi.fn()
+    vi.stubGlobal('fetch', resolverFetch)
+
+    const response = await middleware(new NextRequest(
+      'https://luckread.com/@huihui/post/2116861177622433792',
+      { method: 'POST', body: 'server-action-payload' },
+    ))
+
+    expect(response.headers.get('x-middleware-next')).toBe('1')
+    expect(resolverFetch).not.toHaveBeenCalled()
+  })
+
+  it('passes through when no historical username redirect exists', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 404 })))
+
+    const response = await middleware(new NextRequest('https://luckread.com/@huihui'))
+
+    expect(response.headers.get('x-middleware-next')).toBe('1')
+  })
+
+  it('fails closed when the redirect resolver is unavailable', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('resolver unavailable')))
+
+    const response = await middleware(new NextRequest('https://luckread.com/@huihui/post/42'))
+
+    expect(response.status).toBe(503)
+    expect(response.headers.get('cache-control')).toBe('no-store')
+  })
+
+  it('does not redirect a username to itself', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
+      Response.json({ targetUsername: 'HUIHUI' }, { status: 200 }),
+    ))
+
+    const response = await middleware(new NextRequest('https://luckread.com/@huihui/video/42'))
+
+    expect(response.headers.get('x-middleware-next')).toBe('1')
+  })
+})
+
