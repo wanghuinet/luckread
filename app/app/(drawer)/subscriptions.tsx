@@ -29,6 +29,7 @@ const PRIMARY = '#1d9bf0';
 
 const STATUS_LABELS: Record<SubscriptionStatus, string> = {
   PENDING: '待处理',
+  TRIALING: '试用中',
   ACTIVE: '有效',
   PAST_DUE: '付款逾期',
   PAUSED: '已暂停',
@@ -38,6 +39,7 @@ const STATUS_LABELS: Record<SubscriptionStatus, string> = {
 
 const statusClasses: Record<SubscriptionStatus, string> = {
   PENDING: 'border-neutral-200 bg-neutral-50 text-neutral-700 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300',
+  TRIALING: 'border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-300',
   ACTIVE: 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300',
   PAST_DUE: 'border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300',
   PAUSED: 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300',
