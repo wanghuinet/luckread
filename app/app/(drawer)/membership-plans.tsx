@@ -140,18 +140,13 @@ function PlanCard({ item, onPurchase, busy }: {
 
 export default function MembershipPlansScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ creatorId?: string | string[] }>();
-  const rawCreatorId = Array.isArray(params.creatorId) ? params.creatorId[0] : params.creatorId;
-  const creatorId = typeof rawCreatorId === 'string' && /^[A-Za-z0-9][A-Za-z0-9_-]{0,255}$/.test(rawCreatorId)
-    ? rawCreatorId
-    : null;
-  const invalidCreatorFilter = rawCreatorId !== undefined && creatorId === null;
   const params = useLocalSearchParams<{ creatorId?: string | string[]; returnTo?: string | string[] }>();
   const rawCreatorId = Array.isArray(params.creatorId) ? params.creatorId[0] : params.creatorId;
   const creatorId = typeof rawCreatorId === 'string' &&
     /^[A-Za-z0-9][A-Za-z0-9_-]{0,255}$/.test(rawCreatorId)
     ? rawCreatorId
     : undefined;
+  const invalidCreatorFilter = rawCreatorId !== undefined && creatorId === undefined;
   const rawReturnTo = Array.isArray(params.returnTo) ? params.returnTo[0] : params.returnTo;
   const returnTo = typeof rawReturnTo === 'string' &&
     /^\/post\/[A-Za-z0-9][A-Za-z0-9_-]{0,255}$/.test(rawReturnTo)
@@ -206,9 +201,8 @@ export default function MembershipPlansScreen() {
       const result = await fetchActiveMembershipPlansPage({
         limit: PAGE_SIZE,
         cursor,
-        creatorId,
-        signal: controller.signal,
         creatorId: creatorId ?? undefined,
+        signal: controller.signal,
       });
       if (controller.signal.aborted) return;
       if (result.response.status === 401) {
@@ -250,7 +244,7 @@ export default function MembershipPlansScreen() {
         setRefreshing(false);
       }
     }
-  }, [authStatus, creatorId]);
+  }, [authStatus, creatorId, invalidCreatorFilter]);
 
   useEffect(() => {
     if (authStatus !== 'loading') void loadPage(null, false);
