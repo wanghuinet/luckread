@@ -16,7 +16,7 @@ export class MembershipRenewalWorkflow extends WorkflowEntrypoint<
     return runMembershipRenewalWorkflow(
       this.env,
       event.schedule,
-      (name, options, callback) => step.do(name, options, callback),
+      (name, options, callback) => step.do(name, options, callback) as Promise<unknown>,
     )
   }
 }
