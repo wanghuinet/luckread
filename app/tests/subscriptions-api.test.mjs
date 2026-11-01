@@ -35,6 +35,7 @@ test('pins Android Kotlin to the Hyperswitch and Expo SDK 52 compatible version'
   );
 
   expect(packageJson.dependencies['expo-build-properties']).toBe('~0.13.3');
+  expect(appConfig.expo.newArchEnabled).toBe(true);
   expect(buildProperties?.[1]?.android).toMatchObject({
     buildToolsVersion: '36.0.0',
     compileSdkVersion: 36,
