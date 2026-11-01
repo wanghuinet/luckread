@@ -91,7 +91,7 @@ const makeCreateContentDb = () => {
   return { db: db as never, batches, allocationCount: () => allocationCount }
 }
 
-describe('W03 Snowflake article/video content IDs', () => {
+describe('W03 Snowflake content IDs', () => {
   it('uses the 42-bit timestamp + 10-bit node + 12-bit sequence layout and exact decimal strings', () => {
     const timestampDeltaMs = 500_000_000_000
     const timestampMs = CONTENT_SNOWFLAKE_EPOCH_MS + timestampDeltaMs
@@ -148,7 +148,7 @@ describe('W03 Snowflake article/video content IDs', () => {
     )
   })
 
-  it('assigns Snowflake IDs only to articles/videos and leaves post IDs unchanged', async () => {
+  it('assigns Snowflake IDs to article, video, and post creation', async () => {
     const articleFake = makeCreateContentDb()
     const article = await createContent(
       articleFake.db,
@@ -184,8 +184,9 @@ describe('W03 Snowflake article/video content IDs', () => {
       new Date(nowMs),
       'snowflake-post-test',
     )
-    expect(post.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i)
-    expect(postFake.allocationCount()).toBe(0)
+    expect(post.id).toBe(encodeContentSnowflakeId(nowMs, 0))
+    expect(post.id).toMatch(/^\d{18,20}$/)
+    expect(postFake.allocationCount()).toBe(1)
   })
 
   it('defines the D1-02 single-row allocator table without rewriting legacy IDs', () => {
