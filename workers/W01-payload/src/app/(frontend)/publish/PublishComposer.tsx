@@ -1535,7 +1535,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
           </strong>
         </div>
       ) : null}
-      {(!isTweetModal || message === "正在上传媒体…") && message ? <div className={isTweetModal ? "mx-3.5 mb-2 mt-1 text-xs text-[#71767b]" : isXWorkspace ? "mx-4 my-2 text-sm text-main-accent" : "lr-success"} role="status">{message}</div> : null}
+      {message ? <div aria-live="polite" className={isTweetModal ? "mx-3.5 mb-2 mt-1 text-xs text-[#71767b]" : isXWorkspace ? "mx-4 my-2 text-sm text-main-accent" : "lr-success"} role="status">{message}</div> : null}
       {error ? <div className={isTweetModal ? "mx-3.5 mb-2 mt-1 text-xs text-[#f4212e]" : isXWorkspace ? "mx-4 my-2 text-sm text-red-600 dark:text-red-400" : "lr-error"} role="alert">{error}</div> : null}
 
       {preview ? (
