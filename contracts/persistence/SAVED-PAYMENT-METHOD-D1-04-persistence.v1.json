@@ -5,7 +5,8 @@
   "version": "1.0.0",
   "status": "CONTRACTED_NOT_VERIFIED",
   "featureIds": [
-    "PAY-001"
+    "PAY-001",
+    "PAY-003"
   ],
   "authoritativeDomain": "D1-04",
   "primaryWorker": "W07",
@@ -14,7 +15,15 @@
     "migrationDirectory": "migrations-d1-04",
     "migrationFile": "0003_saved_payment_methods_mandates.sql",
     "migrationId": "0003_saved_payment_methods_mandates",
-    "remoteApplied": false
+    "remoteApplied": false,
+    "extensionMigrationFile": "0007_payment_method_revocation_requests.sql",
+    "extensionMigrationId": "0007_payment_method_revocation_requests",
+    "extensionMigrationRequires": [
+      "0003_saved_payment_methods_mandates",
+      "0004_subscription_renewal_cycles",
+      "0005_revenuecat_webhook_inbox",
+      "0006_refunds_billing_documents"
+    ]
   },
   "tables": {
     "saved_payment_methods": {
@@ -221,6 +230,114 @@
         "Only signature-verified mandate_active/mandate_revoked events with matching merchant, provider mandate ID, payment method ID and status may update mandate state.",
         "Mandate webhook event IDs are durably deduplicated in payment_provider_events; stale timestamps, missing local identity, and forbidden reactivation are stored as reconciliation-required evidence.",
         "A revoked mandate cannot be reactivated by an out-of-order mandate_active event."
+      ]
+    },
+    "payment_method_revocation_requests": {
+      "purpose": "Durable one-way user request to stop future MIT charges and remove a saved Hyperswitch vault reference without rewriting provider mandate truth.",
+      "primaryKey": "revocation_request_id",
+      "columns": {
+        "revocation_request_id": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "immutable": true
+        },
+        "saved_payment_method_id": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "immutable": true
+        },
+        "payment_method_id": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "apiExposure": "NONE",
+          "immutable": true
+        },
+        "provider": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "allowedValues": [
+            "hyperswitch"
+          ],
+          "immutable": true
+        },
+        "merchant_id": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "apiExposure": "NONE",
+          "immutable": true
+        },
+        "customer_id": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "apiExposure": "NONE",
+          "immutable": true
+        },
+        "idempotency_key": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "sensitive": "REQUEST_DEDUPLICATION_KEY",
+          "immutable": true
+        },
+        "status": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "allowedValues": [
+            "REQUESTED",
+            "PENDING_PROVIDER",
+            "RECONCILIATION_REQUIRED",
+            "COMPLETED"
+          ],
+          "terminalStates": [
+            "COMPLETED"
+          ]
+        },
+        "provider_method_deleted_at": {
+          "type": "TEXT",
+          "required": false,
+          "nullable": true,
+          "immutableAfterSet": true
+        },
+        "version": {
+          "type": "INTEGER",
+          "required": true,
+          "nullable": false,
+          "optimisticConcurrency": true
+        },
+        "created_at": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false,
+          "immutable": true
+        },
+        "updated_at": {
+          "type": "TEXT",
+          "required": true,
+          "nullable": false
+        }
+      },
+      "invariants": [
+        "The saved method must belong to the same provider, merchant and authenticated customer.",
+        "A REQUESTED/PENDING_PROVIDER/RECONCILIATION_REQUIRED record blocks MIT renewal selection for the saved method.",
+        "The first revoke request inserts only the durable MIT block and commits one D1-04 write transaction; it returns 202 without provider I/O.",
+        "An exact or new-key replay reads the existing request, performs provider revoke/delete outside D1, then commits provider deletion acknowledgement in one separate D1-04 write transaction.",
+        "Each W07 public request is limited to one D1-04 write transaction; provider network calls never run inside a D1 transaction.",
+        "The request identity is immutable and one request exists per saved payment method.",
+        "Idempotency keys are unique per customer across saved methods; replay must use the exact original key, and a different key for the same removal is a conflict.",
+        "COMPLETED requires provider_method_deleted_at and all linked mandates in REVOKED, FAILED or EXPIRED state.",
+        "A provider revoke/delete API response does not rewrite payment_mandates.status; only signed mandate_revoked webhook evidence may do so.",
+        "Revocation requests are immutable in identity and retained for audit; status changes use version CAS."
+      ],
+      "uniqueConstraints": [
+        "UNIQUE(saved_payment_method_id)",
+        "UNIQUE(customer_id, idempotency_key)"
       ]
     }
   },

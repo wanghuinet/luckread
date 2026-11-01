@@ -397,6 +397,12 @@ type CommerceOrderAuditInput = {
   totalMinor: number
 }
 
+type PaymentMethodRevocationRequestAuditInput = {
+  eventId: string
+  savedPaymentMethodId: string
+  idempotencyKey: string
+}
+
 type SubscriptionPlanChangeRequestAuditInput = {
   eventId: string
   attemptId: string
@@ -668,6 +674,19 @@ function parseSubscriptionPlanChangeAppliedAuditInput(value: unknown): Subscript
   return { ...body, changeType } as SubscriptionPlanChangeAppliedAuditInput
 }
 
+
+function parsePaymentMethodRevocationRequestAuditInput(value: unknown): PaymentMethodRevocationRequestAuditInput {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('INVALID_PAYMENT_METHOD_REVOCATION_AUDIT')
+  const body = value as Record<string, unknown>
+  const allowed = new Set(['eventId', 'savedPaymentMethodId', 'idempotencyKey'])
+  if (Object.keys(body).length !== allowed.size || Object.keys(body).some((key) => !allowed.has(key)) ||
+      typeof body.eventId !== 'string' || !/^evt_pm_revoke_requested_[a-f0-9]{64}$/.test(body.eventId) ||
+      typeof body.savedPaymentMethodId !== 'string' || !/^spm_[A-Za-z0-9]{26}$/.test(body.savedPaymentMethodId) ||
+      typeof body.idempotencyKey !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(body.idempotencyKey)) {
+    throw new Error('INVALID_PAYMENT_METHOD_REVOCATION_AUDIT')
+  }
+  return body as PaymentMethodRevocationRequestAuditInput
+}
 
 function parseCommerceOrderAuditInput(value: unknown): CommerceOrderAuditInput {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('INVALID_COMMERCE_ORDER_AUDIT')
@@ -1334,6 +1353,30 @@ export default {
         occurredAt: input.occurredAt,
       }
       return persistImmutableAuditEvent(env, event)
+    }
+
+    if (request.method === 'POST' && url.pathname === '/internal/audit-events/payment-method-revocation-requested') {
+      let principal: ReturnType<typeof requireW01Transport>
+      try { principal = requireW01Transport(request) }
+      catch (error) { return errorResponse(error, request.headers.get('X-LuckRead-Request-Id')?.trim()) }
+      if (!/^L[2-8]$/.test(principal.layer)) return json({ error: 'PERMISSION_DENIED' }, 403)
+      let input: PaymentMethodRevocationRequestAuditInput
+      try { input = parsePaymentMethodRevocationRequestAuditInput(await readBoundedAuditJson(request, 1024)) }
+      catch { return json({ error: 'INVALID_PAYMENT_METHOD_REVOCATION_AUDIT' }, 400) }
+      if (request.headers.get('Idempotency-Key') !== input.idempotencyKey) return json({ error: 'IDEMPOTENCY_KEY_MISMATCH' }, 409)
+      const event: AuditEvent = {
+        eventId: input.eventId,
+        requestId: principal.requestId,
+        traceId: principal.correlationId,
+        actor: { actorId: principal.userId, actorType: 'user', layer: principal.layer as AuditEvent['actor']['layer'] },
+        action: 'payment_method.revocation_requested',
+        targetType: 'PaymentMethod',
+        targetId: input.savedPaymentMethodId,
+        before: {},
+        after: { operation: 'remove_saved_payment_method' },
+        occurredAt: new Date().toISOString(),
+      }
+      return persistMembershipPlanMutationRequestAudit(env, event)
     }
 
     if (request.method === 'POST' && url.pathname === '/internal/audit-events/membership-plan-created') {

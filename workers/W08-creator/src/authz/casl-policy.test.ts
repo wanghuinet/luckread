@@ -532,3 +532,33 @@ describe('CASL L0-L8 authorization policy', () => {
     }).decision).toBe('DENY')
   })
 })
+
+
+describe('saved payment method authorization', () => {
+  it('allows L2+ principals to manage only their own saved payment methods', () => {
+    for (const layer of ['L2', 'L3', 'L4', 'L7', 'L8'] as const) {
+      for (const action of ['payment_method.read.self', 'payment_method.revoke.self']) {
+        expect(evaluate({
+          layer,
+          action,
+          resourceType: 'PaymentMethod',
+          resourceAttributes: { ownerId: 'user-1' },
+        })).toMatchObject({ decision: 'ALLOW' });
+      }
+    }
+    for (const action of ['payment_method.read.self', 'payment_method.revoke.self']) {
+      expect(evaluate({
+        layer: 'L2',
+        action,
+        resourceType: 'PaymentMethod',
+        resourceAttributes: { ownerId: 'user-2' },
+      })).toMatchObject({ decision: 'DENY', reasonCode: 'PERMISSION_DENIED' });
+      expect(evaluate({
+        layer: 'L1',
+        action,
+        resourceType: 'PaymentMethod',
+        resourceAttributes: { ownerId: 'user-1' },
+      })).toMatchObject({ decision: 'DENY', reasonCode: 'PERMISSION_DENIED' });
+    }
+  });
+});

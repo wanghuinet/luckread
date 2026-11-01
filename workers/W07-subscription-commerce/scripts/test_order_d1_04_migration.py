@@ -13,6 +13,7 @@ SAVED_METHOD_MIGRATION = WORKER / "migrations-d1-04" / "0003_saved_payment_metho
 RENEWAL_MIGRATION = WORKER / "migrations-d1-04" / "0004_subscription_renewal_cycles.sql"
 REVENUECAT_WEBHOOK_MIGRATION = WORKER / "migrations-d1-04" / "0005_revenuecat_webhook_inbox.sql"
 REFUNDS_BILLING_MIGRATION = WORKER / "migrations-d1-04" / "0006_refunds_billing_documents.sql"
+PAYMENT_METHOD_REVOCATION_MIGRATION = WORKER / "migrations-d1-04" / "0007_payment_method_revocation_requests.sql"
 CONFIG = WORKER / "wrangler.jsonc"
 NOW = "2026-10-28T00:00:00.000Z"
 LATER = "2026-10-28T00:00:01.000Z"
@@ -27,6 +28,7 @@ class D104OrderMigrationTests(unittest.TestCase):
         cls.renewal_sql = RENEWAL_MIGRATION.read_text(encoding="utf-8")
         cls.revenuecat_webhook_sql = REVENUECAT_WEBHOOK_MIGRATION.read_text(encoding="utf-8")
         cls.refunds_billing_sql = REFUNDS_BILLING_MIGRATION.read_text(encoding="utf-8")
+        cls.payment_method_revocation_sql = PAYMENT_METHOD_REVOCATION_MIGRATION.read_text(encoding="utf-8")
         config = json.loads(CONFIG.read_text(encoding="utf-8"))
         bindings = {item["binding"]: item for item in config["d1_databases"]}
         if bindings["D1_01"]["migrations_dir"] != "migrations":
@@ -44,6 +46,7 @@ class D104OrderMigrationTests(unittest.TestCase):
         self.db.executescript(self.renewal_sql)
         self.db.executescript(self.revenuecat_webhook_sql)
         self.db.executescript(self.refunds_billing_sql)
+        self.db.executescript(self.payment_method_revocation_sql)
 
     def tearDown(self):
         self.db.close()
@@ -197,6 +200,7 @@ class D104OrderMigrationTests(unittest.TestCase):
             "payment_provider_event_conflicts", "saved_payment_methods", "payment_mandates",
             "subscription_renewal_cycles", "subscription_renewal_scheduler_state",
             "revenuecat_webhook_events", "revenuecat_webhook_event_conflicts", "refunds", "billing_documents",
+            "payment_method_revocation_requests",
         })
         indexes = {row[0] for row in self.db.execute("SELECT name FROM sqlite_master WHERE type='index' AND sql IS NOT NULL")}
         self.assertTrue({
@@ -214,6 +218,7 @@ class D104OrderMigrationTests(unittest.TestCase):
             "ix_revenuecat_webhook_events_state_received", "ix_revenuecat_webhook_events_user_received",
             "ix_revenuecat_webhook_conflicts_event", "ix_refunds_customer_created", "ix_refunds_payment_created",
             "ix_refunds_status_updated", "ix_billing_documents_customer_issued",
+            "ix_payment_method_revocation_status", "ux_payment_method_revocation_customer_idempotency",
         }.issubset(indexes))
         self.assertFalse(tables.intersection({"payment_intents", "ledger_entries", "entitlements"}))
         self.assertNotIn("client_secret", {r[1] for r in self.db.execute('PRAGMA table_info("payments")')})
@@ -226,6 +231,78 @@ class D104OrderMigrationTests(unittest.TestCase):
             self.assertEqual(self.db.execute(f'PRAGMA foreign_key_list("{table}")').fetchall(), [])
 
 
+
+    def test_payment_method_revocation_waits_for_mandate_and_provider_delete_confirmation(self):
+        self.order()
+        self.payment(status="succeeded", provider_updated_at=NOW)
+        self.provider_event(event_id="evt_method", event_type="payment_succeeded",
+                            payment_id="pay_" + "a"*26, state="RECEIVED")
+        saved_id = "spm_" + "s"*26
+        method_id = "pm_revocation_test"
+        self.db.execute(
+            """INSERT INTO saved_payment_methods(saved_payment_method_id,provider,merchant_id,customer_id,
+               payment_method_id,source_payment_id,source_event_id,created_at)
+               VALUES(?,?,?,?,?,?,?,?)""",
+            (saved_id, "hyperswitch", "merchant_1", "user_1", method_id,
+             "pay_" + "a"*26, "evt_method", NOW),
+        )
+        mandate_id = "mnd_" + "m"*26
+        self.db.execute(
+            """INSERT INTO payment_mandates(mandate_record_id,provider,merchant_id,customer_id,payment_method_id,
+               source_payment_id,source_event_id,consent_accepted_at,consent_acceptance_type,consent_scope,
+               consent_terms_version,provider_mandate_id,status,version,provider_updated_at,created_at,updated_at)
+               VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (mandate_id, "hyperswitch", "merchant_1", "user_1", method_id,
+             "pay_" + "a"*26, "evt_method", NOW, "online", "OFF_SESSION_RECURRING",
+             "luckread-recurring-consent-v1", "mandate_revocation_test",
+             "PENDING_PROVIDER_CONFIRMATION", 1, None, NOW, NOW),
+        )
+        self.db.execute(
+            "UPDATE payment_mandates SET status='ACTIVE',provider_updated_at=?,version=2,updated_at=? WHERE mandate_record_id=? AND version=1",
+            (LATER, LATER, mandate_id),
+        )
+        request_id = "pmr_" + "r"*26
+        self.db.execute(
+            """INSERT INTO payment_method_revocation_requests(revocation_request_id,saved_payment_method_id,
+               payment_method_id,provider,merchant_id,customer_id,idempotency_key,status,version,created_at,updated_at)
+               VALUES(?,?,?,?,?,?,?,?,1,?,?)""",
+            (request_id, saved_id, method_id, "hyperswitch", "merchant_1", "user_1",
+             "remove_saved_method_1", "REQUESTED", LATER, LATER),
+        )
+        self.db.execute(
+            "UPDATE payment_method_revocation_requests SET status='PENDING_PROVIDER',version=2,updated_at=? WHERE revocation_request_id=? AND version=1",
+            ("2026-10-28T00:00:02.000Z", request_id),
+        )
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                "UPDATE payment_method_revocation_requests SET status='COMPLETED',provider_method_deleted_at=?,version=3,updated_at=? WHERE revocation_request_id=? AND version=2",
+                ("2026-10-28T00:00:03.000Z", "2026-10-28T00:00:03.000Z", request_id),
+            )
+        self.db.execute(
+            "UPDATE payment_mandates SET status='REVOKED',provider_updated_at=?,version=3,updated_at=? WHERE mandate_record_id=? AND version=2",
+            ("2026-10-28T00:00:03.000Z", "2026-10-28T00:00:03.000Z", mandate_id),
+        )
+        self.db.execute(
+            "UPDATE payment_method_revocation_requests SET provider_method_deleted_at=?,version=3,updated_at=? WHERE revocation_request_id=? AND version=2",
+            ("2026-10-28T00:00:04.000Z", "2026-10-28T00:00:04.000Z", request_id),
+        )
+        self.db.execute(
+            "UPDATE payment_method_revocation_requests SET status='COMPLETED',version=4,updated_at=? WHERE revocation_request_id=? AND version=3",
+            ("2026-10-28T00:00:05.000Z", request_id),
+        )
+        self.assertEqual(self.db.execute(
+            "SELECT status,provider_method_deleted_at,version FROM payment_method_revocation_requests WHERE revocation_request_id=?",
+            (request_id,),
+        ).fetchone(), ("COMPLETED", "2026-10-28T00:00:04.000Z", 4))
+
+        self.provider_event(row_id="evtrow_replay", event_id="evt_replay",
+                            event_type="mandate_revoked", payment_id=None,
+                            state="RECONCILIATION_REQUIRED", processed=LATER,
+                            outcome="UNKNOWN_LOCAL_MANDATE")
+        self.db.execute(
+            "UPDATE payment_provider_events SET state='RECEIVED',processed_at=NULL,outcome_code=NULL WHERE event_id='evt_replay' AND state='RECONCILIATION_REQUIRED'"
+        )
+        self.assertEqual(self.db.execute("SELECT state FROM payment_provider_events WHERE event_id='evt_replay'").fetchone()[0], "RECEIVED")
 
     def test_refund_reservation_enforces_captured_amount_and_multiple_partial_refunds(self):
         self.order(status="PENDING_PAYMENT")

@@ -3553,6 +3553,123 @@ paths:
         default:
           description: Discovery-only operation; detailed response contract remains to be closed.
 
+  /payment-methods:
+    get:
+      tags: [Users]
+      summary: List saved payment methods for the current principal
+      operationId: getPaymentMethods
+      description: >
+        Returns only Hyperswitch payment methods that are also bound to a
+        server-verified successful payment and the authenticated customer.
+        Provider tokens, payment_method_id, mandate IDs, PAN and CVC are never exposed.
+      security:
+        - bearerAuth: []
+        - sessionCookieAuth: []
+      responses:
+        '200':
+          description: Saved payment method summaries owned by the current principal.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, requestId]
+                properties:
+                  data:
+                    type: object
+                    required: [docs]
+                    properties:
+                      docs:
+                        type: array
+                        maxItems: 100
+                        items:
+                          type: object
+                          additionalProperties: false
+                          required: [savedPaymentMethodId, paymentMethod, paymentMethodType, brand, last4, expiryMonth, expiryYear, createdAt, recurringEnabled, mandateStatus, status]
+                          properties:
+                            savedPaymentMethodId: { type: string, pattern: '^spm_[A-Za-z0-9]{26}$' }
+                            paymentMethod: { type: string }
+                            paymentMethodType: { type: [string, 'null'] }
+                            brand: { type: [string, 'null'] }
+                            last4: { type: [string, 'null'], pattern: '^[0-9]{4}$' }
+                            expiryMonth: { type: [string, 'null'], pattern: '^(0[1-9]|1[0-2])$' }
+                            expiryYear: { type: [string, 'null'], pattern: '^[0-9]{2,4}$' }
+                            createdAt: { type: string, format: date-time }
+                            recurringEnabled: { type: boolean }
+                            mandateStatus: { type: string, enum: [ACTIVE, PENDING_PROVIDER_CONFIRMATION, REVOKED, FAILED, EXPIRED, NONE] }
+                            status: { type: string, enum: [ACTIVE, SETUP_PENDING, NO_RECURRING, REVOCATION_PENDING] }
+                  requestId: { $ref: '#/components/schemas/RequestId' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /payment-methods/{savedPaymentMethodId}:
+    parameters:
+      - name: savedPaymentMethodId
+        in: path
+        required: true
+        schema: { type: string, pattern: '^spm_[A-Za-z0-9]{26}$' }
+    delete:
+      tags: [Users]
+      summary: Revoke and remove a saved payment method
+      operationId: deletePaymentMethodsSavedPaymentMethodId
+      description: >
+        Persists a durable revocation request before provider calls and
+        immediately prevents new merchant-initiated recurring charges from
+        selecting this method. A 202 response means Hyperswitch mandate or
+        signed webhook reconciliation is pending. Local mandate state is
+        finalized only by a signature-verified mandate_revoked webhook.
+      security:
+        - bearerAuth: []
+        - sessionCookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      responses:
+        '200':
+          description: The provider vault reference was deleted and every linked mandate is terminal.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [data, requestId]
+                properties:
+                  data:
+                    type: object
+                    additionalProperties: false
+                    required: [savedPaymentMethodId, status, replayed]
+                    properties:
+                      savedPaymentMethodId: { type: string, pattern: '^spm_[A-Za-z0-9]{26}$' }
+                      status: { type: string, const: REMOVED }
+                      replayed: { type: boolean }
+                  requestId: { $ref: '#/components/schemas/RequestId' }
+        '202':
+          description: Revocation accepted; new automatic charges remain blocked pending provider confirmation.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, requestId]
+                properties:
+                  data:
+                    type: object
+                    required: [savedPaymentMethodId, status, replayed]
+                    properties:
+                      savedPaymentMethodId: { type: string, pattern: '^spm_[A-Za-z0-9]{26}$' }
+                      status: { type: string, const: REVOCATION_PENDING }
+                      replayed: { type: boolean }
+                  requestId: { $ref: '#/components/schemas/RequestId' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: The original revocation key differs or was reused for another method.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        '428': { $ref: '#/components/responses/IdempotencyKeyRequired' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
   /payments/intents:
     post:
       tags: [Commerce]

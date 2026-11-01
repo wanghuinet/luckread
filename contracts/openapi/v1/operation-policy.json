@@ -376,6 +376,19 @@
       "stateMachine": "none"
     },
     {
+      "operationId": "deletePaymentMethodsSavedPaymentMethodId",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "payment_method.revoke.self"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": true,
+      "stateMachine": "none"
+    },
+    {
       "operationId": "unfollow",
       "auth": {
         "mode": "permission"
@@ -1194,6 +1207,19 @@
       },
       "permissions": [
         "organization.member.read"
+      ],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none"
+    },
+    {
+      "operationId": "getPaymentMethods",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "payment_method.read.self"
       ],
       "auditRequired": false,
       "optimisticLockRequired": false,

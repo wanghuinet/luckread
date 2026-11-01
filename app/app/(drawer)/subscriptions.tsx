@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Pressable,
   RefreshControl,
@@ -15,6 +16,9 @@ import { getApiErrorMessage } from '~/lib/api-client';
 import { unwrapApiData } from '~/lib/content-adapter';
 import {
   fetchMySubscriptionsPage,
+  fetchSavedPaymentMethods,
+  revokeSavedPaymentMethod,
+  type SavedPaymentMethod,
   type MySubscription,
   type MySubscriptionPage,
   type SubscriptionStatus,
@@ -131,6 +135,12 @@ export default function MySubscriptionsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [authRequired, setAuthRequired] = useState(false);
   const [error, setError] = useState('');
+  const [paymentMethods, setPaymentMethods] = useState<SavedPaymentMethod[]>([]);
+  const [paymentMethodsLoading, setPaymentMethodsLoading] = useState(true);
+  const [revokingPaymentMethodId, setRevokingPaymentMethodId] = useState<string | null>(null);
+  const paymentMethodRequestRef = useRef<AbortController | null>(null);
+  const paymentMethodIdempotencyKeys = useRef(new Map<string, string>());
+
   const requestRef = useRef<AbortController | null>(null);
 
   const openLogin = useCallback(() => {
@@ -202,10 +212,122 @@ export default function MySubscriptionsScreen() {
     }
   }, [authStatus]);
 
+  const loadPaymentMethods = useCallback(async () => {
+    if (authStatus === 'loading') return;
+    if (authStatus !== 'authenticated') {
+      setPaymentMethods([]);
+      setPaymentMethodsLoading(false);
+      return;
+    }
+    paymentMethodRequestRef.current?.abort();
+    const controller = new AbortController();
+    paymentMethodRequestRef.current = controller;
+    setPaymentMethodsLoading(true);
+    try {
+      const result = await fetchSavedPaymentMethods({ signal: controller.signal });
+      if (controller.signal.aborted) return;
+      if (result.response.status === 401) {
+        setAuthRequired(true);
+        setPaymentMethods([]);
+        return;
+      }
+      if (!result.response.ok) {
+        throw new Error(result.error?.message || getApiErrorMessage(
+          result.data,
+          '付款方式读取失败，请稍后重试。',
+          result.response.status,
+        ));
+      }
+      const payload = unwrapApiData<{ docs: SavedPaymentMethod[] }>(result.data);
+      if (!payload || !Array.isArray(payload.docs) || !payload.docs.every((item) =>
+        item && typeof item.savedPaymentMethodId === 'string' &&
+        /^spm_[A-Za-z0-9]{26}$/.test(item.savedPaymentMethodId) &&
+        typeof item.paymentMethod === 'string' &&
+        typeof item.status === 'string' &&
+        ['ACTIVE', 'SETUP_PENDING', 'NO_RECURRING', 'REVOCATION_PENDING'].includes(item.status)
+      )) {
+        throw new Error('付款方式服务返回的数据格式无效。');
+      }
+      setPaymentMethods(payload.docs);
+    } catch (cause) {
+      if (!controller.signal.aborted) {
+        setError(cause instanceof Error ? cause.message : '付款方式读取失败，请稍后重试。');
+      }
+    } finally {
+      if (paymentMethodRequestRef.current === controller) paymentMethodRequestRef.current = null;
+      if (!controller.signal.aborted) setPaymentMethodsLoading(false);
+    }
+  }, [authStatus]);
+
+  const confirmRevokePaymentMethod = useCallback((method: SavedPaymentMethod) => {
+    const label = method.brand
+      ? method.brand + (method.last4 ? ' •••• ' + method.last4 : '')
+      : '该付款方式';
+    Alert.alert(
+      '移除付款方式？',
+      '移除后会立即阻止新的自动续费扣款，并请求支付渠道撤销授权。已完成的付款不会退款；若支付渠道确认仍在处理中，页面会显示“撤销处理中”。\n\n' + label,
+      [
+        { text: '暂不移除', style: 'cancel' },
+        {
+          text: '确认移除',
+          style: 'destructive',
+          onPress: () => {
+            setRevokingPaymentMethodId(method.savedPaymentMethodId);
+            setError('');
+            void (async () => {
+              try {
+                const idempotencyKey = paymentMethodIdempotencyKeys.current.get(method.savedPaymentMethodId) ??
+                  'remove_' + method.savedPaymentMethodId;
+                paymentMethodIdempotencyKeys.current.set(method.savedPaymentMethodId, idempotencyKey);
+                let result = await revokeSavedPaymentMethod(method.savedPaymentMethodId, idempotencyKey);
+                // The first response confirms the D1-04 MIT block. Replay the
+                // same idempotent command once to perform provider-side revocation
+                // in a separate request/write-budget window.
+                const firstStage = result.response.status === 202
+                  ? unwrapApiData<{ replayed?: boolean }>(result.data)
+                  : null;
+                if (result.response.status === 202 && firstStage?.replayed === false) {
+                  result = await revokeSavedPaymentMethod(method.savedPaymentMethodId, idempotencyKey);
+                }
+                if (!result.response.ok) {
+                  throw new Error(result.error?.message || getApiErrorMessage(
+                    result.data,
+                    '付款方式移除失败，请稍后重试。',
+                    result.response.status,
+                  ));
+                }
+                await loadPaymentMethods();
+                if (result.response.status === 202) {
+                  Alert.alert('撤销处理中', '新的自动续费扣款已暂缓。收到 Hyperswitch 的签名确认事件后，请返回此页点击“重试移除”，完成支付渠道中的付款方式删除。');
+                } else {
+                  paymentMethodIdempotencyKeys.current.delete(method.savedPaymentMethodId);
+                  Alert.alert('已移除', '付款方式已从支付渠道确认移除。');
+                }
+              } catch (cause) {
+                setError(cause instanceof Error ? cause.message : '付款方式移除失败，请稍后重试。');
+                // The first request may already have committed the MIT block
+                // even when the provider replay failed; refresh authoritative state.
+                void loadPaymentMethods();
+              } finally {
+                setRevokingPaymentMethodId(null);
+              }
+            })();
+          },
+        },
+      ],
+    );
+  }, [loadPaymentMethods]);
+
   useEffect(() => {
-    if (authStatus !== 'loading') void loadPage(1, false);
-    return () => requestRef.current?.abort();
-  }, [authStatus, loadPage]);
+    if (authStatus !== 'loading') {
+      void loadPage(1, false);
+      void loadPaymentMethods();
+    }
+    return () => {
+      requestRef.current?.abort();
+      paymentMethodRequestRef.current?.abort();
+    };
+  }, [authStatus, loadPage, loadPaymentMethods]);
 
   if (authStatus === 'loading') {
     return (
@@ -272,8 +394,60 @@ export default function MySubscriptionsScreen() {
       <FlatList
         data={items}
         keyExtractor={(item) => item.subscriptionId}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void loadPage(1, false, true)} />}
+        refreshControl={<RefreshControl refreshing={refreshing || paymentMethodsLoading} onRefresh={() => {
+          void loadPage(1, false, true);
+          void loadPaymentMethods();
+        }} />}
         contentContainerStyle={{ paddingTop: 14, paddingBottom: 36, flexGrow: 1 }}
+        ListHeaderComponent={(
+          <View className="mx-4 mb-4 rounded-2xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-950">
+            <View className="flex-row items-center justify-between">
+              <Text className="text-base font-extrabold text-neutral-900 dark:text-white">已保存的付款方式</Text>
+              <Pressable accessibilityRole="button" onPress={() => void loadPaymentMethods()} disabled={paymentMethodsLoading}>
+                <Text className="text-xs font-bold text-sky-600">刷新</Text>
+              </Pressable>
+            </View>
+            <Text className="mt-1 text-xs leading-5 text-neutral-500 dark:text-neutral-400">
+              仅显示已完成付款并经服务器验证保存的付款方式。移除会暂缓新的自动续费扣款，不会自动退款。
+            </Text>
+            {paymentMethodsLoading ? (
+              <ActivityIndicator className="mt-4" color={PRIMARY} />
+            ) : paymentMethods.length === 0 ? (
+              <Text className="mt-4 text-sm text-neutral-500 dark:text-neutral-400">暂无已保存的付款方式</Text>
+            ) : paymentMethods.map((method) => (
+              <View key={method.savedPaymentMethodId} className="mt-3 flex-row items-center justify-between border-t border-neutral-100 pt-3 dark:border-neutral-800">
+                <View className="min-w-0 flex-1 pr-3">
+                  <Text className="text-sm font-bold text-neutral-900 dark:text-white">
+                    {method.brand || method.paymentMethod}
+                    {method.last4 ? ' •••• ' + method.last4 : ''}
+                  </Text>
+                  <Text className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+                    {method.status === 'REVOCATION_PENDING'
+                      ? '撤销处理中 · 自动扣款已暂缓'
+                      : method.status === 'ACTIVE'
+                        ? '自动续费授权有效'
+                        : method.status === 'SETUP_PENDING'
+                          ? '授权确认中'
+                          : '无有效自动续费授权'}
+                    {method.expiryMonth && method.expiryYear ? ' · 到期 ' + method.expiryMonth + '/' + method.expiryYear : ''}
+                  </Text>
+                </View>
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={revokingPaymentMethodId !== null}
+                  onPress={() => confirmRevokePaymentMethod(method)}
+                  className="rounded-full border border-rose-300 px-3 py-2 disabled:opacity-50 dark:border-rose-800"
+                >
+                  {revokingPaymentMethodId === method.savedPaymentMethodId
+                    ? <ActivityIndicator size="small" color={PRIMARY} />
+                    : <Text className="text-xs font-bold text-rose-700 dark:text-rose-300">
+                        {method.status === 'REVOCATION_PENDING' ? '重试移除' : '移除'}
+                      </Text>}
+                </Pressable>
+              </View>
+            ))}
+          </View>
+        )}
         renderItem={({ item }) => <SubscriptionCard item={item} />}
         ListEmptyComponent={(
           <View className="flex-1 items-center justify-center px-8 py-12">
