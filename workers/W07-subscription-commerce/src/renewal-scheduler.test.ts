@@ -117,6 +117,33 @@ describe('W07 renewal scheduler completion status', () => {
     expect(result.status).toBe('PARTIAL');
   });
 
+
+  it('supports a one-cycle cap for a durable W10 Workflow invocation', async () => {
+    const processed: string[] = []
+    let scanLimit = 0
+    const cycleA = 'rcy_' + 'a'.repeat(26)
+    const cycleB = 'rcy_' + 'b'.repeat(26)
+    const deps: RenewalScheduledDependencies = {
+      readTableNames: async (_db, expected) => new Set(expected),
+      syncPending: async () => cleanRecovery,
+      scanDue: async (_runtimeEnv, options): Promise<RenewalScanResult> => {
+        scanLimit = options?.limit ?? 0
+        return { scanned: 2, cycleIds: [cycleA, cycleB], cursorAdvanced: true, cursorReset: false }
+      },
+      processCycle: async (_runtimeEnv, cycleId): Promise<RenewalProcessResult> => {
+        processed.push(cycleId)
+        return { cycleId, state: 'PREPARED', action: 'PREPARED' }
+      },
+      maxCyclesPerBatch: 1,
+    }
+
+    const result = await runRenewalScheduledBatch(env, deps)
+
+    expect(result.status).toBe('COMPLETED')
+    expect(scanLimit).toBe(1)
+    expect(processed).toEqual([cycleA])
+  })
+
   it('reports PARTIAL when the post-scan outcome-sync pass still has retryable work', async () => {
     const result = await runRenewalScheduledBatch(env, dependencies({
       recoveryResults: [
