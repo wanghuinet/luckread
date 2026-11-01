@@ -222,7 +222,7 @@ jobs:
               echo '- Postflight: not completed; inspect the failed step before any retry.'
             fi
             echo '- Worker deployment: not performed by this workflow.'
-            echo '- Recurring renewal scheduling requires the existing W10 queue runtime and an admitted pricing/tax authority; this migration alone does not enable live charges.'
+            echo '- Recurring renewal scheduling requires an admitted W10 Queue or Workflow execution path and an admitted pricing/tax authority; this migration alone does not enable live charges.'
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload migration evidence
