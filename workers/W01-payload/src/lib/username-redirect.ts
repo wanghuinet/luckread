@@ -1,4 +1,4 @@
-const USERNAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/
+const USERNAME_PATTERN = /^[A-Za-z0-9]{6,32}$/
 
 export const normalizeUsernameRedirectHandle = (value: unknown): string | null => {
   if (typeof value !== 'string') return null

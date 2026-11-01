@@ -29,6 +29,9 @@ describe('username 301 URL rules', () => {
   it('does not redirect to itself and rejects invalid or encoded-slash handles', () => {
     expect(buildUsernameRedirectPathname('/@huihui/video/42', 'HUIHUI')).toBeNull()
     expect(normalizeUsernameRedirectHandle('@huihui')).toBeNull()
+    expect(normalizeUsernameRedirectHandle('short')).toBeNull()
+    expect(normalizeUsernameRedirectHandle('hu_i_hui')).toBeNull()
+    expect(normalizeUsernameRedirectHandle('hui-hui')).toBeNull()
     expect(normalizeUsernameRedirectHandle('hui hui')).toBeNull()
     expect(parseUsernameRoutePath('/@bad%2Fhandle/post/42')).toBeNull()
   })

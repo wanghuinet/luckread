@@ -728,7 +728,7 @@ export const invalidatePublicUserProfileByUsername = async (request: Request, us
 
 export const invalidatePublicUsernameRedirect = async (username: string): Promise<void> => {
   const normalizedUsername = username.trim().toLowerCase()
-  if (!/^[a-z0-9][a-z0-9_-]{0,127}$/.test(normalizedUsername)) return
+  if (!/^[a-z0-9]{6,32}$/.test(normalizedUsername)) return
   await invalidatePublicRoute(
     new Request('https://luckread.com'),
     'username-redirect',
