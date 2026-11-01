@@ -15,7 +15,7 @@ import { previewSubscriptionPlanChange } from './subscription-plan-change-previe
 import { createSubscriptionPlanUpgradeCheckout } from './subscription-plan-change-checkout.js'
 import { scheduleSubscriptionPlanDowngrade, scheduleSubscriptionBillingIntervalChange } from './subscription-plan-change-schedule.js'
 import { startSubscriptionTrial } from './subscription-trial-runtime.js'
-import { resolveDemoCommercePricing } from './demo-commerce-pricing-resolver.js'
+import { resolveDemoCommercePricing, resolveDemoRenewalPricing } from './demo-commerce-pricing-resolver.js'
 import { runRenewalScheduledBatch } from './renewal-scheduler.js'
 
 interface RateLimitBinding { limit(input: { key: string }): Promise<{ success: boolean }> }
@@ -196,7 +196,7 @@ export default {
         }
         const result = await runRenewalScheduledBatch(env, {
           maxCyclesPerBatch: 1,
-          resolvePricing: (pricingInput) => resolveDemoCommercePricing(env, pricingInput),
+          resolvePricing: (pricingInput) => resolveDemoRenewalPricing(env, pricingInput),
         })
         return json({ data: result, requestId: crypto.randomUUID() })
       }
