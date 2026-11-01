@@ -40,6 +40,7 @@ const providerPayment: HyperswitchPayment = {
   currency: 'USD',
   status: 'requires_payment_method',
   clientSecret: 'provider-client-secret-test',
+  sdkAuthorization: 'cHJvZmlsZV9pZD10ZXN0',
 };
 
 type RuntimeDependencies = NonNullable<Parameters<typeof handleCommercePaymentIntentRequest>[3]>;
@@ -174,6 +175,7 @@ describe('W07 internal payment-intent runtime', () => {
       status: 'requires_payment_method',
       version: 2,
       clientSecret: 'provider-client-secret-test',
+      sdkAuthorization: 'cHJvZmlsZV9pZD10ZXN0',
     });
     expect(body.data).not.toHaveProperty('apiKey');
     expect(body.data).not.toHaveProperty('merchantId');
@@ -245,6 +247,23 @@ describe('W07 internal payment-intent runtime', () => {
     expect(response?.status).toBe(503);
     expect(fixture.calls.recordIntent).toHaveLength(1);
     expect((await response!.text())).not.toContain('clientSecret');
+  });
+
+
+  it('does not claim native checkout readiness when Hyperswitch omits sdk_authorization', async () => {
+    const fixture = createFixture({
+      providerPayment: { ...providerPayment, sdkAuthorization: null },
+    });
+    const response = await handleCommercePaymentIntentRequest(
+      request({ idempotencyKey: CLIENT_IDEMPOTENCY_KEY }),
+      CUSTOMER_ID,
+      fixture.env,
+      fixture.dependencies,
+    );
+    expect(response?.status).toBe(503);
+    const body = await response!.text();
+    expect(body).not.toContain('sdkAuthorization');
+    expect(body).not.toContain('cHJvZmlsZV9pZD10ZXN0');
   });
 
   it('fails closed before creating a local payment attempt when provider config is missing', async () => {

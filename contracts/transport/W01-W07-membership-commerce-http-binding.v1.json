@@ -295,7 +295,7 @@
       "customerId": "Derived only from the W01 session principal; W07 independently verifies customer ownership against D1-04",
       "amountAndCurrency": "Read from the customer-owned Order and persisted payment attempt in W07 D1-04; never accepted from the browser",
       "pricingMode": "Demo mode is derived from the immutable server-owned OrderLine snapshot; demo orders are payable only against an explicitly configured Hyperswitch sandbox. Live mode requires the admitted production pricing/tax adapter.",
-      "provider": "Hyperswitch payment intent with customer_id and setup_future_usage=off_session; browser confirmation is handled only by the official hosted Payment Element",
+      "provider": "Hyperswitch payment intent with customer_id and setup_future_usage=off_session; Web confirmation uses the official hosted Payment Element and native confirmation uses the official React Native PaymentSession.",
       "consent": "Hyperswitch-hosted checkout must present its explicit save-method choice when supported. This operation does not persist mandate or consent facts; reusable-method storage remains gated on verified provider evidence and the following D1-04 module.",
       "responseFields": [
         "paymentId",
@@ -305,9 +305,10 @@
         "pricingMode",
         "status",
         "version",
-        "clientSecret"
+        "clientSecret",
+        "sdkAuthorization"
       ],
-      "responsePolicy": "Return only an unconfirmed, owner-matched intent and the scoped clientSecret needed by the hosted SDK. Cache-Control no-store; never return provider API keys or raw payment credentials.",
+      "responsePolicy": "Return only an unconfirmed, owner-matched intent and the scoped clientSecret required by the hosted Web Payment Element plus the short-lived sdkAuthorization required by the official native PaymentSession. Cache-Control no-store; never return provider API keys or raw payment credentials.",
       "failurePolicy": {
         "missingPrincipal": "401",
         "CASLDeny": "403",
@@ -316,7 +317,7 @@
         "keyReuseWithDifferentOrder": "409",
         "invalidProviderResponse": "503"
       },
-      "successRule": "W01 validates the bounded W07 response and order identity before returning the scoped SDK clientSecret. W07 D1-04 remains authoritative for payment attempts; neither client confirmation nor redirect grants subscription entitlement.",
+      "successRule": "W01 validates the bounded W07 response and order identity before returning the scoped clientSecret and native sdkAuthorization. W07 D1-04 remains authoritative for payment attempts; neither client confirmation, SDK result nor redirect grants subscription entitlement.",
       "cache": "NO_STORE",
       "topologyConstraints": {
         "newWorker": false,

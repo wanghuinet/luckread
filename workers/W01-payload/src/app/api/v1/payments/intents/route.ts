@@ -20,7 +20,7 @@ function validatePaymentIntentEnvelope(value: unknown, expectedOrderId: string):
       !Object.hasOwn(value, 'data') || !Object.hasOwn(value, 'requestId')) return false
   if (typeof value.requestId !== 'string' || !/^req_[A-Za-z0-9_-]{1,123}$/.test(value.requestId)) return false
   const data = value.data
-  if (!isRecord(data) || Object.keys(data).length !== 8) return false
+  if (!isRecord(data) || Object.keys(data).length !== 9) return false
   if (
     typeof data.paymentId !== 'string' || !/^pay_[a-f0-9]{26}$/.test(data.paymentId) ||
     data.orderId !== expectedOrderId ||
@@ -30,7 +30,9 @@ function validatePaymentIntentEnvelope(value: unknown, expectedOrderId: string):
     (data.status !== 'requires_payment_method' && data.status !== 'requires_confirmation') ||
     typeof data.version !== 'number' || !Number.isSafeInteger(data.version) || data.version < 1 ||
     typeof data.clientSecret !== 'string' || data.clientSecret.length < 1 || data.clientSecret.length > 4096 ||
-    data.clientSecret.trim() !== data.clientSecret || /[\u0000-\u001f\u007f]/.test(data.clientSecret)
+    data.clientSecret.trim() !== data.clientSecret || /[\u0000-\u001f\u007f]/.test(data.clientSecret) ||
+    typeof data.sdkAuthorization !== 'string' || data.sdkAuthorization.length < 1 || data.sdkAuthorization.length > 4096 ||
+    data.sdkAuthorization.trim() !== data.sdkAuthorization || /[\u0000-\u001f\u007f]/.test(data.sdkAuthorization)
   ) return false
   return true
 }

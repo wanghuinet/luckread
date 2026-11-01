@@ -14,11 +14,14 @@ import { useRouter } from 'expo-router';
 import { getApiErrorMessage } from '~/lib/api-client';
 import { unwrapApiData } from '~/lib/content-adapter';
 import {
+  createMembershipOrder,
+  createMembershipPaymentIntent,
   fetchActiveMembershipPlansPage,
   type ActiveMembershipPlan,
   type ActiveMembershipPlanPage,
 } from '~/lib/subscriptions-api';
 import { useAuthStore } from '~/store/auth-store';
+import { assertNativeHyperswitchConfigured, presentNativeMembershipPayment } from '~/lib/hyperswitch-payment';
 
 const PRIMARY = '#1d9bf0';
 const PAGE_SIZE = 20;
@@ -70,7 +73,11 @@ function formatPrice(priceMinor: number, currency: string): string {
   }
 }
 
-function PlanCard({ item }: { item: ActiveMembershipPlan }) {
+function PlanCard({ item, onPurchase, busy }: {
+  item: ActiveMembershipPlan;
+  onPurchase: (item: ActiveMembershipPlan) => void;
+  busy: boolean;
+}) {
   const interval = item.billingInterval === 'MONTHLY' ? '每月' : '每年';
   return (
     <View className="mx-4 mb-3 rounded-2xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-950">
@@ -110,6 +117,23 @@ function PlanCard({ item }: { item: ActiveMembershipPlan }) {
       ) : (
         <Text className="mt-4 text-sm text-neutral-500">该方案尚未填写具体权益说明。</Text>
       )}
+
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={'订阅 ' + item.name}
+        accessibilityState={{ disabled: busy || item.priceMinor === 0 }}
+        disabled={busy || item.priceMinor === 0}
+        onPress={() => onPurchase(item)}
+        className={'mt-5 min-h-11 items-center justify-center rounded-full px-5 py-3 ' +
+          (busy || item.priceMinor === 0 ? 'bg-neutral-300 dark:bg-neutral-800' : 'bg-sky-500')}
+      >
+        <Text className="font-bold text-white">
+          {busy ? '正在准备支付…' : item.priceMinor === 0 ? '免费方案暂未开放' : '订阅并付款'}
+        </Text>
+      </Pressable>
+      {item.priceMinor === 0 ? (
+        <Text className="mt-2 text-xs leading-5 text-neutral-500">免费方案需使用独立试用或零金额开通流程，当前不创建付费订单。</Text>
+      ) : null}
     </View>
   );
 }
@@ -125,6 +149,8 @@ export default function MembershipPlansScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [authRequired, setAuthRequired] = useState(false);
   const [error, setError] = useState('');
+  const [purchaseMessage, setPurchaseMessage] = useState('');
+  const [busyPlanId, setBusyPlanId] = useState<string | null>(null);
   const requestRef = useRef<AbortController | null>(null);
 
   const loadPage = useCallback(async (cursor: string | null, append: boolean, pullRefresh = false) => {
@@ -203,6 +229,94 @@ export default function MembershipPlansScreen() {
     router.push(('/login?returnTo=' + encodeURIComponent('/membership-plans')) as never);
   }, [router]);
 
+  const handlePurchase = useCallback(async (item: ActiveMembershipPlan) => {
+    if (authStatus !== 'authenticated') {
+      openLogin();
+      return;
+    }
+    if (item.priceMinor <= 0 || busyPlanId !== null) return;
+
+    setBusyPlanId(item.planId);
+    setPurchaseMessage('');
+    try {
+      // Fail before creating an order if the native provider SDK is not configured.
+      assertNativeHyperswitchConfigured();
+
+      const orderResult = await createMembershipOrder(item.planId);
+      if (!orderResult.response.ok) {
+        throw new Error(orderResult.error?.message || getApiErrorMessage(
+          orderResult.data,
+          '暂时无法创建会员订单，请稍后重试。',
+          orderResult.response.status,
+        ));
+      }
+      const order = unwrapApiData<unknown>(orderResult.data);
+      if (
+        !order || typeof order !== 'object' || Array.isArray(order) ||
+        typeof (order as Record<string, unknown>).orderId !== 'string' ||
+        !/^ord_[A-Za-z0-9_-]{1,90}$/.test((order as Record<string, unknown>).orderId as string) ||
+        (order as Record<string, unknown>).status !== 'CREATED' ||
+        typeof (order as Record<string, unknown>).totalMinor !== 'number' ||
+        !Number.isSafeInteger((order as Record<string, unknown>).totalMinor) ||
+        ((order as Record<string, unknown>).totalMinor as number) <= 0 ||
+        typeof (order as Record<string, unknown>).currency !== 'string' ||
+        !/^[A-Z]{3}$/.test((order as Record<string, unknown>).currency as string)
+      ) {
+        throw new Error('订单服务返回了无效的订单或金额信息，支付已停止。');
+      }
+      const orderData = order as {
+        orderId: string;
+        totalMinor: number;
+        currency: string;
+      };
+
+      const intentResult = await createMembershipPaymentIntent(orderData.orderId);
+      if (!intentResult.response.ok) {
+        throw new Error(intentResult.error?.message || getApiErrorMessage(
+          intentResult.data,
+          '暂时无法启动安全支付，请稍后重试。',
+          intentResult.response.status,
+        ));
+      }
+      const intent = unwrapApiData<unknown>(intentResult.data);
+      if (
+        !intent || typeof intent !== 'object' || Array.isArray(intent) ||
+        Object.keys(intent).length !== 9 ||
+        typeof (intent as Record<string, unknown>).paymentId !== 'string' ||
+        !/^pay_[a-f0-9]{26}$/.test((intent as Record<string, unknown>).paymentId as string) ||
+        (intent as Record<string, unknown>).orderId !== orderData.orderId ||
+        (intent as Record<string, unknown>).amountMinor !== orderData.totalMinor ||
+        (intent as Record<string, unknown>).currency !== orderData.currency ||
+        !['live', 'demo'].includes(String((intent as Record<string, unknown>).pricingMode)) ||
+        !['requires_payment_method', 'requires_confirmation'].includes(String((intent as Record<string, unknown>).status)) ||
+        typeof (intent as Record<string, unknown>).version !== 'number' ||
+        !Number.isSafeInteger((intent as Record<string, unknown>).version) ||
+        typeof (intent as Record<string, unknown>).clientSecret !== 'string' ||
+        typeof (intent as Record<string, unknown>).sdkAuthorization !== 'string' ||
+        ((intent as Record<string, unknown>).sdkAuthorization as string).length < 1 ||
+        ((intent as Record<string, unknown>).sdkAuthorization as string).length > 4096 ||
+        ((intent as Record<string, unknown>).sdkAuthorization as string).trim() !== (intent as Record<string, unknown>).sdkAuthorization ||
+        /[\u0000-\u001f\u007f]/.test((intent as Record<string, unknown>).sdkAuthorization as string)
+      ) {
+        throw new Error('支付服务没有返回与当前订单匹配的有效支付会话，支付已停止。');
+      }
+
+      const result = await presentNativeMembershipPayment((intent as Record<string, unknown>).sdkAuthorization as string);
+      if (result.status === 'completed') {
+        setPurchaseMessage('支付表单已完成提交。LuckRead 正在等待服务端验证 Hyperswitch 支付 Webhook 并完成订阅开通；此状态不代表会员权益已经生效。');
+        await loadPage(null, false);
+      } else if (result.status === 'canceled') {
+        setPurchaseMessage('你已取消本次支付，订阅尚未开通。');
+      } else {
+        setPurchaseMessage('支付未完成。请核对支付方式或稍后重试；订阅权益不会因客户端回调自动开通。');
+      }
+    } catch (cause) {
+      setPurchaseMessage(cause instanceof Error ? cause.message : '无法启动会员支付，请稍后重试。');
+    } finally {
+      setBusyPlanId(null);
+    }
+  }, [authStatus, busyPlanId, loadPage, openLogin]);
+
   if (authStatus === 'loading') {
     return (
       <View className="flex-1 items-center justify-center bg-white dark:bg-black">
@@ -250,9 +364,15 @@ export default function MembershipPlansScreen() {
 
       <View className="border-b border-neutral-100 bg-white px-4 py-3 dark:border-neutral-800 dark:bg-black">
         <Text className="text-xs leading-5 text-neutral-500 dark:text-neutral-400">
-          以下方案来自 W07 已发布的公开会员目录，价格和权益以服务端记录为准。当前页面仅提供真实方案浏览；移动端购买需先完成对应应用商店的支付通道接入与服务器验证，暂不开放购买操作。
+          以下方案来自 W07 已发布的公开会员目录，价格和权益以服务端记录为准。付款由 Hyperswitch 原生安全表单处理；只有服务端验签并完成订阅履约后，会员权益才会生效。
         </Text>
       </View>
+
+      {purchaseMessage ? (
+        <View className="mx-4 mt-3 rounded-xl border border-sky-200 bg-sky-50 px-3 py-3 dark:border-sky-900 dark:bg-sky-950/30">
+          <Text accessibilityRole="alert" className="text-sm leading-5 text-sky-800 dark:text-sky-200">{purchaseMessage}</Text>
+        </View>
+      ) : null}
 
       {error ? (
         <View className="mx-4 mt-3 flex-row items-center gap-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-3 dark:border-rose-900 dark:bg-rose-950/30">
@@ -268,7 +388,9 @@ export default function MembershipPlansScreen() {
         keyExtractor={(item) => item.planId}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void loadPage(null, false, true)} />}
         contentContainerStyle={{ paddingTop: 14, paddingBottom: 36, flexGrow: 1 }}
-        renderItem={({ item }) => <PlanCard item={item} />}
+        renderItem={({ item }) => (
+          <PlanCard item={item} onPurchase={handlePurchase} busy={busyPlanId === item.planId || busyPlanId !== null} />
+        )}
         ListEmptyComponent={(
           <View className="flex-1 items-center justify-center px-8 py-12">
             {loading ? <ActivityIndicator size="large" color={PRIMARY} /> : (
