@@ -2,10 +2,38 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-import { canTransitionContentState, ContentRuntimeError, createContent, createRequestId, deleteContent, decodeContentListCursor, decodeCursor, decodeScopedCursor, encodeContentListCursor, encodeCursor, encodeScopedCursor, isState, listContents, listPublishedContentsByIds, listContentRevisions, listCreatorContents, publishDueScheduledContent, toErrorResponse, transitionContentState, updateContent, validateInput, validateListFilters } from './content-runtime.js'
+import { canTransitionContentState, ContentRuntimeError, createContent, createRequestId, deleteContent, decodeContentListCursor, decodeCursor, decodeScopedCursor, encodeContentListCursor, encodeCursor, encodeScopedCursor, isState, listContents, listPublishedContentsByIds, listContentRevisions, listCreatorContents, publishDueScheduledContent, publicContent, toErrorResponse, transitionContentState, updateContent, validateInput, validateListFilters } from './content-runtime.js'
 import w03Worker, { hasCreatorContentPermission, hasSocialPostPermission, parseListLimit } from './index.js'
 
 describe('W03 content contract core', () => {
+
+  it('redacts member-only content titles and protected references when access is denied', () => {
+    const result = publicContent({
+      id: 'content_member_preview',
+      creatorId: 'creator_1',
+      state: 'PUBLISHED',
+      scheduledAt: null,
+      accessMode: 'MEMBERS_ONLY',
+      accessGranted: false,
+      version: 1,
+      etag: 'W/"1"',
+      slug: 'member-preview',
+      title: 'This is the private full post body and must never appear in a preview.',
+      bodyRef: 'https://img.luckread.com/private-body.txt',
+      mediaRefs: ['https://img.luckread.com/private-photo.webp'],
+      coverRef: 'https://img.luckread.com/private-cover.webp',
+    } as never);
+
+    expect(result).toMatchObject({
+      accessMode: 'MEMBERS_ONLY',
+      accessGranted: false,
+      title: '会员专享内容',
+      bodyRef: '',
+      mediaRefs: [],
+      coverRef: null,
+    });
+    expect(JSON.stringify(result)).not.toContain('private full post body');
+  });
 
   it('classifies published public-post media and protects member-only media with W07 entitlement', async () => {
     const publicUrl = 'https://img.luckread.com/media/photo%20(1).png'
@@ -230,7 +258,7 @@ describe('W03 content contract core', () => {
       creatorId: 'creator_1',
       accessMode: 'MEMBERS_ONLY',
       accessGranted: false,
-      title: 'Members-only title',
+      title: '会员专享内容',
       bodyRef: '',
       mediaRefs: [],
       coverRef: null,
