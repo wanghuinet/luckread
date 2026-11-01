@@ -10,6 +10,8 @@ mock.module('../lib/api-client.ts', () => ({
 }));
 
 const {
+  createMembershipOrder,
+  createMembershipPaymentIntent,
   fetchActiveMembershipPlansPage,
   fetchMySubscriptionsPage,
   fetchSavedPaymentMethods,
@@ -18,6 +20,22 @@ const {
 
 beforeEach(() => {
   calls.length = 0;
+});
+
+test('keeps the Expo SDK 52 Kotlin toolchain default for React Native 0.76', () => {
+  const appConfig = JSON.parse(readFileSync(new URL('../app.json', import.meta.url), 'utf8'));
+  const packageJson = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+  const buildProperties = appConfig.expo.plugins.find(
+    (plugin) => Array.isArray(plugin) && plugin[0] === 'expo-build-properties',
+  );
+
+  expect(packageJson.dependencies['expo-build-properties']).toBe('~0.13.3');
+  expect(buildProperties?.[1]?.android).toMatchObject({
+    buildToolsVersion: '36.0.0',
+    compileSdkVersion: 36,
+    targetSdkVersion: 36,
+  });
+  expect(buildProperties?.[1]?.android).not.toHaveProperty('kotlinVersion');
 });
 
 test('loads the signed-in subscriber list through the canonical W01 route', async () => {
@@ -38,6 +56,33 @@ test('loads active public membership plans through the existing W01 catalog rout
   expect(calls[0]?.path).toBe('/plans?limit=10&cursor=opaque%2Fcursor');
   expect(calls[0]?.options.method).toBe('GET');
   expect(calls[0]?.options.signal).toBe(controller.signal);
+});
+
+test('creates a server-priced membership order using only the selected plan reference', async () => {
+  const planId = 'plan_' + 'a'.repeat(64);
+  await createMembershipOrder(planId);
+
+  expect(calls).toHaveLength(1);
+  expect(calls[0]?.path).toBe('/commerce/orders');
+  expect(calls[0]?.options.method).toBe('POST');
+  expect(JSON.parse(calls[0]?.options.body)).toEqual({
+    items: [{ itemRef: planId, quantity: 1 }],
+  });
+});
+
+test('creates a customer-owned payment intent using only the server-created order ID', async () => {
+  await createMembershipPaymentIntent('ord_checkout_001');
+
+  expect(calls).toHaveLength(1);
+  expect(calls[0]?.path).toBe('/payments/intents');
+  expect(calls[0]?.options.method).toBe('POST');
+  expect(JSON.parse(calls[0]?.options.body)).toEqual({ orderId: 'ord_checkout_001' });
+});
+
+test('rejects invalid order and plan identifiers before making a mutation', () => {
+  expect(() => createMembershipOrder('plan_invalid')).toThrow('valid published membership plan ID');
+  expect(() => createMembershipPaymentIntent('ord_invalid/other')).toThrow('valid membership order ID');
+  expect(calls).toHaveLength(0);
 });
 
 test('rejects invalid pagination bounds before making a request', () => {
@@ -75,13 +120,20 @@ test('rejects invalid saved payment method IDs and removal keys before transport
   expect(calls).toHaveLength(0);
 });
 
-test('keeps subscription mutations and mobile checkout disabled until store billing is verified', async () => {
+test('keeps subscription mutations disabled and routes paid membership checkout through server-verified Hyperswitch', async () => {
   const api = await import('../lib/subscriptions-api.ts');
   const subscriptionsScreen = readFileSync(new URL('../app/(drawer)/subscriptions.tsx', import.meta.url), 'utf8');
   const plansScreen = readFileSync(new URL('../app/(drawer)/membership-plans.tsx', import.meta.url), 'utf8');
   const drawer = readFileSync(new URL('../app/(drawer)/_layout.tsx', import.meta.url), 'utf8');
 
-  expect(Object.keys(api).sort()).toEqual(['fetchActiveMembershipPlansPage', 'fetchMySubscriptionsPage', 'fetchSavedPaymentMethods', 'revokeSavedPaymentMethod'].sort());
+  expect(Object.keys(api).sort()).toEqual([
+    'createMembershipOrder',
+    'createMembershipPaymentIntent',
+    'fetchActiveMembershipPlansPage',
+    'fetchMySubscriptionsPage',
+    'fetchSavedPaymentMethods',
+    'revokeSavedPaymentMethod',
+  ].sort());
   expect(subscriptionsScreen).not.toContain('transitionMySubscription');
   expect(subscriptionsScreen).not.toContain('onTransition');
   expect(subscriptionsScreen).not.toContain('取消订阅');
@@ -89,8 +141,10 @@ test('keeps subscription mutations and mobile checkout disabled until store bill
   expect(subscriptionsScreen).not.toContain('恢复订阅');
   expect(plansScreen).toContain('fetchActiveMembershipPlansPage');
   expect(plansScreen).toContain('W07 已发布的公开会员目录');
-  expect(plansScreen).toContain('暂不开放购买操作');
-  expect(plansScreen).not.toContain('createCommerceOrder');
-  expect(plansScreen).not.toContain('confirmPayment');
+  expect(plansScreen).toContain('createMembershipOrder');
+  expect(plansScreen).toContain('createMembershipPaymentIntent');
+  expect(plansScreen).toContain('presentNativeMembershipPayment');
+  expect(plansScreen).toContain('服务端验证 Hyperswitch 支付 Webhook');
+  expect(plansScreen).toContain('item.priceMinor === 0');
   expect(drawer).toContain("router.push('/membership-plans' as never)");
 });

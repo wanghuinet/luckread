@@ -82,6 +82,8 @@ export interface HyperswitchPayment {
   status: HyperswitchPaymentStatus;
   /** Sensitive provider value; keep server-side until an authorized checkout response needs it. */
   clientSecret: string | null;
+  /** Short-lived SDK authorization returned for native PaymentSession; never persist or log it. */
+  sdkAuthorization?: string | null;
   /** Customer reference returned by Hyperswitch; absent on endpoints that do not include it. */
   customerId?: string | null;
   /** Opaque Hyperswitch vault reference; not consent evidence and not a fulfillment signal. */
@@ -253,6 +255,7 @@ function normalizePayment(value: unknown): HyperswitchPayment {
     currency,
     status,
     client_secret: clientSecret,
+    sdk_authorization: sdkAuthorization,
     customer_id: customerId,
     payment_method_id: paymentMethodId,
     amount_received: amountCaptured,
@@ -268,6 +271,13 @@ function normalizePayment(value: unknown): HyperswitchPayment {
     !CURRENCY_PATTERN.test(currency) ||
     !isHyperswitchPaymentStatus(status) ||
     (clientSecret !== undefined && clientSecret !== null && typeof clientSecret !== 'string') ||
+    (sdkAuthorization !== undefined && sdkAuthorization !== null && (
+      typeof sdkAuthorization !== 'string' ||
+      sdkAuthorization.length === 0 ||
+      sdkAuthorization.length > 4096 ||
+      sdkAuthorization.trim() !== sdkAuthorization ||
+      /[\u0000-\u001f\u007f]/.test(sdkAuthorization)
+    )) ||
     (customerId !== undefined && customerId !== null && (
       typeof customerId !== 'string' ||
       customerId.length === 0 ||
@@ -297,6 +307,7 @@ function normalizePayment(value: unknown): HyperswitchPayment {
     currency,
     status: status as HyperswitchPaymentStatus,
     clientSecret: typeof clientSecret === 'string' ? clientSecret : null,
+    ...(typeof sdkAuthorization === 'string' ? { sdkAuthorization } : {}),
     ...(typeof customerId === 'string' ? { customerId } : {}),
     paymentMethodId: typeof paymentMethodId === 'string' ? paymentMethodId : null,
     ...(typeof amountCaptured === 'number' ? { amountCaptured } : {}),
