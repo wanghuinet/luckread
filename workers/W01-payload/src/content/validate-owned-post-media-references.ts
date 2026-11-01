@@ -33,11 +33,28 @@ const normalizedTrustedUrl = (value: string, origin: string): string | null => {
   return new URL(trusted).toString()
 }
 
-const pathKey = (value: string, origin: string): string | null => {
-  const trusted = resolvePublicArticleBodyUrl(value, origin)
+/**
+ * Resolve the persisted filename from a trusted media URL. Filename narrows
+ * the owner-scoped candidate lookup; authorization still requires an exact
+ * canonical URL match against the returned Payload Media record.
+ */
+const filenameFromTrustedUrl = (value: string, origin: string): string | null => {
+  const trusted = normalizedTrustedUrl(value, origin)
   if (!trusted) return null
-  const url = new URL(trusted)
-  return url.pathname + url.search
+
+  const segments = new URL(trusted).pathname.split('/').filter(Boolean)
+  const encodedFilename = segments[segments.length - 1]
+  if (!encodedFilename) return null
+
+  let filename: string
+  try {
+    filename = decodeURIComponent(encodedFilename)
+  } catch {
+    return null
+  }
+
+  if (!filename.trim() || filename.includes('/') || filename.includes('\\')) return null
+  return filename
 }
 
 const mediaProfileUnavailable: PostMediaReferenceValidation = {
@@ -88,10 +105,13 @@ export async function validateOwnedPostMediaReferencesWithPayload(
     ...(coverRef ? [coverRef] : []),
   ]))
   const normalized = new Map<string, string>()
+  const filenames = new Set<string>()
   for (const ref of refs) {
-    const value = normalizedTrustedUrl(ref, currentOrigin)
-    if (!value) return invalidReference()
-    normalized.set(ref, value)
+    const canonical = normalizedTrustedUrl(ref, currentOrigin)
+    const filename = filenameFromTrustedUrl(ref, currentOrigin)
+    if (!canonical || !filename) return invalidReference()
+    normalized.set(ref, canonical)
+    filenames.add(filename)
   }
 
   const profileResult = await payload.find({
@@ -109,31 +129,22 @@ export async function validateOwnedPostMediaReferencesWithPayload(
     return mediaProfileUnavailable
   }
 
-  // Query both the raw and normalized URL forms because an upload adapter may
-  // store a relative URL while Payload returns the canonical absolute URL.
-  // The final comparison is still restricted to trusted LuckRead URLs and
-  // exact canonical URL/path matches for records owned by this user.
-  const candidates = new Set<string>()
-  for (const [ref, canonical] of normalized) {
-    candidates.add(ref)
-    candidates.add(canonical)
-    const key = pathKey(ref, currentOrigin)
-    if (key) candidates.add(key)
-  }
-
+  // ownerUserId and filename are persisted, indexed lookup fields. Use them to
+  // find candidate records, then compare the complete canonical URL so a
+  // same-named file on another path or host can never authorize a reference.
   const mediaResult = await payload.find({
     collection: 'media',
     where: {
       and: [
         { ownerUserId: { equals: String(payloadUserId) } },
-        { url: { in: Array.from(candidates) } },
+        { filename: { in: Array.from(filenames) } },
       ],
     },
-    limit: Math.min(candidates.size, 100),
+    limit: 100,
     page: 1,
     depth: 0,
     overrideAccess: true,
-    select: { id: true, url: true, ownerUserId: true } as any,
+    select: { id: true, filename: true, url: true, ownerUserId: true } as any,
   })
 
   const ownedCanonicalUrls = new Set<string>()
@@ -142,6 +153,8 @@ export async function validateOwnedPostMediaReferencesWithPayload(
     if (
       !media ||
       String(media.ownerUserId ?? '') !== String(payloadUserId) ||
+      typeof media.filename !== 'string' ||
+      !filenames.has(media.filename) ||
       typeof media.url !== 'string' ||
       !media.url.trim()
     ) continue
@@ -150,10 +163,8 @@ export async function validateOwnedPostMediaReferencesWithPayload(
     if (canonical) ownedCanonicalUrls.add(canonical)
   }
 
-  // A path-only match would incorrectly equate distinct hosts, for example
-  // https://api.luckread.com/media/a.png and https://img.luckread.com/media/a.png.
-  // Relative URLs are normalized against the API origin above, then compared
-  // as full canonical URLs just like absolute references.
+  // Filename matches are only a lookup aid: a same-named asset under another
+  // prefix or host must not authorize this reference.
   for (const ref of refs) {
     const canonical = normalized.get(ref)
     if (!canonical || !ownedCanonicalUrls.has(canonical)) return invalidReference()
