@@ -170,7 +170,8 @@ describe('public creator profile', () => {
     expect(page).toContain('loadLikedContentDetails')
     expect(page).toContain("data.data.items.filter(isMediaContent)")
     expect(page).toContain("setReplies((current) => [...current, ...data.data.items])")
-    expect(page).toContain("return '/content/' + encodeURIComponent(item.slug || item.id)")
+    expect(page).toContain('return buildPublicContentHref({')
+    expect(page).toContain('authorUsername: profile?.username')
   })
 
   it('routes profile works through the canonical content detail route', () => {
