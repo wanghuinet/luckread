@@ -33,6 +33,7 @@ type ContentRecord = {
   version?: number;
   state?: string;
   contentType?: 'article' | 'post' | 'video';
+  accessMode?: 'PUBLIC' | 'MEMBERS_ONLY';
   title?: string;
   bodyRef?: string;
   mediaRefs?: string[];
@@ -107,6 +108,7 @@ export default function PublishScreen() {
   const user = useAuthStore((state) => state.user);
 
   const [body, setBody] = useState('');
+  const [accessMode, setAccessMode] = useState<'PUBLIC' | 'MEMBERS_ONLY'>('PUBLIC');
   const [assets, setAssets] = useState<ComposerAsset[]>([]);
   const [coverRef, setCoverRef] = useState('');
   const [busy, setBusy] = useState(false);
@@ -119,6 +121,7 @@ export default function PublishScreen() {
   const [pollDurationHours, setPollDurationHours] = useState<PollDurationHours>(24);
 
   const recordRef = useRef<ContentRecord | null>(null);
+  const originalAccessModeRef = useRef<'PUBLIC' | 'MEMBERS_ONLY'>('PUBLIC');
   const originalBodyRef = useRef<{ text: string; bodyRef: string | null }>({ text: '', bodyRef: null });
   const bodyUploadRef = useRef<{ text: string; key: string; uploaded?: UploadedMedia } | null>(null);
   const submitAttemptRef = useRef<SubmitAttempt | null>(null);
@@ -154,6 +157,9 @@ export default function PublishScreen() {
       }
       const loaded: ContentRecord = { ...record, etag };
       recordRef.current = loaded;
+      const loadedAccessMode = record.accessMode === 'MEMBERS_ONLY' ? 'MEMBERS_ONLY' : 'PUBLIC';
+      originalAccessModeRef.current = loadedAccessMode;
+      setAccessMode(loadedAccessMode);
       originalBodyRef.current = { text: record.title || '', bodyRef: record.bodyRef || null };
       setBody(record.title || '');
       setCoverRef(record.coverRef || '');
@@ -359,7 +365,7 @@ export default function PublishScreen() {
     const nextCover = coverRef && mediaRefs.includes(coverRef)
       ? coverRef
       : assets.find((asset) => asset.mimeType.startsWith('image/'))?.serverUrl || null;
-    const fingerprint = JSON.stringify([contentId || '', trimmedBody, mediaRefs, nextCover, pollEnabled, cleanPollOptions, pollEnabled ? pollDurationHours : null]);
+    const fingerprint = JSON.stringify([contentId || '', trimmedBody, mediaRefs, nextCover, accessMode, pollEnabled, cleanPollOptions, pollEnabled ? pollDurationHours : null]);
     let attempt = submitAttemptRef.current;
     if (attempt && attempt.fingerprint !== fingerprint) {
       if (!contentId && !recordRef.current && publishPending) {
@@ -404,12 +410,15 @@ export default function PublishScreen() {
       }
       if (!bodyRef) throw new Error('The server did not return a permanent URL for the post body.');
 
+      const includeAccessMode = accessMode === 'MEMBERS_ONLY' ||
+        originalAccessModeRef.current === 'MEMBERS_ONLY';
       const payload = {
         contentType: 'post',
         title: trimmedBody,
         bodyRef,
         mediaRefs,
         coverRef: nextCover,
+        ...(includeAccessMode ? { accessMode } : {}),
       };
 
       if (contentId) {
