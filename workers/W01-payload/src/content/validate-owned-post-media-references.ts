@@ -34,10 +34,9 @@ const normalizedTrustedUrl = (value: string, origin: string): string | null => {
 }
 
 /**
- * Payload's upload URL is generated from the stored filename by the upload
- * adapter when a document is read. It is not a reliable database query key
- * immediately after the initial upload. Resolve only the final filename here;
- * the full generated URL is checked against the owner-scoped records below.
+ * Resolve the persisted filename from a trusted media URL. Filename narrows
+ * the owner-scoped candidate lookup; authorization still requires an exact
+ * canonical URL match against the returned Payload Media record.
  */
 const filenameFromTrustedUrl = (value: string, origin: string): string | null => {
   const trusted = normalizedTrustedUrl(value, origin)
@@ -130,9 +129,9 @@ export async function validateOwnedPostMediaReferencesWithPayload(
     return mediaProfileUnavailable
   }
 
-  // ownerUserId and filename are persisted fields. Query by those first, then
-  // use Payload's read-time URL projection for an exact host + path comparison.
-  // This avoids false 422s for fresh uploads whose generated url is not stored.
+  // ownerUserId and filename are persisted, indexed lookup fields. Use them to
+  // find candidate records, then compare the complete canonical URL so a
+  // same-named file on another path or host can never authorize a reference.
   const mediaResult = await payload.find({
     collection: 'media',
     where: {
