@@ -27,7 +27,7 @@ beforeEach(() => {
   calls.length = 0;
 });
 
-test('pins the Android Kotlin compiler to the Hyperswitch SDK metadata version', () => {
+test('pins Android Kotlin to the Hyperswitch and Expo SDK 52 compatible version', () => {
   const appConfig = JSON.parse(readFileSync(new URL('../app.json', import.meta.url), 'utf8'));
   const packageJson = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
   const buildProperties = appConfig.expo.plugins.find(
@@ -39,7 +39,7 @@ test('pins the Android Kotlin compiler to the Hyperswitch SDK metadata version',
     buildToolsVersion: '36.0.0',
     compileSdkVersion: 36,
     targetSdkVersion: 36,
-    kotlinVersion: '2.1.20',
+    kotlinVersion: '2.0.21',
   });
 });
 
