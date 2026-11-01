@@ -176,7 +176,8 @@ describe('public creator profile', () => {
 
   it('routes profile works through the canonical content detail route', () => {
     const page = read('src/app/(frontend)/users/[userId]/UserProfilePage.tsx')
-    expect(page).toContain("return '/content/' + encodeURIComponent(item.slug || item.id)")
+    expect(page).toContain('return buildPublicContentHref({')
+    expect(page).toContain('authorUsername: profile?.username')
     expect(page).not.toContain("return '/' + encodeURIComponent(profile!.username) + '/' + item.contentType + '/' + encodeURIComponent(item.id)")
   })
 
@@ -250,7 +251,8 @@ describe('username-resolved public profile API contract', () => {
     expect(route).toContain("cache-control': 'public, max-age=30, stale-while-revalidate=120'")
     expect(route).toContain("bio: typeof publicUser.bio === 'string' ? publicUser.bio : null")
     expect(route).not.toContain('email: true')
-    expect(page).toContain("fetchJson<PublicUserLookup>('/api/v1/users/by-username/' + encodeURIComponent(username)")
+    expect(page).toContain("const normalizedUsername = username.trim().replace(/^@+/, '')")
+    expect(page).toContain("fetchJson<PublicUserLookup>('/api/v1/users/by-username/' + encodeURIComponent(normalizedUsername)")
     expect(openapi).toContain('  /users/by-username/{username}:')
     expect(openapi).toContain('operationId: getUsersByUsernameUsername')
     expect(openapi).toContain('public, max-age=30, stale-while-revalidate=120')
