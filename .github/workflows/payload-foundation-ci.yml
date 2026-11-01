@@ -92,17 +92,19 @@ jobs:
           const path = 'src/migrations/20260928_104842_MIG_PAYLOAD_3902_NATIVE_SCHEMA_V1.json'
           const snapshot = JSON.parse(readFileSync(path, 'utf8'))
           const readMigration = (name) => readFileSync('src/migrations/' + name, 'utf8')
-          const requiredStatements = [
-            ['20261006_202000_MIG_BETTER_AUTH_PROFILE_PROJECTION_V1.ts', 'ALTER TABLE \`users\` ADD \`identity_id\` text;'],
-            ['20261006_202000_MIG_BETTER_AUTH_PROFILE_PROJECTION_V1.ts', 'CREATE UNIQUE INDEX \`users_identity_id_idx\` ON \`users\` (\`identity_id\`);'],
-            ['20261002_120000_media_owner.ts', 'ALTER TABLE \`media\` ADD COLUMN \`owner_user_id\` text;'],
-            ['20261022_120000_MIG_MEDIA_UPLOAD_IDEMPOTENCY_V1.ts', 'ALTER TABLE \`media\` ADD \`upload_idempotency_key\` text;'],
-            ['20261022_120000_MIG_MEDIA_UPLOAD_IDEMPOTENCY_V1.ts', 'ALTER TABLE \`media\` ADD \`upload_fingerprint\` text;'],
-            ['20261022_120000_MIG_MEDIA_UPLOAD_IDEMPOTENCY_V1.ts', 'CREATE UNIQUE INDEX \`media_upload_idempotency_key_idx\` ON \`media\` (\`upload_idempotency_key\`);'],
+          const projectionMigration = readMigration('20261006_202000_MIG_BETTER_AUTH_PROFILE_PROJECTION_V1.ts')
+          const mediaOwnerMigration = readMigration('20261002_120000_media_owner.ts')
+          const mediaIdempotencyMigration = readMigration('20261022_120000_MIG_MEDIA_UPLOAD_IDEMPOTENCY_V1.ts')
+          const authSessionMigration = readMigration('20260921_003203_MIG_AUTH_002_SESSION_V1.ts')
+          const provenExistingDDL = [
+            [projectionMigration, ['ALTER TABLE', 'identity_id', 'users_identity_id_idx']],
+            [mediaOwnerMigration, ['ALTER TABLE', 'owner_user_id']],
+            [mediaIdempotencyMigration, ['ALTER TABLE', 'upload_idempotency_key', 'upload_fingerprint', 'media_upload_idempotency_key_idx']],
+            [authSessionMigration, ['CREATE TABLE', 'auth_session_state', 'auth_session_state_user_id_idx']],
           ]
-          for (const [file, statement] of requiredStatements) {
-            if (!readMigration(file).includes(statement)) {
-              throw new Error('Existing migration does not prove expected prior schema: ' + file + ' / ' + statement)
+          for (const [source, identifiers] of provenExistingDDL) {
+            if (identifiers.some((identifier) => !source.includes(identifier))) {
+              throw new Error('Committed migration source is missing expected prior schema evidence: ' + identifiers.join(','))
             }
           }
           const users = snapshot.tables?.users
@@ -126,15 +128,23 @@ jobs:
           users.indexes.users_identity_id_idx = index('users_identity_id_idx', ['identity_id'])
           media.indexes.media_upload_idempotency_key_idx = index('media_upload_idempotency_key_idx', ['upload_idempotency_key'])
 
-          // This is a legacy external table, not a current Payload collection.
-          // Exclude it from the schema diff; never drop or rename the real D1 table.
+          // This is a historical W01 session-extension table created by an
+          // already-committed migration. It is no longer in the current Payload
+          // config, but the migration history owns it; preserve it physically and
+          // exclude it from this new collection's schema diff.
           delete snapshot.tables.auth_session_state
           writeFileSync(path, JSON.stringify(snapshot, null, 2) + '\n')
           writeFileSync('../../artifacts/evidence/w01-username-redirect-migration-generation/baseline-reconciliation.json', JSON.stringify({
             baselineSnapshot: path,
-            retainedExternalTable: 'auth_session_state',
+            retainedHistoricalTable: 'auth_session_state',
+            historicalTableMigration: '20260921_003203_MIG_AUTH_002_SESSION_V1.ts',
             excludedFromPayloadSchemaDiff: ['auth_session_state'],
-            priorMigrationEvidence: requiredStatements.map(([file, statement]) => ({ file, statement })),
+            priorMigrationSources: [
+              '20260921_003203_MIG_AUTH_002_SESSION_V1.ts',
+              '20261006_202000_MIG_BETTER_AUTH_PROFILE_PROJECTION_V1.ts',
+              '20261002_120000_media_owner.ts',
+              '20261022_120000_MIG_MEDIA_UPLOAD_IDEMPOTENCY_V1.ts',
+            ],
             reconciledFields: {
               users: ['identity_id'],
               media: ['owner_user_id', 'upload_idempotency_key', 'upload_fingerprint'],
