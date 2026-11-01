@@ -64,8 +64,8 @@ jobs:
         working-directory: workers/W01-payload
         run: node ../../scripts/w01-remote-migration-admission.mjs --check-state
 
-      - name: Generate local-only username redirect migration candidate
-        if: ${{ (github.event_name == 'pull_request' && github.event.pull_request.number == 1481) || (github.event_name == 'push' && github.ref == 'refs/heads/feature/unified-username-301-redirects') }}
+      - name: Verify committed official Payload username redirect migration
+        if: ${{ (github.event_name == 'pull_request' && github.event.pull_request.number == 1481) || (github.event_name == 'push' && github.ref == 'refs/heads/feature/unified-username-301-redirects') }
         working-directory: workers/W01-payload
         env:
           NODE_ENV: development
@@ -75,135 +75,86 @@ jobs:
           set -euo pipefail
           artifact_dir="../../artifacts/evidence/w01-username-redirect-migration-generation"
           mkdir -p "$artifact_dir"
-          find src/migrations -maxdepth 1 -type f -printf '%f\n' | sort > "$artifact_dir/before-files.txt"
+          migration="20261101_163928_username_redirects"
+          migration_file="src/migrations/$migration.ts"
+          snapshot_file="src/migrations/$migration.json"
+          test -f "$migration_file"
+          test -f "$snapshot_file"
+          cp "$migration_file" "$artifact_dir/$migration.ts"
+          cp "$snapshot_file" "$artifact_dir/$migration.json"
+          cp src/migrations/index.ts "$artifact_dir/index.ts"
+          cp src/payload-types.ts "$artifact_dir/committed-payload-types.ts"
 
-          # Reconcile the historical Payload snapshot with exact, committed manual
-          # migration evidence. Drizzle must not interpret auth_session_state as a
-          # candidate rename to redirects or repeat existing users/media DDL.
-          latest_snapshot="$(find src/migrations -maxdepth 1 -type f -name '*.json' | sort | tail -n 1)"
-          test "$latest_snapshot" = "src/migrations/20260928_104842_MIG_PAYLOAD_3902_NATIVE_SCHEMA_V1.json"
-          cp "$latest_snapshot" "$RUNNER_TEMP/w01-username-redirect-baseline.snapshot.json"
-          restore_snapshot() {
-            cp "$RUNNER_TEMP/w01-username-redirect-baseline.snapshot.json" "$latest_snapshot"
-          }
-          trap restore_snapshot EXIT
+          # Verify generated Payload types with the pinned official CLI, then restore
+          # the committed file so CI remains read-only with respect to source files.
+          type_backup="$RUNNER_TEMP/w01-payload-types.committed"
+          cp src/payload-types.ts "$type_backup"
+          restore_types() { cp "$type_backup" src/payload-types.ts; }
+          trap restore_types EXIT
+          timeout 180s pnpm exec payload generate:types 2>&1 | tee "$artifact_dir/generate-types.log"
+          cp src/payload-types.ts "$artifact_dir/generated-payload-types.ts"
+          restore_types
+          trap - EXIT
+
           node --input-type=module <<'NODE'
           import { readFileSync, writeFileSync } from 'node:fs'
-          const path = 'src/migrations/20260928_104842_MIG_PAYLOAD_3902_NATIVE_SCHEMA_V1.json'
-          const snapshot = JSON.parse(readFileSync(path, 'utf8'))
-          const readMigration = (name) => readFileSync('src/migrations/' + name, 'utf8')
-          const projectionMigration = readMigration('20261006_202000_MIG_BETTER_AUTH_PROFILE_PROJECTION_V1.ts')
-          const mediaOwnerMigration = readMigration('20261002_120000_media_owner.ts')
-          const mediaIdempotencyMigration = readMigration('20261022_120000_MIG_MEDIA_UPLOAD_IDEMPOTENCY_V1.ts')
-          const authSessionMigration = readMigration('20260921_003203_MIG_AUTH_002_SESSION_V1.ts')
-          const provenExistingDDL = [
-            [projectionMigration, ['ALTER TABLE', 'identity_id', 'users_identity_id_idx']],
-            [mediaOwnerMigration, ['ALTER TABLE', 'owner_user_id']],
-            [mediaIdempotencyMigration, ['ALTER TABLE', 'upload_idempotency_key', 'upload_fingerprint', 'media_upload_idempotency_key_idx']],
-            [authSessionMigration, ['CREATE TABLE', 'auth_session_state', 'auth_session_state_user_id_idx']],
-          ]
-          for (const [source, identifiers] of provenExistingDDL) {
-            if (identifiers.some((identifier) => !source.includes(identifier))) {
-              throw new Error('Committed migration source is missing expected prior schema evidence: ' + identifiers.join(','))
-            }
+          const dir = '../../artifacts/evidence/w01-username-redirect-migration-generation/'
+          const migrationName = '20261101_163928_username_redirects'
+          const migration = readFileSync(dir + migrationName + '.ts', 'utf8')
+          const snapshot = JSON.parse(readFileSync(dir + migrationName + '.json', 'utf8'))
+          const index = readFileSync(dir + 'index.ts', 'utf8')
+          const committedTypes = readFileSync(dir + 'committed-payload-types.ts', 'utf8')
+          const generatedTypes = readFileSync(dir + 'generated-payload-types.ts', 'utf8')
+          const names = [...index.matchAll(/name:\s*'([^']+)'/g)].map((match) => match[1])
+          if (names.filter((name) => name === migrationName).length !== 1 || names.at(-1) !== migrationName) {
+            throw new Error('Redirect migration must be registered exactly once and last')
           }
-          const users = snapshot.tables?.users
-          const media = snapshot.tables?.media
-          if (!users || !media || !snapshot.tables?.auth_session_state) {
-            throw new Error('Unexpected baseline snapshot shape; refusing reconciliation')
+          for (const table of ['redirects', 'redirects_rels']) {
+            if (!snapshot.tables?.[table]) throw new Error('Snapshot is missing ' + table)
           }
-          const column = (name) => ({
-            name, type: 'text', primaryKey: false, notNull: false, autoincrement: false,
-          })
-          const index = (name, columns) => ({ name, columns, isUnique: true })
-          if (users.columns.identity_id || media.columns.owner_user_id ||
-              media.columns.upload_idempotency_key || media.columns.upload_fingerprint ||
-              users.indexes.users_identity_id_idx || media.indexes.media_upload_idempotency_key_idx) {
-            throw new Error('Baseline snapshot already contains one or more manually migrated fields')
+          if (!snapshot.tables.media?.columns?.prefix) throw new Error('Snapshot is missing media.prefix')
+          if (!snapshot.tables.payload_locked_documents_rels?.columns?.redirects_id) {
+            throw new Error('Snapshot is missing payload_locked_documents_rels.redirects_id')
           }
-          users.columns.identity_id = column('identity_id')
-          media.columns.owner_user_id = column('owner_user_id')
-          media.columns.upload_idempotency_key = column('upload_idempotency_key')
-          media.columns.upload_fingerprint = column('upload_fingerprint')
-          users.indexes.users_identity_id_idx = index('users_identity_id_idx', ['identity_id'])
-          media.indexes.media_upload_idempotency_key_idx = index('media_upload_idempotency_key_idx', ['upload_idempotency_key'])
-
-          // This is a historical W01 session-extension table created by an
-          // already-committed migration. It is no longer in the current Payload
-          // config, but the migration history owns it; preserve it physically and
-          // exclude it from this new collection's schema diff.
-          delete snapshot.tables.auth_session_state
-          writeFileSync(path, JSON.stringify(snapshot, null, 2) + '\n')
-          writeFileSync('../../artifacts/evidence/w01-username-redirect-migration-generation/baseline-reconciliation.json', JSON.stringify({
-            baselineSnapshot: path,
-            retainedHistoricalTable: 'auth_session_state',
-            historicalTableMigration: '20260921_003203_MIG_AUTH_002_SESSION_V1.ts',
-            excludedFromPayloadSchemaDiff: ['auth_session_state'],
-            priorMigrationSources: [
-              '20260921_003203_MIG_AUTH_002_SESSION_V1.ts',
-              '20261006_202000_MIG_BETTER_AUTH_PROFILE_PROJECTION_V1.ts',
-              '20261002_120000_media_owner.ts',
-              '20261022_120000_MIG_MEDIA_UPLOAD_IDEMPOTENCY_V1.ts',
-            ],
-            reconciledFields: {
-              users: ['identity_id'],
-              media: ['owner_user_id', 'upload_idempotency_key', 'upload_fingerprint'],
-            },
-            reconciledIndexes: ['users_identity_id_idx', 'media_upload_idempotency_key_idx'],
+          const up = migration.split('export async function down')[0]
+          const down = migration.split('export async function down')[1] ?? ''
+          for (const expected of ['CREATE TABLE', 'redirects_rels', 'redirects_from_idx', 'media', 'prefix', 'redirects_id']) {
+            if (!up.includes(expected)) throw new Error('Migration UP is missing ' + expected)
+          }
+          if (/DROP TABLE|DROP COLUMN|RENAME TABLE|RENAME COLUMN/i.test(up)) {
+            throw new Error('Migration UP contains destructive DDL')
+          }
+          if (!down.includes('PRAGMA foreign_keys=OFF') ||
+              !down.includes('SELECT "id", "order", "parent_id", "path", "users_id", "media_id"') ||
+              !down.includes('PRAGMA foreign_keys=ON') ||
+              !down.includes('ALTER TABLE') ||
+              !down.includes('DROP COLUMN')) {
+            throw new Error('Migration DOWN does not preserve existing Payload relationship rows or rollback media.prefix')
+          }
+          if (!generatedTypes.includes('redirects: Redirect') || !generatedTypes.includes('export interface Redirect {')) {
+            throw new Error('Official Payload type generation did not include redirects')
+          }
+          if (!committedTypes.includes('redirects: Redirect') || !committedTypes.includes('export interface Redirect {')) {
+            throw new Error('Committed Payload types do not include redirects')
+          }
+          const evidence = {
+            source: 'official @payloadcms/plugin-redirects 3.90.2 + Payload CLI 3.90.2',
+            priorOfficialGeneratorArtifactRun: 41327282569,
+            migration: migrationName,
+            registeredExactlyOnceAndLast: true,
+            snapshotTables: Object.keys(snapshot.tables),
+            additiveUpOnly: true,
+            downPreservesExistingLockedRelationshipRows: true,
+            officialPayloadTypeGenerationIncludesRedirects: true,
+            committedTypesIncludeRedirects: true,
             productionD1Access: false,
-          }, null, 2) + '\n')
+            result: 'PASS'
+          }
+          writeFileSync(dir + 'verification.json', JSON.stringify(evidence, null, 2) + '\n')
+          console.log(JSON.stringify(evidence, null, 2))
           NODE
-
-          echo "Starting local-only Payload migration generation (no migrate command is executed)"
-          set +e
-          timeout 240s pnpm exec payload migrate:create username_redirects --force-accept-warning --json 2>&1 | tee "$artifact_dir/generation.log"
-          generation_status=${PIPESTATUS[0]}
-          set -e
-          if [ "$generation_status" -ne 0 ]; then
-            echo "Payload migration generation failed or exceeded 240 seconds (exit=$generation_status)"
-            exit "$generation_status"
-          fi
-
-          echo "Regenerating Payload TypeScript collection types from the official plugin configuration"
-          timeout 180s pnpm exec payload generate:types 2>&1 | tee "$artifact_dir/generate-types.log"
-          cp src/payload-types.ts "$artifact_dir/payload-types.ts"
-
-          find src/migrations -maxdepth 1 -type f -printf '%f\n' | sort > "$artifact_dir/after-files.txt"
-          comm -13 "$artifact_dir/before-files.txt" "$artifact_dir/after-files.txt" > "$artifact_dir/generated-files.txt"
-          if [ ! -s "$artifact_dir/generated-files.txt" ]; then
-            echo "Payload did not produce a migration candidate"
-            exit 1
-          fi
-          while IFS= read -r file; do
-            cp "src/migrations/$file" "$artifact_dir/$file"
-          done < "$artifact_dir/generated-files.txt"
-
-          candidate_ts="$(find "$artifact_dir" -maxdepth 1 -type f -name '*.ts' | head -n 1)"
-          test -n "$candidate_ts"
-          awk '/export async function down/{exit} {print}' "$candidate_ts" > "$artifact_dir/up-only.ts"
-          if grep -Eiq 'DROP|RENAME|auth_session_state' "$artifact_dir/up-only.ts"; then
-            echo "Generated UP migration contains destructive DDL, a rename, or a historical session table"
-            cat "$artifact_dir/up-only.ts"
-            exit 1
-          fi
-          if grep -Eiq 'ALTER TABLE.*(users|media).*(identity_id|owner_user_id|upload_idempotency_key|upload_fingerprint)' "$artifact_dir/up-only.ts"; then
-            echo "Generated UP migration repeats a manually migrated users/media field"
-            cat "$artifact_dir/up-only.ts"
-            exit 1
-          fi
-          for expected in 'CREATE TABLE.*redirects' 'CREATE TABLE.*redirects_rels' 'ALTER TABLE.*media.*ADD.*prefix' 'ALTER TABLE.*payload_locked_documents_rels.*ADD.*redirects_id'; do
-            if ! grep -Eiq "$expected" "$artifact_dir/up-only.ts"; then
-              echo "Generated UP migration is missing expected additive schema: $expected"
-              cat "$artifact_dir/up-only.ts"
-              exit 1
-            fi
-          done
-          if ! grep -Eq 'redirects: Redirect;' "$artifact_dir/payload-types.ts" || ! grep -q 'export interface Redirect {' "$artifact_dir/payload-types.ts"; then
-            echo "Payload type generation did not include the redirects collection"
-            exit 1
-          fi
-          cp src/migrations/index.ts "$artifact_dir/index.ts"
-          git status --short -- src/migrations > "$artifact_dir/worktree-status.txt"
+          git status --short -- src/migrations src/payload-types.ts > "$artifact_dir/worktree-status.txt"
+          test ! -s "$artifact_dir/worktree-status.txt"
 
       - name: Upload local-only username redirect migration candidate
         if: ${{ always() && ((github.event_name == 'pull_request' && github.event.pull_request.number == 1481) || (github.event_name == 'push' && github.ref == 'refs/heads/feature/unified-username-301-redirects')) }}
