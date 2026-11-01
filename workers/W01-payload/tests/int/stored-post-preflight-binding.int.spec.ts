@@ -7,7 +7,7 @@ vi.mock('@opennextjs/cloudflare', () => ({
 }))
 
 import { bindPreflightToStoredPost } from '../../src/content/bind-post-publish-preflight.js'
-import { callW03Content } from '../../src/content/w03-content-client.js'
+import { callW03Content, resolveVerifiedContentCreatorId } from '../../src/content/w03-content-client.js'
 import { validateOwnedPostMediaReferences } from '../../src/content/validate-owned-post-media-references.js'
 
 vi.mock('../../src/content/validate-owned-post-media-references.js', () => ({
@@ -16,9 +16,11 @@ vi.mock('../../src/content/validate-owned-post-media-references.js', () => ({
 
 vi.mock('../../src/content/w03-content-client.js', () => ({
   callW03Content: vi.fn(),
+  resolveVerifiedContentCreatorId: vi.fn(async () => 'creator-1'),
 }))
 
 const callW03ContentMock = vi.mocked(callW03Content)
+const resolveVerifiedCreatorMock = vi.mocked(resolveVerifiedContentCreatorId)
 const validateMediaReferencesMock = vi.mocked(validateOwnedPostMediaReferences)
 
 const makeErrorResponse = (status: number, code: string, message: string): Response =>
@@ -65,6 +67,8 @@ const storedPost = (overrides: Record<string, unknown> = {}) => ({
 describe('bind direct social post publishing to the stored body asset', () => {
   beforeEach(() => {
     callW03ContentMock.mockReset()
+    resolveVerifiedCreatorMock.mockReset()
+    resolveVerifiedCreatorMock.mockResolvedValue('creator-1')
     validateMediaReferencesMock.mockReset()
     validateMediaReferencesMock.mockResolvedValue({ valid: true })
     getCloudflareContextMock.mockReset()
@@ -83,14 +87,18 @@ describe('bind direct social post publishing to the stored body asset', () => {
     getCloudflareContextMock.mockResolvedValue({ env: { R2: { get: r2Get } } })
     const fetchMock = vi.spyOn(globalThis, 'fetch')
 
-    const result = await bindPreflightToStoredPost(
+    const binding = await bindPreflightToStoredPost(
       makeRequest(),
       'post-1',
       principal,
       submitted,
       makeErrorResponse,
-    ) as typeof submitted
+    )
+    if (binding instanceof Response) throw new Error('Expected a bound public post submission')
+    const result = binding.body as typeof submitted
 
+    expect(binding.verifiedCreatorId).toBeUndefined()
+    expect(resolveVerifiedCreatorMock).not.toHaveBeenCalled()
     expect(callW03ContentMock).toHaveBeenCalledWith(expect.objectContaining({
       pathname: '/internal/content/contents/post-1',
       method: 'GET',
@@ -104,6 +112,43 @@ describe('bind direct social post publishing to the stored body asset', () => {
     expect(result.preflight.mediaRefs).toEqual(['https://img.luckread.com/media/photo.png'])
     expect(result.preflight.coverRef).toBeNull()
     expect(result.preflight.body).not.toBe(submitted.preflight.body)
+  })
+
+  it('requires an active matching W08 creator identity for member-only post publication', async () => {
+    const request = makeRequest()
+    callW03ContentMock.mockResolvedValue(new Response(JSON.stringify(storedPost({
+      accessMode: 'MEMBERS_ONLY',
+      creatorId: 'creator-1',
+    })), { status: 200 }))
+
+    const binding = await bindPreflightToStoredPost(
+      request,
+      'post-1',
+      principal,
+      submitted,
+      makeErrorResponse,
+    )
+    if (binding instanceof Response) throw new Error('Expected a bound member-only post submission')
+    expect(binding.verifiedCreatorId).toBe('creator-1')
+    expect(resolveVerifiedCreatorMock).toHaveBeenCalledWith(request, principal)
+
+    callW03ContentMock.mockResolvedValueOnce(new Response(JSON.stringify(storedPost({
+      accessMode: 'MEMBERS_ONLY',
+      creatorId: 'creator-1',
+    })), { status: 200 }))
+    resolveVerifiedCreatorMock.mockResolvedValueOnce('different_creator')
+    const mismatch = await bindPreflightToStoredPost(
+      request,
+      'post-1',
+      principal,
+      submitted,
+      makeErrorResponse,
+    )
+    expect(mismatch).toBeInstanceOf(Response)
+    expect((mismatch as Response).status).toBe(403)
+    expect(await (mismatch as Response).json()).toMatchObject({
+      error: { code: 'PERMISSION_DENIED' },
+    })
   })
 
   it('returns SERVICE_UNAVAILABLE when the existing R2 binding or read operation is unavailable', async () => {
@@ -392,7 +437,7 @@ describe('bind direct social post publishing to the stored body asset', () => {
       reviewSubmission,
       makeErrorResponse,
     )
-    expect(reviewResult).toBe(reviewSubmission)
+    expect(reviewResult).toEqual({ body: reviewSubmission })
     expect(callW03ContentMock).not.toHaveBeenCalled()
 
     const articleSubmission = {
@@ -411,7 +456,7 @@ describe('bind direct social post publishing to the stored body asset', () => {
       articleSubmission,
       makeErrorResponse,
     )
-    expect(articleResult).toBe(articleSubmission)
+    expect(articleResult).toEqual({ body: articleSubmission })
     expect(callW03ContentMock).toHaveBeenCalledTimes(1)
     expect(fetchMock).not.toHaveBeenCalled()
   })
