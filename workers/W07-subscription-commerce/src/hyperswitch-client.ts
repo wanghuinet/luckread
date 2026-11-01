@@ -82,7 +82,7 @@ export interface HyperswitchPayment {
   status: HyperswitchPaymentStatus;
   /** Sensitive provider value; keep server-side until an authorized checkout response needs it. */
   clientSecret: string | null;
-  /** Short-lived SDK authorization returned by Hyperswitch for native PaymentSession; never persist or log it. */
+  /** Short-lived SDK authorization returned for native PaymentSession; never persist or log it. */
   sdkAuthorization?: string | null;
   /** Customer reference returned by Hyperswitch; absent on endpoints that do not include it. */
   customerId?: string | null;
@@ -276,7 +276,7 @@ function normalizePayment(value: unknown): HyperswitchPayment {
       sdkAuthorization.length === 0 ||
       sdkAuthorization.length > 4096 ||
       sdkAuthorization.trim() !== sdkAuthorization ||
-      /[\u0000-\u001f\u007f]/.test(sdkAuthorization)
+      /[\\u0000-\\u001f\\u007f]/.test(sdkAuthorization)
     )) ||
     (customerId !== undefined && customerId !== null && (
       typeof customerId !== 'string' ||
@@ -769,4 +769,169 @@ export async function retrieveHyperswitchRefund(
   return requestRefund(config, '/refunds/' + encodeURIComponent(input.refundId), {
     method: 'GET',
   }, input, fetchImpl);
+}
+
+
+export type HyperswitchSavedPaymentMethod = Readonly<{
+  paymentMethodId: string
+  customerId: string
+  paymentMethod: string
+  paymentMethodType: string | null
+  recurringEnabled: boolean
+  brand: string | null
+  last4: string | null
+  expiryMonth: string | null
+  expiryYear: string | null
+  createdAt: string | null
+}>
+
+async function requestHyperswitchJson(
+  config: HyperswitchClientConfig,
+  path: string,
+  method: 'GET' | 'POST' | 'DELETE',
+  fetchImpl: typeof fetch,
+  body?: Readonly<Record<string, unknown>>,
+  idempotencyKey?: string,
+): Promise<Record<string, unknown>> {
+  const { baseUrl, apiKey, expectedMerchantId } = resolveConfig(config)
+  let response: Response
+  try {
+    response = await fetchImpl(new URL(path, baseUrl), {
+      method,
+      redirect: 'error',
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      headers: {
+        'api-key': apiKey,
+        accept: 'application/json',
+        ...(method === 'POST' ? { 'content-type': 'application/json' } : {}),
+        ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}),
+      },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+    })
+  } catch {
+    throw new HyperswitchClientError('UPSTREAM_UNAVAILABLE', 'Hyperswitch request failed or timed out.')
+  }
+  if (!response.ok) {
+    throw new HyperswitchClientError('UPSTREAM_REJECTED', 'Hyperswitch rejected the payment-method request.', response.status)
+  }
+  const value = await readJsonResponse(response)
+  if (!isRecord(value)) {
+    throw new HyperswitchClientError('UPSTREAM_INVALID_RESPONSE', 'Hyperswitch returned an invalid provider response.')
+  }
+  if (typeof value.merchant_id === 'string' && value.merchant_id !== expectedMerchantId) {
+    throw new HyperswitchClientError('UPSTREAM_INVALID_RESPONSE', 'Hyperswitch returned a different merchant.')
+  }
+  return value
+}
+
+function optionalSafeText(value: unknown, maxLength: number): string | null {
+  return typeof value === 'string' &&
+    value.length > 0 &&
+    value.length <= maxLength &&
+    value.trim() === value &&
+    !/[\u0000-\u001f\u007f]/.test(value)
+    ? value
+    : null
+}
+
+/**
+ * List only Hyperswitch customer-owned saved methods. Caller must intersect
+ * these provider results with LuckRead's webhook-verified D1-04 records
+ * before returning any item to a customer.
+ */
+export async function listHyperswitchCustomerPaymentMethods(
+  config: HyperswitchClientConfig,
+  customerId: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<readonly HyperswitchSavedPaymentMethod[]> {
+  validateProviderReference(customerId, 'Customer ID')
+  const value = await requestHyperswitchJson(
+    config,
+    '/customers/' + encodeURIComponent(customerId) + '/payment_methods',
+    'GET',
+    fetchImpl,
+  )
+  if (!Array.isArray(value.customer_payment_methods) || value.customer_payment_methods.length > 100) {
+    throw new HyperswitchClientError('UPSTREAM_INVALID_RESPONSE', 'Hyperswitch returned an invalid saved-method collection.')
+  }
+  const output: HyperswitchSavedPaymentMethod[] = []
+  for (const entry of value.customer_payment_methods) {
+    if (!isRecord(entry) ||
+        typeof entry.payment_method_id !== 'string' ||
+        !/^[\x21-\x7e]{1,255}$/.test(entry.payment_method_id) ||
+        entry.customer_id !== customerId ||
+        typeof entry.payment_method !== 'string' ||
+        !/^[a-z][a-z0-9_]{0,63}$/.test(entry.payment_method)) {
+      throw new HyperswitchClientError('UPSTREAM_INVALID_RESPONSE', 'Hyperswitch returned an unbound saved payment method.')
+    }
+    const card = isRecord(entry.card) ? entry.card : null
+    const rawLast4 = card ? (card.last4_digits ?? card.last4) : null
+    const rawBrand = card ? (card.scheme ?? card.card_network ?? card.brand) : null
+    const rawExpiryMonth = card ? (card.expiry_month ?? card.exp_month) : null
+    const rawExpiryYear = card ? (card.expiry_year ?? card.exp_year) : null
+    const expiryMonth = optionalSafeText(rawExpiryMonth, 2)
+    const expiryYear = optionalSafeText(rawExpiryYear, 4)
+    const createdAt = optionalSafeText(entry.created, 64)
+    output.push({
+      paymentMethodId: entry.payment_method_id,
+      customerId,
+      paymentMethod: entry.payment_method,
+      paymentMethodType: optionalSafeText(entry.payment_method_type, 64),
+      recurringEnabled: entry.recurring_enabled === true,
+      brand: optionalSafeText(rawBrand, 64),
+      last4: typeof rawLast4 === 'string' && /^\d{4}$/.test(rawLast4) ? rawLast4 : null,
+      expiryMonth: expiryMonth && /^(0[1-9]|1[0-2])$/.test(expiryMonth) ? expiryMonth : null,
+      expiryYear: expiryYear && /^\d{2,4}$/.test(expiryYear) ? expiryYear : null,
+      createdAt: createdAt && Number.isFinite(Date.parse(createdAt)) ? new Date(createdAt).toISOString() : null,
+    })
+  }
+  return output
+}
+
+/** Retrieve a provider mandate without changing LuckRead's signed-webhook state authority. */
+export async function retrieveHyperswitchMandate(
+  config: HyperswitchClientConfig,
+  mandateId: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<Readonly<{ mandateId: string; status: 'active' | 'revoked' | 'inactive' }>> {
+  validateProviderReference(mandateId, 'Mandate ID', 255)
+  const value = await requestHyperswitchJson(config, '/mandates/' + encodeURIComponent(mandateId), 'GET', fetchImpl)
+  if (value.mandate_id !== mandateId || typeof value.status !== 'string' ||
+      !['active', 'revoked', 'inactive'].includes(value.status.toLowerCase())) {
+    throw new HyperswitchClientError('UPSTREAM_INVALID_RESPONSE', 'Hyperswitch returned an invalid mandate response.')
+  }
+  return { mandateId, status: value.status.toLowerCase() as 'active' | 'revoked' | 'inactive' }
+}
+
+/**
+ * Request provider-side mandate revocation. The response is not LuckRead's
+ * final mandate-state evidence; only the signed mandate_revoked webhook may
+ * transition the authoritative D1-04 mandate row to REVOKED.
+ */
+export async function revokeHyperswitchMandate(
+  config: HyperswitchClientConfig,
+  mandateId: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<void> {
+  validateProviderReference(mandateId, 'Mandate ID', 255)
+  const value = await requestHyperswitchJson(config, '/mandates/revoke/' + encodeURIComponent(mandateId), 'POST', fetchImpl)
+  if (value.mandate_id !== mandateId || typeof value.status !== 'string' ||
+      value.status.toLowerCase() !== 'revoked' ||
+      (value.error_code !== undefined && value.error_code !== null) ||
+      (value.error_message !== undefined && value.error_message !== null)) {
+    throw new HyperswitchClientError('UPSTREAM_INVALID_RESPONSE', 'Hyperswitch did not confirm mandate revocation.')
+  }
+}
+
+/** Delete a saved vault reference after every linked mandate has a provider revoke acknowledgement. */
+export async function deleteHyperswitchPaymentMethod(
+  config: HyperswitchClientConfig,
+  paymentMethodId: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<void> {
+  validateProviderReference(paymentMethodId, 'Payment method ID', 255)
+  const value = await requestHyperswitchJson(config, '/payment_methods/' + encodeURIComponent(paymentMethodId), 'DELETE', fetchImpl)
+  if (value.payment_method_id !== paymentMethodId || value.deleted !== true) {
+    throw new HyperswitchClientError('UPSTREAM_INVALID_RESPONSE', 'Hyperswitch did not confirm deletion of the requested payment method.')
+  }
 }
