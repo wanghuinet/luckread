@@ -98,6 +98,8 @@ test('connects the paywall detail CTA to creator plans and returns through W03 e
   expect(detail).toContain('creatorId,');
   expect(detail).toContain("returnTo: '/post/' + postId");
   expect(detail).toContain('查看创作者会员方案');
+  expect(detail).toContain('重新检查会员权益');
+  expect(detail).toContain('setRetryKey((value) => value + 1)');
   expect(detail).toContain('membershipRequired ? undefined : handleScrollToComments');
 
   expect(composer).toContain("setAccessMode('MEMBERS_ONLY')");
