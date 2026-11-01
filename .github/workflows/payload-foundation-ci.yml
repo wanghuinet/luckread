@@ -198,7 +198,7 @@ jobs:
               exit 1
             fi
           done
-          if ! grep -q "'redirects'" "$artifact_dir/payload-types.ts"; then
+          if ! grep -Eq 'redirects: Redirect;' "$artifact_dir/payload-types.ts" || ! grep -q 'export interface Redirect {' "$artifact_dir/payload-types.ts"; then
             echo "Payload type generation did not include the redirects collection"
             exit 1
           fi
