@@ -13,7 +13,7 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
-import { getApiErrorMessage } from '~/lib/api-client';
+import { createIdempotencyKey, getApiErrorMessage } from '~/lib/api-client';
 import {
   fetchBillingDocumentsPage,
   fetchPaymentHistoryPage,
@@ -278,6 +278,7 @@ export default function BillingScreen() {
   const [authRequired, setAuthRequired] = useState(false);
   const [error, setError] = useState('');
   const [refundBusyId, setRefundBusyId] = useState<string | null>(null);
+  const refundIdempotencyKeys = useRef(new Map<string, string>());
   const requestRef = useRef<AbortController | null>(null);
 
   const pendingRefundPaymentIds = useMemo(() => new Set(
@@ -430,7 +431,8 @@ export default function BillingScreen() {
             void (async () => {
               setRefundBusyId(item.paymentId);
               try {
-                const key = 'refund_' + item.paymentId + '_' + String(amountMinor);
+                const key = refundIdempotencyKeys.current.get(item.paymentId) ?? createIdempotencyKey();
+                refundIdempotencyKeys.current.set(item.paymentId, key);
                 const result = await requestPaymentRefund(
                   item.paymentId,
                   amountMinor,
@@ -438,6 +440,9 @@ export default function BillingScreen() {
                   key,
                 );
                 if (!result.response.ok) {
+                  if ([400, 401, 403, 404, 409, 422].includes(result.response.status)) {
+                    refundIdempotencyKeys.current.delete(item.paymentId);
+                  }
                   throw new Error(result.error?.message || getApiErrorMessage(
                     result.data, '退款申请未能提交，请稍后重试。', result.response.status,
                   ));
@@ -446,6 +451,7 @@ export default function BillingScreen() {
                   ? result.data.data
                   : null;
                 const status = typeof envelope?.status === 'string' ? envelope.status : 'PENDING';
+                if (status === 'FAILED') refundIdempotencyKeys.current.delete(item.paymentId);
                 Alert.alert(
                   '退款申请已提交',
                   status === 'SUCCEEDED'
