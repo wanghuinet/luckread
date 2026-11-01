@@ -16,12 +16,14 @@ import { createSubscriptionPlanUpgradeCheckout } from './subscription-plan-chang
 import { scheduleSubscriptionPlanDowngrade, scheduleSubscriptionBillingIntervalChange } from './subscription-plan-change-schedule.js'
 import { startSubscriptionTrial } from './subscription-trial-runtime.js'
 import { resolveDemoCommercePricing } from './demo-commerce-pricing-resolver.js'
+import { runRenewalScheduledBatch } from './renewal-scheduler.js'
 
 interface RateLimitBinding { limit(input: { key: string }): Promise<{ success: boolean }> }
 interface Env {
   D1_01: D1Database
   D1_04: D1Database
   W06_GOVERNANCE?: Fetcher
+  MEMBERSHIP_RENEWAL_ENABLED?: string
   HYPERSWITCH_ENVIRONMENT?: string
   COMMERCE_PRICING_MODE?: string
   HYPERSWITCH_API_KEY?: string
@@ -169,6 +171,36 @@ const toOperation = (method: string, segments: string[]): Operation | null => {
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     try {
+      // W10 is the only admitted scheduler. This private service-binding
+      // endpoint delegates all commerce and membership writes back to W07.
+      if (new URL(request.url).pathname === '/internal/renewals/w10/scheduled-batch') {
+        if (request.method !== 'POST') {
+          return new Response(null, { status: 405, headers: { Allow: 'POST' } })
+        }
+        requireTransport(request, 'W10')
+        if (request.headers.has('Authorization') || request.headers.has('Cookie')) {
+          throw new SubscriptionRuntimeError('PERMISSION_DENIED', 403)
+        }
+        if (env.MEMBERSHIP_RENEWAL_ENABLED !== 'true' ||
+            !isDemoPricingEnabled(env.COMMERCE_PRICING_MODE, env.HYPERSWITCH_ENVIRONMENT) ||
+            !['synthetic', 'taxjar-sandbox'].includes(env.COMMERCE_DEMO_TAX_PROVIDER ?? '')) {
+          throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
+        }
+        const originLimiter = env.SUBSCRIPTION_ORIGIN_GLOBAL_LIMITER
+        if (!originLimiter) throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
+        await applyRateLimit(originLimiter, 'origin:renewal')
+        const input = await readJsonBody(request)
+        if (typeof input !== 'object' || input === null || Array.isArray(input) ||
+            Object.keys(input as Record<string, unknown>).length !== 0) {
+          throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
+        }
+        const result = await runRenewalScheduledBatch(env, {
+          maxCyclesPerBatch: 1,
+          resolvePricing: (pricingInput) => resolveDemoCommercePricing(env, pricingInput),
+        })
+        return json({ data: result, requestId: crypto.randomUUID() })
+      }
+
       // Provider webhooks have no user session. Apply the existing global write
       // limiter and validate the private W01 transport before normal principal
       // and layer checks; do not introduce a new rate-limit namespace.
