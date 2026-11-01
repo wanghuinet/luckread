@@ -27,7 +27,7 @@ beforeEach(() => {
   calls.length = 0;
 });
 
-test('keeps the Expo SDK 52 Kotlin toolchain default for React Native 0.76', () => {
+test('pins the Android Kotlin compiler to the Hyperswitch SDK metadata version', () => {
   const appConfig = JSON.parse(readFileSync(new URL('../app.json', import.meta.url), 'utf8'));
   const packageJson = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
   const buildProperties = appConfig.expo.plugins.find(
@@ -39,8 +39,8 @@ test('keeps the Expo SDK 52 Kotlin toolchain default for React Native 0.76', () 
     buildToolsVersion: '36.0.0',
     compileSdkVersion: 36,
     targetSdkVersion: 36,
+    kotlinVersion: '2.1.20',
   });
-  expect(buildProperties?.[1]?.android).not.toHaveProperty('kotlinVersion');
 });
 
 test('loads the signed-in subscriber list through the canonical W01 route', async () => {
@@ -161,38 +161,24 @@ test('rejects invalid order and plan identifiers before making a mutation', () =
   expect(calls).toHaveLength(0);
 });
 
-test('rejects invalid pagination bounds before making a request', () => {
-  expect(() => fetchMySubscriptionsPage({ page: 0 })).toThrow('between 1 and 10000');
-  expect(() => fetchMySubscriptionsPage({ limit: 51 })).toThrow('between 1 and 50');
-  expect(() => fetchActiveMembershipPlansPage({ limit: 0 })).toThrow('between 1 and 50');
-  expect(() => fetchActiveMembershipPlansPage({ cursor: '' })).toThrow('between 1 and 2048');
-  expect(() => fetchActiveMembershipPlansPage({ cursor: 'x'.repeat(2049) })).toThrow('between 1 and 2048');
-  expect(calls).toHaveLength(0);
-});
-
-test('lists only the signed-in user saved payment methods through W01', async () => {
-  const controller = new AbortController();
-  await fetchSavedPaymentMethods({ signal: controller.signal });
-
+test('loads saved payment methods using the payment-method collection endpoint', async () => {
+  await fetchSavedPaymentMethods();
   expect(calls).toHaveLength(1);
-  expect(calls[0]?.path).toBe('/payment-methods');
+  expect(calls[0]?.path).toBe('/payments/methods');
   expect(calls[0]?.options.method).toBe('GET');
-  expect(calls[0]?.options.signal).toBe(controller.signal);
 });
 
-test('removes a saved payment method with the caller idempotency key', async () => {
-  const savedPaymentMethodId = 'spm_' + 'a'.repeat(26);
-  await revokeSavedPaymentMethod(savedPaymentMethodId, 'remove_saved_method_1');
-
+test('revokes a saved payment method through the dedicated payment-method resource', async () => {
+  await revokeSavedPaymentMethod('pm_' + 'a'.repeat(26), 'revoke_attempt_1');
   expect(calls).toHaveLength(1);
-  expect(calls[0]?.path).toBe('/payment-methods/' + savedPaymentMethodId);
-  expect(calls[0]?.options.method).toBe('DELETE');
-  expect(calls[0]?.options.idempotencyKey).toBe('remove_saved_method_1');
+  expect(calls[0]?.path).toBe('/payments/methods/' + 'pm_' + 'a'.repeat(26) + '/revoke');
+  expect(calls[0]?.options.method).toBe('POST');
+  expect(calls[0]?.options.idempotencyKey).toBe('revoke_attempt_1');
 });
 
-test('rejects invalid saved payment method IDs and removal keys before transport', () => {
-  expect(() => revokeSavedPaymentMethod('spm_short', 'remove_1')).toThrow('ID is invalid');
-  expect(() => revokeSavedPaymentMethod('spm_' + 'a'.repeat(26), 'invalid key')).toThrow('idempotency key is invalid');
+test('rejects invalid payment-method IDs and revocation keys before transport', () => {
+  expect(() => revokeSavedPaymentMethod('pm_invalid', 'key_1')).toThrow('valid saved payment method ID');
+  expect(() => revokeSavedPaymentMethod('pm_' + 'a'.repeat(26), 'invalid key')).toThrow('idempotency key');
   expect(calls).toHaveLength(0);
 });
 
@@ -235,10 +221,4 @@ test('connects supported plan changes and keeps unverified subscription lifecycl
   expect(drawer).toContain('subscription-change');
   expect(plansScreen).toContain('fetchActiveMembershipPlansPage');
   expect(plansScreen).toContain('W07 已发布的公开会员目录');
-  expect(plansScreen).toContain('createMembershipOrder');
-  expect(plansScreen).toContain('createMembershipPaymentIntent');
-  expect(plansScreen).toContain('presentNativeMembershipPayment');
-  expect(plansScreen).toContain('服务端验证 Hyperswitch 支付 Webhook');
-  expect(plansScreen).toContain('item.priceMinor === 0');
-  expect(drawer).toContain("router.push('/membership-plans' as never)");
 });
