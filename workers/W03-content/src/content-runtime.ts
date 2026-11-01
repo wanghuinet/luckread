@@ -1311,17 +1311,13 @@ export async function createContent(
   }
 
   let contentId: string
-  if (normalized.contentType === 'article' || normalized.contentType === 'video') {
-    try {
-      contentId = await allocateContentSnowflakeId(db, now.getTime())
-    } catch {
-      // Do not issue article/video IDs from an uncoordinated fallback generator:
-      // D1-02 is the shared uniqueness boundary across W03 isolates.
-      throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
-    }
-  } else {
-    // Social posts are deliberately outside the Snowflake rollout scope.
-    contentId = crypto.randomUUID()
+  try {
+    // Every newly created content type shares W03's atomic D1-02 ID sequence.
+    // Never fall back to an isolate-local generator: concurrent W03 isolates
+    // must draw from the same uniqueness boundary.
+    contentId = await allocateContentSnowflakeId(db, now.getTime())
+  } catch {
+    throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
   }
   const slug = contentSlugFor(normalized.title, contentId)
   const createdAt = now.toISOString()
