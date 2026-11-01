@@ -1,6 +1,6 @@
 import usernameReservationPolicy from '../../../../contracts/security/username-reservation-policy.v1.json'
 import type { BetterAuthEnv } from './better-auth.js'
-import { resolveBetterAuthPrincipal } from './principal.js'
+import { resolveBetterAuthPrincipal, type AuthenticatedPrincipal } from './principal.js'
 
 const COOLDOWN_MS = Number(usernameReservationPolicy.ownerDecision.renameCooldownDays) * 24 * 60 * 60 * 1000
 const RESERVED_USERNAMES = new Set(usernameReservationPolicy.reservation.reservedUsernames)
@@ -105,14 +105,20 @@ async function loadContext(env: BetterAuthEnv, userId: string, idempotencyKeyHas
   return contextFromRow(row)
 }
 
-async function authenticate(env: BetterAuthEnv, request: Request) {
+type UsernameAuthentication =
+  | { ok: true; principal: AuthenticatedPrincipal }
+  | { ok: false; response: Response }
+
+async function authenticate(env: BetterAuthEnv, request: Request): Promise<UsernameAuthentication> {
   try {
     const principal = await resolveBetterAuthPrincipal(env, request)
-    if (!principal) return { response: error(401, 'UNAUTHENTICATED', 'Authentication required') } as const
-    if (principal.accountState !== 'ACTIVE') return { response: error(403, 'ACCOUNT_NOT_ELIGIBLE', 'Account is not eligible for this operation') } as const
-    return { principal } as const
+    if (!principal) return { ok: false, response: error(401, 'UNAUTHENTICATED', 'Authentication required') }
+    if (principal.accountState !== 'ACTIVE') {
+      return { ok: false, response: error(403, 'ACCOUNT_NOT_ELIGIBLE', 'Account is not eligible for this operation') }
+    }
+    return { ok: true, principal }
   } catch {
-    return { response: error(503, 'SERVICE_UNAVAILABLE', 'Username service unavailable') } as const
+    return { ok: false, response: error(503, 'SERVICE_UNAVAILABLE', 'Username service unavailable') }
   }
 }
 
@@ -187,7 +193,7 @@ function replayResponse(context: UsernameContext): Response {
 export async function handleUsernameStateRequest(env: BetterAuthEnv, request: Request): Promise<Response> {
   if (!callerAllowed(request)) return error(403, 'FORBIDDEN', 'Authorized W01 service boundary required')
   const auth = await authenticate(env, request)
-  if ('response' in auth) return auth.response
+  if (!auth.ok) return auth.response
   const limited = await enforceReadLimits(env, auth.principal.userId)
   if (limited) return limited
 
@@ -208,7 +214,7 @@ export async function handleUsernameStateRequest(env: BetterAuthEnv, request: Re
 export async function handleUsernameChangeRequest(env: BetterAuthEnv, request: Request, now = new Date()): Promise<Response> {
   if (!callerAllowed(request)) return error(403, 'FORBIDDEN', 'Authorized W01 service boundary required')
   const auth = await authenticate(env, request)
-  if ('response' in auth) return auth.response
+  if (!auth.ok) return auth.response
 
   const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
   if (!IDEMPOTENCY_PATTERN.test(idempotencyKey)) return error(428, 'IDEMPOTENCY_KEY_REQUIRED', 'A valid Idempotency-Key is required')
