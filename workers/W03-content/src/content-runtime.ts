@@ -209,6 +209,8 @@ const toContent = (row: ContentRow): ContentRecord => ({
   updatedAt: row.updated_at,
 })
 
+export const MEMBERS_ONLY_CONTENT_PREVIEW_TITLE = '会员专享内容'
+
 export const publicContent = (content: ContentRecord) => {
   const accessGranted = content.accessGranted ?? content.accessMode !== 'MEMBERS_ONLY'
   return {
@@ -221,7 +223,7 @@ export const publicContent = (content: ContentRecord) => {
     version: content.version,
     etag: content.etag,
     slug: content.slug,
-    title: content.title,
+    title: accessGranted ? content.title : MEMBERS_ONLY_CONTENT_PREVIEW_TITLE,
     bodyRef: accessGranted ? content.bodyRef : '',
     mediaRefs: accessGranted ? content.mediaRefs : [],
     coverRef: accessGranted ? content.coverRef : null,
@@ -678,7 +680,14 @@ export async function getContent(
   if (allowed) return { ...content, accessGranted: true }
   // Keep a discoverable paywall shell, but never expose body or private media
   // references to anonymous or non-member readers.
-  return { ...content, accessGranted: false, bodyRef: '', mediaRefs: [], coverRef: null }
+  return {
+    ...content,
+    accessGranted: false,
+    title: MEMBERS_ONLY_CONTENT_PREVIEW_TITLE,
+    bodyRef: '',
+    mediaRefs: [],
+    coverRef: null,
+  }
 }
 
 export type OwnedPostContext = {
