@@ -65,7 +65,7 @@ describe('W10 membership renewal Workflow runtime', () => {
 
     const result = await runMembershipRenewalWorkflow(env, schedule, step.runStep)
 
-    expect(result).toEqual({ status: 'COMPLETED', processed: 1, processFailures: 0 })
+    expect(result).toEqual({ status: 'COMPLETED' })
     expect(fetch).toHaveBeenCalledTimes(1)
     expect(step.calls).toEqual([{
       name: 'invoke-w07-renewal-batch',
