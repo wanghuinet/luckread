@@ -1145,6 +1145,8 @@ describe('Creator Center admin extension', () => {
     expect(publisher).toContain("if (type !== 'post') {")
     expect(publisher).toContain("to: type === 'post' ? 'PUBLISHED' : 'PENDING_REVIEW'")
     expect(publisher).toContain("'动态已发布，已进入公开信息流。'")
+    expect(publisher).toContain('{message ? <div aria-live="polite"')
+    expect(publisher).not.toContain('message === "正在上传媒体…"')
     expect(publisher).toContain("type === 'post' ? '发布动态' : '提交发布'")
     expect(publisher).toContain("...(type === 'article' ? {")
     expect(publisher).toContain("{!isTweetModal && type === 'article' ? (")
