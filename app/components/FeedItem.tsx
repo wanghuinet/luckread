@@ -65,6 +65,8 @@ export interface FeedContent {
     contentId?: string;
     isProfilePinned?: boolean;
     contentType?: 'article' | 'post' | 'video' | string;
+    accessMode?: 'PUBLIC' | 'MEMBERS_ONLY';
+    accessGranted?: boolean;
     etag?: string;
     ownerUserId?: string;
     creatorId?: string | null;
