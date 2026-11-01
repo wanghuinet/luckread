@@ -2,6 +2,7 @@ import { apiRequest } from './api-client';
 
 export type SubscriptionStatus =
   | 'PENDING'
+  | 'TRIALING'
   | 'ACTIVE'
   | 'PAST_DUE'
   | 'PAUSED'
