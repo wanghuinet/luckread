@@ -1,0 +1,256 @@
+name: Public Content 404 Read-only Diagnostic
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/public-content-404-readonly-diagnostic.yml
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Optional immutable commit SHA already contained in protected main
+        required: false
+        type: string
+      content_id:
+        description: Published content ID to inspect
+        required: false
+        default: '2116861177622433792'
+        type: string
+      username:
+        description: Expected public author handle
+        required: false
+        default: huihui
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: public-content-404-readonly-diagnostic
+  cancel-in-progress: false
+
+jobs:
+  diagnose:
+    if: ${{ github.ref == 'refs/heads/main' && github.ref_protected == true }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout protected main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Validate immutable source and diagnostic target
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha || github.sha }}
+          CONTENT_ID: ${{ inputs.content_id || '2116861177622433792' }}
+          EXPECTED_USERNAME: ${{ inputs.username || 'huihui' }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$SOURCE_SHA" | grep -Eq '^[0-9a-f]{40}$'
+          git cat-file -e "$SOURCE_SHA^{commit}"
+          git merge-base --is-ancestor "$SOURCE_SHA" origin/main
+          printf '%s' "$CONTENT_ID" | grep -Eq '^[0-9]{18,20}$'
+          printf '%s' "$EXPECTED_USERNAME" | grep -Eq '^[A-Za-z0-9_]{1,30}$'
+          test "$(git rev-parse HEAD)" = "$(git rev-parse main)"
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Run read-only W03 D1 and public-route diagnostic
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CONTENT_ID: ${{ inputs.content_id || '2116861177622433792' }}
+          EXPECTED_USERNAME: ${{ inputs.username || 'huihui' }}
+          SOURCE_SHA: ${{ inputs.source_sha || github.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/public-content-404-diagnostic
+          node --input-type=module <<'NODE'
+          import { execFileSync } from 'node:child_process';
+          import { readFileSync, writeFileSync } from 'node:fs';
+
+          const contentId = process.env.CONTENT_ID;
+          const expectedUsername = process.env.EXPECTED_USERNAME.replace(/^@+/, '').toLowerCase();
+          if (!/^[0-9]{18,20}$/.test(contentId ?? '')) throw new Error('Invalid content ID');
+          if (!/^[a-z0-9_]{1,30}$/i.test(expectedUsername)) throw new Error('Invalid expected username');
+
+          const config = JSON.parse(readFileSync('workers/W03-content/wrangler.jsonc', 'utf8'));
+          const binding = (config.d1_databases ?? []).filter((entry) => entry.binding === 'D1_02');
+          if (config.name !== 'luckread-w03' || binding.length !== 1 ||
+              binding[0].database_name !== 'luckreadpro' ||
+              binding[0].database_id !== '6c342634-97f6-4248-9f4a-85772af4f22c') {
+            throw new Error('W03 D1_02 target does not match the reviewed production binding');
+          }
+
+          const sql = "SELECT id, slug, content_type, state, access_mode, owner_user_id, creator_id, created_at " +
+            "FROM contents WHERE id = '" + contentId + "' OR slug = '" + contentId + "' LIMIT 1;";
+          let rawD1;
+          try {
+            const output = execFileSync('npx', [
+              '--yes', 'wrangler@4.116.0', 'd1', 'execute', 'luckreadpro',
+              '--remote', '--json', '--config', 'workers/W03-content/wrangler.jsonc',
+              '--command', sql,
+            ], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 8 * 1024 * 1024 });
+            rawD1 = JSON.parse(output);
+          } catch (error) {
+            const stderr = String(error?.stderr ?? '').replace(/Bearer\s+[A-Za-z0-9._-]+/gi, 'Bearer [REDACTED]');
+            throw new Error('Read-only W03 D1 query failed: ' + stderr.slice(-1200));
+          }
+
+          const rows = [];
+          function collectRows(value) {
+            if (Array.isArray(value)) {
+              for (const child of value) collectRows(child);
+              return;
+            }
+            if (!value || typeof value !== 'object') return;
+            if (Array.isArray(value.results)) {
+              for (const row of value.results) if (row && typeof row === 'object') rows.push(row);
+            }
+            for (const [key, child] of Object.entries(value)) {
+              if (key !== 'results') collectRows(child);
+            }
+          }
+          collectRows(rawD1);
+          const row = rows.find((candidate) => String(candidate.id ?? '') === contentId) ??
+            rows.find((candidate) => String(candidate.slug ?? '') === contentId) ?? null;
+
+          const report = {
+            result: 'DIAGNOSTIC_COMPLETE',
+            sourceSha: process.env.SOURCE_SHA,
+            contentId,
+            expectedUsername,
+            readOnly: true,
+            database: { worker: config.name, binding: 'D1_02', databaseName: 'luckreadpro' },
+            d1: row ? {
+              found: true,
+              idMatches: String(row.id ?? '') === contentId,
+              slugMatches: String(row.slug ?? '') === contentId,
+              contentType: typeof row.content_type === 'string' ? row.content_type : null,
+              state: typeof row.state === 'string' ? row.state : null,
+              accessMode: typeof row.access_mode === 'string' ? row.access_mode : null,
+              hasOwnerUserId: typeof row.owner_user_id === 'string' && row.owner_user_id.length > 0,
+              hasCreatorId: typeof row.creator_id === 'string' && row.creator_id.length > 0,
+              createdAt: typeof row.created_at === 'string' ? row.created_at : null,
+            } : { found: false },
+            publicApi: { status: null, state: null, contentType: null, idMatches: false, errorCode: null },
+            authorById: [],
+            authorByUsername: { status: null, usernameMatches: false },
+            canonicalPage: { status: null, finalPath: null },
+            legacyPage: { status: null, finalPath: null },
+          };
+
+          const jsonRequest = async (url) => {
+            try {
+              const response = await fetch(url, {
+                headers: { accept: 'application/json', 'cache-control': 'no-cache' },
+                signal: AbortSignal.timeout(12000),
+              });
+              const payload = await response.json().catch(() => null);
+              return { response, payload };
+            } catch (error) {
+              return { response: null, payload: null, error: error instanceof Error ? error.name : 'FETCH_FAILED' };
+            }
+          };
+
+          const contentUrl = 'https://api.luckread.com/v1/contents/' + encodeURIComponent(contentId);
+          const contentResult = await jsonRequest(contentUrl);
+          if (contentResult.response) {
+            const payload = contentResult.payload && typeof contentResult.payload === 'object' ? contentResult.payload : {};
+            const content = typeof payload.id === 'string' ? payload :
+              payload.data && typeof payload.data === 'object' ? payload.data : {};
+            report.publicApi = {
+              status: contentResult.response.status,
+              state: typeof content.state === 'string' ? content.state : null,
+              contentType: typeof content.contentType === 'string' ? content.contentType : null,
+              idMatches: String(content.id ?? '') === contentId,
+              errorCode: typeof payload.error?.code === 'string' ? payload.error.code : null,
+            };
+          } else {
+            report.publicApi.error = contentResult.error ?? 'FETCH_FAILED';
+          }
+
+          const candidateIds = new Set();
+          for (const value of [row?.creator_id, row?.owner_user_id]) {
+            if (typeof value === 'string' && value.trim()) candidateIds.add(value.trim());
+          }
+          if (contentResult.payload && typeof contentResult.payload === 'object') {
+            const payload = contentResult.payload;
+            const content = typeof payload.id === 'string' ? payload : payload.data;
+            if (content && typeof content === 'object') {
+              for (const value of [content.creatorId, content.ownerUserId]) {
+                if (typeof value === 'string' && value.trim()) candidateIds.add(value.trim());
+              }
+            }
+          }
+
+          for (const candidateId of [...candidateIds].slice(0, 4)) {
+            const result = await jsonRequest(
+              'https://api.luckread.com/v1/users/' + encodeURIComponent(candidateId),
+            );
+            const user = result.payload && typeof result.payload === 'object' ? result.payload : {};
+            report.authorById.push({
+              status: result.response?.status ?? null,
+              usernameMatches: typeof user.username === 'string' &&
+                user.username.replace(/^@+/, '').toLowerCase() === expectedUsername,
+              hasUsername: typeof user.username === 'string' && user.username.length > 0,
+            });
+          }
+
+          const usernameResult = await jsonRequest(
+            'https://api.luckread.com/v1/users/by-username/' + encodeURIComponent(expectedUsername),
+          );
+          const usernamePayload = usernameResult.payload && typeof usernameResult.payload === 'object'
+            ? usernameResult.payload : {};
+          report.authorByUsername = {
+            status: usernameResult.response?.status ?? null,
+            usernameMatches: typeof usernamePayload.username === 'string' &&
+              usernamePayload.username.replace(/^@+/, '').toLowerCase() === expectedUsername,
+          };
+
+          const fetchPage = async (url) => {
+            try {
+              const response = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(15000) });
+              return {
+                status: response.status,
+                finalPath: new URL(response.url).pathname,
+              };
+            } catch (error) {
+              return { status: null, error: error instanceof Error ? error.name : 'FETCH_FAILED' };
+            }
+          };
+          report.canonicalPage = await fetchPage(
+            'https://www.luckread.com/@' + encodeURIComponent(expectedUsername) + '/post/' + encodeURIComponent(contentId),
+          );
+          report.legacyPage = await fetchPage(
+            'https://www.luckread.com/content/' + encodeURIComponent(contentId),
+          );
+
+          const anyAuthorMatch = report.authorById.some((item) => item.usernameMatches);
+          const d1State = report.d1.found ? report.d1.state : null;
+          if (!report.d1.found) report.classification = 'CONTENT_ROW_NOT_FOUND_IN_W03_D1_02';
+          else if (d1State !== 'PUBLISHED') report.classification = 'CONTENT_NOT_PUBLIC_STATE_' + String(d1State ?? 'UNKNOWN');
+          else if (report.publicApi.status !== 200) report.classification = 'W03_PUBLIC_API_READ_MISMATCH';
+          else if (!anyAuthorMatch && report.authorByUsername.status === 200) report.classification = 'AUTHOR_ID_MAPPING_MISMATCH';
+          else if (!anyAuthorMatch) report.classification = 'AUTHOR_PROFILE_NOT_RESOLVED_BY_CONTENT_ID';
+          else if (report.canonicalPage.status !== 200) report.classification = 'CANONICAL_PAGE_ROUTE_FAILURE';
+          else report.classification = 'PUBLIC_CONTENT_LINK_OK';
+
+          const outputPath = 'artifacts/public-content-404-diagnostic/report.json';
+          writeFileSync(outputPath, JSON.stringify(report, null, 2) + '\n');
+          console.log(JSON.stringify(report, null, 2));
+          NODE
+
+      - name: Upload sanitized diagnostic evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: public-content-404-diagnostic-${{ github.run_id }}
+          path: artifacts/public-content-404-diagnostic/report.json
+          if-no-files-found: warn
+          retention-days: 7
