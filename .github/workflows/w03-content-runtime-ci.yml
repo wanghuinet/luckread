@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "workers/W03-content/**"
+      - ".github/workflows/w03-content-runtime-ci.yml"
       - "contracts/persistence/CONTENT-ARTICLE-d1-02-persistence.v1.json"
       - "contracts/transport/W01-W03-content-http-binding.v1.json"
       - "contracts/transport/W05-W03-owned-post-context-http-binding.v1.json"
@@ -33,7 +34,7 @@ jobs:
         run: npm ci
 
       - name: Run W03 content unit tests
-        run: npx --yes vitest@3.2.4 run workers/W03-content/src/content-runtime.test.ts workers/W03-content/src/publish-preflight.test.ts workers/W03-content/src/d1-traffic-guard.test.ts workers/W03-content/src/following-feed.test.ts workers/W03-content/src/content-search.test.ts
+        run: npx --yes vitest@3.2.4 run workers/W03-content/src/content-runtime.test.ts workers/W03-content/src/content-snowflake-id.test.ts workers/W03-content/src/publish-preflight.test.ts workers/W03-content/src/d1-traffic-guard.test.ts workers/W03-content/src/following-feed.test.ts workers/W03-content/src/content-search.test.ts
 
       - name: Typecheck W03 content runtime
         run: >

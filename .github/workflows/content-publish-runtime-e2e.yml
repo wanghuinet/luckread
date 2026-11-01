@@ -334,7 +334,7 @@ jobs:
           node <<'NODE'
           const fs = require('node:fs');
           const value = JSON.parse(fs.readFileSync('/tmp/article-create.json', 'utf8'));
-          if (value.state !== 'DRAFT' || typeof value.id !== 'string' || value.etag !== 'W/"1"' || Number(value.version) !== 1) throw new Error('article create assertion failed: ' + JSON.stringify(value));
+          if (value.state !== 'DRAFT' || typeof value.id !== 'string' || !/^[0-9]{18,20}$/.test(value.id) || BigInt(value.id).toString(10) !== value.id || value.etag !== 'W/"1"' || Number(value.version) !== 1) throw new Error('article Snowflake create assertion failed: ' + JSON.stringify(value));
           fs.appendFileSync(process.env.GITHUB_ENV, 'ARTICLE_ID=' + value.id + '\nARTICLE_ETAG=' + value.etag + '\n');
           NODE
 
@@ -346,7 +346,7 @@ jobs:
           node <<'NODE'
           const fs = require('node:fs');
           const value = JSON.parse(fs.readFileSync('/tmp/video-create.json', 'utf8'));
-          if (value.state !== 'DRAFT' || typeof value.id !== 'string' || value.etag !== 'W/"1"' || Number(value.version) !== 1) throw new Error('video create assertion failed: ' + JSON.stringify(value));
+          if (value.state !== 'DRAFT' || typeof value.id !== 'string' || !/^[0-9]{18,20}$/.test(value.id) || BigInt(value.id).toString(10) !== value.id || value.etag !== 'W/"1"' || Number(value.version) !== 1) throw new Error('video Snowflake create assertion failed: ' + JSON.stringify(value));
           fs.appendFileSync(process.env.GITHUB_ENV, 'VIDEO_ID=' + value.id + '\nVIDEO_ETAG=' + value.etag + '\n');
           NODE
 
@@ -378,8 +378,10 @@ jobs:
           node <<'NODE'
           const fs = require('node:fs');
           const value = JSON.parse(fs.readFileSync('/tmp/social-post-create.json', 'utf8'));
-          if (value.contentType !== 'post' || value.state !== 'DRAFT' || typeof value.id !== 'string' || value.etag !== 'W/"1"' || Number(value.version) !== 1) {
-            throw new Error('social post create assertion failed: ' + JSON.stringify(value));
+          if (value.contentType !== 'post' || value.state !== 'DRAFT' || typeof value.id !== 'string' ||
+              !/^[0-9]{18,20}$/.test(value.id) || BigInt(value.id).toString(10) !== value.id ||
+              value.etag !== 'W/"1"' || Number(value.version) !== 1) {
+            throw new Error('social post Snowflake create assertion failed: ' + JSON.stringify(value));
           }
           fs.appendFileSync(process.env.GITHUB_ENV, 'SOCIAL_POST_ID=' + value.id + '\nSOCIAL_POST_ETAG=' + value.etag + '\n');
           NODE
@@ -579,13 +581,21 @@ jobs:
           npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME_W06" --remote --json --config workers/W06-governance/wrangler.jsonc             --command "SELECT decision_id,case_id,case_version,outcome,policy_version,reviewer_id,reviewer_layer FROM moderation_decisions WHERE case_id IN ('$CASE_ARTICLE_ID','$CASE_VIDEO_ID') ORDER BY case_id;"             > artifacts/mapping-0/content-publish-runtime-e2e/moderation-decisions.json
           node <<'NODE'
           const fs=require('node:fs');
-          for(const kind of ['article','video']){
+          for(const [kind,expectedId] of [['article',process.env.ARTICLE_ID],['video',process.env.VIDEO_ID]]){
             const pub=JSON.parse(fs.readFileSync('artifacts/mapping-0/content-publish-runtime-e2e/'+kind+'-public.json','utf8'));
+            if(typeof pub.id!=='string'||pub.id!==expectedId||!/^[0-9]{18,20}$/.test(pub.id)||BigInt(pub.id).toString(10)!==pub.id) {
+              throw new Error(kind+' public W01 readback changed or coerced its Snowflake ID: '+JSON.stringify({expectedId,actualId:pub.id}));
+            }
             if(pub.state!=='PUBLISHED'||Number(pub.version)!==4) throw new Error(kind+' public visibility failed: '+JSON.stringify(pub));
           }
           const socialPostPublic=JSON.parse(fs.readFileSync('artifacts/mapping-0/content-publish-runtime-e2e/social-post-public.json','utf8'));
           if(socialPostPublic.contentType!=='post'||socialPostPublic.state!=='PUBLISHED'||Number(socialPostPublic.version)!==2) {
             throw new Error('social post public visibility failed: '+JSON.stringify(socialPostPublic));
+          }
+          if(typeof socialPostPublic.id!=='string'||socialPostPublic.id!==process.env.SOCIAL_POST_ID||
+             !/^[0-9]{18,20}$/.test(socialPostPublic.id)||BigInt(socialPostPublic.id).toString(10)!==socialPostPublic.id) {
+            throw new Error('social post public W01 readback changed or coerced its Snowflake ID: '+
+              JSON.stringify({expectedId:process.env.SOCIAL_POST_ID,actualId:socialPostPublic.id}));
           }
           const expectedAttachmentRef = process.env.POST_ATTACHMENT_REF;
           if (!expectedAttachmentRef || !Array.isArray(socialPostPublic.mediaRefs) || socialPostPublic.mediaRefs.length !== 1 ||

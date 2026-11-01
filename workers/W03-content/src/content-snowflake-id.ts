@@ -1,7 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
 /**
- * W03's Snowflake-compatible article/video ID allocator.
+ * W03's Snowflake-compatible content ID allocator.
  *
  * The chosen upstream package documents the same 42/10/12 layout, but its
  * sequence is process-local. Cloudflare isolates do not share in-memory state.
