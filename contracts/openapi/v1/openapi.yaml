@@ -3781,6 +3781,11 @@ paths:
           in: query
           required: false
           schema: { type: string, maxLength: 2048 }
+        - name: creatorId
+          in: query
+          required: false
+          description: Limit discovery to the specified creator's active public plans.
+          schema: { type: string, minLength: 1, maxLength: 256 }
       responses:
         '200':
           description: Active public plan catalog.

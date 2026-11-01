@@ -33,6 +33,7 @@ type ContentRecord = {
   version?: number;
   state?: string;
   contentType?: 'article' | 'post' | 'video';
+  accessMode?: 'PUBLIC' | 'MEMBERS_ONLY';
   title?: string;
   bodyRef?: string;
   mediaRefs?: string[];
@@ -107,6 +108,7 @@ export default function PublishScreen() {
   const user = useAuthStore((state) => state.user);
 
   const [body, setBody] = useState('');
+  const [accessMode, setAccessMode] = useState<'PUBLIC' | 'MEMBERS_ONLY'>('PUBLIC');
   const [assets, setAssets] = useState<ComposerAsset[]>([]);
   const [coverRef, setCoverRef] = useState('');
   const [busy, setBusy] = useState(false);
@@ -119,6 +121,7 @@ export default function PublishScreen() {
   const [pollDurationHours, setPollDurationHours] = useState<PollDurationHours>(24);
 
   const recordRef = useRef<ContentRecord | null>(null);
+  const originalAccessModeRef = useRef<'PUBLIC' | 'MEMBERS_ONLY'>('PUBLIC');
   const originalBodyRef = useRef<{ text: string; bodyRef: string | null }>({ text: '', bodyRef: null });
   const bodyUploadRef = useRef<{ text: string; key: string; uploaded?: UploadedMedia } | null>(null);
   const submitAttemptRef = useRef<SubmitAttempt | null>(null);
@@ -144,7 +147,10 @@ export default function PublishScreen() {
       const record = unwrapContent(result.data);
       if (!record) throw new Error('The server returned an incomplete content record.');
       if (record.contentType !== 'post') throw new Error('Beta editing currently supports social posts only.');
-      const ownerId = record.ownerUserId || record.creatorId;
+      // W03 exposes ownerUserId only to the authenticated owner. creatorId
+      // is the canonical W08 Creator identity and may differ from the login user ID.
+      // Final ownership enforcement remains in W03 for every edit mutation.
+      const ownerId = record.ownerUserId;
       if (ownerId && user?.id && ownerId !== user.id) {
         throw new Error('You can edit only your own post.');
       }
@@ -154,6 +160,9 @@ export default function PublishScreen() {
       }
       const loaded: ContentRecord = { ...record, etag };
       recordRef.current = loaded;
+      const loadedAccessMode = record.accessMode === 'MEMBERS_ONLY' ? 'MEMBERS_ONLY' : 'PUBLIC';
+      originalAccessModeRef.current = loadedAccessMode;
+      setAccessMode(loadedAccessMode);
       originalBodyRef.current = { text: record.title || '', bodyRef: record.bodyRef || null };
       setBody(record.title || '');
       setCoverRef(record.coverRef || '');
@@ -359,7 +368,7 @@ export default function PublishScreen() {
     const nextCover = coverRef && mediaRefs.includes(coverRef)
       ? coverRef
       : assets.find((asset) => asset.mimeType.startsWith('image/'))?.serverUrl || null;
-    const fingerprint = JSON.stringify([contentId || '', trimmedBody, mediaRefs, nextCover, pollEnabled, cleanPollOptions, pollEnabled ? pollDurationHours : null]);
+    const fingerprint = JSON.stringify([contentId || '', trimmedBody, mediaRefs, nextCover, accessMode, pollEnabled, cleanPollOptions, pollEnabled ? pollDurationHours : null]);
     let attempt = submitAttemptRef.current;
     if (attempt && attempt.fingerprint !== fingerprint) {
       if (!contentId && !recordRef.current && publishPending) {
@@ -404,12 +413,15 @@ export default function PublishScreen() {
       }
       if (!bodyRef) throw new Error('The server did not return a permanent URL for the post body.');
 
+      const includeAccessMode = accessMode === 'MEMBERS_ONLY' ||
+        originalAccessModeRef.current === 'MEMBERS_ONLY';
       const payload = {
         contentType: 'post',
         title: trimmedBody,
         bodyRef,
         mediaRefs,
         coverRef: nextCover,
+        ...(includeAccessMode ? { accessMode } : {}),
       };
 
       if (contentId) {
@@ -547,7 +559,7 @@ export default function PublishScreen() {
     } finally {
       setBusy(false);
     }
-  }, [assets, body, contentId, coverRef, pollDurationHours, pollEnabled, pollOptions, publishPending, router]);
+  }, [accessMode, assets, body, contentId, coverRef, pollDurationHours, pollEnabled, pollOptions, publishPending, router]);
 
   if (authStatus !== 'authenticated') {
     return (
@@ -612,6 +624,40 @@ export default function PublishScreen() {
           <View style={styles.counterRow}>
             <Text style={styles.helperText}>Ordinary social posts publish directly; no extra review screen.</Text>
             <Text style={styles.counter}>{body.length}/{MAX_TEXT_LENGTH}</Text>
+          </View>
+
+          <View style={styles.accessModeSection}>
+            <View>
+              <Text style={styles.accessModeTitle}>内容可见范围</Text>
+              <Text style={styles.accessModeDescription}>公开内容人人可见；会员专享内容仅对有效订阅者开放。</Text>
+            </View>
+            <View style={styles.accessModeOptions}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ selected: accessMode === 'PUBLIC', disabled: busy || loadingEdit || publishPending }}
+                disabled={busy || loadingEdit || publishPending}
+                onPress={() => setAccessMode('PUBLIC')}
+                style={[styles.accessModeOption, accessMode === 'PUBLIC' && styles.accessModeOptionSelected]}
+              >
+                <Feather name="globe" size={16} color={accessMode === 'PUBLIC' ? '#ffffff' : PRIMARY} />
+                <Text style={[styles.accessModeOptionText, accessMode === 'PUBLIC' && styles.accessModeOptionTextSelected]}>公开</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ selected: accessMode === 'MEMBERS_ONLY', disabled: busy || loadingEdit || publishPending }}
+                disabled={busy || loadingEdit || publishPending}
+                onPress={() => setAccessMode('MEMBERS_ONLY')}
+                style={[styles.accessModeOption, accessMode === 'MEMBERS_ONLY' && styles.accessModeOptionSelected]}
+              >
+                <Feather name="lock" size={16} color={accessMode === 'MEMBERS_ONLY' ? '#ffffff' : PRIMARY} />
+                <Text style={[styles.accessModeOptionText, accessMode === 'MEMBERS_ONLY' && styles.accessModeOptionTextSelected]}>会员专享</Text>
+              </Pressable>
+            </View>
+            {accessMode === 'MEMBERS_ONLY' ? (
+              <Text style={styles.accessModeNotice}>
+                仅通过服务端创作者身份验证的账号可以发布会员专享内容。订阅权益由 W07 根据有效订阅状态实时判断。
+              </Text>
+            ) : null}
           </View>
 
           {assets.map((asset) => (
@@ -784,6 +830,15 @@ const styles = StyleSheet.create({
   counterRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, paddingBottom: 15, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#eaecf0' },
   helperText: { flex: 1, fontSize: 12, lineHeight: 17, color: '#667085' },
   counter: { fontSize: 12, color: '#667085' },
+  accessModeSection: { paddingVertical: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#eaecf0' },
+  accessModeTitle: { color: '#101828', fontSize: 14, fontWeight: '800' },
+  accessModeDescription: { color: '#667085', fontSize: 12, lineHeight: 18, marginTop: 4 },
+  accessModeOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: 9, marginTop: 12 },
+  accessModeOption: { flexDirection: 'row', alignItems: 'center', gap: 7, borderWidth: 1, borderColor: '#d0d5dd', borderRadius: 999, paddingHorizontal: 15, paddingVertical: 9 },
+  accessModeOptionSelected: { backgroundColor: PRIMARY, borderColor: PRIMARY },
+  accessModeOptionText: { color: '#344054', fontSize: 13, fontWeight: '700' },
+  accessModeOptionTextSelected: { color: '#ffffff' },
+  accessModeNotice: { color: '#667085', fontSize: 12, lineHeight: 18, marginTop: 10 },
   assetRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 12, padding: 10, borderWidth: 1, borderColor: '#eaecf0', borderRadius: 12 },
   assetThumbnail: { width: 58, height: 58, borderRadius: 8, backgroundColor: '#f2f4f7' },
   videoThumbnail: { alignItems: 'center', justifyContent: 'center' },

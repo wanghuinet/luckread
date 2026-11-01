@@ -80,6 +80,7 @@ export type ActiveMembershipPlanPage = {
 type PlanPageOptions = {
   limit?: number;
   cursor?: string | null;
+  creatorId?: string;
   signal?: AbortSignal;
 };
 
@@ -89,6 +90,16 @@ export function fetchActiveMembershipPlansPage(options: PlanPageOptions = {}) {
   if (!Number.isSafeInteger(limit) || limit < 1 || limit > 50) {
     throw new RangeError('Membership plan page size must be between 1 and 50.');
   }
+  const creatorId = options.creatorId;
+  if (creatorId !== undefined && (
+    typeof creatorId !== 'string' ||
+    creatorId.length < 1 ||
+    creatorId.length > 256 ||
+    creatorId.trim() !== creatorId ||
+    !/^[A-Za-z0-9][A-Za-z0-9_-]{0,255}$/.test(creatorId)
+  )) {
+    throw new TypeError('Membership plan creator ID is invalid.');
+  }
   const cursor = options.cursor ?? null;
   if (cursor !== null && (typeof cursor !== 'string' || cursor.length < 1 || cursor.length > 2048)) {
     throw new RangeError('Membership plan cursor must be between 1 and 2048 characters.');
@@ -96,6 +107,7 @@ export function fetchActiveMembershipPlansPage(options: PlanPageOptions = {}) {
 
   const query = new URLSearchParams({ limit: String(limit) });
   if (cursor) query.set('cursor', cursor);
+  if (creatorId !== undefined) query.set('creatorId', creatorId);
   return apiRequest<unknown>('/plans?' + query.toString(), {
     method: 'GET',
     signal: options.signal,

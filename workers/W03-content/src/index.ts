@@ -2,6 +2,7 @@
 
 import {
   ContentRuntimeError,
+  MEMBERS_ONLY_CONTENT_PREVIEW_TITLE,
   createContent,
   createRequestId,
   deleteContent,
@@ -476,7 +477,7 @@ const worker = {
               creatorId: item.creatorId ?? item.ownerUserId,
               createdAt: item.createdAt,
               contentType: item.contentType,
-              title: item.title,
+              title: item.accessMode === 'MEMBERS_ONLY' ? MEMBERS_ONLY_CONTENT_PREVIEW_TITLE : item.title,
               accessMode: item.accessMode ?? 'PUBLIC',
               // Feed remains metadata-only: a member must open the canonical
               // detail route for the W07 entitlement check before refs are returned.
@@ -543,7 +544,7 @@ const worker = {
               creatorId: item.creatorId ?? item.ownerUserId,
               createdAt: item.createdAt,
               contentType: item.contentType,
-              title: item.title,
+              title: item.accessMode === 'MEMBERS_ONLY' ? MEMBERS_ONLY_CONTENT_PREVIEW_TITLE : item.title,
               accessMode: item.accessMode ?? 'PUBLIC',
               // Search is metadata-only: a member must open the canonical
               // detail route for the W07 entitlement check before refs are returned.
@@ -658,7 +659,7 @@ const worker = {
                 ownerUserId: item.ownerUserId,
                 creatorId: item.creatorId,
                 contentType: item.contentType,
-                title: item.title,
+                title: item.accessMode === 'MEMBERS_ONLY' ? MEMBERS_ONLY_CONTENT_PREVIEW_TITLE : item.title,
                 accessMode: item.accessMode ?? 'PUBLIC',
                 // Bookmark projections are not an authorization boundary.
                 // Always omit protected references here; detail checks W07.
@@ -1083,7 +1084,7 @@ const worker = {
                 state: item.state,
                 version: item.version,
                 etag: item.etag,
-                title: item.title,
+                title: item.accessMode === 'MEMBERS_ONLY' ? MEMBERS_ONLY_CONTENT_PREVIEW_TITLE : item.title,
                 accessMode: item.accessMode ?? 'PUBLIC',
                 // General list responses deliberately omit protected references.
                 // The detail endpoint is the single request-time entitlement gate.
@@ -1139,6 +1140,9 @@ const worker = {
               : typeof body.scheduledAt === 'string'
                 ? body.scheduledAt
                 : (() => { throw new ContentRuntimeError('VALIDATION_FAILED', 400) })()
+        const verifiedCreatorId = request.headers.has('X-LuckRead-Verified-Creator-Id')
+          ? requireVerifiedCreatorId(request)
+          : undefined
         const result = await transitionContentState(
           env.D1_02,
           principal.userId,
@@ -1149,7 +1153,7 @@ const worker = {
           requireIfMatch(request),
           requireIdempotency(request),
           new Date(),
-          { scheduledAt: requestedScheduledAt, preflight: body.preflight },
+          { scheduledAt: requestedScheduledAt, preflight: body.preflight, verifiedCreatorId },
         )
         return json({ ...result, requestId: createRequestId() })
       }
@@ -1245,6 +1249,7 @@ const worker = {
         return json({
           id: content.id,
           slug: content.slug,
+          ...(principalUserId === content.ownerUserId ? { ownerUserId: content.ownerUserId } : {}),
           creatorId: content.creatorId,
           contentType: content.contentType,
           state: content.state,

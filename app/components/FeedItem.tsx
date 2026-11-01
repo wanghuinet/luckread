@@ -65,6 +65,8 @@ export interface FeedContent {
     contentId?: string;
     isProfilePinned?: boolean;
     contentType?: 'article' | 'post' | 'video' | string;
+    accessMode?: 'PUBLIC' | 'MEMBERS_ONLY';
+    accessGranted?: boolean;
     etag?: string;
     ownerUserId?: string;
     creatorId?: string | null;
@@ -544,6 +546,12 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
                                 )}
                             </View>
 
+                            {itemData.accessMode === 'MEMBERS_ONLY' && itemData.accessGranted !== true ? (
+                                <View className="mt-2 self-start flex-row items-center gap-1 rounded-full bg-amber-50 px-2 py-1 dark:bg-amber-950/40">
+                                    <Feather name="lock" size={12} color="#b45309" />
+                                    <Text className="text-xs font-semibold text-amber-800 dark:text-amber-300">会员专享</Text>
+                                </View>
+                            ) : null}
                             <Text className="text-black dark:text-white mt-1 text-lg leading-6">{itemData.message}</Text>
                             <FeedMediaGallery items={mediaItems} />
                             {detailView && itemData.contentType === 'post' && itemData.contentId ? (

@@ -2,10 +2,38 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-import { canTransitionContentState, ContentRuntimeError, createContent, createRequestId, deleteContent, decodeContentListCursor, decodeCursor, decodeScopedCursor, encodeContentListCursor, encodeCursor, encodeScopedCursor, isState, listContents, listPublishedContentsByIds, listContentRevisions, listCreatorContents, publishDueScheduledContent, toErrorResponse, transitionContentState, updateContent, validateInput, validateListFilters } from './content-runtime.js'
+import { canTransitionContentState, ContentRuntimeError, createContent, createRequestId, deleteContent, decodeContentListCursor, decodeCursor, decodeScopedCursor, encodeContentListCursor, encodeCursor, encodeScopedCursor, isState, listContents, listPublishedContentsByIds, listContentRevisions, listCreatorContents, publishDueScheduledContent, publicContent, toErrorResponse, transitionContentState, updateContent, validateInput, validateListFilters } from './content-runtime.js'
 import w03Worker, { hasCreatorContentPermission, hasSocialPostPermission, parseListLimit } from './index.js'
 
 describe('W03 content contract core', () => {
+
+  it('redacts member-only content titles and protected references when access is denied', () => {
+    const result = publicContent({
+      id: 'content_member_preview',
+      creatorId: 'creator_1',
+      state: 'PUBLISHED',
+      scheduledAt: null,
+      accessMode: 'MEMBERS_ONLY',
+      accessGranted: false,
+      version: 1,
+      etag: 'W/"1"',
+      slug: 'member-preview',
+      title: 'This is the private full post body and must never appear in a preview.',
+      bodyRef: 'https://img.luckread.com/private-body.txt',
+      mediaRefs: ['https://img.luckread.com/private-photo.webp'],
+      coverRef: 'https://img.luckread.com/private-cover.webp',
+    } as never);
+
+    expect(result).toMatchObject({
+      accessMode: 'MEMBERS_ONLY',
+      accessGranted: false,
+      title: '会员专享内容',
+      bodyRef: '',
+      mediaRefs: [],
+      coverRef: null,
+    });
+    expect(JSON.stringify(result)).not.toContain('private full post body');
+  });
 
   it('classifies published public-post media and protects member-only media with W07 entitlement', async () => {
     const publicUrl = 'https://img.luckread.com/media/photo%20(1).png'
@@ -230,7 +258,7 @@ describe('W03 content contract core', () => {
       creatorId: 'creator_1',
       accessMode: 'MEMBERS_ONLY',
       accessGranted: false,
-      title: 'Members-only title',
+      title: '会员专享内容',
       bodyRef: '',
       mediaRefs: [],
       coverRef: null,
@@ -1106,6 +1134,74 @@ describe('W03 content contract core', () => {
       expect(result).toMatchObject({ from: 'DRAFT', to: 'PUBLISHED', version: 2, etag: 'W/"2"' })
       expect(batchCalled).toBe(true)
     }
+  })
+
+  it('requires the current verified creator identity to publish member-only posts', async () => {
+    const row = {
+      id: 'content_member_publish_1',
+      content_type: 'post',
+      owner_user_id: 'user_member_creator',
+      creator_id: 'creator_verified_1',
+      ip_id: null,
+      state: 'DRAFT',
+      scheduled_at: null,
+      access_mode: 'MEMBERS_ONLY',
+      version: 1,
+      revision: 1,
+      slug: 'member-post-1',
+      title: 'Member-only update',
+      body_ref: 'https://img.luckread.com/media/member-body.txt',
+      media_refs_json: '[]',
+      cover_ref: null,
+      etag: 'W/"1"',
+      created_at: '2026-10-16T00:00:00.000Z',
+      updated_at: '2026-10-16T00:00:00.000Z',
+      idem_id: null,
+      idem_owner_user_id: null,
+      idem_request_hash: null,
+      idem_status: null,
+      idem_response_status: null,
+      idem_response_json: null,
+      idem_expires_at: null,
+    }
+    let batchCalls = 0
+    const db = {
+      prepare() {
+        return { bind: () => ({ first: async () => row }) }
+      },
+      batch: async () => { batchCalls += 1; return [] },
+    } as never
+    const options = {
+      preflight: {
+        contentType: 'post',
+        title: 'Member-only update',
+        body: 'An update available to current members of this creator.',
+        mediaRefs: [],
+        coverRef: null,
+        aiMode: 'none',
+        humanContribution: 'substantial',
+      },
+    }
+    const transition = (verifiedCreatorId?: string) => transitionContentState(
+      db,
+      'user_member_creator',
+      'L3',
+      row.id,
+      'PUBLISHED',
+      undefined,
+      row.etag,
+      'member-publish-' + (verifiedCreatorId ?? 'missing'),
+      new Date('2026-10-16T00:01:00.000Z'),
+      { ...options, verifiedCreatorId },
+    )
+
+    await expect(transition()).rejects.toMatchObject({ code: 'PERMISSION_DENIED', status: 403 })
+    await expect(transition('creator_other')).rejects.toMatchObject({ code: 'PERMISSION_DENIED', status: 403 })
+    expect(batchCalls).toBe(0)
+
+    const published = await transition('creator_verified_1')
+    expect(published).toMatchObject({ from: 'DRAFT', to: 'PUBLISHED', version: 2 })
+    expect(batchCalls).toBe(1)
   })
 
   it('does not let a higher-layer social author publish an article', async () => {

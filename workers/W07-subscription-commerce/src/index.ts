@@ -516,7 +516,13 @@ export default {
       if (operation.operation === 'listPlans') {
         const url = new URL(request.url)
         const requestedLimit = parseBoundedPositiveInt(url.searchParams.get('limit'), 20, 50)
-        const result = await listActiveMembershipPlans(env.D1_01, requestedLimit, url.searchParams.get('cursor'))
+        const creatorId = url.searchParams.get('creatorId')
+        const result = await listActiveMembershipPlans(
+          env.D1_01,
+          requestedLimit,
+          url.searchParams.get('cursor'),
+          creatorId,
+        )
         return json({ data: result, requestId: crypto.randomUUID() })
       }
       if (operation.operation === 'list') {

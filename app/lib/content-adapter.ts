@@ -26,6 +26,8 @@ export type ApiContentRecord = {
   etag?: string;
   ownerUserId?: string;
   creatorId?: string | null;
+  accessMode?: 'PUBLIC' | 'MEMBERS_ONLY';
+  accessGranted?: boolean;
   contentType?: 'article' | 'post' | 'video' | string;
   state?: string;
   title?: string;
@@ -158,7 +160,7 @@ function resolveMediaUrl(value: unknown): string | null {
   }
 }
 
-/** Resolve a media reference for native image/video views without leaking auth off-origin. */
+/** Resolve native media and send sessions only to API or first-party W01 delivery origins. */
 export function resolveNativeMediaSource(
   value: unknown,
   sessionToken?: string | null,
@@ -169,7 +171,10 @@ export function resolveNativeMediaSource(
 
   try {
     const baseOrigin = new URL(getApiBaseUrl()).origin;
-    if (new URL(uri).origin !== baseOrigin) return { uri };
+    const target = new URL(uri);
+    const trustedMediaDeliveryHost = target.protocol === 'https:' &&
+      ['img.luckread.com', 'video.luckread.com'].includes(target.hostname);
+    if (target.origin !== baseOrigin && !trustedMediaDeliveryHost) return { uri };
     return { uri, headers: { Authorization: 'Bearer ' + sessionToken } };
   } catch {
     return { uri };
@@ -189,13 +194,17 @@ export function mapContentToFeedContent(
   const parsedTime = createdAt ? Date.parse(createdAt) : Number.NaN;
   const postedTime = Number.isFinite(parsedTime) ? Math.floor(parsedTime / 1000) : 0;
   const title = item.title?.trim() || '';
-  const body = (bodyText ?? item.bodyText ?? item.body ?? item.text ?? item.excerpt ?? item.summary ?? item.description ?? '').trim();
+  const accessGranted = item.accessMode !== 'MEMBERS_ONLY' || item.accessGranted === true;
+  const bodySource = accessGranted
+    ? (bodyText ?? item.bodyText ?? item.body ?? item.text ?? item.excerpt ?? item.summary ?? item.description ?? '')
+    : (item.excerpt ?? item.summary ?? item.description ?? '');
+  const body = bodySource.trim();
   const message = body && title && body !== title ? title + '\n\n' + body : body || title;
-  const cover = resolveMediaUrl(item.coverRef) ?? undefined;
-  const mediaCandidates = [
+  const cover = accessGranted ? resolveMediaUrl(item.coverRef) ?? undefined : undefined;
+  const mediaCandidates = (accessGranted ? [
     ...(Array.isArray(item.mediaRefs) ? item.mediaRefs : []),
     ...(cover ? [cover] : []),
-  ]
+  ] : [])
     .map(resolveMediaUrl)
     .filter((url): url is string => Boolean(url));
   const mediaItems: FeedMediaAttachment[] = Array.from(new Set(mediaCandidates))
@@ -216,6 +225,8 @@ export function mapContentToFeedContent(
   return {
     contentId: item.id,
     contentType: item.contentType,
+    accessMode: item.accessMode,
+    accessGranted,
     etag: item.etag,
     ownerUserId: item.ownerUserId,
     creatorId: item.creatorId,
@@ -308,6 +319,10 @@ export async function readContentBody(
   signal?: AbortSignal,
   sessionToken?: string | null,
 ): Promise<string> {
+  if (item.accessMode === 'MEMBERS_ONLY' && item.accessGranted !== true) {
+    return (item.excerpt ?? item.summary ?? item.description ?? item.title ?? '').trim();
+  }
+
   const directBody = item.bodyText ?? item.body ?? item.text;
   if (typeof directBody === 'string' && directBody.trim()) return directBody.trim();
 

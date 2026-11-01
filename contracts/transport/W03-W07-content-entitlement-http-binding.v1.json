@@ -56,7 +56,7 @@
     "Only W03 is accepted as transport caller for this operation.",
     "Cookie and Authorization headers are forbidden on the W03 -> W07 service request.",
     "W07 is authoritative for membership subscription state and paid-through time.",
-    "A decision allows access only for ACTIVE subscription state, matching subscriber and creator, current_period_start <= now < current_period_end, and cancel_at is null or in the future.",
+    "A decision allows access only for ACTIVE or TRIALING subscription state, matching subscriber and creator, current_period_start <= now < current_period_end, and cancel_at is null or in the future.",
     "W03 remains authoritative for content identity, publication state, accessMode, content body and media references.",
     "No payment, order, subscription or entitlement state is written by this query.",
     "No new Worker, D1, Queue or runtime namespace is introduced.",

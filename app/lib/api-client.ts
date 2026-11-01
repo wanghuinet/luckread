@@ -495,7 +495,13 @@ export async function fetchContentBodyReference(
   }
 
   const headers = new Headers({ Accept: 'text/plain, application/json;q=0.9, */*;q=0.8' });
-  if (target.origin === base.origin) {
+  // First-party media delivery is a distinct W01 origin, but it authenticates
+  // Bearer sessions and asks W03 to re-check content visibility on every read.
+  // Never forward credentials to other LuckRead subdomains or arbitrary hosts.
+  const trustedMediaDeliveryHost = target.protocol === 'https:' &&
+    ['img.luckread.com', 'video.luckread.com'].includes(target.hostname);
+  const maySendSession = target.origin === base.origin || trustedMediaDeliveryHost;
+  if (maySendSession) {
     const token = options.sessionToken === undefined
       ? await readSessionToken().catch(() => null)
       : options.sessionToken;

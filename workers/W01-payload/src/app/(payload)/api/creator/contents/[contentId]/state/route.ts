@@ -52,15 +52,16 @@ export async function POST(
       return errorResponse(422, 'VALIDATION_FAILED', 'Invalid content state request')
     }
 
-    const boundBody = await bindPreflightToStoredPost(request, contentId, principal, body, errorResponse)
-    if (boundBody instanceof Response) return boundBody
+    const binding = await bindPreflightToStoredPost(request, contentId, principal, body, errorResponse)
+    if (binding instanceof Response) return binding
 
     const response = await callW03Content({
       request,
       pathname: `/internal/content/contents/${encodeURIComponent(contentId)}/state`,
       method: 'POST',
-      body: boundBody,
+      body: binding.body,
       principal,
+      verifiedCreatorId: binding.verifiedCreatorId,
     })
 
     if (response.ok) {

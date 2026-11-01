@@ -229,7 +229,8 @@
       "minimumGlobalLayer": "L2",
       "query": {
         "limit": "optional integer 1..50, default 20",
-        "cursor": "optional opaque keyset cursor"
+        "cursor": "optional opaque keyset cursor",
+        "creatorId": "optional creator identity; returns only that creator's ACTIVE and PUBLIC plans"
       },
       "cache": "NO_STORE",
       "responseAuthority": "W07 returns only ACTIVE, PUBLIC creator plans backed by an immutable current plan version."

@@ -929,6 +929,40 @@ test('fetches trusted W03 body references through the shared client with same-or
   expect(capturedRequest.init.cache).toBe('no-store');
 });
 
+test('forwards a session token to the first-party media delivery hosts so W01 can re-check W03 access', async () => {
+  const requests = [];
+  pendingFetch = async (input, init) => {
+    requests.push({ url: new URL(String(input)), headers: new Headers(init.headers) });
+    return new Response('authorized member body', { status: 200 });
+  };
+
+  await fetchContentBodyReference('https://img.luckread.com/private/member-body.txt', {
+    sessionToken: 'secure-test-token',
+  });
+  await fetchContentBodyReference('https://video.luckread.com/private/member-body.json', {
+    sessionToken: 'secure-test-token',
+  });
+
+  expect(requests).toHaveLength(2);
+  expect(requests[0].headers.get('Authorization')).toBe('Bearer secure-test-token');
+  expect(requests[1].headers.get('Authorization')).toBe('Bearer secure-test-token');
+  expect(requests.every((request) => request.url.protocol === 'https:')).toBe(true);
+});
+
+test('does not forward session credentials to other LuckRead subdomains', async () => {
+  let capturedHeaders;
+  pendingFetch = async (_input, init) => {
+    capturedHeaders = new Headers(init.headers);
+    return new Response('public text', { status: 200 });
+  };
+
+  await fetchContentBodyReference('https://other.luckread.com/public/body.txt', {
+    sessionToken: 'secure-test-token',
+  });
+
+  expect(capturedHeaders.has('Authorization')).toBe(false);
+});
+
 test('rejects untrusted body-reference origins before making a network request', async () => {
   let requestCount = 0;
   pendingFetch = async () => {

@@ -185,6 +185,7 @@ export default function PostDetailScreen() {
     const postId = Array.isArray(rawId) ? rawId[0] || '' : rawId || '';
     const [selectedSort, setSelectedSort] = useState<SortType>('relevant');
     const [findPost, setFindPost] = useState<FeedContent | null>(null);
+    const [membershipRequired, setMembershipRequired] = useState(false);
     const [loading, setLoading] = useState(true);
     const [errorMessage, setErrorMessage] = useState('');
     const [retryKey, setRetryKey] = useState(0);
@@ -216,6 +217,7 @@ export default function PostDetailScreen() {
         setLoading(true);
         setErrorMessage('');
         setFindPost(null);
+        setMembershipRequired(false);
 
         void (async () => {
             try {
@@ -267,8 +269,11 @@ export default function PostDetailScreen() {
 
                 const sessionToken = await readSessionToken().catch(() => null);
                 if (!active || controller.signal.aborted) return;
+                const accessRequired = hydratedRecord.accessMode === 'MEMBERS_ONLY' &&
+                    hydratedRecord.accessGranted !== true;
                 const body = await readContentBody(hydratedRecord, controller.signal, sessionToken);
                 if (!active || controller.signal.aborted) return;
+                setMembershipRequired(accessRequired);
                 setFindPost(mapContentToFeedContent(hydratedRecord, body, social, null, sessionToken));
             } catch (error) {
                 if (!active || controller.signal.aborted) return;
@@ -285,6 +290,18 @@ export default function PostDetailScreen() {
     }, [postId, retryKey]);
 
     const authorHandle = findPost?.authorHandle || findPost?.poster_id || undefined;
+    const membershipCreatorId = findPost?.creatorId;
+    const hasMembershipCreator = typeof membershipCreatorId === 'string' &&
+        /^[A-Za-z0-9][A-Za-z0-9_-]{0,255}$/.test(membershipCreatorId);
+    const openMembershipPlans = useCallback(() => {
+        const creatorId = findPost?.creatorId;
+        if (typeof creatorId !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,255}$/.test(creatorId)) return;
+        const query = new URLSearchParams({
+            creatorId,
+            returnTo: '/post/' + postId,
+        });
+        router.push(('/membership-plans?' + query.toString()) as never);
+    }, [findPost?.creatorId, postId, router]);
 
     if (loading) {
         return (
@@ -318,24 +335,56 @@ export default function PostDetailScreen() {
                 contentContainerStyle={{ flexGrow: 1 }}
             >
                 <PostHeader username={authorHandle} targetUserId={findPost.creatorId || findPost.ownerUserId} contentId={postId} postId={postId} />
-                <FeedItem itemData={findPost} detailView onCommentPress={handleScrollToComments} />
-                <View
-                    className="px-4 mt-2"
-                    onLayout={(event) => {
-                        commentsOffsetRef.current = event.nativeEvent.layout.y;
-                    }}
-                >
-                    <TouchableOpacity
-                        onPress={handlePresentModalPress}
-                        className="flex-row items-center mb-3"
-                    >
-                        <Text className="text-base font-bold text-neutral-500 dark:text-blue-400 mr-1">
-                            {sortOptions[selectedSort]}
+                <FeedItem itemData={findPost} detailView onCommentPress={membershipRequired ? undefined : handleScrollToComments} />
+                {membershipRequired ? (
+                    <View className="mx-4 my-4 rounded-2xl border border-amber-200 bg-amber-50 p-5 dark:border-amber-900 dark:bg-amber-950/30">
+                        <View className="flex-row items-center gap-2">
+                            <Feather name="lock" size={19} color="#b45309" />
+                            <Text className="text-base font-extrabold text-amber-900 dark:text-amber-200">该内容为会员专享</Text>
+                        </View>
+                        <Text className="mt-2 text-sm leading-6 text-amber-900/80 dark:text-amber-100/80">
+                            订阅这位创作者的有效会员方案后，即可解锁完整正文和媒体内容。支付提交成功不等于权益已经生效，返回本页时会重新检查服务端权限。
                         </Text>
-                        <Feather name="chevron-down" size={18} color={'#536471'} />
-                    </TouchableOpacity>
-                    <Comments contentId={postId} sort={selectedSort} />
-                </View>
+                        {hasMembershipCreator ? (
+                            <TouchableOpacity
+                                accessibilityRole="button"
+                                onPress={openMembershipPlans}
+                                className="mt-4 min-h-11 items-center justify-center rounded-full bg-sky-500 px-5 py-3"
+                            >
+                                <Text className="font-bold text-white">查看创作者会员方案</Text>
+                            </TouchableOpacity>
+                        ) : (
+                            <Text className="mt-3 text-sm leading-5 text-amber-900 dark:text-amber-200">
+                                当前内容暂时无法匹配已验证的创作者会员方案，请稍后重试。
+                            </Text>
+                        )}
+                        <TouchableOpacity
+                            accessibilityRole="button"
+                            onPress={() => setRetryKey((value) => value + 1)}
+                            className="mt-3 min-h-10 items-center justify-center rounded-full border border-amber-300 px-5 py-2 dark:border-amber-800"
+                        >
+                            <Text className="font-bold text-amber-900 dark:text-amber-200">重新检查会员权益</Text>
+                        </TouchableOpacity>
+                    </View>
+                ) : (
+                    <View
+                        className="px-4 mt-2"
+                        onLayout={(event) => {
+                            commentsOffsetRef.current = event.nativeEvent.layout.y;
+                        }}
+                    >
+                        <TouchableOpacity
+                            onPress={handlePresentModalPress}
+                            className="flex-row items-center mb-3"
+                        >
+                            <Text className="text-base font-bold text-neutral-500 dark:text-blue-400 mr-1">
+                                {sortOptions[selectedSort]}
+                            </Text>
+                            <Feather name="chevron-down" size={18} color={'#536471'} />
+                        </TouchableOpacity>
+                        <Comments contentId={postId} sort={selectedSort} />
+                    </View>
+                )}
             </ScrollView>
 
             <BottomSheetModal

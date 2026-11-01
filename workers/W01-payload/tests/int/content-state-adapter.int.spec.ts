@@ -18,6 +18,7 @@ describe('content state adapters', () => {
     expect(route).toContain("'PRECONDITION_FAILED'")
     expect(route).toContain("method: 'POST'")
     expect(route).toContain('callW03Content')
+    expect(route).toContain('verifiedCreatorId: binding.verifiedCreatorId')
   })
 
   it('enforces the same preconditions on the Creator Center state route', () => {
@@ -31,6 +32,7 @@ describe('content state adapters', () => {
     expect(route).toContain("'PRECONDITION_REQUIRED'")
     expect(route).toContain("'PRECONDITION_FAILED'")
     expect(route).toContain('callW03Content')
+    expect(route).toContain('verifiedCreatorId: binding.verifiedCreatorId')
   })
 })
 

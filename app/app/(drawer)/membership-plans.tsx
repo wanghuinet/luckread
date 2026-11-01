@@ -9,7 +9,7 @@ import {
   View,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { getApiErrorMessage } from '~/lib/api-client';
 import { unwrapApiData } from '~/lib/content-adapter';
@@ -140,6 +140,23 @@ function PlanCard({ item, onPurchase, busy }: {
 
 export default function MembershipPlansScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ creatorId?: string | string[]; returnTo?: string | string[] }>();
+  const rawCreatorId = Array.isArray(params.creatorId) ? params.creatorId[0] : params.creatorId;
+  const creatorId = typeof rawCreatorId === 'string' &&
+    /^[A-Za-z0-9][A-Za-z0-9_-]{0,255}$/.test(rawCreatorId)
+    ? rawCreatorId
+    : undefined;
+  const invalidCreatorFilter = rawCreatorId !== undefined && creatorId === undefined;
+  const rawReturnTo = Array.isArray(params.returnTo) ? params.returnTo[0] : params.returnTo;
+  const returnTo = typeof rawReturnTo === 'string' &&
+    /^\/post\/[A-Za-z0-9][A-Za-z0-9_-]{0,255}$/.test(rawReturnTo)
+    ? rawReturnTo
+    : undefined;
+  const routeQuery = new URLSearchParams();
+  if (creatorId) routeQuery.set('creatorId', creatorId);
+  if (returnTo) routeQuery.set('returnTo', returnTo);
+  const routeSearch = routeQuery.toString();
+  const membershipPlansPath = '/membership-plans' + (routeSearch ? '?' + routeSearch : '');
   const authStatus = useAuthStore((state) => state.status);
   const [items, setItems] = useState<ActiveMembershipPlan[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
@@ -154,6 +171,14 @@ export default function MembershipPlansScreen() {
   const requestRef = useRef<AbortController | null>(null);
 
   const loadPage = useCallback(async (cursor: string | null, append: boolean, pullRefresh = false) => {
+    if (invalidCreatorFilter) {
+      setError('创作者标识无效，无法加载对应会员方案。');
+      setItems([]);
+      setLoading(false);
+      setLoadingMore(false);
+      setRefreshing(false);
+      return;
+    }
     if (authStatus === 'loading') return;
     if (authStatus !== 'authenticated') {
       setAuthRequired(true);
@@ -176,6 +201,7 @@ export default function MembershipPlansScreen() {
       const result = await fetchActiveMembershipPlansPage({
         limit: PAGE_SIZE,
         cursor,
+        creatorId: creatorId ?? undefined,
         signal: controller.signal,
       });
       if (controller.signal.aborted) return;
@@ -218,7 +244,7 @@ export default function MembershipPlansScreen() {
         setRefreshing(false);
       }
     }
-  }, [authStatus]);
+  }, [authStatus, creatorId, invalidCreatorFilter]);
 
   useEffect(() => {
     if (authStatus !== 'loading') void loadPage(null, false);
@@ -226,8 +252,8 @@ export default function MembershipPlansScreen() {
   }, [authStatus, loadPage]);
 
   const openLogin = useCallback(() => {
-    router.push(('/login?returnTo=' + encodeURIComponent('/membership-plans')) as never);
-  }, [router]);
+    router.push(('/login?returnTo=' + encodeURIComponent(membershipPlansPath)) as never);
+  }, [membershipPlansPath, router]);
 
   const handlePurchase = useCallback(async (item: ActiveMembershipPlan) => {
     if (authStatus !== 'authenticated') {
@@ -350,7 +376,7 @@ export default function MembershipPlansScreen() {
           <Pressable accessibilityRole="button" accessibilityLabel="返回" onPress={() => router.back()} className="mr-3 rounded-full p-1">
             <Feather name="arrow-left" size={23} color="#667085" />
           </Pressable>
-          <Text className="text-xl font-extrabold text-neutral-900 dark:text-white">会员方案</Text>
+          <Text className="text-xl font-extrabold text-neutral-900 dark:text-white">{creatorId ? '创作者会员方案' : '会员方案'}</Text>
         </View>
         <Pressable
           accessibilityRole="button"
@@ -364,13 +390,24 @@ export default function MembershipPlansScreen() {
 
       <View className="border-b border-neutral-100 bg-white px-4 py-3 dark:border-neutral-800 dark:bg-black">
         <Text className="text-xs leading-5 text-neutral-500 dark:text-neutral-400">
-          以下方案来自 W07 已发布的公开会员目录，价格和权益以服务端记录为准。付款由 Hyperswitch 原生安全表单处理；只有服务端验签并完成订阅履约后，会员权益才会生效。
+          {creatorId
+            ? '以下仅显示该创作者在 W07 发布的有效公开会员方案。价格和权益以服务端记录为准。'
+            : '以下方案来自 W07 已发布的公开会员目录，价格和权益以服务端记录为准。'}付款由 Hyperswitch 原生安全表单处理；只有服务端验签并完成订阅履约后，会员权益才会生效。
         </Text>
       </View>
 
       {purchaseMessage ? (
         <View className="mx-4 mt-3 rounded-xl border border-sky-200 bg-sky-50 px-3 py-3 dark:border-sky-900 dark:bg-sky-950/30">
           <Text accessibilityRole="alert" className="text-sm leading-5 text-sky-800 dark:text-sky-200">{purchaseMessage}</Text>
+          {returnTo ? (
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => router.replace(returnTo as never)}
+              className="mt-3 min-h-10 items-center justify-center rounded-full bg-sky-500 px-4 py-2"
+            >
+              <Text className="font-bold text-white">返回内容并重新检查权益</Text>
+            </Pressable>
+          ) : null}
         </View>
       ) : null}
 
@@ -397,10 +434,10 @@ export default function MembershipPlansScreen() {
               <>
                 <Feather name="award" size={34} color="#9ca3af" />
                 <Text className="mt-4 text-base font-bold text-neutral-800 dark:text-neutral-100">
-                  {error ? '暂时无法显示会员方案' : '暂无公开会员方案'}
+                  {error ? '暂时无法显示会员方案' : creatorId ? '该创作者暂无公开会员方案' : '暂无公开会员方案'}
                 </Text>
                 <Text className="mt-2 text-center text-sm leading-6 text-neutral-500 dark:text-neutral-400">
-                  {error ? '检查网络后重试。' : '创作者发布公开会员方案后，会显示在这里。'}
+                  {error ? '检查网络后重试。' : creatorId ? '创作者发布公开会员方案后，会显示在这里。' : '创作者发布公开会员方案后，会显示在这里。'}
                 </Text>
               </>
             )}
