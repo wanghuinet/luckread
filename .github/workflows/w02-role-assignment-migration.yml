@@ -96,7 +96,7 @@ jobs:
           for (const field of ['CREATE TABLE auth_007_mfa_operation_receipts', "'STARTED'", "'READY'", "'EMITTED'", "'RESOLVED'", "'UNKNOWN'", 'event_plan', 'auth_007_mfa_operation_receipts_status_next_attempt_idx']) {
             if (!mfaAuditReceipts.includes(field)) throw new Error('MFA operation receipt migration missing required schema element: ' + field)
           }
-          for (const field of ['CREATE TABLE auth_username_change_history', 'UNIQUE (user_id, version)', 'UNIQUE (user_id, idempotency_key_hash)', 'username_normalized TEXT NOT NULL UNIQUE', 'CREATE TRIGGER auth_username_identity_projection_sync']) {
+          for (const field of ['CREATE TABLE auth_username_change_history', 'UNIQUE (user_id, version)', 'UNIQUE (user_id, idempotency_key_hash)', 'username_normalized TEXT NOT NULL UNIQUE', 'CREATE INDEX auth_user_username_normalized_lookup_idx', 'CREATE TRIGGER auth_username_identity_projection_sync']) {
             if (!usernameHistory.includes(field)) throw new Error('Username history migration missing required element: ' + field)
           }
           if (/DROP TABLE|DROP COLUMN|ALTER TABLE|RENAME TABLE/i.test(usernameHistory)) throw new Error('Username history migration must remain additive')
@@ -138,7 +138,7 @@ jobs:
         run: |
           mkdir -p ../../artifacts/mapping-0
           npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote --config wrangler.jsonc \
-            --command "SELECT type, name, sql FROM sqlite_master WHERE name = 'role_assignments' OR name LIKE 'role_assignments_%' OR name = 'role_authorization_versions' OR name LIKE 'role_authorization_versions_%' OR name IN ('twoFactor', 'l8_genesis_bootstrap_audit', 'auth_007_mfa_publication_journal', 'auth_007_mfa_operation_receipts', 'auth_username_change_history', 'auth_username_change_history_user_version_idx', 'auth_username_change_history_changed_at_idx', 'auth_username_identity_projection_sync', 'user_mfa_enable_revoke_sessions', 'user_mfa_disable_clear_enrollment') OR name LIKE 'auth_007_mfa_publication_journal_%' OR name LIKE 'auth_007_mfa_operation_receipts_%' OR name = 'user' ORDER BY type, name;" \
+            --command "SELECT type, name, sql FROM sqlite_master WHERE name = 'role_assignments' OR name LIKE 'role_assignments_%' OR name = 'role_authorization_versions' OR name LIKE 'role_authorization_versions_%' OR name IN ('twoFactor', 'l8_genesis_bootstrap_audit', 'auth_007_mfa_publication_journal', 'auth_007_mfa_operation_receipts', 'auth_username_change_history', 'auth_username_change_history_user_version_idx', 'auth_username_change_history_changed_at_idx', 'auth_user_username_normalized_lookup_idx', 'auth_username_identity_projection_sync', 'user_mfa_enable_revoke_sessions', 'user_mfa_disable_clear_enrollment') OR name LIKE 'auth_007_mfa_publication_journal_%' OR name LIKE 'auth_007_mfa_operation_receipts_%' OR name = 'user' ORDER BY type, name;" \
             > ../../artifacts/mapping-0/w02-role-assignment-remote-schema.txt
           npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote --config wrangler.jsonc \
             --command "SELECT name FROM sqlite_master WHERE type='table' AND name='d1_migrations';" \
@@ -160,7 +160,7 @@ jobs:
             --command "SELECT COUNT(*) AS role_version_rows, MIN(role_version) AS min_role_version, MAX(role_version) AS max_role_version FROM role_authorization_versions;" \
             > ../../artifacts/mapping-0/w02-role-version-remote-row-count.txt
 
-          for expected in twoFactor l8_genesis_bootstrap_audit auth_007_mfa_publication_journal auth_007_mfa_publication_journal_status_next_attempt_idx auth_007_mfa_operation_receipts auth_007_mfa_operation_receipts_status_next_attempt_idx auth_username_change_history auth_username_change_history_user_version_idx auth_username_change_history_changed_at_idx auth_username_identity_projection_sync lastAcceptedTotpTimeStep user_mfa_enable_revoke_sessions user_mfa_disable_clear_enrollment; do
+          for expected in twoFactor l8_genesis_bootstrap_audit auth_007_mfa_publication_journal auth_007_mfa_publication_journal_status_next_attempt_idx auth_007_mfa_operation_receipts auth_007_mfa_operation_receipts_status_next_attempt_idx auth_username_change_history auth_username_change_history_user_version_idx auth_username_change_history_changed_at_idx auth_user_username_normalized_lookup_idx auth_username_identity_projection_sync lastAcceptedTotpTimeStep user_mfa_enable_revoke_sessions user_mfa_disable_clear_enrollment; do
             grep -q "$expected" ../../artifacts/mapping-0/w02-role-assignment-remote-schema.txt || { echo "Missing deployed schema object: $expected"; exit 1; }
           done
           for expected in 0006_better_auth_two_factor.sql 0007_l8_genesis_bootstrap_audit.sql 0008_auth_007_mfa_publication_journal.sql 0009_auth_007_mfa_operation_receipts.sql 0010_auth_username_change_history.sql; do

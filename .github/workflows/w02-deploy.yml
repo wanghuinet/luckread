@@ -105,9 +105,9 @@ jobs:
             exit 1
           }
           npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote --config wrangler.jsonc \
-            --command "SELECT type, name, sql FROM sqlite_master WHERE name IN ('auth_007_mfa_operation_receipts', 'auth_007_mfa_operation_receipts_status_next_attempt_idx', 'auth_username_change_history', 'auth_username_change_history_user_version_idx', 'auth_username_change_history_changed_at_idx', 'auth_username_identity_projection_sync') ORDER BY type, name;" \
+            --command "SELECT type, name, sql FROM sqlite_master WHERE name IN ('auth_007_mfa_operation_receipts', 'auth_007_mfa_operation_receipts_status_next_attempt_idx', 'auth_username_change_history', 'auth_username_change_history_user_version_idx', 'auth_username_change_history_changed_at_idx', 'auth_user_username_normalized_lookup_idx', 'auth_username_identity_projection_sync') ORDER BY type, name;" \
             > /tmp/auth007-mfa-receipt-schema.txt
-          for expected in auth_007_mfa_operation_receipts auth_007_mfa_operation_receipts_status_next_attempt_idx auth_username_change_history auth_username_change_history_user_version_idx auth_username_change_history_changed_at_idx auth_username_identity_projection_sync; do
+          for expected in auth_007_mfa_operation_receipts auth_007_mfa_operation_receipts_status_next_attempt_idx auth_username_change_history auth_username_change_history_user_version_idx auth_username_change_history_changed_at_idx auth_user_username_normalized_lookup_idx auth_username_identity_projection_sync; do
             grep -q "$expected" /tmp/auth007-mfa-receipt-schema.txt || {
               echo "Required D1-01 schema object $expected is missing; refusing to deploy W02 runtime."
               exit 1

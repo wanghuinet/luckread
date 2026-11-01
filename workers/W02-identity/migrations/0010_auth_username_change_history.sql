@@ -31,6 +31,9 @@ CREATE INDEX auth_username_change_history_changed_at_idx
 -- the same D1 transaction whenever Better Auth's authoritative username changes.
 -- Accepted usernames are ASCII alphanumeric; lower() is therefore identical to
 -- the contracted trim -> NFC -> casefold canonical key after input validation.
+CREATE INDEX auth_user_username_normalized_lookup_idx
+  ON "user" (lower(username));
+
 CREATE TRIGGER auth_username_identity_projection_sync
 AFTER UPDATE OF username ON "user"
 WHEN OLD.username IS NOT NEW.username

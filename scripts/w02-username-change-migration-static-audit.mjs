@@ -9,6 +9,7 @@ for (const required of [
   'UNIQUE (user_id, version)',
   'UNIQUE (user_id, idempotency_key_hash)',
   'username_normalized TEXT NOT NULL UNIQUE',
+  'CREATE INDEX auth_user_username_normalized_lookup_idx',
   'CREATE TRIGGER auth_username_identity_projection_sync',
   "normalization_version = 'unicode-nfc-casefold-v1'",
 ]) assert.ok(migration.includes(required), 'migration missing ' + required)

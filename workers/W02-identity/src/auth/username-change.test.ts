@@ -13,14 +13,26 @@ const activePrincipal = {
   userId: 'user-123', email: 'user@example.com', sessionId: 'session-123',
   accountState: 'ACTIVE', accountStateVersion: 1, layer: 'L2', roleAssignments: [],
 }
-const defaultRow = {
+type TestRow = {
+  username: string | null
+  accountState: string
+  usernameVersion: number
+  lastChangedAt: string | null
+  replayChangeId: string | null
+  replayFingerprint: string | null
+  replayUsername: string | null
+  replayVersion: number | null
+  replayChangedAt: string | null
+}
+
+const defaultRow: TestRow = {
   username: 'OldHandle', accountState: 'ACTIVE', usernameVersion: 0, lastChangedAt: null,
   replayChangeId: null, replayFingerprint: null, replayUsername: null, replayVersion: null, replayChangedAt: null,
 }
 
-function createEnv(row = { ...defaultRow }) {
+function createEnv(row: TestRow = { ...defaultRow }) {
   const prepared: Array<{ sql: string; args: unknown[] }> = []
-  const batch = vi.fn(async () => [
+  const batch = vi.fn(async (_statements: unknown[]) => [
     { success: true, meta: { changes: 1 } }, { success: true, meta: { changes: 1 } },
   ])
   const database = {
