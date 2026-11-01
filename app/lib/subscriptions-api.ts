@@ -82,7 +82,6 @@ type PlanPageOptions = {
   cursor?: string | null;
   creatorId?: string;
   signal?: AbortSignal;
-  creatorId?: string;
 };
 
 /** Read only active/public plans from W01 -> W07; the client never supplies price or owner data. */
@@ -91,15 +90,6 @@ export function fetchActiveMembershipPlansPage(options: PlanPageOptions = {}) {
   if (!Number.isSafeInteger(limit) || limit < 1 || limit > 50) {
     throw new RangeError('Membership plan page size must be between 1 and 50.');
   }
-  const creatorId = options.creatorId;
-  if (creatorId !== undefined && (typeof creatorId !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,255}$/.test(creatorId))) {
-    throw new TypeError('A valid creator ID is required.');
-  }
-  const cursor = options.cursor ?? null;
-  if (cursor !== null && (typeof cursor !== 'string' || cursor.length < 1 || cursor.length > 2048)) {
-    throw new RangeError('Membership plan cursor must be between 1 and 2048 characters.');
-  }
-
   const creatorId = options.creatorId;
   if (creatorId !== undefined && (
     typeof creatorId !== 'string' ||
@@ -110,6 +100,8 @@ export function fetchActiveMembershipPlansPage(options: PlanPageOptions = {}) {
   )) {
     throw new TypeError('Membership plan creator ID is invalid.');
   }
+
+
 
   const query = new URLSearchParams({ limit: String(limit) });
   if (cursor) query.set('cursor', cursor);
