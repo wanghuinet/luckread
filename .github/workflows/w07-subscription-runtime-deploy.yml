@@ -4,11 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       source_sha:
-        description: Exact W07 source commit to deploy
+        description: Exact W07 and W10 source commit to deploy
         required: true
         type: string
       confirm:
-        description: Type DEPLOY_W07_SUBSCRIPTION to permit W07 deployment
+        description: Type DEPLOY_W07_SUBSCRIPTION to permit W07 and W10 runtime deployment
         required: true
         type: string
       migration_confirm:
@@ -338,7 +338,7 @@ jobs:
             "runAttempt": "$GITHUB_RUN_ATTEMPT",
             "sourceSha": "$SOURCE_SHA",
             "worker": "luckread-w10",
-            "workflow": "luckread-membership-renewal",
+            "workflowResource": "luckread-membership-renewal",
             "schedule": "* * * * *",
             "targetWorker": "luckread-w07",
             "renewalActivation": "false",
