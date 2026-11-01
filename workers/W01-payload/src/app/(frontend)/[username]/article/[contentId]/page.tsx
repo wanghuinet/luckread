@@ -1,10 +1,24 @@
-import { permanentRedirect } from 'next/navigation'
+import type { Metadata } from 'next'
+
+import {
+  generateCanonicalContentMetadata,
+  renderCanonicalContentRoute,
+} from '../../../content/PublicContentRoutes'
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ username: string; contentId: string }>
+}): Promise<Metadata> {
+  const route = await params
+  return generateCanonicalContentMetadata({ ...route, routeType: 'article' })
+}
 
 export default async function UsernameArticlePage({
   params,
 }: {
   params: Promise<{ username: string; contentId: string }>
 }) {
-  const { contentId } = await params
-  permanentRedirect('/content/' + encodeURIComponent(contentId))
+  const route = await params
+  return renderCanonicalContentRoute({ ...route, routeType: 'article' })
 }
