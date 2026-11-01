@@ -76,6 +76,74 @@ jobs:
           artifact_dir="../../artifacts/evidence/w01-username-redirect-migration-generation"
           mkdir -p "$artifact_dir"
           find src/migrations -maxdepth 1 -type f -printf '%f\n' | sort > "$artifact_dir/before-files.txt"
+
+          # Reconcile the historical Payload snapshot with exact, committed manual
+          # migration evidence. Drizzle must not interpret auth_session_state as a
+          # candidate rename to redirects or repeat existing users/media DDL.
+          latest_snapshot="$(find src/migrations -maxdepth 1 -type f -name '*.json' | sort | tail -n 1)"
+          test "$latest_snapshot" = "src/migrations/20260928_104842_MIG_PAYLOAD_3902_NATIVE_SCHEMA_V1.json"
+          cp "$latest_snapshot" "$RUNNER_TEMP/w01-username-redirect-baseline.snapshot.json"
+          restore_snapshot() {
+            cp "$RUNNER_TEMP/w01-username-redirect-baseline.snapshot.json" "$latest_snapshot"
+          }
+          trap restore_snapshot EXIT
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from 'node:fs'
+          const path = 'src/migrations/20260928_104842_MIG_PAYLOAD_3902_NATIVE_SCHEMA_V1.json'
+          const snapshot = JSON.parse(readFileSync(path, 'utf8'))
+          const readMigration = (name) => readFileSync('src/migrations/' + name, 'utf8')
+          const requiredStatements = [
+            ['20261006_202000_MIG_BETTER_AUTH_PROFILE_PROJECTION_V1.ts', 'ALTER TABLE \`users\` ADD \`identity_id\` text;'],
+            ['20261006_202000_MIG_BETTER_AUTH_PROFILE_PROJECTION_V1.ts', 'CREATE UNIQUE INDEX \`users_identity_id_idx\` ON \`users\` (\`identity_id\`);'],
+            ['20261002_120000_media_owner.ts', 'ALTER TABLE \`media\` ADD COLUMN \`owner_user_id\` text;'],
+            ['20261022_120000_MIG_MEDIA_UPLOAD_IDEMPOTENCY_V1.ts', 'ALTER TABLE \`media\` ADD \`upload_idempotency_key\` text;'],
+            ['20261022_120000_MIG_MEDIA_UPLOAD_IDEMPOTENCY_V1.ts', 'ALTER TABLE \`media\` ADD \`upload_fingerprint\` text;'],
+            ['20261022_120000_MIG_MEDIA_UPLOAD_IDEMPOTENCY_V1.ts', 'CREATE UNIQUE INDEX \`media_upload_idempotency_key_idx\` ON \`media\` (\`upload_idempotency_key\`);'],
+          ]
+          for (const [file, statement] of requiredStatements) {
+            if (!readMigration(file).includes(statement)) {
+              throw new Error('Existing migration does not prove expected prior schema: ' + file + ' / ' + statement)
+            }
+          }
+          const users = snapshot.tables?.users
+          const media = snapshot.tables?.media
+          if (!users || !media || !snapshot.tables?.auth_session_state) {
+            throw new Error('Unexpected baseline snapshot shape; refusing reconciliation')
+          }
+          const column = (name) => ({
+            name, type: 'text', primaryKey: false, notNull: false, autoincrement: false,
+          })
+          const index = (name, columns) => ({ name, columns, isUnique: true })
+          if (users.columns.identity_id || media.columns.owner_user_id ||
+              media.columns.upload_idempotency_key || media.columns.upload_fingerprint ||
+              users.indexes.users_identity_id_idx || media.indexes.media_upload_idempotency_key_idx) {
+            throw new Error('Baseline snapshot already contains one or more manually migrated fields')
+          }
+          users.columns.identity_id = column('identity_id')
+          media.columns.owner_user_id = column('owner_user_id')
+          media.columns.upload_idempotency_key = column('upload_idempotency_key')
+          media.columns.upload_fingerprint = column('upload_fingerprint')
+          users.indexes.users_identity_id_idx = index('users_identity_id_idx', ['identity_id'])
+          media.indexes.media_upload_idempotency_key_idx = index('media_upload_idempotency_key_idx', ['upload_idempotency_key'])
+
+          // This is a legacy external table, not a current Payload collection.
+          // Exclude it from the schema diff; never drop or rename the real D1 table.
+          delete snapshot.tables.auth_session_state
+          writeFileSync(path, JSON.stringify(snapshot, null, 2) + '\n')
+          writeFileSync('../../artifacts/evidence/w01-username-redirect-migration-generation/baseline-reconciliation.json', JSON.stringify({
+            baselineSnapshot: path,
+            retainedExternalTable: 'auth_session_state',
+            excludedFromPayloadSchemaDiff: ['auth_session_state'],
+            priorMigrationEvidence: requiredStatements.map(([file, statement]) => ({ file, statement })),
+            reconciledFields: {
+              users: ['identity_id'],
+              media: ['owner_user_id', 'upload_idempotency_key', 'upload_fingerprint'],
+            },
+            reconciledIndexes: ['users_identity_id_idx', 'media_upload_idempotency_key_idx'],
+            productionD1Access: false,
+          }, null, 2) + '\n')
+          NODE
+
           echo "Starting local-only Payload migration generation (no migrate command is executed)"
           set +e
           timeout 240s pnpm exec payload migrate:create username_redirects --force-accept-warning --json 2>&1 | tee "$artifact_dir/generation.log"
@@ -94,6 +162,19 @@ jobs:
           while IFS= read -r file; do
             cp "src/migrations/$file" "$artifact_dir/$file"
           done < "$artifact_dir/generated-files.txt"
+
+          candidate_ts="$(find "$artifact_dir" -maxdepth 1 -type f -name '*.ts' | head -n 1)"
+          test -n "$candidate_ts"
+          if grep -Eiq 'DROP TABLE|DROP COLUMN|RENAME TABLE|RENAME COLUMN|auth_session_state|ALTER TABLE .?(users|media)' "$candidate_ts"; then
+            echo "Generated migration includes destructive, legacy-table, or duplicate manual-migration DDL"
+            cat "$candidate_ts"
+            exit 1
+          fi
+          if ! grep -Eiq 'CREATE TABLE.*redirects' "$candidate_ts"; then
+            echo "Generated migration does not create the official redirects collection"
+            cat "$candidate_ts"
+            exit 1
+          fi
           cp src/migrations/index.ts "$artifact_dir/index.ts"
           git status --short -- src/migrations > "$artifact_dir/worktree-status.txt"
 
