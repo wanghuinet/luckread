@@ -22,7 +22,7 @@ type UsernameContext = {
   replayChangedAt: string | null
 }
 
-const CONTEXT_SQL = \`
+const CONTEXT_SQL = `
 SELECT u.username AS username, u.account_state AS accountState,
        COALESCE(latest.version, 0) AS usernameVersion,
        latest.changed_at AS lastChangedAt,
@@ -39,9 +39,9 @@ LEFT JOIN auth_username_change_history replay
   ON replay.user_id = u.id AND replay.idempotency_key_hash = ?
 WHERE u.id = ?
 LIMIT 1
-\`
+`
 
-const STATE_SQL = \`
+const STATE_SQL = `
 SELECT u.username AS username, u.account_state AS accountState,
        COALESCE(latest.version, 0) AS usernameVersion,
        latest.changed_at AS lastChangedAt
@@ -51,7 +51,7 @@ LEFT JOIN auth_username_change_history latest
  AND latest.version = (SELECT MAX(version) FROM auth_username_change_history WHERE user_id = u.id)
 WHERE u.id = ?
 LIMIT 1
-\`
+`
 
 const json = (body: unknown, status = 200, headers?: HeadersInit): Response => {
   const outputHeaders = new Headers(headers)
