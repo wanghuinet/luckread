@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { resolveDemoCommercePricing } from './demo-commerce-pricing-resolver.js';
+import { resolveDemoCommercePricing, type DemoCommercePricingEnv } from './demo-commerce-pricing-resolver.js';
 import type { ResolvedCommerceOrderItems } from './order-item-resolution.js';
 import type { AuthoritativelyPricedOrder } from './order-persistence.js';
 
@@ -27,7 +27,7 @@ const priced: AuthoritativelyPricedOrder = {
   }],
 };
 
-function env(overrides: Record<string, unknown> = {}) {
+function env(overrides: Partial<DemoCommercePricingEnv> = {}): DemoCommercePricingEnv {
   return {
     D1_01: d1,
     COMMERCE_PRICING_MODE: 'demo',
