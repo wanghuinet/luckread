@@ -189,13 +189,17 @@ export function mapContentToFeedContent(
   const parsedTime = createdAt ? Date.parse(createdAt) : Number.NaN;
   const postedTime = Number.isFinite(parsedTime) ? Math.floor(parsedTime / 1000) : 0;
   const title = item.title?.trim() || '';
-  const body = (bodyText ?? item.bodyText ?? item.body ?? item.text ?? item.excerpt ?? item.summary ?? item.description ?? '').trim();
+  const accessGranted = item.accessMode !== 'MEMBERS_ONLY' || item.accessGranted === true;
+  const bodySource = accessGranted
+    ? (bodyText ?? item.bodyText ?? item.body ?? item.text ?? item.excerpt ?? item.summary ?? item.description ?? '')
+    : (item.excerpt ?? item.summary ?? item.description ?? '');
+  const body = bodySource.trim();
   const message = body && title && body !== title ? title + '\n\n' + body : body || title;
-  const cover = resolveMediaUrl(item.coverRef) ?? undefined;
-  const mediaCandidates = [
+  const cover = accessGranted ? resolveMediaUrl(item.coverRef) ?? undefined : undefined;
+  const mediaCandidates = accessGranted ? [
     ...(Array.isArray(item.mediaRefs) ? item.mediaRefs : []),
     ...(cover ? [cover] : []),
-  ]
+  ] : []
     .map(resolveMediaUrl)
     .filter((url): url is string => Boolean(url));
   const mediaItems: FeedMediaAttachment[] = Array.from(new Set(mediaCandidates))
@@ -216,6 +220,8 @@ export function mapContentToFeedContent(
   return {
     contentId: item.id,
     contentType: item.contentType,
+    accessMode: item.accessMode,
+    accessGranted,
     etag: item.etag,
     ownerUserId: item.ownerUserId,
     creatorId: item.creatorId,
@@ -308,6 +314,10 @@ export async function readContentBody(
   signal?: AbortSignal,
   sessionToken?: string | null,
 ): Promise<string> {
+  if (item.accessMode === 'MEMBERS_ONLY' && item.accessGranted !== true) {
+    return (item.excerpt ?? item.summary ?? item.description ?? item.title ?? '').trim();
+  }
+
   const directBody = item.bodyText ?? item.body ?? item.text;
   if (typeof directBody === 'string' && directBody.trim()) return directBody.trim();
 
