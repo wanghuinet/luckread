@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 
 import { fetchJson, getApiErrorMessage } from '../../../../lib/client-api.js'
+import { buildPublicContentHref } from '../../../../lib/public-content-url.js'
 import { getCachedPublicProfile, type PublicProfile } from '../../../../lib/social-post-profile-cache.js'
 import { resolveSocialPostMedia } from '../../../../lib/social-post-media.js'
 import SocialPoll from './SocialPoll'
@@ -119,12 +120,12 @@ export default function LuckReadSocialPostCard({
   const [reportReasonCode, setReportReasonCode] = useState('ABUSE')
   const [message, setMessage] = useState('')
 
-  const contentHref = '/content/' + encodeURIComponent(slug || contentId)
+  const contentHref = buildPublicContentHref({ id: contentId, slug, contentType: 'post', creator: profile || author })
   const mediaItems = resolveSocialPostMedia(mediaRefs, coverRef)
   const singleMedia = mediaItems.length === 1 ? mediaItems[0] : undefined
   const profileName = profile?.displayName?.trim() || profile?.username || ''
   const username = profile?.username ? '@' + profile.username : ''
-  const profileHref = profile?.username ? '/' + encodeURIComponent(profile.username) : null
+  const profileHref = profile?.username ? '/@' + encodeURIComponent(profile.username) : null
   const dateLocale = locale === 'en' ? 'en-US' : locale === 'tw' ? 'zh-TW' : 'zh-CN'
   const isOwnPost = Boolean(viewerUserId && resolvedCreatorId && viewerUserId === resolvedCreatorId)
   const canManagePost = Boolean(
