@@ -216,8 +216,7 @@ export async function bindPreflightToStoredPost(
 ): Promise<BoundPostPublishPreflight | Response> {
   if (!submitted || typeof submitted !== 'object' || Array.isArray(submitted)) return { body: submitted }
   const mutation = submitted as Record<string, unknown>
-  if (mutation.to !== 'PUBLISHED') return { body: submitted }
-  if (!mutation.preflight || typeof mutation.preflight !== 'object' || Array.isArray(mutation.preflight)) return { body: submitted }
+  if (mutation.to !== 'PUBLISHED' && mutation.to !== 'SCHEDULED') return { body: submitted }
 
   const contentResponse = await callW03Content({
     request,
@@ -228,7 +227,6 @@ export async function bindPreflightToStoredPost(
   if (!contentResponse.ok) return contentResponse
 
   const content = await contentResponse.json() as ContentForPublishCheck
-  if (content.contentType !== 'post' || content.state !== 'DRAFT') return { body: submitted }
   let verifiedCreatorId: string | undefined
   if (content.accessMode === 'MEMBERS_ONLY') {
     const verified = await resolveVerifiedContentCreatorId(request, principal)
@@ -237,6 +235,13 @@ export async function bindPreflightToStoredPost(
       return makeErrorResponse(403, 'PERMISSION_DENIED', 'An active matching creator identity is required to publish member-only content')
     }
     verifiedCreatorId = verified
+  }
+
+  // Only direct publication of a draft social post needs the canonical body/media
+  // rebinding. Creator article/video transitions still receive the verified ID.
+  if (mutation.to !== 'PUBLISHED' || content.contentType !== 'post' || content.state !== 'DRAFT' ||
+      !mutation.preflight || typeof mutation.preflight !== 'object' || Array.isArray(mutation.preflight)) {
+    return { body: submitted, ...(verifiedCreatorId ? { verifiedCreatorId } : {}) }
   }
   if (typeof content.title !== 'string' || typeof content.bodyRef !== 'string' || !Array.isArray(content.mediaRefs)) {
     return makeErrorResponse(422, 'VALIDATION_FAILED', 'Stored post content is incomplete')
