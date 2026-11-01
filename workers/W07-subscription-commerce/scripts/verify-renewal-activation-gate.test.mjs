@@ -8,6 +8,7 @@ const w10 = JSON.parse(read('workers/W10-async/wrangler.jsonc'));
 const w07Entry = read('workers/W07-subscription-commerce/src/index.ts');
 const w10Entry = read('workers/W10-async/src/index.ts');
 const workflowRuntime = read('workers/W10-async/src/membership-renewal-workflow-runtime.ts');
+const transport = JSON.parse(read('contracts/transport/W10-W07-membership-renewal-workflow.v1.json'));
 
 test('renewal scheduling runs only through the existing W10 durable Workflow', () => {
   assert.equal(w07.name, 'luckread-w07');
@@ -29,6 +30,14 @@ test('renewal scheduling runs only through the existing W10 durable Workflow', (
   assert.equal(w10.workflows?.length, 1);
   assert.equal(w10.workflows?.[0]?.class_name, 'MembershipRenewalWorkflow');
   assert.deepEqual(w10.workflows?.[0]?.schedules, ['* * * * *']);
+  assert.equal(transport.producer.logicalWorker, 'W10');
+  assert.equal(transport.consumer.logicalWorker, 'W07');
+  assert.equal(transport.transport.queue, false);
+  assert.equal(transport.activationGuards['W10.MEMBERSHIP_RENEWAL_ENABLED'], 'false');
+  assert.equal(transport.activationGuards['W07.MEMBERSHIP_RENEWAL_ENABLED'], 'false');
+  assert.deepEqual(transport.transport.topologyDelta, {
+    workers: 0, databases: 0, queues: 0, serviceBindings: 1, workflows: 1,
+  });
   assert.equal(w10Entry.includes('MembershipRenewalWorkflow'), true);
   assert.equal(workflowRuntime.includes("backoff: 'exponential'"), true);
   assert.equal(workflowRuntime.includes('limit: 3'), true);
