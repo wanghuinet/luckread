@@ -26,12 +26,14 @@ describe('public username routes', () => {
     expect(layout).toContain("import '../../styles/twitter-clone-globals.scss'")
   })
 
-  it('serves the canonical username content routes and keeps the ID route as a redirecting compatibility entry', () => {
+  it('serves canonical username routes without redirecting the canonical detail URL', () => {
     const article = read('src/app/(frontend)/[username]/article/[contentId]/page.tsx')
     const post = read('src/app/(frontend)/[username]/post/[contentId]/page.tsx')
     const video = read('src/app/(frontend)/[username]/video/[contentId]/page.tsx')
     const short = read('src/app/(frontend)/[username]/short/[contentId]/page.tsx')
     const shared = read('src/app/(frontend)/content/PublicContentRoutes.tsx')
+    const canonicalRender = shared.split('export async function renderCanonicalContentRoute')[1]
+      ?.split('export async function generateLegacyContentMetadata')[0] ?? ''
     const legacy = read('src/app/(twitter-clone)/content/[contentId]/page.tsx')
     const profile = read('src/app/(twitter-clone)/[username]/page.tsx')
     const urls = read('src/lib/public-content-url.ts')
@@ -48,10 +50,10 @@ describe('public username routes', () => {
     expect(shared).toContain("'/@' + encodeURIComponent(username) + '/' + segment + '/'")
     expect(shared).toContain("new Request(PUBLIC_API_ORIGIN + '/v1/contents/'")
     expect(shared).toContain("new Request(PUBLIC_API_ORIGIN + '/v1/users/'")
-    expect(shared).toContain('const requestedPath =')
-    expect(shared).toContain('if (requestedPath !== canonical) permanentRedirect(canonical)')
-    expect(shared).not.toContain('input.contentId !== content.id')
-    expect(shared).toContain("permanentRedirect(canonicalPath(author, content))")
+    expect(canonicalRender).not.toContain('permanentRedirect(')
+    expect(canonicalRender).toContain("requestedUsername.toLowerCase() !== canonicalUsername.toLowerCase()")
+    expect(canonicalRender).toContain('routeTypeForContent(content, input.routeType) !== input.routeType')
+    expect(shared).toContain('permanentRedirect(canonicalPath(author, content))')
     expect(shared).toContain('generateLegacyContentMetadata')
     expect(shared).toContain('renderLegacyContentRoute')
     expect(legacy).toContain('renderLegacyContentRoute(contentId)')
