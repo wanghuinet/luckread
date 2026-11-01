@@ -70,7 +70,7 @@ jobs:
         env:
           NODE_ENV: development
           PAYLOAD_SECRET: migration-generation-only
-          CLOUDFLARE_ENV: development
+          CI: "true"
         run: |
           set -euo pipefail
           artifact_dir="../../artifacts/evidence/w01-username-redirect-migration-generation"
@@ -78,7 +78,7 @@ jobs:
           find src/migrations -maxdepth 1 -type f -printf '%f\n' | sort > "$artifact_dir/before-files.txt"
           echo "Starting local-only Payload migration generation (no migrate command is executed)"
           set +e
-          timeout 240s pnpm exec payload migrate:create username_redirects --force-accept-warning 2>&1 | tee "$artifact_dir/generation.log"
+          timeout 240s pnpm exec payload migrate:create username_redirects --force-accept-warning --json 2>&1 | tee "$artifact_dir/generation.log"
           generation_status=${PIPESTATUS[0]}
           set -e
           if [ "$generation_status" -ne 0 ]; then
