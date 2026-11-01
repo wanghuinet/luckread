@@ -781,7 +781,7 @@ describe('Creator Center admin extension', () => {
     expect(contentDetail).toContain('const [retryKey, setRetryKey] = useState(0)')
     expect(contentDetail).toContain('setRetryKey((value) => value + 1)')
     expect(contentDetail).toContain('main-tab rounded-full border border-light-border px-4 py-2 text-sm font-bold')
-    expect(sharedContentRoutes).toContain("/content/' + encodeURIComponent(content.slug)")
+    expect(sharedContentRoutes).toContain("'/content/' + encodeURIComponent(content.slug || content.id)")
     expect(contentDetail).toContain('<Root aria-busy={loading} className="flex min-w-0 flex-col">')
     expect(contentDetail).toContain("const Root = showLanguageToggle ? 'main' : 'section'")
     expect(contentDetail).toContain('{copy.detail.loading}')
