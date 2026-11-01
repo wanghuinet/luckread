@@ -5,6 +5,7 @@ import config from '@payload-config'
 import { etagForUserProfile, normalizeEtag, pickUserProfileSnapshot, PROFILE_MUTABLE_FIELDS } from '@/auth/user-profile-etag'
 import { invalidatePublicUserProfile, invalidatePublicUserProfileByUsername } from '@/lib/public-response-cache'
 import { getBetterAuthPrincipal, W02AuthClientError } from '@/auth/w02-session-client'
+import { normalizeUsernameRedirectHandle } from '@/lib/username-redirect'
 
 const errorResponse = (status: number, code: string, message: string) => Response.json(
   { error: { code, message, details: {} }, requestId: `req_${crypto.randomUUID()}` },
@@ -77,8 +78,9 @@ export async function PATCH(request: Request): Promise<Response> {
     if (!(field in input)) continue
     const value = input[field]
     if (field === 'username') {
-      if (typeof value !== 'string' || value.trim().length === 0 || value.length > 128) return errorResponse(422, 'VALIDATION_FAILED', 'Invalid username')
-      data[field] = value.trim()
+      const username = normalizeUsernameRedirectHandle(value)
+      if (!username || username.length > 128) return errorResponse(422, 'VALIDATION_FAILED', 'Invalid username')
+      data[field] = username
     } else {
       if (value !== null && typeof value !== 'string') return errorResponse(422, 'VALIDATION_FAILED', 'Invalid profile field')
       data[field] = typeof value === 'string' ? value : null
@@ -94,7 +96,10 @@ export async function PATCH(request: Request): Promise<Response> {
       data, overrideAccess: true, depth: 0,
     })
   } catch (error) {
-    if (error instanceof Error && /unique constraint|duplicate/i.test(error.message)) return errorResponse(409, 'CONFLICT', 'Username is already in use')
+    const message = error instanceof Error ? error.message : ''
+    if (message === 'LUCKREAD_USERNAME_RESERVED') return errorResponse(409, 'USERNAME_RESERVED', 'This username was previously used and cannot be reassigned')
+    if (message === 'LUCKREAD_USERNAME_CASE_ONLY_CHANGE' || message === 'LUCKREAD_USERNAME_INVALID') return errorResponse(422, 'VALIDATION_FAILED', 'Invalid username change')
+    if (/unique constraint|duplicate/i.test(message)) return errorResponse(409, 'CONFLICT', 'Username is already in use')
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Profile service unavailable')
   }
   if (!updated || typeof updated !== 'object') return errorResponse(412, 'PRECONDITION_FAILED', 'Profile changed before update')
