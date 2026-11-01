@@ -2,9 +2,7 @@
 
 import { createMembershipPlanDraft, reviseMembershipPlan, getSubscription, hasActiveCreatorMembership, listActiveMembershipPlans, listCreatorMembershipPlans, listSubscriptions, parseBoundedPositiveInt, publishMembershipPlan, transitionMembershipPlanLifecycle, SubscriptionRuntimeError, validatePrincipal } from './subscription-runtime.js'
 import { handleCommerceOrderRequest } from './order-http-runtime.js'
-import { resolveCommerceOrderItems } from './order-item-resolution.js'
-import { applyDemoTaxPricing, isDemoPricingEnabled } from './demo-tax-pricing.js'
-import { applyTaxJarSandboxPricing } from './taxjar-sandbox-pricing.js'
+import { isDemoPricingEnabled } from './demo-tax-pricing.js'
 import { handleCommercePaymentIntentRequest } from './payment-intent-http-runtime.js'
 import { handleCommerceRefundRequest } from './refund-http-runtime.js'
 import { handleCommerceBillingReadRequest } from './billing-read-http-runtime.js'
@@ -15,6 +13,7 @@ import { previewSubscriptionPlanChange } from './subscription-plan-change-previe
 import { createSubscriptionPlanUpgradeCheckout } from './subscription-plan-change-checkout.js'
 import { scheduleSubscriptionPlanDowngrade, scheduleSubscriptionBillingIntervalChange } from './subscription-plan-change-schedule.js'
 import { startSubscriptionTrial } from './subscription-trial-runtime.js'
+import { resolveDemoCommercePricing } from './demo-commerce-pricing-resolver.js'
 
 interface RateLimitBinding { limit(input: { key: string }): Promise<{ success: boolean }> }
 interface Env {
@@ -237,38 +236,7 @@ export default {
       const refundResponse = await handleCommerceRefundRequest(request, principal, env)
       if (refundResponse) return refundResponse
       const orderDependencies = isDemoPricingEnabled(env.COMMERCE_PRICING_MODE, env.HYPERSWITCH_ENVIRONMENT)
-        ? {
-            resolvePricing: async (input: unknown) => {
-              const resolved = await resolveCommerceOrderItems(env.D1_01, input)
-              if (env.COMMERCE_DEMO_TAX_PROVIDER === 'synthetic') {
-                return applyDemoTaxPricing(resolved)
-              }
-              if (env.COMMERCE_DEMO_TAX_PROVIDER === 'taxjar-sandbox') {
-                try {
-                  return await applyTaxJarSandboxPricing(resolved, {
-                    apiKey: env.TAXJAR_SANDBOX_API_KEY,
-                    fromAddress: {
-                      street: env.TAXJAR_DEMO_FROM_STREET ?? '',
-                      city: env.TAXJAR_DEMO_FROM_CITY ?? '',
-                      state: env.TAXJAR_DEMO_FROM_STATE ?? '',
-                      zip: env.TAXJAR_DEMO_FROM_ZIP ?? '',
-                    },
-                    toAddress: {
-                      street: env.TAXJAR_DEMO_TO_STREET ?? '',
-                      city: env.TAXJAR_DEMO_TO_CITY ?? '',
-                      state: env.TAXJAR_DEMO_TO_STATE ?? '',
-                      zip: env.TAXJAR_DEMO_TO_ZIP ?? '',
-                    },
-                  })
-                } catch {
-                  throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
-                }
-              }
-              // Tax provider must be selected explicitly; never silently substitute
-              // a synthetic tax amount when the provider is missing or misspelled.
-              throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
-            },
-          }
+        ? { resolvePricing: (input: unknown) => resolveDemoCommercePricing(env, input) }
         : undefined
       const commerceOrderResponse = await handleCommerceOrderRequest(request, principal, env, orderDependencies)
       if (commerceOrderResponse) return commerceOrderResponse
