@@ -70,8 +70,6 @@ export interface FeedContent {
     etag?: string;
     ownerUserId?: string;
     creatorId?: string | null;
-    accessMode?: 'PUBLIC' | 'MEMBERS_ONLY';
-    accessGranted?: boolean;
     poster_id: string;
     authorName?: string;
     authorHandle?: string;
