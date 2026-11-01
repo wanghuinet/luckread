@@ -71,7 +71,8 @@ function isSubscription(value: unknown): value is MySubscription {
     typeof value.planId === 'string' && /^plan_[a-f0-9]{64}$/.test(value.planId) &&
     typeof value.planVersion === 'number' && Number.isSafeInteger(value.planVersion) && value.planVersion > 0 &&
     (value.creatorId === null || typeof value.creatorId === 'string') &&
-    ['PENDING', 'ACTIVE', 'PAST_DUE', 'PAUSED', 'CANCELED', 'EXPIRED'].includes(String(value.status)) &&
+    ['PENDING', 'TRIALING', 'ACTIVE', 'PAST_DUE', 'PAUSED', 'CANCELED', 'EXPIRED'].includes(String(value.status)) &&
+    (value.cancelAt === null || (typeof value.cancelAt === 'string' && Number.isFinite(Date.parse(value.cancelAt)))) &&
     typeof value.currentPeriodStart === 'string' && Number.isFinite(Date.parse(value.currentPeriodStart)) &&
     typeof value.currentPeriodEnd === 'string' && Number.isFinite(Date.parse(value.currentPeriodEnd)) &&
     typeof value.etag === 'string' && /^"lr-v([1-9]\d*)"$/.test(value.etag);
@@ -205,8 +206,9 @@ export default function SubscriptionChangeScreen() {
   const idempotencyKeysRef = useRef(new Map<string, string>());
 
   const availablePlans = useMemo(() => plans.filter((plan) =>
-    subscription?.creatorId !== null &&
-    subscription?.creatorId !== undefined &&
+    subscription?.status === 'ACTIVE' &&
+    subscription.cancelAt === null &&
+    subscription.creatorId !== null &&
     plan.creatorId === subscription.creatorId &&
     plan.planId !== subscription.planId &&
     plan.priceMinor > 0
@@ -424,7 +426,8 @@ export default function SubscriptionChangeScreen() {
   const canSubmit = Boolean(preview && selectedPlan && !busy && !loadingPreview &&
     ((preview.changeType === 'UPGRADE' && preview.paymentRequired) ||
       (preview.changeType === 'DOWNGRADE' && !preview.paymentRequired) ||
-      (preview.changeType === 'BILLING_INTERVAL_CHANGE' && !preview.paymentRequired)));
+      (preview.changeType === 'BILLING_INTERVAL_CHANGE' && !preview.paymentRequired &&
+        preview.targetPlan.tier === preview.currentPlan.tier)));
 
   if (authStatus === 'loading' || loading) {
     return (
@@ -497,6 +500,14 @@ export default function SubscriptionChangeScreen() {
             仅列出同一创作者的有效付费套餐。最终价格、税费和应付金额由服务端确定，不使用客户端报价扣款。
           </Text>
         </View>
+
+        {subscription && subscription.status !== 'ACTIVE' ? (
+          <View className="mx-4 mb-3 rounded-2xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-950">
+            <Text className="text-sm leading-6 text-neutral-500 dark:text-neutral-400">
+              当前订阅状态为 {subscription.status}。套餐报价仅对未设置取消时间的 ACTIVE 订阅开放；此记录仍可查看，但不会提交套餐变更。
+            </Text>
+          </View>
+        ) : null}
 
         {availablePlans.length === 0 ? (
           <View className="mx-4 rounded-2xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-950">
