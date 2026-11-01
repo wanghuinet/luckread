@@ -151,6 +151,29 @@ describe('bind direct social post publishing to the stored body asset', () => {
     })
   })
 
+  it('forwards the verified creator identity for scheduled member-only creator content', async () => {
+    const request = makeRequest()
+    callW03ContentMock.mockResolvedValue(new Response(JSON.stringify(storedPost({
+      contentType: 'article',
+      state: 'APPROVED',
+      accessMode: 'MEMBERS_ONLY',
+      creatorId: 'creator-1',
+    })), { status: 200 }))
+    const scheduled = { to: 'SCHEDULED', scheduledAt: '2026-11-05T12:00:00.000Z' }
+
+    const binding = await bindPreflightToStoredPost(
+      request,
+      'post-1',
+      principal,
+      scheduled,
+      makeErrorResponse,
+    )
+    if (binding instanceof Response) throw new Error('Expected a verified scheduled transition')
+    expect(binding.body).toBe(scheduled)
+    expect(binding.verifiedCreatorId).toBe('creator-1')
+    expect(resolveVerifiedCreatorMock).toHaveBeenCalledWith(request, principal)
+  })
+
   it('returns SERVICE_UNAVAILABLE when the existing R2 binding or read operation is unavailable', async () => {
     callW03ContentMock.mockResolvedValue(new Response(JSON.stringify(storedPost()), { status: 200 }))
     getCloudflareContextMock.mockResolvedValue({ env: {} })
