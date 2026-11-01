@@ -98,7 +98,7 @@ export default buildConfig({
   plugins: [
     r2Storage({
       bucket: cloudflare.env.R2,
-      collections: { media: { generateFileURL: createPublicMediaUrl } },
+      collections: { media: { prefix: 'media', generateFileURL: createPublicMediaUrl } },
     }),
   ],
 })
