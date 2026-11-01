@@ -75,6 +75,32 @@ jobs:
           console.log("Android Release signing configuration is generated correctly.");
           NODE
 
+      - name: Prepare temporary Android signing for native Codegen
+        run: |
+          SIGNING_DIR="${RUNNER_TEMP}/luckread-android-codegen-signing"
+          mkdir -p "$SIGNING_DIR"
+          STORE_PASSWORD="$(openssl rand -hex 16)"
+          KEY_PASSWORD="$(openssl rand -hex 16)"
+          echo "::add-mask::$STORE_PASSWORD"
+          echo "::add-mask::$KEY_PASSWORD"
+          KEY_ALIAS="luckread-codegen-check"
+          KEYSTORE_PATH="$SIGNING_DIR/luckread-codegen.keystore"
+          keytool -genkeypair -noprompt -v \
+            -keystore "$KEYSTORE_PATH" \
+            -storetype JKS \
+            -storepass "$STORE_PASSWORD" \
+            -keypass "$KEY_PASSWORD" \
+            -alias "$KEY_ALIAS" \
+            -keyalg RSA -keysize 2048 -validity 2 \
+            -dname "CN=LuckRead CI Codegen, OU=CI, O=LuckRead, L=NA, ST=NA, C=US"
+          chmod 600 "$KEYSTORE_PATH"
+          {
+            echo "ANDROID_KEYSTORE_PATH=$KEYSTORE_PATH"
+            echo "ANDROID_KEYSTORE_PASSWORD=$STORE_PASSWORD"
+            echo "ANDROID_KEY_ALIAS=$KEY_ALIAS"
+            echo "ANDROID_KEY_PASSWORD=$KEY_PASSWORD"
+          } >> "$GITHUB_ENV"
+
       - name: Generate and verify Hyperswitch native module Codegen
         run: |
           test -f android/gradle.properties
