@@ -45,6 +45,10 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: "1.1.38"
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
       - name: Install Expo app dependencies
         run: bun install
       - name: Verify versions bundled for the Expo SDK
@@ -70,6 +74,23 @@ jobs:
           }
           console.log("Android Release signing configuration is generated correctly.");
           NODE
+
+      - name: Generate and verify Hyperswitch native module Codegen
+        run: |
+          test -f android/gradle.properties
+          grep -Fxq "newArchEnabled=true" android/gradle.properties
+          chmod +x android/gradlew
+          cd android
+          ./gradlew generateCodegenArtifactsFromSchema --no-daemon
+          cd ..
+          SPEC_ROOT="node_modules/@juspay-tech/react-native-hyperswitch/android/build/generated/source/codegen"
+          MODULE_SPEC="$(find "$SPEC_ROOT" -type f -name 'NativeHyperswitchModuleSpec.java' -print -quit)"
+          HEADLESS_SPEC="$(find "$SPEC_ROOT" -type f -name 'NativeHyperHeadlessSpec.java' -print -quit)"
+          test -n "$MODULE_SPEC" || { echo "Hyperswitch NativeHyperswitchModuleSpec was not generated" >&2; exit 1; }
+          test -n "$HEADLESS_SPEC" || { echo "Hyperswitch NativeHyperHeadlessSpec was not generated" >&2; exit 1; }
+          echo "Verified generated Hyperswitch specs:"
+          echo "$MODULE_SPEC"
+          echo "$HEADLESS_SPEC"
       - name: TypeScript typecheck
         run: bun run typecheck
       - name: Test unified native API client rules
