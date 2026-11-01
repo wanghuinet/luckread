@@ -3,7 +3,7 @@ import { resolvePublicArticleBodyUrl } from '../lib/article-summary-preview.js'
 import { resolveMediaObjectKey } from '../media/media-delivery.js'
 import { PUBLIC_IMAGE_MEDIA_ORIGIN } from '../media/public-media-url.js'
 import { validateOwnedPostMediaReferences } from './validate-owned-post-media-references.js'
-import { callW03Content, type ContentPrincipal } from './w03-content-client.js'
+import { callW03Content, resolveVerifiedContentCreatorId, type ContentPrincipal } from './w03-content-client.js'
 
 type ContentForPublishCheck = {
   contentType?: unknown
@@ -12,6 +12,8 @@ type ContentForPublishCheck = {
   bodyRef?: unknown
   mediaRefs?: unknown
   coverRef?: unknown
+  accessMode?: unknown
+  creatorId?: unknown
 }
 
 type ErrorResponseFactory = (status: number, code: string, message: string) => Response
@@ -200,17 +202,22 @@ const readBoundedUtf8 = async (
  * LuckRead-hosted body asset. Never trust the browser's body/media snapshot
  * when authorizing a draft post's direct transition to PUBLISHED.
  */
+export type BoundPostPublishPreflight = Readonly<{
+  body: unknown
+  verifiedCreatorId?: string
+}>
+
 export async function bindPreflightToStoredPost(
   request: Request,
   contentId: string,
   principal: ContentPrincipal,
   submitted: unknown,
   makeErrorResponse: ErrorResponseFactory,
-): Promise<unknown | Response> {
-  if (!submitted || typeof submitted !== 'object' || Array.isArray(submitted)) return submitted
+): Promise<BoundPostPublishPreflight | Response> {
+  if (!submitted || typeof submitted !== 'object' || Array.isArray(submitted)) return { body: submitted }
   const mutation = submitted as Record<string, unknown>
-  if (mutation.to !== 'PUBLISHED') return submitted
-  if (!mutation.preflight || typeof mutation.preflight !== 'object' || Array.isArray(mutation.preflight)) return submitted
+  if (mutation.to !== 'PUBLISHED') return { body: submitted }
+  if (!mutation.preflight || typeof mutation.preflight !== 'object' || Array.isArray(mutation.preflight)) return { body: submitted }
 
   const contentResponse = await callW03Content({
     request,
@@ -221,7 +228,16 @@ export async function bindPreflightToStoredPost(
   if (!contentResponse.ok) return contentResponse
 
   const content = await contentResponse.json() as ContentForPublishCheck
-  if (content.contentType !== 'post' || content.state !== 'DRAFT') return submitted
+  if (content.contentType !== 'post' || content.state !== 'DRAFT') return { body: submitted }
+  let verifiedCreatorId: string | undefined
+  if (content.accessMode === 'MEMBERS_ONLY') {
+    const verified = await resolveVerifiedContentCreatorId(request, principal)
+    if (verified instanceof Response) return verified
+    if (typeof content.creatorId !== 'string' || verified !== content.creatorId) {
+      return makeErrorResponse(403, 'PERMISSION_DENIED', 'An active matching creator identity is required to publish member-only content')
+    }
+    verifiedCreatorId = verified
+  }
   if (typeof content.title !== 'string' || typeof content.bodyRef !== 'string' || !Array.isArray(content.mediaRefs)) {
     return makeErrorResponse(422, 'VALIDATION_FAILED', 'Stored post content is incomplete')
   }
@@ -250,14 +266,17 @@ export async function bindPreflightToStoredPost(
 
   const preflight = mutation.preflight as Record<string, unknown>
   return {
-    ...mutation,
-    preflight: {
-      ...preflight,
-      contentType: 'post',
-      title: content.title,
-      body: canonicalBody,
-      mediaRefs: content.mediaRefs,
-      coverRef: typeof content.coverRef === 'string' ? content.coverRef : null,
+    body: {
+      ...mutation,
+      preflight: {
+        ...preflight,
+        contentType: 'post',
+        title: content.title,
+        body: canonicalBody,
+        mediaRefs: content.mediaRefs,
+        coverRef: typeof content.coverRef === 'string' ? content.coverRef : null,
+      },
     },
+    ...(verifiedCreatorId ? { verifiedCreatorId } : {}),
   }
 }
