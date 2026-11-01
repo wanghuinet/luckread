@@ -67,7 +67,7 @@ function isSubscriptionRecord(value: unknown): value is MySubscription {
     typeof item.etag === 'string' && item.etag.length > 0;
 }
 
-function SubscriptionCard({ item }: { item: MySubscription }) {
+function SubscriptionCard({ item, onManage }: { item: MySubscription; onManage: () => void }) {
   return (
     <View className="mx-4 mb-3 rounded-2xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-950">
       <View className="flex-row items-start justify-between gap-3">
@@ -120,6 +120,16 @@ function SubscriptionCard({ item }: { item: MySubscription }) {
       <Text selectable className="mt-3 text-[11px] leading-4 text-neutral-400">
         订阅 ID：{item.subscriptionId}
       </Text>
+      {item.status === 'ACTIVE' ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="管理订阅套餐"
+          onPress={onManage}
+          className="mt-4 min-h-10 items-center justify-center rounded-full border border-sky-500 px-4 py-2"
+        >
+          <Text className="text-sm font-bold text-sky-600 dark:text-sky-400">管理套餐</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -378,7 +388,7 @@ export default function MySubscriptionsScreen() {
 
       <View className="border-b border-neutral-100 bg-white px-4 py-3 dark:border-neutral-800 dark:bg-black">
         <Text className="text-xs leading-5 text-neutral-500 dark:text-neutral-400">
-          订阅状态由 W07 提供。订阅记录本身不证明付款已完成或内容权益已生效；在支付渠道、续费与退款同步通过验收前，APP 仅提供真实记录查询，不开放暂停、恢复或取消操作。
+          订阅状态由 W07 提供。可管理有效订阅的套餐：升级需通过原生 Hyperswitch 付款并等待签名 Webhook 履约；降级和月/年周期切换在当前周期结束时生效。取消、暂停和恢复暂不开放，付款与内容权益仍以服务端确认为准。
         </Text>
       </View>
 
@@ -448,7 +458,7 @@ export default function MySubscriptionsScreen() {
             ))}
           </View>
         )}
-        renderItem={({ item }) => <SubscriptionCard item={item} />}
+        renderItem={({ item }) => <SubscriptionCard item={item} onManage={() => router.push(('/subscription-change?subscriptionId=' + encodeURIComponent(item.subscriptionId)) as never)} />}
         ListEmptyComponent={(
           <View className="flex-1 items-center justify-center px-8 py-12">
             {loading ? <ActivityIndicator size="large" color={PRIMARY} /> : (
