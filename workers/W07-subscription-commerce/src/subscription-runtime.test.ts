@@ -43,14 +43,16 @@ function fakeDb(rows: SubscriptionRow[], plans: MembershipPlanRow[] = []): D1Dat
         async all<T>() {
           if (sql.includes('FROM membership_plans AS p')) {
             const hasCursor = sql.includes('p.created_at < ?')
-            const ownerQuery = sql.includes('p.owner_id = ?')
-            const cursorOffset = ownerQuery ? 1 : 0
+            const creatorFilterQuery = sql.includes("p.status = 'ACTIVE' AND p.visibility = 'PUBLIC'") && sql.includes('p.owner_id = ?')
+            const ownerQuery = sql.includes('p.owner_id = ?') && !creatorFilterQuery
+            const cursorOffset = ownerQuery || creatorFilterQuery ? 1 : 0
             const limit = Number(values[values.length - 1])
             const cursorCreatedAt = hasCursor ? String(values[cursorOffset]) : null
             const cursorPlanId = hasCursor ? String(values[cursorOffset + 2]) : null
             const results = Array.from(planState.values())
               .filter((plan) => !ownerQuery || (plan.owner_type === 'CREATOR' && plan.owner_id === String(values[0])))
-              .filter((plan) => ownerQuery || (plan.owner_type === 'CREATOR' && plan.status === 'ACTIVE' && plan.visibility === 'PUBLIC'))
+              .filter((plan) => !creatorFilterQuery || (plan.owner_type === 'CREATOR' && plan.owner_id === String(values[0]) && plan.status === 'ACTIVE' && plan.visibility === 'PUBLIC'))
+              .filter((plan) => ownerQuery || creatorFilterQuery || (plan.owner_type === 'CREATOR' && plan.status === 'ACTIVE' && plan.visibility === 'PUBLIC'))
               .filter((plan) => plan.has_current_version)
               .filter((plan) => !hasCursor || plan.created_at < cursorCreatedAt! || (plan.created_at === cursorCreatedAt && plan.plan_id < cursorPlanId!))
               .sort((left, right) => right.created_at.localeCompare(left.created_at) || right.plan_id.localeCompare(left.plan_id))
@@ -694,6 +696,23 @@ describe('subscription runtime', () => {
     expect(JSON.stringify([first, second])).not.toContain('plan_paused')
     expect(JSON.stringify([first, second])).not.toContain('plan_community')
     expect(JSON.stringify([first, second])).not.toContain('plan_missing_version')
+  })
+
+  it('filters public membership plan discovery to the requested creator only', async () => {
+    const db = fakeDb([], [
+      activePlan('plan_creator_one', { owner_id: 'creator_one' }),
+      activePlan('plan_creator_two', { owner_id: 'creator_two' }),
+      activePlan('plan_creator_two_private', {
+        owner_id: 'creator_two',
+        status: 'DRAFT',
+        visibility: 'PRIVATE',
+      }),
+    ])
+
+    const result = await listActiveMembershipPlans(db, 20, null, 'creator_two')
+    expect(result.docs.map((plan) => plan.planId)).toEqual(['plan_creator_two'])
+    expect(JSON.stringify(result)).not.toContain('plan_creator_one')
+    expect(JSON.stringify(result)).not.toContain('plan_creator_two_private')
   })
 
   it('rejects malformed membership plan cursors', async () => {
