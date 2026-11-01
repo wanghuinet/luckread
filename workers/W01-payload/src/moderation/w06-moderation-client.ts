@@ -221,6 +221,24 @@ export async function callW06CommerceOrderAudit(input: {
   })
 }
 
+export async function callW06PaymentMethodRevocationRequestAudit(input: {
+  request: Request
+  principal: ContentPrincipal
+  body: {
+    eventId: string
+    savedPaymentMethodId: string
+    idempotencyKey: string
+  }
+}): Promise<Response> {
+  return callW06Moderation({
+    request: input.request,
+    pathname: '/internal/audit-events/payment-method-revocation-requested',
+    method: 'POST',
+    principal: input.principal,
+    body: input.body,
+  })
+}
+
 export async function callW06Moderation(input: {
   request: Request
   pathname: string

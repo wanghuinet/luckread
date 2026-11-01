@@ -107,9 +107,12 @@ class MemoryPaymentD1 {
       row = this.conflicts.find(c => c.provider === provider && c.merchant_id === merchantId &&
         c.event_id === eventId && c.incoming_payload_sha256 === incomingHash);
     } else if (sql.includes('FROM payment_mandates')) {
-      const [provider, merchantId, mandateId, methodId] = values;
+      const [provider, merchantId, methodId, providerMandateId, sourcePaymentId] = values as
+        [string, string, string, string, string];
       row = this.mandates.find(m => m.provider === provider && m.merchant_id === merchantId &&
-        m.provider_mandate_id === mandateId && m.payment_method_id === methodId);
+        m.payment_method_id === methodId &&
+        (m.provider_mandate_id === providerMandateId ||
+          (m.provider_mandate_id === null && m.source_payment_id === sourcePaymentId)));
     } else if (sql.includes('FROM subscription_renewal_cycles')) {
       // Payment-webhook tests without a seeded renewal cycle model the normal
       // customer-present payment path; no cycle-specific state update is expected.
@@ -234,6 +237,16 @@ class MemoryPaymentD1 {
       });
       return result(1) as D1Result<T>;
     }
+    if (sql.startsWith("UPDATE payment_provider_events SET state = 'RECEIVED'")) {
+      const [provider, merchantId, eventId, payloadHash] = values as [string, string, string, string];
+      const row = this.events.find(e => e.provider === provider && e.merchant_id === merchantId &&
+        e.event_id === eventId && e.payload_sha256 === payloadHash && e.state === 'RECONCILIATION_REQUIRED');
+      if (!row) return result(0) as D1Result<T>;
+      row.state = 'RECEIVED';
+      row.processed_at = null;
+      row.outcome_code = null;
+      return result(1) as D1Result<T>;
+    }
     if (sql.startsWith('UPDATE payment_provider_events SET state = CASE WHEN EXISTS') &&
         sql.includes('FROM payment_mandates m')) {
       const [mandateId, provider, merchantId, providerMandateId, methodId, status, providerTimestamp,
@@ -253,15 +266,18 @@ class MemoryPaymentD1 {
       receipt.outcome_code = applied ? 'MANDATE_STATUS_APPLIED' : 'MANDATE_STATUS_CAS_LOST_OR_OUT_OF_ORDER';
       return result(1) as D1Result<T>;
     }
-    if (sql.startsWith('UPDATE payment_mandates SET status = ?')) {
-      const [status, providerUpdatedAt, updatedAt, mandateId, provider, merchantId, providerMandateId,
-        methodId, version, oldStatus, timestampGuard, activeStatus, revokedStatus, eventProvider,
-        eventMerchant, eventId, payloadHash] = values as
-        [Mandate['status'], string, string, string, string, string, string, string, number, Mandate['status'],
-         string, Mandate['status'], Mandate['status'], string, string, string, string];
+    if (sql.startsWith('UPDATE payment_mandates SET provider_mandate_id = COALESCE')) {
+      const [providerMandateId, status, providerUpdatedAt, updatedAt, mandateId, provider, merchantId,
+        matchedMandateId, sourcePaymentId, methodId, version, oldStatus, timestampGuard,
+        activeStatus, revokedStatus, eventProvider, eventMerchant, eventId, payloadHash] = values as
+        [string, Mandate['status'], string, string, string, string, string, string, string,
+         string, number, Mandate['status'], string, Mandate['status'], Mandate['status'],
+         string, string, string, string];
       const mandate = this.mandates.find(m => m.mandate_record_id === mandateId && m.provider === provider &&
-        m.merchant_id === merchantId && m.provider_mandate_id === providerMandateId &&
-        m.payment_method_id === methodId && m.version === version && m.status === oldStatus &&
+        m.merchant_id === merchantId && m.payment_method_id === methodId &&
+        (m.provider_mandate_id === matchedMandateId ||
+          (m.provider_mandate_id === null && m.source_payment_id === sourcePaymentId)) &&
+        m.version === version && m.status === oldStatus &&
         (m.provider_updated_at === null || m.provider_updated_at < timestampGuard));
       const receipt = this.events.find(e => e.provider === eventProvider && e.merchant_id === eventMerchant &&
         e.event_id === eventId && e.payload_sha256 === payloadHash && e.state === 'RECEIVED');
@@ -271,6 +287,7 @@ class MemoryPaymentD1 {
           ? ['PENDING_PROVIDER_CONFIRMATION', 'ACTIVE', 'REVOKED'].includes(oldStatus)
           : false;
       if (!mandate || !receipt || !transitionAllowed) return result(0) as D1Result<T>;
+      mandate.provider_mandate_id = providerMandateId;
       mandate.status = status;
       mandate.provider_updated_at = providerUpdatedAt;
       mandate.updated_at = updatedAt;
@@ -361,6 +378,10 @@ class MemoryPaymentD1 {
         created_at: createdAt, updated_at: updatedAt,
       });
       return result(1) as D1Result<T>;
+    }
+    if (sql.startsWith("UPDATE payment_method_revocation_requests SET status = 'COMPLETED'")) {
+      // These existing payment-persistence test cases do not seed removal requests.
+      return result(0) as D1Result<T>;
     }
     if (sql.startsWith('INSERT INTO payment_provider_event_conflicts')) {
       // State/count/version are SQL literals ('OPEN', 1, 1), not bound values.

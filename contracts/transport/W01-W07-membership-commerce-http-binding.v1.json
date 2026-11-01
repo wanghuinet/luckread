@@ -250,6 +250,32 @@
       "cache": "NO_STORE"
     },
     {
+      "operationId": "listOwnSavedPaymentMethods",
+      "method": "GET",
+      "publicPath": "/api/v1/payment-methods",
+      "internalPath": "/payment-methods",
+      "principalRequired": true,
+      "permission": "payment_method.read.self",
+      "minimumGlobalLayer": "L2",
+      "ownerScope": "W07 derives customer_id from the authenticated W02 principal. Results are intersected with local saved_payment_methods rows created by a verified payment_succeeded event for the same customer and merchant.",
+      "provider": "hyperswitch",
+      "responseData": "Only safe card summary fields are exposed (payment method type, brand, last4, expiry month/year, createdAt, and LuckRead mandate/removal state: ACTIVE, SETUP_PENDING, NO_RECURRING or REVOCATION_PENDING). Never expose payment_method_id, payment_token, card_token, PAN, CVC, client secrets, merchant ID, or provider mandate ID.",
+      "cache": "NO_STORE",
+      "failurePolicy": {
+        "authorizationDenied": "403",
+        "unavailableProviderOrD1": "503",
+        "unmatchedProviderMethod": "OMIT"
+      },
+      "topologyConstraints": {
+        "newWorker": false,
+        "newDatabase": false,
+        "newQueue": false,
+        "newServiceBinding": false,
+        "d1Authority": "D1-04",
+        "crossD1Transactions": 0
+      }
+    },
+    {
       "operationId": "postPaymentsIntents",
       "method": "POST",
       "publicPath": "/api/v1/payments/intents",
@@ -455,6 +481,40 @@
         "d1Authority": "D1-04",
         "crossD1Transactions": 0
       }
+    },
+    {
+      "operationId": "revokeOwnSavedPaymentMethod",
+      "method": "DELETE",
+      "publicPath": "/api/v1/payment-methods/{savedPaymentMethodId}",
+      "internalPath": "/payment-methods/{savedPaymentMethodId}",
+      "principalRequired": true,
+      "permission": "payment_method.revoke.self",
+      "minimumGlobalLayer": "L2",
+      "ownerScope": "D1-04 saved_payment_methods row must match authenticated W02 customer ID and configured Hyperswitch merchant.",
+      "idempotency": "Idempotency-Key: stable resource-derived key 'remove_' + savedPaymentMethodId; the key survives app reloads and binds the one-way removal request.",
+      "successRule": "W01 first confirms durable W06 payment_method.revocation_requested intent. The first W07 invocation writes only the D1-04 revocation request (one write transaction), immediately blocking all new MIT renewal selection, and returns 202 without provider I/O. W01 clients then replay DELETE with the same Idempotency-Key in a separate request. That replay performs Hyperswitch mandate revocation and vault deletion, then uses at most one D1-04 write transaction to persist provider deletion acknowledgement. Local payment_mandates rows become REVOKED only through a matching signature-verified mandate_revoked webhook; the public response remains 202 until all linked mandates are terminal and provider method deletion is durably confirmed.",
+      "replay": "The saved method has one durable revocation request. The initial request only establishes the local MIT block; only a replay with the exact original Idempotency-Key may reattempt provider revoke/delete operations. APP/H5 derive the key deterministically from savedPaymentMethodId so retries survive reloads. A different key for the same method, or reuse of the same customer key on another method, returns 409. No replay creates a second local request or mandate.",
+      "cache": "NO_STORE",
+      "d1WriteTransactionMaxPerRequest": 1,
+      "providerNetworkCallsInsideD1Transaction": false,
+      "failurePolicy": {
+        "missingIdempotencyKey": "428",
+        "invalidId": "404",
+        "foreignCustomerOrMerchant": "404",
+        "authorizationDenied": "403",
+        "providerUnconfirmed": "202; local MIT block remains active",
+        "missingW06AuditConfirmation": "503; W07 is not called",
+        "idempotencyKeyMismatch": "409; only the exact original key can replay the saved method revocation request"
+      },
+      "topologyConstraints": {
+        "newWorker": false,
+        "newDatabase": false,
+        "newQueue": false,
+        "newServiceBinding": false,
+        "d1Authority": "D1-04",
+        "crossD1Transactions": 0
+      },
+      "auditTransportBinding": "W01-W06-moderation-http-binding.v1"
     },
     {
       "operationId": "transitionOwnMembershipPlanLifecycle",

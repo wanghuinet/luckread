@@ -12,6 +12,8 @@ mock.module('../lib/api-client.ts', () => ({
 const {
   fetchActiveMembershipPlansPage,
   fetchMySubscriptionsPage,
+  fetchSavedPaymentMethods,
+  revokeSavedPaymentMethod,
 } = await import('../lib/subscriptions-api.ts');
 
 beforeEach(() => {
@@ -47,13 +49,39 @@ test('rejects invalid pagination bounds before making a request', () => {
   expect(calls).toHaveLength(0);
 });
 
+test('lists only the signed-in user saved payment methods through W01', async () => {
+  const controller = new AbortController();
+  await fetchSavedPaymentMethods({ signal: controller.signal });
+
+  expect(calls).toHaveLength(1);
+  expect(calls[0]?.path).toBe('/payment-methods');
+  expect(calls[0]?.options.method).toBe('GET');
+  expect(calls[0]?.options.signal).toBe(controller.signal);
+});
+
+test('removes a saved payment method with the caller idempotency key', async () => {
+  const savedPaymentMethodId = 'spm_' + 'a'.repeat(26);
+  await revokeSavedPaymentMethod(savedPaymentMethodId, 'remove_saved_method_1');
+
+  expect(calls).toHaveLength(1);
+  expect(calls[0]?.path).toBe('/payment-methods/' + savedPaymentMethodId);
+  expect(calls[0]?.options.method).toBe('DELETE');
+  expect(calls[0]?.options.idempotencyKey).toBe('remove_saved_method_1');
+});
+
+test('rejects invalid saved payment method IDs and removal keys before transport', () => {
+  expect(() => revokeSavedPaymentMethod('spm_short', 'remove_1')).toThrow('ID is invalid');
+  expect(() => revokeSavedPaymentMethod('spm_' + 'a'.repeat(26), 'invalid key')).toThrow('idempotency key is invalid');
+  expect(calls).toHaveLength(0);
+});
+
 test('keeps subscription mutations and mobile checkout disabled until store billing is verified', async () => {
   const api = await import('../lib/subscriptions-api.ts');
   const subscriptionsScreen = readFileSync(new URL('../app/(drawer)/subscriptions.tsx', import.meta.url), 'utf8');
   const plansScreen = readFileSync(new URL('../app/(drawer)/membership-plans.tsx', import.meta.url), 'utf8');
   const drawer = readFileSync(new URL('../app/(drawer)/_layout.tsx', import.meta.url), 'utf8');
 
-  expect(Object.keys(api).sort()).toEqual(['fetchActiveMembershipPlansPage', 'fetchMySubscriptionsPage'].sort());
+  expect(Object.keys(api).sort()).toEqual(['fetchActiveMembershipPlansPage', 'fetchMySubscriptionsPage', 'fetchSavedPaymentMethods', 'revokeSavedPaymentMethod'].sort());
   expect(subscriptionsScreen).not.toContain('transitionMySubscription');
   expect(subscriptionsScreen).not.toContain('onTransition');
   expect(subscriptionsScreen).not.toContain('取消订阅');

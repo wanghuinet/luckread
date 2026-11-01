@@ -9,7 +9,8 @@ export const SAVED_METHOD_MIGRATION_ID = '0003_saved_payment_methods_mandates'
 export const RENEWAL_MIGRATION_ID = '0004_subscription_renewal_cycles'
 export const REVENUECAT_WEBHOOK_MIGRATION_ID = '0005_revenuecat_webhook_inbox'
 export const REFUNDS_BILLING_MIGRATION_ID = '0006_refunds_billing_documents'
-export const REQUIRED_MIGRATION_IDS = [ORDER_MIGRATION_ID, PAYMENT_MIGRATION_ID, SAVED_METHOD_MIGRATION_ID, RENEWAL_MIGRATION_ID, REVENUECAT_WEBHOOK_MIGRATION_ID, REFUNDS_BILLING_MIGRATION_ID]
+export const PAYMENT_METHOD_REVOCATION_MIGRATION_ID = '0007_payment_method_revocation_requests'
+export const REQUIRED_MIGRATION_IDS = [ORDER_MIGRATION_ID, PAYMENT_MIGRATION_ID, SAVED_METHOD_MIGRATION_ID, RENEWAL_MIGRATION_ID, REVENUECAT_WEBHOOK_MIGRATION_ID, REFUNDS_BILLING_MIGRATION_ID, PAYMENT_METHOD_REVOCATION_MIGRATION_ID]
 
 export const REQUIRED_COLUMNS = {
   orders: [
@@ -114,7 +115,14 @@ export const REQUIRED_COLUMNS = {
     ['customer_id', 'TEXT', 1, 0], ['order_id', 'TEXT', 1, 0], ['payment_id', 'TEXT', 0, 0],
     ['amount_minor', 'INTEGER', 1, 0], ['currency', 'TEXT', 1, 0], ['snapshot_json', 'TEXT', 1, 0],
     ['issued_at', 'TEXT', 1, 0], ['created_at', 'TEXT', 1, 0],
+  ],  payment_method_revocation_requests: [
+    ['revocation_request_id', 'TEXT', 1, 1], ['saved_payment_method_id', 'TEXT', 1, 0],
+    ['payment_method_id', 'TEXT', 1, 0], ['provider', 'TEXT', 1, 0], ['merchant_id', 'TEXT', 1, 0],
+    ['customer_id', 'TEXT', 1, 0], ['idempotency_key', 'TEXT', 1, 0], ['status', 'TEXT', 1, 0],
+    ['provider_method_deleted_at', 'TEXT', 0, 0], ['version', 'INTEGER', 1, 0],
+    ['created_at', 'TEXT', 1, 0], ['updated_at', 'TEXT', 1, 0],
   ],
+
 }
 
 export const REQUIRED_INDEXES = {
@@ -145,7 +153,11 @@ export const REQUIRED_INDEXES = {
   ],
   revenuecat_webhook_event_conflicts: ['ix_revenuecat_webhook_conflicts_event'],
   refunds: ['ix_refunds_customer_created', 'ix_refunds_payment_created', 'ix_refunds_status_updated'],
-  billing_documents: ['ix_billing_documents_customer_issued'],
+  billing_documents: ['ix_billing_documents_customer_issued'],  payment_method_revocation_requests: [
+    'ix_payment_method_revocation_status',
+    'ux_payment_method_revocation_customer_idempotency',
+  ],
+
 }
 
 export const REQUIRED_TRIGGERS = {
@@ -224,7 +236,16 @@ export const REQUIRED_TRIGGERS = {
   ],
   billing_documents: [
     'billing_documents_source_guard', 'billing_documents_identity_immutable', 'billing_documents_retained',
+  ],  payment_method_revocation_requests: [
+    'payment_method_revocation_request_requires_saved_method',
+    'payment_method_revocation_request_identity_immutable',
+    'payment_method_revocation_request_version_guard',
+    'payment_method_revocation_request_transition_guard',
+    'payment_method_revocation_request_provider_deleted_immutable',
+    'payment_method_revocation_request_retained',
+    'payment_method_revocation_request_completion_guard',
   ],
+
 }
 
 const targetNamesFor = (migrationId) => {
@@ -240,7 +261,9 @@ const targetNamesFor = (migrationId) => {
             ? ['revenuecat_webhook_events', 'revenuecat_webhook_event_conflicts']
             : migrationId === REFUNDS_BILLING_MIGRATION_ID
               ? ['refunds', 'billing_documents']
-              : []
+              : migrationId === PAYMENT_METHOD_REVOCATION_MIGRATION_ID
+                ? ['payment_method_revocation_requests']
+                : []
   return new Set([
     ...tables,
     ...tables.flatMap((table) => REQUIRED_INDEXES[table] ?? []),
@@ -250,6 +273,18 @@ const targetNamesFor = (migrationId) => {
 
 function fail(message) {
   throw new Error('W07_D1_04_MIGRATION_GATE_FAILED: ' + message)
+}
+
+function normalizeSqlDefinition(sql) {
+  return sql.replace(/\s+/g, ' ').trim().replace(/;$/, '').toLowerCase()
+}
+
+function expectedPaymentProviderEventsTerminalTriggerSql() {
+  const migrationPath = new URL('../migrations-d1-04/0007_payment_method_revocation_requests.sql', import.meta.url)
+  const migration = fs.readFileSync(migrationPath, 'utf8')
+  const match = migration.match(/CREATE TRIGGER payment_provider_events_terminal_immutable\b[\s\S]*?\bEND;/i)
+  if (!match) fail('0007 migration does not define the reviewed payment-provider event terminal trigger')
+  return normalizeSqlDefinition(match[0])
 }
 
 function collectObjects(value, output = [], seen = new Set()) {
@@ -346,6 +381,10 @@ export function inspectD1_04OrderMigrationPreflight({ schemaSnapshot, migrationS
       REQUIRED_MIGRATION_IDS.slice(0, 5).some((id) => !state.names.includes(id))) {
     fail('refund/billing migration is recorded without its required prior commerce migrations; manual schema reconciliation is required')
   }
+  if (state.names.includes(PAYMENT_METHOD_REVOCATION_MIGRATION_ID) &&
+      REQUIRED_MIGRATION_IDS.slice(0, 6).some((id) => !state.names.includes(id))) {
+    fail('payment-method revocation migration is recorded without its required prior commerce migrations; manual schema reconciliation is required')
+  }
   const byName = new Set(objects.map((object) => object.name))
 
   for (const migrationId of state.names.filter((name) => REQUIRED_MIGRATION_IDS.includes(name))) {
@@ -418,6 +457,7 @@ export function verifyD1_04OrderMigrationPostflight({
   revenueCatWebhookConflictsTableInfo,
   refundsTableInfo,
   billingDocumentsTableInfo,
+  paymentMethodRevocationRequestsTableInfo,
 }) {
   const before = schemaObjects(preflightSchema)
   const after = schemaObjects(postflightSchema)
@@ -450,6 +490,7 @@ export function verifyD1_04OrderMigrationPostflight({
     revenuecat_webhook_event_conflicts: revenueCatWebhookConflictsTableInfo,
     refunds: refundsTableInfo,
     billing_documents: billingDocumentsTableInfo,
+    payment_method_revocation_requests: paymentMethodRevocationRequestsTableInfo,
   }
   for (const [tableName, expectedColumns] of Object.entries(REQUIRED_COLUMNS)) {
     const actual = tableColumns(tableInfoByName[tableName], tableName)
@@ -484,9 +525,23 @@ export function verifyD1_04OrderMigrationPostflight({
   for (const oldObject of before) {
     const key = oldObject.type + '\u0000' + oldObject.name
     const newObject = afterByKey.get(key)
-    if (!newObject || JSON.stringify(newObject) !== JSON.stringify(oldObject)) {
+    const isReviewedMandateReplayGuardUpdate =
+      oldObject.type === 'trigger' &&
+      oldObject.name === 'payment_provider_events_terminal_immutable' &&
+      state.names.includes(PAYMENT_METHOD_REVOCATION_MIGRATION_ID) &&
+      newObject && newObject.tableName === oldObject.tableName &&
+      typeof newObject.sql === 'string' &&
+      normalizeSqlDefinition(newObject.sql) === expectedPaymentProviderEventsTerminalTriggerSql()
+    if (!newObject || (JSON.stringify(newObject) !== JSON.stringify(oldObject) && !isReviewedMandateReplayGuardUpdate)) {
       fail('pre-existing schema object was removed or changed: ' + oldObject.type + ':' + oldObject.name)
     }
+  }
+
+  const mandateReplayGuard = present.get('trigger\u0000payment_provider_events_terminal_immutable')
+  if (state.names.includes(PAYMENT_METHOD_REVOCATION_MIGRATION_ID) &&
+      (!mandateReplayGuard || typeof mandateReplayGuard.sql !== 'string' ||
+       normalizeSqlDefinition(mandateReplayGuard.sql) !== expectedPaymentProviderEventsTerminalTriggerSql())) {
+    fail('payment-provider event terminal trigger does not match the reviewed 0007 mandate replay guard')
   }
 
   const beforeKeys = new Set(before.map((object) => object.type + '\u0000' + object.name))
@@ -534,7 +589,7 @@ function main() {
     return
   }
   if (mode === 'postflight') {
-    if (args.length !== 18) throw new Error('Usage: verify-d1-04-order-migration.mjs postflight <preflight-schema.json> <postflight-schema.json> <migration-state.json> <orders-info.json> <order-lines-info.json> <idempotency-info.json> <payments-info.json> <provider-events-info.json> <event-conflicts-info.json> <saved-methods-info.json> <mandates-info.json> <renewal-cycles-info.json> <renewal-scheduler-state-info.json> <revenuecat-events-info.json> <revenuecat-conflicts-info.json> <refunds-info.json> <billing-documents-info.json> <output.json>')
+    if (args.length !== 19) throw new Error('Usage: verify-d1-04-order-migration.mjs postflight <preflight-schema.json> <postflight-schema.json> <migration-state.json> <orders-info.json> <order-lines-info.json> <idempotency-info.json> <payments-info.json> <provider-events-info.json> <event-conflicts-info.json> <saved-methods-info.json> <mandates-info.json> <renewal-cycles-info.json> <renewal-scheduler-state-info.json> <revenuecat-events-info.json> <revenuecat-conflicts-info.json> <refunds-info.json> <billing-documents-info.json> <payment-method-revocation-requests-info.json> <output.json>')
     const report = verifyD1_04OrderMigrationPostflight({
       preflightSchema: readJson(args[0]),
       postflightSchema: readJson(args[1]),
@@ -553,8 +608,9 @@ function main() {
       revenueCatWebhookConflictsTableInfo: readJson(args[14]),
       refundsTableInfo: readJson(args[15]),
       billingDocumentsTableInfo: readJson(args[16]),
+      paymentMethodRevocationRequestsTableInfo: readJson(args[17]),
     })
-    writeReport(args[17], report)
+    writeReport(args[18], report)
     console.log(JSON.stringify(report, null, 2))
     return
   }

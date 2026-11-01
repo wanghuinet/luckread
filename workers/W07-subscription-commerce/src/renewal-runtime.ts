@@ -405,6 +405,7 @@ async function readActiveMandate(
     'AND s.customer_id = m.customer_id AND s.payment_method_id = m.payment_method_id ' +
     "WHERE m.provider = 'hyperswitch' AND m.merchant_id = ? AND m.customer_id = ? " +
     "AND m.status = 'ACTIVE' AND m.provider_mandate_id IS NOT NULL " +
+    "AND NOT EXISTS (SELECT 1 FROM payment_method_revocation_requests r JOIN saved_payment_methods rs ON rs.saved_payment_method_id = r.saved_payment_method_id WHERE rs.provider = m.provider AND rs.merchant_id = m.merchant_id AND rs.customer_id = m.customer_id AND rs.payment_method_id = m.payment_method_id AND r.status <> 'COMPLETED') " +
     'ORDER BY m.updated_at DESC, m.mandate_record_id DESC LIMIT 1',
   ).bind(merchantId, customerId).first<ActiveMandateRow>();
 }
@@ -417,7 +418,8 @@ async function isExactMandateActive(db: D1Database, cycle: RenewalCycleRow): Pro
     'AND s.customer_id = m.customer_id AND s.payment_method_id = m.payment_method_id ' +
     "WHERE m.mandate_record_id = ? AND m.provider = 'hyperswitch' AND m.merchant_id = ? " +
     "AND m.customer_id = ? AND m.payment_method_id = ? AND m.status = 'ACTIVE' " +
-    'AND m.provider_mandate_id IS NOT NULL LIMIT 1',
+    'AND m.provider_mandate_id IS NOT NULL ' +
+    "AND NOT EXISTS (SELECT 1 FROM payment_method_revocation_requests r JOIN saved_payment_methods rs ON rs.saved_payment_method_id = r.saved_payment_method_id WHERE rs.provider = m.provider AND rs.merchant_id = m.merchant_id AND rs.customer_id = m.customer_id AND rs.payment_method_id = m.payment_method_id AND r.status <> 'COMPLETED') LIMIT 1",
   ).bind(cycle.mandate_record_id, cycle.merchant_id, cycle.subscriber_id, cycle.payment_method_id).first<{ active: number }>();
   return row?.active === 1;
 }
