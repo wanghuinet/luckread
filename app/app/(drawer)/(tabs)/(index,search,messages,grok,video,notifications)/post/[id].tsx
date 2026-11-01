@@ -290,14 +290,16 @@ export default function PostDetailScreen() {
     }, [postId, retryKey]);
 
     const authorHandle = findPost?.authorHandle || findPost?.poster_id || undefined;
+    const membershipCreatorId = findPost?.creatorId;
+    const hasMembershipCreator = typeof membershipCreatorId === 'string' &&
+        /^[A-Za-z0-9][A-Za-z0-9_-]{0,255}$/.test(membershipCreatorId);
     const openMembershipPlans = useCallback(() => {
+        const creatorId = findPost?.creatorId;
+        if (typeof creatorId !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,255}$/.test(creatorId)) return;
         const query = new URLSearchParams({
+            creatorId,
             returnTo: '/post/' + postId,
         });
-        const creatorId = findPost?.creatorId;
-        if (typeof creatorId === 'string' && /^[A-Za-z0-9][A-Za-z0-9_-]{0,255}$/.test(creatorId)) {
-            query.set('creatorId', creatorId);
-        }
         router.push(('/membership-plans?' + query.toString()) as never);
     }, [findPost?.creatorId, postId, router]);
 
@@ -343,13 +345,19 @@ export default function PostDetailScreen() {
                         <Text className="mt-2 text-sm leading-6 text-amber-900/80 dark:text-amber-100/80">
                             订阅这位创作者的有效会员方案后，即可解锁完整正文和媒体内容。支付提交成功不等于权益已经生效，返回本页时会重新检查服务端权限。
                         </Text>
-                        <TouchableOpacity
-                            accessibilityRole="button"
-                            onPress={openMembershipPlans}
-                            className="mt-4 min-h-11 items-center justify-center rounded-full bg-sky-500 px-5 py-3"
-                        >
-                            <Text className="font-bold text-white">查看创作者会员方案</Text>
-                        </TouchableOpacity>
+                        {hasMembershipCreator ? (
+                            <TouchableOpacity
+                                accessibilityRole="button"
+                                onPress={openMembershipPlans}
+                                className="mt-4 min-h-11 items-center justify-center rounded-full bg-sky-500 px-5 py-3"
+                            >
+                                <Text className="font-bold text-white">查看创作者会员方案</Text>
+                            </TouchableOpacity>
+                        ) : (
+                            <Text className="mt-3 text-sm leading-5 text-amber-900 dark:text-amber-200">
+                                当前内容暂时无法匹配已验证的创作者会员方案，请稍后重试。
+                            </Text>
+                        )}
                     </View>
                 ) : (
                     <View
