@@ -276,7 +276,7 @@ function normalizePayment(value: unknown): HyperswitchPayment {
       sdkAuthorization.length === 0 ||
       sdkAuthorization.length > 4096 ||
       sdkAuthorization.trim() !== sdkAuthorization ||
-      /[\\u0000-\\u001f\\u007f]/.test(sdkAuthorization)
+      /[\u0000-\u001f\u007f]/.test(sdkAuthorization)
     )) ||
     (customerId !== undefined && customerId !== null && (
       typeof customerId !== 'string' ||
