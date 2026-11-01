@@ -114,6 +114,7 @@ describe('article summary card preview', () => {
     const discovery = read('src/app/(frontend)/content/ContentBrowsePage.tsx')
     const detail = read('src/app/(twitter-clone)/content/[contentId]/page.tsx')
     const sharedRoutes = read('src/app/(frontend)/content/PublicContentRoutes.tsx')
+    const publicUrlHelper = read('src/lib/public-content-url.ts')
     const api = read('src/app/api/v1/contents/route.ts')
     const w03 = read('../W03-content/src/index.ts')
     const component = read('src/components/ArticleSummaryPreview.tsx')
@@ -126,6 +127,7 @@ describe('article summary card preview', () => {
     expect(api).toContain('cachedPublicGet')
     expect(detail).toContain('renderLegacyContentRoute(contentId)')
     expect(sharedRoutes).toContain('<ContentDetailClient')
+    expect(publicUrlHelper).toContain("if (!username) return '/content/' + encodeURIComponent(content.slug || id)")
     expect(component).toContain("rootMargin: '320px 0px'")
     expect(component).toContain("credentials: 'omit'")
     expect(component).toContain("referrerPolicy: 'no-referrer'")
@@ -138,7 +140,7 @@ describe('article summary card preview', () => {
     expect(component).not.toContain('ArticleSummaryPreview.module.css')
     expect(existsSync(resolve(process.cwd(), 'src/components/ArticleSummaryPreview.module.css'))).toBe(false)
     expect(component).not.toContain("fetch('/api/v1/contents?'")
-    expect(discovery).toContain('/content/')
+    expect(discovery).toContain('buildPublicContentHref(item)')
   })
 
   it('keeps article summaries preview-only and leaves video content to the existing vertical player', () => {
