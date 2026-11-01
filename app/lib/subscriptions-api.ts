@@ -244,7 +244,7 @@ export type ScheduledSubscriptionPlanChange = {
 
 const SUBSCRIPTION_ID_PATTERN = /^sub_[A-Za-z0-9_-]{1,128}$/;
 const PLAN_ID_PATTERN = /^plan_[a-f0-9]{64}$/;
-const SUBSCRIPTION_ETAG_PATTERN = /^"lr-v([1-9]\\d*)"$/;
+const SUBSCRIPTION_ETAG_PATTERN = /^"lr-v([1-9][0-9]*)"$/;
 const SUBSCRIPTION_IDEMPOTENCY_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
 
 function validateSubscriptionId(subscriptionId: string): string {
