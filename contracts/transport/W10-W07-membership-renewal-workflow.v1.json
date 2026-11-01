@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/transport/W10-W07-membership-renewal-workflow.v1.json",
+  "title": "W10 to W07 Membership Renewal Workflow Transport",
+  "version": "1.0.0",
+  "status": "IMPLEMENTED_PENDING_CI_DEPLOYMENT_AND_RUNTIME_ADMISSION",
+  "producer": {
+    "logicalWorker": "W10",
+    "runtime": "Cloudflare Workflow",
+    "workflowClass": "MembershipRenewalWorkflow",
+    "primaryResponsibility": "Durable scheduling and bounded retry orchestration only"
+  },
+  "consumer": {
+    "logicalWorker": "W07",
+    "targetWorker": "luckread-w07",
+    "businessAuthority": "Membership, subscription, order, payment, MIT mandate and renewal-cycle state"
+  },
+  "transport": {
+    "kind": "Cloudflare Workflow scheduled binding plus Worker Service Binding",
+    "serviceBinding": "W07_COMMERCE",
+    "targetService": "luckread-w07",
+    "method": "POST",
+    "internalPath": "/internal/renewals/w10/scheduled-batch",
+    "publicRoute": false,
+    "queue": false,
+    "topologyDelta": {
+      "workers": 0,
+      "databases": 0,
+      "queues": 0,
+      "serviceBindings": 1,
+      "workflows": 1
+    }
+  },
+  "schedule": {
+    "cron": "* * * * *",
+    "owner": "W10 Workflow binding",
+    "directW07Cron": false,
+    "w07ScheduledHandler": false
+  },
+  "request": {
+    "body": {},
+    "headers": {
+      "X-LuckRead-Caller": "W10",
+      "X-LuckRead-Transport-Version": "1.0",
+      "X-LuckRead-Correlation-Id": "membership-renewal-workflow-{scheduledTime}"
+    },
+    "forbiddenHeaders": [
+      "Authorization",
+      "Cookie"
+    ],
+    "maximumBodyBytes": 16384
+  },
+  "batchPolicy": {
+    "maximumRenewalCyclesPerWorkflowInvocation": 1,
+    "outcomeSyncBeforeNewCharge": true,
+    "outcomeSyncAfterChargeSubmission": true,
+    "stopOnPendingOutcomeRetry": true,
+    "stopOnReconciliationRequired": true
+  },
+  "durability": {
+    "workflowStep": "invoke-w07-renewal-batch",
+    "retry": {
+      "limit": 3,
+      "delay": "5 seconds",
+      "backoff": "exponential"
+    },
+    "renewalOperationIdentity": "W07 D1-04 subscription_renewal_cycles.cycle_id, stable for one subscription and billing period",
+    "duplicateExecutionProtection": [
+      "D1-04 unique subscription_id + cycle_start",
+      "W07 cycle version compare-and-swap",
+      "W07 submission lease",
+      "stable order and payment idempotency keys",
+      "HyperSwitch provider idempotency",
+      "signed provider webhook and W07 outcome reconciliation"
+    ]
+  },
+  "authority": {
+    "W10": "Owns only workflow scheduling, persisted step execution, retry and orchestration. It does not read/write D1-01 or D1-04 and cannot make payment, mandate, price, entitlement or subscription-state decisions.",
+    "W07": "Owns D1-04 renewal cycles, orders, payment attempts and MIT submission. It resolves Demo pricing/tax from the owning domain and performs scoped D1-01 subscription transitions after verified provider outcomes.",
+    "providerOutcome": "A synchronous HTTP response never grants entitlement. Signed HyperSwitch webhook/reconciliation remains the source for successful or failed payment outcomes."
+  },
+  "activationGuards": {
+    "W10.MEMBERSHIP_RENEWAL_ENABLED": "false",
+    "W07.MEMBERSHIP_RENEWAL_ENABLED": "false",
+    "requiredHyperswitchEnvironment": "sandbox",
+    "requiredCommercePricingMode": "demo",
+    "taxProviderMustBeExplicitlyConfigured": true,
+    "productionActivation": "NOT_AUTHORIZED_BY_THIS_CONTRACT"
+  },
+  "failureSemantics": {
+    "http5xxOrTransportFailure": "Workflow step retries according to the bounded retry policy; W07 stable cycle/payment idempotency protects replays.",
+    "partialOrSchemaNotReady": "Workflow instance completes with the structured W07 result; the next scheduled invocation attempts recovery again.",
+    "unknownPaymentOutcome": "W07 leaves the cycle in reconciliation state and does not create a second payment attempt until authoritative outcome reconciliation permits it.",
+    "poisonOrInvalidRequest": "W07 rejects the internal call; Workflow records the failed instance. No payment side effect is inferred."
+  },
+  "nonGoals": [
+    "No AUTH-013 Queue reuse",
+    "No new Worker, D1 database or Queue",
+    "No direct W07 Cron or scheduled handler",
+    "No W10 D1-01 or D1-04 business writes",
+    "No new subscription authority such as Kill Bill",
+    "No live charge, remote migration or production activation in this PR"
+  ],
+  "implementationEvidence": {
+    "source": "FEATURE_BRANCH",
+    "unitTests": "PENDING_CI",
+    "wranglerDryRun": "PENDING_CI",
+    "deployment": "NOT_PERFORMED",
+    "sandboxE2E": "PENDING",
+    "unifiedAdmission": "NOT_ESTABLISHED"
+  }
+}
