@@ -2,6 +2,7 @@
 
 import { resolveCommerceOrderItems } from './order-item-resolution.js';
 import type { AuthoritativelyPricedOrder } from './order-persistence.js';
+import type { RenewalRuntimeDependencies } from './renewal-runtime.js';
 import { applyDemoTaxPricing, isDemoPricingEnabled } from './demo-tax-pricing.js';
 import { applyTaxJarSandboxPricing, type TaxJarSandboxAddress } from './taxjar-sandbox-pricing.js';
 import { SubscriptionRuntimeError } from './subscription-runtime.js';
@@ -81,4 +82,21 @@ export async function resolveDemoCommercePricing(
 
   // Demo pricing is closed unless the tax provider is explicitly selected.
   throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
+}
+
+
+type RenewalPricingInput = Parameters<NonNullable<RenewalRuntimeDependencies['resolvePricing']>>[0]
+
+/**
+ * Adapter for W07's renewal runtime envelope. The shared commerce resolver
+ * accepts the exact customer-present order request, not the enclosing cycle
+ * and offer metadata. Keep the owning-domain pricing path identical while
+ * preventing renewal-only fields from being interpreted as client order data.
+ */
+export function resolveDemoRenewalPricing(
+  env: DemoCommercePricingEnv,
+  input: RenewalPricingInput,
+  dependencies: DemoCommercePricingDependencies = {},
+): Promise<AuthoritativelyPricedOrder> {
+  return resolveDemoCommercePricing(env, input.request, dependencies)
 }
