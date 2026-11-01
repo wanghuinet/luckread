@@ -170,3 +170,183 @@ export function createMembershipPaymentIntent(orderId: string) {
     body: JSON.stringify({ orderId }),
   });
 }
+
+
+export type SubscriptionPlanSnapshot = {
+  planId: string;
+  planVersion: number;
+  name: string;
+  tier: string;
+  billingInterval: 'MONTHLY' | 'YEARLY';
+  priceMinor: number;
+  currency: string;
+};
+
+export type SubscriptionPlanChangeType =
+  | 'NO_CHANGE'
+  | 'UPGRADE'
+  | 'DOWNGRADE'
+  | 'BILLING_INTERVAL_CHANGE'
+  | 'SAME_PRICE_CHANGE';
+
+export type SubscriptionPlanChangePreview = {
+  subscriptionId: string;
+  currentPeriodStart: string;
+  currentPeriodEnd: string;
+  currentPlan: SubscriptionPlanSnapshot;
+  targetPlan: SubscriptionPlanSnapshot;
+  changeType: SubscriptionPlanChangeType;
+  effectiveAt: string;
+  prorationBaseMinor: number;
+  currency: string;
+  paymentRequired: boolean;
+  prorationBasis: 'LIST_PRICE_DIFFERENCE_BEFORE_DISCOUNTS_AND_TAX';
+  pricingFinalized: false;
+  remainingPeriodMs: number;
+  periodDurationMs: number;
+  computedAt: string;
+  etag: string;
+};
+
+export type SubscriptionPlanUpgradeCheckout = {
+  attemptId: string;
+  subscriptionId: string;
+  status: 'PENDING_PAYMENT' | 'APPLIED';
+  order: {
+    orderId: string;
+    status: string;
+    totalMinor: number;
+    currency: string;
+  };
+  proration: {
+    amountMinor: number;
+    currency: string;
+    basis: 'LIST_PRICE_DIFFERENCE_BEFORE_DISCOUNTS_AND_TAX';
+    pricingFinalized: true;
+  };
+  effectiveAt: string | null;
+  expiresAt: string;
+  replayed: boolean;
+};
+
+export type ScheduledSubscriptionPlanChange = {
+  changeId: string;
+  subscriptionId: string;
+  status: 'SCHEDULED' | 'APPLIED';
+  changeType: 'DOWNGRADE' | 'BILLING_INTERVAL_CHANGE';
+  currentPlanId: string;
+  targetPlanId: string;
+  targetPlanVersion: number;
+  effectiveAt: string;
+  replayed: boolean;
+};
+
+const SUBSCRIPTION_ID_PATTERN = /^sub_[A-Za-z0-9_-]{1,128}$/;
+const PLAN_ID_PATTERN = /^plan_[a-f0-9]{64}$/;
+const SUBSCRIPTION_ETAG_PATTERN = /^"lr-v([1-9]\\d*)"$/;
+const SUBSCRIPTION_IDEMPOTENCY_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
+
+function validateSubscriptionId(subscriptionId: string): string {
+  if (typeof subscriptionId !== 'string' || !SUBSCRIPTION_ID_PATTERN.test(subscriptionId)) {
+    throw new TypeError('A valid subscription ID is required.');
+  }
+  return subscriptionId;
+}
+
+function validatePlanChangeInput(planId: string, etag: string, idempotencyKey: string): void {
+  if (typeof planId !== 'string' || !PLAN_ID_PATTERN.test(planId)) {
+    throw new TypeError('A valid published membership plan ID is required.');
+  }
+  if (typeof etag !== 'string' || !SUBSCRIPTION_ETAG_PATTERN.test(etag)) {
+    throw new TypeError('A current subscription ETag is required.');
+  }
+  if (typeof idempotencyKey !== 'string' || !SUBSCRIPTION_IDEMPOTENCY_PATTERN.test(idempotencyKey)) {
+    throw new TypeError('A valid subscription change idempotency key is required.');
+  }
+}
+
+/** Read one subscriber-owned subscription through W01 -> W07. */
+export function fetchMySubscription(subscriptionId: string, options: { signal?: AbortSignal } = {}) {
+  const id = validateSubscriptionId(subscriptionId);
+  return apiRequest<unknown>('/memberships/subscriptions/' + encodeURIComponent(id), {
+    method: 'GET',
+    signal: options.signal,
+  });
+}
+
+/** Read-only server quote; no order, payment, subscription write, or entitlement is created. */
+export function fetchSubscriptionPlanChangePreview(
+  subscriptionId: string,
+  targetPlanId: string,
+  options: { signal?: AbortSignal } = {},
+) {
+  const id = validateSubscriptionId(subscriptionId);
+  if (typeof targetPlanId !== 'string' || !PLAN_ID_PATTERN.test(targetPlanId)) {
+    throw new TypeError('A valid published membership plan ID is required.');
+  }
+  const query = new URLSearchParams({ targetPlanId });
+  return apiRequest<unknown>(
+    '/memberships/subscriptions/' + encodeURIComponent(id) + '/change-plan-preview?' + query.toString(),
+    { method: 'GET', signal: options.signal },
+  );
+}
+
+/** Start the existing W07 upgrade reservation and server-priced checkout, guarded by ETag and idempotency. */
+export function createSubscriptionPlanUpgradeCheckout(
+  subscriptionId: string,
+  planId: string,
+  etag: string,
+  idempotencyKey: string,
+) {
+  const id = validateSubscriptionId(subscriptionId);
+  validatePlanChangeInput(planId, etag, idempotencyKey);
+  return apiRequest<unknown>(
+    '/memberships/subscriptions/' + encodeURIComponent(id) + '/change-plan/checkout',
+    {
+      method: 'POST',
+      headers: { 'If-Match': etag },
+      idempotencyKey,
+      body: JSON.stringify({ planId }),
+    },
+  );
+}
+
+/** Schedule a same-interval downgrade at the authoritative current-period boundary. */
+export function scheduleSubscriptionPlanDowngrade(
+  subscriptionId: string,
+  planId: string,
+  etag: string,
+  idempotencyKey: string,
+) {
+  const id = validateSubscriptionId(subscriptionId);
+  validatePlanChangeInput(planId, etag, idempotencyKey);
+  return apiRequest<unknown>(
+    '/memberships/subscriptions/' + encodeURIComponent(id) + '/change-plan/schedule',
+    {
+      method: 'POST',
+      headers: { 'If-Match': etag },
+      idempotencyKey,
+      body: JSON.stringify({ planId }),
+    },
+  );
+}
+
+/** Schedule a monthly/yearly interval switch at the current-period boundary. */
+export function scheduleSubscriptionBillingIntervalChange(
+  subscriptionId: string,
+  planId: string,
+  etag: string,
+  idempotencyKey: string,
+) {
+  const id = validateSubscriptionId(subscriptionId);
+  validatePlanChangeInput(planId, etag, idempotencyKey);
+  return apiRequest<unknown>(
+    '/memberships/subscriptions/' + encodeURIComponent(id) + '/change-plan/interval-schedule',
+    {
+      method: 'POST',
+      headers: { 'If-Match': etag },
+      idempotencyKey,
+      body: JSON.stringify({ planId }),
+    },
+  );
+}
