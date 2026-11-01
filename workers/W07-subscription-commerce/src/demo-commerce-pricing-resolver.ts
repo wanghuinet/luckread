@@ -1,3 +1,5 @@
+/// <reference types="@cloudflare/workers-types" />
+
 import { resolveCommerceOrderItems } from './order-item-resolution.js';
 import type { AuthoritativelyPricedOrder } from './order-persistence.js';
 import { applyDemoTaxPricing, isDemoPricingEnabled } from './demo-tax-pricing.js';
