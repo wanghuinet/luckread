@@ -5,7 +5,6 @@ on:
     paths:
       - "workers/W03-content/**"
       - ".github/workflows/w03-content-runtime-ci.yml"
-      - ".github/workflows/w03-content-runtime-ci.yml"
       - "contracts/persistence/CONTENT-ARTICLE-d1-02-persistence.v1.json"
       - "contracts/transport/W01-W03-content-http-binding.v1.json"
       - "contracts/transport/W05-W03-owned-post-context-http-binding.v1.json"
