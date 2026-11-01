@@ -127,6 +127,26 @@ test('loads active public membership plans through the existing W01 catalog rout
   expect(calls[0]?.options.signal).toBe(controller.signal);
 });
 
+test('filters public membership plans to one creator without changing pagination', async () => {
+  await fetchActiveMembershipPlansPage({
+    limit: 10,
+    cursor: 'opaque/cursor',
+    creatorId: 'creator_42',
+  });
+
+  expect(calls).toHaveLength(1);
+  expect(calls[0]?.path).toBe('/plans?limit=10&cursor=opaque%2Fcursor&creatorId=creator_42');
+  expect(calls[0]?.options.method).toBe('GET');
+});
+
+test('rejects malformed creator filters before transport', () => {
+  expect(() => fetchActiveMembershipPlansPage({ creatorId: '../other' }))
+    .toThrow('creator ID is invalid');
+  expect(() => fetchActiveMembershipPlansPage({ creatorId: ' creator_42 ' }))
+    .toThrow('creator ID is invalid');
+  expect(calls).toHaveLength(0);
+});
+
 test('creates a server-priced membership order using only the selected plan reference', async () => {
   const planId = 'plan_' + 'a'.repeat(64);
   await createMembershipOrder(planId);
