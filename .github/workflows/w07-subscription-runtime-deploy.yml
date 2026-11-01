@@ -1,18 +1,22 @@
-name: W07 Subscription Runtime Deploy
+name: W07 + W10 Membership Renewal Runtime Deploy
 
 on:
   workflow_dispatch:
     inputs:
       source_sha:
-        description: Exact W07 source commit to deploy
+        description: Exact W07 and W10 source commit to deploy
         required: true
         type: string
       confirm:
-        description: Type DEPLOY_W07_SUBSCRIPTION to permit W07 deployment
+        description: Type DEPLOY_W07_SUBSCRIPTION to permit W07 and W10 runtime deployment
         required: true
         type: string
       migration_confirm:
         description: Type APPLY_W07_SUBSCRIPTION_MIGRATION to permit D1-01 migration
+        required: true
+        type: string
+      renewal_confirm:
+        description: Type DEPLOY_W07_W10_RENEWAL_RUNTIME to deploy the gated W07 and W10 renewal runtime
         required: true
         type: string
 
@@ -21,7 +25,7 @@ permissions:
 
 jobs:
   deploy:
-    if: ${{ inputs.confirm == 'DEPLOY_W07_SUBSCRIPTION' && inputs.migration_confirm == 'APPLY_W07_SUBSCRIPTION_MIGRATION' }}
+    if: ${{ inputs.confirm == 'DEPLOY_W07_SUBSCRIPTION' && inputs.migration_confirm == 'APPLY_W07_SUBSCRIPTION_MIGRATION' && inputs.renewal_confirm == 'DEPLOY_W07_W10_RENEWAL_RUNTIME' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -35,11 +39,16 @@ jobs:
           SOURCE_SHA: ${{ inputs.source_sha }}
           DEPLOY_CONFIRM: ${{ inputs.confirm }}
           MIGRATION_CONFIRM: ${{ inputs.migration_confirm }}
+          RENEWAL_CONFIRM: ${{ inputs.renewal_confirm }}
         run: |
           set -euo pipefail
           [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$GITHUB_REF" == "refs/heads/main" ]]
+          MAIN_SHA="$(git rev-parse origin/main)"
+          [[ "$SOURCE_SHA" == "$GITHUB_SHA" && "$SOURCE_SHA" == "$MAIN_SHA" ]]
           [[ "$DEPLOY_CONFIRM" == "DEPLOY_W07_SUBSCRIPTION" ]]
           [[ "$MIGRATION_CONFIRM" == "APPLY_W07_SUBSCRIPTION_MIGRATION" ]]
+          [[ "$RENEWAL_CONFIRM" == "DEPLOY_W07_W10_RENEWAL_RUNTIME" ]]
           git cat-file -e "$SOURCE_SHA^{commit}"
           git merge-base --is-ancestor "$SOURCE_SHA" origin/main
           echo "Validated source SHA is an ancestor of reviewed main."
@@ -96,6 +105,55 @@ jobs:
           console.log(JSON.stringify({rateLimitBindings:[...names].sort()}))
           NODE
 
+      - name: Verify W10 Workflow runtime and renewal topology
+        working-directory: workers/W10-async
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const fs = require('node:fs')
+          const c = JSON.parse(fs.readFileSync('wrangler.jsonc', 'utf8'))
+          if (c.name !== 'luckread-w10' || c.main !== 'src/index.ts') throw new Error('W10 identity or entrypoint mismatch')
+          if (c.workers_dev !== false) throw new Error('W10 public workers.dev must remain disabled')
+          if (c.vars?.MEMBERSHIP_RENEWAL_ENABLED !== 'false') throw new Error('W10 renewal activation must remain disabled during deployment')
+          if ((c.d1_databases || []).length !== 0) throw new Error('W10 must not bind a business D1')
+          if ((c.queues?.producers || []).length !== 0 || (c.queues?.consumers || []).length !== 0) throw new Error('W10 renewal runtime must not introduce or reuse a Queue')
+          if (c.triggers?.crons) throw new Error('W10 must use Workflow schedules, not Worker Cron')
+          if (!(c.services || []).some(x => x.binding === 'W07_COMMERCE' && x.service === 'luckread-w07')) throw new Error('W10 to W07 Service Binding mismatch')
+          if (!(c.workflows || []).some(x => x.name === 'luckread-membership-renewal' && x.binding === 'MEMBERSHIP_RENEWAL_WORKFLOW' && x.class_name === 'MembershipRenewalWorkflow' && (x.schedules || []).includes('* * * * *'))) throw new Error('W10 durable renewal Workflow schedule missing')
+          const w07 = JSON.parse(fs.readFileSync('../W07-subscription-commerce/wrangler.jsonc', 'utf8'))
+          if (w07.vars?.MEMBERSHIP_RENEWAL_ENABLED !== 'false') throw new Error('W07 renewal activation must remain disabled during deployment')
+          if (!(w07.services || []).some(x => x.binding === 'W06_GOVERNANCE' && x.service === 'luckread-w06')) throw new Error('W07 governance Service Binding must be restored by deployment')
+          console.log(JSON.stringify({worker:c.name,workflow:'luckread-membership-renewal',schedule:'* * * * *',service:'luckread-w07',activation:'disabled',topology:{newWorkers:0,newD1:0,newQueues:0}}))
+          NODE
+          test -f src/membership-renewal-workflow.ts
+          test -f src/membership-renewal-workflow-runtime.ts
+      - name: Run W10 runtime and transport tests
+        run: |
+          npx vitest run workers/W10-async/src/*.test.ts
+          node --test workers/W07-subscription-commerce/scripts/verify-renewal-activation-gate.test.mjs
+      - name: Typecheck W10 runtime
+        run: >-
+          npx tsc --noEmit --strict --skipLibCheck
+          --target ES2022 --module ESNext --moduleResolution Bundler
+          --lib ES2022,DOM --types @cloudflare/workers-types
+          workers/W10-async/src/queue-batch.ts
+          workers/W10-async/src/queue-batch.test.ts
+          workers/W10-async/src/retry-policy.ts
+          workers/W10-async/src/retry-policy.test.ts
+          workers/W10-async/src/event-envelope.ts
+          workers/W10-async/src/event-envelope.test.ts
+          workers/W10-async/src/canonical-json-idempotency.ts
+          workers/W10-async/src/membership-renewal-workflow-runtime.ts
+          workers/W10-async/src/membership-renewal-workflow.test.ts
+          workers/W10-async/src/membership-renewal-workflow.ts
+          workers/W10-async/src/index.ts
+      - name: Validate W10 Workflow bundle without deployment
+        working-directory: workers/W10-async
+        run: >-
+          npx --yes wrangler@4.156.0 deploy --dry-run
+          --config wrangler.jsonc
+          --outdir /tmp/w10-renewal-workflow-dry-run
+
       - name: Read-only D1-01 migration and schema preflight
         id: d1_preflight
         working-directory: workers/W07-subscription-commerce
@@ -104,17 +162,17 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
           set -euo pipefail
-          npx --yes wrangler@4.116.0 d1 list --json --config wrangler.jsonc > /tmp/w07-d1-list.json
+          npx --yes wrangler@4.156.0 d1 list --json --config wrangler.jsonc > /tmp/w07-d1-list.json
           node scripts/verify-d1-04-binding.mjs /tmp/w07-d1-list.json
-          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command="SELECT name FROM d1_migrations WHERE name IN ('0001_membership_subscriptions.sql','0002_subscription_version_cas.sql','0003_membership_plans.sql') ORDER BY name" --json > /tmp/w07-d1-migrations.json
-          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA table_info("membership_subscriptions")' --json > /tmp/w07-subscription-schema.json
-          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA index_list("membership_subscriptions")' --json > /tmp/w07-subscription-indexes.json
-          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA foreign_key_list("membership_subscriptions")' --json > /tmp/w07-subscription-foreign-keys.json
-          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA table_info("membership_plans")' --json > /tmp/w07-plan-schema.json
-          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA table_info("membership_plan_versions")' --json > /tmp/w07-plan-version-schema.json
-          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA index_list("membership_plans")' --json > /tmp/w07-plan-indexes.json
-          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA index_list("membership_plan_versions")' --json > /tmp/w07-plan-version-indexes.json
-          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command="SELECT name FROM sqlite_master WHERE type = 'trigger' AND tbl_name IN ('membership_plans','membership_plan_versions') ORDER BY name" --json > /tmp/w07-plan-triggers.json
+          npx --yes wrangler@4.156.0 d1 execute luckread --remote --config wrangler.jsonc --command="SELECT name FROM d1_migrations WHERE name IN ('0001_membership_subscriptions.sql','0002_subscription_version_cas.sql','0003_membership_plans.sql') ORDER BY name" --json > /tmp/w07-d1-migrations.json
+          npx --yes wrangler@4.156.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA table_info("membership_subscriptions")' --json > /tmp/w07-subscription-schema.json
+          npx --yes wrangler@4.156.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA index_list("membership_subscriptions")' --json > /tmp/w07-subscription-indexes.json
+          npx --yes wrangler@4.156.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA foreign_key_list("membership_subscriptions")' --json > /tmp/w07-subscription-foreign-keys.json
+          npx --yes wrangler@4.156.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA table_info("membership_plans")' --json > /tmp/w07-plan-schema.json
+          npx --yes wrangler@4.156.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA table_info("membership_plan_versions")' --json > /tmp/w07-plan-version-schema.json
+          npx --yes wrangler@4.156.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA index_list("membership_plans")' --json > /tmp/w07-plan-indexes.json
+          npx --yes wrangler@4.156.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA index_list("membership_plan_versions")' --json > /tmp/w07-plan-version-indexes.json
+          npx --yes wrangler@4.156.0 d1 execute luckread --remote --config wrangler.jsonc --command="SELECT name FROM sqlite_master WHERE type = 'trigger' AND tbl_name IN ('membership_plans','membership_plan_versions') ORDER BY name" --json > /tmp/w07-plan-triggers.json
           node scripts/verify-remote-preflight.mjs preflight \
             /tmp/w07-d1-list.json \
             /tmp/w07-d1-migrations.json \
@@ -152,10 +210,10 @@ jobs:
           NODE
           )"
 
-          npx --yes wrangler@4.116.0 d1 execute "$D1_04_NAME" --remote --config wrangler.jsonc --command="SELECT type, name, tbl_name, sql FROM sqlite_master WHERE type IN ('table', 'view', 'index', 'trigger') AND name NOT LIKE 'sqlite_%' ORDER BY type, name" --json > /tmp/w07-d1-04-deploy-schema.json
+          npx --yes wrangler@4.156.0 d1 execute "$D1_04_NAME" --remote --config wrangler.jsonc --command="SELECT type, name, tbl_name, sql FROM sqlite_master WHERE type IN ('table', 'view', 'index', 'trigger') AND name NOT LIKE 'sqlite_%' ORDER BY type, name" --json > /tmp/w07-d1-04-deploy-schema.json
           HAS_MIGRATION_TABLE="$(node scripts/verify-d1-04-order-migration.mjs has-migration-table /tmp/w07-d1-04-deploy-schema.json)"
           if [[ "$HAS_MIGRATION_TABLE" == "true" ]]; then
-            npx --yes wrangler@4.116.0 d1 execute "$D1_04_NAME" --remote --config wrangler.jsonc --command="SELECT name FROM d1_migrations ORDER BY name" --json > /tmp/w07-d1-04-deploy-migrations.json
+            npx --yes wrangler@4.156.0 d1 execute "$D1_04_NAME" --remote --config wrangler.jsonc --command="SELECT name FROM d1_migrations ORDER BY name" --json > /tmp/w07-d1-04-deploy-migrations.json
           else
             printf '{"querySkipped":"d1_migrations table not present"}\n' > /tmp/w07-d1-04-deploy-migrations.json
           fi
@@ -179,7 +237,7 @@ jobs:
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        run: npx --yes wrangler@4.116.0 d1 migrations apply luckread --remote --config wrangler.jsonc
+        run: npx --yes wrangler@4.156.0 d1 migrations apply luckread --remote --config wrangler.jsonc
       - name: Read-only D1-01 schema and version postflight
         working-directory: workers/W07-subscription-commerce
         env:
@@ -187,19 +245,19 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
           set -euo pipefail
-          npx --yes wrangler@4.116.0 d1 list --json --config wrangler.jsonc > /tmp/w07-post-d1-list.json
+          npx --yes wrangler@4.156.0 d1 list --json --config wrangler.jsonc > /tmp/w07-post-d1-list.json
           node scripts/verify-d1-04-binding.mjs /tmp/w07-post-d1-list.json
-          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command="SELECT name FROM d1_migrations WHERE name IN ('0001_membership_subscriptions.sql','0002_subscription_version_cas.sql','0003_membership_plans.sql') ORDER BY name" --json > /tmp/w07-post-d1-migrations.json
-          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA table_info("membership_subscriptions")' --json > /tmp/w07-post-subscription-schema.json
-          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA index_list("membership_subscriptions")' --json > /tmp/w07-post-subscription-indexes.json
-          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA foreign_key_list("membership_subscriptions")' --json > /tmp/w07-post-subscription-foreign-keys.json
-          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA table_info("membership_plans")' --json > /tmp/w07-post-plan-schema.json
-          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA table_info("membership_plan_versions")' --json > /tmp/w07-post-plan-version-schema.json
-          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA index_list("membership_plans")' --json > /tmp/w07-post-plan-indexes.json
-          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA index_list("membership_plan_versions")' --json > /tmp/w07-post-plan-version-indexes.json
-          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command="SELECT name FROM sqlite_master WHERE type = 'trigger' AND tbl_name IN ('membership_plans','membership_plan_versions') ORDER BY name" --json > /tmp/w07-post-plan-triggers.json
-          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command="SELECT COUNT(*) AS invalid_versions FROM membership_subscriptions WHERE version IS NULL OR version < 1 OR typeof(version) <> 'integer'" --json > /tmp/w07-post-subscription-version-integrity.json
-          npx --yes wrangler@4.116.0 d1 execute luckread --remote --config wrangler.jsonc --command="SELECT COUNT(*) AS invalid_current_plan_versions FROM membership_plans p LEFT JOIN membership_plan_versions pv ON pv.plan_id = p.plan_id AND pv.plan_version = p.current_version WHERE pv.plan_id IS NULL OR p.current_version < 1 OR typeof(p.current_version) <> 'integer'" --json > /tmp/w07-post-plan-integrity.json
+          npx --yes wrangler@4.156.0 d1 execute luckread --remote --config wrangler.jsonc --command="SELECT name FROM d1_migrations WHERE name IN ('0001_membership_subscriptions.sql','0002_subscription_version_cas.sql','0003_membership_plans.sql') ORDER BY name" --json > /tmp/w07-post-d1-migrations.json
+          npx --yes wrangler@4.156.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA table_info("membership_subscriptions")' --json > /tmp/w07-post-subscription-schema.json
+          npx --yes wrangler@4.156.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA index_list("membership_subscriptions")' --json > /tmp/w07-post-subscription-indexes.json
+          npx --yes wrangler@4.156.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA foreign_key_list("membership_subscriptions")' --json > /tmp/w07-post-subscription-foreign-keys.json
+          npx --yes wrangler@4.156.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA table_info("membership_plans")' --json > /tmp/w07-post-plan-schema.json
+          npx --yes wrangler@4.156.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA table_info("membership_plan_versions")' --json > /tmp/w07-post-plan-version-schema.json
+          npx --yes wrangler@4.156.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA index_list("membership_plans")' --json > /tmp/w07-post-plan-indexes.json
+          npx --yes wrangler@4.156.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA index_list("membership_plan_versions")' --json > /tmp/w07-post-plan-version-indexes.json
+          npx --yes wrangler@4.156.0 d1 execute luckread --remote --config wrangler.jsonc --command="SELECT name FROM sqlite_master WHERE type = 'trigger' AND tbl_name IN ('membership_plans','membership_plan_versions') ORDER BY name" --json > /tmp/w07-post-plan-triggers.json
+          npx --yes wrangler@4.156.0 d1 execute luckread --remote --config wrangler.jsonc --command="SELECT COUNT(*) AS invalid_versions FROM membership_subscriptions WHERE version IS NULL OR version < 1 OR typeof(version) <> 'integer'" --json > /tmp/w07-post-subscription-version-integrity.json
+          npx --yes wrangler@4.156.0 d1 execute luckread --remote --config wrangler.jsonc --command="SELECT COUNT(*) AS invalid_current_plan_versions FROM membership_plans p LEFT JOIN membership_plan_versions pv ON pv.plan_id = p.plan_id AND pv.plan_version = p.current_version WHERE pv.plan_id IS NULL OR p.current_version < 1 OR typeof(p.current_version) <> 'integer'" --json > /tmp/w07-post-plan-integrity.json
           node scripts/verify-remote-preflight.mjs postflight \
             /tmp/w07-post-d1-list.json \
             /tmp/w07-post-d1-migrations.json \
@@ -219,7 +277,30 @@ jobs:
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        run: npx --yes wrangler@4.116.0 deploy --config wrangler.jsonc
+        run: npx --yes wrangler@4.156.0 deploy --config wrangler.jsonc
+      - name: Deploy W10 durable renewal Workflow
+        working-directory: workers/W10-async
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: npx --yes wrangler@4.156.0 deploy --config wrangler.jsonc
+
+      - name: Read-only postflight for W07 and W10 Service Bindings
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          for worker in luckread-w07 luckread-w10; do
+            curl -fsS --retry 3 --retry-all-errors \
+              "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/$worker/settings" \
+              -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+              -H "Content-Type: application/json" > "/tmp/$worker-settings.json"
+            jq -e '.success == true' "/tmp/$worker-settings.json" >/dev/null
+          done
+          jq -e '[.result.bindings[] | select(.type == "service" and .name == "W06_GOVERNANCE" and .service == "luckread-w06")] | length == 1' /tmp/luckread-w07-settings.json >/dev/null
+          jq -e '[.result.bindings[] | select(.type == "service" and .name == "W07_COMMERCE" and .service == "luckread-w07")] | length == 1' /tmp/luckread-w10-settings.json >/dev/null
+          echo "W07 governance and W10 commerce service bindings verified after deployment."
       - name: Write deployment provenance
         env:
           SOURCE_SHA: ${{ inputs.source_sha }}
@@ -227,7 +308,7 @@ jobs:
           REMOTE_MIGRATION: ${{ steps.d1_preflight.outputs.migration_action == 'apply' }}
         run: |
           set -euo pipefail
-          mkdir -p artifacts/w07-subscription
+          mkdir -p artifacts/w07-subscription artifacts/w10-renewal
           cat > artifacts/w07-subscription/provenance.json <<EOF
           {
             "workflow": "W07 Subscription Runtime Deploy",
@@ -249,9 +330,31 @@ jobs:
           }
           EOF
           cat artifacts/w07-subscription/provenance.json
+      - name: Write W10 deployment provenance
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          cat > artifacts/w10-renewal/provenance.json <<EOF
+          {
+            "workflow": "W07 + W10 Membership Renewal Runtime Deploy",
+            "runId": "$GITHUB_RUN_ID",
+            "runAttempt": "$GITHUB_RUN_ATTEMPT",
+            "sourceSha": "$SOURCE_SHA",
+            "worker": "luckread-w10",
+            "workflowResource": "luckread-membership-renewal",
+            "schedule": "* * * * *",
+            "targetWorker": "luckread-w07",
+            "renewalActivation": "false",
+            "deployment": "performed_only_after_explicit_three_part_confirmation"
+          }
+          EOF
+          cat artifacts/w10-renewal/provenance.json
       - name: Upload deployment provenance
         uses: actions/upload-artifact@v4
         with:
-          name: w07-subscription-deployment-${{ inputs.source_sha }}
-          path: artifacts/w07-subscription/provenance.json
+          name: w07-w10-renewal-deployment-${{ inputs.source_sha }}
+          path: |
+            artifacts/w07-subscription/provenance.json
+            artifacts/w10-renewal/provenance.json
           if-no-files-found: error
