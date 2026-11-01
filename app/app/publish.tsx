@@ -556,7 +556,7 @@ export default function PublishScreen() {
     } finally {
       setBusy(false);
     }
-  }, [assets, body, contentId, coverRef, pollDurationHours, pollEnabled, pollOptions, publishPending, router]);
+  }, [accessMode, assets, body, contentId, coverRef, pollDurationHours, pollEnabled, pollOptions, publishPending, router]);
 
   if (authStatus !== 'authenticated') {
     return (
