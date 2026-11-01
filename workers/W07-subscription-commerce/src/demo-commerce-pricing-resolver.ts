@@ -4,7 +4,7 @@ import { applyDemoTaxPricing, isDemoPricingEnabled } from './demo-tax-pricing.js
 import { applyTaxJarSandboxPricing, type TaxJarSandboxAddress } from './taxjar-sandbox-pricing.js';
 import { SubscriptionRuntimeError } from './subscription-runtime.js';
 
-type DemoCommercePricingEnv = Readonly<{
+export type DemoCommercePricingEnv = Readonly<{
   D1_01: D1Database;
   HYPERSWITCH_ENVIRONMENT?: string | null;
   COMMERCE_PRICING_MODE?: string | null;
