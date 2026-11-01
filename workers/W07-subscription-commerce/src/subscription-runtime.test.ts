@@ -336,6 +336,37 @@ describe('subscription runtime', () => {
     expect(readCount).toBe(beforeDenied)
   })
 
+  it('routes creator-filtered GET /plans through the scoped active-public plan query', async () => {
+    const allowLimiter = { limit: async () => ({ success: true }) }
+    const request = new Request('https://luckread-w07.internal/plans?limit=10&creatorId=creator_two', {
+      method: 'GET',
+      headers: {
+        'X-LuckRead-Caller': 'W01',
+        'X-LuckRead-Transport-Version': '1.0',
+        'X-LuckRead-Correlation-Id': 'creator-plan-filter-test',
+        'X-LuckRead-Principal-User-Id': 'user_1',
+        'X-LuckRead-Principal-Layer': 'L2',
+      },
+    })
+    const response = await w07.fetch(request, {
+      D1_01: fakeDb([], [
+        activePlan('plan_creator_one', { owner_id: 'creator_one' }),
+        activePlan('plan_creator_two', { owner_id: 'creator_two' }),
+        activePlan('plan_creator_two_private', {
+          owner_id: 'creator_two',
+          status: 'DRAFT',
+          visibility: 'PRIVATE',
+        }),
+      ]),
+      SUBSCRIPTION_ORIGIN_GLOBAL_LIMITER: allowLimiter,
+      SUBSCRIPTION_READ_LIMITER: allowLimiter,
+      SUBSCRIPTION_WRITE_LIMITER: allowLimiter,
+    })
+    const body = await response.json() as { data?: { docs?: Array<{ planId: string }> } }
+    expect(response.status).toBe(200)
+    expect(body.data?.docs?.map((plan) => plan.planId)).toEqual(['plan_creator_two'])
+  })
+
   it('routes authenticated GET /plans through the active-public plan query', async () => {
     const allowLimiter = { limit: async () => ({ success: true }) }
     const request = new Request('https://luckread-w07.internal/plans?limit=10', {
