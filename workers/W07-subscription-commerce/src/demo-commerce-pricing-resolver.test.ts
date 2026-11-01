@@ -1,3 +1,5 @@
+/// <reference types="@cloudflare/workers-types" />
+
 import { describe, expect, it, vi } from 'vitest';
 import { resolveDemoCommercePricing, type DemoCommercePricingEnv } from './demo-commerce-pricing-resolver.js';
 import type { ResolvedCommerceOrderItems } from './order-item-resolution.js';
