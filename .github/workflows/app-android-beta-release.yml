@@ -203,6 +203,95 @@ jobs:
       - name: Generate Android native project
         run: bunx expo prebuild --platform android --clean --no-install
 
+      - name: Generate and verify Hyperswitch React Native Codegen specs
+        run: |
+          test -f android/gradle.properties
+          grep -Fxq "newArchEnabled=true" android/gradle.properties
+          chmod +x android/gradlew
+          cd android
+          ./gradlew generateCodegenArtifactsFromSchema --no-daemon
+          cd ..
+          SPEC_ROOT="node_modules/@juspay-tech/react-native-hyperswitch/android/build/generated/source/codegen"
+          MODULE_SPEC="$(find "$SPEC_ROOT" -type f -name 'NativeHyperswitchModuleSpec.java' -print -quit)"
+          HEADLESS_SPEC="$(find "$SPEC_ROOT" -type f -name 'NativeHyperHeadlessSpec.java' -print -quit)"
+          test -n "$MODULE_SPEC" || { echo "Hyperswitch NativeHyperswitchModuleSpec was not generated" >&2; exit 1; }
+          test -n "$HEADLESS_SPEC" || { echo "Hyperswitch NativeHyperHeadlessSpec was not generated" >&2; exit 1; }
+          echo "Verified generated Hyperswitch specs:"
+          echo "$MODULE_SPEC"
+          echo "$HEADLESS_SPEC"
+      - name: Compile signed Release APK with embedded JavaScript bundle
+        # Keep the values selected by the preceding step (stable or temporary key).
+        # Re-declaring these from repository secrets would blank them in test-key mode.
+        run: |
+          chmod +x android/gradlew
+          cd android
+          ./gradlew :app:assembleRelease --no-daemon
+
+      - name: Verify APK bundle and signing
+        env:
+          RELEASE_VERSION_NAME: ${{ steps.version.outputs.version_name }}
+          RELEASE_VERSION_CODE: ${{ steps.version.outputs.version_code }}
+        run: |
+          APK="android/app/build/outputs/apk/release/app-release.apk"
+          test -s "$APK" || { echo "Release APK was not created" >&2; exit 1; }
+          if ! unzip -l "$APK" | grep -Eq 'assets/index\.android\.bundle'; then
+            echo "Release APK is missing assets/index.android.bundle; refusing to publish a Metro-dependent build." >&2
+            exit 1
+          fi
+          APKSIGNER="$(find "${ANDROID_HOME:-/usr/local/lib/android/sdk}/build-tools" -type f -name apksigner -print | sort -V | tail -n 1)"
+          test -n "$APKSIGNER" || { echo "Android apksigner was not found" >&2; exit 1; }
+          "$APKSIGNER" verify --verbose --print-certs "$APK"
+          mkdir -p "$GITHUB_WORKSPACE/dist"
+          VERSION_NAME="$RELEASE_VERSION_NAME"
+          VERSION_CODE="$RELEASE_VERSION_CODE"
+          SIGNING_KIND="test"
+          if [ "$LUCKREAD_STABLE_SIGNING" = "true" ]; then SIGNING_KIND="signed"; fi
+          APK_NAME="LuckRead-Android-Beta-$VERSION_NAME-$SIGNING_KIND-code$VERSION_CODE.apk"
+          cp "$APK" "$GITHUB_WORKSPACE/dist/$APK_NAME"
+          (cd "$GITHUB_WORKSPACE/dist" && sha256sum "$APK_NAME" > "$APK_NAME.sha256")
+          echo "Verified signed APK: dist/$APK_NAME"
+          ls -lh "$GITHUB_WORKSPACE/dist"
+
+      - name: Upload downloadable APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: luckread-android-beta-${{ steps.version.outputs.version_name }}-code-${{ steps.version.outputs.version_code }}
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish APK to GitHub Releases
+        if: ${{ inputs.publish_release && steps.signing.outputs.stable_signing == 'true' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: luckread-android-beta-v${{ steps.version.outputs.version_name }}-code${{ steps.version.outputs.version_code }}
+          target_commitish: ${{ github.sha }}
+          name: LuckRead Android Beta ${{ steps.version.outputs.version_name }} (code ${{ steps.version.outputs.version_code }})
+          prerelease: true
+          draft: false
+          make_latest: false
+          generate_release_notes: true
+          overwrite_files: true
+          fail_on_unmatched_files: true
+          files: |
+            dist/LuckRead-Android-Beta-${{ steps.version.outputs.version_name }}-signed-code${{ steps.version.outputs.version_code }}.apk
+            dist/LuckRead-Android-Beta-${{ steps.version.outputs.version_name }}-signed-code${{ steps.version.outputs.version_code }}.apk.sha256
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+ android/gradle.properties
+          chmod +x android/gradlew
+          cd android
+          ./gradlew generateCodegenArtifactsFromSchema --no-daemon
+          cd ..
+          SPEC_ROOT="node_modules/@juspay-tech/react-native-hyperswitch/android/build/generated/source/codegen"
+          MODULE_SPEC="$(find "$SPEC_ROOT" -type f -name 'NativeHyperswitchModuleSpec.java' -print -quit)"
+          HEADLESS_SPEC="$(find "$SPEC_ROOT" -type f -name 'NativeHyperHeadlessSpec.java' -print -quit)"
+          test -n "$MODULE_SPEC" || { echo "Hyperswitch NativeHyperswitchModuleSpec was not generated" >&2; exit 1; }
+          test -n "$HEADLESS_SPEC" || { echo "Hyperswitch NativeHyperHeadlessSpec was not generated" >&2; exit 1; }
+          echo "Verified generated Hyperswitch specs:"
+          echo "$MODULE_SPEC"
+          echo "$HEADLESS_SPEC"
+
       - name: Compile signed Release APK with embedded JavaScript bundle
         # Keep the values selected by the preceding step (stable or temporary key).
         # Re-declaring these from repository secrets would blank them in test-key mode.
