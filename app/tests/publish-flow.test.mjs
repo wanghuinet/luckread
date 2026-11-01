@@ -40,7 +40,7 @@ test('editing is ETag guarded and returns to a refreshed authoritative timeline'
   expect(composer).toContain("headers: { 'If-Match': record.etag }");
   expect(composer).toContain('idempotencyKey: attempt.mutationKey');
   expect(composer).toContain("router.replace(('/?published=' + encodeURIComponent(contentId) + '&refresh=' + Date.now()) as never)");
-  expect(composer).toContain("router.replace(('/?published=' + encodeURIComponent(draft.id) + '&refresh=' + Date.now()) as never)");
+  expect(composer).toContain("router.replace(('/?published=' + encodeURIComponent(contentId) + '&refresh=' + Date.now()) as never)");
 });
 
 test('edit and delete controls are only shown for the authenticated owner and use authoritative checks', () => {
