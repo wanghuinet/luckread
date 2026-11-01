@@ -180,14 +180,26 @@ jobs:
 
           candidate_ts="$(find "$artifact_dir" -maxdepth 1 -type f -name '*.ts' | head -n 1)"
           test -n "$candidate_ts"
-          if grep -Eiq 'DROP TABLE|DROP COLUMN|RENAME TABLE|RENAME COLUMN|auth_session_state|ALTER TABLE .?(users|media)' "$candidate_ts"; then
-            echo "Generated migration includes destructive, legacy-table, or duplicate manual-migration DDL"
-            cat "$candidate_ts"
+          awk '/export async function down/{exit} {print}' "$candidate_ts" > "$artifact_dir/up-only.ts"
+          if grep -Eiq 'DROP|RENAME|auth_session_state' "$artifact_dir/up-only.ts"; then
+            echo "Generated UP migration contains destructive DDL, a rename, or a historical session table"
+            cat "$artifact_dir/up-only.ts"
             exit 1
           fi
-          if ! grep -Eiq 'CREATE TABLE.*redirects' "$candidate_ts"; then
-            echo "Generated migration does not create the official redirects collection"
-            cat "$candidate_ts"
+          if grep -Eiq 'ALTER TABLE.*(users|media).*(identity_id|owner_user_id|upload_idempotency_key|upload_fingerprint)' "$artifact_dir/up-only.ts"; then
+            echo "Generated UP migration repeats a manually migrated users/media field"
+            cat "$artifact_dir/up-only.ts"
+            exit 1
+          fi
+          for expected in 'CREATE TABLE.*redirects' 'CREATE TABLE.*redirects_rels' 'ALTER TABLE.*media.*ADD.*prefix' 'ALTER TABLE.*payload_locked_documents_rels.*ADD.*redirects_id'; do
+            if ! grep -Eiq "$expected" "$artifact_dir/up-only.ts"; then
+              echo "Generated UP migration is missing expected additive schema: $expected"
+              cat "$artifact_dir/up-only.ts"
+              exit 1
+            fi
+          done
+          if ! grep -q "'redirects'" "$artifact_dir/payload-types.ts"; then
+            echo "Payload type generation did not include the redirects collection"
             exit 1
           fi
           cp src/migrations/index.ts "$artifact_dir/index.ts"
