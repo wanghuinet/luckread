@@ -6,6 +6,7 @@ import * as migration_20260928_104842_MIG_PAYLOAD_3902_NATIVE_SCHEMA_V1 from './
 import * as migration_20261002_120000_media_owner from './20261002_120000_media_owner';
 import * as migration_20261006_202000_MIG_BETTER_AUTH_PROFILE_PROJECTION_V1 from './20261006_202000_MIG_BETTER_AUTH_PROFILE_PROJECTION_V1';
 import * as migration_20261022_120000_MIG_MEDIA_UPLOAD_IDEMPOTENCY_V1 from './20261022_120000_MIG_MEDIA_UPLOAD_IDEMPOTENCY_V1';
+import * as migration_20261101_163928_username_redirects from './20261101_163928_username_redirects';
 
 export const migrations = [
   {
@@ -47,5 +48,10 @@ export const migrations = [
     up: migration_20261022_120000_MIG_MEDIA_UPLOAD_IDEMPOTENCY_V1.up,
     down: migration_20261022_120000_MIG_MEDIA_UPLOAD_IDEMPOTENCY_V1.down,
     name: '20261022_120000_MIG_MEDIA_UPLOAD_IDEMPOTENCY_V1',
+  },
+  {
+    up: migration_20261101_163928_username_redirects.up,
+    down: migration_20261101_163928_username_redirects.down,
+    name: '20261101_163928_username_redirects',
   },
 ];

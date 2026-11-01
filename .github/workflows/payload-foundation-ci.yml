@@ -64,5 +64,105 @@ jobs:
         working-directory: workers/W01-payload
         run: node ../../scripts/w01-remote-migration-admission.mjs --check-state
 
+      - name: Verify committed official Payload username redirect migration
+        if: ${{ (github.event_name == 'pull_request' && github.event.pull_request.number == 1481) || (github.event_name == 'push' && github.ref == 'refs/heads/feature/unified-username-301-redirects') }}
+        working-directory: workers/W01-payload
+        env:
+          NODE_ENV: development
+          PAYLOAD_SECRET: migration-generation-only
+          CI: "true"
+        run: |
+          set -euo pipefail
+          artifact_dir="../../artifacts/evidence/w01-username-redirect-migration-generation"
+          mkdir -p "$artifact_dir"
+          migration="20261101_163928_username_redirects"
+          migration_file="src/migrations/$migration.ts"
+          snapshot_file="src/migrations/$migration.json"
+          test -f "$migration_file"
+          test -f "$snapshot_file"
+          cp "$migration_file" "$artifact_dir/$migration.ts"
+          cp "$snapshot_file" "$artifact_dir/$migration.json"
+          cp src/migrations/index.ts "$artifact_dir/index.ts"
+          cp src/payload-types.ts "$artifact_dir/committed-payload-types.ts"
+
+          # Verify generated Payload types with the pinned official CLI, then restore
+          # the committed file so CI remains read-only with respect to source files.
+          type_backup="$RUNNER_TEMP/w01-payload-types.committed"
+          cp src/payload-types.ts "$type_backup"
+          restore_types() { cp "$type_backup" src/payload-types.ts; }
+          trap restore_types EXIT
+          timeout 180s pnpm exec payload generate:types 2>&1 | tee "$artifact_dir/generate-types.log"
+          cp src/payload-types.ts "$artifact_dir/generated-payload-types.ts"
+          restore_types
+          trap - EXIT
+
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from 'node:fs'
+          const dir = '../../artifacts/evidence/w01-username-redirect-migration-generation/'
+          const migrationName = '20261101_163928_username_redirects'
+          const migration = readFileSync(dir + migrationName + '.ts', 'utf8')
+          const snapshot = JSON.parse(readFileSync(dir + migrationName + '.json', 'utf8'))
+          const index = readFileSync(dir + 'index.ts', 'utf8')
+          const committedTypes = readFileSync(dir + 'committed-payload-types.ts', 'utf8')
+          const generatedTypes = readFileSync(dir + 'generated-payload-types.ts', 'utf8')
+          const names = [...index.matchAll(/name:\s*'([^']+)'/g)].map((match) => match[1])
+          if (names.filter((name) => name === migrationName).length !== 1 || names.at(-1) !== migrationName) {
+            throw new Error('Redirect migration must be registered exactly once and last')
+          }
+          for (const table of ['redirects', 'redirects_rels']) {
+            if (!snapshot.tables?.[table]) throw new Error('Snapshot is missing ' + table)
+          }
+          if (!snapshot.tables.media?.columns?.prefix) throw new Error('Snapshot is missing media.prefix')
+          if (!snapshot.tables.payload_locked_documents_rels?.columns?.redirects_id) {
+            throw new Error('Snapshot is missing payload_locked_documents_rels.redirects_id')
+          }
+          const up = migration.split('export async function down')[0]
+          const down = migration.split('export async function down')[1] ?? ''
+          for (const expected of ['CREATE TABLE', 'redirects_rels', 'redirects_from_idx', 'media', 'prefix', 'redirects_id']) {
+            if (!up.includes(expected)) throw new Error('Migration UP is missing ' + expected)
+          }
+          if (/DROP TABLE|DROP COLUMN|RENAME TABLE|RENAME COLUMN/i.test(up)) {
+            throw new Error('Migration UP contains destructive DDL')
+          }
+          if (!down.includes('PRAGMA foreign_keys=OFF') ||
+              !down.includes('SELECT "id", "order", "parent_id", "path", "users_id", "media_id"') ||
+              !down.includes('PRAGMA foreign_keys=ON') ||
+              !down.includes('ALTER TABLE') ||
+              !down.includes('DROP COLUMN')) {
+            throw new Error('Migration DOWN does not preserve existing Payload relationship rows or rollback media.prefix')
+          }
+          if (!generatedTypes.includes('redirects: Redirect') || !generatedTypes.includes('export interface Redirect {')) {
+            throw new Error('Official Payload type generation did not include redirects')
+          }
+          if (!committedTypes.includes('redirects: Redirect') || !committedTypes.includes('export interface Redirect {')) {
+            throw new Error('Committed Payload types do not include redirects')
+          }
+          const evidence = {
+            source: 'official @payloadcms/plugin-redirects 3.90.2 + Payload CLI 3.90.2',
+            priorOfficialGeneratorArtifactRun: 41327282569,
+            migration: migrationName,
+            registeredExactlyOnceAndLast: true,
+            snapshotTables: Object.keys(snapshot.tables),
+            additiveUpOnly: true,
+            downPreservesExistingLockedRelationshipRows: true,
+            officialPayloadTypeGenerationIncludesRedirects: true,
+            committedTypesIncludeRedirects: true,
+            productionD1Access: false,
+            result: 'PASS'
+          }
+          writeFileSync(dir + 'verification.json', JSON.stringify(evidence, null, 2) + '\n')
+          console.log(JSON.stringify(evidence, null, 2))
+          NODE
+          git status --short -- src/migrations src/payload-types.ts > "$artifact_dir/worktree-status.txt"
+          test ! -s "$artifact_dir/worktree-status.txt"
+
+      - name: Upload local-only username redirect migration candidate
+        if: ${{ always() && ((github.event_name == 'pull_request' && github.event.pull_request.number == 1481) || (github.event_name == 'push' && github.ref == 'refs/heads/feature/unified-username-301-redirects')) }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: w01-username-redirect-migration-candidate-${{ github.run_id }}
+          path: artifacts/evidence/w01-username-redirect-migration-generation/
+          if-no-files-found: error
+          retention-days: 14
       - name: Payload implementation admission gate
         run: node scripts/payload-implementation-admission-check.mjs

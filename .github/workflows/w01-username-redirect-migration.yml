@@ -1,0 +1,356 @@
+name: W01 Username Redirect Migration
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Read-only D1 preflight or explicitly confirmed migration
+        required: true
+        type: choice
+        options: [preflight-only, apply]
+        default: preflight-only
+      source_sha:
+        description: Exact immutable main commit containing the admitted migration
+        required: true
+        type: string
+      database_name:
+        description: Controlled W01 D1 database
+        required: true
+        type: string
+        default: luckread
+      confirm:
+        description: Type APPLY_W01_USERNAME_REDIRECT_MIGRATION to permit mutation
+        required: true
+        type: string
+        default: NO
+
+permissions:
+  contents: read
+
+env:
+  WRANGLER_VERSION: 4.116.0
+  TARGET_MIGRATION: 20261101_163928_username_redirects
+  EXPECTED_DATABASE_ID: 2f80471e-3756-49f9-8db1-7707a433ad64
+  EXPECTED_PREDECESSORS: 20250929_111647,20260921_003203_MIG_AUTH_002_SESSION_V1,20260925_111503_MIG_ENT_USER_PROFILE_V1,20260928_020000_MIG_AUTH_001_REGISTRATION_BATCH_V1,20260928_104842_MIG_PAYLOAD_3902_NATIVE_SCHEMA_V1,20261002_120000_media_owner,20261006_202000_MIG_BETTER_AUTH_PROFILE_PROJECTION_V1,20261022_120000_MIG_MEDIA_UPLOAD_IDEMPOTENCY_V1
+
+jobs:
+  execute:
+    if: ${{ github.ref == 'refs/heads/main' && github.ref_protected == true && (inputs.mode == 'preflight-only' || (inputs.mode == 'apply' && inputs.confirm == 'APPLY_W01_USERNAME_REDIRECT_MIGRATION')) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Validate dispatch inputs
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          DATABASE_NAME: ${{ inputs.database_name }}
+          CONFIRM: ${{ inputs.confirm }}
+          MODE: ${{ inputs.mode }}
+        run: |
+          set -euo pipefail
+          test "$DATABASE_NAME" = "luckread"
+          test "$GITHUB_REF" = "refs/heads/main"
+          test "$GITHUB_REF_PROTECTED" = "true"
+          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          if [[ "$MODE" == "apply" ]]; then
+            test "$CONFIRM" = "APPLY_W01_USERNAME_REDIRECT_MIGRATION"
+          elif [[ "$MODE" == "preflight-only" ]]; then
+            echo "READ_ONLY_PREFLIGHT_ONLY"
+          else
+            exit 1
+          fi
+
+      - name: Checkout exact migration source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha }}
+          fetch-depth: 0
+
+      - name: Prove exact source and registered migration
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          git fetch --no-tags origin main
+          git merge-base --is-ancestor "$SOURCE_SHA" FETCH_HEAD
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs'
+          const dir = 'workers/W01-payload/src/migrations/'
+          const target = process.env.TARGET_MIGRATION
+          const index = readFileSync(dir + 'index.ts', 'utf8')
+          const migration = readFileSync(dir + target + '.ts', 'utf8')
+          const snapshot = JSON.parse(readFileSync(dir + target + '.json', 'utf8'))
+          const names = [...index.matchAll(/name:\s*'([^']+)'/g)].map((m) => m[1])
+          if (names.filter((n) => n === target).length !== 1 || names.at(-1) !== target) throw new Error('Migration must be registered exactly once and last')
+          for (const table of ['redirects','redirects_rels']) if (!snapshot.tables?.[table]) throw new Error('Snapshot missing ' + table)
+          if (!snapshot.tables.media?.columns?.prefix) throw new Error('Snapshot missing media.prefix')
+          if (!snapshot.tables.payload_locked_documents_rels?.columns?.redirects_id) throw new Error('Snapshot missing redirects relationship')
+          const up = migration.split('export async function down')[0]
+          for (const item of ['CREATE TABLE','redirects_rels','redirects_from_idx','media','prefix','redirects_id']) if (!up.includes(item)) throw new Error('Migration UP missing ' + item)
+          if (/DROP TABLE|DROP COLUMN|RENAME TABLE|RENAME COLUMN/i.test(up)) throw new Error('Migration UP contains destructive DDL')
+          console.log(JSON.stringify({sourceSha:process.env.SOURCE_SHA,migration:target,registeredLast:true,result:'PASS'}))
+          NODE
+
+      - name: Setup Node 24 and pnpm 11
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+          run_install: false
+
+      - name: Install locked W01 dependencies
+        working-directory: workers/W01-payload
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate Cloudflare access and initialize evidence
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          test -n "$CLOUDFLARE_API_TOKEN"
+          mkdir -p artifacts/evidence/w01-username-redirect-migration
+
+      - name: Capture read-only D1 preflight
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          DATABASE_NAME: ${{ inputs.database_name }}
+        working-directory: workers/W01-payload
+        run: |
+          set -euo pipefail
+          E=../../artifacts/evidence/w01-username-redirect-migration
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 info "$DATABASE_NAME" --json --config wrangler.jsonc > "$E/d1-info.json"
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc --command 'SELECT id,name,batch FROM payload_migrations ORDER BY id;' > "$E/migrations.json"
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc --command 'PRAGMA table_info("redirects");' > "$E/redirects-schema.json"
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc --command 'PRAGMA table_info("redirects_rels");' > "$E/redirects-rels-schema.json"
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc --command 'PRAGMA index_list("redirects");' > "$E/redirects-indexes.json"
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc --command 'PRAGMA table_info("media");' > "$E/media-schema.json"
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc --command 'PRAGMA table_info("payload_locked_documents_rels");' > "$E/locked-rels-schema.json"
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc --command 'PRAGMA index_list("payload_locked_documents_rels");' > "$E/locked-rels-indexes.json"
+
+      - name: Fail closed unless only the admitted migration is pending
+        id: preflight
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          DATABASE_NAME: ${{ inputs.database_name }}
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync, appendFileSync } from 'node:fs'
+          const dir = 'artifacts/evidence/w01-username-redirect-migration'
+          const read = (name) => JSON.parse(readFileSync(dir + '/' + name, 'utf8'))
+          const collect = (value, out = []) => {
+            if (Array.isArray(value)) { for (const item of value) collect(item, out); return out }
+            if (!value || typeof value !== 'object') return out
+            if (Array.isArray(value.results)) out.push(...value.results)
+            if (Array.isArray(value.result)) out.push(...value.result)
+            for (const [key, item] of Object.entries(value)) if (key !== 'results' && key !== 'result') collect(item, out)
+            return out
+          }
+          const rows = (name) => [...new Map(collect(read(name)).filter((r) => r && typeof r === 'object').map((r) => [JSON.stringify(r),r])).values()]
+          const target = process.env.TARGET_MIGRATION
+          const expected = process.env.EXPECTED_PREDECESSORS.split(',')
+          const history = rows('migrations.json').map((r) => String(r.name ?? ''))
+          const redirectColumns = new Set(rows('redirects-schema.json').map((r) => String(r.name)))
+          const relColumns = new Set(rows('redirects-rels-schema.json').map((r) => String(r.name)))
+          const redirectIndexes = rows('redirects-indexes.json')
+          const mediaColumns = new Set(rows('media-schema.json').map((r) => String(r.name)))
+          const lockedColumns = new Set(rows('locked-rels-schema.json').map((r) => String(r.name)))
+          const lockedIndexes = rows('locked-rels-indexes.json')
+          const info = JSON.stringify(read('d1-info.json'))
+          const positions = history.flatMap((n,i) => n === target ? [i] : [])
+          const recorded = positions.length > 0
+          const errors = []
+          if (!info.includes(process.env.EXPECTED_DATABASE_ID)) errors.push('D1 info does not prove the admitted database ID')
+          if (positions.length > 1) errors.push('Target migration is recorded more than once')
+          let decision = 'RUN_REQUIRED'
+          if (recorded) {
+            const pos = positions[0]
+            if (history.slice(0,pos).join('|') !== expected.join('|')) errors.push('Target migration predecessors differ from admitted history')
+            for (const n of ['id','from','to_type','to_url','type','redirect_scope','identity_id','source_username','destination_username','created_at','updated_at']) if (!redirectColumns.has(n)) errors.push('Missing redirects.' + n)
+            for (const n of ['id','order','parent_id','path','users_id']) if (!relColumns.has(n)) errors.push('Missing redirects_rels.' + n)
+            if (!mediaColumns.has('prefix')) errors.push('media.prefix is absent after migration record')
+            if (!lockedColumns.has('redirects_id')) errors.push('payload_locked_documents_rels.redirects_id is absent')
+            if (!redirectIndexes.some((r) => String(r.name) === 'redirects_from_idx' && (r.unique === 1 || r.unique === true))) errors.push('redirects.from unique index is absent')
+            if (!lockedIndexes.some((r) => String(r.name) === 'payload_locked_documents_rels_redirects_id_idx')) errors.push('locked-document redirects index is absent')
+            decision = 'ALREADY_APPLIED'
+          } else {
+            if (history.join('|') !== expected.join('|')) errors.push('Unexpected or missing predecessor migration history')
+            if (redirectColumns.size || relColumns.size) errors.push('Redirects tables exist without target migration record')
+            if (mediaColumns.has('prefix')) errors.push('media.prefix exists without target migration record')
+            if (lockedColumns.has('redirects_id')) errors.push('redirects_id exists without target migration record')
+            if (redirectIndexes.length) errors.push('Redirects indexes exist without target migration record')
+            if (lockedIndexes.some((r) => String(r.name) === 'payload_locked_documents_rels_redirects_id_idx')) errors.push('Redirects relationship index exists without target migration record')
+          }
+          const summary = {
+            mode:'READ_ONLY_PREFLIGHT', result:errors.length?'BLOCKED':'PASS',
+            sourceSha:process.env.SOURCE_SHA,databaseName:process.env.DATABASE_NAME,
+            expectedDatabaseId:process.env.EXPECTED_DATABASE_ID,migrationHistory:history,
+            expectedPredecessors:expected,targetMigration:target,targetRecorded:recorded,
+            schema:{redirectColumns:[...redirectColumns].sort(),redirectRelColumns:[...relColumns].sort(),mediaPrefix:mediaColumns.has('prefix'),lockedRedirectId:lockedColumns.has('redirects_id')},
+            decision:errors.length?'BLOCKED':decision,errors
+          }
+          writeFileSync(dir+'/preflight-summary.json',JSON.stringify(summary,null,2)+'\n')
+          console.log(JSON.stringify(summary,null,2))
+          if (errors.length) throw new Error('W01_USERNAME_REDIRECT_MIGRATION_PREFLIGHT_BLOCKED')
+          appendFileSync(process.env.GITHUB_OUTPUT,'decision='+decision+'\n')
+          NODE
+
+      - name: Verify Payload D1 binding contract
+        id: binding_contract
+        if: steps.preflight.outcome == 'success'
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          DATABASE_NAME: ${{ inputs.database_name }}
+        working-directory: workers/W01-payload
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from 'node:fs'
+          const dir='../../artifacts/evidence/w01-username-redirect-migration'
+          const config=JSON.parse(readFileSync('wrangler.jsonc','utf8'))
+          const source=readFileSync('src/payload.config.ts','utf8')
+          const live=JSON.parse(readFileSync(dir+'/preflight-summary.json','utf8'))
+          const d1=(config.d1_databases??[]).filter((x)=>x?.binding==='D1')
+          const errors=[]
+          if(d1.length!==1)errors.push('Exactly one D1 binding is required')
+          if(d1.length===1&&(d1[0].database_id!==process.env.EXPECTED_DATABASE_ID||d1[0].database_name!==process.env.DATABASE_NAME))errors.push('D1 binding identity mismatch')
+          if(config.env?.production)errors.push('Named production environment is not admitted')
+          if(!/db:\s*sqliteD1Adapter\(\s*\{\s*binding:\s*cloudflare\.env\.D1,/s.test(source))errors.push('Payload adapter is not directly bound to cloudflare.env.D1')
+          if(!/const isExplicitRemoteMigration = process\.env\.PAYLOAD_MIGRATION_REMOTE === 'true'/.test(source))errors.push('Explicit remote-migration switch missing')
+          if(live.result!=='PASS')errors.push('Read-only D1 preflight did not pass')
+          const result={mode:'PAYLOAD_D1_CONFIG_CONTRACT_PREFLIGHT',result:errors.length?'BLOCKED':'PASS',sourceSha:process.env.SOURCE_SHA,databaseName:process.env.DATABASE_NAME,databaseId:d1[0]?.database_id??null,errors}
+          writeFileSync(dir+'/payload-d1-config-preflight.json',JSON.stringify(result,null,2)+'\n')
+          console.log(JSON.stringify(result,null,2))
+          if(errors.length)throw new Error('W01_USERNAME_REDIRECT_D1_BINDING_PREFLIGHT_BLOCKED')
+          NODE
+
+      - name: Execute only the admitted redirect migration on remote D1
+        id: execute_migration
+        if: inputs.mode == 'apply' && steps.preflight.outputs.decision == 'RUN_REQUIRED' && steps.binding_contract.outcome == 'success'
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          DATABASE_NAME: ${{ inputs.database_name }}
+          NODE_ENV: production
+          PAYLOAD_MIGRATION_REMOTE: 'true'
+          PAYLOAD_SECRET: migration-workflow-only
+        working-directory: workers/W01-payload
+        run: |
+          set -euo pipefail
+          unset CLOUDFLARE_ENV
+          BACKUP="$RUNNER_TEMP/w01-wrangler-jsonc.original"
+          cp wrangler.jsonc "$BACKUP"
+          restore_config(){ cp "$BACKUP" wrangler.jsonc; }
+          trap restore_config EXIT
+          node --input-type=module <<'NODE'
+          import {readFileSync,writeFileSync} from 'node:fs'
+          const path='wrangler.jsonc'
+          const config=JSON.parse(readFileSync(path,'utf8'))
+          const target=(config.d1_databases??[]).filter((x)=>x?.binding==='D1'&&x.database_id===process.env.EXPECTED_DATABASE_ID&&x.database_name===process.env.DATABASE_NAME)
+          if(target.length!==1)throw new Error('Exact production D1 binding was not found')
+          target[0].remote=true
+          writeFileSync(path,JSON.stringify(config,null,2))
+          NODE
+          pnpm exec payload migrate
+
+      - name: Assert preflight-only did not mutate D1
+        if: inputs.mode == 'preflight-only'
+        env:
+          OUTCOME: ${{ steps.execute_migration.outcome }}
+        run: |
+          set -euo pipefail
+          test "$OUTCOME" = "skipped"
+          echo "PASS: read-only mode did not invoke Payload migrate"
+
+      - name: Verify exact post-migration state
+        id: postcheck
+        if: inputs.mode == 'apply' && always() && steps.preflight.outcome == 'success' && steps.binding_contract.outcome == 'success'
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          DATABASE_NAME: ${{ inputs.database_name }}
+        working-directory: workers/W01-payload
+        run: |
+          set -euo pipefail
+          E=../../artifacts/evidence/w01-username-redirect-migration
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc --command 'SELECT id,name,batch FROM payload_migrations ORDER BY id;' > "$E/post-migrations.json"
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc --command 'PRAGMA table_info("redirects");' > "$E/post-redirects-schema.json"
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc --command 'PRAGMA table_info("redirects_rels");' > "$E/post-redirects-rels-schema.json"
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc --command 'PRAGMA index_list("redirects");' > "$E/post-redirects-indexes.json"
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc --command 'PRAGMA table_info("media");' > "$E/post-media-schema.json"
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc --command 'PRAGMA table_info("payload_locked_documents_rels");' > "$E/post-locked-rels-schema.json"
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc --command 'PRAGMA index_list("payload_locked_documents_rels");' > "$E/post-locked-rels-indexes.json"
+          node --input-type=module <<'NODE'
+          import {readFileSync,writeFileSync} from 'node:fs'
+          const dir='../../artifacts/evidence/w01-username-redirect-migration'
+          const collect=(value,out=[])=>{if(Array.isArray(value)){for(const x of value)collect(x,out);return out}if(!value||typeof value!=='object')return out;if(Array.isArray(value.results))out.push(...value.results);if(Array.isArray(value.result))out.push(...value.result);for(const [k,v] of Object.entries(value))if(k!=='results'&&k!=='result')collect(v,out);return out}
+          const rows=(name)=>[...new Map(collect(JSON.parse(readFileSync(dir+'/'+name,'utf8'))).filter((x)=>x&&typeof x==='object').map((x)=>[JSON.stringify(x),x])).values()]
+          const history=rows('post-migrations.json').map((x)=>String(x.name??''))
+          const expected=process.env.EXPECTED_PREDECESSORS.split(',')
+          const pos=history.flatMap((x,i)=>x===process.env.TARGET_MIGRATION?[i]:[])
+          const redirects=new Set(rows('post-redirects-schema.json').map((x)=>String(x.name)))
+          const rels=new Set(rows('post-redirects-rels-schema.json').map((x)=>String(x.name)))
+          const media=new Set(rows('post-media-schema.json').map((x)=>String(x.name)))
+          const locked=new Set(rows('post-locked-rels-schema.json').map((x)=>String(x.name)))
+          const ridx=rows('post-redirects-indexes.json'),lidx=rows('post-locked-rels-indexes.json')
+          const required=['id','from','to_type','to_url','type','redirect_scope','identity_id','source_username','destination_username','created_at','updated_at']
+          const result={
+            targetRecordedExactlyOnce:pos.length===1,
+            predecessorsMatchExactly:pos.length===1&&history.slice(0,pos[0]).join('|')===expected.join('|'),
+            missingRedirectColumns:required.filter((x)=>!redirects.has(x)),
+            redirectsRelTablePresent:rels.has('parent_id')&&rels.has('users_id'),
+            mediaPrefixPresent:media.has('prefix'),
+            lockedRedirectIdPresent:locked.has('redirects_id'),
+            redirectsFromUniqueIndexPresent:ridx.some((x)=>String(x.name)==='redirects_from_idx'&&(x.unique===1||x.unique===true)),
+            lockedRedirectIndexPresent:lidx.some((x)=>String(x.name)==='payload_locked_documents_rels_redirects_id_idx'),
+            migrationHistory:history
+          }
+          result.result=result.targetRecordedExactlyOnce&&result.predecessorsMatchExactly&&result.missingRedirectColumns.length===0&&result.redirectsRelTablePresent&&result.mediaPrefixPresent&&result.lockedRedirectIdPresent&&result.redirectsFromUniqueIndexPresent&&result.lockedRedirectIndexPresent?'PASS':'FAIL'
+          writeFileSync(dir+'/post-validation-summary.json',JSON.stringify(result,null,2)+'\n')
+          console.log(JSON.stringify(result,null,2))
+          if(result.result!=='PASS')throw new Error('W01_USERNAME_REDIRECT_MIGRATION_POSTCHECK_FAILED')
+          NODE
+
+      - name: Record migration provenance
+        if: always()
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          DATABASE_NAME: ${{ inputs.database_name }}
+          MODE: ${{ inputs.mode }}
+          PREFLIGHT_OUTCOME: ${{ steps.preflight.outcome }}
+          EXECUTE_OUTCOME: ${{ steps.execute_migration.outcome }}
+          POSTCHECK_OUTCOME: ${{ steps.postcheck.outcome }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/evidence/w01-username-redirect-migration
+          node --input-type=module <<'NODE'
+          import {existsSync,readFileSync,writeFileSync} from 'node:fs'
+          const dir='artifacts/evidence/w01-username-redirect-migration'
+          const read=(name)=>{try{return JSON.parse(readFileSync(dir+'/'+name,'utf8'))}catch{return null}}
+          const pre=read('preflight-summary.json'),post=read('post-validation-summary.json'),mode=process.env.MODE
+          const verified=mode==='apply'&&process.env.EXECUTE_OUTCOME==='success'&&process.env.POSTCHECK_OUTCOME==='success'&&post?.result==='PASS'
+          const result=mode==='preflight-only'?(process.env.PREFLIGHT_OUTCOME==='success'&&pre?.result==='PASS'?'READ_ONLY_PREFLIGHT_PASS':'READ_ONLY_PREFLIGHT_FAILED'):(verified?'VERIFIED_APPLIED':'APPLY_NOT_VERIFIED')
+          writeFileSync(dir+'/provenance.json',JSON.stringify({
+            repository:process.env.GITHUB_REPOSITORY,workflow:process.env.GITHUB_WORKFLOW,
+            runId:Number(process.env.GITHUB_RUN_ID),sourceSha:process.env.SOURCE_SHA,
+            databaseName:process.env.DATABASE_NAME,expectedDatabaseId:process.env.EXPECTED_DATABASE_ID,
+            migration:process.env.TARGET_MIGRATION,mode,result,verifiedApplied:verified,
+            preflightOutcome:process.env.PREFLIGHT_OUTCOME,executeOutcome:process.env.EXECUTE_OUTCOME,
+            postcheckOutcome:process.env.POSTCHECK_OUTCOME,
+            environment:verified?'CONTROLLED_REMOTE_D1':mode==='apply'?'UNVERIFIED_APPLY':'READ_ONLY_PREFLIGHT_ONLY'
+          },null,2)+'\n')
+          NODE
+
+      - name: Upload migration evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: w01-username-redirect-migration-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/evidence/w01-username-redirect-migration/
+          if-no-files-found: warn
+          retention-days: 30

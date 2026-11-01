@@ -598,6 +598,10 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
     }))
     // The read-before-write check improves the common path; the database's
     // unique constraint remains authoritative under concurrent registrations.
+    const projectionErrorMessage = error instanceof Error ? error.message : ''
+    if (projectionErrorMessage === 'LUCKREAD_USERNAME_RESERVED') {
+      return errorResponse(409, 'USERNAME_RESERVED', '该用户名曾被使用，不能重新分配。')
+    }
     const usernameConflict = error instanceof Error && (
       error.message === 'AUTH001_USERNAME_TAKEN' ||
       (isUniqueConstraintError(error) && /username/i.test(error.message))

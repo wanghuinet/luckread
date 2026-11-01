@@ -28,6 +28,7 @@ export interface Config {
   collections: {
     users: User
     media: Media
+    redirects: Redirect
     'payload-kv': PayloadKv
     'payload-locked-documents': PayloadLockedDocument
     'payload-preferences': PayloadPreference
@@ -37,6 +38,7 @@ export interface Config {
   collectionsSelect: {
     users: UsersSelect<false> | UsersSelect<true>
     media: MediaSelect<false> | MediaSelect<true>
+    redirects: RedirectsSelect<false> | RedirectsSelect<true>
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>
@@ -85,6 +87,10 @@ export interface User {
 export interface Media {
   id: number
   alt: string
+  ownerUserId?: string | null
+  uploadIdempotencyKey?: string | null
+  uploadFingerprint?: string | null
+  prefix?: string | null
   updatedAt: string
   createdAt: string
   url?: string | null
@@ -94,6 +100,23 @@ export interface Media {
   filesize?: number | null
   width?: number | null
   height?: number | null
+}
+
+export interface Redirect {
+  id: number
+  from: string
+  to?: {
+    type?: 'reference' | 'custom' | null
+    reference?: { relationTo: 'users'; value: number | User } | null
+    url?: string | null
+  }
+  type: '301'
+  redirectScope: 'username'
+  identityId: string
+  sourceUsername: string
+  destinationUsername: string
+  updatedAt: string
+  createdAt: string
 }
 
 export interface PayloadKv {
@@ -107,6 +130,7 @@ export interface PayloadLockedDocument {
   document?:
     | { relationTo: 'users'; value: number | User }
     | { relationTo: 'media'; value: number | Media }
+    | { relationTo: 'redirects'; value: number | Redirect }
     | null
   globalSlug?: string | null
   user: { relationTo: 'users'; value: number | User }
@@ -138,7 +162,8 @@ export interface UsersSelect<T extends boolean = true> {
 }
 
 export interface MediaSelect<T extends boolean = true> {
-  alt?: T; updatedAt?: T; createdAt?: T; url?: T; thumbnailURL?: T
+  alt?: T; ownerUserId?: T; uploadIdempotencyKey?: T; uploadFingerprint?: T; prefix?: T
+  updatedAt?: T; createdAt?: T; url?: T; thumbnailURL?: T
   filename?: T; mimeType?: T; filesize?: T; width?: T; height?: T
 }
 
@@ -157,4 +182,9 @@ export interface Auth { [k: string]: unknown }
 
 declare module 'payload' {
   export interface GeneratedTypes extends Config {}
+}
+
+export interface RedirectsSelect<T extends boolean = true> {
+  from?: T; to?: T; type?: T; redirectScope?: T; identityId?: T
+  sourceUsername?: T; destinationUsername?: T; updatedAt?: T; createdAt?: T
 }

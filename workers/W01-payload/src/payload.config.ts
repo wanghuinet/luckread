@@ -2,6 +2,7 @@ import fs from 'fs'
 import path from 'path'
 import { sqliteD1Adapter } from '@payloadcms/db-d1-sqlite'
 import { lexicalEditor, UploadFeature } from '@payloadcms/richtext-lexical'
+import { redirectsPlugin } from '@payloadcms/plugin-redirects'
 import { buildConfig } from 'payload'
 import type { Payload } from 'payload'
 import { fileURLToPath } from 'url'
@@ -11,6 +12,7 @@ import { r2Storage } from '@payloadcms/storage-r2'
 
 import { Users } from './collections/Users'
 import { Media } from './collections/Media'
+import { payloadAdminOnly } from './auth/payload-admin-access'
 import { createPublicMediaUrl } from './media/public-media-url'
 
 const filename = fileURLToPath(import.meta.url)
@@ -22,13 +24,7 @@ const isPayloadCLI = process.argv.some((value) => {
   return resolved !== undefined && resolved.endsWith(path.join('payload', 'bin.js'))
 })
 const isProduction = process.env.NODE_ENV === 'production'
-// The migration workflow sets this only for the explicitly admitted baseline
-// migration. This makes the remote-D1 decision independent of package-manager
-// CLI argv/symlink shape while keeping next build/dev offline.
 const isExplicitRemoteMigration = process.env.PAYLOAD_MIGRATION_REMOTE === 'true'
-// ADR-B001 (docs/312-BUILD-BASELINE-AND-BINDING-SEMANTICS-v1.0.md, D-03):
-// runtime detection is the only signal stable across all process shapes;
-// process.argv-based detection fails in Next.js page-data collection workers.
 const isWorkerRuntime =
   typeof navigator !== 'undefined' && navigator.userAgent === 'Cloudflare-Workers'
 
@@ -82,20 +78,59 @@ export default buildConfig({
   logger: isProduction ? cloudflareLogger : undefined,
   onInit: async (payload: Payload) => {
     if (payload.db.packageName !== '@payloadcms/db-d1-sqlite') return
-
-    // CC-MAPPING-0-AUTH-002-E4-5-D1-ADAPTER-CORRECTION-2026-09-20:
-    // The pinned D1 adapter currently aliases upsert to updateOne without
-    // forwarding the required { upsert: true } option. Keep the correction
-    // at the W01 configuration boundary; do not modify Payload core.
     const updateOne = payload.db.updateOne.bind(payload.db)
     payload.db.upsert = (args) =>
       updateOne({
         ...args,
         options: { upsert: true },
       })
-
   },
   plugins: [
+    redirectsPlugin({
+      collections: ['users'],
+      redirectTypes: ['301'],
+      overrides: {
+        access: {
+          create: payloadAdminOnly,
+          read: payloadAdminOnly,
+          update: payloadAdminOnly,
+          delete: payloadAdminOnly,
+          admin: payloadAdminOnly,
+        },
+        fields: ({ defaultFields }) => [
+          ...defaultFields,
+          {
+            name: 'redirectScope',
+            type: 'select',
+            options: [{ label: 'Username history', value: 'username' }],
+            defaultValue: 'username',
+            required: true,
+            index: true,
+            admin: { position: 'sidebar', readOnly: true },
+          },
+          {
+            name: 'identityId',
+            type: 'text',
+            required: true,
+            index: true,
+            admin: { position: 'sidebar', readOnly: true },
+          },
+          {
+            name: 'sourceUsername',
+            type: 'text',
+            required: true,
+            index: true,
+            admin: { position: 'sidebar', readOnly: true },
+          },
+          {
+            name: 'destinationUsername',
+            type: 'text',
+            required: true,
+            admin: { position: 'sidebar', readOnly: true },
+          },
+        ],
+      },
+    }),
     r2Storage({
       bucket: cloudflare.env.R2,
       collections: { media: { prefix: 'media', generateFileURL: createPublicMediaUrl } },
@@ -108,16 +143,7 @@ function getCloudflareContextFromWrangler(): Promise<CloudflareContext> {
     ({ getPlatformProxy }) =>
       getPlatformProxy({
         environment: process.env.CLOUDFLARE_ENV,
-        // D-02: next build/dev stay local; only production Payload CLI
-        // migrations admitted by the workflow may opt into remote D1.
         remoteBindings: isProduction && (isPayloadCLI || isExplicitRemoteMigration),
-        // During next build the page-data phase forks parallel workers, each
-        // of which loads its own workerd against the same local D1 persistence
-        // file, so production non-CLI evaluation stays in-memory and offline.
-        // Wrangler CLI's --persist-to appends /v3, but getPlatformProxy's
-        // persist.path does not. Point both at the same storage root so W01
-        // Payload migrations and W02 Wrangler migrations share the local D1.
-        // This override only applies outside the Worker runtime when explicitly set.
         persist: process.env.CLOUDFLARE_PERSIST_TO
           ? { path: path.join(process.env.CLOUDFLARE_PERSIST_TO, 'v3') }
           : isProduction
