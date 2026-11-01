@@ -21,7 +21,8 @@
     "test:comment-navigation": "bun test tests/comment-navigation.test.mjs",
     "test:content-search": "bun test tests/content-search.test.mjs",
     "test:auth-flow": "bun test tests/auth-flow-api.test.mjs",
-    "test:subscriptions-api": "bun test tests/subscriptions-api.test.mjs"
+    "test:subscriptions-api": "bun test tests/subscriptions-api.test.mjs",
+    "test:billing-api": "bun test tests/billing-api.test.mjs"
   },
   "dependencies": {
     "@codeherence/react-native-header": "^0.14.0",
