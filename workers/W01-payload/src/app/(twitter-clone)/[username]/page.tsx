@@ -29,7 +29,8 @@ export default function UsernameProfilePage({
     void (async () => {
       try {
         const { username } = await params
-        const { response, data } = await fetchJson<PublicUserLookup>('/api/v1/users/by-username/' + encodeURIComponent(username), {
+        const normalizedUsername = username.trim().replace(/^@+/, '')
+        const { response, data } = await fetchJson<PublicUserLookup>('/api/v1/users/by-username/' + encodeURIComponent(normalizedUsername), {
           headers: { accept: 'application/json' },
           cache: 'no-store',
           signal: controller.signal,
