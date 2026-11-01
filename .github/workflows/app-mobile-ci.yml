@@ -84,6 +84,8 @@ jobs:
         run: bun run test:social-screen-api
       - name: Test native subscription management API
         run: bun run test:subscriptions-api
+      - name: Test native billing history and refunds API
+        run: bun run test:billing-api
       - name: Test native block and mute management
         run: bun test tests/block-mute-management.test.mjs
       - name: Test native video feed API requests
