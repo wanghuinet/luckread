@@ -26,6 +26,8 @@ export type ApiContentRecord = {
   etag?: string;
   ownerUserId?: string;
   creatorId?: string | null;
+  accessMode?: 'PUBLIC' | 'MEMBERS_ONLY';
+  accessGranted?: boolean;
   contentType?: 'article' | 'post' | 'video' | string;
   state?: string;
   title?: string;
@@ -196,10 +198,10 @@ export function mapContentToFeedContent(
   const body = bodySource.trim();
   const message = body && title && body !== title ? title + '\n\n' + body : body || title;
   const cover = accessGranted ? resolveMediaUrl(item.coverRef) ?? undefined : undefined;
-  const mediaCandidates = accessGranted ? [
+  const mediaCandidates = (accessGranted ? [
     ...(Array.isArray(item.mediaRefs) ? item.mediaRefs : []),
     ...(cover ? [cover] : []),
-  ] : []
+  ] : [])
     .map(resolveMediaUrl)
     .filter((url): url is string => Boolean(url));
   const mediaItems: FeedMediaAttachment[] = Array.from(new Set(mediaCandidates))
