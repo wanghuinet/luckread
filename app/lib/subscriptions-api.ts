@@ -104,10 +104,6 @@ export function fetchActiveMembershipPlansPage(options: PlanPageOptions = {}) {
   if (cursor !== null && (typeof cursor !== 'string' || cursor.length < 1 || cursor.length > 2048)) {
     throw new RangeError('Membership plan cursor must be between 1 and 2048 characters.');
   }
-  const cursor = options.cursor ?? null;
-  if (cursor !== null && (typeof cursor !== 'string' || cursor.length < 1 || cursor.length > 2048)) {
-    throw new RangeError('Membership plan cursor must be between 1 and 2048 characters.');
-  }
 
   const query = new URLSearchParams({ limit: String(limit) });
   if (cursor) query.set('cursor', cursor);
