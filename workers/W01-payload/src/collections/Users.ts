@@ -2,6 +2,7 @@ import type { CollectionAfterChangeHook, CollectionBeforeChangeHook, CollectionC
 
 import { betterAuthPayloadStrategy } from '@/auth/better-auth-payload-strategy'
 import { payloadAdminOnly } from '@/auth/payload-admin-access'
+import { invalidatePublicUsernameRedirect } from '@/lib/public-response-cache'
 import {
   normalizeUsernameRedirectHandle,
   usernameRedirectFromPath,
@@ -151,6 +152,15 @@ const recordUsernameHistory: CollectionAfterChangeHook = async ({
     overrideAccess: true,
     req,
   })
+
+  const usernamesToInvalidate = new Set<string>([
+    previousUsername,
+    currentUsername,
+    ...history.docs
+      .map((record) => record.sourceUsername)
+      .filter((value): value is string => typeof value === 'string' && value.length > 0),
+  ])
+  await Promise.all([...usernamesToInvalidate].map(invalidatePublicUsernameRedirect))
   return doc
 }
 

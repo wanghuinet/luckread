@@ -15,11 +15,15 @@ export async function middleware(request: NextRequest): Promise<Response> {
     request.url,
   )
 
+  const resolverHeaders = new Headers({ accept: 'application/json' })
+  const clientIP = request.headers.get('cf-connecting-ip')
+  if (clientIP) resolverHeaders.set('cf-connecting-ip', clientIP)
+
   let resolverResponse: Response
   try {
     resolverResponse = await fetch(resolverURL, {
       method: 'GET',
-      headers: { accept: 'application/json' },
+      headers: resolverHeaders,
       cache: 'no-store',
       redirect: 'manual',
     })

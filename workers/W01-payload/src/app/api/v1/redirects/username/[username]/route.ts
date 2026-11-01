@@ -2,6 +2,7 @@ import { getPayload } from 'payload'
 
 import config from '@payload-config'
 import { enforcePublicReadRateLimit, TrafficLimitError, rateLimitResponse } from '@/auth/traffic-limit'
+import { cachedPublicGet } from '@/lib/public-response-cache'
 import {
   normalizeUsernameRedirectHandle,
   usernameRedirectFromPath,
@@ -44,42 +45,49 @@ export async function GET(
     const username = normalizeUsernameRedirectHandle(rawUsername)
     if (!username) return notFound()
 
-    const payload = await getPayload({ config })
-    const result = await redirectAPI(payload).find({
-      collection: 'redirects',
-      where: {
-        and: [
-          { from: { equals: usernameRedirectFromPath(username) } },
-          { redirectScope: { equals: 'username' } },
-        ],
+    return await cachedPublicGet(
+      request,
+      'username-redirect',
+      async () => {
+        const payload = await getPayload({ config })
+        const result = await redirectAPI(payload).find({
+          collection: 'redirects',
+          where: {
+            and: [
+              { from: { equals: usernameRedirectFromPath(username) } },
+              { redirectScope: { equals: 'username' } },
+            ],
+          },
+          depth: 0,
+          limit: 1,
+          overrideAccess: true,
+        })
+
+        const redirect = result.docs[0]
+        const destinationUsername = normalizeUsernameRedirectHandle(redirect?.destinationUsername)
+        const destinationPath = destinationUsername
+          ? usernameRedirectTargetPath(destinationUsername)
+          : null
+
+        if (
+          !redirect ||
+          redirect.type !== '301' ||
+          redirect.redirectScope !== 'username' ||
+          typeof redirect.identityId !== 'string' ||
+          !redirect.identityId.trim() ||
+          redirect.to?.type !== 'custom' ||
+          !destinationPath ||
+          redirect.to.url !== destinationPath
+        ) {
+          return notFound()
+        }
+
+        return Response.json(
+          { targetUsername: destinationUsername },
+          { headers: { 'cache-control': 'public, max-age=0, s-maxage=10' } },
+        )
       },
-      depth: 0,
-      limit: 1,
-      overrideAccess: true,
-    })
-
-    const redirect = result.docs[0]
-    const destinationUsername = normalizeUsernameRedirectHandle(redirect?.destinationUsername)
-    const destinationPath = destinationUsername
-      ? usernameRedirectTargetPath(destinationUsername)
-      : null
-
-    if (
-      !redirect ||
-      redirect.type !== '301' ||
-      redirect.redirectScope !== 'username' ||
-      typeof redirect.identityId !== 'string' ||
-      !redirect.identityId.trim() ||
-      redirect.to?.type !== 'custom' ||
-      !destinationPath ||
-      redirect.to.url !== destinationPath
-    ) {
-      return notFound()
-    }
-
-    return Response.json(
-      { targetUsername: destinationUsername },
-      { headers: { 'cache-control': 'no-store' } },
+      10,
     )
   } catch (error) {
     if (error instanceof TrafficLimitError) return rateLimitResponse(request)
