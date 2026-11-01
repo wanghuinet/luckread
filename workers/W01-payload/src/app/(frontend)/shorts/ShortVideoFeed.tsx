@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 
 import { fetchJson, getApiErrorMessage } from '../../../lib/client-api.js'
+import { buildPublicContentHref } from '../../../lib/public-content-url.js'
 import ContentComments from '../content/[contentId]/ContentComments'
 import { usePublicLocale } from '../i18n/PublicLanguageToggle'
 
@@ -869,7 +870,7 @@ export default function ShortVideoFeed() {
                     className="text-[13px] text-white/80 underline-offset-4"
                     data-umami-event="content-open"
                     data-umami-event-content-type="video"
-                    href={'/content/' + encodeURIComponent(item.slug || item.id)}
+                    href={buildPublicContentHref({ id: item.id, slug: item.slug, contentType: 'video', authorUsername: creatorUsername }, { short: true })}
                   >
                     打开详情
                   </Link>
