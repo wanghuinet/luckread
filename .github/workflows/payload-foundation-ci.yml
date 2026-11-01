@@ -64,5 +64,38 @@ jobs:
         working-directory: workers/W01-payload
         run: node ../../scripts/w01-remote-migration-admission.mjs --check-state
 
+      - name: Generate local-only username redirect migration candidate
+        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.number == 1481 }}
+        working-directory: workers/W01-payload
+        env:
+          NODE_ENV: development
+          PAYLOAD_SECRET: migration-generation-only
+          CLOUDFLARE_ENV: development
+        run: |
+          set -euo pipefail
+          artifact_dir="../../artifacts/evidence/w01-username-redirect-migration-generation"
+          mkdir -p "$artifact_dir"
+          find src/migrations -maxdepth 1 -type f -printf '%f\\n' | sort > "$artifact_dir/before-files.txt"
+          pnpm exec payload migrate:create username_redirects --force-accept-warning
+          find src/migrations -maxdepth 1 -type f -printf '%f\\n' | sort > "$artifact_dir/after-files.txt"
+          comm -13 "$artifact_dir/before-files.txt" "$artifact_dir/after-files.txt" > "$artifact_dir/generated-files.txt"
+          if [ ! -s "$artifact_dir/generated-files.txt" ]; then
+            echo "Payload did not produce a migration candidate"
+            exit 1
+          fi
+          while IFS= read -r file; do
+            cp "src/migrations/$file" "$artifact_dir/$file"
+          done < "$artifact_dir/generated-files.txt"
+          cp src/migrations/index.ts "$artifact_dir/index.ts"
+          git status --short -- src/migrations > "$artifact_dir/worktree-status.txt"
+
+      - name: Upload local-only username redirect migration candidate
+        if: ${{ always() && github.event_name == 'pull_request' && github.event.pull_request.number == 1481 }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: w01-username-redirect-migration-candidate-${{ github.run_id }}
+          path: artifacts/evidence/w01-username-redirect-migration-generation/
+          if-no-files-found: error
+          retention-days: 14
       - name: Payload implementation admission gate
         run: node scripts/payload-implementation-admission-check.mjs
