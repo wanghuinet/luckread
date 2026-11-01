@@ -93,7 +93,8 @@ test('connects the paywall detail CTA to creator plans and returns through W03 e
 
   expect(detail).toContain("hydratedRecord.accessMode === 'MEMBERS_ONLY'");
   expect(detail).toContain('hydratedRecord.accessGranted !== true');
-  expect(detail).toContain("query.set('creatorId', creatorId)");
+  expect(detail).toContain('hasMembershipCreator');
+  expect(detail).toContain('creatorId,');
   expect(detail).toContain("returnTo: '/post/' + postId");
   expect(detail).toContain('查看创作者会员方案');
   expect(detail).toContain('membershipRequired ? undefined : handleScrollToComments');
