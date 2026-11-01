@@ -378,8 +378,10 @@ jobs:
           node <<'NODE'
           const fs = require('node:fs');
           const value = JSON.parse(fs.readFileSync('/tmp/social-post-create.json', 'utf8'));
-          if (value.contentType !== 'post' || value.state !== 'DRAFT' || typeof value.id !== 'string' || value.etag !== 'W/"1"' || Number(value.version) !== 1) {
-            throw new Error('social post create assertion failed: ' + JSON.stringify(value));
+          if (value.contentType !== 'post' || value.state !== 'DRAFT' || typeof value.id !== 'string' ||
+              !/^[0-9]{18,20}$/.test(value.id) || BigInt(value.id).toString(10) !== value.id ||
+              value.etag !== 'W/"1"' || Number(value.version) !== 1) {
+            throw new Error('social post Snowflake create assertion failed: ' + JSON.stringify(value));
           }
           fs.appendFileSync(process.env.GITHUB_ENV, 'SOCIAL_POST_ID=' + value.id + '\nSOCIAL_POST_ETAG=' + value.etag + '\n');
           NODE
@@ -589,6 +591,11 @@ jobs:
           const socialPostPublic=JSON.parse(fs.readFileSync('artifacts/mapping-0/content-publish-runtime-e2e/social-post-public.json','utf8'));
           if(socialPostPublic.contentType!=='post'||socialPostPublic.state!=='PUBLISHED'||Number(socialPostPublic.version)!==2) {
             throw new Error('social post public visibility failed: '+JSON.stringify(socialPostPublic));
+          }
+          if(typeof socialPostPublic.id!=='string'||socialPostPublic.id!==process.env.SOCIAL_POST_ID||
+             !/^[0-9]{18,20}$/.test(socialPostPublic.id)||BigInt(socialPostPublic.id).toString(10)!==socialPostPublic.id) {
+            throw new Error('social post public W01 readback changed or coerced its Snowflake ID: '+
+              JSON.stringify({expectedId:process.env.SOCIAL_POST_ID,actualId:socialPostPublic.id}));
           }
           const expectedAttachmentRef = process.env.POST_ATTACHMENT_REF;
           if (!expectedAttachmentRef || !Array.isArray(socialPostPublic.mediaRefs) || socialPostPublic.mediaRefs.length !== 1 ||
