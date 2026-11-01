@@ -56,7 +56,11 @@ test('edit and delete controls are only shown for the authenticated owner and us
   expect(home).toContain('current.filter((post) => post.contentId !== contentId)');
 });
 
-test('successful publishing requests a fresh page rather than mutating a sample feed locally', () => {
+test('successful publishing confirms success and offers a direct link to the published post', () => {
+  expect(composer).toContain("Alert.alert('发布成功', '你的动态已发布，现在可以在公开信息流中查看。'");
+  expect(composer).toContain("text: '查看动态'");
+  expect(composer).toContain("('/post/' + encodeURIComponent(publishedId))");
+  expect(composer).toContain("('/?published=' + encodeURIComponent(publishedId) + '&refresh=' + Date.now())");
   expect(home).toContain("useLocalSearchParams<{ published?: string; refresh?: string }>()");
   expect(home).toContain('refreshSignal={refreshSignal}');
   expect(home).toContain('[loadPage, refreshKey, refreshSignal]');
