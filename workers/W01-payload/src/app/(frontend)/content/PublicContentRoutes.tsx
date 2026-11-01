@@ -203,9 +203,7 @@ export async function renderCanonicalContentRoute(input: {
   if (!content || content.state !== 'PUBLISHED' || !author?.username) notFound()
 
   const requestedUsername = input.username.trim().replace(/^@+/, '')
-  const canonicalUsername = author.username.trim().replace(/^@+/, '')
   const canonical = canonicalPath(author, content, input.routeType)
-  const canonicalType = routeTypeForContent(content, input.routeType)
 
   const requestedPath =
     '/@' + encodeURIComponent(requestedUsername) + '/' +
