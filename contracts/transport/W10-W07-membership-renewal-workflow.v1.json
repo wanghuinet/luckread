@@ -3,7 +3,7 @@
   "$id": "https://luckread.com/contracts/v1/transport/W10-W07-membership-renewal-workflow.v1.json",
   "title": "W10 to W07 Membership Renewal Workflow Transport",
   "version": "1.0.0",
-  "status": "IMPLEMENTED_PENDING_CI_DEPLOYMENT_AND_RUNTIME_ADMISSION",
+  "status": "IMPLEMENTED_PENDING_EXPLICIT_DEPLOYMENT_AND_SANDBOX_RUNTIME_ADMISSION",
   "producer": {
     "logicalWorker": "W10",
     "runtime": "Cloudflare Workflow",
@@ -102,11 +102,14 @@
     "No live charge, remote migration or production activation in this PR"
   ],
   "implementationEvidence": {
-    "source": "FEATURE_BRANCH",
-    "unitTests": "PENDING_CI",
-    "wranglerDryRun": "PENDING_CI",
+    "source": "MERGED_MAIN",
+    "mergedCommit": "acb19b7fd53d477449e6e30deda8709057e6a327",
+    "unitTests": "PASSED_CI",
+    "w07RuntimeCi": "PASSED",
+    "w10AsyncRuntimeCi": "PASSED",
+    "wranglerDryRun": "PASSED",
     "deployment": "NOT_PERFORMED",
     "sandboxE2E": "PENDING",
-    "unifiedAdmission": "NOT_ESTABLISHED"
+    "unifiedAdmission": "DEVELOPMENT_MODE_PASSED; FIVE_WAY_AND_STRICT_DOWNSTREAM_GATES_SKIPPED"
   }
 }
