@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { fetchJson, getApiErrorMessage } from '../../../lib/client-api.js'
+import { buildPublicContentHref } from '../../../lib/public-content-url.js'
 import LuckReadSocialPostCard from '../components/reuse/LuckReadSocialPostCard'
 import ArticleSummaryPreview from '../../../components/ArticleSummaryPreview.js'
 import { usePublicLocale } from '../i18n/PublicLanguageToggle'
@@ -210,7 +211,7 @@ export default function ContentBrowsePage() {
                   />
                 )
               }
-              const href = '/content/' + encodeURIComponent(item.slug || item.id)
+              const href = buildPublicContentHref(item)
               const cover = item.coverRef
               return (
                 <Link
