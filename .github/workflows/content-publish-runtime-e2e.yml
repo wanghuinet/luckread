@@ -168,7 +168,8 @@ jobs:
       - name: Setup native moderator fixture
         env:
           AUTH_BASE_URL: ${{ inputs.content_api_base_url }}
-          AUTH_BROWSER_ORIGIN: ${{ inputs.moderation_base_url }}
+          # Better Auth validates the trusted web origin, not the API endpoint host.
+          AUTH_BROWSER_ORIGIN: https://luckread.com
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: node scripts/moderation-native-reviewer-fixture.mjs
@@ -176,7 +177,8 @@ jobs:
       - name: Setup creator fixture and login
         env:
           AUTH_BASE_URL: ${{ inputs.content_api_base_url }}
-          AUTH_BROWSER_ORIGIN: ${{ inputs.moderation_base_url }}
+          # Better Auth validates the trusted web origin, not the API endpoint host.
+          AUTH_BROWSER_ORIGIN: https://luckread.com
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           WRANGLER_VERSION: ${{ env.WRANGLER_VERSION }}
