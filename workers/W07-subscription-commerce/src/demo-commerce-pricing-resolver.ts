@@ -2,7 +2,6 @@
 
 import { resolveCommerceOrderItems } from './order-item-resolution.js';
 import type { AuthoritativelyPricedOrder } from './order-persistence.js';
-import type { RenewalRuntimeDependencies } from './renewal-runtime.js';
 import { applyDemoTaxPricing, isDemoPricingEnabled } from './demo-tax-pricing.js';
 import { applyTaxJarSandboxPricing, type TaxJarSandboxAddress } from './taxjar-sandbox-pricing.js';
 import { SubscriptionRuntimeError } from './subscription-runtime.js';
@@ -85,7 +84,7 @@ export async function resolveDemoCommercePricing(
 }
 
 
-type RenewalPricingInput = Parameters<NonNullable<RenewalRuntimeDependencies['resolvePricing']>>[0]
+type RenewalPricingInput = Readonly<{ request: unknown }>
 
 /**
  * Adapter for W07's renewal runtime envelope. The shared commerce resolver
