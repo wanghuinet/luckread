@@ -406,6 +406,7 @@ function DrawerLayout() {
       <Drawer.Screen name="bookmarks" options={{ headerShown: false }} />
       <Drawer.Screen name="notification-preferences" options={{ headerShown: false }} />
       <Drawer.Screen name="blocked-muted" options={{ headerShown: false }} />
+      <Drawer.Screen name="subscription-change" options={{ headerShown: false, drawerItemStyle: { display: 'none' } }} />
     </Drawer>
   );
 }
