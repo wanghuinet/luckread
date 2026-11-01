@@ -121,6 +121,7 @@ describe('1.1 content lifecycle closeout', () => {
     const boundPreflight = read('src/content/bind-post-publish-preflight.ts')
     const creatorList = read('src/app/(payload)/v1beta/CreatorContentList.tsx')
     const publicDetail = read('src/app/(twitter-clone)/content/[contentId]/page.tsx')
+    const publicRoutes = read('src/app/(frontend)/content/PublicContentRoutes.tsx')
     const publicDetailClient = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
     const w03Client = read('src/content/w03-content-client.ts')
     const w03Runtime = readFileSync(
@@ -169,13 +170,12 @@ describe('1.1 content lifecycle closeout', () => {
     expect(creatorList).toContain("item.state === 'DRAFT'")
     expect(creatorList).toContain("window.addEventListener('luckread:content-mutated'")
 
-    expect(publicDetail).toContain("state !== 'PUBLISHED'")
-    expect(publicDetail).toContain("import { fetchJson } from '../../../../lib/client-api.js'")
-    expect(publicDetail).toContain("'https://api.luckread.com/v1/contents/' + encodeURIComponent(contentId)")
-    expect(publicDetail).toContain("fetchJson<PublicContent>(request)")
-    expect(publicDetail).not.toContain("cachedPublicGet")
-    expect(publicDetail).not.toContain("callW03Content")
-    expect(publicDetail).toContain("permanentRedirect('/content/' + encodeURIComponent(content.slug))")
+    expect(publicDetail).toContain('renderLegacyContentRoute(contentId)')
+    expect(publicDetail).toContain('generateLegacyContentMetadata(contentId)')
+    expect(publicRoutes).toContain("new Request(PUBLIC_API_ORIGIN + '/v1/contents/'")
+    expect(publicRoutes).toContain("new Request(PUBLIC_API_ORIGIN + '/v1/users/'")
+    expect(publicRoutes).toContain("content.state !== 'PUBLISHED'")
+    expect(publicRoutes).toContain('permanentRedirect(canonicalPath(author, content))')
     expect(publicDetailClient).toContain("apiFetch(resolved.bodyRef")
     expect(publicDetailClient).toContain("<ArticleStructuredRenderer document={structuredArticle} />")
 
@@ -202,12 +202,14 @@ describe('1.1 content lifecycle closeout', () => {
       'utf8',
     )
     const detailPage = read('src/app/(twitter-clone)/content/[contentId]/page.tsx')
+    const publicRoutes = read('src/app/(frontend)/content/PublicContentRoutes.tsx')
     const detailClient = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
 
     expect(runtime).toContain(
       "WHERE (id = ? OR slug = ?)\n        AND (state = 'PUBLISHED' OR owner_user_id = ?)",
     )
-    expect(detailPage).toContain("if (!content || content.state !== 'PUBLISHED')")
+    expect(detailPage).toContain('renderLegacyContentRoute(contentId)')
+    expect(publicRoutes).toContain("if (!content || content.state !== 'PUBLISHED') notFound()")
     expect(detailClient).toContain("if (!response.ok || !data?.id || data.state !== 'PUBLISHED')")
   })
 
