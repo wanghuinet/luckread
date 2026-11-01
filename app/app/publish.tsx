@@ -15,6 +15,7 @@ import {
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import { VideoView, useVideoPlayer } from 'expo-video';
 
 import { apiRequest, createIdempotencyKey } from '~/lib/api-client';
 import {
@@ -74,7 +75,8 @@ type SubmitAttempt = {
 
 const PRIMARY = '#1769aa';
 const MAX_TEXT_LENGTH = 500;
-const MAX_IMAGES = 4;
+const MAX_MEDIA_ITEMS = 4;
+const MAX_VIDEO_ITEMS = 1;
 const MIN_POLL_OPTIONS = 2;
 const MAX_POLL_OPTIONS = 4;
 const MAX_POLL_OPTION_LENGTH = 50;
@@ -94,10 +96,27 @@ function unwrapContent(value: unknown): ContentRecord | null {
 }
 
 function mimeFromUrl(url: string): string {
-  if (/\.(mp4|webm|mov|m4v|avi|mkv)(?:[?#].*)?$/i.test(url)) return 'video/mp4';
+  if (/\.(mp4|webm|mov|m4v|avi|mkv)(?:[?#].*)?$/i.test(url) || url.startsWith('https://video.luckread.com/')) return 'video/mp4';
   if (/\.png(?:[?#].*)?$/i.test(url)) return 'image/png';
   if (/\.webp(?:[?#].*)?$/i.test(url)) return 'image/webp';
   return 'image/jpeg';
+}
+
+function ComposerVideoPreview({ uri }: { uri: string }) {
+  const player = useVideoPlayer({ uri }, (instance) => {
+    instance.loop = false;
+    instance.muted = true;
+  });
+  return (
+    <VideoView
+      player={player}
+      style={styles.videoPreview}
+      contentFit="contain"
+      nativeControls
+      allowsFullscreen={false}
+      allowsPictureInPicture={false}
+    />
+  );
 }
 
 export default function PublishScreen() {
@@ -234,39 +253,49 @@ export default function PublishScreen() {
     }
   }, [updateAsset]);
 
-  const pickMedia = useCallback(async (kind: 'image' | 'video') => {
+  const pickMedia = useCallback(async () => {
     if (busy || loadingEdit || publishPending) return;
-    if (kind === 'image' && assets.some(isVideoAsset)) {
-      Alert.alert('Replace video first', 'Remove the selected video before adding pictures.');
+    const available = Math.max(0, MAX_MEDIA_ITEMS - assets.length);
+    if (available === 0) {
+      Alert.alert('Attachment limit', 'A post can contain up to four photos or videos.');
       return;
     }
-    if (kind === 'video' && assets.length > 0) {
-      Alert.alert('Replace current media first', 'A short video must be the only media attachment in this Beta composer.');
-      return;
-    }
+
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert('Photo access required', 'Allow LuckRead to access your photo library to attach media.');
+      Alert.alert('Photo and video access required', 'Allow LuckRead to access your library to attach photos or videos.');
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: kind === 'image' ? ImagePicker.MediaTypeOptions.Images : ImagePicker.MediaTypeOptions.Videos,
-      allowsMultipleSelection: kind === 'image',
-      selectionLimit: kind === 'image' ? MAX_IMAGES : 1,
+      mediaTypes: ImagePicker.MediaTypeOptions.All,
+      allowsMultipleSelection: true,
+      selectionLimit: available,
       quality: 0.9,
       videoMaxDuration: 60,
     });
     if (result.canceled || !result.assets?.length) return;
 
-    const available = kind === 'image' ? Math.max(0, MAX_IMAGES - assets.length) : 1;
-    if (available === 0) {
-      Alert.alert('Attachment limit', 'A post can contain up to four pictures.');
+    const selectedVideoCount = result.assets.filter((asset) =>
+      asset.type === 'video' ||
+      asset.mimeType?.startsWith('video/') ||
+      /\.(mp4|webm|mov|m4v|avi|mkv)(?:[?#].*)?$/i.test(asset.fileName || ''),
+    ).length;
+    const existingVideoCount = assets.filter(isVideoAsset).length;
+    if (existingVideoCount + selectedVideoCount > MAX_VIDEO_ITEMS) {
+      Alert.alert('One video per post', 'A dynamic can include one video and up to three pictures. Remove the existing video before choosing another.');
       return;
     }
+
     const picked = result.assets.slice(0, available);
+    if (picked.length + assets.length > MAX_MEDIA_ITEMS) {
+      Alert.alert('Attachment limit', 'A post can contain up to four photos or videos.');
+      return;
+    }
     const newAssets: ComposerAsset[] = picked.map((asset) => {
       const localId = createIdempotencyKey();
-      const video = asset.type === 'video' || kind === 'video';
+      const video = asset.type === 'video' ||
+        asset.mimeType?.startsWith('video/') ||
+        /\.(mp4|webm|mov|m4v|avi|mkv)(?:[?#].*)?$/i.test(asset.fileName || '');
       const filename = asset.fileName || (video ? 'luckread-video-' + localId + '.mp4' : 'luckread-image-' + localId + '.jpg');
       return {
         localId,
@@ -281,7 +310,7 @@ export default function PublishScreen() {
     });
     setAssets((current) => [...current, ...newAssets]);
     setErrorMessage('');
-    setStatusMessage('Uploading media to LuckRead…');
+    setStatusMessage('Uploading selected media to LuckRead…');
     setBusy(true);
     try {
       const uploadResults: boolean[] = [];
@@ -416,6 +445,7 @@ export default function PublishScreen() {
       const includeAccessMode = accessMode === 'MEMBERS_ONLY' ||
         originalAccessModeRef.current === 'MEMBERS_ONLY';
       const payload = {
+        // X-style media posts remain W03 social posts; video is an attachment, not a separate video-content record.
         contentType: 'post',
         title: trimmedBody,
         bodyRef,
@@ -682,12 +712,12 @@ export default function PublishScreen() {
 
           {assets.map((asset) => (
             <View key={asset.localId} style={styles.assetRow}>
-              {asset.mimeType.startsWith('image/') && (asset.uri || asset.playbackUrl || asset.serverUrl) ? (
-                <Image source={{ uri: asset.uri || asset.playbackUrl || asset.serverUrl }} style={styles.assetThumbnail} />
-              ) : (
-                <View style={[styles.assetThumbnail, styles.videoThumbnail]}>
-                  <Feather name="video" size={24} color={PRIMARY} />
+              {isVideoAsset(asset) ? (
+                <View style={styles.videoPreviewWrap}>
+                  <ComposerVideoPreview uri={(asset.uri || asset.playbackUrl || asset.serverUrl) as string} />
                 </View>
+              ) : (
+                <Image source={{ uri: asset.uri || asset.playbackUrl || asset.serverUrl }} style={styles.assetThumbnail} />
               )}
               <View style={styles.assetText}>
                 <Text numberOfLines={1} style={styles.assetName}>{asset.filename}</Text>
@@ -705,37 +735,23 @@ export default function PublishScreen() {
                   </Pressable>
                 ) : null}
               </View>
-              {!asset.existing ? (
-                <Pressable disabled={busy || publishPending} accessibilityLabel="Remove attachment" onPress={() => removeAsset(asset.localId)} style={styles.iconButton}>
-                  <Feather name="x-circle" size={21} color="#667085" />
-                </Pressable>
-              ) : (
-                <Pressable disabled={busy || publishPending} accessibilityLabel="Remove attachment" onPress={() => removeAsset(asset.localId)} style={styles.iconButton}>
-                  <Feather name="x-circle" size={21} color="#667085" />
-                </Pressable>
-              )}
+              <Pressable disabled={busy || publishPending} accessibilityLabel="Remove attachment" onPress={() => removeAsset(asset.localId)} style={styles.iconButton}>
+                <Feather name="x-circle" size={21} color="#667085" />
+              </Pressable>
             </View>
           ))}
 
           <View style={styles.mediaActions}>
             <Pressable
               accessibilityRole="button"
-              disabled={busy || loadingEdit || publishPending || assets.length >= MAX_IMAGES || assets.some(isVideoAsset)}
+              disabled={busy || loadingEdit || publishPending || assets.length >= MAX_MEDIA_ITEMS}
               style={styles.mediaButton}
-              onPress={() => { void pickMedia('image'); }}
+              onPress={() => { void pickMedia(); }}
             >
               <Feather name="image" size={19} color={PRIMARY} />
-              <Text style={styles.mediaButtonText}>Add pictures</Text>
+              <Text style={styles.mediaButtonText}>Add photos or video</Text>
             </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              disabled={busy || loadingEdit || publishPending || assets.length > 0}
-              style={styles.mediaButton}
-              onPress={() => { void pickMedia('video'); }}
-            >
-              <Feather name="video" size={19} color={PRIMARY} />
-              <Text style={styles.mediaButtonText}>Add short video</Text>
-            </Pressable>
+            <Text style={styles.mediaLimitHint}>Up to 4 media items · 1 video max · 60 seconds</Text>
           </View>
 
           {!contentId ? (
@@ -861,7 +877,8 @@ const styles = StyleSheet.create({
   accessModeNotice: { color: '#667085', fontSize: 12, lineHeight: 18, marginTop: 10 },
   assetRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 12, padding: 10, borderWidth: 1, borderColor: '#eaecf0', borderRadius: 12 },
   assetThumbnail: { width: 58, height: 58, borderRadius: 8, backgroundColor: '#f2f4f7' },
-  videoThumbnail: { alignItems: 'center', justifyContent: 'center' },
+  videoPreviewWrap: { width: 132, height: 76, overflow: 'hidden', borderRadius: 8, backgroundColor: '#101828' },
+  videoPreview: { width: '100%', height: '100%' },
   assetText: { flex: 1, minWidth: 0 },
   assetName: { fontSize: 13, fontWeight: '700', color: '#344054' },
   assetStatus: { marginTop: 3, fontSize: 12, color: '#667085' },
@@ -872,6 +889,7 @@ const styles = StyleSheet.create({
   mediaActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingTop: 18, paddingBottom: 10 },
   mediaButton: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: '#d0d5dd', borderRadius: 999, paddingHorizontal: 15, paddingVertical: 10 },
   mediaButtonText: { color: PRIMARY, fontSize: 13, fontWeight: '800' },
+  mediaLimitHint: { alignSelf: 'center', color: '#667085', fontSize: 11 },
   pollSection: { marginTop: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#eaecf0', paddingBottom: 14 },
   pollToggle: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 8, borderWidth: 1, borderColor: '#d0d5dd', borderRadius: 999, paddingHorizontal: 15, paddingVertical: 10 },
   pollEditor: { marginTop: 12, padding: 12, borderWidth: 1, borderColor: '#d0d5dd', borderRadius: 14 },
