@@ -1136,6 +1136,74 @@ describe('W03 content contract core', () => {
     }
   })
 
+  it('requires the current verified creator identity to publish member-only posts', async () => {
+    const row = {
+      id: 'content_member_publish_1',
+      content_type: 'post',
+      owner_user_id: 'user_member_creator',
+      creator_id: 'creator_verified_1',
+      ip_id: null,
+      state: 'DRAFT',
+      scheduled_at: null,
+      access_mode: 'MEMBERS_ONLY',
+      version: 1,
+      revision: 1,
+      slug: 'member-post-1',
+      title: 'Member-only update',
+      body_ref: 'https://img.luckread.com/media/member-body.txt',
+      media_refs_json: '[]',
+      cover_ref: null,
+      etag: 'W/"1"',
+      created_at: '2026-10-16T00:00:00.000Z',
+      updated_at: '2026-10-16T00:00:00.000Z',
+      idem_id: null,
+      idem_owner_user_id: null,
+      idem_request_hash: null,
+      idem_status: null,
+      idem_response_status: null,
+      idem_response_json: null,
+      idem_expires_at: null,
+    }
+    let batchCalls = 0
+    const db = {
+      prepare() {
+        return { bind: () => ({ first: async () => row }) }
+      },
+      batch: async () => { batchCalls += 1; return [] },
+    } as never
+    const options = {
+      preflight: {
+        contentType: 'post',
+        title: 'Member-only update',
+        body: 'An update available to current members of this creator.',
+        mediaRefs: [],
+        coverRef: null,
+        aiMode: 'none',
+        humanContribution: 'substantial',
+      },
+    }
+    const transition = (verifiedCreatorId?: string) => transitionContentState(
+      db,
+      'user_member_creator',
+      'L3',
+      row.id,
+      'PUBLISHED',
+      undefined,
+      row.etag,
+      'member-publish-' + (verifiedCreatorId ?? 'missing'),
+      new Date('2026-10-16T00:01:00.000Z'),
+      { ...options, verifiedCreatorId },
+    )
+
+    await expect(transition()).rejects.toMatchObject({ code: 'PERMISSION_DENIED', status: 403 })
+    await expect(transition('creator_other')).rejects.toMatchObject({ code: 'PERMISSION_DENIED', status: 403 })
+    expect(batchCalls).toBe(0)
+
+    const published = await transition('creator_verified_1')
+    expect(published).toMatchObject({ from: 'DRAFT', to: 'PUBLISHED', version: 2 })
+    expect(batchCalls).toBe(1)
+  })
+
   it('does not let a higher-layer social author publish an article', async () => {
     const row = {
       id: 'content_high_layer_article',
