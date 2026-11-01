@@ -63,6 +63,8 @@ export type RenewalScheduledDependencies = Readonly<{
   processCycle?: typeof processSubscriptionRenewalCycle;
   /** Reuse the admitted owning-domain price/tax resolver for each cycle. */
   resolvePricing?: RenewalRuntimeDependencies['resolvePricing'];
+  /** Optional smaller bound for a single durable Workflow invocation. */
+  maxCyclesPerBatch?: number;
 }>;
 
 async function readTableNames(db: D1Database, expected: readonly string[]): Promise<Set<string>> {
@@ -74,7 +76,7 @@ async function readTableNames(db: D1Database, expected: readonly string[]): Prom
 }
 
 /**
- * Bounded Cron tick for existing W07 state only.
+ * Bounded renewal batch for existing W07 state, invoked by the admitted W10 async runtime.
  *
  * The schema preflight prevents a newly deployed Cron trigger from repeatedly
  * querying a D1-04 candidate migration that has not been applied. New cycles
@@ -108,6 +110,9 @@ export async function runRenewalScheduledBatch(
   const syncPending = dependencies.syncPending ?? syncPendingRenewalOutcomes;
   const scanDue = dependencies.scanDue ?? scanDueSubscriptionRenewals;
   const processCycle = dependencies.processCycle ?? processSubscriptionRenewalCycle;
+  const maxCycles = Number.isSafeInteger(dependencies.maxCyclesPerBatch)
+    ? Math.min(Math.max(dependencies.maxCyclesPerBatch!, 1), MAX_CYCLES_PER_TICK)
+    : MAX_CYCLES_PER_TICK;
 
   let beforeRecovery: OutcomeBatch;
   try {
@@ -132,15 +137,15 @@ export async function runRenewalScheduledBatch(
   let dueScan: RenewalScanResult;
   try {
     dueScan = dependencies.resolvePricing
-      ? await scanDue(env, { limit: MAX_CYCLES_PER_TICK }, { resolvePricing: dependencies.resolvePricing })
-      : await scanDue(env, { limit: MAX_CYCLES_PER_TICK });
+      ? await scanDue(env, { limit: maxCycles }, { resolvePricing: dependencies.resolvePricing })
+      : await scanDue(env, { limit: maxCycles });
   } catch {
     return { status: 'PARTIAL', phase: 'DUE_SCAN' };
   }
 
   const cycleResults: RenewalProcessResult[] = [];
   let processFailures = 0;
-  for (const cycleId of dueScan.cycleIds.slice(0, MAX_CYCLES_PER_TICK)) {
+  for (const cycleId of dueScan.cycleIds.slice(0, maxCycles)) {
     try {
       cycleResults.push(dependencies.resolvePricing
         ? await processCycle(env, cycleId, { resolvePricing: dependencies.resolvePricing })
