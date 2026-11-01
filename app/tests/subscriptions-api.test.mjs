@@ -196,7 +196,7 @@ test('rejects invalid saved payment method IDs and removal keys before transport
   expect(calls).toHaveLength(0);
 });
 
-test('keeps subscription mutations disabled and routes paid membership checkout through server-verified Hyperswitch', async () => {
+test('connects supported plan changes and keeps unverified subscription lifecycle actions gated', async () => {
   const api = await import('../lib/subscriptions-api.ts');
   const subscriptionsScreen = readFileSync(new URL('../app/(drawer)/subscriptions.tsx', import.meta.url), 'utf8');
   const planChangeScreen = readFileSync(new URL('../app/(drawer)/subscription-change.tsx', import.meta.url), 'utf8');
