@@ -260,6 +260,18 @@ function CustomDrawerContent(props: any) {
             }
           }}
         />
+        <DrawerMenuItem
+          icon="file-text"
+          label="账单与付款"
+          isDark={isDark}
+          onPress={() => {
+            if (authStatus !== 'authenticated') {
+              router.push(('/login?returnTo=' + encodeURIComponent('/billing')) as never);
+            } else {
+              router.push('/billing' as never);
+            }
+          }}
+        />
         <DrawerMenuItem icon="users" label="社群" onPress={() => showUnavailable('社群')} isDark={isDark} />
         <DrawerMenuItem
           icon="bookmark"
@@ -406,6 +418,7 @@ function DrawerLayout() {
       <Drawer.Screen name="bookmarks" options={{ headerShown: false }} />
       <Drawer.Screen name="notification-preferences" options={{ headerShown: false }} />
       <Drawer.Screen name="blocked-muted" options={{ headerShown: false }} />
+      <Drawer.Screen name="billing" options={{ headerShown: false, drawerItemStyle: { display: 'none' } }} />
       <Drawer.Screen name="subscription-change" options={{ headerShown: false, drawerItemStyle: { display: 'none' } }} />
     </Drawer>
   );
