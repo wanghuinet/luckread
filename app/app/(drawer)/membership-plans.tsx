@@ -140,6 +140,12 @@ function PlanCard({ item, onPurchase, busy }: {
 
 export default function MembershipPlansScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ creatorId?: string | string[] }>();
+  const rawCreatorId = Array.isArray(params.creatorId) ? params.creatorId[0] : params.creatorId;
+  const creatorId = typeof rawCreatorId === 'string' && /^[A-Za-z0-9][A-Za-z0-9_-]{0,255}$/.test(rawCreatorId)
+    ? rawCreatorId
+    : null;
+  const invalidCreatorFilter = rawCreatorId !== undefined && creatorId === null;
   const params = useLocalSearchParams<{ creatorId?: string | string[]; returnTo?: string | string[] }>();
   const rawCreatorId = Array.isArray(params.creatorId) ? params.creatorId[0] : params.creatorId;
   const creatorId = typeof rawCreatorId === 'string' &&
@@ -170,6 +176,14 @@ export default function MembershipPlansScreen() {
   const requestRef = useRef<AbortController | null>(null);
 
   const loadPage = useCallback(async (cursor: string | null, append: boolean, pullRefresh = false) => {
+    if (invalidCreatorFilter) {
+      setError('创作者标识无效，无法加载对应会员方案。');
+      setItems([]);
+      setLoading(false);
+      setLoadingMore(false);
+      setRefreshing(false);
+      return;
+    }
     if (authStatus === 'loading') return;
     if (authStatus !== 'authenticated') {
       setAuthRequired(true);
@@ -194,6 +208,7 @@ export default function MembershipPlansScreen() {
         cursor,
         creatorId,
         signal: controller.signal,
+        creatorId: creatorId ?? undefined,
       });
       if (controller.signal.aborted) return;
       if (result.response.status === 401) {
@@ -425,10 +440,10 @@ export default function MembershipPlansScreen() {
               <>
                 <Feather name="award" size={34} color="#9ca3af" />
                 <Text className="mt-4 text-base font-bold text-neutral-800 dark:text-neutral-100">
-                  {error ? '暂时无法显示会员方案' : '暂无公开会员方案'}
+                  {error ? '暂时无法显示会员方案' : creatorId ? '该创作者暂无公开会员方案' : '暂无公开会员方案'}
                 </Text>
                 <Text className="mt-2 text-center text-sm leading-6 text-neutral-500 dark:text-neutral-400">
-                  {error ? '检查网络后重试。' : '创作者发布公开会员方案后，会显示在这里。'}
+                  {error ? '检查网络后重试。' : creatorId ? '创作者发布公开会员方案后，会显示在这里。' : '创作者发布公开会员方案后，会显示在这里。'}
                 </Text>
               </>
             )}
