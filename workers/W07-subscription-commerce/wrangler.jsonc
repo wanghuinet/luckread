@@ -4,6 +4,9 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-09-30",
   "workers_dev": false,
+  "vars": {
+    "MEMBERSHIP_RENEWAL_ENABLED": "false"
+  },
   "ratelimits": [
     {
       "name": "SUBSCRIPTION_ORIGIN_GLOBAL_LIMITER",

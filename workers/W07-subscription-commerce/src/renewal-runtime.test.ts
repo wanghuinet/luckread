@@ -434,6 +434,34 @@ describe('W07 scheduled renewal batch', () => {
     expect(f.processCycle).toHaveBeenCalledTimes(2);
   });
 
+  it('forwards the admitted pricing and tax resolver to both cycle discovery and execution', async () => {
+    const f = scheduledSetup();
+    const resolvePricing: NonNullable<RenewalScheduledDependencies['resolvePricing']> = async () => {
+      throw new Error('the scheduler must forward the resolver, not invent a pricing decision');
+    };
+
+    const result = await runRenewalScheduledBatch(f.env, { ...f.dependencies, resolvePricing });
+
+    expect(result).toMatchObject({ status: 'COMPLETED', processed: 2 });
+    expect(f.scanDue).toHaveBeenCalledWith(
+      f.env,
+      { limit: 5 },
+      { resolvePricing },
+    );
+    expect(f.processCycle).toHaveBeenNthCalledWith(
+      1,
+      f.env,
+      'rcy_' + 'a'.repeat(26),
+      { resolvePricing },
+    );
+    expect(f.processCycle).toHaveBeenNthCalledWith(
+      2,
+      f.env,
+      'rcy_' + 'b'.repeat(26),
+      { resolvePricing },
+    );
+  });
+
   it('stops before scanning when existing cross-D1 recovery fails', async () => {
     const f = scheduledSetup();
     f.syncPending.mockRejectedValueOnce(new Error('D1-01 unavailable'));
