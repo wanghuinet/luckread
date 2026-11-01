@@ -203,15 +203,16 @@ export async function renderCanonicalContentRoute(input: {
   if (!content || content.state !== 'PUBLISHED' || !author?.username) notFound()
 
   const requestedUsername = input.username.trim().replace(/^@+/, '')
-  const canonicalUsername = author.username.trim().replace(/^@+/, '')
   const canonical = canonicalPath(author, content, input.routeType)
-  const canonicalType = routeTypeForContent(content, input.routeType)
 
-  if (
-    requestedUsername !== canonicalUsername ||
-    input.routeType !== canonicalType ||
-    input.contentId !== content.id
-  ) permanentRedirect(canonical)
+  const requestedPath =
+    '/@' + encodeURIComponent(requestedUsername) + '/' +
+    input.routeType + '/' + encodeURIComponent(input.contentId)
+
+  // Redirect only when the canonical URL is actually different. Comparing
+  // individual fields can trigger a 308 to the exact same URL when upstream
+  // identity values differ only in representation.
+  if (requestedPath !== canonical) permanentRedirect(canonical)
 
   const locale = normalizePublicLocale((await cookies()).get('luckread-ui-locale')?.value)
   return (
