@@ -65,7 +65,7 @@ jobs:
         run: node ../../scripts/w01-remote-migration-admission.mjs --check-state
 
       - name: Verify committed official Payload username redirect migration
-        if: ${{ (github.event_name == 'pull_request' && github.event.pull_request.number == 1481) || (github.event_name == 'push' && github.ref == 'refs/heads/feature/unified-username-301-redirects') }
+        if: ${{ (github.event_name == 'pull_request' && github.event.pull_request.number == 1481) || (github.event_name == 'push' && github.ref == 'refs/heads/feature/unified-username-301-redirects') }}
         working-directory: workers/W01-payload
         env:
           NODE_ENV: development
@@ -157,7 +157,7 @@ jobs:
           test ! -s "$artifact_dir/worktree-status.txt"
 
       - name: Upload local-only username redirect migration candidate
-        if: ${{ always() && ((github.event_name == 'pull_request' && github.event.pull_request.number == 1481) || (github.event_name == 'push' && github.ref == 'refs/heads/feature/unified-username-301-redirects')) }}
+        if: ${{ always() && ((github.event_name == 'pull_request' && github.event.pull_request.number == 1481) || (github.event_name == 'push' && github.ref == 'refs/heads/feature/unified-username-301-redirects')) }}}
         uses: actions/upload-artifact@v4
         with:
           name: w01-username-redirect-migration-candidate-${{ github.run_id }}
