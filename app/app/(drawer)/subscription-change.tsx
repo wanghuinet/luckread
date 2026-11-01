@@ -501,7 +501,7 @@ export default function SubscriptionChangeScreen() {
           </Text>
         </View>
 
-        {subscription && subscription.status !== 'ACTIVE' ? (
+        {subscription && (subscription.status !== 'ACTIVE' || subscription.cancelAt !== null) ? (
           <View className="mx-4 mb-3 rounded-2xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-950">
             <Text className="text-sm leading-6 text-neutral-500 dark:text-neutral-400">
               当前订阅状态为 {subscription.status}。套餐报价仅对未设置取消时间的 ACTIVE 订阅开放；此记录仍可查看，但不会提交套餐变更。
