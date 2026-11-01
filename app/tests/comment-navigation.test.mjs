@@ -26,7 +26,11 @@ test('post cards preserve comment navigation and pass detail-screen comment call
 test('post detail comment action scrolls to the real comments section instead of pushing the same route', () => {
   expect(postDetail).toContain('const handleScrollToComments = useCallback');
   expect(postDetail).toContain('scrollViewRef.current?.scrollTo({ y: commentsOffsetRef.current, animated: true })');
-  expect(postDetail).toContain('onCommentPress={handleScrollToComments}');
+  // Public/entitled detail content keeps the canonical scroll-to-comments
+  // callback; a locked member-only detail must not expose comments or the action.
+  expect(postDetail).toContain('onCommentPress={membershipRequired ? undefined : handleScrollToComments}');
+  expect(postDetail).toContain('{membershipRequired ? (');
+  expect(postDetail).toContain('<Comments contentId={postId} sort={selectedSort} />');
   expect(postDetail).toContain('commentsOffsetRef.current = event.nativeEvent.layout.y');
 });
 
