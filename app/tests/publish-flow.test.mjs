@@ -104,3 +104,24 @@ test('media upload success is reported only when every attachment is ready', () 
   expect(composer).toContain('const allReady = succeeded && assets.every((candidate) =>');
   expect(composer).toContain('Retry any remaining failed media before publishing.');
 });
+
+test('native social composer supports an X-style mixed photo and video attachment set', () => {
+  expect(composer).toContain('ImagePicker.MediaTypeOptions.All');
+  expect(composer).toContain('allowsMultipleSelection: true');
+  expect(composer).toContain('MAX_MEDIA_ITEMS = 4');
+  expect(composer).toContain('MAX_VIDEO_ITEMS = 1');
+  expect(composer).toContain('existingVideoCount + selectedVideoCount > MAX_VIDEO_ITEMS');
+  expect(composer).toContain('Add photos or video');
+  expect(composer).toContain('Up to 4 media items');
+  expect(composer).toContain('videoMaxDuration: 60');
+  expect(composer).toContain('contentType: \'post\'');
+  expect(composer).toContain('video is an attachment, not a separate video-content record');
+});
+
+test('native composer previews attached videos before publishing and preserves playback controls', () => {
+  expect(composer).toContain("import { VideoView, useVideoPlayer } from 'expo-video'");
+  expect(composer).toContain('function ComposerVideoPreview');
+  expect(composer).toContain('<VideoView');
+  expect(composer).toContain('nativeControls');
+  expect(composer).toContain('asset.uri || asset.playbackUrl || asset.serverUrl');
+});
