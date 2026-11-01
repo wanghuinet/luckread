@@ -29,8 +29,6 @@ export type ApiContentRecord = {
   accessMode?: 'PUBLIC' | 'MEMBERS_ONLY';
   accessGranted?: boolean;
   contentType?: 'article' | 'post' | 'video' | string;
-  accessMode?: 'PUBLIC' | 'MEMBERS_ONLY';
-  accessGranted?: boolean;
   state?: string;
   title?: string;
   body?: string | null;
