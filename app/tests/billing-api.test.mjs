@@ -1,10 +1,10 @@
 import { beforeEach, expect, mock, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 
-const calls: Array<{ path: string; options: Record<string, unknown> }> = [];
+const calls = [];
 
 mock.module('../lib/api-client.ts', () => ({
-  apiRequest: async (path: string, options = {}) => {
+  apiRequest: async (path, options = {}) => {
     calls.push({ path, options });
     return {
       response: { ok: true, status: 200 },
