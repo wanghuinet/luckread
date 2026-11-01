@@ -358,6 +358,13 @@ export default function PostDetailScreen() {
                                 当前内容暂时无法匹配已验证的创作者会员方案，请稍后重试。
                             </Text>
                         )}
+                        <TouchableOpacity
+                            accessibilityRole="button"
+                            onPress={() => setRetryKey((value) => value + 1)}
+                            className="mt-3 min-h-10 items-center justify-center rounded-full border border-amber-300 px-5 py-2 dark:border-amber-800"
+                        >
+                            <Text className="font-bold text-amber-900 dark:text-amber-200">重新检查会员权益</Text>
+                        </TouchableOpacity>
                     </View>
                 ) : (
                     <View
