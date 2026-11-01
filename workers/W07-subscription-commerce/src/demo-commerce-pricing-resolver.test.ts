@@ -1,7 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import { describe, expect, it, vi } from 'vitest';
-import { resolveDemoCommercePricing, type DemoCommercePricingEnv } from './demo-commerce-pricing-resolver.js';
+import { resolveDemoCommercePricing, resolveDemoRenewalPricing, type DemoCommercePricingEnv } from './demo-commerce-pricing-resolver.js';
 import type { ResolvedCommerceOrderItems } from './order-item-resolution.js';
 import type { AuthoritativelyPricedOrder } from './order-persistence.js';
 
@@ -90,5 +90,22 @@ describe('shared Demo commerce pricing resolver', () => {
 
     expect(resolveItems).toHaveBeenCalledTimes(1);
     expect(applyTaxJar).not.toHaveBeenCalled();
+  });
+
+  it('unwraps the W07 renewal envelope before invoking the shared order-item resolver', async () => {
+    const resolveItems = vi.fn(async () => resolved);
+    const applyTaxJar = vi.fn(async () => priced);
+    const renewalInput = {
+      cycle: { cycle_id: 'rcy_' + 'a'.repeat(26) },
+      offer: { planId: 'plan_' + 'a'.repeat(64), planVersion: 3 },
+      request: input,
+    };
+
+    const result = await resolveDemoRenewalPricing(env(), renewalInput, { resolveItems, applyTaxJar });
+
+    expect(result).toEqual(priced);
+    expect(resolveItems).toHaveBeenCalledTimes(1);
+    expect(resolveItems).toHaveBeenCalledWith(d1, input);
+    expect(resolveItems).not.toHaveBeenCalledWith(d1, renewalInput);
   });
 });
