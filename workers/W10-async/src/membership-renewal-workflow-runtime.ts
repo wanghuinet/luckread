@@ -12,17 +12,17 @@ export type WorkflowSchedule = Readonly<{
   scheduledTime: number
 }>
 
-export type WorkflowStepRunner = <T>(
+export type WorkflowStepRunner = (
   name: string,
   options: Readonly<{
     retries: Readonly<{
       limit: number
-      delay: string
+      delay: '5 seconds'
       backoff: 'exponential'
     }>
   }>,
-  callback: () => Promise<T>,
-) => Promise<T>
+  callback: () => Promise<unknown>,
+) => Promise<unknown>
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -58,7 +58,7 @@ export async function runMembershipRenewalWorkflow(
 
   const correlationId = 'membership-renewal-workflow-' + String(schedule.scheduledTime)
 
-  return runStep(
+  const persistedResult = await runStep(
     'invoke-w07-renewal-batch',
     { retries: { limit: 3, delay: '5 seconds', backoff: 'exponential' } },
     async () => {
@@ -92,4 +92,5 @@ export async function runMembershipRenewalWorkflow(
       return parseRenewalBatchResult(envelope.data)
     },
   )
+  return parseRenewalBatchResult(persistedResult)
 }
