@@ -1140,6 +1140,9 @@ const worker = {
               : typeof body.scheduledAt === 'string'
                 ? body.scheduledAt
                 : (() => { throw new ContentRuntimeError('VALIDATION_FAILED', 400) })()
+        const verifiedCreatorId = request.headers.has('X-LuckRead-Verified-Creator-Id')
+          ? requireVerifiedCreatorId(request)
+          : undefined
         const result = await transitionContentState(
           env.D1_02,
           principal.userId,
@@ -1150,7 +1153,7 @@ const worker = {
           requireIfMatch(request),
           requireIdempotency(request),
           new Date(),
-          { scheduledAt: requestedScheduledAt, preflight: body.preflight },
+          { scheduledAt: requestedScheduledAt, preflight: body.preflight, verifiedCreatorId },
         )
         return json({ ...result, requestId: createRequestId() })
       }
@@ -1246,6 +1249,7 @@ const worker = {
         return json({
           id: content.id,
           slug: content.slug,
+          ...(principalUserId === content.ownerUserId ? { ownerUserId: content.ownerUserId } : {}),
           creatorId: content.creatorId,
           contentType: content.contentType,
           state: content.state,
