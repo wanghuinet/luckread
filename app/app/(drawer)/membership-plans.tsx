@@ -154,7 +154,8 @@ export default function MembershipPlansScreen() {
   const routeQuery = new URLSearchParams();
   if (creatorId) routeQuery.set('creatorId', creatorId);
   if (returnTo) routeQuery.set('returnTo', returnTo);
-  const membershipPlansPath = '/membership-plans' + (routeQuery.size ? '?' + routeQuery.toString() : '');
+  const routeSearch = routeQuery.toString();
+  const membershipPlansPath = '/membership-plans' + (routeSearch ? '?' + routeSearch : '');
   const authStatus = useAuthStore((state) => state.status);
   const [items, setItems] = useState<ActiveMembershipPlan[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
