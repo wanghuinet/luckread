@@ -164,21 +164,21 @@ test('rejects invalid order and plan identifiers before making a mutation', () =
 test('loads saved payment methods using the payment-method collection endpoint', async () => {
   await fetchSavedPaymentMethods();
   expect(calls).toHaveLength(1);
-  expect(calls[0]?.path).toBe('/payments/methods');
+  expect(calls[0]?.path).toBe('/payment-methods');
   expect(calls[0]?.options.method).toBe('GET');
 });
 
 test('revokes a saved payment method through the dedicated payment-method resource', async () => {
-  await revokeSavedPaymentMethod('pm_' + 'a'.repeat(26), 'revoke_attempt_1');
+  await revokeSavedPaymentMethod('spm_' + 'a'.repeat(26), 'revoke_attempt_1');
   expect(calls).toHaveLength(1);
-  expect(calls[0]?.path).toBe('/payments/methods/' + 'pm_' + 'a'.repeat(26) + '/revoke');
+  expect(calls[0]?.path).toBe('/payment-methods/' + 'spm_' + 'a'.repeat(26));
   expect(calls[0]?.options.method).toBe('POST');
   expect(calls[0]?.options.idempotencyKey).toBe('revoke_attempt_1');
 });
 
 test('rejects invalid payment-method IDs and revocation keys before transport', () => {
-  expect(() => revokeSavedPaymentMethod('pm_invalid', 'key_1')).toThrow('valid saved payment method ID');
-  expect(() => revokeSavedPaymentMethod('pm_' + 'a'.repeat(26), 'invalid key')).toThrow('idempotency key');
+  expect(() => revokeSavedPaymentMethod('spm_invalid', 'key_1')).toThrow('Saved payment method ID is invalid.');
+  expect(() => revokeSavedPaymentMethod('spm_' + 'a'.repeat(26), 'invalid key')).toThrow('idempotency key');
   expect(calls).toHaveLength(0);
 });
 
