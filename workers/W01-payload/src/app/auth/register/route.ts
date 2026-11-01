@@ -602,9 +602,10 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
     if (projectionErrorMessage === 'LUCKREAD_USERNAME_RESERVED') {
       return errorResponse(409, 'USERNAME_RESERVED', '该用户名曾被使用，不能重新分配。')
     }
-    const usernameConflict =
-      projectionErrorMessage === 'AUTH001_USERNAME_TAKEN' ||
-      (isUniqueConstraintError(error) && /username/i.test(projectionErrorMessage))
+    const usernameConflict = error instanceof Error && (
+      error.message === 'AUTH001_USERNAME_TAKEN' ||
+      (isUniqueConstraintError(error) && /username/i.test(error.message))
+    )
     if (usernameConflict) {
       return errorResponse(409, 'USERNAME_TAKEN', '该用户名已被使用，请换一个用户名。')
     }
