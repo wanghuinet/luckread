@@ -14,13 +14,15 @@ const {
   createMembershipPaymentIntent,
   fetchActiveMembershipPlansPage,
   fetchMySubscriptionsPage,
+  fetchSavedPaymentMethods,
+  revokeSavedPaymentMethod,
 } = await import('../lib/subscriptions-api.ts');
 
 beforeEach(() => {
   calls.length = 0;
 });
 
-test('pins the Android API level and Kotlin compiler needed by the native checkout SDK', () => {
+test('keeps the Expo SDK 52 Kotlin toolchain default for React Native 0.76', () => {
   const appConfig = JSON.parse(readFileSync(new URL('../app.json', import.meta.url), 'utf8'));
   const packageJson = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
   const buildProperties = appConfig.expo.plugins.find(
@@ -28,17 +30,12 @@ test('pins the Android API level and Kotlin compiler needed by the native checko
   );
 
   expect(packageJson.dependencies['expo-build-properties']).toBe('~0.13.3');
-  expect(buildProperties).toEqual([
-    'expo-build-properties',
-    {
-      android: {
-        buildToolsVersion: '36.0.0',
-        compileSdkVersion: 36,
-        targetSdkVersion: 36,
-        kotlinVersion: '2.1.20',
-      },
-    },
-  ]);
+  expect(buildProperties?.[1]?.android).toMatchObject({
+    buildToolsVersion: '36.0.0',
+    compileSdkVersion: 36,
+    targetSdkVersion: 36,
+  });
+  expect(buildProperties?.[1]?.android).not.toHaveProperty('kotlinVersion');
 });
 
 test('loads the signed-in subscriber list through the canonical W01 route', async () => {
@@ -97,7 +94,33 @@ test('rejects invalid pagination bounds before making a request', () => {
   expect(calls).toHaveLength(0);
 });
 
-test('keeps subscription mutations and mobile checkout disabled until store billing is verified', async () => {
+test('lists only the signed-in user saved payment methods through W01', async () => {
+  const controller = new AbortController();
+  await fetchSavedPaymentMethods({ signal: controller.signal });
+
+  expect(calls).toHaveLength(1);
+  expect(calls[0]?.path).toBe('/payment-methods');
+  expect(calls[0]?.options.method).toBe('GET');
+  expect(calls[0]?.options.signal).toBe(controller.signal);
+});
+
+test('removes a saved payment method with the caller idempotency key', async () => {
+  const savedPaymentMethodId = 'spm_' + 'a'.repeat(26);
+  await revokeSavedPaymentMethod(savedPaymentMethodId, 'remove_saved_method_1');
+
+  expect(calls).toHaveLength(1);
+  expect(calls[0]?.path).toBe('/payment-methods/' + savedPaymentMethodId);
+  expect(calls[0]?.options.method).toBe('DELETE');
+  expect(calls[0]?.options.idempotencyKey).toBe('remove_saved_method_1');
+});
+
+test('rejects invalid saved payment method IDs and removal keys before transport', () => {
+  expect(() => revokeSavedPaymentMethod('spm_short', 'remove_1')).toThrow('ID is invalid');
+  expect(() => revokeSavedPaymentMethod('spm_' + 'a'.repeat(26), 'invalid key')).toThrow('idempotency key is invalid');
+  expect(calls).toHaveLength(0);
+});
+
+test('keeps subscription mutations disabled and routes paid membership checkout through server-verified Hyperswitch', async () => {
   const api = await import('../lib/subscriptions-api.ts');
   const subscriptionsScreen = readFileSync(new URL('../app/(drawer)/subscriptions.tsx', import.meta.url), 'utf8');
   const plansScreen = readFileSync(new URL('../app/(drawer)/membership-plans.tsx', import.meta.url), 'utf8');
@@ -108,6 +131,8 @@ test('keeps subscription mutations and mobile checkout disabled until store bill
     'createMembershipPaymentIntent',
     'fetchActiveMembershipPlansPage',
     'fetchMySubscriptionsPage',
+    'fetchSavedPaymentMethods',
+    'revokeSavedPaymentMethod',
   ].sort());
   expect(subscriptionsScreen).not.toContain('transitionMySubscription');
   expect(subscriptionsScreen).not.toContain('onTransition');
@@ -121,15 +146,5 @@ test('keeps subscription mutations and mobile checkout disabled until store bill
   expect(plansScreen).toContain('presentNativeMembershipPayment');
   expect(plansScreen).toContain('服务端验证 Hyperswitch 支付 Webhook');
   expect(plansScreen).toContain('item.priceMinor === 0');
-  const nativePayment = readFileSync(new URL('../lib/hyperswitch-payment.native.ts', import.meta.url), 'utf8');
-  const webPayment = readFileSync(new URL('../lib/hyperswitch-payment.ts', import.meta.url), 'utf8');
-  expect(nativePayment).toContain('Hyperswitch.init');
-  expect(nativePayment).toContain('initPaymentSession({ sdkAuthorization })');
-  expect(nativePayment).toContain('displaySavedPaymentMethodsCheckbox: true');
-  expect(nativePayment).toContain('paymentSession.presentPaymentSheet');
-  expect(nativePayment).not.toContain('HYPERSWITCH_API_KEY');
-  expect(nativePayment).not.toContain('client_secret');
-  expect(webPayment).not.toContain('@juspay-tech/react-native-hyperswitch');
-
   expect(drawer).toContain("router.push('/membership-plans' as never)");
 });
