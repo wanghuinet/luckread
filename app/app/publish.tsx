@@ -147,7 +147,10 @@ export default function PublishScreen() {
       const record = unwrapContent(result.data);
       if (!record) throw new Error('The server returned an incomplete content record.');
       if (record.contentType !== 'post') throw new Error('Beta editing currently supports social posts only.');
-      const ownerId = record.ownerUserId || record.creatorId;
+      // W03 exposes ownerUserId only to the authenticated owner. creatorId
+      // is the canonical W08 Creator identity and may differ from the login user ID.
+      // Final ownership enforcement remains in W03 for every edit mutation.
+      const ownerId = record.ownerUserId;
       if (ownerId && user?.id && ownerId !== user.id) {
         throw new Error('You can edit only your own post.');
       }
