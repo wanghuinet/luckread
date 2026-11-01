@@ -3,9 +3,9 @@ export interface MembershipRenewalWorkflowEnv {
   readonly MEMBERSHIP_RENEWAL_ENABLED?: string
 }
 
-export type RenewalBatchWorkflowResult = Readonly<Record<string, unknown>> & {
+export type RenewalBatchWorkflowResult = Readonly<{
   readonly status: 'COMPLETED' | 'PARTIAL' | 'SCHEMA_NOT_READY'
-}
+}>
 
 export type WorkflowSchedule = Readonly<{
   cron: string
@@ -21,8 +21,8 @@ export type WorkflowStepRunner = (
       backoff: 'exponential'
     }>
   }>,
-  callback: () => Promise<unknown>,
-) => Promise<unknown>
+  callback: () => Promise<RenewalBatchWorkflowResult>,
+) => Promise<RenewalBatchWorkflowResult>
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -32,7 +32,7 @@ function parseRenewalBatchResult(value: unknown): RenewalBatchWorkflowResult {
       (value.status !== 'COMPLETED' && value.status !== 'PARTIAL' && value.status !== 'SCHEMA_NOT_READY')) {
     throw new Error('W07_RENEWAL_RESPONSE_INVALID')
   }
-  return value as RenewalBatchWorkflowResult
+  return { status: value.status }
 }
 
 /**
