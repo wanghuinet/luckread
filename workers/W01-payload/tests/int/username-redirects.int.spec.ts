@@ -1,7 +1,18 @@
 import { NextRequest } from 'next/server'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+const { payloadFind } = vi.hoisted(() => ({ payloadFind: vi.fn() }))
+
+vi.mock('payload', () => ({ getPayload: vi.fn(async () => ({ find: payloadFind })) }))
+vi.mock('@payload-config', () => ({ default: {} }))
+vi.mock('@/auth/traffic-limit', () => ({
+  enforcePublicReadRateLimit: vi.fn(async () => undefined),
+  TrafficLimitError: class TrafficLimitError extends Error {},
+  rateLimitResponse: vi.fn(() => new Response(null, { status: 429 })),
+}))
 
 import { middleware } from '../../src/middleware'
+import { GET as resolveUsernameRedirect } from '../../src/app/api/v1/redirects/username/[username]/route'
 
 import {
   buildUsernameRedirectPathname,
@@ -140,3 +151,67 @@ describe('username redirect middleware', () => {
   })
 })
 
+
+
+describe('username redirect resolver identity and expiry guards', () => {
+  beforeEach(() => {
+    payloadFind.mockReset()
+  })
+
+  const request = () => new Request('https://luckread.com/api/v1/redirects/username/oldname')
+  const context = { params: Promise.resolve({ username: 'oldname' }) }
+
+  it('returns a target only while the redirect is active and its identity still owns the destination', async () => {
+    const expiry = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+    payloadFind.mockImplementation(async (args: { collection: string }) => {
+      if (args.collection === 'redirects') return { docs: [{
+        type: '301', redirectScope: 'username', identityId: 'identity-1',
+        destinationUsername: 'NewName', expiresAt: expiry,
+        to: { type: 'custom', url: '/@NewName' },
+      }] }
+      return { docs: [{ identityId: 'identity-1', username: 'NewName' }] }
+    })
+
+    const response = await resolveUsernameRedirect(request(), context)
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({ targetUsername: 'NewName' })
+    expect(response.headers.get('cache-control')).toBe('no-store')
+    expect(payloadFind).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      collection: 'redirects', depth: 0, limit: 1, overrideAccess: true,
+      where: { and: expect.arrayContaining([
+        { from: { equals: '/@oldname' } },
+        { redirectScope: { equals: 'username' } },
+      ]) },
+    }))
+    expect(payloadFind).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      collection: 'users', where: { identityId: { equals: 'identity-1' } },
+    }))
+  })
+
+  it('does not resolve an expired record even when a stale row is returned by the storage mock', async () => {
+    payloadFind.mockResolvedValue({ docs: [{
+      type: '301', redirectScope: 'username', identityId: 'identity-1',
+      destinationUsername: 'NewName', expiresAt: '2026-01-01T00:00:00.000Z',
+      to: { type: 'custom', url: '/@NewName' },
+    }] })
+
+    const response = await resolveUsernameRedirect(request(), context)
+    expect(response.status).toBe(404)
+    expect(payloadFind).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not send an old identity to a destination username now owned by another handle', async () => {
+    payloadFind.mockImplementation(async (args: { collection: string }) => {
+      if (args.collection === 'redirects') return { docs: [{
+        type: '301', redirectScope: 'username', identityId: 'identity-1',
+        destinationUsername: 'ReclaimedName', expiresAt: new Date(Date.now() + 60_000).toISOString(),
+        to: { type: 'custom', url: '/@ReclaimedName' },
+      }] }
+      return { docs: [{ identityId: 'identity-1', username: 'NewName' }] }
+    })
+
+    const response = await resolveUsernameRedirect(request(), context)
+    expect(response.status).toBe(404)
+    expect(payloadFind).toHaveBeenCalledTimes(2)
+  })
+})
