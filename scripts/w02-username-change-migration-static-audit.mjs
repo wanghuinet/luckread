@@ -9,6 +9,7 @@ for (const required of [
   'username_version INTEGER NOT NULL',
   'previous_username_expires_at TEXT',
   'idempotency_expires_at TEXT NOT NULL',
+  'changed_username TEXT NOT NULL',
   'CREATE INDEX auth_username_change_state_previous_name_idx',
   'CREATE INDEX auth_username_change_state_last_changed_idx',
   'CREATE TRIGGER auth_username_identity_projection_sync',
@@ -84,7 +85,7 @@ try {
   assert.equal(state.previous_username, null)
 
   console.log(JSON.stringify({
-    migration: '0010_auth_username_change_history.sql',
+    migration: '0010_auth_username_change_state.sql',
     oneRowPerRenamedAccount: 'PASS',
     oldHandleReservationExpiresAfter30Days: 'PASS',
     expiredHandleCanBeRegistered: 'PASS',
