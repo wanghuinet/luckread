@@ -374,7 +374,7 @@ export default function VideoFeed() {
       );
       const hydrationResults = await Promise.allSettled(
         videoRecords.map(async (record): Promise<VideoFeedItem | null> => {
-          const [body, social, author, playback] = await settleVideoFeedEnrichment(
+          const { body, social, author, playback } = await settleVideoFeedEnrichment(
             {
               body: () => readContentBody(record, undefined, sessionToken),
               social: () => readContentSocial(record.id),
