@@ -11,6 +11,7 @@ export async function up({ db }: MigrateUpArgs): Promise<void> {
     \`identity_id\` text NOT NULL,
     \`source_username\` text NOT NULL,
     \`destination_username\` text NOT NULL,
+    \`expires_at\` text NOT NULL,
     \`updated_at\` text DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) NOT NULL,
     \`created_at\` text DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) NOT NULL
   );`)
@@ -18,6 +19,7 @@ export async function up({ db }: MigrateUpArgs): Promise<void> {
   await db.run(sql`CREATE INDEX \`redirects_redirect_scope_idx\` ON \`redirects\` (\`redirect_scope\`);`)
   await db.run(sql`CREATE INDEX \`redirects_identity_id_idx\` ON \`redirects\` (\`identity_id\`);`)
   await db.run(sql`CREATE INDEX \`redirects_source_username_idx\` ON \`redirects\` (\`source_username\`);`)
+  await db.run(sql`CREATE INDEX \`redirects_expires_at_idx\` ON \`redirects\` (\`expires_at\`);`)
   await db.run(sql`CREATE INDEX \`redirects_updated_at_idx\` ON \`redirects\` (\`updated_at\`);`)
   await db.run(sql`CREATE INDEX \`redirects_created_at_idx\` ON \`redirects\` (\`created_at\`);`)
 
