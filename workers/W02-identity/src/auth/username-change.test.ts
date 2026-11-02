@@ -20,6 +20,7 @@ type TestRow = {
   usernameVersion: number
   lastChangedAt: string | null
   replayKeyHash: string | null
+  replayUsername: string | null
   replayFingerprint: string | null
   replayChangedAt: string | null
   replayExpiresAt: string | null
@@ -27,7 +28,7 @@ type TestRow = {
 
 const defaultRow: TestRow = {
   username: 'OldHandle', accountState: 'ACTIVE', usernameVersion: 0, lastChangedAt: null,
-  replayKeyHash: null, replayFingerprint: null, replayChangedAt: null, replayExpiresAt: null,
+  replayKeyHash: null, replayUsername: null, replayFingerprint: null, replayChangedAt: null, replayExpiresAt: null,
 }
 
 function createEnv(row: TestRow = { ...defaultRow }) {
@@ -136,7 +137,7 @@ describe('W02 username change authority', () => {
     const fingerprint = await fingerprintUsernameChange('NewHandle', '"username-v0"')
     const { env, batch } = createEnv({
       ...defaultRow, username: 'NewHandle', usernameVersion: 1,
-      replayKeyHash: keyHash, replayFingerprint: fingerprint,
+      replayKeyHash: keyHash, replayUsername: 'NewHandle', replayFingerprint: fingerprint,
       replayChangedAt: '2026-11-02T12:00:00.000Z',
       replayExpiresAt: '2026-11-03T12:00:00.000Z',
     })
@@ -150,7 +151,7 @@ describe('W02 username change authority', () => {
   it('rejects reuse of a live idempotency key with different intent', async () => {
     const keyHash = await hashUsernameIdempotencyKey('username-change-key-0001')
     const { env, batch } = createEnv({
-      ...defaultRow, replayKeyHash: keyHash, replayFingerprint: '0'.repeat(64),
+      ...defaultRow, replayKeyHash: keyHash, replayUsername: 'NewHandle', replayFingerprint: '0'.repeat(64),
       replayChangedAt: '2026-11-02T12:00:00.000Z',
       replayExpiresAt: '2026-11-03T12:00:00.000Z',
     })
