@@ -3,7 +3,8 @@ import { cookies, headers } from 'next/headers'
 import { notFound, permanentRedirect } from 'next/navigation'
 import { cache } from 'react'
 
-import { fetchJson } from '../../../lib/client-api.js'
+import { getPublicContentDetailResponse } from '../../../content/public-content-detail-reader.js'
+import { getPublicUserProfileResponse } from '../../../users/public-user-profile-reader.js'
 import ContentDetailClient from './[contentId]/ContentDetailClient'
 import { normalizePublicLocale } from '../i18n/public-locale'
 import TwitterCloneSecondaryPageLayout from '../../(twitter-clone)/TwitterCloneSecondaryPageLayout'
@@ -38,7 +39,6 @@ type ContentBundle = {
   author: PublicAuthor | null
 }
 
-const PUBLIC_API_ORIGIN = 'https://api.luckread.com'
 const requestHeaders = async (): Promise<Headers> => {
   const incoming = await headers()
   const outgoing = new Headers({ accept: 'application/json' })
@@ -60,45 +60,79 @@ const uuidFromStableContentSlug = (slug: string): string | null => {
 }
 
 const fetchContentById = async (contentId: string, headersForRequest: Headers) =>
-  fetchJson<PublicContent>(
-    new Request(PUBLIC_API_ORIGIN + '/v1/contents/' + encodeURIComponent(contentId), {
+  getPublicContentDetailResponse(
+    new Request('https://luckread.com/api/v1/contents/' + encodeURIComponent(contentId), {
       method: 'GET',
       headers: headersForRequest,
       cache: 'no-store',
     }),
+    contentId,
   )
+
+const readPublicContentResponse = async (response: Response): Promise<PublicContent | null> => {
+  if (response.status === 404) return null
+  if (!response.ok) {
+    throw new Error('PUBLIC_CONTENT_READ_FAILED:' + response.status)
+  }
+
+  const value: unknown = await response.json().catch((): null => null)
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('PUBLIC_CONTENT_RESPONSE_INVALID')
+  }
+  const content = value as { id?: unknown; state?: unknown; contentType?: unknown; title?: unknown }
+  if (
+    typeof content.id !== 'string' ||
+    typeof content.state !== 'string' ||
+    !['article', 'post', 'video'].includes(String(content.contentType)) ||
+    typeof content.title !== 'string'
+  ) {
+    throw new Error('PUBLIC_CONTENT_RESPONSE_INVALID')
+  }
+  return value as PublicContent
+}
 
 const getPublicContent = cache(async (contentId: string): Promise<PublicContent | null> => {
   const headersForRequest = await requestHeaders()
-  try {
-    let result = await fetchContentById(contentId, headersForRequest)
-    if (result.response.status === 404) {
-      const fallbackId = uuidFromStableContentSlug(contentId)
-      if (fallbackId) result = await fetchContentById(fallbackId, headersForRequest)
+  let response = await fetchContentById(contentId, headersForRequest)
+  let content = await readPublicContentResponse(response)
+
+  if (!content && response.status === 404) {
+    const fallbackId = uuidFromStableContentSlug(contentId)
+    if (fallbackId) {
+      response = await fetchContentById(fallbackId, headersForRequest)
+      content = await readPublicContentResponse(response)
     }
-    if (!result.response.ok || !result.data || typeof result.data.id !== 'string') return null
-    return result.data
-  } catch {
-    return null
   }
+
+  return content
 })
 
 const getPublicAuthorById = cache(async (userId: string): Promise<PublicAuthor | null> => {
   const normalized = userId.trim()
-  if (!normalized || normalized.length > 128) return null
-  try {
-    const result = await fetchJson<PublicAuthor>(
-      new Request(PUBLIC_API_ORIGIN + '/v1/users/' + encodeURIComponent(normalized), {
-        method: 'GET',
-        headers: await requestHeaders(),
-        cache: 'no-store',
-      }),
-    )
-    if (!result.response.ok || !result.data || typeof result.data.username !== 'string') return null
-    return result.data
-  } catch {
-    return null
+  if (!normalized || normalized.length > 128) {
+    throw new Error('PUBLIC_AUTHOR_ID_INVALID')
   }
+
+  const response = await getPublicUserProfileResponse(
+    new Request('https://luckread.com/api/v1/users/' + encodeURIComponent(normalized), {
+      method: 'GET',
+      headers: await requestHeaders(),
+      cache: 'no-store',
+    }),
+    normalized,
+  )
+  if (response.status === 404) return null
+  if (!response.ok) {
+    throw new Error('PUBLIC_AUTHOR_READ_FAILED:' + response.status)
+  }
+
+  const value: unknown = await response.json().catch((): null => null)
+  if (!value || typeof value !== 'object' || Array.isArray(value) ||
+      typeof (value as { username?: unknown }).username !== 'string' ||
+      !(value as { username: string }).username.trim()) {
+    throw new Error('PUBLIC_AUTHOR_RESPONSE_INVALID')
+  }
+  return value as PublicAuthor
 })
 
 const getContentBundle = cache(async (contentId: string): Promise<ContentBundle> => {
@@ -130,6 +164,10 @@ const getContentBundle = cache(async (contentId: string): Promise<ContentBundle>
     content.author?.id,
     content.author?.userId,
   ].filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+
+  if (ownerIds.length === 0) {
+    throw new Error('PUBLIC_CONTENT_AUTHOR_ID_MISSING')
+  }
 
   const authors = await Promise.all(
     [...new Set(ownerIds)].map((ownerId) => getPublicAuthorById(ownerId)),
