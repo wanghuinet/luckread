@@ -60,6 +60,16 @@ jobs:
         with:
           node-version: 24
 
+      - name: Setup pnpm 11 for W01 runtime probe
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+          run_install: false
+
+      - name: Install locked W01 runtime dependencies
+        working-directory: workers/W01-payload
+        run: pnpm install --frozen-lockfile
+
       - name: Run read-only W03 D1 and public-route diagnostic
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -290,6 +300,122 @@ jobs:
           const outputPath = 'artifacts/public-content-404-diagnostic/report.json';
           writeFileSync(outputPath, JSON.stringify(report, null, 2) + '\n');
           console.log(JSON.stringify(report, null, 2));
+          NODE
+
+      - name: Probe W01-to-W03 author-context Service Binding (read-only)
+        working-directory: workers/W01-payload
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CONTENT_ID: ${{ inputs.content_id || '2116861177622433792' }}
+          EXPECTED_USERNAME: ${{ inputs.username || 'huihui' }}
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from 'node:fs';
+          import { getPlatformProxy } from 'wrangler';
+
+          const contentId = process.env.CONTENT_ID;
+          const expectedUsername = (process.env.EXPECTED_USERNAME ?? '').replace(/^@+/, '').toLowerCase();
+          const reportPath = '../../artifacts/public-content-404-diagnostic/report.json';
+          const report = JSON.parse(readFileSync(reportPath, 'utf8'));
+          const probe = {
+            status: null,
+            contentIdMatches: false,
+            ownerUserIdPresent: false,
+            ownerProfileStatus: null,
+            ownerUsernameMatches: false,
+            classification: 'W01_W03_BINDING_PROBE_NOT_RUN',
+          };
+
+          let platform;
+          try {
+            // Use the existing W01 Wrangler configuration and its W03_CONTENT
+            // Service Binding. Remote bindings target the deployed W03 Worker;
+            // no public diagnostic endpoint or new binding is introduced.
+            platform = await getPlatformProxy({
+              configPath: 'wrangler.jsonc',
+              remoteBindings: true,
+              persist: false,
+            });
+            const service = platform.env?.W03_CONTENT;
+            if (!service || typeof service.fetch !== 'function') {
+              probe.classification = 'W01_W03_SERVICE_BINDING_MISSING';
+            } else {
+              const response = await service.fetch(new Request(
+                'https://luckread-w03.internal/internal/content/contents/' +
+                  encodeURIComponent(contentId) + '/public-author-context',
+                {
+                  method: 'GET',
+                  headers: {
+                    accept: 'application/json',
+                    'X-LuckRead-Caller': 'W01',
+                    'X-LuckRead-Transport-Version': '1.0',
+                    'X-LuckRead-Correlation-Id': 'public-content-404-readonly-diagnostic',
+                  },
+                },
+              ));
+              probe.status = response.status;
+              const envelope = await response.json().catch(() => null);
+              const data = envelope && typeof envelope === 'object' && !Array.isArray(envelope)
+                ? envelope.data
+                : null;
+              if (response.status !== 200) {
+                probe.classification = response.status === 404
+                  ? 'W03_INTERNAL_AUTHOR_CONTEXT_NOT_FOUND'
+                  : 'W03_INTERNAL_AUTHOR_CONTEXT_NON_200';
+              } else if (!data || typeof data !== 'object' || Array.isArray(data) ||
+                         data.contentId !== contentId ||
+                         typeof data.ownerUserId !== 'string' || !data.ownerUserId.trim()) {
+                probe.classification = 'W03_INTERNAL_AUTHOR_CONTEXT_RESPONSE_INVALID';
+              } else {
+                probe.contentIdMatches = true;
+                probe.ownerUserIdPresent = true;
+                const profileResponse = await fetch(
+                  'https://api.luckread.com/v1/users/' + encodeURIComponent(data.ownerUserId),
+                  {
+                    headers: { accept: 'application/json', 'cache-control': 'no-cache' },
+                    signal: AbortSignal.timeout(12000),
+                  },
+                );
+                probe.ownerProfileStatus = profileResponse.status;
+                const profile = await profileResponse.json().catch(() => null);
+                probe.ownerUsernameMatches = !!profile &&
+                  typeof profile === 'object' &&
+                  typeof profile.username === 'string' &&
+                  profile.username.replace(/^@+/, '').toLowerCase() === expectedUsername;
+                if (probe.ownerProfileStatus === 404) {
+                  probe.classification = 'W03_OWNER_ID_NOT_FOUND_IN_W01_PROFILE_PROJECTION';
+                } else if (probe.ownerProfileStatus !== 200) {
+                  probe.classification = 'W01_OWNER_PROFILE_NON_200';
+                } else if (!probe.ownerUsernameMatches) {
+                  probe.classification = 'W01_OWNER_PROFILE_USERNAME_MISMATCH';
+                } else {
+                  probe.classification = 'W01_W03_BINDING_AND_OWNER_PROFILE_OK';
+                }
+              }
+            }
+          } catch (error) {
+            const code = error && typeof error === 'object' && typeof error.code === 'string'
+              ? error.code
+              : error instanceof Error ? error.name : 'UNKNOWN';
+            probe.classification = code === 'Error'
+              ? 'W01_W03_BINDING_PROBE_FAILED'
+              : 'W01_W03_BINDING_PROBE_' + code.replace(/[^A-Z0-9_]/gi, '_').slice(0, 48).toUpperCase();
+          } finally {
+            if (platform?.dispose) {
+              await platform.dispose().catch(() => {});
+            }
+          }
+
+          report.w01W03AuthorContext = probe;
+          if (probe.classification !== 'W01_W03_BINDING_AND_OWNER_PROFILE_OK') {
+            report.classification = probe.classification;
+          } else if (report.canonicalPage?.status !== 200) {
+            report.classification = 'NEXTJS_ROUTE_404_AFTER_W01_W03_AUTHOR_RESOLUTION';
+          }
+          writeFileSync(reportPath, JSON.stringify(report, null, 2) + '\\n');
+          console.log(JSON.stringify(probe, null, 2));
           NODE
 
       - name: Upload sanitized diagnostic evidence
