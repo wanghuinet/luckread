@@ -329,19 +329,13 @@ export async function handleUsernameChangeRequest(env: BetterAuthEnv, request: R
     auth.principal.userId, candidate.display, nowIso, expectedVersion,
   )
 
-  const cleanupExpiredReservations = env.D1_01.prepare(
-    'UPDATE auth_username_change_state SET previous_username = NULL, ' +
-    'previous_username_normalized = NULL, previous_username_expires_at = NULL ' +
-    'WHERE previous_username_expires_at IS NOT NULL AND previous_username_expires_at <= ?',
-  ).bind(nowIso)
-
   try {
-    const results = await env.D1_01.batch([cleanupExpiredReservations, updateUser, saveState])
-    if (!Array.isArray(results) || results.length !== 3 || results.some(result => result.success !== true)) {
+    const results = await env.D1_01.batch([updateUser, saveState])
+    if (!Array.isArray(results) || results.length !== 2 || results.some(result => result.success !== true)) {
       throw new Error('USERNAME_CHANGE_BATCH_FAILED')
     }
-    const updated = Number(results[1].meta?.changes ?? 0)
-    const saved = Number(results[2].meta?.changes ?? 0)
+    const updated = Number(results[0].meta?.changes ?? 0)
+    const saved = Number(results[1].meta?.changes ?? 0)
     if (updated !== 1 || saved !== 1) {
       const latest = await loadContext(env, auth.principal.userId, idempotencyKeyHash, nowIso)
       if (latest?.replayKeyHash && latest.replayFingerprint === requestFingerprint) return replayResponse(latest, now)
