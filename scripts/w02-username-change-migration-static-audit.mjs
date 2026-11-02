@@ -77,14 +77,12 @@ try {
   assert.equal(db.prepare("SELECT COUNT(*) AS count FROM sqlite_master WHERE type = 'trigger' AND name = 'auth_username_identity_projection_sync'").get().count, 1)
   assert.equal(db.prepare("SELECT COUNT(*) AS count FROM sqlite_master WHERE type = 'trigger' AND name LIKE 'auth_user_previous_username_reservation_guard_%'").get().count, 2)
 
-  // Expired aliases are physically cleared on the next username mutation batch,
-  // while the monotonic version/cooldown row remains available.
-  db.prepare(
-    'UPDATE auth_username_change_state SET previous_username = NULL, previous_username_normalized = NULL, previous_username_expires_at = NULL WHERE previous_username_expires_at <= ?'
-  ).run(new Date().toISOString())
-  const state = db.prepare('SELECT username_version, last_changed_at, previous_username FROM auth_username_change_state WHERE user_id = ?').get('u1')
+  // Expired aliases may remain as a compact, non-authoritative tombstone;
+  // the reservation predicate ignores them and the name is reusable.
+  const state = db.prepare('SELECT username_version, last_changed_at, previous_username, previous_username_expires_at FROM auth_username_change_state WHERE user_id = ?').get('u1')
   assert.equal(state.username_version, 1)
-  assert.equal(state.previous_username, null)
+  assert.equal(state.previous_username, 'OldName')
+  assert.ok(Date.parse(state.previous_username_expires_at) < Date.now())
 
   console.log(JSON.stringify({
     migration: '0010_auth_username_change_state.sql',
@@ -93,7 +91,7 @@ try {
     expiredHandleCanBeRegistered: 'PASS',
     identityProjectionTriggerSync: 'PASS',
     registrationAndUpdateReservationGuards: 'PASS',
-    expiredAliasCanBeClearedWithoutLosingVersion: 'PASS',
+    expiredAliasIsNotReservedAndVersionIsPreserved: 'PASS',
     additiveOnly: 'PASS',
     productionD1Access: false,
     result: 'PASS'
