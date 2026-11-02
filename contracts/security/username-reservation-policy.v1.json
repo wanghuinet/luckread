@@ -201,7 +201,11 @@
       "deleted",
       "removed",
       "moderation_blocked"
-    ]
+    ],
+    "sourcePathUniqueness": "Payload redirects plugin enforces a unique from value",
+    "expiredRecordReuse": "When an expired source path is reclaimed and later needs a redirect for another identity, update the existing unique-from Payload document in place with the new identity, destination, type and new expiresAt; never create a duplicate from path",
+    "activeOwnership": "Resolve only when expiresAt is in the future and redirect identity matches the current source-username lease owner",
+    "lookup": "Filter by source path, username scope and expiresAt greater than current UTC time before resolving or reserving"
   },
   "rationale": {
     "platformRoutes": "Protects active frontend route segments, API/auth paths, system endpoints and technical hostnames found in the LuckRead W01 route tree.",
