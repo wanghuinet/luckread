@@ -35,6 +35,7 @@ describe('public content detail', () => {
     expect(page).toContain('socialMentions')
     expect(page).toContain("href={'/topics/' + encodeURIComponent(topic.name)}")
     expect(page).toContain("href={'/users/' + encodeURIComponent(mention.userId)}")
+    expect(page).toContain('<SocialMentionText text={paragraph} mentions={socialMentions}')
     expect(page).not.toContain("href={'/users/' + encodeURIComponent(mention.handle)}")
     expect(page).toContain('copy.detail.tagAria')
     expect(page).toContain('main-tab rounded-full border border-light-border px-3 py-1.5 text-sm text-main-accent')
