@@ -282,6 +282,7 @@ export default function ProfilePage() {
 
   const fieldClass = 'mt-1 block w-full rounded-xl border border-light-border bg-transparent px-3 py-2 text-sm text-light-primary outline-none focus:border-main-accent dark:border-dark-border dark:text-dark-primary'
   const actionClass = 'rounded-full border border-light-border px-4 py-2 text-sm font-bold transition hover:bg-light-primary/10 disabled:cursor-not-allowed disabled:opacity-50 dark:border-dark-border dark:hover:bg-dark-primary/10'
+  const usernameCooldownActive = Boolean(usernameCanChangeAt && Date.parse(usernameCanChangeAt) > Date.now())
 
   return (
     <TwitterCloneSecondaryPageLayout locale={locale} title={copy.title} active="editProfile">
@@ -316,7 +317,7 @@ export default function ProfilePage() {
             <input className={fieldClass} value={usernameDraft} onChange={(event) => { setUsernameDraft(event.target.value); setUsernameIdempotencyKey('') }} maxLength={32} minLength={6} required />
             <small className="text-xs font-normal text-light-secondary dark:text-dark-secondary">{copy.usernameHelp}</small>
             {usernameCanChangeAt ? <small className="text-xs font-normal text-light-secondary dark:text-dark-secondary">{copy.usernameCooldown(new Date(usernameCanChangeAt).toLocaleString(locale === 'en' ? 'en-US' : locale === 'tw' ? 'zh-TW' : 'zh-CN'))}</small> : null}
-            <button className={actionClass + ' self-start'} disabled={saving || usernameSaving || loggingOut || !usernameEtag || usernameDraft.trim() === profile.username} onClick={() => void saveUsername()} type="button">
+            <button className={actionClass + ' self-start'} disabled={saving || usernameSaving || loggingOut || !usernameEtag || usernameCooldownActive || usernameDraft.trim() === profile.username} onClick={() => void saveUsername()} type="button">
               {usernameSaving ? copy.usernameSaving : copy.usernameSave}
             </button>
           </label>
