@@ -234,26 +234,6 @@ function VideoItem({
         </View>
       )}
 
-      {item.videoSource && status === 'loading' ? (
-        <ActivityIndicator size="large" color="#ffffff" style={styles.loadingIndicator} />
-      ) : null}
-
-      {item.videoSource && !isPlaying && status === 'readyToPlay' && !playbackFailed ? (
-        <Pressable accessibilityRole="button" onPress={togglePlayPause} style={styles.playPauseIndicator}>
-          <Feather name="play" size={50} color="#ffffff" />
-        </Pressable>
-      ) : null}
-
-      {item.videoSource && status === 'error' ? (
-        <View style={styles.playbackError} pointerEvents="box-none">
-          <Feather name="alert-triangle" size={30} color="#ffffff" />
-          <Text style={styles.unavailableMessage}>{error?.message || 'Unable to play this video.'}</Text>
-          <Pressable accessibilityRole="button" onPress={onRetry} style={styles.retryButton}>
-            <Text style={styles.retryButtonText}>Retry feed</Text>
-          </Pressable>
-        </View>
-      ) : null}
-
       <LinearGradient
         pointerEvents="box-none"
         colors={['rgba(0,0,0,0.26)', 'transparent', 'rgba(0,0,0,0.82)']}
