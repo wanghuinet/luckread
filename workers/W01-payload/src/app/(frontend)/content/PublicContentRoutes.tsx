@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import { cookies, headers } from 'next/headers'
-import { notFound, permanentRedirect } from 'next/navigation'
+import { notFound, permanentRedirect, redirect } from 'next/navigation'
 import { cache } from 'react'
 
 import { getPublicContentAuthorContextResponse, getPublicContentDetailResponse } from '../../../content/public-content-detail-reader.js'
@@ -240,17 +240,29 @@ export async function renderCanonicalContentRoute(input: {
   const { content, author } = await getContentBundle(input.contentId)
   if (!content || content.state !== 'PUBLISHED' || !author?.username) notFound()
 
-  const requestedUsername = input.username.trim().replace(/^@+/, '')
-  const canonicalUsername = author.username.trim().replace(/^@+/, '')
-
-  // The username/content detail routes are already the public canonical route.
-  // Do not issue a 308 from a canonical route: even a URL-equivalent redirect
-  // can be cached by browsers/CDNs as a permanent self-redirect.
-  // Reject a mismatched author or content-type path instead of redirecting.
-  if (!requestedUsername || requestedUsername.toLowerCase() !== canonicalUsername.toLowerCase()) {
-    notFound()
+  let decodedRequestedUsername = input.username.trim()
+  try {
+    decodedRequestedUsername = decodeURIComponent(decodedRequestedUsername)
+  } catch {
+    // Keep the raw segment; it will fail the username comparison and be
+    // redirected to the owner-resolved canonical path below.
   }
-  if (routeTypeForContent(content, input.routeType) !== input.routeType) notFound()
+  const requestedUsername = decodedRequestedUsername.replace(/^@+/, '')
+  const canonicalUsername = author.username.trim().replace(/^@+/, '')
+  const canonicalRouteType = routeTypeForContent(content, input.routeType)
+
+  // A valid canonical URL never redirects. When an old handle, encoded handle,
+  // or incorrect content-type segment reaches this route, correct it using
+  // W03's authoritative content owner instead of returning a misleading 404.
+  // Use a temporary redirect so a later username change cannot leave a stale
+  // permanent redirect cached at the edge.
+  if (
+    !requestedUsername ||
+    requestedUsername.toLowerCase() !== canonicalUsername.toLowerCase() ||
+    canonicalRouteType !== input.routeType
+  ) {
+    redirect(canonicalPath(author, content, input.routeType))
+  }
 
   const locale = normalizePublicLocale((await cookies()).get('luckread-ui-locale')?.value)
   return (
