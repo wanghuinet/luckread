@@ -177,21 +177,25 @@ describe('W05 unified social closure', () => {
 
   it('preserves an existing mention identity when the same handle is later owned by another account', async () => {
     const inserts: Array<{ sql: string; values: unknown[] }> = []
+    const boundStatements: Array<{ sql: string; values: unknown[] }> = []
     const queries: string[] = []
     const db = {
       prepare: (sql: string) => {
         queries.push(sql)
         return {
-          bind: (...values: unknown[]) => ({
-            first: async () => null,
-            all: async () => sql.includes('FROM social_mentions')
-              ? { results: [{ mentioned_user_id: 'original-user-id', handle: 'alice' }] }
-              : { results: [] },
-            run: async () => {
-              inserts.push({ sql, values })
-              return { success: true, meta: { changes: 1 } }
-            },
-          }),
+          bind: (...values: unknown[]) => {
+            boundStatements.push({ sql, values })
+            return {
+              first: async () => null,
+              all: async () => sql.includes('FROM social_mentions')
+                ? { results: [{ mention_id: 'mention-original', mentioned_user_id: 'original-user-id', handle: 'alice' }] }
+                : { results: [] },
+              run: async () => {
+                inserts.push({ sql, values })
+                return { success: true, meta: { changes: 1 } }
+              },
+            }
+          },
         }
       },
       batch: async () => [],
@@ -214,14 +218,15 @@ describe('W05 unified social closure', () => {
       contentContext,
     )).resolves.toEqual({ topics: 0, mentions: 1 })
 
-    const mentionInsert = inserts.find(({ sql }) => sql.includes('INSERT OR IGNORE INTO social_mentions'))
-    expect(mentionInsert?.values[4]).toBe('original-user-id')
-    expect(mentionInsert?.values[5]).toBe('alice')
+    expect(inserts.some(({ sql }) => sql.includes('INSERT OR IGNORE INTO social_mentions'))).toBe(false)
     expect(inserts.some(({ sql }) => sql.includes('INSERT OR IGNORE INTO social_notifications'))).toBe(false)
     const priorLookup = queries.find((sql) => sql.includes('FROM social_mentions'))
-    expect(priorLookup).toContain('SELECT mentioned_user_id, handle')
+    expect(priorLookup).toContain('SELECT mention_id, mentioned_user_id, handle')
     expect(priorLookup).not.toContain('JOIN users')
     expect(priorLookup).not.toContain('username')
+    const cleanup = boundStatements.find(({ sql }) => sql.includes('DELETE FROM social_mentions'))
+    expect(cleanup?.sql).toContain('mention_id NOT IN (?)')
+    expect(cleanup?.values).toEqual(['content', 'content-1', 'mention-original'])
   })
 
   it('fails closed for content token sync without W03 context or when the actor is not the owner', async () => {
