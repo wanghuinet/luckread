@@ -104,6 +104,10 @@ describe('W01 Better Auth boundary', () => {
       'utf8',
     )
     expect(authConfig).toContain("baseURL: 'https://luckread.com'")
+    expect(authConfig).toContain("import { buildPasswordResetPageUrl } from './password-reset-link.js'")
+    expect(authConfig).toContain('const resetPageUrl = buildPasswordResetPageUrl(input.url)')
+    expect(authConfig).toContain('const safeUrl = escapeHtml(resetPageUrl)')
+    expect(authConfig).toContain("text: 'Reset your LuckRead password by opening this link: ' + resetPageUrl")
     expect(authConfig).toContain('requireEmailVerification: true')
     expect(authConfig).toContain('sendVerificationEmail: async ({ user, url })')
     expect(authConfig).toContain('afterEmailVerification: async (user)')

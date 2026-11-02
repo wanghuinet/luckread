@@ -9,6 +9,7 @@ import { isActiveMfaSubject } from './mfa-challenge-account-state.js'
 import { isUnexpiredMfaChallengeRecord } from './mfa-challenge-verification.js'
 import { deriveMfaAuditEventIdForIdempotencyKey } from './mfa-audit-events.js'
 import { sendResendEmail } from './resend-email.js'
+import { buildPasswordResetPageUrl } from './password-reset-link.js'
 import {
   appendMfaAuditOperationReceiptEvent,
   assertMfaAuditOperationReceiptOwner,
@@ -64,12 +65,15 @@ async function sendPasswordResetEmail(
   env: BetterAuthEnv,
   input: { user: { email: string }; url: string },
 ): Promise<void> {
-  const safeUrl = escapeHtml(input.url)
+  // Better Auth generates an API URL for consuming the token. Public clients
+  // must enter through W01's reset page and versioned confirmation endpoint.
+  const resetPageUrl = buildPasswordResetPageUrl(input.url)
+  const safeUrl = escapeHtml(resetPageUrl)
   await sendResendEmail(env, {
     purpose: 'password_reset',
     to: input.user.email,
     subject: 'Reset your LuckRead password',
-    text: 'Reset your LuckRead password by opening this link: ' + input.url,
+    text: 'Reset your LuckRead password by opening this link: ' + resetPageUrl,
     html: '<p>We received a request to reset your password.</p><p>If you requested this, use the link below to choose a new password:</p><p><a href="' + safeUrl + '">Reset password</a></p><p>If you did not request this, you can ignore this email.</p>',
   })
 }
