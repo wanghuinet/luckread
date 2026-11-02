@@ -168,19 +168,20 @@ async function enforceWriteLimits(env: BetterAuthEnv, request: Request, userId: 
   return result ? rateLimitResponse(result) : null
 }
 
-function cooldownEndsAt(lastChangedAt: string | null): string | null {
+function cooldownEndsAt(lastChangedAt: string | null, now: Date = new Date()): string | null {
   if (!lastChangedAt) return null
   const timestamp = Date.parse(lastChangedAt)
   if (!Number.isFinite(timestamp)) throw new Error('USERNAME_CHANGE_TIMESTAMP_INVALID')
-  return new Date(timestamp + COOLDOWN_MS).toISOString()
+  const cooldownEnd = timestamp + COOLDOWN_MS
+  return cooldownEnd > now.getTime() ? new Date(cooldownEnd).toISOString() : null
 }
 
-function stateDto(context: UsernameContext) {
+function stateDto(context: UsernameContext, now: Date = new Date()) {
   return {
     username: context.username,
     usernameVersion: context.usernameVersion,
     lastChangedAt: context.lastChangedAt,
-    canChangeAt: cooldownEndsAt(context.lastChangedAt),
+    canChangeAt: cooldownEndsAt(context.lastChangedAt, now),
   }
 }
 
@@ -196,14 +197,14 @@ function replayResponse(context: UsernameContext, now = new Date()): Response {
       username: context.replayUsername,
       usernameVersion: context.usernameVersion,
       changedAt: context.replayChangedAt,
-      canChangeAt: cooldownEndsAt(context.replayChangedAt),
+      canChangeAt: cooldownEndsAt(context.replayChangedAt, now),
       previousUsernameReservedUntil: new Date(Date.parse(context.replayChangedAt) + RESERVATION_MS).toISOString(),
     },
     meta: { idempotentReplay: true },
   }, 200, { ETag: etagForVersion(context.usernameVersion) })
 }
 
-export async function handleUsernameStateRequest(env: BetterAuthEnv, request: Request): Promise<Response> {
+export async function handleUsernameStateRequest(env: BetterAuthEnv, request: Request, now = new Date()): Promise<Response> {
   if (!callerAllowed(request)) return error(403, 'FORBIDDEN', 'Authorized W01 service boundary required')
   const auth = await authenticate(env, request)
   if (!auth.ok) return auth.response
@@ -225,7 +226,7 @@ export async function handleUsernameStateRequest(env: BetterAuthEnv, request: Re
       replayFingerprint: null,
       replayChangedAt: null,
       replayExpiresAt: null,
-    })
+    }, now)
     return json({ data }, 200, { ETag: etagForVersion(version) })
   } catch {
     return error(503, 'SERVICE_UNAVAILABLE', 'Username state unavailable')
@@ -284,7 +285,7 @@ export async function handleUsernameChangeRequest(env: BetterAuthEnv, request: R
   if (oldNormalized === candidate.normalized) return error(422, 'USERNAME_UNCHANGED', 'The requested username is already current')
 
   let canChangeAt: string | null
-  try { canChangeAt = cooldownEndsAt(context.lastChangedAt) }
+  try { canChangeAt = cooldownEndsAt(context.lastChangedAt, now) }
   catch { return error(503, 'SERVICE_UNAVAILABLE', 'Username state is unavailable') }
   if (canChangeAt && Date.parse(canChangeAt) > now.getTime()) {
     const retryAfter = Math.max(1, Math.ceil((Date.parse(canChangeAt) - now.getTime()) / 1000))
