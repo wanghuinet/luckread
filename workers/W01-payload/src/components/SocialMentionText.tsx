@@ -33,7 +33,7 @@ export default function SocialMentionText({
   const nodes: ReactNode[] = []
   let cursor = 0
   let match: RegExpExecArray | null
-  const pattern = /(^|[\\s([{"'“‘，。！？；：、])([@＠])([\\p{L}\\p{N}_]{1,64})/gu
+  const pattern = /(^|[\s([{"'“‘，。！？；：、])([@＠])([\p{L}\p{N}_]{1,64})/gu
   while ((match = pattern.exec(text)) !== null) {
     const marker = match[2]
     const handle = match[3]
