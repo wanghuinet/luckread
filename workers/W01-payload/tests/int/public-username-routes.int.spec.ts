@@ -60,7 +60,10 @@ describe('public username routes', () => {
     expect(shared).not.toContain('api.luckread.com')
     expect(canonicalRender).not.toContain('permanentRedirect(')
     expect(canonicalRender).toContain("requestedUsername.toLowerCase() !== canonicalUsername.toLowerCase()")
-    expect(canonicalRender).toContain('routeTypeForContent(content, input.routeType) !== input.routeType')
+    expect(canonicalRender).toContain('canonicalRouteType !== input.routeType')
+    expect(canonicalRender).toContain('redirect(canonicalPath(author, content, input.routeType))')
+    const canonicalPathGuard = canonicalRender.split('const requestedUsername')[1] ?? ''
+    expect(canonicalPathGuard).not.toContain('notFound()')
     expect(shared).toContain('permanentRedirect(canonicalPath(author, content))')
     expect(shared).toContain('generateLegacyContentMetadata')
     expect(shared).toContain('renderLegacyContentRoute')
