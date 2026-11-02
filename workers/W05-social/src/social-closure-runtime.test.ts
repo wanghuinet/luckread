@@ -178,17 +178,18 @@ describe('W05 unified social closure', () => {
     const db = {
       prepare: (sql: string) => {
         queries.push(sql)
-        return ({
-        bind: (...values: unknown[]) => ({
-          first: async () => null,
-          all: async () => sql.includes('FROM social_mentions')
-            ? { results: [{ mentioned_user_id: 'original-user-id', handle: 'alice' }] }
-            : { results: [] },
-          run: async () => {
-            inserts.push({ sql, values })
-            return { success: true, meta: { changes: 1 } }
-          },
-        })
+        return {
+          bind: (...values: unknown[]) => ({
+            first: async () => null,
+            all: async () => sql.includes('FROM social_mentions')
+              ? { results: [{ mentioned_user_id: 'original-user-id', handle: 'alice' }] }
+              : { results: [] },
+            run: async () => {
+              inserts.push({ sql, values })
+              return { success: true, meta: { changes: 1 } }
+            },
+          }),
+        }
       },
       batch: async () => [],
     } as unknown as D1Database
