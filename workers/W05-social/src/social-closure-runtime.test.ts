@@ -167,8 +167,9 @@ describe('W05 unified social closure', () => {
     const mentionRead = queries.find(sql => sql.includes('FROM social_mentions'))
     expect(mentionRead).toContain('SELECT mentioned_user_id, handle')
     expect(mentionRead).toContain('WHERE target_type = ? AND target_id = ?')
-    expect(mentionRead).not.toMatch(/\bJOIN\\s+(users|profiles)\b/i)
-    expect(mentionRead).not.toMatch(/\busername\b/i)
+    expect(mentionRead).not.toContain('JOIN users')
+    expect(mentionRead).not.toContain('JOIN profiles')
+    expect(mentionRead).not.toContain('username')
   })
 
   it('fails closed for content token sync without W03 context or when the actor is not the owner', async () => {
