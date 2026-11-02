@@ -82,6 +82,7 @@ const CACHE_QUERY_KEYS: Record<string, readonly string[]> = {
   'share-detail': [],
   'user-profile': [],
   'user-profile-by-username': [],
+  'username-redirect': [],
   'media-detail': [],
 }
 
@@ -724,3 +725,13 @@ export const invalidatePublicUserProfile = async (request: Request, userId: stri
 
 export const invalidatePublicUserProfileByUsername = async (request: Request, username: string): Promise<void> =>
   invalidatePublicRoute(request, 'user-profile-by-username', `/api/v1/users/by-username/${encodeURIComponent(username)}`)
+
+export const invalidatePublicUsernameRedirect = async (username: string): Promise<void> => {
+  const normalizedUsername = username.trim().toLowerCase()
+  if (!/^[a-z0-9]{6,32}$/.test(normalizedUsername)) return
+  await invalidatePublicRoute(
+    new Request('https://luckread.com'),
+    'username-redirect',
+    `/api/v1/redirects/username/${encodeURIComponent(normalizedUsername)}`,
+  )
+}

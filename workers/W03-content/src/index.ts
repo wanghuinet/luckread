@@ -1017,6 +1017,25 @@ const worker = {
         })
       }
 
+      const usernameRedirectEligibilityMatch = /^\/internal\/content\/username-redirect-eligibility\/([^/]+)$/.exec(url.pathname)
+      if (usernameRedirectEligibilityMatch) {
+        if (request.method !== 'GET') return new Response(null, { status: 405, headers: { Allow: 'GET' } })
+        if (
+          request.headers.get('X-LuckRead-Caller') !== 'W01' ||
+          request.headers.get('X-LuckRead-Transport-Version') !== '1.0' ||
+          !request.headers.get('X-LuckRead-Correlation-Id')?.trim() ||
+          request.headers.has('Authorization') || request.headers.has('Cookie')
+        ) throw new ContentRuntimeError('PERMISSION_DENIED', 403)
+        if (url.search !== '') throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        const ownerUserId = decodePathSegment(usernameRedirectEligibilityMatch[1] ?? '')
+        if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(ownerUserId)) throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        // W03/D1-02 is the only authority for published, publicly accessible content.
+        const eligible = await env.D1_02.prepare(
+          "SELECT id FROM contents WHERE owner_user_id = ? AND state = 'PUBLISHED' AND content_type IN ('article', 'post', 'video') AND COALESCE(access_mode, 'PUBLIC') = 'PUBLIC' LIMIT 1",
+        ).bind(ownerUserId).first<{ id: string }>()
+        return json({ data: { eligible: Boolean(eligible) }, requestId: createRequestId() })
+      }
+
       if (request.method === 'GET' && url.pathname === '/internal/content/creator-contents') {
         const principal = requiredCreatorPrincipal(request)
         const cursor = url.searchParams.get('cursor')

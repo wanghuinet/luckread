@@ -2221,3 +2221,56 @@ describe('1.1 content lifecycle idempotency', () => {
     expect(batchCalled).toBe(false)
   })
 })
+
+describe('W03 username redirect eligibility', () => {
+  it('uses only W03-owned published public content and accepts only the W01 service caller', async () => {
+    let query = ''
+    let bindings: unknown[] = []
+    let row: { id: string } | null = { id: 'public_post_1' }
+    let databaseReads = 0
+    const allowLimiter = { limit: async () => ({ success: true }) }
+    const env = {
+      CONTENT_ORIGIN_GLOBAL_LIMITER: allowLimiter,
+      CONTENT_PUBLIC_READ_LIMITER: allowLimiter,
+      CONTENT_MUTATION_LIMITER: allowLimiter,
+      D1_02: {
+        prepare(sql: string) {
+          query = sql
+          return {
+            bind(...values: unknown[]) {
+              bindings = values
+              return { first: async () => { databaseReads += 1; return row } }
+            },
+          }
+        },
+      },
+    } as never
+    const request = (caller = 'W01', owner = 'user_123', extra: Record<string, string> = {}) =>
+      new Request('https://luckread-w03.internal/internal/content/username-redirect-eligibility/' + owner, {
+        headers: {
+          'X-LuckRead-Caller': caller,
+          'X-LuckRead-Transport-Version': '1.0',
+          'X-LuckRead-Correlation-Id': 'username-redirect-eligibility-test',
+          ...extra,
+        },
+      })
+    const eligible = await w03Worker.fetch(request(), env, {} as never)
+    expect(eligible.status).toBe(200)
+    await expect(eligible.json()).resolves.toMatchObject({ data: { eligible: true } })
+    expect(bindings).toEqual(['user_123'])
+    expect(query).toContain('owner_user_id = ?')
+    expect(query).toContain("state = 'PUBLISHED'")
+    expect(query).toContain("content_type IN ('article', 'post', 'video')")
+    expect(query).toContain("COALESCE(access_mode, 'PUBLIC') = 'PUBLIC'")
+    row = null
+    const empty = await w03Worker.fetch(request(), env, {} as never)
+    await expect(empty.json()).resolves.toMatchObject({ data: { eligible: false } })
+    const readsBeforeReject = databaseReads
+    const wrongCaller = await w03Worker.fetch(request('W05'), env, {} as never)
+    expect(wrongCaller.status).toBe(403)
+    expect(databaseReads).toBe(readsBeforeReject)
+    const forwardedCookie = await w03Worker.fetch(request('W01', 'user_123', { Cookie: 'session=secret' }), env, {} as never)
+    expect(forwardedCookie.status).toBe(403)
+    expect(databaseReads).toBe(readsBeforeReject)
+  })
+})
