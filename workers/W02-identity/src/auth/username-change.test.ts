@@ -74,6 +74,14 @@ describe('W02 username change authority', () => {
     mocks.resolveBetterAuthPrincipal.mockResolvedValue(activePrincipal)
   })
 
+  it('binds normalized username, exact display value, and If-Match into the idempotency fingerprint', async () => {
+    const actual = await fingerprintUsernameChange('NewHandle', '"username-v0"')
+    const bytes = new TextEncoder().encode('newhandle\\0NewHandle\\0"username-v0"')
+    const digest = await crypto.subtle.digest('SHA-256', bytes)
+    const expected = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('')
+    expect(actual).toBe(expected)
+  })
+
   it('normalizes accepted ASCII handles and rejects Unicode lookalikes', () => {
     expect(normalizeUsernameCandidate('  NewHandle  ')).toEqual({ display: 'NewHandle', normalized: 'newhandle' })
     expect(normalizeUsernameCandidate('NéwHandle')).toBeNull()
