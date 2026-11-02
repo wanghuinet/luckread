@@ -13,6 +13,12 @@ on:
       - 'workers/W02-identity/migrations/0007_l8_genesis_bootstrap_audit.sql'
       - 'workers/W02-identity/migrations/0008_auth_007_mfa_publication_journal.sql'
       - 'workers/W02-identity/migrations/0009_auth_007_mfa_operation_receipts.sql'
+      - 'workers/W02-identity/migrations/0010_auth_username_change_history.sql'
+      - 'contracts/security/username-reservation-policy.v1.json'
+      - 'contracts/api/user-account-operation-policy.v1.json'
+      - 'contracts/transport/W01-W02-username-change-http-binding.v1.json'
+      - 'docs/change-control/CC-W02-USERNAME-CHANGE-AUTHORITY-2026-11-02.md'
+      - 'scripts/w02-username-change-migration-static-audit.mjs'
       - 'contracts/migration/AUTH-007-mfa-operation-receipt.v1.json'
       - 'contracts/events/AUTH-007-mfa-audit-binding.v1.json'
       - 'contracts/transport/logical-data-authority.v1.json'
@@ -49,6 +55,12 @@ on:
       - 'workers/W02-identity/wrangler.jsonc'
       - 'workers/W02-identity/migrations/0008_auth_007_mfa_publication_journal.sql'
       - 'workers/W02-identity/migrations/0009_auth_007_mfa_operation_receipts.sql'
+      - 'workers/W02-identity/migrations/0010_auth_username_change_history.sql'
+      - 'contracts/security/username-reservation-policy.v1.json'
+      - 'contracts/api/user-account-operation-policy.v1.json'
+      - 'contracts/transport/W01-W02-username-change-http-binding.v1.json'
+      - 'docs/change-control/CC-W02-USERNAME-CHANGE-AUTHORITY-2026-11-02.md'
+      - 'scripts/w02-username-change-migration-static-audit.mjs'
       - 'contracts/migration/AUTH-007-mfa-operation-receipt.v1.json'
       - 'contracts/events/AUTH-007-mfa-audit-binding.v1.json'
       - 'contracts/transport/logical-data-authority.v1.json'
@@ -116,6 +128,10 @@ jobs:
       - name: Install W02 runtime dependencies for MFA tests
         working-directory: workers/W02-identity
         run: npm install --ignore-scripts --no-audit --no-fund --package-lock=false
+      - name: Run W02 username change authority tests
+        run: npx vitest@3.2.4 run workers/W02-identity/src/auth/username-change.test.ts
+      - name: Audit W02 username history migration with local SQLite only
+        run: node scripts/w02-username-change-migration-static-audit.mjs
       - name: Run W02 principal, Resend, session-list and session-revoke tests
         run: npx vitest@3.2.4 run workers/W02-identity/src/auth/principal.test.ts workers/W02-identity/src/auth/resend-email.test.ts workers/W02-identity/src/auth/session-list.test.ts workers/W02-identity/src/auth/session-rate-limit.test.ts workers/W02-identity/src/auth/session-revoke.test.ts
       - name: Run W02 AUTH-007 MFA lifecycle and replay tests

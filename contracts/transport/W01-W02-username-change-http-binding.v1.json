@@ -1,0 +1,58 @@
+{
+  "version": "1.0.0",
+  "status": "IMPLEMENTATION_CANDIDATE",
+  "transport": "CLOUDFLARE_SERVICE_BINDING",
+  "sourceWorker": "W01",
+  "targetWorker": "W02",
+  "authority": "W02_BETTER_AUTH_D1_01",
+  "operations": [
+    {
+      "method": "GET",
+      "path": "/internal/auth/username/state",
+      "purpose": "Read the authenticated subject's current username and optimistic-concurrency version",
+      "requiredHeaders": [
+        "X-LuckRead-Caller: W01",
+        "X-LuckRead-Transport-Version: 1.0"
+      ],
+      "response": [
+        "username",
+        "usernameVersion",
+        "lastChangedAt",
+        "canChangeAt",
+        "ETag"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/internal/auth/username/change",
+      "purpose": "Change only the authenticated subject's username",
+      "requiredHeaders": [
+        "X-LuckRead-Caller: W01",
+        "X-LuckRead-Transport-Version: 1.0",
+        "Idempotency-Key",
+        "If-Match"
+      ],
+      "body": {
+        "username": "string"
+      },
+      "response": [
+        "username",
+        "usernameVersion",
+        "changedAt",
+        "canChangeAt",
+        "ETag",
+        "previousUsernameReservedUntil"
+      ]
+    }
+  ],
+  "identity": "W02 derives userId and sessionId from Better Auth session; request body has no target user field",
+  "limits": "Existing AUTH_SESSION_READ_LIMITER and AUTH_SESSION_WRITE_LIMITER bindings only",
+  "forbidden": [
+    "public direct W02 endpoint",
+    "client-supplied userId",
+    "Payload Core modification",
+    "new Worker",
+    "new D1",
+    "new Queue"
+  ]
+}

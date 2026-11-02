@@ -83,6 +83,7 @@ jobs:
           const bootstrap = fs.readFileSync('workers/W02-identity/migrations/0007_l8_genesis_bootstrap_audit.sql', 'utf8')
           const mfaAuditOutbox = fs.readFileSync('workers/W02-identity/migrations/0008_auth_007_mfa_publication_journal.sql', 'utf8')
           const mfaAuditReceipts = fs.readFileSync('workers/W02-identity/migrations/0009_auth_007_mfa_operation_receipts.sql', 'utf8')
+          const usernameHistory = fs.readFileSync('workers/W02-identity/migrations/0010_auth_username_change_state.sql', 'utf8')
           for (const field of ['two_factor_enabled', 'mfa_enrolled_at', 'CREATE TABLE "twoFactor"', 'verified', 'failedVerificationCount', 'lockedUntil', 'lastAcceptedTotpTimeStep', 'user_mfa_enable_revoke_sessions', 'user_mfa_disable_clear_enrollment']) {
             if (!mfa.includes(field)) throw new Error('MFA migration missing required schema/lifecycle element: ' + field)
           }
@@ -95,6 +96,10 @@ jobs:
           for (const field of ['CREATE TABLE auth_007_mfa_operation_receipts', "'STARTED'", "'READY'", "'EMITTED'", "'RESOLVED'", "'UNKNOWN'", 'event_plan', 'auth_007_mfa_operation_receipts_status_next_attempt_idx']) {
             if (!mfaAuditReceipts.includes(field)) throw new Error('MFA operation receipt migration missing required schema element: ' + field)
           }
+          for (const field of ['CREATE TABLE auth_username_change_state', 'username_version INTEGER NOT NULL', 'previous_username_expires_at TEXT', 'idempotency_expires_at TEXT NOT NULL', 'changed_username TEXT NOT NULL', 'CREATE INDEX auth_username_change_state_previous_name_idx', 'CREATE INDEX auth_username_change_state_last_changed_idx', 'CREATE TRIGGER auth_username_identity_projection_sync', 'CREATE TRIGGER auth_user_previous_username_reservation_guard_insert', 'CREATE TRIGGER auth_user_previous_username_reservation_guard_update', "julianday(s.previous_username_expires_at) > julianday('now')"]) {
+            if (!usernameHistory.includes(field)) throw new Error('Username history migration missing required element: ' + field)
+          }
+          if (/DROP TABLE|DROP COLUMN|ALTER TABLE|RENAME TABLE/i.test(usernameHistory)) throw new Error('Username history migration must remain additive')
           console.log('W02 MFA/L8/MFA-audit outbox/operation-receipt migration artifacts: PASS')
           NODE
 
@@ -102,6 +107,7 @@ jobs:
         run: |
           node scripts/auth-007-mfa-journal-migration-static-audit.mjs
           node scripts/auth-007-mfa-operation-receipts-static-audit.mjs
+          node scripts/w02-username-change-migration-static-audit.mjs
 
       - name: Verify protected AUTH-007 rollout admission before schema mutation
         env:
@@ -132,7 +138,7 @@ jobs:
         run: |
           mkdir -p ../../artifacts/mapping-0
           npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote --config wrangler.jsonc \
-            --command "SELECT type, name, sql FROM sqlite_master WHERE name = 'role_assignments' OR name LIKE 'role_assignments_%' OR name = 'role_authorization_versions' OR name LIKE 'role_authorization_versions_%' OR name IN ('twoFactor', 'l8_genesis_bootstrap_audit', 'auth_007_mfa_publication_journal', 'auth_007_mfa_operation_receipts', 'user_mfa_enable_revoke_sessions', 'user_mfa_disable_clear_enrollment') OR name LIKE 'auth_007_mfa_publication_journal_%' OR name LIKE 'auth_007_mfa_operation_receipts_%' OR name = 'user' ORDER BY type, name;" \
+            --command "SELECT type, name, sql FROM sqlite_master WHERE name = 'role_assignments' OR name LIKE 'role_assignments_%' OR name = 'role_authorization_versions' OR name LIKE 'role_authorization_versions_%' OR name IN ('twoFactor', 'l8_genesis_bootstrap_audit', 'auth_007_mfa_publication_journal', 'auth_007_mfa_operation_receipts', 'auth_username_change_state', 'auth_username_change_state_previous_name_idx', 'auth_username_change_state_last_changed_idx', 'auth_user_username_normalized_lookup_idx', 'auth_username_identity_projection_sync', 'auth_user_previous_username_reservation_guard_insert', 'auth_user_previous_username_reservation_guard_update', 'user_mfa_enable_revoke_sessions', 'user_mfa_disable_clear_enrollment') OR name LIKE 'auth_007_mfa_publication_journal_%' OR name LIKE 'auth_007_mfa_operation_receipts_%' OR name = 'user' ORDER BY type, name;" \
             > ../../artifacts/mapping-0/w02-role-assignment-remote-schema.txt
           npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote --config wrangler.jsonc \
             --command "SELECT name FROM sqlite_master WHERE type='table' AND name='d1_migrations';" \
@@ -141,7 +147,7 @@ jobs:
             --command "SELECT * FROM d1_migrations ORDER BY id;" \
             > ../../artifacts/mapping-0/w02-role-assignment-remote-ledger.txt
           npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote --config wrangler.jsonc \
-            --command "SELECT name FROM d1_migrations WHERE name LIKE '%0006_better_auth_two_factor.sql' OR name LIKE '%0007_l8_genesis_bootstrap_audit.sql' OR name LIKE '%0008_auth_007_mfa_publication_journal.sql' OR name LIKE '%0009_auth_007_mfa_operation_receipts.sql' ORDER BY name;" \
+            --command "SELECT name FROM d1_migrations WHERE name LIKE '%0006_better_auth_two_factor.sql' OR name LIKE '%0007_l8_genesis_bootstrap_audit.sql' OR name LIKE '%0008_auth_007_mfa_publication_journal.sql' OR name LIKE '%0009_auth_007_mfa_operation_receipts.sql' OR name LIKE '%0010_auth_username_change_state.sql' ORDER BY name;" \
             > ../../artifacts/mapping-0/w02-mfa-l8-migration-ledger-check.txt
           npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote --config wrangler.jsonc \
             --command "SELECT name FROM sqlite_master WHERE type = 'trigger' AND name IN ('user_mfa_enable_revoke_sessions', 'user_mfa_disable_clear_enrollment') ORDER BY name;" \
@@ -154,10 +160,10 @@ jobs:
             --command "SELECT COUNT(*) AS role_version_rows, MIN(role_version) AS min_role_version, MAX(role_version) AS max_role_version FROM role_authorization_versions;" \
             > ../../artifacts/mapping-0/w02-role-version-remote-row-count.txt
 
-          for expected in twoFactor l8_genesis_bootstrap_audit auth_007_mfa_publication_journal auth_007_mfa_publication_journal_status_next_attempt_idx auth_007_mfa_operation_receipts auth_007_mfa_operation_receipts_status_next_attempt_idx lastAcceptedTotpTimeStep user_mfa_enable_revoke_sessions user_mfa_disable_clear_enrollment; do
+          for expected in twoFactor l8_genesis_bootstrap_audit auth_007_mfa_publication_journal auth_007_mfa_publication_journal_status_next_attempt_idx auth_007_mfa_operation_receipts auth_007_mfa_operation_receipts_status_next_attempt_idx auth_username_change_state auth_username_change_state_previous_name_idx auth_username_change_state_last_changed_idx auth_user_username_normalized_lookup_idx auth_username_identity_projection_sync auth_user_previous_username_reservation_guard_insert auth_user_previous_username_reservation_guard_update lastAcceptedTotpTimeStep user_mfa_enable_revoke_sessions user_mfa_disable_clear_enrollment; do
             grep -q "$expected" ../../artifacts/mapping-0/w02-role-assignment-remote-schema.txt || { echo "Missing deployed schema object: $expected"; exit 1; }
           done
-          for expected in 0006_better_auth_two_factor.sql 0007_l8_genesis_bootstrap_audit.sql 0008_auth_007_mfa_publication_journal.sql 0009_auth_007_mfa_operation_receipts.sql; do
+          for expected in 0006_better_auth_two_factor.sql 0007_l8_genesis_bootstrap_audit.sql 0008_auth_007_mfa_publication_journal.sql 0009_auth_007_mfa_operation_receipts.sql 0010_auth_username_change_state.sql; do
             grep -q "$expected" ../../artifacts/mapping-0/w02-mfa-l8-migration-ledger-check.txt || { echo "Migration not present in D1 ledger: $expected"; exit 1; }
           done
           for expected in user_mfa_enable_revoke_sessions user_mfa_disable_clear_enrollment; do
