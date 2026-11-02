@@ -624,6 +624,7 @@ describe('comment runtime', () => {
         depth: 0,
         created_at: '2026-10-02T00:00:00.000Z',
         updated_at: '2026-10-02T00:00:00.000Z',
+        mentions_json: '[{"userId":"original-user-id","handle":"alice"}]',
       },
       {
         id: 'c2',
@@ -652,12 +653,18 @@ describe('comment runtime', () => {
     expect(page.items).toHaveLength(2)
     expect(page.items[0].id).toBe('c1')
     expect(page.items[0].authorUserId).toBe('user-1')
+    expect(page.items[0].mentions).toEqual([{ userId: 'original-user-id', handle: 'alice' }])
     expect(page.items[1].id).toBe('c2')
     expect(page.items[1].authorUserId).toBe('user-2')
     expect(page.hasMore).toBe(true)
     expect(page.nextCursor).toEqual(expect.any(String))
     const queries = (d.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls.map(([sql]) => String(sql))
     expect(queries.every(sql => !sql.toLowerCase().includes('join contents') && !sql.toLowerCase().includes('from contents'))).toBe(true)
+    expect(queries[0]).toContain('mention.mentioned_user_id')
+    expect(queries[0]).toContain('mention.handle')
+    expect(queries[0]).toContain("mention.target_type = 'comment'")
+    expect(queries[0]).not.toContain('JOIN users')
+    expect(queries[0]).not.toContain('username')
   })
 
   it('returns the authenticated viewer like state in the same bounded comment list query', async () => {
