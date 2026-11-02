@@ -114,14 +114,46 @@ function VideoItem({
   const insets = useSafeAreaInsets();
   const currentUserId = useAuthStore((state) => state.user?.id);
   const authorId = item.creatorId || item.ownerUserId;
-  const player = useVideoPlayer(item.videoSource, (instance) => {
+  const player = useVideoPlayer(null, (instance) => {
     instance.loop = true;
   });
+  const sourceReplacementRef = useRef<Promise<void>>(Promise.resolve());
+  const [loadedSource, setLoadedSource] = useState<VideoPlaybackResult['source']>(null);
   const { isPlaying } = useEvent(player, 'playingChange', { isPlaying: player.playing });
   const { status, error } = useEvent(player, 'statusChange', { status: player.status });
 
+  // SDK 52 creates the player once. Replace its source when the authorized
+  // playback URL arrives instead of relying on a changed hook argument.
   useEffect(() => {
-    if (!isFocused || !isVisible || !item.videoSource) {
+    player.pause();
+    setLoadedSource(null);
+    const nextSource = item.videoSource;
+    if (!nextSource) return;
+
+    let active = true;
+    const replacement = sourceReplacementRef.current
+      .catch(() => undefined)
+      .then(() => player.replaceAsync(nextSource));
+    sourceReplacementRef.current = replacement.catch(() => undefined);
+    void replacement
+      .then(() => {
+        if (active) setLoadedSource(nextSource);
+      })
+      .catch(() => undefined);
+
+    return () => {
+      active = false;
+      player.pause();
+    };
+  }, [item.videoSource, player]);
+
+  useEffect(() => {
+    if (
+      !isFocused ||
+      !isVisible ||
+      !item.videoSource ||
+      loadedSource !== item.videoSource
+    ) {
       player.pause();
       return;
     }
@@ -131,7 +163,7 @@ function VideoItem({
     } catch {
       // Playback can be interrupted while the user changes tabs.
     }
-  }, [isFocused, isVisible, item.videoSource, muted, player]);
+  }, [isFocused, isVisible, item.videoSource, loadedSource, muted, player]);
 
   const togglePlayPause = useCallback(() => {
     if (!item.videoSource) return;
