@@ -34,7 +34,6 @@ const defaultRow: TestRow = {
 function createEnv(row: TestRow = { ...defaultRow }) {
   const prepared: Array<{ sql: string; args: unknown[] }> = []
   const batch = vi.fn(async (_statements: unknown[]) => [
-    { success: true, meta: { changes: 0 } },
     { success: true, meta: { changes: 1 } },
     { success: true, meta: { changes: 1 } },
   ])
@@ -119,7 +118,7 @@ describe('W02 username change authority', () => {
     const response = await handleUsernameChangeRequest(env, changeRequest({ ifMatch: '"username-v1"' }), new Date('2026-11-02T12:00:00.000Z'))
     expect(response.status).toBe(200)
     expect(batch).toHaveBeenCalledTimes(1)
-    expect(batch.mock.calls[0][0]).toHaveLength(3)
+    expect(batch.mock.calls[0][0]).toHaveLength(2)
     expect(prepared[1].sql).toContain('previous_username_normalized')
     expect(prepared[1].sql).toContain('previous_username_expires_at > ?')
   })
