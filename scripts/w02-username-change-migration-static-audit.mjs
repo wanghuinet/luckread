@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { DatabaseSync } from 'node:sqlite'
 
-const migrationPath = new URL('../workers/W02-identity/migrations/0010_auth_username_change_history.sql', import.meta.url)
+const migrationPath = new URL('../workers/W02-identity/migrations/0010_auth_username_change_state.sql', import.meta.url)
 const migration = readFileSync(migrationPath, 'utf8')
 for (const required of [
   'CREATE TABLE auth_username_change_state',
