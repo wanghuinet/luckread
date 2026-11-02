@@ -1494,6 +1494,19 @@
       "stateMachine": "none"
     },
     {
+      "operationId": "getMyUsername",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "user.read.self"
+      ],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none"
+    },
+    {
       "operationId": "patchAccountsAccountId",
       "auth": {
         "mode": "permission"
@@ -1673,6 +1686,19 @@
       "auditRequired": true,
       "optimisticLockRequired": true,
       "idempotencyRequired": false,
+      "stateMachine": "none"
+    },
+    {
+      "operationId": "updateUsername",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "user.update.self"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": true,
+      "idempotencyRequired": true,
       "stateMachine": "none"
     },
     {
