@@ -66,6 +66,7 @@ export async function PATCH(request: Request): Promise<Response> {
   try { body = await request.json() } catch { return errorResponse(422, 'VALIDATION_FAILED', 'Invalid request body') }
   if (!body || typeof body !== 'object' || Array.isArray(body)) return errorResponse(422, 'VALIDATION_FAILED', 'Invalid request body')
   const input = body as Record<string, unknown>
+  if ('username' in input) return errorResponse(409, 'USERNAME_CHANGE_ENDPOINT_REQUIRED', 'Use the dedicated username change endpoint')
   if (Object.keys(input).some(key => !PROFILE_MUTABLE_FIELDS.includes(key as typeof PROFILE_MUTABLE_FIELDS[number]))) return errorResponse(422, 'VALIDATION_FAILED', 'Unsupported profile field')
 
   const current = authenticated.user
@@ -76,13 +77,8 @@ export async function PATCH(request: Request): Promise<Response> {
   for (const field of PROFILE_MUTABLE_FIELDS) {
     if (!(field in input)) continue
     const value = input[field]
-    if (field === 'username') {
-      if (typeof value !== 'string' || value.trim().length === 0 || value.length > 128) return errorResponse(422, 'VALIDATION_FAILED', 'Invalid username')
-      data[field] = value.trim()
-    } else {
-      if (value !== null && typeof value !== 'string') return errorResponse(422, 'VALIDATION_FAILED', 'Invalid profile field')
-      data[field] = typeof value === 'string' ? value : null
-    }
+    if (value !== null && typeof value !== 'string') return errorResponse(422, 'VALIDATION_FAILED', 'Invalid profile field')
+    data[field] = typeof value === 'string' ? value : null
   }
   if (Object.keys(data).length === 0) return errorResponse(422, 'VALIDATION_FAILED', 'No profile fields to update')
 
