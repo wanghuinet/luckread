@@ -33,7 +33,7 @@ jobs:
   diagnose:
     if: ${{ github.ref == 'refs/heads/main' && github.ref_protected == true }}
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - name: Checkout protected main
         uses: actions/checkout@v4
@@ -330,19 +330,24 @@ jobs:
 
           let platform;
           try {
-            // Use the existing W01 Wrangler configuration and its W03_CONTENT
-            // Service Binding. Remote bindings target the deployed W03 Worker;
-            // no public diagnostic endpoint or new binding is introduced.
-            platform = await getPlatformProxy({
-              configPath: 'wrangler.jsonc',
-              remoteBindings: true,
-              persist: false,
-            });
-            const service = platform.env?.W03_CONTENT;
-            if (!service || typeof service.fetch !== 'function') {
-              probe.classification = 'W01_W03_SERVICE_BINDING_MISSING';
+            const wrangler = JSON.parse(readFileSync('wrangler.jsonc', 'utf8'));
+            const binding = (wrangler.services ?? []).filter((entry) => entry.binding === 'W03_CONTENT');
+            if (binding.length !== 1 || binding[0].service !== 'luckread-w03') {
+              probe.classification = 'W01_W03_SERVICE_BINDING_CONFIG_MISMATCH';
             } else {
-              const response = await service.fetch(new Request(
+              // Use the existing W01 Wrangler configuration and its W03_CONTENT
+              // Service Binding. Remote bindings target the deployed W03 Worker;
+              // no public diagnostic endpoint or new binding is introduced.
+              platform = await getPlatformProxy({
+                configPath: 'wrangler.jsonc',
+                remoteBindings: true,
+                persist: false,
+              });
+              const service = platform.env?.W03_CONTENT;
+              if (!service || typeof service.fetch !== 'function') {
+                probe.classification = 'W01_W03_SERVICE_BINDING_MISSING';
+              } else {
+                const response = await service.fetch(new Request(
                 'https://luckread-w03.internal/internal/content/contents/' +
                   encodeURIComponent(contentId) + '/public-author-context',
                 {
@@ -392,6 +397,7 @@ jobs:
                   probe.classification = 'W01_OWNER_PROFILE_USERNAME_MISMATCH';
                 } else {
                   probe.classification = 'W01_W03_BINDING_AND_OWNER_PROFILE_OK';
+                }
                 }
               }
             }
