@@ -38,6 +38,7 @@ const pageCopy = (locale: PublicLocale) => ({
   loading: locale === 'en' ? 'Loading profile…' : locale === 'tw' ? '正在載入個人資料…' : '正在加载个人资料…',
   email: locale === 'en' ? 'Sign-in email' : locale === 'tw' ? '登入郵箱' : '登录邮箱',
   username: locale === 'en' ? 'Username' : locale === 'tw' ? '使用者名稱' : '用户名',
+  usernameCooldown: (date: string) => locale === 'en' ? 'You can change your username again after ' + date : locale === 'tw' ? '下次可更改時間：' + date : '下次可修改时间：' + date,
   usernameSave: locale === 'en' ? 'Change username' : locale === 'tw' ? '更改使用者名稱' : '修改用户名',
   usernameSaving: locale === 'en' ? 'Changing…' : locale === 'tw' ? '更改中…' : '修改中…',
   usernameHelp: locale === 'en' ? 'Username changes are limited to once every 30 days. Your previous username is released after 30 days.' : locale === 'tw' ? '每 30 天只能更改一次使用者名稱，舊名稱會在 30 天後釋出。' : '用户名每 30 天只能修改一次，旧用户名将在 30 天后释放。',
@@ -73,6 +74,7 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [usernameDraft, setUsernameDraft] = useState('')
   const [usernameEtag, setUsernameEtag] = useState('')
+  const [usernameCanChangeAt, setUsernameCanChangeAt] = useState<string | null>(null)
   const [usernameSaving, setUsernameSaving] = useState(false)
   const [usernameIdempotencyKey, setUsernameIdempotencyKey] = useState('')
   const [etag, setEtag] = useState('')
@@ -99,7 +101,7 @@ export default function ProfilePage() {
         if (!response.ok || !data?.id) {
           throw new Error(getApiErrorMessage(data, '个人资料加载失败'))
         }
-        const usernameResult = await fetchJson<{ data?: { username?: string }; error?: { message?: string } }>('/api/v1/users/me/username', {
+        const usernameResult = await fetchJson<{ data?: { username?: string; canChangeAt?: string | null }; error?: { message?: string } }>('/api/v1/users/me/username', {
           credentials: 'include',
           cache: 'no-store',
           headers: { accept: 'application/json' },
@@ -117,6 +119,7 @@ export default function ProfilePage() {
         setProfile(effectiveProfile)
         setUsernameDraft(effectiveProfile.username)
         setUsernameEtag(usernameResult.response.headers.get('ETag') ?? '')
+        setUsernameCanChangeAt(typeof usernameResult.data.data.canChangeAt === 'string' ? usernameResult.data.data.canChangeAt : null)
         setEtag(response.headers.get('ETag') ?? '')
       } catch (cause) {
         if (cancelled) return
@@ -221,6 +224,7 @@ export default function ProfilePage() {
       }
       setUsernameDraft(savedUsername)
       setUsernameEtag(response.headers.get('ETag') ?? usernameEtag)
+      setUsernameCanChangeAt(typeof (data?.data as { canChangeAt?: unknown } | undefined)?.canChangeAt === 'string' ? (data.data as { canChangeAt: string }).canChangeAt : null)
       setUsernameIdempotencyKey('')
       setProfile((current) => current ? { ...current, username: savedUsername } : current)
       // The profile ETag includes username. Refresh only the ETag while preserving
@@ -311,6 +315,7 @@ export default function ProfilePage() {
             <span>{copy.username}</span>
             <input className={fieldClass} value={usernameDraft} onChange={(event) => { setUsernameDraft(event.target.value); setUsernameIdempotencyKey('') }} maxLength={32} minLength={6} required />
             <small className="text-xs font-normal text-light-secondary dark:text-dark-secondary">{copy.usernameHelp}</small>
+            {usernameCanChangeAt ? <small className="text-xs font-normal text-light-secondary dark:text-dark-secondary">{copy.usernameCooldown(new Date(usernameCanChangeAt).toLocaleString(locale === 'en' ? 'en-US' : locale === 'tw' ? 'zh-TW' : 'zh-CN'))}</small> : null}
             <button className={actionClass + ' self-start'} disabled={saving || usernameSaving || loggingOut || !usernameEtag || usernameDraft.trim() === profile.username} onClick={() => void saveUsername()} type="button">
               {usernameSaving ? copy.usernameSaving : copy.usernameSave}
             </button>
