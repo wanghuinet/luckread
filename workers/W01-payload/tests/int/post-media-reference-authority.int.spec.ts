@@ -24,13 +24,15 @@ const payloadFor = (
     if (query.collection === 'users') return { docs: profile ? [profile] : [] }
     const clauses = (query.where as { and?: Array<Record<string, any>> }).and ?? []
     const ownerId = clauses[0]?.ownerUserId?.equals
-    const filenames = clauses[1]?.filename?.in as string[] | undefined
+    const lookup = clauses[1]?.or as Array<Record<string, any>> | undefined
+    const filenames = lookup?.find((item) => item.filename)?.filename?.in as string[] | undefined
+    const urls = lookup?.find((item) => item.url)?.url?.in as string[] | undefined
     return {
       docs: media.filter((item) => {
         const record = item as Record<string, unknown>
-        return String(record.ownerUserId ?? '') === String(ownerId) &&
-          typeof record.filename === 'string' &&
-          Boolean(filenames?.includes(record.filename))
+        const filenameMatch = typeof record.filename === 'string' && Boolean(filenames?.includes(record.filename))
+        const urlMatch = typeof record.url === 'string' && Boolean(urls?.includes(record.url))
+        return String(record.ownerUserId ?? '') === String(ownerId) && (filenameMatch || urlMatch)
       }),
     }
   }),
@@ -66,28 +68,39 @@ describe('W01/W03 social post media-reference authority boundary', () => {
       where: {
         and: [
           { ownerUserId: { equals: 'payload-user-7' } },
-          { filename: { in: expect.arrayContaining(['body.txt', 'photo.png', 'clip.mp4']) } },
+          {
+            or: [
+              { filename: { in: expect.arrayContaining(['body.txt', 'photo.png', 'clip.mp4']) } },
+              { url: { in: expect.arrayContaining([
+                'https://img.luckread.com/media/body.txt',
+                'https://img.luckread.com/media/photo.png',
+                'https://video.luckread.com/videos/clip.mp4',
+              ]) } },
+            ],
+          },
         ],
       },
       overrideAccess: true,
       select: { id: true, filename: true, url: true, ownerUserId: true },
     })
-    // Filename narrows the owner-scoped candidate set; exact URL matching below
-    // remains the authorization check, including the host and full path.
-    expect(mediaQuery.where.and[1]).not.toHaveProperty('url')
   })
 
-  it('matches a URL-encoded filename only when the complete owner-scoped URL also matches', async () => {
+  it('accepts an owned media record when its persisted filename differs from the URL filename', async () => {
+    const actualUrl = 'https://img.luckread.com/media/generated-object-key.png'
     const payload = payloadFor(
       { id: 'payload-user-7' },
       [
         {
-          id: 'fresh-body-1',
-          filename: 'fresh body.txt',
+          id: 'body-1',
+          filename: 'post-body-generated-name.txt',
           ownerUserId: 'payload-user-7',
-          // The stored filename narrows candidates; the full returned URL is
-          // checked separately and must exactly match the submitted reference.
-          url: 'https://img.luckread.com/media/fresh%20body.txt',
+          url: 'https://img.luckread.com/media/body.txt',
+        },
+        {
+          id: 'attachment-1',
+          filename: 'payload-renamed-attachment.png',
+          ownerUserId: 'payload-user-7',
+          url: actualUrl,
         },
       ],
     )
@@ -96,15 +109,17 @@ describe('W01/W03 social post media-reference authority boundary', () => {
       payload,
       'better-auth-user-7',
       post({
-        bodyRef: 'https://img.luckread.com/media/fresh%20body.txt',
-        mediaRefs: [],
+        bodyRef: 'https://img.luckread.com/media/body.txt',
+        mediaRefs: [actualUrl],
         coverRef: null,
       }),
       origin,
     )).resolves.toEqual({ valid: true })
 
     const mediaQuery = payload.find.mock.calls[1]?.[0] as Record<string, any>
-    expect(mediaQuery.where.and[1]).toEqual({ filename: { in: ['fresh body.txt'] } })
+    const lookup = mediaQuery.where.and[1].or
+    expect(lookup[0].filename.in).toEqual(['body.txt', 'generated-object-key.png'])
+    expect(lookup[1].url.in).toContain(actualUrl)
   })
 
   it('rejects a valid LuckRead URL when the asset does not belong to this account', async () => {
