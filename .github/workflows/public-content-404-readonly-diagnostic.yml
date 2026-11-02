@@ -346,7 +346,7 @@ jobs:
                 'export default { async fetch() { return new Response("read-only probe"); } };\n');
               const probeConfig = {
                 name: 'luckread-w01-readonly-binding-probe',
-                main: '.wrangler/public-content-404-probe-worker.mjs',
+                main: 'public-content-404-probe-worker.mjs',
                 compatibility_date: wrangler.compatibility_date ?? '2025-08-15',
                 compatibility_flags: wrangler.compatibility_flags ?? [],
                 services: [{
@@ -474,7 +474,7 @@ jobs:
             NODE
           elif [ "$probe_exit" -ne 0 ]; then
             echo "W01_W03_BINDING_PROBE_PROCESS_EXIT_$probe_exit"
-            node --input-type=module <<'NODE'
+            PROBE_EXIT="$probe_exit" node --input-type=module <<'NODE'
             import { readFileSync, writeFileSync } from 'node:fs';
             const path = '../../artifacts/public-content-404-diagnostic/report.json';
             const report = JSON.parse(readFileSync(path, 'utf8'));
