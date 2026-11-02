@@ -39,6 +39,18 @@
       "idempotency": false
     },
     {
+      "operationId": "getUsernameRedirectEligibility",
+      "method": "GET",
+      "publicPath": null,
+      "internalPath": "/internal/content/username-redirect-eligibility/{ownerUserId}",
+      "principalRequired": false,
+      "idempotency": false,
+      "subjectOwnerIdSource": "W01 authenticated W02 identity projection; never client supplied",
+      "response": "{ data: { eligible: boolean } }",
+      "eligibility": "At least one W03 content row owned by ownerUserId with state=PUBLISHED, content_type in article/post/video and access_mode=PUBLIC",
+      "d1Owner": "W03 / D1-02 only"
+    },
+    {
       "operationId": "createContent",
       "method": "POST",
       "publicPath": "/api/v1/contents",
@@ -147,7 +159,8 @@
     "creator-owned list evidence",
     "cross-user exclusion evidence",
     "creator list filter/cursor evidence",
-    "publish preflight verdict/recheck evidence"
+    "publish preflight verdict/recheck evidence",
+    "W03 username redirect eligibility positive/negative public-content evidence"
   ],
   "nonGoals": [
     "No RPC surface.",
