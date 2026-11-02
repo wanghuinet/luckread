@@ -1,0 +1,56 @@
+@tailwind utilities;
+
+/*
+ * Account-entry pages live under the legacy frontend root, which does not
+ * import the Twitter-clone Tailwind entrypoint. Generate only the utilities
+ * they already use; do not apply Tailwind Preflight or change other routes.
+ */
+.lr-account-auth-page {
+  --main-background: 255 255 255;
+  --main-sidebar-background: 245 249 255;
+  --main-accent: 37 99 235;
+  --tw-ring-offset-width: 0px;
+  --tw-ring-offset-color: #fff;
+  --tw-ring-color: rgb(59 130 246 / 0.5);
+  --tw-ring-offset-shadow: 0 0 #0000;
+  --tw-ring-shadow: 0 0 #0000;
+  --tw-shadow: 0 0 #0000;
+  --tw-shadow-colored: 0 0 #0000;
+}
+
+:where(
+  .lr-account-auth-page,
+  .lr-account-auth-page *,
+  .lr-account-auth-page *::before,
+  .lr-account-auth-page *::after
+) {
+  box-sizing: border-box;
+  border-style: solid;
+  border-width: 0;
+}
+
+:where(
+  .lr-account-auth-page h1,
+  .lr-account-auth-page h2,
+  .lr-account-auth-page h3,
+  .lr-account-auth-page p
+) {
+  margin: 0;
+}
+
+:where(.lr-account-auth-page button, .lr-account-auth-page input) {
+  font: inherit;
+}
+
+:where(.lr-account-auth-page button) {
+  cursor: pointer;
+}
+
+/* The legacy H5 stylesheet colors all anchors with a more specific selector. */
+html.frontend-legacy-root .lr-account-auth-page a.text-main-accent {
+  color: var(--lr-blue-700);
+}
+
+html.frontend-legacy-root .lr-account-auth-page a.text-light-primary {
+  color: var(--lr-h5-text);
+}

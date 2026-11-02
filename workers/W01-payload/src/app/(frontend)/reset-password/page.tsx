@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import '../../../styles/account-auth.css'
 import { useSearchParams } from 'next/navigation'
 import { FormEvent, Suspense, useEffect, useState } from 'react'
 import { fetchJson, getApiErrorMessage } from '../../../lib/client-api.js'
@@ -105,7 +106,7 @@ function ResetPasswordForm() {
   }
 
   return (
-    <main className="min-h-screen bg-main-background px-4 py-10 text-light-primary dark:text-dark-primary">
+    <main className="lr-account-auth-page min-h-screen bg-main-background px-4 py-10 text-light-primary dark:text-dark-primary">
       <section className="mx-auto flex w-full max-w-xl flex-col gap-5 border-x border-light-border px-6 py-8 dark:border-dark-border">
         <div className="text-2xl font-bold">LuckRead</div>
         <h1 className="text-2xl font-bold tracking-tight">重置密码</h1>
@@ -172,7 +173,7 @@ function ResetPasswordForm() {
 export default function ResetPasswordPage() {
   return (
     <Suspense fallback={
-      <main className="min-h-screen bg-main-background px-4 py-10 text-light-primary dark:text-dark-primary">
+      <main className="lr-account-auth-page min-h-screen bg-main-background px-4 py-10 text-light-primary dark:text-dark-primary">
         <section className="mx-auto flex w-full max-w-xl flex-col gap-5 border-x border-light-border px-6 py-8 dark:border-dark-border">
           <div className="text-2xl font-bold">LuckRead</div>
           <p className="text-sm text-light-secondary dark:text-dark-secondary" role="status">正在加载密码重置…</p>
