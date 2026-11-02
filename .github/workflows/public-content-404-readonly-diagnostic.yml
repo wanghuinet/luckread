@@ -229,10 +229,10 @@ jobs:
               const contentType = (response.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase() || null;
               const isHtml = contentType === 'text/html' || contentType === 'application/xhtml+xml';
               const html = isHtml ? await response.text() : '';
-              const linkTags = [...html.matchAll(/<link\\b[^>]*>/gi)].map((match) => match[0]);
+              const linkTags = [...html.matchAll(/<link\b[^>]*>/gi)].map((match) => match[0]);
               const canonicalTag = linkTags.find((tag) => {
                 const rel = readHtmlAttribute(tag, 'rel') ?? '';
-                return rel.toLowerCase().split(/\\s+/).includes('canonical');
+                return rel.toLowerCase().split(/\s+/).includes('canonical');
               });
               const canonicalHref = canonicalTag ? readHtmlAttribute(canonicalTag, 'href') : null;
               let canonicalPath = null;
@@ -248,7 +248,7 @@ jobs:
                   : canonicalPath
                     ? 'OTHER'
                     : 'NONE';
-              const rawTitle = /<title\\b[^>]*>([\\s\\S]*?)<\\/title>/i.exec(html)?.[1] ?? '';
+              const rawTitle = /<title\b[^>]*>([\s\S]*?)<\/title>/i.exec(html)?.[1] ?? '';
               const metadataTitleKind = rawTitle.includes('内容不存在')
                 ? 'NOT_FOUND'
                 : rawTitle.includes('LuckRead')
@@ -262,8 +262,8 @@ jobs:
                 contentType,
                 canonicalTarget,
                 metadataTitleKind,
-                hasNextDocument: /<!doctype html|<html\\b/i.test(html),
-                hasNextFlightPayload: /__next_f\\.push|self\\.__next_f/i.test(html),
+                hasNextDocument: /<!doctype html|<html\b/i.test(html),
+                hasNextFlightPayload: /__next_f\.push|self\.__next_f/i.test(html),
                 hasNotFoundMarker: html.includes('NEXT_HTTP_ERROR_FALLBACK;404'),
                 htmlBytes: new TextEncoder().encode(html).byteLength,
               };
