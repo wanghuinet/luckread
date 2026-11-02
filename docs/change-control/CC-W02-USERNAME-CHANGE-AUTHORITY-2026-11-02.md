@@ -34,6 +34,9 @@ Matching is exact after trim → Unicode NFC → casefold. Accepted usernames re
 
 ## Redirect ownership and eligibility
 
+- The official Payload Redirects plugin enforces uniqueness of the `from` path. When an expired username is later reclaimed and the new account later needs its own redirect, update the existing expired Payload redirect document in place with the new identity, destination and fresh 30-day expiry; do not create a duplicate source path.
+- Resolver and username-availability queries must filter by `expiresAt > now`. An expired document is not an active reservation and must never resolve against the previous identity.
+
 - The official Payload `@payloadcms/plugin-redirects` remains the W01 redirect storage/admin implementation.
 - W01 creates a redirect only after the W03 authority confirms at least one existing publicly published post/article/video/short for the identity.
 - Draft, scheduled, private, unlisted, deleted, removed and moderation-blocked content do not qualify.
