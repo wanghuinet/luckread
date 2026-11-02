@@ -172,6 +172,47 @@ describe('W05 unified social closure', () => {
     expect(mentionRead).not.toContain('username')
   })
 
+  it('preserves an existing mention identity when the same handle is later owned by another account', async () => {
+    const inserts: Array<{ sql: string; values: unknown[] }> = []
+    const db = {
+      prepare: (sql: string) => ({
+        bind: (...values: unknown[]) => ({
+          first: async () => null,
+          all: async () => sql.includes('FROM social_mentions')
+            ? { results: [{ mentioned_user_id: 'original-user-id', handle: 'alice' }] }
+            : { results: [] },
+          run: async () => {
+            inserts.push({ sql, values })
+            return { success: true, meta: { changes: 1 } }
+          },
+        }),
+      }),
+      batch: async () => [],
+    } as unknown as D1Database
+    const contentContext = {
+      contentId: 'content-1',
+      ownerUserId: 'owner-1',
+      contentType: 'post',
+      state: 'PUBLISHED',
+      updatedAt: '2026-10-17T04:00:00.000Z',
+    } as const
+
+    await expect(syncSocialTokens(
+      db,
+      'owner-1',
+      'content',
+      'content-1',
+      'Still mentioning @alice',
+      [{ userId: 'reclaimed-handle-owner-id', handle: 'alice' }],
+      contentContext,
+    )).resolves.toEqual({ topics: 0, mentions: 1 })
+
+    const mentionInsert = inserts.find(({ sql }) => sql.includes('INSERT OR IGNORE INTO social_mentions'))
+    expect(mentionInsert?.values[4]).toBe('original-user-id')
+    expect(mentionInsert?.values[5]).toBe('alice')
+    expect(inserts.some(({ sql }) => sql.includes('FROM users') || sql.includes('username'))).toBe(false)
+  })
+
   it('fails closed for content token sync without W03 context or when the actor is not the owner', async () => {
     const prepare = vi.fn()
     const db = { prepare } as unknown as D1Database
