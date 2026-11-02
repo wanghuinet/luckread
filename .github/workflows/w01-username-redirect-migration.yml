@@ -83,10 +83,12 @@ jobs:
           const names = [...index.matchAll(/name:\s*'([^']+)'/g)].map((m) => m[1])
           if (names.filter((n) => n === target).length !== 1 || names.at(-1) !== target) throw new Error('Migration must be registered exactly once and last')
           for (const table of ['redirects','redirects_rels']) if (!snapshot.tables?.[table]) throw new Error('Snapshot missing ' + table)
+          if (!snapshot.tables.redirects.columns?.expires_at) throw new Error('Snapshot missing redirects.expires_at')
+          if (!snapshot.tables.redirects.indexes?.redirects_expires_at_idx) throw new Error('Snapshot missing redirects.expires_at index')
           if (!snapshot.tables.media?.columns?.prefix) throw new Error('Snapshot missing media.prefix')
           if (!snapshot.tables.payload_locked_documents_rels?.columns?.redirects_id) throw new Error('Snapshot missing redirects relationship')
           const up = migration.split('export async function down')[0]
-          for (const item of ['CREATE TABLE','redirects_rels','redirects_from_idx','media','prefix','redirects_id']) if (!up.includes(item)) throw new Error('Migration UP missing ' + item)
+          for (const item of ['CREATE TABLE','redirects_rels','redirects_from_idx','expires_at','redirects_expires_at_idx','media','prefix','redirects_id']) if (!up.includes(item)) throw new Error('Migration UP missing ' + item)
           if (/DROP TABLE|DROP COLUMN|RENAME TABLE|RENAME COLUMN/i.test(up)) throw new Error('Migration UP contains destructive DDL')
           console.log(JSON.stringify({sourceSha:process.env.SOURCE_SHA,migration:target,registeredLast:true,result:'PASS'}))
           NODE
@@ -171,11 +173,12 @@ jobs:
           if (recorded) {
             const pos = positions[0]
             if (history.slice(0,pos).join('|') !== expected.join('|')) errors.push('Target migration predecessors differ from admitted history')
-            for (const n of ['id','from','to_type','to_url','type','redirect_scope','identity_id','source_username','destination_username','created_at','updated_at']) if (!redirectColumns.has(n)) errors.push('Missing redirects.' + n)
+            for (const n of ['id','from','to_type','to_url','type','redirect_scope','identity_id','source_username','destination_username','expires_at','created_at','updated_at']) if (!redirectColumns.has(n)) errors.push('Missing redirects.' + n)
             for (const n of ['id','order','parent_id','path','users_id']) if (!relColumns.has(n)) errors.push('Missing redirects_rels.' + n)
             if (!mediaColumns.has('prefix')) errors.push('media.prefix is absent after migration record')
             if (!lockedColumns.has('redirects_id')) errors.push('payload_locked_documents_rels.redirects_id is absent')
             if (!redirectIndexes.some((r) => String(r.name) === 'redirects_from_idx' && (r.unique === 1 || r.unique === true))) errors.push('redirects.from unique index is absent')
+            if (!redirectIndexes.some((r) => String(r.name) === 'redirects_expires_at_idx')) errors.push('redirects.expires_at index is absent')
             if (!lockedIndexes.some((r) => String(r.name) === 'payload_locked_documents_rels_redirects_id_idx')) errors.push('locked-document redirects index is absent')
             decision = 'ALREADY_APPLIED'
           } else {
@@ -298,7 +301,7 @@ jobs:
           const media=new Set(rows('post-media-schema.json').map((x)=>String(x.name)))
           const locked=new Set(rows('post-locked-rels-schema.json').map((x)=>String(x.name)))
           const ridx=rows('post-redirects-indexes.json'),lidx=rows('post-locked-rels-indexes.json')
-          const required=['id','from','to_type','to_url','type','redirect_scope','identity_id','source_username','destination_username','created_at','updated_at']
+          const required=['id','from','to_type','to_url','type','redirect_scope','identity_id','source_username','destination_username','expires_at','created_at','updated_at']
           const result={
             targetRecordedExactlyOnce:pos.length===1,
             predecessorsMatchExactly:pos.length===1&&history.slice(0,pos[0]).join('|')===expected.join('|'),
@@ -307,10 +310,11 @@ jobs:
             mediaPrefixPresent:media.has('prefix'),
             lockedRedirectIdPresent:locked.has('redirects_id'),
             redirectsFromUniqueIndexPresent:ridx.some((x)=>String(x.name)==='redirects_from_idx'&&(x.unique===1||x.unique===true)),
+            redirectsExpiryIndexPresent:ridx.some((x)=>String(x.name)==='redirects_expires_at_idx'),
             lockedRedirectIndexPresent:lidx.some((x)=>String(x.name)==='payload_locked_documents_rels_redirects_id_idx'),
             migrationHistory:history
           }
-          result.result=result.targetRecordedExactlyOnce&&result.predecessorsMatchExactly&&result.missingRedirectColumns.length===0&&result.redirectsRelTablePresent&&result.mediaPrefixPresent&&result.lockedRedirectIdPresent&&result.redirectsFromUniqueIndexPresent&&result.lockedRedirectIndexPresent?'PASS':'FAIL'
+          result.result=result.targetRecordedExactlyOnce&&result.predecessorsMatchExactly&&result.missingRedirectColumns.length===0&&result.redirectsExpiryIndexPresent&&result.redirectsRelTablePresent&&result.mediaPrefixPresent&&result.lockedRedirectIdPresent&&result.redirectsFromUniqueIndexPresent&&result.lockedRedirectIndexPresent?'PASS':'FAIL'
           writeFileSync(dir+'/post-validation-summary.json',JSON.stringify(result,null,2)+'\n')
           console.log(JSON.stringify(result,null,2))
           if(result.result!=='PASS')throw new Error('W01_USERNAME_REDIRECT_MIGRATION_POSTCHECK_FAILED')
