@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -7,7 +7,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
+import { type ErrorBoundaryProps, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { DrawerActions } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -78,7 +78,7 @@ function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSig
   const [items, setItems] = useState<FeedContent[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
-  const [candidateWindowTruncated, setCandidateWindowTruncated] = useState(false);
+  const requestSequence = useRef(0);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -88,6 +88,8 @@ function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSig
   const endpoint = kind === 'following' ? '/feed/following' : '/contents';
 
   const loadPage = useCallback(async (nextCursor: string | null, append: boolean) => {
+    const requestId = ++requestSequence.current;
+
     if (kind === 'following' && authStatus !== 'authenticated') {
       setAuthRequired(true);
       setItems([]);
@@ -98,8 +100,14 @@ function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSig
       return;
     }
 
-    if (append) setLoadingMore(true);
-    else setLoading(true);
+    if (append) {
+      setLoadingMore(true);
+    } else {
+      setLoading(true);
+      setLoadingMore(false);
+      setCursor(null);
+      setHasMore(false);
+    }
     setErrorMessage('');
 
     try {
@@ -111,9 +119,11 @@ function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSig
         endpoint + '?' + params.toString(),
         { method: 'GET' },
       );
+      if (requestId !== requestSequence.current) return;
 
       if (response.status === 401 && kind === 'following') {
         if (authStatus === 'authenticated') await invalidateSession();
+        if (requestId !== requestSequence.current) return;
         setAuthRequired(true);
         setItems([]);
         setCursor(null);
@@ -127,42 +137,89 @@ function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSig
         throw new Error(getApiErrorMessage(data, 'Could not load this timeline. Please retry.'));
       }
 
-      const sessionToken = await readSessionToken().catch(() => null);
-      const mapped = await Promise.all(
-        page.items
-          .filter((item): item is ApiContentRecord => Boolean(item && typeof item.id === 'string'))
-          .map(async (item) => {
-            const [body, social, author] = await Promise.all([
-              readContentBody(item, undefined, sessionToken),
-              readContentSocial(item.id),
-              readContentAuthor(item),
-            ]);
-            return mapContentToFeedContent(item, body, social, author, sessionToken);
-          }),
+      const validRecords = page.items.filter(
+        (item): item is ApiContentRecord => Boolean(item && typeof item.id === 'string' && item.id.trim()),
       );
+
+      // Render the server's first-page projection immediately. Body, author and
+      // social reads are optional enrichment and must not block the timeline.
+      const visibleItems = validRecords.flatMap((item) => {
+        try {
+          return [mapContentToFeedContent(item, undefined, item.social, item.creator ?? item.author)];
+        } catch {
+          // One malformed record must not prevent the other posts from rendering.
+          return [];
+        }
+      });
 
       if (append) {
         setItems((current) => {
           const known = new Set(current.map((item) => item.contentId));
-          return [...current, ...mapped.filter((item) => !known.has(item.contentId))];
+          return [...current, ...visibleItems.filter((item) => !known.has(item.contentId))];
         });
       } else {
-        setItems(mapped);
+        setItems(visibleItems);
+      }
+
+      if (validRecords.length > 0 && visibleItems.length === 0) {
+        throw new Error('Posts were returned, but could not be displayed. Please retry.');
+      }
+
+      const sessionToken = await readSessionToken().catch(() => null);
+      if (requestId !== requestSequence.current) return;
+
+      // Isolate each optional read. A failed body/social/author request for one
+      // post falls back to the list projection instead of rejecting the page.
+      const hydrationResults = await Promise.allSettled(
+        validRecords.map(async (item) => {
+          const [bodyResult, socialResult, authorResult] = await Promise.allSettled([
+            readContentBody(item, undefined, sessionToken),
+            readContentSocial(item.id),
+            readContentAuthor(item),
+          ]);
+
+          const body = bodyResult.status === 'fulfilled' ? bodyResult.value : undefined;
+          const social = socialResult.status === 'fulfilled' ? socialResult.value : item.social ?? null;
+          const author = authorResult.status === 'fulfilled' ? authorResult.value : null;
+
+          try {
+            return mapContentToFeedContent(item, body, social, author, sessionToken);
+          } catch {
+            return null;
+          }
+        }),
+      );
+      if (requestId !== requestSequence.current) return;
+
+      const hydratedItems = hydrationResults.flatMap((result) =>
+        result.status === 'fulfilled' && result.value ? [result.value] : [],
+      );
+      if (hydratedItems.length > 0) {
+        const hydratedById = new Map(
+          hydratedItems
+            .filter((item) => typeof item.contentId === 'string')
+            .map((item) => [item.contentId as string, item]),
+        );
+        setItems((current) =>
+          current.map((item) => item.contentId ? hydratedById.get(item.contentId) ?? item : item),
+        );
       }
 
       setCursor(page.nextCursor || null);
       setHasMore(page.hasMore === true);
-      setCandidateWindowTruncated(page.candidateWindowTruncated === true);
       setAuthRequired(false);
     } catch (error) {
+      if (requestId !== requestSequence.current) return;
       setErrorMessage(
         error instanceof Error
           ? error.message
           : 'Could not load this timeline. Please retry.',
       );
     } finally {
-      setLoading(false);
-      setLoadingMore(false);
+      if (requestId === requestSequence.current) {
+        setLoading(false);
+        setLoadingMore(false);
+      }
     }
   }, [authStatus, endpoint, invalidateSession, kind]);
 
@@ -173,6 +230,7 @@ function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSig
     });
     return () => {
       active = false;
+      requestSequence.current += 1;
     };
   }, [loadPage, refreshKey, refreshSignal]);
 
@@ -250,10 +308,24 @@ function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSig
       onRefresh={() => setRefreshKey((value) => value + 1)}
       refreshing={loading && items.length > 0}
       onEndReached={() => {
-        if (hasMore && cursor && !loadingMore && !errorMessage) void loadPage(cursor, true);
+        if (hasMore && cursor && !loading && !loadingMore && !errorMessage) void loadPage(cursor, true);
       }}
       onEndReachedThreshold={0.5}
     />
+  );
+}
+
+export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  return (
+    <View style={styles.errorBoundaryContainer}>
+      <Text style={styles.stateTitle}>首页暂时无法显示</Text>
+      <Text style={styles.stateDescription}>
+        {error.message || '页面发生异常，请重试。'}
+      </Text>
+      <Pressable accessibilityRole="button" onPress={retry} style={styles.primaryButton}>
+        <Text style={styles.primaryButtonText}>重新加载首页</Text>
+      </Pressable>
+    </View>
   );
 }
 
@@ -333,6 +405,7 @@ const styles = StyleSheet.create({
   headerRightSpacer: { width: 36, height: 36 },
   floatingCompose: { position: 'absolute', right: 20, width: 56, height: 56, borderRadius: 28, backgroundColor: APP_PRIMARY_COLOR, alignItems: 'center', justifyContent: 'center', elevation: 6, shadowColor: '#000000', shadowOpacity: 0.22, shadowRadius: 5, shadowOffset: { width: 0, height: 3 }, zIndex: 20 },
   stateContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 28, paddingVertical: 32 },
+  errorBoundaryContainer: { flex: 1, backgroundColor: 'white', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 28, paddingVertical: 32 },
   stateTitle: { color: '#101828', fontSize: 18, fontWeight: '800', textAlign: 'center' },
   stateDescription: { color: '#667085', fontSize: 14, lineHeight: 21, marginTop: 10, textAlign: 'center' },
   primaryButton: { alignItems: 'center', backgroundColor: APP_PRIMARY_COLOR, borderRadius: 999, marginTop: 18, minWidth: 130, paddingHorizontal: 22, paddingVertical: 12 },
