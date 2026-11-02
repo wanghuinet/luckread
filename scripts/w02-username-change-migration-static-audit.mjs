@@ -64,6 +64,13 @@ try {
   )
 
   const insertUser = db.prepare('INSERT INTO "user" (id, username, account_state, updated_at, created_at) VALUES (?, ?, ?, ?, ?)')
+  db.prepare('INSERT INTO "user" (id, username, account_state, updated_at, created_at) VALUES (?, ?, ?, ?, ?)')
+    .run('u4', 'AvailableName', 'ACTIVE', new Date().toISOString(), new Date().toISOString())
+  assert.throws(
+    () => db.prepare('UPDATE "user" SET username = ?, updated_at = ? WHERE id = ?')
+      .run('oldname', new Date().toISOString(), 'u4'),
+    /USERNAME_RESERVED/
+  )
   assert.throws(
     () => insertUser.run('u2', 'oldname', 'ACTIVE', new Date().toISOString(), new Date().toISOString()),
     /USERNAME_RESERVED/
