@@ -2228,7 +2228,11 @@ describe('W03 username redirect eligibility', () => {
     let bindings: unknown[] = []
     let row: { id: string } | null = { id: 'public_post_1' }
     let databaseReads = 0
+    const allowLimiter = { limit: async () => ({ success: true }) }
     const env = {
+      CONTENT_ORIGIN_GLOBAL_LIMITER: allowLimiter,
+      CONTENT_PUBLIC_READ_LIMITER: allowLimiter,
+      CONTENT_MUTATION_LIMITER: allowLimiter,
       D1_02: {
         prepare(sql: string) {
           query = sql
