@@ -282,7 +282,8 @@ export default function ProfilePage() {
 
   const fieldClass = 'mt-1 block w-full rounded-xl border border-light-border bg-transparent px-3 py-2 text-sm text-light-primary outline-none focus:border-main-accent dark:border-dark-border dark:text-dark-primary'
   const actionClass = 'rounded-full border border-light-border px-4 py-2 text-sm font-bold transition hover:bg-light-primary/10 disabled:cursor-not-allowed disabled:opacity-50 dark:border-dark-border dark:hover:bg-dark-primary/10'
-  const usernameCooldownActive = Boolean(usernameCanChangeAt && Date.parse(usernameCanChangeAt) > Date.now())
+  // W02 already returns null after cooldown expiry; use that authoritative state.
+  const usernameCooldownActive = Boolean(usernameCanChangeAt)
 
   return (
     <TwitterCloneSecondaryPageLayout locale={locale} title={copy.title} active="editProfile">
