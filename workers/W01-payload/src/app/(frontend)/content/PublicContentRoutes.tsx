@@ -76,8 +76,16 @@ const readPublicContentResponse = async (response: Response): Promise<PublicCont
   }
 
   const value: unknown = await response.json().catch((): null => null)
-  if (!value || typeof value !== 'object' || Array.isArray(value) ||
-      typeof (value as { id?: unknown }).id !== 'string') {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('PUBLIC_CONTENT_RESPONSE_INVALID')
+  }
+  const content = value as { id?: unknown; state?: unknown; contentType?: unknown; title?: unknown }
+  if (
+    typeof content.id !== 'string' ||
+    typeof content.state !== 'string' ||
+    !['article', 'post', 'video'].includes(String(content.contentType)) ||
+    typeof content.title !== 'string'
+  ) {
     throw new Error('PUBLIC_CONTENT_RESPONSE_INVALID')
   }
   return value as PublicContent
@@ -101,7 +109,9 @@ const getPublicContent = cache(async (contentId: string): Promise<PublicContent 
 
 const getPublicAuthorById = cache(async (userId: string): Promise<PublicAuthor | null> => {
   const normalized = userId.trim()
-  if (!normalized || normalized.length > 128) return null
+  if (!normalized || normalized.length > 128) {
+    throw new Error('PUBLIC_AUTHOR_ID_INVALID')
+  }
 
   const response = await getPublicUserProfileResponse(
     new Request('https://luckread.com/api/v1/users/' + encodeURIComponent(normalized), {
@@ -118,7 +128,8 @@ const getPublicAuthorById = cache(async (userId: string): Promise<PublicAuthor |
 
   const value: unknown = await response.json().catch((): null => null)
   if (!value || typeof value !== 'object' || Array.isArray(value) ||
-      typeof (value as { username?: unknown }).username !== 'string') {
+      typeof (value as { username?: unknown }).username !== 'string' ||
+      !(value as { username: string }).username.trim()) {
     throw new Error('PUBLIC_AUTHOR_RESPONSE_INVALID')
   }
   return value as PublicAuthor
@@ -153,6 +164,10 @@ const getContentBundle = cache(async (contentId: string): Promise<ContentBundle>
     content.author?.id,
     content.author?.userId,
   ].filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+
+  if (ownerIds.length === 0) {
+    throw new Error('PUBLIC_CONTENT_AUTHOR_ID_MISSING')
+  }
 
   const authors = await Promise.all(
     [...new Set(ownerIds)].map((ownerId) => getPublicAuthorById(ownerId)),
