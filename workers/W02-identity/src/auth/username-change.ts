@@ -81,7 +81,9 @@ export function isReservedUsername(normalized: string): boolean {
 }
 
 export async function fingerprintUsernameChange(display: string, ifMatch: string): Promise<string> {
-  return sha256Hex(display + '\0' + ifMatch)
+  const candidate = normalizeUsernameCandidate(display)
+  if (!candidate) throw new Error('USERNAME_CANDIDATE_INVALID')
+  return sha256Hex(candidate.normalized + '\0' + candidate.display + '\0' + ifMatch)
 }
 
 const etagForVersion = (version: number): string => '"username-v' + String(version) + '"'
