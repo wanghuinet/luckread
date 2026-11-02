@@ -112,13 +112,16 @@ jobs:
           for (const table of ['redirects', 'redirects_rels']) {
             if (!snapshot.tables?.[table]) throw new Error('Snapshot is missing ' + table)
           }
+          if (!snapshot.tables.redirects.columns?.expires_at || !snapshot.tables.redirects.indexes?.redirects_expires_at_idx) {
+            throw new Error('Snapshot is missing username redirect expiry column/index')
+          }
           if (!snapshot.tables.media?.columns?.prefix) throw new Error('Snapshot is missing media.prefix')
           if (!snapshot.tables.payload_locked_documents_rels?.columns?.redirects_id) {
             throw new Error('Snapshot is missing payload_locked_documents_rels.redirects_id')
           }
           const up = migration.split('export async function down')[0]
           const down = migration.split('export async function down')[1] ?? ''
-          for (const expected of ['CREATE TABLE', 'redirects_rels', 'redirects_from_idx', 'media', 'prefix', 'redirects_id']) {
+          for (const expected of ['CREATE TABLE', 'redirects_rels', 'redirects_from_idx', 'expires_at', 'redirects_expires_at_idx', 'media', 'prefix', 'redirects_id']) {
             if (!up.includes(expected)) throw new Error('Migration UP is missing ' + expected)
           }
           if (/DROP TABLE|DROP COLUMN|RENAME TABLE|RENAME COLUMN/i.test(up)) {
@@ -131,10 +134,10 @@ jobs:
               !down.includes('DROP COLUMN')) {
             throw new Error('Migration DOWN does not preserve existing Payload relationship rows or rollback media.prefix')
           }
-          if (!generatedTypes.includes('redirects: Redirect') || !generatedTypes.includes('export interface Redirect {')) {
+          if (!generatedTypes.includes('redirects: Redirect') || !generatedTypes.includes('export interface Redirect {') || !generatedTypes.includes('expiresAt: string') || !generatedTypes.includes('expiresAt?: T')) {
             throw new Error('Official Payload type generation did not include redirects')
           }
-          if (!committedTypes.includes('redirects: Redirect') || !committedTypes.includes('export interface Redirect {')) {
+          if (!committedTypes.includes('redirects: Redirect') || !committedTypes.includes('export interface Redirect {') || !committedTypes.includes('expiresAt: string') || !committedTypes.includes('expiresAt?: T')) {
             throw new Error('Committed Payload types do not include redirects')
           }
           const evidence = {
