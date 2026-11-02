@@ -5,7 +5,8 @@ vi.mock('./principal.js', () => ({ resolveBetterAuthPrincipal: mocks.resolveBett
 
 import type { BetterAuthEnv } from './better-auth.js'
 import {
-  fingerprintUsernameChange, handleUsernameChangeRequest, handleUsernameStateRequest,
+  fingerprintUsernameChange, hashUsernameIdempotencyKey,
+  handleUsernameChangeRequest, handleUsernameStateRequest,
   isReservedUsername, normalizeUsernameCandidate,
 } from './username-change.js'
 
@@ -18,22 +19,23 @@ type TestRow = {
   accountState: string
   usernameVersion: number
   lastChangedAt: string | null
-  replayChangeId: string | null
+  replayKeyHash: string | null
   replayFingerprint: string | null
-  replayUsername: string | null
-  replayVersion: number | null
   replayChangedAt: string | null
+  replayExpiresAt: string | null
 }
 
 const defaultRow: TestRow = {
   username: 'OldHandle', accountState: 'ACTIVE', usernameVersion: 0, lastChangedAt: null,
-  replayChangeId: null, replayFingerprint: null, replayUsername: null, replayVersion: null, replayChangedAt: null,
+  replayKeyHash: null, replayFingerprint: null, replayChangedAt: null, replayExpiresAt: null,
 }
 
 function createEnv(row: TestRow = { ...defaultRow }) {
   const prepared: Array<{ sql: string; args: unknown[] }> = []
   const batch = vi.fn(async (_statements: unknown[]) => [
-    { success: true, meta: { changes: 1 } }, { success: true, meta: { changes: 1 } },
+    { success: true, meta: { changes: 0 } },
+    { success: true, meta: { changes: 1 } },
+    { success: true, meta: { changes: 1 } },
   ])
   const database = {
     prepare(sql: string) {
@@ -111,6 +113,16 @@ describe('W02 username change authority', () => {
     expect(batch).not.toHaveBeenCalled()
   })
 
+  it('allows a username change when the 30-day cooldown has expired', async () => {
+    const { env, batch, prepared } = createEnv({ ...defaultRow, usernameVersion: 1, lastChangedAt: '2026-10-03T12:00:00.000Z' })
+    const response = await handleUsernameChangeRequest(env, changeRequest({ ifMatch: '"username-v1"' }), new Date('2026-11-02T12:00:00.000Z'))
+    expect(response.status).toBe(200)
+    expect(batch).toHaveBeenCalledTimes(1)
+    expect(batch.mock.calls[0][0]).toHaveLength(3)
+    expect(prepared[3].sql).toContain('previous_username_normalized')
+    expect(prepared[3].sql).toContain('previous_username_expires_at > ?')
+  })
+
   it('rejects stale If-Match versions', async () => {
     const { env, batch } = createEnv({ ...defaultRow, usernameVersion: 2 })
     const response = await handleUsernameChangeRequest(env, changeRequest({ ifMatch: '"username-v1"' }))
@@ -120,24 +132,27 @@ describe('W02 username change authority', () => {
   })
 
   it('replays a successful idempotent operation without another write', async () => {
+    const keyHash = await hashUsernameIdempotencyKey('username-change-key-0001')
     const fingerprint = await fingerprintUsernameChange('NewHandle', '"username-v0"')
     const { env, batch } = createEnv({
-      ...defaultRow, replayChangeId: 'uchg_0123456789abcdef0123456789abcdef',
-      replayFingerprint: fingerprint, replayUsername: 'NewHandle', replayVersion: 1,
+      ...defaultRow, username: 'NewHandle', usernameVersion: 1,
+      replayKeyHash: keyHash, replayFingerprint: fingerprint,
       replayChangedAt: '2026-11-02T12:00:00.000Z',
+      replayExpiresAt: '2026-11-03T12:00:00.000Z',
     })
-    const response = await handleUsernameChangeRequest(env, changeRequest())
+    const response = await handleUsernameChangeRequest(env, changeRequest(), new Date('2026-11-02T12:05:00.000Z'))
     expect(response.status).toBe(200)
     expect(response.headers.get('etag')).toBe('"username-v1"')
     expect(await response.json()).toMatchObject({ meta: { idempotentReplay: true } })
     expect(batch).not.toHaveBeenCalled()
   })
 
-  it('rejects reuse of an idempotency key with different intent', async () => {
+  it('rejects reuse of a live idempotency key with different intent', async () => {
+    const keyHash = await hashUsernameIdempotencyKey('username-change-key-0001')
     const { env, batch } = createEnv({
-      ...defaultRow, replayChangeId: 'uchg_0123456789abcdef0123456789abcdef',
-      replayFingerprint: '0'.repeat(64), replayUsername: 'OtherHandle',
-      replayVersion: 1, replayChangedAt: '2026-11-02T12:00:00.000Z',
+      ...defaultRow, replayKeyHash: keyHash, replayFingerprint: '0'.repeat(64),
+      replayChangedAt: '2026-11-02T12:00:00.000Z',
+      replayExpiresAt: '2026-11-03T12:00:00.000Z',
     })
     const response = await handleUsernameChangeRequest(env, changeRequest())
     expect(response.status).toBe(409)
@@ -145,17 +160,25 @@ describe('W02 username change authority', () => {
     expect(batch).not.toHaveBeenCalled()
   })
 
-  it('writes the user and durable history in one D1 batch', async () => {
+  it('writes one compact per-user state row rather than an append-only history log', async () => {
     const { env, batch, prepared, limiter } = createEnv()
     const response = await handleUsernameChangeRequest(env, changeRequest(), new Date('2026-11-02T12:00:00.000Z'))
     expect(response.status).toBe(200)
     expect(response.headers.get('etag')).toBe('"username-v1"')
     expect(batch).toHaveBeenCalledTimes(1)
-    expect(batch.mock.calls[0][0]).toHaveLength(2)
-    expect(prepared[1].sql).toContain('UPDATE "user"')
-    expect(prepared[2].sql).toContain('INSERT INTO auth_username_change_history')
+    expect(batch.mock.calls[0][0]).toHaveLength(3)
+    expect(prepared[2].sql).toContain('UPDATE "user"')
+    expect(prepared[3].sql).toContain('INSERT INTO auth_username_change_state')
+    expect(prepared[4].sql).toContain('UPDATE auth_username_change_state SET previous_username = NULL')
     expect(limiter.limit).toHaveBeenCalled()
-    expect(await response.json()).toMatchObject({ data: { username: 'NewHandle', usernameVersion: 1, changedAt: '2026-11-02T12:00:00.000Z' }, meta: { idempotentReplay: false } })
+    expect(await response.json()).toMatchObject({
+      data: {
+        username: 'NewHandle', usernameVersion: 1,
+        changedAt: '2026-11-02T12:00:00.000Z',
+        previousUsernameReservedUntil: '2026-12-02T12:00:00.000Z',
+      },
+      meta: { idempotentReplay: false },
+    })
   })
 
   it('fails closed when the existing write limiter is unavailable', async () => {
