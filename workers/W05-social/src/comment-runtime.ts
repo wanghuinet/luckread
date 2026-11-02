@@ -834,9 +834,14 @@ export async function listComments(
            'userId', mention.mentioned_user_id,
            'handle', mention.handle
          ))
-         FROM social_mentions mention
-         WHERE mention.target_type = 'comment'
-           AND mention.target_id = c.id
+         FROM (
+           SELECT mentioned_user_id, handle
+             FROM social_mentions
+            WHERE target_type = 'comment'
+              AND target_id = c.id
+            ORDER BY created_at ASC
+            LIMIT 100
+         ) mention
        ), '[]') AS mentions_json,
        c.liked_by_viewer,
        c.thread_created_at,
