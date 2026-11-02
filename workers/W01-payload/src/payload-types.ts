@@ -115,6 +115,7 @@ export interface Redirect {
   identityId: string
   sourceUsername: string
   destinationUsername: string
+  expiresAt: string
   updatedAt: string
   createdAt: string
 }
