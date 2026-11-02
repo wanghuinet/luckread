@@ -85,7 +85,10 @@ describe('W05 unified social closure', () => {
     const db = {
       prepare: (sql: string) => {
         queries.push(sql)
-        return { bind: (..._values: unknown[]) => ({ run: async () => ({ success: true, meta: { changes: 1 } }) }) }
+        return { bind: (..._values: unknown[]) => ({
+          all: async () => ({ results: [] }),
+          run: async () => ({ success: true, meta: { changes: 1 } }),
+        }) }
       },
       batch,
     } as unknown as D1Database
