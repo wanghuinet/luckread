@@ -26,7 +26,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: public-content-404-readonly-diagnostic
+  group: public-content-404-readonly-diagnostic-v2
   cancel-in-progress: false
 
 jobs:
@@ -303,6 +303,7 @@ jobs:
           NODE
 
       - name: Probe W01-to-W03 author-context Service Binding (read-only)
+        timeout-minutes: 4
         working-directory: workers/W01-payload
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -311,8 +312,9 @@ jobs:
           EXPECTED_USERNAME: ${{ inputs.username || 'huihui' }}
         run: |
           set -euo pipefail
-          node --input-type=module <<'NODE'
-          import { readFileSync, writeFileSync } from 'node:fs';
+          set +e
+          timeout --signal=TERM --kill-after=10s 150s node --input-type=module <<'NODE'
+          import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
           import { getPlatformProxy } from 'wrangler';
 
           const contentId = process.env.CONTENT_ID;
@@ -335,69 +337,96 @@ jobs:
             if (binding.length !== 1 || binding[0].service !== 'luckread-w03') {
               probe.classification = 'W01_W03_SERVICE_BINDING_CONFIG_MISMATCH';
             } else {
-              // Use the existing W01 Wrangler configuration and its W03_CONTENT
-              // Service Binding. Remote bindings target the deployed W03 Worker;
-              // no public diagnostic endpoint or new binding is introduced.
+              // Build a temporary local-only config that reuses the exact
+              // deployed service name and binding name. "remote: true" is
+              // required for Wrangler's local proxy to reach deployed W03.
+              // This file is never deployed and creates no Cloudflare resource.
+              mkdirSync('.wrangler', { recursive: true });
+              writeFileSync('.wrangler/public-content-404-probe-worker.mjs',
+                'export default { async fetch() { return new Response("read-only probe"); } };\n');
+              const probeConfig = {
+                name: wrangler.name,
+                main: 'public-content-404-probe-worker.mjs',
+                compatibility_date: wrangler.compatibility_date ?? '2025-08-15',
+                compatibility_flags: wrangler.compatibility_flags ?? [],
+                services: [{
+                  binding: 'W03_CONTENT',
+                  service: binding[0].service,
+                  remote: true,
+                }],
+              };
+              if (typeof wrangler.account_id === 'string' && wrangler.account_id) {
+                probeConfig.account_id = wrangler.account_id;
+              }
+              writeFileSync('.wrangler/public-content-404-probe.jsonc',
+                JSON.stringify(probeConfig, null, 2) + '\n');
+
+              console.log('PROBE_STAGE=GET_PLATFORM_PROXY_START');
               platform = await getPlatformProxy({
-                configPath: 'wrangler.jsonc',
+                configPath: '.wrangler/public-content-404-probe.jsonc',
                 remoteBindings: true,
                 persist: false,
               });
+              console.log('PROBE_STAGE=GET_PLATFORM_PROXY_READY');
+
               const service = platform.env?.W03_CONTENT;
               if (!service || typeof service.fetch !== 'function') {
                 probe.classification = 'W01_W03_SERVICE_BINDING_MISSING';
               } else {
+                console.log('PROBE_STAGE=W03_AUTHOR_CONTEXT_REQUEST_START');
                 const response = await service.fetch(new Request(
-                'https://luckread-w03.internal/internal/content/contents/' +
-                  encodeURIComponent(contentId) + '/public-author-context',
-                {
-                  method: 'GET',
-                  headers: {
-                    accept: 'application/json',
-                    'X-LuckRead-Caller': 'W01',
-                    'X-LuckRead-Transport-Version': '1.0',
-                    'X-LuckRead-Correlation-Id': 'public-content-404-readonly-diagnostic',
-                  },
-                },
-              ));
-              probe.status = response.status;
-              const envelope = await response.json().catch(() => null);
-              const data = envelope && typeof envelope === 'object' && !Array.isArray(envelope)
-                ? envelope.data
-                : null;
-              if (response.status !== 200) {
-                probe.classification = response.status === 404
-                  ? 'W03_INTERNAL_AUTHOR_CONTEXT_NOT_FOUND'
-                  : 'W03_INTERNAL_AUTHOR_CONTEXT_NON_200';
-              } else if (!data || typeof data !== 'object' || Array.isArray(data) ||
-                         data.contentId !== contentId ||
-                         typeof data.ownerUserId !== 'string' || !data.ownerUserId.trim()) {
-                probe.classification = 'W03_INTERNAL_AUTHOR_CONTEXT_RESPONSE_INVALID';
-              } else {
-                probe.contentIdMatches = true;
-                probe.ownerUserIdPresent = true;
-                const profileResponse = await fetch(
-                  'https://api.luckread.com/v1/users/' + encodeURIComponent(data.ownerUserId),
+                  'https://luckread-w03.internal/internal/content/contents/' +
+                    encodeURIComponent(contentId) + '/public-author-context',
                   {
-                    headers: { accept: 'application/json', 'cache-control': 'no-cache' },
+                    method: 'GET',
                     signal: AbortSignal.timeout(12000),
+                    headers: {
+                      accept: 'application/json',
+                      'X-LuckRead-Caller': 'W01',
+                      'X-LuckRead-Transport-Version': '1.0',
+                      'X-LuckRead-Correlation-Id': 'public-content-404-readonly-diagnostic',
+                    },
                   },
-                );
-                probe.ownerProfileStatus = profileResponse.status;
-                const profile = await profileResponse.json().catch(() => null);
-                probe.ownerUsernameMatches = !!profile &&
-                  typeof profile === 'object' &&
-                  typeof profile.username === 'string' &&
-                  profile.username.replace(/^@+/, '').toLowerCase() === expectedUsername;
-                if (probe.ownerProfileStatus === 404) {
-                  probe.classification = 'W03_OWNER_ID_NOT_FOUND_IN_W01_PROFILE_PROJECTION';
-                } else if (probe.ownerProfileStatus !== 200) {
-                  probe.classification = 'W01_OWNER_PROFILE_NON_200';
-                } else if (!probe.ownerUsernameMatches) {
-                  probe.classification = 'W01_OWNER_PROFILE_USERNAME_MISMATCH';
+                ));
+                probe.status = response.status;
+                const envelope = await response.json().catch(() => null);
+                const data = envelope && typeof envelope === 'object' && !Array.isArray(envelope)
+                  ? envelope.data
+                  : null;
+                if (response.status !== 200) {
+                  probe.classification = response.status === 404
+                    ? 'W03_INTERNAL_AUTHOR_CONTEXT_NOT_FOUND'
+                    : 'W03_INTERNAL_AUTHOR_CONTEXT_NON_200';
+                } else if (!data || typeof data !== 'object' || Array.isArray(data) ||
+                           data.contentId !== contentId ||
+                           typeof data.ownerUserId !== 'string' || !data.ownerUserId.trim()) {
+                  probe.classification = 'W03_INTERNAL_AUTHOR_CONTEXT_RESPONSE_INVALID';
                 } else {
-                  probe.classification = 'W01_W03_BINDING_AND_OWNER_PROFILE_OK';
-                }
+                  probe.contentIdMatches = true;
+                  probe.ownerUserIdPresent = true;
+                  console.log('PROBE_STAGE=OWNER_PROFILE_LOOKUP_START');
+                  const profileResponse = await fetch(
+                    'https://api.luckread.com/v1/users/' + encodeURIComponent(data.ownerUserId),
+                    {
+                      headers: { accept: 'application/json', 'cache-control': 'no-cache' },
+                      signal: AbortSignal.timeout(12000),
+                    },
+                  );
+                  probe.ownerProfileStatus = profileResponse.status;
+                  const profile = await profileResponse.json().catch(() => null);
+                  probe.ownerUsernameMatches = !!profile &&
+                    typeof profile === 'object' &&
+                    typeof profile.username === 'string' &&
+                    profile.username.replace(/^@+/, '').toLowerCase() === expectedUsername;
+                  if (probe.ownerProfileStatus === 404) {
+                    probe.classification = 'W03_OWNER_ID_NOT_FOUND_IN_W01_PROFILE_PROJECTION';
+                  } else if (probe.ownerProfileStatus !== 200) {
+                    probe.classification = 'W01_OWNER_PROFILE_NON_200';
+                  } else if (!probe.ownerUsernameMatches) {
+                    probe.classification = 'W01_OWNER_PROFILE_USERNAME_MISMATCH';
+                  } else {
+                    probe.classification = 'W01_W03_BINDING_AND_OWNER_PROFILE_OK';
+                  }
                 }
               }
             }
@@ -408,6 +437,7 @@ jobs:
             probe.classification = code === 'Error'
               ? 'W01_W03_BINDING_PROBE_FAILED'
               : 'W01_W03_BINDING_PROBE_' + code.replace(/[^A-Z0-9_]/gi, '_').slice(0, 48).toUpperCase();
+            console.log('PROBE_STAGE=ERROR', probe.classification);
           } finally {
             if (platform?.dispose) {
               await platform.dispose().catch(() => {});
@@ -423,7 +453,44 @@ jobs:
           writeFileSync(reportPath, JSON.stringify(report, null, 2) + '\n');
           console.log(JSON.stringify(probe, null, 2));
           NODE
-
+          probe_exit=$?
+          set -e
+          if [ "$probe_exit" -eq 124 ] || [ "$probe_exit" -eq 137 ] || [ "$probe_exit" -eq 143 ]; then
+            echo "W01_W03_BINDING_PROBE_TIMEOUT"
+            node --input-type=module <<'NODE'
+            import { readFileSync, writeFileSync } from 'node:fs';
+            const path = '../../artifacts/public-content-404-diagnostic/report.json';
+            const report = JSON.parse(readFileSync(path, 'utf8'));
+            report.w01W03AuthorContext = {
+              status: null,
+              contentIdMatches: false,
+              ownerUserIdPresent: false,
+              ownerProfileStatus: null,
+              ownerUsernameMatches: false,
+              classification: 'W01_W03_BINDING_PROBE_TIMEOUT',
+            };
+            report.classification = 'W01_W03_BINDING_PROBE_TIMEOUT';
+            writeFileSync(path, JSON.stringify(report, null, 2) + '\n');
+            NODE
+          elif [ "$probe_exit" -ne 0 ]; then
+            echo "W01_W03_BINDING_PROBE_PROCESS_EXIT_$probe_exit"
+            PROBE_EXIT="$probe_exit" node --input-type=module <<'NODE'
+            import { readFileSync, writeFileSync } from 'node:fs';
+            const path = '../../artifacts/public-content-404-diagnostic/report.json';
+            const report = JSON.parse(readFileSync(path, 'utf8'));
+            const classification = 'W01_W03_BINDING_PROBE_PROCESS_EXIT_' + process.env.PROBE_EXIT;
+            report.w01W03AuthorContext = {
+              status: null,
+              contentIdMatches: false,
+              ownerUserIdPresent: false,
+              ownerProfileStatus: null,
+              ownerUsernameMatches: false,
+              classification,
+            };
+            report.classification = classification;
+            writeFileSync(path, JSON.stringify(report, null, 2) + '\n');
+            NODE
+          fi
       - name: Upload sanitized diagnostic evidence
         if: always()
         uses: actions/upload-artifact@v4
