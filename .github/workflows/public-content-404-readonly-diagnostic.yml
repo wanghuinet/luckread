@@ -1,10 +1,10 @@
 name: Public Content 404 Read-only Diagnostic
 
 on:
-  push:
+  workflow_run:
+    workflows: ["W01 Payload Application Deploy"]
+    types: [completed]
     branches: [main]
-    paths:
-      - .github/workflows/public-content-404-readonly-diagnostic.yml
   workflow_dispatch:
     inputs:
       source_sha:
@@ -31,7 +31,7 @@ concurrency:
 
 jobs:
   diagnose:
-    if: ${{ github.ref == 'refs/heads/main' && github.ref_protected == true }}
+    if: ${{ github.ref == 'refs/heads/main' && github.ref_protected == true && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success') }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -43,7 +43,7 @@ jobs:
 
       - name: Validate immutable source and diagnostic target
         env:
-          SOURCE_SHA: ${{ inputs.source_sha || github.sha }}
+          SOURCE_SHA: ${{ inputs.source_sha || github.event.workflow_run.head_sha || github.sha }}
           CONTENT_ID: ${{ inputs.content_id || '2116861177622433792' }}
           EXPECTED_USERNAME: ${{ inputs.username || 'huihui' }}
         run: |
@@ -61,12 +61,14 @@ jobs:
           node-version: 24
 
       - name: Setup pnpm 11 for W01 runtime probe
+        if: ${{ github.event_name == 'workflow_dispatch' }}
         uses: pnpm/action-setup@v4
         with:
           version: 11
           run_install: false
 
       - name: Install locked W01 runtime dependencies
+        if: ${{ github.event_name == 'workflow_dispatch' }}
         working-directory: workers/W01-payload
         run: pnpm install --frozen-lockfile
 
@@ -76,7 +78,7 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CONTENT_ID: ${{ inputs.content_id || '2116861177622433792' }}
           EXPECTED_USERNAME: ${{ inputs.username || 'huihui' }}
-          SOURCE_SHA: ${{ inputs.source_sha || github.sha }}
+          SOURCE_SHA: ${{ inputs.source_sha || github.event.workflow_run.head_sha || github.sha }}
         run: |
           set -euo pipefail
           mkdir -p artifacts/public-content-404-diagnostic
@@ -303,6 +305,7 @@ jobs:
           NODE
 
       - name: Probe W01-to-W03 author-context Service Binding (read-only)
+        if: ${{ github.event_name == 'workflow_dispatch' }}
         timeout-minutes: 4
         working-directory: workers/W01-payload
         env:
