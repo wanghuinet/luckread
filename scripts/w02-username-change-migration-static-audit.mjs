@@ -16,7 +16,7 @@ for (const required of [
   'CREATE TRIGGER auth_user_previous_username_reservation_guard_insert',
   'CREATE TRIGGER auth_user_previous_username_reservation_guard_update',
   "normalization_version = 'unicode-nfc-casefold-v1'",
-  "julianday(s.previous_username_expires_at) > julianday(COALESCE(NEW.updated_at",
+  "julianday(s.previous_username_expires_at) > julianday('now')",
 ]) assert.ok(migration.includes(required), 'migration missing ' + required)
 assert.doesNotMatch(migration, /DROP TABLE|DROP COLUMN|ALTER TABLE|RENAME TABLE/i)
 assert.doesNotMatch(migration, /UNIQUE\s*\(\s*previous_username_normalized\s*\)/i)
@@ -81,7 +81,7 @@ try {
   // while the monotonic version/cooldown row remains available.
   db.prepare(
     'UPDATE auth_username_change_state SET previous_username = NULL, previous_username_normalized = NULL, previous_username_expires_at = NULL WHERE previous_username_expires_at <= ?'
-  ).run('2026-12-02T00:01:00.000Z')
+  ).run(new Date().toISOString())
   const state = db.prepare('SELECT username_version, last_changed_at, previous_username FROM auth_username_change_state WHERE user_id = ?').get('u1')
   assert.equal(state.username_version, 1)
   assert.equal(state.previous_username, null)
