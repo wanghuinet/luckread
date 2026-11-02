@@ -690,6 +690,34 @@ export async function getContent(
   }
 }
 
+/** Minimal public author projection for W01 server-rendered pages. */
+export type PublishedContentAuthorContext = Readonly<{
+  contentId: string
+  ownerUserId: string
+}>
+
+/**
+ * Resolve the canonical owner of a published content record without returning
+ * its body or media. W01 consumes this only over the existing W03 service
+ * binding; public content-detail responses continue to redact ownerUserId.
+ */
+export async function getPublishedContentAuthorContext(
+  db: ContentD1,
+  contentId: string,
+): Promise<PublishedContentAuthorContext> {
+  assertContentReference(contentId)
+  const row = await db.prepare(
+    `SELECT id, owner_user_id
+       FROM contents
+      WHERE (id = ? OR slug = ?)
+        AND state = 'PUBLISHED'
+      LIMIT 1`,
+  ).bind(contentId, contentId).first<{ id: string; owner_user_id: string }>()
+  if (!row) throw new ContentRuntimeError('NOT_FOUND', 404)
+  if (!row.owner_user_id || !row.id) throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
+  return { contentId: row.id, ownerUserId: row.owner_user_id }
+}
+
 export type OwnedPostContext = {
   contentId: string
   ownerUserId: string

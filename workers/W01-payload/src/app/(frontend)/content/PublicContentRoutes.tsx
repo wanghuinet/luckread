@@ -3,7 +3,7 @@ import { cookies, headers } from 'next/headers'
 import { notFound, permanentRedirect } from 'next/navigation'
 import { cache } from 'react'
 
-import { getPublicContentDetailResponse } from '../../../content/public-content-detail-reader.js'
+import { getPublicContentAuthorContextResponse, getPublicContentDetailResponse } from '../../../content/public-content-detail-reader.js'
 import { getPublicUserProfileResponse } from '../../../users/public-user-profile-reader.js'
 import ContentDetailClient from './[contentId]/ContentDetailClient'
 import { normalizePublicLocale } from '../i18n/public-locale'
@@ -68,6 +68,36 @@ const fetchContentById = async (contentId: string, headersForRequest: Headers) =
     }),
     contentId,
   )
+
+const getPublicContentOwnerId = cache(async (contentId: string): Promise<string | null> => {
+  const response = await getPublicContentAuthorContextResponse(
+    new Request('https://luckread.com/api/v1/contents/' + encodeURIComponent(contentId) + '/public-author-context', {
+      method: 'GET',
+      headers: await requestHeaders(),
+      cache: 'no-store',
+    }),
+    contentId,
+  )
+  if (response.status === 404) return null
+  if (!response.ok) {
+    throw new Error('PUBLIC_CONTENT_AUTHOR_CONTEXT_READ_FAILED:' + response.status)
+  }
+
+  const value: unknown = await response.json().catch((): null => null)
+  const data = value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as { data?: unknown }).data
+    : null
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    throw new Error('PUBLIC_CONTENT_AUTHOR_CONTEXT_RESPONSE_INVALID')
+  }
+  const context = data as { contentId?: unknown; ownerUserId?: unknown }
+  if (context.contentId !== contentId ||
+      typeof context.ownerUserId !== 'string' ||
+      !context.ownerUserId.trim()) {
+    throw new Error('PUBLIC_CONTENT_AUTHOR_CONTEXT_RESPONSE_INVALID')
+  }
+  return context.ownerUserId
+})
 
 const readPublicContentResponse = async (response: Response): Promise<PublicContent | null> => {
   if (response.status === 404) return null
@@ -139,43 +169,13 @@ const getContentBundle = cache(async (contentId: string): Promise<ContentBundle>
   const content = await getPublicContent(contentId)
   if (!content) return { content: null, author: null }
 
-  const embedded = content.creator?.username
-    ? content.creator
-    : content.author?.username
-      ? content.author
-      : null
-  if (embedded?.username) {
-    return {
-      content,
-      author: {
-        id: embedded.id || content.creatorId || content.ownerUserId || '',
-        username: embedded.username,
-        displayName: embedded.displayName ?? null,
-        avatar: embedded.avatar ?? null,
-      },
-    }
-  }
+  // W03, not Creator identity data or a stale Payload projection, is the
+  // authority for the owner of a published content record.
+  const ownerUserId = await getPublicContentOwnerId(content.id)
+  if (!ownerUserId) return { content, author: null }
 
-  const ownerIds = [
-    content.creatorId,
-    content.ownerUserId,
-    content.creator?.id,
-    content.creator?.userId,
-    content.author?.id,
-    content.author?.userId,
-  ].filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
-
-  if (ownerIds.length === 0) {
-    throw new Error('PUBLIC_CONTENT_AUTHOR_ID_MISSING')
-  }
-
-  const authors = await Promise.all(
-    [...new Set(ownerIds)].map((ownerId) => getPublicAuthorById(ownerId)),
-  )
-  const author = authors.find((candidate): candidate is PublicAuthor =>
-    Boolean(candidate?.username),
-  )
-  return { content, author: author ?? null }
+  const author = await getPublicAuthorById(ownerUserId)
+  return { content, author }
 })
 
 const routeTypeForContent = (content: PublicContent, requested?: PublicContentRouteType): PublicContentRouteType => {

@@ -41,3 +41,22 @@ export async function getPublicContentDetailResponse(
     principal,
   })
 }
+
+/**
+ * Internal W01-to-W03 lookup used by server-rendered public content pages.
+ * It returns only the published record's owner identity, never public content
+ * detail fields, and is not exposed as a public HTTP API route.
+ */
+export async function getPublicContentAuthorContextResponse(
+  request: Request,
+  contentId: string,
+): Promise<Response> {
+  if (!hasAuthenticatedSessionCredential(request)) {
+    await enforcePublicReadRateLimit(request)
+  }
+  return callW03Content({
+    request,
+    pathname: contentPath(contentId) + '/public-author-context',
+    method: 'GET',
+  })
+}

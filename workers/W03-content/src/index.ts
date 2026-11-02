@@ -7,6 +7,7 @@ import {
   createRequestId,
   deleteContent,
   getContent,
+  getPublishedContentAuthorContext,
   getOwnedPostContext,
   getPublishedOwnerPostContext,
   getPublishedContentSocialContext,
@@ -674,6 +675,27 @@ const worker = {
           requestId: createRequestId(),
         })
       }
+      const publicAuthorContextMatch = /^\/internal\/content\/contents\/([^/]+)\/public-author-context$/.exec(url.pathname)
+      if (publicAuthorContextMatch) {
+        if (request.method !== 'GET') {
+          return new Response(null, { status: 405, headers: { Allow: 'GET' } })
+        }
+        if (
+          request.headers.get('X-LuckRead-Caller') !== 'W01' ||
+          request.headers.get('X-LuckRead-Transport-Version') !== '1.0' ||
+          !request.headers.get('X-LuckRead-Correlation-Id')?.trim() ||
+          request.headers.has('Authorization') ||
+          request.headers.has('Cookie') ||
+          request.headers.has('X-LuckRead-Principal-User-Id')
+        ) {
+          throw new ContentRuntimeError('PERMISSION_DENIED', 403)
+        }
+        if (url.search !== '') throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        const contentId = decodePathSegment(publicAuthorContextMatch[1] ?? '')
+        const context = await getPublishedContentAuthorContext(env.D1_02, contentId)
+        return json({ data: context, requestId: createRequestId() })
+      }
+
       const path = getPath(url.pathname)
 
       if (path && path.collectionMembers && path.id && request.method === 'GET') {
