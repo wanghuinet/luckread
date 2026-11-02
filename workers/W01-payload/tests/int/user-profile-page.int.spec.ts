@@ -10,7 +10,7 @@ describe('user profile page', () => {
     expect(page).toContain("fetchJson<Profile & { error?: { message?: string } }>('/api/v1/users/me'")
     expect(page).toContain("method: 'PATCH'")
     expect(page).toContain("'If-Match': etag")
-    expect(page).toContain("fetchJson<{ data?: { username?: string }; error?: { message?: string } }>('/api/v1/users/me/username'")
+    expect(page).toContain("fetchJson<{ data?: { username?: string; canChangeAt?: string | null }; error?: { message?: string } }>('/api/v1/users/me/username'")
     expect(page).toContain("'If-Match': usernameEtag")
     expect(page).toContain("'Idempotency-Key': idempotencyKey")
     expect(page).toContain('function saveUsername()')
