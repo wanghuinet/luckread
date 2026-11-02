@@ -19,8 +19,7 @@ type Profile = {
   timezone: string | null
 }
 
-const fields: Array<keyof Omit<Profile, 'id' | 'email'>> = [
-  'username',
+const fields: Array<keyof Omit<Profile, 'id' | 'email' | 'username'>> = [
   'displayName',
   'bio',
   'avatar',
@@ -39,6 +38,9 @@ const pageCopy = (locale: PublicLocale) => ({
   loading: locale === 'en' ? 'Loading profile…' : locale === 'tw' ? '正在載入個人資料…' : '正在加载个人资料…',
   email: locale === 'en' ? 'Sign-in email' : locale === 'tw' ? '登入郵箱' : '登录邮箱',
   username: locale === 'en' ? 'Username' : locale === 'tw' ? '使用者名稱' : '用户名',
+  usernameSave: locale === 'en' ? 'Change username' : locale === 'tw' ? '更改使用者名稱' : '修改用户名',
+  usernameSaving: locale === 'en' ? 'Changing…' : locale === 'tw' ? '更改中…' : '修改中…',
+  usernameHelp: locale === 'en' ? 'Username changes are limited to once every 30 days. Your previous username is released after 30 days.' : locale === 'tw' ? '每 30 天只能更改一次使用者名稱，舊名稱會在 30 天後釋出。' : '用户名每 30 天只能修改一次，旧用户名将在 30 天后释放。',
   displayName: locale === 'en' ? 'Display name' : locale === 'tw' ? '顯示名稱' : '显示名称',
   bio: locale === 'en' ? 'Bio' : locale === 'tw' ? '個人簡介' : '个人简介',
   avatar: locale === 'en' ? 'Avatar URL' : locale === 'tw' ? '頭像網址' : '头像地址',
@@ -69,6 +71,10 @@ export default function ProfilePage() {
   const locale = usePublicLocale()
   const copy = pageCopy(locale)
   const [profile, setProfile] = useState<Profile | null>(null)
+  const [usernameDraft, setUsernameDraft] = useState('')
+  const [usernameEtag, setUsernameEtag] = useState('')
+  const [usernameSaving, setUsernameSaving] = useState(false)
+  const [usernameIdempotencyKey, setUsernameIdempotencyKey] = useState('')
   const [etag, setEtag] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -93,8 +99,24 @@ export default function ProfilePage() {
         if (!response.ok || !data?.id) {
           throw new Error(getApiErrorMessage(data, '个人资料加载失败'))
         }
+        const usernameResult = await fetchJson<{ data?: { username?: string }; error?: { message?: string } }>('/api/v1/users/me/username', {
+          credentials: 'include',
+          cache: 'no-store',
+          headers: { accept: 'application/json' },
+        })
+        if (usernameResult.response.status === 401) {
+          const returnTo = window.location.pathname + window.location.search + window.location.hash
+          router.replace('/login?returnTo=' + encodeURIComponent(returnTo))
+          return
+        }
+        if (!usernameResult.response.ok || typeof usernameResult.data?.data?.username !== 'string') {
+          throw new Error(getApiErrorMessage(usernameResult.data, '用户名状态加载失败'))
+        }
         if (cancelled) return
-        setProfile(data as Profile)
+        const effectiveProfile = { ...(data as Profile), username: usernameResult.data.data.username }
+        setProfile(effectiveProfile)
+        setUsernameDraft(effectiveProfile.username)
+        setUsernameEtag(usernameResult.response.headers.get('ETag') ?? '')
         setEtag(response.headers.get('ETag') ?? '')
       } catch (cause) {
         if (cancelled) return
@@ -164,6 +186,54 @@ export default function ProfilePage() {
     } catch (cause) {
       setMessage('')
       setError(cause instanceof Error ? cause.message : '头像上传失败，请稍后重试。')
+    }
+  }
+
+  async function saveUsername() {
+    if (!profile || !usernameEtag || usernameSaving) return
+    const username = usernameDraft.trim()
+    if (!/^[A-Za-z0-9]{6,32}$/.test(username)) {
+      setError('用户名必须为 6–32 位英文字母或数字。')
+      return
+    }
+    setUsernameSaving(true)
+    setError('')
+    setMessage('')
+    const idempotencyKey = usernameIdempotencyKey || 'username-change:' + crypto.randomUUID()
+    setUsernameIdempotencyKey(idempotencyKey)
+    try {
+      const { response, data } = await fetchJson<{ data?: { username?: string }; error?: { message?: string; code?: string } }>('/api/v1/users/me/username', {
+        method: 'PATCH',
+        credentials: 'include',
+        cache: 'no-store',
+        headers: {
+          accept: 'application/json',
+          'content-type': 'application/json',
+          'If-Match': usernameEtag,
+          'Idempotency-Key': idempotencyKey,
+        },
+        body: JSON.stringify({ username }),
+      })
+      if (response.status === 412) throw new Error('用户名状态已更新，请刷新后重试。')
+      const savedUsername = data?.data?.username
+      if (!response.ok || typeof savedUsername !== 'string') {
+        throw new Error(getApiErrorMessage(data, '用户名修改失败'))
+      }
+      setUsernameDraft(savedUsername)
+      setUsernameEtag(response.headers.get('ETag') ?? usernameEtag)
+      setUsernameIdempotencyKey('')
+      setProfile((current) => current ? { ...current, username: savedUsername } : current)
+      // The profile ETag includes username. Refresh only the ETag while preserving
+      // any unsaved edits in the other profile fields.
+      const refreshed = await fetchJson<Profile>('/api/v1/users/me', {
+        credentials: 'include', cache: 'no-store', headers: { accept: 'application/json' },
+      })
+      if (refreshed.response.ok && refreshed.data?.id) setEtag(refreshed.response.headers.get('ETag') ?? etag)
+      setMessage(copy.saved)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : '用户名修改失败')
+    } finally {
+      setUsernameSaving(false)
     }
   }
 
@@ -239,7 +309,11 @@ export default function ProfilePage() {
           </label>
           <label className="flex flex-col gap-1 text-sm font-medium">
             <span>{copy.username}</span>
-            <input className={fieldClass} value={profile.username} onChange={(event) => updateField('username', event.target.value)} maxLength={128} required />
+            <input className={fieldClass} value={usernameDraft} onChange={(event) => { setUsernameDraft(event.target.value); setUsernameIdempotencyKey('') }} maxLength={32} minLength={6} required />
+            <small className="text-xs font-normal text-light-secondary dark:text-dark-secondary">{copy.usernameHelp}</small>
+            <button className={actionClass + ' self-start'} disabled={saving || usernameSaving || loggingOut || !usernameEtag || usernameDraft.trim() === profile.username} onClick={() => void saveUsername()} type="button">
+              {usernameSaving ? copy.usernameSaving : copy.usernameSave}
+            </button>
           </label>
           <label className="flex flex-col gap-1 text-sm font-medium">
             <span>{copy.displayName}</span>
