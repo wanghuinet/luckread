@@ -59,17 +59,19 @@ try {
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     'u1', 1, '2026-11-02T00:01:00.000Z', 'OldName', 'oldname',
-    '2026-12-02T00:01:00.000Z', 'a'.repeat(64), 'b'.repeat(64),
-    '2026-11-03T00:01:00.000Z', 'NewName'
+    new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), 'a'.repeat(64), 'b'.repeat(64),
+    new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), 'NewName'
   )
 
   const insertUser = db.prepare('INSERT INTO "user" (id, username, account_state, updated_at, created_at) VALUES (?, ?, ?, ?, ?)')
   assert.throws(
-    () => insertUser.run('u2', 'oldname', 'ACTIVE', '2026-11-20T00:00:00.000Z', '2026-11-20T00:00:00.000Z'),
+    () => insertUser.run('u2', 'oldname', 'ACTIVE', new Date().toISOString(), new Date().toISOString()),
     /USERNAME_RESERVED/
   )
-  // At the exact lease boundary the old username becomes reusable.
-  insertUser.run('u3', 'oldname', 'ACTIVE', '2026-12-02T00:01:00.000Z', '2026-12-02T00:01:00.000Z')
+  // A lease strictly in the past no longer prevents registration.
+  db.prepare('UPDATE auth_username_change_state SET previous_username_expires_at = ? WHERE user_id = ?')
+    .run(new Date(Date.now() - 1000).toISOString(), 'u1')
+  insertUser.run('u3', 'oldname', 'ACTIVE', new Date().toISOString(), new Date().toISOString())
 
   assert.equal(db.prepare('SELECT COUNT(*) AS count FROM auth_username_change_state').get().count, 1)
   assert.equal(db.prepare("SELECT COUNT(*) AS count FROM sqlite_master WHERE type = 'trigger' AND name = 'auth_username_identity_projection_sync'").get().count, 1)
