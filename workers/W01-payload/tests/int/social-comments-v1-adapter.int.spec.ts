@@ -11,6 +11,14 @@ describe('v1 comment adapters', () => {
     resolve(process.cwd(), 'src/app/api/v1/comments/[commentId]/route.ts'),
     'utf8',
   )
+  const commentsPage = readFileSync(
+    resolve(process.cwd(), 'src/app/(frontend)/content/[contentId]/ContentComments.tsx'),
+    'utf8',
+  )
+  const mentionRenderer = readFileSync(
+    resolve(process.cwd(), 'src/components/SocialMentionText.tsx'),
+    'utf8',
+  )
 
   it('routes public reads and authenticated creates through W05', () => {
     expect(route).toContain('callW05SocialPublic')
@@ -31,6 +39,17 @@ describe('v1 comment adapters', () => {
   it('keeps parentId and body in the create request only', () => {
     expect(route).toContain('body: { body, parentId: parentId ?? null, mentions }')
     expect(route).toContain('resolveSocialMentionTargets(body)')
+  })
+
+  it('resolves, persists, and renders comment mentions using immutable identity IDs', () => {
+    expect(route).toContain('resolveSocialMentionTargets(body)')
+    expect(route).toContain('body: { body, parentId: parentId ?? null, mentions }')
+    expect(updateRoute).toContain('resolveSocialMentionTargets(bodyValue)')
+    expect(updateRoute).toContain('body: { body: bodyValue, mentions }')
+    expect(commentsPage).toContain('comment.mentions ?? []')
+    expect(commentsPage).toContain('<SocialMentionText text={comment.body}')
+    expect(mentionRenderer).toContain("encodeURIComponent(mention.userId)")
+    expect(mentionRenderer).not.toContain("encodeURIComponent(mention.handle)")
   })
 
   it('enforces idempotency precondition on comment deletion', () => {

@@ -1,6 +1,7 @@
 import {
   callW05Social,
   resolveCookieSocialPrincipal,
+  resolveSocialMentionTargets,
   W05SocialClientError,
 } from '../../../../../social/w05-social-client.js'
 import { invalidatePublicContentComments } from '../../../../../lib/public-response-cache.js'
@@ -63,12 +64,13 @@ export async function PATCH(
       return errorResponse(422, 'VALIDATION_FAILED', 'Comment body is required')
     }
 
+    const mentions = await resolveSocialMentionTargets(bodyValue)
     return await finalizeCommentMutationResponse(await callW05Social({
       request,
       pathname: '/internal/social/comments/' + encodeURIComponent(commentId),
       method: 'PATCH',
       principal,
-      body: { body: bodyValue },
+      body: { body: bodyValue, mentions },
     }))
   } catch (error) {
     if (error instanceof W05SocialClientError) {

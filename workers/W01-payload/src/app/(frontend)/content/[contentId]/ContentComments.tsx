@@ -8,6 +8,7 @@ import { fetchJson, getApiErrorMessage } from '../../../../lib/client-api.js'
 import { getCachedPublicProfile, type PublicProfile } from '../../../../lib/social-post-profile-cache.js'
 import { getPublicCopy, type PublicLocale } from '../../i18n/public-locale'
 import DiscussionThread from './DiscussionThread'
+import SocialMentionText, { type SocialMentionReference } from '../../../../components/SocialMentionText.js'
 
 type CommentItem = {
   id: string
@@ -19,6 +20,7 @@ type CommentItem = {
   depth: number
   createdAt: string
   updatedAt: string
+  mentions?: SocialMentionReference[]
   likedByViewer?: boolean
 }
 
@@ -479,7 +481,9 @@ export default function ContentComments({
                 </div>
               ) : (
                 <>
-                  <p>{comment.body}</p>
+                  <p className="whitespace-pre-wrap break-words">
+                    <SocialMentionText text={comment.body} mentions={comment.mentions ?? []} />
+                  </p>
                   {!interactionRestricted ? (
                     <button
                       className="content-comment-reply"

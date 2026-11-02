@@ -225,10 +225,50 @@ export async function syncSocialTokens(
   const relatedContentId = relatedContent?.content_id ?? null
   const tokens = extractSocialTokens(text)
   const now = new Date().toISOString()
+  const previousMentions = await db.prepare(
+    `SELECT mention_id, mentioned_user_id, handle
+       FROM social_mentions
+      WHERE target_type = ? AND target_id = ?`,
+  ).bind(targetValue.targetType, targetValue.targetId).all<{
+    mention_id: string
+    mentioned_user_id: string
+    handle: string
+  }>()
+  const previousByHandle = new Map<string, MentionTarget | null>()
+  const currentMentionHandles = new Set(
+    tokens.filter((token) => token.kind === 'mention').map((token) => token.normalized),
+  )
+  const retainedMentionIds: string[] = []
+  for (const row of previousMentions.results ?? []) {
+    const normalizedHandle = row.handle.trim().replace(/^[@＠]/, '').normalize('NFKC').toLocaleLowerCase('en-US')
+    if (!normalizedHandle) continue
+    if (currentMentionHandles.has(normalizedHandle)) retainedMentionIds.push(row.mention_id)
+    const previous = previousByHandle.get(normalizedHandle)
+    if (previous && previous.userId !== row.mentioned_user_id) {
+      previousByHandle.set(normalizedHandle, null)
+    } else if (!previousByHandle.has(normalizedHandle)) {
+      previousByHandle.set(normalizedHandle, {
+        userId: id(row.mentioned_user_id),
+        handle: row.handle,
+      })
+    }
+  }
 
+  const deleteRemovedMentions = retainedMentionIds.length
+    ? db.prepare(
+        `DELETE FROM social_mentions
+          WHERE target_type = ? AND target_id = ?
+            AND mention_id NOT IN (${retainedMentionIds.map(() => '?').join(', ')})`,
+      ).bind(targetValue.targetType, targetValue.targetId, ...retainedMentionIds)
+    : db.prepare(
+        'DELETE FROM social_mentions WHERE target_type = ? AND target_id = ?',
+      ).bind(targetValue.targetType, targetValue.targetId)
+
+  // Preserve rows for handles that remain in the edited text. This makes the
+  // original identity durable even if later inserts or notification writes fail.
   await db.batch([
     db.prepare('DELETE FROM social_target_topics WHERE target_type = ? AND target_id = ?').bind(targetValue.targetType, targetValue.targetId),
-    db.prepare('DELETE FROM social_mentions WHERE target_type = ? AND target_id = ?').bind(targetValue.targetType, targetValue.targetId),
+    deleteRemovedMentions,
   ])
 
   const topics = tokens.filter((token) => token.kind === 'hashtag')
@@ -259,33 +299,42 @@ export async function syncSocialTokens(
 
   let mentionCount = 0
   for (const token of tokens.filter((item) => item.kind === 'mention')) {
-    const entry = resolved.get(token.normalized)
+    // An edit must not rebind an unchanged historical @handle to a new account
+    // after the old username has been reclaimed. Keep the stored identity for
+    // handles already attached to this target; resolve only newly introduced handles.
+    const previous = previousByHandle.get(token.normalized)
+    const hadPreviousIdentity = previous !== undefined && previous !== null
+    const entry = previous === undefined ? resolved.get(token.normalized) : previous ?? undefined
     if (!entry || entry.userId === actorUserId) continue
-    await db.prepare(
-      `INSERT OR IGNORE INTO social_mentions
-        (mention_id, target_type, target_id, actor_user_id, mentioned_user_id, handle, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    ).bind(
-      crypto.randomUUID(),
-      targetValue.targetType,
-      targetValue.targetId,
-      actorUserId,
-      entry.userId,
-      entry.handle,
-      now,
-    ).run()
+    if (!hadPreviousIdentity) {
+      await db.prepare(
+        `INSERT OR IGNORE INTO social_mentions
+          (mention_id, target_type, target_id, actor_user_id, mentioned_user_id, handle, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      ).bind(
+        crypto.randomUUID(),
+        targetValue.targetType,
+        targetValue.targetId,
+        actorUserId,
+        entry.userId,
+        entry.handle,
+        now,
+      ).run()
+    }
 
-    await enqueueNotification(db, {
-      recipientUserId: entry.userId,
-      actorUserId,
-      type: 'MENTION',
-      targetType: targetValue.targetType,
-      targetId: targetValue.targetId,
-      payload: {
-        handle: entry.handle,
-        ...(relatedContentId ? { contentId: relatedContentId } : {}),
-      },
-    })
+    if (!hadPreviousIdentity) {
+      await enqueueNotification(db, {
+        recipientUserId: entry.userId,
+        actorUserId,
+        type: 'MENTION',
+        targetType: targetValue.targetType,
+        targetId: targetValue.targetId,
+        payload: {
+          handle: entry.handle,
+          ...(relatedContentId ? { contentId: relatedContentId } : {}),
+        },
+      })
+    }
     mentionCount += 1
   }
 
