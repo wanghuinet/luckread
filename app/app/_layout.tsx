@@ -1,8 +1,8 @@
 import '../global.css';
 import { useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Stack, useRootNavigationState, useRouter, useSegments } from 'expo-router';
+import { type ErrorBoundaryProps, Stack, useRootNavigationState, useRouter, useSegments } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import * as SecureStore from 'expo-secure-store';
@@ -14,6 +14,20 @@ import { isThemePreference, THEME_PREFERENCE_KEY } from '../lib/theme-preference
 export const unstable_settings = {
   initialRouteName: '(drawer)',
 };
+
+export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  return (
+    <View style={styles.errorContainer}>
+      <Text style={styles.errorTitle}>LuckRead 页面暂时无法显示</Text>
+      <Text style={styles.errorDescription}>
+        {error.message || '页面发生异常，请重新加载。'}
+      </Text>
+      <Pressable accessibilityRole="button" onPress={retry} style={styles.errorButton}>
+        <Text style={styles.errorButtonText}>重新加载页面</Text>
+      </Pressable>
+    </View>
+  );
+}
 
 export default function RootLayout() {
   const [isLoaded, setIsLoaded] = useState(false);
@@ -85,6 +99,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#080808',
     justifyContent: 'center',
   },
+  errorContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#ffffff', paddingHorizontal: 28, paddingVertical: 32 },
+  errorTitle: { color: '#101828', fontSize: 19, fontWeight: '800', textAlign: 'center' },
+  errorDescription: { color: '#667085', fontSize: 14, lineHeight: 21, marginTop: 10, textAlign: 'center' },
+  errorButton: { alignItems: 'center', backgroundColor: '#1769aa', borderRadius: 999, marginTop: 18, minWidth: 150, paddingHorizontal: 22, paddingVertical: 12 },
+  errorButtonText: { color: '#ffffff', fontSize: 15, fontWeight: '800' },
   brand: {
     color: '#ffffff',
     fontSize: 30,
