@@ -58,8 +58,13 @@ describe('v1 content adapter', () => {
     expect(createRoute).toContain('status: 428')
   })
 
-  it('keeps public GET without mutation preconditions', () => {
-    expect(route).toContain("method: 'GET'")
-    expect(route).toContain('resolveOptionalCookieContentPrincipal')
+  it('keeps public GET without mutation preconditions through the shared W01 reader', () => {
+    const reader = readFileSync(
+      resolve(process.cwd(), 'src/content/public-content-detail-reader.ts'),
+      'utf8',
+    )
+    expect(route).toContain('getPublicContentDetailResponse')
+    expect(reader).toContain("method: 'GET'")
+    expect(reader).toContain('resolveOptionalCookieContentPrincipal')
   })
 })
