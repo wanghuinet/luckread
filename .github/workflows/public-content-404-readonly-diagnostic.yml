@@ -1,10 +1,6 @@
 name: Public Content 404 Read-only Diagnostic
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - .github/workflows/public-content-404-readonly-diagnostic.yml
   workflow_run:
     workflows: ["W01 Payload Application Deploy"]
     types: [completed]
