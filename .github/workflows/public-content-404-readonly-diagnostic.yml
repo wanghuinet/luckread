@@ -141,8 +141,8 @@ jobs:
             publicApi: { status: null, state: null, contentType: null, idMatches: false, errorCode: null },
             authorById: [],
             authorByUsername: { status: null, usernameMatches: false },
-            canonicalPage: { status: null, finalPath: null },
-            legacyPage: { status: null, finalPath: null },
+            canonicalPage: { status: null, finalPath: null, contentType: null, canonicalTarget: 'NONE', metadataTitleKind: 'MISSING', hasNextDocument: false, hasNextFlightPayload: false, hasNotFoundMarker: false, htmlBytes: 0 },
+            legacyPage: { status: null, finalPath: null, contentType: null, canonicalTarget: 'NONE', metadataTitleKind: 'MISSING', hasNextDocument: false, hasNextFlightPayload: false, hasNotFoundMarker: false, htmlBytes: 0 },
           };
 
           const jsonRequest = async (url) => {
@@ -213,12 +213,59 @@ jobs:
               usernamePayload.username.replace(/^@+/, '').toLowerCase() === expectedUsername,
           };
 
+          const readHtmlAttribute = (tag, name) => {
+            const pattern = new RegExp('(?:^|\\s)' + name + '\\s*=\\s*(?:"([^"]*)"|\\x27([^\\x27]*)\\x27|([^\\s>]+))', 'i');
+            const match = pattern.exec(tag);
+            return match?.[1] ?? match?.[2] ?? match?.[3] ?? null;
+          };
+
           const fetchPage = async (url) => {
             try {
-              const response = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(15000) });
+              const response = await fetch(url, {
+                redirect: 'follow',
+                headers: { accept: 'text/html', 'cache-control': 'no-cache' },
+                signal: AbortSignal.timeout(15000),
+              });
+              const contentType = (response.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase() || null;
+              const isHtml = contentType === 'text/html' || contentType === 'application/xhtml+xml';
+              const html = isHtml ? await response.text() : '';
+              const linkTags = [...html.matchAll(/<link\\b[^>]*>/gi)].map((match) => match[0]);
+              const canonicalTag = linkTags.find((tag) => {
+                const rel = readHtmlAttribute(tag, 'rel') ?? '';
+                return rel.toLowerCase().split(/\\s+/).includes('canonical');
+              });
+              const canonicalHref = canonicalTag ? readHtmlAttribute(canonicalTag, 'href') : null;
+              let canonicalPath = null;
+              if (canonicalHref) {
+                try { canonicalPath = new URL(canonicalHref, url).pathname; } catch { /* no raw URL is retained */ }
+              }
+              const expectedPath = '/@' + encodeURIComponent(expectedUsername) + '/post/' + encodeURIComponent(contentId);
+              const legacyPath = '/content/' + encodeURIComponent(contentId);
+              const canonicalTarget = canonicalPath === expectedPath
+                ? 'EXPECTED_CANONICAL'
+                : canonicalPath === legacyPath
+                  ? 'LEGACY_CONTENT_FALLBACK'
+                  : canonicalPath
+                    ? 'OTHER'
+                    : 'NONE';
+              const rawTitle = /<title\\b[^>]*>([\\s\\S]*?)<\\/title>/i.exec(html)?.[1] ?? '';
+              const metadataTitleKind = rawTitle.includes('内容不存在')
+                ? 'NOT_FOUND'
+                : rawTitle.includes('LuckRead')
+                  ? 'CONTENT'
+                  : rawTitle.trim()
+                    ? 'OTHER'
+                    : 'MISSING';
               return {
                 status: response.status,
                 finalPath: new URL(response.url).pathname,
+                contentType,
+                canonicalTarget,
+                metadataTitleKind,
+                hasNextDocument: /<!doctype html|<html\\b/i.test(html),
+                hasNextFlightPayload: /__next_f\\.push|self\\.__next_f/i.test(html),
+                hasNotFoundMarker: html.includes('NEXT_HTTP_ERROR_FALLBACK;404'),
+                htmlBytes: new TextEncoder().encode(html).byteLength,
               };
             } catch (error) {
               return { status: null, error: error instanceof Error ? error.name : 'FETCH_FAILED' };
@@ -238,6 +285,9 @@ jobs:
           else if (report.publicApi.status !== 200) report.classification = 'W03_PUBLIC_API_READ_MISMATCH';
           else if (!anyAuthorMatch && report.authorByUsername.status === 200) report.classification = 'AUTHOR_ID_MAPPING_MISMATCH';
           else if (!anyAuthorMatch) report.classification = 'AUTHOR_PROFILE_NOT_RESOLVED_BY_CONTENT_ID';
+          else if (report.canonicalPage.status !== 200 && report.canonicalPage.canonicalTarget === 'EXPECTED_CANONICAL') report.classification = 'SSR_ROUTE_FAILURE_AFTER_AUTHOR_RESOLUTION';
+          else if (report.canonicalPage.status !== 200 && report.canonicalPage.canonicalTarget === 'LEGACY_CONTENT_FALLBACK') report.classification = 'SSR_AUTHOR_CONTEXT_OR_PROFILE_PROJECTION_MISMATCH';
+          else if (report.canonicalPage.status !== 200 && report.canonicalPage.metadataTitleKind === 'NOT_FOUND') report.classification = 'SSR_CONTENT_LOOKUP_MISMATCH';
           else if (report.canonicalPage.status !== 200) report.classification = 'CANONICAL_PAGE_ROUTE_FAILURE';
           else report.classification = 'PUBLIC_CONTENT_LINK_OK';
 
