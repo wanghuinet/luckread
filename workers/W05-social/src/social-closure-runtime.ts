@@ -226,17 +226,23 @@ export async function syncSocialTokens(
   const tokens = extractSocialTokens(text)
   const now = new Date().toISOString()
   const previousMentions = await db.prepare(
-    `SELECT mentioned_user_id, handle
+    `SELECT mention_id, mentioned_user_id, handle
        FROM social_mentions
       WHERE target_type = ? AND target_id = ?`,
   ).bind(targetValue.targetType, targetValue.targetId).all<{
+    mention_id: string
     mentioned_user_id: string
     handle: string
   }>()
   const previousByHandle = new Map<string, MentionTarget | null>()
+  const currentMentionHandles = new Set(
+    tokens.filter((token) => token.kind === 'mention').map((token) => token.normalized),
+  )
+  const retainedMentionIds: string[] = []
   for (const row of previousMentions.results ?? []) {
     const normalizedHandle = row.handle.trim().replace(/^[@＠]/, '').normalize('NFKC').toLocaleLowerCase('en-US')
     if (!normalizedHandle) continue
+    if (currentMentionHandles.has(normalizedHandle)) retainedMentionIds.push(row.mention_id)
     const previous = previousByHandle.get(normalizedHandle)
     if (previous && previous.userId !== row.mentioned_user_id) {
       previousByHandle.set(normalizedHandle, null)
@@ -248,9 +254,21 @@ export async function syncSocialTokens(
     }
   }
 
+  const deleteRemovedMentions = retainedMentionIds.length
+    ? db.prepare(
+        `DELETE FROM social_mentions
+          WHERE target_type = ? AND target_id = ?
+            AND mention_id NOT IN (${retainedMentionIds.map(() => '?').join(', ')})`,
+      ).bind(targetValue.targetType, targetValue.targetId, ...retainedMentionIds)
+    : db.prepare(
+        'DELETE FROM social_mentions WHERE target_type = ? AND target_id = ?',
+      ).bind(targetValue.targetType, targetValue.targetId)
+
+  // Preserve rows for handles that remain in the edited text. This makes the
+  // original identity durable even if later inserts or notification writes fail.
   await db.batch([
     db.prepare('DELETE FROM social_target_topics WHERE target_type = ? AND target_id = ?').bind(targetValue.targetType, targetValue.targetId),
-    db.prepare('DELETE FROM social_mentions WHERE target_type = ? AND target_id = ?').bind(targetValue.targetType, targetValue.targetId),
+    deleteRemovedMentions,
   ])
 
   const topics = tokens.filter((token) => token.kind === 'hashtag')
@@ -288,19 +306,21 @@ export async function syncSocialTokens(
     const hadPreviousIdentity = previous !== undefined && previous !== null
     const entry = previous === undefined ? resolved.get(token.normalized) : previous ?? undefined
     if (!entry || entry.userId === actorUserId) continue
-    await db.prepare(
-      `INSERT OR IGNORE INTO social_mentions
-        (mention_id, target_type, target_id, actor_user_id, mentioned_user_id, handle, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    ).bind(
-      crypto.randomUUID(),
-      targetValue.targetType,
-      targetValue.targetId,
-      actorUserId,
-      entry.userId,
-      entry.handle,
-      now,
-    ).run()
+    if (!hadPreviousIdentity) {
+      await db.prepare(
+        `INSERT OR IGNORE INTO social_mentions
+          (mention_id, target_type, target_id, actor_user_id, mentioned_user_id, handle, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      ).bind(
+        crypto.randomUUID(),
+        targetValue.targetType,
+        targetValue.targetId,
+        actorUserId,
+        entry.userId,
+        entry.handle,
+        now,
+      ).run()
+    }
 
     if (!hadPreviousIdentity) {
       await enqueueNotification(db, {
