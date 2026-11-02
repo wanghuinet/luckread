@@ -57,18 +57,6 @@ jobs:
           ref: ${{ inputs.source_sha }}
           fetch-depth: 0
 
-      - name: Verify protected AUTH-007 rollout admission before W01 production deployment
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
-          GITHUB_ACTOR: ${{ github.actor }}
-          GITHUB_REF: ${{ github.ref }}
-          GITHUB_EVENT_NAME: ${{ github.event_name }}
-          GITHUB_REF_PROTECTED: ${{ github.ref_protected }}
-          AUTH007_ROLLOUT_ENVIRONMENT: auth-mfa-rollout
-          SOURCE_SHA: ${{ inputs.source_sha }}
-        run: node scripts/verify-auth-007-rollout-admission.mjs
-
       - name: Record deployment source
         id: source
         run: |

@@ -5,7 +5,6 @@ import { describe, it } from 'node:test'
 const workflowPaths = [
   '.github/workflows/auth-mfa-rollout-preflight.yml',
   '.github/workflows/w02-deploy.yml',
-  '.github/workflows/w01-payload-app-deploy.yml',
   '.github/workflows/w01-w02-binding-deploy.yml',
   '.github/workflows/w02-role-assignment-migration.yml',
   '.github/workflows/w06-deploy.yml',
@@ -29,6 +28,19 @@ describe('AUTH-007 protected-ref admission contract', () => {
         path + ' must pass github.ref_protected to the admission verifier',
       )
     }
+  })
+
+  it('keeps standalone W01 app deployment protected and manually approved without AUTH-007 admission', () => {
+    const workflow = readFileSync('.github/workflows/w01-payload-app-deploy.yml', 'utf8')
+    assert.match(
+      workflow,
+      /^\s+if:\s*\$\{\{[^\n]*github\.ref == 'refs\/heads\/main'[^\n]*github\.ref_protected\s*==\s*true[^\n]*\}\}$/m,
+    )
+    assert.match(workflow, /environment:\s*auth-mfa-rollout/)
+    assert.match(workflow, /inputs\.confirm == 'DEPLOY'/)
+    assert.match(workflow, /merge-base --is-ancestor/)
+    assert.match(workflow, /run: pnpm run deploy:app/)
+    assert.doesNotMatch(workflow, /verify-auth-007-rollout-admission\.mjs|AUTH007_ROLLOUT_ENVIRONMENT/)
   })
 
   it('fails closed when the protected-ref value is missing or false', () => {

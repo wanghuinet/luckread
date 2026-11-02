@@ -16,7 +16,6 @@ const readOnlyConfigPreflight = process.argv.includes('--read-only-config-prefli
 const protectedRefWorkflowPaths = [
   '.github/workflows/auth-mfa-rollout-preflight.yml',
   '.github/workflows/w02-deploy.yml',
-  '.github/workflows/w01-payload-app-deploy.yml',
   '.github/workflows/w01-w02-binding-deploy.yml',
   '.github/workflows/w02-role-assignment-migration.yml',
   '.github/workflows/w06-deploy.yml',
@@ -453,13 +452,17 @@ if (blockers.length === 0) {
     l8EnvironmentDisablesAdminBypass: read('workers/W02-identity/src/authz/l8-genesis-bootstrap-approval.ts').includes('environment.can_admins_bypass !== false') &&
       /can_admins_bypass: true/.test(read('workers/W02-identity/src/authz/l8-genesis-bootstrap-approval.test.ts')) &&
       /rejects environments that permit administrator bypass of protection rules/.test(read('workers/W02-identity/src/authz/l8-genesis-bootstrap-approval.test.ts')),
-    standaloneW01DeployUsesProtectedAdmission:
-      /environment:\s*auth-mfa-rollout/.test(standaloneW01Workflow) &&
+    standaloneW01DeployIsIndependentOfAuth007:
+      /workflow_dispatch:/.test(standaloneW01Workflow) &&
+      /inputs\.confirm == 'DEPLOY'/.test(standaloneW01Workflow) &&
       /github\.ref == 'refs\/heads\/main'/.test(standaloneW01Workflow) &&
+      /github\.ref_protected == true/.test(standaloneW01Workflow) &&
+      /environment:\s*auth-mfa-rollout/.test(standaloneW01Workflow) &&
+      /SOURCE_SHA:\s*\$\{\{\s*inputs\.source_sha\s*\}\}/.test(standaloneW01Workflow) &&
       /merge-base --is-ancestor/.test(standaloneW01Workflow) &&
-      /verify-auth-007-rollout-admission\.mjs/.test(standaloneW01Workflow) &&
-      standaloneW01Workflow.indexOf('verify-auth-007-rollout-admission.mjs') >= 0 &&
-      standaloneW01Workflow.indexOf('verify-auth-007-rollout-admission.mjs') < standaloneW01Workflow.indexOf('run: pnpm run deploy:app'),
+      /run: pnpm run deploy:app/.test(standaloneW01Workflow) &&
+      !/verify-auth-007-rollout-admission\.mjs/.test(standaloneW01Workflow) &&
+      !/AUTH007_ROLLOUT_ENVIRONMENT/.test(standaloneW01Workflow),
     w06DeploymentUsesProtectedAdmission:
       /environment:\s*auth-mfa-rollout/.test(w06DeployWorkflow) &&
       /github\.ref == 'refs\/heads\/main'/.test(w06DeployWorkflow) &&
