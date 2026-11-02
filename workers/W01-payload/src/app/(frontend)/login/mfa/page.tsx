@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from 'react'
 import Link from 'next/link'
+import '../../../../styles/account-auth.css'
 import { useRouter } from 'next/navigation'
 import { fetchJson, jsonHeaders } from '../../../../lib/client-api.js'
 
@@ -109,7 +110,7 @@ export default function MfaSetupPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-[70vh] w-full max-w-2xl items-center px-4 py-10">
+    <main className="lr-account-auth-page mx-auto flex min-h-[70vh] w-full max-w-2xl items-center px-4 py-10">
       <section className="w-full rounded-2xl border border-light-line-reply bg-main-background p-6 shadow-sm dark:border-dark-border">
         <h1 className="text-2xl font-bold text-light-primary dark:text-dark-primary">配置双重验证</h1>
         <p className="mt-2 text-sm text-light-secondary dark:text-dark-secondary">
