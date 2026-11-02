@@ -5,7 +5,9 @@ import { middleware } from '../../src/middleware'
 
 import {
   buildUsernameRedirectPathname,
+  isUsernameRedirectActive,
   normalizeUsernameRedirectHandle,
+  usernameRedirectExpiresAt,
   parseUsernameRoutePath,
   usernameRedirectFromPath,
   usernameRedirectTargetPath,
@@ -15,6 +17,16 @@ describe('username 301 URL rules', () => {
   it('uses a case-folded history key and keeps the display username in the destination', () => {
     expect(usernameRedirectFromPath('HuiHui')).toBe('/@huihui')
     expect(usernameRedirectTargetPath('HuiXin')).toBe('/@HuiXin')
+  })
+
+  it('expires redirects after 30 days and treats the expiry instant as inactive', () => {
+    const changedAt = new Date('2026-11-02T00:00:00.000Z')
+    const expiresAt = '2026-12-02T00:00:00.000Z'
+    expect(usernameRedirectExpiresAt(changedAt)).toBe(expiresAt)
+    expect(isUsernameRedirectActive(expiresAt, new Date('2026-12-01T23:59:59.999Z'))).toBe(true)
+    expect(isUsernameRedirectActive(expiresAt, new Date(expiresAt))).toBe(false)
+    expect(isUsernameRedirectActive('not-a-date', changedAt)).toBe(false)
+    expect(isUsernameRedirectActive(null, changedAt)).toBe(false)
   })
 
   it('preserves the content-type route and immutable content ID', () => {
