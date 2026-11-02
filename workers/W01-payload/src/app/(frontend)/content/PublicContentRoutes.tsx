@@ -75,7 +75,7 @@ const readPublicContentResponse = async (response: Response): Promise<PublicCont
     throw new Error('PUBLIC_CONTENT_READ_FAILED:' + response.status)
   }
 
-  const value: unknown = await response.json().catch(() => null)
+  const value: unknown = await response.json().catch((): null => null)
   if (!value || typeof value !== 'object' || Array.isArray(value) ||
       typeof (value as { id?: unknown }).id !== 'string') {
     throw new Error('PUBLIC_CONTENT_RESPONSE_INVALID')
@@ -116,7 +116,7 @@ const getPublicAuthorById = cache(async (userId: string): Promise<PublicAuthor |
     throw new Error('PUBLIC_AUTHOR_READ_FAILED:' + response.status)
   }
 
-  const value: unknown = await response.json().catch(() => null)
+  const value: unknown = await response.json().catch((): null => null)
   if (!value || typeof value !== 'object' || Array.isArray(value) ||
       typeof (value as { username?: unknown }).username !== 'string') {
     throw new Error('PUBLIC_AUTHOR_RESPONSE_INVALID')
