@@ -28,6 +28,9 @@ on:
       - 'workers/W01-payload/src/app/(twitter-clone)/content/[contentId]/page.tsx'
       - 'workers/W01-payload/src/app/api/v1/shares/[shareId]/route.ts'
       - 'workers/W01-payload/src/content/w03-content-client.ts'
+      - 'workers/W01-payload/src/content/public-content-detail-reader.ts'
+      - 'workers/W01-payload/src/users/public-user-profile-reader.ts'
+      - 'workers/W01-payload/src/app/(frontend)/content/PublicContentRoutes.tsx'
       - 'workers/W01-payload/src/social/w05-social-client.ts'
       - 'workers/W01-payload/wrangler.jsonc'
       - 'workers/W03-content/src/**'
@@ -52,6 +55,9 @@ on:
       - 'workers/W01-payload/src/app/auth/**'
       - 'workers/W01-payload/src/app/api/v1/contents/**'
       - 'workers/W01-payload/src/content/w03-content-client.ts'
+      - 'workers/W01-payload/src/content/public-content-detail-reader.ts'
+      - 'workers/W01-payload/src/users/public-user-profile-reader.ts'
+      - 'workers/W01-payload/src/app/(frontend)/content/PublicContentRoutes.tsx'
       - 'workers/W01-payload/src/social/w05-social-client.ts'
       - 'workers/W01-payload/wrangler.jsonc'
       - 'workers/W03-content/src/**'
@@ -109,16 +115,23 @@ jobs:
           }
           const listRoute = fs.readFileSync('workers/W01-payload/src/app/api/v1/contents/route.ts', 'utf8')
           const detailRoute = fs.readFileSync('workers/W01-payload/src/app/api/v1/contents/[contentId]/route.ts', 'utf8')
+          const contentDetailReader = fs.readFileSync('workers/W01-payload/src/content/public-content-detail-reader.ts', 'utf8')
+          const userProfileRoute = fs.readFileSync('workers/W01-payload/src/app/api/v1/users/[userId]/route.ts', 'utf8')
+          const userProfileReader = fs.readFileSync('workers/W01-payload/src/users/public-user-profile-reader.ts', 'utf8')
           if (!listRoute.includes('cachedPublicGet')) throw new Error('public content list is not cache-first')
-          if (!detailRoute.includes('cachedPublicGet')) throw new Error('public content detail is not cache-first')
+          if (!detailRoute.includes('getPublicContentDetailResponse')) throw new Error('public content detail route does not use shared reader')
+          if (!contentDetailReader.includes('cachedPublicGet')) throw new Error('public content detail reader is not cache-first')
+          if (!contentDetailReader.includes('enforcePublicReadRateLimit')) throw new Error('public content detail reader is missing public-read edge rate limit')
+          if (!contentDetailReader.includes('hasAuthenticatedSessionCredential')) throw new Error('public content detail reader is missing authenticated cache bypass')
           if (!detailRoute.includes('invalidatePublicContentDetail')) throw new Error('content cache invalidation missing')
+          if (!userProfileRoute.includes('getPublicUserProfileResponse')) throw new Error('public user profile route does not use shared reader')
+          if (!userProfileReader.includes('cachedPublicGet')) throw new Error('public user profile reader is not cache-first')
+          if (!userProfileReader.includes('enforcePublicReadRateLimit')) throw new Error('public user profile reader is missing public-read edge rate limit')
           for (const [path, marker] of [
-            ['workers/W01-payload/src/app/api/v1/users/[userId]/route.ts', 'cachedPublicGet'],
             ['workers/W01-payload/src/app/api/v1/users/[userId]/followers/route.ts', 'cachedPublicGet'],
             ['workers/W01-payload/src/app/api/v1/users/[userId]/following/route.ts', 'cachedPublicGet'],
             ['workers/W01-payload/src/app/api/v1/contents/[contentId]/comments/route.ts', 'cachedPublicGet'],
-            ['workers/W01-payload/src/app/api/v1/shares/[shareId]/route.ts', 'cachedPublicGet'],
-            ['workers/W01-payload/src/app/api/v1/users/[userId]/route.ts', 'enforcePublicReadRateLimit']
+            ['workers/W01-payload/src/app/api/v1/shares/[shareId]/route.ts', 'cachedPublicGet']
           ]) {
             if (!fs.readFileSync(path, 'utf8').includes(marker)) throw new Error(path + ' is not cache-first')
           }
