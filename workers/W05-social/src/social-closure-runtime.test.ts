@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 import { describe, expect, it, vi } from 'vitest'
-import { enqueueNotification, extractSocialTokens, getContentSocialSummary, listDiscoveryTopics, syncSocialTokens } from './social-closure-runtime.js'
+import { enqueueNotification, extractSocialTokens, getContentSocialSummary, getSocialTargets, listDiscoveryTopics, syncSocialTokens } from './social-closure-runtime.js'
 
 describe('W05 unified social closure', () => {
   it('normalizes and deduplicates mentions and hashtags', () => {
@@ -140,6 +140,35 @@ describe('W05 unified social closure', () => {
     const mentionInsert = inserts.find(({ sql }) => sql.includes('INSERT OR IGNORE INTO social_mentions'))
     expect(mentionInsert?.values[4]).toBe('mentioned-user')
     expect(inserts.some(({ sql }) => sql.includes('INSERT OR IGNORE INTO social_notifications'))).toBe(true)
+  })
+
+  it('keeps a historical mention attached to its stored identity after its handle is reclaimed', async () => {
+    const queries: string[] = []
+    const db = {
+      prepare: (sql: string) => {
+        queries.push(sql)
+        return {
+          bind: (..._values: unknown[]) => ({
+            all: async () => sql.includes('FROM social_mentions')
+              ? { results: [{ mentioned_user_id: 'original-user-id', handle: 'alice' }] }
+              : { results: [] },
+          }),
+        }
+      },
+    } as unknown as D1Database
+
+    // The current username owner may now be a different account. Historical
+    // reads must use the immutable ID captured when the mention was created.
+    await expect(getSocialTargets(db, 'content', 'content-1')).resolves.toEqual({
+      topics: [],
+      mentions: [{ userId: 'original-user-id', handle: 'alice' }],
+    })
+
+    const mentionRead = queries.find(sql => sql.includes('FROM social_mentions'))
+    expect(mentionRead).toContain('SELECT mentioned_user_id, handle')
+    expect(mentionRead).toContain('WHERE target_type = ? AND target_id = ?')
+    expect(mentionRead).not.toMatch(/\\bJOIN\\s+(users|profiles)\\b/i)
+    expect(mentionRead).not.toMatch(/\\busername\\b/i)
   })
 
   it('fails closed for content token sync without W03 context or when the actor is not the owner', async () => {
