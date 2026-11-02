@@ -345,7 +345,7 @@ jobs:
               writeFileSync('.wrangler/public-content-404-probe-worker.mjs',
                 'export default { async fetch() { return new Response("read-only probe"); } };\n');
               const probeConfig = {
-                name: 'luckread-w01-readonly-binding-probe',
+                name: wrangler.name,
                 main: 'public-content-404-probe-worker.mjs',
                 compatibility_date: wrangler.compatibility_date ?? '2025-08-15',
                 compatibility_flags: wrangler.compatibility_flags ?? [],
