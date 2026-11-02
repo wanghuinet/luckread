@@ -2273,4 +2273,115 @@ describe('W03 username redirect eligibility', () => {
     expect(forwardedCookie.status).toBe(403)
     expect(databaseReads).toBe(readsBeforeReject)
   })
+
+  it('exposes published owner identity only through the W01 internal author context', async () => {
+    const contentRow = {
+      id: 'content_public_123',
+      content_type: 'post',
+      owner_user_id: 'w02-user-123',
+      creator_id: 'creator-identity-456',
+      ip_id: null,
+      state: 'PUBLISHED',
+      scheduled_at: null,
+      access_mode: 'PUBLIC',
+      version: 1,
+      revision: 1,
+      slug: 'public-post-123',
+      title: 'Public post',
+      body_ref: 'body-ref',
+      media_refs_json: '[]',
+      cover_ref: null,
+      etag: 'W/"1"',
+      created_at: '2026-11-01T00:00:00.000Z',
+      updated_at: '2026-11-01T00:00:00.000Z',
+    }
+    let row: typeof contentRow | null = { ...contentRow }
+    let query = ''
+    let bindings: unknown[] = []
+    let databaseReads = 0
+    const allowLimiter = { limit: async () => ({ success: true }) }
+    const env = {
+      D1_02: {
+        prepare(sql: string) {
+          query = sql
+          return {
+            bind(...values: unknown[]) {
+              bindings = values
+              return {
+                first: async () => {
+                  databaseReads += 1
+                  return row ? { ...row } : null
+                },
+              }
+            },
+          }
+        },
+      },
+      CONTENT_ORIGIN_GLOBAL_LIMITER: allowLimiter,
+      CONTENT_PUBLIC_READ_LIMITER: allowLimiter,
+      CONTENT_MUTATION_LIMITER: allowLimiter,
+    } as never
+
+    const makeRequest = (
+      path: string,
+      caller = 'W01',
+      method = 'GET',
+      extraHeaders: Record<string, string> = {},
+    ) => new Request('https://luckread-w03.internal' + path, {
+      method,
+      headers: {
+        'X-LuckRead-Caller': caller,
+        'X-LuckRead-Transport-Version': '1.0',
+        'X-LuckRead-Correlation-Id': 'public-author-context-test',
+        ...extraHeaders,
+      },
+    })
+
+    const authorPath = '/internal/content/contents/content_public_123/public-author-context'
+    const authorResponse = await w03Worker.fetch(makeRequest(authorPath), env, {} as never)
+    expect(authorResponse.status).toBe(200)
+    await expect(authorResponse.json()).resolves.toMatchObject({
+      data: {
+        contentId: 'content_public_123',
+        ownerUserId: 'w02-user-123',
+      },
+    })
+    expect(query).toContain("state = 'PUBLISHED'")
+    expect(bindings).toEqual(['content_public_123', 'content_public_123'])
+    expect(databaseReads).toBe(1)
+
+    const publicDetail = await w03Worker.fetch(
+      makeRequest('/internal/content/contents/content_public_123'),
+      env,
+      {} as never,
+    )
+    expect(publicDetail.status).toBe(200)
+    const publicDetailBody = await publicDetail.json() as Record<string, unknown>
+    expect(publicDetailBody).not.toHaveProperty('ownerUserId')
+    expect(databaseReads).toBe(2)
+
+    const readsBeforeReject = databaseReads
+    const wrongCaller = await w03Worker.fetch(makeRequest(authorPath, 'W05'), env, {} as never)
+    expect(wrongCaller.status).toBe(403)
+    const forwardedCookie = await w03Worker.fetch(
+      makeRequest(authorPath, 'W01', 'GET', { Cookie: 'session=must-not-cross-service-binding' }),
+      env,
+      {} as never,
+    )
+    expect(forwardedCookie.status).toBe(403)
+    const forwardedPrincipal = await w03Worker.fetch(
+      makeRequest(authorPath, 'W01', 'GET', { 'X-LuckRead-Principal-User-Id': 'spoofed-user' }),
+      env,
+      {} as never,
+    )
+    expect(forwardedPrincipal.status).toBe(403)
+    const wrongMethod = await w03Worker.fetch(makeRequest(authorPath, 'W01', 'POST'), env, {} as never)
+    expect(wrongMethod.status).toBe(405)
+    expect(databaseReads).toBe(readsBeforeReject)
+
+    row = null
+    const unpublishedOrMissing = await w03Worker.fetch(makeRequest(authorPath), env, {} as never)
+    expect(unpublishedOrMissing.status).toBe(404)
+  })
+
 })
