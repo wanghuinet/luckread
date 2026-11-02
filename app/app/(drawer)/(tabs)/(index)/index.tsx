@@ -198,7 +198,7 @@ function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSig
         const hydratedById = new Map(
           hydratedItems
             .filter((item) => typeof item.contentId === 'string')
-            .map((item) => [item.contentId as string, item]),
+            .map((item): [string, FeedContent] => [item.contentId as string, item]),
         );
         setItems((current) =>
           current.map((item) => item.contentId ? hydratedById.get(item.contentId) ?? item : item),
