@@ -195,7 +195,7 @@ export default function RegisterForm({ policyVersion }: RegisterFormProps) {
   }
 
   return (
-    <main className="min-h-screen bg-main-background text-light-primary dark:text-dark-primary">
+    <main className="lr-account-auth-page min-h-screen bg-main-background text-light-primary dark:text-dark-primary">
       <div className="mx-auto flex min-h-screen w-full max-w-xl flex-col border-x border-light-border dark:border-dark-border">
 
         <section className="flex flex-1 flex-col px-4 py-6 sm:px-8" aria-labelledby="register-title">
