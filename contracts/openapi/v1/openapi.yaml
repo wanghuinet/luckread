@@ -799,7 +799,10 @@ paths:
                       username: { type: string, minLength: 6, maxLength: 32, pattern: '^[A-Za-z0-9]{6,32}$' }
                       usernameVersion: { type: integer, minimum: 0 }
                       lastChangedAt: { type: [string, 'null'], format: date-time }
-                      canChangeAt: { type: [string, 'null'], format: date-time }
+                      canChangeAt:
+                        type: [string, 'null']
+                        format: date-time
+                        description: Null when the 30-day username cooldown has expired or no change has yet occurred.
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '429': { $ref: '#/components/responses/RateLimited' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
