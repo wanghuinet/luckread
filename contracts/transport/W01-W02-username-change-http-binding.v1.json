@@ -40,7 +40,8 @@
         "usernameVersion",
         "changedAt",
         "canChangeAt",
-        "ETag"
+        "ETag",
+        "previousUsernameReservedUntil"
       ]
     }
   ],
