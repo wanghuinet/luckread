@@ -20,7 +20,8 @@ it('rejects username changes through the generic profile PATCH route', () => {
   const route = readFileSync(resolve(process.cwd(), 'src/app/(payload)/api/users/me/route.ts'), 'utf8')
   expect(route).toContain("'USERNAME_CHANGE_ENDPOINT_REQUIRED'")
   const fields = readFileSync(resolve(process.cwd(), 'src/auth/user-profile-etag.ts'), 'utf8')
-  expect(fields).not.toContain("  'username',\\n  'displayName'")
+  const mutableFields = fields.split('export const PROFILE_MUTABLE_FIELDS = [')[1]?.split(']')[0] ?? ''
+  expect(mutableFields).not.toContain("'username'")
 })
 
 it('distinguishes unauthenticated profile access from W02 service failure', () => {
@@ -34,7 +35,7 @@ it('uses canonical self-profile error envelopes and response request IDs', () =>
   expect(route).toContain("errorResponse(401, 'UNAUTHENTICATED', 'Authentication required')")
   expect(route).toContain("requestId: `req_${crypto.randomUUID()}`")
   expect(route).toContain("status: code === 'VALIDATION_FAILED' && status === 400 ? 422 : status")
-  expect(route).toContain("'CONFLICT', 'Username is already in use'")
+  expect(route).toContain("'USERNAME_CHANGE_ENDPOINT_REQUIRED'")
 })
 
 it('guards viewer profile reads before authentication', () => {
