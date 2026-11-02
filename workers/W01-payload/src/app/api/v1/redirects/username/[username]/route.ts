@@ -2,9 +2,9 @@ import { getPayload } from 'payload'
 
 import config from '@payload-config'
 import { enforcePublicReadRateLimit, TrafficLimitError, rateLimitResponse } from '@/auth/traffic-limit'
-import { cachedPublicGet } from '@/lib/public-response-cache'
 import {
   normalizeUsernameRedirectHandle,
+  isUsernameRedirectActive,
   usernameRedirectFromPath,
   usernameRedirectTargetPath,
 } from '@/lib/username-redirect'
@@ -14,6 +14,7 @@ type UsernameRedirectDocument = {
   redirectScope?: unknown
   identityId?: unknown
   destinationUsername?: unknown
+  expiresAt?: unknown
   to?: { type?: unknown; url?: unknown } | null
 }
 
@@ -44,55 +45,39 @@ export async function GET(
     const { username: rawUsername } = await context.params
     const username = normalizeUsernameRedirectHandle(rawUsername)
     if (!username) return notFound()
-
-    return await cachedPublicGet(
-      request,
-      'username-redirect',
-      async () => {
-        const payload = await getPayload({ config })
-        const result = await redirectAPI(payload).find({
-          collection: 'redirects',
-          where: {
-            and: [
-              { from: { equals: usernameRedirectFromPath(username) } },
-              { redirectScope: { equals: 'username' } },
-            ],
-          },
-          depth: 0,
-          limit: 1,
-          overrideAccess: true,
-        })
-
-        const redirect = result.docs[0]
-        const destinationUsername = normalizeUsernameRedirectHandle(redirect?.destinationUsername)
-        const destinationPath = destinationUsername
-          ? usernameRedirectTargetPath(destinationUsername)
-          : null
-
-        if (
-          !redirect ||
-          redirect.type !== '301' ||
-          redirect.redirectScope !== 'username' ||
-          typeof redirect.identityId !== 'string' ||
-          !redirect.identityId.trim() ||
-          redirect.to?.type !== 'custom' ||
-          !destinationPath ||
-          redirect.to.url !== destinationPath
-        ) {
-          return notFound()
-        }
-
-        return Response.json(
-          { targetUsername: destinationUsername },
-          { headers: { 'cache-control': 'public, max-age=0, s-maxage=10' } },
-        )
-      },
-      10,
-    )
+    const now = new Date()
+    const payload = await getPayload({ config })
+    const result = await redirectAPI(payload).find({
+      collection: 'redirects',
+      where: { and: [
+        { from: { equals: usernameRedirectFromPath(username) } },
+        { redirectScope: { equals: 'username' } },
+        { expiresAt: { greater_than: now.toISOString() } },
+      ] },
+      depth: 0, limit: 1, overrideAccess: true,
+    })
+    const redirect = result.docs[0]
+    const identityId = typeof redirect?.identityId === 'string' ? redirect.identityId.trim() : ''
+    const destinationUsername = normalizeUsernameRedirectHandle(redirect?.destinationUsername)
+    const destinationPath = destinationUsername ? usernameRedirectTargetPath(destinationUsername) : null
+    if (!redirect || redirect.type !== '301' || redirect.redirectScope !== 'username' || !identityId ||
+        !isUsernameRedirectActive(redirect.expiresAt, now) || redirect.to?.type !== 'custom' ||
+        !destinationPath || redirect.to.url !== destinationPath) return notFound()
+    // Never trust a historical row if the recorded identity no longer owns the destination handle.
+    const ownerResult = await payload.find({
+      collection: 'users',
+      where: { identityId: { equals: identityId } },
+      depth: 0, limit: 1, overrideAccess: true,
+    })
+    const currentOwner = ownerResult.docs[0]
+    const currentOwnerUsername = normalizeUsernameRedirectHandle(currentOwner?.username)
+    if (!currentOwner || currentOwner.identityId !== identityId || !currentOwnerUsername ||
+        currentOwnerUsername.toLowerCase() !== destinationUsername.toLowerCase()) return notFound()
+    return Response.json({ targetUsername: destinationUsername }, { headers: { 'cache-control': 'no-store' } })
   } catch (error) {
     if (error instanceof TrafficLimitError) return rateLimitResponse(request)
     return Response.json(
-      { error: { code: 'SERVICE_UNAVAILABLE', message: 'Username redirect service unavailable', details: {} }, requestId: `req_${crypto.randomUUID()}` },
+      { error: { code: 'SERVICE_UNAVAILABLE', message: 'Username redirect service unavailable', details: {} }, requestId: 'req_' + crypto.randomUUID() },
       { status: 503, headers: { 'cache-control': 'no-store', 'retry-after': '1' } },
     )
   }
