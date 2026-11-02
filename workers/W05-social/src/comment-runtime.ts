@@ -353,6 +353,7 @@ export async function createComment(
       depth: Number(validation.existing_depth ?? 0),
       createdAt: validation.existing_created_at ?? '',
       updatedAt: validation.existing_updated_at ?? validation.existing_created_at ?? '',
+      mentions: [],
     }
   }
 
