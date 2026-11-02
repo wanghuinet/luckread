@@ -164,31 +164,37 @@ it('cancels stale public profile content pagination requests', () => {
 })
 
 it('keeps arbitrary cookies from bypassing the public content cache', () => {
-  const route = read('src/app/api/v1/contents/[contentId]/route.ts')
-  expect(route).toContain('resolveOptionalCookieContentPrincipal')
-  expect(route).toContain('if (!hasAuthenticatedSessionCredential(request)) {')
-  expect(route).not.toContain("!request.headers.get('Authorization') && !request.headers.get('cookie')")
+  const reader = read('src/content/public-content-detail-reader.ts')
+  expect(reader).toContain('resolveOptionalCookieContentPrincipal')
+  expect(reader).toContain('if (!hasAuthenticatedSessionCredential(request)) {')
+  expect(reader).not.toContain("!request.headers.get('Authorization') && !request.headers.get('cookie')")
 })
 
 
-it('uses the canonical public W01 API for server-rendered content detail and metadata', () => {
+it('uses in-process W01 readers for server-rendered public content and author data', () => {
   const page = read('src/app/(twitter-clone)/content/[contentId]/page.tsx')
   const routes = read('src/app/(frontend)/content/PublicContentRoutes.tsx')
+  const contentReader = read('src/content/public-content-detail-reader.ts')
+  const userReader = read('src/users/public-user-profile-reader.ts')
   expect(page).toContain('generateMetadata')
   expect(page).toContain('generateLegacyContentMetadata(contentId)')
   expect(page).toContain('renderLegacyContentRoute(contentId)')
-  expect(routes).toContain("const PUBLIC_API_ORIGIN = 'https://api.luckread.com'")
-  expect(routes).toContain("new Request(PUBLIC_API_ORIGIN + '/v1/contents/'")
-  expect(routes).toContain("new Request(PUBLIC_API_ORIGIN + '/v1/users/'")
+  expect(routes).toContain('getPublicContentDetailResponse(')
+  expect(routes).toContain('getPublicUserProfileResponse(')
+  expect(routes).toContain("if (response.status === 404) return null")
+  expect(routes).toContain("throw new Error('PUBLIC_CONTENT_READ_FAILED:' + response.status)")
+  expect(routes).toContain("throw new Error('PUBLIC_AUTHOR_READ_FAILED:' + response.status)")
   expect(routes).toContain('alternates: { canonical:')
   expect(routes).toContain('permanentRedirect(canonicalPath(author, content))')
   expect(routes).toContain('showLanguageToggle={false}')
-  expect(routes).toContain("cache: 'no-store'")
-  expect(routes).not.toContain('callW03Content')
-  expect(routes).not.toContain('w03-content-client')
-  expect(routes).not.toContain('cachedPublicGet')
-  expect(routes).not.toContain('enforcePublicReadRateLimit')
-  expect(routes).not.toContain('/internal/content/contents/')
+  expect(routes).not.toContain('fetchJson')
+  expect(routes).not.toContain('api.luckread.com')
+  expect(contentReader).toContain('callW03Content')
+  expect(contentReader).toContain('W03_CONTENT')
+  expect(userReader).toContain('getPayload({ config })')
+  expect(userReader).toContain("throw error")
+  expect(contentReader).not.toContain('globalThis.fetch')
+  expect(userReader).not.toContain('globalThis.fetch')
 })
 
 it('keeps interactive content requests anonymous so signed-in browsers can use the shared cache', () => {
@@ -228,12 +234,12 @@ it('handles the follow DELETE no-body response without attempting JSON parsing',
 })
 
 
-it('retries a missing UUID-backed stable slug through the canonical public API by content ID', () => {
+it('retries a missing UUID-backed stable slug through W01 content detail by content ID', () => {
   const routes = read('src/app/(frontend)/content/PublicContentRoutes.tsx')
   expect(routes).toContain('const uuidFromStableContentSlug = (slug: string): string | null =>')
   expect(routes).toContain("const compactUuid = /-([0-9a-f]{32})$/i.exec(slug)?.[1]")
-  expect(routes).toContain('if (result.response.status === 404)')
+  expect(routes).toContain('if (!content && response.status === 404)')
   expect(routes).toContain('const fallbackId = uuidFromStableContentSlug(contentId)')
-  expect(routes).toContain('result = await fetchContentById(fallbackId, headersForRequest)')
-  expect(routes).toContain("new Request(PUBLIC_API_ORIGIN + '/v1/contents/'")
+  expect(routes).toContain('response = await fetchContentById(fallbackId, headersForRequest)')
+  expect(routes).toContain("new Request('https://luckread.com/api/v1/contents/'")
 })
