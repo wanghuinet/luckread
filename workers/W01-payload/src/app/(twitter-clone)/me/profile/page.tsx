@@ -205,7 +205,7 @@ export default function ProfilePage() {
     const idempotencyKey = usernameIdempotencyKey || 'username-change:' + crypto.randomUUID()
     setUsernameIdempotencyKey(idempotencyKey)
     try {
-      const { response, data } = await fetchJson<{ data?: { username?: string }; error?: { message?: string; code?: string } }>('/api/v1/users/me/username', {
+      const { response, data } = await fetchJson<{ data?: { username?: string; canChangeAt?: string | null }; error?: { message?: string; code?: string } }>('/api/v1/users/me/username', {
         method: 'PATCH',
         credentials: 'include',
         cache: 'no-store',
@@ -224,7 +224,7 @@ export default function ProfilePage() {
       }
       setUsernameDraft(savedUsername)
       setUsernameEtag(response.headers.get('ETag') ?? usernameEtag)
-      setUsernameCanChangeAt(typeof (data?.data as { canChangeAt?: unknown } | undefined)?.canChangeAt === 'string' ? (data.data as { canChangeAt: string }).canChangeAt : null)
+      setUsernameCanChangeAt(typeof data?.data?.canChangeAt === 'string' ? data.data.canChangeAt : null)
       setUsernameIdempotencyKey('')
       setProfile((current) => current ? { ...current, username: savedUsername } : current)
       // The profile ETag includes username. Refresh only the ETag while preserving
