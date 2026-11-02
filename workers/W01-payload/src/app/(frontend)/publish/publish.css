@@ -993,7 +993,7 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
-\n
+
 .lr-editor-plugin-button {
   min-height: 29px;
   padding: 0 8px;
@@ -1149,7 +1149,7 @@
     grid-template-columns: 1fr;
   }
 }
-\n
+
 .lr-editor-outline nav {
   min-width: 0;
 }
@@ -1222,7 +1222,7 @@
     min-height: 34px;
   }
 }
-\n
+
 .lr-editor-writer-stats-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -1273,7 +1273,7 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
-\n
+
 .lr-editor-markdown-actions {
   display: inline-flex;
   align-items: center;
