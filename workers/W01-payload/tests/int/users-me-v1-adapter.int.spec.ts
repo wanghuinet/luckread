@@ -16,6 +16,13 @@ describe('versioned users/me adapter', () => {
   })
 })
 
+it('rejects username changes through the generic profile PATCH route', () => {
+  const route = readFileSync(resolve(process.cwd(), 'src/app/(payload)/api/users/me/route.ts'), 'utf8')
+  expect(route).toContain("'USERNAME_CHANGE_ENDPOINT_REQUIRED'")
+  const fields = readFileSync(resolve(process.cwd(), 'src/auth/user-profile-etag.ts'), 'utf8')
+  expect(fields).not.toContain("  'username',\\n  'displayName'")
+})
+
 it('distinguishes unauthenticated profile access from W02 service failure', () => {
   const route = readFileSync(resolve(process.cwd(), 'src/app/(payload)/api/users/me/route.ts'), 'utf8')
   expect(route).toContain('error instanceof W02AuthClientError && error.status === 401')
