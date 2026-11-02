@@ -313,7 +313,7 @@ jobs:
         run: |
           set -euo pipefail
           set +e
-          timeout --signal=TERM --kill-after=10s 150s node --input-type=module <<'NODE'
+          timeout --signal=TERM --kill-after=10s 120s node --input-type=module <<'NODE'
           import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
           import { getPlatformProxy } from 'wrangler';
 
@@ -337,15 +337,13 @@ jobs:
             if (binding.length !== 1 || binding[0].service !== 'luckread-w03') {
               probe.classification = 'W01_W03_SERVICE_BINDING_CONFIG_MISMATCH';
             } else {
-              // Build a temporary local-only config that reuses the exact
-              // deployed service name and binding name. "remote: true" is
-              // required for Wrangler's local proxy to reach deployed W03.
-              // This file is never deployed and creates no Cloudflare resource.
+              // Local-only Worker identity. The binding target remains the
+              // exact deployed W03 service configured in production W01.
               mkdirSync('.wrangler', { recursive: true });
               writeFileSync('.wrangler/public-content-404-probe-worker.mjs',
                 'export default { async fetch() { return new Response("read-only probe"); } };\n');
               const probeConfig = {
-                name: wrangler.name,
+                name: 'luckread-w01-readonly-binding-probe',
                 main: 'public-content-404-probe-worker.mjs',
                 compatibility_date: wrangler.compatibility_date ?? '2025-08-15',
                 compatibility_flags: wrangler.compatibility_flags ?? [],
@@ -456,29 +454,11 @@ jobs:
           probe_exit=$?
           set -e
           if [ "$probe_exit" -eq 124 ] || [ "$probe_exit" -eq 137 ] || [ "$probe_exit" -eq 143 ]; then
-            echo "W01_W03_BINDING_PROBE_TIMEOUT"
-            node --input-type=module <<'NODE'
-            import { readFileSync, writeFileSync } from 'node:fs';
-            const path = '../../artifacts/public-content-404-diagnostic/report.json';
-            const report = JSON.parse(readFileSync(path, 'utf8'));
-            report.w01W03AuthorContext = {
-              status: null,
-              contentIdMatches: false,
-              ownerUserIdPresent: false,
-              ownerProfileStatus: null,
-              ownerUsernameMatches: false,
-              classification: 'W01_W03_BINDING_PROBE_TIMEOUT',
-            };
-            report.classification = 'W01_W03_BINDING_PROBE_TIMEOUT';
-            writeFileSync(path, JSON.stringify(report, null, 2) + '\n');
-            NODE
-          elif [ "$probe_exit" -ne 0 ]; then
-            echo "W01_W03_BINDING_PROBE_PROCESS_EXIT_$probe_exit"
-            PROBE_EXIT="$probe_exit" node --input-type=module <<'NODE'
-            import { readFileSync, writeFileSync } from 'node:fs';
-            const path = '../../artifacts/public-content-404-diagnostic/report.json';
-            const report = JSON.parse(readFileSync(path, 'utf8'));
-            const classification = 'W01_W03_BINDING_PROBE_PROCESS_EXIT_' + process.env.PROBE_EXIT;
+            PROBE_CLASSIFICATION="W01_W03_BINDING_PROBE_TIMEOUT" node --input-type=module -e '
+            import { readFileSync, writeFileSync } from "node:fs";
+            const path = "../../artifacts/public-content-404-diagnostic/report.json";
+            const report = JSON.parse(readFileSync(path, "utf8"));
+            const classification = process.env.PROBE_CLASSIFICATION;
             report.w01W03AuthorContext = {
               status: null,
               contentIdMatches: false,
@@ -488,8 +468,25 @@ jobs:
               classification,
             };
             report.classification = classification;
-            writeFileSync(path, JSON.stringify(report, null, 2) + '\n');
-            NODE
+            writeFileSync(path, JSON.stringify(report, null, 2) + "\\n");
+            '
+          elif [ "$probe_exit" -ne 0 ]; then
+            PROBE_CLASSIFICATION="W01_W03_BINDING_PROBE_PROCESS_EXIT_$probe_exit" node --input-type=module -e '
+            import { readFileSync, writeFileSync } from "node:fs";
+            const path = "../../artifacts/public-content-404-diagnostic/report.json";
+            const report = JSON.parse(readFileSync(path, "utf8"));
+            const classification = process.env.PROBE_CLASSIFICATION;
+            report.w01W03AuthorContext = {
+              status: null,
+              contentIdMatches: false,
+              ownerUserIdPresent: false,
+              ownerProfileStatus: null,
+              ownerUsernameMatches: false,
+              classification,
+            };
+            report.classification = classification;
+            writeFileSync(path, JSON.stringify(report, null, 2) + "\\n");
+            '
           fi
       - name: Upload sanitized diagnostic evidence
         if: always()
