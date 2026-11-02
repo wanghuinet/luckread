@@ -108,9 +108,9 @@ test('renders video list projections before asynchronous enrichment and settles 
   expect(videoScreen).toContain('mediaLoading: true');
   expect(videoScreen).toContain('mediaLoading: false');
   expect(videoScreen).toContain('settleVideoFeedEnrichment(');
-  expect(videoScreen).toContain('useVideoPlayer(null');
-  expect(videoScreen).toContain('player.replaceAsync(nextSource)');
-  expect(videoScreen).toContain('loadedSource !== item.videoSource');
+  expect(videoScreen).toContain('function VideoPlayerSurface(');
+  expect(videoScreen).toContain('useVideoPlayer(source');
+  expect(videoScreen).toContain('key={item.contentId +');
   expect(videoScreen).toContain('setItems((current) =>');
   expect(videoScreen).toContain('Video unavailable');
 });
