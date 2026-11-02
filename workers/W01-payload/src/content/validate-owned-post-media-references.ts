@@ -34,9 +34,9 @@ const normalizedTrustedUrl = (value: string, origin: string): string | null => {
 }
 
 /**
- * Resolve the persisted filename from a trusted media URL. Filename narrows
- * the owner-scoped candidate lookup; authorization still requires an exact
- * canonical URL match against the returned Payload Media record.
+ * Resolve the persisted filename from a trusted media URL. Filename is one
+ * candidate lookup key, not an authorization decision: Payload adapters may
+ * persist a URL whose final path segment does not exactly equal filename.
  */
 const filenameFromTrustedUrl = (value: string, origin: string): string | null => {
   const trusted = normalizedTrustedUrl(value, origin)
@@ -55,6 +55,21 @@ const filenameFromTrustedUrl = (value: string, origin: string): string | null =>
 
   if (!filename.trim() || filename.includes('/') || filename.includes('\\')) return null
   return filename
+}
+
+/**
+ * Include URL forms used by Payload upload adapters. These are lookup
+ * candidates only; every returned record is still checked against the exact
+ * canonical host and path before it can authorize a reference.
+ */
+const urlLookupCandidates = (value: string, canonical: string, origin: string): string[] => {
+  const candidates = new Set([value, canonical])
+  const trusted = normalizedTrustedUrl(value, origin)
+  if (trusted) {
+    const url = new URL(trusted)
+    candidates.add(url.pathname + url.search)
+  }
+  return Array.from(candidates)
 }
 
 const mediaProfileUnavailable: PostMediaReferenceValidation = {
@@ -106,12 +121,16 @@ export async function validateOwnedPostMediaReferencesWithPayload(
   ]))
   const normalized = new Map<string, string>()
   const filenames = new Set<string>()
+  const urlCandidates = new Set<string>()
   for (const ref of refs) {
     const canonical = normalizedTrustedUrl(ref, currentOrigin)
     const filename = filenameFromTrustedUrl(ref, currentOrigin)
     if (!canonical || !filename) return invalidReference()
     normalized.set(ref, canonical)
     filenames.add(filename)
+    for (const candidate of urlLookupCandidates(ref, canonical, currentOrigin)) {
+      urlCandidates.add(candidate)
+    }
   }
 
   const profileResult = await payload.find({
@@ -129,15 +148,21 @@ export async function validateOwnedPostMediaReferencesWithPayload(
     return mediaProfileUnavailable
   }
 
-  // ownerUserId and filename are persisted, indexed lookup fields. Use them to
-  // find candidate records, then compare the complete canonical URL so a
-  // same-named file on another path or host can never authorize a reference.
+  // Keep the owner constraint outside the OR so neither lookup route can ever
+  // return another account's media. Filename is the indexed fast path; URL
+  // candidates cover legacy/adapter records whose stored filename differs
+  // from the last URL segment. Authorization below still requires exact URL.
   const mediaResult = await payload.find({
     collection: 'media',
     where: {
       and: [
         { ownerUserId: { equals: String(payloadUserId) } },
-        { filename: { in: Array.from(filenames) } },
+        {
+          or: [
+            { filename: { in: Array.from(filenames) } },
+            { url: { in: Array.from(urlCandidates) } },
+          ],
+        },
       ],
     },
     limit: 100,
@@ -153,8 +178,6 @@ export async function validateOwnedPostMediaReferencesWithPayload(
     if (
       !media ||
       String(media.ownerUserId ?? '') !== String(payloadUserId) ||
-      typeof media.filename !== 'string' ||
-      !filenames.has(media.filename) ||
       typeof media.url !== 'string' ||
       !media.url.trim()
     ) continue
@@ -163,8 +186,8 @@ export async function validateOwnedPostMediaReferencesWithPayload(
     if (canonical) ownedCanonicalUrls.add(canonical)
   }
 
-  // Filename matches are only a lookup aid: a same-named asset under another
-  // prefix or host must not authorize this reference.
+  // Candidate lookup may use filename or URL variants, but only an exact
+  // canonical URL belonging to this Payload user can authorize the reference.
   for (const ref of refs) {
     const canonical = normalized.get(ref)
     if (!canonical || !ownedCanonicalUrls.has(canonical)) return invalidReference()
