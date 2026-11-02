@@ -48,8 +48,10 @@ describe('public username routes', () => {
     }
 
     expect(shared).toContain("'/@' + encodeURIComponent(username) + '/' + segment + '/'")
-    expect(shared).toContain("new Request(PUBLIC_API_ORIGIN + '/v1/contents/'")
-    expect(shared).toContain("new Request(PUBLIC_API_ORIGIN + '/v1/users/'")
+    expect(shared).toContain('getPublicContentDetailResponse(')
+    expect(shared).toContain('getPublicUserProfileResponse(')
+    expect(shared).not.toContain('PUBLIC_API_ORIGIN')
+    expect(shared).not.toContain('api.luckread.com')
     expect(canonicalRender).not.toContain('permanentRedirect(')
     expect(canonicalRender).toContain("requestedUsername.toLowerCase() !== canonicalUsername.toLowerCase()")
     expect(canonicalRender).toContain('routeTypeForContent(content, input.routeType) !== input.routeType')
