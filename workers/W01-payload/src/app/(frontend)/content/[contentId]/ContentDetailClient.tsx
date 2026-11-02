@@ -550,7 +550,7 @@ export default function ContentDetailPage({
         {!(content.contentType === 'post' && body.trim() === content.title.trim()) ? (
           <div className="px-4 py-4 sm:py-6">
             {structuredArticle ? (
-              <ArticleStructuredRenderer document={structuredArticle} />
+              <ArticleStructuredRenderer document={structuredArticle} mentions={socialMentions} />
             ) : body ? (
               <div className="flex flex-col gap-4">{splitBodyIntoParagraphs(body).map((paragraph, index) => (
                 <p className="whitespace-pre-wrap break-words text-[15px] leading-6 text-light-primary dark:text-dark-primary" key={index}>
