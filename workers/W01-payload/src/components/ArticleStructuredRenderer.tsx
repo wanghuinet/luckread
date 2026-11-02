@@ -66,7 +66,7 @@ export default function ArticleStructuredRenderer({ document, mentions = [] }: P
                   />
                 ))}
               </div>
-              {block.text ? <figcaption>{block.text}</figcaption> : null}
+              {block.text ? <figcaption><SocialMentionText text={block.text} mentions={mentions} /></figcaption> : null}
             </figure>
           )
         }
