@@ -13,6 +13,7 @@ CREATE TABLE auth_username_change_state (
   idempotency_key_hash TEXT NOT NULL CHECK (length(idempotency_key_hash) = 64),
   request_fingerprint TEXT NOT NULL CHECK (length(request_fingerprint) = 64),
   idempotency_expires_at TEXT NOT NULL,
+  changed_username TEXT NOT NULL,
   CHECK (
     (previous_username IS NULL AND previous_username_normalized IS NULL AND previous_username_expires_at IS NULL)
     OR
@@ -65,7 +66,7 @@ WHEN NEW.username IS NOT NULL
    SELECT 1
      FROM auth_username_change_state s
     WHERE s.previous_username_normalized = lower(NEW.username)
-      AND s.previous_username_expires_at > COALESCE(NEW.updated_at, NEW.created_at, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+      AND julianday(s.previous_username_expires_at) > julianday(COALESCE(NEW.updated_at, NEW.created_at, strftime('%Y-%m-%dT%H:%M:%fZ', 'now')))
  )
 BEGIN
   SELECT RAISE(ABORT, 'USERNAME_RESERVED');
