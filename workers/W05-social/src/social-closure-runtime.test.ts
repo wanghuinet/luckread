@@ -174,8 +174,11 @@ describe('W05 unified social closure', () => {
 
   it('preserves an existing mention identity when the same handle is later owned by another account', async () => {
     const inserts: Array<{ sql: string; values: unknown[] }> = []
+    const queries: string[] = []
     const db = {
-      prepare: (sql: string) => ({
+      prepare: (sql: string) => {
+        queries.push(sql)
+        return ({
         bind: (...values: unknown[]) => ({
           first: async () => null,
           all: async () => sql.includes('FROM social_mentions')
@@ -185,8 +188,8 @@ describe('W05 unified social closure', () => {
             inserts.push({ sql, values })
             return { success: true, meta: { changes: 1 } }
           },
-        }),
-      }),
+        })
+      },
       batch: async () => [],
     } as unknown as D1Database
     const contentContext = {
@@ -210,7 +213,10 @@ describe('W05 unified social closure', () => {
     const mentionInsert = inserts.find(({ sql }) => sql.includes('INSERT OR IGNORE INTO social_mentions'))
     expect(mentionInsert?.values[4]).toBe('original-user-id')
     expect(mentionInsert?.values[5]).toBe('alice')
-    expect(inserts.some(({ sql }) => sql.includes('FROM users') || sql.includes('username'))).toBe(false)
+    const priorLookup = queries.find((sql) => sql.includes('FROM social_mentions'))
+    expect(priorLookup).toContain('SELECT mentioned_user_id, handle')
+    expect(priorLookup).not.toContain('JOIN users')
+    expect(priorLookup).not.toContain('username')
   })
 
   it('fails closed for content token sync without W03 context or when the actor is not the owner', async () => {
