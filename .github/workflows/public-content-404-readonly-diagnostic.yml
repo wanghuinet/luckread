@@ -468,7 +468,7 @@ jobs:
               classification,
             };
             report.classification = classification;
-            writeFileSync(path, JSON.stringify(report, null, 2) + "\\n");
+            writeFileSync(path, JSON.stringify(report, null, 2) + "\n");
             '
           elif [ "$probe_exit" -ne 0 ]; then
             PROBE_CLASSIFICATION="W01_W03_BINDING_PROBE_PROCESS_EXIT_$probe_exit" node --input-type=module -e '
@@ -485,7 +485,7 @@ jobs:
               classification,
             };
             report.classification = classification;
-            writeFileSync(path, JSON.stringify(report, null, 2) + "\\n");
+            writeFileSync(path, JSON.stringify(report, null, 2) + "\n");
             '
           fi
       - name: Upload sanitized diagnostic evidence
