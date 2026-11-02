@@ -214,6 +214,7 @@ describe('W05 unified social closure', () => {
     const mentionInsert = inserts.find(({ sql }) => sql.includes('INSERT OR IGNORE INTO social_mentions'))
     expect(mentionInsert?.values[4]).toBe('original-user-id')
     expect(mentionInsert?.values[5]).toBe('alice')
+    expect(inserts.some(({ sql }) => sql.includes('INSERT OR IGNORE INTO social_notifications'))).toBe(false)
     const priorLookup = queries.find((sql) => sql.includes('FROM social_mentions'))
     expect(priorLookup).toContain('SELECT mentioned_user_id, handle')
     expect(priorLookup).not.toContain('JOIN users')
