@@ -4,6 +4,7 @@ import Link from 'next/link'
 import ContentComments from './ContentComments'
 import ContentLikesModal from './ContentLikesModal'
 import ArticleStructuredRenderer from '../../../../components/ArticleStructuredRenderer.js'
+import SocialMentionText from '../../../../components/SocialMentionText.js'
 import { tryDeserializeArticleDocument } from '../../../../lib/article-document.js'
 import { useEffect, useMemo, useState } from 'react'
 
@@ -552,7 +553,9 @@ export default function ContentDetailPage({
               <ArticleStructuredRenderer document={structuredArticle} />
             ) : body ? (
               <div className="flex flex-col gap-4">{splitBodyIntoParagraphs(body).map((paragraph, index) => (
-                <p className="whitespace-pre-wrap break-words text-[15px] leading-6 text-light-primary dark:text-dark-primary" key={index}>{paragraph}</p>
+                <p className="whitespace-pre-wrap break-words text-[15px] leading-6 text-light-primary dark:text-dark-primary" key={index}>
+                  <SocialMentionText text={paragraph} mentions={socialMentions} />
+                </p>
               ))}</div>
             ) : (
               <p className="text-sm text-light-secondary dark:text-dark-secondary">{copy.detail.bodyPreparing}</p>
