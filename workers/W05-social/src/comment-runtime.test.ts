@@ -91,6 +91,7 @@ describe('comment runtime', () => {
       contentId: 'content-1',
       authorUserId: 'user-1',
       state: 'PUBLISHED',
+      mentions: [],
     })
     expect(d.prepare).toHaveBeenCalledTimes(1)
   })
