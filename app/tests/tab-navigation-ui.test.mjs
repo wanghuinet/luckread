@@ -43,3 +43,12 @@ test('home route exposes an actionable error boundary instead of an unhandled bl
   expect(homeScreen).toContain('export function ErrorBoundary({ error, retry }: ErrorBoundaryProps)');
   expect(homeScreen).toContain('onPress={retry}');
 });
+
+
+test('root route boundary catches render failures across all native app pages', () => {
+  const rootLayout = readFileSync(new URL('../app/_layout.tsx', import.meta.url), 'utf8');
+
+  expect(rootLayout).toContain('export function ErrorBoundary({ error, retry }: ErrorBoundaryProps)');
+  expect(rootLayout).toContain('LuckRead 页面暂时无法显示');
+  expect(rootLayout).toContain('onPress={retry}');
+});
