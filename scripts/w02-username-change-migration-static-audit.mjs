@@ -55,12 +55,12 @@ try {
     INSERT INTO auth_username_change_state (
       user_id, username_version, last_changed_at, previous_username,
       previous_username_normalized, previous_username_expires_at,
-      idempotency_key_hash, request_fingerprint, idempotency_expires_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      idempotency_key_hash, request_fingerprint, idempotency_expires_at, changed_username
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     'u1', 1, '2026-11-02T00:01:00.000Z', 'OldName', 'oldname',
     '2026-12-02T00:01:00.000Z', 'a'.repeat(64), 'b'.repeat(64),
-    '2026-11-03T00:01:00.000Z'
+    '2026-11-03T00:01:00.000Z', 'NewName'
   )
 
   const insertUser = db.prepare('INSERT INTO "user" (id, username, account_state, updated_at, created_at) VALUES (?, ?, ?, ?, ?)')
