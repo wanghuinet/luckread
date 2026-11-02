@@ -172,8 +172,10 @@ describe('1.1 content lifecycle closeout', () => {
 
     expect(publicDetail).toContain('renderLegacyContentRoute(contentId)')
     expect(publicDetail).toContain('generateLegacyContentMetadata(contentId)')
-    expect(publicRoutes).toContain("new Request(PUBLIC_API_ORIGIN + '/v1/contents/'")
-    expect(publicRoutes).toContain("new Request(PUBLIC_API_ORIGIN + '/v1/users/'")
+    expect(publicRoutes).toContain('getPublicContentDetailResponse(')
+    expect(publicRoutes).toContain('getPublicUserProfileResponse(')
+    expect(publicRoutes).not.toContain('PUBLIC_API_ORIGIN')
+    expect(publicRoutes).not.toContain('api.luckread.com')
     expect(publicRoutes).toContain("content.state !== 'PUBLISHED'")
     expect(publicRoutes).toContain('permanentRedirect(canonicalPath(author, content))')
     expect(publicDetailClient).toContain("apiFetch(resolved.bodyRef")
