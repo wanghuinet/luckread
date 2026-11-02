@@ -128,6 +128,13 @@ export default buildConfig({
             required: true,
             admin: { position: 'sidebar', readOnly: true },
           },
+          {
+            name: 'expiresAt',
+            type: 'date',
+            required: true,
+            index: true,
+            admin: { position: 'sidebar', readOnly: true },
+          },
         ],
       },
     }),
