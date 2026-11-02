@@ -9,6 +9,9 @@ on:
       - 'workers/W01-payload/src/lib/content-list-cache-guard.ts'
       - 'workers/W01-payload/src/lib/content-list-cache-guard.test.ts'
       - 'workers/W01-payload/src/app/api/v1/contents/**'
+      - 'workers/W01-payload/src/app/(frontend)/content/PublicContentRoutes.tsx'
+      - 'workers/W01-payload/src/content/public-content-detail-reader.ts'
+      - 'workers/W01-payload/src/users/public-user-profile-reader.ts'
       - 'workers/W01-payload/tests/int/content-state-adapter.int.spec.ts'
       - 'workers/W03-content/src/content-runtime.ts'
       - 'workers/W01-payload/src/app/api/v1/comments/**'
@@ -26,6 +29,9 @@ on:
       - 'workers/W01-payload/src/lib/content-list-cache-guard.ts'
       - 'workers/W01-payload/src/lib/content-list-cache-guard.test.ts'
       - 'workers/W01-payload/src/app/api/v1/contents/**'
+      - 'workers/W01-payload/src/app/(frontend)/content/PublicContentRoutes.tsx'
+      - 'workers/W01-payload/src/content/public-content-detail-reader.ts'
+      - 'workers/W01-payload/src/users/public-user-profile-reader.ts'
       - 'workers/W01-payload/tests/int/content-state-adapter.int.spec.ts'
       - 'workers/W03-content/src/content-runtime.ts'
       - 'workers/W01-payload/src/app/api/v1/comments/**'
@@ -138,16 +144,29 @@ jobs:
             Path('workers/W01-payload/src/app/api/v1/users/[userId]/route.ts'),
             Path('workers/W01-payload/src/app/api/v1/users/by-username/[username]/route.ts'),
           ]
-          for cache_route in cache_boundary_routes:
-            source = cache_route.read_text()
-            assert 'enforcePublicReadRateLimit' in source, f'{cache_route} missing public-read edge rate limit'
-          for cache_route in [
-            cache_boundary_routes[1],
-            cache_boundary_routes[2],
-            cache_boundary_routes[3],
-            cache_boundary_routes[4],
-            cache_boundary_routes[5],
+          content_detail_reader = Path('workers/W01-payload/src/content/public-content-detail-reader.ts')
+          user_profile_reader = Path('workers/W01-payload/src/users/public-user-profile-reader.ts')
+          rate_limit_sources = [
+            cache_boundary_routes[0].read_text(),
+            content_detail_reader.read_text(),
+            cache_boundary_routes[2].read_text(),
+            cache_boundary_routes[3].read_text(),
+            cache_boundary_routes[4].read_text(),
+            cache_boundary_routes[5].read_text(),
+            user_profile_reader.read_text(),
+            cache_boundary_routes[7].read_text(),
+          ]
+          for cache_route, source in zip(cache_boundary_routes, rate_limit_sources):
+            assert 'enforcePublicReadRateLimit' in source, f'{cache_route} or its shared reader missing public-read edge rate limit'
+          assert 'getPublicContentDetailResponse' in cache_boundary_routes[1].read_text()
+          assert 'getPublicUserProfileResponse' in cache_boundary_routes[6].read_text()
+          for source in [
+            content_detail_reader.read_text(),
+            cache_boundary_routes[2].read_text(),
+            cache_boundary_routes[3].read_text(),
+            cache_boundary_routes[4].read_text(),
+            cache_boundary_routes[5].read_text(),
           ]:
-            assert 'hasAuthenticatedSessionCredential' in cache_route.read_text(), f'{cache_route} missing authenticated cache bypass'
+            assert 'hasAuthenticatedSessionCredential' in source, 'shared public cache read missing authenticated cache bypass'
           print('1.1_P0_CACHE_BOUNDARY_STATIC=PASS')
           PY
