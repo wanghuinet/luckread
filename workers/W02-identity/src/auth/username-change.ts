@@ -8,7 +8,6 @@ const IDEMPOTENCY_RETENTION_MS = Number(usernameReservationPolicy.ownerDecision.
 const RESERVED_USERNAMES = new Set(usernameReservationPolicy.reservation.reservedUsernames)
 const USERNAME_PATTERN = /^[A-Za-z0-9]{6,32}$/
 const IDEMPOTENCY_PATTERN = /^[A-Za-z0-9._:-]{16,255}$/
-const CORRELATION_PATTERN = /^[A-Za-z0-9._:-]{1,128}$/
 const ETAG_PATTERN = /^"username-v(0|[1-9][0-9]*)"$/
 
 type UsernameCandidate = { display: string; normalized: string }
@@ -58,11 +57,6 @@ const error = (status: number, code: string, message: string, details?: Record<s
 const callerAllowed = (request: Request): boolean =>
   request.headers.get('X-LuckRead-Caller') === 'W01' &&
   request.headers.get('X-LuckRead-Transport-Version') === '1.0'
-
-const safeCorrelationId = (request: Request): string => {
-  const supplied = request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? ''
-  return CORRELATION_PATTERN.test(supplied) ? supplied : 'req_' + crypto.randomUUID()
-}
 
 const sha256Hex = async (value: string): Promise<string> => {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))
@@ -185,10 +179,10 @@ function stateDto(context: UsernameContext) {
   }
 }
 
-function replayResponse(context: UsernameContext): Response {
+function replayResponse(context: UsernameContext, now = new Date()): Response {
   if (!context.username || !context.replayChangedAt || !context.replayExpiresAt ||
       !Number.isFinite(Date.parse(context.replayExpiresAt)) ||
-      Date.parse(context.replayExpiresAt) <= Date.now() ||
+      Date.parse(context.replayExpiresAt) <= now.getTime() ||
       !Number.isSafeInteger(Number(context.usernameVersion))) {
     return error(503, 'SERVICE_UNAVAILABLE', 'Username idempotency record is invalid')
   }
@@ -261,7 +255,6 @@ export async function handleUsernameChangeRequest(env: BetterAuthEnv, request: R
   const nowIso = now.toISOString()
   const reservationExpiresAt = new Date(now.getTime() + RESERVATION_MS).toISOString()
   const idempotencyExpiresAt = new Date(now.getTime() + IDEMPOTENCY_RETENTION_MS).toISOString()
-  const correlationId = safeCorrelationId(request)
 
   let context: UsernameContext | null
   try { context = await loadContext(env, auth.principal.userId, idempotencyKeyHash, nowIso) }
@@ -272,7 +265,7 @@ export async function handleUsernameChangeRequest(env: BetterAuthEnv, request: R
     if (context.replayFingerprint !== requestFingerprint) {
       return error(409, 'IDEMPOTENCY_KEY_REUSE_CONFLICT', 'Idempotency-Key was already used for a different username change')
     }
-    return replayResponse(context)
+    return replayResponse(context, now)
   }
   if (context.accountState !== 'ACTIVE') return error(403, 'ACCOUNT_NOT_ELIGIBLE', 'Account is not eligible for this operation')
   if (typeof context.username !== 'string' || context.username.length === 0) return error(409, 'USERNAME_NOT_SET', 'An existing username is required before it can be changed')
@@ -346,7 +339,7 @@ export async function handleUsernameChangeRequest(env: BetterAuthEnv, request: R
     const saved = Number(results[2].meta?.changes ?? 0)
     if (updated !== 1 || saved !== 1) {
       const latest = await loadContext(env, auth.principal.userId, idempotencyKeyHash, nowIso)
-      if (latest?.replayKeyHash && latest.replayFingerprint === requestFingerprint) return replayResponse(latest)
+      if (latest?.replayKeyHash && latest.replayFingerprint === requestFingerprint) return replayResponse(latest, now)
       return error(412, 'PRECONDITION_FAILED', 'Username changed before this request was applied', undefined, latest ? { ETag: etagForVersion(latest.usernameVersion) } : undefined)
     }
   } catch (failure) {
