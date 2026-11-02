@@ -357,8 +357,9 @@ export default function VideoFeed() {
         throw new Error(getApiErrorMessage(result.data, 'Could not load LuckRead videos.', result.response.status));
       }
 
-      const videoRecords = page.items.filter((item): item is ApiContentRecord =>
-        Boolean(item && typeof item.id === 'string' && item.contentType === 'video'),
+      const videoRecords = page.items.filter(
+        (item): item is ApiContentRecord & { id: string } =>
+          Boolean(item && typeof item.id === 'string' && item.id.length > 0 && item.contentType === 'video'),
       );
 
       // Render the canonical list projection first. Optional W03/W05/W01
