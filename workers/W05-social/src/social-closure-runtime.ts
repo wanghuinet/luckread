@@ -285,6 +285,7 @@ export async function syncSocialTokens(
     // after the old username has been reclaimed. Keep the stored identity for
     // handles already attached to this target; resolve only newly introduced handles.
     const previous = previousByHandle.get(token.normalized)
+    const hadPreviousIdentity = previous !== undefined && previous !== null
     const entry = previous === undefined ? resolved.get(token.normalized) : previous ?? undefined
     if (!entry || entry.userId === actorUserId) continue
     await db.prepare(
@@ -301,17 +302,19 @@ export async function syncSocialTokens(
       now,
     ).run()
 
-    await enqueueNotification(db, {
-      recipientUserId: entry.userId,
-      actorUserId,
-      type: 'MENTION',
-      targetType: targetValue.targetType,
-      targetId: targetValue.targetId,
-      payload: {
-        handle: entry.handle,
-        ...(relatedContentId ? { contentId: relatedContentId } : {}),
-      },
-    })
+    if (!hadPreviousIdentity) {
+      await enqueueNotification(db, {
+        recipientUserId: entry.userId,
+        actorUserId,
+        type: 'MENTION',
+        targetType: targetValue.targetType,
+        targetId: targetValue.targetId,
+        payload: {
+          handle: entry.handle,
+          ...(relatedContentId ? { contentId: relatedContentId } : {}),
+        },
+      })
+    }
     mentionCount += 1
   }
 
