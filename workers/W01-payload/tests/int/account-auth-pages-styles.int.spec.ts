@@ -19,18 +19,19 @@ describe('account authentication page styles', () => {
 
   it('loads the scoped style entry on all frontend account-entry pages', () => {
     const routes = [
-      'src/app/(frontend)/forgot-password/page.tsx',
-      'src/app/(frontend)/reset-password/page.tsx',
-      'src/app/(frontend)/verify-email/page.tsx',
-      'src/app/(frontend)/register/page.tsx',
-    ]
+      ['src/app/(frontend)/forgot-password/page.tsx', "import '../../../styles/account-auth.css'"],
+      ['src/app/(frontend)/reset-password/page.tsx', "import '../../../styles/account-auth.css'"],
+      ['src/app/(frontend)/verify-email/page.tsx', "import '../../../styles/account-auth.css'"],
+      ['src/app/(frontend)/register/page.tsx', "import '../../../styles/account-auth.css'"],
+      ['src/app/(frontend)/login/mfa/page.tsx', "import '../../../../styles/account-auth.css'"],
+      ['src/app/(frontend)/login/two-factor/page.tsx', "import '../../../../styles/account-auth.css'"],
+    ] as const
 
-    for (const path of routes) {
-      expect(read(path)).toContain("import '../../../styles/account-auth.css'")
-    }
-
-    for (const path of routes.slice(0, 3)) {
-      expect(read(path)).toContain('className="lr-account-auth-page')
+    for (const [routePath, styleImport] of routes) {
+      expect(read(routePath)).toContain(styleImport)
+      if (!routePath.endsWith('/register/page.tsx')) {
+        expect(read(routePath)).toContain('className="lr-account-auth-page')
+      }
     }
 
     const registerForm = read('src/app/(frontend)/register/RegisterForm.tsx')
