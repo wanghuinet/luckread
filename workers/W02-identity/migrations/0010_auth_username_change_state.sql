@@ -52,7 +52,7 @@ WHEN NEW.username IS NOT NULL
    SELECT 1
      FROM auth_username_change_state s
     WHERE s.previous_username_normalized = lower(NEW.username)
-      AND julianday(s.previous_username_expires_at) > julianday(COALESCE(NEW.updated_at, NEW.created_at, strftime('%Y-%m-%dT%H:%M:%fZ', 'now')))
+      AND julianday(s.previous_username_expires_at) > julianday('now')
  )
 BEGIN
   SELECT RAISE(ABORT, 'USERNAME_RESERVED');
@@ -66,7 +66,7 @@ WHEN NEW.username IS NOT NULL
    SELECT 1
      FROM auth_username_change_state s
     WHERE s.previous_username_normalized = lower(NEW.username)
-      AND julianday(s.previous_username_expires_at) > julianday(COALESCE(NEW.updated_at, NEW.created_at, strftime('%Y-%m-%dT%H:%M:%fZ', 'now')))
+      AND julianday(s.previous_username_expires_at) > julianday('now')
  )
 BEGIN
   SELECT RAISE(ABORT, 'USERNAME_RESERVED');
