@@ -195,6 +195,7 @@ function replayResponse(context: UsernameContext, now = new Date()): Response {
       usernameVersion: context.usernameVersion,
       changedAt: context.replayChangedAt,
       canChangeAt: cooldownEndsAt(context.replayChangedAt),
+      previousUsernameReservedUntil: new Date(Date.parse(context.replayChangedAt) + RESERVATION_MS).toISOString(),
     },
     meta: { idempotentReplay: true },
   }, 200, { ETag: etagForVersion(context.usernameVersion) })
