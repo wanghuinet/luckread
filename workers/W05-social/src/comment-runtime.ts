@@ -13,6 +13,8 @@ export type CommentCreateInput = {
   idempotencyKey: string
 }
 
+export type CommentMention = { userId: string; handle: string }
+
 export type CommentItem = {
   id: string
   contentId: string
@@ -23,6 +25,7 @@ export type CommentItem = {
   depth: number
   createdAt: string
   updatedAt: string
+  mentions: CommentMention[]
   likedByViewer?: boolean
 }
 
@@ -206,6 +209,7 @@ const toCommentItem = (row: {
   depth: number
   created_at: string
   updated_at: string
+  mentions_json?: string | null
 }): CommentItem => ({
   id: row.id,
   contentId: row.content_id,
@@ -216,6 +220,22 @@ const toCommentItem = (row: {
   depth: Number(row.depth),
   createdAt: row.created_at,
   updatedAt: row.updated_at,
+  mentions: (() => {
+    try {
+      const value: unknown = JSON.parse(row.mentions_json || '[]')
+      if (!Array.isArray(value)) return []
+      return value.filter((item): item is CommentMention =>
+        Boolean(item) &&
+        typeof item === 'object' &&
+        typeof (item as { userId?: unknown }).userId === 'string' &&
+        typeof (item as { handle?: unknown }).handle === 'string' &&
+        (item as { userId: string }).userId.length > 0 &&
+        (item as { handle: string }).handle.length > 0
+      )
+    } catch {
+      return []
+    }
+  })(),
 })
 
 export async function createComment(
@@ -809,6 +829,15 @@ export async function listComments(
        c.depth,
        c.created_at,
        c.updated_at,
+       COALESCE((
+         SELECT json_group_array(json_object(
+           'userId', mention.mentioned_user_id,
+           'handle', mention.handle
+         ))
+         FROM social_mentions mention
+         WHERE mention.target_type = 'comment'
+           AND mention.target_id = c.id
+       ), '[]') AS mentions_json,
        c.liked_by_viewer,
        c.thread_created_at,
        c.thread_id,
@@ -828,6 +857,7 @@ export async function listComments(
     depth: number
     created_at: string
     updated_at: string
+    mentions_json: string
     liked_by_viewer: number
     thread_created_at: string
     thread_id: string
