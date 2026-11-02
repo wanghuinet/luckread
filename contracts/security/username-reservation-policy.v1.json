@@ -1,12 +1,23 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://luckread.com/contracts/v1/security/username-reservation-policy.json",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "status": "OWNER_DELEGATED_POLICY",
   "ownerDecision": {
     "renameCooldownDays": 30,
-    "reservedNamePolicy": "EXACT_NORMALIZED_MATCH",
-    "historicalUsernames": "PERMANENTLY_UNAVAILABLE_FOR_REUSE"
+    "previousUsernameReservationDays": 30,
+    "redirectLifetimeDays": 30,
+    "redirectEligibility": "AT_LEAST_ONE_PUBLICLY_PUBLISHED_CONTENT_ITEM",
+    "redirectEligibleContentTypes": [
+      "post",
+      "article",
+      "video",
+      "short"
+    ],
+    "redirectEligibleVisibility": "PUBLIC",
+    "idempotencyRetentionHours": 24,
+    "previousUsernames": "REUSABLE_AFTER_30_DAYS",
+    "redirects": "CREATE_ONLY_FOR_ACCOUNTS_WITH_EXISTING_PUBLIC_CONTENT"
   },
   "username": {
     "inputNormalization": [
@@ -25,6 +36,7 @@
     "prefixes": [],
     "suffixes": [],
     "confusableUnicode": "Rejected by the ASCII-only character rule",
+    "storage": "One compact current-state row per renamed account; only the immediately previous username is reserved",
     "reservedUsernames": [
       "admin",
       "administrator",
@@ -171,10 +183,31 @@
       "luckreadmoderation"
     ]
   },
+  "redirectPolicy": {
+    "recordOwner": "W01_PAYLOAD_REDIRECTS_PLUGIN",
+    "onlyCreateWhen": "W03 reports at least one existing publicly published post, article, video, or short for the identity",
+    "redirectPath": "Preserve /@oldUsername and the complete post/article/video/short suffix and query string; replace only the username",
+    "statusCode": 301,
+    "expiresAfterDays": 30,
+    "cache": "NO_STORE; never cache beyond expiresAt",
+    "subsequentRename": "Update the destination of still-active redirects to the latest username without extending their original expiresAt",
+    "expired": "Do not resolve an expired redirect; an expired previous username may be registered by another account",
+    "emptyAccount": "No redirect document is created when the account has no publicly published content",
+    "exclude": [
+      "draft",
+      "scheduled",
+      "private",
+      "unlisted",
+      "deleted",
+      "removed",
+      "moderation_blocked"
+    ]
+  },
   "rationale": {
     "platformRoutes": "Protects active frontend route segments, API/auth paths, system endpoints and technical hostnames found in the LuckRead W01 route tree.",
     "privilegedIdentities": "Protects platform administration, support, security, legal, trust and moderation identities.",
     "brand": "Protects LuckRead brand and official-account variants from impersonation.",
-    "leastPrivilege": "Exact names only; no broad prefix or suffix reservation is applied."
+    "leastPrivilege": "Exact names only; no broad prefix or suffix reservation is applied.",
+    "lightweight": "W02 stores operational username state only; the Payload redirects plugin stores time-limited 301 documents only when they preserve existing public-content URLs."
   }
 }
