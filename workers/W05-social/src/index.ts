@@ -458,7 +458,8 @@ export default {
           }, request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '')
           const mentionTargets = rawMentions === undefined ? [] : rawMentions as Array<{ userId: string; handle: string }>
           await syncSocialTokens(env.DB, actorUserId, 'comment', commentId, bodyValue, mentionTargets)
-          const item = { ...result.item, mentions: mentionTargets }
+          const persistedMentions = await getSocialTargets(env.DB, 'comment', commentId)
+          const item = { ...result.item, mentions: persistedMentions.mentions }
           return Response.json(
             { data: item, requestId: createRequestId() },
             {
@@ -832,6 +833,7 @@ export default {
         }, actorVerified)
         const mentionTargets = rawMentions === undefined ? [] : rawMentions as Array<{ userId: string; handle: string }>
         await syncSocialTokens(env.DB, viewerUserId, 'comment', comment.id, bodyValue, mentionTargets)
+        const persistedMentions = await getSocialTargets(env.DB, 'comment', comment.id)
         if (parentId) {
           const parent = await env.DB.prepare(
             'SELECT author_user_id FROM social_comments WHERE id = ? AND state = \'PUBLISHED\' LIMIT 1',
@@ -862,7 +864,7 @@ export default {
             })
           }
         }
-        return json({ data: { ...comment, mentions: mentionTargets }, requestId: createRequestId() }, 201)
+        return json({ data: { ...comment, mentions: persistedMentions.mentions }, requestId: createRequestId() }, 201)
       }
 
 
