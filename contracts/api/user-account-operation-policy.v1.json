@@ -304,12 +304,83 @@
       }
     },
     {
+      "operationId": "getMyUsername",
+      "method": "GET",
+      "path": "/users/me/username",
+      "visibility": "public_authenticated",
+      "capability": "username_change_state",
+      "status": "CONTRACTED_PARTIAL",
+      "authorization": {
+        "required": true,
+        "permission": "user.read.self",
+        "scope": "self",
+        "authority": "W02_BETTER_AUTH"
+      },
+      "resource": {
+        "class": "BOUNDED_READ",
+        "d1ReadMax": 1,
+        "d1WriteMax": 0,
+        "d1ReadRowsMax": 1,
+        "d1WriteRowsMax": 0,
+        "rpcMax": 0
+      },
+      "cache": {
+        "mode": "PRIVATE_NO_SHARED_CACHE",
+        "shared": false,
+        "authorizationBoundary": true
+      },
+      "retry": {
+        "maxAttempts": 1,
+        "clientRetrySafe": true
+      },
+      "event": {
+        "syncConsumersMax": 0,
+        "asyncEventsMax": 0,
+        "fanoutMax": 0
+      },
+      "queue": {
+        "enqueueMax": 0
+      },
+      "antiAbuse": {
+        "required": true,
+        "scopes": [
+          "account",
+          "endpoint",
+          "global"
+        ],
+        "actions": [
+          "ALLOW",
+          "THROTTLE",
+          "BLOCK"
+        ]
+      },
+      "idempotency": {
+        "required": false
+      },
+      "security": [
+        "self_scope_only",
+        "active_better_auth_session",
+        "username_version_etag",
+        "no_shared_cache"
+      ],
+      "evidence": {
+        "openapi": "PASS",
+        "permission": "PASS",
+        "state": "PASS",
+        "resource": "PASS",
+        "cache": "PASS",
+        "antiAbuse": "MISSING",
+        "integration": "MISSING",
+        "securityE2E": "MISSING"
+      }
+    },
+    {
       "operationId": "updateUsername",
       "method": "PATCH",
       "path": "/users/me/username",
       "visibility": "public_authenticated",
       "capability": "username_change",
-      "status": "MISSING",
+      "status": "CONTRACTED_PARTIAL",
       "authorization": {
         "required": true,
         "permission": "user.update.self",
@@ -335,12 +406,11 @@
       },
       "event": {
         "syncConsumersMax": 0,
-        "asyncEventsMax": 1,
+        "asyncEventsMax": 0,
         "fanoutMax": 0
       },
       "queue": {
-        "enqueueMax": 1,
-        "taskType": "username_projection"
+        "enqueueMax": 0
       },
       "antiAbuse": {
         "required": true,
@@ -383,9 +453,9 @@
         "redirect_expires_after_30_days"
       ],
       "evidence": {
-        "openapi": "MISSING",
+        "openapi": "PASS",
         "permission": "PASS",
-        "state": "MISSING",
+        "state": "PASS",
         "resource": "PASS",
         "cache": "MISSING",
         "antiAbuse": "MISSING",
