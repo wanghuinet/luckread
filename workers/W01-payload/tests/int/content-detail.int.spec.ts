@@ -35,6 +35,8 @@ describe('public content detail', () => {
     expect(page).toContain('socialMentions')
     expect(page).toContain("href={'/topics/' + encodeURIComponent(topic.name)}")
     expect(page).toContain("href={'/users/' + encodeURIComponent(mention.userId)}")
+    expect(page).toContain('<SocialMentionText text={paragraph} mentions={socialMentions}')
+    expect(page).not.toContain("href={'/users/' + encodeURIComponent(mention.handle)}")
     expect(page).toContain('copy.detail.tagAria')
     expect(page).toContain('main-tab rounded-full border border-light-border px-3 py-1.5 text-sm text-main-accent')
     expect(page).not.toContain('extractSocialTokens(socialTokenBody)')
@@ -205,12 +207,14 @@ it('renders versioned structured article bodies instead of flattening them to pa
 
   expect(page).toContain("tryDeserializeArticleDocument(body)")
   expect(page).toContain('ArticleStructuredRenderer')
-  expect(page).toContain('<ArticleStructuredRenderer document={structuredArticle} />')
+  expect(page).toContain('<ArticleStructuredRenderer document={structuredArticle} mentions={socialMentions} />')
   expect(page).toContain('!structuredArticle')
   expect(renderer).toContain("block.type === 'heading'")
   expect(renderer).toContain("block.type === 'bulletList' || block.type === 'orderedList'")
   expect(renderer).toContain("block.type === 'gallery'")
   expect(renderer).toContain('content-detail-article-gallery')
+  expect(renderer).toContain('<SocialMentionText text={block.text} mentions={mentions}')
+  expect(renderer).toContain('<SocialMentionText text={item} mentions={mentions}')
 })
 
 it('keeps legacy plain-text article bodies on the backward-compatible renderer', () => {

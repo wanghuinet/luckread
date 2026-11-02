@@ -4,6 +4,7 @@ import Link from 'next/link'
 import ContentComments from './ContentComments'
 import ContentLikesModal from './ContentLikesModal'
 import ArticleStructuredRenderer from '../../../../components/ArticleStructuredRenderer.js'
+import SocialMentionText from '../../../../components/SocialMentionText.js'
 import { tryDeserializeArticleDocument } from '../../../../lib/article-document.js'
 import { useEffect, useMemo, useState } from 'react'
 
@@ -485,7 +486,7 @@ export default function ContentDetailPage({
         <header className="px-4 py-5">
           {showLanguageToggle ? <div className="mb-2 flex justify-end"><PublicLanguageToggle locale={locale} /></div> : null}
           <p className="mb-2 text-xs font-bold uppercase tracking-widest text-main-accent">LUCKREAD CONTENT</p>
-          <h1 className="break-words text-xl font-bold leading-6 sm:text-2xl">{content.title}</h1>
+          <h1 className="break-words text-xl font-bold leading-6 sm:text-2xl"><SocialMentionText text={content.title} mentions={socialMentions} /></h1>
           {content.updatedAt ? (
             <time className="mt-2 block text-sm text-light-secondary dark:text-dark-secondary" dateTime={content.updatedAt}>
               {copy.detail.updatedAt} {new Date(content.updatedAt).toLocaleString(dateLocale, { hour12: false })}
@@ -549,10 +550,12 @@ export default function ContentDetailPage({
         {!(content.contentType === 'post' && body.trim() === content.title.trim()) ? (
           <div className="px-4 py-4 sm:py-6">
             {structuredArticle ? (
-              <ArticleStructuredRenderer document={structuredArticle} />
+              <ArticleStructuredRenderer document={structuredArticle} mentions={socialMentions} />
             ) : body ? (
               <div className="flex flex-col gap-4">{splitBodyIntoParagraphs(body).map((paragraph, index) => (
-                <p className="whitespace-pre-wrap break-words text-[15px] leading-6 text-light-primary dark:text-dark-primary" key={index}>{paragraph}</p>
+                <p className="whitespace-pre-wrap break-words text-[15px] leading-6 text-light-primary dark:text-dark-primary" key={index}>
+                  <SocialMentionText text={paragraph} mentions={socialMentions} />
+                </p>
               ))}</div>
             ) : (
               <p className="text-sm text-light-secondary dark:text-dark-secondary">{copy.detail.bodyPreparing}</p>

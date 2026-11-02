@@ -225,6 +225,28 @@ export async function syncSocialTokens(
   const relatedContentId = relatedContent?.content_id ?? null
   const tokens = extractSocialTokens(text)
   const now = new Date().toISOString()
+  const previousMentions = await db.prepare(
+    `SELECT mentioned_user_id, handle
+       FROM social_mentions
+      WHERE target_type = ? AND target_id = ?`,
+  ).bind(targetValue.targetType, targetValue.targetId).all<{
+    mentioned_user_id: string
+    handle: string
+  }>()
+  const previousByHandle = new Map<string, MentionTarget | null>()
+  for (const row of previousMentions.results ?? []) {
+    const normalizedHandle = row.handle.trim().replace(/^[@＠]/, '').normalize('NFKC').toLocaleLowerCase('en-US')
+    if (!normalizedHandle) continue
+    const previous = previousByHandle.get(normalizedHandle)
+    if (previous && previous.userId !== row.mentioned_user_id) {
+      previousByHandle.set(normalizedHandle, null)
+    } else if (!previousByHandle.has(normalizedHandle)) {
+      previousByHandle.set(normalizedHandle, {
+        userId: id(row.mentioned_user_id),
+        handle: row.handle,
+      })
+    }
+  }
 
   await db.batch([
     db.prepare('DELETE FROM social_target_topics WHERE target_type = ? AND target_id = ?').bind(targetValue.targetType, targetValue.targetId),
@@ -259,7 +281,12 @@ export async function syncSocialTokens(
 
   let mentionCount = 0
   for (const token of tokens.filter((item) => item.kind === 'mention')) {
-    const entry = resolved.get(token.normalized)
+    // An edit must not rebind an unchanged historical @handle to a new account
+    // after the old username has been reclaimed. Keep the stored identity for
+    // handles already attached to this target; resolve only newly introduced handles.
+    const previous = previousByHandle.get(token.normalized)
+    const hadPreviousIdentity = previous !== undefined && previous !== null
+    const entry = previous === undefined ? resolved.get(token.normalized) : previous ?? undefined
     if (!entry || entry.userId === actorUserId) continue
     await db.prepare(
       `INSERT OR IGNORE INTO social_mentions
@@ -275,17 +302,19 @@ export async function syncSocialTokens(
       now,
     ).run()
 
-    await enqueueNotification(db, {
-      recipientUserId: entry.userId,
-      actorUserId,
-      type: 'MENTION',
-      targetType: targetValue.targetType,
-      targetId: targetValue.targetId,
-      payload: {
-        handle: entry.handle,
-        ...(relatedContentId ? { contentId: relatedContentId } : {}),
-      },
-    })
+    if (!hadPreviousIdentity) {
+      await enqueueNotification(db, {
+        recipientUserId: entry.userId,
+        actorUserId,
+        type: 'MENTION',
+        targetType: targetValue.targetType,
+        targetId: targetValue.targetId,
+        payload: {
+          handle: entry.handle,
+          ...(relatedContentId ? { contentId: relatedContentId } : {}),
+        },
+      })
+    }
     mentionCount += 1
   }
 

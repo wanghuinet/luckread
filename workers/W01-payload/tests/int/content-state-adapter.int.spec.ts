@@ -177,7 +177,7 @@ describe('1.1 content lifecycle closeout', () => {
     expect(publicRoutes).toContain("content.state !== 'PUBLISHED'")
     expect(publicRoutes).toContain('permanentRedirect(canonicalPath(author, content))')
     expect(publicDetailClient).toContain("apiFetch(resolved.bodyRef")
-    expect(publicDetailClient).toContain("<ArticleStructuredRenderer document={structuredArticle} />")
+    expect(publicDetailClient).toContain("<ArticleStructuredRenderer document={structuredArticle} mentions={socialMentions} />")
 
     expect(w03Client).toContain("X-LuckRead-Principal-User-Id")
     expect(w03Client).toContain("X-LuckRead-Principal-Layer")

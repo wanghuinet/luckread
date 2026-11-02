@@ -435,7 +435,20 @@ export default {
             throw new CommentRuntimeError('VALIDATION_FAILED', 400)
           }
           const bodyValue = (body as { body?: unknown }).body
-          if (typeof bodyValue !== 'string') {
+          const rawMentions = (body as { mentions?: unknown }).mentions
+          if (
+            typeof bodyValue !== 'string' ||
+            (rawMentions !== undefined &&
+              (!Array.isArray(rawMentions) ||
+                rawMentions.length > 20 ||
+                rawMentions.some((value) =>
+                  !value ||
+                  typeof value !== 'object' ||
+                  Array.isArray(value) ||
+                  typeof (value as { userId?: unknown }).userId !== 'string' ||
+                  typeof (value as { handle?: unknown }).handle !== 'string'
+                )))
+          ) {
             throw new CommentRuntimeError('VALIDATION_FAILED', 400)
           }
 
@@ -443,8 +456,12 @@ export default {
             body: bodyValue,
             ifMatch,
           }, request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '')
+          const mentionTargets = rawMentions === undefined ? [] : rawMentions as Array<{ userId: string; handle: string }>
+          await syncSocialTokens(env.DB, actorUserId, 'comment', commentId, bodyValue, mentionTargets)
+          const persistedMentions = await getSocialTargets(env.DB, 'comment', commentId)
+          const item = { ...result.item, mentions: persistedMentions.mentions }
           return Response.json(
-            { data: result.item, requestId: createRequestId() },
+            { data: item, requestId: createRequestId() },
             {
               status: 200,
               headers: {
@@ -815,9 +832,8 @@ export default {
           idempotencyKey,
         }, actorVerified)
         const mentionTargets = rawMentions === undefined ? [] : rawMentions as Array<{ userId: string; handle: string }>
-        ctx.waitUntil(
-          syncSocialTokens(env.DB, viewerUserId, 'comment', comment.id, bodyValue, mentionTargets).catch(() => undefined),
-        )
+        await syncSocialTokens(env.DB, viewerUserId, 'comment', comment.id, bodyValue, mentionTargets)
+        const persistedMentions = await getSocialTargets(env.DB, 'comment', comment.id)
         if (parentId) {
           const parent = await env.DB.prepare(
             'SELECT author_user_id FROM social_comments WHERE id = ? AND state = \'PUBLISHED\' LIMIT 1',
@@ -848,7 +864,7 @@ export default {
             })
           }
         }
-        return json({ data: comment, requestId: createRequestId() }, 201)
+        return json({ data: { ...comment, mentions: persistedMentions.mentions }, requestId: createRequestId() }, 201)
       }
 
 
