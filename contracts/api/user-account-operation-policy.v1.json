@@ -363,8 +363,9 @@
         "required": true,
         "key": "Idempotency-Key",
         "fingerprint": "SHA-256(normalizedUsername + exact display value + If-Match)",
-        "durableResult": "auth_username_change_history",
-        "sameKeyDifferentIntent": "409 IDEMPOTENCY_KEY_REUSE_CONFLICT"
+        "durableResult": "auth_username_change_state (one current state row per renamed account)",
+        "sameKeyDifferentIntent": "409 IDEMPOTENCY_KEY_REUSE_CONFLICT",
+        "retentionHours": 24
       },
       "security": [
         "uniqueness_atomic",
@@ -373,10 +374,13 @@
         "audit_required",
         "self_scope_only",
         "active_better_auth_session",
-        "historical_username_never_reused",
         "idempotency_result_durable",
         "username_version_optimistic_concurrency",
-        "display_name_unchanged"
+        "display_name_unchanged",
+        "previous_username_reserved_for_30_days",
+        "previous_username_reusable_after_expiry",
+        "redirect_only_when_public_content_exists",
+        "redirect_expires_after_30_days"
       ],
       "evidence": {
         "openapi": "MISSING",
@@ -399,8 +403,9 @@
         "normalization": "trim -> Unicode NFC -> casefold",
         "syntax": "ASCII alphanumeric, 6-32 characters",
         "cooldownDays": 30,
-        "previousNames": "permanently unavailable for reuse",
-        "reservationPolicyRef": "contracts/security/username-reservation-policy.v1.json"
+        "previousNames": "reserved for 30 days after a successful change, then reusable",
+        "reservationPolicyRef": "contracts/security/username-reservation-policy.v1.json",
+        "redirect": "301 for 30 days only when at least one public post/article/video/short already exists"
       }
     },
     {
