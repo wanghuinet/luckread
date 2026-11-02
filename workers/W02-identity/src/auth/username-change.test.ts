@@ -143,7 +143,14 @@ describe('W02 username change authority', () => {
     const response = await handleUsernameChangeRequest(env, changeRequest(), new Date('2026-11-02T12:05:00.000Z'))
     expect(response.status).toBe(200)
     expect(response.headers.get('etag')).toBe('"username-v1"')
-    expect(await response.json()).toMatchObject({ meta: { idempotentReplay: true } })
+    expect(await response.json()).toMatchObject({
+      data: {
+        username: 'NewHandle',
+        changedAt: '2026-11-02T12:00:00.000Z',
+        previousUsernameReservedUntil: '2026-12-02T12:00:00.000Z',
+      },
+      meta: { idempotentReplay: true },
+    })
     expect(batch).not.toHaveBeenCalled()
   })
 
