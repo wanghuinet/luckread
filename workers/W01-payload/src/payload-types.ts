@@ -187,5 +187,5 @@ declare module 'payload' {
 
 export interface RedirectsSelect<T extends boolean = true> {
   from?: T; to?: T; type?: T; redirectScope?: T; identityId?: T
-  sourceUsername?: T; destinationUsername?: T; updatedAt?: T; createdAt?: T
+  sourceUsername?: T; destinationUsername?: T; expiresAt?: T; updatedAt?: T; createdAt?: T
 }
