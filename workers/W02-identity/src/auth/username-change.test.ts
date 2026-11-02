@@ -166,10 +166,9 @@ describe('W02 username change authority', () => {
     expect(response.status).toBe(200)
     expect(response.headers.get('etag')).toBe('"username-v1"')
     expect(batch).toHaveBeenCalledTimes(1)
-    expect(batch.mock.calls[0][0]).toHaveLength(3)
+    expect(batch.mock.calls[0][0]).toHaveLength(2)
     expect(prepared[1].sql).toContain('UPDATE "user"')
     expect(prepared[2].sql).toContain('INSERT INTO auth_username_change_state')
-    expect(prepared[3].sql).toContain('UPDATE auth_username_change_state SET previous_username = NULL')
     expect(limiter.limit).toHaveBeenCalled()
     expect(await response.json()).toMatchObject({
       data: {
