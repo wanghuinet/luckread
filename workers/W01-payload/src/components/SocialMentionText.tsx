@@ -6,8 +6,6 @@ export type SocialMentionReference = {
   handle: string
 }
 
-const MENTION_PATTERN = /(^|[\\s([{"'“‘，。！？；：、])([@＠])([\\p{L}\\p{N}_]{1,64})/gu
-
 const normalizeHandle = (value: string) =>
   value.normalize('NFKC').toLocaleLowerCase('en-US')
 
@@ -35,9 +33,8 @@ export default function SocialMentionText({
   const nodes: ReactNode[] = []
   let cursor = 0
   let match: RegExpExecArray | null
-  MENTION_PATTERN.lastIndex = 0
-
-  while ((match = MENTION_PATTERN.exec(text)) !== null) {
+  const pattern = /(^|[\\s([{"'“‘，。！？；：、])([@＠])([\\p{L}\\p{N}_]{1,64})/gu
+  while ((match = pattern.exec(text)) !== null) {
     const marker = match[2]
     const handle = match[3]
     const mention = byHandle.get(normalizeHandle(handle))
