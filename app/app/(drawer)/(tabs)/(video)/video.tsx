@@ -49,6 +49,7 @@ const PAGE_SIZE = 12;
 const PRIMARY = '#1d9bf0';
 
 type VideoFeedItem = FeedContent & {
+  contentId: string;
   videoSource: VideoPlaybackResult['source'];
   mediaError?: string;
   mediaLoading?: boolean;
@@ -368,6 +369,7 @@ export default function VideoFeed() {
         try {
           return [{
             ...mapContentToFeedContent(record, undefined, record.social, record.creator ?? record.author),
+            contentId: record.id,
             videoSource: null,
             mediaLoading: true,
           }];
@@ -420,6 +422,7 @@ export default function VideoFeed() {
           try {
             return {
               ...mapContentToFeedContent(record, body, social, author, sessionToken),
+              contentId: record.id,
               videoSource: playback.source,
               mediaError: playback.source
                 ? undefined
