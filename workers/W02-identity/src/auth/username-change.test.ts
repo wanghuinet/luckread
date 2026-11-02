@@ -105,6 +105,26 @@ describe('W02 username change authority', () => {
     expect(await response.json()).toMatchObject({ data: { username: 'OldHandle', usernameVersion: 0, lastChangedAt: null, canChangeAt: null } })
   })
 
+  it('returns the cooldown end only while the 30-day cooldown is still active', async () => {
+    const lastChangedAt = '2026-10-03T12:00:00.000Z'
+    const { env } = createEnv({ ...defaultRow, usernameVersion: 1, lastChangedAt })
+    const request = new Request('https://luckread-w02.internal/internal/auth/username/state', {
+      headers: { 'X-LuckRead-Caller': 'W01', 'X-LuckRead-Transport-Version': '1.0' },
+    })
+
+    const beforeExpiry = await handleUsernameStateRequest(env, request, new Date('2026-11-02T11:59:59.999Z'))
+    expect(beforeExpiry.status).toBe(200)
+    await expect(beforeExpiry.json()).resolves.toMatchObject({
+      data: { canChangeAt: '2026-11-02T12:00:00.000Z' },
+    })
+
+    const atExpiry = await handleUsernameStateRequest(env, request, new Date('2026-11-02T12:00:00.000Z'))
+    expect(atExpiry.status).toBe(200)
+    await expect(atExpiry.json()).resolves.toMatchObject({
+      data: { canChangeAt: null },
+    })
+  })
+
   it('rejects reserved handles before persistence', async () => {
     const { env, batch } = createEnv()
     const response = await handleUsernameChangeRequest(env, changeRequest({ username: 'Support' }))
