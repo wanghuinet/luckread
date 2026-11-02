@@ -1,10 +1,11 @@
 import Link from 'next/link'
+import '../../../styles/account-auth.css'
 
 import VerifyEmailForm from './VerifyEmailForm'
 
 export default function VerifyEmailPage() {
   return (
-    <main className="min-h-screen bg-main-background px-4 py-10 text-light-primary dark:text-dark-primary">
+    <main className="lr-account-auth-page min-h-screen bg-main-background px-4 py-10 text-light-primary dark:text-dark-primary">
       <section className="mx-auto flex w-full max-w-xl flex-col gap-5 border-x border-light-border px-6 py-8 dark:border-dark-border" aria-labelledby="verify-email-title">
         <Link className="mb-2 text-2xl font-bold text-light-primary dark:text-dark-primary" href="/" aria-label="LuckRead 首页">LuckRead</Link>
         <h1 id="verify-email-title">重发验证邮件</h1>
