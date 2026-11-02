@@ -220,12 +220,12 @@ describe('username redirect resolver identity and expiry guards', () => {
 
 
 describe('username redirect history hook', () => {
-  const hook = Users.hooks?.afterChange?.[0] as (args: unknown) => Promise<unknown>
+  const hook = Users.hooks?.afterChange?.[0] as unknown as (args: unknown) => Promise<unknown>
   const invoke = async (eligible: boolean, findResults: Array<{ docs: Array<{ identityId?: string; expiresAt?: string }> }>) => {
     const results = [...findResults]
     const find = vi.fn(async (_args: unknown) => results.shift() ?? { docs: [] })
     const create = vi.fn(async (_args: { data: Record<string, unknown> }) => undefined)
-    const update = vi.fn(async (_args: unknown) => undefined)
+    const update = vi.fn(async (_args: { data?: Record<string, unknown> }) => undefined)
     const req = {
       headers: new Headers({ 'X-LuckRead-Correlation-Id': 'username-redirect-hook-test' }),
       payload: { find, create, update },
