@@ -13,6 +13,8 @@ describe('user profile page', () => {
     expect(page).toContain("fetchJson<{ data?: { username?: string; canChangeAt?: string | null }; error?: { message?: string } }>('/api/v1/users/me/username'")
     expect(page).toContain("'If-Match': usernameEtag")
     expect(page).toContain("'Idempotency-Key': idempotencyKey")
+    expect(page).toContain('Boolean(usernameCanChangeAt)')
+    expect(page).not.toContain('Date.now()')
     expect(page).toContain('function saveUsername()')
     expect(page).toContain("response.status === 412")
     expect(page).toContain("router.replace('/login?returnTo='")
