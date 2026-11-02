@@ -103,6 +103,7 @@ async function loadContext(
     idempotencyKeyHash, nowIso,
     idempotencyKeyHash, nowIso,
     idempotencyKeyHash, nowIso,
+    idempotencyKeyHash, nowIso,
     userId,
   ).first<UsernameContext>()
   return contextFromRow(row)
