@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { payloadFind } = vi.hoisted(() => ({ payloadFind: vi.fn() }))
+const { payloadFind, callW03ContentMock } = vi.hoisted(() => ({ payloadFind: vi.fn(), callW03ContentMock: vi.fn() }))
 
 vi.mock('payload', () => ({ getPayload: vi.fn(async () => ({ find: payloadFind })) }))
 vi.mock('@payload-config', () => ({ default: {} }))
@@ -10,8 +10,10 @@ vi.mock('@/auth/traffic-limit', () => ({
   TrafficLimitError: class TrafficLimitError extends Error {},
   rateLimitResponse: vi.fn(() => new Response(null, { status: 429 })),
 }))
+vi.mock('@/content/w03-content-client', () => ({ callW03Content: callW03ContentMock }))
 
 import { middleware } from '../../src/middleware'
+import { Users } from '../../src/collections/Users'
 import { GET as resolveUsernameRedirect } from '../../src/app/api/v1/redirects/username/[username]/route'
 
 import {
@@ -213,5 +215,80 @@ describe('username redirect resolver identity and expiry guards', () => {
     const response = await resolveUsernameRedirect(request(), context)
     expect(response.status).toBe(404)
     expect(payloadFind).toHaveBeenCalledTimes(2)
+  })
+})
+
+
+describe('username redirect history hook', () => {
+  const hook = Users.hooks?.afterChange?.[0] as (args: unknown) => Promise<unknown>
+  const invoke = async (eligible: boolean, findResults: Array<{ docs: Array<{ identityId?: string; expiresAt?: string }> }>) => {
+    const results = [...findResults]
+    const find = vi.fn(async (_args: unknown) => results.shift() ?? { docs: [] })
+    const create = vi.fn(async (_args: { data: Record<string, unknown> }) => undefined)
+    const update = vi.fn(async (_args: unknown) => undefined)
+    const req = {
+      headers: new Headers({ 'X-LuckRead-Correlation-Id': 'username-redirect-hook-test' }),
+      payload: { find, create, update },
+    }
+    callW03ContentMock.mockResolvedValue(Response.json({ data: { eligible } }))
+    const doc = { username: 'NewName', identityId: 'identity-1' }
+    await hook({ doc, operation: 'update', previousDoc: { username: 'OldName' }, req })
+    return { find, create, update }
+  }
+
+  beforeEach(() => {
+    callW03ContentMock.mockReset()
+  })
+
+  it('does not create a new 301 for an account without published public content', async () => {
+    const result = await invoke(false, [{ docs: [] }])
+    expect(result.find).toHaveBeenCalledTimes(1)
+    expect(result.create).not.toHaveBeenCalled()
+    expect(result.update).not.toHaveBeenCalled()
+  })
+
+  it('creates a 30-day 301 only after W03 confirms public published content', async () => {
+    const result = await invoke(true, [{ docs: [] }, { docs: [] }])
+    expect(result.create).toHaveBeenCalledTimes(1)
+    const data = result.create.mock.calls[0]?.[0].data
+    expect(data).toMatchObject({
+      from: '/@oldname',
+      to: { type: 'custom', url: '/@NewName' },
+      type: '301', redirectScope: 'username', identityId: 'identity-1',
+      sourceUsername: 'OldName', destinationUsername: 'NewName',
+    })
+    const remainingMs = Date.parse(String(data?.expiresAt)) - Date.now()
+    expect(remainingMs).toBeGreaterThan(30 * 24 * 60 * 60 * 1000 - 60_000)
+    expect(remainingMs).toBeLessThanOrEqual(30 * 24 * 60 * 60 * 1000)
+    expect(callW03ContentMock).toHaveBeenCalledWith(expect.objectContaining({
+      pathname: '/internal/content/username-redirect-eligibility/identity-1', method: 'GET',
+    }))
+  })
+
+  it('retargets active history without extending its original expiry', async () => {
+    const originalExpiry = new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString()
+    const result = await invoke(true, [
+      { docs: [{ identityId: 'identity-1', expiresAt: originalExpiry }] },
+      { docs: [{ identityId: 'identity-1', expiresAt: originalExpiry }] },
+    ])
+    expect(result.update).toHaveBeenCalledTimes(2)
+    const updates = result.update.mock.calls.map(call => call[0])
+    expect(updates[0]?.data).not.toHaveProperty('expiresAt')
+    expect(updates[1]?.data).toMatchObject({ expiresAt: originalExpiry, to: { url: '/@NewName' } })
+    expect(result.create).not.toHaveBeenCalled()
+  })
+
+  it('reuses an expired unique source row in place with a new 30-day lease', async () => {
+    const result = await invoke(true, [
+      { docs: [] },
+      { docs: [{ identityId: 'former-identity', expiresAt: '2026-01-01T00:00:00.000Z' }] },
+    ])
+    expect(result.create).not.toHaveBeenCalled()
+    expect(result.update).toHaveBeenCalledTimes(1)
+    const data = result.update.mock.calls[0]?.[0].data
+    expect(data).toMatchObject({ identityId: 'identity-1', from: '/@oldname' })
+    const remainingMs = Date.parse(String(data?.expiresAt)) - Date.now()
+    expect(remainingMs).toBeGreaterThan(30 * 24 * 60 * 60 * 1000 - 60_000)
+    expect(remainingMs).toBeLessThanOrEqual(30 * 24 * 60 * 60 * 1000)
   })
 })
