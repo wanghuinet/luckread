@@ -15,6 +15,7 @@ import {
 import { resolveBetterAuthPrincipal } from './auth/principal.js'
 import { handleCurrentUserSessionList } from './auth/session-list.js'
 import { handleCurrentUserSessionRevoke } from './auth/session-revoke.js'
+import { handleUsernameChangeRequest, handleUsernameStateRequest } from './auth/username-change.js'
 import { handleMfaStatusRequest } from './auth/mfa-status.js'
 import { handleMfaEnrollmentStartRequest } from './auth/mfa-enrollment-start.js'
 import { handleMfaEnrollmentConfirmRequest } from './auth/mfa-enrollment-confirm.js'
@@ -204,6 +205,14 @@ export default {
 
     if (request.method === 'POST' && url.pathname === '/internal/auth/mfa/status') {
       return handleMfaStatusRequest(env, request)
+    }
+
+    if (url.pathname === '/internal/auth/username/state' && request.method === 'GET') {
+      return handleUsernameStateRequest(env, request)
+    }
+
+    if (url.pathname === '/internal/auth/username/change' && request.method === 'POST') {
+      return handleUsernameChangeRequest(env, request)
     }
 
     if (request.method === 'POST' && url.pathname === '/internal/auth/session/list') {

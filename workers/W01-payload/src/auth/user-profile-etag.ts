@@ -8,7 +8,6 @@ export type UserProfileSnapshot = {
 }
 
 export const PROFILE_MUTABLE_FIELDS = [
-  'username',
   'displayName',
   'bio',
   'avatar',

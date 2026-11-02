@@ -304,12 +304,83 @@
       }
     },
     {
+      "operationId": "getMyUsername",
+      "method": "GET",
+      "path": "/users/me/username",
+      "visibility": "public_authenticated",
+      "capability": "username_change_state",
+      "status": "CONTRACTED_PARTIAL",
+      "authorization": {
+        "required": true,
+        "permission": "user.read.self",
+        "scope": "self",
+        "authority": "W02_BETTER_AUTH"
+      },
+      "resource": {
+        "class": "BOUNDED_READ",
+        "d1ReadMax": 1,
+        "d1WriteMax": 0,
+        "d1ReadRowsMax": 1,
+        "d1WriteRowsMax": 0,
+        "rpcMax": 0
+      },
+      "cache": {
+        "mode": "PRIVATE_NO_SHARED_CACHE",
+        "shared": false,
+        "authorizationBoundary": true
+      },
+      "retry": {
+        "maxAttempts": 1,
+        "clientRetrySafe": true
+      },
+      "event": {
+        "syncConsumersMax": 0,
+        "asyncEventsMax": 0,
+        "fanoutMax": 0
+      },
+      "queue": {
+        "enqueueMax": 0
+      },
+      "antiAbuse": {
+        "required": true,
+        "scopes": [
+          "account",
+          "endpoint",
+          "global"
+        ],
+        "actions": [
+          "ALLOW",
+          "THROTTLE",
+          "BLOCK"
+        ]
+      },
+      "idempotency": {
+        "required": false
+      },
+      "security": [
+        "self_scope_only",
+        "active_better_auth_session",
+        "username_version_etag",
+        "no_shared_cache"
+      ],
+      "evidence": {
+        "openapi": "PASS",
+        "permission": "PASS",
+        "state": "PASS",
+        "resource": "PASS",
+        "cache": "PASS",
+        "antiAbuse": "MISSING",
+        "integration": "MISSING",
+        "securityE2E": "MISSING"
+      }
+    },
+    {
       "operationId": "updateUsername",
       "method": "PATCH",
       "path": "/users/me/username",
       "visibility": "public_authenticated",
       "capability": "username_change",
-      "status": "MISSING",
+      "status": "CONTRACTED_PARTIAL",
       "authorization": {
         "required": true,
         "permission": "user.update.self",
@@ -317,10 +388,10 @@
       },
       "resource": {
         "class": "SINGLE_AUTHORITATIVE_WRITE",
-        "d1ReadMax": 1,
+        "d1ReadMax": 2,
         "d1WriteMax": 1,
         "d1ReadRowsMax": 2,
-        "d1WriteRowsMax": 2,
+        "d1WriteRowsMax": 3,
         "rpcMax": 0
       },
       "cache": {
@@ -335,12 +406,11 @@
       },
       "event": {
         "syncConsumersMax": 0,
-        "asyncEventsMax": 1,
+        "asyncEventsMax": 0,
         "fanoutMax": 0
       },
       "queue": {
-        "enqueueMax": 1,
-        "taskType": "username_projection"
+        "enqueueMax": 0
       },
       "antiAbuse": {
         "required": true,
@@ -360,24 +430,52 @@
         ]
       },
       "idempotency": {
-        "required": true
+        "required": true,
+        "key": "Idempotency-Key",
+        "fingerprint": "SHA-256(normalizedUsername + exact display value + If-Match)",
+        "durableResult": "auth_username_change_state (one current state row per renamed account)",
+        "sameKeyDifferentIntent": "409 IDEMPOTENCY_KEY_REUSE_CONFLICT",
+        "retentionHours": 24
       },
       "security": [
         "uniqueness_atomic",
         "reserved_name_policy",
         "rename_cooldown",
         "audit_required",
-        "self_scope_only"
+        "self_scope_only",
+        "active_better_auth_session",
+        "idempotency_result_durable",
+        "username_version_optimistic_concurrency",
+        "display_name_unchanged",
+        "previous_username_reserved_for_30_days",
+        "previous_username_reusable_after_expiry",
+        "redirect_only_when_public_content_exists",
+        "redirect_expires_after_30_days"
       ],
       "evidence": {
-        "openapi": "MISSING",
+        "openapi": "PASS",
         "permission": "PASS",
-        "state": "MISSING",
+        "state": "PASS",
         "resource": "PASS",
         "cache": "MISSING",
         "antiAbuse": "MISSING",
         "integration": "MISSING",
         "securityE2E": "MISSING"
+      },
+      "concurrency": {
+        "required": true,
+        "header": "If-Match",
+        "etag": "\"username-v{version}\"",
+        "initialVersion": 0,
+        "stale": "412 PRECONDITION_FAILED"
+      },
+      "usernamePolicy": {
+        "normalization": "trim -> Unicode NFC -> casefold",
+        "syntax": "ASCII alphanumeric, 6-32 characters",
+        "cooldownDays": 30,
+        "previousNames": "reserved for 30 days after a successful change, then reusable",
+        "reservationPolicyRef": "contracts/security/username-reservation-policy.v1.json",
+        "redirect": "301 for 30 days only when at least one public post/article/video/short already exists"
       }
     },
     {

@@ -771,6 +771,103 @@ paths:
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
 
+  /users/me/username:
+    get:
+      tags: [Users]
+      summary: Read the current user's authoritative username state
+      operationId: getMyUsername
+      security:
+        - sessionCookieAuth: []
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Current username and rename cooldown state from W02.
+          headers:
+            ETag:
+              description: Username version for optimistic concurrency.
+              schema: { type: string, pattern: '^"username-v(0|[1-9][0-9]*)"$' }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [username, usernameVersion, lastChangedAt, canChangeAt]
+                    properties:
+                      username: { type: string, minLength: 6, maxLength: 32, pattern: '^[A-Za-z0-9]{6,32}$' }
+                      usernameVersion: { type: integer, minimum: 0 }
+                      lastChangedAt: { type: [string, 'null'], format: date-time }
+                      canChangeAt:
+                        type: [string, 'null']
+                        format: date-time
+                        description: Null when the 30-day username cooldown has expired or no change has yet occurred.
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    patch:
+      tags: [Users]
+      summary: Change the current user's username
+      description: >-
+        W02 Better Auth is the username authority. The request can change only
+        the authenticated subject's username; the target user ID is never client supplied.
+        The previous username is reserved for 30 days and can then be registered by another account.
+      operationId: updateUsername
+      security:
+        - sessionCookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+        - $ref: '#/components/parameters/IfMatchRequired'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username]
+              additionalProperties: false
+              properties:
+                username:
+                  type: string
+                  minLength: 6
+                  maxLength: 32
+                  pattern: '^[A-Za-z0-9]{6,32}$'
+      responses:
+        '200':
+          description: Username changed in W02 and projected to W01.
+          headers:
+            ETag:
+              description: New username version for optimistic concurrency.
+              schema: { type: string, pattern: '^"username-v(0|[1-9][0-9]*)"$' }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: object
+                    required: [username, usernameVersion, changedAt, canChangeAt, previousUsernameReservedUntil]
+                    properties:
+                      username: { type: string, minLength: 6, maxLength: 32 }
+                      usernameVersion: { type: integer, minimum: 1 }
+                      changedAt: { type: string, format: date-time }
+                      canChangeAt: { type: string, format: date-time }
+                      previousUsernameReservedUntil: { type: string, format: date-time }
+                  meta:
+                    type: object
+                    properties:
+                      idempotentReplay: { type: boolean }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '409': { $ref: '#/components/responses/InvalidState' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/ClientError' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
   /users/{userId}/account-state:
     parameters:
       - $ref: '#/components/parameters/UserId'
