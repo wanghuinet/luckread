@@ -1,7 +1,9 @@
 import type { ArticleDocument } from '../lib/article-document.js'
+import SocialMentionText, { type SocialMentionReference } from './SocialMentionText.js'
 
 type Props = {
   document: ArticleDocument
+  mentions?: readonly SocialMentionReference[]
 }
 
 const listItems = (text: string) =>
@@ -10,7 +12,7 @@ const listItems = (text: string) =>
     .map((item) => item.trim())
     .filter(Boolean)
 
-export default function ArticleStructuredRenderer({ document }: Props) {
+export default function ArticleStructuredRenderer({ document, mentions = [] }: Props) {
   return (
     <div className="content-detail-article-body">
       {document.blocks.map((block) => {
@@ -20,11 +22,11 @@ export default function ArticleStructuredRenderer({ document }: Props) {
 
         if (block.type === 'heading') {
           const Heading = block.level === 3 ? 'h3' : 'h2'
-          return <Heading key={block.id}>{block.text}</Heading>
+          return <Heading key={block.id}><SocialMentionText text={block.text} mentions={mentions} /></Heading>
         }
 
         if (block.type === 'quote') {
-          return <blockquote key={block.id}>{block.text}</blockquote>
+          return <blockquote key={block.id}><SocialMentionText text={block.text} mentions={mentions} /></blockquote>
         }
 
         if (block.type === 'bulletList' || block.type === 'orderedList') {
@@ -32,7 +34,7 @@ export default function ArticleStructuredRenderer({ document }: Props) {
           return (
             <ListTag key={block.id}>
               {listItems(block.text).map((item, index) => (
-                <li key={block.id + ':' + index}>{item}</li>
+                <li key={block.id + ':' + index}><SocialMentionText text={item} mentions={mentions} /></li>
               ))}
             </ListTag>
           )
@@ -44,7 +46,7 @@ export default function ArticleStructuredRenderer({ document }: Props) {
           return (
             <figure key={block.id}>
               <img alt={block.text || '文章图片'} loading="lazy" src={ref} />
-              {block.text ? <figcaption>{block.text}</figcaption> : null}
+              {block.text ? <figcaption><SocialMentionText text={block.text} mentions={mentions} /></figcaption> : null}
             </figure>
           )
         }
@@ -69,7 +71,7 @@ export default function ArticleStructuredRenderer({ document }: Props) {
           )
         }
 
-        return <p key={block.id}>{block.text}</p>
+        return <p key={block.id}><SocialMentionText text={block.text} mentions={mentions} /></p>
       })}
     </div>
   )
