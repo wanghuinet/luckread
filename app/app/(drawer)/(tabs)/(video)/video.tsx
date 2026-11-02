@@ -52,6 +52,7 @@ type VideoFeedItem = FeedContent & {
   videoSource: VideoPlaybackResult['source'];
   mediaError?: string;
   mediaLoading?: boolean;
+  mediaSourceVersion?: number;
 };
 
 async function resolveVideoSource(
@@ -93,6 +94,89 @@ function formatCount(value: number | undefined): string {
   return String(value);
 }
 
+function VideoPlayerSurface({
+  source,
+  isVisible,
+  isFocused,
+  muted,
+  onRetry,
+}: {
+  source: NonNullable<VideoPlaybackResult['source']>;
+  isVisible: boolean;
+  isFocused: boolean;
+  muted: boolean;
+  onRetry: () => void;
+}) {
+  const player = useVideoPlayer(source, (instance) => {
+    instance.loop = true;
+  });
+  const { isPlaying } = useEvent(player, 'playingChange', { isPlaying: player.playing });
+  const { status, error } = useEvent(player, 'statusChange', { status: player.status });
+
+  useEffect(() => {
+    if (!isFocused || !isVisible) {
+      player.pause();
+      return;
+    }
+    player.muted = muted;
+    try {
+      player.play();
+    } catch {
+      // Playback can be interrupted while the user changes tabs.
+    }
+  }, [isFocused, isVisible, muted, player]);
+
+  const togglePlayPause = useCallback(() => {
+    if (isPlaying) player.pause();
+    else {
+      player.muted = muted;
+      player.play();
+    }
+  }, [isPlaying, muted, player]);
+  const playbackFailed = status === 'error';
+
+  return (
+    <>
+      <TouchableOpacity
+        accessibilityRole="button"
+        accessibilityLabel={isPlaying ? 'Pause video' : 'Play video'}
+        activeOpacity={1}
+        onPress={togglePlayPause}
+        style={StyleSheet.absoluteFill}
+      >
+        <VideoView
+          player={player}
+          style={styles.videoPlayer}
+          contentFit="cover"
+          allowsFullscreen={false}
+          allowsPictureInPicture={false}
+          nativeControls={false}
+        />
+      </TouchableOpacity>
+
+      {status === 'loading' ? (
+        <ActivityIndicator size="large" color="#ffffff" style={styles.loadingIndicator} />
+      ) : null}
+
+      {!isPlaying && status === 'readyToPlay' && !playbackFailed ? (
+        <Pressable accessibilityRole="button" onPress={togglePlayPause} style={styles.playPauseIndicator}>
+          <Feather name="play" size={50} color="#ffffff" />
+        </Pressable>
+      ) : null}
+
+      {status === 'error' ? (
+        <View style={styles.playbackError} pointerEvents="box-none">
+          <Feather name="alert-triangle" size={30} color="#ffffff" />
+          <Text style={styles.unavailableMessage}>{error?.message || 'Unable to play this video.'}</Text>
+          <Pressable accessibilityRole="button" onPress={onRetry} style={styles.retryButton}>
+            <Text style={styles.retryButtonText}>Retry feed</Text>
+          </Pressable>
+        </View>
+      ) : null}
+    </>
+  );
+}
+
 function VideoItem({
   item,
   isVisible,
@@ -114,65 +198,7 @@ function VideoItem({
   const insets = useSafeAreaInsets();
   const currentUserId = useAuthStore((state) => state.user?.id);
   const authorId = item.creatorId || item.ownerUserId;
-  const player = useVideoPlayer(null, (instance) => {
-    instance.loop = true;
-  });
-  const sourceReplacementRef = useRef<Promise<void>>(Promise.resolve());
-  const [loadedSource, setLoadedSource] = useState<VideoPlaybackResult['source']>(null);
-  const { isPlaying } = useEvent(player, 'playingChange', { isPlaying: player.playing });
-  const { status, error } = useEvent(player, 'statusChange', { status: player.status });
 
-  // SDK 52 creates the player once. Replace its source when the authorized
-  // playback URL arrives instead of relying on a changed hook argument.
-  useEffect(() => {
-    player.pause();
-    setLoadedSource(null);
-    const nextSource = item.videoSource;
-    if (!nextSource) return;
-
-    let active = true;
-    const replacement = sourceReplacementRef.current
-      .catch(() => undefined)
-      .then(() => player.replaceAsync(nextSource));
-    sourceReplacementRef.current = replacement.catch(() => undefined);
-    void replacement
-      .then(() => {
-        if (active) setLoadedSource(nextSource);
-      })
-      .catch(() => undefined);
-
-    return () => {
-      active = false;
-      player.pause();
-    };
-  }, [item.videoSource, player]);
-
-  useEffect(() => {
-    if (
-      !isFocused ||
-      !isVisible ||
-      !item.videoSource ||
-      loadedSource !== item.videoSource
-    ) {
-      player.pause();
-      return;
-    }
-    player.muted = muted;
-    try {
-      player.play();
-    } catch {
-      // Playback can be interrupted while the user changes tabs.
-    }
-  }, [isFocused, isVisible, item.videoSource, loadedSource, muted, player]);
-
-  const togglePlayPause = useCallback(() => {
-    if (!item.videoSource) return;
-    if (isPlaying) player.pause();
-    else {
-      player.muted = muted;
-      player.play();
-    }
-  }, [isPlaying, item.videoSource, muted, player]);
 
   const openAuthor = useCallback(() => {
     const identifier = item.poster_id && item.poster_id !== 'unknown'
@@ -181,27 +207,17 @@ function VideoItem({
     if (identifier) router.push(('/profile/' + encodeURIComponent(identifier)) as never);
   }, [item.authorHandle, item.poster_id, router]);
 
-  const playbackFailed = Boolean(item.mediaError) || status === 'error';
-
   return (
     <View style={styles.videoContainer}>
       {item.videoSource ? (
-        <TouchableOpacity
-          accessibilityRole="button"
-          accessibilityLabel={isPlaying ? 'Pause video' : 'Play video'}
-          activeOpacity={1}
-          onPress={togglePlayPause}
-          style={StyleSheet.absoluteFill}
-        >
-          <VideoView
-            player={player}
-            style={styles.videoPlayer}
-            contentFit="cover"
-            allowsFullscreen={false}
-            allowsPictureInPicture={false}
-            nativeControls={false}
-          />
-        </TouchableOpacity>
+        <VideoPlayerSurface
+          key={item.contentId + ':' + String(item.mediaSourceVersion ?? 0)}
+          source={item.videoSource}
+          isVisible={isVisible}
+          isFocused={isFocused}
+          muted={muted}
+          onRetry={onRetry}
+        />
       ) : item.mediaLoading ? (
         <View style={styles.unavailableVideo}>
           <ActivityIndicator size="large" color="#ffffff" />
@@ -428,6 +444,7 @@ export default function VideoFeed() {
                 ? undefined
                 : playback.error || 'This video has no playable media source.',
               mediaLoading: false,
+              mediaSourceVersion: requestId,
             };
           } catch {
             return fallback
