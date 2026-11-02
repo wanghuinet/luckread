@@ -1,5 +1,4 @@
 import {
-  cachedPublicGet,
   invalidatePublicContentComments,
   invalidatePublicContentDetail,
   invalidatePublicContentList,
@@ -7,15 +6,14 @@ import {
   invalidatePublicContentRelationships,
 } from '../../../../../lib/public-response-cache.js'
 
-import { TrafficLimitError, enforcePublicReadRateLimit, rateLimitResponse } from '../../../../../auth/traffic-limit.js'
-import { hasAuthenticatedSessionCredential } from '../../../../../lib/content-list-cache-guard.js'
+import { TrafficLimitError, rateLimitResponse } from '../../../../../auth/traffic-limit.js'
+import { getPublicContentDetailResponse } from '../../../../../content/public-content-detail-reader.js'
 
 import { mediaReferenceValidationResponse, validateOwnedPostMediaReferences } from '../../../../../content/validate-owned-post-media-references.js'
 
 import {
   callW03Content,
   resolveContentPrincipal,
-  resolveOptionalCookieContentPrincipal,
   resolveVerifiedContentCreatorId,
   W03ContentClientError,
 } from '../../../../../content/w03-content-client.js'
@@ -49,28 +47,7 @@ export async function GET(
 ): Promise<Response> {
   try {
     const { contentId } = await context.params
-    if (!hasAuthenticatedSessionCredential(request)) {
-      await enforcePublicReadRateLimit(request)
-      return await cachedPublicGet(
-        request,
-        'content-detail',
-        () => callW03Content({
-          request,
-          pathname: contentPath(contentId),
-          method: 'GET',
-        }),
-        30,
-      )
-    }
-
-    const principal = await resolveOptionalCookieContentPrincipal(request)
-    if (principal instanceof Response) return principal
-    return await callW03Content({
-      request,
-      pathname: contentPath(contentId),
-      method: 'GET',
-      principal,
-    })
+    return await getPublicContentDetailResponse(request, contentId)
   } catch (error) {
     if (error instanceof TrafficLimitError) return rateLimitResponse(request)
     if (error instanceof W03ContentClientError) return errorResponse(error.status, error.code, 'Content service unavailable')
