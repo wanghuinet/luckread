@@ -26,17 +26,29 @@ test('keeps the five LuckRead primary tabs available', () => {
   }
 });
 
-
-test('home feed renders first-page posts before optional detail enrichment completes', () => {
+test('home feed renders first-page projections while optional detail hydration runs independently', () => {
   const homeScreen = readFileSync(
     new URL('../app/(drawer)/(tabs)/(index)/index.tsx', import.meta.url),
     'utf8',
   );
 
-  expect(homeScreen).toContain('setItems(visibleItems)');
-  expect(homeScreen).toContain('Promise.allSettled(');
-  expect(homeScreen).toContain('const hydrationResults = await Promise.allSettled(');
-  expect(homeScreen).toContain('!loading && !loadingMore');
+  // The first page is mapped directly from the W01 list projection.
+  expect(homeScreen).toContain('const visibleItems = useMemo(() => records.flatMap(');
+  expect(homeScreen).toContain('mapContentToFeedContent(item, undefined, item.social, item.creator ?? item.author)');
+  expect(homeScreen).toContain('const items = useMemo(');
+  expect(homeScreen).toContain('visibleItems.map((item) => item.contentId ? hydratedById[item.contentId] ?? item : item)');
+  expect(homeScreen).toContain('<Tabs.FlatList');
+  expect(homeScreen).toContain('data={items}');
+
+  // Body, social and author reads are optional, independent enrichment.
+  expect(homeScreen).toContain('const pendingRecords = records.filter((item) => !hydratedIdsRef.current.has(item.id));');
+  expect(homeScreen).toContain('const results = await Promise.allSettled(pendingRecords.map(async (item) => {');
+  expect(homeScreen).toContain('readContentBody(item, undefined, sessionToken)');
+  expect(homeScreen).toContain('readContentSocial(item.id)');
+  expect(homeScreen).toContain('readContentAuthor(item)');
+  expect(homeScreen).toContain('generation !== hydrationGenerationRef.current');
+  expect(homeScreen).not.toContain('setItems(visibleItems)');
+  expect(homeScreen).not.toContain('!loading && !loadingMore');
 });
 
 test('home route exposes an actionable error boundary instead of an unhandled blank screen', () => {
