@@ -31,6 +31,71 @@ env:
   CI: "1"
 
 jobs:
+  prepare-camera-dependency-lockfile:
+    name: Prepare SDK 58 camera dependency lockfile
+    if: ${{ github.event_name == 'pull_request' && github.repository == 'wanghuinet/luckread' && github.head_ref == 'feat/native-camera-photo-capture' && github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.head_ref }}
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22.13.1"
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.1.38"
+      - name: Regenerate Bun binary lockfile from package manifest
+        run: bun install
+      - name: Upload generated camera dependency lockfile
+        uses: actions/upload-artifact@v4
+        with:
+          name: luckread-camera-bun-lockfile-sync
+          path: app/bun.lockb
+          if-no-files-found: error
+          retention-days: 1
+
+  sync-camera-dependency-lockfile:
+    name: Sync generated SDK 58 camera dependency lockfile
+    needs: prepare-camera-dependency-lockfile
+    if: ${{ github.event_name == 'pull_request' && github.repository == 'wanghuinet/luckread' && github.head_ref == 'feat/native-camera-photo-capture' && github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - name: Download generated Bun lockfile
+        uses: actions/download-artifact@v4
+        with:
+          name: luckread-camera-bun-lockfile-sync
+          path: /tmp/luckread-camera-lock
+      - name: Checkout exact camera PR branch
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.head_ref }}
+      - name: Commit generated lockfile and dispatch fresh validation
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_HEAD_REF: ${{ github.head_ref }}
+        run: |
+          test -s /tmp/luckread-camera-lock/bun.lockb
+          cp /tmp/luckread-camera-lock/bun.lockb app/bun.lockb
+          if git diff --quiet -- app/bun.lockb; then
+            echo "Bun lockfile already matches app/package.json."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/bun.lockb
+          git commit -m "chore(native): sync Bun lockfile for Expo Camera"
+          git push origin "HEAD:${GITHUB_HEAD_REF}"
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/actions/workflows/app-mobile-ci.yml/dispatches" -f "ref=${GITHUB_HEAD_REF}" -f "inputs[run_native_builds]=false"
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/actions/workflows/security-hardening.yml/dispatches" -f "ref=${GITHUB_HEAD_REF}"
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/actions/workflows/three-client-development-contract.yml/dispatches" -f "ref=${GITHUB_HEAD_REF}"
+
   dependency-compatibility:
     name: Expo install, doctor and typecheck
     runs-on: ubuntu-latest
@@ -139,6 +204,8 @@ jobs:
         run: bun test tests/content-adapter-media-reference.test.mjs
       - name: Test native authenticated image gallery and multi-photo preview
         run: bun run test:media-gallery
+      - name: Test native camera photo capture and composer upload integration
+        run: bun test tests/camera-capture.test.mjs
       - name: Test native publishing and media upload contracts
         run: bun run test:publish-api
       - name: Test native publishing flow and owner-only post actions

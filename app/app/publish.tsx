@@ -15,6 +15,7 @@ import {
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import CameraCaptureModal, { type CapturedCameraPhoto } from '~/components/CameraCaptureModal';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { useColorScheme } from 'nativewind';
 
@@ -132,6 +133,7 @@ export default function PublishScreen() {
   const [body, setBody] = useState('');
   const [accessMode, setAccessMode] = useState<'PUBLIC' | 'MEMBERS_ONLY'>('PUBLIC');
   const [assets, setAssets] = useState<ComposerAsset[]>([]);
+  const [cameraVisible, setCameraVisible] = useState(false);
   const [coverRef, setCoverRef] = useState('');
   const [busy, setBusy] = useState(false);
   const [loadingEdit, setLoadingEdit] = useState(Boolean(contentId));
@@ -255,6 +257,48 @@ export default function PublishScreen() {
       return false;
     }
   }, [updateAsset]);
+
+  const addCapturedPhoto = useCallback(async (photo: CapturedCameraPhoto) => {
+    if (busy || loadingEdit || publishPending) return;
+    if (assets.length >= MAX_MEDIA_ITEMS) {
+      Alert.alert('Attachment limit', 'A post can contain up to four photos or videos.');
+      return;
+    }
+
+    const localId = createIdempotencyKey();
+    const asset: ComposerAsset = {
+      localId,
+      uri: photo.uri,
+      filename: 'luckread-camera-' + localId + '.jpg',
+      mimeType: 'image/jpeg',
+      size: null,
+      width: photo.width,
+      height: photo.height,
+      uploadKey: createIdempotencyKey(),
+      serverUrl: '',
+      status: 'uploading',
+    };
+    setAssets((current) => [...current, asset]);
+    setCameraVisible(false);
+    setErrorMessage('');
+    setStatusMessage('Uploading camera photo to LuckRead…');
+    setBusy(true);
+    try {
+      const succeeded = await uploadAsset(asset);
+      setStatusMessage(
+        succeeded
+          ? 'Camera photo uploaded. Server media references are ready to publish.'
+          : 'Camera photo upload failed. Retry this file before publishing.',
+      );
+    } finally {
+      setBusy(false);
+    }
+  }, [assets.length, busy, loadingEdit, publishPending, uploadAsset]);
+
+  const handleCameraCapture = useCallback((photo: CapturedCameraPhoto) => {
+    setCameraVisible(false);
+    void addCapturedPhoto(photo);
+  }, [addCapturedPhoto]);
 
   const pickMedia = useCallback(async () => {
     if (busy || loadingEdit || publishPending) return;
@@ -749,6 +793,15 @@ export default function PublishScreen() {
               accessibilityRole="button"
               disabled={busy || loadingEdit || publishPending || assets.length >= MAX_MEDIA_ITEMS}
               style={[styles.mediaButton, isDark && { borderColor: '#52525b' }]}
+              onPress={() => setCameraVisible(true)}
+            >
+              <Feather name="camera" size={19} color={PRIMARY} />
+              <Text style={styles.mediaButtonText}>Take photo</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              disabled={busy || loadingEdit || publishPending || assets.length >= MAX_MEDIA_ITEMS}
+              style={[styles.mediaButton, isDark && { borderColor: '#52525b' }]}
               onPress={() => { void pickMedia(); }}
             >
               <Feather name="image" size={19} color={PRIMARY} />
@@ -853,6 +906,11 @@ export default function PublishScreen() {
           </View>
         </ScrollView>
       )}
+      <CameraCaptureModal
+        visible={cameraVisible}
+        onClose={() => setCameraVisible(false)}
+        onCapture={handleCameraCapture}
+      />
     </KeyboardAvoidingView>
   );
 }
