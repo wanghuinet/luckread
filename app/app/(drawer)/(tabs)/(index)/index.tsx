@@ -83,7 +83,7 @@ function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSig
 
   const feedQuery = useInfiniteQuery({
     queryKey,
-    enabled: kind === 'for-you' || authStatus === 'authenticated',
+    enabled: kind === 'for-you' || (authStatus === 'authenticated' && Boolean(viewerId)),
     initialPageParam: null as string | null,
     queryFn: ({ pageParam, signal }) => fetchNativeFeedPage({
       kind,
@@ -198,7 +198,8 @@ function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSig
     () => visibleItems.map((item) => item.contentId ? hydratedById[item.contentId] ?? item : item),
     [hydratedById, visibleItems],
   );
-  const authRequired = kind === 'following' && authStatus !== 'authenticated';
+  const authRequired = kind === 'following' && authStatus === 'anonymous';
+  const waitingForFollowingIdentity = kind === 'following' && authStatus === 'authenticated' && !viewerId;
   const projectionError = records.length > 0 && visibleItems.length === 0
     ? 'Posts were returned, but could not be displayed. Please retry.'
     : '';
@@ -288,7 +289,7 @@ function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSig
     );
   }
 
-  if (feedQuery.isPending && items.length === 0) {
+  if ((waitingForFollowingIdentity || feedQuery.isPending) && items.length === 0) {
     return (
       <View style={[styles.stateContainer, { backgroundColor: isDark ? '#000000' : '#ffffff' }]}>
         <ActivityIndicator color={APP_PRIMARY_COLOR} size="large" />
