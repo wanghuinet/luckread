@@ -150,6 +150,10 @@ jobs:
 
       - name: Install Expo app dependencies
         run: bun install
+      - name: Apply and verify Hyperswitch React Native 0.88 compatibility
+        run: |
+          node scripts/apply-hyperswitch-rn88-compat.mjs
+          bun run test:hyperswitch-compat
 
       - name: Set requested app version and Android versionCode
         id: version
