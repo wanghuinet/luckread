@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { Linking, Pressable, Text, View } from 'react-native';
+import { useColorScheme } from 'nativewind';
 import { useRouter } from 'expo-router';
 
 import {
@@ -26,6 +27,8 @@ type RegistrationState = 'idle' | 'submitting' | 'success' | 'error';
 type VerificationState = 'idle' | 'sending' | 'accepted' | 'error';
 
 export default function RegisterScreen() {
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === 'dark';
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
@@ -173,9 +176,9 @@ export default function RegisterScreen() {
     return (
       <AuthScreen title="检查你的邮箱" subtitle="账号已创建。完成邮箱验证后，就可以登录 LuckRead。">
         <AuthMessage message="账号创建成功" variant="success" />
-        <View style={{ borderWidth: 1, borderColor: '#cfd9de', borderRadius: 12, padding: 14, marginBottom: 12 }}>
-          <Text style={{ color: AUTH_COLORS.secondary, fontSize: 13, marginBottom: 5 }}>验证邮件发送至</Text>
-          <Text accessibilityRole="text" style={{ color: AUTH_COLORS.text, fontSize: 16, fontWeight: '700' }}>
+        <View style={{ borderWidth: 1, borderColor: isDark ? '#3f3f46' : '#cfd9de', backgroundColor: isDark ? '#09090b' : '#ffffff', borderRadius: 12, padding: 14, marginBottom: 12 }}>
+          <Text style={{ color: isDark ? '#9ca3af' : AUTH_COLORS.secondary, fontSize: 13, marginBottom: 5 }}>验证邮件发送至</Text>
+          <Text accessibilityRole="text" style={{ color: isDark ? '#f9fafb' : AUTH_COLORS.text, fontSize: 16, fontWeight: '700' }}>
             {registeredEmail}
           </Text>
         </View>
@@ -270,8 +273,8 @@ export default function RegisterScreen() {
           height: 22,
           borderRadius: 5,
           borderWidth: 1,
-          borderColor: consent ? AUTH_COLORS.accent : AUTH_COLORS.border,
-          backgroundColor: consent ? AUTH_COLORS.accent : '#ffffff',
+          borderColor: consent ? AUTH_COLORS.accent : isDark ? '#52525b' : AUTH_COLORS.border,
+          backgroundColor: consent ? AUTH_COLORS.accent : isDark ? '#18181b' : '#ffffff',
         }}>
           {consent ? <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 14 }}>✓</Text> : null}
         </View>
@@ -302,7 +305,7 @@ export default function RegisterScreen() {
         <Text style={{ color: AUTH_COLORS.secondary, fontSize: 14 }}>已经有账号？</Text>
         <AuthTextLink label="登录" onPress={() => router.replace('/login' as never)} />
       </View>
-      <Text style={{ color: '#8b98a5', fontSize: 12, lineHeight: 18, marginTop: 18, textAlign: 'center' }}>
+      <Text style={{ color: isDark ? '#9ca3af' : '#8b98a5', fontSize: 12, lineHeight: 18, marginTop: 18, textAlign: 'center' }}>
         当前支持邮箱注册和验证；手机号及第三方登录暂未开放。
       </Text>
     </AuthScreen>
