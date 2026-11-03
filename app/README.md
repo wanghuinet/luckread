@@ -4,7 +4,7 @@ Expo / React Native client source for LuckRead. The root web application and the
 
 ## Local development
 
-Requirements: Node.js 20.18+ for the current Expo SDK 52 baseline, Bun 1.1.x, Android Studio for Android builds, and macOS with Xcode + CocoaPods for iOS builds.
+Requirements: Node.js 20.18+ for the Expo SDK 53 baseline (CI uses Node.js 22.13.1), Bun 1.1.x, Android Studio for Android builds, and macOS with Xcode + CocoaPods for iOS builds.
 
 ```sh
 cd app
