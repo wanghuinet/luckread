@@ -56,6 +56,8 @@ type ComposerAsset = {
   filename: string;
   mimeType: string;
   size?: number | null;
+  width?: number;
+  height?: number;
   uploadKey?: string;
   uploaded?: UploadedMedia;
   serverUrl: string;
