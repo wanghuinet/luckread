@@ -38,16 +38,18 @@ concurrency:
 env:
   CI: "1"
   EXPO_NO_TELEMETRY: "1"
-  EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-  EXPO_PROJECT_ID: ${{ vars.EXPO_PROJECT_ID || secrets.EXPO_PROJECT_ID }}
-  EXPO_UPDATE_CHANNEL: ${{ inputs.channel }}
-  LUCKREAD_RUNTIME_VERSION: ${{ inputs.runtime_version }}
-  LUCKREAD_REQUIRE_OTA_CONFIG: "1"
 
 jobs:
   publish:
     name: Publish compatible APP update
     runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      EXPO_PROJECT_ID: ${{ vars.EXPO_PROJECT_ID || secrets.EXPO_PROJECT_ID }}
+      EXPO_UPDATE_CHANNEL: ${{ inputs.channel }}
+      LUCKREAD_RUNTIME_VERSION: ${{ inputs.runtime_version }}
+      LUCKREAD_REQUIRE_OTA_CONFIG: "1"
     defaults:
       run:
         working-directory: app
