@@ -4,7 +4,7 @@ Expo / React Native client source for LuckRead. The root web application and the
 
 ## Local development
 
-Requirements: Node.js 20.18+ for the Expo SDK 53 baseline (CI uses Node.js 22.13.1), Bun 1.1.x, Android Studio for Android builds, and macOS with Xcode + CocoaPods for iOS builds.
+Requirements: Node.js 22.13+ for the Expo SDK 58 baseline (CI uses Node.js 22.13.1), Bun 1.1.x, Android Studio for Android builds, and macOS with Xcode + CocoaPods for iOS builds.
 
 ```sh
 cd app
@@ -22,7 +22,7 @@ bun run android
 bun run ios
 ```
 
-The GitHub Actions workflow `.github/workflows/app-mobile-ci.yml` installs dependencies, checks the Expo SDK compatibility, type-checks the client, prebuilds the native projects, and compiles Android and iOS simulator targets.
+The GitHub Actions workflow `.github/workflows/app-mobile-ci.yml` installs dependencies, checks the Expo SDK 58 compatibility, type-checks the client, verifies native Codegen, and builds the Android Release APK. The SDK 58 Android baseline uses compile API 37 and target API 36; iOS builds require Xcode 26.4 or newer.
 
 ## API configuration
 
