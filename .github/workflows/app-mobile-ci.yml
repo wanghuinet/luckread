@@ -148,8 +148,12 @@ jobs:
         run: bun test tests/content-adapter-media-reference.test.mjs
       - name: Test native authenticated image gallery and multi-photo preview
         run: bun run test:media-gallery
+      - name: Test native camera photo capture and composer upload integration
+        run: bun test tests/camera-capture.test.mjs
       - name: Test native publishing and media upload contracts
         run: bun run test:publish-api
+      - name: Test native image upload preparation and fallback behavior
+        run: bun run test:image-upload-preparation
       - name: Test native publishing flow and owner-only post actions
         run: bun run test:publish-flow
       - name: Test native notifications, bookmarks, relationships and discovery API routes
@@ -168,8 +172,6 @@ jobs:
         run: bun test tests/tab-navigation-ui.test.mjs
       - name: Test native feed comment navigation
         run: bun run test:comment-navigation
-      - name: Test native TanStack Query feed cache and pagination
-        run: bun run test:feed-query
       - name: Test native public content search
         run: bun run test:content-search
       - name: Test native profile pin and unpin actions

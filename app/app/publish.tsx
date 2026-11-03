@@ -12,6 +12,7 @@ import {
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import CameraCaptureModal, { type CapturedCameraPhoto } from '~/components/CameraCaptureModal';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { useColorScheme } from 'nativewind';
 import { KeyboardAwareScrollView, KeyboardProvider } from 'react-native-keyboard-controller';
@@ -25,6 +26,7 @@ import {
   type LocalMediaFile,
   type UploadedMedia,
 } from '~/lib/publish-api';
+import { prepareImageForUpload } from '~/lib/image-upload-preparation';
 import { useAuthStore } from '~/store/auth-store';
 
 type ContentRecord = {
@@ -53,6 +55,8 @@ type ComposerAsset = {
   filename: string;
   mimeType: string;
   size?: number | null;
+  width?: number;
+  height?: number;
   uploadKey?: string;
   uploaded?: UploadedMedia;
   serverUrl: string;
@@ -130,6 +134,7 @@ function PublishScreenContent() {
   const [body, setBody] = useState('');
   const [accessMode, setAccessMode] = useState<'PUBLIC' | 'MEMBERS_ONLY'>('PUBLIC');
   const [assets, setAssets] = useState<ComposerAsset[]>([]);
+  const [cameraVisible, setCameraVisible] = useState(false);
   const [coverRef, setCoverRef] = useState('');
   const [busy, setBusy] = useState(false);
   const [loadingEdit, setLoadingEdit] = useState(Boolean(contentId));
@@ -218,8 +223,21 @@ function PublishScreenContent() {
           name: asset.filename,
           mimeType: asset.mimeType,
           size: asset.size,
+          width: asset.width,
+          height: asset.height,
         };
-        uploaded = await uploadMediaFile(file, asset.uploadKey);
+        const uploadFile = await prepareImageForUpload(file);
+        // Persist the prepared local URI and matching metadata before network I/O.
+        // A retry then uploads the exact same bytes with the same idempotency key.
+        updateAsset(asset.localId, {
+          uri: uploadFile.uri,
+          filename: uploadFile.name,
+          mimeType: uploadFile.mimeType,
+          size: uploadFile.size,
+          width: uploadFile.width,
+          height: uploadFile.height,
+        });
+        uploaded = await uploadMediaFile(uploadFile, asset.uploadKey);
         updateAsset(asset.localId, {
           uploaded,
           serverUrl: uploaded.url,
@@ -253,6 +271,48 @@ function PublishScreenContent() {
       return false;
     }
   }, [updateAsset]);
+
+  const addCapturedPhoto = useCallback(async (photo: CapturedCameraPhoto) => {
+    if (busy || loadingEdit || publishPending) return;
+    if (assets.length >= MAX_MEDIA_ITEMS) {
+      Alert.alert('Attachment limit', 'A post can contain up to four photos or videos.');
+      return;
+    }
+
+    const localId = createIdempotencyKey();
+    const asset: ComposerAsset = {
+      localId,
+      uri: photo.uri,
+      filename: 'luckread-camera-' + localId + '.jpg',
+      mimeType: 'image/jpeg',
+      size: null,
+      width: photo.width,
+      height: photo.height,
+      uploadKey: createIdempotencyKey(),
+      serverUrl: '',
+      status: 'uploading',
+    };
+    setAssets((current) => [...current, asset]);
+    setCameraVisible(false);
+    setErrorMessage('');
+    setStatusMessage('Uploading camera photo to LuckRead…');
+    setBusy(true);
+    try {
+      const succeeded = await uploadAsset(asset);
+      setStatusMessage(
+        succeeded
+          ? 'Camera photo uploaded. Server media references are ready to publish.'
+          : 'Camera photo upload failed. Retry this file before publishing.',
+      );
+    } finally {
+      setBusy(false);
+    }
+  }, [assets.length, busy, loadingEdit, publishPending, uploadAsset]);
+
+  const handleCameraCapture = useCallback((photo: CapturedCameraPhoto) => {
+    setCameraVisible(false);
+    void addCapturedPhoto(photo);
+  }, [addCapturedPhoto]);
 
   const pickMedia = useCallback(async () => {
     if (busy || loadingEdit || publishPending) return;
@@ -304,6 +364,8 @@ function PublishScreenContent() {
         filename,
         mimeType: asset.mimeType || (video ? 'video/mp4' : 'image/jpeg'),
         size: asset.fileSize,
+        width: asset.width,
+        height: asset.height,
         uploadKey: createIdempotencyKey(),
         serverUrl: '',
         status: 'uploading',
@@ -745,6 +807,15 @@ function PublishScreenContent() {
               accessibilityRole="button"
               disabled={busy || loadingEdit || publishPending || assets.length >= MAX_MEDIA_ITEMS}
               style={[styles.mediaButton, isDark && { borderColor: '#52525b' }]}
+              onPress={() => setCameraVisible(true)}
+            >
+              <Feather name="camera" size={19} color={PRIMARY} />
+              <Text style={styles.mediaButtonText}>Take photo</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              disabled={busy || loadingEdit || publishPending || assets.length >= MAX_MEDIA_ITEMS}
+              style={[styles.mediaButton, isDark && { borderColor: '#52525b' }]}
               onPress={() => { void pickMedia(); }}
             >
               <Feather name="image" size={19} color={PRIMARY} />
@@ -849,6 +920,11 @@ function PublishScreenContent() {
           </View>
         </KeyboardAwareScrollView>
       )}
+      <CameraCaptureModal
+        visible={cameraVisible}
+        onClose={() => setCameraVisible(false)}
+        onCapture={handleCameraCapture}
+      />
     </View>
   );
 }
