@@ -12,6 +12,7 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useColorScheme } from 'nativewind';
+import { useTabBarScroll } from '~/components/TabBarScroll';
 
 import { getApiErrorMessage } from '~/lib/api-client';
 import { fetchNotificationsPage, markAllNotificationsRead, markNotificationRead } from '~/lib/social-screen-api';
@@ -79,6 +80,7 @@ function resolveContentId(item: SocialNotification): string | null {
 }
 
 export default function Notifications() {
+  const tabBarScroll = useTabBarScroll();
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
   const router = useRouter();
@@ -385,6 +387,8 @@ export default function Notifications() {
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       <FlatList
         data={filteredItems}
+        onScroll={tabBarScroll.onScroll}
+        scrollEventThrottle={tabBarScroll.scrollEventThrottle}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         ListHeaderComponent={header}
