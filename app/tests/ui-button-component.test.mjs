@@ -51,3 +51,10 @@ test('Reusables runtime helpers are installed as app dependencies, not dev-only 
   }
   expect(appPackage.devDependencies['tailwind-merge']).toBeUndefined();
 });
+
+
+test('React Native Reusables MIT notice is retained with the adapted component source', () => {
+  const license = readFileSync(new URL('../components/ui/LICENSE.react-native-reusables.txt', import.meta.url), 'utf8');
+  expect(license).toContain('Copyright (c) 2025 Founded Labs');
+  expect(license).toContain('Permission is hereby granted, free of charge');
+});
