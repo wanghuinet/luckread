@@ -12,6 +12,7 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useColorScheme } from 'nativewind';
+import { useTabBarScroll } from '~/components/TabBarScroll';
 
 import { getApiErrorMessage } from '~/lib/api-client';
 import { fetchUserRelationshipsPage } from '~/lib/social-screen-api';
@@ -46,6 +47,7 @@ type FollowListRow = {
 const PRIMARY = '#1d9bf0';
 
 export default function ProfileRelationships() {
+  const tabBarScroll = useTabBarScroll();
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
   const params = useLocalSearchParams<{ id?: string | string[]; type?: string | string[] }>();
@@ -155,6 +157,8 @@ export default function ProfileRelationships() {
       ) : null}
       <FlatList
         data={rows}
+        onScroll={tabBarScroll.onScroll}
+        scrollEventThrottle={tabBarScroll.scrollEventThrottle}
         keyExtractor={(item) => item.relation.relationshipId}
         renderItem={renderItem}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => {
