@@ -121,6 +121,11 @@ jobs:
             exit 1
           fi
 
+          # Keep the shared mobile workflow untouched in this token-limited sync push.
+          # The TanStack tests are executed below; the CI hook will be added separately.
+          git show origin/main:.github/workflows/app-mobile-ci.yml > .github/workflows/app-mobile-ci.yml
+          git add .github/workflows/app-mobile-ci.yml
+
           cd app
           bun install
           bun run check:compat
