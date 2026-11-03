@@ -17,7 +17,9 @@ test('declares the native Android menu peer required by Zeego 3', () => {
   expect(packageJson.dependencies['@react-native-menu/menu']).toBe('1.2.2');
   expect(packageJson.dependencies['react-native-ios-context-menu']).toBe('3.1.0');
   expect(packageJson.dependencies['react-native-ios-utilities']).toBe('5.1.2');
-  expect(appConfig.expo.newArchEnabled).toBe(true);
+  // SDK 58 / React Native 0.88 requires the New Architecture; SDK 58 removes the
+  // obsolete app.json toggle, so the native Prebuild check verifies the generated flag.
+  expect(appConfig.expo).not.toHaveProperty('newArchEnabled');
 });
 
 test('uses Zeego native menus from the feed item tree', () => {
