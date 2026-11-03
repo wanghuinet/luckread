@@ -5,6 +5,7 @@ const button = readFileSync(new URL('../components/ui/button.tsx', import.meta.u
 const text = readFileSync(new URL('../components/ui/text.tsx', import.meta.url), 'utf8');
 const follow = readFileSync(new URL('../components/FollowButton.tsx', import.meta.url), 'utf8');
 const utils = readFileSync(new URL('../lib/utils.ts', import.meta.url), 'utf8');
+const appPackage = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 
 test('Reusables Button provides semantic variants and accessible native Pressable behavior', () => {
   for (const variant of ['default', 'destructive', 'outline', 'secondary', 'ghost', 'link']) {
@@ -41,4 +42,12 @@ test('Follow action consumes the shared Button primitive and preserves its exist
   expect(follow).toContain("accessibilityState={{ disabled, selected: loaded && following }}");
   expect(follow).toContain("{label}");
   expect(follow).not.toContain('<TouchableOpacity');
+});
+
+
+test('Reusables runtime helpers are installed as app dependencies, not dev-only packages', () => {
+  for (const dependency of ['@rn-primitives/slot', 'class-variance-authority', 'clsx', 'tailwind-merge']) {
+    expect(appPackage.dependencies[dependency]).toBeTruthy();
+  }
+  expect(appPackage.devDependencies['tailwind-merge']).toBeUndefined();
 });
