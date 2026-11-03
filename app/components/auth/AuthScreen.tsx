@@ -50,9 +50,9 @@ export function AuthScreen({
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.container}>
-            <Text accessibilityRole="header" style={[styles.brand, isDark && { color: "#f9fafb" }]}>LuckRead</Text>
-            <Text accessibilityRole="header" style={[styles.title, isDark && { color: "#f9fafb" }]}>{title}</Text>
-            <Text style={[styles.subtitle, isDark && { color: "#9ca3af" }]}>{subtitle}</Text>
+            <Text accessibilityRole="header" style={[styles.brand, isDark && { color: '#f9fafb' }]}>LuckRead</Text>
+            <Text accessibilityRole="header" style={[styles.title, isDark && { color: '#f9fafb' }]}>{title}</Text>
+            <Text style={[styles.subtitle, isDark && { color: '#9ca3af' }]}>{subtitle}</Text>
             {children}
           </View>
         </ScrollView>
@@ -70,12 +70,12 @@ export function AuthInput({
   const isDark = colorScheme === 'dark';
   return (
     <View style={[styles.fieldContainer, containerStyle]}>
-      <Text style={[styles.label, isDark && { color: "#e5e7eb" }]}>{label}</Text>
+      <Text style={[styles.label, isDark && { color: '#e5e7eb' }]}>{label}</Text>
       <TextInput
         {...inputProps}
         placeholderTextColor="#8b98a5"
         selectionColor={AUTH_COLORS.accent}
-        style={[styles.input, inputProps.editable === false ? styles.inputDisabled : null, isDark && { backgroundColor: "#18181b", borderColor: "#3f3f46", color: "#f9fafb" }]}
+        style={[styles.input, inputProps.editable === false ? styles.inputDisabled : null, isDark && { backgroundColor: '#18181b', borderColor: '#3f3f46', color: '#f9fafb' }]}
       />
     </View>
   );
@@ -141,7 +141,7 @@ export function AuthSecondaryButton({
         pressed && !disabled ? styles.buttonPressed : null,
       ]}
     >
-      <Text style={[styles.secondaryButtonText, isDark && { color: "#f9fafb" }]}>{label}</Text>
+      <Text style={[styles.secondaryButtonText, isDark && { color: '#f9fafb' }]}>{label}</Text>
     </Pressable>
   );
 }
