@@ -63,6 +63,8 @@ jobs:
         run: bunx expo config --type public
       - name: Test EAS Update configuration and runtime guards
         run: bun test tests/ota-config.test.mjs
+      - name: Verify Zeego Android native menu dependencies
+        run: bun run test:native-menu
       - name: Verify generated Android Release signing configuration
         run: |
           bunx expo prebuild --platform android --clean --no-install
