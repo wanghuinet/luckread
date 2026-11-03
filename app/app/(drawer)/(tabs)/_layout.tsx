@@ -78,7 +78,7 @@ function TabNavigator() {
         name="(index)"
         options={{
           headerShown: false,
-          tabBarIcon: ({ focused, color }) => focused ? <FilledHome width={26} height={26} color={color ?? (isDark ? '#ffffff' : '#111827')} /> : <Home width={26} height={26} color={color ?? (isDark ? '#ffffff' : '#111827')} />,
+          tabBarIcon: ({ focused, color }) => focused ? <FilledHome width={26} height={26} color={typeof color === 'string' ? color : (isDark ? '#ffffff' : '#111827')} /> : <Home width={26} height={26} color={typeof color === 'string' ? color : (isDark ? '#ffffff' : '#111827')} />,
         }}
       />
 
@@ -86,26 +86,26 @@ function TabNavigator() {
         name="(search)"
         options={{
           headerShown: false,
-          tabBarIcon: ({ focused, color }) => focused ? <FilledSearch width={26} height={26} color={color ?? (isDark ? '#ffffff' : '#111827')} /> : <Search width={26} height={26} color={color ?? (isDark ? '#ffffff' : '#111827')} />,
+          tabBarIcon: ({ focused, color }) => focused ? <FilledSearch width={26} height={26} color={typeof color === 'string' ? color : (isDark ? '#ffffff' : '#111827')} /> : <Search width={26} height={26} color={typeof color === 'string' ? color : (isDark ? '#ffffff' : '#111827')} />,
         }}
       />
 
       <Tabs.Screen
         name="(video)"
         options={{
-          tabBarIcon: ({ color }) => <Foundation name="play-circle" size={26} color={color ?? (isDark ? '#ffffff' : '#111827')} />,
+          tabBarIcon: ({ color }) => <Foundation name="play-circle" size={26} color={typeof color === 'string' ? color : (isDark ? '#ffffff' : '#111827')} />,
         }}
       />
       <Tabs.Screen
         name="(notifications)"
         options={{
-          tabBarIcon: ({ focused, color }) => focused ? <FilledNotifications width={26} height={26} color={color ?? (isDark ? '#ffffff' : '#111827')} /> : <Notifications width={26} height={26} color={color ?? (isDark ? '#ffffff' : '#111827')} />,
+          tabBarIcon: ({ focused, color }) => focused ? <FilledNotifications width={26} height={26} color={typeof color === 'string' ? color : (isDark ? '#ffffff' : '#111827')} /> : <Notifications width={26} height={26} color={typeof color === 'string' ? color : (isDark ? '#ffffff' : '#111827')} />,
         }}
       />
       <Tabs.Screen
         name="(messages)"
         options={{
-          tabBarIcon: ({ focused, color }) => focused ? <FilledMessages width={26} height={26} color={color ?? (isDark ? '#ffffff' : '#111827')} /> : <Messages width={26} height={26} color={color ?? (isDark ? '#ffffff' : '#111827')} />,
+          tabBarIcon: ({ focused, color }) => focused ? <FilledMessages width={26} height={26} color={typeof color === 'string' ? color : (isDark ? '#ffffff' : '#111827')} /> : <Messages width={26} height={26} color={typeof color === 'string' ? color : (isDark ? '#ffffff' : '#111827')} />,
         }}
       />
     </Tabs>
