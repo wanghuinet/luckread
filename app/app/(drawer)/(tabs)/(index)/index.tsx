@@ -21,7 +21,7 @@ import { useColorScheme } from 'nativewind';
 import { FeedContent, FeedItem } from '~/components/FeedItem';
 import X from '~/assets/svg/aside/x.svg';
 import { mapContentToFeedContent, readContentBody, readContentSocial, readContentAuthor, type ApiContentRecord } from '~/lib/content-adapter';
-import { fetchNativeFeedPage, nativeFeedQueryKey, type NativeFeedKind, type NativeFeedPage } from '~/lib/feed-query';
+import { fetchNativeFeedPage, incrementNativeFeedReplyCount, nativeFeedQueryKey, type NativeFeedKind, type NativeFeedPage } from '~/lib/feed-query';
 import { useAuthStore } from '~/store/auth-store';
 import { readSessionToken } from '~/lib/secure-session';
 
@@ -235,6 +235,30 @@ function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSig
       });
     }} onPress={() => {
       if (item.contentId) router.push(('/post/' + encodeURIComponent(item.contentId)) as never);
+    }} onReplySubmitted={(contentId) => {
+      let nextReplyCount = (item.reply_count ?? 0) + 1;
+      queryClient.setQueryData<InfiniteData<NativeFeedPage, string | null>>(queryKey, (current) => {
+        if (!current) return current;
+        return {
+          ...current,
+          pages: current.pages.map((page) => ({
+            ...page,
+            items: page.items.map((post) => {
+              if (post.id !== contentId) return post;
+              const updated = incrementNativeFeedReplyCount(post, item.reply_count ?? 0);
+              nextReplyCount = updated.reply_count ?? nextReplyCount;
+              return updated;
+            }),
+          })),
+        };
+      });
+      setHydratedById((current) => ({
+        ...current,
+        [contentId]: {
+          ...(current[contentId] ?? item),
+          reply_count: nextReplyCount,
+        },
+      }));
     }} />
   ), [queryClient, queryKey, router]);
 
