@@ -27,7 +27,7 @@ test('post cards keep their optional comment callback contract', () => {
   expect(feedItem).toContain('detailView={Boolean(detailView)}');
   expect(feedItem).toContain('replyDisabled={effectiveReplyDisabled}');
   expect(feedItem).toContain("itemData.accessMode === 'MEMBERS_ONLY' && itemData.accessGranted !== true");
-  expect(feedItem.match(/replyDisabled=\\{effectiveReplyDisabled\\}/g)).toHaveLength(2);
+  expect(feedItem.split('replyDisabled={effectiveReplyDisabled}')).toHaveLength(3);
   expect(actions).toContain('replyDisabled || !itemData?.contentId?.trim()');
   expect(actions).toContain('onSubmitted: () => onReplySubmitted?.(contentId)');
   expect(feedItem).toContain('onReplySubmitted?: (contentId: string) => void');
