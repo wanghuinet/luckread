@@ -1,4 +1,4 @@
-import * as ImageManipulator from 'expo-image-manipulator';
+import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 
 import type { LocalMediaFile } from './publish-api';
 
@@ -63,9 +63,9 @@ export async function prepareImageForUpload(file: LocalMediaFile): Promise<Local
     const rendered = await context.renderAsync();
     const result = await rendered.saveAsync(
       format === 'png'
-        ? { format: ImageManipulator.SaveFormat.PNG }
+        ? { format: SaveFormat.PNG }
         : {
-            format: ImageManipulator.SaveFormat.JPEG,
+            format: SaveFormat.JPEG,
             compress: IMAGE_UPLOAD_COMPRESSION,
           },
     );
