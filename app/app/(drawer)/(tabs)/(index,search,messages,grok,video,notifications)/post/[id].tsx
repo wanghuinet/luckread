@@ -145,13 +145,15 @@ export const MoreContextIcons = ({
 };
 
 const PostHeader = ({ username, targetUserId, contentId, postId }: { username?: string; targetUserId?: string | null; contentId: string; postId: string }) => {
+    const { colorScheme } = useColorScheme();
+    const isDark = colorScheme === 'dark';
     const insets = useSafeAreaInsets();
     const router = useRouter();
     return (
         <View className="p-4  top-0 left-0 right-0 flex-row items-center justify-center">
 
             <TouchableOpacity onPress={() => { router.back() }} className="absolute left-4">
-                <Feather name="arrow-left" size={22} color={'#536471'} />
+                <Feather name="arrow-left" size={22} color={isDark ? '#d1d5db' : '#536471'} />
             </TouchableOpacity>
 
             <Text className="text-xl font-bold text-black dark:text-white">Post</Text>
@@ -385,7 +387,7 @@ export default function PostDetailScreen() {
                             <Text className="text-base font-bold text-neutral-500 dark:text-blue-400 mr-1">
                                 {sortOptions[selectedSort]}
                             </Text>
-                            <Feather name="chevron-down" size={18} color={'#536471'} />
+                            <Feather name="chevron-down" size={18} color={isDark ? '#d1d5db' : '#536471'} />
                         </TouchableOpacity>
                         <Comments contentId={postId} sort={selectedSort} />
                     </View>
