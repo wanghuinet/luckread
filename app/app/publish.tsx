@@ -690,20 +690,20 @@ export default function PublishScreen() {
                 accessibilityState={{ selected: accessMode === 'PUBLIC', disabled: busy || loadingEdit || publishPending }}
                 disabled={busy || loadingEdit || publishPending}
                 onPress={() => setAccessMode('PUBLIC')}
-                style={[styles.accessModeOption, accessMode === 'PUBLIC' && styles.accessModeOptionSelected]}
+                style={[styles.accessModeOption, isDark && { borderColor: '#52525b' }, accessMode === 'PUBLIC' && styles.accessModeOptionSelected]}
               >
                 <Feather name="globe" size={16} color={accessMode === 'PUBLIC' ? '#ffffff' : PRIMARY} />
-                <Text style={[styles.accessModeOptionText, accessMode === 'PUBLIC' && styles.accessModeOptionTextSelected]}>公开</Text>
+                <Text style={[styles.accessModeOptionText, isDark && accessMode !== 'PUBLIC' && { color: '#e5e7eb' }, accessMode === 'PUBLIC' && styles.accessModeOptionTextSelected]}>公开</Text>
               </Pressable>
               <Pressable
                 accessibilityRole="button"
                 accessibilityState={{ selected: accessMode === 'MEMBERS_ONLY', disabled: busy || loadingEdit || publishPending }}
                 disabled={busy || loadingEdit || publishPending}
                 onPress={() => setAccessMode('MEMBERS_ONLY')}
-                style={[styles.accessModeOption, accessMode === 'MEMBERS_ONLY' && styles.accessModeOptionSelected]}
+                style={[styles.accessModeOption, isDark && { borderColor: '#52525b' }, accessMode === 'MEMBERS_ONLY' && styles.accessModeOptionSelected]}
               >
                 <Feather name="lock" size={16} color={accessMode === 'MEMBERS_ONLY' ? '#ffffff' : PRIMARY} />
-                <Text style={[styles.accessModeOptionText, accessMode === 'MEMBERS_ONLY' && styles.accessModeOptionTextSelected]}>会员专享</Text>
+                <Text style={[styles.accessModeOptionText, isDark && accessMode !== 'MEMBERS_ONLY' && { color: '#e5e7eb' }, accessMode === 'MEMBERS_ONLY' && styles.accessModeOptionTextSelected]}>会员专享</Text>
               </Pressable>
             </View>
             {accessMode === 'MEMBERS_ONLY' ? (
@@ -748,7 +748,7 @@ export default function PublishScreen() {
             <Pressable
               accessibilityRole="button"
               disabled={busy || loadingEdit || publishPending || assets.length >= MAX_MEDIA_ITEMS}
-              style={styles.mediaButton}
+              style={[styles.mediaButton, isDark && { borderColor: '#52525b' }]}
               onPress={() => { void pickMedia(); }}
             >
               <Feather name="image" size={19} color={PRIMARY} />
@@ -825,12 +825,12 @@ export default function PublishScreen() {
                         disabled={busy || publishPending}
                         onPress={() => setPollDurationHours(duration)}
                         style={[
-                          styles.pollDurationOption,
+                          styles.pollDurationOption, isDark && { borderColor: '#52525b' },
                           pollDurationHours === duration && styles.pollDurationSelected,
                         ]}
                       >
                         <Text style={[
-                          styles.pollDurationText,
+                          styles.pollDurationText, isDark && { color: '#e5e7eb' },
                           pollDurationHours === duration && styles.pollDurationSelectedText,
                         ]}>
                           {duration === 24 ? '1 day' : duration === 72 ? '3 days' : '7 days'}
