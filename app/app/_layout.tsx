@@ -17,10 +17,12 @@ export const unstable_settings = {
 };
 
 export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === 'dark';
   return (
-    <View style={styles.errorContainer}>
-      <Text style={styles.errorTitle}>LuckRead 页面暂时无法显示</Text>
-      <Text style={styles.errorDescription}>
+    <View style={[styles.errorContainer, isDark && { backgroundColor: '#000000' }]}>
+      <Text style={[styles.errorTitle, isDark && { color: "#f9fafb" }]}>LuckRead 页面暂时无法显示</Text>
+      <Text style={[styles.errorDescription, isDark && { color: "#9ca3af" }]}>
         {error.message || '页面发生异常，请重新加载。'}
       </Text>
       <Pressable accessibilityRole="button" onPress={retry} style={styles.errorButton}>
