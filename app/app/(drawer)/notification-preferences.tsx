@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { Stack, useRouter } from 'expo-router';
+import { useColorScheme } from 'nativewind';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
@@ -58,6 +59,8 @@ function equalPreferences(
 }
 
 export default function NotificationPreferencesScreen() {
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === 'dark';
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const authStatus = useAuthStore((state) => state.status);
@@ -157,7 +160,7 @@ export default function NotificationPreferencesScreen() {
           onPress={() => router.back()}
           className="mr-3 h-10 w-10 items-center justify-center rounded-full"
         >
-          <Feather name="arrow-left" size={22} color="#536471" />
+          <Feather name="arrow-left" size={22} color={isDark ? '#d1d5db' : '#536471'} />
         </Pressable>
         <View className="flex-1">
           <Text className="text-lg font-bold text-neutral-900 dark:text-white">通知设置</Text>
@@ -225,7 +228,7 @@ export default function NotificationPreferencesScreen() {
                 accessibilityLabel={option.title}
                 disabled={saving}
                 onValueChange={(value) => changePreference(option.key, value)}
-                trackColor={{ false: '#d0d5dd', true: '#91d0fa' }}
+                trackColor={{ false: isDark ? '#52525b' : '#d0d5dd', true: '#91d0fa' }}
                 thumbColor={preferences[option.key] ? PRIMARY : '#f9fafb'}
                 value={preferences[option.key]}
               />
