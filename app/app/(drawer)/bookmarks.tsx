@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { StatusBar } from 'expo-status-bar';
 import {
   ActivityIndicator,
   FlatList,
   Pressable,
-  StatusBar,
   Text,
   View,
 } from 'react-native';
@@ -148,7 +148,7 @@ export default function Bookmarks() {
   if (authRequired) {
     return (
       <View className="flex-1 items-center justify-center bg-white px-6 dark:bg-black">
-        <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={isDark ? '#000000' : '#ffffff'} />
+        <StatusBar style={isDark ? 'light' : 'dark'} />
         <Feather name="bookmark" size={34} color={PRIMARY} />
         <Text className="mt-4 text-lg font-bold text-neutral-900 dark:text-white">登录后查看收藏</Text>
         <Text className="mt-2 text-center text-sm text-neutral-500">收藏列表来自你的账号，不展示示例内容。</Text>
@@ -161,7 +161,7 @@ export default function Bookmarks() {
 
   return (
     <View className="flex-1 bg-white dark:bg-black">
-      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={isDark ? '#000000' : '#ffffff'} />
+      <StatusBar style={isDark ? 'light' : 'dark'} />
       <View className="flex-row items-center justify-between border-b border-neutral-100 px-4 py-3 dark:border-neutral-800">
         <Text className="text-xl font-bold text-neutral-900 dark:text-white">收藏</Text>
         <Pressable accessibilityRole="button" onPress={() => void loadPage(null, false)} disabled={loading} className="p-2">
