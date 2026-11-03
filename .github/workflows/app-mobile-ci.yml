@@ -218,7 +218,7 @@ jobs:
 
   ios-build:
     name: iOS simulator build
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_native_builds }}
+    if: ${{ github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.run_native_builds) }}
     runs-on: macos-26
     timeout-minutes: 45
     defaults:
