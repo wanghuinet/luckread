@@ -16,6 +16,7 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { VideoView, useVideoPlayer } from 'expo-video';
+import { useColorScheme } from 'nativewind';
 
 import { apiRequest, createIdempotencyKey } from '~/lib/api-client';
 import {
@@ -120,6 +121,8 @@ function ComposerVideoPreview({ uri }: { uri: string }) {
 }
 
 export default function PublishScreen() {
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === 'dark';
   const router = useRouter();
   const params = useLocalSearchParams<{ contentId?: string | string[] }>();
   const contentId = Array.isArray(params.contentId) ? params.contentId[0] : params.contentId;
@@ -613,10 +616,10 @@ export default function PublishScreen() {
 
   if (authStatus !== 'authenticated') {
     return (
-      <View style={styles.centerState}>
+      <View style={[styles.centerState, isDark && { backgroundColor: '#000000' }]}>
         <Stack.Screen options={{ title: 'Create post', headerShown: false }} />
-        <Text style={styles.heading}>Create a LuckRead post</Text>
-        <Text style={styles.description}>Sign in to publish text, pictures, or a short video.</Text>
+        <Text style={[styles.heading, isDark && { color: '#f9fafb' }]}>Create a LuckRead post</Text>
+        <Text style={[styles.description, isDark && { color: '#9ca3af' }]}>Sign in to publish text, pictures, or a short video.</Text>
         <Pressable style={styles.primaryButton} onPress={() => router.push('/login' as never)}>
           <Text style={styles.primaryButtonText}>Sign in</Text>
         </Pressable>
@@ -629,16 +632,16 @@ export default function PublishScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={styles.page}
+      style={[styles.page, isDark && { backgroundColor: '#000000' }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 12 : 0}
     >
       <Stack.Screen options={{ title: contentId ? 'Edit post' : 'New post', headerShown: false }} />
-      <View style={styles.header}>
+      <View style={[styles.header, isDark && { backgroundColor: '#000000', borderBottomColor: '#27272a' }]}>
         <Pressable accessibilityRole="button" accessibilityLabel="Close composer" onPress={() => router.back()} style={styles.iconButton}>
-          <Feather name="x" size={22} color="#111827" />
+          <Feather name="x" size={22} color={isDark ? '#e5e7eb' : '#111827'} />
         </Pressable>
-        <Text style={styles.headerTitle}>{contentId ? 'Edit post' : 'New post'}</Text>
+        <Text style={[styles.headerTitle, isDark && { color: '#f9fafb' }]}>{contentId ? 'Edit post' : 'New post'}</Text>
         <Pressable
           accessibilityRole="button"
           onPress={() => { void submit(); }}
@@ -650,14 +653,14 @@ export default function PublishScreen() {
       </View>
 
       {loadingEdit ? (
-        <View style={styles.centerState}>
+        <View style={[styles.centerState, isDark && { backgroundColor: '#000000' }]}>
           <ActivityIndicator size="large" color={PRIMARY} />
-          <Text style={styles.description}>Loading your post…</Text>
+          <Text style={[styles.description, isDark && { color: '#9ca3af' }]}>Loading your post…</Text>
         </View>
       ) : (
         <ScrollView
           keyboardShouldPersistTaps="handled"
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[styles.scrollContent, isDark && { backgroundColor: '#000000' }]}
         >
           <TextInput
             accessibilityLabel="Post text"
@@ -666,20 +669,20 @@ export default function PublishScreen() {
             editable={!busy && !publishPending}
             placeholder="What is happening?!"
             placeholderTextColor="#667085"
-            style={styles.composerInput}
+            style={[styles.composerInput, isDark && { color: '#f9fafb' }]}
             value={body}
             onChangeText={(value) => { setBody(value); setErrorMessage(''); }}
             textAlignVertical="top"
           />
-          <View style={styles.counterRow}>
-            <Text style={styles.helperText}>Ordinary social posts publish directly; no extra review screen.</Text>
-            <Text style={styles.counter}>{body.length}/{MAX_TEXT_LENGTH}</Text>
+          <View style={[styles.counterRow, isDark && { borderBottomColor: '#27272a' }]}>
+            <Text style={[styles.helperText, isDark && { color: '#9ca3af' }]}>Ordinary social posts publish directly; no extra review screen.</Text>
+            <Text style={[styles.counter, isDark && { color: '#9ca3af' }]}>{body.length}/{MAX_TEXT_LENGTH}</Text>
           </View>
 
-          <View style={styles.accessModeSection}>
+          <View style={[styles.accessModeSection, isDark && { borderBottomColor: '#27272a' }]}>
             <View>
-              <Text style={styles.accessModeTitle}>内容可见范围</Text>
-              <Text style={styles.accessModeDescription}>公开内容人人可见；会员专享内容仅对有效订阅者开放。</Text>
+              <Text style={[styles.accessModeTitle, isDark && { color: '#f9fafb' }]}>内容可见范围</Text>
+              <Text style={[styles.accessModeDescription, isDark && { color: '#9ca3af' }]}>公开内容人人可见；会员专享内容仅对有效订阅者开放。</Text>
             </View>
             <View style={styles.accessModeOptions}>
               <Pressable
@@ -704,24 +707,24 @@ export default function PublishScreen() {
               </Pressable>
             </View>
             {accessMode === 'MEMBERS_ONLY' ? (
-              <Text style={styles.accessModeNotice}>
+              <Text style={[styles.accessModeNotice, isDark && { color: '#9ca3af' }]}>
                 仅通过服务端创作者身份验证的账号可以发布会员专享内容。订阅权益由 W07 根据有效订阅状态实时判断。
               </Text>
             ) : null}
           </View>
 
           {assets.map((asset) => (
-            <View key={asset.localId} style={styles.assetRow}>
+            <View key={asset.localId} style={[styles.assetRow, isDark && { backgroundColor: '#09090b', borderColor: '#3f3f46' }]}>
               {isVideoAsset(asset) ? (
                 <View style={styles.videoPreviewWrap}>
                   <ComposerVideoPreview uri={(asset.uri || asset.playbackUrl || asset.serverUrl) as string} />
                 </View>
               ) : (
-                <Image source={{ uri: asset.uri || asset.playbackUrl || asset.serverUrl }} style={styles.assetThumbnail} />
+                <Image source={{ uri: asset.uri || asset.playbackUrl || asset.serverUrl }} style={[styles.assetThumbnail, isDark && { backgroundColor: '#18181b' }]} />
               )}
               <View style={styles.assetText}>
-                <Text numberOfLines={1} style={styles.assetName}>{asset.filename}</Text>
-                <Text style={[styles.assetStatus, asset.status === 'failed' ? styles.errorText : null]}>
+                <Text numberOfLines={1} style={[styles.assetName, isDark && { color: '#e5e7eb' }]}>{asset.filename}</Text>
+                <Text style={[styles.assetStatus, isDark && { color: '#9ca3af' }, asset.status === 'failed' ? styles.errorText : null]}>
                   {asset.status === 'uploading' ? 'Uploading to LuckRead…'
                     : asset.status === 'uploaded' ? 'Uploaded; playback authorization needs retry'
                       : asset.status === 'ready' ? 'Ready'
@@ -736,7 +739,7 @@ export default function PublishScreen() {
                 ) : null}
               </View>
               <Pressable disabled={busy || publishPending} accessibilityLabel="Remove attachment" onPress={() => removeAsset(asset.localId)} style={styles.iconButton}>
-                <Feather name="x-circle" size={21} color="#667085" />
+                <Feather name="x-circle" size={21} color={isDark ? '#9ca3af' : '#667085'} />
               </Pressable>
             </View>
           ))}
@@ -751,11 +754,11 @@ export default function PublishScreen() {
               <Feather name="image" size={19} color={PRIMARY} />
               <Text style={styles.mediaButtonText}>Add photos or video</Text>
             </Pressable>
-            <Text style={styles.mediaLimitHint}>Up to 4 media items · 1 video max · 60 seconds</Text>
+            <Text style={[styles.mediaLimitHint, isDark && { color: '#9ca3af' }]}>Up to 4 media items · 1 video max · 60 seconds</Text>
           </View>
 
           {!contentId ? (
-            <View style={styles.pollSection}>
+            <View style={[styles.pollSection, isDark && { borderBottomColor: '#27272a' }]}>
               <Pressable
                 accessibilityRole="button"
                 accessibilityState={{ selected: pollEnabled, disabled: busy || loadingEdit || publishPending }}
@@ -764,14 +767,14 @@ export default function PublishScreen() {
                   setPollEnabled((value) => !value);
                   setErrorMessage('');
                 }}
-                style={styles.pollToggle}
+                style={[styles.pollToggle, isDark && { borderColor: '#52525b', backgroundColor: '#09090b' }]}
               >
                 <Feather name="bar-chart-2" size={19} color={PRIMARY} />
                 <Text style={styles.mediaButtonText}>{pollEnabled ? 'Remove poll' : 'Add poll'}</Text>
               </Pressable>
               {pollEnabled ? (
-                <View style={styles.pollEditor}>
-                  <Text style={styles.pollHelper}>
+                <View style={[styles.pollEditor, isDark && { borderColor: '#3f3f46', backgroundColor: '#09090b' }]}>
+                  <Text style={[styles.pollHelper, isDark && { color: '#9ca3af' }]}>
                     Add 2–4 different options. Published poll options cannot be changed.
                   </Text>
                   {pollOptions.map((option, index) => (
@@ -785,7 +788,7 @@ export default function PublishScreen() {
                         )}
                         placeholder={'Option ' + (index + 1)}
                         placeholderTextColor="#667085"
-                        style={styles.pollOptionInput}
+                        style={[styles.pollOptionInput, isDark && { borderColor: '#52525b', backgroundColor: '#18181b', color: '#f9fafb' }]}
                         value={option}
                       />
                       {pollOptions.length > MIN_POLL_OPTIONS ? (
@@ -844,8 +847,8 @@ export default function PublishScreen() {
           {errorMessage ? <Text accessibilityLiveRegion="assertive" style={styles.errorText}>{errorMessage}</Text> : null}
 
           <View style={styles.footer}>
-            <Feather name="check-circle" size={17} color="#667085" />
-            <Text style={styles.footerText}>Files upload to LuckRead first. Only permanent server media URLs are attached to the post.</Text>
+            <Feather name="check-circle" size={17} color={isDark ? '#9ca3af' : '#667085'} />
+            <Text style={[styles.footerText, isDark && { color: '#9ca3af' }]}>Files upload to LuckRead first. Only permanent server media URLs are attached to the post.</Text>
           </View>
         </ScrollView>
       )}
