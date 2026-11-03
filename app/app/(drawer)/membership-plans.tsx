@@ -64,7 +64,7 @@ function formatPrice(priceMinor: number, currency: string): string {
     const digits = new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency,
-    }).resolvedOptions().maximumFractionDigits;
+    }).resolvedOptions().maximumFractionDigits ?? 2;
     return new Intl.NumberFormat('zh-CN', {
       style: 'currency',
       currency,
