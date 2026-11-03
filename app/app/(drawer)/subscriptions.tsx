@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useColorScheme } from 'nativewind';
 
 import { getApiErrorMessage } from '~/lib/api-client';
 import { unwrapApiData } from '~/lib/content-adapter';
@@ -137,6 +138,8 @@ function SubscriptionCard({ item, onManage }: { item: MySubscription; onManage: 
 }
 
 export default function MySubscriptionsScreen() {
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === 'dark';
   const router = useRouter();
   const authStatus = useAuthStore((state) => state.status);
   const [items, setItems] = useState<MySubscription[]>([]);
@@ -344,7 +347,7 @@ export default function MySubscriptionsScreen() {
   if (authStatus === 'loading') {
     return (
       <View className="flex-1 items-center justify-center bg-white dark:bg-black">
-        <StatusBar barStyle="dark-content" />
+        <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={isDark ? "#000000" : "#ffffff"} />
         <ActivityIndicator size="large" color={PRIMARY} />
       </View>
     );
@@ -353,7 +356,7 @@ export default function MySubscriptionsScreen() {
   if (authRequired || authStatus !== 'authenticated') {
     return (
       <View className="flex-1 items-center justify-center bg-white px-7 dark:bg-black">
-        <StatusBar barStyle="dark-content" />
+        <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={isDark ? "#000000" : "#ffffff"} />
         <Feather name="credit-card" size={36} color={PRIMARY} />
         <Text className="mt-4 text-lg font-extrabold text-neutral-900 dark:text-white">登录后管理订阅</Text>
         <Text className="mt-2 text-center text-sm leading-6 text-neutral-500 dark:text-neutral-400">
@@ -368,7 +371,7 @@ export default function MySubscriptionsScreen() {
 
   return (
     <View className="flex-1 bg-neutral-50 dark:bg-black">
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={isDark ? "#000000" : "#ffffff"} />
       <View className="flex-row items-center justify-between border-b border-neutral-200 bg-white px-4 py-3 dark:border-neutral-800 dark:bg-black">
         <View className="flex-row items-center">
           <Pressable accessibilityRole="button" accessibilityLabel="返回" onPress={() => router.back()} className="mr-3 rounded-full p-1">
