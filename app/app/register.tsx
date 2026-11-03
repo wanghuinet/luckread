@@ -302,7 +302,7 @@ export default function RegisterScreen() {
       />
 
       <View style={{ marginTop: 16, alignItems: 'center' }}>
-        <Text style={{ color: AUTH_COLORS.secondary, fontSize: 14 }}>已经有账号？</Text>
+        <Text style={{ color: isDark ? '#9ca3af' : AUTH_COLORS.secondary, fontSize: 14 }}>已经有账号？</Text>
         <AuthTextLink label="登录" onPress={() => router.replace('/login' as never)} />
       </View>
       <Text style={{ color: isDark ? '#9ca3af' : '#8b98a5', fontSize: 12, lineHeight: 18, marginTop: 18, textAlign: 'center' }}>
