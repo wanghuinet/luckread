@@ -55,8 +55,7 @@ test('edit and delete controls are only shown for the authenticated owner and us
   expect(feedItem).toContain("id: 'delete-own-post'");
   expect(feedItem).toContain("case 'delete-own-post': removeOwnPost(); break;");
   expect(home).toContain('onDeleted={(contentId) => {');
-  // Feed pages are stored as TanStack InfiniteData; deleting a post must
-  // remove it from every cached page rather than a separate local items array.
+  // Feed pages are stored as TanStack InfiniteData; remove the post from every cached page.
   expect(home).toContain('queryClient.setQueryData<InfiniteData<NativeFeedPage, string | null>>(queryKey, (current) => {');
   expect(home).toContain('pages: current.pages.map((page) => ({');
   expect(home).toContain('items: page.items.filter((post) => post.id !== contentId)');
@@ -70,8 +69,7 @@ test('successful publishing confirms success and offers a direct link to the pub
   expect(composer).toContain("('/?published=' + encodeURIComponent(publishedId) + '&refresh=' + Date.now())");
   expect(home).toContain("useLocalSearchParams<{ published?: string; refresh?: string }>()");
   expect(home).toContain('refreshSignal={refreshSignal}');
-  // Publishing navigates back with a refresh signal; the active feed query
-  // is invalidated so the W01 timeline revalidates without manual pagination state.
+  // Publishing returns to the authoritative W01 feed and invalidates its cache.
   expect(home).toContain('previousRefreshSignal.current !== refreshSignal && refreshSignal');
   expect(home).toContain('queryClient.invalidateQueries({ queryKey })');
   expect(home).toContain('[queryClient, queryKey, refreshSignal]');
@@ -135,4 +133,14 @@ test('native composer previews attached videos before publishing and preserves p
   expect(composer).toContain('<VideoView');
   expect(composer).toContain('nativeControls');
   expect(composer).toContain('asset.uri || asset.playbackUrl || asset.serverUrl');
+});
+
+
+test('Keyboard Controller keeps the publish header stable and scrolls focused editor fields above the keyboard', () => {
+  expect(composer).toContain("from 'react-native-keyboard-controller'");
+  expect(composer).toContain('<KeyboardProvider preload={false}>');
+  expect(composer).toContain('<KeyboardAwareScrollView');
+  expect(composer).toContain('bottomOffset={16}');
+  expect(composer).not.toContain('KeyboardAvoidingView');
+  expect(composer).not.toContain('<ScrollView');
 });

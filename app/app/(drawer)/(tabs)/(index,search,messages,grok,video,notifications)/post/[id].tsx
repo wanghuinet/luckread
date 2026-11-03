@@ -1,5 +1,5 @@
 import React, { useState, useRef, useMemo, useCallback, useEffect } from 'react';
-import { ActionSheetIOS, Alert, Platform, View, Text, ScrollView, TouchableOpacity, StyleSheet, type ScrollViewInstance } from 'react-native';
+import { ActionSheetIOS, Alert, Platform, View, Text, ScrollView, TouchableOpacity, StyleSheet,  } from 'react-native';
 import { useLocalSearchParams, Stack, useRouter } from 'expo-router';
 import { FeedItem, FeedContent } from '~/components/FeedItem';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -212,17 +212,13 @@ export default function PostDetailScreen() {
     const [errorMessage, setErrorMessage] = useState('');
     const [retryKey, setRetryKey] = useState(0);
     const bottomSheetModalRef = useRef<BottomSheetModal>(null);
-    const scrollViewRef = useRef<ScrollViewInstance | null>(null);
-    const commentsOffsetRef = useRef(0);
     const snapPoints = useMemo(() => ['25%', '30%'], []);
 
     const handlePresentModalPress = useCallback(() => {
         bottomSheetModalRef.current?.present();
     }, []);
 
-    const handleScrollToComments = useCallback(() => {
-        scrollViewRef.current?.scrollTo({ y: commentsOffsetRef.current, animated: true });
-    }, []);const handleSelectSort = useCallback((sortType: SortType) => {
+const handleSelectSort = useCallback((sortType: SortType) => {
         setSelectedSort(sortType);
         bottomSheetModalRef.current?.dismiss();
     }, []);
@@ -351,7 +347,6 @@ export default function PostDetailScreen() {
     return (
         <>
             <ScrollView
-                ref={scrollViewRef}
                 onScroll={tabBarScroll.onScroll}
                 scrollEventThrottle={tabBarScroll.scrollEventThrottle}
                 className="flex-1 bg-white dark:bg-black"
@@ -359,7 +354,14 @@ export default function PostDetailScreen() {
                 contentContainerStyle={{ flexGrow: 1 }}
             >
                 <PostHeader username={authorHandle} targetUserId={findPost.creatorId || findPost.ownerUserId} contentId={postId} postId={postId} />
-                <FeedItem itemData={findPost} detailView onCommentPress={membershipRequired ? undefined : handleScrollToComments} />
+                <FeedItem
+                    itemData={findPost}
+                    detailView
+                    replyDisabled={membershipRequired}
+                    onReplySubmitted={() => setFindPost((current) => current
+                        ? { ...current, reply_count: (current.reply_count ?? 0) + 1 }
+                        : current)}
+                />
                 {membershipRequired ? (
                     <View className="mx-4 my-4 rounded-2xl border border-amber-200 bg-amber-50 p-5 dark:border-amber-900 dark:bg-amber-950/30">
                         <View className="flex-row items-center gap-2">
@@ -393,9 +395,6 @@ export default function PostDetailScreen() {
                 ) : (
                     <View
                         className="px-4 mt-2"
-                        onLayout={(event) => {
-                            commentsOffsetRef.current = event.nativeEvent.layout.y;
-                        }}
                     >
                         <TouchableOpacity
                             onPress={handlePresentModalPress}
@@ -406,7 +405,13 @@ export default function PostDetailScreen() {
                             </Text>
                             <Feather name="chevron-down" size={18} color={isDark ? '#d1d5db' : '#536471'} />
                         </TouchableOpacity>
-                        <Comments contentId={postId} sort={selectedSort} />
+                        <Comments
+                            contentId={postId}
+                            sort={selectedSort}
+                            onReplySubmitted={() => setFindPost((current) => current
+                                ? { ...current, reply_count: (current.reply_count ?? 0) + 1 }
+                                : current)}
+                        />
                     </View>
                 )}
             </ScrollView>

@@ -11,6 +11,7 @@ import { useColorScheme } from 'nativewind';
 import { StatusBar } from 'expo-status-bar';
 
 import { useAuthStore } from '../store/auth-store';
+import { ReplyComposerProvider } from '../components/ReplyComposerProvider';
 import { isThemePreference, THEME_PREFERENCE_KEY } from '../lib/theme-preference';
 
 export const unstable_settings = {
@@ -78,7 +79,8 @@ export default function RootLayout() {
       <QueryProvider>
       <StatusBar style={isDark ? 'light' : 'dark'} />
       <BottomSheetModalProvider>
-        <View style={styles.flex}>
+        <ReplyComposerProvider>
+          <View style={styles.flex}>
           <Stack>
             <Stack.Screen name="(drawer)" options={{ headerShown: false }} />
             <Stack.Screen name="login" options={{ headerShown: false, gestureEnabled: false }} />
@@ -92,7 +94,8 @@ export default function RootLayout() {
               <Text style={[styles.brand, { color: isDark ? '#ffffff' : '#111827' }]}>LuckRead</Text>
             </View>
           ) : null}
-        </View>
+          </View>
+        </ReplyComposerProvider>
       </BottomSheetModalProvider>
       </QueryProvider>
     </GestureHandlerRootView>
