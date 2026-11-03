@@ -100,7 +100,7 @@ test('connects the paywall detail CTA to creator plans and returns through W03 e
   expect(detail).toContain('查看创作者会员方案');
   expect(detail).toContain('重新检查会员权益');
   expect(detail).toContain('setRetryKey((value) => value + 1)');
-  expect(detail).toContain('membershipRequired ? undefined : handleScrollToComments');
+  expect(detail).toContain('replyDisabled={membershipRequired}');
 
   expect(composer).toContain("setAccessMode('MEMBERS_ONLY')");
   expect(composer).toContain("originalAccessModeRef.current === 'MEMBERS_ONLY'");
@@ -114,4 +114,6 @@ test('connects the paywall detail CTA to creator plans and returns through W03 e
 
   expect(feedItem).toContain("itemData.accessMode === 'MEMBERS_ONLY'");
   expect(feedItem).toContain('会员专享');
+  expect(feedItem).toContain("itemData.accessMode === 'MEMBERS_ONLY' && itemData.accessGranted !== true");
+  expect(feedItem.match(/replyDisabled=\{effectiveReplyDisabled\}/g)).toHaveLength(2);
 });
