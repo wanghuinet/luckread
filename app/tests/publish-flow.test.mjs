@@ -7,7 +7,8 @@ const home = readFileSync(new URL('../app/(drawer)/(tabs)/(index)/index.tsx', im
 const socialPoll = readFileSync(new URL('../components/SocialPoll.tsx', import.meta.url), 'utf8');
 
 test('native publisher uses the shared media API helpers and existing W01 state endpoint', () => {
-  expect(composer).toContain('uploadMediaFile(file, asset.uploadKey)');
+  expect(composer).toContain('prepareImageForUpload(file)');
+  expect(composer).toContain('uploadMediaFile(uploadFile, asset.uploadKey)');
   expect(composer).toContain('getMediaPlayback(uploaded.id)');
   expect(composer).toContain('uploadTextBody(');
   expect(composer).toContain("'/contents/' + encodeURIComponent(draft.id) + '/state'");
