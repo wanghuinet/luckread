@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { type ErrorBoundaryProps, Stack, useRootNavigationState, useRouter, useSegments } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
+import { QueryProvider } from '~/lib/query-provider';
 import * as SecureStore from 'expo-secure-store';
 import { useColorScheme } from 'nativewind';
 import { StatusBar } from 'expo-status-bar';
@@ -74,6 +75,7 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={styles.flex}>
+      <QueryProvider>
       <StatusBar style={isDark ? 'light' : 'dark'} />
       <BottomSheetModalProvider>
         <View style={styles.flex}>
@@ -92,6 +94,7 @@ export default function RootLayout() {
           ) : null}
         </View>
       </BottomSheetModalProvider>
+      </QueryProvider>
     </GestureHandlerRootView>
   );
 }
