@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useColorScheme } from 'nativewind';
 
 import { apiRequest, createIdempotencyKey, getApiErrorMessage } from '~/lib/api-client';
 import { unwrapApiData } from '~/lib/content-adapter';
@@ -31,6 +32,8 @@ const PRIMARY = '#1d9bf0';
 
 export default function SocialPoll({ contentId }: { contentId: string }) {
   const router = useRouter();
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === 'dark';
   const [poll, setPoll] = useState<Poll | null>(null);
   const [selectedOptionId, setSelectedOptionId] = useState('');
   const [loading, setLoading] = useState(true);
@@ -137,9 +140,9 @@ export default function SocialPoll({ contentId }: { contentId: string }) {
     if (!errorMessage) return null;
     return (
       <View style={styles.card}>
-        <Text style={styles.title}>投票暂时不可用</Text>
-        <Text style={styles.description}>{errorMessage}</Text>
-        <Pressable accessibilityRole="button" onPress={() => setRefreshKey((value) => value + 1)} style={styles.retryButton}>
+        <Text style={[styles.title, isDark && { color: "#f9fafb" }]}>投票暂时不可用</Text>
+        <Text style={[styles.description, isDark && { color: "#9ca3af" }]}>{errorMessage}</Text>
+        <Pressable accessibilityRole="button" onPress={() => setRefreshKey((value) => value + 1)} style={[styles.retryButton, isDark && { borderColor: "#52525b" }]}>
           <Text style={styles.retryText}>重试</Text>
         </Pressable>
       </View>
@@ -152,10 +155,10 @@ export default function SocialPoll({ contentId }: { contentId: string }) {
     : null;
 
   return (
-    <View accessibilityLabel="投票" style={styles.card}>
+    <View accessibilityLabel="投票" style={[styles.card, isDark && { backgroundColor: "#09090b", borderColor: "#3f3f46" }]}>
       <View style={styles.header}>
-        <Text style={styles.title}>投票</Text>
-        {poll.closed ? <Text style={styles.closedLabel}>已结束</Text> : null}
+        <Text style={[styles.title, isDark && { color: "#f9fafb" }]}>投票</Text>
+        {poll.closed ? <Text style={[styles.closedLabel, isDark && { color: "#9ca3af" }]}>已结束</Text> : null}
       </View>
 
       {poll.options.map((option) => {
@@ -166,10 +169,10 @@ export default function SocialPoll({ contentId }: { contentId: string }) {
           <View key={option.optionId} style={styles.optionBlock}>
             {showResults ? (
               <View style={styles.resultHeading}>
-                <Text style={[styles.optionText, viewerVote && styles.viewerVoteText]}>
+                <Text style={[styles.optionText, isDark && { color: "#e5e7eb" }, viewerVote && styles.viewerVoteText]}>
                   {option.text}{viewerVote ? ' ✓' : ''}
                 </Text>
-                <Text style={styles.resultText}>{percentage}% · {option.votes} 票</Text>
+                <Text style={[styles.resultText, isDark && { color: "#9ca3af" }]}>{percentage}% · {option.votes} 票</Text>
               </View>
             ) : (
               <Pressable
@@ -180,13 +183,13 @@ export default function SocialPoll({ contentId }: { contentId: string }) {
                   setSelectedOptionId(option.optionId);
                   setMessage('');
                 }}
-                style={[styles.optionButton, selected && styles.optionSelected]}
+                style={[styles.optionButton, isDark && { borderColor: "#52525b", backgroundColor: "#18181b" }, selected && styles.optionSelected, selected && isDark && { backgroundColor: "#102a43" }]}
               >
-                <Text style={[styles.optionText, selected && styles.optionSelectedText]}>{option.text}</Text>
+                <Text style={[styles.optionText, isDark && { color: "#e5e7eb" }, selected && styles.optionSelectedText]}>{option.text}</Text>
               </Pressable>
             )}
             {showResults ? (
-              <View style={styles.progressTrack}>
+              <View style={[styles.progressTrack, isDark && { backgroundColor: "#3f3f46" }]}>
                 <View style={[styles.progressFill, { width: (percentage + '%') as `${number}%` }]} />
               </View>
             ) : null}
@@ -195,7 +198,7 @@ export default function SocialPoll({ contentId }: { contentId: string }) {
       })}
 
       <View style={styles.metaRow}>
-        <Text style={styles.metaText}>{poll.totalVotes.toLocaleString()} 票</Text>
+        <Text style={[styles.metaText, isDark && { color: "#9ca3af" }]}>{poll.totalVotes.toLocaleString()} 票</Text>
         {endsAt ? <Text style={styles.metaText}>{poll.closed ? '截止于' : '截止时间'}：{endsAt}</Text> : null}
       </View>
 
