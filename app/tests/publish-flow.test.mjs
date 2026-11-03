@@ -7,7 +7,8 @@ const home = readFileSync(new URL('../app/(drawer)/(tabs)/(index)/index.tsx', im
 const socialPoll = readFileSync(new URL('../components/SocialPoll.tsx', import.meta.url), 'utf8');
 
 test('native publisher uses the shared media API helpers and existing W01 state endpoint', () => {
-  expect(composer).toContain('uploadMediaFile(file, asset.uploadKey)');
+  expect(composer).toContain('prepareImageForUpload(file)');
+  expect(composer).toContain('uploadMediaFile(uploadFile, asset.uploadKey)');
   expect(composer).toContain('getMediaPlayback(uploaded.id)');
   expect(composer).toContain('uploadTextBody(');
   expect(composer).toContain("'/contents/' + encodeURIComponent(draft.id) + '/state'");
@@ -126,4 +127,14 @@ test('native composer previews attached videos before publishing and preserves p
   expect(composer).toContain('<VideoView');
   expect(composer).toContain('nativeControls');
   expect(composer).toContain('asset.uri || asset.playbackUrl || asset.serverUrl');
+});
+
+
+test('Keyboard Controller keeps the publish header stable and scrolls focused editor fields above the keyboard', () => {
+  expect(composer).toContain("from 'react-native-keyboard-controller'");
+  expect(composer).toContain('<KeyboardProvider preload={false}>');
+  expect(composer).toContain('<KeyboardAwareScrollView');
+  expect(composer).toContain('bottomOffset={16}');
+  expect(composer).not.toContain('KeyboardAvoidingView');
+  expect(composer).not.toContain('<ScrollView');
 });

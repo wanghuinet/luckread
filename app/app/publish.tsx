@@ -3,10 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -18,6 +15,7 @@ import * as ImagePicker from 'expo-image-picker';
 import CameraCaptureModal, { type CapturedCameraPhoto } from '~/components/CameraCaptureModal';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { useColorScheme } from 'nativewind';
+import { KeyboardAwareScrollView, KeyboardProvider } from 'react-native-keyboard-controller';
 
 import { apiRequest, createIdempotencyKey } from '~/lib/api-client';
 import {
@@ -28,6 +26,7 @@ import {
   type LocalMediaFile,
   type UploadedMedia,
 } from '~/lib/publish-api';
+import { prepareImageForUpload } from '~/lib/image-upload-preparation';
 import { useAuthStore } from '~/store/auth-store';
 
 type ContentRecord = {
@@ -123,7 +122,7 @@ function ComposerVideoPreview({ uri }: { uri: string }) {
   );
 }
 
-export default function PublishScreen() {
+function PublishScreenContent() {
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
   const router = useRouter();
@@ -224,8 +223,21 @@ export default function PublishScreen() {
           name: asset.filename,
           mimeType: asset.mimeType,
           size: asset.size,
+          width: asset.width,
+          height: asset.height,
         };
-        uploaded = await uploadMediaFile(file, asset.uploadKey);
+        const uploadFile = await prepareImageForUpload(file);
+        // Persist the prepared local URI and matching metadata before network I/O.
+        // A retry then uploads the exact same bytes with the same idempotency key.
+        updateAsset(asset.localId, {
+          uri: uploadFile.uri,
+          filename: uploadFile.name,
+          mimeType: uploadFile.mimeType,
+          size: uploadFile.size,
+          width: uploadFile.width,
+          height: uploadFile.height,
+        });
+        uploaded = await uploadMediaFile(uploadFile, asset.uploadKey);
         updateAsset(asset.localId, {
           uploaded,
           serverUrl: uploaded.url,
@@ -352,6 +364,8 @@ export default function PublishScreen() {
         filename,
         mimeType: asset.mimeType || (video ? 'video/mp4' : 'image/jpeg'),
         size: asset.fileSize,
+        width: asset.width,
+        height: asset.height,
         uploadKey: createIdempotencyKey(),
         serverUrl: '',
         status: 'uploading',
@@ -677,11 +691,7 @@ export default function PublishScreen() {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={[styles.page, isDark && { backgroundColor: '#000000' }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 12 : 0}
-    >
+    <View style={[styles.page, isDark && { backgroundColor: '#000000' }]}>
       <Stack.Screen options={{ title: contentId ? 'Edit post' : 'New post', headerShown: false }} />
       <View style={[styles.header, isDark && { backgroundColor: '#000000', borderBottomColor: '#27272a' }]}>
         <Pressable accessibilityRole="button" accessibilityLabel="Close composer" onPress={() => router.back()} style={styles.iconButton}>
@@ -704,7 +714,9 @@ export default function PublishScreen() {
           <Text style={[styles.description, isDark && { color: '#9ca3af' }]}>Loading your post…</Text>
         </View>
       ) : (
-        <ScrollView
+        <KeyboardAwareScrollView
+          style={{ flex: 1 }}
+          bottomOffset={16}
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={[styles.scrollContent, isDark && { backgroundColor: '#000000' }]}
         >
@@ -906,14 +918,23 @@ export default function PublishScreen() {
             <Feather name="check-circle" size={17} color={isDark ? '#9ca3af' : '#667085'} />
             <Text style={[styles.footerText, isDark && { color: '#9ca3af' }]}>Files upload to LuckRead first. Only permanent server media URLs are attached to the post.</Text>
           </View>
-        </ScrollView>
+        </KeyboardAwareScrollView>
       )}
       <CameraCaptureModal
         visible={cameraVisible}
         onClose={() => setCameraVisible(false)}
         onCapture={handleCameraCapture}
       />
-    </KeyboardAvoidingView>
+    </View>
+  );
+}
+
+
+export default function PublishScreen() {
+  return (
+    <KeyboardProvider preload={false}>
+      <PublishScreenContent />
+    </KeyboardProvider>
   );
 }
 

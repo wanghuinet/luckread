@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Text, TouchableOpacity } from 'react-native';
+import { ActivityIndicator, Alert } from 'react-native';
 import { useColorScheme } from 'nativewind';
+import { Button } from '~/components/ui/button';
+import { Text } from '~/components/ui/text';
 import {
   getUserFollowSnapshot,
   resolveUserProfileId,
@@ -106,7 +108,9 @@ export default function FollowButton({ targetUserId, targetUsername }: FollowBut
   }
 
   return (
-    <TouchableOpacity
+    <Button
+      variant={loaded && following ? 'outline' : 'default'}
+      size="default"
       accessibilityRole="button"
       accessibilityState={{ disabled, selected: loaded && following }}
       disabled={disabled}
@@ -133,6 +137,6 @@ export default function FollowButton({ targetUserId, targetUsername }: FollowBut
           {label}
         </Text>
       )}
-    </TouchableOpacity>
+    </Button>
   );
 }
