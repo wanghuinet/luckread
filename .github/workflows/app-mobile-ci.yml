@@ -31,6 +31,31 @@ env:
   CI: "1"
 
 jobs:
+  prepare-image-upload-lockfile:
+    name: Prepare the SDK 58 image dependency lockfile
+    if: ${{ github.event_name == 'pull_request' && github.repository == 'wanghuinet/luckread' && github.head_ref == 'feat/native-image-upload-preparation' && github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22.13.1"
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.1.38"
+      - name: Regenerate Bun binary lockfile from the package manifest
+        run: bun install
+      - name: Upload generated binary lockfile for the one-time sync job
+        uses: actions/upload-artifact@v4
+        with:
+          name: luckread-image-upload-bun-lockfile-sync
+          path: app/bun.lockb
+          if-no-files-found: error
+          retention-days: 1
+
   dependency-compatibility:
     name: Expo install, doctor and typecheck
     runs-on: ubuntu-latest
@@ -55,13 +80,6 @@ jobs:
           java-version: "17"
       - name: Install Expo app dependencies
         run: bun install
-      - name: Upload regenerated Bun lockfile for this one-time dependency sync
-        uses: actions/upload-artifact@v4
-        with:
-          name: luckread-image-upload-bun-lockfile-sync
-          path: app/bun.lockb
-          if-no-files-found: error
-          retention-days: 1
       - name: Apply and verify Hyperswitch React Native 0.88 compatibility
         run: |
           node scripts/apply-hyperswitch-rn88-compat.mjs
@@ -289,7 +307,7 @@ jobs:
 
   sync-image-upload-lockfile:
     name: One-time sync of Expo image dependency lockfile
-    needs: dependency-compatibility
+    needs: prepare-image-upload-lockfile
     if: ${{ github.event_name == 'pull_request' && github.repository == 'wanghuinet/luckread' && github.head_ref == 'feat/native-image-upload-preparation' && github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
     permissions:
