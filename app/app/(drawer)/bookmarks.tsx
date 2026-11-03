@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useColorScheme } from 'nativewind';
 
 import { FeedContent, FeedItem } from '~/components/FeedItem';
 import { getApiErrorMessage } from '~/lib/api-client';
@@ -65,6 +66,8 @@ function BookmarkFeedRow({
 }
 
 export default function Bookmarks() {
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === 'dark';
   const router = useRouter();
   const authStatus = useAuthStore((state) => state.status);
   const [items, setItems] = useState<FeedContent[]>([]);
@@ -145,7 +148,7 @@ export default function Bookmarks() {
   if (authRequired) {
     return (
       <View className="flex-1 items-center justify-center bg-white px-6 dark:bg-black">
-        <StatusBar barStyle="dark-content" />
+        <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={isDark ? "#000000" : "#ffffff"} />
         <Feather name="bookmark" size={34} color={PRIMARY} />
         <Text className="mt-4 text-lg font-bold text-neutral-900 dark:text-white">登录后查看收藏</Text>
         <Text className="mt-2 text-center text-sm text-neutral-500">收藏列表来自你的账号，不展示示例内容。</Text>
@@ -158,7 +161,7 @@ export default function Bookmarks() {
 
   return (
     <View className="flex-1 bg-white dark:bg-black">
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={isDark ? "#000000" : "#ffffff"} />
       <View className="flex-row items-center justify-between border-b border-neutral-100 px-4 py-3 dark:border-neutral-800">
         <Text className="text-xl font-bold text-neutral-900 dark:text-white">收藏</Text>
         <Pressable accessibilityRole="button" onPress={() => void loadPage(null, false)} disabled={loading} className="p-2">
