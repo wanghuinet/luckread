@@ -101,18 +101,6 @@ jobs:
                   ;;
                 .github/workflows/app-mobile-ci.yml)
                   git show origin/main:.github/workflows/app-mobile-ci.yml > .github/workflows/app-mobile-ci.yml
-                  node --input-type=module <<'NODE'
-          import fs from 'node:fs';
-          const path = '.github/workflows/app-mobile-ci.yml';
-          let content = fs.readFileSync(path, 'utf8');
-          const anchor = '      - name: Test native feed comment navigation\n        run: bun run test:comment-navigation\n';
-          const queryStep = '      - name: Test native TanStack Query feed cache and pagination\n        run: bun run test:feed-query\n';
-          if (!content.includes(queryStep)) {
-            if (!content.includes(anchor)) throw new Error('Feed-comment CI anchor not found.');
-            content = content.replace(anchor, anchor + queryStep);
-          }
-          fs.writeFileSync(path, content);
-          NODE
                   git add .github/workflows/app-mobile-ci.yml
                   ;;
                 app/bun.lockb)
