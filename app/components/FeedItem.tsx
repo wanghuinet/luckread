@@ -334,10 +334,12 @@ interface FeedItemProps {
     detailView?: boolean;
     onDeleted?: (contentId: string) => void;
     onCommentPress?: () => void;
+    replyDisabled?: boolean;
+    onReplySubmitted?: (contentId: string) => void;
 }
 
 
-export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailView, onDeleted, onCommentPress }) => {
+export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailView, onDeleted, onCommentPress, replyDisabled, onReplySubmitted }) => {
     const { colorScheme } = useColorScheme();
 
 
@@ -711,7 +713,7 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
                     {detailView && itemData.contentType === 'post' && itemData.contentId ? (
                         <SocialPoll contentId={itemData.contentId} />
                     ) : null}
-                    <EngagementActions itemData={itemData} detailView={Boolean(detailView)} onCommentPress={onCommentPress} />
+                    <EngagementActions itemData={itemData} detailView={Boolean(detailView)} onCommentPress={onCommentPress} replyDisabled={replyDisabled} onReplySubmitted={onReplySubmitted} />
                 </View>
             </View>
         </TouchableOpacity>
@@ -726,7 +728,7 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
 };
 
 
-export const FeedItemDetailView: React.FC<FeedItemProps> = ({ itemData, onPress, detailView, onCommentPress }) => {
+export const FeedItemDetailView: React.FC<FeedItemProps> = ({ itemData, onPress, detailView, onCommentPress, replyDisabled, onReplySubmitted }) => {
     const { colorScheme } = useColorScheme();
 
 
@@ -809,7 +811,10 @@ export const FeedItemDetailView: React.FC<FeedItemProps> = ({ itemData, onPress,
                     <EngagementActions
                         itemData={itemData}
                         detailView={true}
-                        onCommentPress={onCommentPress} />
+                        onCommentPress={onCommentPress}
+                        replyDisabled={replyDisabled}
+                        onReplySubmitted={onReplySubmitted}
+                    />
                 </View>
             </View>
         </View>
