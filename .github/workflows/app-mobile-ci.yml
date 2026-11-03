@@ -35,7 +35,7 @@ jobs:
     name: Expo install, doctor and typecheck
     runs-on: ubuntu-latest
     env:
-      EXPO_PROJECT_ID: "00000000-0000-4000-8000-000000000001"
+      EXPO_PROJECT_ID: ${{ vars.EXPO_PROJECT_ID || secrets.EXPO_PROJECT_ID }}
       EXPO_UPDATE_CHANNEL: preview
       LUCKREAD_REQUIRE_OTA_CONFIG: "1"
     defaults:
@@ -55,6 +55,13 @@ jobs:
           java-version: "17"
       - name: Install Expo app dependencies
         run: bun install
+      - name: Upload resolved Bun lockfile for repository lockfile synchronization
+        uses: actions/upload-artifact@v4
+        with:
+          name: luckread-app-bun-lockb
+          path: app/bun.lockb
+          if-no-files-found: error
+          retention-days: 1
       - name: Verify versions bundled for the Expo SDK
         run: bunx expo install --check
       - name: Run Expo compatibility doctor
