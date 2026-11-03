@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useColorScheme } from 'nativewind';
 
 import { createIdempotencyKey, getApiErrorMessage } from '~/lib/api-client';
 import {
@@ -256,6 +257,8 @@ function RefundRow({ item }: { item: RefundHistoryItem }) {
 }
 
 export default function BillingScreen() {
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === 'dark';
   const router = useRouter();
   const authStatus = useAuthStore((state) => state.status);
   const [activeTab, setActiveTab] = useState<BillingTab>('payments');
@@ -505,7 +508,7 @@ export default function BillingScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-neutral-50 dark:bg-black">
-      <StatusBar barStyle="dark-content" backgroundColor="#f9fafb" />
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={isDark ? "#000000" : "#f9fafb"} />
       <View className="flex-row items-center border-b border-neutral-200 px-4 py-3 dark:border-neutral-800">
         <Pressable
           accessibilityRole="button"
