@@ -79,7 +79,7 @@ function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSig
   const invalidateSession = useAuthStore((state) => state.invalidateSession);
   const queryClient = useQueryClient();
   const queryKey = useMemo(() => nativeFeedQueryKey(kind, viewerId), [kind, viewerId]);
-  const hydrationScope = kind === 'following' ? 'following:' + (viewerId || 'anonymous') : 'for-you';
+  const hydrationScope = kind + ':' + (viewerId || 'anonymous');
 
   const feedQuery = useInfiniteQuery({
     queryKey,
@@ -119,7 +119,13 @@ function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSig
     }
   }), [records]);
 
-  const [hydratedById, setHydratedById] = useState<Record<string, FeedContent>>({});
+  const [hydratedState, setHydratedState] = useState<{
+    scope: string;
+    byId: Record<string, FeedContent>;
+  }>({ scope: hydrationScope, byId: {} });
+  // For You list pages remain public/shared, but hydrated social.viewer state is viewer-specific.
+  // The scope guard prevents even a one-frame flash from a previous account during switches.
+  const hydratedById = hydratedState.scope === hydrationScope ? hydratedState.byId : {};
   const hydratedIdsRef = useRef<Set<string>>(new Set());
   const hydrationScopeRef = useRef(hydrationScope);
   const hydrationGenerationRef = useRef(0);
@@ -139,7 +145,7 @@ function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSig
     hydrationScopeRef.current = hydrationScope;
     hydrationGenerationRef.current += 1;
     hydratedIdsRef.current.clear();
-    setHydratedById({});
+    setHydratedState({ scope: hydrationScope, byId: {} });
   }, [hydrationScope]);
 
   useEffect(() => {
@@ -182,7 +188,13 @@ function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSig
         }
       }
       if (Object.keys(hydrated).length > 0) {
-        setHydratedById((current) => ({ ...current, ...hydrated }));
+        setHydratedState((current) => ({
+          scope: hydrationScope,
+          byId: {
+            ...(current.scope === hydrationScope ? current.byId : {}),
+            ...hydrated,
+          },
+        }));
       }
     })();
   }, [records, hydrationScope]);
@@ -227,11 +239,11 @@ function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSig
           })),
         };
       });
-      setHydratedById((current) => {
-        if (!Object.prototype.hasOwnProperty.call(current, contentId)) return current;
-        const next = { ...current };
+      setHydratedState((current) => {
+        if (current.scope !== hydrationScope || !Object.prototype.hasOwnProperty.call(current.byId, contentId)) return current;
+        const next = { ...current.byId };
         delete next[contentId];
-        return next;
+        return { scope: hydrationScope, byId: next };
       });
     }} onPress={() => {
       if (item.contentId) router.push(('/post/' + encodeURIComponent(item.contentId)) as never);
@@ -252,15 +264,21 @@ function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSig
           })),
         };
       });
-      setHydratedById((current) => ({
-        ...current,
-        [contentId]: {
-          ...(current[contentId] ?? item),
-          reply_count: nextReplyCount,
-        },
-      }));
+      setHydratedState((current) => {
+        const currentById = current.scope === hydrationScope ? current.byId : {};
+        return {
+          scope: hydrationScope,
+          byId: {
+            ...currentById,
+            [contentId]: {
+              ...(currentById[contentId] ?? item),
+              reply_count: nextReplyCount,
+            },
+          },
+        };
+      });
     }} />
-  ), [queryClient, queryKey, router]);
+  ), [hydrationScope, queryClient, queryKey, router]);
 
   const footer = useMemo(() => {
     if (feedQuery.isFetchingNextPage) {
