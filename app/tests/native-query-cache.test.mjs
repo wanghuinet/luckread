@@ -28,7 +28,7 @@ test('React Native lifecycle binds app focus and Expo network connectivity to Ta
 test('viewer changes remove cached Following pages to prevent account-to-account timeline leakage', () => {
   expect(provider).toContain("queryClient.removeQueries({ queryKey: ['native-feed', 'following'] })");
   expect(feed).toContain("nativeFeedQueryKey(kind, viewerId)");
-  expect(feed).toContain("enabled: kind === 'for-you' || authStatus === 'authenticated'");
+  expect(feed).toContain("enabled: kind === 'for-you' || (authStatus === 'authenticated' && Boolean(viewerId))");
 });
 
 test('home timeline uses cursor-based infinite queries, cached refetch and page-level invalidation', () => {
