@@ -1,4 +1,4 @@
-import React, { useReducer, Reducer, useState } from 'react';
+import React, { useReducer, useState } from 'react';
 import {
     Text,
     TouchableOpacity,
@@ -42,7 +42,6 @@ type ProfileImageSize = 'xxs' | 'xs' | 's' | 'm' | 'l';
 type ProfileImageProps = ImageProps & { displaySize?: ProfileImageSize; className?: string, is_organization?: boolean };
 type ProfileImageReducerState = { isLoading: boolean; hasError: boolean };
 type ProfileImageReducerActions = { type: 'loaded' } | { type: 'error' };
-type ProfileImageReducer = Reducer<ProfileImageReducerState, ProfileImageReducerActions>;
 
 const PROFILE_IMAGE_DIMENSIONS: Record<ProfileImageSize, number> = {
     xxs: 20,
@@ -116,8 +115,8 @@ const formatTime = (timestamp: number, isDetailView: boolean): string => {
 
 
 export const ProfileImage: React.FC<ProfileImageProps> = ({ style, displaySize = 's', className = '', is_organization = false, ...imageProps }) => {
-    const [{ isLoading, hasError }, dispatch] = useReducer<ProfileImageReducer>(
-        (state, action) => {
+    const [{ isLoading, hasError }, dispatch] = useReducer(
+        (state: ProfileImageReducerState, action: ProfileImageReducerActions): ProfileImageReducerState => {
             if (action.type === 'loaded') return { isLoading: false, hasError: false };
             if (action.type === 'error') return { isLoading: false, hasError: true };
             return state;
@@ -475,7 +474,7 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
                                             <Image
                                                 source={{ uri: verified_badge }}
                                                 className="w-4 h-4"
-                                                onError={(e) => console.log('Failed to load verified badge:', e.nativeEvent.error)}
+                                                onError={(e) => console.log('Failed to load verified badge:', e.error)}
                                             />
                                         )}
                                         <Text className="text-lg text-neutral-500 dark:text-neutral-400 mr-1 ml-1">@{authorHandle}</Text>
