@@ -371,7 +371,7 @@ export default function HomeScreen() {
   );
 
   return (
-    <BlurView style={[styles.container, { backgroundColor: isDark ? '#000000' : '#ffffff' }]} className="flex-1" intensity={80} tint={isDark ? "dark" : "light"}>
+    <BlurView style={[styles.container, { backgroundColor: isDark ? '#000000' : '#ffffff' }]} className="flex-1" intensity={80} tint={isDark ? 'dark' : 'light'}>
       <Tabs.Container
         renderHeader={Header}
         renderTabBar={renderTabBar}
