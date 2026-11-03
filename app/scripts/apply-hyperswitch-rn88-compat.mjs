@@ -20,7 +20,7 @@ async function patchFile(relativePath, before, after, expectedCount) {
   const source = await readFile(filePath, 'utf8');
   const count = (value, token) => value.split(token).length - 1;
   const remaining = count(source, before);
-  const alreadyPatched = count(source, after);
+  const alreadyPatched = after ? count(source, after) : 0;
 
   if (remaining === expectedCount && alreadyPatched === 0) {
     await writeFile(filePath, source.replaceAll(before, after), 'utf8');
@@ -28,7 +28,7 @@ async function patchFile(relativePath, before, after, expectedCount) {
     return;
   }
 
-  if (remaining === 0 && alreadyPatched === expectedCount) {
+  if (remaining === 0 && (after ? alreadyPatched === expectedCount : true)) {
     console.log('Hyperswitch RN 0.88 patch already present: ' + relativePath);
     return;
   }
