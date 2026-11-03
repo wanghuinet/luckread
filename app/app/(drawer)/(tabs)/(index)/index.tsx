@@ -13,6 +13,7 @@ import { DrawerActions } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Tabs, MaterialTabBar } from 'react-native-collapsible-tab-view';
 import { BlurView } from 'expo-blur';
+import { useColorScheme } from 'nativewind';
 
 import { FeedContent, FeedItem } from '~/components/FeedItem';
 import X from '~/assets/svg/aside/x.svg';
@@ -38,6 +39,8 @@ const Header = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const user = useAuthStore((state) => state.user);
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === 'dark';
 
   const openDrawer = useCallback(() => {
     // This screen is nested inside the tab navigator; the drawer action bubbles
@@ -46,23 +49,23 @@ const Header = () => {
   }, [navigation]);
 
   return (
-    <View style={[styles.headerContainer, { paddingTop: insets.top }]}>
+    <View style={[styles.headerContainer, { paddingTop: insets.top, backgroundColor: isDark ? '#000000' : '#ffffff' }]}>
       <View style={styles.headerRow}>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="打开导航菜单"
           onPress={openDrawer}
-          style={styles.profileButton}
+          style={[styles.profileButton, { backgroundColor: isDark ? '#171717' : '#f2f4f7' }]}
           hitSlop={8}
         >
           {user?.image ? (
             <Image source={{ uri: user.image }} style={styles.profileAvatar} />
           ) : (
-            <Feather name="user" size={22} color="#667085" />
+            <Feather name="user" size={22} color={isDark ? '#9ca3af' : '#667085'} />
           )}
         </Pressable>
         <View pointerEvents="none" style={styles.headerLogoWrap}>
-          <X width={28} height={28} fill="#000000" />
+          <X width={28} height={28} fill={isDark ? '#ffffff' : '#000000'} />
         </View>
         <View style={styles.headerRightSpacer} />
       </View>
@@ -73,6 +76,8 @@ const Header = () => {
 function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSignal?: string }) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === 'dark';
   const authStatus = useAuthStore((state) => state.status);
   const invalidateSession = useAuthStore((state) => state.invalidateSession);
   const [items, setItems] = useState<FeedContent[]>([]);
@@ -256,9 +261,9 @@ function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSig
 
   if (authRequired) {
     return (
-      <View style={styles.stateContainer}>
-        <Text style={styles.stateTitle}>Sign in to see your Following timeline</Text>
-        <Text style={styles.stateDescription}>Your followed creators’ posts will appear here after you sign in.</Text>
+      <View style={[styles.stateContainer, { backgroundColor: isDark ? '#000000' : '#ffffff' }]}>
+        <Text style={[styles.stateTitle, { color: isDark ? '#f9fafb' : '#101828' }]}>Sign in to see your Following timeline</Text>
+        <Text style={[styles.stateDescription, { color: isDark ? '#9ca3af' : '#667085' }]}>Your followed creators’ posts will appear here after you sign in.</Text>
         <Pressable accessibilityRole="button" onPress={openLogin} style={styles.primaryButton}>
           <Text style={styles.primaryButtonText}>Sign in</Text>
         </Pressable>
@@ -268,18 +273,18 @@ function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSig
 
   if (loading && items.length === 0) {
     return (
-      <View style={styles.stateContainer}>
+      <View style={[styles.stateContainer, { backgroundColor: isDark ? '#000000' : '#ffffff' }]}>
         <ActivityIndicator color={APP_PRIMARY_COLOR} size="large" />
-        <Text style={styles.stateDescription}>Loading LuckRead posts…</Text>
+        <Text style={[styles.stateDescription, { color: isDark ? '#9ca3af' : '#667085' }]}>Loading LuckRead posts…</Text>
       </View>
     );
   }
 
   if (errorMessage && items.length === 0) {
     return (
-      <View style={styles.stateContainer}>
-        <Text style={styles.stateTitle}>Unable to load posts</Text>
-        <Text style={styles.stateDescription}>{errorMessage}</Text>
+      <View style={[styles.stateContainer, { backgroundColor: isDark ? '#000000' : '#ffffff' }]}>
+        <Text style={[styles.stateTitle, { color: isDark ? '#f9fafb' : '#101828' }]}>Unable to load posts</Text>
+        <Text style={[styles.stateDescription, { color: isDark ? '#9ca3af' : '#667085' }]}>{errorMessage}</Text>
         <Pressable accessibilityRole="button" onPress={() => setRefreshKey((value) => value + 1)} style={styles.primaryButton}>
           <Text style={styles.primaryButtonText}>Retry</Text>
         </Pressable>
@@ -289,9 +294,9 @@ function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSig
 
   if (!loading && !errorMessage && items.length === 0) {
     return (
-      <View style={styles.stateContainer}>
-        <Text style={styles.stateTitle}>{kind === 'following' ? 'No posts from followed creators yet' : 'No public posts yet'}</Text>
-        <Text style={styles.stateDescription}>
+      <View style={[styles.stateContainer, { backgroundColor: isDark ? '#000000' : '#ffffff' }]}>
+        <Text style={[styles.stateTitle, { color: isDark ? '#f9fafb' : '#101828' }]}>{kind === 'following' ? 'No posts from followed creators yet' : 'No public posts yet'}</Text>
+        <Text style={[styles.stateDescription, { color: isDark ? '#9ca3af' : '#667085' }]}>
           {kind === 'following' ? 'Follow creators on LuckRead to build your timeline.' : 'Public LuckRead posts will appear here.'}
         </Text>
       </View>
@@ -301,6 +306,7 @@ function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSig
   return (
     <Tabs.FlatList
       data={items}
+      style={{ backgroundColor: isDark ? '#000000' : '#ffffff' }}
       renderItem={renderItem}
       keyExtractor={(item, index) => item.contentId || 'content-' + index}
       contentContainerStyle={{ paddingBottom: insets.bottom + 88 }}
@@ -316,10 +322,12 @@ function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSig
 }
 
 export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === 'dark';
   return (
-    <View style={styles.errorBoundaryContainer}>
-      <Text style={styles.stateTitle}>首页暂时无法显示</Text>
-      <Text style={styles.stateDescription}>
+    <View style={[styles.errorBoundaryContainer, { backgroundColor: isDark ? '#000000' : '#ffffff' }]}>
+      <Text style={[styles.stateTitle, { color: isDark ? '#f9fafb' : '#101828' }]}>首页暂时无法显示</Text>
+      <Text style={[styles.stateDescription, { color: isDark ? '#9ca3af' : '#667085' }]}>
         {error.message || '页面发生异常，请重试。'}
       </Text>
       <Pressable accessibilityRole="button" onPress={retry} style={styles.primaryButton}>
@@ -330,6 +338,8 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
 }
 
 export default function HomeScreen() {
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === 'dark';
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const params = useLocalSearchParams<{ published?: string; refresh?: string }>();
@@ -339,15 +349,15 @@ export default function HomeScreen() {
     <MaterialTabBar
       {...props}
       indicatorStyle={{ backgroundColor: APP_PRIMARY_COLOR, height: 3, borderRadius: 50 }}
-      activeColor="black"
+      activeColor={isDark ? '#ffffff' : '#000000'}
       scrollEnabled={false}
       style={{
         paddingHorizontal: 16,
         elevation: 0,
         shadowOpacity: 0,
         borderBottomWidth: StyleSheet.hairlineWidth,
-        borderBottomColor: '#e4e7ec',
-        backgroundColor: 'white',
+        borderBottomColor: isDark ? '#262626' : '#e4e7ec',
+        backgroundColor: isDark ? '#000000' : '#ffffff',
       }}
       labelStyle={{
         marginHorizontal: 10,
@@ -355,13 +365,13 @@ export default function HomeScreen() {
         textTransform: 'none',
         textAlign: 'center',
         fontSize: 15,
-        color: '#475467',
+        color: isDark ? '#9ca3af' : '#475467',
       }}
     />
   );
 
   return (
-    <BlurView style={styles.container} className="flex-1" intensity={80} tint="light">
+    <BlurView style={[styles.container, { backgroundColor: isDark ? '#000000' : '#ffffff' }]} className="flex-1" intensity={80} tint={isDark ? 'dark' : 'light'}>
       <Tabs.Container
         renderHeader={Header}
         renderTabBar={renderTabBar}
@@ -382,14 +392,14 @@ export default function HomeScreen() {
           <FeedTimeline kind="following" refreshSignal={refreshSignal} />
         </Tabs.Tab>
       </Tabs.Container>
-      <View style={{ height: Math.max(0, insets.bottom - 8) }} />
+      <View style={{ height: Math.max(0, insets.bottom - 8), backgroundColor: isDark ? '#000000' : '#ffffff' }} />
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="发布动态"
         onPress={() => router.push('/publish' as never)}
         style={[styles.floatingCompose, { bottom: insets.bottom + 72 }]}
       >
-        <Feather name="plus" size={28} color="#ffffff" />
+        <Feather name="plus" size={28} color='#ffffff' />
       </Pressable>
     </BlurView>
   );
