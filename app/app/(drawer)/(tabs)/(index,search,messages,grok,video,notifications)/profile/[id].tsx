@@ -126,6 +126,8 @@ const ProfileHeader = ({ navBarVisibility, scrollOffset, refreshing, user, curre
   user: User;
   currentUserId: string | null;
 }) => {
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === 'dark';
   const navigation = useNavigation();
   const { left: leftInset, right: rightInset, top: safeAreaTop } = useSafeAreaInsets();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
