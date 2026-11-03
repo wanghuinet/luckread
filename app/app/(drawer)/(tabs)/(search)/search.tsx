@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useColorScheme } from 'nativewind';
 
 import { getApiErrorMessage } from '~/lib/api-client';
 import { fetchContentSearchPage, fetchDiscoveryTopics, findPublicUserByUsername } from '~/lib/social-screen-api';
@@ -47,6 +48,8 @@ const PRIMARY = '#1d9bf0';
 const SEARCH_PAGE_SIZE = 20;
 
 export default function Search() {
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === 'dark';
   const router = useRouter();
   const authStatus = useAuthStore((state) => state.status);
   const [contentInput, setContentInput] = useState('');
@@ -198,7 +201,7 @@ export default function Search() {
 
   return (
     <View className="flex-1 bg-white dark:bg-black">
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 28 }}>
         <View className="border-b border-neutral-100 px-4 py-4 dark:border-neutral-800">
           <Text className="text-xl font-bold text-neutral-900 dark:text-white">搜索</Text>

@@ -3,14 +3,17 @@ import { Pressable, StatusBar, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuthStore } from '~/store/auth-store';
+import { useColorScheme } from 'nativewind';
 
 export default function Messages() {
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === 'dark';
   const router = useRouter();
   const authStatus = useAuthStore((state) => state.status);
 
   return (
     <View className="flex-1 bg-white dark:bg-black">
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       <View className="flex-row items-center justify-between border-b border-neutral-100 px-4 py-3 dark:border-neutral-800">
         <Text className="text-xl font-bold text-neutral-900 dark:text-white">私信</Text>
         <Feather name="mail" size={22} color="#1d9bf0" />

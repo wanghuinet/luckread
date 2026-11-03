@@ -18,6 +18,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useIsFocused } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useColorScheme } from 'nativewind';
 
 import Comment from '~/assets/svg/comment.svg';
 import Views from '~/assets/svg/views.svg';
@@ -325,6 +326,8 @@ function VideoItem({
 }
 
 export default function VideoFeed() {
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === 'dark';
   const router = useRouter();
   const isFocused = useIsFocused();
   const [items, setItems] = useState<VideoFeedItem[]>([]);
@@ -508,19 +511,19 @@ export default function VideoFeed() {
 
   if (loading && items.length === 0) {
     return (
-      <View style={styles.stateContainer}>
+      <View style={[styles.stateContainer, { backgroundColor: isDark ? '#000000' : '#ffffff' }]}>
         <ActivityIndicator color={PRIMARY} size="large" />
-        <Text style={styles.stateDescription}>Loading LuckRead videos…</Text>
+        <Text style={[styles.stateDescription, { color: isDark ? '#9ca3af' : '#667085' }]}>Loading LuckRead videos…</Text>
       </View>
     );
   }
 
   if (errorMessage && items.length === 0) {
     return (
-      <View style={styles.stateContainer}>
-        <Feather name="wifi-off" size={36} color="#667085" />
-        <Text style={styles.stateTitle}>Unable to load videos</Text>
-        <Text style={styles.stateDescription}>{errorMessage}</Text>
+      <View style={[styles.stateContainer, { backgroundColor: isDark ? '#000000' : '#ffffff' }]}>
+        <Feather name="wifi-off" size={36} color={isDark ? '#9ca3af' : '#667085'} />
+        <Text style={[styles.stateTitle, { color: isDark ? '#f9fafb' : '#101828' }]}>Unable to load videos</Text>
+        <Text style={[styles.stateDescription, { color: isDark ? '#9ca3af' : '#667085' }]}>{errorMessage}</Text>
         <Pressable accessibilityRole="button" onPress={retry} style={styles.retryButtonLight}>
           <Text style={styles.retryButtonText}>Retry</Text>
         </Pressable>
@@ -530,10 +533,10 @@ export default function VideoFeed() {
 
   if (!loading && items.length === 0) {
     return (
-      <View style={styles.stateContainer}>
-        <Feather name="video" size={36} color="#667085" />
-        <Text style={styles.stateTitle}>No videos yet</Text>
-        <Text style={styles.stateDescription}>
+      <View style={[styles.stateContainer, { backgroundColor: isDark ? '#000000' : '#ffffff' }]}>
+        <Feather name="video" size={36} color={isDark ? '#9ca3af' : '#667085'} />
+        <Text style={[styles.stateTitle, { color: isDark ? '#f9fafb' : '#101828' }]}>No videos yet</Text>
+        <Text style={[styles.stateDescription, { color: isDark ? '#9ca3af' : '#667085' }]}>
           Videos published on LuckRead will appear here. Sample videos are not shown.
         </Text>
         <Pressable

@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useColorScheme } from 'nativewind';
 
 import { getApiErrorMessage } from '~/lib/api-client';
 import { fetchNotificationsPage, markAllNotificationsRead, markNotificationRead } from '~/lib/social-screen-api';
@@ -78,6 +79,8 @@ function resolveContentId(item: SocialNotification): string | null {
 }
 
 export default function Notifications() {
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === 'dark';
   const router = useRouter();
   const authStatus = useAuthStore((state) => state.status);
   const [items, setItems] = useState<SocialNotification[]>([]);
@@ -366,7 +369,7 @@ export default function Notifications() {
   if (authRequired) {
     return (
       <View className="flex-1 items-center justify-center bg-white px-6 dark:bg-black">
-        <StatusBar barStyle="dark-content" />
+        <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
         <Feather name="bell" size={34} color={PRIMARY} />
         <Text className="mt-4 text-lg font-bold text-neutral-900 dark:text-white">登录后查看通知</Text>
         <Text className="mt-2 text-center text-sm text-neutral-500">通知只展示账号真实收到的互动，不使用示例内容。</Text>
@@ -379,7 +382,7 @@ export default function Notifications() {
 
   return (
     <View className="flex-1 bg-white dark:bg-black">
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       <FlatList
         data={filteredItems}
         keyExtractor={(item) => item.id}
@@ -396,7 +399,7 @@ export default function Notifications() {
                 <Text className="mt-2 text-center text-sm text-neutral-500">
                   {error ? '请检查网络后重试。' : '当有人关注、点赞、评论或提及你时，会显示在这里。'}
                 </Text>
-                {error ? <Pressable onPress={() => void loadPage(null, false)} className="mt-4 rounded-full border border-neutral-300 px-4 py-2"><Text className="font-semibold">重试</Text></Pressable> : null}
+                {error ? <Pressable onPress={() => void loadPage(null, false)} className="mt-4 rounded-full border border-neutral-300 px-4 py-2"><Text className="font-semibold text-neutral-800 dark:text-neutral-100">重试</Text></Pressable> : null}
               </>
             )}
           </View>
