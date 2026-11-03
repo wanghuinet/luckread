@@ -274,7 +274,7 @@ const ScrollingListWithHeaderInternal = <
   
   const safeAreaInsets = useSafeAreaInsets();
   
-  const listRef = useAnimatedRef();
+  const listRef = useAnimatedRef<typeof AnimatedSectionList>();
   
   useImperativeHandle(ref, () => listRef.current as any);
 
@@ -303,6 +303,8 @@ const ScrollingListWithHeaderInternal = <
     },
   });
 
+  const animatedListProps = rest as unknown as React.ComponentProps<typeof AnimatedSectionList>;
+
   return (
     
     <View
@@ -318,6 +320,7 @@ const ScrollingListWithHeaderInternal = <
 
       
       <AnimatedSectionList
+        {...animatedListProps}
         ref={listRef} 
         scrollEventThrottle={16} 
         overScrollMode="auto" 
