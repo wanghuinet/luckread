@@ -7,6 +7,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import * as SecureStore from 'expo-secure-store';
 import { useColorScheme } from 'nativewind';
+import { StatusBar } from 'expo-status-bar';
 
 import { useAuthStore } from '../store/auth-store';
 import { isThemePreference, THEME_PREFERENCE_KEY } from '../lib/theme-preference';
@@ -34,7 +35,8 @@ export default function RootLayout() {
   const [isThemeLoaded, setIsThemeLoaded] = useState(false);
   const status = useAuthStore((state) => state.status);
   const bootstrap = useAuthStore((state) => state.bootstrap);
-  const { setColorScheme } = useColorScheme();
+  const { colorScheme, setColorScheme } = useColorScheme();
+  const isDark = colorScheme === 'dark';
   const segments = useSegments();
   const router = useRouter();
   const navigationState = useRootNavigationState();
@@ -70,6 +72,7 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={styles.flex}>
+      <StatusBar style={isDark ? 'light' : 'dark'} backgroundColor={isDark ? '#000000' : '#ffffff'} />
       <BottomSheetModalProvider>
         <View style={styles.flex}>
           <Stack>
