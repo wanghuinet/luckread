@@ -210,10 +210,12 @@ export function mapContentToFeedContent(
   const mediaItems: FeedMediaAttachment[] = Array.from(new Set(mediaCandidates))
     .slice(0, 4)
     .map((src) => {
-      const media = resolveNativeMediaSource(src, sessionToken);
+      const requiresAuthentication = item.accessMode === 'MEMBERS_ONLY';
+      const media = resolveNativeMediaSource(src, requiresAuthentication ? sessionToken : null);
       return {
         src: media?.uri ?? src,
         kind: /\.(?:mp4|webm|mov|m4v|avi|mkv)(?:[?#].*)?$/i.test(src) ? 'video' : 'image',
+        ...(requiresAuthentication ? { requiresAuthentication: true } : {}),
         ...(media?.headers ? { headers: media.headers } : {}),
       };
     });
