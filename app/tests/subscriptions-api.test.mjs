@@ -35,7 +35,9 @@ test('pins Android Kotlin to the Hyperswitch and Expo SDK 58 compatible version'
   );
 
   expect(packageJson.dependencies['expo-build-properties']).toBe('~58.0.12');
-  expect(appConfig.expo.newArchEnabled).toBe(true);
+  expect(packageJson.dependencies['react-native']).toBe('0.88.1');
+  // Expo SDK 58 / React Native 0.88 use the New Architecture by default; keep it enabled or implicit.
+  expect(appConfig.expo.newArchEnabled).not.toBe(false);
   expect(buildProperties?.[1]?.android).toMatchObject({
     buildToolsVersion: '37.0.0',
     compileSdkVersion: 37,
