@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Linking, Pressable, Text, View } from 'react-native';
+import { useColorScheme } from 'nativewind';
 
 import {
   AuthInput,
@@ -16,6 +17,8 @@ import { getApiErrorMessage } from '../lib/api-client';
 import { AuthStoreError, useAuthStore } from '../store/auth-store';
 
 export default function LoginScreen() {
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === 'dark';
   const router = useRouter();
   const params = useLocalSearchParams<{ verified?: string }>();
   const login = useAuthStore((state) => state.login);
@@ -140,7 +143,7 @@ export default function LoginScreen() {
 
       <AuthPrimaryButton label="登录" busy={submitting} onPress={() => void submit()} />
       <View style={{ marginTop: 20 }}>
-        <Text style={{ color: AUTH_COLORS.secondary, fontSize: 14, lineHeight: 21 }}>还没有账号？</Text>
+        <Text style={{ color: isDark ? '#9ca3af' : AUTH_COLORS.secondary, fontSize: 14, lineHeight: 21 }}>还没有账号？</Text>
         <AuthSecondaryButton label="创建账号" onPress={() => router.push('/register' as never)} />
       </View>
 
@@ -151,7 +154,7 @@ export default function LoginScreen() {
       </View>
 
       <View style={{ marginTop: 22, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 5 }}>
-        <Text style={{ color: '#8b98a5', fontSize: 12 }}>查看 LuckRead</Text>
+        <Text style={{ color: isDark ? '#9ca3af' : '#8b98a5', fontSize: 12 }}>查看 LuckRead</Text>
         <Pressable accessibilityRole="link" onPress={() => void Linking.openURL('https://luckread.com/terms').catch(() => undefined)}>
           <Text style={{ color: AUTH_COLORS.accent, fontSize: 12, fontWeight: '700' }}>用户协议</Text>
         </Pressable>
