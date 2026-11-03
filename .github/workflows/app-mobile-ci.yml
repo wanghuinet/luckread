@@ -31,6 +31,66 @@ env:
   CI: "1"
 
 jobs:
+  prepare-camera-lockfile:
+    name: Prepare SDK 58 aligned Bun lockfile
+    if: ${{ github.event_name == 'pull_request' && github.repository == 'wanghuinet/luckread' && github.head_ref == 'feat/native-camera-photo-capture' && github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.head_ref }}
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22.13.1"
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.1.38"
+      - name: Regenerate binary lockfile from aligned SDK 58 package versions
+        run: bun install
+      - name: Upload generated lockfile for one-time branch sync
+        uses: actions/upload-artifact@v4
+        with:
+          name: luckread-camera-sdk58-bun-lockfile-sync
+          path: app/bun.lockb
+          if-no-files-found: error
+          retention-days: 1
+
+  sync-camera-lockfile:
+    name: Sync aligned SDK 58 Bun lockfile
+    needs: prepare-camera-lockfile
+    if: ${{ github.event_name == 'pull_request' && github.repository == 'wanghuinet/luckread' && github.head_ref == 'feat/native-camera-photo-capture' && github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download generated lockfile
+        uses: actions/download-artifact@v4
+        with:
+          name: luckread-camera-sdk58-bun-lockfile-sync
+          path: /tmp/luckread-camera-sdk58-lock
+      - name: Checkout camera PR branch
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.head_ref }}
+      - name: Commit generated binary lockfile
+        env:
+          GITHUB_HEAD_REF: ${{ github.head_ref }}
+        run: |
+          test -s /tmp/luckread-camera-sdk58-lock/bun.lockb
+          cp /tmp/luckread-camera-sdk58-lock/bun.lockb app/bun.lockb
+          if git diff --quiet -- app/bun.lockb; then
+            echo "Bun lockfile already matches package.json."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/bun.lockb
+          git commit -m "chore(native): align SDK 58 Expo dependencies"
+          git push origin "HEAD:${GITHUB_HEAD_REF}"
+
   dependency-compatibility:
     name: Expo install, doctor and typecheck
     runs-on: ubuntu-latest
