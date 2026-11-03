@@ -63,3 +63,17 @@ await patchFile(
   'reactDelegate.reactRootView?.getRootViewTag()',
   1,
 );
+
+await patchFile(
+  'ios/hyperswitchSDK/Core/NativeModule/RNHeadlessManager.swift',
+  '    public override func bridgelessEnabled() -> Bool {\n        return true\n    }\n',
+  '',
+  1,
+);
+
+await patchFile(
+  'ios/hyperswitchSDK/Core/NativeModule/RNViewManager.swift',
+  '    public override func bridgelessEnabled() -> Bool {\n        return true\n    }\n',
+  '',
+  1,
+);
