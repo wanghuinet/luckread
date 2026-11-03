@@ -55,6 +55,13 @@ jobs:
           java-version: "17"
       - name: Install Expo app dependencies
         run: bun install
+      - name: Export generated Bun lockfile for the reviewed PR
+        uses: actions/upload-artifact@v4
+        with:
+          name: luckread-native-bun-lockfile
+          path: app/bun.lockb
+          if-no-files-found: error
+          retention-days: 1
       - name: Apply and verify Hyperswitch React Native 0.88 compatibility
         run: |
           node scripts/apply-hyperswitch-rn88-compat.mjs
@@ -71,6 +78,8 @@ jobs:
         run: bun test tests/ota-build-provenance.test.mjs
       - name: Verify Zeego Android native menu dependencies
         run: bun run test:native-menu
+      - name: Test native reusable Button component
+        run: bun run test:ui-button
       - name: Verify generated Android Release signing configuration
         run: |
           bunx expo prebuild --platform android --clean --no-install

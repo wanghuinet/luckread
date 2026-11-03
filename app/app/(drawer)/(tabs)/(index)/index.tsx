@@ -253,6 +253,11 @@ function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSig
       setItems((current) => current.filter((post) => post.contentId !== contentId));
     }} onPress={() => {
       if (item.contentId) router.push(('/post/' + encodeURIComponent(item.contentId)) as never);
+    }} onReplySubmitted={() => {
+      if (!item.contentId) return;
+      setItems((current) => current.map((post) => post.contentId === item.contentId
+        ? { ...post, reply_count: (post.reply_count ?? 0) + 1 }
+        : post));
     }} />
   ), [router]);
 

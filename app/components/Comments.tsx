@@ -4,7 +4,6 @@ import {
   Alert,
   Text,
   TextInput,
-  type TextInputInstance,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -13,7 +12,9 @@ import { useRouter } from 'expo-router';
 import { StyledExpoImage as Image } from '~/components/Image';
 import CommentEditAction from '~/components/CommentEditAction';
 
-import { apiRequest, getApiErrorMessage } from '~/lib/api-client';
+import { apiRequest, createIdempotencyKey, getApiErrorMessage } from '~/lib/api-client';
+import { createComment } from '~/lib/comment-create-api';
+import { useReplyComposer } from '~/components/ReplyComposerProvider';
 import ReportCommentDialog from '~/components/ReportCommentDialog';
 import { CommentLikeApiError, toggleCommentLike as toggleCommentLikeRequest } from '~/lib/comment-likes-api';
 import { CommentDeleteApiError, deleteComment as deleteCommentRequest } from '~/lib/comment-delete-api';
@@ -65,15 +66,8 @@ export type CommentSort = 'relevant' | 'recent' | 'liked';
 type CommentsProps = {
   contentId: string;
   sort?: CommentSort;
+  onReplySubmitted?: () => void;
 };
-
-const createIdempotencyKey = (contentId: string) =>
-  'native-comment:' +
-  contentId +
-  ':' +
-  Date.now().toString(36) +
-  ':' +
-  Math.random().toString(36).slice(2, 14);
 
 const formatDate = (value: string): string => {
   const timestamp = Date.parse(value);
@@ -82,8 +76,9 @@ const formatDate = (value: string): string => {
     : '';
 };
 
-export default function Comments({ contentId, sort = 'relevant' }: CommentsProps) {
+export default function Comments({ contentId, sort = 'relevant', onReplySubmitted }: CommentsProps) {
   const router = useRouter();
+  const { openReplyComposer } = useReplyComposer();
   const currentUserId = useAuthStore((state) => state.user?.id ?? null);
   const viewer = useAuthStore((state) => state.user);
   const [comments, setComments] = useState<ApiComment[]>([]);
@@ -96,19 +91,13 @@ export default function Comments({ contentId, sort = 'relevant' }: CommentsProps
   const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [body, setBody] = useState('');
-  const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [deletingIds, setDeletingIds] = useState<Set<string>>(() => new Set());
   const [message, setMessage] = useState('');
   const [reportingCommentId, setReportingCommentId] = useState<string | null>(null);
   const pendingDeleteKeysRef = useRef<Record<string, string>>({});
   const requestIdRef = useRef(0);
-  const pendingSubmissionRef = useRef<{
-    body: string;
-    parentId: string | null;
-    key: string;
-  } | null>(null);
-  const inputRef = useRef<TextInputInstance | null>(null);
+  const pendingSubmissionRef = useRef<{ body: string; key: string } | null>(null);
 
   const loadComments = useCallback(async (nextCursor: string | null = null) => {
     const requestId = ++requestIdRef.current;
@@ -245,20 +234,16 @@ export default function Comments({ contentId, sort = 'relevant' }: CommentsProps
     setMessage('');
 
     const existing = pendingSubmissionRef.current;
-    const key = existing && existing.body === trimmed && existing.parentId === replyingTo
-      ? existing.key
-      : createIdempotencyKey(contentId);
-    pendingSubmissionRef.current = { body: trimmed, parentId: replyingTo, key };
+    const key = existing && existing.body === trimmed ? existing.key : createIdempotencyKey();
+    pendingSubmissionRef.current = { body: trimmed, key };
 
     try {
-      const { response, data } = await apiRequest<{ data?: ApiComment; error?: { message?: string } }>(
-        '/contents/' + encodeURIComponent(contentId) + '/comments',
-        {
-          method: 'POST',
-          headers: { 'Idempotency-Key': key },
-          body: JSON.stringify({ body: trimmed, parentId: replyingTo }),
-        },
-      );
+      const { response, data } = await createComment<{ data?: ApiComment; error?: { message?: string } }>({
+        contentId,
+        body: trimmed,
+        parentId: null,
+        idempotencyKey: key,
+      });
 
       if (response.status === 401) {
         router.push('/login' as never);
@@ -273,7 +258,6 @@ export default function Comments({ contentId, sort = 'relevant' }: CommentsProps
       // local-only comment. The same content ID is used for GET and POST.
       pendingSubmissionRef.current = null;
       setBody('');
-      setReplyingTo(null);
       await loadComments();
     } catch (error) {
       // Retain the same idempotency key for a retry of the identical draft.
@@ -281,21 +265,20 @@ export default function Comments({ contentId, sort = 'relevant' }: CommentsProps
     } finally {
       setSubmitting(false);
     }
-  }, [body, contentId, loadComments, replyingTo, router, submitting]);
+  }, [body, contentId, loadComments, router, submitting]);
 
   const deleteOwnComment = useCallback(async (comment: ApiComment) => {
     if (!currentUserId || comment.authorUserId !== currentUserId || deletingIds.has(comment.id)) return;
 
     setDeletingIds((current) => new Set(current).add(comment.id));
     setMessage('');
-    const key = pendingDeleteKeysRef.current[comment.id] || createIdempotencyKey(contentId + ':delete:' + comment.id);
+    const key = pendingDeleteKeysRef.current[comment.id] || createIdempotencyKey();
     pendingDeleteKeysRef.current[comment.id] = key;
 
     try {
       await deleteCommentRequest(comment.id, key);
       delete pendingDeleteKeysRef.current[comment.id];
       setComments((current) => current.filter((candidate) => candidate.id !== comment.id));
-      setReplyingTo((current) => current === comment.id ? null : current);
       setMessage('Reply deleted.');
     } catch (cause) {
       if (cause instanceof CommentDeleteApiError && cause.status === 401) {
@@ -341,10 +324,22 @@ export default function Comments({ contentId, sort = 'relevant' }: CommentsProps
   }, [currentUserId, deleteOwnComment, deletingIds]);
 
   const beginReply = useCallback((comment: ApiComment) => {
-    setReplyingTo(comment.id);
+    const author = profiles[comment.authorUserId] ?? comment.author ?? undefined;
+    openReplyComposer({
+      contentId,
+      parentId: comment.id,
+      authorName: author?.displayName?.trim() || author?.username || 'LuckRead member',
+      authorHandle: author?.username || comment.authorUserId,
+      authorAvatar: author?.avatar ?? null,
+      authorAvatarHeaders: author?.avatarHeaders,
+      contentText: comment.body,
+      onSubmitted: () => {
+        void loadComments();
+        onReplySubmitted?.();
+      },
+    });
     setMessage('');
-    inputRef.current?.focus();
-  }, []);
+  }, [contentId, loadComments, onReplySubmitted, openReplyComposer, profiles]);
 
   const toggleCommentLike = useCallback(async (comment: ApiComment) => {
     if (likingCommentId) return;
@@ -374,26 +369,13 @@ export default function Comments({ contentId, sort = 'relevant' }: CommentsProps
       </View>
 
       <View className="rounded-2xl border border-neutral-200 dark:border-neutral-700 p-3">
-        {replyingTo ? (
-          <View className="mb-2 flex-row items-center justify-between">
-            <Text className="text-sm text-neutral-500">Replying to a comment</Text>
-            <TouchableOpacity
-              accessibilityRole="button"
-              onPress={() => setReplyingTo(null)}
-              disabled={submitting}
-            >
-              <Text className="text-sm font-semibold text-sky-500">Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        ) : null}
         <TextInput
-          ref={inputRef}
-          accessibilityLabel={replyingTo ? 'Write a reply' : 'Write a comment'}
+          accessibilityLabel="Write a comment"
           className="min-h-20 text-base text-black dark:text-white"
           maxLength={10000}
           multiline
           onChangeText={setBody}
-          placeholder={replyingTo ? 'Write your reply…' : 'Post your reply'}
+          placeholder="Write a comment…"
           placeholderTextColor="#8b98a5"
           textAlignVertical="top"
           value={body}
@@ -406,7 +388,7 @@ export default function Comments({ contentId, sort = 'relevant' }: CommentsProps
             disabled={!body.trim() || submitting}
             onPress={() => void submitComment()}
           >
-            <Text className="font-bold text-white">{submitting ? 'Sending…' : replyingTo ? 'Reply' : 'Post'}</Text>
+            <Text className="font-bold text-white">{submitting ? 'Sending…' : 'Post'}</Text>
           </TouchableOpacity>
         </View>
       </View>

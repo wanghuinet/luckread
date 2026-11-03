@@ -4,16 +4,24 @@ on:
   pull_request:
     paths:
       - "app/components/Comments.tsx"
+      - "app/components/ReplyComposerProvider.tsx"
       - "app/lib/comment-delete-api.ts"
+      - "app/lib/comment-create-api.ts"
       - "app/tests/comment-delete-api.test.mjs"
+      - "app/tests/comment-create-api.test.mjs"
+      - "app/tests/comment-navigation.test.mjs"
       - ".github/workflows/native-comment-delete-ci.yml"
   push:
     branches:
       - main
     paths:
       - "app/components/Comments.tsx"
+      - "app/components/ReplyComposerProvider.tsx"
       - "app/lib/comment-delete-api.ts"
+      - "app/lib/comment-create-api.ts"
       - "app/tests/comment-delete-api.test.mjs"
+      - "app/tests/comment-create-api.test.mjs"
+      - "app/tests/comment-navigation.test.mjs"
       - ".github/workflows/native-comment-delete-ci.yml"
 
 permissions:
@@ -44,7 +52,7 @@ jobs:
         run: bunx expo install --check
       - name: Typecheck native app
         run: bun run typecheck
-      - name: Test native comment deletion and author guard
-        run: bun test tests/comment-delete-api.test.mjs
+      - name: Test native comment write, floating reply composer, and deletion
+        run: bun test tests/comment-delete-api.test.mjs tests/comment-create-api.test.mjs tests/comment-navigation.test.mjs
       - name: Enforce shared API client boundary
         run: bun run check:api-boundary

@@ -3,10 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -17,6 +14,7 @@ import { Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { useColorScheme } from 'nativewind';
+import { KeyboardAwareScrollView, KeyboardProvider } from 'react-native-keyboard-controller';
 
 import { apiRequest, createIdempotencyKey } from '~/lib/api-client';
 import {
@@ -123,7 +121,7 @@ function ComposerVideoPreview({ uri }: { uri: string }) {
   );
 }
 
-export default function PublishScreen() {
+function PublishScreenContent() {
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
   const router = useRouter();
@@ -649,11 +647,7 @@ export default function PublishScreen() {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={[styles.page, isDark && { backgroundColor: '#000000' }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 12 : 0}
-    >
+    <View style={[styles.page, isDark && { backgroundColor: '#000000' }]}>
       <Stack.Screen options={{ title: contentId ? 'Edit post' : 'New post', headerShown: false }} />
       <View style={[styles.header, isDark && { backgroundColor: '#000000', borderBottomColor: '#27272a' }]}>
         <Pressable accessibilityRole="button" accessibilityLabel="Close composer" onPress={() => router.back()} style={styles.iconButton}>
@@ -676,7 +670,9 @@ export default function PublishScreen() {
           <Text style={[styles.description, isDark && { color: '#9ca3af' }]}>Loading your post…</Text>
         </View>
       ) : (
-        <ScrollView
+        <KeyboardAwareScrollView
+          style={{ flex: 1 }}
+          bottomOffset={16}
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={[styles.scrollContent, isDark && { backgroundColor: '#000000' }]}
         >
@@ -869,9 +865,18 @@ export default function PublishScreen() {
             <Feather name="check-circle" size={17} color={isDark ? '#9ca3af' : '#667085'} />
             <Text style={[styles.footerText, isDark && { color: '#9ca3af' }]}>Files upload to LuckRead first. Only permanent server media URLs are attached to the post.</Text>
           </View>
-        </ScrollView>
+        </KeyboardAwareScrollView>
       )}
-    </KeyboardAvoidingView>
+    </View>
+  );
+}
+
+
+export default function PublishScreen() {
+  return (
+    <KeyboardProvider preload={false}>
+      <PublishScreenContent />
+    </KeyboardProvider>
   );
 }
 
