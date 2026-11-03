@@ -60,7 +60,7 @@ test('edit and delete controls are only shown for the authenticated owner and us
   expect(home).toContain('queryClient.setQueryData<InfiniteData<NativeFeedPage, string | null>>(queryKey, (current) => {');
   expect(home).toContain('pages: current.pages.map((page) => ({');
   expect(home).toContain('items: page.items.filter((post) => post.id !== contentId)');
-  expect(home).toContain('setHydratedById((current) => {');
+  expect(home).toContain('setHydratedState((current) => {');
 });
 
 test('successful publishing confirms success and offers a direct link to the published post', () => {
