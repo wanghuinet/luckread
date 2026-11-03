@@ -86,8 +86,8 @@ export default function RootLayout() {
             <Stack.Screen name="publish" options={{ headerShown: false, presentation: 'modal', animation: 'slide_from_bottom' }} />
           </Stack>
           {(!isLoaded || !isThemeLoaded || status === 'loading') ? (
-            <View className="flex-1" style={styles.splash} pointerEvents="auto">
-              <Text style={styles.brand}>LuckRead</Text>
+            <View className="flex-1" style={[styles.splash, { backgroundColor: isDark ? "#080808" : "#ffffff" }]} pointerEvents="auto">
+              <Text style={[styles.brand, { color: isDark ? "#ffffff" : "#111827" }]}>LuckRead</Text>
             </View>
           ) : null}
         </View>
