@@ -733,6 +733,9 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
 
 export const FeedItemDetailView: React.FC<FeedItemProps> = ({ itemData, onPress, detailView, onCommentPress, replyDisabled, onReplySubmitted }) => {
     const { colorScheme } = useColorScheme();
+    const effectiveReplyDisabled = replyDisabled ?? (
+        itemData.accessMode === 'MEMBERS_ONLY' && itemData.accessGranted !== true
+    );
 
 
     const mediaItems = itemData.media_items?.length
