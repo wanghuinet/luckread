@@ -1,0 +1,150 @@
+name: Sync native feed query branch with main
+
+on:
+  push:
+    branches:
+      - feat/native-feed-tanstack-query
+    paths:
+      - .github/workflows/sync-native-feed-branch.yml
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the existing feature branch
+        uses: actions/checkout@v5
+        with:
+          ref: feat/native-feed-tanstack-query
+          fetch-depth: 0
+          token: ${{ github.token }}
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Merge latest main while preserving both feature sets
+        run: |
+          set -euo pipefail
+          WORKFLOW_FILE=".github/workflows/sync-native-feed-branch.yml"
+          if [ ! -f "$WORKFLOW_FILE" ]; then
+            echo "Temporary sync workflow already removed; nothing to do."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+
+          set +e
+          git merge --no-ff --no-edit --no-commit origin/main
+          merge_status=$?
+          set -e
+
+          if [ "$merge_status" -ne 0 ]; then
+            conflicts="$(git diff --name-only --diff-filter=U)"
+            echo "Resolving known overlapping files:"
+            printf '%s\n' "$conflicts"
+
+            while IFS= read -r path; do
+              [ -n "$path" ] || continue
+              case "$path" in
+                app/package.json)
+                  git show HEAD:app/package.json > "$RUNNER_TEMP/feed-package.json"
+                  git show origin/main:app/package.json > "$RUNNER_TEMP/main-package.json"
+                  node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const feature = JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP + '/feed-package.json', 'utf8'));
+          const main = JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP + '/main-package.json', 'utf8'));
+          const merged = {
+            ...feature,
+            ...main,
+            scripts: { ...feature.scripts, ...main.scripts },
+            dependencies: { ...feature.dependencies, ...main.dependencies },
+            devDependencies: { ...feature.devDependencies, ...main.devDependencies },
+          };
+          fs.writeFileSync('app/package.json', JSON.stringify(merged, null, 2) + '\n');
+          NODE
+                  git add app/package.json
+                  ;;
+                app/tests/publish-flow.test.mjs)
+                  git show origin/main:app/tests/publish-flow.test.mjs > app/tests/publish-flow.test.mjs
+                  node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const path = 'app/tests/publish-flow.test.mjs';
+          let content = fs.readFileSync(path, 'utf8');
+          const deleteAssertion = "  expect(home).toContain('current.filter((post) => post.contentId !== contentId)');";
+          const deleteReplacement = [
+            '  // Feed pages are stored as TanStack InfiniteData; remove the post from every cached page.',
+            "  expect(home).toContain('queryClient.setQueryData<InfiniteData<NativeFeedPage, string | null>>(queryKey, (current) => {');",
+            "  expect(home).toContain('pages: current.pages.map((page) => ({');",
+            "  expect(home).toContain('items: page.items.filter((post) => post.id !== contentId)');",
+            "  expect(home).toContain('setHydratedById((current) => {');",
+          ].join('\n');
+          const refreshAssertion = "  expect(home).toContain('[loadPage, refreshKey, refreshSignal]');";
+          const refreshReplacement = [
+            '  // Publishing invalidates the authoritative W01 feed cache.',
+            "  expect(home).toContain('previousRefreshSignal.current !== refreshSignal && refreshSignal');",
+            "  expect(home).toContain('queryClient.invalidateQueries({ queryKey })');",
+            "  expect(home).toContain('[queryClient, queryKey, refreshSignal]');",
+          ].join('\n');
+          if (content.includes(deleteAssertion)) content = content.replace(deleteAssertion, deleteReplacement);
+          if (content.includes(refreshAssertion)) content = content.replace(refreshAssertion, refreshReplacement);
+          if (!content.includes('queryClient.setQueryData<InfiniteData<NativeFeedPage, string | null>>') ||
+              !content.includes("queryClient.invalidateQueries({ queryKey })")) {
+            throw new Error('Unable to merge TanStack assertions into the current publish-flow test.');
+          }
+          fs.writeFileSync(path, content);
+          NODE
+                  git add app/tests/publish-flow.test.mjs
+                  ;;
+                .github/workflows/app-mobile-ci.yml)
+                  git show origin/main:.github/workflows/app-mobile-ci.yml > .github/workflows/app-mobile-ci.yml
+                  node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const path = '.github/workflows/app-mobile-ci.yml';
+          let content = fs.readFileSync(path, 'utf8');
+          const anchor = '      - name: Test native feed comment navigation\n        run: bun run test:comment-navigation\n';
+          const queryStep = '      - name: Test native TanStack Query feed cache and pagination\n        run: bun run test:feed-query\n';
+          if (!content.includes(queryStep)) {
+            if (!content.includes(anchor)) throw new Error('Feed-comment CI anchor not found.');
+            content = content.replace(anchor, anchor + queryStep);
+          }
+          fs.writeFileSync(path, content);
+          NODE
+                  git add .github/workflows/app-mobile-ci.yml
+                  ;;
+                app/bun.lockb)
+                  git checkout origin/main -- app/bun.lockb
+                  git add app/bun.lockb
+                  ;;
+                *)
+                  echo "Unexpected merge conflict: $path" >&2
+                  exit 1
+                  ;;
+              esac
+            done <<< "$conflicts"
+          fi
+
+          remaining="$(git diff --name-only --diff-filter=U)"
+          if [ -n "$remaining" ]; then
+            echo "Unresolved conflicts remain: $remaining" >&2
+            exit 1
+          fi
+
+          cd app
+          bun install
+          bun run check:compat
+          bun run typecheck
+          bun run test:feed-query
+          bun run test:publish-flow
+          bun test tests/image-upload-preparation.test.mjs tests/camera-capture.test.mjs
+          cd ..
+
+          rm -f "$WORKFLOW_FILE"
+          git add -A
+          git diff --cached --check
+          git status --short
+          git commit -m "merge main and sync TanStack feed query dependencies"
+          git push origin HEAD:feat/native-feed-tanstack-query
