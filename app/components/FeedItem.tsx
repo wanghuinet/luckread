@@ -7,7 +7,12 @@ import {
     ActivityIndicator,
     Platform,
     Alert,
+    FlatList,
+    Modal,
+    StatusBar,
+    useWindowDimensions,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useColorScheme } from "nativewind";
 import { StyledExpoImage as Image } from "~/components/Image"
@@ -58,6 +63,7 @@ export type FeedMediaAttachment = {
     src: string;
     kind: 'image' | 'video';
     headers?: Record<string, string>;
+    requiresAuthentication?: boolean;
 };
 
 export interface FeedContent {
@@ -179,33 +185,146 @@ const FeedMediaGallery = ({
     items: FeedMediaAttachment[];
     detailView?: boolean;
 }) => {
+    const [viewerStartIndex, setViewerStartIndex] = useState<number | null>(null);
+    const [viewerIndex, setViewerIndex] = useState(0);
+    const { width, height } = useWindowDimensions();
+    const insets = useSafeAreaInsets();
+
     if (items.length === 0) return null;
 
-    return (
+    const imageItems = items.filter((media) => media.kind === 'image');
+    const requiresAuthenticatedViewer = imageItems.some(
+        (media) => media.requiresAuthentication || Boolean(media.headers),
+    );
+
+    let imageIndex = 0;
+    const mediaContent = (
         <View className={detailView ? "mt-4 flex-row flex-wrap gap-2" : "mt-2 flex-row flex-wrap gap-2"}>
-            {items.map((media, index) => (
-                <View
-                    key={media.src + '-' + index}
-                    className={items.length === 1
-                        ? "w-full overflow-hidden rounded-lg bg-neutral-100 dark:bg-neutral-900"
-                        : "w-[48%] overflow-hidden rounded-lg bg-neutral-100 dark:bg-neutral-900"}
-                >
-                    {media.kind === 'video' ? (
-                        <FeedVideoAttachment uri={media.src} headers={media.headers} />
-                    ) : (
-                        <Galeria urls={[media.src]}>
-                            <Galeria.Image>
+            {items.map((media, index) => {
+                const currentImageIndex = media.kind === 'image' ? imageIndex++ : -1;
+                return (
+                    <View
+                        key={media.src + '-' + index}
+                        className={items.length === 1
+                            ? "w-full overflow-hidden rounded-lg bg-neutral-100 dark:bg-neutral-900"
+                            : "w-[48%] overflow-hidden rounded-lg bg-neutral-100 dark:bg-neutral-900"}
+                    >
+                        {media.kind === 'video' ? (
+                            <FeedVideoAttachment uri={media.src} headers={media.headers} />
+                        ) : requiresAuthenticatedViewer ? (
+                            <TouchableOpacity
+                                activeOpacity={0.9}
+                                onPress={() => {
+                                    setViewerStartIndex(currentImageIndex);
+                                    setViewerIndex(currentImageIndex);
+                                }}
+                            >
                                 <Image
                                     source={{ uri: media.src, headers: media.headers }}
                                     className="w-full aspect-square"
                                     contentFit="cover"
                                 />
+                            </TouchableOpacity>
+                        ) : (
+                            <Galeria.Image index={currentImageIndex}>
+                                <Image
+                                    source={{ uri: media.src }}
+                                    className="w-full aspect-square"
+                                    contentFit="cover"
+                                />
                             </Galeria.Image>
-                        </Galeria>
-                    )}
-                </View>
-            ))}
+                        )}
+                    </View>
+                );
+            })}
         </View>
+    );
+
+    return (
+        <>
+            {!requiresAuthenticatedViewer && imageItems.length > 0 ? (
+                <Galeria urls={imageItems.map((media) => media.src)}>
+                    {mediaContent}
+                </Galeria>
+            ) : mediaContent}
+
+            {requiresAuthenticatedViewer && viewerStartIndex !== null ? (
+                <Modal
+                    visible
+                    animationType="fade"
+                    onRequestClose={() => setViewerStartIndex(null)}
+                    statusBarTranslucent
+                >
+                    <StatusBar hidden />
+                    <View style={{ flex: 1, backgroundColor: '#000000' }}>
+                        <FlatList
+                            data={imageItems}
+                            horizontal
+                            pagingEnabled
+                            initialScrollIndex={viewerStartIndex}
+                            getItemLayout={(_, index) => ({
+                                length: width,
+                                offset: width * index,
+                                index,
+                            })}
+                            keyExtractor={(media, index) => media.src + '-' + index}
+                            showsHorizontalScrollIndicator={false}
+                            onMomentumScrollEnd={(event) => {
+                                setViewerIndex(Math.round(event.nativeEvent.contentOffset.x / width));
+                            }}
+                            renderItem={({ item }) => (
+                                <View
+                                    style={{
+                                        width,
+                                        height,
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                    }}
+                                >
+                                    <Image
+                                        source={{ uri: item.src, headers: item.headers }}
+                                        style={{ width, height }}
+                                        contentFit="contain"
+                                    />
+                                </View>
+                            )}
+                        />
+                        <TouchableOpacity
+                            accessibilityRole="button"
+                            accessibilityLabel="Close image viewer"
+                            onPress={() => setViewerStartIndex(null)}
+                            style={{
+                                position: 'absolute',
+                                top: insets.top + 12,
+                                right: 20,
+                                zIndex: 10,
+                                width: 42,
+                                height: 42,
+                                borderRadius: 21,
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                backgroundColor: '#262626',
+                            }}
+                        >
+                            <Feather name="x" size={24} color="#ffffff" />
+                        </TouchableOpacity>
+                        {imageItems.length > 1 ? (
+                            <Text
+                                style={{
+                                    position: 'absolute',
+                                    top: insets.top + 22,
+                                    alignSelf: 'center',
+                                    color: '#ffffff',
+                                    fontSize: 13,
+                                }}
+                            >
+                                {viewerIndex + 1} / {imageItems.length}
+                            </Text>
+                        ) : null}
+                    </View>
+                </Modal>
+            ) : null}
+        </>
     );
 };
 
@@ -225,7 +344,11 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
     const mediaItems = itemData.media_items?.length
         ? itemData.media_items
         : itemData.media_url
-            ? [{ src: itemData.media_url, kind: 'image' as const }]
+            ? [{
+                src: itemData.media_url,
+                kind: 'image' as const,
+                requiresAuthentication: itemData.accessMode === 'MEMBERS_ONLY',
+            }]
             : [];
 
 
@@ -610,7 +733,11 @@ export const FeedItemDetailView: React.FC<FeedItemProps> = ({ itemData, onPress,
     const mediaItems = itemData.media_items?.length
         ? itemData.media_items
         : itemData.media_url
-            ? [{ src: itemData.media_url, kind: 'image' as const }]
+            ? [{
+                src: itemData.media_url,
+                kind: 'image' as const,
+                requiresAuthentication: itemData.accessMode === 'MEMBERS_ONLY',
+            }]
             : [];
 
 
