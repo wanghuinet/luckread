@@ -13,29 +13,21 @@ import { Feather } from '@expo/vector-icons';
 import { DrawerActions } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Tabs, MaterialTabBar, useCurrentTabScrollY } from 'react-native-collapsible-tab-view';
+import { useInfiniteQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import { useTabBarScrollState, useTabBarVisibilityOnAnimatedScroll } from '~/components/TabBarScroll';
 import { BlurView } from 'expo-blur';
 import { useColorScheme } from 'nativewind';
 
 import { FeedContent, FeedItem } from '~/components/FeedItem';
 import X from '~/assets/svg/aside/x.svg';
-import { apiRequest, getApiErrorMessage } from '~/lib/api-client';
-import { mapContentToFeedContent, readContentBody, readContentSocial, readContentAuthor, type ApiContentPage, type ApiContentRecord } from '~/lib/content-adapter';
+import { mapContentToFeedContent, readContentBody, readContentSocial, readContentAuthor, type ApiContentRecord } from '~/lib/content-adapter';
+import { fetchNativeFeedPage, nativeFeedQueryKey, type NativeFeedKind, type NativeFeedPage } from '~/lib/feed-query';
 import { useAuthStore } from '~/store/auth-store';
 import { readSessionToken } from '~/lib/secure-session';
 
-type FeedKind = 'for-you' | 'following';
-
-type ContentPageResponse = {
-  data?: ApiContentPage;
-  error?: {
-    code?: string;
-    message?: string;
-  };
-};
+type FeedKind = NativeFeedKind;
 
 const APP_PRIMARY_COLOR = '#1769aa';
-const API_PAGE_SIZE = '20';
 
 const Header = () => {
   const insets = useSafeAreaInsets();
@@ -83,188 +75,206 @@ function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSig
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
   const authStatus = useAuthStore((state) => state.status);
+  const viewerId = useAuthStore((state) => state.user?.id ?? null);
   const invalidateSession = useAuthStore((state) => state.invalidateSession);
-  const [items, setItems] = useState<FeedContent[]>([]);
-  const [cursor, setCursor] = useState<string | null>(null);
-  const [hasMore, setHasMore] = useState(false);
-  const requestSequence = useRef(0);
-  const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
-  const [authRequired, setAuthRequired] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0);
+  const queryClient = useQueryClient();
+  const queryKey = useMemo(() => nativeFeedQueryKey(kind, viewerId), [kind, viewerId]);
+  const refresh = feedQuery.refetch;
+  const hydrationScope = kind === 'following' ? 'following:' + (viewerId || 'anonymous') : 'for-you';
 
-  const endpoint = kind === 'following' ? '/feed/following' : '/contents';
+  const feedQuery = useInfiniteQuery({
+    queryKey,
+    enabled: kind === 'for-you' || authStatus === 'authenticated',
+    initialPageParam: null as string | null,
+    queryFn: ({ pageParam, signal }) => fetchNativeFeedPage({
+      kind,
+      cursor: pageParam,
+      signal,
+      invalidateSession,
+    }),
+    getNextPageParam: (lastPage) => lastPage.hasMore ? lastPage.nextCursor ?? undefined : undefined,
+    staleTime: 30_000,
+  });
 
-  const loadPage = useCallback(async (nextCursor: string | null, append: boolean) => {
-    const requestId = ++requestSequence.current;
-
-    if (kind === 'following' && authStatus !== 'authenticated') {
-      setAuthRequired(true);
-      setItems([]);
-      setCursor(null);
-      setHasMore(false);
-      setLoading(false);
-      setLoadingMore(false);
-      return;
-    }
-
-    if (append) {
-      setLoadingMore(true);
-    } else {
-      setLoading(true);
-      setLoadingMore(false);
-      setCursor(null);
-      setHasMore(false);
-    }
-    setErrorMessage('');
-
-    try {
-      const params = new URLSearchParams({ limit: API_PAGE_SIZE });
-      if (nextCursor) params.set('cursor', nextCursor);
-      if (kind === 'for-you') params.set('type', 'post');
-
-      const { response, data } = await apiRequest<ContentPageResponse>(
-        endpoint + '?' + params.toString(),
-        // For You is a public W01 list read. Do not let an expired local
-        // session token force the public route through W02 authentication.
-        // Following is viewer-scoped and must remain authenticated.
-        { method: 'GET', auth: kind === 'following' },
-      );
-      if (requestId !== requestSequence.current) return;
-
-      if (response.status === 401 && kind === 'following') {
-        if (authStatus === 'authenticated') await invalidateSession();
-        if (requestId !== requestSequence.current) return;
-        setAuthRequired(true);
-        setItems([]);
-        setCursor(null);
-        setHasMore(false);
-        return;
-      }
-
-      const payload = data as ContentPageResponse | null;
-      const page = payload?.data;
-      if (!response.ok || !page || !Array.isArray(page.items)) {
-        throw new Error(getApiErrorMessage(data, 'Could not load this timeline. Please retry.'));
-      }
-
-      const validRecords = page.items.filter(
-        (item): item is ApiContentRecord => Boolean(item && typeof item.id === 'string' && item.id.trim()),
-      );
-
-      // Render the server's first-page projection immediately. Body, author and
-      // social reads are optional enrichment and must not block the timeline.
-      const visibleItems = validRecords.flatMap((item) => {
-        try {
-          return [mapContentToFeedContent(item, undefined, item.social, item.creator ?? item.author)];
-        } catch {
-          // One malformed record must not prevent the other posts from rendering.
-          return [];
+  const records = useMemo(() => {
+    const known = new Set<string>();
+    const result: ApiContentRecord[] = [];
+    for (const page of feedQuery.data?.pages ?? []) {
+      for (const item of page.items) {
+        if (!known.has(item.id)) {
+          known.add(item.id);
+          result.push(item);
         }
-      });
-
-      if (append) {
-        setItems((current) => {
-          const known = new Set(current.map((item) => item.contentId));
-          return [...current, ...visibleItems.filter((item) => !known.has(item.contentId))];
-        });
-      } else {
-        setItems(visibleItems);
-      }
-
-      if (validRecords.length > 0 && visibleItems.length === 0) {
-        throw new Error('Posts were returned, but could not be displayed. Please retry.');
-      }
-
-      const sessionToken = await readSessionToken().catch(() => null);
-      if (requestId !== requestSequence.current) return;
-
-      // Isolate each optional read. A failed body/social/author request for one
-      // post falls back to the list projection instead of rejecting the page.
-      const hydrationResults = await Promise.allSettled(
-        validRecords.map(async (item) => {
-          const [bodyResult, socialResult, authorResult] = await Promise.allSettled([
-            readContentBody(item, undefined, sessionToken),
-            readContentSocial(item.id),
-            readContentAuthor(item),
-          ]);
-
-          const body = bodyResult.status === 'fulfilled' ? bodyResult.value : undefined;
-          const social = socialResult.status === 'fulfilled' ? socialResult.value : item.social ?? null;
-          const author = authorResult.status === 'fulfilled' ? authorResult.value : null;
-
-          try {
-            return mapContentToFeedContent(item, body, social, author, sessionToken);
-          } catch {
-            return null;
-          }
-        }),
-      );
-      if (requestId !== requestSequence.current) return;
-
-      const hydratedItems = hydrationResults.flatMap((result) =>
-        result.status === 'fulfilled' && result.value ? [result.value] : [],
-      );
-      if (hydratedItems.length > 0) {
-        const hydratedById = new Map(
-          hydratedItems
-            .filter((item) => typeof item.contentId === 'string')
-            .map((item): [string, FeedContent] => [item.contentId as string, item]),
-        );
-        setItems((current) =>
-          current.map((item) => item.contentId ? hydratedById.get(item.contentId) ?? item : item),
-        );
-      }
-
-      setCursor(page.nextCursor || null);
-      setHasMore(page.hasMore === true);
-      setAuthRequired(false);
-    } catch (error) {
-      if (requestId !== requestSequence.current) return;
-      setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : 'Could not load this timeline. Please retry.',
-      );
-    } finally {
-      if (requestId === requestSequence.current) {
-        setLoading(false);
-        setLoadingMore(false);
       }
     }
-  }, [authStatus, endpoint, invalidateSession, kind]);
+    return result;
+  }, [feedQuery.data?.pages]);
+
+  const visibleItems = useMemo(() => records.flatMap((item) => {
+    try {
+      return [mapContentToFeedContent(item, undefined, item.social, item.creator ?? item.author)];
+    } catch {
+      // Keep other valid posts visible if one list projection is malformed.
+      return [];
+    }
+  }), [records]);
+
+  const [hydratedById, setHydratedById] = useState<Record<string, FeedContent>>({});
+  const hydratedIdsRef = useRef<Set<string>>(new Set());
+  const hydrationScopeRef = useRef(hydrationScope);
+  const hydrationGenerationRef = useRef(0);
+  const mountedRef = useRef(false);
+  const previousRefreshSignal = useRef(refreshSignal);
 
   useEffect(() => {
-    let active = true;
-    void Promise.resolve().then(() => {
-      if (active) void loadPage(null, false);
-    });
+    mountedRef.current = true;
     return () => {
-      active = false;
-      requestSequence.current += 1;
+      mountedRef.current = false;
+      hydrationGenerationRef.current += 1;
     };
-  }, [loadPage, refreshKey, refreshSignal]);
+  }, []);
+
+  useEffect(() => {
+    if (hydrationScopeRef.current === hydrationScope) return;
+    hydrationScopeRef.current = hydrationScope;
+    hydrationGenerationRef.current += 1;
+    hydratedIdsRef.current.clear();
+    setHydratedById({});
+  }, [hydrationScope]);
+
+  useEffect(() => {
+    const pendingRecords = records.filter((item) => !hydratedIdsRef.current.has(item.id));
+    if (pendingRecords.length === 0) return;
+
+    for (const item of pendingRecords) hydratedIdsRef.current.add(item.id);
+    const generation = hydrationGenerationRef.current;
+
+    void (async () => {
+      const sessionToken = await readSessionToken().catch(() => null);
+      const results = await Promise.allSettled(pendingRecords.map(async (item) => {
+        const [bodyResult, socialResult, authorResult] = await Promise.allSettled([
+          readContentBody(item, undefined, sessionToken),
+          readContentSocial(item.id),
+          readContentAuthor(item),
+        ]);
+
+        const body = bodyResult.status === 'fulfilled' ? bodyResult.value : undefined;
+        const social = socialResult.status === 'fulfilled' ? socialResult.value : item.social ?? null;
+        const author = authorResult.status === 'fulfilled' ? authorResult.value : null;
+
+        try {
+          return mapContentToFeedContent(item, body, social, author, sessionToken);
+        } catch {
+          return null;
+        }
+      }));
+
+      if (
+        !mountedRef.current ||
+        generation !== hydrationGenerationRef.current ||
+        hydrationScopeRef.current !== hydrationScope
+      ) return;
+
+      const hydrated: Record<string, FeedContent> = {};
+      for (const result of results) {
+        if (result.status === 'fulfilled' && result.value?.contentId) {
+          hydrated[result.value.contentId] = result.value;
+        }
+      }
+      if (Object.keys(hydrated).length > 0) {
+        setHydratedById((current) => ({ ...current, ...hydrated }));
+      }
+    })();
+  }, [records, hydrationScope]);
+
+  useEffect(() => {
+    if (previousRefreshSignal.current !== refreshSignal && refreshSignal) {
+      void queryClient.invalidateQueries({ queryKey });
+    }
+    previousRefreshSignal.current = refreshSignal;
+  }, [queryClient, queryKey, refreshSignal]);
+
+  const items = useMemo(
+    () => visibleItems.map((item) => item.contentId ? hydratedById[item.contentId] ?? item : item),
+    [hydratedById, visibleItems],
+  );
+  const authRequired = kind === 'following' && authStatus !== 'authenticated';
+  const projectionError = records.length > 0 && visibleItems.length === 0
+    ? 'Posts were returned, but could not be displayed. Please retry.'
+    : '';
+  const errorMessage = feedQuery.error instanceof Error
+    ? feedQuery.error.message
+    : projectionError;
 
   const openLogin = () => router.push('/login' as never);
 
+  const loadMore = useCallback(() => {
+    if (feedQuery.hasNextPage && !feedQuery.isFetchingNextPage && !feedQuery.isFetching) {
+      void feedQuery.fetchNextPage();
+    }
+  }, [feedQuery.fetchNextPage, feedQuery.hasNextPage, feedQuery.isFetching, feedQuery.isFetchingNextPage]);
+
   const renderItem = useCallback(({ item }: { item: FeedContent }) => (
     <FeedItem itemData={item} onDeleted={(contentId) => {
-      setItems((current) => current.filter((post) => post.contentId !== contentId));
+      queryClient.setQueryData<InfiniteData<NativeFeedPage, string | null>>(queryKey, (current) => {
+        if (!current) return current;
+        return {
+          ...current,
+          pages: current.pages.map((page) => ({
+            ...page,
+            items: page.items.filter((post) => post.id !== contentId),
+          })),
+        };
+      });
+      setHydratedById((current) => {
+        if (!Object.prototype.hasOwnProperty.call(current, contentId)) return current;
+        const next = { ...current };
+        delete next[contentId];
+        return next;
+      });
     }} onPress={() => {
       if (item.contentId) router.push(('/post/' + encodeURIComponent(item.contentId)) as never);
     }} />
-  ), [router]);
+  ), [queryClient, queryKey, router]);
 
   const footer = useMemo(() => {
-    if (loadingMore) return <ActivityIndicator style={styles.footer} color={APP_PRIMARY_COLOR} />;
-    if (!hasMore || loading || authRequired || errorMessage) return <View style={{ height: 20 }} />;
+    if (feedQuery.isFetchingNextPage) {
+      return <ActivityIndicator style={styles.footer} color={APP_PRIMARY_COLOR} />;
+    }
+    if (feedQuery.isFetchNextPageError) {
+      return (
+        <Pressable style={styles.loadMore} onPress={loadMore}>
+          <Text style={styles.loadMoreText}>Retry loading posts</Text>
+        </Pressable>
+      );
+    }
+    if (feedQuery.isRefetchError && items.length > 0) {
+      return (
+        <Pressable style={styles.loadMore} onPress={() => void refresh()}>
+          <Text style={styles.loadMoreText}>Refresh failed. Tap to retry.</Text>
+        </Pressable>
+      );
+    }
+    if (!feedQuery.hasNextPage || feedQuery.isPending || authRequired || errorMessage) {
+      return <View style={{ height: 20 }} />;
+    }
     return (
-      <Pressable style={styles.loadMore} onPress={() => void loadPage(cursor, true)}>
+      <Pressable style={styles.loadMore} onPress={loadMore}>
         <Text style={styles.loadMoreText}>Load more</Text>
       </Pressable>
     );
-  }, [authRequired, cursor, errorMessage, hasMore, loadPage, loading, loadingMore]);
+  }, [
+    authRequired,
+    errorMessage,
+    feedQuery.hasNextPage,
+    feedQuery.isFetchingNextPage,
+    feedQuery.isFetchNextPageError,
+    feedQuery.isPending,
+    feedQuery.isRefetchError,
+    items.length,
+    loadMore,
+    refresh,
+  ]);
 
   if (authRequired) {
     return (
@@ -278,7 +288,7 @@ function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSig
     );
   }
 
-  if (loading && items.length === 0) {
+  if (feedQuery.isPending && items.length === 0) {
     return (
       <View style={[styles.stateContainer, { backgroundColor: isDark ? '#000000' : '#ffffff' }]}>
         <ActivityIndicator color={APP_PRIMARY_COLOR} size="large" />
@@ -292,14 +302,14 @@ function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSig
       <View style={[styles.stateContainer, { backgroundColor: isDark ? '#000000' : '#ffffff' }]}>
         <Text style={[styles.stateTitle, { color: isDark ? '#f9fafb' : '#101828' }]}>Unable to load posts</Text>
         <Text style={[styles.stateDescription, { color: isDark ? '#9ca3af' : '#667085' }]}>{errorMessage}</Text>
-        <Pressable accessibilityRole="button" onPress={() => setRefreshKey((value) => value + 1)} style={styles.primaryButton}>
+        <Pressable accessibilityRole="button" onPress={() => void refresh()} style={styles.primaryButton}>
           <Text style={styles.primaryButtonText}>Retry</Text>
         </Pressable>
       </View>
     );
   }
 
-  if (!loading && !errorMessage && items.length === 0) {
+  if (!feedQuery.isPending && !errorMessage && items.length === 0) {
     return (
       <View style={[styles.stateContainer, { backgroundColor: isDark ? '#000000' : '#ffffff' }]}>
         <Text style={[styles.stateTitle, { color: isDark ? '#f9fafb' : '#101828' }]}>{kind === 'following' ? 'No posts from followed creators yet' : 'No public posts yet'}</Text>
@@ -318,16 +328,13 @@ function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSig
       keyExtractor={(item, index) => item.contentId || 'content-' + index}
       contentContainerStyle={{ paddingBottom: insets.bottom + 88 }}
       ListFooterComponent={footer}
-      onRefresh={() => setRefreshKey((value) => value + 1)}
-      refreshing={loading && items.length > 0}
-      onEndReached={() => {
-        if (hasMore && cursor && !loading && !loadingMore && !errorMessage) void loadPage(cursor, true);
-      }}
+      onRefresh={() => { void refresh(); }}
+      refreshing={feedQuery.isRefetching}
+      onEndReached={loadMore}
       onEndReachedThreshold={0.5}
     />
   );
 }
-
 export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
