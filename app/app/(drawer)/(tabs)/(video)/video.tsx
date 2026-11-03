@@ -574,7 +574,6 @@ export default function VideoFeed() {
           />
         )}
         keyExtractor={(item, index) => item.contentId || 'video-' + index}
-        estimatedItemSize={SCREEN_HEIGHT}
         pagingEnabled
         snapToInterval={SCREEN_HEIGHT}
         decelerationRate="fast"
