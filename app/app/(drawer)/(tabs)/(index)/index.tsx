@@ -61,11 +61,11 @@ const Header = () => {
           {user?.image ? (
             <Image source={{ uri: user.image }} style={styles.profileAvatar} />
           ) : (
-            <Feather name="user" size={22} color={isDark ? '#${1}' : '#${1}'} />
+            <Feather name="user" size={22} color={isDark ? '#9ca3af' : '#667085'} />
           )}
         </Pressable>
         <View pointerEvents="none" style={styles.headerLogoWrap}>
-          <X width={28} height={28} fill={isDark ? '#${1}' : '#${1}'} />
+          <X width={28} height={28} fill={isDark ? '#ffffff' : '#000000'} />
         </View>
         <View style={styles.headerRightSpacer} />
       </View>
@@ -261,9 +261,9 @@ function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSig
 
   if (authRequired) {
     return (
-      <View style={[styles.stateContainer, { backgroundColor: isDark ? '#${1}' : '#${1}' }]}>
-        <Text style={[styles.stateTitle, { color: isDark ? '#${1}' : '#${1}' }]}>Sign in to see your Following timeline</Text>
-        <Text style={[styles.stateDescription, { color: isDark ? '#${1}' : '#${1}' }]}>Your followed creators’ posts will appear here after you sign in.</Text>
+      <View style={[styles.stateContainer, { backgroundColor: isDark ? '#000000' : '#ffffff' }]}>
+        <Text style={[styles.stateTitle, { color: isDark ? '#f9fafb' : '#101828' }]}>Sign in to see your Following timeline</Text>
+        <Text style={[styles.stateDescription, { color: isDark ? '#9ca3af' : '#667085' }]}>Your followed creators’ posts will appear here after you sign in.</Text>
         <Pressable accessibilityRole="button" onPress={openLogin} style={styles.primaryButton}>
           <Text style={styles.primaryButtonText}>Sign in</Text>
         </Pressable>
@@ -273,18 +273,18 @@ function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSig
 
   if (loading && items.length === 0) {
     return (
-      <View style={[styles.stateContainer, { backgroundColor: isDark ? '#${1}' : '#${1}' }]}>
+      <View style={[styles.stateContainer, { backgroundColor: isDark ? '#000000' : '#ffffff' }]}>
         <ActivityIndicator color={APP_PRIMARY_COLOR} size="large" />
-        <Text style={[styles.stateDescription, { color: isDark ? '#${1}' : '#${1}' }]}>Loading LuckRead posts…</Text>
+        <Text style={[styles.stateDescription, { color: isDark ? '#9ca3af' : '#667085' }]}>Loading LuckRead posts…</Text>
       </View>
     );
   }
 
   if (errorMessage && items.length === 0) {
     return (
-      <View style={[styles.stateContainer, { backgroundColor: isDark ? '#${1}' : '#${1}' }]}>
-        <Text style={[styles.stateTitle, { color: isDark ? '#${1}' : '#${1}' }]}>Unable to load posts</Text>
-        <Text style={[styles.stateDescription, { color: isDark ? '#${1}' : '#${1}' }]}>{errorMessage}</Text>
+      <View style={[styles.stateContainer, { backgroundColor: isDark ? '#000000' : '#ffffff' }]}>
+        <Text style={[styles.stateTitle, { color: isDark ? '#f9fafb' : '#101828' }]}>Unable to load posts</Text>
+        <Text style={[styles.stateDescription, { color: isDark ? '#9ca3af' : '#667085' }]}>{errorMessage}</Text>
         <Pressable accessibilityRole="button" onPress={() => setRefreshKey((value) => value + 1)} style={styles.primaryButton}>
           <Text style={styles.primaryButtonText}>Retry</Text>
         </Pressable>
@@ -294,9 +294,9 @@ function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSig
 
   if (!loading && !errorMessage && items.length === 0) {
     return (
-      <View style={[styles.stateContainer, { backgroundColor: isDark ? '#${1}' : '#${1}' }]}>
-        <Text style={[styles.stateTitle, { color: isDark ? '#${1}' : '#${1}' }]}>{kind === 'following' ? 'No posts from followed creators yet' : 'No public posts yet'}</Text>
-        <Text style={[styles.stateDescription, { color: isDark ? '#${1}' : '#${1}' }]}>
+      <View style={[styles.stateContainer, { backgroundColor: isDark ? '#000000' : '#ffffff' }]}>
+        <Text style={[styles.stateTitle, { color: isDark ? '#f9fafb' : '#101828' }]}>{kind === 'following' ? 'No posts from followed creators yet' : 'No public posts yet'}</Text>
+        <Text style={[styles.stateDescription, { color: isDark ? '#9ca3af' : '#667085' }]}>
           {kind === 'following' ? 'Follow creators on LuckRead to build your timeline.' : 'Public LuckRead posts will appear here.'}
         </Text>
       </View>
@@ -371,7 +371,7 @@ export default function HomeScreen() {
   );
 
   return (
-    <BlurView style={[styles.container, { backgroundColor: isDark ? '#${1}' : '#${1}' }]} className="flex-1" intensity={80} tint={isDark ? "dark" : "light"}>
+    <BlurView style={[styles.container, { backgroundColor: isDark ? '#000000' : '#ffffff' }]} className="flex-1" intensity={80} tint={isDark ? "dark" : "light"}>
       <Tabs.Container
         renderHeader={Header}
         renderTabBar={renderTabBar}
@@ -399,7 +399,7 @@ export default function HomeScreen() {
         onPress={() => router.push('/publish' as never)}
         style={[styles.floatingCompose, { bottom: insets.bottom + 72 }]}
       >
-        <Feather name="plus" size={28} color='#${1}' />
+        <Feather name="plus" size={28} color='#ffffff' />
       </Pressable>
     </BlurView>
   );
