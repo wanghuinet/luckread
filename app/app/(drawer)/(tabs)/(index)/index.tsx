@@ -79,7 +79,6 @@ function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSig
   const invalidateSession = useAuthStore((state) => state.invalidateSession);
   const queryClient = useQueryClient();
   const queryKey = useMemo(() => nativeFeedQueryKey(kind, viewerId), [kind, viewerId]);
-  const refresh = feedQuery.refetch;
   const hydrationScope = kind === 'following' ? 'following:' + (viewerId || 'anonymous') : 'for-you';
 
   const feedQuery = useInfiniteQuery({
@@ -95,6 +94,7 @@ function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSig
     getNextPageParam: (lastPage) => lastPage.hasMore ? lastPage.nextCursor ?? undefined : undefined,
     staleTime: 30_000,
   });
+  const refresh = feedQuery.refetch;
 
   const records = useMemo(() => {
     const known = new Set<string>();
