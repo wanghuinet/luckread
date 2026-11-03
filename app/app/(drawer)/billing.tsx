@@ -508,7 +508,7 @@ export default function BillingScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-neutral-50 dark:bg-black">
-      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={isDark ? "#000000" : "#f9fafb"} />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={isDark ? '#000000' : '#f9fafb'} />
       <View className="flex-row items-center border-b border-neutral-200 px-4 py-3 dark:border-neutral-800">
         <Pressable
           accessibilityRole="button"
