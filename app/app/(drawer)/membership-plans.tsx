@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useColorScheme } from 'nativewind';
 
 import { getApiErrorMessage } from '~/lib/api-client';
 import { unwrapApiData } from '~/lib/content-adapter';
@@ -139,6 +140,8 @@ function PlanCard({ item, onPurchase, busy }: {
 }
 
 export default function MembershipPlansScreen() {
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === 'dark';
   const router = useRouter();
   const params = useLocalSearchParams<{ creatorId?: string | string[]; returnTo?: string | string[] }>();
   const rawCreatorId = Array.isArray(params.creatorId) ? params.creatorId[0] : params.creatorId;
@@ -346,7 +349,7 @@ export default function MembershipPlansScreen() {
   if (authStatus === 'loading') {
     return (
       <View className="flex-1 items-center justify-center bg-white dark:bg-black">
-        <StatusBar barStyle="dark-content" />
+        <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={isDark ? "#000000" : "#ffffff"} />
         <ActivityIndicator size="large" color={PRIMARY} />
       </View>
     );
@@ -355,7 +358,7 @@ export default function MembershipPlansScreen() {
   if (authRequired || authStatus !== 'authenticated') {
     return (
       <View className="flex-1 items-center justify-center bg-white px-7 dark:bg-black">
-        <StatusBar barStyle="dark-content" />
+        <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={isDark ? "#000000" : "#ffffff"} />
         <Feather name="award" size={36} color={PRIMARY} />
         <Text className="mt-4 text-lg font-extrabold text-neutral-900 dark:text-white">登录后查看会员方案</Text>
         <Text className="mt-2 text-center text-sm leading-6 text-neutral-500 dark:text-neutral-400">
@@ -370,7 +373,7 @@ export default function MembershipPlansScreen() {
 
   return (
     <View className="flex-1 bg-neutral-50 dark:bg-black">
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={isDark ? "#000000" : "#ffffff"} />
       <View className="flex-row items-center justify-between border-b border-neutral-200 bg-white px-4 py-3 dark:border-neutral-800 dark:bg-black">
         <View className="flex-row items-center">
           <Pressable accessibilityRole="button" accessibilityLabel="返回" onPress={() => router.back()} className="mr-3 rounded-full p-1">
