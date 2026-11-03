@@ -5,6 +5,8 @@ export type LocalMediaFile = {
   name: string;
   mimeType: string;
   size?: number | null;
+  width?: number;
+  height?: number;
 };
 
 export type UploadedMedia = {
