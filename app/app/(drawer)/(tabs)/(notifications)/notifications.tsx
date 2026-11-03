@@ -369,7 +369,7 @@ export default function Notifications() {
   if (authRequired) {
     return (
       <View className="flex-1 items-center justify-center bg-white px-6 dark:bg-black">
-        <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
+        <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
         <Feather name="bell" size={34} color={PRIMARY} />
         <Text className="mt-4 text-lg font-bold text-neutral-900 dark:text-white">登录后查看通知</Text>
         <Text className="mt-2 text-center text-sm text-neutral-500">通知只展示账号真实收到的互动，不使用示例内容。</Text>
@@ -382,7 +382,7 @@ export default function Notifications() {
 
   return (
     <View className="flex-1 bg-white dark:bg-black">
-      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       <FlatList
         data={filteredItems}
         keyExtractor={(item) => item.id}
