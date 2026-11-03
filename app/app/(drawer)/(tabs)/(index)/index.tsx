@@ -126,7 +126,10 @@ function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSig
 
       const { response, data } = await apiRequest<ContentPageResponse>(
         endpoint + '?' + params.toString(),
-        { method: 'GET' },
+        // For You is a public W01 list read. Do not let an expired local
+        // session token force the public route through W02 authentication.
+        // Following is viewer-scoped and must remain authenticated.
+        { method: 'GET', auth: kind === 'following' },
       );
       if (requestId !== requestSequence.current) return;
 

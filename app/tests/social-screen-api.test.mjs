@@ -237,3 +237,11 @@ test('block and mute mutations reject missing target identities before sending r
   expect(() => unmuteUser('')).toThrow('A target user ID is required.');
   expect(calls).toHaveLength(0);
 });
+
+const homeFeedSource = readFileSync(new URL('../app/(drawer)/(tabs)/(index)/index.tsx', import.meta.url), 'utf8');
+
+test('keeps the public For You feed independent of stale native session credentials', () => {
+  expect(homeFeedSource).toContain("const endpoint = kind === 'following' ? '/feed/following' : '/contents';");
+  expect(homeFeedSource).toContain("{ method: 'GET', auth: kind === 'following' },");
+  expect(homeFeedSource).toContain("if (response.status === 401 && kind === 'following')");
+});
