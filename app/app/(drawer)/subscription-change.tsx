@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useColorScheme } from 'nativewind';
 
 import { createIdempotencyKey, getApiErrorMessage } from '~/lib/api-client';
 import { unwrapApiData } from '~/lib/content-adapter';
@@ -182,6 +183,8 @@ function planInterval(value: 'MONTHLY' | 'YEARLY'): string {
 }
 
 export default function SubscriptionChangeScreen() {
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === 'dark';
   const router = useRouter();
   const params = useLocalSearchParams<{ subscriptionId?: string | string[] }>();
   const rawSubscriptionId = Array.isArray(params.subscriptionId) ? params.subscriptionId[0] : params.subscriptionId;
@@ -432,7 +435,7 @@ export default function SubscriptionChangeScreen() {
   if (authStatus === 'loading' || loading) {
     return (
       <View className="flex-1 items-center justify-center bg-white dark:bg-black">
-        <StatusBar barStyle="dark-content" />
+        <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={isDark ? "#000000" : "#ffffff"} />
         <ActivityIndicator size="large" color={PRIMARY} />
         <Text className="mt-3 text-sm text-neutral-500">正在读取订阅和可用套餐…</Text>
       </View>
@@ -442,7 +445,7 @@ export default function SubscriptionChangeScreen() {
   if (authRequired || authStatus !== 'authenticated') {
     return (
       <View className="flex-1 items-center justify-center bg-white px-7 dark:bg-black">
-        <StatusBar barStyle="dark-content" />
+        <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={isDark ? "#000000" : "#ffffff"} />
         <Feather name="lock" size={34} color={PRIMARY} />
         <Text className="mt-4 text-lg font-extrabold text-neutral-900 dark:text-white">登录后管理订阅</Text>
         <Pressable onPress={() => router.replace(('/login?returnTo=' + encodeURIComponent('/subscriptions')) as never)} className="mt-5 rounded-full bg-sky-500 px-6 py-3">
@@ -454,7 +457,7 @@ export default function SubscriptionChangeScreen() {
 
   return (
     <View className="flex-1 bg-neutral-50 dark:bg-black">
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={isDark ? "#000000" : "#ffffff"} />
       <View className="flex-row items-center justify-between border-b border-neutral-200 bg-white px-4 py-3 dark:border-neutral-800 dark:bg-black">
         <View className="flex-row items-center">
           <Pressable accessibilityRole="button" accessibilityLabel="返回" onPress={() => router.back()} className="mr-3 rounded-full p-1">
