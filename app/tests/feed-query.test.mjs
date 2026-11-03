@@ -1,18 +1,14 @@
 import { beforeEach, expect, mock, test } from 'bun:test';
 
 const calls = [];
-let nextResult: {
-  response: { ok: boolean; status: number };
-  data: unknown;
-  error: unknown;
-};
+let nextResult;
 
 mock.module('../lib/api-client.ts', () => ({
   apiRequest: async (path, options) => {
     calls.push({ path, options });
     return nextResult;
   },
-  getApiErrorMessage: (_data: unknown, fallback: string) => fallback,
+  getApiErrorMessage: (_data, fallback) => fallback,
 }));
 
 const { fetchNativeFeedPage, nativeFeedQueryKey } = await import('../lib/feed-query.ts');
