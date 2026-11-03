@@ -139,7 +139,7 @@ export default function SocialPoll({ contentId }: { contentId: string }) {
   if (!poll) {
     if (!errorMessage) return null;
     return (
-      <View style={styles.card}>
+      <View style={[styles.card, isDark && { backgroundColor: "#09090b", borderColor: "#3f3f46" }]}>
         <Text style={[styles.title, isDark && { color: "#f9fafb" }]}>投票暂时不可用</Text>
         <Text style={[styles.description, isDark && { color: "#9ca3af" }]}>{errorMessage}</Text>
         <Pressable accessibilityRole="button" onPress={() => setRefreshKey((value) => value + 1)} style={[styles.retryButton, isDark && { borderColor: "#52525b" }]}>
@@ -199,7 +199,7 @@ export default function SocialPoll({ contentId }: { contentId: string }) {
 
       <View style={styles.metaRow}>
         <Text style={[styles.metaText, isDark && { color: "#9ca3af" }]}>{poll.totalVotes.toLocaleString()} 票</Text>
-        {endsAt ? <Text style={styles.metaText}>{poll.closed ? '截止于' : '截止时间'}：{endsAt}</Text> : null}
+        {endsAt ? <Text style={[styles.metaText, isDark && { color: "#9ca3af" }]}>{poll.closed ? '截止于' : '截止时间'}：{endsAt}</Text> : null}
       </View>
 
       {!showResults && !poll.closed ? (
@@ -213,10 +213,10 @@ export default function SocialPoll({ contentId }: { contentId: string }) {
         </Pressable>
       ) : null}
 
-      {message ? <Text accessibilityLiveRegion="polite" style={styles.description}>{message}</Text> : null}
+      {message ? <Text accessibilityLiveRegion="polite" style={[styles.description, isDark && { color: "#9ca3af" }]}>{message}</Text> : null}
       {errorMessage && poll ? <Text accessibilityLiveRegion="assertive" style={styles.inlineError}>{errorMessage}</Text> : null}
       {errorMessage && poll ? (
-        <Pressable accessibilityRole="button" onPress={() => setRefreshKey((value) => value + 1)} style={styles.retryButton}>
+        <Pressable accessibilityRole="button" onPress={() => setRefreshKey((value) => value + 1)} style={[styles.retryButton, isDark && { borderColor: "#52525b" }]}>
           <Text style={styles.retryText}>刷新投票状态</Text>
         </Pressable>
       ) : null}
