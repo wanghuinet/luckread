@@ -400,6 +400,8 @@ function DrawerLayout() {
   const { width } = useWindowDimensions();
   const segments = useSegments();
   const isGrokRoute = segments.includes('(grok)');
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === 'dark';
 
   return (
     <Drawer
@@ -408,7 +410,7 @@ function DrawerLayout() {
         headerShown: false,
         swipeEnabled: isGrokRoute,
         swipeEdgeWidth: width,
-        overlayColor: '#adadad8c',
+        overlayColor: isDark ? '#000000b3' : '#adadad8c',
         drawerStyle: { width: '82%', backgroundColor: 'transparent' },
       }}
     >

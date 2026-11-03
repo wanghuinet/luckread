@@ -7,6 +7,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import * as SecureStore from 'expo-secure-store';
 import { useColorScheme } from 'nativewind';
+import { StatusBar } from 'expo-status-bar';
 
 import { useAuthStore } from '../store/auth-store';
 import { isThemePreference, THEME_PREFERENCE_KEY } from '../lib/theme-preference';
@@ -16,10 +17,12 @@ export const unstable_settings = {
 };
 
 export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === 'dark';
   return (
-    <View style={styles.errorContainer}>
-      <Text style={styles.errorTitle}>LuckRead 页面暂时无法显示</Text>
-      <Text style={styles.errorDescription}>
+    <View style={[styles.errorContainer, isDark && { backgroundColor: '#000000' }]}>
+      <Text style={[styles.errorTitle, isDark && { color: "#f9fafb" }]}>LuckRead 页面暂时无法显示</Text>
+      <Text style={[styles.errorDescription, isDark && { color: "#9ca3af" }]}>
         {error.message || '页面发生异常，请重新加载。'}
       </Text>
       <Pressable accessibilityRole="button" onPress={retry} style={styles.errorButton}>
@@ -34,7 +37,8 @@ export default function RootLayout() {
   const [isThemeLoaded, setIsThemeLoaded] = useState(false);
   const status = useAuthStore((state) => state.status);
   const bootstrap = useAuthStore((state) => state.bootstrap);
-  const { setColorScheme } = useColorScheme();
+  const { colorScheme, setColorScheme } = useColorScheme();
+  const isDark = colorScheme === 'dark';
   const segments = useSegments();
   const router = useRouter();
   const navigationState = useRootNavigationState();
@@ -70,6 +74,7 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={styles.flex}>
+      <StatusBar style={isDark ? 'light' : 'dark'} backgroundColor={isDark ? '#000000' : '#ffffff'} />
       <BottomSheetModalProvider>
         <View style={styles.flex}>
           <Stack>
@@ -81,8 +86,8 @@ export default function RootLayout() {
             <Stack.Screen name="publish" options={{ headerShown: false, presentation: 'modal', animation: 'slide_from_bottom' }} />
           </Stack>
           {(!isLoaded || !isThemeLoaded || status === 'loading') ? (
-            <View className="flex-1" style={styles.splash} pointerEvents="auto">
-              <Text style={styles.brand}>LuckRead</Text>
+            <View className="flex-1" style={[styles.splash, { backgroundColor: isDark ? '#080808' : '#ffffff' }]} pointerEvents="auto">
+              <Text style={[styles.brand, { color: isDark ? '#ffffff' : '#111827' }]}>LuckRead</Text>
             </View>
           ) : null}
         </View>
