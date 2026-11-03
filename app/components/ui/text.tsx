@@ -1,3 +1,4 @@
+// Adapted from founded-labs/react-native-reusables (MIT); LuckRead-specific text palette.
 import { Slot } from '@rn-primitives/slot';
 import { cva, type VariantProps } from 'class-variance-authority';
 import * as React from 'react';
