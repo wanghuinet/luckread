@@ -24,7 +24,9 @@
     "test:subscriptions-api": "bun test tests/subscriptions-api.test.mjs",
     "test:billing-api": "bun test tests/billing-api.test.mjs",
     "test:paid-content": "bun test tests/paid-content-entitlement.test.mjs",
-    "test:native-menu": "bun test tests/native-menu-dependencies.test.mjs"
+    "test:native-menu": "bun test tests/native-menu-dependencies.test.mjs",
+    "postinstall": "node scripts/apply-hyperswitch-rn88-compat.mjs",
+    "test:hyperswitch-compat": "bun test tests/hyperswitch-rn88-compat.test.mjs"
   },
   "dependencies": {
     "@codeherence/react-native-header": "^0.14.0",
