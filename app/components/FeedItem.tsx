@@ -341,6 +341,9 @@ interface FeedItemProps {
 
 export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailView, onDeleted, onCommentPress, replyDisabled, onReplySubmitted }) => {
     const { colorScheme } = useColorScheme();
+    const effectiveReplyDisabled = replyDisabled ?? (
+        itemData.accessMode === 'MEMBERS_ONLY' && itemData.accessGranted !== true
+    );
 
 
     const mediaItems = itemData.media_items?.length
@@ -713,7 +716,7 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
                     {detailView && itemData.contentType === 'post' && itemData.contentId ? (
                         <SocialPoll contentId={itemData.contentId} />
                     ) : null}
-                    <EngagementActions itemData={itemData} detailView={Boolean(detailView)} onCommentPress={onCommentPress} replyDisabled={replyDisabled} onReplySubmitted={onReplySubmitted} />
+                    <EngagementActions itemData={itemData} detailView={Boolean(detailView)} onCommentPress={onCommentPress} replyDisabled={effectiveReplyDisabled} onReplySubmitted={onReplySubmitted} />
                 </View>
             </View>
         </TouchableOpacity>
@@ -812,7 +815,7 @@ export const FeedItemDetailView: React.FC<FeedItemProps> = ({ itemData, onPress,
                         itemData={itemData}
                         detailView={true}
                         onCommentPress={onCommentPress}
-                        replyDisabled={replyDisabled}
+                        replyDisabled={effectiveReplyDisabled}
                         onReplySubmitted={onReplySubmitted}
                     />
                 </View>

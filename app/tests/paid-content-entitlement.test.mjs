@@ -114,4 +114,6 @@ test('connects the paywall detail CTA to creator plans and returns through W03 e
 
   expect(feedItem).toContain("itemData.accessMode === 'MEMBERS_ONLY'");
   expect(feedItem).toContain('会员专享');
+  expect(feedItem).toContain("itemData.accessMode === 'MEMBERS_ONLY' && itemData.accessGranted !== true");
+  expect(feedItem.match(/replyDisabled=\{effectiveReplyDisabled\}/g)).toHaveLength(2);
 });
