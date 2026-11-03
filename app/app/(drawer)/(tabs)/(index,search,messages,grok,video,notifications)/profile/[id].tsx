@@ -1260,7 +1260,7 @@ export default function UserProfileScreen() {
         ignoreLeftPadding
         ignoreRightPadding
         expandedHeaderCollapseThreshold={0.25}
-        style={{ flex: 1, backgroundColor: 'white' }}
+        style={{ flex: 1, backgroundColor: colorScheme === 'dark' ? 'black' : 'white' }}
 
         contentContainerStyle={{ paddingBottom: bottomInset, flexGrow: 1, backgroundColor: colorScheme === 'light' ? 'white' : 'black' }}
         keyExtractor={(item: FeedContent, index: number) => {
