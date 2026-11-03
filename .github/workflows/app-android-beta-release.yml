@@ -46,15 +46,17 @@ concurrency:
 env:
   EXPO_NO_TELEMETRY: "1"
   CI: "1"
-  EXPO_PROJECT_ID: ${{ vars.EXPO_PROJECT_ID || secrets.EXPO_PROJECT_ID }}
-  EXPO_UPDATE_CHANNEL: ${{ github.event_name == 'pull_request' && 'preview' || 'production' }}
-  LUCKREAD_REQUIRE_OTA_CONFIG: ${{ github.event_name == 'pull_request' && '0' || '1' }}
 
 jobs:
   android-beta-release:
     name: Build and verify standalone Android Beta APK
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    environment: ${{ github.event_name == 'pull_request' && 'preview' || 'production' }}
+    env:
+      EXPO_PROJECT_ID: ${{ vars.EXPO_PROJECT_ID || secrets.EXPO_PROJECT_ID }}
+      EXPO_UPDATE_CHANNEL: ${{ github.event_name == 'pull_request' && 'preview' || 'production' }}
+      LUCKREAD_REQUIRE_OTA_CONFIG: ${{ github.event_name == 'pull_request' && '0' || '1' }}
     defaults:
       run:
         working-directory: app
