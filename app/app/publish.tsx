@@ -27,6 +27,7 @@ import {
   type LocalMediaFile,
   type UploadedMedia,
 } from '~/lib/publish-api';
+import { prepareImageForUpload } from '~/lib/image-upload-preparation';
 import { useAuthStore } from '~/store/auth-store';
 
 type ContentRecord = {
@@ -55,6 +56,8 @@ type ComposerAsset = {
   filename: string;
   mimeType: string;
   size?: number | null;
+  width?: number;
+  height?: number;
   uploadKey?: string;
   uploaded?: UploadedMedia;
   serverUrl: string;
@@ -220,8 +223,21 @@ export default function PublishScreen() {
           name: asset.filename,
           mimeType: asset.mimeType,
           size: asset.size,
+          width: asset.width,
+          height: asset.height,
         };
-        uploaded = await uploadMediaFile(file, asset.uploadKey);
+        const uploadFile = await prepareImageForUpload(file);
+        // Persist the prepared local URI and matching metadata before network I/O.
+        // A retry then uploads the exact same bytes with the same idempotency key.
+        updateAsset(asset.localId, {
+          uri: uploadFile.uri,
+          filename: uploadFile.name,
+          mimeType: uploadFile.mimeType,
+          size: uploadFile.size,
+          width: uploadFile.width,
+          height: uploadFile.height,
+        });
+        uploaded = await uploadMediaFile(uploadFile, asset.uploadKey);
         updateAsset(asset.localId, {
           uploaded,
           serverUrl: uploaded.url,
@@ -306,6 +322,8 @@ export default function PublishScreen() {
         filename,
         mimeType: asset.mimeType || (video ? 'video/mp4' : 'image/jpeg'),
         size: asset.fileSize,
+        width: asset.width,
+        height: asset.height,
         uploadKey: createIdempotencyKey(),
         serverUrl: '',
         status: 'uploading',
