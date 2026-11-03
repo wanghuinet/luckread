@@ -27,20 +27,22 @@ beforeEach(() => {
   calls.length = 0;
 });
 
-test('pins Android Kotlin to the Hyperswitch and Expo SDK 52 compatible version', () => {
+test('pins Android Kotlin to the Hyperswitch and Expo SDK 58 compatible version', () => {
   const appConfig = JSON.parse(readFileSync(new URL('../app.json', import.meta.url), 'utf8'));
   const packageJson = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
   const buildProperties = appConfig.expo.plugins.find(
     (plugin) => Array.isArray(plugin) && plugin[0] === 'expo-build-properties',
   );
 
-  expect(packageJson.dependencies['expo-build-properties']).toBe('~0.13.3');
-  expect(appConfig.expo.newArchEnabled).toBe(true);
+  expect(packageJson.dependencies['expo-build-properties']).toBe('~58.0.12');
+  expect(packageJson.dependencies['react-native']).toBe('0.88.1');
+  // Expo SDK 58 / React Native 0.88 use the New Architecture by default; keep it enabled or implicit.
+  expect(appConfig.expo.newArchEnabled).not.toBe(false);
   expect(buildProperties?.[1]?.android).toMatchObject({
-    buildToolsVersion: '36.0.0',
-    compileSdkVersion: 36,
+    buildToolsVersion: '37.0.0',
+    compileSdkVersion: 37,
     targetSdkVersion: 36,
-    kotlinVersion: '2.0.21',
+    kotlinVersion: '2.2.0',
   });
 });
 

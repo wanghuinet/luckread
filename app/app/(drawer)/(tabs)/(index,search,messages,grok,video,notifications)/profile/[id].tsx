@@ -1384,7 +1384,7 @@ export default function UserProfileScreen() {
               </TouchableOpacity>
             )}
           </View>
-        ) : null}
+        ) : undefined}
         stickySectionHeadersEnabled
         renderSectionHeader={() => (
           <View className=" border-b border-neutral-200 dark:border-neutral-700">

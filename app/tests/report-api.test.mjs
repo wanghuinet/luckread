@@ -69,10 +69,12 @@ test('wires the feed and post-detail report menu entries to the shared dialog', 
   const postDetail = readFileSync(new URL('../app/(drawer)/(tabs)/(index,search,messages,grok,video,notifications)/post/[id].tsx', import.meta.url), 'utf8');
   const dialog = readFileSync(new URL('../components/ReportPostDialog.tsx', import.meta.url), 'utf8');
 
-  expect(feedItem).toContain('key="report" onSelect={() => setReportDialogOpen(true)}');
-  expect(feedItem).toContain('<ReportPostDialog');
-  expect(postDetail).toContain('key="report" onSelect={() => setReportDialogOpen(true)}');
-  expect(postDetail).toContain('<ReportPostDialog');
+  expect(feedItem).toContain("id: 'report', title: 'Report post'");
+  expect(feedItem).toContain("case 'report': setReportDialogOpen(true); break;");
+  expect(feedItem).toContain('<ReportPostDialog visible={reportDialogOpen} contentId={itemData.contentId}');
+  expect(postDetail).toContain("id: 'report', title: 'Report post'");
+  expect(postDetail).toContain("case 'report': setReportDialogOpen(true); break;");
+  expect(postDetail).toContain('<ReportPostDialog visible={reportDialogOpen} contentId={contentId}');
   expect(postDetail).toContain('contentId={postId}');
   expect(dialog).toContain('Submit report');
   expect(dialog).toContain("submitContentReport(contentId, reasonCode, description)");

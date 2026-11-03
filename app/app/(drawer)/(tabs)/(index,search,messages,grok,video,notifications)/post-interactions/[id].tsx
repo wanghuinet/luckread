@@ -276,7 +276,7 @@ export default function PostInteractionsScreen() {
                 <Text className="font-bold text-black dark:text-white">Retry loading more</Text>
               </TouchableOpacity>
             </View>
-          ) : null
+          ) : undefined
         }
       />
     </View>

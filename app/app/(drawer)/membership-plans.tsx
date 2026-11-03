@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { StatusBar } from 'expo-status-bar';
 import {
   ActivityIndicator,
   FlatList,
   Pressable,
   RefreshControl,
-  StatusBar,
   Text,
   View,
 } from 'react-native';
@@ -64,7 +64,7 @@ function formatPrice(priceMinor: number, currency: string): string {
     const digits = new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency,
-    }).resolvedOptions().maximumFractionDigits;
+    }).resolvedOptions().maximumFractionDigits ?? 2;
     return new Intl.NumberFormat('zh-CN', {
       style: 'currency',
       currency,
@@ -349,7 +349,7 @@ export default function MembershipPlansScreen() {
   if (authStatus === 'loading') {
     return (
       <View className="flex-1 items-center justify-center bg-white dark:bg-black">
-        <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={isDark ? '#000000' : '#ffffff'} />
+        <StatusBar style={isDark ? 'light' : 'dark'} />
         <ActivityIndicator size="large" color={PRIMARY} />
       </View>
     );
@@ -358,7 +358,7 @@ export default function MembershipPlansScreen() {
   if (authRequired || authStatus !== 'authenticated') {
     return (
       <View className="flex-1 items-center justify-center bg-white px-7 dark:bg-black">
-        <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={isDark ? '#000000' : '#ffffff'} />
+        <StatusBar style={isDark ? 'light' : 'dark'} />
         <Feather name="award" size={36} color={PRIMARY} />
         <Text className="mt-4 text-lg font-extrabold text-neutral-900 dark:text-white">登录后查看会员方案</Text>
         <Text className="mt-2 text-center text-sm leading-6 text-neutral-500 dark:text-neutral-400">
@@ -373,7 +373,7 @@ export default function MembershipPlansScreen() {
 
   return (
     <View className="flex-1 bg-neutral-50 dark:bg-black">
-      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={isDark ? '#000000' : '#ffffff'} />
+      <StatusBar style={isDark ? 'light' : 'dark'} />
       <View className="flex-row items-center justify-between border-b border-neutral-200 bg-white px-4 py-3 dark:border-neutral-800 dark:bg-black">
         <View className="flex-row items-center">
           <Pressable accessibilityRole="button" accessibilityLabel="返回" onPress={() => router.back()} className="mr-3 rounded-full p-1">

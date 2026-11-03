@@ -216,14 +216,17 @@ test('block and mute actions use authenticated canonical endpoints and supported
 });
 
 test('block and mute menu items invoke real actions in feed and post detail', () => {
-  expect(feedItemSource).toContain('onSelect={muteAuthor}');
-  expect(feedItemSource).toContain('onSelect={confirmBlockAuthor}');
+  expect(feedItemSource).toContain("id: 'mute'");
+  expect(feedItemSource).toContain("id: 'block'");
+  expect(feedItemSource).toContain("case 'mute': muteAuthor(); break;");
+  expect(feedItemSource).toContain("case 'block': confirmBlockAuthor(); break;");
   expect(feedItemSource).toContain("itemData.creatorId || itemData.ownerUserId || ''");
-  expect(postDetailSource).toContain('onSelect={muteTarget}');
-  expect(postDetailSource).toContain('onSelect={confirmBlockTarget}');
-  expect(postDetailSource).toContain('targetUserId={findPost.creatorId || findPost.ownerUserId}');
+  expect(postDetailSource).toContain("id: 'mute'");
+  expect(postDetailSource).toContain("id: 'block'");
+  expect(postDetailSource).toContain("case 'mute': muteTarget(); break;");
+  expect(postDetailSource).toContain("case 'block': confirmBlockTarget(); break;");
   expect(postDetailSource).toContain('targetUserId === currentUserId');
-  expect(postDetailSource).toContain('disabled={!targetUserId || isOwnTarget}');
+  expect(postDetailSource).toContain('attributes: { disabled: !targetUserId || isOwnTarget');
   expect(feedItemSource).toContain('itemData.ownerUserId === currentUser.id || itemData.creatorId === currentUser.id');
 });
 

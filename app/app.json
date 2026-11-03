@@ -11,15 +11,28 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff"
+        }
+      ],
       "expo-video",
       [
         "expo-build-properties",
         {
           "android": {
-            "buildToolsVersion": "36.0.0",
-            "compileSdkVersion": 36,
+            "buildToolsVersion": "37.0.0",
+            "compileSdkVersion": 37,
             "targetSdkVersion": 36,
-            "kotlinVersion": "2.0.21"
+            "kotlinVersion": "2.2.0"
+          },
+          "ios": {
+            "buildReactNativeFromSource": false,
+            "deploymentTarget": "16.4"
           }
         }
       ],
@@ -46,11 +59,6 @@
     "orientation": "portrait",
     "icon": "./assets/favicon.png",
     "userInterfaceStyle": "light",
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
-    },
     "assetBundlePatterns": [
       "**/*"
     ],
@@ -67,7 +75,6 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.luckread.app"
-    },
-    "newArchEnabled": true
+    }
   }
 }

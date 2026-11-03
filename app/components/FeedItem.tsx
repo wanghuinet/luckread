@@ -1,5 +1,6 @@
-import React, { useReducer, Reducer, useState } from 'react';
+import React, { useReducer, useState } from 'react';
 import {
+    ActionSheetIOS,
     Text,
     TouchableOpacity,
     View,
@@ -25,8 +26,7 @@ import { VideoView, useVideoPlayer } from 'expo-video';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { EngagementActions } from './EngagementActions';
-import * as ContextMenu from 'zeego/context-menu';
-import * as DropdownMenu from 'zeego/dropdown-menu';
+import { MenuView, type MenuAction } from '@react-native-menu/menu';
 import { apiRequest, getApiErrorMessage } from '~/lib/api-client';
 import { useAuthStore } from '~/store/auth-store';
 import { blockUser, muteUser } from '~/lib/social-screen-api';
@@ -42,7 +42,6 @@ type ProfileImageSize = 'xxs' | 'xs' | 's' | 'm' | 'l';
 type ProfileImageProps = ImageProps & { displaySize?: ProfileImageSize; className?: string, is_organization?: boolean };
 type ProfileImageReducerState = { isLoading: boolean; hasError: boolean };
 type ProfileImageReducerActions = { type: 'loaded' } | { type: 'error' };
-type ProfileImageReducer = Reducer<ProfileImageReducerState, ProfileImageReducerActions>;
 
 const PROFILE_IMAGE_DIMENSIONS: Record<ProfileImageSize, number> = {
     xxs: 20,
@@ -116,8 +115,8 @@ const formatTime = (timestamp: number, isDetailView: boolean): string => {
 
 
 export const ProfileImage: React.FC<ProfileImageProps> = ({ style, displaySize = 's', className = '', is_organization = false, ...imageProps }) => {
-    const [{ isLoading, hasError }, dispatch] = useReducer<ProfileImageReducer>(
-        (state, action) => {
+    const [{ isLoading, hasError }, dispatch] = useReducer(
+        (state: ProfileImageReducerState, action: ProfileImageReducerActions): ProfileImageReducerState => {
             if (action.type === 'loaded') return { isLoading: false, hasError: false };
             if (action.type === 'error') return { isLoading: false, hasError: true };
             return state;
@@ -167,7 +166,7 @@ const FeedVideoAttachment = ({ uri, headers }: { uri: string; headers?: Record<s
             style={{ width: '100%', aspectRatio: 1 }}
             contentFit="contain"
             nativeControls
-            allowsFullscreen
+            fullscreenOptions={{ enable: true }}
             allowsPictureInPicture={false}
         />
     );
@@ -453,150 +452,153 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
         }
     };
 
-    return (
-        <ContextMenu.Root>
-            <ContextMenu.Trigger asChild>
-                <TouchableOpacity onPress={onPress} className="p-1 py-2 pr-4 border-b border-neutral-200 dark:border-neutral-800">
-                    {isProfilePinned ? (
-                        <View className="ml-11 mb-1 flex-row items-center gap-1">
-                            <Feather name="bookmark" size={13} color={colorScheme === 'dark' ? '#a3a3a3' : '#737373'} />
-                            <Text className="text-xs font-semibold text-neutral-500 dark:text-neutral-400">Pinned</Text>
+    const contextMenuActions: MenuAction[] = [
+        { id: 'view-post', title: 'View post' },
+        ...(isOwnPost ? [
+            { id: 'pin-profile-post', title: isProfilePinned ? 'Unpin from profile' : 'Pin to profile', attributes: { disabled: profilePinSnapshot.pending || profilePinSnapshot.loading } },
+            { id: 'edit-own-post', title: 'Edit post' },
+            { id: 'delete-own-post', title: 'Delete post', attributes: { destructive: true } },
+        ] : []),
+    ];
+
+    const dropdownMenuActions: MenuAction[] = [
+        ...(isOwnPost ? [
+            { id: 'pin-profile-post', title: isProfilePinned ? 'Unpin from profile' : 'Pin to profile', attributes: { disabled: profilePinSnapshot.pending || profilePinSnapshot.loading } },
+            { id: 'edit-own-post', title: 'Edit post' },
+            { id: 'delete-own-post', title: 'Delete post', attributes: { destructive: true } },
+        ] : []),
+        { id: 'view-post', title: 'View post', attributes: { disabled: !itemData.contentId } },
+        { id: 'interactions', title: 'View post interactions', attributes: { disabled: !itemData.contentId } },
+        { id: 'report', title: 'Report post', attributes: { disabled: !itemData.contentId } },
+        ...(!isOwnPost && targetUserId ? [{
+            id: 'user-actions',
+            title: '@' + authorHandle,
+            subactions: [
+                { id: 'mute', title: 'Mute @' + authorHandle },
+                { id: 'block', title: 'Block @' + authorHandle, attributes: { destructive: true } },
+            ],
+        }] : []),
+    ];
+
+    const runMenuAction = (actionId: string) => {
+        switch (actionId) {
+            case 'view-post': goToPost(); break;
+            case 'pin-profile-post': toggleProfilePin(); break;
+            case 'edit-own-post': beginEditOwnPost(); break;
+            case 'delete-own-post': removeOwnPost(); break;
+            case 'interactions': openPostInteractions(); break;
+            case 'report': setReportDialogOpen(true); break;
+            case 'mute': muteAuthor(); break;
+            case 'block': confirmBlockAuthor(); break;
+        }
+    };
+
+    const showIosActionSheet = (menu: 'context' | 'dropdown') => {
+        const sourceActions = menu === 'context' ? contextMenuActions : dropdownMenuActions;
+        const items = sourceActions
+            .filter((action) => !action.attributes?.disabled && !action.subactions)
+            .map((action) => ({
+                id: action.id ?? '',
+                title: action.title,
+                destructive: action.attributes?.destructive === true,
+            }));
+
+        if (menu === 'dropdown' && !isOwnPost && targetUserId) {
+            items.push(
+                { id: 'mute', title: 'Mute @' + authorHandle, destructive: false },
+                { id: 'block', title: 'Block @' + authorHandle, destructive: true },
+            );
+        }
+        if (items.length === 0) return;
+
+        const cancelButtonIndex = items.length;
+        const destructiveButtonIndex = items.findIndex((item) => item.destructive);
+        ActionSheetIOS.showActionSheetWithOptions(
+            {
+                title: menu === 'context' ? 'Post options' : '@' + authorHandle,
+                options: [...items.map((item) => item.title), 'Cancel'],
+                cancelButtonIndex,
+                ...(destructiveButtonIndex >= 0 ? { destructiveButtonIndex } : {}),
+                userInterfaceStyle: colorScheme === 'dark' ? 'dark' : 'light',
+            },
+            (selectedIndex) => {
+                const selected = items[selectedIndex];
+                if (selected) runMenuAction(selected.id);
+            },
+        );
+    };
+
+    const feedCard = (
+        <TouchableOpacity
+            onPress={onPress}
+            onLongPress={Platform.OS === 'ios' ? () => showIosActionSheet('context') : undefined}
+            className="p-1 py-2 pr-4 border-b border-neutral-200 dark:border-neutral-800"
+        >
+            {isProfilePinned ? (
+                <View className="ml-11 mb-1 flex-row items-center gap-1">
+                    <Feather name="bookmark" size={13} color={colorScheme === 'dark' ? '#a3a3a3' : '#737373'} />
+                    <Text className="text-xs font-semibold text-neutral-500 dark:text-neutral-400">Pinned</Text>
+                </View>
+            ) : null}
+            <View className="flex-row">
+                <ProfileImage source={{ uri: authorImageUrl, headers: authorImageHeaders }} displaySize="s" is_organization={isOrganization} />
+                <View className="ml-2 flex-1">
+                    <View className="flex-row items-center justify-between">
+                        <TouchableOpacity onPress={() => router.push('/profile/' + encodeURIComponent(profileIdentifier))}>
+                            <View className="flex-row items-center">
+                                <Text className="text-lg font-bold text-black dark:text-white mr-1">{authorName}</Text>
+                                {verified_badge && (
+                                    <Image
+                                        source={{ uri: verified_badge }}
+                                        className="w-4 h-4"
+                                        onError={(e) => console.log('Failed to load verified badge:', e.error)}
+                                    />
+                                )}
+                                <Text className="text-lg text-neutral-500 dark:text-neutral-400 mr-1 ml-1">@{authorHandle}</Text>
+                                <Text className="text-lg text-neutral-500 dark:text-neutral-400"> · {formatTime(itemData.posted_time, false)}</Text>
+                            </View>
+                        </TouchableOpacity>
+                        {!detailView && (
+                            Platform.OS === 'android' ? (
+                                <MenuView
+                                    actions={dropdownMenuActions}
+                                    isAnchoredToRight
+                                    onPressAction={({ nativeEvent }) => runMenuAction(nativeEvent.event)}
+                                    style={{ width: 28, height: 28 }}
+                                >
+                                    <View className="p-1 -m-1 opacity-70">
+                                        <Feather name="more-horizontal" size={18} color={colorScheme === 'dark' ? 'white' : 'black'} />
+                                    </View>
+                                </MenuView>
+                            ) : (
+                                <TouchableOpacity onPress={() => showIosActionSheet('dropdown')} className="p-1 -m-1 opacity-70">
+                                    <Feather name="more-horizontal" size={18} color={colorScheme === 'dark' ? 'white' : 'black'} />
+                                </TouchableOpacity>
+                            )
+                        )}
+                    </View>
+                    {itemData.accessMode === 'MEMBERS_ONLY' && itemData.accessGranted !== true ? (
+                        <View className="mt-2 self-start flex-row items-center gap-1 rounded-full bg-amber-50 px-2 py-1 dark:bg-amber-950/40">
+                            <Feather name="lock" size={12} color="#b45309" />
+                            <Text className="text-xs font-semibold text-amber-800 dark:text-amber-300">会员专享</Text>
                         </View>
                     ) : null}
-                    <View className="flex-row">
-                        <ProfileImage source={{ uri: authorImageUrl, headers: authorImageHeaders }} displaySize="s" is_organization={isOrganization} />
-                        <View className="ml-2 flex-1">
+                    <Text className="text-black dark:text-white mt-1 text-lg leading-6">{itemData.message}</Text>
+                    <FeedMediaGallery items={mediaItems} />
+                    {detailView && itemData.contentType === 'post' && itemData.contentId ? (
+                        <SocialPoll contentId={itemData.contentId} />
+                    ) : null}
+                    <EngagementActions itemData={itemData} detailView={Boolean(detailView)} onCommentPress={onCommentPress} />
+                </View>
+            </View>
+        </TouchableOpacity>
+    );
 
-                            <View className="flex-row items-center justify-between">
-                                <TouchableOpacity onPress={() => router.push(`/profile/${encodeURIComponent(profileIdentifier)}`)}>
-                                    <View className="flex-row items-center">
-                                        <Text className=" text-lg font-bold text-black dark:text-white mr-1">{authorName}</Text>
-                                        {verified_badge && (
-                                            <Image
-                                                source={{ uri: verified_badge }}
-                                                className="w-4 h-4"
-                                                onError={(e) => console.log('Failed to load verified badge:', e.nativeEvent.error)}
-                                            />
-                                        )}
-                                        <Text className="text-lg text-neutral-500 dark:text-neutral-400 mr-1 ml-1">@{authorHandle}</Text>
-                                        <Text className="text-lg text-neutral-500 dark:text-neutral-400"> · {formatTime(itemData.posted_time, false)}</Text>
-                                    </View>
-                                </TouchableOpacity>
-
-                                {!detailView && (
-                                    <DropdownMenu.Root>
-                                        <DropdownMenu.Trigger>
-                                            <TouchableOpacity className="p-1 -m-1 opacity-70">
-                                                <Feather name="more-horizontal" size={18} color={colorScheme === 'dark' ? 'white' : 'black'} />
-                                            </TouchableOpacity>
-                                        </DropdownMenu.Trigger>
-                                        <DropdownMenu.Content>
-                                            {isOwnPost ? (
-                                                <>
-                                                    <DropdownMenu.Item
-                                                        key="pin-profile-post"
-                                                        onSelect={toggleProfilePin}
-                                                        disabled={profilePinSnapshot.pending || profilePinSnapshot.loading}
-                                                    >
-                                                        <DropdownMenu.ItemTitle>
-                                                            {isProfilePinned ? 'Unpin from profile' : 'Pin to profile'}
-                                                        </DropdownMenu.ItemTitle>
-                                                        <DropdownMenu.ItemIcon ios={{ name: 'pin' }} />
-                                                    </DropdownMenu.Item>
-                                                    <DropdownMenu.Item key="edit-own-post" onSelect={beginEditOwnPost}>
-                                                        <DropdownMenu.ItemTitle>Edit post</DropdownMenu.ItemTitle>
-                                                        <DropdownMenu.ItemIcon ios={{ name: 'pencil' }} />
-                                                    </DropdownMenu.Item>
-                                                    <DropdownMenu.Item key="delete-own-post" destructive onSelect={removeOwnPost}>
-                                                        <DropdownMenu.ItemTitle>Delete post</DropdownMenu.ItemTitle>
-                                                        <DropdownMenu.ItemIcon ios={{ name: 'trash' }} />
-                                                    </DropdownMenu.Item>
-                                                    <DropdownMenu.Separator />
-                                                </>
-                                            ) : null}
-                                            <DropdownMenu.Item key="interactions" onSelect={openPostInteractions} disabled={!itemData.contentId}>
-                                                <DropdownMenu.ItemTitle>View post interactions</DropdownMenu.ItemTitle>
-                                                <DropdownMenu.ItemIcon
-                                                    ios={{ name: 'chart.bar.xaxis' }}
-                                                />
-                                            </DropdownMenu.Item>
-                                            <DropdownMenu.Item key="report" onSelect={() => setReportDialogOpen(true)} disabled={!itemData.contentId}>
-                                                <DropdownMenu.ItemTitle>Report post</DropdownMenu.ItemTitle>
-                                                <DropdownMenu.ItemIcon
-                                                    ios={{ name: 'flag' }}
-                                                />
-                                            </DropdownMenu.Item><DropdownMenu.Sub>
-                                                <DropdownMenu.SubTrigger key="user-actions">
-                                                    <DropdownMenu.ItemTitle>@{authorHandle}</DropdownMenu.ItemTitle>
-
-                                                </DropdownMenu.SubTrigger>
-                                                <DropdownMenu.SubContent><DropdownMenu.Item key="mute" onSelect={muteAuthor} disabled={!targetUserId || isOwnPost}>
-                                                        <DropdownMenu.ItemTitle>Mute @{authorHandle}</DropdownMenu.ItemTitle>
-                                                        <DropdownMenu.ItemIcon ios={{ name: 'speaker.slash' }} />
-                                                    </DropdownMenu.Item>
-                                                    <DropdownMenu.Item key="block" destructive onSelect={confirmBlockAuthor} disabled={!targetUserId || isOwnPost}>
-                                                        <DropdownMenu.ItemTitle>Block @{authorHandle}</DropdownMenu.ItemTitle>
-                                                        <DropdownMenu.ItemIcon ios={{ name: 'nosign' }} />
-                                                    </DropdownMenu.Item>
-                                                </DropdownMenu.SubContent>
-                                            </DropdownMenu.Sub>
-
-                                        </DropdownMenu.Content>
-                                    </DropdownMenu.Root>
-                                )}
-                            </View>
-
-                            {itemData.accessMode === 'MEMBERS_ONLY' && itemData.accessGranted !== true ? (
-                                <View className="mt-2 self-start flex-row items-center gap-1 rounded-full bg-amber-50 px-2 py-1 dark:bg-amber-950/40">
-                                    <Feather name="lock" size={12} color="#b45309" />
-                                    <Text className="text-xs font-semibold text-amber-800 dark:text-amber-300">会员专享</Text>
-                                </View>
-                            ) : null}
-                            <Text className="text-black dark:text-white mt-1 text-lg leading-6">{itemData.message}</Text>
-                            <FeedMediaGallery items={mediaItems} />
-                            {detailView && itemData.contentType === 'post' && itemData.contentId ? (
-                                <SocialPoll contentId={itemData.contentId} />
-                            ) : null}
-                            <EngagementActions itemData={itemData} detailView={Boolean(detailView)} onCommentPress={onCommentPress} />
-                        </View>
-                    </View>
-                </TouchableOpacity>
-            </ContextMenu.Trigger>
-            <ContextMenu.Content>
-                <ContextMenu.Item key="view-post" onSelect={goToPost}>
-                    <ContextMenu.ItemTitle>View post</ContextMenu.ItemTitle>
-                    <ContextMenu.ItemIcon ios={{ name: 'doc.text' }} />
-                </ContextMenu.Item>
-
-                {isOwnPost ? (
-                    <>
-                        <ContextMenu.Item
-                            key="pin-profile-post"
-                            onSelect={toggleProfilePin}
-                            disabled={profilePinSnapshot.pending || profilePinSnapshot.loading}
-                        >
-                            <ContextMenu.ItemTitle>
-                                {isProfilePinned ? 'Unpin from profile' : 'Pin to profile'}
-                            </ContextMenu.ItemTitle>
-                            <ContextMenu.ItemIcon ios={{ name: 'pin' }} />
-                        </ContextMenu.Item>
-                        <ContextMenu.Item key="edit-own-post" onSelect={beginEditOwnPost}>
-                            <ContextMenu.ItemTitle>Edit post</ContextMenu.ItemTitle>
-                            <ContextMenu.ItemIcon ios={{ name: 'pencil' }} />
-                        </ContextMenu.Item>
-                        <ContextMenu.Item key="delete-own-post" destructive onSelect={removeOwnPost}>
-                            <ContextMenu.ItemTitle>Delete post</ContextMenu.ItemTitle>
-                            <ContextMenu.ItemIcon ios={{ name: 'trash' }} />
-                        </ContextMenu.Item>
-                    </>
-                ) : null}
-            </ContextMenu.Content>
-            <ReportPostDialog
-                visible={reportDialogOpen}
-                contentId={itemData.contentId}
-                onClose={() => setReportDialogOpen(false)}
-            />
-        </ContextMenu.Root>
+    return (
+        <>
+            {feedCard}
+            <ReportPostDialog visible={reportDialogOpen} contentId={itemData.contentId} onClose={() => setReportDialogOpen(false)} />
+        </>
     );
 };
 
@@ -654,7 +656,7 @@ export const FeedItemDetailView: React.FC<FeedItemProps> = ({ itemData, onPress,
                                 <Image
                                     source={{ uri: verified_badge }}
                                     className="w-4 h-4 mr-1"
-                                    onError={(e) => console.log('Failed to load verified badge:', e.nativeEvent.error)}
+                                    onError={(e) => console.log('Failed to load verified badge:', e.error)}
                                 />
                             )}
                             <Text className="text-lg text-neutral-500 dark:text-neutral-400  ml-1">@{authorHandle}</Text>

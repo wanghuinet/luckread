@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { StatusBar } from 'expo-status-bar';
 import {
   ActivityIndicator,
   Alert,
@@ -6,7 +7,6 @@ import {
   Pressable,
   RefreshControl,
   SafeAreaView,
-  StatusBar,
   Text,
   View,
 } from 'react-native';
@@ -94,7 +94,7 @@ function formatAmount(amountMinor: number, currency: string): string {
     const fractionDigits = new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency,
-    }).resolvedOptions().maximumFractionDigits;
+    }).resolvedOptions().maximumFractionDigits ?? 2;
     return new Intl.NumberFormat('zh-CN', {
       style: 'currency',
       currency,
@@ -508,7 +508,7 @@ export default function BillingScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-neutral-50 dark:bg-black">
-      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={isDark ? '#000000' : '#f9fafb'} />
+      <StatusBar style={isDark ? 'light' : 'dark'} />
       <View className="flex-row items-center border-b border-neutral-200 px-4 py-3 dark:border-neutral-800">
         <Pressable
           accessibilityRole="button"

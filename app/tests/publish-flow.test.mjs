@@ -51,7 +51,9 @@ test('edit and delete controls are only shown for the authenticated owner and us
   expect(feedItem).toContain("method: 'DELETE'");
   expect(feedItem).toContain("headers: { 'If-Match': etag }");
   expect(feedItem).toContain("idempotencyKey: 'native-content-delete:' + contentId + ':' + etag");
-  expect(feedItem).toContain('key="delete-own-post"');
+  expect(feedItem).toContain("...(isOwnPost ? [");
+  expect(feedItem).toContain("id: 'delete-own-post'");
+  expect(feedItem).toContain("case 'delete-own-post': removeOwnPost(); break;");
   expect(home).toContain('onDeleted={(contentId) => {');
   expect(home).toContain('current.filter((post) => post.contentId !== contentId)');
 });

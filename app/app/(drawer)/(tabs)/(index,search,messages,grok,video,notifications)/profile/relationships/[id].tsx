@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { StatusBar } from 'expo-status-bar';
 import {
   ActivityIndicator,
   FlatList,
   Image,
   Pressable,
   RefreshControl,
-  StatusBar,
   Text,
   View,
 } from 'react-native';
@@ -139,7 +139,7 @@ export default function ProfileRelationships() {
 
   return (
     <View className="flex-1 bg-white dark:bg-black">
-      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={isDark ? '#000000' : '#ffffff'} />
+      <StatusBar style={isDark ? 'light' : 'dark'} />
       <View className="flex-row items-center border-b border-neutral-100 px-4 py-3 dark:border-neutral-800">
         <Pressable accessibilityRole="button" onPress={() => router.back()} className="mr-4 rounded-full p-1">
           <Feather name="arrow-left" size={23} color="#6b7280" />

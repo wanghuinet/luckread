@@ -55,6 +55,10 @@ jobs:
           java-version: "17"
       - name: Install Expo app dependencies
         run: bun install
+      - name: Apply and verify Hyperswitch React Native 0.88 compatibility
+        run: |
+          node scripts/apply-hyperswitch-rn88-compat.mjs
+          bun run test:hyperswitch-compat
       - name: Verify versions bundled for the Expo SDK
         run: bunx expo install --check
       - name: Run Expo compatibility doctor
@@ -199,9 +203,13 @@ jobs:
             exit 1
           fi
           yes | "$SDKMANAGER" --licenses
-          "$SDKMANAGER" "platform-tools" "platforms;android-36" "build-tools;36.0.0" "cmake;3.22.1" "ndk;26.1.10909125"
+          "$SDKMANAGER" "platform-tools" --channel=3 "platforms;android-37.0" "build-tools;37.0.0" "cmake;3.22.1" "ndk;27.1.12297006"
       - name: Install Expo app dependencies
         run: bun install
+      - name: Apply and verify Hyperswitch React Native 0.88 compatibility
+        run: |
+          node scripts/apply-hyperswitch-rn88-compat.mjs
+          bun run test:hyperswitch-compat
       - name: Generate Android native project
         run: bunx expo prebuild --platform android --clean --no-install
       - name: Compile debug APK
@@ -218,8 +226,8 @@ jobs:
 
   ios-build:
     name: iOS simulator build
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_native_builds }}
-    runs-on: macos-15
+    if: ${{ github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.run_native_builds) }}
+    runs-on: macos-26
     timeout-minutes: 45
     defaults:
       run:
@@ -234,6 +242,10 @@ jobs:
           bun-version: "1.1.38"
       - name: Install Expo app dependencies
         run: bun install
+      - name: Apply and verify Hyperswitch React Native 0.88 compatibility
+        run: |
+          node scripts/apply-hyperswitch-rn88-compat.mjs
+          bun run test:hyperswitch-compat
       - name: Generate iOS native project
         run: bunx expo prebuild --platform ios --clean --no-install
       - name: Install CocoaPods dependencies
