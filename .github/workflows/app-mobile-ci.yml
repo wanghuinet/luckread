@@ -199,7 +199,7 @@ jobs:
             exit 1
           fi
           yes | "$SDKMANAGER" --licenses
-          "$SDKMANAGER" "platform-tools" "platforms;android-36" "build-tools;36.0.0" "cmake;3.22.1" "ndk;26.1.10909125"
+          "$SDKMANAGER" "platform-tools" "platforms;android-37" "build-tools;37.0.0" "cmake;3.22.1" "ndk;27.1.12297006"
       - name: Install Expo app dependencies
         run: bun install
       - name: Generate Android native project
@@ -219,7 +219,7 @@ jobs:
   ios-build:
     name: iOS simulator build
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_native_builds }}
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 45
     defaults:
       run:
