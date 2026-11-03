@@ -547,6 +547,7 @@ export default function UserProfileScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const listRef = useRef<any>(null);
   const { colorScheme, setColorScheme } = useColorScheme();
+  const isDark = colorScheme === 'dark';
   const scrollPosition = useSharedValue(0);
   const router = useRouter();
 
@@ -1196,7 +1197,7 @@ export default function UserProfileScreen() {
 
   return (
     <>
-      <StatusBar style="light" />
+      <StatusBar style={isDark ? 'light' : 'dark'} />
       <ScrollingListWithHeader
         NavigationBarComponent={(props) => <ProfileHeader {...props} user={user} refreshing={refreshing} currentUserId={currentUserId} />}
 
