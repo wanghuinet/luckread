@@ -16,8 +16,10 @@ mock.module('expo-image-manipulator', () => ({
               manipulationCalls.push({ saveOptions });
               return renderResult;
             },
+            release: () => manipulationCalls.push({ released: 'image' }),
           };
         },
+        release: () => manipulationCalls.push({ released: 'context' }),
       };
     },
   },
