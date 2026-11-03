@@ -827,6 +827,7 @@ export default function PublishScreen() {
                         style={[
                           styles.pollDurationOption, isDark && { borderColor: '#52525b' },
                           pollDurationHours === duration && styles.pollDurationSelected,
+                          isDark && pollDurationHours === duration && { backgroundColor: '#102a43', borderColor: PRIMARY },
                         ]}
                       >
                         <Text style={[
