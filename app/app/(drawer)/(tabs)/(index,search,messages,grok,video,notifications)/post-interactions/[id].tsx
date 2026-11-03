@@ -3,6 +3,7 @@ import { ActivityIndicator, FlatList, Text, TouchableOpacity, View } from 'react
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
+import { useColorScheme } from 'nativewind';
 import { ProfileImage } from '~/components/FeedItem';
 import {
   fetchContentLikesPage,
@@ -33,6 +34,8 @@ function likedAtLabel(value: string): string {
 }
 
 export default function PostInteractionsScreen() {
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === 'dark';
   const params = useLocalSearchParams<{ id?: string | string[] }>();
   const rawId = params.id;
   const postId = Array.isArray(rawId) ? rawId[0] || '' : rawId || '';
@@ -169,7 +172,7 @@ export default function PostInteractionsScreen() {
           className="mr-4 h-10 w-10 items-center justify-center rounded-full"
           onPress={() => router.back()}
         >
-          <Feather name="arrow-left" size={22} color="#536471" />
+          <Feather name="arrow-left" size={22} color={isDark ? '#d1d5db' : '#536471'} />
         </TouchableOpacity>
         <View className="flex-1">
           <Text className="text-lg font-bold text-black dark:text-white">Post interactions</Text>
