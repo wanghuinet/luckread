@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
   Image,
   Pressable,
   StyleSheet,
@@ -11,7 +12,8 @@ import { type ErrorBoundaryProps, useLocalSearchParams, useNavigation, useRouter
 import { Feather } from '@expo/vector-icons';
 import { DrawerActions } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Tabs, MaterialTabBar } from 'react-native-collapsible-tab-view';
+import { Tabs, MaterialTabBar, useCurrentTabScrollY } from 'react-native-collapsible-tab-view';
+import { useTabBarScrollState, useTabBarVisibilityOnAnimatedScroll } from '~/components/TabBarScroll';
 import { BlurView } from 'expo-blur';
 import { useColorScheme } from 'nativewind';
 
@@ -74,6 +76,8 @@ const Header = () => {
 };
 
 function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSignal?: string }) {
+  const currentTabScrollY = useCurrentTabScrollY();
+  useTabBarVisibilityOnAnimatedScroll(currentTabScrollY);
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { colorScheme } = useColorScheme();
@@ -344,6 +348,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ published?: string; refresh?: string }>();
   const refreshSignal = (typeof params.published === 'string' ? params.published : '') + ':' + (typeof params.refresh === 'string' ? params.refresh : '');
+  const { tabBarTranslateY } = useTabBarScrollState();
 
   const renderTabBar = (props: any) => (
     <MaterialTabBar
@@ -393,14 +398,23 @@ export default function HomeScreen() {
         </Tabs.Tab>
       </Tabs.Container>
       <View style={{ height: Math.max(0, insets.bottom - 8), backgroundColor: isDark ? '#000000' : '#ffffff' }} />
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="发布动态"
-        onPress={() => router.push('/publish' as never)}
-        style={[styles.floatingCompose, { bottom: insets.bottom + 72 }]}
+      <Animated.View
+        pointerEvents="box-none"
+        style={[
+          styles.floatingCompose,
+          { bottom: insets.bottom + 72 },
+          { transform: [{ translateY: tabBarTranslateY }] },
+        ]}
       >
-        <Feather name="plus" size={28} color='#ffffff' />
-      </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="发布动态"
+          onPress={() => router.push('/publish' as never)}
+          style={styles.floatingComposeButton}
+        >
+          <Feather name="plus" size={28} color="#ffffff" />
+        </Pressable>
+      </Animated.View>
     </BlurView>
   );
 }
@@ -413,7 +427,8 @@ const styles = StyleSheet.create({
   profileAvatar: { width: 36, height: 36, borderRadius: 18 },
   headerLogoWrap: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
   headerRightSpacer: { width: 36, height: 36 },
-  floatingCompose: { position: 'absolute', right: 20, width: 56, height: 56, borderRadius: 28, backgroundColor: APP_PRIMARY_COLOR, alignItems: 'center', justifyContent: 'center', elevation: 6, shadowColor: '#000000', shadowOpacity: 0.22, shadowRadius: 5, shadowOffset: { width: 0, height: 3 }, zIndex: 20 },
+  floatingCompose: { position: 'absolute', right: 20, width: 56, height: 56, zIndex: 20 },
+  floatingComposeButton: { flex: 1, borderRadius: 28, backgroundColor: APP_PRIMARY_COLOR, alignItems: 'center', justifyContent: 'center', elevation: 6, shadowColor: '#000000', shadowOpacity: 0.22, shadowRadius: 5, shadowOffset: { width: 0, height: 3 } },
   stateContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 28, paddingVertical: 32 },
   errorBoundaryContainer: { flex: 1, backgroundColor: 'white', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 28, paddingVertical: 32 },
   stateTitle: { color: '#101828', fontSize: 18, fontWeight: '800', textAlign: 'center' },
