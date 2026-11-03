@@ -59,7 +59,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: luckread-image-upload-bun-lockfile
-          path: bun.lockb
+          path: app/bun.lockb
           if-no-files-found: error
           retention-days: 1
       - name: Apply and verify Hyperswitch React Native 0.88 compatibility
