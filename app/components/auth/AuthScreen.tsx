@@ -1,4 +1,5 @@
 import React, { type ReactNode } from 'react';
+import { useColorScheme } from 'nativewind';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -36,8 +37,10 @@ export function AuthScreen({
   subtitle: string;
   children: ReactNode;
 }) {
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === 'dark';
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, isDark && { backgroundColor: '#000000' }]}>
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -47,9 +50,9 @@ export function AuthScreen({
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.container}>
-            <Text accessibilityRole="header" style={styles.brand}>LuckRead</Text>
-            <Text accessibilityRole="header" style={styles.title}>{title}</Text>
-            <Text style={styles.subtitle}>{subtitle}</Text>
+            <Text accessibilityRole="header" style={[styles.brand, isDark && { color: "#f9fafb" }]}>LuckRead</Text>
+            <Text accessibilityRole="header" style={[styles.title, isDark && { color: "#f9fafb" }]}>{title}</Text>
+            <Text style={[styles.subtitle, isDark && { color: "#9ca3af" }]}>{subtitle}</Text>
             {children}
           </View>
         </ScrollView>
@@ -63,14 +66,16 @@ export function AuthInput({
   containerStyle,
   ...inputProps
 }: TextInputProps & { label: string; containerStyle?: StyleProp<ViewStyle> }) {
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === 'dark';
   return (
     <View style={[styles.fieldContainer, containerStyle]}>
-      <Text style={styles.label}>{label}</Text>
+      <Text style={[styles.label, isDark && { color: "#e5e7eb" }]}>{label}</Text>
       <TextInput
         {...inputProps}
         placeholderTextColor="#8b98a5"
         selectionColor={AUTH_COLORS.accent}
-        style={[styles.input, inputProps.editable === false ? styles.inputDisabled : null]}
+        style={[styles.input, inputProps.editable === false ? styles.inputDisabled : null, isDark && { backgroundColor: "#18181b", borderColor: "#3f3f46", color: "#f9fafb" }]}
       />
     </View>
   );
@@ -121,6 +126,8 @@ export function AuthSecondaryButton({
   onPress: () => void;
   disabled?: boolean;
 }) {
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === 'dark';
   return (
     <Pressable
       accessibilityRole="button"
@@ -129,11 +136,12 @@ export function AuthSecondaryButton({
       onPress={onPress}
       style={({ pressed }) => [
         styles.secondaryButton,
+        isDark && { borderColor: '#52525b' },
         disabled ? styles.buttonDisabled : null,
         pressed && !disabled ? styles.buttonPressed : null,
       ]}
     >
-      <Text style={styles.secondaryButtonText}>{label}</Text>
+      <Text style={[styles.secondaryButtonText, isDark && { color: "#f9fafb" }]}>{label}</Text>
     </Pressable>
   );
 }
@@ -168,6 +176,8 @@ export function AuthMessage({
   message: string;
   variant?: 'error' | 'success' | 'info';
 }) {
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === 'dark';
   if (!message) return null;
   const variantStyle = variant === 'success'
     ? styles.successMessage
@@ -179,9 +189,19 @@ export function AuthMessage({
     : variant === 'info'
       ? styles.infoMessageText
       : styles.errorMessageText;
+  const darkContainerStyle = isDark
+    ? variant === 'error'
+      ? { borderColor: '#7f1d1d', backgroundColor: '#450a0a' }
+      : variant === 'success'
+        ? { borderColor: '#14532d', backgroundColor: '#052e16' }
+        : { borderColor: '#3f3f46', backgroundColor: '#18181b' }
+    : null;
+  const darkTextStyle = isDark
+    ? variant === 'error' ? { color: '#fca5a5' } : variant === 'success' ? { color: '#86efac' } : { color: '#d4d4d8' }
+    : null;
   return (
-    <View accessibilityRole={variant === 'error' ? 'alert' : 'text'} style={variantStyle} accessibilityLiveRegion="polite">
-      <Text style={textStyle}>{message}</Text>
+    <View accessibilityRole={variant === 'error' ? 'alert' : 'text'} style={[variantStyle, darkContainerStyle]} accessibilityLiveRegion="polite">
+      <Text style={[textStyle, darkTextStyle]}>{message}</Text>
     </View>
   );
 }
