@@ -17,6 +17,39 @@ type ContentPageResponse = {
   };
 };
 
+export function incrementNativeFeedReplyCount(item: ApiContentRecord, minimumCount = 0): ApiContentRecord {
+  const currentCount = Math.max(
+    0,
+    minimumCount,
+    item.social?.counts?.comments ?? 0,
+    item.social?.counts?.replies ?? 0,
+    item.counts?.comments ?? 0,
+    item.counts?.replies ?? 0,
+    item.replyCount ?? 0,
+    item.reply_count ?? 0,
+  );
+  const nextCount = currentCount + 1;
+
+  return {
+    ...item,
+    replyCount: nextCount,
+    reply_count: nextCount,
+    counts: {
+      ...(item.counts ?? {}),
+      comments: nextCount,
+      replies: nextCount,
+    },
+    social: {
+      ...(item.social ?? {}),
+      counts: {
+        ...(item.social?.counts ?? {}),
+        comments: nextCount,
+        replies: nextCount,
+      },
+    },
+  };
+}
+
 export function nativeFeedQueryKey(kind: NativeFeedKind, viewerId?: string | null) {
   return kind === 'following'
     ? (['native-feed', 'following', viewerId || 'anonymous'] as const)
