@@ -1,5 +1,6 @@
 import { Tabs } from 'expo-router';
 import { StyleSheet } from 'react-native';
+import { TabBarScrollProvider, useTabBarScrollState } from '~/components/TabBarScroll';
 import { BlurView } from 'expo-blur';
 
 import Home from "~/assets/svg/tabs/home.svg"
@@ -45,9 +46,10 @@ const TabBarBackground = () => {
 };
 
 
-export default function TabLayout() {
+function TabNavigator() {
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
+  const { tabBarTranslateY } = useTabBarScrollState();
 
   return (
     <Tabs
@@ -66,6 +68,7 @@ export default function TabLayout() {
             paddingTop: 4,
           },
           route.name === '(video)' ? { display: 'none' } : {},
+          { transform: [{ translateY: tabBarTranslateY }] } as any,
         ],
       })}
     >
@@ -106,5 +109,13 @@ export default function TabLayout() {
         }}
       />
     </Tabs>
+  );
+}
+
+export default function TabLayout() {
+  return (
+    <TabBarScrollProvider>
+      <TabNavigator />
+    </TabBarScrollProvider>
   );
 }

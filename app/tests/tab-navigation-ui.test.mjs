@@ -10,6 +10,11 @@ const upstreamGrokRoute = new URL(
   import.meta.url,
 );
 
+const tabBarScrollSource = readFileSync(
+  new URL('../components/TabBarScroll.tsx', import.meta.url),
+  'utf8',
+);
+
 test('does not register or ship the upstream Grok demo route', () => {
   expect(tabLayoutSource).not.toContain('name="(grok)"');
   expect(existsSync(upstreamGrokRoute)).toBe(false);
@@ -51,4 +56,61 @@ test('root route boundary catches render failures across all native app pages', 
   expect(rootLayout).toContain('export function ErrorBoundary({ error, retry }: ErrorBoundaryProps)');
   expect(rootLayout).toContain('LuckRead 页面暂时无法显示');
   expect(rootLayout).toContain('onPress={retry}');
+});
+
+
+test('hides the same floating bottom navigation and publish action on downward scroll, then restores them on upward scroll', () => {
+  const homeScreen = readFileSync(
+    new URL('../app/(drawer)/(tabs)/(index)/index.tsx', import.meta.url),
+    'utf8',
+  );
+
+  expect(tabLayoutSource).toContain('TabBarScrollProvider');
+  expect(tabLayoutSource).toContain('transform: [{ translateY: tabBarTranslateY }]');
+  expect(homeScreen).toContain('transform: [{ translateY: tabBarTranslateY }]');
+  expect(tabBarScrollSource).toContain('HIDE_SCROLL_THRESHOLD');
+  expect(tabBarScrollSource).toContain('SHOW_SCROLL_THRESHOLD');
+  expect(tabBarScrollSource).toContain('setTabBarVisible(direction < 0)');
+  expect(tabBarScrollSource).toContain('duration: 210');
+  expect(tabBarScrollSource).toContain('useNativeDriver: true');
+});
+
+test('connects the existing home, search, notifications, content, profile and interaction scroll containers', () => {
+  const homeScreen = readFileSync(
+    new URL('../app/(drawer)/(tabs)/(index)/index.tsx', import.meta.url),
+    'utf8',
+  );
+  const searchScreen = readFileSync(
+    new URL('../app/(drawer)/(tabs)/(search)/search.tsx', import.meta.url),
+    'utf8',
+  );
+  const notificationsScreen = readFileSync(
+    new URL('../app/(drawer)/(tabs)/(notifications)/notifications.tsx', import.meta.url),
+    'utf8',
+  );
+  const postDetail = readFileSync(
+    new URL('../app/(drawer)/(tabs)/(index,search,messages,grok,video,notifications)/post/[id].tsx', import.meta.url),
+    'utf8',
+  );
+  const profile = readFileSync(
+    new URL('../app/(drawer)/(tabs)/(index,search,messages,grok,video,notifications)/profile/[id].tsx', import.meta.url),
+    'utf8',
+  );
+  const relationships = readFileSync(
+    new URL('../app/(drawer)/(tabs)/(index,search,messages,grok,video,notifications)/profile/relationships/[id].tsx', import.meta.url),
+    'utf8',
+  );
+  const interactions = readFileSync(
+    new URL('../app/(drawer)/(tabs)/(index,search,messages,grok,video,notifications)/post-interactions/[id].tsx', import.meta.url),
+    'utf8',
+  );
+
+  expect(homeScreen).toContain('useCurrentTabScrollY()');
+  expect(homeScreen).toContain('useTabBarVisibilityOnAnimatedScroll(currentTabScrollY)');
+  expect(searchScreen).toContain('onScroll={tabBarScroll.onScroll}');
+  expect(notificationsScreen).toContain('onScroll={tabBarScroll.onScroll}');
+  expect(postDetail).toContain('onScroll={tabBarScroll.onScroll}');
+  expect(profile).toContain('useTabBarVisibilityOnAnimatedScroll(scrollOffset)');
+  expect(relationships).toContain('onScroll={tabBarScroll.onScroll}');
+  expect(interactions).toContain('onScroll={tabBarScroll.onScroll}');
 });

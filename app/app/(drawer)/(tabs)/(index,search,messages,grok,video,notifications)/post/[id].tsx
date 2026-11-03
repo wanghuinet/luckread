@@ -21,6 +21,7 @@ import {
 import { Feather } from '@expo/vector-icons';
 import * as DropdownMenu from 'zeego/dropdown-menu';
 import { useColorScheme } from 'nativewind';
+import { useTabBarScroll } from '~/components/TabBarScroll';
 
 type SortType = 'relevant' | 'recent' | 'liked';
 
@@ -188,6 +189,7 @@ export default function PostDetailScreen() {
     const params = useLocalSearchParams();
     const router = useRouter();
     const insets = useSafeAreaInsets();
+    const tabBarScroll = useTabBarScroll();
     const rawId = params.id;
     const postId = Array.isArray(rawId) ? rawId[0] || '' : rawId || '';
     const [selectedSort, setSelectedSort] = useState<SortType>('relevant');
@@ -337,6 +339,8 @@ export default function PostDetailScreen() {
         <>
             <ScrollView
                 ref={scrollViewRef}
+                onScroll={tabBarScroll.onScroll}
+                scrollEventThrottle={tabBarScroll.scrollEventThrottle}
                 className="flex-1 bg-white dark:bg-black"
                 style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
                 contentContainerStyle={{ flexGrow: 1 }}

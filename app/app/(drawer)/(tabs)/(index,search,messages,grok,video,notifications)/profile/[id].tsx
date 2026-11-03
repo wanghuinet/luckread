@@ -46,6 +46,7 @@ import Share from "~/assets/svg/share.svg"
 import Views from "~/assets/svg/views.svg"
 import Category from "~/assets/svg/category.svg"
 import Grok from "~/assets/svg/tabs/grok.svg";
+import { useTabBarVisibilityOnAnimatedScroll } from '~/components/TabBarScroll';
 
 import { FeedItem, FeedContent, ProfileImage, PROFILE_IMAGE_SIZE_MAP } from '~/components/FeedItem';
 import FollowButton from '~/components/FollowButton';
@@ -126,6 +127,7 @@ const ProfileHeader = ({ navBarVisibility, scrollOffset, refreshing, user, curre
   user: User;
   currentUserId: string | null;
 }) => {
+  useTabBarVisibilityOnAnimatedScroll(scrollOffset);
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
   const navigation = useNavigation();

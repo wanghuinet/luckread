@@ -4,6 +4,7 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useColorScheme } from 'nativewind';
+import { useTabBarScroll } from '~/components/TabBarScroll';
 import { ProfileImage } from '~/components/FeedItem';
 import {
   fetchContentLikesPage,
@@ -34,6 +35,7 @@ function likedAtLabel(value: string): string {
 }
 
 export default function PostInteractionsScreen() {
+  const tabBarScroll = useTabBarScroll();
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
   const params = useLocalSearchParams<{ id?: string | string[] }>();
@@ -182,6 +184,8 @@ export default function PostInteractionsScreen() {
 
       <FlatList
         data={items}
+        onScroll={tabBarScroll.onScroll}
+        scrollEventThrottle={tabBarScroll.scrollEventThrottle}
         keyExtractor={(item) => item.userId + ':' + item.likedAt}
         contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 16) }}
         ListHeaderComponent={
