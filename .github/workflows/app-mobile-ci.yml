@@ -172,6 +172,8 @@ jobs:
         run: bun test tests/tab-navigation-ui.test.mjs
       - name: Test native feed comment navigation
         run: bun run test:comment-navigation
+      - name: Test native TanStack Query feed cache and pagination
+        run: bun run test:feed-query
       - name: Test native public content search
         run: bun run test:content-search
       - name: Test native profile pin and unpin actions
