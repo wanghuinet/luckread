@@ -28,4 +28,9 @@ test('uses React Native 0.88 activity and root view tag methods', () => {
     'reactDelegate.reactRootView?.getRootViewTag() ?: -1',
   );
   expect(hyperFragment).not.toContain('reactRootView?.rootViewTag');
+  expect(hyperModule).not.toContain('bridgelessEnabled');
+  expect(hyperFragment).not.toContain('bridgelessEnabled');
+  expect(
+    readFileSync(new URL('ios/hyperswitchSDK/Core/NativeModule/RNHeadlessManager.swift', packageRoot), 'utf8'),
+  ).not.toContain('bridgelessEnabled');
 });
