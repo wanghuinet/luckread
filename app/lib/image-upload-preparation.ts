@@ -55,13 +55,15 @@ export async function prepareImageForUpload(file: LocalMediaFile): Promise<Local
   const format = getOutputFormat(file);
   if (!format || !needsPreparation(file)) return file;
 
-  const context = ImageManipulator.manipulate(file.uri, {
-    maxWidth: MAX_UPLOAD_IMAGE_DIMENSION,
-    maxHeight: MAX_UPLOAD_IMAGE_DIMENSION,
-  });
-  let rendered: Awaited<ReturnType<typeof context.renderAsync>> | null = null;
+  type ManipulatorContext = ReturnType<typeof ImageManipulator.manipulate>;
+  let context: ManipulatorContext | null = null;
+  let rendered: Awaited<ReturnType<ManipulatorContext['renderAsync']>> | null = null;
 
   try {
+    context = ImageManipulator.manipulate(file.uri, {
+      maxWidth: MAX_UPLOAD_IMAGE_DIMENSION,
+      maxHeight: MAX_UPLOAD_IMAGE_DIMENSION,
+    });
     rendered = await context.renderAsync();
     const result = await rendered.saveAsync(
       format === 'png'
@@ -86,6 +88,6 @@ export async function prepareImageForUpload(file: LocalMediaFile): Promise<Local
     return file;
   } finally {
     rendered?.release();
-    context.release();
+    context?.release();
   }
 }
