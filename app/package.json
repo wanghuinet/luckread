@@ -23,13 +23,15 @@
     "test:auth-flow": "bun test tests/auth-flow-api.test.mjs",
     "test:subscriptions-api": "bun test tests/subscriptions-api.test.mjs",
     "test:billing-api": "bun test tests/billing-api.test.mjs",
-    "test:paid-content": "bun test tests/paid-content-entitlement.test.mjs"
+    "test:paid-content": "bun test tests/paid-content-entitlement.test.mjs",
+    "test:native-menu": "bun test tests/native-menu-dependencies.test.mjs"
   },
   "dependencies": {
     "@codeherence/react-native-header": "^0.14.0",
     "@expo/vector-icons": "~14.0.4",
     "@gorhom/bottom-sheet": "^5",
     "@nandorojo/galeria": "^1.2.0",
+    "@react-native-menu/menu": "1.2.2",
     "@react-navigation/bottom-tabs": "^7.0.5",
     "@react-navigation/drawer": "^7.0.0",
     "@react-navigation/native": "^7.0.3",
