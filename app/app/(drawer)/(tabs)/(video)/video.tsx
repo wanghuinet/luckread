@@ -37,6 +37,7 @@ import {
   type ApiContentRecord,
 } from '~/lib/content-adapter';
 import { getMediaPlayback } from '~/lib/publish-api';
+import { settleVideoFeedEnrichment, type VideoPlaybackResult } from '~/lib/video-feed-enrichment';
 import { readSessionToken } from '~/lib/secure-session';
 import { fetchVideoFeedPage } from '~/lib/video-feed-api';
 import { getApiErrorMessage } from '~/lib/api-client';
@@ -47,20 +48,18 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const PAGE_SIZE = 12;
 const PRIMARY = '#1d9bf0';
 
-type NativeVideoSource = {
-  uri: string;
-  headers?: Record<string, string>;
-};
-
 type VideoFeedItem = FeedContent & {
-  videoSource: NativeVideoSource | null;
+  contentId: string;
+  videoSource: VideoPlaybackResult['source'];
   mediaError?: string;
+  mediaLoading?: boolean;
+  mediaSourceVersion?: number;
 };
 
 async function resolveVideoSource(
   item: ApiContentRecord,
   sessionToken: string | null,
-): Promise<{ source: NativeVideoSource | null; error?: string }> {
+): Promise<VideoPlaybackResult> {
   const reference = item.mediaRefs?.find((value) => typeof value === 'string' && value.trim())?.trim();
   if (!reference) return { source: null, error: 'This video has no playable media attached.' };
 
@@ -96,6 +95,89 @@ function formatCount(value: number | undefined): string {
   return String(value);
 }
 
+function VideoPlayerSurface({
+  source,
+  isVisible,
+  isFocused,
+  muted,
+  onRetry,
+}: {
+  source: NonNullable<VideoPlaybackResult['source']>;
+  isVisible: boolean;
+  isFocused: boolean;
+  muted: boolean;
+  onRetry: () => void;
+}) {
+  const player = useVideoPlayer(source, (instance) => {
+    instance.loop = true;
+  });
+  const { isPlaying } = useEvent(player, 'playingChange', { isPlaying: player.playing });
+  const { status, error } = useEvent(player, 'statusChange', { status: player.status });
+
+  useEffect(() => {
+    if (!isFocused || !isVisible) {
+      player.pause();
+      return;
+    }
+    player.muted = muted;
+    try {
+      player.play();
+    } catch {
+      // Playback can be interrupted while the user changes tabs.
+    }
+  }, [isFocused, isVisible, muted, player]);
+
+  const togglePlayPause = useCallback(() => {
+    if (isPlaying) player.pause();
+    else {
+      player.muted = muted;
+      player.play();
+    }
+  }, [isPlaying, muted, player]);
+  const playbackFailed = status === 'error';
+
+  return (
+    <>
+      <TouchableOpacity
+        accessibilityRole="button"
+        accessibilityLabel={isPlaying ? 'Pause video' : 'Play video'}
+        activeOpacity={1}
+        onPress={togglePlayPause}
+        style={StyleSheet.absoluteFill}
+      >
+        <VideoView
+          player={player}
+          style={styles.videoPlayer}
+          contentFit="cover"
+          allowsFullscreen={false}
+          allowsPictureInPicture={false}
+          nativeControls={false}
+        />
+      </TouchableOpacity>
+
+      {status === 'loading' ? (
+        <ActivityIndicator size="large" color="#ffffff" style={styles.loadingIndicator} />
+      ) : null}
+
+      {!isPlaying && status === 'readyToPlay' && !playbackFailed ? (
+        <Pressable accessibilityRole="button" onPress={togglePlayPause} style={styles.playPauseIndicator}>
+          <Feather name="play" size={50} color="#ffffff" />
+        </Pressable>
+      ) : null}
+
+      {status === 'error' ? (
+        <View style={styles.playbackError} pointerEvents="box-none">
+          <Feather name="alert-triangle" size={30} color="#ffffff" />
+          <Text style={styles.unavailableMessage}>{error?.message || 'Unable to play this video.'}</Text>
+          <Pressable accessibilityRole="button" onPress={onRetry} style={styles.retryButton}>
+            <Text style={styles.retryButtonText}>Retry feed</Text>
+          </Pressable>
+        </View>
+      ) : null}
+    </>
+  );
+}
+
 function VideoItem({
   item,
   isVisible,
@@ -117,33 +199,7 @@ function VideoItem({
   const insets = useSafeAreaInsets();
   const currentUserId = useAuthStore((state) => state.user?.id);
   const authorId = item.creatorId || item.ownerUserId;
-  const player = useVideoPlayer(item.videoSource, (instance) => {
-    instance.loop = true;
-  });
-  const { isPlaying } = useEvent(player, 'playingChange', { isPlaying: player.playing });
-  const { status, error } = useEvent(player, 'statusChange', { status: player.status });
 
-  useEffect(() => {
-    if (!isFocused || !isVisible || !item.videoSource) {
-      player.pause();
-      return;
-    }
-    player.muted = muted;
-    try {
-      player.play();
-    } catch {
-      // Playback can be interrupted while the user changes tabs.
-    }
-  }, [isFocused, isVisible, item.videoSource, muted, player]);
-
-  const togglePlayPause = useCallback(() => {
-    if (!item.videoSource) return;
-    if (isPlaying) player.pause();
-    else {
-      player.muted = muted;
-      player.play();
-    }
-  }, [isPlaying, item.videoSource, muted, player]);
 
   const openAuthor = useCallback(() => {
     const identifier = item.poster_id && item.poster_id !== 'unknown'
@@ -152,27 +208,22 @@ function VideoItem({
     if (identifier) router.push(('/profile/' + encodeURIComponent(identifier)) as never);
   }, [item.authorHandle, item.poster_id, router]);
 
-  const playbackFailed = Boolean(item.mediaError) || status === 'error';
-
   return (
     <View style={styles.videoContainer}>
       {item.videoSource ? (
-        <TouchableOpacity
-          accessibilityRole="button"
-          accessibilityLabel={isPlaying ? 'Pause video' : 'Play video'}
-          activeOpacity={1}
-          onPress={togglePlayPause}
-          style={StyleSheet.absoluteFill}
-        >
-          <VideoView
-            player={player}
-            style={styles.videoPlayer}
-            contentFit="cover"
-            allowsFullscreen={false}
-            allowsPictureInPicture={false}
-            nativeControls={false}
-          />
-        </TouchableOpacity>
+        <VideoPlayerSurface
+          key={item.contentId + ':' + String(item.mediaSourceVersion ?? 0)}
+          source={item.videoSource}
+          isVisible={isVisible}
+          isFocused={isFocused}
+          muted={muted}
+          onRetry={onRetry}
+        />
+      ) : item.mediaLoading ? (
+        <View style={styles.unavailableVideo}>
+          <ActivityIndicator size="large" color="#ffffff" />
+          <Text style={styles.unavailableMessage}>Loading video…</Text>
+        </View>
       ) : (
         <View style={styles.unavailableVideo}>
           <Feather name="video-off" size={42} color="#ffffff" />
@@ -183,26 +234,6 @@ function VideoItem({
           </Pressable>
         </View>
       )}
-
-      {item.videoSource && status === 'loading' ? (
-        <ActivityIndicator size="large" color="#ffffff" style={styles.loadingIndicator} />
-      ) : null}
-
-      {item.videoSource && !isPlaying && status === 'readyToPlay' && !playbackFailed ? (
-        <Pressable accessibilityRole="button" onPress={togglePlayPause} style={styles.playPauseIndicator}>
-          <Feather name="play" size={50} color="#ffffff" />
-        </Pressable>
-      ) : null}
-
-      {item.videoSource && status === 'error' ? (
-        <View style={styles.playbackError} pointerEvents="box-none">
-          <Feather name="alert-triangle" size={30} color="#ffffff" />
-          <Text style={styles.unavailableMessage}>{error?.message || 'Unable to play this video.'}</Text>
-          <Pressable accessibilityRole="button" onPress={onRetry} style={styles.retryButton}>
-            <Text style={styles.retryButtonText}>Retry feed</Text>
-          </Pressable>
-        </View>
-      ) : null}
 
       <LinearGradient
         pointerEvents="box-none"
@@ -327,33 +358,114 @@ export default function VideoFeed() {
         throw new Error(getApiErrorMessage(result.data, 'Could not load LuckRead videos.', result.response.status));
       }
 
-      const sessionToken = await readSessionToken().catch(() => null);
-      const videoRecords = page.items.filter((item): item is ApiContentRecord =>
-        Boolean(item && typeof item.id === 'string' && item.contentType === 'video'),
+      const videoRecords = page.items.filter(
+        (item): item is ApiContentRecord & { id: string } =>
+          Boolean(item && typeof item.id === 'string' && item.id.length > 0 && item.contentType === 'video'),
       );
-      const mapped = await Promise.all(videoRecords.map(async (record): Promise<VideoFeedItem> => {
-        const [body, social, author, playback] = await Promise.all([
-          readContentBody(record, undefined, sessionToken),
-          readContentSocial(record.id),
-          readContentAuthor(record),
-          resolveVideoSource(record, sessionToken),
-        ]);
-        return {
-          ...mapContentToFeedContent(record, body, social, author, sessionToken),
-          videoSource: playback.source,
-          mediaError: playback.error,
-        };
-      }));
+
+      // Render the canonical list projection first. Optional W03/W05/W01
+      // enrichment and playback authorization must not hold the video screen.
+      const visibleItems = videoRecords.flatMap((record): VideoFeedItem[] => {
+        try {
+          return [{
+            ...mapContentToFeedContent(record, undefined, record.social, record.creator ?? record.author),
+            contentId: record.id,
+            videoSource: null,
+            mediaLoading: true,
+          }];
+        } catch {
+          // Skip only a malformed record; keep the rest of the video page visible.
+          return [];
+        }
+      });
+      if (videoRecords.length > 0 && visibleItems.length === 0) {
+        throw new Error('Videos were returned, but could not be displayed. Please retry.');
+      }
+
+      if (append) {
+        setItems((current) => {
+          const known = new Set(current.map((item) => item.contentId));
+          return [...current, ...visibleItems.filter((item) => !known.has(item.contentId))];
+        });
+      } else {
+        setItems(visibleItems);
+      }
+      setCurrentId((current) => {
+        if (append) return current ?? visibleItems[0]?.contentId ?? null;
+        return current && visibleItems.some((item) => item.contentId === current)
+          ? current
+          : visibleItems[0]?.contentId ?? null;
+      });
+
+      const sessionToken = await readSessionToken().catch(() => null);
       if (requestId !== requestIdRef.current) return;
 
-      setItems((current) => {
-        if (!append) return mapped;
-        const known = new Set(current.map((item) => item.contentId));
-        return [...current, ...mapped.filter((item) => !known.has(item.contentId))];
+      const projectionById = new Map(
+        visibleItems.map((item): [string, VideoFeedItem] => [item.contentId, item]),
+      );
+      const hydrationResults = await Promise.allSettled(
+        videoRecords.map(async (record): Promise<VideoFeedItem | null> => {
+          const { body, social, author, playback } = await settleVideoFeedEnrichment(
+            {
+              body: () => readContentBody(record, undefined, sessionToken),
+              social: () => readContentSocial(record.id),
+              author: () => readContentAuthor(record),
+              playback: () => resolveVideoSource(record, sessionToken),
+            },
+            {
+              social: record.social ?? null,
+              author: record.creator ?? record.author ?? null,
+            },
+          );
+
+          const fallback = projectionById.get(record.id);
+          try {
+            return {
+              ...mapContentToFeedContent(record, body, social, author, sessionToken),
+              contentId: record.id,
+              videoSource: playback.source,
+              mediaError: playback.source
+                ? undefined
+                : playback.error || 'This video has no playable media source.',
+              mediaLoading: false,
+              mediaSourceVersion: requestId,
+            };
+          } catch {
+            return fallback
+              ? {
+                  ...fallback,
+                  mediaLoading: false,
+                  mediaError: 'Unable to load this video. Please retry.',
+                }
+              : null;
+          }
+        }),
+      );
+      if (requestId !== requestIdRef.current) return;
+
+      // A malformed record or unexpected mapper failure must still settle its
+      // own loading state instead of leaving the whole feed waiting.
+      const hydratedItems = hydrationResults.flatMap((result, index): VideoFeedItem[] => {
+        if (result.status === 'fulfilled' && result.value) return [result.value];
+        const failedRecord = videoRecords[index];
+        const fallback = failedRecord ? projectionById.get(failedRecord.id) : undefined;
+        return fallback
+          ? [{
+              ...fallback,
+              mediaLoading: false,
+              mediaError: 'Unable to load video details. Please retry.',
+            }]
+          : [];
       });
+      const hydratedById = new Map(
+        hydratedItems.map((item): [string, VideoFeedItem] => [item.contentId, item]),
+      );
+      setItems((current) =>
+        current.map((item) => hydratedById.get(item.contentId) ?? item),
+      );
+
       setCursor(page.nextCursor || null);
       setHasMore(page.hasMore === true);
-      setCurrentId((current) => current ?? mapped[0]?.contentId ?? null);
     } catch (cause) {
       if (requestId !== requestIdRef.current) return;
       setErrorMessage(cause instanceof Error ? cause.message : 'Could not load LuckRead videos.');
