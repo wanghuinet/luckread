@@ -46,4 +46,6 @@ test('home timeline uses cursor-based infinite queries, cached refetch and page-
 test('TanStack Query and Expo Network are normal app runtime dependencies', () => {
   expect(packageJson.dependencies['@tanstack/react-query']).toBe('5.105.3');
   expect(packageJson.dependencies['expo-network']).toBe('~58.0.4');
+  // Keep the navigation inset dependency aligned with the Expo SDK 58 package matrix.
+  expect(packageJson.dependencies['react-native-safe-area-context']).toBe('~5.11.1');
 });
