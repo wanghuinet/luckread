@@ -20,6 +20,7 @@ import {
 } from '@gorhom/bottom-sheet';
 import { Feather } from '@expo/vector-icons';
 import * as DropdownMenu from 'zeego/dropdown-menu';
+import { useColorScheme } from 'nativewind';
 
 type SortType = 'relevant' | 'recent' | 'liked';
 
@@ -43,6 +44,8 @@ export const MoreContextIcons = ({
     postId?: string;
 }) => {
     const router = useRouter();
+    const { colorScheme } = useColorScheme();
+    const isDark = colorScheme === 'dark';
     const openPostInteractions = () => {
         if (!postId) return;
         router.push(('/post-interactions/' + encodeURIComponent(postId)) as never);
@@ -95,12 +98,12 @@ export const MoreContextIcons = ({
     return (
         <View className="flex-row items-center gap-3  ">
             <TouchableOpacity onPress={() => { router.back() }}>
-                <Grok width={size === 'sm' ? 18 : 22} height={size === 'sm' ? 18 : 22} fill={'#536471'} />
+                <Grok width={size === 'sm' ? 18 : 22} height={size === 'sm' ? 18 : 22} fill={isDark ? '#d1d5db' : '#536471'} />
             </TouchableOpacity>
             <DropdownMenu.Root>
                 <DropdownMenu.Trigger>
                     <TouchableOpacity>
-                        <Feather name="more-horizontal" size={size === 'sm' ? 18 : 22} color={'#536471'} />
+                        <Feather name="more-horizontal" size={size === 'sm' ? 18 : 22} color={isDark ? '#d1d5db' : '#536471'} />
                     </TouchableOpacity>
                 </DropdownMenu.Trigger>
                 <DropdownMenu.Content>
@@ -142,13 +145,15 @@ export const MoreContextIcons = ({
 };
 
 const PostHeader = ({ username, targetUserId, contentId, postId }: { username?: string; targetUserId?: string | null; contentId: string; postId: string }) => {
+    const { colorScheme } = useColorScheme();
+    const isDark = colorScheme === 'dark';
     const insets = useSafeAreaInsets();
     const router = useRouter();
     return (
         <View className="p-4  top-0 left-0 right-0 flex-row items-center justify-center">
 
             <TouchableOpacity onPress={() => { router.back() }} className="absolute left-4">
-                <Feather name="arrow-left" size={22} color={'#536471'} />
+                <Feather name="arrow-left" size={22} color={isDark ? '#d1d5db' : '#536471'} />
             </TouchableOpacity>
 
             <Text className="text-xl font-bold text-black dark:text-white">Post</Text>
@@ -178,6 +183,8 @@ type PublicAuthor = {
 };
 
 export default function PostDetailScreen() {
+    const { colorScheme } = useColorScheme();
+    const isDark = colorScheme === 'dark';
     const params = useLocalSearchParams();
     const router = useRouter();
     const insets = useSafeAreaInsets();
@@ -380,7 +387,7 @@ export default function PostDetailScreen() {
                             <Text className="text-base font-bold text-neutral-500 dark:text-blue-400 mr-1">
                                 {sortOptions[selectedSort]}
                             </Text>
-                            <Feather name="chevron-down" size={18} color={'#536471'} />
+                            <Feather name="chevron-down" size={18} color={isDark ? '#d1d5db' : '#536471'} />
                         </TouchableOpacity>
                         <Comments contentId={postId} sort={selectedSort} />
                     </View>
@@ -397,8 +404,8 @@ export default function PostDetailScreen() {
                         disappearsOnIndex={-1}
                     />
                 )}
-                handleIndicatorStyle={{ backgroundColor: '#EEF3F4', height: 5, width: 35 }}
-                backgroundStyle={{ backgroundColor: '#ffffff', borderRadius: 30 }}
+                handleIndicatorStyle={{ backgroundColor: isDark ? '#52525b' : '#EEF3F4', height: 5, width: 35 }}
+                backgroundStyle={{ backgroundColor: isDark ? '#09090b' : '#ffffff', borderRadius: 30 }}
             >
                 <BottomSheetView style={styles.contentContainer}>
                     <Text className="text-lg font-extrabold text-black dark:text-white text-center">Sort replies</Text>
