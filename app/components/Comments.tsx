@@ -4,6 +4,7 @@ import {
   Alert,
   Text,
   TextInput,
+  type TextInputInstance,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -107,7 +108,7 @@ export default function Comments({ contentId, sort = 'relevant' }: CommentsProps
     parentId: string | null;
     key: string;
   } | null>(null);
-  const inputRef = useRef<TextInput | null>(null);
+  const inputRef = useRef<TextInputInstance | null>(null);
 
   const loadComments = useCallback(async (nextCursor: string | null = null) => {
     const requestId = ++requestIdRef.current;

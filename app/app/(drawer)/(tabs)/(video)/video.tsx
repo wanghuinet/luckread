@@ -8,9 +8,8 @@ import {
   Text,
   TouchableOpacity,
   View,
-  type ViewToken,
 } from 'react-native';
-import { FlashList } from '@shopify/flash-list';
+import { FlashList, type ViewToken } from '@shopify/flash-list';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { useEvent } from 'expo';
 import { Feather } from '@expo/vector-icons';
@@ -150,7 +149,7 @@ function VideoPlayerSurface({
           player={player}
           style={styles.videoPlayer}
           contentFit="cover"
-          allowsFullscreen={false}
+          fullscreenOptions={{ enable: false }}
           allowsPictureInPicture={false}
           nativeControls={false}
         />
@@ -606,11 +605,11 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   videoPlayer: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: '#000000',
   },
   overlayGradient: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     justifyContent: 'space-between',
     paddingHorizontal: 16,
   },
@@ -693,7 +692,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   unavailableVideo: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 30,

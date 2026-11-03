@@ -11,8 +11,12 @@ const feedItem = readFileSync(
   new URL('../components/FeedItem.tsx', import.meta.url),
   'utf8',
 );
+const postDetail = readFileSync(
+  new URL('../app/(drawer)/(tabs)/(index,search,messages,grok,video,notifications)/post/[id].tsx', import.meta.url),
+  'utf8',
+);
 
-test('declares the native Android menu peer required by Zeego 3', () => {
+test('declares the SDK 58 native Android menu dependency', () => {
   expect(packageJson.dependencies.zeego).toBeUndefined();
   expect(packageJson.dependencies['@react-native-menu/menu']).toBe('2.0.0');
   expect(packageJson.dependencies['react-native-ios-context-menu']).toBeUndefined();
@@ -27,6 +31,9 @@ test('uses an RN 0.88-compatible Android native menu and the iOS system action s
   expect(feedItem).toContain('ActionSheetIOS.showActionSheetWithOptions');
   expect(feedItem).toContain("onLongPress={Platform.OS === 'ios'");
   expect(feedItem).not.toContain('zeego/');
+  expect(postDetail).toContain("from '@react-native-menu/menu'");
+  expect(postDetail).toContain('ActionSheetIOS.showActionSheetWithOptions');
+  expect(postDetail).not.toContain('zeego/');
 });
 
 test('keeps the Android native menu out of the iOS CocoaPods build', () => {

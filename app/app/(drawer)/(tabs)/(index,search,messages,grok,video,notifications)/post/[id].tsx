@@ -1,5 +1,5 @@
 import React, { useState, useRef, useMemo, useCallback, useEffect } from 'react';
-import { Alert, View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import { ActionSheetIOS, Alert, Platform, View, Text, ScrollView, TouchableOpacity, StyleSheet, type ScrollViewInstance } from 'react-native';
 import { useLocalSearchParams, Stack, useRouter } from 'expo-router';
 import { FeedItem, FeedContent } from '~/components/FeedItem';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -19,7 +19,7 @@ import {
     BottomSheetBackdrop
 } from '@gorhom/bottom-sheet';
 import { Feather } from '@expo/vector-icons';
-import * as DropdownMenu from 'zeego/dropdown-menu';
+import { MenuView, type MenuAction } from '@react-native-menu/menu';
 import { useColorScheme } from 'nativewind';
 import { useTabBarScroll } from '~/components/TabBarScroll';
 
@@ -47,13 +47,14 @@ export const MoreContextIcons = ({
     const router = useRouter();
     const { colorScheme } = useColorScheme();
     const isDark = colorScheme === 'dark';
+    const [reportDialogOpen, setReportDialogOpen] = useState(false);
+    const currentUserId = useAuthStore((state) => state.user?.id);
+    const isOwnTarget = Boolean(targetUserId && currentUserId && targetUserId === currentUserId);
+
     const openPostInteractions = () => {
         if (!postId) return;
         router.push(('/post-interactions/' + encodeURIComponent(postId)) as never);
     };
-    const [reportDialogOpen, setReportDialogOpen] = useState(false);
-    const currentUserId = useAuthStore((state) => state.user?.id);
-    const isOwnTarget = Boolean(targetUserId && currentUserId && targetUserId === currentUserId);
 
     const muteTarget = () => {
         if (!targetUserId || isOwnTarget) {
@@ -96,51 +97,63 @@ export const MoreContextIcons = ({
         ]);
     };
 
+    const actions: MenuAction[] = [
+        { id: 'interactions', title: 'View post interactions', attributes: { disabled: !postId } },
+        { id: 'report', title: 'Report post', attributes: { disabled: !contentId } },
+        { id: 'mute', title: 'Mute @' + username, attributes: { disabled: !targetUserId || isOwnTarget } },
+        { id: 'block', title: 'Block @' + username, attributes: { disabled: !targetUserId || isOwnTarget, destructive: true } },
+    ];
+
+    const runMenuAction = (id: string) => {
+        switch (id) {
+            case 'interactions': openPostInteractions(); break;
+            case 'report': setReportDialogOpen(true); break;
+            case 'mute': muteTarget(); break;
+            case 'block': confirmBlockTarget(); break;
+        }
+    };
+
+    const showIosActionSheet = () => {
+        const available = actions.filter((action) => !action.attributes?.disabled);
+        const cancelButtonIndex = available.length;
+        const destructiveButtonIndex = available.findIndex((action) => action.attributes?.destructive);
+        ActionSheetIOS.showActionSheetWithOptions(
+            {
+                title: '@' + username,
+                options: [...available.map((action) => action.title), 'Cancel'],
+                cancelButtonIndex,
+                ...(destructiveButtonIndex >= 0 ? { destructiveButtonIndex } : {}),
+                userInterfaceStyle: isDark ? 'dark' : 'light',
+            },
+            (selectedIndex) => {
+                const selected = available[selectedIndex];
+                if (selected?.id) runMenuAction(selected.id);
+            },
+        );
+    };
+
     return (
-        <View className="flex-row items-center gap-3  ">
-            <TouchableOpacity onPress={() => { router.back() }}>
+        <View className="flex-row items-center gap-3">
+            <TouchableOpacity onPress={() => router.back()}>
                 <Grok width={size === 'sm' ? 18 : 22} height={size === 'sm' ? 18 : 22} fill={isDark ? '#d1d5db' : '#536471'} />
             </TouchableOpacity>
-            <DropdownMenu.Root>
-                <DropdownMenu.Trigger>
+            {Platform.OS === 'android' ? (
+                <MenuView
+                    actions={actions}
+                    isAnchoredToRight
+                    onPressAction={({ nativeEvent }) => runMenuAction(nativeEvent.event)}
+                    style={{ width: size === 'sm' ? 28 : 32, height: size === 'sm' ? 28 : 32 }}
+                >
                     <TouchableOpacity>
                         <Feather name="more-horizontal" size={size === 'sm' ? 18 : 22} color={isDark ? '#d1d5db' : '#536471'} />
                     </TouchableOpacity>
-                </DropdownMenu.Trigger>
-                <DropdownMenu.Content>
-                    <DropdownMenu.Item key="interactions" onSelect={openPostInteractions} disabled={!postId}>
-                        <DropdownMenu.ItemTitle>View post interactions</DropdownMenu.ItemTitle>
-                        <DropdownMenu.ItemIcon
-                            ios={{ name: 'chart.bar.xaxis' }}
-                        />
-                    </DropdownMenu.Item>
-                    <DropdownMenu.Item key="report" onSelect={() => setReportDialogOpen(true)} disabled={!contentId}>
-                        <DropdownMenu.ItemTitle>Report post</DropdownMenu.ItemTitle>
-                        <DropdownMenu.ItemIcon
-                            ios={{ name: 'flag' }}
-                        />
-                    </DropdownMenu.Item><DropdownMenu.Sub>
-                        <DropdownMenu.SubTrigger key="user-actions">
-                            <DropdownMenu.ItemTitle>@{username}</DropdownMenu.ItemTitle>
-                            
-                        </DropdownMenu.SubTrigger>
-                        <DropdownMenu.SubContent><DropdownMenu.Item key="mute" onSelect={muteTarget} disabled={!targetUserId || isOwnTarget}>
-                                <DropdownMenu.ItemTitle>Mute @{username}</DropdownMenu.ItemTitle>
-                                <DropdownMenu.ItemIcon ios={{ name: 'speaker.slash' }} />
-                            </DropdownMenu.Item>
-                            <DropdownMenu.Item key="block" destructive onSelect={confirmBlockTarget} disabled={!targetUserId || isOwnTarget}>
-                                <DropdownMenu.ItemTitle>Block @{username}</DropdownMenu.ItemTitle>
-                                <DropdownMenu.ItemIcon ios={{ name: 'nosign' }} />
-                            </DropdownMenu.Item>
-                        </DropdownMenu.SubContent>
-                    </DropdownMenu.Sub>
-                </DropdownMenu.Content>
-            </DropdownMenu.Root>
-            <ReportPostDialog
-                visible={reportDialogOpen}
-                contentId={contentId}
-                onClose={() => setReportDialogOpen(false)}
-            />
+                </MenuView>
+            ) : (
+                <TouchableOpacity onPress={showIosActionSheet}>
+                    <Feather name="more-horizontal" size={size === 'sm' ? 18 : 22} color={isDark ? '#d1d5db' : '#536471'} />
+                </TouchableOpacity>
+            )}
+            <ReportPostDialog visible={reportDialogOpen} contentId={contentId} onClose={() => setReportDialogOpen(false)} />
         </View>
     );
 };
@@ -199,7 +212,7 @@ export default function PostDetailScreen() {
     const [errorMessage, setErrorMessage] = useState('');
     const [retryKey, setRetryKey] = useState(0);
     const bottomSheetModalRef = useRef<BottomSheetModal>(null);
-    const scrollViewRef = useRef<ScrollView | null>(null);
+    const scrollViewRef = useRef<ScrollViewInstance | null>(null);
     const commentsOffsetRef = useRef(0);
     const snapPoints = useMemo(() => ['25%', '30%'], []);
 

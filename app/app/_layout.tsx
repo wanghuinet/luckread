@@ -74,7 +74,7 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={styles.flex}>
-      <StatusBar style={isDark ? 'light' : 'dark'} backgroundColor={isDark ? '#000000' : '#ffffff'} />
+      <StatusBar style={isDark ? 'light' : 'dark'} />
       <BottomSheetModalProvider>
         <View style={styles.flex}>
           <Stack>
@@ -99,7 +99,7 @@ export default function RootLayout() {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   splash: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems: 'center',
     backgroundColor: '#080808',
     justifyContent: 'center',

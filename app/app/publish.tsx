@@ -114,7 +114,7 @@ function ComposerVideoPreview({ uri }: { uri: string }) {
       style={styles.videoPreview}
       contentFit="contain"
       nativeControls
-      allowsFullscreen={false}
+      fullscreenOptions={{ enable: false }}
       allowsPictureInPicture={false}
     />
   );

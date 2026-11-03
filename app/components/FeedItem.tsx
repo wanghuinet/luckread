@@ -166,7 +166,7 @@ const FeedVideoAttachment = ({ uri, headers }: { uri: string; headers?: Record<s
             style={{ width: '100%', aspectRatio: 1 }}
             contentFit="contain"
             nativeControls
-            allowsFullscreen
+            fullscreenOptions={{ enable: true }}
             allowsPictureInPicture={false}
         />
     );
@@ -656,7 +656,7 @@ export const FeedItemDetailView: React.FC<FeedItemProps> = ({ itemData, onPress,
                                 <Image
                                     source={{ uri: verified_badge }}
                                     className="w-4 h-4 mr-1"
-                                    onError={(e) => console.log('Failed to load verified badge:', e.nativeEvent.error)}
+                                    onError={(e) => console.log('Failed to load verified badge:', e.error)}
                                 />
                             )}
                             <Text className="text-lg text-neutral-500 dark:text-neutral-400  ml-1">@{authorHandle}</Text>

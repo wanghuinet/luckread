@@ -8,8 +8,8 @@ import {
   ViewStyle,
   SectionListProps,
   LayoutChangeEvent,
-  DefaultSectionT, 
 } from 'react-native';
+import type { AnimatedStyle, SharedValue } from 'react-native-reanimated';
 import Animated, {
   useAnimatedProps,
   useAnimatedStyle,
@@ -25,12 +25,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 
 
+type DefaultSectionT = any;
+
 type AnimatedViewInteractionEvents = React.ComponentProps<typeof Animated.View>['pointerEvents'];
 
 
 type OpacityTransitionViewProps = {
-  customStyle?: StyleProp<Animated.AnimateStyle<StyleProp<ViewStyle>>>;
-  visibilityLevel: Animated.SharedValue<number>; 
+  customStyle?: StyleProp<AnimatedStyle<ViewStyle>>;
+  visibilityLevel: SharedValue<number>; 
   visibilityThresholdForInteraction?: number; 
   children?: React.ReactNode;
   dynamicProps?: object; 
@@ -43,20 +45,20 @@ interface ExpandedHeaderProps {
 
 
 interface TopNavigationBarProps {
-  navBarVisibility?: Animated.SharedValue<number>; 
+  navBarVisibility?: SharedValue<number>; 
   leftContent?: React.ReactNode; 
   centerContent?: React.ReactNode; 
   rightContent?: React.ReactNode; 
   ignoreTopPadding?: boolean; 
-  BackgroundLayer?: (props: { navBarVisibility?: Animated.SharedValue<number> }) => React.ReactElement | null; 
-  scrollOffset?: Animated.SharedValue<number>; 
+  BackgroundLayer?: (props: { navBarVisibility?: SharedValue<number> }) => React.ReactElement | null; 
+  scrollOffset?: SharedValue<number>; 
 }
 
 
 interface ScrollingListProps<ItemT, SectionT = DefaultSectionT> {
   
-  NavigationBarComponent: (props: { scrollOffset: Animated.SharedValue<number>; navBarVisibility: Animated.SharedValue<number>; }) => React.ReactElement;
-  ExpandedHeaderComponent?: (props: { scrollOffset: Animated.SharedValue<number>; navBarVisibility: Animated.SharedValue<number>; }) => React.ReactElement;
+  NavigationBarComponent: (props: { scrollOffset: SharedValue<number>; navBarVisibility: SharedValue<number>; }) => React.ReactElement;
+  ExpandedHeaderComponent?: (props: { scrollOffset: SharedValue<number>; navBarVisibility: SharedValue<number>; }) => React.ReactElement;
   wrapperStyle?: StyleProp<ViewStyle>; 
   ignoreLeftPadding?: boolean; 
   ignoreRightPadding?: boolean; 
@@ -247,10 +249,7 @@ type ScrollingListWithHeaderProps<ItemT, SectionT = DefaultSectionT> =
   & ScrollingListProps<ItemT, SectionT>; 
 
 
-const AnimatedSectionList = Animated.createAnimatedComponent(SectionList) as React.ComponentClass<
-  Animated.AnimateProps<SectionListProps<any, any>>, 
-  any
->;
+const AnimatedSectionList = Animated.createAnimatedComponent(SectionList);
 
 /**
  * The core component: A SectionList that integrates collapsible large header
