@@ -399,19 +399,19 @@ export default function VideoFeed() {
 
   if (loading && items.length === 0) {
     return (
-      <View style={[styles.stateContainer, { backgroundColor: isDark ? "#000000" : "#ffffff" }]}>
+      <View style={[styles.stateContainer, { backgroundColor: isDark ? '#000000' : '#ffffff' }]}>
         <ActivityIndicator color={PRIMARY} size="large" />
-        <Text style={[styles.stateDescription, { color: isDark ? "#9ca3af" : "#667085" }]}>Loading LuckRead videos…</Text>
+        <Text style={[styles.stateDescription, { color: isDark ? '#9ca3af' : '#667085' }]}>Loading LuckRead videos…</Text>
       </View>
     );
   }
 
   if (errorMessage && items.length === 0) {
     return (
-      <View style={[styles.stateContainer, { backgroundColor: isDark ? "#000000" : "#ffffff" }]}>
-        <Feather name="wifi-off" size={36} color={isDark ? "#9ca3af" : "#667085"} />
-        <Text style={[styles.stateTitle, { color: isDark ? "#f9fafb" : "#101828" }]}>Unable to load videos</Text>
-        <Text style={[styles.stateDescription, { color: isDark ? "#9ca3af" : "#667085" }]}>{errorMessage}</Text>
+      <View style={[styles.stateContainer, { backgroundColor: isDark ? '#000000' : '#ffffff' }]}>
+        <Feather name="wifi-off" size={36} color={isDark ? '#9ca3af' : '#667085'} />
+        <Text style={[styles.stateTitle, { color: isDark ? '#f9fafb' : '#101828' }]}>Unable to load videos</Text>
+        <Text style={[styles.stateDescription, { color: isDark ? '#9ca3af' : '#667085' }]}>{errorMessage}</Text>
         <Pressable accessibilityRole="button" onPress={retry} style={styles.retryButtonLight}>
           <Text style={styles.retryButtonText}>Retry</Text>
         </Pressable>
@@ -421,10 +421,10 @@ export default function VideoFeed() {
 
   if (!loading && items.length === 0) {
     return (
-      <View style={[styles.stateContainer, { backgroundColor: isDark ? "#000000" : "#ffffff" }]}>
-        <Feather name="video" size={36} color={isDark ? "#9ca3af" : "#667085"} />
-        <Text style={[styles.stateTitle, { color: isDark ? "#f9fafb" : "#101828" }]}>No videos yet</Text>
-        <Text style={[styles.stateDescription, { color: isDark ? "#9ca3af" : "#667085" }]}>
+      <View style={[styles.stateContainer, { backgroundColor: isDark ? '#000000' : '#ffffff' }]}>
+        <Feather name="video" size={36} color={isDark ? '#9ca3af' : '#667085'} />
+        <Text style={[styles.stateTitle, { color: isDark ? '#f9fafb' : '#101828' }]}>No videos yet</Text>
+        <Text style={[styles.stateDescription, { color: isDark ? '#9ca3af' : '#667085' }]}>
           Videos published on LuckRead will appear here. Sample videos are not shown.
         </Text>
         <Pressable
