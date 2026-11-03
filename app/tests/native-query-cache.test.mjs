@@ -38,6 +38,10 @@ test('home timeline uses cursor-based infinite queries, cached refetch and page-
   expect(feed).toContain('queryClient.invalidateQueries({ queryKey })');
   expect(feed).toContain('queryClient.setQueryData<InfiniteData<NativeFeedPage, string | null>>');
   expect(feed).toContain('feedQuery.fetchNextPage');
+  expect(feed).toContain('onReplySubmitted={(contentId) => {');
+  expect(feed).toContain('incrementNativeFeedReplyCount(post, item.reply_count ?? 0)');
+  expect(feed).toContain('reply_count: nextReplyCount');
+
   expect(feed).toContain('refreshing={feedQuery.isRefetching}');
   expect(feed).not.toContain('const [cursor, setCursor]');
   expect(feed).not.toContain('const [loadingMore, setLoadingMore]');
