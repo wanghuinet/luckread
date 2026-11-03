@@ -94,7 +94,7 @@ function formatAmount(amountMinor: number, currency: string): string {
     const fractionDigits = new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency,
-    }).resolvedOptions().maximumFractionDigits;
+    }).resolvedOptions().maximumFractionDigits ?? 2;
     return new Intl.NumberFormat('zh-CN', {
       style: 'currency',
       currency,
