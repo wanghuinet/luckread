@@ -29,6 +29,10 @@ test('viewer changes remove cached Following pages to prevent account-to-account
   expect(provider).toContain("queryClient.removeQueries({ queryKey: ['native-feed', 'following'] })");
   expect(feed).toContain("nativeFeedQueryKey(kind, viewerId)");
   expect(feed).toContain("enabled: kind === 'for-you' || (authStatus === 'authenticated' && Boolean(viewerId))");
+  // The public For You query is shared, but per-post social.viewer hydration must be viewer-scoped.
+  expect(feed).toContain("const hydrationScope = kind + ':' + (viewerId || 'anonymous');");
+  expect(feed).toContain('hydratedState.scope === hydrationScope ? hydratedState.byId : {}');
+  expect(feed).toContain('current.scope === hydrationScope ? current.byId : {}');
 });
 
 test('home timeline uses cursor-based infinite queries, cached refetch and page-level invalidation', () => {
