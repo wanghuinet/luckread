@@ -148,6 +148,8 @@ jobs:
         run: bun test tests/content-adapter-media-reference.test.mjs
       - name: Test native authenticated image gallery and multi-photo preview
         run: bun run test:media-gallery
+      - name: Test native camera photo capture and composer upload integration
+        run: bun test tests/camera-capture.test.mjs
       - name: Test native publishing and media upload contracts
         run: bun run test:publish-api
       - name: Test native image upload preparation and fallback behavior

@@ -45,6 +45,15 @@
         }
       ],
       [
+        "expo-camera",
+        {
+          "cameraPermission": "LuckRead needs camera access so you can take photos for posts.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false,
+          "barcodeScannerEnabled": false
+        }
+      ],
+      [
         "expo-secure-store",
         {
           "configureAndroidBackup": true
