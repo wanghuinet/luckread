@@ -28,7 +28,7 @@ async function patchFile(relativePath, before, after, expectedCount) {
     return;
   }
 
-  if (remaining === 0 && (after ? alreadyPatched === expectedCount : true)) {
+  if (remaining === 0 && (after ? alreadyPatched === expectedCount : !source.includes('bridgelessEnabled'))) {
     console.log('Hyperswitch RN 0.88 patch already present: ' + relativePath);
     return;
   }
