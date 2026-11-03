@@ -178,7 +178,36 @@ jobs:
           fs.appendFileSync(process.env.GITHUB_OUTPUT, "version_name=" + version + "\nversion_code=" + versionCode + "\n");
           console.log("Building LuckRead Android " + version + " (versionCode " + versionCode + ")");
           NODE
-          bunx expo config --type public
+          bunx expo config --type public --json > "$RUNNER_TEMP/luckread-expo-build-config.json"
+          node - "$RUNNER_TEMP/luckread-expo-build-config.json" <<'NODE'
+          const fs = require("node:fs");
+          const config = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+          const projectId = String(config.extra?.eas?.projectId ?? process.env.EXPO_PROJECT_ID ?? "").trim();
+          const channel = process.env.EXPO_UPDATE_CHANNEL;
+          const enabled = config.updates?.enabled === true;
+          if (process.env.LUCKREAD_REQUIRE_OTA_CONFIG === "1" && !enabled) {
+            throw new Error("Production APK builds must have EAS Update enabled.");
+          }
+          if (config.runtimeVersion?.policy !== "appVersion" || config.version !== process.env.BETA_VERSION_NAME) {
+            throw new Error("Resolved OTA runtime must use the exact APK versionName.");
+          }
+          if (enabled && (
+            !projectId ||
+            config.updates?.url !== "https://u.expo.dev/" + projectId ||
+            config.updates?.requestHeaders?.["expo-channel-name"] !== channel
+          )) {
+            throw new Error("Resolved EAS project URL/channel does not match the APK build environment.");
+          }
+          const environment = [
+            "LUCKREAD_OTA_CONFIG_ENABLED=" + String(enabled),
+            "LUCKREAD_OTA_CONFIG_URL=" + String(config.updates?.url ?? ""),
+            "LUCKREAD_OTA_CONFIG_CHANNEL=" + String(config.updates?.requestHeaders?.["expo-channel-name"] ?? ""),
+            "LUCKREAD_OTA_RUNTIME_POLICY=" + String(config.runtimeVersion?.policy ?? ""),
+            "LUCKREAD_OTA_PROJECT_ID=" + projectId,
+          ];
+          fs.appendFileSync(process.env.GITHUB_ENV, environment.join("\n") + "\n");
+          console.log("Verified Expo runtime and OTA channel configuration.");
+          NODE
 
       - name: Guard published Beta version monotonicity
         if: ${{ inputs.publish_release == true }}
@@ -236,7 +265,7 @@ jobs:
           cd android
           ./gradlew :app:assembleRelease --no-daemon
 
-      - name: Verify APK bundle and signing
+      - name: Verify APK bundle, native version, signing and OTA provenance
         env:
           RELEASE_VERSION_NAME: ${{ steps.version.outputs.version_name }}
           RELEASE_VERSION_CODE: ${{ steps.version.outputs.version_code }}
@@ -247,6 +276,15 @@ jobs:
             echo "Release APK is missing assets/index.android.bundle; refusing to publish a Metro-dependent build." >&2
             exit 1
           fi
+          AAPT="$(find "${ANDROID_HOME:-/usr/local/lib/android/sdk}/build-tools" -type f -name aapt -print | sort -V | tail -n 1)"
+          test -n "$AAPT" || { echo "Android aapt was not found" >&2; exit 1; }
+          BADGING="$("$AAPT" dump badging "$APK")"
+          ACTUAL_VERSION_NAME="$(printf '%s\n' "$BADGING" | sed -n "s/^package:.*versionName='\([^']*\)'.*/\1/p" | head -n 1)"
+          ACTUAL_VERSION_CODE="$(printf '%s\n' "$BADGING" | sed -n "s/^package:.*versionCode='\([^']*\)'.*/\1/p" | head -n 1)"
+          ACTUAL_PACKAGE="$(printf '%s\n' "$BADGING" | sed -n "s/^package: name='\([^']*\)'.*/\1/p" | head -n 1)"
+          test "$ACTUAL_PACKAGE" = "com.luckread.app" || { echo "Unexpected Android application ID: $ACTUAL_PACKAGE" >&2; exit 1; }
+          test "$ACTUAL_VERSION_NAME" = "$RELEASE_VERSION_NAME" || { echo "APK versionName does not match the requested build version." >&2; exit 1; }
+          test "$ACTUAL_VERSION_CODE" = "$RELEASE_VERSION_CODE" || { echo "APK versionCode does not match the requested build version code." >&2; exit 1; }
           APKSIGNER="$(find "${ANDROID_HOME:-/usr/local/lib/android/sdk}/build-tools" -type f -name apksigner -print | sort -V | tail -n 1)"
           test -n "$APKSIGNER" || { echo "Android apksigner was not found" >&2; exit 1; }
           "$APKSIGNER" verify --verbose --print-certs "$APK"
@@ -257,8 +295,40 @@ jobs:
           if [ "$LUCKREAD_STABLE_SIGNING" = "true" ]; then SIGNING_KIND="signed"; fi
           APK_NAME="LuckRead-Android-Beta-$VERSION_NAME-$SIGNING_KIND-code$VERSION_CODE.apk"
           cp "$APK" "$GITHUB_WORKSPACE/dist/$APK_NAME"
+          APK_SHA256="$(sha256sum "$GITHUB_WORKSPACE/dist/$APK_NAME" | awk '{print $1}')"
           (cd "$GITHUB_WORKSPACE/dist" && sha256sum "$APK_NAME" > "$APK_NAME.sha256")
-          echo "Verified signed APK: dist/$APK_NAME"
+          export APK_NAME APK_SHA256 ACTUAL_VERSION_NAME ACTUAL_VERSION_CODE
+          node - "$GITHUB_WORKSPACE/dist/ota-build-metadata.json" <<'NODE'
+          const fs = require("node:fs");
+          const metadata = {
+            workflowName: "LuckRead Android Beta Release",
+            workflowRunId: process.env.GITHUB_RUN_ID,
+            sourceSha: (() => {
+              if (process.env.GITHUB_EVENT_NAME !== "pull_request") return process.env.GITHUB_SHA;
+              const event = JSON.parse(fs.readFileSync(process.env.GITHUB_EVENT_PATH, "utf8"));
+              const headSha = event.pull_request?.head?.sha;
+              if (typeof headSha !== "string" || !/^[0-9a-f]{40}$/i.test(headSha)) {
+                throw new Error("Pull request event did not provide a valid head commit SHA.");
+              }
+              return headSha;
+            })(),
+            sourceBranch: process.env.GITHUB_HEAD_REF || process.env.GITHUB_REF_NAME,
+            eventName: process.env.GITHUB_EVENT_NAME,
+            channel: process.env.EXPO_UPDATE_CHANNEL,
+            runtimeVersion: process.env.RELEASE_VERSION_NAME,
+            versionName: process.env.ACTUAL_VERSION_NAME,
+            androidVersionCode: Number(process.env.ACTUAL_VERSION_CODE),
+            otaEnabled: process.env.LUCKREAD_OTA_CONFIG_ENABLED === "true",
+            projectId: process.env.LUCKREAD_OTA_PROJECT_ID || null,
+            updateUrl: process.env.LUCKREAD_OTA_CONFIG_URL || null,
+            updateChannel: process.env.LUCKREAD_OTA_CONFIG_CHANNEL || null,
+            runtimeVersionPolicy: process.env.LUCKREAD_OTA_RUNTIME_POLICY || null,
+            apkFile: process.env.APK_NAME,
+            apkSha256: process.env.APK_SHA256,
+          };
+          fs.writeFileSync(process.argv[2], JSON.stringify(metadata, null, 2) + "\n");
+          NODE
+          echo "Verified APK versionName=$ACTUAL_VERSION_NAME versionCode=$ACTUAL_VERSION_CODE OTA=$LUCKREAD_OTA_CONFIG_ENABLED"
           ls -lh "$GITHUB_WORKSPACE/dist"
 
       - name: Upload downloadable APK artifact
@@ -267,7 +337,7 @@ jobs:
           name: luckread-android-beta-${{ steps.version.outputs.version_name }}-code-${{ steps.version.outputs.version_code }}
           path: dist/*
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 90
 
       - name: Publish APK to GitHub Releases
         if: ${{ inputs.publish_release && steps.signing.outputs.stable_signing == 'true' }}
