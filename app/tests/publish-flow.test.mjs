@@ -127,3 +127,13 @@ test('native composer previews attached videos before publishing and preserves p
   expect(composer).toContain('nativeControls');
   expect(composer).toContain('asset.uri || asset.playbackUrl || asset.serverUrl');
 });
+
+
+test('Keyboard Controller keeps the publish header stable and scrolls focused editor fields above the keyboard', () => {
+  expect(composer).toContain("from 'react-native-keyboard-controller'");
+  expect(composer).toContain('<KeyboardProvider preload={false}>');
+  expect(composer).toContain('<KeyboardAwareScrollView');
+  expect(composer).toContain('bottomOffset={16}');
+  expect(composer).not.toContain('KeyboardAvoidingView');
+  expect(composer).not.toContain('<ScrollView');
+});
