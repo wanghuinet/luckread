@@ -1,0 +1,114 @@
+name: LuckRead APP OTA Update
+
+on:
+  workflow_dispatch:
+    inputs:
+      runtime_version:
+        description: Exact versionName embedded in the installed LuckRead APK (for example 1.0.0-beta.123)
+        required: true
+        type: string
+      channel:
+        description: EAS Update channel embedded in the target APK
+        required: true
+        type: choice
+        options:
+          - preview
+          - production
+        default: preview
+      environment:
+        description: EAS environment used while bundling the update
+        required: true
+        type: choice
+        options:
+          - preview
+          - production
+        default: preview
+      message:
+        description: Short release note for this OTA update
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: luckread-app-ota-${{ inputs.channel }}
+  cancel-in-progress: false
+
+env:
+  CI: "1"
+  EXPO_NO_TELEMETRY: "1"
+
+jobs:
+  publish:
+    name: Publish compatible APP update
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      EXPO_PROJECT_ID: ${{ vars.EXPO_PROJECT_ID || secrets.EXPO_PROJECT_ID }}
+      EXPO_UPDATE_CHANNEL: ${{ inputs.channel }}
+      LUCKREAD_RUNTIME_VERSION: ${{ inputs.runtime_version }}
+      LUCKREAD_REQUIRE_OTA_CONFIG: "1"
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22.13.1"
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.1.38"
+
+      - name: Validate OTA credentials and target runtime
+        env:
+          OTA_RUNTIME_VERSION: ${{ inputs.runtime_version }}
+          OTA_MESSAGE: ${{ inputs.message }}
+        run: |
+          test -n "$EXPO_TOKEN" || { echo "::error::GitHub secret EXPO_TOKEN is missing." >&2; exit 1; }
+          test -n "$EXPO_PROJECT_ID" || { echo "::error::Set GitHub repository variable EXPO_PROJECT_ID (or secret EXPO_PROJECT_ID) to the EAS project UUID." >&2; exit 1; }
+          if ! [[ "$OTA_RUNTIME_VERSION" =~ ^[0-9]+[.][0-9]+[.][0-9]+([-+][0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::runtime_version must exactly match the target APK versionName." >&2
+            exit 1
+          fi
+          test -n "$OTA_MESSAGE" || { echo "::error::A release message is required." >&2; exit 1; }
+
+      - name: Install Expo app dependencies
+        run: bun install
+
+      - name: Verify resolved OTA config and runtime compatibility
+        run: |
+          bun test tests/ota-config.test.mjs
+          bunx expo config --type public > "$RUNNER_TEMP/luckread-expo-config.json"
+          node - "$RUNNER_TEMP/luckread-expo-config.json" <<'NODE'
+          const fs = require("node:fs");
+          const config = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+          const expectedUrl = "https://u.expo.dev/" + process.env.EXPO_PROJECT_ID;
+          if (config.updates?.url !== expectedUrl) throw new Error("EAS Update URL does not match EXPO_PROJECT_ID");
+          if (config.updates?.requestHeaders?.["expo-channel-name"] !== process.env.EXPO_UPDATE_CHANNEL) {
+            throw new Error("Configured channel does not match the requested channel");
+          }
+          if (config.runtimeVersion?.policy !== "appVersion" || config.version !== process.env.LUCKREAD_RUNTIME_VERSION) {
+            throw new Error("OTA runtime does not exactly match the target APK versionName");
+          }
+          console.log("Verified EAS project, channel and runtime version.");
+          NODE
+
+      - name: Publish Expo Update
+        env:
+          OTA_MESSAGE: ${{ inputs.message }}
+          OTA_ENVIRONMENT: ${{ inputs.environment }}
+        run: |
+          npx --yes eas-cli@latest update \
+            --channel "$EXPO_UPDATE_CHANNEL" \
+            --message "$OTA_MESSAGE" \
+            --environment "$OTA_ENVIRONMENT" \
+            --platform all \
+            --non-interactive

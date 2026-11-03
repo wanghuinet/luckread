@@ -34,6 +34,10 @@ jobs:
   dependency-compatibility:
     name: Expo install, doctor and typecheck
     runs-on: ubuntu-latest
+    env:
+      EXPO_PROJECT_ID: "00000000-0000-4000-8000-000000000001"
+      EXPO_UPDATE_CHANNEL: preview
+      LUCKREAD_REQUIRE_OTA_CONFIG: "1"
     defaults:
       run:
         working-directory: app
@@ -55,8 +59,10 @@ jobs:
         run: bunx expo install --check
       - name: Run Expo compatibility doctor
         run: bunx expo-doctor@latest
-      - name: Check public Expo config
+      - name: Check public Expo config with OTA test project
         run: bunx expo config --type public
+      - name: Test EAS Update configuration and runtime guards
+        run: bun test tests/ota-config.test.mjs
       - name: Verify generated Android Release signing configuration
         run: |
           bunx expo prebuild --platform android --clean --no-install
