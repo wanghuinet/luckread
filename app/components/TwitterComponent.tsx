@@ -327,7 +327,6 @@ const ScrollingListWithHeaderInternal = <
         onScroll={scrollEventHandler} 
         automaticallyAdjustContentInsets={false} 
         contentContainerStyle={listContentWrapperStyle} 
-        {...rest} 
         
         ListHeaderComponent={
           <>
