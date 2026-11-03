@@ -199,7 +199,7 @@ jobs:
             exit 1
           fi
           yes | "$SDKMANAGER" --licenses
-          "$SDKMANAGER" "platform-tools" "platforms;android-37" "build-tools;37.0.0" "cmake;3.22.1" "ndk;27.1.12297006"
+          "$SDKMANAGER" "platform-tools" --channel=3 "platforms;android-37.0" "build-tools;37.0.0" "cmake;3.22.1" "ndk;27.1.12297006"
       - name: Install Expo app dependencies
         run: bun install
       - name: Generate Android native project
