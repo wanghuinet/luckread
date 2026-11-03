@@ -14,6 +14,7 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useColorScheme } from 'nativewind';
+import { useTabBarScroll } from '~/components/TabBarScroll';
 
 import { getApiErrorMessage } from '~/lib/api-client';
 import { fetchContentSearchPage, fetchDiscoveryTopics, findPublicUserByUsername } from '~/lib/social-screen-api';
@@ -48,6 +49,7 @@ const PRIMARY = '#1d9bf0';
 const SEARCH_PAGE_SIZE = 20;
 
 export default function Search() {
+  const tabBarScroll = useTabBarScroll();
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
   const router = useRouter();
@@ -202,7 +204,12 @@ export default function Search() {
   return (
     <View className="flex-1 bg-white dark:bg-black">
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
-      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 28 }}>
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{ paddingBottom: 28 }}
+        onScroll={tabBarScroll.onScroll}
+        scrollEventThrottle={tabBarScroll.scrollEventThrottle}
+      >
         <View className="border-b border-neutral-100 px-4 py-4 dark:border-neutral-800">
           <Text className="text-xl font-bold text-neutral-900 dark:text-white">搜索</Text>
           <Text className="mt-1 text-sm text-neutral-500">按标题或链接标识搜索已发布的公开内容，也可以按用户名查找用户或浏览专题。</Text>
