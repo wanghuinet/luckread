@@ -113,7 +113,7 @@ jobs:
           const fs = require("node:fs");
           const run = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
           const repository = process.env.GITHUB_REPOSITORY;
-          const expectedPath = ".github/workflows/app-android-beta-release.yml@";
+          const expectedPath = ".github/workflows/app-android-beta-release.yml";
           if (run.name !== "LuckRead Android Beta Release" || !String(run.path ?? "").startsWith(expectedPath)) {
             throw new Error("The selected run is not the LuckRead Android Beta Release workflow.");
           }

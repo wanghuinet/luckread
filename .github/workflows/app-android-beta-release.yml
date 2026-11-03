@@ -303,7 +303,15 @@ jobs:
           const metadata = {
             workflowName: "LuckRead Android Beta Release",
             workflowRunId: process.env.GITHUB_RUN_ID,
-            sourceSha: process.env.GITHUB_SHA,
+            sourceSha: (() => {
+              if (process.env.GITHUB_EVENT_NAME !== "pull_request") return process.env.GITHUB_SHA;
+              const event = JSON.parse(fs.readFileSync(process.env.GITHUB_EVENT_PATH, "utf8"));
+              const headSha = event.pull_request?.head?.sha;
+              if (typeof headSha !== "string" || !/^[0-9a-f]{40}$/i.test(headSha)) {
+                throw new Error("Pull request event did not provide a valid head commit SHA.");
+              }
+              return headSha;
+            })(),
             sourceBranch: process.env.GITHUB_HEAD_REF || process.env.GITHUB_REF_NAME,
             eventName: process.env.GITHUB_EVENT_NAME,
             channel: process.env.EXPO_UPDATE_CHANNEL,

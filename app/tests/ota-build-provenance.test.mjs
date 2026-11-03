@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { verifyOtaBuildArtifact } from "../scripts/verify-ota-build-provenance.mjs";
@@ -88,4 +88,12 @@ test("rejects a replaced APK even when its manifest claims the original checksum
   writeFileSync(path.join(artifact.directory, artifact.apkFile), "different-apk");
   expect(() => verifyOtaBuildArtifact(artifact.manifestPath, expected))
     .toThrow("APK SHA-256 does not match");
+});
+
+test("rejects a build manifest from a different source commit", () => {
+  const artifact = makeArtifact();
+  expect(() => verifyOtaBuildArtifact(artifact.manifestPath, {
+    ...expected,
+    sourceSha: "b".repeat(40),
+  })).toThrow("source commit SHA does not match");
 });
