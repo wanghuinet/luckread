@@ -38,7 +38,7 @@ const TabBarBackground = () => {
     <View
       style={[
         StyleSheet.absoluteFill,
-        { backgroundColor: isDark ? '#1e1e1e' : '#fff' },
+        { backgroundColor: isDark ? '#000000' : '#ffffff' },
       ]}
     />
   );
@@ -46,11 +46,15 @@ const TabBarBackground = () => {
 
 
 export default function TabLayout() {
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === 'dark';
+
   return (
     <Tabs
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarActiveTintColor: 'black',
+        tabBarActiveTintColor: isDark ? '#ffffff' : '#000000',
+        tabBarInactiveTintColor: isDark ? '#9ca3af' : '#6b7280',
         tabBarShowLabel: false,
         tabBarBackground: () => <TabBarBackground />,
         tabBarStyle: [
@@ -86,7 +90,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="(video)"
         options={{
-          tabBarIcon: ({ color }) => <Foundation name="play-circle" size={26} color={'#000'} />,
+          tabBarIcon: ({ color }) => <Foundation name="play-circle" size={26} color={color} />,
         }}
       />
       <Tabs.Screen
