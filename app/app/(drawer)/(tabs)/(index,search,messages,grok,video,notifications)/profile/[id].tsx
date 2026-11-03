@@ -126,6 +126,8 @@ const ProfileHeader = ({ navBarVisibility, scrollOffset, refreshing, user, curre
   user: User;
   currentUserId: string | null;
 }) => {
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === 'dark';
   const navigation = useNavigation();
   const { left: leftInset, right: rightInset, top: safeAreaTop } = useSafeAreaInsets();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
@@ -545,6 +547,7 @@ export default function UserProfileScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const listRef = useRef<any>(null);
   const { colorScheme, setColorScheme } = useColorScheme();
+  const isDark = colorScheme === 'dark';
   const scrollPosition = useSharedValue(0);
   const router = useRouter();
 
@@ -1194,7 +1197,7 @@ export default function UserProfileScreen() {
 
   return (
     <>
-      <StatusBar style="light" />
+      <StatusBar style={isDark ? 'light' : 'dark'} />
       <ScrollingListWithHeader
         NavigationBarComponent={(props) => <ProfileHeader {...props} user={user} refreshing={refreshing} currentUserId={currentUserId} />}
 
@@ -1260,7 +1263,7 @@ export default function UserProfileScreen() {
         ignoreLeftPadding
         ignoreRightPadding
         expandedHeaderCollapseThreshold={0.25}
-        style={{ flex: 1, backgroundColor: 'white' }}
+        style={{ flex: 1, backgroundColor: colorScheme === 'dark' ? 'black' : 'white' }}
 
         contentContainerStyle={{ paddingBottom: bottomInset, flexGrow: 1, backgroundColor: colorScheme === 'light' ? 'white' : 'black' }}
         keyExtractor={(item: FeedContent, index: number) => {
