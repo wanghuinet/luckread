@@ -25,6 +25,7 @@
     "test:billing-api": "bun test tests/billing-api.test.mjs",
     "test:paid-content": "bun test tests/paid-content-entitlement.test.mjs",
     "test:native-menu": "bun test tests/native-menu-dependencies.test.mjs",
+    "test:media-gallery": "bun test tests/feed-media-gallery.test.mjs",
     "postinstall": "node scripts/apply-hyperswitch-rn88-compat.mjs",
     "test:hyperswitch-compat": "bun test tests/hyperswitch-rn88-compat.test.mjs"
   },

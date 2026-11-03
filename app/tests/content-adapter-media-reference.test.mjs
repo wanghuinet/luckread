@@ -78,3 +78,68 @@ test('maps counts with the same non-negative integer normalization used by detai
   expect(item.view_count).toBe('0');
   expect(item.save_count).toBe(5);
 });
+
+
+test('public multi-image posts use anonymous delivery and do not attach a bearer token', () => {
+  const mapped = mapContentToFeedContent(
+    {
+      id: 'public-gallery-post',
+      accessMode: 'PUBLIC',
+      mediaRefs: [
+        'https://img.luckread.com/users/1/first.webp',
+        'https://img.luckread.com/users/1/second.webp',
+      ],
+    },
+    undefined,
+    null,
+    null,
+    'session-secret',
+  );
+
+  expect(mapped.media_items).toHaveLength(2);
+  expect(mapped.media_items?.map((media) => media.src)).toEqual([
+    'https://img.luckread.com/users/1/first.webp',
+    'https://img.luckread.com/users/1/second.webp',
+  ]);
+  expect(mapped.media_items?.every((media) => media.headers === undefined)).toBe(true);
+  expect(mapped.media_items?.every((media) => media.requiresAuthentication !== true)).toBe(true);
+});
+
+test('entitled member-only images retain the W02 bearer header for the authenticated viewer', () => {
+  const mapped = mapContentToFeedContent(
+    {
+      id: 'member-gallery-post',
+      accessMode: 'MEMBERS_ONLY',
+      accessGranted: true,
+      mediaRefs: [
+        'https://img.luckread.com/members/creator/first.webp',
+        'https://img.luckread.com/members/creator/second.webp',
+      ],
+    },
+    undefined,
+    null,
+    null,
+    'member-session-secret',
+  );
+
+  expect(mapped.media_items).toHaveLength(2);
+  expect(mapped.media_items?.every((media) => media.requiresAuthentication === true)).toBe(true);
+  expect(mapped.media_items?.every((media) => media.headers?.Authorization === 'Bearer member-session-secret')).toBe(true);
+});
+
+test('unentitled member-only content never exposes its media references to the native gallery', () => {
+  const mapped = mapContentToFeedContent(
+    {
+      id: 'locked-gallery-post',
+      accessMode: 'MEMBERS_ONLY',
+      accessGranted: false,
+      mediaRefs: ['https://img.luckread.com/members/creator/locked.webp'],
+    },
+    undefined,
+    null,
+    null,
+    'non-member-session-secret',
+  );
+
+  expect(mapped.media_items).toEqual([]);
+});
