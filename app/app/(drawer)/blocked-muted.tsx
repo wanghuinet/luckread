@@ -188,7 +188,7 @@ export default function BlockedMutedScreen() {
   if (authStatus !== 'authenticated') {
     return (
       <View className="flex-1 items-center justify-center bg-white px-6 dark:bg-black">
-        <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={isDark ? "#000000" : "#ffffff"} />
+        <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={isDark ? '#000000' : '#ffffff'} />
         <Feather name="shield" size={36} color={PRIMARY} />
         <Text className="mt-4 text-lg font-bold text-neutral-900 dark:text-white">请先登录</Text>
         <Text className="mt-2 text-center text-sm text-neutral-500">登录后可以管理你屏蔽和静音的账号。</Text>
@@ -205,7 +205,7 @@ export default function BlockedMutedScreen() {
 
   return (
     <View className="flex-1 bg-white dark:bg-black">
-      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={isDark ? "#000000" : "#ffffff"} />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={isDark ? '#000000' : '#ffffff'} />
       <View className="flex-row items-center border-b border-neutral-100 px-4 py-3 dark:border-neutral-800">
         <Pressable accessibilityRole="button" accessibilityLabel="返回" onPress={() => router.back()} className="mr-4 rounded-full p-1">
           <Feather name="arrow-left" size={23} color="#6b7280" />
