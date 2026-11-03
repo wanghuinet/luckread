@@ -165,7 +165,7 @@ function isPaymentIntent(value: unknown, orderId: string, amountMinor: number, c
 
 function formatPrice(priceMinor: number, currency: string): string {
   try {
-    const digits = new Intl.NumberFormat('en-US', { style: 'currency', currency }).resolvedOptions().maximumFractionDigits;
+    const digits = new Intl.NumberFormat('en-US', { style: 'currency', currency }).resolvedOptions().maximumFractionDigits ?? 2;
     return new Intl.NumberFormat('zh-CN', { style: 'currency', currency }).format(priceMinor / (10 ** digits));
   } catch {
     return currency + ' ' + String(priceMinor);
