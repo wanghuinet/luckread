@@ -8,7 +8,6 @@ import {
   ViewStyle,
   SectionListProps,
   LayoutChangeEvent,
-  type SectionListInstance,
 } from 'react-native';
 import type { AnimatedStyle, SharedValue } from 'react-native-reanimated';
 import Animated, {
@@ -275,7 +274,7 @@ const ScrollingListWithHeaderInternal = <
   
   const safeAreaInsets = useSafeAreaInsets();
   
-  const listRef = useAnimatedRef<SectionListInstance>();
+  const listRef = useAnimatedRef();
   
   useImperativeHandle(ref, () => listRef.current as any);
 
