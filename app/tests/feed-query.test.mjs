@@ -11,7 +11,7 @@ mock.module('../lib/api-client.ts', () => ({
   getApiErrorMessage: (_data, fallback) => fallback,
 }));
 
-const { fetchNativeFeedPage, nativeFeedQueryKey } = await import('../lib/feed-query.ts');
+const { fetchNativeFeedPage, incrementNativeFeedReplyCount, nativeFeedQueryKey } = await import('../lib/feed-query.ts');
 
 beforeEach(() => {
   calls.length = 0;
@@ -94,4 +94,23 @@ test('cache keys isolate Following data by viewer while keeping public For You d
   expect(nativeFeedQueryKey('for-you')).toEqual(['native-feed', 'for-you']);
   expect(nativeFeedQueryKey('following', 'user-a')).toEqual(['native-feed', 'following', 'user-a']);
   expect(nativeFeedQueryKey('following', 'user-b')).not.toEqual(nativeFeedQueryKey('following', 'user-a'));
+});
+
+test('reply submission increments all cached comment-count projections without dropping social viewer state', () => {
+  const record = {
+    id: 'post-reply',
+    replyCount: 2,
+    counts: { comments: 2, likes: 5, views: 21 },
+    social: {
+      viewer: { liked: true },
+      counts: { comments: 2, likes: 5 },
+    },
+  };
+  const updated = incrementNativeFeedReplyCount(record, 2);
+
+  expect(updated.replyCount).toBe(3);
+  expect(updated.reply_count).toBe(3);
+  expect(updated.counts).toEqual({ comments: 3, replies: 3, likes: 5, views: 21 });
+  expect(updated.social?.counts).toEqual({ comments: 3, replies: 3, likes: 5 });
+  expect(updated.social?.viewer).toEqual({ liked: true });
 });
