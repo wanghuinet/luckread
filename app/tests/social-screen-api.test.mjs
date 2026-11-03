@@ -226,7 +226,7 @@ test('block and mute menu items invoke real actions in feed and post detail', ()
   expect(postDetailSource).toContain("case 'mute': muteTarget(); break;");
   expect(postDetailSource).toContain("case 'block': confirmBlockTarget(); break;");
   expect(postDetailSource).toContain('targetUserId === currentUserId');
-  expect(postDetailSource).toContain('disabled={!targetUserId || isOwnTarget}');
+  expect(postDetailSource).toContain('attributes: { disabled: !targetUserId || isOwnTarget');
   expect(feedItemSource).toContain('itemData.ownerUserId === currentUser.id || itemData.creatorId === currentUser.id');
 });
 
