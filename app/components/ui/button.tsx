@@ -1,3 +1,4 @@
+// Adapted from founded-labs/react-native-reusables (MIT); LuckRead-specific color and sizing tokens.
 import { cva, type VariantProps } from 'class-variance-authority';
 import { Platform, Pressable } from 'react-native';
 
