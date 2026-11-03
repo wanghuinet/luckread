@@ -16,6 +16,14 @@ const hyperFragment = readFileSync(
   new URL('android/src/rn81/java/io/hyperswitch/react/HyperFragment.kt', packageRoot),
   'utf8',
 );
+const rnViewManager = readFileSync(
+  new URL('ios/hyperswitchSDK/Core/NativeModule/RNViewManager.swift', packageRoot),
+  'utf8',
+);
+const rnHeadlessManager = readFileSync(
+  new URL('ios/hyperswitchSDK/Core/NativeModule/RNHeadlessManager.swift', packageRoot),
+  'utf8',
+);
 
 test('pins the compatibility patch to the audited official Hyperswitch package', () => {
   expect(packageJson.version).toBe('1.3.6');
@@ -28,9 +36,6 @@ test('uses React Native 0.88 activity and root view tag methods', () => {
     'reactDelegate.reactRootView?.getRootViewTag() ?: -1',
   );
   expect(hyperFragment).not.toContain('reactRootView?.rootViewTag');
-  expect(hyperModule).not.toContain('bridgelessEnabled');
-  expect(hyperFragment).not.toContain('bridgelessEnabled');
-  expect(
-    readFileSync(new URL('ios/hyperswitchSDK/Core/NativeModule/RNHeadlessManager.swift', packageRoot), 'utf8'),
-  ).not.toContain('bridgelessEnabled');
+  expect(rnViewManager).not.toContain('bridgelessEnabled');
+  expect(rnHeadlessManager).not.toContain('bridgelessEnabled');
 });
