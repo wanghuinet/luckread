@@ -71,7 +71,6 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.luckread.app"
-    },
-    "newArchEnabled": true
+    }
   }
 }
