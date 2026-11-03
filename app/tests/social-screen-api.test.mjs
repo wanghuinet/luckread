@@ -238,10 +238,12 @@ test('block and mute mutations reject missing target identities before sending r
   expect(calls).toHaveLength(0);
 });
 
-const homeFeedSource = readFileSync(new URL('../app/(drawer)/(tabs)/(index)/index.tsx', import.meta.url), 'utf8');
+const feedQuerySource = readFileSync(new URL('../lib/feed-query.ts', import.meta.url), 'utf8');
 
 test('keeps the public For You feed independent of stale native session credentials', () => {
-  expect(homeFeedSource).toContain("const endpoint = kind === 'following' ? '/feed/following' : '/contents';");
-  expect(homeFeedSource).toContain("{ method: 'GET', auth: kind === 'following' },");
-  expect(homeFeedSource).toContain("if (response.status === 401 && kind === 'following')");
+  // The endpoint and authentication policy now live in the dedicated query fetcher.
+  expect(feedQuerySource).toContain("const endpoint = input.kind === 'following' ? '/feed/following' : '/contents';");
+  expect(feedQuerySource).toContain("auth: input.kind === 'following',");
+  expect(feedQuerySource).toContain("if (input.kind === 'for-you') params.set('type', 'post');");
+  expect(feedQuerySource).toContain("if (response.status === 401 && input.kind === 'following')");
 });
