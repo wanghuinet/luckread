@@ -177,7 +177,8 @@ jobs:
 
       - name: Verify resolved OTA config and run APP checks
         run: |
-          bun test tests/ota-config.test.mjs tests/ota-build-provenance.test.mjs
+          bun test tests/ota-config.test.mjs
+          bun test tests/ota-build-provenance.test.mjs
           bun run typecheck
           bunx expo config --type public --json > "$RUNNER_TEMP/luckread-expo-config.json"
           node - "$RUNNER_TEMP/luckread-expo-config.json" <<'NODE'
