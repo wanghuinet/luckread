@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 
-const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
+const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
 const client = read('../lib/query-client.ts');
 const provider = read('../lib/query-provider.tsx');
 const root = read('../app/_layout.tsx');
