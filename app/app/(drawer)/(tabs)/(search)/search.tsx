@@ -201,7 +201,7 @@ export default function Search() {
 
   return (
     <View className="flex-1 bg-white dark:bg-black">
-      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 28 }}>
         <View className="border-b border-neutral-100 px-4 py-4 dark:border-neutral-800">
           <Text className="text-xl font-bold text-neutral-900 dark:text-white">搜索</Text>
