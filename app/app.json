@@ -29,6 +29,10 @@
             "compileSdkVersion": 37,
             "targetSdkVersion": 36,
             "kotlinVersion": "2.2.0"
+          },
+          "ios": {
+            "buildReactNativeFromSource": false,
+            "deploymentTarget": "16.4"
           }
         }
       ],
