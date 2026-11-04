@@ -12,7 +12,7 @@ test('replaces only the active token and returns the next caret position', () =>
   const token = findActiveComposerToken('before @ali after', 11);
   expect(token).not.toBeNull();
   const replaced = replaceActiveComposerToken('before @ali after', token, 'alice');
-  expect(replaced.text).toBe('before @alice  after');
+  expect(replaced.text).toBe('before @alice after');
   expect(replaced.selection).toEqual({ start: 14, end: 14 });
 });
 
