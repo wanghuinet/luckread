@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { DatabaseSync } from 'node:sqlite'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -64,28 +65,10 @@ const context = { params: Promise.resolve({ installationId }) }
 
 function createD1Sqlite() {
   const sqlite = new DatabaseSync(':memory:')
-  sqlite.exec(
-    'CREATE TABLE notification_push_endpoints (' +
-      'endpoint_id TEXT PRIMARY KEY NOT NULL, ' +
-      'installation_id TEXT NOT NULL UNIQUE, ' +
-      'owner_user_id TEXT NOT NULL, ' +
-      "provider TEXT NOT NULL CHECK (provider = 'expo'), " +
-      "platform TEXT NOT NULL CHECK (platform IN ('ios', 'android')), " +
-      'push_token TEXT, ' +
-      "permission_status TEXT NOT NULL CHECK (permission_status IN ('granted', 'denied', 'undetermined')), " +
-      'app_version TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, last_seen_at TEXT NOT NULL, ' +
-      "CHECK ((permission_status = 'granted' AND push_token IS NOT NULL) OR " +
-      "(permission_status IN ('denied', 'undetermined') AND push_token IS NULL)), " +
-      'CHECK (push_token IS NULL OR length(push_token) BETWEEN 20 AND 512))',
-  )
-  sqlite.exec(
-    'CREATE UNIQUE INDEX uq_notification_push_endpoints_provider_token ' +
-      'ON notification_push_endpoints (provider, push_token) WHERE push_token IS NOT NULL',
-  )
-  sqlite.exec(
-    'CREATE INDEX ix_notification_push_endpoints_owner_status ' +
-      'ON notification_push_endpoints (owner_user_id, permission_status, updated_at)',
-  )
+  sqlite.exec(readFileSync(
+    new URL('../../../W09-platform/migrations-d1-03/0001_notification_push_endpoints.sql', import.meta.url),
+    'utf8',
+  ))
 
   const db = {
     prepare(sql: string) {
