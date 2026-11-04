@@ -153,14 +153,14 @@
       ],
       "schemaEvidenceRefs": [
         "contracts/entity/NOTIFICATION-PUSH-ENDPOINT-CONTRACT.v1.json",
-        "workers/W05-social/migrations-d1-03/0001_notification_push_endpoints.sql"
+        "workers/W09-platform/migrations-d1-03/0001_notification_push_endpoints.sql"
       ],
       "migrationEvidenceRefs": [
-        "workers/W05-social/migrations-d1-03/0001_notification_push_endpoints.sql"
+        "workers/W09-platform/migrations-d1-03/0001_notification_push_endpoints.sql"
       ],
       "payloadNativeEvidenceRefs": [],
       "blockers": [
-        "W05 D1-03 remote migration and live scoped binding deployment are pending."
+        "W09 D1-03 remote migration is pending; W05 delegated runtime access remains unavailable until its scoped binding deployment is verified."
       ],
       "status": "BLOCKED",
       "testEvidenceRefs": [
