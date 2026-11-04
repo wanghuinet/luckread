@@ -45,6 +45,24 @@ test('uses Expo MenuView for native post overflow actions on both platforms', ()
   expect(postDetail).not.toContain('ActionSheetIOS');
 });
 
+test('preserves ownership, disabled, destructive and nested mute/block menu actions', () => {
+  const dropdownMenu = feedItem.slice(
+    feedItem.indexOf('const dropdownMenuActions: MenuAction[] ='),
+    feedItem.indexOf('const runMenuAction'),
+  );
+
+  expect(dropdownMenu).toContain("id: 'pin-profile-post'");
+  expect(dropdownMenu).toContain('disabled: profilePinSnapshot.pending || profilePinSnapshot.loading');
+  expect(dropdownMenu).toContain("id: 'delete-own-post'");
+  expect(dropdownMenu).toContain("id: 'report'");
+  expect(dropdownMenu).toContain("id: 'user-actions'");
+  expect(dropdownMenu).toContain('subactions: [');
+  expect(dropdownMenu).toContain("id: 'mute'");
+  expect(dropdownMenu).toContain("id: 'block'");
+  expect(dropdownMenu).toContain('destructive: true');
+  expect(dropdownMenu).toContain("...(!isOwnPost && targetUserId ? [{");
+});
+
 test('uses the native long-press context menu on iOS without wrapping Android feed taps', () => {
   expect(feedItem).toContain("Platform.OS === 'ios' ? (");
   expect(feedItem).toContain('actions={contextMenuActions}');
