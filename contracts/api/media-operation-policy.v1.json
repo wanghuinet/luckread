@@ -612,7 +612,7 @@
     {
       "visibility": "public_or_authenticated_by_published_content_access",
       "capability": "published_media_accessibility_metadata",
-      "status": "MISSING",
+      "status": "CONTRACTED_PARTIAL",
       "resource": {
         "class": "BOUNDED_READ",
         "d1ReadMax": 4,
@@ -758,7 +758,7 @@
     {
       "visibility": "public_authenticated_owner_scoped",
       "capability": "media_metadata_list_owned",
-      "status": "MISSING",
+      "status": "CONTRACTED_PARTIAL",
       "resource": {
         "class": "BOUNDED_READ",
         "d1ReadMax": 1,
@@ -829,6 +829,83 @@
         "no_store",
         "no_cross_account_metadata_disclosure"
       ]
+    },
+    {
+      "operationId": "updateOwnMedia",
+      "method": "PATCH",
+      "path": "/media/{mediaId}",
+      "visibility": "public_authenticated_owner_scoped",
+      "capability": "media_asset_metadata_update",
+      "status": "CONTRACTED_PARTIAL",
+      "authorization": {
+        "required": true,
+        "permission": null,
+        "scope": "resource_owner"
+      },
+      "resource": {
+        "class": "SINGLE_AUTHORITATIVE_WRITE",
+        "d1ReadMax": 1,
+        "d1WriteMax": 1,
+        "d1ReadRowsMax": 1,
+        "d1WriteRowsMax": 1,
+        "rpcMax": 0,
+        "requestBodyBytesMax": 4096,
+        "responseBytesMax": 16384
+      },
+      "cache": {
+        "mode": "NO_STORE",
+        "shared": false,
+        "authorizationBoundary": true
+      },
+      "retry": {
+        "maxAttempts": 1,
+        "clientRetrySafe": true,
+        "requiresIdempotency": false
+      },
+      "event": {
+        "syncConsumersMax": 0,
+        "asyncEventsMax": 0,
+        "fanoutMax": 0
+      },
+      "queue": {
+        "enqueueMax": 0
+      },
+      "antiAbuse": {
+        "required": true,
+        "scopes": [
+          "account",
+          "ip",
+          "device",
+          "endpoint",
+          "resource",
+          "global"
+        ],
+        "actions": [
+          "ALLOW",
+          "THROTTLE",
+          "BLOCK"
+        ]
+      },
+      "idempotency": {
+        "required": false
+      },
+      "security": [
+        "payload_owner_access_required",
+        "alt_text_non_empty",
+        "alt_text_max_1000",
+        "no_shared_cache",
+        "no_owner_id_client_override"
+      ],
+      "evidence": {
+        "openapi": "PASS",
+        "permission": "PASS",
+        "state": "N/A",
+        "resource": "PASS",
+        "cache": "PASS",
+        "antiAbuse": "PASS",
+        "integration": "MISSING",
+        "securityE2E": "MISSING"
+      }
     }
   ]
 }
