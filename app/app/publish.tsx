@@ -27,6 +27,7 @@ import { computeAutoSaveDelay, createPublishDraftFingerprint } from '~/lib/publi
 import {
   apiFailureDiagnostic,
   getMediaPlayback,
+  getOwnedMediaMetadata,
   uploadMediaFile,
   uploadTextBody,
   type LocalMediaFile,
@@ -77,6 +78,7 @@ type ComposerAsset = {
   height?: number;
   uploadKey?: string;
   uploaded?: UploadedMedia;
+  altText?: string;
   serverUrl: string;
   playbackUrl?: string;
   status: 'uploading' | 'uploaded' | 'ready' | 'failed';
@@ -285,14 +287,24 @@ function PublishScreenContent() {
       const restoredMediaRefs = (record.mediaRefs || []).filter((url): url is string =>
         typeof url === 'string' && /^https?:\/\//i.test(url.trim()),
       );
-      const restoredAssets: ComposerAsset[] = restoredMediaRefs.map((url, index) => ({
-        localId: 'existing-' + index + '-' + url,
-        filename: url.split('/').pop() || 'Existing media',
-        mimeType: mimeFromUrl(url),
-        serverUrl: url,
-        status: 'ready',
-        existing: true,
-      }));
+      const ownedMedia = restoredMediaRefs.length > 0
+        ? await getOwnedMediaMetadata(restoredMediaRefs).catch(() => [])
+        : [];
+      const ownedMediaByUrl = new Map(ownedMedia.map((media) => [media.url, media]));
+      const restoredAssets: ComposerAsset[] = restoredMediaRefs.map((url, index) => {
+        const filename = url.split('/').pop() || 'Existing media';
+        const uploaded = ownedMediaByUrl.get(url);
+        return {
+          localId: 'existing-' + index + '-' + url,
+          filename,
+          mimeType: uploaded?.mimeType || mimeFromUrl(url),
+          uploaded,
+          altText: uploaded?.alt || filename,
+          serverUrl: url,
+          status: 'ready',
+          existing: true,
+        };
+      });
 
       originalAccessModeRef.current = loadedAccessMode;
       originalBodyRef.current = { text: restoredBody, bodyRef: record.bodyRef || null };
@@ -361,6 +373,7 @@ function PublishScreenContent() {
         uploaded = await uploadMediaFile(uploadFile, asset.uploadKey);
         updateAsset(asset.localId, {
           uploaded,
+          altText: uploaded.alt || asset.altText || asset.filename,
           serverUrl: uploaded.url,
           status: 'uploaded',
           error: undefined,
@@ -554,6 +567,39 @@ function PublishScreenContent() {
     });
   }, [busy, publishPending]);
 
+  const saveAssetAltText = useCallback(async (asset: ComposerAsset, value: string) => {
+    const media = asset.uploaded;
+    if (!media?.id) throw new Error('只有当前账号拥有的已上传图片才能保存替代文本。');
+    const alt = value.normalize('NFKC').trim();
+    if (!alt) throw new Error('请填写图片替代文本，或使用简短的内容描述。');
+    if (alt === (media.alt || '').trim()) {
+      updateAsset(asset.localId, { altText: alt });
+      return;
+    }
+    const result = await apiRequest<Record<string, unknown>>(
+      '/media/' + encodeURIComponent(media.id),
+      { method: 'PATCH', body: JSON.stringify({ alt }) },
+    );
+    if (!result.response.ok) {
+      throw new Error(apiFailureDiagnostic(result, '图片替代文本保存失败。'));
+    }
+    updateAsset(asset.localId, {
+      altText: alt,
+      uploaded: { ...media, alt },
+    });
+  }, [updateAsset]);
+
+  const savePendingAssetAltText = useCallback(async () => {
+    for (const asset of assets) {
+      const media = asset.uploaded;
+      if (!media?.id) continue;
+      const alt = (asset.altText ?? media.alt ?? asset.filename).normalize('NFKC').trim();
+      if (alt && alt !== (media.alt || '').trim()) {
+        await saveAssetAltText(asset, alt);
+      }
+    }
+  }, [assets, saveAssetAltText]);
+
   const renderComposerAsset = useCallback(
     ({ item: asset, index }: { item: ComposerAsset; index: number }) => (
       <View style={[styles.assetTile, isDark && { backgroundColor: '#09090b', borderColor: '#3f3f46' }]}>
@@ -595,6 +641,51 @@ function PublishScreenContent() {
                   : 'Upload failed'}
             {typeof asset.size === 'number' ? ' · ' + Math.round(asset.size / 1024) + ' KB' : ''}
           </Text>
+          {asset.mimeType.startsWith('image/') ? (
+            <View style={{ marginTop: 10 }}>
+              <Text style={[styles.assetStatus, isDark && { color: '#d4d4d8' }]}>替代文本（无障碍图片说明）</Text>
+              <TextInput
+                accessibilityLabel="图片替代文本"
+                accessibilityHint="描述图片的重要内容，供屏幕阅读器用户理解。"
+                value={asset.altText ?? asset.uploaded?.alt ?? asset.filename}
+                onChangeText={(value) => updateAsset(asset.localId, { altText: value })}
+                editable={Boolean(asset.uploaded?.id) && asset.status === 'ready' && !busy && !publishPending}
+                multiline
+                maxLength={1000}
+                placeholder="描述图片内容，方便屏幕阅读器用户理解"
+                placeholderTextColor={isDark ? '#71717a' : '#98a2b3'}
+                style={{
+                  minHeight: 54,
+                  borderWidth: 1,
+                  borderColor: isDark ? '#52525b' : '#d0d5dd',
+                  borderRadius: 8,
+                  paddingHorizontal: 10,
+                  paddingVertical: 8,
+                  marginTop: 5,
+                  color: isDark ? '#f4f4f5' : '#101828',
+                  fontSize: 13,
+                  textAlignVertical: 'top',
+                }}
+              />
+              {asset.uploaded?.id && (asset.altText ?? asset.uploaded.alt ?? asset.filename).trim() !== (asset.uploaded.alt ?? '').trim() ? (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="保存图片替代文本"
+                  disabled={busy || publishPending}
+                  onPress={() => {
+                    void saveAssetAltText(asset, asset.altText ?? asset.uploaded?.alt ?? asset.filename)
+                      .then(() => setStatusMessage('图片替代文本已保存。'))
+                      .catch((error) => setErrorMessage(error instanceof Error ? error.message : '图片替代文本保存失败。'));
+                  }}
+                  style={[styles.retryLink, (busy || publishPending) && styles.disabledButton]}
+                >
+                  <Text style={styles.retryText}>保存说明</Text>
+                </Pressable>
+              ) : !asset.uploaded?.id ? (
+                <Text style={[styles.assetStatus, isDark && { color: '#71717a' }]}>上传完成后可编辑图片说明。</Text>
+              ) : null}
+            </View>
+          ) : null}
           {assets.length > 1 ? (
             <View style={styles.assetOrderControls}>
               <Pressable
@@ -663,7 +754,7 @@ function PublishScreenContent() {
         </View>
       </View>
     ),
-    [activeCoverRef, assets.length, busy, isDark, moveAsset, publishPending, removeAsset, retryAsset],
+    [activeCoverRef, assets.length, busy, isDark, moveAsset, publishPending, removeAsset, retryAsset, saveAssetAltText, updateAsset],
   );
 
   const saveDraftSnapshot = useCallback(async () => {
@@ -1317,6 +1408,7 @@ function PublishScreenContent() {
     setErrorMessage('');
     setStatusMessage(contentId ? 'Saving your changes…' : 'Publishing your post…');
     try {
+      await savePendingAssetAltText();
       let bodyRef: string | null = null;
       const unchangedExistingBody = Boolean(
         contentId &&
@@ -1557,7 +1649,7 @@ function PublishScreenContent() {
     } finally {
       setBusy(false);
     }
-  }, [accessMode, assets, body, contentId, coverRef, pollDurationHours, pollEnabled, pollOptions, publishPending, router, saveDraftSnapshot, syncPublishedSocialTokens]);
+  }, [accessMode, assets, body, contentId, coverRef, pollDurationHours, pollEnabled, pollOptions, publishPending, router, saveDraftSnapshot, savePendingAssetAltText, syncPublishedSocialTokens]);
 
   if (authStatus !== 'authenticated') {
     return (
