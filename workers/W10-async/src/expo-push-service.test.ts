@@ -21,7 +21,7 @@ afterEach(() => {
 describe('W10 Expo push service adapter', () => {
   it('delegates 100-message chunking, compression and authenticated sends to Expo SDK', async () => {
     let requestIndex = 0
-    const fetchMock = vi.fn(async () => {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => {
       const expectedCount = requestIndex++ === 0 ? 100 : 1
       const tickets = Array.from({ length: expectedCount }, (_, index) => ({
         status: 'ok',
