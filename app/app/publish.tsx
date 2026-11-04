@@ -16,6 +16,7 @@ import CameraCaptureModal, { type CapturedCameraPhoto } from '~/components/Camer
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { useColorScheme } from 'nativewind';
 import { KeyboardAwareScrollView, KeyboardProvider } from 'react-native-keyboard-controller';
+import Sortable from 'react-native-sortables';
 
 import { apiRequest, createIdempotencyKey } from '~/lib/api-client';
 import {
@@ -421,6 +422,59 @@ function PublishScreenContent() {
     }
   }, [assets, busy, coverRef, publishPending]);
 
+  const renderComposerAsset = useCallback(
+    ({ item: asset }: { item: ComposerAsset; index: number }) => (
+      <View style={[styles.assetTile, isDark && { backgroundColor: '#09090b', borderColor: '#3f3f46' }]}>
+        <View style={styles.assetTilePreview}>
+          {isVideoAsset(asset) ? (
+            <View style={styles.videoPreviewWrap}>
+              <ComposerVideoPreview uri={(asset.uri || asset.playbackUrl || asset.serverUrl) as string} />
+            </View>
+          ) : (
+            <Image
+              source={{ uri: asset.uri || asset.playbackUrl || asset.serverUrl }}
+              style={styles.assetThumbnail}
+              resizeMode="cover"
+            />
+          )}
+          <View style={styles.assetTileActions}>
+            <Sortable.Handle style={styles.assetTileAction}>
+              <Feather name="move" size={17} color="#ffffff" />
+            </Sortable.Handle>
+            <Pressable
+              disabled={busy || publishPending}
+              accessibilityRole="button"
+              accessibilityLabel="Remove attachment"
+              onPress={() => removeAsset(asset.localId)}
+              style={styles.assetTileAction}
+            >
+              <Feather name="x" size={18} color="#ffffff" />
+            </Pressable>
+          </View>
+        </View>
+        <View style={styles.assetTileMeta}>
+          <Text numberOfLines={1} style={[styles.assetName, isDark && { color: '#e5e7eb' }]}>
+            {asset.filename}
+          </Text>
+          <Text style={[styles.assetStatus, isDark && { color: '#9ca3af' }, asset.status === 'failed' ? styles.errorText : null]}>
+            {asset.status === 'uploading' ? 'Uploading to LuckRead…'
+              : asset.status === 'uploaded' ? 'Uploaded; playback authorization needs retry'
+                : asset.status === 'ready' ? 'Ready'
+                  : 'Upload failed'}
+            {typeof asset.size === 'number' ? ' · ' + Math.round(asset.size / 1024) + ' KB' : ''}
+          </Text>
+          {asset.error ? <Text numberOfLines={2} style={styles.inlineError}>{asset.error}</Text> : null}
+          {(asset.status === 'failed' || asset.status === 'uploaded') && !asset.existing ? (
+            <Pressable disabled={busy || publishPending} onPress={() => { void retryAsset(asset); }} style={styles.retryLink}>
+              <Text style={styles.retryText}>Retry this file</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      </View>
+    ),
+    [busy, isDark, publishPending, removeAsset, retryAsset],
+  );
+
   const submit = useCallback(async () => {
     const trimmedBody = body.trim();
     if (!trimmedBody) {
@@ -771,36 +825,20 @@ function PublishScreenContent() {
             ) : null}
           </View>
 
-          {assets.map((asset) => (
-            <View key={asset.localId} style={[styles.assetRow, isDark && { backgroundColor: '#09090b', borderColor: '#3f3f46' }]}>
-              {isVideoAsset(asset) ? (
-                <View style={styles.videoPreviewWrap}>
-                  <ComposerVideoPreview uri={(asset.uri || asset.playbackUrl || asset.serverUrl) as string} />
-                </View>
-              ) : (
-                <Image source={{ uri: asset.uri || asset.playbackUrl || asset.serverUrl }} style={[styles.assetThumbnail, isDark && { backgroundColor: '#18181b' }]} />
-              )}
-              <View style={styles.assetText}>
-                <Text numberOfLines={1} style={[styles.assetName, isDark && { color: '#e5e7eb' }]}>{asset.filename}</Text>
-                <Text style={[styles.assetStatus, isDark && { color: '#9ca3af' }, asset.status === 'failed' ? styles.errorText : null]}>
-                  {asset.status === 'uploading' ? 'Uploading to LuckRead…'
-                    : asset.status === 'uploaded' ? 'Uploaded; playback authorization needs retry'
-                      : asset.status === 'ready' ? 'Ready'
-                        : 'Upload failed'}
-                  {typeof asset.size === 'number' ? ' · ' + Math.round(asset.size / 1024) + ' KB' : ''}
-                </Text>
-                {asset.error ? <Text style={styles.inlineError}>{asset.error}</Text> : null}
-                {(asset.status === 'failed' || asset.status === 'uploaded') && !asset.existing ? (
-                  <Pressable disabled={busy || publishPending} onPress={() => { void retryAsset(asset); }} style={styles.retryLink}>
-                    <Text style={styles.retryText}>Retry this file</Text>
-                  </Pressable>
-                ) : null}
-              </View>
-              <Pressable disabled={busy || publishPending} accessibilityLabel="Remove attachment" onPress={() => removeAsset(asset.localId)} style={styles.iconButton}>
-                <Feather name="x-circle" size={21} color={isDark ? '#9ca3af' : '#667085'} />
-              </Pressable>
-            </View>
-          ))}
+          {assets.length > 0 ? (
+            <Sortable.Grid
+              columns={assets.length === 1 ? 1 : 2}
+              data={assets}
+              keyExtractor={(asset) => asset.localId}
+              renderItem={renderComposerAsset}
+              onDragEnd={({ data }) => setAssets(data)}
+              sortEnabled={!busy && !publishPending && assets.length > 1}
+              customHandle
+              rowGap={10}
+              columnGap={10}
+              style={styles.assetGrid}
+            />
+          ) : null}
 
           <View style={styles.mediaActions}>
             <Pressable
@@ -960,11 +998,15 @@ const styles = StyleSheet.create({
   accessModeOptionText: { color: '#344054', fontSize: 13, fontWeight: '700' },
   accessModeOptionTextSelected: { color: '#ffffff' },
   accessModeNotice: { color: '#667085', fontSize: 12, lineHeight: 18, marginTop: 10 },
-  assetRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 12, padding: 10, borderWidth: 1, borderColor: '#eaecf0', borderRadius: 12 },
-  assetThumbnail: { width: 58, height: 58, borderRadius: 8, backgroundColor: '#f2f4f7' },
-  videoPreviewWrap: { width: 132, height: 76, overflow: 'hidden', borderRadius: 8, backgroundColor: '#101828' },
+  assetGrid: { width: '100%', marginTop: 12 },
+  assetTile: { width: '100%', overflow: 'hidden', borderWidth: 1, borderColor: '#eaecf0', borderRadius: 14, backgroundColor: '#ffffff' },
+  assetTilePreview: { width: '100%', height: 148, position: 'relative', overflow: 'hidden', backgroundColor: '#101828' },
+  assetThumbnail: { width: '100%', height: '100%' },
+  videoPreviewWrap: { width: '100%', height: '100%', overflow: 'hidden', backgroundColor: '#101828' },
   videoPreview: { width: '100%', height: '100%' },
-  assetText: { flex: 1, minWidth: 0 },
+  assetTileActions: { position: 'absolute', top: 8, left: 8, right: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  assetTileAction: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.58)' },
+  assetTileMeta: { paddingHorizontal: 10, paddingVertical: 8 },
   assetName: { fontSize: 13, fontWeight: '700', color: '#344054' },
   assetStatus: { marginTop: 3, fontSize: 12, color: '#667085' },
   inlineError: { marginTop: 3, fontSize: 11, color: '#b42318', lineHeight: 15 },
