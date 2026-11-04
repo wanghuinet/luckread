@@ -88,11 +88,11 @@
       "evidence": {
         "openapi": "PASS",
         "permission": "PASS",
-        "state": "MISSING",
+        "state": "PASS",
         "resource": "PASS",
         "cache": "PASS",
         "antiAbuse": "PASS",
-        "integration": "MISSING",
+        "integration": "PASS",
         "securityE2E": "MISSING"
       }
     },
@@ -169,11 +169,11 @@
       "evidence": {
         "openapi": "PASS",
         "permission": "PASS",
-        "state": "MISSING",
+        "state": "PASS",
         "resource": "PASS",
         "cache": "PASS",
         "antiAbuse": "PASS",
-        "integration": "MISSING",
+        "integration": "PASS",
         "securityE2E": "MISSING"
       }
     }
