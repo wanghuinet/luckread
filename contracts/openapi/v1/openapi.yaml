@@ -1197,7 +1197,23 @@ paths:
           description: Owner media metadata updated.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Media' }
+              schema:
+                type: object
+                required: [doc, requestId]
+                properties:
+                  doc:
+                    type: object
+                    required: [id, url, filename, mimeType, alt]
+                    properties:
+                      id: { $ref: '#/components/schemas/ResourceId' }
+                      url: { type: [string, 'null'], format: uri }
+                      filename: { type: [string, 'null'] }
+                      mimeType: { type: [string, 'null'] }
+                      filesize: { type: [integer, 'null'], minimum: 0 }
+                      width: { type: [integer, 'null'], minimum: 1 }
+                      height: { type: [integer, 'null'], minimum: 1 }
+                      alt: { type: string, minLength: 1, maxLength: 1000 }
+                  requestId: { $ref: '#/components/schemas/RequestId' }
         '400': { $ref: '#/components/responses/ClientError' }
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '403': { $ref: '#/components/responses/PermissionDenied' }
