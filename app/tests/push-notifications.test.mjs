@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { beforeEach, expect, mock, test } from 'bun:test';
 
 const calls = [];
@@ -178,4 +179,17 @@ test('web cleanup is a no-op and never calls the native secure store or push API
 test('API errors are not reported as successful registration', async () => {
   apiStatus = 503;
   await expect(requestDevicePushPermission('user-1')).rejects.toThrow('API request failed');
+});
+
+
+test('notification settings exposes both explicit enable and system permission management actions', () => {
+  const screen = readFileSync(
+    new URL('../app/(drawer)/notification-preferences.tsx', import.meta.url),
+    'utf8',
+  );
+
+  expect(screen).toContain('requestDevicePushPermission(accountId)');
+  expect(screen).toContain('openSystemNotificationSettings');
+  expect(screen).toContain('管理系统通知');
+  expect(screen).toContain('Linking.openSettings()');
 });
