@@ -48,5 +48,18 @@
       "binding": "W03_CONTENT",
       "service": "luckread-w03"
     }
+  ],
+  "vars": {
+    "PUSH_DELIVERY_ENABLED": "false"
+  },
+  "workflows": [
+    {
+      "name": "luckread-w05-notification-push",
+      "binding": "NOTIFICATION_PUSH_WORKFLOW",
+      "class_name": "NotificationPushWorkflow",
+      "schedules": [
+        "* * * * *"
+      ]
+    }
   ]
 }
