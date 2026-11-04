@@ -69,6 +69,11 @@ jobs:
         env:
           TARGET_BRANCH: ${{ github.event.pull_request.head.ref }}
         run: |
+          GENERATED_LOCKFILE="${RUNNER_TEMP}/luckread-generated-bun.lockb"
+          cp bun.lockb "${GENERATED_LOCKFILE}"
+          git fetch origin "${TARGET_BRANCH}"
+          git checkout -B "${TARGET_BRANCH}" "origin/${TARGET_BRANCH}"
+          cp "${GENERATED_LOCKFILE}" bun.lockb
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add bun.lockb
