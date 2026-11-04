@@ -19,7 +19,8 @@ import { KeyboardAwareScrollView, KeyboardProvider } from 'react-native-keyboard
 import Sortable from 'react-native-sortables';
 import PublishMediaActionSheet from '~/components/PublishMediaActionSheet';
 
-import { apiRequest, createIdempotencyKey } from '~/lib/api-client';
+import { apiRequest, createIdempotencyKey, fetchContentBodyReference } from '~/lib/api-client';
+import { computeAutoSaveDelay, createPublishDraftFingerprint } from '~/lib/publish-draft-autosave';
 import {
   apiFailureDiagnostic,
   getMediaPlayback,
@@ -128,8 +129,9 @@ function PublishScreenContent() {
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
   const router = useRouter();
-  const params = useLocalSearchParams<{ contentId?: string | string[] }>();
+  const params = useLocalSearchParams<{ contentId?: string | string[]; draftId?: string | string[] }>();
   const contentId = Array.isArray(params.contentId) ? params.contentId[0] : params.contentId;
+  const draftId = Array.isArray(params.draftId) ? params.draftId[0] : params.draftId;
   const authStatus = useAuthStore((state) => state.status);
   const user = useAuthStore((state) => state.user);
 
@@ -147,8 +149,22 @@ function PublishScreenContent() {
   const [pollEnabled, setPollEnabled] = useState(false);
   const [pollOptions, setPollOptions] = useState<string[]>(['', '']);
   const [pollDurationHours, setPollDurationHours] = useState<PollDurationHours>(24);
+  const [draftSaveStatus, setDraftSaveStatus] = useState<'idle' | 'scheduled' | 'saving' | 'saved' | 'error'>('idle');
 
   const recordRef = useRef<ContentRecord | null>(null);
+  const draftSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const draftSaveInFlightRef = useRef(false);
+  const draftSaveInFlightPromiseRef = useRef<Promise<void> | null>(null);
+  const draftSaveLastSavedAtRef = useRef<number | null>(null);
+  const draftSaveChangeTokenRef = useRef(0);
+  const draftSaveDirtyRef = useRef(false);
+  const draftSaveRestoreCompleteRef = useRef(false);
+  const skipNextDraftSaveRef = useRef(false);
+  const draftCreateKeyRef = useRef('');
+  const draftCreatePendingRef = useRef<{ key: string; payload: string; bodyText: string; fingerprint: string } | null>(null);
+  const draftSavedFingerprintRef = useRef('');
+  const draftAutoSaveSchedulerRef = useRef<() => void>(() => {});
+  const pollConfiguredRef = useRef(false);
   const originalAccessModeRef = useRef<'PUBLIC' | 'MEMBERS_ONLY'>('PUBLIC');
   const originalBodyRef = useRef<{ text: string; bodyRef: string | null }>({ text: '', bodyRef: null });
   const bodyUploadRef = useRef<{ text: string; key: string; uploaded?: UploadedMedia } | null>(null);
@@ -160,24 +176,28 @@ function PublishScreenContent() {
   }, []);
 
   const loadExistingContent = useCallback(async () => {
-    if (!contentId || authStatus !== 'authenticated' || editLoadKeyRef.current === contentId) return;
-    editLoadKeyRef.current = contentId;
+    const targetContentId = draftId || contentId;
+    const restoringDraft = Boolean(draftId && !contentId);
+    if (!targetContentId || authStatus !== 'authenticated' || editLoadKeyRef.current === targetContentId) return;
+    editLoadKeyRef.current = targetContentId;
     setLoadingEdit(true);
     setErrorMessage('');
     try {
       const result = await apiRequest<Record<string, unknown>>(
-        '/contents/' + encodeURIComponent(contentId),
+        '/contents/' + encodeURIComponent(targetContentId),
         { method: 'GET' },
       );
       if (!result.response.ok) {
-        throw new Error(apiFailureDiagnostic(result, 'Unable to load this post for editing.'));
+        throw new Error(apiFailureDiagnostic(result, restoringDraft ? 'Unable to restore this draft.' : 'Unable to load this post for editing.'));
       }
       const record = unwrapContent(result.data);
       if (!record) throw new Error('The server returned an incomplete content record.');
       if (record.contentType !== 'post') throw new Error('Beta editing currently supports social posts only.');
-      // W03 exposes ownerUserId only to the authenticated owner. creatorId
-      // is the canonical W08 Creator identity and may differ from the login user ID.
-      // Final ownership enforcement remains in W03 for every edit mutation.
+      if (restoringDraft && record.state !== 'DRAFT') {
+        throw new Error('This saved draft is no longer editable as a draft. Open the published post instead.');
+      }
+      // W03 exposes ownerUserId only to the authenticated owner. Creator identity
+      // may differ from the login user ID; W03 remains the final mutation authority.
       const ownerId = record.ownerUserId;
       if (ownerId && user?.id && ownerId !== user.id) {
         throw new Error('You can edit only your own post.');
@@ -186,34 +206,83 @@ function PublishScreenContent() {
       if (!etag || etag === '*') {
         throw new Error('The server did not return a version for this post. Refresh it before editing.');
       }
+
+      let restoredBody = record.title || '';
+      if (restoringDraft && record.bodyRef) {
+        const bodyResponse = await fetchContentBodyReference(record.bodyRef);
+        if (!bodyResponse.ok) throw new Error('The saved draft text could not be restored. Your server draft was left unchanged.');
+        restoredBody = await bodyResponse.text();
+      }
+
+      let restoredPoll: { options: Array<{ text: string }>; durationHours: PollDurationHours } | null = null;
+      if (restoringDraft) {
+        const pollResult = await apiRequest<{ data?: { poll?: { options?: Array<{ text?: string }>; durationHours?: number } | null } }>(
+          '/contents/' + encodeURIComponent(targetContentId) + '/poll',
+          { method: 'GET' },
+        );
+        const poll = pollResult.response.ok ? pollResult.data?.data?.poll : null;
+        const options = Array.isArray(poll?.options)
+          ? poll.options.map((option) => typeof option.text === 'string' ? option.text : '').filter(Boolean)
+          : [];
+        const duration = Number(poll?.durationHours);
+        if (options.length >= MIN_POLL_OPTIONS && options.length <= MAX_POLL_OPTIONS && [24, 72, 168].includes(duration)) {
+          restoredPoll = { options: options.map((text) => ({ text })), durationHours: duration as PollDurationHours };
+        }
+      }
+
       const loaded: ContentRecord = { ...record, etag };
       recordRef.current = loaded;
       const loadedAccessMode = record.accessMode === 'MEMBERS_ONLY' ? 'MEMBERS_ONLY' : 'PUBLIC';
+      const restoredMediaRefs = (record.mediaRefs || []).filter((url): url is string =>
+        typeof url === 'string' && /^https?:\\/\\//i.test(url.trim()),
+      );
+      const restoredAssets: ComposerAsset[] = restoredMediaRefs.map((url, index) => ({
+        localId: 'existing-' + index + '-' + url,
+        filename: url.split('/').pop() || 'Existing media',
+        mimeType: mimeFromUrl(url),
+        serverUrl: url,
+        status: 'ready',
+        existing: true,
+      }));
+
       originalAccessModeRef.current = loadedAccessMode;
+      originalBodyRef.current = { text: restoredBody, bodyRef: record.bodyRef || null };
       setAccessMode(loadedAccessMode);
-      originalBodyRef.current = { text: record.title || '', bodyRef: record.bodyRef || null };
-      setBody(record.title || '');
+      setBody(restoredBody);
       setCoverRef(record.coverRef || '');
-      setAssets((record.mediaRefs || []).filter((url): url is string => typeof url === 'string' && /^https?:\/\//i.test(url.trim()))
-        .map((url, index) => ({
-          localId: 'existing-' + index + '-' + url,
-          filename: url.split('/').pop() || 'Existing media',
-          mimeType: mimeFromUrl(url),
-          serverUrl: url,
-          status: 'ready',
-          existing: true,
-        })));
+      setAssets(restoredAssets);
+      pollConfiguredRef.current = Boolean(restoredPoll);
+      setPollEnabled(Boolean(restoredPoll));
+      setPollOptions(restoredPoll ? restoredPoll.options.map((option) => option.text) : ['', '']);
+      setPollDurationHours(restoredPoll?.durationHours ?? 24);
+      if (restoringDraft) {
+        draftSavedFingerprintRef.current = createPublishDraftFingerprint({
+          body: restoredBody,
+          accessMode: loadedAccessMode,
+          mediaRefs: restoredMediaRefs,
+          coverRef: record.coverRef || null,
+          pollEnabled: Boolean(restoredPoll),
+          pollOptions: restoredPoll ? restoredPoll.options.map((option) => option.text) : [],
+          pollDurationHours: restoredPoll?.durationHours ?? 24,
+        });
+        draftSaveLastSavedAtRef.current = Date.now();
+        draftSaveDirtyRef.current = false;
+        skipNextDraftSaveRef.current = true;
+        setDraftSaveStatus('saved');
+      }
+      draftSaveRestoreCompleteRef.current = true;
     } catch (error) {
       editLoadKeyRef.current = '';
-      setErrorMessage(error instanceof Error ? error.message : 'Unable to load this post for editing.');
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to load this post.');
     } finally {
       setLoadingEdit(false);
     }
-  }, [authStatus, contentId, user?.id]);
+  }, [authStatus, contentId, draftId, user?.id]);
 
   useEffect(() => {
+    if (!contentId && !draftId) draftSaveRestoreCompleteRef.current = true;
     void loadExistingContent();
-  }, [loadExistingContent]);
+  }, [contentId, draftId, loadExistingContent]);
 
   const uploadAsset = useCallback(async (asset: ComposerAsset) => {
     let uploaded = asset.uploaded;
@@ -477,6 +546,295 @@ function PublishScreenContent() {
     [busy, isDark, publishPending, removeAsset, retryAsset],
   );
 
+  const saveDraftSnapshot = useCallback(async () => {
+    if (contentId || loadingEdit || publishPending || authStatus !== 'authenticated') return;
+    const trimmedBody = body.trim();
+    if (!trimmedBody || trimmedBody.length > MAX_TEXT_LENGTH) return;
+    if (assets.some((asset) => !asset.existing && asset.status !== 'ready')) return;
+    if (assets.some((asset) => !asset.serverUrl || !/^https?:\\/\\//i.test(asset.serverUrl))) return;
+
+    const mediaRefs = Array.from(new Set(assets.map((asset) => asset.serverUrl)));
+    const nextCover = coverRef && mediaRefs.includes(coverRef)
+      ? coverRef
+      : assets.find((asset) => asset.mimeType.startsWith('image/'))?.serverUrl || null;
+    const fingerprint = createPublishDraftFingerprint({
+      body: trimmedBody,
+      accessMode,
+      mediaRefs,
+      coverRef: nextCover,
+      pollEnabled,
+      pollOptions,
+      pollDurationHours,
+    });
+    if (recordRef.current?.id && draftSavedFingerprintRef.current === fingerprint) return;
+
+    let bodyRef = originalBodyRef.current.text === trimmedBody
+      ? originalBodyRef.current.bodyRef
+      : null;
+    if (!bodyRef && bodyUploadRef.current?.text === trimmedBody && bodyUploadRef.current.uploaded) {
+      bodyRef = bodyUploadRef.current.uploaded.url;
+    }
+    if (!bodyRef) {
+      if (bodyUploadRef.current?.text !== trimmedBody) {
+        bodyUploadRef.current = { text: trimmedBody, key: createIdempotencyKey() };
+      }
+      const bodyAttempt = bodyUploadRef.current;
+      const uploadedBody = await uploadTextBody(trimmedBody, bodyAttempt.key);
+      bodyAttempt.uploaded = uploadedBody;
+      bodyRef = uploadedBody.url;
+    }
+    if (!bodyRef) throw new Error('The server did not return a permanent URL for the draft text.');
+
+    const payload = {
+      contentType: 'post',
+      title: trimmedBody,
+      bodyRef,
+      mediaRefs,
+      coverRef: nextCover,
+      ...(accessMode === 'MEMBERS_ONLY' || originalAccessModeRef.current === 'MEMBERS_ONLY' ? { accessMode } : {}),
+    };
+    const serializedPayload = JSON.stringify(payload);
+    let draft = recordRef.current;
+
+    // If a create timed out, replay its exact idempotent request before writing
+    // newer text. This prevents a second DRAFT row from being created.
+    const pendingCreate = draftCreatePendingRef.current;
+    if (!draft?.id) {
+      const createKey = pendingCreate?.key || draftCreateKeyRef.current || createIdempotencyKey();
+      const createPayload = pendingCreate?.payload || serializedPayload;
+      const createBody = pendingCreate?.bodyText || trimmedBody;
+      const createFingerprint = pendingCreate?.fingerprint || fingerprint;
+      draftCreateKeyRef.current = createKey;
+      let created;
+      try {
+        created = await apiRequest<Record<string, unknown>>('/contents', {
+          method: 'POST',
+          body: createPayload,
+          idempotencyKey: createKey,
+        });
+      } catch (error) {
+        draftCreatePendingRef.current = {
+          key: createKey,
+          payload: createPayload,
+          bodyText: createBody,
+          fingerprint: createFingerprint,
+        };
+        throw error;
+      }
+      if (!created.response.ok) {
+        if (created.response.status === 408 || created.response.status >= 500) {
+          draftCreatePendingRef.current = {
+            key: createKey,
+            payload: createPayload,
+            bodyText: createBody,
+            fingerprint: createFingerprint,
+          };
+        }
+        throw new Error(apiFailureDiagnostic(created, 'Unable to auto-save this post draft.'));
+      }
+      const createdRecord = unwrapContent(created.data);
+      const createdEtag = createdRecord?.etag || created.response.headers.get('ETag') || undefined;
+      if (!createdRecord?.id || !createdEtag || createdEtag === '*') {
+        draftCreatePendingRef.current = {
+          key: createKey,
+          payload: createPayload,
+          bodyText: createBody,
+          fingerprint: createFingerprint,
+        };
+        throw new Error('The draft may have been created, but its version was not returned. Retry the same save to avoid duplicates.');
+      }
+      draft = {
+        ...createdRecord,
+        etag: createdEtag,
+        contentType: 'post',
+        title: createBody,
+        bodyRef: (JSON.parse(createPayload) as { bodyRef: string }).bodyRef,
+        mediaRefs: (JSON.parse(createPayload) as { mediaRefs: string[] }).mediaRefs,
+        coverRef: (JSON.parse(createPayload) as { coverRef: string | null }).coverRef,
+        state: 'DRAFT',
+      };
+      recordRef.current = draft;
+      draftSavedFingerprintRef.current = createFingerprint;
+      draftCreatePendingRef.current = null;
+      draftCreateKeyRef.current = '';
+      editLoadKeyRef.current = draft.id;
+      router.setParams({ draftId: draft.id } as never);
+      originalBodyRef.current = { text: createBody, bodyRef: draft.bodyRef || null };
+    }
+
+    if (!draft?.id) throw new Error('The draft could not be identified after saving.');
+    if (draftSavedFingerprintRef.current !== fingerprint) {
+      if (!draft.etag || draft.etag === '*') {
+        const detail = await apiRequest<Record<string, unknown>>(
+          '/contents/' + encodeURIComponent(draft.id),
+          { method: 'GET' },
+        );
+        if (detail.response.ok) {
+          const refreshed = unwrapContent(detail.data);
+          const etag = refreshed?.etag || detail.response.headers.get('ETag') || undefined;
+          if (refreshed && etag) draft = { ...draft, ...refreshed, etag };
+        }
+      }
+      if (!draft.etag || draft.etag === '*') throw new Error('The saved draft is missing its version. Reload it before saving again.');
+      const updated = await apiRequest<Record<string, unknown>>(
+        '/contents/' + encodeURIComponent(draft.id),
+        {
+          method: 'PATCH',
+          headers: { 'If-Match': draft.etag },
+          body: serializedPayload,
+          idempotencyKey: createIdempotencyKey(),
+        },
+      );
+      if (!updated.response.ok) {
+        throw new Error(apiFailureDiagnostic(updated, 'Unable to update the saved draft.'));
+      }
+      const updatedRecord = unwrapContent(updated.data);
+      const updatedEtag = updatedRecord?.etag || updated.response.headers.get('ETag') || undefined;
+      if (!updatedRecord?.id || !updatedEtag || updatedEtag === '*') {
+        throw new Error('The draft was updated, but its new version was not returned. Reload before publishing.');
+      }
+      draft = { ...updatedRecord, etag: updatedEtag };
+      recordRef.current = draft;
+      draftSavedFingerprintRef.current = fingerprint;
+      originalBodyRef.current = { text: trimmedBody, bodyRef };
+    }
+
+    // The web composer already uses these W01/W05 draft poll routes. Keep the
+    // native draft's poll synchronized without creating new backend surfaces.
+    if (pollEnabled) {
+      const cleanOptions = pollOptions.map((option) => option.normalize('NFKC').trim());
+      const optionKeys = cleanOptions.map((option) => option.toLocaleLowerCase('en-US'));
+      const validPoll = cleanOptions.length >= MIN_POLL_OPTIONS &&
+        cleanOptions.length <= MAX_POLL_OPTIONS &&
+        cleanOptions.every((option) => option.length > 0 && [...option].length <= MAX_POLL_OPTION_LENGTH) &&
+        new Set(optionKeys).size === optionKeys.length;
+      if (validPoll) {
+        const pollResult = await apiRequest<unknown>(
+          '/contents/' + encodeURIComponent(draft.id) + '/poll',
+          {
+            method: 'POST',
+            body: JSON.stringify({ options: cleanOptions, durationHours: pollDurationHours }),
+            idempotencyKey: createIdempotencyKey(),
+          },
+        );
+        if (!pollResult.response.ok) {
+          throw new Error(apiFailureDiagnostic(pollResult, 'Unable to auto-save the poll.'));
+        }
+        pollConfiguredRef.current = true;
+      }
+    } else if (pollConfiguredRef.current) {
+      const pollResult = await apiRequest<unknown>(
+        '/contents/' + encodeURIComponent(draft.id) + '/poll',
+        { method: 'DELETE', idempotencyKey: createIdempotencyKey() },
+      );
+      if (!pollResult.response.ok) {
+        throw new Error(apiFailureDiagnostic(pollResult, 'Unable to remove the draft poll.'));
+      }
+      pollConfiguredRef.current = false;
+    }
+  }, [
+    accessMode,
+    assets,
+    authStatus,
+    body,
+    contentId,
+    coverRef,
+    loadingEdit,
+    pollDurationHours,
+    pollEnabled,
+    pollOptions,
+    publishPending,
+    router,
+  ]);
+
+  const scheduleDraftAutoSave = useCallback(() => {
+    if (draftSaveTimerRef.current) {
+      clearTimeout(draftSaveTimerRef.current);
+      draftSaveTimerRef.current = null;
+    }
+    if (
+      !draftSaveRestoreCompleteRef.current ||
+      !draftSaveDirtyRef.current ||
+      contentId ||
+      !body.trim() ||
+      body.trim().length > MAX_TEXT_LENGTH ||
+      loadingEdit ||
+      publishPending ||
+      assets.some((asset) => !asset.existing && asset.status !== 'ready')
+    ) {
+      setDraftSaveStatus('idle');
+      return;
+    }
+
+    const changeToken = draftSaveChangeTokenRef.current;
+    const delay = computeAutoSaveDelay(Date.now(), draftSaveLastSavedAtRef.current);
+    setDraftSaveStatus('scheduled');
+    draftSaveTimerRef.current = setTimeout(() => {
+      draftSaveTimerRef.current = null;
+      if (
+        changeToken !== draftSaveChangeTokenRef.current ||
+        draftSaveInFlightRef.current ||
+        busy ||
+        !draftSaveDirtyRef.current
+      ) {
+        return;
+      }
+      draftSaveInFlightRef.current = true;
+      setDraftSaveStatus('saving');
+      const task = (async () => {
+        try {
+          await saveDraftSnapshot();
+          draftSaveLastSavedAtRef.current = Date.now();
+          if (changeToken === draftSaveChangeTokenRef.current) {
+            draftSaveDirtyRef.current = false;
+            setDraftSaveStatus('saved');
+          }
+        } catch {
+          setDraftSaveStatus('error');
+        } finally {
+          draftSaveInFlightRef.current = false;
+          if (draftSaveDirtyRef.current && changeToken !== draftSaveChangeTokenRef.current) {
+            draftAutoSaveSchedulerRef.current();
+          }
+        }
+      })();
+      draftSaveInFlightPromiseRef.current = task;
+      void task.finally(() => {
+        if (draftSaveInFlightPromiseRef.current === task) {
+          draftSaveInFlightPromiseRef.current = null;
+        }
+      });
+    }, delay);
+  }, [
+    assets,
+    body,
+    busy,
+    contentId,
+    loadingEdit,
+    publishPending,
+    saveDraftSnapshot,
+  ]);
+
+  useEffect(() => {
+    draftAutoSaveSchedulerRef.current = scheduleDraftAutoSave;
+  }, [scheduleDraftAutoSave]);
+
+  useEffect(() => {
+    if (!draftSaveRestoreCompleteRef.current || contentId || loadingEdit || publishPending) return;
+    if (skipNextDraftSaveRef.current) {
+      skipNextDraftSaveRef.current = false;
+      return;
+    }
+    if (!body.trim() && assets.length === 0 && !pollEnabled) return;
+    draftSaveDirtyRef.current = true;
+    draftSaveChangeTokenRef.current += 1;
+    draftAutoSaveSchedulerRef.current();
+  }, [accessMode, assets, body, busy, contentId, coverRef, loadingEdit, pollDurationHours, pollEnabled, pollOptions, publishPending]);
+
+  useEffect(() => () => {
+    if (draftSaveTimerRef.current) clearTimeout(draftSaveTimerRef.current);
+  }, []);
+
   const submit = useCallback(async () => {
     const trimmedBody = body.trim();
     if (!trimmedBody) {
@@ -536,6 +894,15 @@ function PublishScreenContent() {
       submitAttemptRef.current = attempt;
     }
 
+    if (!contentId) {
+      if (draftSaveTimerRef.current) {
+        clearTimeout(draftSaveTimerRef.current);
+        draftSaveTimerRef.current = null;
+      }
+      draftSaveChangeTokenRef.current += 1;
+      const pendingDraftSave = draftSaveInFlightPromiseRef.current;
+      if (pendingDraftSave) await pendingDraftSave;
+    }
     setBusy(true);
     setErrorMessage('');
     setStatusMessage(contentId ? 'Saving your changes…' : 'Publishing your post…');
@@ -602,6 +969,46 @@ function PublishScreenContent() {
       }
 
       let draft = recordRef.current;
+      const currentDraftFingerprint = createPublishDraftFingerprint({
+        body: trimmedBody,
+        accessMode,
+        mediaRefs,
+        coverRef: nextCover,
+        pollEnabled,
+        pollOptions,
+        pollDurationHours,
+      });
+      if (draft?.id && draftSavedFingerprintRef.current !== currentDraftFingerprint) {
+        if (!draft.etag || draft.etag === '*') {
+          const detail = await apiRequest<Record<string, unknown>>(
+            '/contents/' + encodeURIComponent(draft.id),
+            { method: 'GET' },
+          );
+          if (detail.response.ok) {
+            const refreshed = unwrapContent(detail.data);
+            const refreshedEtag = refreshed?.etag || detail.response.headers.get('ETag') || undefined;
+            if (refreshed && refreshedEtag) draft = { ...draft, ...refreshed, etag: refreshedEtag };
+          }
+        }
+        if (!draft.etag || draft.etag === '*') throw new Error('Reload the draft before publishing because its server version is missing.');
+        const updated = await apiRequest<Record<string, unknown>>(
+          '/contents/' + encodeURIComponent(draft.id),
+          {
+            method: 'PATCH',
+            headers: { 'If-Match': draft.etag },
+            body: JSON.stringify(payload),
+            idempotencyKey: attempt.mutationKey,
+          },
+        );
+        if (!updated.response.ok) throw new Error(apiFailureDiagnostic(updated, 'Unable to save the latest draft before publishing.'));
+        const updatedRecord = unwrapContent(updated.data);
+        const updatedEtag = updatedRecord?.etag || updated.response.headers.get('ETag') || undefined;
+        if (!updatedRecord?.id || !updatedEtag || updatedEtag === '*') throw new Error('The draft was saved but its new version was not returned. Retry publication after reloading.');
+        draft = { ...updatedRecord, etag: updatedEtag };
+        recordRef.current = draft;
+        draftSavedFingerprintRef.current = currentDraftFingerprint;
+        originalBodyRef.current = { text: trimmedBody, bodyRef };
+      }
       if (!draft?.id) {
         let created;
         try {
@@ -710,6 +1117,8 @@ function PublishScreenContent() {
 
       submitAttemptRef.current = null;
       recordRef.current = null;
+      draftSaveDirtyRef.current = false;
+      draftSaveStatus !== 'idle' && setDraftSaveStatus('idle');
       const publishedId = draft.id;
       setStatusMessage('发布成功');
       Alert.alert('发布成功', '你的动态已发布，现在可以在公开信息流中查看。', [
@@ -792,6 +1201,14 @@ function PublishScreenContent() {
             <Text style={[styles.helperText, isDark && { color: '#9ca3af' }]}>Ordinary social posts publish directly; no extra review screen.</Text>
             <Text style={[styles.counter, isDark && { color: '#9ca3af' }]}>{body.length}/{MAX_TEXT_LENGTH}</Text>
           </View>
+          {!contentId && draftSaveStatus !== 'idle' ? (
+            <Text accessibilityLiveRegion="polite" style={[styles.draftSaveStatus, isDark && { color: '#9ca3af' }]}>
+              {draftSaveStatus === 'scheduled' ? '草稿即将自动保存…'
+                : draftSaveStatus === 'saving' ? '正在自动保存草稿…'
+                  : draftSaveStatus === 'saved' ? '草稿已自动保存，可稍后继续编辑。'
+                    : '草稿自动保存失败，请检查网络后继续；再次编辑会重试。'}
+            </Text>
+          ) : null}
 
           <View style={[styles.accessModeSection, isDark && { borderBottomColor: '#27272a' }]}>
             <View>
@@ -993,6 +1410,7 @@ const styles = StyleSheet.create({
   counterRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, paddingBottom: 15, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#eaecf0' },
   helperText: { flex: 1, fontSize: 12, lineHeight: 17, color: '#667085' },
   counter: { fontSize: 12, color: '#667085' },
+  draftSaveStatus: { color: '#667085', fontSize: 12, lineHeight: 17, marginTop: 7 },
   accessModeSection: { paddingVertical: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#eaecf0' },
   accessModeTitle: { color: '#101828', fontSize: 14, fontWeight: '800' },
   accessModeDescription: { color: '#667085', fontSize: 12, lineHeight: 18, marginTop: 4 },
