@@ -62,8 +62,33 @@ jobs:
           assert actual['D1_03'].get('migrations_dir') is None
           assert len(c.get('services', [])) == 1
           assert c['services'][0]['binding'] == 'W03_CONTENT'
-          assert 'queues' not in c and 'workflows' not in c
-          print('W05_D1_03_BINDING_SOURCE=PASS')
+          assert 'queues' not in c
+          assert c.get('vars', {}).get('PUSH_DELIVERY_ENABLED') == 'false'
+          workflows = c.get('workflows', [])
+          assert workflows == [{
+              'name': 'luckread-w05-notification-push',
+              'binding': 'NOTIFICATION_PUSH_WORKFLOW',
+              'class_name': 'NotificationPushWorkflow',
+              'schedules': ['* * * * *'],
+          }]
+          print('W05_D1_03_BINDING_AND_DISABLED_PUSH_WORKFLOW_SOURCE=PASS')
+          PY
+
+      - name: Verify W05 D1-02 notification push delivery migration before deploying W05
+        working-directory: workers/W05-social
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4.116.0 d1 execute luckreadpro --remote --json --config wrangler.jsonc --command "SELECT name FROM d1_migrations WHERE name IN ('20261104_017_notification_push_delivery_v1.sql','20261104_017_notification_push_delivery_v1');" > /tmp/w05-notify-003-ready.json
+          python - <<'PY'
+          import json
+          data = json.load(open('/tmp/w05-notify-003-ready.json'))
+          rows = [r for item in data for r in item.get('results', [])] if isinstance(data, list) else data.get('results', [])
+          if len(rows) != 1:
+              raise SystemExit('W05 D1-02 NOTIFY-003 migration must be applied before W05 delivery deployment')
+          print('W05_NOTIFY_003_D1_02_MIGRATION_PREREQUISITE=PASS')
           PY
 
       - name: Setup Node 24
@@ -87,6 +112,10 @@ jobs:
               raise SystemExit('D1-03 push endpoint migration must be applied before W05 deployment')
           print('W05_D1_03_MIGRATION_PREREQUISITE=PASS')
           PY
+
+      - name: Install W05 Expo SDK dependency from committed lockfile
+        working-directory: workers/W05-social
+        run: npm ci --ignore-scripts --no-audit --fund=false
 
       - name: Deploy W05 with existing D1-02 and scoped D1-03 bindings
         working-directory: workers/W05-social
