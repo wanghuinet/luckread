@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 const feedItem = readFileSync(new URL('../components/FeedItem.tsx', import.meta.url), 'utf8');
 
 test('public post photos share one Galeria root and stable indexes for swipe navigation', () => {
-  expect(feedItem).toContain('const imageItems = items.filter((media) => media.kind === \'image\')');
+  expect(feedItem).toContain('const imageItems = accessibleItems.filter((media) => media.kind === \'image\')');
   expect(feedItem).toContain('<Galeria urls={imageItems.map((media) => media.src)}>');
   expect(feedItem).toContain('<Galeria.Image index={currentImageIndex}>');
   expect(feedItem).toContain('!requiresAuthenticatedViewer && imageItems.length > 0');
