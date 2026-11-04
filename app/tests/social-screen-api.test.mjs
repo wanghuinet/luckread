@@ -6,6 +6,8 @@ const bookmarkScreenSource = readFileSync(resolve(process.cwd(), 'app/(drawer)/b
 const feedItemSource = readFileSync(new URL('../components/FeedItem.tsx', import.meta.url), 'utf8');
 const postDetailSource = readFileSync(new URL('../app/(drawer)/(tabs)/(index,search,messages,grok,video,notifications)/post/[id].tsx', import.meta.url), 'utf8');
 const profileScreenSource = readFileSync(resolve(process.cwd(), 'app/(drawer)/(tabs)/(index,search,messages,grok,video,notifications)/profile/[id].tsx'), 'utf8');
+const rootLayoutSource = readFileSync(new URL('../app/_layout.tsx', import.meta.url), 'utf8');
+const notificationsScreenSource = readFileSync(new URL('../app/(drawer)/(tabs)/(notifications)/notifications.tsx', import.meta.url), 'utf8');
 
 const calls = [];
 let keyCounter = 0;
@@ -22,6 +24,7 @@ const {
   fetchBookmarksPage,
   fetchDiscoveryTopics,
   fetchNotificationsPage,
+  fetchNotificationById,
   fetchUserRelationshipsPage,
   fetchUserLikedContentsPage,
   fetchUserRepliesPage,
@@ -59,6 +62,30 @@ test('uses the existing mention filter and cursor for notification pagination', 
   expect(calls[0].path).toBe('/notifications?limit=20&cursor=next+page%2F2&type=MENTION');
   expect(calls[0].options.method).toBe('GET');
   expect(calls[0].options.signal).toBe(controller.signal);
+});
+
+test('loads one exact notification through the existing recipient-scoped notifications query', async () => {
+  const controller = new AbortController();
+  await fetchNotificationById('notification_123', controller.signal);
+
+  expect(calls).toHaveLength(1);
+  expect(calls[0].path).toBe('/notifications?limit=1&notificationId=notification_123');
+  expect(calls[0].options.method).toBe('GET');
+  expect(calls[0].options.signal).toBe(controller.signal);
+});
+
+test('rejects malformed notification IDs before making an API request', () => {
+  expect(() => fetchNotificationById('../someone-elses-notification')).toThrow('A valid notification ID is required.');
+  expect(calls).toHaveLength(0);
+});
+
+test('notification taps resolve by server-owned notification ID and never trust payload target URLs', () => {
+  expect(rootLayoutSource).toContain('payload?.notificationId');
+  expect(rootLayoutSource).toContain("pathname: '/notifications', params: { notificationId }");
+  expect(rootLayoutSource).not.toContain('payload?.url');
+  expect(notificationsScreenSource).toContain('fetchNotificationById(notificationId, controller.signal)');
+  expect(notificationsScreenSource).toContain('candidate.id === notificationId');
+  expect(notificationsScreenSource).toContain('const actorRoute = actor?.username || actor?.id || item.actorUserId');
 });
 
 test('marks an individual notification as read with an encoded ID', async () => {
