@@ -12,13 +12,20 @@
     "primaryWorker": "W09",
     "databaseUuid": "bda1d247-a371-4244-91ae-aef96034db7f",
     "databaseName": "secondary",
-    "scope": "W09-owned D1-03 push routing state; W05/T14 is a narrowly delegated self-service writer only, not a general D1-03 entity owner.",
+    "scope": "W09-owned D1-03 push routing state; W05/T14 has only the explicit self-service endpoint PUT/DELETE delegation and the separate internal notification-delivery delegation in W05-W09-notification-push-delivery.v1.json.",
     "primaryTask": "T25",
     "scopedWriter": {
       "task": "T14",
       "worker": "W05",
       "workerName": "luckread-w05",
       "scope": "Self-service registration/deletion for the current user's Expo endpoint only."
+    },
+    "scopedDeliveryRuntime": {
+      "task": "T14",
+      "worker": "W05",
+      "workerName": "luckread-w05",
+      "scope": "Owner-scoped active endpoint read and compare-and-set token clearing only after Expo DeviceNotRegistered.",
+      "contractRef": "contracts/transport/W05-W09-notification-push-delivery.v1.json"
     }
   },
   "persistence": {
@@ -65,7 +72,8 @@
     "caller": "W01 only through authenticated W02 session resolution",
     "minimumInteractionLayer": "L2",
     "rateLimit": "W01 origin/IP write limit plus W05 global and authenticated-principal limit",
-    "deliveryRead": "Only W05 internal delivery runtime may read tokens under the separate notification-delivery contract."
+    "deliveryRead": "Only W05 internal delivery runtime may read active recipient tokens under contracts/transport/W05-W09-notification-push-delivery.v1.json.",
+    "deliveryWrite": "Only W05 internal delivery runtime may clear the exact token snapshot after Expo DeviceNotRegistered, using the hash compare-and-set in contracts/transport/W05-W09-notification-push-delivery.v1.json."
   },
   "nonGoals": [
     "No Expo Push API sending in this module.",
@@ -79,6 +87,7 @@
     "W05 registration and owner-scoped deletion runtime tests",
     "W01 bearer-session adapter contract tests",
     "Negative tests for caller spoofing, token collision, denied permission, missing D1-03 binding, and unauthorized deletion",
-    "Production Expo push-token privacy and authorization E2E"
+    "Production Expo push-token privacy and authorization E2E",
+    "W05 delivery-runtime endpoint read / DeviceNotRegistered compare-and-set tests under NOTIFY-003"
   ]
 }
