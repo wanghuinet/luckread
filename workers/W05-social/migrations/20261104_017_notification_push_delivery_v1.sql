@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS social_notification_push_deliveries (
   lease_token TEXT,
   lease_expires_at TEXT,
   expo_ticket_id TEXT,
+  push_token_hash TEXT,
   last_error_code TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
