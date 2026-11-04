@@ -892,19 +892,6 @@
       "x-luckread-source": "contracts/api/notification-operation-policy.v1.json"
     },
     {
-      "operationId": "deletePushEndpointsInstallationId",
-      "auth": {
-        "mode": "permission"
-      },
-      "permissions": [],
-      "auditRequired": true,
-      "optimisticLockRequired": false,
-      "idempotencyRequired": false,
-      "stateMachine": "none",
-      "x-luckread-contract-status": "DISCOVERY_DRAFT",
-      "x-luckread-source": "contracts/api/api-inventory.v1.json"
-    },
-    {
       "operationId": "deleteSubscriptionsSubscriptionId",
       "auth": {
         "mode": "permission"
