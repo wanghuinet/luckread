@@ -86,6 +86,7 @@ jobs:
           from pathlib import Path
           c = json.loads(Path('workers/W05-social/wrangler.jsonc').read_text())
           assert c.get('vars', {}).get('PUSH_DELIVERY_ENABLED') == 'false'
+          assert 'nodejs_compat' in c.get('compatibility_flags', [])
           assert c.get('queues') in (None, [])
           workflows = c.get('workflows', [])
           assert workflows == [{
