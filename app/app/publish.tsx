@@ -220,7 +220,8 @@ function PublishScreenContent() {
           '/contents/' + encodeURIComponent(targetContentId) + '/poll',
           { method: 'GET' },
         );
-        const poll = pollResult.response.ok ? pollResult.data?.data?.poll : null;
+        const pollEnvelope = pollResult.data as { data?: { poll?: { options?: Array<{ text?: string }>; durationHours?: number } | null } } | null;
+        const poll = pollResult.response.ok ? pollEnvelope?.data?.poll : null;
         const options = Array.isArray(poll?.options)
           ? poll.options.map((option) => typeof option.text === 'string' ? option.text : '').filter(Boolean)
           : [];
@@ -234,7 +235,7 @@ function PublishScreenContent() {
       recordRef.current = loaded;
       const loadedAccessMode = record.accessMode === 'MEMBERS_ONLY' ? 'MEMBERS_ONLY' : 'PUBLIC';
       const restoredMediaRefs = (record.mediaRefs || []).filter((url): url is string =>
-        typeof url === 'string' && /^https?:\\/\\//i.test(url.trim()),
+        typeof url === 'string' && /^https?:\/\//i.test(url.trim()),
       );
       const restoredAssets: ComposerAsset[] = restoredMediaRefs.map((url, index) => ({
         localId: 'existing-' + index + '-' + url,
@@ -551,7 +552,7 @@ function PublishScreenContent() {
     const trimmedBody = body.trim();
     if (!trimmedBody || trimmedBody.length > MAX_TEXT_LENGTH) return;
     if (assets.some((asset) => !asset.existing && asset.status !== 'ready')) return;
-    if (assets.some((asset) => !asset.serverUrl || !/^https?:\\/\\//i.test(asset.serverUrl))) return;
+    if (assets.some((asset) => !asset.serverUrl || !/^https?:\/\//i.test(asset.serverUrl))) return;
 
     const mediaRefs = Array.from(new Set(assets.map((asset) => asset.serverUrl)));
     const nextCover = coverRef && mediaRefs.includes(coverRef)
@@ -834,6 +835,26 @@ function PublishScreenContent() {
   useEffect(() => () => {
     if (draftSaveTimerRef.current) clearTimeout(draftSaveTimerRef.current);
   }, []);
+
+  const closeComposer = useCallback(async () => {
+    if (!contentId && body.trim() && !publishPending) {
+      if (draftSaveTimerRef.current) {
+        clearTimeout(draftSaveTimerRef.current);
+        draftSaveTimerRef.current = null;
+      }
+      draftSaveChangeTokenRef.current += 1;
+      const pendingSave = draftSaveInFlightPromiseRef.current;
+      if (pendingSave) await pendingSave;
+      try {
+        await saveDraftSnapshot();
+      } catch (error) {
+        setDraftSaveStatus('error');
+        setErrorMessage(error instanceof Error ? error.message : '草稿保存失败，请检查网络后重试。');
+        return;
+      }
+    }
+    router.back();
+  }, [body, contentId, publishPending, router, saveDraftSnapshot]);
 
   const submit = useCallback(async () => {
     const trimmedBody = body.trim();
@@ -1118,7 +1139,7 @@ function PublishScreenContent() {
       submitAttemptRef.current = null;
       recordRef.current = null;
       draftSaveDirtyRef.current = false;
-      draftSaveStatus !== 'idle' && setDraftSaveStatus('idle');
+      setDraftSaveStatus('idle');
       const publishedId = draft.id;
       setStatusMessage('发布成功');
       Alert.alert('发布成功', '你的动态已发布，现在可以在公开信息流中查看。', [
@@ -1159,7 +1180,7 @@ function PublishScreenContent() {
     <View style={[styles.page, isDark && { backgroundColor: '#000000' }]}>
       <Stack.Screen options={{ title: contentId ? 'Edit post' : 'New post', headerShown: false }} />
       <View style={[styles.header, isDark && { backgroundColor: '#000000', borderBottomColor: '#27272a' }]}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Close composer" onPress={() => router.back()} style={styles.iconButton}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Close composer" onPress={() => { void closeComposer(); }} style={styles.iconButton}>
           <Feather name="x" size={22} color={isDark ? '#e5e7eb' : '#111827'} />
         </Pressable>
         <Text style={[styles.headerTitle, isDark && { color: '#f9fafb' }]}>{contentId ? 'Edit post' : 'New post'}</Text>
