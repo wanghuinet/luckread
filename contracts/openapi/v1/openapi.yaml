@@ -911,9 +911,17 @@ paths:
       parameters:
         - $ref: '#/components/parameters/Cursor'
         - $ref: '#/components/parameters/Limit'
+        - name: status
+          in: query
+          required: false
+          description: >-
+            Optional owner-only native social draft listing. Only DRAFT is supported;
+            requests must be authenticated, are scoped to the caller's W02 identity,
+            return only post drafts, and are never placed in the shared public cache.
+          schema: { type: string, enum: [DRAFT] }
       responses:
         '200':
-          description: Content list.
+          description: Public content list or authenticated owner-scoped social post drafts.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ListResponse' }
