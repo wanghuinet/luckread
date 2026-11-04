@@ -1,9 +1,10 @@
-import { getBetterAuthPrincipal, W02AuthClientError } from '@/auth/w02-session-client'
-import { TrafficLimitError, enforcePublicReadRateLimit, enforceW01WriteRateLimit, rateLimitResponse } from '@/auth/traffic-limit'
 import { getPayload } from 'payload'
 import config from '@payload-config'
-import { resolvePayloadOwnerUserId } from '@/media/media-owner'
+
+import { getBetterAuthPrincipal, W02AuthClientError } from '@/auth/w02-session-client'
+import { TrafficLimitError, enforcePublicReadRateLimit, enforceW01WriteRateLimit, rateLimitResponse } from '@/auth/traffic-limit'
 import { apiErrorResponse, appendRequestIdToJsonResponse, normalizeApiErrorResponse } from '@/lib/api-response'
+import { resolvePayloadOwnerUserId } from '@/media/media-owner'
 import { DELETE as payloadMediaDelete, GET as payloadMediaGet } from '../../../../(payload)/api/[...slug]/route'
 
 type PayloadRouteContext = Parameters<typeof payloadMediaGet>[1]
@@ -17,6 +18,7 @@ type MediaDocument = {
   height?: number | null
   filename?: string | null
   alt?: string | null
+  ownerUserId?: string | number | null
   [key: string]: unknown
 }
 
