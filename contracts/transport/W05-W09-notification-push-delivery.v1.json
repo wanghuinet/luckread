@@ -65,8 +65,7 @@
       "allowedMutation": {
         "permission_status": "undetermined",
         "push_token": null,
-        "updated_at": "current timestamp",
-        "last_seen_at": "current timestamp"
+        "updated_at": "current timestamp"
       },
       "requiredPredicates": [
         "endpoint_id = delivery endpoint ID",
