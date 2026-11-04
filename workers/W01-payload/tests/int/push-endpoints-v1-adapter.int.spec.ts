@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { getCloudflareContext } from '@opennextjs/cloudflare'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import w05Worker from '../../../W05-social/src/index.js'
 import {
   DELETE as deletePushEndpointRoute,
@@ -9,9 +11,6 @@ import {
 vi.mock('@opennextjs/cloudflare', () => ({ getCloudflareContext: vi.fn() }))
 vi.mock('payload', () => ({ getPayload: vi.fn() }))
 vi.mock('@payload-config', () => ({ default: {} }))
-
-import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
 
 describe('v1 Expo push endpoint adapter', () => {
   const route = readFileSync(
@@ -154,6 +153,8 @@ describe('v1 Expo push endpoint W01-to-W05 integration', () => {
     expect(forwarded.headers.get('X-LuckRead-Caller')).toBe('W01')
     expect(forwarded.headers.get('X-LuckRead-Principal-User-Id')).toBe('session-owner-42')
     expect(forwarded.headers.get('X-LuckRead-Principal-Layer')).toBe('L2')
+    expect(forwarded.headers.has('Authorization')).toBe(false)
+    expect(forwarded.headers.has('Cookie')).toBe(false)
     expect(runtime.writes).toHaveLength(1)
     expect(runtime.writes[0]?.sql).toContain('INSERT INTO notification_push_endpoints')
     expect(runtime.writes[0]?.values).toContain('session-owner-42')
