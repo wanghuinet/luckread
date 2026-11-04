@@ -163,7 +163,7 @@
         "W09 D1-03 remote migration and W05 delegated runtime binding deployment are pending."
       ],
       "status": "BLOCKED",
-      "testEvidenceRefs": [
+      "extensionEvidenceRefs": [
         "workers/W05-social/src/push-endpoint-runtime.test.ts",
         "workers/W05-social/src/index.test.ts",
         "workers/W01-payload/tests/int/push-endpoints-v1-adapter.int.spec.ts"
