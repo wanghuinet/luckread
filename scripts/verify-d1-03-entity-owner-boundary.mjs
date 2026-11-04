@@ -32,9 +32,11 @@ const w05ConfigPath = resolve(root, 'workers/W05-social/wrangler.jsonc')
 const w09MigrationConfigPath = resolve(root, 'workers/W09-platform/wrangler.d1-03-migrations.jsonc')
 const w05SourcePath = resolve(root, 'workers/W05-social/src/index.ts')
 const pushRuntimePath = resolve(root, 'workers/W05-social/src/push-endpoint-runtime.ts')
+const deliveryRuntimePath = resolve(root, 'workers/W05-social/src/notification-push-delivery-runtime.ts')
+const deliveryContractPath = resolve(root, 'contracts/transport/W05-W09-notification-push-delivery.v1.json')
 const pushMigrationPath = resolve(root, 'workers/W09-platform/migrations-d1-03/0001_notification_push_endpoints.sql')
 
-for (const path of [w05ConfigPath, w09MigrationConfigPath, w05SourcePath, pushRuntimePath, pushMigrationPath]) {
+for (const path of [w05ConfigPath, w09MigrationConfigPath, w05SourcePath, pushRuntimePath, deliveryRuntimePath, deliveryContractPath, pushMigrationPath]) {
   if (!existsSync(path)) throw new Error(`Missing scoped NotificationPushEndpoint owner artifact: ${path}`)
 }
 
@@ -107,6 +109,35 @@ if (
   throw new Error('NotificationPushEndpoint must remain W09-owned with only the explicit W05/T14 self-service writer delegation')
 }
 
+const deliveryRuntime = readFileSync(deliveryRuntimePath, 'utf8')
+const deliveryContract = JSON.parse(readFileSync(deliveryContractPath, 'utf8'))
+const runtimeDelegation = pushDelegation?.delegatedDeliveryRuntime
+const deliveryOperations = new Set((deliveryContract.operations ?? []).map((operation) => operation.id))
+if (
+  runtimeDelegation?.worker !== 'W05' ||
+  runtimeDelegation?.task !== 'T14' ||
+  runtimeDelegation?.contractRef !== 'contracts/transport/W05-W09-notification-push-delivery.v1.json' ||
+  !Array.isArray(runtimeDelegation.allowedOperations) ||
+  runtimeDelegation.allowedOperations.length !== 2 ||
+  !runtimeDelegation.allowedOperations.includes('resolveActiveRecipientPushEndpoints') ||
+  !runtimeDelegation.allowedOperations.includes('clearProviderInvalidExpoToken') ||
+  deliveryContract.primaryOwner?.worker !== 'W09' ||
+  deliveryContract.primaryOwner?.task !== 'T25' ||
+  deliveryContract.delegatedRuntime?.worker !== 'W05' ||
+  deliveryContract.authority?.maxEndpointsPerRecipient !== 20 ||
+  !deliveryOperations.has('resolveActiveRecipientPushEndpoints') ||
+  !deliveryOperations.has('clearProviderInvalidExpoToken') ||
+  !deliveryRuntime.includes("owner_user_id = ?") ||
+  !deliveryRuntime.includes("permission_status = 'granted'") ||
+  !deliveryRuntime.includes('LIMIT ?') ||
+  !deliveryRuntime.includes('await hashPushToken(endpoint.push_token) !== task.pushTokenHash') ||
+  !deliveryRuntime.includes("AND push_token = ?") ||
+  !deliveryRuntime.includes("errorCode === 'DeviceNotRegistered'") ||
+  deliveryRuntime.includes('last_seen_at =')
+) {
+  throw new Error('W05 notification delivery D1-03 access exceeds the scoped W09/T25 delegation')
+}
+
 for (const rule of contract.boundaryRules ?? []) {
   if (typeof rule !== 'string' || rule.length === 0) throw new Error('Invalid D1-03 boundary rule')
 }
@@ -117,6 +148,7 @@ console.log(JSON.stringify({
   auditEventOwner: contract.crossCutting.AuditEvent.owner,
   notificationPushEndpointOwner: seen.get('NotificationPushEndpoint'),
   notificationPushEndpointDelegatedWriter: pushDelegation.delegatedWriter,
+  notificationPushDeliveryRuntimeContract: deliveryContractPath,
   w05D1_03RuntimeReferences: d1_03References.length,
   w09D1_03MigrationConfig: 'VERIFIED',
 }, null, 2))

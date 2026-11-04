@@ -62,6 +62,8 @@ jobs:
           node-version: 24
       - name: Install repository dependencies
         run: npm ci
+      - name: Install pinned W10 Expo SDK dependency
+        run: npm ci --prefix workers/W10-async --ignore-scripts --no-audit --fund=false
       - name: Verify W07 physical binding and migration source
         working-directory: workers/W07-subscription-commerce
         run: |

@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/transport/W05-W09-notification-push-delivery.v1.json",
+  "title": "W05 to W09 Scoped Notification Push Delivery Access Contract",
+  "version": "1.0.0",
+  "status": "CONTRACTED_PARTIAL",
+  "featureId": "NOTIFY-003",
+  "purpose": "Permit only the W05 notification delivery runtime to resolve a notification recipient's active Expo endpoints and conditionally clear a provider-invalid token, without transferring D1-03 entity ownership.",
+  "primaryOwner": {
+    "worker": "W09",
+    "task": "T25",
+    "entity": "NotificationPushEndpoint",
+    "database": "D1-03",
+    "databaseName": "secondary"
+  },
+  "delegatedRuntime": {
+    "worker": "W05",
+    "task": "T14",
+    "workerName": "luckread-w05",
+    "purpose": "Deliver W05-owned social notifications to authenticated recipients' currently active Expo installations."
+  },
+  "authority": {
+    "notificationRecipient": "Derived only from the persisted W05 D1-02 social_notification_push_outbox and social_notifications records.",
+    "endpointOwner": "Must exactly equal the notification recipient user ID.",
+    "endpointProvider": "expo",
+    "endpointPermission": "granted",
+    "maxEndpointsPerRecipient": 20,
+    "publicAccess": false
+  },
+  "operations": [
+    {
+      "id": "resolveActiveRecipientPushEndpoints",
+      "kind": "SCOPED_READ",
+      "table": "notification_push_endpoints",
+      "allowedColumns": [
+        "endpoint_id",
+        "owner_user_id",
+        "provider",
+        "platform",
+        "push_token",
+        "permission_status",
+        "updated_at"
+      ],
+      "requiredPredicates": [
+        "owner_user_id = notificationRecipientUserId",
+        "provider = 'expo'",
+        "permission_status = 'granted'",
+        "push_token IS NOT NULL"
+      ],
+      "maxRows": 20,
+      "ordering": [
+        "updated_at DESC"
+      ],
+      "forbidden": [
+        "unbounded endpoint enumeration",
+        "client-supplied owner IDs",
+        "returning tokens to W01, APP, H5, PC, analytics or logs"
+      ]
+    },
+    {
+      "id": "clearProviderInvalidExpoToken",
+      "kind": "CONDITIONAL_SCOPED_WRITE",
+      "trigger": "Expo ticket or receipt reports DeviceNotRegistered",
+      "table": "notification_push_endpoints",
+      "allowedMutation": {
+        "permission_status": "undetermined",
+        "push_token": null,
+        "updated_at": "current timestamp"
+      },
+      "requiredPredicates": [
+        "endpoint_id = delivery endpoint ID",
+        "owner_user_id = persisted notification recipient",
+        "provider = 'expo'",
+        "current push token SHA-256 equals the hash captured when the Expo ticket was issued"
+      ],
+      "concurrency": "Read current token, compare its hash to the delivery snapshot, then UPDATE with the exact current token as a compare-and-set predicate. Never clear a rotated replacement token.",
+      "idempotent": true,
+      "forbidden": [
+        "changing endpoint owner",
+        "changing installation ID",
+        "deleting account/session/device state",
+        "clearing a token after an unrelated provider error"
+      ]
+    }
+  ],
+  "dataHandling": {
+    "tokenClassification": "PRIVATE_ROUTING_ADDRESS",
+    "tokenExposure": "W05 delivery runtime memory only",
+    "tokenPersistence": "Never copy raw push tokens into D1-02, outbox rows, delivery rows, Workflow payloads/results, logs or errors.",
+    "tokenSnapshot": "Persist only SHA-256 token hash in W05 D1-02 delivery record so stale receipts cannot clear a rotated token.",
+    "endpointAccess": "D1-03 read/write remains limited to the two operations in this contract."
+  },
+  "architecture": {
+    "workerCount": 12,
+    "d1Count": 5,
+    "newWorker": false,
+    "newD1": false,
+    "newQueue": false,
+    "newServiceBinding": false,
+    "notificationOutbox": "W05 D1-02, atomic with social_notifications insert.",
+    "deliveryState": "W05 D1-02.",
+    "endpointState": "W09 D1-03.",
+    "workflow": "Existing W05 Worker-owned durable Workflow resource; no new Worker or Queue."
+  },
+  "evidenceRequired": [
+    "W05 D1-02 NOTIFY-003 migration and atomic notification-to-outbox trigger validation",
+    "W05 endpoint lookup is owner-scoped and capped at 20 rows",
+    "W05 DeviceNotRegistered cleanup compares SHA-256 against the exact ticket token snapshot",
+    "Negative test proves a rotated token is not cleared by an older receipt",
+    "W05 D1-03 binding deploy source and live binding evidence",
+    "Android/iOS provider ticket and receipt acceptance"
+  ],
+  "nonGoals": [
+    "No generalized W05 D1-03 access",
+    "No W10 or AUTH-013 Queue reuse",
+    "No new public API for delivery",
+    "No cross-D1 transaction or foreign key",
+    "No notification inbox ownership transfer"
+  ]
+}

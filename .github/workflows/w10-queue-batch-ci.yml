@@ -42,8 +42,10 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - name: Install locked dependencies
+      - name: Install locked repository dependencies
         run: npm ci --ignore-scripts --no-audit --fund=false
+      - name: Install locked W10 SDK dependency
+        run: npm ci --prefix workers/W10-async --ignore-scripts --no-audit --fund=false
       - name: Test W10 async execution and Workflow orchestration
         run: npx vitest run workers/W10-async/src/*.test.ts
       - name: Verify renewal activation and W10 transport boundary
@@ -60,6 +62,8 @@ jobs:
           workers/W10-async/src/event-envelope.ts
           workers/W10-async/src/event-envelope.test.ts
           workers/W10-async/src/canonical-json-idempotency.ts
+          workers/W10-async/src/expo-push-service.ts
+          workers/W10-async/src/expo-push-service.test.ts
           workers/W10-async/src/membership-renewal-workflow-runtime.ts
           workers/W10-async/src/membership-renewal-workflow.test.ts
           workers/W10-async/src/membership-renewal-workflow.ts
