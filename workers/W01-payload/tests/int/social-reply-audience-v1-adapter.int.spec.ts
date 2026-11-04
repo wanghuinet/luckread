@@ -22,10 +22,12 @@ describe('reply audience backend closure', () => {
   it('forwards verified status only from W02 resolved role assignments', () => {
     const identityClient = read('src/content/w03-content-client.ts')
     const socialClient = read('src/social/w05-social-client.ts')
+    const socialTransport = read('src/social/w05-social-transport.ts')
     expect(identityClient).toContain("assignment.roleId === 'verified_user'")
     expect(identityClient).toContain("X-LuckRead-Principal-Verified")
-    expect(socialClient).toContain("X-LuckRead-Principal-Verified")
-    expect(socialClient).toContain("input.principal.verified === true ? 'true' : 'false'")
+    expect(socialClient).toContain("createW05SocialCaller(getW05Service)")
+    expect(socialTransport).toContain("X-LuckRead-Principal-Verified")
+    expect(socialTransport).toContain("input.principal.verified === true ? 'true' : 'false'")
   })
 
   it('persists the selected audience for drafts and before a post is published', () => {

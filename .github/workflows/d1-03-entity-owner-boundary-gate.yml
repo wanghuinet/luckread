@@ -6,12 +6,26 @@ on:
     paths:
       - 'docs/09-D1-DOMAIN-MASTER-v1.0.md'
       - 'contracts/transport/d1-03-entity-owner-boundary.v1.json'
+      - 'workers/W05-social/wrangler.jsonc'
+      - 'workers/W05-social/src/index.ts'
+      - 'workers/W05-social/src/push-endpoint-runtime.ts'
+      - 'workers/W05-social/src/notification-push-delivery-runtime.ts'
+      - 'contracts/transport/W05-W09-notification-push-delivery.v1.json'
+      - 'workers/W09-platform/wrangler.d1-03-migrations.jsonc'
+      - 'workers/W09-platform/migrations-d1-03/**'
       - 'scripts/verify-d1-03-entity-owner-boundary.mjs'
       - '.github/workflows/d1-03-entity-owner-boundary-gate.yml'
   pull_request:
     paths:
       - 'docs/09-D1-DOMAIN-MASTER-v1.0.md'
       - 'contracts/transport/d1-03-entity-owner-boundary.v1.json'
+      - 'workers/W05-social/wrangler.jsonc'
+      - 'workers/W05-social/src/index.ts'
+      - 'workers/W05-social/src/push-endpoint-runtime.ts'
+      - 'workers/W05-social/src/notification-push-delivery-runtime.ts'
+      - 'contracts/transport/W05-W09-notification-push-delivery.v1.json'
+      - 'workers/W09-platform/wrangler.d1-03-migrations.jsonc'
+      - 'workers/W09-platform/migrations-d1-03/**'
       - 'scripts/verify-d1-03-entity-owner-boundary.mjs'
       - '.github/workflows/d1-03-entity-owner-boundary-gate.yml'
   workflow_dispatch:

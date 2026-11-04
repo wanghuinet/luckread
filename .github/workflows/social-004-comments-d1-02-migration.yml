@@ -57,11 +57,17 @@ jobs:
           from pathlib import Path
           config = json.loads(Path('workers/W05-social/wrangler.jsonc').read_text())
           assert config['name'] == 'luckread-w05'
-          bindings = config['d1_databases']
-          assert len(bindings) == 1
-          assert bindings[0]['binding'] == 'DB'
-          assert bindings[0]['database_id'] == '6c342634-97f6-4248-9f4a-85772af4f22c'
-          assert bindings[0]['database_name'] == 'luckreadpro'
+          bindings = config.get('d1_databases', [])
+          binding_by_name = {item.get('binding'): item for item in bindings}
+          assert set(binding_by_name) == {'DB', 'D1_03'}
+          d1_02 = binding_by_name['DB']
+          d1_03 = binding_by_name['D1_03']
+          assert d1_02['database_id'] == '6c342634-97f6-4248-9f4a-85772af4f22c'
+          assert d1_02['database_name'] == 'luckreadpro'
+          assert d1_02.get('migrations_dir') == 'migrations'
+          assert d1_03['database_id'] == 'bda1d247-a371-4244-91ae-aef96034db7f'
+          assert d1_03['database_name'] == 'secondary'
+          assert d1_03.get('migrations_dir') is None
           print('SOCIAL_004_BINDING=PASS')
           PY
 

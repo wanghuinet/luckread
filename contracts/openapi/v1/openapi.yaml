@@ -1429,6 +1429,14 @@ paths:
           schema:
             type: string
             enum: [FOLLOW, LIKE, COMMENT, REPLY, MENTION]
+        - name: notificationId
+          in: query
+          required: false
+          description: Optional exact notification ID filter for resolving a push notification tap. Results remain scoped to the authenticated recipient.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 128
       responses:
         '200':
           description: Notifications.
@@ -5001,6 +5009,96 @@ paths:
         '400': { $ref: '#/components/responses/ValidationFailed' }
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '403': { $ref: '#/components/responses/PermissionDenied' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+
+  /push/endpoints/{installationId}:
+    parameters:
+      - name: installationId
+        in: path
+        required: true
+        schema: { type: string, format: uuid, minLength: 36, maxLength: 36 }
+    put:
+      tags: [Notifications]
+      summary: Register or update the current user's Expo push endpoint
+      operationId: upsertPushEndpoint
+      x-luckread-contract-status: CONTRACTED_PARTIAL
+      x-luckread-runtime-status: IMPLEMENTED_SOURCE_ONLY_PENDING_D1_03_MIGRATION_AND_W05_BINDING_DEPLOY
+      x-luckread-source: contracts/api/notification-operation-policy.v1.json
+      description: Idempotent app-installation registration. The owner is derived from the authenticated W02 session. The installation identifier is only a routing correlation key. Push tokens are never returned or logged.
+      security:
+        - sessionCookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [platform, permissionStatus, expoPushToken]
+              properties:
+                platform: { type: string, enum: [ios, android] }
+                permissionStatus: { type: string, enum: [granted, denied, undetermined] }
+                expoPushToken:
+                  type: [string, 'null']
+                  minLength: 20
+                  maxLength: 512
+                  description: Required when permission is granted. Denied or undetermined permission clears any existing stored token.
+                appVersion: { type: [string, 'null'], maxLength: 64 }
+      responses:
+        '200':
+          description: Endpoint registered or updated; push token is never returned.
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [data, requestId]
+                properties:
+                  data:
+                    type: object
+                    additionalProperties: false
+                    required: [endpointId, status]
+                    properties:
+                      endpointId: { type: string, format: uuid }
+                      status: { type: string, enum: [ACTIVE, DISABLED] }
+                  requestId: { $ref: '#/components/schemas/RequestId' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '409': { $ref: '#/components/responses/InvalidState' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    delete:
+      tags: [Notifications]
+      summary: Remove the current user's Expo push endpoint
+      operationId: deletePushEndpoint
+      x-luckread-contract-status: CONTRACTED_PARTIAL
+      x-luckread-runtime-status: IMPLEMENTED_SOURCE_ONLY_PENDING_D1_03_MIGRATION_AND_W05_BINDING_DEPLOY
+      x-luckread-source: contracts/api/notification-operation-policy.v1.json
+      description: Idempotent owner-scoped deletion by app installation identifier. Does not revoke an authentication session or trusted device.
+      security:
+        - sessionCookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      responses:
+        '204':
+          description: Push endpoint removed or already absent.
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
         '429': { $ref: '#/components/responses/RateLimited' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
 

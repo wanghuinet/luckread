@@ -403,6 +403,15 @@ type PaymentMethodRevocationRequestAuditInput = {
   idempotencyKey: string
 }
 
+type PushEndpointMutationAuditInput = {
+  eventId: string
+  installationId: string
+  operation: 'REGISTER' | 'REMOVE'
+  idempotencyKey: string
+  platform: 'ios' | 'android' | null
+  permissionStatus: 'granted' | 'denied' | 'undetermined' | null
+}
+
 type SubscriptionPlanChangeRequestAuditInput = {
   eventId: string
   attemptId: string
@@ -686,6 +695,30 @@ function parsePaymentMethodRevocationRequestAuditInput(value: unknown): PaymentM
     throw new Error('INVALID_PAYMENT_METHOD_REVOCATION_AUDIT')
   }
   return body as PaymentMethodRevocationRequestAuditInput
+}
+
+function parsePushEndpointMutationAuditInput(value: unknown): PushEndpointMutationAuditInput {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('INVALID_PUSH_ENDPOINT_AUDIT')
+  const body = value as Record<string, unknown>
+  const allowed = new Set(['eventId', 'installationId', 'operation', 'idempotencyKey', 'platform', 'permissionStatus'])
+  if (
+    Object.keys(body).length !== allowed.size ||
+    Object.keys(body).some((key) => !allowed.has(key)) ||
+    typeof body.eventId !== 'string' || !/^evt_push_endpoint_[a-f0-9]{64}$/.test(body.eventId) ||
+    typeof body.installationId !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.installationId) ||
+    (body.operation !== 'REGISTER' && body.operation !== 'REMOVE') ||
+    typeof body.idempotencyKey !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(body.idempotencyKey)
+  ) throw new Error('INVALID_PUSH_ENDPOINT_AUDIT')
+
+  if (body.operation === 'REGISTER') {
+    if (
+      (body.platform !== 'ios' && body.platform !== 'android') ||
+      !['granted', 'denied', 'undetermined'].includes(String(body.permissionStatus))
+    ) throw new Error('INVALID_PUSH_ENDPOINT_AUDIT')
+  } else if (body.platform !== null || body.permissionStatus !== null) {
+    throw new Error('INVALID_PUSH_ENDPOINT_AUDIT')
+  }
+  return body as PushEndpointMutationAuditInput
 }
 
 function parseCommerceOrderAuditInput(value: unknown): CommerceOrderAuditInput {
@@ -1353,6 +1386,35 @@ export default {
         occurredAt: input.occurredAt,
       }
       return persistImmutableAuditEvent(env, event)
+    }
+
+    if (request.method === 'POST' && url.pathname === '/internal/audit-events/push-endpoint-mutation-requested') {
+      let principal: ReturnType<typeof requireW01Transport>
+      try { principal = requireW01Transport(request) }
+      catch (error) { return errorResponse(error, request.headers.get('X-LuckRead-Request-Id')?.trim()) }
+      if (!/^L[2-8]$/.test(principal.layer)) return json({ error: 'PERMISSION_DENIED' }, 403)
+      let input: PushEndpointMutationAuditInput
+      try { input = parsePushEndpointMutationAuditInput(await readBoundedAuditJson(request, 2048)) }
+      catch { return json({ error: 'INVALID_PUSH_ENDPOINT_AUDIT' }, 400) }
+      if (request.headers.get('Idempotency-Key') !== input.idempotencyKey) return json({ error: 'IDEMPOTENCY_KEY_MISMATCH' }, 409)
+      const event: AuditEvent = {
+        eventId: input.eventId,
+        requestId: principal.requestId,
+        traceId: principal.correlationId,
+        actor: { actorId: principal.userId, actorType: 'user', layer: principal.layer as AuditEvent['actor']['layer'] },
+        action: 'notification.push_endpoint.mutation_requested',
+        targetType: 'NotificationPushEndpoint',
+        targetId: input.installationId,
+        before: {},
+        after: {
+          operation: input.operation,
+          provider: 'expo',
+          platform: input.platform,
+          permissionStatus: input.permissionStatus,
+        },
+        occurredAt: new Date().toISOString(),
+      }
+      return persistMembershipPlanMutationRequestAudit(env, event)
     }
 
     if (request.method === 'POST' && url.pathname === '/internal/audit-events/payment-method-revocation-requested') {

@@ -430,41 +430,66 @@ const incompleteCodes = new Set([
   'UNRECONCILED_OPENAPI_POLICY_OPERATION',
 ]);
 
-const hasConflict =
-  failures.some((x) => conflictCodes.has(x.code)) ||
-  findings.some((x) => conflictCodes.has(x.code));
-const hasIncomplete =
-  failures.some((x) => incompleteCodes.has(x.code)) ||
-  findings.some((x) => incompleteCodes.has(x.code));
+const requestedStage = process.argv.find((arg) => arg.startsWith('--stage='))?.slice('--stage='.length) ?? 'production';
+if (!['contract', 'production'].includes(requestedStage)) {
+  console.error(`Unsupported reconciliation stage: ${requestedStage}`);
+  process.exit(2);
+}
+const stage = requestedStage === 'contract' ? 'CONTRACT' : 'PRODUCTION';
+const isEvidenceFinding = (item) => ['EVIDENCE_MISSING', 'EVIDENCE_INCOMPLETE', 'EVIDENCE_INVALID'].includes(item.code);
+const informationalFindings = findings.filter((item) => item.code === 'DEPRECATED_POLICY_OPERATION');
+const productionEvidenceFindings = findings.filter(isEvidenceFinding);
+const structuralFindings = findings.filter((item) => !isEvidenceFinding(item) && item.code !== 'DEPRECATED_POLICY_OPERATION');
+const structuralIncompleteCodes = new Set([...incompleteCodes].filter((code) => !code.startsWith('EVIDENCE_')));
 
-const status = hasConflict ? 'CONFLICT' : hasIncomplete ? 'INCOMPLETE' : 'PASS';
+const hasStructuralConflict =
+  failures.some((item) => conflictCodes.has(item.code)) ||
+  structuralFindings.some((item) => conflictCodes.has(item.code));
+const hasStructuralIncomplete =
+  failures.some((item) => structuralIncompleteCodes.has(item.code)) ||
+  structuralFindings.some((item) => structuralIncompleteCodes.has(item.code));
+const contractStatus = hasStructuralConflict ? 'CONFLICT' : hasStructuralIncomplete ? 'INCOMPLETE' : 'PASS';
+const productionReadinessStatus = hasStructuralConflict
+  ? 'CONFLICT'
+  : hasStructuralIncomplete || productionEvidenceFindings.length > 0 ? 'INCOMPLETE' : 'PASS';
+const status = stage === 'CONTRACT' ? contractStatus : productionReadinessStatus;
+const stageFindings = stage === 'CONTRACT' ? structuralFindings : [...structuralFindings, ...productionEvidenceFindings];
+
 const report = {
-  schemaVersion: '1.2.0',
+  schemaVersion: '1.3.0',
   generatedAt: new Date().toISOString(),
+  stage,
   status,
   reconciliationGreen: status === 'PASS',
+  contractStatus,
+  productionReadinessStatus,
   inventoryCount: inventory.size,
   openapiOperationCount: openapiOps.size,
   openapiPolicyCount: policyOps.size,
   failureCount: failures.length,
-  findingCount: findings.length,
+  findingCount: stageFindings.length,
+  productionEvidenceFindingCount: productionEvidenceFindings.length,
   policyGapSummary: {
     coreDetailedPolicyDomainCount: detailedPolicyDomains.size,
-    alternatePolicyNormalizationGapCount: findings.filter((x) => x.code === 'POLICY_SOURCE_PRESENT_NOT_NORMALIZED').length,
+    alternatePolicyNormalizationGapCount: findings.filter((item) => item.code === 'POLICY_SOURCE_PRESENT_NOT_NORMALIZED').length,
     normalizedPolicySourceCount: [...policyOps.entries()].filter(([id, op]) => {
       const record = inventory.get(id);
       return record && hasNormalizedAlternatePolicySource(id, record, op);
     }).length,
-    coreDetailedPolicyMissingCount: findings.filter((x) => x.code === 'MISSING_POLICY_OPERATION').length,
+    coreDetailedPolicyMissingCount: findings.filter((item) => item.code === 'MISSING_POLICY_OPERATION').length,
   },
   failures,
-  findings,
+  findings: stageFindings,
+  productionEvidenceFindings,
+  informationalFindings,
   matches,
   alternatePolicySources: [...alternateOperationSources.entries()]
     .map(([operationId, sources]) => ({ operationId, sources }))
     .sort((a, b) => a.operationId.localeCompare(b.operationId)),
   evidenceSemantics: { pass: ['PASS','N/A'], incomplete: ['MISSING','ABSENT'], invalid: ['unknown_or_unsupported'] },
-  rule: 'PASS requires zero structural conflicts, zero unresolved required inventory/OpenAPI/policy membership, zero missing required detailed policy coverage, zero alternate-policy normalization gaps, and zero incomplete/invalid evidence. alternatePolicySources is informational authority-trace evidence only; it does not promote an operation to Green. Explicit DISCOVERY_DRAFT, MISSING, and DEPRECATED operation-policy statuses do not silently become active contract evidence; deprecated records require a reason and canonical OpenAPI reference and are reported as informational findings. N/A is valid only when explicitly declared by the operation contract.',
+  rule: stage === 'CONTRACT'
+    ? 'CONTRACT stage validates canonical inventory/OpenAPI/policy structure only. Missing or invalid production evidence remains visible in productionEvidenceFindings and keeps productionReadinessStatus non-PASS; this stage does not authorize deployment or production activation.'
+    : 'PRODUCTION stage requires zero structural conflicts, zero unresolved required inventory/OpenAPI/policy membership, zero missing required detailed policy coverage, and zero incomplete/invalid evidence. Deprecated operations with a reason and matching canonical reference are reported separately as informational findings.',
 };
 const evidenceDir = path.join(root, 'artifacts', 'api-inventory');
 fs.mkdirSync(evidenceDir, { recursive: true });

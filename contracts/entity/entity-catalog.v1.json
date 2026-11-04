@@ -5,51 +5,23 @@
   "featureInventoryRef": "contracts/alignment/feature-inventory.v1.json",
   "records": [
     {
-      "entityId": "ENT-USER",
-      "name": "User",
+      "entityId": "ENT-CONSENT",
+      "name": "Consent",
       "domainId": "D01 Core",
-      "classification": "AUTHORITATIVE",
-      "status": "VERIFIED",
-      "implementationRef": "workers/W01-payload/src/collections/Users.ts",
-      "evidenceRefs": [
-        "docs/303-IDENTITY-ROLE-ENTITLEMENT-SEPARATION-AND-ACCOUNT-LIFECYCLE-CONTRACT-v1.0.md",
-        "workers/W01-payload/src/collections/Users.ts",
-        "workers/W01-payload/src/payload.config.ts"
-      ]
-    },
-    {
-      "entityId": "ENT-IDENTITY",
-      "name": "Identity",
-      "domainId": "D01 Core",
-      "classification": "AUTHORITATIVE",
+      "classification": "PRIVACY",
       "status": "PROPOSED",
+      "implementationRef": "contracts/entity/PRIV-002-consent-field-contract.v1.json",
       "evidenceRefs": [
-        "docs/303-IDENTITY-ROLE-ENTITLEMENT-SEPARATION-AND-ACCOUNT-LIFECYCLE-CONTRACT-v1.0.md"
+        "contracts/entity/PRIV-002-consent-field-contract.v1.json",
+        "contracts/persistence/PRIV-002-consent-persistence-contract.v1.json",
+        "contracts/events/privacy-consent-withdrawn.v1.json",
+        "docs/160-DATA-LIFECYCLE-RETENTION-ERASURE-CONTRACT-v1.0.md",
+        "docs/184-L5-L6-IDENTITY-AND-SESSION-INSTANCE-REGISTRY-v1.0.md"
       ]
     },
     {
       "entityId": "ENT-CREDENTIAL",
       "name": "Credential",
-      "domainId": "D01 Core",
-      "classification": "AUTHORITATIVE",
-      "status": "PROPOSED",
-      "evidenceRefs": [
-        "docs/303-IDENTITY-ROLE-ENTITLEMENT-SEPARATION-AND-ACCOUNT-LIFECYCLE-CONTRACT-v1.0.md"
-      ]
-    },
-    {
-      "entityId": "ENT-SESSION",
-      "name": "Session",
-      "domainId": "D1-01",
-      "classification": "AUTHORITATIVE",
-      "status": "PROPOSED",
-      "evidenceRefs": [
-        "docs/303-IDENTITY-ROLE-ENTITLEMENT-SEPARATION-AND-ACCOUNT-LIFECYCLE-CONTRACT-v1.0.md"
-      ]
-    },
-    {
-      "entityId": "ENT-VERIFICATION",
-      "name": "Verification",
       "domainId": "D01 Core",
       "classification": "AUTHORITATIVE",
       "status": "PROPOSED",
@@ -68,16 +40,6 @@
       ]
     },
     {
-      "entityId": "ENT-ROLE-ASSIGNMENT",
-      "name": "RoleAssignment",
-      "domainId": "D1-01",
-      "classification": "AUTHORIZATION",
-      "status": "PROPOSED",
-      "evidenceRefs": [
-        "docs/303-IDENTITY-ROLE-ENTITLEMENT-SEPARATION-AND-ACCOUNT-LIFECYCLE-CONTRACT-v1.0.md"
-      ]
-    },
-    {
       "entityId": "ENT-ENTITLEMENT-GRANT",
       "name": "EntitlementGrant",
       "domainId": "D1-01",
@@ -88,53 +50,26 @@
       ]
     },
     {
-      "entityId": "ENT-SUBSCRIPTION",
-      "name": "Subscription",
-      "domainId": "D1-01",
-      "classification": "BILLING",
-      "status": "PROPOSED",
-      "evidenceRefs": [
-        "docs/303-IDENTITY-ROLE-ENTITLEMENT-SEPARATION-AND-ACCOUNT-LIFECYCLE-CONTRACT-v1.0.md",
-        "contracts/entity/SUBSCRIPTION-ENTITY-CONTRACT.v1.json",
-        "docs/110-MEMBERSHIP-DATA-CONTRACT-v1.0.md",
-        "contracts/state-machines/subscription.json"
-      ]
-    },
-    {
-      "entityId": "ENT-ORG-MEMBERSHIP",
-      "name": "OrgMembership",
-      "domainId": "D1-01",
-      "classification": "AUTHORIZATION",
+      "entityId": "ENT-IDENTITY",
+      "name": "Identity",
+      "domainId": "D01 Core",
+      "classification": "AUTHORITATIVE",
       "status": "PROPOSED",
       "evidenceRefs": [
         "docs/303-IDENTITY-ROLE-ENTITLEMENT-SEPARATION-AND-ACCOUNT-LIFECYCLE-CONTRACT-v1.0.md"
       ]
     },
     {
-      "entityId": "ENT-CONSENT",
-      "name": "Consent",
+      "entityId": "ENT-MFA-FACTOR",
+      "name": "MfaFactor",
       "domainId": "D01 Core",
-      "classification": "PRIVACY",
-      "status": "PROPOSED",
-      "implementationRef": "contracts/entity/PRIV-002-consent-field-contract.v1.json",
-      "evidenceRefs": [
-        "contracts/entity/PRIV-002-consent-field-contract.v1.json",
-        "contracts/persistence/PRIV-002-consent-persistence-contract.v1.json",
-        "contracts/events/privacy-consent-withdrawn.v1.json",
-        "docs/160-DATA-LIFECYCLE-RETENTION-ERASURE-CONTRACT-v1.0.md",
-        "docs/184-L5-L6-IDENTITY-AND-SESSION-INSTANCE-REGISTRY-v1.0.md"
-      ]
-    },
-    {
-      "entityId": "ENT-SOCIAL-FOLLOW",
-      "name": "SocialFollowRelationship",
-      "domainId": "D1-02",
       "classification": "AUTHORITATIVE",
       "status": "PROPOSED",
       "evidenceRefs": [
-        "contracts/entity/SOCIAL-001-follow-relationship-contract.v1.json",
-        "docs/change-control/CC-MAPPING-0-SOCIAL-001-FOLLOW-ENTITY-CONTRACT-2026-09-30.md",
-        "contracts/persistence/SOCIAL-001-follow-relationship-persistence-contract.v1.json"
+        "contracts/entity/AUTH-007-mfa-factor-field-contract.v1.json",
+        "workers/W02-identity/migrations/0006_better_auth_two_factor.sql",
+        "workers/W02-identity/src/auth/better-auth.ts",
+        "contracts/alignment/mapping-batches/AUTH-007-real-evidence-reconciliation.v1.md"
       ]
     },
     {
@@ -166,16 +101,16 @@
       ]
     },
     {
-      "entityId": "ENT-MFA-FACTOR",
-      "name": "MfaFactor",
-      "domainId": "D01 Core",
+      "entityId": "ENT-NOTIFICATION-PUSH-ENDPOINT",
+      "name": "NotificationPushEndpoint",
+      "domainId": "D1-03",
       "classification": "AUTHORITATIVE",
       "status": "PROPOSED",
       "evidenceRefs": [
-        "contracts/entity/AUTH-007-mfa-factor-field-contract.v1.json",
-        "workers/W02-identity/migrations/0006_better_auth_two_factor.sql",
-        "workers/W02-identity/src/auth/better-auth.ts",
-        "contracts/alignment/mapping-batches/AUTH-007-real-evidence-reconciliation.v1.md"
+        "contracts/entity/NOTIFICATION-PUSH-ENDPOINT-CONTRACT.v1.json",
+        "contracts/persistence/NOTIFY-002-W05-D1-03-PUSH-ENDPOINT-PERSISTENCE.v1.json",
+        "workers/W09-platform/migrations-d1-03/0001_notification_push_endpoints.sql",
+        "docs/change-control/CC-T14-W05-D1-03-PUSH-ENDPOINT-REGISTRATION-2026-11-04.md"
       ]
     },
     {
@@ -211,6 +146,16 @@
       ]
     },
     {
+      "entityId": "ENT-ORG-MEMBERSHIP",
+      "name": "OrgMembership",
+      "domainId": "D1-01",
+      "classification": "AUTHORIZATION",
+      "status": "PROPOSED",
+      "evidenceRefs": [
+        "docs/303-IDENTITY-ROLE-ENTITLEMENT-SEPARATION-AND-ACCOUNT-LIFECYCLE-CONTRACT-v1.0.md"
+      ]
+    },
+    {
       "entityId": "ENT-PAYMENT",
       "name": "Payment",
       "domainId": "D1-04",
@@ -224,6 +169,74 @@
         "docs/09-D1-DOMAIN-MASTER-v1.0.md",
         "docs/65-MONETIZATION-COMMERCE-SYSTEM-CONTRACT-v1.0.md",
         "docs/68-WALLET-LEDGER-AND-SETTLEMENT-CONTRACT-v1.0.md"
+      ]
+    },
+    {
+      "entityId": "ENT-ROLE-ASSIGNMENT",
+      "name": "RoleAssignment",
+      "domainId": "D1-01",
+      "classification": "AUTHORIZATION",
+      "status": "PROPOSED",
+      "evidenceRefs": [
+        "docs/303-IDENTITY-ROLE-ENTITLEMENT-SEPARATION-AND-ACCOUNT-LIFECYCLE-CONTRACT-v1.0.md"
+      ]
+    },
+    {
+      "entityId": "ENT-SESSION",
+      "name": "Session",
+      "domainId": "D1-01",
+      "classification": "AUTHORITATIVE",
+      "status": "PROPOSED",
+      "evidenceRefs": [
+        "docs/303-IDENTITY-ROLE-ENTITLEMENT-SEPARATION-AND-ACCOUNT-LIFECYCLE-CONTRACT-v1.0.md"
+      ]
+    },
+    {
+      "entityId": "ENT-SOCIAL-FOLLOW",
+      "name": "SocialFollowRelationship",
+      "domainId": "D1-02",
+      "classification": "AUTHORITATIVE",
+      "status": "PROPOSED",
+      "evidenceRefs": [
+        "contracts/entity/SOCIAL-001-follow-relationship-contract.v1.json",
+        "docs/change-control/CC-MAPPING-0-SOCIAL-001-FOLLOW-ENTITY-CONTRACT-2026-09-30.md",
+        "contracts/persistence/SOCIAL-001-follow-relationship-persistence-contract.v1.json"
+      ]
+    },
+    {
+      "entityId": "ENT-SUBSCRIPTION",
+      "name": "Subscription",
+      "domainId": "D1-01",
+      "classification": "BILLING",
+      "status": "PROPOSED",
+      "evidenceRefs": [
+        "docs/303-IDENTITY-ROLE-ENTITLEMENT-SEPARATION-AND-ACCOUNT-LIFECYCLE-CONTRACT-v1.0.md",
+        "contracts/entity/SUBSCRIPTION-ENTITY-CONTRACT.v1.json",
+        "docs/110-MEMBERSHIP-DATA-CONTRACT-v1.0.md",
+        "contracts/state-machines/subscription.json"
+      ]
+    },
+    {
+      "entityId": "ENT-USER",
+      "name": "User",
+      "domainId": "D01 Core",
+      "classification": "AUTHORITATIVE",
+      "status": "VERIFIED",
+      "implementationRef": "workers/W01-payload/src/collections/Users.ts",
+      "evidenceRefs": [
+        "docs/303-IDENTITY-ROLE-ENTITLEMENT-SEPARATION-AND-ACCOUNT-LIFECYCLE-CONTRACT-v1.0.md",
+        "workers/W01-payload/src/collections/Users.ts",
+        "workers/W01-payload/src/payload.config.ts"
+      ]
+    },
+    {
+      "entityId": "ENT-VERIFICATION",
+      "name": "Verification",
+      "domainId": "D01 Core",
+      "classification": "AUTHORITATIVE",
+      "status": "PROPOSED",
+      "evidenceRefs": [
+        "docs/303-IDENTITY-ROLE-ENTITLEMENT-SEPARATION-AND-ACCOUNT-LIFECYCLE-CONTRACT-v1.0.md"
       ]
     }
   ],

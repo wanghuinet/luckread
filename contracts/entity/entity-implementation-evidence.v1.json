@@ -5,55 +5,18 @@
   "sourceOfTruth": "contracts/entity/entity-catalog.v1.json",
   "records": [
     {
-      "entityId": "ENT-USER",
-      "catalogStatus": "VERIFIED",
-      "implementationStatus": "IMPLEMENTED",
-      "implementationRefs": [
-        "workers/W01-payload/src/collections/Users.ts",
-        "workers/W01-payload/src/payload.config.ts"
-      ],
-      "schemaEvidenceRefs": [
-        "workers/W01-payload/src/collections/Users.ts"
-      ],
-      "migrationEvidenceRefs": [
-        "workers/W01-payload/src/payload.config.ts",
-        "artifacts/evidence/auth-002-remote-baseline/run-35508571153.json"
-      ],
-      "payloadNativeEvidenceRefs": [],
-      "extensionEvidenceRefs": [
-        "workers/W01-payload/src/collections/Users.ts"
-      ],
-      "blockers": [
-        "AUTH-002 native session runtime, extension correlation, and final Evidence Registry promotion remain open."
-      ],
-      "status": "NOT_GREEN"
-    },
-    {
-      "entityId": "ENT-IDENTITY",
+      "entityId": "ENT-CONSENT",
       "catalogStatus": "PROPOSED",
-      "implementationStatus": "IMPLEMENTED",
-      "implementationRefs": [
-        "workers/W02-identity/src/account/registration-materializer.ts"
-      ],
-      "schemaEvidenceRefs": [
-        "https://github.com/wanghuinet/luckread/actions/runs/36298629648"
-      ],
-      "migrationEvidenceRefs": [
-        "workers/W02-identity/migrations/0004_auth_003_credentials.sql",
-        "https://github.com/wanghuinet/luckread/actions/runs/36296831559"
-      ],
+      "implementationStatus": "CONTRACT_ONLY",
+      "implementationRefs": [],
+      "schemaEvidenceRefs": [],
+      "migrationEvidenceRefs": [],
       "payloadNativeEvidenceRefs": [],
-      "extensionEvidenceRefs": [
-        "workers/W02-identity/src/credentials/credential-add.ts",
-        "https://github.com/wanghuinet/luckread/actions/runs/36299334577",
-        "https://github.com/wanghuinet/luckread/actions/runs/36307891924",
-        "https://github.com/wanghuinet/luckread/actions/runs/36308120758",
-        "https://github.com/wanghuinet/luckread/actions/runs/36377880967",
-        "docs/change-control/CC-MAPPING-0-AUTH-003-IDENTITY-MATERIALIZATION-EVIDENCE-ADMISSION-2026-09-28.md"
-      ],
+      "extensionEvidenceRefs": [],
       "blockers": [
-        "AUTH-001 W02 scheduled registration materializer now provides exact-SHA executable identity materialization evidence; no independent public identity CRUD lifecycle is claimed by this admission.",
-        "Canonical entity catalog promotion remains blocked because ENT-IDENTITY is still PROPOSED and global Mapping 0 / Five-Way remains NOT_GREEN."
+        "PRIV-002 concrete consent contract is admitted, but runtime implementation and physical persistence evidence are not yet verified.",
+        "AUTH-001 registration consent transaction, withdrawal propagation, security/privacy E2E, and Evidence Registry admission remain pending.",
+        "Final Mapping 0 / Five-Way validation remains NOT_GREEN."
       ],
       "status": "BLOCKED"
     },
@@ -89,7 +52,7 @@
       "status": "BLOCKED"
     },
     {
-      "entityId": "ENT-CONSENT",
+      "entityId": "ENT-DEVICE-RECORD",
       "catalogStatus": "PROPOSED",
       "implementationStatus": "CONTRACT_ONLY",
       "implementationRefs": [],
@@ -98,9 +61,212 @@
       "payloadNativeEvidenceRefs": [],
       "extensionEvidenceRefs": [],
       "blockers": [
-        "PRIV-002 concrete consent contract is admitted, but runtime implementation and physical persistence evidence are not yet verified.",
-        "AUTH-001 registration consent transaction, withdrawal propagation, security/privacy E2E, and Evidence Registry admission remain pending.",
-        "Final Mapping 0 / Five-Way validation remains NOT_GREEN."
+        "No concrete implementation evidence recorded."
+      ],
+      "status": "BLOCKED"
+    },
+    {
+      "entityId": "ENT-ENTITLEMENT-GRANT",
+      "catalogStatus": "PROPOSED",
+      "implementationStatus": "CONTRACT_ONLY",
+      "implementationRefs": [],
+      "schemaEvidenceRefs": [],
+      "migrationEvidenceRefs": [],
+      "payloadNativeEvidenceRefs": [],
+      "extensionEvidenceRefs": [],
+      "blockers": [
+        "No concrete implementation evidence recorded."
+      ],
+      "status": "BLOCKED"
+    },
+    {
+      "entityId": "ENT-IDENTITY",
+      "catalogStatus": "PROPOSED",
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "workers/W02-identity/src/account/registration-materializer.ts"
+      ],
+      "schemaEvidenceRefs": [
+        "https://github.com/wanghuinet/luckread/actions/runs/36298629648"
+      ],
+      "migrationEvidenceRefs": [
+        "workers/W02-identity/migrations/0004_auth_003_credentials.sql",
+        "https://github.com/wanghuinet/luckread/actions/runs/36296831559"
+      ],
+      "payloadNativeEvidenceRefs": [],
+      "extensionEvidenceRefs": [
+        "workers/W02-identity/src/credentials/credential-add.ts",
+        "https://github.com/wanghuinet/luckread/actions/runs/36299334577",
+        "https://github.com/wanghuinet/luckread/actions/runs/36307891924",
+        "https://github.com/wanghuinet/luckread/actions/runs/36308120758",
+        "https://github.com/wanghuinet/luckread/actions/runs/36377880967",
+        "docs/change-control/CC-MAPPING-0-AUTH-003-IDENTITY-MATERIALIZATION-EVIDENCE-ADMISSION-2026-09-28.md"
+      ],
+      "blockers": [
+        "AUTH-001 W02 scheduled registration materializer now provides exact-SHA executable identity materialization evidence; no independent public identity CRUD lifecycle is claimed by this admission.",
+        "Canonical entity catalog promotion remains blocked because ENT-IDENTITY is still PROPOSED and global Mapping 0 / Five-Way remains NOT_GREEN."
+      ],
+      "status": "BLOCKED"
+    },
+    {
+      "entityId": "ENT-MFA-FACTOR",
+      "catalogStatus": "PROPOSED",
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "workers/W02-identity/src/auth/better-auth.ts",
+        "workers/W02-identity/src/authz/role-assignment.ts",
+        "workers/W02-identity/src/authz/l8-genesis-bootstrap-command.ts",
+        "workers/W02-identity/migrations/0006_better_auth_two_factor.sql"
+      ],
+      "schemaEvidenceRefs": [
+        "contracts/entity/AUTH-007-mfa-factor-field-contract.v1.json",
+        "workers/W02-identity/migrations/0006_better_auth_two_factor.sql"
+      ],
+      "migrationEvidenceRefs": [
+        "workers/W02-identity/migrations/0006_better_auth_two_factor.sql"
+      ],
+      "payloadNativeEvidenceRefs": [],
+      "extensionEvidenceRefs": [
+        "workers/W02-identity/src/auth/better-auth.ts",
+        "workers/W02-identity/src/authz/role-assignment.ts"
+      ],
+      "blockers": [
+        "ENT-MFA-FACTOR remains PROPOSED and has not been promoted through canonical entity authority.",
+        "Controlled remote D1-01 schema and migration-ledger read-back occurred in run 40152799763 (artifact 12583636257), confirming migrations 0006-0008 and the MFA replay/outbox schema. The artifact's embedded provenance fields contain literal $SOURCE_SHA and $DATABASE_NAME due the earlier heredoc bug, so its registry entry is CREATED and formal evidence admission remains pending.",
+        "The scoped live MFA E2E and W01/W02 production binding records are VERIFIED through unchanged-scope inheritance documented in docs/change-control/CC-AUTH-007-MFA-RUNTIME-EVIDENCE-INHERITANCE-2026-10-25.md. The D1-01 schema/read-back record remains CREATED because the historical artifact embeds literal $SOURCE_SHA and $DATABASE_NAME. Concurrent replay races and full attempt/lockout evidence remain outstanding.",
+        "Canonical W01 MFA endpoints and DTO bindings exist in source, and the deployed API passed scoped status/enrollment/confirmation/challenge/disable/recovery-code-consumption tests. Canonical entity/field promotion and full operation-level acceptance, including recovery-code rotation, remain outstanding.",
+        "Live security E2E run 40157067122 passed 25/25 scoped assertions, including TOTP and recovery-code replay denial and session invalidation. Challenge-expiry, cross-account authorization, rate-limit/lockout and abuse-negative tests remain outstanding.",
+        "Production W02 outbox -> existing AUTH013_QUEUE -> W06 canonical AuditEvent persistence, duplicate delivery, retry/DLQ and failure evidence are not yet admitted.",
+        "AUTH-007 remains BLOCKED_NOT_GREEN with implementation authorization false. No L8 genesis grant or further privileged production mutation is authorized by this record.",
+        "Evidence Registry records EVD-AUTH007-MFA-LIVE-SECURITY-E2E-20261025-001 and EVD-AUTH007-W01-W02-PRODUCTION-RUNTIME-20261025-001 are VERIFIED only for their scoped claims under docs/change-control/CC-AUTH-007-MFA-RUNTIME-EVIDENCE-INHERITANCE-2026-10-25.md. EVD-AUTH007-MFA-D1-01-SCHEMA-READBACK-20261025-001 remains CREATED pending a corrected controlled migration/read-back run. Global Evidence Registry and final Mapping 0 acceptance remain open."
+      ],
+      "status": "BLOCKED"
+    },
+    {
+      "entityId": "ENT-NOTIFICATION-PUSH-ENDPOINT",
+      "catalogStatus": "PROPOSED",
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "workers/W05-social/src/push-endpoint-runtime.ts",
+        "workers/W05-social/src/index.ts",
+        "workers/W01-payload/src/app/api/v1/push/endpoints/[installationId]/route.ts"
+      ],
+      "schemaEvidenceRefs": [
+        "contracts/entity/NOTIFICATION-PUSH-ENDPOINT-CONTRACT.v1.json",
+        "workers/W09-platform/migrations-d1-03/0001_notification_push_endpoints.sql"
+      ],
+      "migrationEvidenceRefs": [
+        "workers/W09-platform/migrations-d1-03/0001_notification_push_endpoints.sql"
+      ],
+      "payloadNativeEvidenceRefs": [],
+      "blockers": [
+        "W09 D1-03 remote migration and W05 delegated runtime binding deployment are pending."
+      ],
+      "status": "BLOCKED",
+      "extensionEvidenceRefs": [
+        "workers/W01-payload/tests/int/push-endpoints-v1-adapter.int.spec.ts",
+        "workers/W05-social/src/index.test.ts",
+        "workers/W05-social/src/push-endpoint-runtime.test.ts",
+        "workers/W05-social/src/push-endpoint-w01-runtime.integration.test.ts"
+      ]
+    },
+    {
+      "entityId": "ENT-ORDER",
+      "catalogStatus": "PROPOSED",
+      "implementationStatus": "CONTRACT_ONLY",
+      "implementationRefs": [],
+      "schemaEvidenceRefs": [
+        "contracts/entity/ORDER-ENTITY-CONTRACT.v1.json",
+        "contracts/persistence/ORDER-D1-04-persistence.v1.json",
+        "contracts/state-machines/order.json",
+        "docs/change-control/CC-PAY-002-ORDER-ENTITY-MODEL-2026-10-27.md"
+      ],
+      "migrationEvidenceRefs": [],
+      "payloadNativeEvidenceRefs": [],
+      "extensionEvidenceRefs": [],
+      "blockers": [
+        "Contract candidate only: no canonical API/DTO, physical migration, runtime handler, deployed schema, or exact-commit runtime evidence has been admitted."
+      ],
+      "status": "BLOCKED"
+    },
+    {
+      "entityId": "ENT-ORDER-LINE",
+      "catalogStatus": "PROPOSED",
+      "implementationStatus": "CONTRACT_ONLY",
+      "implementationRefs": [],
+      "schemaEvidenceRefs": [
+        "contracts/entity/ORDER-LINE-ENTITY-CONTRACT.v1.json",
+        "contracts/persistence/ORDER-D1-04-persistence.v1.json",
+        "contracts/state-machines/order.json",
+        "docs/change-control/CC-PAY-002-ORDER-ENTITY-MODEL-2026-10-27.md"
+      ],
+      "migrationEvidenceRefs": [],
+      "payloadNativeEvidenceRefs": [],
+      "extensionEvidenceRefs": [],
+      "blockers": [
+        "Contract candidate only: no canonical API/DTO, physical migration, runtime handler, deployed schema, or exact-commit runtime evidence has been admitted."
+      ],
+      "status": "BLOCKED"
+    },
+    {
+      "entityId": "ENT-ORG-MEMBERSHIP",
+      "catalogStatus": "PROPOSED",
+      "implementationStatus": "CONTRACT_ONLY",
+      "implementationRefs": [],
+      "schemaEvidenceRefs": [],
+      "migrationEvidenceRefs": [],
+      "payloadNativeEvidenceRefs": [],
+      "extensionEvidenceRefs": [],
+      "blockers": [
+        "No concrete implementation evidence recorded."
+      ],
+      "status": "BLOCKED"
+    },
+    {
+      "entityId": "ENT-PAYMENT",
+      "catalogStatus": "PROPOSED",
+      "implementationStatus": "CONTRACT_ONLY",
+      "implementationRefs": [],
+      "schemaEvidenceRefs": [
+        "contracts/entity/PAYMENT-ENTITY-CONTRACT.v1.json",
+        "contracts/persistence/PAYMENT-D1-04-persistence.v1.json",
+        "contracts/state-machines/payment.json"
+      ],
+      "migrationEvidenceRefs": [],
+      "payloadNativeEvidenceRefs": [],
+      "extensionEvidenceRefs": [],
+      "blockers": [
+        "D1-04 payment migration is a reviewed source candidate only; remote schema and exact postflight evidence have not been collected.",
+        "Payment-intent persistence, provider retry/reconciliation, verified webhook deduplication, and exact-commit security/runtime evidence are not yet implemented/admitted.",
+        "No ledger posting, Order confirmation, or entitlement grant is authorized by this candidate."
+      ],
+      "status": "BLOCKED"
+    },
+    {
+      "entityId": "ENT-ROLE-ASSIGNMENT",
+      "catalogStatus": "PROPOSED",
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "workers/W02-identity/src/authz/role-assignment.ts",
+        "workers/W02-identity/src/index.ts"
+      ],
+      "schemaEvidenceRefs": [
+        "workers/W02-identity/migrations/0001_role_assignments.sql"
+      ],
+      "migrationEvidenceRefs": [
+        "workers/W02-identity/migrations/0001_role_assignments.sql",
+        "scripts/generate-role-assignment-migration.mjs",
+        "https://github.com/wanghuinet/luckread/actions/runs/35793128427",
+        "https://github.com/wanghuinet/luckread/actions/runs/35793310927"
+      ],
+      "payloadNativeEvidenceRefs": [],
+      "extensionEvidenceRefs": [
+        "workers/W02-identity/src/authz/role-assignment.ts",
+        "https://github.com/wanghuinet/luckread/actions/runs/35793226740"
+      ],
+      "blockers": [
+        "Controlled authLogin/authRefresh runtime evidence is pending.",
+        "Controlled authLogin/authRefresh runtime evidence and W01 Service Binding deployment evidence are pending."
       ],
       "status": "BLOCKED"
     },
@@ -143,76 +309,6 @@
       "status": "BLOCKED"
     },
     {
-      "entityId": "ENT-VERIFICATION",
-      "catalogStatus": "PROPOSED",
-      "implementationStatus": "CONTRACT_ONLY",
-      "implementationRefs": [],
-      "schemaEvidenceRefs": [],
-      "migrationEvidenceRefs": [],
-      "payloadNativeEvidenceRefs": [],
-      "extensionEvidenceRefs": [],
-      "blockers": [
-        "No concrete implementation evidence recorded."
-      ],
-      "status": "BLOCKED"
-    },
-    {
-      "entityId": "ENT-DEVICE-RECORD",
-      "catalogStatus": "PROPOSED",
-      "implementationStatus": "CONTRACT_ONLY",
-      "implementationRefs": [],
-      "schemaEvidenceRefs": [],
-      "migrationEvidenceRefs": [],
-      "payloadNativeEvidenceRefs": [],
-      "extensionEvidenceRefs": [],
-      "blockers": [
-        "No concrete implementation evidence recorded."
-      ],
-      "status": "BLOCKED"
-    },
-    {
-      "entityId": "ENT-ROLE-ASSIGNMENT",
-      "catalogStatus": "PROPOSED",
-      "implementationStatus": "IMPLEMENTED",
-      "implementationRefs": [
-        "workers/W02-identity/src/authz/role-assignment.ts",
-        "workers/W02-identity/src/index.ts"
-      ],
-      "schemaEvidenceRefs": [
-        "workers/W02-identity/migrations/0001_role_assignments.sql"
-      ],
-      "migrationEvidenceRefs": [
-        "workers/W02-identity/migrations/0001_role_assignments.sql",
-        "scripts/generate-role-assignment-migration.mjs",
-        "https://github.com/wanghuinet/luckread/actions/runs/35793128427",
-        "https://github.com/wanghuinet/luckread/actions/runs/35793310927"
-      ],
-      "payloadNativeEvidenceRefs": [],
-      "extensionEvidenceRefs": [
-        "workers/W02-identity/src/authz/role-assignment.ts",
-        "https://github.com/wanghuinet/luckread/actions/runs/35793226740"
-      ],
-      "blockers": [
-        "Controlled authLogin/authRefresh runtime evidence is pending.",
-        "Controlled authLogin/authRefresh runtime evidence and W01 Service Binding deployment evidence are pending."
-      ],
-      "status": "BLOCKED"
-    },
-    {
-      "entityId": "ENT-ENTITLEMENT-GRANT",
-      "catalogStatus": "PROPOSED",
-      "implementationStatus": "CONTRACT_ONLY",
-      "implementationRefs": [],
-      "schemaEvidenceRefs": [],
-      "migrationEvidenceRefs": [],
-      "payloadNativeEvidenceRefs": [],
-      "extensionEvidenceRefs": [],
-      "blockers": [
-        "No concrete implementation evidence recorded."
-      ],
-      "status": "BLOCKED"
-    },
-    {
       "entityId": "ENT-SUBSCRIPTION",
       "catalogStatus": "PROPOSED",
       "implementationStatus": "BLOCKED",
@@ -250,7 +346,31 @@
       "status": "BLOCKED"
     },
     {
-      "entityId": "ENT-ORG-MEMBERSHIP",
+      "entityId": "ENT-USER",
+      "catalogStatus": "VERIFIED",
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "workers/W01-payload/src/collections/Users.ts",
+        "workers/W01-payload/src/payload.config.ts"
+      ],
+      "schemaEvidenceRefs": [
+        "workers/W01-payload/src/collections/Users.ts"
+      ],
+      "migrationEvidenceRefs": [
+        "workers/W01-payload/src/payload.config.ts",
+        "artifacts/evidence/auth-002-remote-baseline/run-35508571153.json"
+      ],
+      "payloadNativeEvidenceRefs": [],
+      "extensionEvidenceRefs": [
+        "workers/W01-payload/src/collections/Users.ts"
+      ],
+      "blockers": [
+        "AUTH-002 native session runtime, extension correlation, and final Evidence Registry promotion remain open."
+      ],
+      "status": "NOT_GREEN"
+    },
+    {
+      "entityId": "ENT-VERIFICATION",
       "catalogStatus": "PROPOSED",
       "implementationStatus": "CONTRACT_ONLY",
       "implementationRefs": [],
@@ -260,98 +380,6 @@
       "extensionEvidenceRefs": [],
       "blockers": [
         "No concrete implementation evidence recorded."
-      ],
-      "status": "BLOCKED"
-    },
-    {
-      "entityId": "ENT-MFA-FACTOR",
-      "catalogStatus": "PROPOSED",
-      "implementationStatus": "IMPLEMENTED",
-      "implementationRefs": [
-        "workers/W02-identity/src/auth/better-auth.ts",
-        "workers/W02-identity/src/authz/role-assignment.ts",
-        "workers/W02-identity/src/authz/l8-genesis-bootstrap-command.ts",
-        "workers/W02-identity/migrations/0006_better_auth_two_factor.sql"
-      ],
-      "schemaEvidenceRefs": [
-        "contracts/entity/AUTH-007-mfa-factor-field-contract.v1.json",
-        "workers/W02-identity/migrations/0006_better_auth_two_factor.sql"
-      ],
-      "migrationEvidenceRefs": [
-        "workers/W02-identity/migrations/0006_better_auth_two_factor.sql"
-      ],
-      "payloadNativeEvidenceRefs": [],
-      "extensionEvidenceRefs": [
-        "workers/W02-identity/src/auth/better-auth.ts",
-        "workers/W02-identity/src/authz/role-assignment.ts"
-      ],
-      "blockers": [
-        "ENT-MFA-FACTOR remains PROPOSED and has not been promoted through canonical entity authority.",
-        "Controlled remote D1-01 schema and migration-ledger read-back occurred in run 40152799763 (artifact 12583636257), confirming migrations 0006-0008 and the MFA replay/outbox schema. The artifact's embedded provenance fields contain literal $SOURCE_SHA and $DATABASE_NAME due the earlier heredoc bug, so its registry entry is CREATED and formal evidence admission remains pending.",
-        "The scoped live MFA E2E and W01/W02 production binding records are VERIFIED through unchanged-scope inheritance documented in docs/change-control/CC-AUTH-007-MFA-RUNTIME-EVIDENCE-INHERITANCE-2026-10-25.md. The D1-01 schema/read-back record remains CREATED because the historical artifact embeds literal $SOURCE_SHA and $DATABASE_NAME. Concurrent replay races and full attempt/lockout evidence remain outstanding.",
-        "Canonical W01 MFA endpoints and DTO bindings exist in source, and the deployed API passed scoped status/enrollment/confirmation/challenge/disable/recovery-code-consumption tests. Canonical entity/field promotion and full operation-level acceptance, including recovery-code rotation, remain outstanding.",
-        "Live security E2E run 40157067122 passed 25/25 scoped assertions, including TOTP and recovery-code replay denial and session invalidation. Challenge-expiry, cross-account authorization, rate-limit/lockout and abuse-negative tests remain outstanding.",
-        "Production W02 outbox -> existing AUTH013_QUEUE -> W06 canonical AuditEvent persistence, duplicate delivery, retry/DLQ and failure evidence are not yet admitted.",
-        "AUTH-007 remains BLOCKED_NOT_GREEN with implementation authorization false. No L8 genesis grant or further privileged production mutation is authorized by this record.",
-        "Evidence Registry records EVD-AUTH007-MFA-LIVE-SECURITY-E2E-20261025-001 and EVD-AUTH007-W01-W02-PRODUCTION-RUNTIME-20261025-001 are VERIFIED only for their scoped claims under docs/change-control/CC-AUTH-007-MFA-RUNTIME-EVIDENCE-INHERITANCE-2026-10-25.md. EVD-AUTH007-MFA-D1-01-SCHEMA-READBACK-20261025-001 remains CREATED pending a corrected controlled migration/read-back run. Global Evidence Registry and final Mapping 0 acceptance remain open."
-      ],
-      "status": "BLOCKED"
-    },
-    {
-      "entityId": "ENT-ORDER",
-      "catalogStatus": "PROPOSED",
-      "implementationStatus": "CONTRACT_ONLY",
-      "implementationRefs": [],
-      "schemaEvidenceRefs": [
-        "contracts/entity/ORDER-ENTITY-CONTRACT.v1.json",
-        "contracts/persistence/ORDER-D1-04-persistence.v1.json",
-        "contracts/state-machines/order.json",
-        "docs/change-control/CC-PAY-002-ORDER-ENTITY-MODEL-2026-10-27.md"
-      ],
-      "migrationEvidenceRefs": [],
-      "payloadNativeEvidenceRefs": [],
-      "extensionEvidenceRefs": [],
-      "blockers": [
-        "Contract candidate only: no canonical API/DTO, physical migration, runtime handler, deployed schema, or exact-commit runtime evidence has been admitted."
-      ],
-      "status": "BLOCKED"
-    },
-    {
-      "entityId": "ENT-ORDER-LINE",
-      "catalogStatus": "PROPOSED",
-      "implementationStatus": "CONTRACT_ONLY",
-      "implementationRefs": [],
-      "schemaEvidenceRefs": [
-        "contracts/entity/ORDER-LINE-ENTITY-CONTRACT.v1.json",
-        "contracts/persistence/ORDER-D1-04-persistence.v1.json",
-        "contracts/state-machines/order.json",
-        "docs/change-control/CC-PAY-002-ORDER-ENTITY-MODEL-2026-10-27.md"
-      ],
-      "migrationEvidenceRefs": [],
-      "payloadNativeEvidenceRefs": [],
-      "extensionEvidenceRefs": [],
-      "blockers": [
-        "Contract candidate only: no canonical API/DTO, physical migration, runtime handler, deployed schema, or exact-commit runtime evidence has been admitted."
-      ],
-      "status": "BLOCKED"
-    },
-    {
-      "entityId": "ENT-PAYMENT",
-      "catalogStatus": "PROPOSED",
-      "implementationStatus": "CONTRACT_ONLY",
-      "implementationRefs": [],
-      "schemaEvidenceRefs": [
-        "contracts/entity/PAYMENT-ENTITY-CONTRACT.v1.json",
-        "contracts/persistence/PAYMENT-D1-04-persistence.v1.json",
-        "contracts/state-machines/payment.json"
-      ],
-      "migrationEvidenceRefs": [],
-      "payloadNativeEvidenceRefs": [],
-      "extensionEvidenceRefs": [],
-      "blockers": [
-        "D1-04 payment migration is a reviewed source candidate only; remote schema and exact postflight evidence have not been collected.",
-        "Payment-intent persistence, provider retry/reconciliation, verified webhook deduplication, and exact-commit security/runtime evidence are not yet implemented/admitted.",
-        "No ledger posting, Order confirmation, or entitlement grant is authorized by this candidate."
       ],
       "status": "BLOCKED"
     }

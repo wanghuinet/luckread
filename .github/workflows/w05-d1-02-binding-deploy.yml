@@ -40,17 +40,74 @@ jobs:
           ref: ${{ inputs.source_sha }}
           fetch-depth: 1
 
+      - name: Verify W05 D1-02 notification push delivery migration before deploying W05
+        working-directory: workers/W05-social
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4.116.0 d1 execute luckreadpro --remote --json --config wrangler.jsonc --command "SELECT name FROM d1_migrations WHERE name IN ('20261104_017_notification_push_delivery_v1.sql','20261104_017_notification_push_delivery_v1');" > /tmp/w05-notify-003-ready.json
+          python - <<'PY'
+          import json
+          data = json.load(open('/tmp/w05-notify-003-ready.json'))
+          rows = [r for item in data for r in item.get('results', [])] if isinstance(data, list) else data.get('results', [])
+          if len(rows) != 1:
+              raise SystemExit('W05 D1-02 NOTIFY-003 migration must be applied before W05 delivery deployment')
+          print('W05_NOTIFY_003_D1_02_MIGRATION_PREREQUISITE=PASS')
+          PY
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 24
+
+      - name: Verify W09-owned D1-03 push endpoint migration before deploying W05
+        working-directory: workers/W09-platform
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4.116.0 d1 execute secondary --remote --json --config wrangler.d1-03-migrations.jsonc --command "SELECT name FROM d1_migrations WHERE name IN ('0001_notification_push_endpoints.sql','0001_notification_push_endpoints');" > /tmp/w05-push-ready.json
+          python - <<'PY'
+          import json
+          value = json.load(open('/tmp/w05-push-ready.json'))
+          rows = [r for item in value for r in item.get('results', [])] if isinstance(value, list) else value.get('results', [])
+          if len(rows) != 1:
+              raise SystemExit('W05 D1-03 push endpoint migration must be applied before deploying the two-binding Worker')
+          print('W05_D1_03_MIGRATION_PREREQUISITE=PASS')
+          PY
+
+      - name: Verify the default-disabled push Workflow contract
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          c = json.loads(Path('workers/W05-social/wrangler.jsonc').read_text())
+          assert c.get('vars', {}).get('PUSH_DELIVERY_ENABLED') == 'false'
+          assert 'nodejs_compat' in c.get('compatibility_flags', [])
+          assert c.get('queues') in (None, [])
+          workflows = c.get('workflows', [])
+          assert workflows == [{
+              'name': 'luckread-w05-notification-push',
+              'binding': 'NOTIFICATION_PUSH_WORKFLOW',
+              'class_name': 'NotificationPushWorkflow',
+              'schedules': ['* * * * *'],
+          }]
+          print('W05_PUSH_WORKFLOW_DEFAULT_DISABLED=PASS')
+          PY
 
       - name: Verify binding contract before deployment
         run: |
           set -euo pipefail
           test -f workers/W05-social/wrangler.jsonc
           jq -e --arg worker "$EXPECTED_WORKER" '.name == $worker' workers/W05-social/wrangler.jsonc >/dev/null
-          jq -e --arg db "$EXPECTED_DB_UUID"             '.d1_databases | length == 1 and .[0].binding == "DB" and .[0].database_id == $db'             workers/W05-social/wrangler.jsonc >/dev/null
+          jq -e --arg db02 "$EXPECTED_DB_UUID" --arg db03 "bda1d247-a371-4244-91ae-aef96034db7f" '
+            .d1_databases | length == 2
+            and any(.[]; .binding == "DB" and .database_id == $db02 and .database_name == "luckreadpro" and .migrations_dir == "migrations")
+            and any(.[]; .binding == "D1_03" and .database_id == $db03 and .database_name == "secondary" and ((.migrations_dir // "") == ""))
+          ' workers/W05-social/wrangler.jsonc >/dev/null
 
       - name: Verify W05 traffic guard bindings
         working-directory: workers/W05-social
@@ -63,6 +120,10 @@ jobs:
           for(const name of required) if(!names.has(name)) throw new Error('missing rate limiter: '+name)
           console.log(JSON.stringify({rateLimitBindings:[...names].sort()}))
           NODE
+
+      - name: Install W05 Expo SDK dependency from committed lockfile
+        working-directory: workers/W05-social
+        run: npm ci --ignore-scripts --no-audit --fund=false
 
       - name: Deploy W05 with D1-02 binding
         env:
@@ -81,6 +142,7 @@ jobs:
           set -euo pipefail
           curl -fsS             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             -H "Content-Type: application/json"             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/$EXPECTED_WORKER/settings"             > /tmp/w05-settings.json
           jq -e --arg db "$EXPECTED_DB_UUID"             '.. | objects | select(.id? == $db)' /tmp/w05-settings.json >/dev/null
+          jq -e --arg db "bda1d247-a371-4244-91ae-aef96034db7f"             '.. | objects | select(.id? == $db)' /tmp/w05-settings.json >/dev/null
 
       - name: Write exact-SHA provenance
         run: |

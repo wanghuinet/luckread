@@ -1,18 +1,20 @@
 import '../global.css';
-import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { AppState, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { type ErrorBoundaryProps, Stack, useRootNavigationState, useRouter, useSegments } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { QueryProvider } from '~/lib/query-provider';
 import * as SecureStore from 'expo-secure-store';
+import * as Notifications from 'expo-notifications';
 import { useColorScheme } from 'nativewind';
 import { StatusBar } from 'expo-status-bar';
 
 import { useAuthStore } from '../store/auth-store';
 import { ReplyComposerProvider } from '../components/ReplyComposerProvider';
 import { isThemePreference, THEME_PREFERENCE_KEY } from '../lib/theme-preference';
+import { syncPushEndpointForAuthenticatedUser } from '../lib/push-notifications';
 
 export const unstable_settings = {
   initialRouteName: '(drawer)',
@@ -38,12 +40,15 @@ export default function RootLayout() {
   const [isLoaded, setIsLoaded] = useState(false);
   const [isThemeLoaded, setIsThemeLoaded] = useState(false);
   const status = useAuthStore((state) => state.status);
+  const userId = useAuthStore((state) => state.user?.id ?? null);
   const bootstrap = useAuthStore((state) => state.bootstrap);
   const { colorScheme, setColorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
   const segments = useSegments();
   const router = useRouter();
   const navigationState = useRootNavigationState();
+  const lastNotificationResponse = Notifications.useLastNotificationResponse();
+  const handledNotificationResponseRef = useRef<string | null>(null);
 
   useEffect(() => {
     void bootstrap();
@@ -65,6 +70,82 @@ export default function RootLayout() {
       active = false;
     };
   }, [setColorScheme]);
+
+  useEffect(() => {
+    if (status !== 'authenticated' || !userId || Platform.OS === 'web') return;
+
+    let active = true;
+    let syncInFlight = false;
+    let syncQueued = false;
+    let queuedDevicePushToken: Notifications.DevicePushToken | undefined;
+    const syncPushEndpoint = (devicePushToken?: Notifications.DevicePushToken) => {
+      if (!active) return;
+      if (syncInFlight) {
+        syncQueued = true;
+        if (devicePushToken) queuedDevicePushToken = devicePushToken;
+        return;
+      }
+      syncInFlight = true;
+      // Permission reconciliation never displays a system prompt.
+      void syncPushEndpointForAuthenticatedUser(userId, devicePushToken)
+        .catch(() => undefined)
+        .finally(() => {
+          syncInFlight = false;
+          if (active && syncQueued) {
+            syncQueued = false;
+            const nextDevicePushToken = queuedDevicePushToken;
+            queuedDevicePushToken = undefined;
+            syncPushEndpoint(nextDevicePushToken);
+          }
+        });
+    };
+
+    syncPushEndpoint();
+    const appStateSubscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') syncPushEndpoint();
+    });
+    const tokenSubscription = Notifications.addPushTokenListener((devicePushToken) => {
+      // Reuse the SDK's new native token instead of fetching it a second time.
+      syncPushEndpoint(devicePushToken);
+    });
+
+    return () => {
+      active = false;
+      appStateSubscription.remove();
+      tokenSubscription.remove();
+    };
+  }, [status, userId]);
+
+  useEffect(() => {
+    if (!lastNotificationResponse) {
+      handledNotificationResponseRef.current = null;
+      return;
+    }
+    if (!navigationState?.key || Platform.OS === 'web') return;
+
+    const responseKey = [
+      lastNotificationResponse.notification.request.identifier,
+      lastNotificationResponse.actionIdentifier,
+    ].join(':');
+    if (handledNotificationResponseRef.current === responseKey) return;
+    handledNotificationResponseRef.current = responseKey;
+
+    const payload = lastNotificationResponse.notification.request.content.data;
+    const rawNotificationId = payload?.notificationId;
+    const notificationId = typeof rawNotificationId === 'string' &&
+      /^[A-Za-z0-9_-]{1,128}$/.test(rawNotificationId)
+      ? rawNotificationId
+      : null;
+
+    // Only the notification ID is accepted as a lookup hint. Target IDs and URLs
+    // in push data are untrusted and never determine the destination.
+    if (notificationId) {
+      router.push({ pathname: '/notifications', params: { notificationId } } as never);
+    } else {
+      router.push('/notifications' as never);
+    }
+    Notifications.clearLastNotificationResponse();
+  }, [lastNotificationResponse, navigationState?.key, router]);
 
   useEffect(() => {
     if (!navigationState?.key || !isLoaded || status === 'loading') return;

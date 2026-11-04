@@ -4811,17 +4811,43 @@
     },
     {
       "featureId": "NOTIFY-002",
-      "status": "UNRESOLVED",
-      "apiOperationIds": [],
-      "entityIds": [],
+      "status": "PARTIAL",
+      "apiOperationIds": [
+        "upsertPushEndpoint",
+        "deletePushEndpoint"
+      ],
+      "entityIds": [
+        "ENT-NOTIFICATION-PUSH-ENDPOINT"
+      ],
       "payloadCollections": [],
-      "codeEvidenceRefs": [],
+      "codeEvidenceRefs": [
+        "workers/W01-payload/src/app/api/v1/push/endpoints/[installationId]/route.ts",
+        "workers/W01-payload/tests/int/push-endpoints-v1-adapter.int.spec.ts",
+        "workers/W05-social/src/index.test.ts",
+        "workers/W05-social/src/index.ts",
+        "workers/W05-social/src/push-endpoint-runtime.test.ts",
+        "workers/W05-social/src/push-endpoint-runtime.ts",
+        "workers/W05-social/src/push-endpoint-w01-runtime.integration.test.ts",
+        "workers/W09-platform/migrations-d1-03/0001_notification_push_endpoints.sql"
+      ],
       "evidence": [
         "contracts/alignment/mapping-batches/MSG-001-008-NOTIFY-001-008-real-evidence-reconciliation.v1.md",
-        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
+        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
+        "contracts/persistence/NOTIFY-002-W05-D1-03-PUSH-ENDPOINT-PERSISTENCE.v1.json",
+        "docs/change-control/CC-T14-W05-D1-03-PUSH-ENDPOINT-REGISTRATION-2026-11-04.md",
+        "contracts/transport/d1-03-entity-owner-boundary.v1.json"
       ],
       "blockers": [
-        "Canonical Mapping record is materialized; API/Entity/Field/Persistence/Runtime mapping remains unresolved and must be closed in downstream reconciliation."
+        "W09 D1-03 remote migration and W05 delegated runtime binding deployment are pending.",
+        "Push sending, W10 delivery orchestration, receipts, and production security E2E are outside this module."
+      ],
+      "affectedSystems": [
+        "API",
+        "AUTHORIZATION",
+        "CODE",
+        "DB",
+        "MIGRATION",
+        "TEST"
       ]
     },
     {

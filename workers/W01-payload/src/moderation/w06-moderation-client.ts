@@ -239,6 +239,28 @@ export async function callW06PaymentMethodRevocationRequestAudit(input: {
   })
 }
 
+/** Durable, token-free intent audit for authenticated Expo push endpoint mutations. */
+export async function callW06PushEndpointMutationAudit(input: {
+  request: Request
+  principal: ContentPrincipal
+  body: {
+    eventId: string
+    installationId: string
+    operation: 'REGISTER' | 'REMOVE'
+    idempotencyKey: string
+    platform: 'ios' | 'android' | null
+    permissionStatus: 'granted' | 'denied' | 'undetermined' | null
+  }
+}): Promise<Response> {
+  return callW06Moderation({
+    request: input.request,
+    pathname: '/internal/audit-events/push-endpoint-mutation-requested',
+    method: 'POST',
+    principal: input.principal,
+    body: input.body,
+  })
+}
+
 export async function callW06Moderation(input: {
   request: Request
   pathname: string

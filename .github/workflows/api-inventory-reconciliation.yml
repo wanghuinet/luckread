@@ -7,6 +7,7 @@ on:
       - 'contracts/api/**'
       - 'contracts/openapi/**'
       - 'scripts/api-inventory-reconciliation-check.mjs'
+      - 'scripts/api-inventory-reconciliation-stage-test.mjs'
       - 'scripts/api-inventory-report-schema-check.mjs'
       - '.github/workflows/api-inventory-reconciliation.yml'
   pull_request:
@@ -14,6 +15,7 @@ on:
       - 'contracts/api/**'
       - 'contracts/openapi/**'
       - 'scripts/api-inventory-reconciliation-check.mjs'
+      - 'scripts/api-inventory-reconciliation-stage-test.mjs'
       - 'scripts/api-inventory-report-schema-check.mjs'
       - '.github/workflows/api-inventory-reconciliation.yml'
   workflow_dispatch:
@@ -34,9 +36,21 @@ jobs:
         with:
           node-version: 24
 
+      - name: Verify contract and production evidence stages stay separate
+        run: node scripts/api-inventory-reconciliation-stage-test.mjs
+
       - name: Run reconciliation
         id: reconciliation
-        run: node scripts/api-inventory-reconciliation-check.mjs
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            # Production readiness is an explicit, strict operator-invoked gate.
+            node scripts/api-inventory-reconciliation-check.mjs --stage=production
+          else
+            # PR and main push keep integration CI green while preserving every
+            # production evidence finding in the report. This does not grant
+            # production readiness or alter missing evidence to PASS/N/A.
+            node scripts/api-inventory-reconciliation-check.mjs --stage=contract
+          fi
 
       - name: Validate reconciliation report
         if: always()

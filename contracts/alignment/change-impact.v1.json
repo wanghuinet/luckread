@@ -838,7 +838,7 @@
     {
       "impactId": "IMPACT:AUTH-001",
       "featureId": "AUTH-001",
-      "status": "UNCHANGED",
+      "status": "MODIFIED",
       "affectedSystems": [],
       "affectedRefs": [
         "ENT-CREDENTIAL",
@@ -877,7 +877,7 @@
     {
       "impactId": "IMPACT:AUTH-002",
       "featureId": "AUTH-002",
-      "status": "UNCHANGED",
+      "status": "MODIFIED",
       "affectedSystems": [],
       "affectedRefs": [
         "ENT-CREDENTIAL",
@@ -910,7 +910,7 @@
     {
       "impactId": "IMPACT:AUTH-003",
       "featureId": "AUTH-003",
-      "status": "UNCHANGED",
+      "status": "MODIFIED",
       "affectedSystems": [],
       "affectedRefs": [
         "ENT-CREDENTIAL",
@@ -956,7 +956,7 @@
     {
       "impactId": "IMPACT:AUTH-004",
       "featureId": "AUTH-004",
-      "status": "UNCHANGED",
+      "status": "MODIFIED",
       "affectedSystems": [],
       "affectedRefs": [
         "ENT-CREDENTIAL",
@@ -999,7 +999,7 @@
     {
       "impactId": "IMPACT:AUTH-005",
       "featureId": "AUTH-005",
-      "status": "UNCHANGED",
+      "status": "MODIFIED",
       "affectedSystems": [],
       "affectedRefs": [
         "ENT-CREDENTIAL",
@@ -1073,7 +1073,7 @@
     {
       "impactId": "IMPACT:AUTH-008",
       "featureId": "AUTH-008",
-      "status": "UNCHANGED",
+      "status": "MODIFIED",
       "affectedSystems": [],
       "affectedRefs": [],
       "evidenceRefs": [
@@ -1088,7 +1088,7 @@
     {
       "impactId": "IMPACT:AUTH-009",
       "featureId": "AUTH-009",
-      "status": "UNCHANGED",
+      "status": "MODIFIED",
       "affectedSystems": [],
       "affectedRefs": [],
       "evidenceRefs": [
@@ -1102,7 +1102,7 @@
     {
       "impactId": "IMPACT:AUTH-010",
       "featureId": "AUTH-010",
-      "status": "UNCHANGED",
+      "status": "MODIFIED",
       "affectedSystems": [],
       "affectedRefs": [
         "ENT-SESSION",
@@ -1124,7 +1124,7 @@
     {
       "impactId": "IMPACT:AUTH-011",
       "featureId": "AUTH-011",
-      "status": "UNCHANGED",
+      "status": "MODIFIED",
       "affectedSystems": [],
       "affectedRefs": [
         "ENT-SESSION",
@@ -1143,7 +1143,7 @@
     {
       "impactId": "IMPACT:AUTH-012",
       "featureId": "AUTH-012",
-      "status": "UNCHANGED",
+      "status": "MODIFIED",
       "affectedSystems": [],
       "affectedRefs": [
         "authLogin"
@@ -1160,7 +1160,7 @@
     {
       "impactId": "IMPACT:AUTH-013",
       "featureId": "AUTH-013",
-      "status": "UNCHANGED",
+      "status": "MODIFIED",
       "affectedSystems": [],
       "affectedRefs": [
         "ENT-USER",
@@ -1187,7 +1187,7 @@
     {
       "impactId": "IMPACT:AUTH-014",
       "featureId": "AUTH-014",
-      "status": "UNCHANGED",
+      "status": "MODIFIED",
       "affectedSystems": [],
       "affectedRefs": [],
       "evidenceRefs": [
@@ -1202,7 +1202,7 @@
     {
       "impactId": "IMPACT:AUTH-015",
       "featureId": "AUTH-015",
-      "status": "UNCHANGED",
+      "status": "MODIFIED",
       "affectedSystems": [],
       "affectedRefs": [],
       "evidenceRefs": [
@@ -1217,7 +1217,7 @@
     {
       "impactId": "IMPACT:AUTH-016",
       "featureId": "AUTH-016",
-      "status": "UNCHANGED",
+      "status": "MODIFIED",
       "affectedSystems": [],
       "affectedRefs": [],
       "evidenceRefs": [
@@ -3653,7 +3653,7 @@
     {
       "impactId": "IMPACT:MON-004",
       "featureId": "MON-004",
-      "status": "UNCHANGED",
+      "status": "MODIFIED",
       "affectedSystems": [],
       "affectedRefs": [
         "ENT-SUBSCRIPTION"
@@ -3671,7 +3671,7 @@
     {
       "impactId": "IMPACT:MON-005",
       "featureId": "MON-005",
-      "status": "UNCHANGED",
+      "status": "MODIFIED",
       "affectedSystems": [],
       "affectedRefs": [
         "ENT-SUBSCRIPTION",
@@ -3940,12 +3940,33 @@
       "impactId": "IMPACT:NOTIFY-002",
       "featureId": "NOTIFY-002",
       "status": "MODIFIED",
-      "affectedSystems": [],
-      "affectedRefs": [],
+      "affectedSystems": [
+        "API",
+        "AUTHORIZATION",
+        "CODE",
+        "DB",
+        "MIGRATION",
+        "TEST"
+      ],
+      "affectedRefs": [
+        "ENT-NOTIFICATION-PUSH-ENDPOINT",
+        "deletePushEndpoint",
+        "upsertPushEndpoint",
+        "workers/W01-payload/src/app/api/v1/push/endpoints/[installationId]/route.ts",
+        "workers/W01-payload/tests/int/push-endpoints-v1-adapter.int.spec.ts",
+        "workers/W05-social/src/index.test.ts",
+        "workers/W05-social/src/index.ts",
+        "workers/W05-social/src/push-endpoint-runtime.test.ts",
+        "workers/W05-social/src/push-endpoint-runtime.ts",
+        "workers/W09-platform/migrations-d1-03/0001_notification_push_endpoints.sql"
+      ],
       "evidenceRefs": [
         "contracts/alignment/mapping-batches/MSG-001-008-NOTIFY-001-008-real-evidence-reconciliation.v1.md",
+        "contracts/persistence/NOTIFY-002-W05-D1-03-PUSH-ENDPOINT-PERSISTENCE.v1.json",
+        "contracts/transport/d1-03-entity-owner-boundary.v1.json",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
-        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md:L228"
+        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md:L228",
+        "docs/change-control/CC-T14-W05-D1-03-PUSH-ENDPOINT-REGISTRATION-2026-11-04.md"
       ],
       "blockers": []
     },
@@ -4370,12 +4391,39 @@
       "featureId": "PAY-001",
       "status": "MODIFIED",
       "affectedSystems": [],
-      "affectedRefs": [],
+      "affectedRefs": [
+        "ENT-ORDER",
+        "ENT-PAYMENT",
+        "postPaymentsIntents",
+        "workers/W01-payload/src/app/api/v1/payments/intents/route.ts",
+        "workers/W01-payload/src/commerce/w07-commerce-client.ts",
+        "workers/W01-payload/src/subscription/w07-subscription-client.ts",
+        "workers/W01-payload/tests/int/payments-intent-v1-adapter.int.spec.ts",
+        "workers/W07-subscription-commerce/src/hyperswitch-client.test.ts",
+        "workers/W07-subscription-commerce/src/hyperswitch-client.ts",
+        "workers/W07-subscription-commerce/src/index.ts",
+        "workers/W07-subscription-commerce/src/payment-intent-http-runtime.test.ts",
+        "workers/W07-subscription-commerce/src/payment-intent-http-runtime.ts"
+      ],
       "evidenceRefs": [
+        "contracts/alignment/api-inventory.v1.json",
+        "contracts/alignment/code-evidence-inventory.v1.json",
         "contracts/alignment/mapping-batches/B13-B15-creator-membership-commerce.v1.json",
         "contracts/alignment/mapping-batches/MON-001-011-PAY-001-013-real-evidence-reconciliation.v1.md",
+        "contracts/api/api-inventory.v1.json",
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/transport/W01-W07-membership-commerce-http-binding.v1.json",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
-        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md:L265"
+        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md:L265",
+        "workers/W01-payload/src/app/api/v1/payments/intents/route.ts",
+        "workers/W01-payload/src/commerce/w07-commerce-client.ts",
+        "workers/W01-payload/src/subscription/w07-subscription-client.ts",
+        "workers/W01-payload/tests/int/payments-intent-v1-adapter.int.spec.ts",
+        "workers/W07-subscription-commerce/src/hyperswitch-client.test.ts",
+        "workers/W07-subscription-commerce/src/hyperswitch-client.ts",
+        "workers/W07-subscription-commerce/src/index.ts",
+        "workers/W07-subscription-commerce/src/payment-intent-http-runtime.test.ts",
+        "workers/W07-subscription-commerce/src/payment-intent-http-runtime.ts"
       ],
       "blockers": []
     },
@@ -5707,7 +5755,7 @@
     {
       "impactId": "IMPACT:SOCIAL-001",
       "featureId": "SOCIAL-001",
-      "status": "UNCHANGED",
+      "status": "MODIFIED",
       "affectedSystems": [],
       "affectedRefs": [
         "ENT-SOCIAL-FOLLOW",

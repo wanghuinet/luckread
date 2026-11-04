@@ -4,6 +4,12 @@ on:
   pull_request:
     paths:
       - 'workers/W05-social/**'
+      - 'contracts/transport/W05-W09-notification-push-delivery.v1.json'
+      - 'contracts/transport/d1-03-entity-owner-boundary.v1.json'
+      - 'contracts/entity/NOTIFICATION-PUSH-ENDPOINT-CONTRACT.v1.json'
+      - 'contracts/persistence/NOTIFY-002-W05-D1-03-PUSH-ENDPOINT-PERSISTENCE.v1.json'
+      - 'workers/W09-platform/wrangler.d1-03-migrations.jsonc'
+      - 'workers/W09-platform/migrations-d1-03/**'
       - 'contracts/transport/W05-W03-owned-post-context-http-binding.v1.json'
       - 'workers/W01-payload/src/app/api/v1/content/[contentId]/reposts/**'
       - 'workers/W01-payload/src/app/api/v1/content/[contentId]/pin/**'
@@ -11,6 +17,7 @@ on:
       - 'workers/W01-payload/src/social/w05-social-client.ts'
       - 'workers/W01-payload/src/social/w05-response.ts'
       - 'workers/W01-payload/tests/int/w05-social-response-forwarding.int.spec.ts'
+      - 'workers/W01-payload/tests/int/push-endpoints-v1-adapter.int.spec.ts'
       - 'workers/W01-payload/src/app/(frontend)/components/reuse/LuckReadSocialPostCard.tsx'
       - 'workers/W01-payload/src/app/(frontend)/users/[userId]/UserProfilePage.tsx'
       - 'workers/W01-payload/src/app/(twitter-clone)/users/[userId]/page.tsx'
@@ -19,6 +26,7 @@ on:
       - 'workers/W01-payload/src/app/api/v1/users/[userId]/followers/**'
       - 'workers/W01-payload/src/app/api/v1/users/[userId]/following/**'
       - 'workers/W01-payload/src/social/**'
+      - 'workers/W01-payload/src/app/api/v1/push/endpoints/**'
       - 'workers/W01-payload/src/social/social-token-parser.ts'
       - 'workers/W01-payload/src/social/social-token-parser.test.ts'
       - 'workers/W01-payload/tests/int/social-followers-v1-adapter.int.spec.ts'
@@ -71,6 +79,10 @@ on:
       - main
     paths:
       - 'workers/W05-social/**'
+      - 'contracts/transport/W05-W09-notification-push-delivery.v1.json'
+      - 'contracts/transport/d1-03-entity-owner-boundary.v1.json'
+      - 'contracts/entity/NOTIFICATION-PUSH-ENDPOINT-CONTRACT.v1.json'
+      - 'contracts/persistence/NOTIFY-002-W05-D1-03-PUSH-ENDPOINT-PERSISTENCE.v1.json'
       - 'contracts/transport/W05-W03-owned-post-context-http-binding.v1.json'
       - 'workers/W01-payload/src/app/api/v1/content/[contentId]/reposts/**'
       - 'workers/W01-payload/src/app/api/v1/content/[contentId]/pin/**'
@@ -83,6 +95,8 @@ on:
       - 'workers/W01-payload/src/app/api/v1/users/[userId]/followers/**'
       - 'workers/W01-payload/src/app/api/v1/users/[userId]/following/**'
       - 'workers/W01-payload/src/app/api/v1/social/follows/**'
+      - 'workers/W01-payload/src/app/api/v1/push/endpoints/**'
+      - 'workers/W01-payload/tests/int/push-endpoints-v1-adapter.int.spec.ts'
       - 'workers/W01-payload/src/social/**'
       - 'workers/W01-payload/tests/int/social-followers-v1-adapter.int.spec.ts'
       - 'workers/W01-payload/tests/int/social-follow-mutation-v1-adapter.int.spec.ts'
@@ -140,9 +154,25 @@ jobs:
         working-directory: workers/W01-payload
         run: pnpm install --frozen-lockfile --ignore-scripts
 
+      - name: Install W05 Expo SDK dependency from committed lockfile
+        working-directory: workers/W05-social
+        run: npm ci --ignore-scripts --no-audit --fund=false
+
+      - name: Validate W05 Notification Workflow bundle with Wrangler
+        working-directory: workers/W05-social
+        run: npx --yes wrangler@4.116.0 deploy --dry-run --outdir /tmp/w05-notify-003-dry-run
+
+      - name: Typecheck durable W05 push delivery and Workflow modules
+        working-directory: workers/W01-payload
+        run: pnpm exec tsc --noEmit --target ES2022 --lib ES2022,DOM --module ESNext --moduleResolution Bundler --strict --skipLibCheck ../../workers/W05-social/src/notification-push-delivery-runtime.ts ../../workers/W05-social/src/notification-push-workflow-runtime.ts ../../workers/W05-social/src/notification-push-workflow.ts ../../workers/W05-social/src/entry.ts
+
       - name: Run W05 Social and W01 adapter tests
         working-directory: workers/W01-payload
-        run: pnpm exec vitest run --config ./vitest.config.mts ../../workers/W05-social/src/follow-runtime.test.ts ../../workers/W05-social/src/following-feed.test.ts ../../workers/W05-social/src/like-runtime.test.ts ../../workers/W05-social/src/like-list-runtime.test.ts ../../workers/W05-social/src/comment-runtime.test.ts ../../workers/W05-social/src/favorite-runtime.test.ts ../../workers/W05-social/src/share-runtime.test.ts ../../workers/W05-social/src/repost-runtime.test.ts ../../workers/W05-social/src/profile-pin-runtime.test.ts ../../workers/W05-social/src/block-policy.test.ts ../../workers/W05-social/src/relationship-graph-runtime.test.ts ../../workers/W05-social/src/block-mute-runtime.test.ts ../../workers/W05-social/src/index.test.ts ../../workers/W05-social/src/w03-content-context-client.test.ts ../../workers/W05-social/src/d1-traffic-guard.test.ts tests/int/social-followers-v1-adapter.int.spec.ts tests/int/social-profile-channels-v1-adapter.int.spec.ts tests/int/social-follow-mutation-v1-adapter.int.spec.ts tests/int/social-likes-v1-adapter.int.spec.ts tests/int/social-likers-v1-adapter.int.spec.ts tests/int/social-comments-v1-adapter.int.spec.ts tests/int/social-reply-audience-v1-adapter.int.spec.ts tests/int/social-comment-likes-v1-adapter.int.spec.ts tests/int/social-bookmarks-v1-adapter.int.spec.ts tests/int/social-shares-v1-adapter.int.spec.ts tests/int/social-shares-landing.int.spec.ts tests/int/social-block-mute-v1-adapter.int.spec.ts tests/int/social-reposts-v1-adapter.int.spec.ts tests/int/social-profile-pins-v1-adapter.int.spec.ts tests/int/w05-social-response-forwarding.int.spec.ts tests/int/content-detail.int.spec.ts tests/int/content-detail-comments.int.spec.ts tests/int/content-likes-modal.int.spec.ts
+        run: pnpm exec vitest run --config ./vitest.config.mts ../../workers/W05-social/src/follow-runtime.test.ts ../../workers/W05-social/src/following-feed.test.ts ../../workers/W05-social/src/like-runtime.test.ts ../../workers/W05-social/src/like-list-runtime.test.ts ../../workers/W05-social/src/comment-runtime.test.ts ../../workers/W05-social/src/favorite-runtime.test.ts ../../workers/W05-social/src/share-runtime.test.ts ../../workers/W05-social/src/repost-runtime.test.ts ../../workers/W05-social/src/profile-pin-runtime.test.ts ../../workers/W05-social/src/block-policy.test.ts ../../workers/W05-social/src/relationship-graph-runtime.test.ts ../../workers/W05-social/src/block-mute-runtime.test.ts ../../workers/W05-social/src/index.test.ts ../../workers/W05-social/src/push-endpoint-runtime.test.ts ../../workers/W05-social/src/notification-push-delivery-runtime.test.ts ../../workers/W05-social/src/notification-push-workflow.test.ts ../../workers/W05-social/src/w03-content-context-client.test.ts ../../workers/W05-social/src/d1-traffic-guard.test.ts tests/int/social-followers-v1-adapter.int.spec.ts tests/int/social-profile-channels-v1-adapter.int.spec.ts tests/int/social-follow-mutation-v1-adapter.int.spec.ts tests/int/social-likes-v1-adapter.int.spec.ts tests/int/social-likers-v1-adapter.int.spec.ts tests/int/social-comments-v1-adapter.int.spec.ts tests/int/social-reply-audience-v1-adapter.int.spec.ts tests/int/social-comment-likes-v1-adapter.int.spec.ts tests/int/social-bookmarks-v1-adapter.int.spec.ts tests/int/social-shares-v1-adapter.int.spec.ts tests/int/social-shares-landing.int.spec.ts tests/int/social-block-mute-v1-adapter.int.spec.ts tests/int/social-reposts-v1-adapter.int.spec.ts tests/int/social-profile-pins-v1-adapter.int.spec.ts tests/int/w05-social-response-forwarding.int.spec.ts tests/int/push-endpoints-v1-adapter.int.spec.ts tests/int/content-detail.int.spec.ts tests/int/content-detail-comments.int.spec.ts tests/int/content-likes-modal.int.spec.ts
+
+      - name: Run real W01 to W05 push endpoint SQLite integration
+        working-directory: workers/W01-payload
+        run: pnpm exec vitest run --config ./vitest.w05-push-endpoint-integration.config.mts ../W05-social/src/push-endpoint-w01-runtime.integration.test.ts
 
       - name: Run W05 reply audience runtime and comment tests
         working-directory: workers/W01-payload
@@ -480,6 +510,121 @@ jobs:
           if any('USE TEMP B-TREE' in row for row in plan):
               raise SystemExit(f'discovery ranking scan requires a temporary sort: {details}')
           print('SOCIAL_DISCOVERY_SCAN_QUERY_PLAN=PASS')
+          PY
+
+      - name: Verify NOTIFY-003 W05 to W09 endpoint delivery delegation
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          root = Path('.')
+          delivery = json.loads((root / 'contracts/transport/W05-W09-notification-push-delivery.v1.json').read_text())
+          boundary = json.loads((root / 'contracts/transport/d1-03-entity-owner-boundary.v1.json').read_text())
+          persistence = json.loads((root / 'contracts/persistence/NOTIFY-002-W05-D1-03-PUSH-ENDPOINT-PERSISTENCE.v1.json').read_text())
+          entity = json.loads((root / 'contracts/entity/NOTIFICATION-PUSH-ENDPOINT-CONTRACT.v1.json').read_text())
+          assert delivery['primaryOwner'] == {'worker': 'W09', 'task': 'T25', 'entity': 'NotificationPushEndpoint', 'database': 'D1-03', 'databaseName': 'secondary'}
+          assert delivery['delegatedRuntime']['worker'] == 'W05' and delivery['delegatedRuntime']['task'] == 'T14'
+          assert delivery['authority']['maxEndpointsPerRecipient'] == 20
+          operations = {item['id']: item for item in delivery['operations']}
+          assert operations['resolveActiveRecipientPushEndpoints']['kind'] == 'SCOPED_READ'
+          assert operations['resolveActiveRecipientPushEndpoints']['maxRows'] == 20
+          invalidation = operations['clearProviderInvalidExpoToken']
+          assert invalidation['kind'] == 'CONDITIONAL_SCOPED_WRITE'
+          assert 'last_seen_at' not in invalidation['allowedMutation']
+          assert 'DeviceNotRegistered' in invalidation['trigger']
+          assert 'current push token SHA-256 equals the hash captured' in invalidation['requiredPredicates'][-1]
+          scoped = boundary['scopedDelegations']['NotificationPushEndpoint']
+          assert scoped['primaryOwner'] == 'W09'
+          assert scoped['delegatedDeliveryRuntime']['contractRef'] == 'contracts/transport/W05-W09-notification-push-delivery.v1.json'
+          assert persistence['authority']['primaryWorker'] == 'W09'
+          assert persistence['authority']['scopedDeliveryRuntime']['contractRef'] == 'contracts/transport/W05-W09-notification-push-delivery.v1.json'
+          assert persistence['security']['publicTokenExposure'] == 'NEVER'
+          assert entity['delegatedDeliveryRuntime']['contractRef'] == 'contracts/transport/W05-W09-notification-push-delivery.v1.json'
+          print('NOTIFY_003_W05_W09_SCOPED_ENDPOINT_DELEGATION=PASS')
+          PY
+
+      - name: Verify durable notification push migration and atomic outbox trigger
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import sqlite3
+          from pathlib import Path
+          db = sqlite3.connect(':memory:')
+          base = Path('workers/W05-social/migrations')
+          db.executescript((base / '20261002_002_social_003_like_v1.sql').read_text())
+          db.executescript((base / '20261002_005_social_005_comment_likes_v1.sql').read_text())
+          db.executescript((base / '20261008_011_social_closure_v1.sql').read_text())
+          migration = base / '20261104_017_notification_push_delivery_v1.sql'
+          db.executescript(migration.read_text())
+          names = {row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type IN ('table','index','trigger')")}
+          required = {
+              'social_notification_push_outbox',
+              'social_notification_push_deliveries',
+              'ix_social_notification_push_outbox_status_created',
+              'ix_social_notification_push_deliveries_due',
+              'ix_social_notification_push_deliveries_endpoint',
+              'uq_social_notification_push_ticket',
+              'trg_social_notifications_push_outbox_insert',
+          }
+          if not required.issubset(names):
+              raise SystemExit(f'missing notification push schema objects: {sorted(required - names)}')
+          db.execute(
+              'INSERT INTO social_notifications '
+              '(notification_id, recipient_user_id, actor_user_id, notification_type, target_type, target_id, dedupe_key, payload_json, created_at) '
+              'VALUES (?,?,?,?,?,?,?,?,?)',
+              ('n1','recipient-1','actor-1','FOLLOW','user','recipient-1','FOLLOW:recipient-1:actor-1:user:recipient-1','{}','2026-11-04T00:00:00.000Z'),
+          )
+          row = db.execute(
+              'SELECT notification_id, recipient_user_id, status FROM social_notification_push_outbox WHERE notification_id = ?',
+              ('n1',),
+          ).fetchone()
+          if row != ('n1','recipient-1','PENDING'):
+              raise SystemExit(f'outbox trigger did not atomically create the pending delivery intent: {row}')
+          columns = {row[1] for row in db.execute('PRAGMA table_info("social_notification_push_deliveries")')}
+          if 'push_token_hash' not in columns or 'expo_ticket_id' not in columns or 'lease_expires_at' not in columns:
+              raise SystemExit('delivery lease / receipt snapshot fields are missing')
+          print('NOTIFY_003_D1_02_MIGRATION_AND_TRIGGER=PASS')
+          PY
+
+      - name: Verify scoped D1-03 push endpoint migration isolation
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import sqlite3
+          from pathlib import Path
+          config = json.loads(Path('workers/W05-social/wrangler.jsonc').read_text())
+          assert config['name'] == 'luckread-w05'
+          assert 'nodejs_compat' in config.get('compatibility_flags', [])
+          bindings = {item['binding']: item for item in config['d1_databases']}
+          assert set(bindings) == {'DB', 'D1_03'}
+          assert bindings['DB']['database_id'] == '6c342634-97f6-4248-9f4a-85772af4f22c'
+          assert bindings['DB']['database_name'] == 'luckreadpro'
+          assert bindings['DB']['migrations_dir'] == 'migrations'
+          assert bindings['D1_03']['database_id'] == 'bda1d247-a371-4244-91ae-aef96034db7f'
+          assert bindings['D1_03']['database_name'] == 'secondary'
+          assert bindings['D1_03'].get('migrations_dir') is None
+          owner_config = json.loads(Path('workers/W09-platform/wrangler.d1-03-migrations.jsonc').read_text())
+          assert owner_config['name'] == 'luckread-w09'
+          owner_bindings = owner_config['d1_databases']
+          assert len(owner_bindings) == 1
+          assert owner_bindings[0]['binding'] == 'D1_03'
+          assert owner_bindings[0]['database_id'] == 'bda1d247-a371-4244-91ae-aef96034db7f'
+          assert owner_bindings[0]['database_name'] == 'secondary'
+          assert owner_bindings[0]['migrations_dir'] == 'migrations-d1-03'
+          sql_path = Path('workers/W09-platform/migrations-d1-03/0001_notification_push_endpoints.sql')
+          db = sqlite3.connect(':memory:')
+          db.executescript(sql_path.read_text())
+          columns = [row[1] for row in db.execute('PRAGMA table_info("notification_push_endpoints")')]
+          expected = ['endpoint_id','installation_id','owner_user_id','provider','platform','push_token','permission_status','app_version','created_at','updated_at','last_seen_at']
+          if columns != expected:
+              raise SystemExit(f'W05 D1-03 push schema mismatch: {columns}')
+          indexes = {row[1] for row in db.execute('PRAGMA index_list("notification_push_endpoints")')}
+          if not {'uq_notification_push_endpoints_provider_token','ix_notification_push_endpoints_owner_status'}.issubset(indexes):
+              raise SystemExit('W05 D1-03 push indexes missing')
+          print('W05_D1_03_PUSH_ENDPOINT_MIGRATION_ISOLATION=PASS')
           PY
 
       - name: Run W05 unified social closure runtime tests

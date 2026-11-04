@@ -9,6 +9,7 @@ import {
   saveSessionToken,
   type LuckReadUser,
 } from '../lib/secure-session';
+import { unregisterPushEndpointForUser } from '../lib/push-notifications';
 
 type AuthStatus = 'loading' | 'authenticated' | 'anonymous';
 
@@ -65,7 +66,7 @@ const validUser = (value: unknown): value is LuckReadUser => {
   );
 };
 
-export const useAuthStore = create<AuthStore>((set) => ({
+export const useAuthStore = create<AuthStore>((set, get) => ({
   status: 'loading',
   user: null,
 
@@ -150,6 +151,12 @@ export const useAuthStore = create<AuthStore>((set) => ({
     try {
       const token = await readSessionToken();
       if (token) {
+        const userId = get().user?.id;
+        if (userId) {
+          // Remove the account-scoped push endpoint before revoking the session.
+          // A transient notification-service failure must never block logout.
+          await unregisterPushEndpointForUser(userId).catch(() => undefined);
+        }
         await apiRequest<unknown>('/auth/logout', { method: 'POST', idempotencyKey: false });
       }
     } finally {

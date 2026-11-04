@@ -1043,28 +1043,26 @@
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md:L32",
         "contracts/alignment/mapping-batches/B01-B03-identity-user-authz-org.v1.json",
         "contracts/alignment/mapping-batches/B19-AUTH-001-real-evidence-reconciliation.v1.md",
+        "contracts/api/auth-operation-policy.v1.json",
         "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json",
         "contracts/dto/auth-dto-contract.v1.json",
-        "workers/W01-payload/src/collections/Users.ts",
-        "workers/W01-payload/src/payload.config.ts",
         "contracts/entity/entity-implementation-evidence.v1.json",
+        "contracts/evidence/mapping-0-evidence-registry.v1.json",
         "contracts/persistence/AUTH-001-registration-envelope-contract.v1.json",
-        "docs/change-control/CC-MAPPING-0-AUTH-001-REGISTRATION-ENVELOPE-WRITER-BOUNDARY-2026-09-27.md",
-        "docs/change-control/CC-MAPPING-0-AUTH-001-RUNTIME-IMPLEMENTATION-ADMISSION-2026-09-27.md",
-        "docs/change-control/CC-MAPPING-0-AUTH-001-RUNTIME-EVIDENCE-ADMISSION-2026-09-28.md",
-        "docs/change-control/CC-MAPPING-0-AUTH-001-REGISTRATION-MIGRATION-EXECUTION-2026-09-28.md",
-        "docs/change-control/CC-MAPPING-0-AUTH-001-W02-CREDENTIAL-HASH-SECRET-AUTHORITY-GAP-2026-09-28.md",
         "docs/MAPPING-0-CLOSURE-LEDGER.md",
-        "contracts/evidence/mapping-0-evidence-registry.v1.json"
+        "docs/change-control/CC-MAPPING-0-AUTH-001-EVENTUAL-MATERIALIZATION-ADMISSION-2026-09-28.md",
+        "docs/change-control/CC-MAPPING-0-AUTH-001-REGISTRATION-ENVELOPE-WRITER-BOUNDARY-2026-09-27.md",
+        "docs/change-control/CC-MAPPING-0-AUTH-001-REGISTRATION-MIGRATION-EXECUTION-2026-09-28.md",
+        "docs/change-control/CC-MAPPING-0-AUTH-001-RUNTIME-EVIDENCE-ADMISSION-2026-09-28.md",
+        "docs/change-control/CC-MAPPING-0-AUTH-001-RUNTIME-IMPLEMENTATION-ADMISSION-2026-09-27.md",
+        "docs/change-control/CC-MAPPING-0-AUTH-001-W02-CREDENTIAL-HASH-SECRET-AUTHORITY-GAP-2026-09-28.md",
+        "workers/W01-payload/src/collections/Users.ts",
+        "workers/W01-payload/src/payload.config.ts"
       ],
       "blockers": [
         "Canonical page/reference mapping for AUTH-001 remains absent; no page is inferred from an API-only registration surface.",
-        "Final canonical Worker/D1 promotion remains governed by the current Worker/D1 binding and global Mapping 0 / Five-Way gates; the admitted W01 transactional + W02 eventual materialization boundary is recorded but not promoted to global GREEN.",
+        "Final canonical Worker/D1 promotion remains governed by the current Worker/D1 binding and global Mapping 0 / Five-Way gates; this reconciliation records the already-admitted W01 transactional + W02 eventual materialization boundary without promoting it to global GREEN.",
         "Remote production/public registration E2E and complete security/anti-abuse evidence beyond the verified controlled scopes remain incomplete."
-      ],
-      "workerRefs": [
-        "W01",
-        "W02"
       ]
     },
     {
@@ -1083,6 +1081,8 @@
       "codeEvidenceRefs": [],
       "evidence": [
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md:L33",
+        "artifacts/mapping-0/auth-002-historical-migration-evidence-admission-2026-09-28.json",
+        "artifacts/mapping-0/auth-002-remote-baseline-evidence-2026-09-20.json",
         "contracts/alignment/mapping-batches/AUTH-002-003-batch-closure-gate.v1.md",
         "contracts/alignment/mapping-batches/AUTH-002-006-persistence-api-entity-field-mapping.v1.json",
         "contracts/alignment/mapping-batches/AUTH-002-real-evidence-reconciliation.v1.md",
@@ -1091,11 +1091,17 @@
         "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json",
         "contracts/dto/auth-dto-contract.v1.json",
         "contracts/entity/AUTH-002-006-canonical-field-authority.v1.json",
-        "contracts/entity/AUTH-002-session-field-contract.v1.json"
+        "contracts/entity/AUTH-002-session-field-contract.v1.json",
+        "docs/change-control/CC-MAPPING-0-AUTH-002-EVIDENCE-RECONCILIATION-2026-09-28.md",
+        "docs/change-control/CC-MAPPING-0-AUTH-002-HISTORICAL-MIGRATION-EVIDENCE-ADMISSION-2026-09-28.md",
+        "https://github.com/wanghuinet/luckread/actions/runs/35552919573/artifacts/10618729380",
+        "https://github.com/wanghuinet/luckread/actions/runs/36217784262",
+        "https://github.com/wanghuinet/luckread/actions/runs/36219132123"
       ],
       "blockers": [
-        "session DTO/entity mappings incomplete",
-        "state/security E2E evidence missing"
+        "ENT-SESSION catalog promotion remains blocked even though Gate-1, native runtime, security, concurrency and extension-correlation evidence are VERIFIED.",
+        "Mapping 0 / Five-Way remains globally NOT_GREEN.",
+        "ENT-SESSION catalog promotion remains blocked pending final Mapping 0 / Five-Way admission."
       ]
     },
     {
@@ -1112,9 +1118,16 @@
         "authCredentialRemove"
       ],
       "payloadCollections": [],
-      "codeEvidenceRefs": [],
+      "codeEvidenceRefs": [
+        "workers/W02-identity/src/credentials/credential-add.ts",
+        "workers/W02-identity/src/credentials/credential-add.test.ts",
+        "workers/W02-identity/src/credentials/credential-list.ts",
+        "workers/W02-identity/src/credentials/credential-lifecycle.ts"
+      ],
       "evidence": [
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md:L34",
+        "artifacts/mapping-0/auth-003-wire-projection-authority-2026-09-26.json",
+        "contracts/alignment/mapping-batches/AUTH-002-006-d1-schema-mapping.v1.json",
         "contracts/alignment/mapping-batches/AUTH-002-006-persistence-api-entity-field-mapping.v1.json",
         "contracts/alignment/mapping-batches/AUTH-003-006-dto-schema-closure-gate.v1.md",
         "contracts/alignment/mapping-batches/AUTH-003-006-openapi-operation-reconciliation.v1.md",
@@ -1122,13 +1135,26 @@
         "contracts/alignment/mapping-batches/AUTH-003-real-evidence-reconciliation.v1.md",
         "contracts/alignment/mapping-batches/B01-B03-identity-user-authz-org.v1.json",
         "contracts/api/AUTH-003-credential-management-contract.v1.json",
-        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json",
+        "contracts/dto/auth-dto-contract.v1.json",
+        "contracts/dto/auth-dto-records.v1.json",
         "contracts/entity/AUTH-002-006-canonical-field-authority.v1.json",
         "contracts/entity/AUTH-003-credential-field-contract.v1.json",
-        "contracts/entity/AUTH-003-identity-field-contract.v1.json"
+        "contracts/entity/AUTH-003-identity-field-contract.v1.json",
+        "contracts/entity/entity-implementation-evidence.v1.json",
+        "contracts/evidence/mapping-0-evidence-registry.v1.json",
+        "docs/change-control/CC-MAPPING-0-AUTH-003-IDENTITY-MATERIALIZATION-EVIDENCE-ADMISSION-2026-09-28.md",
+        "docs/change-control/CC-MAPPING-0-AUTH-003-LIFECYCLE-EVIDENCE-ADMISSION-2026-09-27.md",
+        "https://github.com/wanghuinet/luckread/actions/runs/36298629648",
+        "https://github.com/wanghuinet/luckread/actions/runs/36299334577",
+        "https://github.com/wanghuinet/luckread/actions/runs/36307891924",
+        "https://github.com/wanghuinet/luckread/actions/runs/36308120758",
+        "workers/W02-identity/migrations/0004_auth_003_credentials.sql",
+        "workers/W02-identity/src/credentials/credential-add.ts"
       ],
       "blockers": [
-        "DTO registry and Entity/Field binding remain unverified"
+        "ENT-IDENTITY materialization ownership is now executable-evidence verified through the AUTH-001 W02 scheduled materializer; final entity catalog promotion remains blocked.",
+        "ENT-IDENTITY / ENT-CREDENTIAL catalog promotion remains BLOCKED while global Mapping 0 / Five-Way is NOT_GREEN.",
+        "Mapping 0 / Five-Way remains globally NOT_GREEN."
       ]
     },
     {
@@ -1145,9 +1171,16 @@
         "authPasswordResetConfirm"
       ],
       "payloadCollections": [],
-      "codeEvidenceRefs": [],
+      "codeEvidenceRefs": [
+        "workers/W01-payload/src/app/auth/password/change/route.ts",
+        "workers/W01-payload/src/app/auth/password/reset/request/route.ts",
+        "workers/W01-payload/src/app/auth/password/reset/confirm/route.ts"
+      ],
       "evidence": [
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md:L35",
+        "EVD-AUTH004-B12-PROTECTED-ACCOUNT-ENUMERATION-001",
+        "EVD-AUTH004-B12-REMOTE-HTTP-E2E-001",
+        "EVD-AUTH004-B12-SESSION-LIFECYCLE-REMOTE-001",
         "contracts/alignment/mapping-batches/AUTH-002-006-persistence-api-entity-field-mapping.v1.json",
         "contracts/alignment/mapping-batches/AUTH-003-006-dto-schema-closure-gate.v1.md",
         "contracts/alignment/mapping-batches/AUTH-003-006-openapi-operation-reconciliation.v1.md",
@@ -1159,9 +1192,14 @@
         "contracts/entity/AUTH-002-session-field-contract.v1.json",
         "contracts/entity/AUTH-003-credential-field-contract.v1.json",
         "contracts/entity/AUTH-004-password-recovery-field-contract.v1.json",
-        "docs/72-USER-CENTER-PROFILE-SETTINGS-AND-ACCOUNT-LIFECYCLE-CONTRACT-v1.0.md",
+        "contracts/evidence/mapping-0-evidence-registry.v1.json",
         "docs/163-EVENT-SEMANTICS-DELIVERY-ORDERING-REPLAY-DLQ-CONTRACT-v1.0.md",
-        "docs/change-control/CC-MAPPING-0-AUTH-004-LIFECYCLE-EVENT-AUTHORITY-GAP-2026-09-29.md"
+        "docs/72-USER-CENTER-PROFILE-SETTINGS-AND-ACCOUNT-LIFECYCLE-CONTRACT-v1.0.md",
+        "docs/change-control/CC-AUTH-004-PAYLOAD-NATIVE-ADAPTER-IMPLEMENTATION-ADMISSION-2026-09-28.md",
+        "docs/change-control/CC-MAPPING-0-AUTH-004-DTO-REGISTRY-RECONCILIATION-2026-09-28.md",
+        "docs/change-control/CC-MAPPING-0-AUTH-004-EVIDENCE-REGISTRY-BINDING-2026-09-28.md",
+        "docs/change-control/CC-MAPPING-0-AUTH-004-LIFECYCLE-EVENT-AUTHORITY-GAP-2026-09-29.md",
+        "https://github.com/wanghuinet/luckread/commit/7e9396460136a6ce083db0f600ec04c7829a9c99"
       ],
       "blockers": [
         "Canonical password lifecycle event authority is not yet admitted: docs/72 names candidate event `user.password.changed`, while no concrete event schema/producer/consumer binding is admitted in contracts/events.",
@@ -1204,7 +1242,7 @@
     },
     {
       "featureId": "AUTH-006",
-      "status": "MISSING",
+      "status": "PARTIAL",
       "entityIds": [
         "ENT-CREDENTIAL",
         "ENT-IDENTITY",
@@ -1381,14 +1419,15 @@
         "contracts/alignment/mapping-batches/AUTH-013-reconciliation.v1.md",
         "contracts/alignment/mapping-batches/B01-B03-identity-user-authz-org.v1.json",
         "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json",
-        "docs/change-control/CC-MAPPING-0-AUTH-013-EVIDENCE-REGISTRY-RECONCILIATION-2026-09-29.md",
-        "docs/change-control/CC-MAPPING-0-AUTH-013-PUBLIC-HTTP-E2E-SUCCESS-2026-09-29.md",
+        "contracts/evidence/mapping-0-evidence-registry.v1.json",
+        "docs/04-WORKER-MASTER-v1.0.md",
         "docs/MAPPING-0-CLOSURE-LEDGER.md",
-        "contracts/evidence/mapping-0-evidence-registry.v1.json"
+        "docs/change-control/CC-MAPPING-0-AUTH-013-EVIDENCE-REGISTRY-RECONCILIATION-2026-09-29.md",
+        "docs/change-control/CC-MAPPING-0-AUTH-013-PUBLIC-HTTP-E2E-SUCCESS-2026-09-29.md"
       ],
       "blockers": [
-        "Feature-wide lifecycle transition coverage remains incomplete beyond the proven ACTIVE → RESTRICTED public path; FROZEN/SUSPENDED/BANNED plus escalation/reinstatement/restore paths require bounded evidence.",
-        "Approval-required BANNED behavior and complete cache/deindex/feed/search convergence across contracted lifecycle states remain unproven at feature-wide scope.",
+        "Feature-wide lifecycle transition coverage remains incomplete beyond the proven remote ACTIVE → RESTRICTED → FROZEN → SUSPENDED → BANNED → RESTORED → ACTIVE matrix; deletion/recovery timeout paths and full feature-wide HTTP/security convergence still require bounded evidence.",
+        "Complete cache/deindex/feed/search convergence across contracted lifecycle states remains unproven at feature-wide scope.",
         "AUTH-013 remains PARTIAL until the remaining lifecycle/side-effect/evidence graph gates are reconciled."
       ]
     },
@@ -4417,8 +4456,8 @@
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md:L253",
         "contracts/alignment/mapping-batches/B13-B15-creator-membership-commerce.v1.json",
         "contracts/alignment/mapping-batches/MON-001-011-PAY-001-013-real-evidence-reconciliation.v1.md",
-        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
         "contracts/entity/SUBSCRIPTION-ENTITY-CONTRACT.v1.json",
+        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
         "docs/change-control/CC-MON-SUBSCRIPTION-DATA-MODEL-ADMISSION-2026-10-02.md"
       ],
       "blockers": [
@@ -4753,18 +4792,35 @@
     },
     {
       "featureId": "NOTIFY-002",
-      "status": "UNRESOLVED",
-      "entityIds": [],
-      "apiOperationIds": [],
+      "status": "PARTIAL",
+      "entityIds": [
+        "ENT-NOTIFICATION-PUSH-ENDPOINT"
+      ],
+      "apiOperationIds": [
+        "upsertPushEndpoint",
+        "deletePushEndpoint"
+      ],
       "payloadCollections": [],
-      "codeEvidenceRefs": [],
+      "codeEvidenceRefs": [
+        "workers/W01-payload/src/app/api/v1/push/endpoints/[installationId]/route.ts",
+        "workers/W01-payload/tests/int/push-endpoints-v1-adapter.int.spec.ts",
+        "workers/W05-social/src/index.ts",
+        "workers/W05-social/src/index.test.ts",
+        "workers/W05-social/src/push-endpoint-runtime.ts",
+        "workers/W05-social/src/push-endpoint-runtime.test.ts",
+        "workers/W09-platform/migrations-d1-03/0001_notification_push_endpoints.sql"
+      ],
       "evidence": [
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md:L228",
         "contracts/alignment/mapping-batches/MSG-001-008-NOTIFY-001-008-real-evidence-reconciliation.v1.md",
-        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
+        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
+        "contracts/persistence/NOTIFY-002-W05-D1-03-PUSH-ENDPOINT-PERSISTENCE.v1.json",
+        "docs/change-control/CC-T14-W05-D1-03-PUSH-ENDPOINT-REGISTRATION-2026-11-04.md",
+        "contracts/transport/d1-03-entity-owner-boundary.v1.json"
       ],
       "blockers": [
-        "Canonical Mapping record is materialized; API/Entity/Field/Persistence/Runtime mapping remains unresolved and must be closed in downstream reconciliation."
+        "W09 D1-03 remote migration and W05 delegated runtime binding deployment are pending.",
+        "Push sending, W10 delivery orchestration, receipts, and production security E2E are outside this module."
       ]
     },
     {
@@ -5281,19 +5337,50 @@
     },
     {
       "featureId": "PAY-001",
-      "status": "UNRESOLVED",
-      "entityIds": [],
-      "apiOperationIds": [],
+      "status": "PARTIAL",
+      "entityIds": [
+        "ENT-ORDER",
+        "ENT-PAYMENT"
+      ],
+      "apiOperationIds": [
+        "postPaymentsIntents"
+      ],
       "payloadCollections": [],
-      "codeEvidenceRefs": [],
+      "codeEvidenceRefs": [
+        "workers/W01-payload/src/app/api/v1/payments/intents/route.ts",
+        "workers/W01-payload/src/commerce/w07-commerce-client.ts",
+        "workers/W01-payload/src/subscription/w07-subscription-client.ts",
+        "workers/W01-payload/tests/int/payments-intent-v1-adapter.int.spec.ts",
+        "workers/W07-subscription-commerce/src/index.ts",
+        "workers/W07-subscription-commerce/src/payment-intent-http-runtime.ts",
+        "workers/W07-subscription-commerce/src/payment-intent-http-runtime.test.ts",
+        "workers/W07-subscription-commerce/src/hyperswitch-client.ts",
+        "workers/W07-subscription-commerce/src/hyperswitch-client.test.ts"
+      ],
       "evidence": [
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md:L265",
         "contracts/alignment/mapping-batches/B13-B15-creator-membership-commerce.v1.json",
         "contracts/alignment/mapping-batches/MON-001-011-PAY-001-013-real-evidence-reconciliation.v1.md",
-        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
+        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json",
+        "contracts/alignment/api-inventory.v1.json",
+        "contracts/alignment/code-evidence-inventory.v1.json",
+        "contracts/transport/W01-W07-membership-commerce-http-binding.v1.json",
+        "workers/W01-payload/src/app/api/v1/payments/intents/route.ts",
+        "workers/W01-payload/src/commerce/w07-commerce-client.ts",
+        "workers/W01-payload/src/subscription/w07-subscription-client.ts",
+        "workers/W01-payload/tests/int/payments-intent-v1-adapter.int.spec.ts",
+        "workers/W07-subscription-commerce/src/index.ts",
+        "workers/W07-subscription-commerce/src/payment-intent-http-runtime.ts",
+        "workers/W07-subscription-commerce/src/payment-intent-http-runtime.test.ts",
+        "workers/W07-subscription-commerce/src/hyperswitch-client.ts",
+        "workers/W07-subscription-commerce/src/hyperswitch-client.test.ts"
       ],
       "blockers": [
-        "Canonical Mapping record is materialized; API/Entity/Field/Persistence/Runtime mapping remains unresolved and must be closed in downstream reconciliation."
+        "The postPaymentsIntents public adapter and W07 payment-intent/Hyperswitch source plus automated tests are now linked; these establish code traceability only.",
+        "OpenAPI still marks this flow source-only pending the D1-04 migration and production secrets; live Hyperswitch payment E2E and postflight evidence are not admitted.",
+        "Provider-event, mandate, reconciliation, and successful-payment evidence remain separate acceptance gates. A payment intent or browser callback does not grant subscription entitlement."
       ]
     },
     {
@@ -5662,9 +5749,14 @@
     },
     {
       "featureId": "PRIV-002",
-      "status": "UNRESOLVED",
-      "entityIds": [],
-      "apiOperationIds": [],
+      "status": "PARTIAL",
+      "entityIds": [
+        "ENT-CONSENT",
+        "ENT-USER"
+      ],
+      "apiOperationIds": [
+        "authRegister"
+      ],
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
@@ -5673,7 +5765,8 @@
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
       ],
       "blockers": [
-        "Canonical Mapping record is materialized; API/Entity/Field/Persistence/Runtime mapping remains unresolved and must be closed in downstream reconciliation."
+        "Runtime persistence and physical mapping remain unverified.",
+        "Withdrawal runtime and evidence remain unverified."
       ]
     },
     {
@@ -5694,18 +5787,22 @@
     },
     {
       "featureId": "PRIV-004",
-      "status": "UNRESOLVED",
+      "status": "PARTIAL",
       "entityIds": [],
       "apiOperationIds": [],
       "payloadCollections": [],
       "codeEvidenceRefs": [],
       "evidence": [
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md:L579",
+        "artifacts/mapping-0/priv004-policy-instance-admission-packet-2026-09-27.json",
         "contracts/alignment/mapping-batches/PRIV-001-008-real-evidence-reconciliation.v1.md",
-        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md"
+        "contracts/privacy/PRIV-004-retention-policy-authority.v1.json",
+        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
+        "docs/change-control/CC-MAPPING-0-PRIV-004-RETENTION-POLICY-AUTHORITY-DECISION-PACKET-2026-09-27.md"
       ],
       "blockers": [
-        "Canonical Mapping record is materialized; API/Entity/Field/Persistence/Runtime mapping remains unresolved and must be closed in downstream reconciliation."
+        "Approved production policy instance for ACCOUNT_REGISTRATION / LEGAL_AUDIT is not yet admitted.",
+        "Runtime retention evaluation and executable evidence remain blocked until the first policy instance is admitted."
       ]
     },
     {
@@ -6927,15 +7024,15 @@
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md:L192",
         "contracts/alignment/mapping-batches/B10-B12-search-interaction-messaging.v1.json",
         "contracts/alignment/mapping-batches/SOCIAL-001-010-real-evidence-reconciliation.v1.md",
-        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
-        "contracts/openapi/v1/openapi.yaml#/social/follows",
         "contracts/api/interaction-operation-policy.v1.json",
-        "contracts/entity/SOCIAL-001-follow-relationship-contract.v1.json",
-        "docs/change-control/CC-MAPPING-0-SOCIAL-001-FOLLOW-ENTITY-CONTRACT-2026-09-30.md",
         "contracts/dto/auth-dto-contract.v1.json",
+        "contracts/entity/SOCIAL-001-follow-relationship-contract.v1.json",
+        "contracts/openapi/v1/openapi.yaml#/social/follows",
         "contracts/persistence/SOCIAL-001-follow-relationship-persistence-contract.v1.json",
+        "contracts/transport/SOCIAL-001-follow-trusted-authority-binding.v1.json",
         "contracts/transport/W01-W05-social-follow-http-binding.v1.json",
-        "contracts/transport/SOCIAL-001-follow-trusted-authority-binding.v1.json"
+        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
+        "docs/change-control/CC-MAPPING-0-SOCIAL-001-FOLLOW-ENTITY-CONTRACT-2026-09-30.md"
       ],
       "blockers": [
         "API and Entity/Field/Persistence contracts are bound.",
@@ -6958,10 +7055,10 @@
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md:L193",
         "contracts/alignment/mapping-batches/B10-B12-search-interaction-messaging.v1.json",
         "contracts/alignment/mapping-batches/SOCIAL-001-010-real-evidence-reconciliation.v1.md",
-        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
         "contracts/entity/SOCIAL-001-follow-relationship-contract.v1.json",
-        "docs/change-control/CC-MAPPING-0-SOCIAL-001-FOLLOW-ENTITY-CONTRACT-2026-09-30.md",
-        "contracts/persistence/SOCIAL-001-follow-relationship-persistence-contract.v1.json"
+        "contracts/persistence/SOCIAL-001-follow-relationship-persistence-contract.v1.json",
+        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
+        "docs/change-control/CC-MAPPING-0-SOCIAL-001-FOLLOW-ENTITY-CONTRACT-2026-09-30.md"
       ],
       "blockers": [
         "Canonical followers/following API/DTO/Field/Persistence/Payload/Runtime/Security/Lifecycle/Test/Evidence mapping remains unresolved; followers/following operations remain DISCOVERY_DRAFT."
@@ -7457,7 +7554,7 @@
     },
     {
       "featureId": "USER-001",
-      "status": "UNRESOLVED",
+      "status": "PARTIAL",
       "entityIds": [
         "ENT-USER"
       ],
@@ -7471,6 +7568,7 @@
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md:L51",
         "contracts/alignment/mapping-batches/B01-B03-identity-user-authz-org.v1.json",
         "contracts/alignment/mapping-batches/USER-001-006-evidence-bound-mapping-delta-2026-09-17.v1.json",
+        "contracts/alignment/mapping-batches/USER-001-010-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
         "workers/W01-payload/src/collections/Users.ts",
         "workers/W01-payload/src/payload.config.ts"
@@ -7545,7 +7643,7 @@
     },
     {
       "featureId": "USER-006",
-      "status": "UNRESOLVED",
+      "status": "PARTIAL",
       "entityIds": [],
       "apiOperationIds": [
         "blockUser",

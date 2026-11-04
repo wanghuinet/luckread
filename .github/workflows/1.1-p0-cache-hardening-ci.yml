@@ -18,6 +18,7 @@ on:
       - 'workers/W01-payload/src/app/api/v1/content/[contentId]/shares/route.ts'
       - 'workers/W01-payload/src/app/api/v1/shares/[shareId]/route.ts'
       - 'workers/W01-payload/src/social/w05-social-client.ts'
+      - 'workers/W01-payload/src/social/w05-social-transport.ts'
       - 'workers/W01-payload/src/app/api/v1/media/[mediaId]/route.ts'
       - 'contracts/resource-budget/1.0-d1-traffic-guard.v1.json'
       - '.github/workflows/1.1-p0-cache-hardening-ci.yml'
@@ -38,6 +39,7 @@ on:
       - 'workers/W01-payload/src/app/api/v1/content/[contentId]/shares/route.ts'
       - 'workers/W01-payload/src/app/api/v1/shares/[shareId]/route.ts'
       - 'workers/W01-payload/src/social/w05-social-client.ts'
+      - 'workers/W01-payload/src/social/w05-social-transport.ts'
       - 'workers/W01-payload/src/app/api/v1/media/[mediaId]/route.ts'
       - 'contracts/resource-budget/1.0-d1-traffic-guard.v1.json'
       - '.github/workflows/1.1-p0-cache-hardening-ci.yml'
@@ -118,7 +120,9 @@ jobs:
           assert 'invalidatePublicContentComments' in comments_route
           assert 'invalidatePublicContentComments' in comment_item_route
           assert 'X-LuckRead-Content-Id' in comment_item_route
-          assert 'X-LuckRead-Content-Id' in Path('workers/W01-payload/src/social/w05-social-client.ts').read_text()
+          w05_social_client = Path('workers/W01-payload/src/social/w05-social-client.ts').read_text()
+          w05_social_transport = Path('workers/W01-payload/src/social/w05-social-transport.ts').read_text()
+          assert 'X-LuckRead-Content-Id' in w05_social_client or 'X-LuckRead-Content-Id' in w05_social_transport
           assert 'MAX_QUERY_LENGTH = 4096' in guard
           assert 'MAX_CURSOR_LENGTH = 2048' in guard
           assert '^[A-Za-z0-9_-]+$' in guard

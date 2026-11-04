@@ -9,6 +9,7 @@ import {
 } from '../content/w03-content-client.js'
 import { extractSocialTokens } from './social-token-parser.js'
 import { relayW05Response } from './w05-response.js'
+import { createW05SocialCaller } from './w05-social-transport.js'
 
 type W05SocialService = {
   fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>
@@ -213,44 +214,4 @@ export async function callW05SocialPublic(input: {
   return relayW05Response(response, responseHeaders)
 }
 
-export async function callW05Social(input: {
-  request: Request
-  pathname: string
-  method: string
-  principal: ContentPrincipal
-  body?: unknown
-}): Promise<Response> {
-  const service = await getW05Service()
-  const headers = new Headers({
-    'X-LuckRead-Caller': 'W01',
-    'X-LuckRead-Transport-Version': '1.0',
-    'X-LuckRead-Correlation-Id': input.request.headers.get('X-LuckRead-Correlation-Id')?.trim() || crypto.randomUUID(),
-    'X-LuckRead-Principal-User-Id': input.principal.userId,
-  })
-  if (input.principal.layer) headers.set('X-LuckRead-Principal-Layer', input.principal.layer)
-  headers.set('X-LuckRead-Principal-Verified', input.principal.verified === true ? 'true' : 'false')
-  if (input.body !== undefined) headers.set('content-type', 'application/json; charset=utf-8')
-  const idempotencyKey = input.request.headers.get('Idempotency-Key')?.trim()
-  if (idempotencyKey) headers.set('Idempotency-Key', idempotencyKey)
-  const ifMatch = input.request.headers.get('If-Match')?.trim()
-  if (ifMatch) headers.set('If-Match', ifMatch)
-
-  const response = await service.fetch(
-    new Request('https://luckread-w05.internal' + input.pathname, {
-      method: input.method,
-      headers,
-      body: input.body === undefined ? undefined : JSON.stringify(input.body),
-    }),
-  )
-
-  const responseHeaders = new Headers({
-    'content-type': response.headers.get('content-type') ?? 'application/json; charset=utf-8',
-    'cache-control': 'no-store',
-  })
-  const etag = response.headers.get('etag')
-  if (etag) responseHeaders.set('etag', etag)
-  const contentId = response.headers.get('X-LuckRead-Content-Id')
-  if (contentId) responseHeaders.set('X-LuckRead-Content-Id', contentId)
-
-  return relayW05Response(response, responseHeaders)
-}
+export const callW05Social = createW05SocialCaller(getW05Service)

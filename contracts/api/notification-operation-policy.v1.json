@@ -1,0 +1,191 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/api/notification-operation-policy.json",
+  "title": "LuckRead Notification API Operation Policy",
+  "version": "1.0.0",
+  "domain": "notification",
+  "greenRule": "Notification endpoint registration is production-green only after identity derivation, token secrecy, D1-03 persistence, remote schema readback, deployment, rate limiting, and security E2E evidence are verified.",
+  "invariants": [
+    "Push endpoint ownership MUST be derived from the authenticated W02 principal, never from request data.",
+    "An app installation identifier is a correlation key only and MUST NOT become a trusted device, credential, or session record.",
+    "Push tokens are private routing addresses; they MUST NOT be returned by APIs or written to logs, URLs, analytics events, or error messages.",
+    "A denied or undetermined notification permission MUST clear the stored push token before the endpoint can be used for delivery.",
+    "Notification inbox, preference, and social-event authority remains in W05 D1-02; only push endpoint runtime routing state is stored in W05 scoped D1-03."
+  ],
+  "operations": [
+    {
+      "operationId": "upsertPushEndpoint",
+      "method": "PUT",
+      "path": "/push/endpoints/{installationId}",
+      "visibility": "public_authenticated",
+      "capability": "notification.push_endpoint.manage",
+      "status": "CONTRACTED_PARTIAL",
+      "authorization": {
+        "required": true,
+        "permission": "notification.update.self",
+        "scope": "actor_self"
+      },
+      "resource": {
+        "class": "SINGLE_AUTHORITATIVE_WRITE",
+        "d1ReadMax": 0,
+        "d1WriteMax": 1,
+        "d1ReadRowsMax": 0,
+        "d1WriteRowsMax": 1,
+        "rpcMax": 0,
+        "eventCountMax": 0
+      },
+      "cache": {
+        "mode": "NO_STORE",
+        "shared": false
+      },
+      "retry": {
+        "maxAttempts": 1,
+        "clientRetrySafe": true
+      },
+      "event": {
+        "syncConsumersMax": 0,
+        "asyncEventsMax": 0,
+        "fanoutMax": 0
+      },
+      "queue": {
+        "enqueueMax": 0,
+        "depthBounded": true
+      },
+      "antiAbuse": {
+        "required": true,
+        "scopes": [
+          "ip",
+          "account",
+          "endpoint",
+          "global"
+        ],
+        "actions": [
+          "ALLOW",
+          "THROTTLE",
+          "BLOCK"
+        ]
+      },
+      "idempotency": {
+        "required": true,
+        "naturalKey": "ownerUserId:installationId:operation",
+        "header": "Idempotency-Key",
+        "pattern": "^[A-Za-z0-9_-]{1,128}$",
+        "eventId": "evt_push_endpoint_sha256(UTF-8(JSON.stringify([userId, installationId, operation, idempotencyKey])))",
+        "duplicateResult": "W06 exact semantic intent replay returns 200; changed actor/target/operation/platform/permission facts return 409"
+      },
+      "state": {
+        "required": [
+          "authenticated_actor_active",
+          "interaction_layer_l2_or_higher"
+        ],
+        "terminal": "ACTIVE_OR_DISABLED"
+      },
+      "security": [
+        "actor_server_derived",
+        "installation_id_not_trusted_device",
+        "push_token_never_returned",
+        "push_token_never_logged",
+        "denied_permission_clears_token",
+        "cross_d1_reference_only",
+        "w06_intent_audit_before_w05_mutation"
+      ],
+      "evidence": {
+        "openapi": "PASS",
+        "permission": "PASS",
+        "state": "PASS",
+        "resource": "PASS",
+        "cache": "PASS",
+        "antiAbuse": "PASS",
+        "integration": "PASS",
+        "securityE2E": "MISSING"
+      },
+      "auditRequired": true
+    },
+    {
+      "operationId": "deletePushEndpoint",
+      "method": "DELETE",
+      "path": "/push/endpoints/{installationId}",
+      "visibility": "public_authenticated",
+      "capability": "notification.push_endpoint.manage",
+      "status": "CONTRACTED_PARTIAL",
+      "authorization": {
+        "required": true,
+        "permission": "notification.update.self",
+        "scope": "actor_self"
+      },
+      "resource": {
+        "class": "SINGLE_AUTHORITATIVE_WRITE",
+        "d1ReadMax": 0,
+        "d1WriteMax": 1,
+        "d1ReadRowsMax": 0,
+        "d1WriteRowsMax": 1,
+        "rpcMax": 0,
+        "eventCountMax": 0
+      },
+      "cache": {
+        "mode": "NO_STORE",
+        "shared": false
+      },
+      "retry": {
+        "maxAttempts": 1,
+        "clientRetrySafe": true
+      },
+      "event": {
+        "syncConsumersMax": 0,
+        "asyncEventsMax": 0,
+        "fanoutMax": 0
+      },
+      "queue": {
+        "enqueueMax": 0,
+        "depthBounded": true
+      },
+      "antiAbuse": {
+        "required": true,
+        "scopes": [
+          "ip",
+          "account",
+          "endpoint",
+          "global"
+        ],
+        "actions": [
+          "ALLOW",
+          "THROTTLE",
+          "BLOCK"
+        ]
+      },
+      "idempotency": {
+        "required": true,
+        "naturalKey": "ownerUserId:installationId:operation",
+        "header": "Idempotency-Key",
+        "pattern": "^[A-Za-z0-9_-]{1,128}$",
+        "eventId": "evt_push_endpoint_sha256(UTF-8(JSON.stringify([userId, installationId, operation, idempotencyKey])))",
+        "duplicateResult": "W06 exact semantic intent replay returns 200; changed actor/target/operation/platform/permission facts return 409"
+      },
+      "state": {
+        "required": [
+          "authenticated_actor_active",
+          "interaction_layer_l2_or_higher"
+        ],
+        "terminal": "DELETED_OR_ABSENT"
+      },
+      "security": [
+        "actor_server_derived",
+        "owner_scoped_delete",
+        "installation_id_not_trusted_device",
+        "no_auth_session_revocation",
+        "w06_intent_audit_before_w05_mutation"
+      ],
+      "evidence": {
+        "openapi": "PASS",
+        "permission": "PASS",
+        "state": "PASS",
+        "resource": "PASS",
+        "cache": "PASS",
+        "antiAbuse": "PASS",
+        "integration": "PASS",
+        "securityE2E": "MISSING"
+      },
+      "auditRequired": true
+    }
+  ]
+}
