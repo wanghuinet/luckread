@@ -88,6 +88,14 @@ test('notification taps resolve by server-owned notification ID and never trust 
   expect(notificationsScreenSource).toContain('const actorRoute = actor?.username || actor?.id || item.actorUserId');
 });
 
+test('retries the exact deep-linked notification lookup after a transient fetch failure', () => {
+  expect(notificationsScreenSource).toContain('handledDeepLinkIdRef.current = null;');
+  expect(notificationsScreenSource).toContain('setDeepLinkRetryNonce((current) => current + 1)');
+  expect(notificationsScreenSource).toContain('deepLinkRetryNonce');
+  expect(notificationsScreenSource).toContain('const retryNotificationLoad = useCallback(() => {');
+  expect(notificationsScreenSource).toContain('onPress={retryNotificationLoad}');
+});
+
 test('marks an individual notification as read with an encoded ID', async () => {
   await markNotificationRead('notification/with space');
 
