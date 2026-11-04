@@ -1,5 +1,12 @@
 /// <reference types="@cloudflare/workers-types" />
 import { describe, expect, it, vi } from 'vitest'
+
+// Cloudflare provides this virtual module in the Worker runtime. The unit tests
+// exercise the fetch entrypoint, not the WorkflowEntrypoint base class.
+vi.mock('cloudflare:workers', () => ({
+  WorkflowEntrypoint: class WorkflowEntrypoint {},
+}))
+
 import worker from './index.js'
 
 
