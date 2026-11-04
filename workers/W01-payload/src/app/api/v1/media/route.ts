@@ -6,6 +6,7 @@ import { POST as payloadMediaPost } from '../../../(payload)/api/[...slug]/route
 import { getBetterAuthPrincipal, W02AuthClientError } from '@/auth/w02-session-client'
 import { TrafficLimitError, enforcePublicReadRateLimit, enforceW01WriteRateLimit, rateLimitResponse } from '@/auth/traffic-limit'
 import { apiErrorResponse, appendRequestIdToJsonResponse, normalizeApiErrorResponse } from '@/lib/api-response'
+import { isCanonicalMediaDeliveryUrl } from '@/media/media-delivery'
 
 type PayloadRouteContext = Parameters<typeof payloadMediaPost>[1]
 
@@ -143,8 +144,16 @@ export async function GET(request: Request): Promise<Response> {
   const url = new URL(request.url)
   const requestedLimit = Number.parseInt(url.searchParams.get('limit') ?? '24', 10)
   const requestedPage = Number.parseInt(url.searchParams.get('page') ?? '1', 10)
+  const requestedUrls = url.searchParams.getAll('url')
+  if (
+    requestedUrls.length > 4 ||
+    requestedUrls.some((value) => !isCanonicalMediaDeliveryUrl(value))
+  ) {
+    return apiErrorResponse(422, 'VALIDATION_FAILED', 'Provide at most four canonical LuckRead media URLs')
+  }
+  const matchingUrls = [...new Set(requestedUrls)]
   const limit = Number.isFinite(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 50) : 24
-  const page = Number.isFinite(requestedPage) ? Math.max(requestedPage, 1) : 1
+  const page = matchingUrls.length > 0 ? 1 : Number.isFinite(requestedPage) ? Math.max(requestedPage, 1) : 1
 
   try {
     const payloadUserId = await resolvePayloadOwnerUserId(authenticated.payload, authenticated.identityId)
@@ -154,15 +163,39 @@ export async function GET(request: Request): Promise<Response> {
 
     const result = await authenticated.payload.find({
       collection: 'media',
-      where: { ownerUserId: { equals: payloadUserId } },
+      where: matchingUrls.length > 0
+        ? {
+            and: [
+              { ownerUserId: { equals: payloadUserId } },
+              { or: matchingUrls.map((mediaUrl) => ({ url: { equals: mediaUrl } })) },
+            ],
+          } as any
+        : { ownerUserId: { equals: payloadUserId } },
       sort: '-createdAt',
-      limit,
+      limit: matchingUrls.length > 0 ? matchingUrls.length : limit,
       page,
       depth: 0,
       overrideAccess: true,
     })
+    const responseValue = matchingUrls.length > 0
+      ? {
+          ...result,
+          docs: result.docs
+            .filter((doc) => typeof doc.url === 'string' && matchingUrls.includes(doc.url))
+            .map((doc) => ({
+              id: doc.id,
+              url: doc.url,
+              filename: doc.filename,
+              mimeType: doc.mimeType,
+              filesize: doc.filesize,
+              width: doc.width,
+              height: doc.height,
+              alt: doc.alt,
+            })),
+        }
+      : result
 
-    return await appendRequestIdToJsonResponse(new Response(JSON.stringify(result), {
+    return await appendRequestIdToJsonResponse(new Response(JSON.stringify(responseValue), {
       status: 200,
       headers: {
         'content-type': 'application/json; charset=utf-8',
