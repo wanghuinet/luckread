@@ -96,7 +96,7 @@
         "resource": "PASS",
         "cache": "PASS",
         "antiAbuse": "PASS",
-        "integration": "MISSING",
+        "integration": "PASS",
         "securityE2E": "MISSING"
       },
       "auditRequired": true
@@ -182,7 +182,7 @@
         "resource": "PASS",
         "cache": "PASS",
         "antiAbuse": "PASS",
-        "integration": "MISSING",
+        "integration": "PASS",
         "securityE2E": "MISSING"
       },
       "auditRequired": true

@@ -858,9 +858,9 @@
       ],
       "testRefs": [
         "workers/W01-payload/tests/int/push-endpoints-v1-adapter.int.spec.ts",
-        "workers/W01-payload/tests/int/push-endpoints-w05-binding.int.spec.ts",
         "workers/W05-social/src/index.test.ts",
-        "workers/W05-social/src/push-endpoint-runtime.test.ts"
+        "workers/W05-social/src/push-endpoint-runtime.test.ts",
+        "workers/W05-social/src/push-endpoint-w01-runtime.integration.test.ts"
       ],
       "schemaEvidenceRefs": [],
       "sourceRefs": [
@@ -3201,9 +3201,9 @@
       ],
       "testRefs": [
         "workers/W01-payload/tests/int/push-endpoints-v1-adapter.int.spec.ts",
-        "workers/W01-payload/tests/int/push-endpoints-w05-binding.int.spec.ts",
         "workers/W05-social/src/index.test.ts",
-        "workers/W05-social/src/push-endpoint-runtime.test.ts"
+        "workers/W05-social/src/push-endpoint-runtime.test.ts",
+        "workers/W05-social/src/push-endpoint-w01-runtime.integration.test.ts"
       ],
       "schemaEvidenceRefs": [],
       "sourceRefs": [
@@ -3382,9 +3382,9 @@
       ],
       "testRefs": [
         "workers/W01-payload/tests/int/push-endpoints-v1-adapter.int.spec.ts",
-        "workers/W01-payload/tests/int/push-endpoints-w05-binding.int.spec.ts",
         "workers/W05-social/src/index.test.ts",
-        "workers/W05-social/src/push-endpoint-runtime.test.ts"
+        "workers/W05-social/src/push-endpoint-runtime.test.ts",
+        "workers/W05-social/src/push-endpoint-w01-runtime.integration.test.ts"
       ],
       "schemaEvidenceRefs": [
         "contracts/entity/NOTIFICATION-PUSH-ENDPOINT-CONTRACT.v1.json",

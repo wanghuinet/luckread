@@ -116,5 +116,7 @@ console.log(JSON.stringify({
   entityOwners: Object.fromEntries(seen),
   auditEventOwner: contract.crossCutting.AuditEvent.owner,
   notificationPushEndpointOwner: seen.get('NotificationPushEndpoint'),
-  notificationPushEndpointDelegatedWriter: pushDelegation.delegatedWriter,\n  w05D1_03RuntimeReferences: d1_03References.length,\n  w09D1_03MigrationConfig: 'VERIFIED',
+  notificationPushEndpointDelegatedWriter: pushDelegation.delegatedWriter,
+  w05D1_03RuntimeReferences: d1_03References.length,
+  w09D1_03MigrationConfig: 'VERIFIED',
 }, null, 2))
