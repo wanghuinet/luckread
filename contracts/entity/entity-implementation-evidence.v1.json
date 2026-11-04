@@ -160,7 +160,7 @@
       ],
       "payloadNativeEvidenceRefs": [],
       "blockers": [
-        "W09 D1-03 remote migration is pending; W05 delegated runtime access remains unavailable until its scoped binding deployment is verified."
+        "W09 D1-03 remote migration and W05 delegated runtime binding deployment are pending."
       ],
       "status": "BLOCKED",
       "testEvidenceRefs": [
