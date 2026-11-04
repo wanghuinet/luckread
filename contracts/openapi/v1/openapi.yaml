@@ -1067,7 +1067,7 @@ paths:
                     maxItems: 50
                     items:
                       type: object
-                      required: [id, url, filename, mimeType, alt]
+                      required: [id, url, filename, mimeType]
                       properties:
                         id: { type: [string, integer] }
                         url: { type: string, format: uri }
@@ -1076,7 +1076,7 @@ paths:
                         filesize: { type: [integer, 'null'], minimum: 0 }
                         width: { type: [integer, 'null'], minimum: 1 }
                         height: { type: [integer, 'null'], minimum: 1 }
-                        alt: { type: string, maxLength: 1000 }
+                        alt: { type: [string, 'null'], maxLength: 1000 }
                   totalDocs: { type: integer }
                   page: { type: integer }
                   totalPages: { type: integer }
@@ -5621,7 +5621,7 @@ components:
       properties:
         id: { $ref: '#/components/schemas/ResourceId' }
         mimeType: { type: string }
-        alt: { type: string, maxLength: 1000 }
+        alt: { type: [string, 'null'], maxLength: 1000 }
         size: { type: integer, minimum: 1 }
         checksum: { type: string }
         status: { enum: [INITIATED, UPLOADING, READY, FAILED, QUARANTINED] }
