@@ -158,6 +158,10 @@ jobs:
         working-directory: workers/W05-social
         run: npm ci --ignore-scripts --no-audit --fund=false
 
+      - name: Validate W05 Notification Workflow bundle with Wrangler
+        working-directory: workers/W05-social
+        run: npx --yes wrangler@4.116.0 deploy --dry-run --outdir /tmp/w05-notify-003-dry-run
+
       - name: Typecheck durable W05 push delivery and Workflow modules
         working-directory: workers/W01-payload
         run: pnpm exec tsc --noEmit --target ES2022 --lib ES2022,DOM --module ESNext --moduleResolution Bundler --strict --skipLibCheck ../../workers/W05-social/src/notification-push-delivery-runtime.ts ../../workers/W05-social/src/notification-push-workflow-runtime.ts ../../workers/W05-social/src/notification-push-workflow.ts
