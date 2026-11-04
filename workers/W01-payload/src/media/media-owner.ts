@@ -7,6 +7,8 @@ export async function resolvePayloadOwnerUserId(
   payload: MediaOwnerPayload,
   identityId: string,
 ): Promise<string | null> {
+  if (!identityId.trim() || identityId.length > 256) return null
+
   const profileResult = await payload.find({
     collection: 'users',
     where: { identityId: { equals: identityId } },
