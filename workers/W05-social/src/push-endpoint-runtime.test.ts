@@ -54,7 +54,7 @@ describe('W05 notification push endpoint runtime', () => {
     const result = await upsertPushEndpoint(db, 'identity-user-1', installationId, {
       platform: 'android',
       permissionStatus: 'denied',
-      expoPushToken: null,
+      expoPushToken: pushToken,
     })
 
     expect(result).toEqual({ endpointId: 'endpoint-1', status: 'DISABLED' })
