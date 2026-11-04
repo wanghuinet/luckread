@@ -9,6 +9,7 @@ import {
 } from '../content/w03-content-client.js'
 import { extractSocialTokens } from './social-token-parser.js'
 import { relayW05Response } from './w05-response.js'
+import { createW05SocialCaller } from './w05-social-transport.js'
 
 type W05SocialService = {
   fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>
@@ -213,13 +214,7 @@ export async function callW05SocialPublic(input: {
   return relayW05Response(response, responseHeaders)
 }
 
-export async function callW05Social(input: {
-  request: Request
-  pathname: string
-  method: string
-  principal: ContentPrincipal
-  body?: unknown
-}): Promise<Response> {
+export const callW05Social = createW05SocialCaller(getW05Service)): Promise<Response> {
   const service = await getW05Service()
   const headers = new Headers({
     'X-LuckRead-Caller': 'W01',
