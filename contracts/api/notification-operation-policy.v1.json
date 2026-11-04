@@ -66,9 +66,10 @@
         ]
       },
       "idempotency": {
-        "required": false,
-        "naturalKey": "installationId",
-        "duplicateResult": "IDEMPOTENT_UPSERT"
+        "required": true,
+        "naturalKey": "ownerUserId:installationId:operation",
+        "header": "Idempotency-Key",
+        "duplicateResult": "EXACT_SEMANTIC_REPLAY"
       },
       "state": {
         "required": [
@@ -94,7 +95,8 @@
         "antiAbuse": "PASS",
         "integration": "MISSING",
         "securityE2E": "MISSING"
-      }
+      },
+      "auditRequired": true
     },
     {
       "operationId": "deletePushEndpoint",
@@ -149,9 +151,10 @@
         ]
       },
       "idempotency": {
-        "required": false,
-        "naturalKey": "ownerUserId:installationId",
-        "duplicateResult": "IDEMPOTENT_DELETE"
+        "required": true,
+        "naturalKey": "ownerUserId:installationId:operation",
+        "header": "Idempotency-Key",
+        "duplicateResult": "EXACT_SEMANTIC_REPLAY"
       },
       "state": {
         "required": [
@@ -175,7 +178,8 @@
         "antiAbuse": "PASS",
         "integration": "MISSING",
         "securityE2E": "MISSING"
-      }
+      },
+      "auditRequired": true
     }
   ]
 }
