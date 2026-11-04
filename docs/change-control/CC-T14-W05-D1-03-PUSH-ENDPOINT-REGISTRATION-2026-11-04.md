@@ -46,7 +46,7 @@ A denied or undetermined permission state clears any previously stored token, pr
 - `PUT /v1/push/endpoints/{installationId}`: idempotent, authenticated endpoint upsert.
 - `DELETE /v1/push/endpoints/{installationId}`: idempotent, owner-scoped deletion.
 
-Both operations enter W01, resolve the existing session, and call W05 through the already-existing W01→W05 Service Binding. W05 accepts only trusted W01 transport headers and L2+ principal context.
+Both operations enter W01, resolve the existing session through W02, and obtain a W08 CASL `notification.update.self` ALLOW for `Notification` with the server-derived self owner before calling W05 through the existing W01→W05 Service Binding. W08 independently validates the same session through W02/D1-01; W01 verifies the returned action, resource type, policy version, and layer. W05 accepts only trusted W01 transport headers and L2+ principal context. The W01→W08 call uses the existing `W08_CREATOR` binding; no new binding is added.
 
 ## Resource and deployment controls
 
