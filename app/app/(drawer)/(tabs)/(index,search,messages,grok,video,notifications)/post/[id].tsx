@@ -1,5 +1,5 @@
 import React, { useState, useRef, useMemo, useCallback, useEffect } from 'react';
-import { ActionSheetIOS, Alert, Platform, View, Text, ScrollView, TouchableOpacity, StyleSheet,  } from 'react-native';
+import { Alert, View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { useLocalSearchParams, Stack, useRouter } from 'expo-router';
 import { FeedItem, FeedContent } from '~/components/FeedItem';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -19,7 +19,7 @@ import {
     BottomSheetBackdrop
 } from '@gorhom/bottom-sheet';
 import { Feather } from '@expo/vector-icons';
-import { MenuView, type MenuAction } from '@react-native-menu/menu';
+import { MenuView, type MenuAction } from '@expo/ui/community/menu';
 import { useColorScheme } from 'nativewind';
 import { useTabBarScroll } from '~/components/TabBarScroll';
 
@@ -113,46 +113,21 @@ export const MoreContextIcons = ({
         }
     };
 
-    const showIosActionSheet = () => {
-        const available = actions.filter((action) => !action.attributes?.disabled);
-        const cancelButtonIndex = available.length;
-        const destructiveButtonIndex = available.findIndex((action) => action.attributes?.destructive);
-        ActionSheetIOS.showActionSheetWithOptions(
-            {
-                title: '@' + username,
-                options: [...available.map((action) => action.title), 'Cancel'],
-                cancelButtonIndex,
-                ...(destructiveButtonIndex >= 0 ? { destructiveButtonIndex } : {}),
-                userInterfaceStyle: isDark ? 'dark' : 'light',
-            },
-            (selectedIndex) => {
-                const selected = available[selectedIndex];
-                if (selected?.id) runMenuAction(selected.id);
-            },
-        );
-    };
-
     return (
         <View className="flex-row items-center gap-3">
             <TouchableOpacity onPress={() => router.back()}>
                 <Grok width={size === 'sm' ? 18 : 22} height={size === 'sm' ? 18 : 22} fill={isDark ? '#d1d5db' : '#536471'} />
             </TouchableOpacity>
-            {Platform.OS === 'android' ? (
-                <MenuView
-                    actions={actions}
-                    isAnchoredToRight
-                    onPressAction={({ nativeEvent }) => runMenuAction(nativeEvent.event)}
-                    style={{ width: size === 'sm' ? 28 : 32, height: size === 'sm' ? 28 : 32 }}
-                >
-                    <TouchableOpacity>
-                        <Feather name="more-horizontal" size={size === 'sm' ? 18 : 22} color={isDark ? '#d1d5db' : '#536471'} />
-                    </TouchableOpacity>
-                </MenuView>
-            ) : (
-                <TouchableOpacity onPress={showIosActionSheet}>
+            <MenuView
+                actions={actions}
+                colorScheme={isDark ? 'dark' : 'light'}
+                onPressAction={({ nativeEvent }) => runMenuAction(nativeEvent.event)}
+                style={{ width: size === 'sm' ? 28 : 32, height: size === 'sm' ? 28 : 32 }}
+            >
+                <View>
                     <Feather name="more-horizontal" size={size === 'sm' ? 18 : 22} color={isDark ? '#d1d5db' : '#536471'} />
-                </TouchableOpacity>
-            )}
+                </View>
+            </MenuView>
             <ReportPostDialog visible={reportDialogOpen} contentId={contentId} onClose={() => setReportDialogOpen(false)} />
         </View>
     );

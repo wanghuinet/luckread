@@ -1,9 +1,1 @@
-module.exports = {
-  dependencies: {
-    '@react-native-menu/menu': {
-      platforms: {
-        ios: null,
-      },
-    },
-  },
-};
+module.exports = {};
