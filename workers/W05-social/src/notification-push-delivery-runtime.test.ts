@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   calculatePushRetryDelaySeconds,
+  createPushMessageDeliveryIndex,
   deactivateInvalidEndpoint,
   isRetryableExpoError,
   notificationPushMessage,
@@ -35,6 +36,41 @@ describe('W05 durable Expo push delivery runtime', () => {
       data: { notificationId: 'notification-001', type: 'MENTION', targetType: 'content', targetId: 'content-001' },
     })
     expect(JSON.stringify(message.data)).not.toContain('private-token-value')
+  })
+
+
+  it('keeps distinct delivery tasks for multiple notifications sent to the same Expo token', () => {
+    const sharedToken = 'ExponentPushToken[shared_device_token_1234567890]'
+    const tasks = [
+      {
+        notificationId: 'notification-like-1',
+        pushToken: sharedToken,
+        notificationType: 'LIKE' as const,
+        targetType: 'content' as const,
+        targetId: 'content-1',
+      },
+      {
+        notificationId: 'notification-comment-2',
+        pushToken: sharedToken,
+        notificationType: 'COMMENT' as const,
+        targetType: 'content' as const,
+        targetId: 'content-2',
+      },
+    ]
+
+    const { messages, taskByMessage } = createPushMessageDeliveryIndex(tasks)
+    const chunk = messages.slice(0, 2)
+
+    expect(messages).toHaveLength(2)
+    expect(messages[0]?.to).toBe(sharedToken)
+    expect(messages[1]?.to).toBe(sharedToken)
+    expect(messages[0]).not.toBe(messages[1])
+    expect(taskByMessage.get(chunk[0]!)).toBe(tasks[0])
+    expect(taskByMessage.get(chunk[1]!)).toBe(tasks[1])
+    expect(messages.map((message) => message.data?.notificationId)).toEqual([
+      'notification-like-1',
+      'notification-comment-2',
+    ])
   })
 
   it('uses bounded exponential retry backoff', () => {
