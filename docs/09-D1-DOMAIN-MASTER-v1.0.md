@@ -113,6 +113,7 @@ D1-03 owns platform operational, governance and runtime state.
 - Reconciliation operation state
 - Platform runtime state
 - NotificationPushEndpoint (W05-owned Expo push routing endpoint state only)
+- NotificationPushEndpoint (W05-owned Expo push routing endpoint state only)
 
 ### Bounded Worker owner matrix
 
@@ -125,6 +126,7 @@ D1-03 owns platform operational, governance and runtime state.
 | RecoveryOperation | W09 | Recovery control state only |
 | ReconciliationOperation | W09 | Reconciliation control state only |
 | AuditEvent | W09 | Append-only platform audit events |
+| NotificationPushEndpoint | W05 | Scoped T14 push routing endpoint registry only |
 | NotificationPushEndpoint | W05 | Scoped T14 push routing endpoint registry only |
 | Job / Retry / DLQ | W10 | Async execution state only |
 | ExecutionInbox / ExecutionOutbox | W10 | Async delivery/execution records only |
@@ -140,6 +142,7 @@ Domain-local outbox/inbox/idempotency records remain in their source D1 and are 
 - Every authoritative D1-03 entity has exactly one primary Worker owner.
 - Audit records are append-oriented or controlled-state records and cannot be silently rewritten by ordinary business flows.
 - Runtime/job state does not become business authority.
+- W05 D1-03 access is limited to the T14 notification push endpoint registry; notification inbox, preferences, and social event writes remain in D1-02.
 - W05 D1-03 access is limited to the T14 notification push endpoint registry; W05 notification inbox and preferences remain in D1-02.
 - Campaign/growth operational state may remain in D1-03; analytics-derived counters and rollups belong to D1-05. Neither may become identity, content, social, entitlement or financial authority.
 
