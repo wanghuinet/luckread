@@ -122,16 +122,26 @@ jobs:
           if c.get('name') != 'luckread-w05':
               raise SystemExit('W05 worker name mismatch')
           ds = c.get('d1_databases', [])
-          if len(ds) != 1:
-              raise SystemExit(f'expected exactly one D1 binding, got {len(ds)}')
-          d = ds[0]
-          if d.get('binding') != 'DB':
-              raise SystemExit('unexpected D1 binding name')
-          if d.get('database_id') != '6c342634-97f6-4248-9f4a-85772af4f22c':
-              raise SystemExit('unexpected D1 database UUID')
-          if d.get('database_name') != 'luckreadpro':
-              raise SystemExit('unexpected D1 display name')
-          print(json.dumps(d, indent=2))
+          bindings = {item.get('binding'): item for item in ds}
+          if set(bindings) != {'DB', 'D1_03'}:
+              raise SystemExit(f'unexpected W05 D1 binding set: {sorted(bindings)}')
+          d = bindings['DB']
+          runtime = bindings['D1_03']
+          expected_db = {
+              'database_id': '6c342634-97f6-4248-9f4a-85772af4f22c',
+              'database_name': 'luckreadpro',
+              'migrations_dir': 'migrations',
+          }
+          expected_runtime = {
+              'database_id': 'bda1d247-a371-4244-91ae-aef96034db7f',
+              'database_name': 'secondary',
+              'migrations_dir': 'migrations-d1-03',
+          }
+          if d.get('binding') != 'DB' or any(d.get(k) != v for k, v in expected_db.items()):
+              raise SystemExit('W05 D1-02 DB binding mismatch')
+          if runtime.get('binding') != 'D1_03' or any(runtime.get(k) != v for k, v in expected_runtime.items()):
+              raise SystemExit('W05 scoped D1-03 binding mismatch')
+          print(json.dumps({'D1-02': d, 'D1-03': runtime}, indent=2))
           PY
           test -f migrations/20260930_001_social_001_follow_v1.sql
           test -z "$(git status --short)"
