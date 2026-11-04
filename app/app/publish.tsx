@@ -213,7 +213,6 @@ function PublishScreenContent() {
   const editLoadKeyRef = useRef('');
   const bodyInputRef = useRef<TextInput | null>(null);
   const pendingCaretRef = useRef<number | null>(null);
-  const topicSuggestionsLoadedRef = useRef(false);
 
   const activeComposerToken = findActiveComposerToken(body, textSelection.start);
 
@@ -1021,11 +1020,11 @@ function PublishScreenContent() {
   }, []);
 
   useEffect(() => {
-    if (activeComposerToken?.kind !== 'topic' || topicSuggestionsLoadedRef.current) return;
-    topicSuggestionsLoadedRef.current = true;
+    if (activeComposerToken?.kind !== 'topic') return;
     let active = true;
+    const controller = new AbortController();
     setTopicSuggestionsLoading(true);
-    void fetchDiscoveryTopics().then((result) => {
+    void fetchDiscoveryTopics(controller.signal).then((result) => {
       if (!result.response.ok) throw new Error('Topics unavailable');
       const root = result.data as { data?: { items?: unknown[] } } | null;
       const items = Array.isArray(root?.data?.items) ? root.data.items : [];
@@ -1036,12 +1035,15 @@ function PublishScreenContent() {
         return typeof value.topicId === 'string' && typeof value.name === 'string' && typeof value.displayName === 'string';
       }));
     }).catch(() => {
-      if (active) topicSuggestionsLoadedRef.current = false;
+      if (active) setTopicSuggestions([]);
     }).finally(() => {
       if (active) setTopicSuggestionsLoading(false);
     });
-    return () => { active = false; };
-  }, [activeComposerToken?.kind, activeComposerToken?.query]);
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [activeComposerToken?.kind]);
 
   useEffect(() => {
     const query = activeComposerToken?.kind === 'mention' ? activeComposerToken.query : '';
