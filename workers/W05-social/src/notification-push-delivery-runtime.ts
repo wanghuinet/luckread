@@ -1,6 +1,9 @@
 /// <reference types="@cloudflare/workers-types" />
 import Expo, { type ExpoPushMessage, type ExpoPushReceipt, type ExpoPushTicket } from 'expo-server-sdk'
 
+type PushReceiptLike = ExpoPushReceipt
+type PushTicketLike = ExpoPushTicket
+
 export interface NotificationPushDeliveryEnv {
   readonly DB: D1Database
   readonly D1_03?: D1Database
@@ -28,6 +31,7 @@ const DELIVERY_LIMIT = 100
 const RECEIPT_LIMIT = 300
 const ENDPOINT_LIMIT = 20
 const MAX_SEND_ATTEMPTS = 6
+const MAX_RECEIPT_POLLS = 24
 const LEASE_SECONDS = 180
 const RECEIPT_DELAY_SECONDS = 15 * 60
 const RECEIPT_RETRY_SECONDS = 5 * 60
