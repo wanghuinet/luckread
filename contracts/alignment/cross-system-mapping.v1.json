@@ -4838,6 +4838,14 @@
       "blockers": [
         "W05 D1-03 remote migration and live scoped binding deployment are pending.",
         "Push sending, W10 delivery orchestration, receipts, and production security E2E are outside this module."
+      ],
+      "affectedSystems": [
+        "API",
+        "AUTHORIZATION",
+        "CODE",
+        "DB",
+        "MIGRATION",
+        "TEST"
       ]
     },
     {
