@@ -142,6 +142,7 @@ export async function upsertPushEndpoint(
          app_version = excluded.app_version,
          updated_at = excluded.updated_at,
          last_seen_at = excluded.last_seen_at
+       WHERE notification_push_endpoints.owner_user_id = excluded.owner_user_id
        RETURNING endpoint_id, permission_status`,
     ).bind(
       endpointId,
@@ -156,7 +157,7 @@ export async function upsertPushEndpoint(
       now,
     ).first<PushEndpointRow>()
 
-    if (!row?.endpoint_id) throw new PushEndpointRuntimeError('SERVICE_UNAVAILABLE', 503)
+    if (!row?.endpoint_id) throw new PushEndpointRuntimeError('CONFLICT', 409)
     return {
       endpointId: row.endpoint_id,
       status: row.permission_status === 'granted' ? 'ACTIVE' : 'DISABLED',
