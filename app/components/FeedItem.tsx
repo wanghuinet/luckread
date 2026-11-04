@@ -192,7 +192,7 @@ const FeedMediaGallery = ({
     const { width, height } = useWindowDimensions();
     const insets = useSafeAreaInsets();
     const altTextRequestKey = JSON.stringify(
-        items.filter((media) => media.kind === 'image' && !media.alt).slice(0, 4).map((media) => media.src),
+        items.filter((media) => media.kind === 'image' && !media.alt?.trim()).slice(0, 4).map((media) => media.src),
     );
 
     useEffect(() => {
