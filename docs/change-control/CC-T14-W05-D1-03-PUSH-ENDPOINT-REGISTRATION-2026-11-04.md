@@ -6,7 +6,7 @@
 
 ## Scope
 
-Admit one narrowly scoped W05 D1-03 runtime entity for Expo push endpoint registration and self-service deletion under existing T14 Notification ownership.
+Admit one W09-owned D1-03 platform runtime entity for Expo push routing, with a narrowly scoped W05/T14 delegated writer for registration and self-service deletion.
 
 This slice does not implement push sending, W10 scheduling, Queue delivery, notification preferences, in-app notification storage, or authentication device/session management.
 
@@ -19,10 +19,10 @@ This slice does not implement push sending, W10 scheduling, Queue delivery, noti
 
 ## Decision
 
-1. Register `ENT-NOTIFICATION-PUSH-ENDPOINT` as a W05-owned, scoped D1-03 runtime delivery entity.
+1. Register `ENT-NOTIFICATION-PUSH-ENDPOINT` as a W09/T25-owned D1-03 platform runtime entity; grant W05/T14 only the explicit self-service writer delegation recorded in `contracts/transport/d1-03-entity-owner-boundary.v1.json`.
 2. Keep social notification inbox, notification preferences, read/unread state, and social event generation in existing W05 D1-02.
 3. Keep authentication sessions, trusted devices, account identity, and session revocation in W02/D1-01. An `installation_id` is an app-generated correlation key only; it is not an authentication factor or trusted device identifier.
-4. Add only the existing D1-03 database as a second D1 binding on W05. Preserve existing D1-02 binding and its `migrations/` directory unchanged.
+4. Add only the existing D1-03 database as a second, scoped D1 binding on W05 to execute the approved W05/T14 delegation. W09 remains the primary owner. Preserve existing D1-02 binding and its `migrations/` directory unchanged.
 5. Set `migrations_dir=migrations-d1-03` only on W05's D1-03 binding. The controlled migration workflow targets the existing database name `secondary` and verifies the remote schema before the Worker is deployed with the new binding.
 6. No Service Binding, Worker, D1 database, Queue, KV namespace, or Payload Core change is introduced.
 
