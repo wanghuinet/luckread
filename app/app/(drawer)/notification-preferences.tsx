@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  AppState,
+  Linking,
   Pressable,
   ScrollView,
   Switch,
@@ -20,6 +22,11 @@ import {
   type NotificationPreferences,
 } from '~/lib/notification-preferences-api';
 import { useAuthStore } from '~/store/auth-store';
+import {
+  getDevicePushPermission,
+  requestDevicePushPermission,
+  type DevicePushPermission,
+} from '~/lib/push-notifications';
 
 const PRIMARY = '#1d9bf0';
 
@@ -64,6 +71,7 @@ export default function NotificationPreferencesScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const authStatus = useAuthStore((state) => state.status);
+  const accountId = useAuthStore((state) => state.user?.id ?? null);
   const [preferences, setPreferences] = useState<NotificationPreferences | null>(null);
   const [savedPreferences, setSavedPreferences] = useState<NotificationPreferences | null>(null);
   const [loading, setLoading] = useState(true);
@@ -72,6 +80,15 @@ export default function NotificationPreferencesScreen() {
   const [message, setMessage] = useState('');
   const [authRequired, setAuthRequired] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
+  const [devicePushPermission, setDevicePushPermission] = useState<DevicePushPermission>({
+    supported: true,
+    status: 'undetermined',
+    canAskAgain: true,
+  });
+  const [devicePushBusy, setDevicePushBusy] = useState(false);
+  const [devicePushError, setDevicePushError] = useState('');
+  const [devicePushMessage, setDevicePushMessage] = useState('');
+
 
   useEffect(() => {
     if (authStatus === 'loading') return;
@@ -115,6 +132,77 @@ export default function NotificationPreferencesScreen() {
       controller.abort();
     };
   }, [authStatus, retryKey]);
+
+
+  useEffect(() => {
+    let active = true;
+    const refreshDevicePushPermission = () => {
+      void getDevicePushPermission()
+        .then((permission) => {
+          if (active) setDevicePushPermission(permission);
+        })
+        .catch(() => {
+          if (active) {
+            setDevicePushPermission({
+              supported: false,
+              status: 'undetermined',
+              canAskAgain: false,
+            });
+          }
+        });
+    };
+
+    refreshDevicePushPermission();
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') refreshDevicePushPermission();
+    });
+    return () => {
+      active = false;
+      subscription.remove();
+    };
+  }, []);
+
+  const enableDevicePush = useCallback(async () => {
+    if (!accountId || devicePushBusy || !devicePushPermission.supported) return;
+    setDevicePushBusy(true);
+    setDevicePushError('');
+    setDevicePushMessage('');
+    try {
+      if (devicePushPermission.status === 'denied' && !devicePushPermission.canAskAgain) {
+        await Linking.openSettings();
+        return;
+      }
+
+      const result = await requestDevicePushPermission(accountId);
+      const permission = await getDevicePushPermission();
+      setDevicePushPermission(permission);
+
+      if (result === 'enabled') {
+        setDevicePushMessage('此设备的推送通知已启用，令牌已通过 LuckRead 安全接口同步。');
+      } else if (result === 'settings-required') {
+        setDevicePushMessage('系统已禁止再次询问，请在系统设置中允许 LuckRead 通知。');
+      } else if (result === 'denied') {
+        setDevicePushMessage('你尚未允许系统通知；可以随时在系统设置中更改。');
+      } else if (result === 'unsupported') {
+        setDevicePushError('设备推送仅支持安装版 iOS 或 Android APP。');
+      } else {
+        setDevicePushMessage('尚未授予通知权限。');
+      }
+    } catch (cause) {
+      setDevicePushError(cause instanceof Error ? cause.message : '无法启用此设备的推送通知，请重试。');
+    } finally {
+      setDevicePushBusy(false);
+    }
+  }, [accountId, devicePushBusy, devicePushPermission]);
+
+  const openSystemNotificationSettings = useCallback(async () => {
+    setDevicePushError('');
+    try {
+      await Linking.openSettings();
+    } catch {
+      setDevicePushError('无法打开系统设置，请在设备设置中找到 LuckRead 的通知权限。');
+    }
+  }, []);
 
   const dirty = useMemo(
     () => !equalPreferences(preferences, savedPreferences),
@@ -209,6 +297,49 @@ export default function NotificationPreferencesScreen() {
             <Text className="text-sm leading-6 text-neutral-500 dark:text-neutral-400">
               选择哪些社交活动可以通知你。保存后设置会同步到你的账号，并用于后续通知投递。
             </Text>
+          </View>
+
+          <View className="mx-4 mb-3 rounded-2xl border border-neutral-200 px-4 py-4 dark:border-neutral-800">
+            <Text className="text-base font-bold text-neutral-900 dark:text-white">此设备的推送通知</Text>
+            <Text className="mt-1 text-sm leading-5 text-neutral-500 dark:text-neutral-400">
+              {devicePushPermission.supported
+                ? devicePushPermission.status === 'granted'
+                  ? '系统已允许通知。登录期间，LuckRead 会自动同步此设备的推送地址。'
+                  : devicePushPermission.status === 'denied'
+                    ? '系统当前禁止通知。启用前可能需要到设备设置中重新允许。'
+                    : '开启后，LuckRead 才会向系统申请通知权限；不会在后台自动弹出授权请求。'
+                : '此功能仅支持安装版 iOS 或 Android APP。'}
+            </Text>
+            {devicePushError ? (
+              <Text accessibilityRole="alert" className="mt-3 text-sm text-red-600">{devicePushError}</Text>
+            ) : null}
+            {devicePushMessage ? (
+              <Text accessibilityRole="text" className="mt-3 text-sm text-emerald-600">{devicePushMessage}</Text>
+            ) : null}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ disabled: devicePushBusy || !devicePushPermission.supported || !accountId }}
+              disabled={devicePushBusy || !devicePushPermission.supported || !accountId}
+              onPress={() => void enableDevicePush()}
+              className="mt-3 min-h-11 items-center justify-center rounded-full bg-sky-500 px-5 py-2.5"
+            >
+              {devicePushBusy ? <ActivityIndicator color="#ffffff" /> : (
+                <Text className="font-bold text-white">
+                  {devicePushPermission.status === 'denied' && !devicePushPermission.canAskAgain
+                    ? '打开系统设置'
+                    : devicePushPermission.status === 'granted'
+                      ? '重新同步设备推送'
+                      : '启用设备推送'}
+                </Text>
+              )}
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => void openSystemNotificationSettings()}
+              className="mt-2 min-h-10 items-center justify-center rounded-full px-5 py-2"
+            >
+              <Text className="font-semibold text-sky-600 dark:text-sky-400">管理系统通知</Text>
+            </Pressable>
           </View>
 
           {OPTIONS.map((option) => (
