@@ -122,6 +122,8 @@
       "required": true,
       "endpoint_groups": [
         "DELETE /v1/media/{mediaId}",
+        "GET /v1/media",
+        "GET /v1/media/metadata",
         "GET /v1/media/{mediaId}",
         "GET /v1/media/{mediaId}/playback",
         "GET /v1/media/{mediaId}/processing",
