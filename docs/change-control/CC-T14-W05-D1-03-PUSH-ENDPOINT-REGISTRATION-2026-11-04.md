@@ -59,6 +59,6 @@ Both operations enter W01, resolve the existing session, and call W05 through th
 ## Acceptance
 
 - W05 unit tests prove actor identity is server-derived, token is not returned, token collision fails generically, disabled permission clears token, and deletion is owner-scoped.
-- W01 tests prove bearer/cookie session principal resolution, write rate limiting before auth, and no direct D1/Payload access.
+- W01 handler tests prove the route delegates principal resolution to the existing W02-backed social session resolver, applies origin/IP → actor-account → fixed-endpoint write limits in order, and forwards only through W05. Direct W02 session acceptance and deployed W01→W05 binding behavior remain production security E2E prerequisites.
 - CI statically verifies the exact D1-02 + D1-03 binding UUIDs and separate migration directories.
 - Remote migration and Worker deployment remain pending until their explicit workflow_dispatch gates are run against a merged main SHA.
