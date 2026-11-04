@@ -194,6 +194,9 @@ test('native publisher auto-saves server drafts, restores them by draft ID, and 
   expect(composer).toContain('draftSaveInFlightPromiseRef.current');
   expect(composer).toContain('await saveDraftSnapshot();');
   expect(composer).toContain("onPress={() => { void closeComposer(); }}");
+  expect(composer).toContain("usePreventRemove(shouldPreventRemove, handlePreventRemove)");
+  expect(composer).toContain('navigation.dispatch(data.action)');
+  expect(composer).toContain('draftWasPublishedRef.current = true');
   expect(composer).toContain("to: 'PUBLISHED'");
   expect(composer).toContain('fetchContentBodyReference');
   expect(composer).toContain('draftSavedFingerprintRef.current = fingerprint;');
