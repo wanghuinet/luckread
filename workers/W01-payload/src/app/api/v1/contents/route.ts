@@ -26,6 +26,22 @@ export async function GET(request: Request): Promise<Response> {
     const url = new URL(request.url)
     const query = validateContentListQuery(url)
     const suffix = query.toString() ? `?${query.toString()}` : ''
+    const ownerDraftRequest = query.get('status') === 'DRAFT'
+
+    // A private draft-list request is never anonymous and never cacheable.
+    if (ownerDraftRequest) {
+      if (!hasAuthenticatedSessionCredential(request)) {
+        return unavailable(new W03ContentClientError(401, 'UNAUTHENTICATED', 'Authentication required'))
+      }
+      const principal = await resolveCookieContentPrincipal(request)
+      if (principal instanceof Response) return principal
+      return await callW03Content({
+        request,
+        pathname: `/internal/content/contents${suffix}`,
+        method: 'GET',
+        principal,
+      })
+    }
 
     // Never put an authenticated request into the shared public cache. This
     // includes both the Payload auth cookie and Authorization credentials.

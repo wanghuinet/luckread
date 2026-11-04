@@ -20,7 +20,7 @@
     "targetWorker": "luckread-w03",
     "publicExposure": false
   },
-  "wireRule": "W01 maps the public /api/v1/contents family to the exact internal operations below; Creator Center also uses the authenticated application route /api/creator/contents for owner-scoped reads; W03 never owns a public API namespace.",
+  "wireRule": "W01 maps the public /api/v1/contents family to the exact internal operations below; status=DRAFT is an authenticated owner-only social post list scoped by W03 to the W02 principal and must bypass shared public caching. Creator Center also uses the authenticated application route /api/creator/contents for owner-scoped reads; W03 never owns a public API namespace.",
   "operations": [
     {
       "operationId": "listContents",
@@ -28,7 +28,8 @@
       "publicPath": "/api/v1/contents",
       "internalPath": "/internal/content/contents",
       "principalRequired": false,
-      "idempotency": false
+      "idempotency": false,
+      "conditionalPrincipal": "For status=DRAFT, W01 must authenticate via W02; W03 requires L2+ and returns only caller-owned DRAFT posts. The request is never shared-cache eligible."
     },
     {
       "operationId": "listCreatorContents",

@@ -1381,6 +1381,102 @@ describe('W03 content contract core', () => {
   })
 
 
+
+  it('lists native social drafts only for the authenticated owner at L2+', async () => {
+    const row = {
+      id: 'native_draft_123',
+      content_type: 'post',
+      owner_user_id: 'user_draft_owner',
+      creator_id: 'user_draft_owner',
+      ip_id: null,
+      state: 'DRAFT',
+      scheduled_at: null,
+      access_mode: 'MEMBERS_ONLY',
+      version: 4,
+      revision: 4,
+      slug: 'native-draft-123',
+      title: 'Private draft body',
+      body_ref: 'https://img.luckread.com/drafts/body.txt',
+      media_refs_json: '["https://img.luckread.com/drafts/photo.jpg"]',
+      cover_ref: 'https://img.luckread.com/drafts/photo.jpg',
+      etag: 'W/"4"',
+      created_at: '2026-11-04T12:00:00.000Z',
+      updated_at: '2026-11-04T12:04:00.000Z',
+      idem_id: null,
+      idem_owner_user_id: null,
+      idem_request_hash: null,
+      idem_status: null,
+      idem_response_status: null,
+      idem_response_json: null,
+      idem_expires_at: null,
+    };
+    const statements: Array<{ query: string; bindings: unknown[] }> = [];
+    const db = {
+      prepare(query: string) {
+        return {
+          bind: (...bindings: unknown[]) => ({
+            all: async () => {
+              statements.push({ query, bindings });
+              return { results: [row] };
+            },
+          }),
+        };
+      },
+    } as never;
+
+    const response = await w03Worker.fetch(
+      new Request('https://luckread-w03.internal/internal/content/contents?status=DRAFT&type=post&limit=20', {
+        headers: {
+          'X-LuckRead-Caller': 'W01',
+          'X-LuckRead-Transport-Version': '1.0',
+          'X-LuckRead-Correlation-Id': 'native-draft-list',
+          'X-LuckRead-Principal-User-Id': 'user_draft_owner',
+          'X-LuckRead-Principal-Layer': 'L2',
+        },
+      }),
+      { D1_02: db },
+      {} as never,
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      data: {
+        items: [{
+          id: 'native_draft_123',
+          contentType: 'post',
+          state: 'DRAFT',
+          accessMode: 'MEMBERS_ONLY',
+          bodyRef: 'https://img.luckread.com/drafts/body.txt',
+          mediaRefs: ['https://img.luckread.com/drafts/photo.jpg'],
+          etag: 'W/"4"',
+        }],
+        hasMore: false,
+        nextCursor: null,
+      },
+    });
+    expect(statements).toHaveLength(1);
+    expect(statements[0]?.query).toContain('owner_user_id = ?');
+    expect(statements[0]?.query).toContain('state = ?');
+    expect(statements[0]?.query).toContain('content_type = ?');
+    expect(statements[0]?.bindings.slice(0, 3)).toEqual(['user_draft_owner', 'DRAFT', 'post']);
+
+    const denied = await w03Worker.fetch(
+      new Request('https://luckread-w03.internal/internal/content/contents?status=DRAFT&type=post', {
+        headers: {
+          'X-LuckRead-Caller': 'W01',
+          'X-LuckRead-Transport-Version': '1.0',
+          'X-LuckRead-Correlation-Id': 'native-draft-list-denied',
+          'X-LuckRead-Principal-User-Id': 'user_draft_owner',
+          'X-LuckRead-Principal-Layer': 'L1',
+        },
+      }),
+      { D1_02: db },
+      {} as never,
+    );
+    expect(denied.status).toBe(403);
+    expect(statements).toHaveLength(1);
+  });
+
   it('returns the canonical error envelope for an unmatched internal route', async () => {
     const db = {
       prepare() {

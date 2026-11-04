@@ -3,6 +3,8 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Modal,
+  FlatList,
   Pressable,
   StyleSheet,
   Text,
@@ -32,6 +34,17 @@ import {
 } from '~/lib/publish-api';
 import { prepareImageForUpload } from '~/lib/image-upload-preparation';
 import { useAuthStore } from '~/store/auth-store';
+import {
+  deleteOwnPostDraft,
+  fetchDiscoveryTopics,
+  fetchOwnPostDraftsPage,
+  findPublicUserByUsername,
+  type NativePostDraft,
+} from '~/lib/social-screen-api';
+import {
+  findActiveComposerToken,
+  replaceActiveComposerToken,
+} from '~/lib/publish-composer-tokens';
 
 type ContentRecord = {
   id: string;
@@ -71,6 +84,19 @@ type ComposerAsset = {
 };
 
 type PollDurationHours = 24 | 72 | 168;
+
+type DiscoveryTopicOption = {
+  topicId: string;
+  name: string;
+  displayName: string;
+  contentCount: number;
+};
+
+type MentionSuggestion = {
+  username: string;
+  displayName: string | null;
+  avatar: string | null;
+};
 
 type SubmitAttempt = {
   fingerprint: string;
@@ -152,6 +178,18 @@ function PublishScreenContent() {
   const [pollOptions, setPollOptions] = useState<string[]>(['', '']);
   const [pollDurationHours, setPollDurationHours] = useState<PollDurationHours>(24);
   const [draftSaveStatus, setDraftSaveStatus] = useState<'idle' | 'scheduled' | 'saving' | 'saved' | 'error'>('idle');
+  const [draftInboxVisible, setDraftInboxVisible] = useState(false);
+  const [draftInboxItems, setDraftInboxItems] = useState<NativePostDraft[]>([]);
+  const [draftInboxCursor, setDraftInboxCursor] = useState<string | null>(null);
+  const [draftInboxHasMore, setDraftInboxHasMore] = useState(false);
+  const [draftInboxLoading, setDraftInboxLoading] = useState(false);
+  const [draftInboxError, setDraftInboxError] = useState('');
+  const [deletingDraftId, setDeletingDraftId] = useState<string | null>(null);
+  const [textSelection, setTextSelection] = useState({ start: 0, end: 0 });
+  const [topicSuggestions, setTopicSuggestions] = useState<DiscoveryTopicOption[]>([]);
+  const [topicSuggestionsLoading, setTopicSuggestionsLoading] = useState(false);
+  const [mentionSuggestion, setMentionSuggestion] = useState<MentionSuggestion | null>(null);
+  const [mentionLookupLoading, setMentionLookupLoading] = useState(false);
 
   const recordRef = useRef<ContentRecord | null>(null);
   const draftSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -173,6 +211,10 @@ function PublishScreenContent() {
   const bodyUploadRef = useRef<{ text: string; key: string; uploaded?: UploadedMedia } | null>(null);
   const submitAttemptRef = useRef<SubmitAttempt | null>(null);
   const editLoadKeyRef = useRef('');
+  const bodyInputRef = useRef<React.ElementRef<typeof TextInput>>(null);
+  const pendingCaretRef = useRef<number | null>(null);
+
+  const activeComposerToken = findActiveComposerToken(body, textSelection.start);
 
   const updateAsset = useCallback((localId: string, patch: Partial<ComposerAsset>) => {
     setAssets((current) => current.map((asset) => asset.localId === localId ? { ...asset, ...patch } : asset));
@@ -834,6 +876,226 @@ function PublishScreenContent() {
     saveDraftSnapshot,
   ]);
 
+  const loadDraftInbox = useCallback(async (cursor: string | null = null, append = false) => {
+    setDraftInboxLoading(true);
+    setDraftInboxError('');
+    try {
+      const result = await fetchOwnPostDraftsPage({ cursor, limit: 20 });
+      if (!result.response.ok) throw new Error(apiFailureDiagnostic(result, '暂时无法加载草稿箱。'));
+      const page = result.data && 'data' in result.data ? result.data.data : undefined;
+      if (!page || !Array.isArray(page.items)) throw new Error('草稿箱返回的数据格式无效。');
+      setDraftInboxItems((current) => {
+        if (!append) return page.items;
+        const known = new Set(current.map((item) => item.id));
+        return [...current, ...page.items.filter((item) => !known.has(item.id))];
+      });
+      setDraftInboxCursor(page.nextCursor || null);
+      setDraftInboxHasMore(page.hasMore === true);
+    } catch (cause) {
+      setDraftInboxError(cause instanceof Error ? cause.message : '暂时无法加载草稿箱。');
+    } finally {
+      setDraftInboxLoading(false);
+    }
+  }, []);
+
+  const openDraftInbox = useCallback(async () => {
+    if (busy || loadingEdit || publishPending) return;
+    setDraftInboxVisible(true);
+    setDraftInboxError('');
+    if (draftSaveTimerRef.current) {
+      clearTimeout(draftSaveTimerRef.current);
+      draftSaveTimerRef.current = null;
+    }
+    if (!contentId && draftSaveDirtyRef.current) {
+      draftSaveChangeTokenRef.current += 1;
+      const pendingSave = draftSaveInFlightPromiseRef.current;
+      if (pendingSave) await pendingSave;
+      try {
+        await saveDraftSnapshot();
+        draftSaveDirtyRef.current = false;
+        setDraftSaveStatus('saved');
+      } catch (cause) {
+        setDraftInboxError(cause instanceof Error ? cause.message : '当前草稿保存失败，请先检查网络。');
+        return;
+      }
+    }
+    await loadDraftInbox(null, false);
+  }, [busy, contentId, loadDraftInbox, loadingEdit, publishPending, saveDraftSnapshot]);
+
+  const restoreDraftFromInbox = useCallback((draft: NativePostDraft) => {
+    setDraftInboxVisible(false);
+    if (draftId === draft.id) return;
+    if (draftSaveTimerRef.current) {
+      clearTimeout(draftSaveTimerRef.current);
+      draftSaveTimerRef.current = null;
+    }
+    draftSaveDirtyRef.current = false;
+    draftSaveRestoreCompleteRef.current = false;
+    draftSavedFingerprintRef.current = '';
+    draftCreatePendingRef.current = null;
+    draftCreateKeyRef.current = '';
+    recordRef.current = null;
+    editLoadKeyRef.current = '';
+    pollConfiguredRef.current = false;
+    draftWasPublishedRef.current = false;
+    setBody('');
+    setAssets([]);
+    setCoverRef('');
+    setAccessMode('PUBLIC');
+    setPollEnabled(false);
+    setPollOptions(['', '']);
+    setErrorMessage('');
+    setStatusMessage('');
+    setDraftSaveStatus('idle');
+    router.setParams({ contentId: undefined, draftId: draft.id } as never);
+  }, [draftId, router]);
+
+  const removeDraftFromInbox = useCallback((draft: NativePostDraft) => {
+    Alert.alert('删除草稿', '删除后无法恢复这条草稿。', [
+      { text: '取消', style: 'cancel' },
+      {
+        text: '删除',
+        style: 'destructive',
+        onPress: () => {
+          void (async () => {
+            setDeletingDraftId(draft.id);
+            setDraftInboxError('');
+            try {
+              const result = await deleteOwnPostDraft(draft.id, draft.etag);
+              if (!result.response.ok) throw new Error(apiFailureDiagnostic(result, '删除草稿失败。'));
+              setDraftInboxItems((current) => current.filter((item) => item.id !== draft.id));
+              if (recordRef.current?.id === draft.id) {
+                recordRef.current = null;
+                editLoadKeyRef.current = '';
+                draftSaveRestoreCompleteRef.current = false;
+                draftSavedFingerprintRef.current = '';
+                pollConfiguredRef.current = false;
+                setBody('');
+                setAssets([]);
+                setCoverRef('');
+                setAccessMode('PUBLIC');
+                setPollEnabled(false);
+                setPollOptions(['', '']);
+                setDraftSaveStatus('idle');
+                router.setParams({ draftId: undefined } as never);
+              }
+            } catch (cause) {
+              setDraftInboxError(cause instanceof Error ? cause.message : '删除草稿失败。');
+              await loadDraftInbox(null, false);
+            } finally {
+              setDeletingDraftId(null);
+            }
+          })();
+        },
+      },
+    ]);
+  }, [loadDraftInbox, router]);
+
+  const insertComposerToken = useCallback((value: string) => {
+    const token = findActiveComposerToken(body, textSelection.start);
+    if (!token) return;
+    try {
+      const updated = replaceActiveComposerToken(body, token, value);
+      pendingCaretRef.current = updated.selection.start;
+      setBody(updated.text);
+      setTextSelection(updated.selection);
+      setMentionSuggestion(null);
+    } catch {
+      setErrorMessage('无法插入该用户名或话题，请重新输入。');
+    }
+  }, [body, textSelection.start]);
+
+  const syncPublishedSocialTokens = useCallback(async (contentIdValue: string, textValue: string): Promise<string | null> => {
+    try {
+      const result = await apiRequest<unknown>(
+        '/contents/' + encodeURIComponent(contentIdValue) + '/social',
+        { method: 'POST', body: JSON.stringify({ text: textValue }) },
+      );
+      return result.response.ok
+        ? null
+        : apiFailureDiagnostic(result, '提及和话题同步暂时失败。');
+    } catch {
+      return '动态已保存，但 @提及和 #话题同步暂时失败；可稍后编辑动态重试。';
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeComposerToken?.kind !== 'topic') return;
+    let active = true;
+    const controller = new AbortController();
+    setTopicSuggestionsLoading(true);
+    void fetchDiscoveryTopics(controller.signal).then((result) => {
+      if (!result.response.ok) throw new Error('Topics unavailable');
+      const root = result.data as { data?: { items?: unknown[] } } | null;
+      const items = Array.isArray(root?.data?.items) ? root.data.items : [];
+      if (!active) return;
+      setTopicSuggestions(items.filter((item): item is DiscoveryTopicOption => {
+        if (!item || typeof item !== 'object') return false;
+        const value = item as Record<string, unknown>;
+        return typeof value.topicId === 'string' && typeof value.name === 'string' && typeof value.displayName === 'string';
+      }));
+    }).catch(() => {
+      if (active) setTopicSuggestions([]);
+    }).finally(() => {
+      if (active) setTopicSuggestionsLoading(false);
+    });
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [activeComposerToken?.kind]);
+
+  useEffect(() => {
+    const query = activeComposerToken?.kind === 'mention' ? activeComposerToken.query : '';
+    if (query.length < 2) {
+      setMentionSuggestion(null);
+      setMentionLookupLoading(false);
+      return;
+    }
+    setMentionSuggestion(null);
+    setMentionLookupLoading(false);
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      setMentionLookupLoading(true);
+      void findPublicUserByUsername(query, controller.signal).then((result) => {
+        if (controller.signal.aborted) return;
+        if (!result.response.ok) {
+          setMentionSuggestion(null);
+          return;
+        }
+        const root = result.data as Record<string, unknown> | null;
+        const profile = root?.data && typeof root.data === 'object'
+          ? root.data as Record<string, unknown>
+          : root;
+        const username = typeof profile?.username === 'string' ? profile.username : '';
+        if (!username || username.toLocaleLowerCase('en-US') !== query.toLocaleLowerCase('en-US')) {
+          setMentionSuggestion(null);
+          return;
+        }
+        setMentionSuggestion({
+          username,
+          displayName: typeof profile?.displayName === 'string' ? profile.displayName : null,
+          avatar: typeof profile?.avatar === 'string' ? profile.avatar : null,
+        });
+      }).catch(() => {
+        if (!controller.signal.aborted) setMentionSuggestion(null);
+      }).finally(() => {
+        if (!controller.signal.aborted) setMentionLookupLoading(false);
+      });
+    }, 350);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [activeComposerToken?.kind, activeComposerToken?.query]);
+
+  useEffect(() => {
+    const caret = pendingCaretRef.current;
+    if (caret === null) return;
+    bodyInputRef.current?.setNativeProps({ selection: { start: caret, end: caret } });
+    pendingCaretRef.current = null;
+  }, [body]);
+
   useEffect(() => {
     draftAutoSaveSchedulerRef.current = scheduleDraftAutoSave;
   }, [scheduleDraftAutoSave]);
@@ -1029,7 +1291,12 @@ function PublishScreenContent() {
         if (!result.response.ok) {
           throw new Error(apiFailureDiagnostic(result, 'Unable to save post changes.'));
         }
-        Alert.alert('保存成功', '你的动态修改已保存。', [
+        const socialSyncWarning = recordRef.current?.state === 'PUBLISHED'
+          ? await syncPublishedSocialTokens(contentId, trimmedBody)
+          : null;
+        Alert.alert('保存成功', socialSyncWarning
+          ? '你的动态已保存，但 @提及和 #话题同步暂时失败，可稍后再次编辑重试。'
+          : '你的动态修改已保存。', [
           {
             text: '查看动态',
             onPress: () => router.replace(('/post/' + encodeURIComponent(contentId)) as never),
@@ -1189,14 +1456,18 @@ function PublishScreenContent() {
         ));
       }
 
+      // W01 resolves @handles to canonical W02 identities; W05 persists mention/topic edges.
+      const socialSyncWarning = await syncPublishedSocialTokens(draft.id, trimmedBody);
       submitAttemptRef.current = null;
       recordRef.current = null;
       draftWasPublishedRef.current = true;
       draftSaveDirtyRef.current = false;
       setDraftSaveStatus('idle');
       const publishedId = draft.id;
-      setStatusMessage('发布成功');
-      Alert.alert('发布成功', '你的动态已发布，现在可以在公开信息流中查看。', [
+      setStatusMessage(socialSyncWarning ? '发布成功，提及和话题同步待重试。' : '发布成功');
+      Alert.alert('发布成功', socialSyncWarning
+        ? '你的动态已发布，但 @提及和 #话题同步暂时失败；之后编辑动态可以重试同步。'
+        : '你的动态已发布，现在可以在公开信息流中查看。', [
         {
           text: '查看动态',
           onPress: () => router.replace(('/post/' + encodeURIComponent(publishedId)) as never),
@@ -1212,7 +1483,7 @@ function PublishScreenContent() {
     } finally {
       setBusy(false);
     }
-  }, [accessMode, assets, body, contentId, coverRef, pollDurationHours, pollEnabled, pollOptions, publishPending, router, saveDraftSnapshot]);
+  }, [accessMode, assets, body, contentId, coverRef, pollDurationHours, pollEnabled, pollOptions, publishPending, router, saveDraftSnapshot, syncPublishedSocialTokens]);
 
   if (authStatus !== 'authenticated') {
     return (
@@ -1237,6 +1508,11 @@ function PublishScreenContent() {
         <Pressable accessibilityRole="button" accessibilityLabel="Close composer" disabled={busy || loadingEdit} onPress={() => { void closeComposer(); }} style={[styles.iconButton, (busy || loadingEdit) && styles.disabledButton]}>
           <Feather name="x" size={22} color={isDark ? '#e5e7eb' : '#111827'} />
         </Pressable>
+        {!contentId ? (
+          <Pressable accessibilityRole="button" accessibilityLabel="Open drafts" onPress={() => { void openDraftInbox(); }} style={styles.iconButton}>
+            <Feather name="file-text" size={19} color={isDark ? '#e5e7eb' : '#344054'} />
+          </Pressable>
+        ) : null}
         <Text style={[styles.headerTitle, isDark && { color: '#f9fafb' }]}>{contentId ? 'Edit post' : 'New post'}</Text>
         <Pressable
           accessibilityRole="button"
@@ -1261,6 +1537,7 @@ function PublishScreenContent() {
           contentContainerStyle={[styles.scrollContent, isDark && { backgroundColor: '#000000' }]}
         >
           <TextInput
+            ref={bodyInputRef}
             accessibilityLabel="Post text"
             multiline
             maxLength={MAX_TEXT_LENGTH}
@@ -1270,8 +1547,39 @@ function PublishScreenContent() {
             style={[styles.composerInput, isDark && { color: '#f9fafb' }]}
             value={body}
             onChangeText={(value) => { setBody(value); setErrorMessage(''); }}
+            onSelectionChange={(event) => setTextSelection(event.nativeEvent.selection)}
             textAlignVertical="top"
           />
+          {activeComposerToken?.kind === 'topic' ? (
+            <View style={[styles.suggestionPanel, isDark && styles.suggestionPanelDark]}>
+              <Text style={[styles.suggestionHeading, isDark && { color: '#d4d4d8' }]}>热门话题</Text>
+              {topicSuggestions
+                .filter((topic) => !activeComposerToken.query || topic.name.toLocaleLowerCase('en-US').includes(activeComposerToken.query.toLocaleLowerCase('en-US')))
+                .slice(0, 5)
+                .map((topic) => (
+                  <Pressable key={topic.topicId} accessibilityRole="button" onPress={() => insertComposerToken(topic.name)} style={styles.suggestionRow}>
+                    <View style={styles.suggestionTopicIcon}><Feather name="hash" size={16} color={PRIMARY} /></View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.suggestionName, isDark && { color: '#f4f4f5' }]}>#{topic.name}</Text>
+                      <Text style={[styles.suggestionMeta, isDark && { color: '#a1a1aa' }]}>{topic.displayName} · {topic.contentCount.toLocaleString()} 条动态</Text>
+                    </View>
+                  </Pressable>
+                ))}
+              {topicSuggestionsLoading ? <Text style={[styles.suggestionMeta, isDark && { color: '#a1a1aa' }]}>正在加载热门话题…</Text> : topicSuggestions.length === 0 ? <Text style={[styles.suggestionMeta, isDark && { color: '#a1a1aa' }]}>暂无热门话题；可以继续输入自定义话题。</Text> : null}
+            </View>
+          ) : activeComposerToken?.kind === 'mention' && activeComposerToken.query.length >= 2 ? (
+            <View style={[styles.suggestionPanel, isDark && styles.suggestionPanelDark]}>
+              {mentionSuggestion ? (
+                <Pressable accessibilityRole="button" onPress={() => insertComposerToken(mentionSuggestion.username)} style={styles.suggestionRow}>
+                  {mentionSuggestion.avatar ? <Image source={{ uri: mentionSuggestion.avatar }} style={styles.mentionAvatar} /> : <View style={styles.mentionAvatarFallback}><Feather name="user" size={15} color={PRIMARY} /></View>}
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.suggestionName, isDark && { color: '#f4f4f5' }]}>{mentionSuggestion.displayName || mentionSuggestion.username}</Text>
+                    <Text style={[styles.suggestionMeta, isDark && { color: '#a1a1aa' }]}>@{mentionSuggestion.username}</Text>
+                  </View>
+                </Pressable>
+              ) : <Text style={[styles.suggestionMeta, isDark && { color: '#a1a1aa' }]}>{mentionLookupLoading ? '正在查找完整用户名…' : '输入完整用户名后可确认并插入提及。'}</Text>}
+            </View>
+          ) : null}
           <View style={[styles.counterRow, isDark && { borderBottomColor: '#27272a' }]}>
             <Text style={[styles.helperText, isDark && { color: '#9ca3af' }]}>Ordinary social posts publish directly; no extra review screen.</Text>
             <Text style={[styles.counter, isDark && { color: '#9ca3af' }]}>{body.length}/{MAX_TEXT_LENGTH}</Text>
@@ -1459,6 +1767,52 @@ function PublishScreenContent() {
         onClose={() => setCameraVisible(false)}
         onCapture={handleCameraCapture}
       />
+      <Modal
+        visible={draftInboxVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setDraftInboxVisible(false)}
+      >
+        <View style={[styles.draftsModal, isDark && styles.draftsModalDark]}>
+          <View style={[styles.draftsHeader, isDark && { borderBottomColor: '#27272a' }]}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Close drafts" onPress={() => setDraftInboxVisible(false)} style={styles.iconButton}>
+              <Feather name="x" size={22} color={isDark ? '#e5e7eb' : '#111827'} />
+            </Pressable>
+            <Text style={[styles.draftsTitle, isDark && { color: '#f9fafb' }]}>草稿箱</Text>
+            <Pressable accessibilityRole="button" accessibilityLabel="Refresh drafts" disabled={draftInboxLoading} onPress={() => { void loadDraftInbox(null, false); }} style={styles.iconButton}>
+              <Feather name="refresh-cw" size={18} color={isDark ? '#e5e7eb' : '#344054'} />
+            </Pressable>
+          </View>
+          {draftInboxError ? <Text style={styles.draftsError}>{draftInboxError}</Text> : null}
+          {draftInboxLoading && draftInboxItems.length === 0 ? (
+            <View style={styles.draftsEmpty}><ActivityIndicator color={PRIMARY} /><Text style={[styles.suggestionMeta, isDark && { color: '#a1a1aa' }]}>正在加载草稿…</Text></View>
+          ) : (
+            <FlatList
+              data={draftInboxItems}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={draftInboxItems.length === 0 ? styles.draftsEmptyList : styles.draftsList}
+              ListEmptyComponent={<Text style={[styles.draftsEmptyText, isDark && { color: '#a1a1aa' }]}>还没有保存的动态草稿。</Text>}
+              renderItem={({ item }) => (
+                <View style={[styles.draftItem, isDark && { borderBottomColor: '#27272a' }]}>
+                  <Pressable accessibilityRole="button" onPress={() => restoreDraftFromInbox(item)} style={styles.draftItemMain}>
+                    <Text numberOfLines={2} style={[styles.draftItemTitle, isDark && { color: '#f4f4f5' }]}>{item.title?.trim() || '未命名草稿'}</Text>
+                    <Text style={[styles.draftItemMeta, isDark && { color: '#a1a1aa' }]}>{item.updatedAt ? new Date(item.updatedAt).toLocaleString() : ''} · {item.mediaRefs?.length ? item.mediaRefs.length + ' 个附件 · ' : ''}{item.accessMode === 'MEMBERS_ONLY' ? '会员专享' : '公开'}</Text>
+                    <Text style={styles.draftRestoreLabel}>点击继续编辑</Text>
+                  </Pressable>
+                  <Pressable accessibilityRole="button" accessibilityLabel="Delete draft" disabled={deletingDraftId === item.id} onPress={() => removeDraftFromInbox(item)} style={styles.draftDeleteButton}>
+                    {deletingDraftId === item.id ? <ActivityIndicator size="small" color="#b42318" /> : <Feather name="trash-2" size={18} color="#b42318" />}
+                  </Pressable>
+                </View>
+              )}
+              onEndReached={() => {
+                if (draftInboxHasMore && !draftInboxLoading && draftInboxCursor) void loadDraftInbox(draftInboxCursor, true);
+              }}
+              onEndReachedThreshold={0.5}
+              ListFooterComponent={draftInboxLoading && draftInboxItems.length > 0 ? <ActivityIndicator color={PRIMARY} style={{ padding: 16 }} /> : undefined}
+            />
+          )}
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -1486,6 +1840,30 @@ const styles = StyleSheet.create({
   helperText: { flex: 1, fontSize: 12, lineHeight: 17, color: '#667085' },
   counter: { fontSize: 12, color: '#667085' },
   draftSaveStatus: { color: '#667085', fontSize: 12, lineHeight: 17, marginTop: 7 },
+  suggestionPanel: { marginTop: 8, marginBottom: 10, borderWidth: 1, borderColor: '#d0d5dd', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 8, backgroundColor: '#ffffff' },
+  suggestionPanelDark: { borderColor: '#3f3f46', backgroundColor: '#09090b' },
+  suggestionHeading: { color: '#667085', fontSize: 11, fontWeight: '800', paddingHorizontal: 4, paddingBottom: 5 },
+  suggestionRow: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 44, paddingHorizontal: 4, paddingVertical: 6 },
+  suggestionTopicIcon: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: '#e8f4ff' },
+  suggestionName: { color: '#101828', fontSize: 13, fontWeight: '800' },
+  suggestionMeta: { color: '#667085', fontSize: 11, lineHeight: 16 },
+  mentionAvatar: { width: 32, height: 32, borderRadius: 16 },
+  mentionAvatarFallback: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: '#e8f4ff' },
+  draftsModal: { flex: 1, backgroundColor: '#ffffff', paddingTop: 8 },
+  draftsModalDark: { backgroundColor: '#000000' },
+  draftsHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingBottom: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#eaecf0' },
+  draftsTitle: { color: '#101828', fontSize: 17, fontWeight: '800' },
+  draftsList: { paddingHorizontal: 16, paddingBottom: 28 },
+  draftsEmptyList: { flexGrow: 1, justifyContent: 'center', padding: 28 },
+  draftsEmpty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 },
+  draftsEmptyText: { color: '#667085', fontSize: 14, textAlign: 'center' },
+  draftsError: { color: '#b42318', fontSize: 12, lineHeight: 18, paddingHorizontal: 16, paddingVertical: 8 },
+  draftItem: { flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#eaecf0', paddingVertical: 14, gap: 8 },
+  draftItemMain: { flex: 1, gap: 4 },
+  draftItemTitle: { color: '#101828', fontSize: 14, lineHeight: 20, fontWeight: '700' },
+  draftItemMeta: { color: '#667085', fontSize: 11, lineHeight: 16 },
+  draftRestoreLabel: { color: PRIMARY, fontSize: 11, fontWeight: '800', marginTop: 2 },
+  draftDeleteButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   accessModeSection: { paddingVertical: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#eaecf0' },
   accessModeTitle: { color: '#101828', fontSize: 14, fontWeight: '800' },
   accessModeDescription: { color: '#667085', fontSize: 12, lineHeight: 18, marginTop: 4 },

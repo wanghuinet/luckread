@@ -14,7 +14,7 @@ export const validateContentListQuery = (url: URL): URLSearchParams => {
     throw new ContentListQueryError('VALIDATION_FAILED', 422)
   }
 
-  const allowed = ['cursor', 'creatorId', 'limit', 'type'] as const
+  const allowed = ['cursor', 'creatorId', 'limit', 'status', 'type'] as const
   const query = new URLSearchParams()
 
   for (const key of allowed) {
@@ -41,6 +41,9 @@ export const validateContentListQuery = (url: URL): URLSearchParams => {
       if (!/^(?:[1-9]|[1-4][0-9]|50)$/.test(value)) {
         throw new ContentListQueryError('VALIDATION_FAILED', 422)
       }
+    } else if (key === 'status') {
+      // Private owner-scoped draft lists share this route but never enter the public cache.
+      if (value !== 'DRAFT') throw new ContentListQueryError('VALIDATION_FAILED', 422)
     } else if (!CONTENT_TYPES.has(value)) {
       throw new ContentListQueryError('VALIDATION_FAILED', 422)
     }

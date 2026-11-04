@@ -1,12 +1,15 @@
 import { expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { computeAutoSaveDelay, createPublishDraftFingerprint } from '../lib/publish-draft-autosave.ts';
+import { findActiveComposerToken, replaceActiveComposerToken } from '../lib/publish-composer-tokens.ts';
 
 const composer = readFileSync(new URL('../app/publish.tsx', import.meta.url), 'utf8');
 const feedItem = readFileSync(new URL('../components/FeedItem.tsx', import.meta.url), 'utf8');
 const home = readFileSync(new URL('../app/(drawer)/(tabs)/(index)/index.tsx', import.meta.url), 'utf8');
 const socialPoll = readFileSync(new URL('../components/SocialPoll.tsx', import.meta.url), 'utf8');
 const mediaActionSheet = readFileSync(new URL('../components/PublishMediaActionSheet.tsx', import.meta.url), 'utf8');
+const w01SocialRoute = readFileSync(new URL('../../workers/W01-payload/src/app/api/v1/contents/[contentId]/social/route.ts', import.meta.url), 'utf8');
+const socialScreenApiSource = readFileSync(new URL('../lib/social-screen-api.ts', import.meta.url), 'utf8');
 
 test('native publisher uses the shared media API helpers and existing W01 state endpoint', () => {
   expect(composer).toContain('prepareImageForUpload(file)');
@@ -66,7 +69,9 @@ test('edit and delete controls are only shown for the authenticated owner and us
 });
 
 test('successful publishing confirms success and offers a direct link to the published post', () => {
-  expect(composer).toContain("Alert.alert('发布成功', '你的动态已发布，现在可以在公开信息流中查看。'");
+  expect(composer).toContain("Alert.alert('发布成功', socialSyncWarning");
+  expect(composer).toContain("'你的动态已发布，现在可以在公开信息流中查看。'");
+  expect(composer).toContain("'你的动态已发布，但 @提及和 #话题同步暂时失败；之后编辑动态可以重试同步。'");
   expect(composer).toContain("text: '查看动态'");
   expect(composer).toContain("('/post/' + encodeURIComponent(publishedId))");
   expect(composer).toContain("('/?published=' + encodeURIComponent(publishedId) + '&refresh=' + Date.now())");
@@ -228,4 +233,38 @@ test('native draft fingerprints are stable and change when persisted content cha
   expect(createPublishDraftFingerprint({ ...input, accessMode: 'MEMBERS_ONLY' })).not.toBe(fingerprint);
   expect(createPublishDraftFingerprint({ ...input, pollEnabled: true, pollOptions: ['Yes', 'No'] })).not.toBe(fingerprint);
   expect(fingerprint).not.toContain(input.body);
+});
+
+test('native publisher lists, restores, paginates and deletes the owner-only draft inbox', () => {
+  expect(composer).toContain('fetchOwnPostDraftsPage({ cursor, limit: 20 })');
+  expect(composer).toContain('deleteOwnPostDraft(draft.id, draft.etag)');
+  expect(composer).toContain('restoreDraftFromInbox(item)');
+  expect(composer).toContain('setDraftInboxCursor(page.nextCursor || null)');
+  expect(composer).toContain('draftInboxHasMore && !draftInboxLoading && draftInboxCursor');
+  expect(composer).toContain('router.setParams({ contentId: undefined, draftId: draft.id } as never)');
+  expect(composer).toContain('<Modal');
+  expect(composer).toContain('草稿箱');
+  expect(composer).toContain('删除草稿');
+  expect(socialScreenApiSource).toContain("headers: { 'If-Match': etag }");
+});
+
+test('native composer inserts only the active @mention or #topic at the caret', () => {
+  const mention = findActiveComposerToken('hello @ali', 10);
+  expect(mention).toMatchObject({ kind: 'mention', query: 'ali' });
+  expect(replaceActiveComposerToken('hello @ali', mention, 'alice').text).toBe('hello @alice ');
+  const topic = findActiveComposerToken('read #books', 11);
+  expect(topic).toMatchObject({ kind: 'topic', query: 'books' });
+  expect(replaceActiveComposerToken('read #books', topic, 'reading').text).toBe('read #reading ');
+  expect(composer).toContain('fetchDiscoveryTopics(controller.signal)');
+  expect(composer).toContain('}, [activeComposerToken?.kind]);');
+  expect(composer).toContain('findPublicUserByUsername(query, controller.signal)');
+  expect(composer).toContain('onSelectionChange={(event) => setTextSelection(event.nativeEvent.selection)}');
+});
+
+test('published native posts sync mention and topic tokens through W01 and W05 authorities', () => {
+  expect(composer).toContain("'/contents/' + encodeURIComponent(contentIdValue) + '/social'");
+  expect(composer).toContain('syncPublishedSocialTokens(draft.id, trimmedBody)');
+  expect(w01SocialRoute).toContain('resolveSocialMentionTargets(text)');
+  expect(w01SocialRoute).toContain("pathname: '/internal/social/contents/' + encodeURIComponent(contentId) + '/tokens'");
+  expect(w01SocialRoute).toContain('mentions = await resolveSocialMentionTargets(text)');
 });

@@ -60,6 +60,20 @@ describe('content list cache guard', () => {
     )).toThrow(ContentListQueryError)
   })
 
+  it('accepts only the owner-draft status filter for the authenticated-only list path', () => {
+    expect(validateContentListQuery(
+      new URL('https://luckread.com/api/v1/contents?status=DRAFT&type=post&limit=20'),
+    ).toString()).toBe('limit=20&status=DRAFT&type=post')
+
+    expect(() => validateContentListQuery(
+      new URL('https://luckread.com/api/v1/contents?status=PUBLISHED'),
+    )).toThrow(ContentListQueryError)
+
+    expect(() => validateContentListQuery(
+      new URL('https://luckread.com/api/v1/contents?status=DRAFT&status=DRAFT'),
+    )).toThrow(ContentListQueryError)
+  })
+
   it('detects Authorization and Better Auth or legacy login credentials', () => {
     expect(hasAuthenticatedSessionCredential(
       new Request('https://luckread.com/api/v1/contents', { headers: { Authorization: 'Bearer token' } }),
