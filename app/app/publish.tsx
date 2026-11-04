@@ -45,6 +45,7 @@ import {
   findActiveComposerToken,
   replaceActiveComposerToken,
 } from '~/lib/publish-composer-tokens';
+import { moveComposerAsset } from '~/lib/publish-composer-assets';
 
 type ContentRecord = {
   id: string;
@@ -544,8 +545,17 @@ function PublishScreenContent() {
     }
   }, [assets, busy, coverRef, publishPending]);
 
+  const moveAsset = useCallback((localId: string, direction: -1 | 1) => {
+    if (busy || publishPending) return;
+    setAssets((current) => {
+      const currentIndex = current.findIndex((asset) => asset.localId === localId);
+      if (currentIndex < 0) return current;
+      return moveComposerAsset(current, currentIndex, direction);
+    });
+  }, [busy, publishPending]);
+
   const renderComposerAsset = useCallback(
-    ({ item: asset }: { item: ComposerAsset; index: number }) => (
+    ({ item: asset, index }: { item: ComposerAsset; index: number }) => (
       <View style={[styles.assetTile, isDark && { backgroundColor: '#09090b', borderColor: '#3f3f46' }]}>
         <View style={styles.assetTilePreview}>
           {isVideoAsset(asset) ? (
@@ -585,6 +595,33 @@ function PublishScreenContent() {
                   : 'Upload failed'}
             {typeof asset.size === 'number' ? ' · ' + Math.round(asset.size / 1024) + ' KB' : ''}
           </Text>
+          {assets.length > 1 ? (
+            <View style={styles.assetOrderControls}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Move attachment earlier"
+                accessibilityHint="Moves this attachment one position earlier in the post."
+                accessibilityState={{ disabled: busy || publishPending || index === 0 }}
+                disabled={busy || publishPending || index === 0}
+                onPress={() => moveAsset(asset.localId, -1)}
+                style={[styles.assetOrderButton, isDark && { borderColor: '#52525b' }, (busy || publishPending || index === 0) && styles.disabledButton]}
+              >
+                <Feather name="arrow-up" size={16} color={isDark ? '#d4d4d8' : '#475467'} />
+              </Pressable>
+              <Text style={[styles.assetOrderLabel, isDark && { color: '#9ca3af' }]}>Attachment {index + 1} of {assets.length}</Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Move attachment later"
+                accessibilityHint="Moves this attachment one position later in the post."
+                accessibilityState={{ disabled: busy || publishPending || index === assets.length - 1 }}
+                disabled={busy || publishPending || index === assets.length - 1}
+                onPress={() => moveAsset(asset.localId, 1)}
+                style={[styles.assetOrderButton, isDark && { borderColor: '#52525b' }, (busy || publishPending || index === assets.length - 1) && styles.disabledButton]}
+              >
+                <Feather name="arrow-down" size={16} color={isDark ? '#d4d4d8' : '#475467'} />
+              </Pressable>
+            </View>
+          ) : null}
           {asset.mimeType.startsWith('image/') && asset.status === 'ready' && asset.serverUrl ? (
             <Pressable
               accessibilityRole="button"
@@ -626,7 +663,7 @@ function PublishScreenContent() {
         </View>
       </View>
     ),
-    [activeCoverRef, busy, isDark, publishPending, removeAsset, retryAsset],
+    [activeCoverRef, assets.length, busy, isDark, moveAsset, publishPending, removeAsset, retryAsset],
   );
 
   const saveDraftSnapshot = useCallback(async () => {
@@ -1919,6 +1956,9 @@ const styles = StyleSheet.create({
   assetTileActions: { position: 'absolute', top: 8, left: 8, right: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   assetTileAction: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.58)' },
   assetTileMeta: { paddingHorizontal: 10, paddingVertical: 8 },
+  assetOrderControls: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 7 },
+  assetOrderButton: { width: 34, height: 30, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#d0d5dd', borderRadius: 8 },
+  assetOrderLabel: { flex: 1, color: '#667085', fontSize: 11, textAlign: 'center' },
   assetName: { fontSize: 13, fontWeight: '700', color: '#344054' },
   assetStatus: { marginTop: 3, fontSize: 12, color: '#667085' },
   inlineError: { marginTop: 3, fontSize: 11, color: '#b42318', lineHeight: 15 },
