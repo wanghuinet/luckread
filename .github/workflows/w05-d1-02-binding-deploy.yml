@@ -45,12 +45,33 @@ jobs:
         with:
           node-version: 24
 
+      - name: Verify scoped D1-03 push endpoint migration before deploying W05
+        working-directory: workers/W05-social
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4.116.0 d1 execute secondary --remote --json --config wrangler.jsonc --command "SELECT name FROM d1_migrations WHERE name IN ('0001_notification_push_endpoints.sql','0001_notification_push_endpoints');" > /tmp/w05-push-ready.json
+          python - <<'PY'
+          import json
+          value = json.load(open('/tmp/w05-push-ready.json'))
+          rows = [r for item in value for r in item.get('results', [])] if isinstance(value, list) else value.get('results', [])
+          if len(rows) != 1:
+              raise SystemExit('W05 D1-03 push endpoint migration must be applied before deploying the two-binding Worker')
+          print('W05_D1_03_MIGRATION_PREREQUISITE=PASS')
+          PY
+
       - name: Verify binding contract before deployment
         run: |
           set -euo pipefail
           test -f workers/W05-social/wrangler.jsonc
           jq -e --arg worker "$EXPECTED_WORKER" '.name == $worker' workers/W05-social/wrangler.jsonc >/dev/null
-          jq -e --arg db "$EXPECTED_DB_UUID"             '.d1_databases | length == 1 and .[0].binding == "DB" and .[0].database_id == $db'             workers/W05-social/wrangler.jsonc >/dev/null
+          jq -e --arg db02 "$EXPECTED_DB_UUID" --arg db03 "bda1d247-a371-4244-91ae-aef96034db7f" '
+            .d1_databases | length == 2
+            and any(.[]; .binding == "DB" and .database_id == $db02 and .database_name == "luckreadpro" and .migrations_dir == "migrations")
+            and any(.[]; .binding == "D1_03" and .database_id == $db03 and .database_name == "secondary" and .migrations_dir == "migrations-d1-03")
+          ' workers/W05-social/wrangler.jsonc >/dev/null
 
       - name: Verify W05 traffic guard bindings
         working-directory: workers/W05-social
@@ -81,6 +102,7 @@ jobs:
           set -euo pipefail
           curl -fsS             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             -H "Content-Type: application/json"             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/$EXPECTED_WORKER/settings"             > /tmp/w05-settings.json
           jq -e --arg db "$EXPECTED_DB_UUID"             '.. | objects | select(.id? == $db)' /tmp/w05-settings.json >/dev/null
+          jq -e --arg db "bda1d247-a371-4244-91ae-aef96034db7f"             '.. | objects | select(.id? == $db)' /tmp/w05-settings.json >/dev/null
 
       - name: Write exact-SHA provenance
         run: |
