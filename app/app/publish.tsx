@@ -622,12 +622,6 @@ function PublishScreenContent() {
               </Pressable>
             </View>
           ) : null}
-            {asset.status === 'uploading' ? 'Uploading to LuckRead…'
-              : asset.status === 'uploaded' ? 'Uploaded; playback authorization needs retry'
-                : asset.status === 'ready' ? 'Ready'
-                  : 'Upload failed'}
-            {typeof asset.size === 'number' ? ' · ' + Math.round(asset.size / 1024) + ' KB' : ''}
-          </Text>
           {asset.mimeType.startsWith('image/') && asset.status === 'ready' && asset.serverUrl ? (
             <Pressable
               accessibilityRole="button"
