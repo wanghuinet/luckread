@@ -135,9 +135,6 @@ async function forwardPushEndpoint(
     if (principal instanceof Response) return principal
     await enforceW01WriteAccountRateLimit(principal.userId)
     await enforceW01WriteEndpointRateLimit(method === 'PUT' ? 'upsertPushEndpoint' : 'deletePushEndpoint')
-    const authorizationDenied = await authorizePushEndpoint(request, principal)
-    if (authorizationDenied) return authorizationDenied
-
     const { installationId } = await context.params
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(installationId)) {
       return errorResponse(422, 'VALIDATION_FAILED', 'Invalid installation id')
@@ -165,6 +162,9 @@ async function forwardPushEndpoint(
       platform = registration.platform
       permissionStatus = registration.permissionStatus as 'granted' | 'denied' | 'undetermined'
     }
+
+    const authorizationDenied = await authorizePushEndpoint(request, principal)
+    if (authorizationDenied) return authorizationDenied
 
     const auditDenied = await persistPushEndpointMutationIntent({
       request,
