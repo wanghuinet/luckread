@@ -592,7 +592,7 @@ export default {
         })
       }
 
-      const pushEndpointMatch = /^\\/internal\\/social\\/push-endpoints\\/([^/]+)$/.exec(url.pathname)
+      const pushEndpointMatch = /^\/internal\/social\/push-endpoints\/([^/]+)$/.exec(url.pathname)
       if (pushEndpointMatch) {
         const actorUserId = requirePrincipal(request)
         requireInteractionLayer(request)
