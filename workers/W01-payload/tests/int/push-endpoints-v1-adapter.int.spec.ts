@@ -87,7 +87,7 @@ beforeEach(() => {
   mocks.callW05Social.mockReset()
   mocks.callW05Social.mockImplementation(async (input: { method: string }) => input.method === 'DELETE' ? new Response(null, { status: 204 }) : Response.json({ data: { endpointId: 'endpoint-1', status: 'ACTIVE' } }))
   mocks.callW08Creator.mockReset()
-  mocks.callW08Creator.mockResolvedValue(Response.json({
+  mocks.callW08Creator.mockImplementation(async () => Response.json({
     decision: 'ALLOW', action: 'notification.update.self', resourceType: 'Notification',
     policyVersion: 'casl-l0-l8-v1', layer: 'L2',
   }))
