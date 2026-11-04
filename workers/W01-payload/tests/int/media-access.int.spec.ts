@@ -230,6 +230,7 @@ describe('Media upload access', () => {
     expect(route).toContain("collection: 'media'")
     const ownerHelper = read('src/media/media-owner.ts')
     expect(ownerHelper).toContain("where: { identityId: { equals: identityId } }")
+    expect(ownerHelper).toContain('if (!identityId.trim() || identityId.length > 256) return null')
     expect(route).toContain("resolvePayloadOwnerUserId(authenticated.payload, authenticated.identityId)")
     expect(route).toContain("ownerUserId: { equals: payloadUserId }")
     expect(route).not.toContain("ownerUserId: { equals: authenticated.userId }")
