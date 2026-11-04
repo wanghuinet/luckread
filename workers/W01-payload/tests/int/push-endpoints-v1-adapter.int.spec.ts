@@ -31,6 +31,8 @@ describe('v1 Expo push endpoint adapter', () => {
 
   it('applies the W01 write rate limit before principal resolution', () => {
     expect(route).toContain('await enforceW01WriteRateLimit(request)')
+    expect(route).toContain('await enforceW01WriteAccountRateLimit(principal.userId)')
+    expect(route).toContain("await enforceW01WriteEndpointRateLimit('push-endpoint-registration')")
     expect(route).toContain('TrafficLimitError')
     expect(route).toContain('rateLimitResponse(request)')
     expect(route.indexOf('await enforceW01WriteRateLimit(request)'))
