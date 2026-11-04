@@ -73,7 +73,7 @@ jobs:
           assert d1_02.get('migrations_dir') == 'migrations'
           assert d1_03['database_id'] == 'bda1d247-a371-4244-91ae-aef96034db7f'
           assert d1_03['database_name'] == 'secondary'
-          assert d1_03.get('migrations_dir') == 'migrations-d1-03'
+          assert d1_03.get('migrations_dir') is None
           migration = Path('workers/W05-social/migrations/20261016_013_social_repost_pin_v1.sql')
           assert migration.is_file()
           assert 'MIG-SOCIAL-013-REPOST-PIN-V1' in migration.read_text()
