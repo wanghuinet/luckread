@@ -7,6 +7,7 @@ import { getBetterAuthPrincipal, W02AuthClientError } from '@/auth/w02-session-c
 import { TrafficLimitError, enforcePublicReadRateLimit, enforceW01WriteRateLimit, rateLimitResponse } from '@/auth/traffic-limit'
 import { apiErrorResponse, appendRequestIdToJsonResponse, normalizeApiErrorResponse } from '@/lib/api-response'
 import { isCanonicalMediaDeliveryUrl } from '@/media/media-delivery'
+import { resolvePayloadOwnerUserId } from '@/media/media-owner'
 
 type PayloadRouteContext = Parameters<typeof payloadMediaPost>[1]
 
@@ -18,24 +19,6 @@ async function authenticate(request: Request) {
   return { payload, identityId: principal.userId }
 }
 
-async function resolvePayloadOwnerUserId(
-  payload: Awaited<ReturnType<typeof getPayload>>,
-  identityId: string,
-): Promise<string | null> {
-  const profileResult = await payload.find({
-    collection: 'users',
-    where: { identityId: { equals: identityId } },
-    limit: 1,
-    page: 1,
-    depth: 0,
-    overrideAccess: true,
-    select: { id: true } as any,
-  })
-  const profileId = profileResult.docs[0]?.id
-  if (profileId === undefined || profileId === null) return null
-  const normalizedId = String(profileId).trim()
-  return normalizedId || null
-}
 
 type MediaFailureStage =
   | 'write_rate_limit'
