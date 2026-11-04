@@ -40,15 +40,23 @@ for (const path of [w05ConfigPath, w09MigrationConfigPath, w05SourcePath, pushRu
 
 const w05Config = JSON.parse(readFileSync(w05ConfigPath, 'utf8'))
 const w05D1Bindings = w05Config.d1_databases ?? []
-const w05D1_03 = w05D1Bindings.find((binding) => binding.binding === 'D1_03')
+const w05D1ByBinding = new Map(w05D1Bindings.map((binding) => [binding.binding, binding]))
+const w05D1_02 = w05D1ByBinding.get('DB')
+const w05D1_03 = w05D1ByBinding.get('D1_03')
 if (
   w05Config.name !== 'luckread-w05' ||
+  w05D1Bindings.length !== 2 ||
+  !w05D1_02 ||
+  w05D1_02.database_id !== '6c342634-97f6-4248-9f4a-85772af4f22c' ||
+  w05D1_02.database_name !== 'luckreadpro' ||
+  w05D1_02.migrations_dir !== 'migrations' ||
   !w05D1_03 ||
   w05D1_03.database_id !== 'bda1d247-a371-4244-91ae-aef96034db7f' ||
   w05D1_03.database_name !== 'secondary' ||
-  w05D1_03.migrations_dir !== undefined
+  w05D1_03.migrations_dir !== undefined ||
+  existsSync(resolve(root, 'workers/W05-social/migrations-d1-03'))
 ) {
-  throw new Error('W05 D1_03 must be the scoped runtime-only binding; W09 owns D1-03 schema migrations')
+  throw new Error('W05 must retain only D1-02 DB plus runtime-only D1_03; all D1-03 schema migrations belong to W09')
 }
 
 const w05Source = readFileSync(w05SourcePath, 'utf8')
