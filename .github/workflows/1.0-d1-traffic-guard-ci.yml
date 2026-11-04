@@ -88,6 +88,9 @@ jobs:
       - name: Install W01 dependencies
         working-directory: workers/W01-payload
         run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Install W05 scoped Expo SDK dependency
+        run: npm ci --prefix workers/W05-social --ignore-scripts --no-audit --fund=false
       - name: Static contract checks
         run: |
           node --input-type=module <<'NODE'
