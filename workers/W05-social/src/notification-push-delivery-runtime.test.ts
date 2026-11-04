@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import Expo from 'expo-server-sdk'
 import {
   calculatePushRetryDelaySeconds,
   createPushMessageDeliveryIndex,
@@ -59,15 +60,20 @@ describe('W05 durable Expo push delivery runtime', () => {
     ]
 
     const { messages, taskByMessage } = createPushMessageDeliveryIndex(tasks)
-    const chunk = messages.slice(0, 2)
+    const chunks = new Expo().chunkPushNotifications(messages)
+    const chunkedMessages = chunks.flat()
 
     expect(messages).toHaveLength(2)
     expect(messages[0]?.to).toBe(sharedToken)
     expect(messages[1]?.to).toBe(sharedToken)
     expect(messages[0]).not.toBe(messages[1])
-    expect(taskByMessage.get(chunk[0]!)).toBe(tasks[0])
-    expect(taskByMessage.get(chunk[1]!)).toBe(tasks[1])
-    expect(messages.map((message) => message.data?.notificationId)).toEqual([
+    // expo-server-sdk@8.0.0 keeps each single-recipient message object intact
+    // when chunking, so delivery identity survives the SDK boundary.
+    expect(chunkedMessages[0]).toBe(messages[0])
+    expect(chunkedMessages[1]).toBe(messages[1])
+    expect(taskByMessage.get(chunkedMessages[0]!)).toBe(tasks[0])
+    expect(taskByMessage.get(chunkedMessages[1]!)).toBe(tasks[1])
+    expect(chunkedMessages.map((message) => message.data?.notificationId)).toEqual([
       'notification-like-1',
       'notification-comment-2',
     ])
