@@ -12,7 +12,7 @@ describe('W05 durable Expo push delivery runtime', () => {
     const prepare = vi.fn()
     const env = { PUSH_DELIVERY_ENABLED: 'false', DB: { prepare }, D1_03: { prepare } } as never
     await expect(runNotificationPushBatch(env)).resolves.toEqual({
-      status: 'DISABLED', fannedOut: 0, sent: 0, delivered: 0, retried: 0, failed: 0, skipped: 0,
+      status: 'DISABLED', fannedOut: 0, sent: 0, providerAccepted: 0, retried: 0, failed: 0, skipped: 0,
     })
     expect(prepare).not.toHaveBeenCalled()
   })
