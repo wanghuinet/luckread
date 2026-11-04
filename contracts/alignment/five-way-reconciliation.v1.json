@@ -4819,7 +4819,7 @@
         "contracts/transport/d1-03-entity-owner-boundary.v1.json"
       ],
       "blockers": [
-        "W05 D1-03 remote migration and live scoped binding deployment are pending.",
+        "W09 D1-03 remote migration and W05 delegated runtime binding deployment are pending.",
         "Push sending, W10 delivery orchestration, receipts, and production security E2E are outside this module."
       ]
     },
