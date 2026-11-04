@@ -159,15 +159,15 @@
         "workers/W05-social/migrations-d1-03/0001_notification_push_endpoints.sql"
       ],
       "payloadNativeEvidenceRefs": [],
-      "extensionEvidenceRefs": [
-        "workers/W05-social/src/push-endpoint-runtime.test.ts",
-        "workers/W05-social/src/index.test.ts",
-        "workers/W01-payload/tests/int/push-endpoints-v1-adapter.int.spec.ts"
-      ],
       "blockers": [
         "W05 D1-03 remote migration and live scoped binding deployment are pending."
       ],
-      "status": "BLOCKED"
+      "status": "BLOCKED",
+      "testEvidenceRefs": [
+        "workers/W05-social/src/push-endpoint-runtime.test.ts",
+        "workers/W05-social/src/index.test.ts",
+        "workers/W01-payload/tests/int/push-endpoints-v1-adapter.int.spec.ts"
+      ]
     },
     {
       "entityId": "ENT-ORDER",
