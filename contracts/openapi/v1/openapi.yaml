@@ -1052,7 +1052,6 @@ paths:
             type: array
             minItems: 1
             maxItems: 4
-            uniqueItems: true
             items: { type: string, format: uri }
       responses:
         '200':
@@ -1066,7 +1065,18 @@ paths:
                   docs:
                     type: array
                     maxItems: 50
-                    items: { $ref: '#/components/schemas/Media' }
+                    items:
+                      type: object
+                      required: [id, url, filename, mimeType, alt]
+                      properties:
+                        id: { type: [string, integer] }
+                        url: { type: string, format: uri }
+                        filename: { type: string }
+                        mimeType: { type: string }
+                        filesize: { type: [integer, 'null'], minimum: 0 }
+                        width: { type: [integer, 'null'], minimum: 1 }
+                        height: { type: [integer, 'null'], minimum: 1 }
+                        alt: { type: string, maxLength: 1000 }
                   totalDocs: { type: integer }
                   page: { type: integer }
                   totalPages: { type: integer }
@@ -1126,11 +1136,10 @@ paths:
             type: array
             minItems: 1
             maxItems: 4
-            uniqueItems: true
             items:
               type: string
               format: uri
-              pattern: '^https://(img|video)\.luckread\.com/.+'
+              pattern: '^https://img\.luckread\.com/.+'
       responses:
         '200':
           description: Only authorized published media descriptions; unauthorized or unreferenced URLs are omitted.
@@ -1158,7 +1167,7 @@ paths:
                           properties:
                             url: { type: string, format: uri }
                             alt: { type: string, maxLength: 1000 }
-                            mimeType: { type: [string, 'null'] }
+                            mimeType: { type: string }
                   requestId: { $ref: '#/components/schemas/RequestId' }
         '422': { $ref: '#/components/responses/ClientError' }
         '429': { $ref: '#/components/responses/RateLimited' }
