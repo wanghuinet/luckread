@@ -1,9 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 import { WorkflowEntrypoint, type WorkflowEvent, type WorkflowStep } from 'cloudflare:workers'
-import {
-  runScheduledNotificationPush,
-  type NotificationPushDeliveryEnv,
-} from './notification-push-workflow-runtime.js'
+import { runScheduledNotificationPush } from './notification-push-workflow-runtime.js'
+import type { NotificationPushDeliveryEnv } from './notification-push-delivery-runtime.js'
 
 export class NotificationPushWorkflow extends WorkflowEntrypoint<NotificationPushDeliveryEnv, unknown> {
   async run(event: WorkflowEvent<unknown>, step: WorkflowStep) {
