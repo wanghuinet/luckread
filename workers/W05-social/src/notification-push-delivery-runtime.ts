@@ -197,7 +197,7 @@ async function claimDueDeliveries(db: D1Database, endpointDb: D1Database, now: D
 async function deactivateInvalidEndpoint(endpointDb: D1Database, task: ClaimedDelivery, now: Date): Promise<void> {
   await endpointDb.prepare(
     "UPDATE notification_push_endpoints SET permission_status = 'undetermined', push_token = NULL, " +
-    'updated_at = ?, last_seen_at = ? WHERE endpoint_id = ? AND owner_user_id = ? ' +
+    'updated_at = ? WHERE endpoint_id = ? AND owner_user_id = ? ' +
     "AND provider = 'expo' AND push_token = ?",
   ).bind(now.toISOString(), task.endpointId, task.recipientUserId, task.pushToken).run()
 }
