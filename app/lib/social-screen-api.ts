@@ -76,6 +76,55 @@ export function fetchUserProfileContentPage(userIdValue: string, options: PageRe
   });
 }
 
+
+export type NativePostDraft = {
+  id: string;
+  contentType: 'post';
+  state: 'DRAFT';
+  version: number;
+  revision: number;
+  etag: string;
+  title: string;
+  accessMode: 'PUBLIC' | 'MEMBERS_ONLY';
+  bodyRef: string;
+  mediaRefs: string[];
+  coverRef: string | null;
+  updatedAt: string;
+};
+
+export type NativePostDraftPage = {
+  items: NativePostDraft[];
+  nextCursor: string | null;
+  hasMore: boolean;
+};
+
+/** List only the signed-in owner's social post drafts; W01 routes status=DRAFT through W03 owner scoping. */
+export function fetchOwnPostDraftsPage(options: PageRequestOptions = {}) {
+  const query = new URLSearchParams({ status: 'DRAFT', type: 'post', limit: String(options.limit ?? 20) });
+  if (options.cursor) query.set('cursor', options.cursor);
+  return apiRequest<{ data?: NativePostDraftPage; error?: { code?: string; message?: string } }>(
+    '/contents?' + query.toString(),
+    { method: 'GET', signal: options.signal },
+  );
+}
+
+/** Soft-delete an owner draft with the current W03 ETag and a unique operation key. */
+export function deleteOwnPostDraft(contentIdValue: string, etagValue: string) {
+  const contentId = contentIdValue.trim();
+  const etag = etagValue.trim();
+  if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(contentId)) {
+    throw new TypeError('A valid draft ID is required.');
+  }
+  if (!etag || etag === '*' || etag.length > 256) {
+    throw new TypeError('A current draft version is required.');
+  }
+  return apiRequest<unknown>('/contents/' + encodeURIComponent(contentId), {
+    method: 'DELETE',
+    headers: { 'If-Match': etag },
+    idempotencyKey: 'native-draft-delete:' + contentId + ':' + createIdempotencyKey(),
+  });
+}
+
 /** Fetch one profile's public replies using the existing W01/W05 read route. */
 export function fetchUserRepliesPage(userIdValue: string, options: PageRequestOptions = {}) {
   const userId = userIdValue.trim();
