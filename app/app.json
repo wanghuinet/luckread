@@ -59,6 +59,7 @@
           "configureAndroidBackup": true
         }
       ],
+      "expo-notifications",
       "./plugins/withAndroidReleaseSigning"
     ],
     "experiments": {
