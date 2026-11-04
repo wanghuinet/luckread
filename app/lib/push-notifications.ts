@@ -127,9 +127,25 @@ async function disableExistingPushEndpoint(userId: string): Promise<void> {
   await writePushEndpoint(userId, 'denied', null, installationId);
 }
 
-async function registerGrantedPushEndpoint(userId: string): Promise<void> {
+async function ensureAndroidNotificationChannel(): Promise<void> {
+  if (nativePlatform() !== 'android') return;
+  await Notifications.setNotificationChannelAsync('default', {
+    name: 'Default',
+    importance: Notifications.AndroidImportance.DEFAULT,
+    vibrationPattern: [0, 250, 250, 250],
+    lightColor: '#1d9bf0',
+  });
+}
+
+async function registerGrantedPushEndpoint(
+  userId: string,
+  devicePushToken?: Notifications.DevicePushToken,
+  androidChannelReady = false,
+): Promise<void> {
+  if (!androidChannelReady) await ensureAndroidNotificationChannel();
   const tokenResult = await Notifications.getExpoPushTokenAsync({
     projectId: expoProjectId(),
+    ...(devicePushToken ? { devicePushToken } : {}),
   });
   const token = typeof tokenResult.data === 'string' ? tokenResult.data.trim() : '';
   if (!token) throw new Error('Expo did not return a push token for this device.');
@@ -159,6 +175,7 @@ export async function getDevicePushPermission(): Promise<DevicePushPermission> {
  */
 export async function syncPushEndpointForAuthenticatedUser(
   userId: string,
+  devicePushToken?: Notifications.DevicePushToken,
 ): Promise<PushRegistrationResult> {
   if (!nativePlatform()) return 'unsupported';
 
@@ -170,7 +187,7 @@ export async function syncPushEndpointForAuthenticatedUser(
     return 'denied';
   }
 
-  await registerGrantedPushEndpoint(userId);
+  await registerGrantedPushEndpoint(userId, devicePushToken);
   return 'enabled';
 }
 
@@ -183,22 +200,21 @@ export async function requestDevicePushPermission(
   const platform = nativePlatform();
   if (!platform) return 'unsupported';
 
-  if (platform === 'android') {
-    await Notifications.setNotificationChannelAsync('default', {
-      name: 'Default',
-      importance: Notifications.AndroidImportance.DEFAULT,
-      vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#1d9bf0',
-    });
+  let permission = await Notifications.getPermissionsAsync();
+  if (permission.status === 'denied' && permission.canAskAgain === false) {
+    await disableExistingPushEndpoint(userId);
+    return 'settings-required';
   }
 
-  let permission = await Notifications.getPermissionsAsync();
+  let androidChannelReady = false;
   if (permission.status !== 'granted' && permission.canAskAgain !== false) {
+    await ensureAndroidNotificationChannel();
+    androidChannelReady = platform === 'android';
     permission = await Notifications.requestPermissionsAsync();
   }
 
   if (permission.status === 'granted') {
-    await registerGrantedPushEndpoint(userId);
+    await registerGrantedPushEndpoint(userId, undefined, androidChannelReady);
     return 'enabled';
   }
 
