@@ -1,6 +1,6 @@
-import { getPayload } from 'payload'
+import type { Payload } from 'payload'
 
-export type MediaOwnerPayload = Awaited<ReturnType<typeof getPayload>>
+export type MediaOwnerPayload = Payload
 
 /** Resolve the authoritative Payload profile mapped to the authenticated W02 identity. */
 export async function resolvePayloadOwnerUserId(
