@@ -52,10 +52,9 @@ describe('W10 Expo push service adapter', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2)
     expect(requestBody(fetchMock.mock.calls[0]?.[1])).toHaveLength(100)
     expect(requestBody(fetchMock.mock.calls[1]?.[1])).toHaveLength(1)
-    expect(fetchMock.mock.calls[0]?.[1]?.headers).toMatchObject({
-      Authorization: 'Bearer expo-server-access-token',
-      'Content-Encoding': 'gzip',
-    })
+    const sentHeaders = new Headers(fetchMock.mock.calls[0]?.[1]?.headers)
+    expect(sentHeaders.get('Authorization')).toBe('Bearer expo-server-access-token')
+    expect(sentHeaders.get('Content-Encoding')).toBe('gzip')
     expect(tickets).toHaveLength(101)
     expect(tickets.every((ticket) => ticket.status === 'ok')).toBe(true)
   })
