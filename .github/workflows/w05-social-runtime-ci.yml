@@ -8,10 +8,6 @@ on:
       - 'contracts/transport/d1-03-entity-owner-boundary.v1.json'
       - 'contracts/entity/NOTIFICATION-PUSH-ENDPOINT-CONTRACT.v1.json'
       - 'contracts/persistence/NOTIFY-002-W05-D1-03-PUSH-ENDPOINT-PERSISTENCE.v1.json'
-      - 'contracts/transport/W05-W09-notification-push-delivery.v1.json'
-      - 'contracts/transport/d1-03-entity-owner-boundary.v1.json'
-      - 'contracts/entity/NOTIFICATION-PUSH-ENDPOINT-CONTRACT.v1.json'
-      - 'contracts/persistence/NOTIFY-002-W05-D1-03-PUSH-ENDPOINT-PERSISTENCE.v1.json'
       - 'workers/W09-platform/wrangler.d1-03-migrations.jsonc'
       - 'workers/W09-platform/migrations-d1-03/**'
       - 'contracts/transport/W05-W03-owned-post-context-http-binding.v1.json'
@@ -83,6 +79,10 @@ on:
       - main
     paths:
       - 'workers/W05-social/**'
+      - 'contracts/transport/W05-W09-notification-push-delivery.v1.json'
+      - 'contracts/transport/d1-03-entity-owner-boundary.v1.json'
+      - 'contracts/entity/NOTIFICATION-PUSH-ENDPOINT-CONTRACT.v1.json'
+      - 'contracts/persistence/NOTIFY-002-W05-D1-03-PUSH-ENDPOINT-PERSISTENCE.v1.json'
       - 'contracts/transport/W05-W03-owned-post-context-http-binding.v1.json'
       - 'workers/W01-payload/src/app/api/v1/content/[contentId]/reposts/**'
       - 'workers/W01-payload/src/app/api/v1/content/[contentId]/pin/**'
@@ -523,6 +523,7 @@ jobs:
           assert operations['resolveActiveRecipientPushEndpoints']['maxRows'] == 20
           invalidation = operations['clearProviderInvalidExpoToken']
           assert invalidation['kind'] == 'CONDITIONAL_SCOPED_WRITE'
+          assert 'last_seen_at' not in invalidation['allowedMutation']
           assert 'DeviceNotRegistered' in invalidation['trigger']
           assert 'current push token SHA-256 equals the hash captured' in invalidation['requiredPredicates'][-1]
           scoped = boundary['scopedDelegations']['NotificationPushEndpoint']
