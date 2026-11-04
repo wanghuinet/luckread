@@ -3,6 +3,7 @@ import { beforeEach, expect, mock, test } from 'bun:test';
 const calls = [];
 const events = [];
 const secureValues = new Map();
+const platformState = { OS: 'android' };
 const permissionState = {
   current: { status: 'undetermined', canAskAgain: true },
   requested: { status: 'granted', canAskAgain: false },
@@ -42,7 +43,7 @@ mock.module('expo-secure-store', () => ({
 }));
 
 mock.module('react-native', () => ({
-  Platform: { OS: 'android' },
+  Platform: platformState,
 }));
 
 mock.module('../lib/api-client.ts', () => ({
@@ -71,6 +72,7 @@ beforeEach(() => {
   permissionState.requested = { status: 'granted', canAskAgain: false };
   pushToken = 'ExponentPushToken[abcdefghijklmnop_1234567890]';
   apiStatus = 200;
+  platformState.OS = 'android';
 });
 
 test('app resume never prompts when notification permission is undetermined', async () => {
@@ -105,6 +107,23 @@ test('explicit enable action creates the Android channel before asking permissio
   permissionState.current = { status: 'granted', canAskAgain: false };
   await syncPushEndpointForAuthenticatedUser('user-1');
   expect(calls[1].path).toBe(calls[0].path);
+});
+
+test('installation correlation IDs are stable per account and isolated across accounts', async () => {
+  permissionState.current = { status: 'granted', canAskAgain: false };
+  await syncPushEndpointForAuthenticatedUser('user-1');
+  const firstPath = calls[0].path;
+  const firstId = secureValues.get('luckread.native.push-installation.user-1');
+
+  pushToken = 'ExpoPushToken[zyxwvutsrqponmlk_0987654321]';
+  await syncPushEndpointForAuthenticatedUser('user-2');
+  const secondPath = calls[1].path;
+  const secondId = secureValues.get('luckread.native.push-installation.user-2');
+
+  expect(firstPath).not.toBe(secondPath);
+  expect(firstId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+  expect(secondId).toMatch(UUID_PATTERN_FOR_TEST);
+  expect(firstId).not.toBe(secondId);
 });
 
 test('denied permission clears an existing endpoint without requesting permission again', async () => {
@@ -144,6 +163,16 @@ test('logout deletes only the current account installation endpoint and clears i
   expect(calls[0].options.method).toBe('DELETE');
   expect(secureValues.has('luckread.native.push-installation.user-1')).toBe(false);
   expect(secureValues.has('luckread.native.push-installation.user-2')).toBe(true);
+});
+
+test('web cleanup is a no-op and never calls the native secure store or push API', async () => {
+  secureValues.set('luckread.native.push-installation.user-1', '123e4567-e89b-42d3-a456-426614174000');
+  platformState.OS = 'web';
+
+  await unregisterPushEndpointForUser('user-1');
+
+  expect(calls).toHaveLength(0);
+  expect(secureValues.has('luckread.native.push-installation.user-1')).toBe(true);
 });
 
 test('API errors are not reported as successful registration', async () => {
