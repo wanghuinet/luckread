@@ -70,13 +70,13 @@ describe('W05 notification push endpoint runtime', () => {
       platform: 'ios',
       permissionStatus: 'granted',
       expoPushToken: pushToken,
-    })).rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 })
+    })).rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 422 })
 
     await expect(upsertPushEndpoint(db, 'identity-user-1', installationId, {
       platform: 'ios',
       permissionStatus: 'granted',
       expoPushToken: 'not-an-expo-token',
-    })).rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 })
+    })).rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 422 })
 
     expect(prepare).not.toHaveBeenCalled()
   })
