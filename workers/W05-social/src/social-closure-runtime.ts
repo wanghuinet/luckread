@@ -828,6 +828,7 @@ export async function listNotifications(
   cursorValue: string | null,
   limitValue: string | null,
   typeValue: string | null = null,
+  notificationIdValue: string | null = null,
 ) {
   const recipientUserId = id(recipientUserIdValue, 'UNAUTHENTICATED')
   const limit = parseLimit(limitValue)
@@ -837,12 +838,16 @@ export async function listNotifications(
   if (notificationType && !NOTIFICATION_TYPES.includes(notificationType as SocialNotificationType)) {
     throw new SocialClosureRuntimeError('VALIDATION_FAILED', 400)
   }
+  const notificationIdText = notificationIdValue?.trim() ?? ''
+  const notificationId = notificationIdText ? id(notificationIdText) : null
   const whereType = notificationType ? ' AND notification_type = ?' : ''
+  const whereNotificationId = notificationId ? ' AND notification_id = ?' : ''
   const whereCursor = cursor ? ' AND (created_at < ? OR (created_at = ? AND notification_id < ?))' : ''
   const cursorBinds = cursor ? [cursor.createdAt, cursor.createdAt, cursor.notificationId] : []
   const binds = [
     recipientUserId,
     ...(notificationType ? [notificationType] : []),
+    ...(notificationId ? [notificationId] : []),
     ...cursorBinds,
     limit + 1,
   ]
@@ -850,7 +855,7 @@ export async function listNotifications(
   const rows = await db.prepare(
     `SELECT notification_id, notification_type, actor_user_id, target_type, target_id, payload_json, read_at, created_at
        FROM social_notifications
-      WHERE recipient_user_id = ?${whereType}${whereCursor}
+      WHERE recipient_user_id = ?${whereType}${whereNotificationId}${whereCursor}
       ORDER BY created_at DESC, notification_id DESC
       LIMIT ?`,
   ).bind(...binds).all<{
