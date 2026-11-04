@@ -76,7 +76,7 @@ jobs:
         run: bun test tests/ota-config.test.mjs
       - name: Test Android OTA build provenance verification
         run: bun test tests/ota-build-provenance.test.mjs
-      - name: Verify Zeego Android native menu dependencies
+      - name: Verify Expo UI native menu dependencies
         run: bun run test:native-menu
       - name: Test native reusable Button component
         run: bun run test:ui-button
