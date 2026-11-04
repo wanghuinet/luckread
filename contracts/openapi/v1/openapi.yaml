@@ -1429,6 +1429,14 @@ paths:
           schema:
             type: string
             enum: [FOLLOW, LIKE, COMMENT, REPLY, MENTION]
+        - name: notificationId
+          in: query
+          required: false
+          description: Optional exact notification ID filter for resolving a push notification tap. Results remain scoped to the authenticated recipient.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 128
       responses:
         '200':
           description: Notifications.
