@@ -6,9 +6,9 @@
   "name": "NotificationPushEndpoint",
   "domainId": "D1-03",
   "owner": {
-    "worker": "W05",
-    "task": "T14",
-    "authority": "Scoped notification routing state only"
+    "worker": "W09",
+    "task": "T25",
+    "authority": "Primary owner of D1-03 platform runtime push routing state."
   },
   "purpose": "Stores the current Expo push routing address for one app installation. It is not an authentication device, account session, credential, or notification inbox record.",
   "table": "notification_push_endpoints",
@@ -295,5 +295,10 @@
     "workers/W05-social/migrations-d1-03/0001_notification_push_endpoints.sql",
     "workers/W01-payload/src/app/api/v1/push/endpoints/[installationId]/route.ts",
     "workers/W05-social/src/push-endpoint-runtime.ts"
-  ]
+  ],
+  "delegatedWriter": {
+    "worker": "W05",
+    "task": "T14",
+    "scope": "Authenticated self-service PUT registration and DELETE removal only for the current user's Expo push endpoint."
+  }
 }
