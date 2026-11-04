@@ -32,6 +32,7 @@ describe('W05 notification push endpoint runtime', () => {
     expect(JSON.stringify(result)).not.toContain(pushToken)
     expect(sql).toContain('INSERT INTO notification_push_endpoints')
     expect(sql).toContain('ON CONFLICT(installation_id) DO UPDATE')
+    expect(sql).toContain('WHERE notification_push_endpoints.owner_user_id = excluded.owner_user_id')
     expect(sql).toContain('RETURNING endpoint_id, permission_status')
     expect(sql).not.toContain('social_notifications')
     expect(bindings).toContain('identity-user-1')
