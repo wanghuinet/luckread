@@ -62,3 +62,11 @@ Both operations enter W01, resolve the existing session through W02, and obtain 
 - W01 handler tests prove the route delegates principal resolution to the existing W02-backed social session resolver, applies origin/IP → actor-account → fixed-endpoint write limits in order, and forwards only through W05. Direct W02 session acceptance and deployed W01→W05 binding behavior remain production security E2E prerequisites.
 - CI statically verifies the exact D1-02 + D1-03 binding UUIDs and separate migration directories.
 - Remote migration and Worker deployment remain pending until their explicit workflow_dispatch gates are run against a merged main SHA.
+
+
+## Upstream main synchronization — 2026-11-04
+
+- Synced the feature branch to current `main` using merge commit `c9081b5a58c545e8baf590b4ba379c877dbf1ac7`.
+- Upstream parent: `bd6d72d1cd8950d4ad5070db1898cfc8a2985857`.
+- The two intervening upstream commits touched only APP share UI/tests/package metadata and mobile CI; their four changed paths did not overlap this PR's changed paths.
+- The merge commit preserves both parent histories; no force-push or feature commit rewrite was performed.
