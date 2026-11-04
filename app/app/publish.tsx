@@ -1114,7 +1114,7 @@ function PublishScreenContent() {
         throw new Error('The post exists, but the server did not return its version. Retry publication; another content record will not be created.');
       }
 
-      if (pollEnabled && !contentId) {
+      if (pollEnabled && !contentId && !pollConfiguredRef.current) {
         let pollResult: { response: Response; data: unknown };
         try {
           pollResult = await apiRequest<unknown>(
@@ -1261,7 +1261,7 @@ function PublishScreenContent() {
             <Text accessibilityLiveRegion="polite" style={[styles.draftSaveStatus, isDark && { color: '#9ca3af' }]}>
               {draftSaveStatus === 'scheduled' ? '草稿即将自动保存…'
                 : draftSaveStatus === 'saving' ? '正在自动保存草稿…'
-                  : draftSaveStatus === 'saved' ? '草稿已自动保存，可稍后继续编辑。'
+                  : draftSaveStatus === 'saved' ? '草稿已自动保存。'
                     : '草稿自动保存失败，请检查网络后继续；再次编辑会重试。'}
             </Text>
           ) : null}
