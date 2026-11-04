@@ -253,7 +253,8 @@ test('native composer inserts only the active @mention or #topic at the caret', 
   const topic = findActiveComposerToken('read #books', 11);
   expect(topic).toMatchObject({ kind: 'topic', query: 'books' });
   expect(replaceActiveComposerToken('read #books', topic, 'reading').text).toBe('read #reading ');
-  expect(composer).toContain('fetchDiscoveryTopics()');
+  expect(composer).toContain('fetchDiscoveryTopics(controller.signal)');
+  expect(composer).toContain('}, [activeComposerToken?.kind]);');
   expect(composer).toContain('findPublicUserByUsername(query, controller.signal)');
   expect(composer).toContain('onSelectionChange={(event) => setTextSelection(event.nativeEvent.selection)}');
 });
