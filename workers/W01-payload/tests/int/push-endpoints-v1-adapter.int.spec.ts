@@ -11,6 +11,16 @@ const mocks = vi.hoisted(() => {
     MockTrafficLimitError,
     MockW05SocialClientError,
     MockW08CreatorClientError: class MockW08CreatorClientError extends Error {},
+    MockW06ModerationClientError: class MockW06ModerationClientError extends Error {},
+    callW06PushEndpointMutationAudit: vi.fn(async (input: { body: {
+      eventId: string; installationId: string; operation: 'REGISTER' | 'REMOVE'
+    } }) => Response.json({
+      eventId: input.body.eventId,
+      action: 'notification.push_endpoint.mutation_requested',
+      targetType: 'NotificationPushEndpoint',
+      targetId: input.body.installationId,
+      replayed: false,
+    }, { status: 201 })),
     callW08Creator: vi.fn(async (_request: Request, _path: string, _method: 'GET' | 'POST') => Response.json({
       decision: 'ALLOW', action: 'notification.update.self', resourceType: 'Notification',
       policyVersion: 'casl-l0-l8-v1', layer: 'L2',
@@ -42,6 +52,10 @@ vi.mock('../../src/auth/w08-creator-client.js', () => ({
   callW08Creator: mocks.callW08Creator,
   W08CreatorClientError: mocks.MockW08CreatorClientError,
 }))
+vi.mock('../../src/moderation/w06-moderation-client.js', () => ({
+  callW06PushEndpointMutationAudit: mocks.callW06PushEndpointMutationAudit,
+  W06ModerationClientError: mocks.MockW06ModerationClientError,
+}))
 
 import { DELETE, PUT } from '../../src/app/api/v1/push/endpoints/[installationId]/route.js'
 
@@ -54,6 +68,7 @@ const requestFor = (method: 'PUT' | 'DELETE', body?: unknown) =>
     method,
     headers: {
       Authorization: 'Bearer test-session-token',
+      'Idempotency-Key': method === 'PUT' ? 'idem_register_test_0001' : 'idem_remove_test_0001',
       ...(method === 'PUT' ? { 'content-type': 'application/json' } : {}),
     },
     ...(method === 'PUT' ? { body: JSON.stringify(body) } : {}),
@@ -76,6 +91,16 @@ beforeEach(() => {
     decision: 'ALLOW', action: 'notification.update.self', resourceType: 'Notification',
     policyVersion: 'casl-l0-l8-v1', layer: 'L2',
   }))
+  mocks.callW06PushEndpointMutationAudit.mockReset()
+  mocks.callW06PushEndpointMutationAudit.mockImplementation(async (input: { body: {
+    eventId: string; installationId: string; operation: 'REGISTER' | 'REMOVE'
+  } }) => Response.json({
+    eventId: input.body.eventId,
+    action: 'notification.push_endpoint.mutation_requested',
+    targetType: 'NotificationPushEndpoint',
+    targetId: input.body.installationId,
+    replayed: false,
+  }, { status: 201 }))
 })
 
 describe('v1 Expo push endpoint adapter', () => {
@@ -97,6 +122,20 @@ describe('v1 Expo push endpoint adapter', () => {
       principal: { userId: 'user_test_01', layer: 'L2', verified: true },
       body: registrationBody,
     }))
+    expect(mocks.callW06PushEndpointMutationAudit).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      principal: { userId: 'user_test_01', layer: 'L2', verified: true },
+      body: expect.objectContaining({
+        installationId,
+        operation: 'REGISTER',
+        idempotencyKey: 'idem_register_test_0001',
+        platform: 'android',
+        permissionStatus: 'granted',
+      }),
+    }))
+    const auditIntent = mocks.callW06PushEndpointMutationAudit.mock.calls[0]?.[0] as { body: Record<string, unknown> }
+    expect(JSON.stringify(auditIntent.body)).not.toContain(token)
+    expect(mocks.callW06PushEndpointMutationAudit.mock.invocationCallOrder[0])
+      .toBeLessThan(mocks.callW05Social.mock.invocationCallOrder[0])
     expect(mocks.callW08Creator).toHaveBeenNthCalledWith(
       1,
       expect.any(Request),
@@ -115,6 +154,15 @@ describe('v1 Expo push endpoint adapter', () => {
       principal: { userId: 'user_test_01', layer: 'L2', verified: true },
     }))
     expect(mocks.callW08Creator).toHaveBeenCalledTimes(2)
+    expect(mocks.callW06PushEndpointMutationAudit).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      body: expect.objectContaining({
+        installationId,
+        operation: 'REMOVE',
+        idempotencyKey: 'idem_remove_test_0001',
+        platform: null,
+        permissionStatus: null,
+      }),
+    }))
     expect(JSON.stringify(await putResponse.clone().json())).not.toContain(token)
   })
 
@@ -215,6 +263,34 @@ describe('v1 Expo push endpoint adapter', () => {
     }), context)
 
     expect(response.status).toBe(503)
+    expect(mocks.callW05Social).not.toHaveBeenCalled()
+  })
+
+
+  it('fails closed before W05 when the durable W06 audit intent is unavailable', async () => {
+    mocks.callW06PushEndpointMutationAudit.mockResolvedValueOnce(
+      Response.json({ error: 'AUDIT_EVENT_PERSISTENCE_FAILED' }, { status: 503 }),
+    )
+    const response = await PUT(requestFor('PUT', {
+      platform: 'ios',
+      permissionStatus: 'granted',
+      expoPushToken: token,
+    }), context)
+
+    expect(response.status).toBe(503)
+    expect(mocks.callW06PushEndpointMutationAudit).toHaveBeenCalledTimes(1)
+    expect(mocks.callW05Social).not.toHaveBeenCalled()
+  })
+
+  it('requires a stable idempotency key before asking W08 or W06', async () => {
+    const request = new Request('https://www.luckread.com/api/v1/push/endpoints/' + installationId, {
+      method: 'DELETE',
+      headers: { Authorization: 'Bearer test-session-token' },
+    })
+    const response = await DELETE(request, context)
+    expect(response.status).toBe(428)
+    expect(mocks.callW08Creator).not.toHaveBeenCalled()
+    expect(mocks.callW06PushEndpointMutationAudit).not.toHaveBeenCalled()
     expect(mocks.callW05Social).not.toHaveBeenCalled()
   })
 
