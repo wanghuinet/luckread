@@ -64,20 +64,23 @@ const parseRegistration = (value: unknown): PushEndpointRegistrationInput => {
   if (rawToken !== null && typeof rawToken !== 'string') {
     throw new PushEndpointRuntimeError('VALIDATION_FAILED', 422)
   }
-  const token = typeof rawToken === 'string' ? rawToken.trim() : null
-  if (value.permissionStatus === 'granted') {
-    if (
-      !token ||
-      token.length > MAX_PUSH_TOKEN ||
-      !/^(?:Expo|Exponent)PushToken\[[A-Za-z0-9_-]{16,480}\]$/.test(token)
-    ) {
-      throw new PushEndpointRuntimeError('VALIDATION_FAILED', 422)
-    }
-  } else if (token !== null) {
-    // Revoked/undetermined permission must never leave an old token eligible
-    // for delivery.
+  const submittedToken = typeof rawToken === 'string' ? rawToken.trim() : null
+  if (submittedToken !== null && submittedToken.length > MAX_PUSH_TOKEN) {
     throw new PushEndpointRuntimeError('VALIDATION_FAILED', 422)
   }
+  if (
+    value.permissionStatus === 'granted' &&
+    (
+      !submittedToken ||
+      !/^(?:Expo|Exponent)PushToken\\[[A-Za-z0-9_-]{16,480}\\]$/.test(submittedToken)
+    )
+  ) {
+    throw new PushEndpointRuntimeError('VALIDATION_FAILED', 422)
+  }
+
+  // Permission state is authoritative. Always clear stale tokens when the
+  // user has denied or not yet granted notification permission.
+  const token = value.permissionStatus === 'granted' ? submittedToken : null
 
   let appVersion: string | null = null
   if (value.appVersion !== undefined && value.appVersion !== null) {
