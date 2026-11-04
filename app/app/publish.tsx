@@ -17,6 +17,7 @@ import { VideoView, useVideoPlayer } from 'expo-video';
 import { useColorScheme } from 'nativewind';
 import { KeyboardAwareScrollView, KeyboardProvider } from 'react-native-keyboard-controller';
 import Sortable from 'react-native-sortables';
+import PublishMediaActionSheet from '~/components/PublishMediaActionSheet';
 
 import { apiRequest, createIdempotencyKey } from '~/lib/api-client';
 import {
@@ -136,6 +137,7 @@ function PublishScreenContent() {
   const [accessMode, setAccessMode] = useState<'PUBLIC' | 'MEMBERS_ONLY'>('PUBLIC');
   const [assets, setAssets] = useState<ComposerAsset[]>([]);
   const [cameraVisible, setCameraVisible] = useState(false);
+  const [mediaActionsVisible, setMediaActionsVisible] = useState(false);
   const [coverRef, setCoverRef] = useState('');
   const [busy, setBusy] = useState(false);
   const [loadingEdit, setLoadingEdit] = useState(Boolean(contentId));
@@ -844,18 +846,11 @@ function PublishScreenContent() {
           <View style={styles.mediaActions}>
             <Pressable
               accessibilityRole="button"
+              accessibilityLabel="Add photos or video"
+              accessibilityState={{ disabled: busy || loadingEdit || publishPending || assets.length >= MAX_MEDIA_ITEMS }}
               disabled={busy || loadingEdit || publishPending || assets.length >= MAX_MEDIA_ITEMS}
               style={[styles.mediaButton, isDark && { borderColor: '#52525b' }]}
-              onPress={() => setCameraVisible(true)}
-            >
-              <Feather name="camera" size={19} color={PRIMARY} />
-              <Text style={styles.mediaButtonText}>Take photo</Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              disabled={busy || loadingEdit || publishPending || assets.length >= MAX_MEDIA_ITEMS}
-              style={[styles.mediaButton, isDark && { borderColor: '#52525b' }]}
-              onPress={() => { void pickMedia(); }}
+              onPress={() => setMediaActionsVisible(true)}
             >
               <Feather name="image" size={19} color={PRIMARY} />
               <Text style={styles.mediaButtonText}>Add photos or video</Text>
@@ -959,6 +954,14 @@ function PublishScreenContent() {
           </View>
         </KeyboardAwareScrollView>
       )}
+      <PublishMediaActionSheet
+        visible={mediaActionsVisible}
+        disabled={busy || loadingEdit || publishPending || assets.length >= MAX_MEDIA_ITEMS}
+        remainingCount={MAX_MEDIA_ITEMS - assets.length}
+        onClose={() => setMediaActionsVisible(false)}
+        onTakePhoto={() => setCameraVisible(true)}
+        onPickMedia={() => { void pickMedia(); }}
+      />
       <CameraCaptureModal
         visible={cameraVisible}
         onClose={() => setCameraVisible(false)}
