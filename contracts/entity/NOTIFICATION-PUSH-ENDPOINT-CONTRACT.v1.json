@@ -35,7 +35,7 @@
       "evidenceRefs": [
         "contracts/entity/NOTIFICATION-PUSH-ENDPOINT-CONTRACT.v1.json",
         "contracts/persistence/NOTIFY-002-W05-D1-03-PUSH-ENDPOINT-PERSISTENCE.v1.json",
-        "workers/W05-social/migrations-d1-03/0001_notification_push_endpoints.sql"
+        "workers/W09-platform/migrations-d1-03/0001_notification_push_endpoints.sql"
       ]
     },
     {
@@ -59,7 +59,7 @@
       "evidenceRefs": [
         "contracts/entity/NOTIFICATION-PUSH-ENDPOINT-CONTRACT.v1.json",
         "contracts/persistence/NOTIFY-002-W05-D1-03-PUSH-ENDPOINT-PERSISTENCE.v1.json",
-        "workers/W05-social/migrations-d1-03/0001_notification_push_endpoints.sql"
+        "workers/W09-platform/migrations-d1-03/0001_notification_push_endpoints.sql"
       ]
     },
     {
@@ -83,7 +83,7 @@
       "evidenceRefs": [
         "contracts/entity/NOTIFICATION-PUSH-ENDPOINT-CONTRACT.v1.json",
         "contracts/persistence/NOTIFY-002-W05-D1-03-PUSH-ENDPOINT-PERSISTENCE.v1.json",
-        "workers/W05-social/migrations-d1-03/0001_notification_push_endpoints.sql"
+        "workers/W09-platform/migrations-d1-03/0001_notification_push_endpoints.sql"
       ]
     },
     {
@@ -107,7 +107,7 @@
       "evidenceRefs": [
         "contracts/entity/NOTIFICATION-PUSH-ENDPOINT-CONTRACT.v1.json",
         "contracts/persistence/NOTIFY-002-W05-D1-03-PUSH-ENDPOINT-PERSISTENCE.v1.json",
-        "workers/W05-social/migrations-d1-03/0001_notification_push_endpoints.sql"
+        "workers/W09-platform/migrations-d1-03/0001_notification_push_endpoints.sql"
       ]
     },
     {
@@ -131,7 +131,7 @@
       "evidenceRefs": [
         "contracts/entity/NOTIFICATION-PUSH-ENDPOINT-CONTRACT.v1.json",
         "contracts/persistence/NOTIFY-002-W05-D1-03-PUSH-ENDPOINT-PERSISTENCE.v1.json",
-        "workers/W05-social/migrations-d1-03/0001_notification_push_endpoints.sql"
+        "workers/W09-platform/migrations-d1-03/0001_notification_push_endpoints.sql"
       ]
     },
     {
@@ -155,7 +155,7 @@
       "evidenceRefs": [
         "contracts/entity/NOTIFICATION-PUSH-ENDPOINT-CONTRACT.v1.json",
         "contracts/persistence/NOTIFY-002-W05-D1-03-PUSH-ENDPOINT-PERSISTENCE.v1.json",
-        "workers/W05-social/migrations-d1-03/0001_notification_push_endpoints.sql"
+        "workers/W09-platform/migrations-d1-03/0001_notification_push_endpoints.sql"
       ]
     },
     {
@@ -179,7 +179,7 @@
       "evidenceRefs": [
         "contracts/entity/NOTIFICATION-PUSH-ENDPOINT-CONTRACT.v1.json",
         "contracts/persistence/NOTIFY-002-W05-D1-03-PUSH-ENDPOINT-PERSISTENCE.v1.json",
-        "workers/W05-social/migrations-d1-03/0001_notification_push_endpoints.sql"
+        "workers/W09-platform/migrations-d1-03/0001_notification_push_endpoints.sql"
       ]
     },
     {
@@ -203,7 +203,7 @@
       "evidenceRefs": [
         "contracts/entity/NOTIFICATION-PUSH-ENDPOINT-CONTRACT.v1.json",
         "contracts/persistence/NOTIFY-002-W05-D1-03-PUSH-ENDPOINT-PERSISTENCE.v1.json",
-        "workers/W05-social/migrations-d1-03/0001_notification_push_endpoints.sql"
+        "workers/W09-platform/migrations-d1-03/0001_notification_push_endpoints.sql"
       ]
     },
     {
@@ -227,7 +227,7 @@
       "evidenceRefs": [
         "contracts/entity/NOTIFICATION-PUSH-ENDPOINT-CONTRACT.v1.json",
         "contracts/persistence/NOTIFY-002-W05-D1-03-PUSH-ENDPOINT-PERSISTENCE.v1.json",
-        "workers/W05-social/migrations-d1-03/0001_notification_push_endpoints.sql"
+        "workers/W09-platform/migrations-d1-03/0001_notification_push_endpoints.sql"
       ]
     },
     {
@@ -251,7 +251,7 @@
       "evidenceRefs": [
         "contracts/entity/NOTIFICATION-PUSH-ENDPOINT-CONTRACT.v1.json",
         "contracts/persistence/NOTIFY-002-W05-D1-03-PUSH-ENDPOINT-PERSISTENCE.v1.json",
-        "workers/W05-social/migrations-d1-03/0001_notification_push_endpoints.sql"
+        "workers/W09-platform/migrations-d1-03/0001_notification_push_endpoints.sql"
       ]
     },
     {
@@ -275,7 +275,7 @@
       "evidenceRefs": [
         "contracts/entity/NOTIFICATION-PUSH-ENDPOINT-CONTRACT.v1.json",
         "contracts/persistence/NOTIFY-002-W05-D1-03-PUSH-ENDPOINT-PERSISTENCE.v1.json",
-        "workers/W05-social/migrations-d1-03/0001_notification_push_endpoints.sql"
+        "workers/W09-platform/migrations-d1-03/0001_notification_push_endpoints.sql"
       ]
     }
   ],
