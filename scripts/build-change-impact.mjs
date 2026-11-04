@@ -44,7 +44,7 @@ const records = features.map((f) => {
   }
   let status = 'UNRESOLVED';
   if (ms.length === 0) status = 'BLOCKED';
-  else if (rs.some((r) => ['DRIFT','CONFLICT','DUPLICATE','UNRESOLVED','BLOCKED','MISSING','EXTRA'].includes(r.status))) status = 'MODIFIED';
+  else if (rs.some((r) => ['DRIFT','CONFLICT','DUPLICATE','UNRESOLVED','BLOCKED','MISSING','EXTRA','PARTIAL'].includes(r.status))) status = 'MODIFIED';
   else if (ms.some((m) => m.status === 'MISSING')) status = 'MODIFIED';
   else status = 'UNCHANGED';
   return { impactId:`IMPACT:${f.featureId}`, featureId:f.featureId, status, affectedSystems:[...affectedSystems].sort(), affectedRefs:[...new Set(affectedRefs)].sort(), evidenceRefs:[...new Set(evidenceRefs)].sort(), blockers: ms.length === 0 ? ['No cross-system mapping exists for feature; impact cannot be inferred.'] : [] };
