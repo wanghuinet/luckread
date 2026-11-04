@@ -18,7 +18,7 @@ const postDetail = readFileSync(
 );
 
 test('uses the Expo SDK 58 native menu package instead of the legacy community module', () => {
-  expect(packageJson.dependencies['@expo/ui']).toBe('~58.0.26');
+  expect(packageJson.dependencies['@expo/ui']).toBe('~58.0.27');
   expect(packageJson.dependencies['@react-native-menu/menu']).toBeUndefined();
   expect(packageJson.dependencies.zeego).toBeUndefined();
   expect(packageJson.dependencies['react-native-ios-context-menu']).toBeUndefined();
