@@ -398,7 +398,7 @@
       ],
       "auditRequired": true,
       "optimisticLockRequired": false,
-      "idempotencyRequired": false,
+      "idempotencyRequired": true,
       "stateMachine": "none",
       "x-luckread-contract-status": "CONTRACTED_PARTIAL",
       "x-luckread-source": "contracts/api/notification-operation-policy.v1.json"
@@ -2951,7 +2951,7 @@
       ],
       "auditRequired": true,
       "optimisticLockRequired": false,
-      "idempotencyRequired": false,
+      "idempotencyRequired": true,
       "stateMachine": "none",
       "x-luckread-contract-status": "CONTRACTED_PARTIAL",
       "x-luckread-source": "contracts/api/notification-operation-policy.v1.json"
