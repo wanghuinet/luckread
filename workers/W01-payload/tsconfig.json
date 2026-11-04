@@ -41,7 +41,6 @@
     ".next/dev/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules",
-    "tests/int/push-endpoints-w05-binding.int.spec.ts"
+    "node_modules"
   ]
 }
