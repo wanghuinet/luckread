@@ -44,7 +44,7 @@
     "D1-03 is not a generic business-data sink.",
     "Every authoritative D1-03 entity has exactly one primary Worker owner.",
     "Cross-owner changes use explicit events/contracts rather than unrestricted direct database access.",
-    "W05 is not a general D1-03 owner; its only scoped delegated D1-03 writer exception is NotificationPushEndpoint under T14, with W09 remaining the primary entity owner."
+    "W05 is not a general D1-03 owner; its only scoped D1-03 access exceptions for NotificationPushEndpoint are authenticated self-service PUT/DELETE under NOTIFY-002 and owner-scoped delivery read / conditional invalid-token clearing under contracts/transport/W05-W09-notification-push-delivery.v1.json, with W09 remaining the primary entity owner."
   ],
   "topology": {
     "workerCount": 12,
@@ -62,8 +62,18 @@
         "PUT /v1/push/endpoints/{installationId}",
         "DELETE /v1/push/endpoints/{installationId}"
       ],
-      "boundary": "W05 may write only notification_push_endpoints through the declared D1_03 binding. It gains no other D1-03 entity ownership or platform runtime authority.",
-      "contractRef": "contracts/persistence/NOTIFY-002-W05-D1-03-PUSH-ENDPOINT-PERSISTENCE.v1.json"
+      "boundary": "W05 may perform only the declared self-service registration/removal and scoped delivery-runtime read/conditional invalid-token clear operations on notification_push_endpoints. It gains no other D1-03 entity ownership or platform runtime authority.",
+      "contractRef": "contracts/persistence/NOTIFY-002-W05-D1-03-PUSH-ENDPOINT-PERSISTENCE.v1.json",
+      "delegatedDeliveryRuntime": {
+        "worker": "W05",
+        "task": "T14",
+        "allowedOperations": [
+          "resolveActiveRecipientPushEndpoints",
+          "clearProviderInvalidExpoToken"
+        ],
+        "scope": "Only persisted W05 notification recipients, maximum 20 active Expo endpoints, and conditional clear of the exact token hash reported DeviceNotRegistered.",
+        "contractRef": "contracts/transport/W05-W09-notification-push-delivery.v1.json"
+      }
     }
   }
 }
