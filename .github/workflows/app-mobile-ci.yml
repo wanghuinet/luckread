@@ -33,6 +33,8 @@ env:
 jobs:
   dependency-compatibility:
     name: Expo install, doctor and typecheck
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     env:
       EXPO_PROJECT_ID: "00000000-0000-4000-8000-000000000001"
@@ -62,6 +64,20 @@ jobs:
           path: app/bun.lockb
           if-no-files-found: error
           retention-days: 1
+      - name: Commit generated Bun lockfile for this component branch
+        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'feat/native-expo-network-status' }}
+        env:
+          TARGET_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add bun.lockb
+          if git diff --cached --quiet; then
+            echo "Bun lockfile is already synchronized."
+          else
+            git commit -m "chore(app): sync Expo Network Bun lockfile"
+            git push origin "HEAD:${TARGET_BRANCH}"
+          fi
       - name: Apply and verify Hyperswitch React Native 0.88 compatibility
         run: |
           node scripts/apply-hyperswitch-rn88-compat.mjs
