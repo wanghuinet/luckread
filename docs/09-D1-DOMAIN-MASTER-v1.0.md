@@ -113,7 +113,6 @@ D1-03 owns platform operational, governance and runtime state.
 - Reconciliation operation state
 - Platform runtime state
 - NotificationPushEndpoint (W09-owned platform runtime routing state; W05 has only an explicit T14 self-service writer delegation)
-- NotificationPushEndpoint (W05-owned Expo push routing endpoint state only)
 
 ### Bounded Worker owner matrix
 
@@ -127,7 +126,6 @@ D1-03 owns platform operational, governance and runtime state.
 | ReconciliationOperation | W09 | Reconciliation control state only |
 | AuditEvent | W09 | Append-only platform audit events |
 | NotificationPushEndpoint | W09 | Platform runtime push routing registry; scoped W05/T14 writer delegation only |
-| NotificationPushEndpoint | W05 | Scoped T14 push routing endpoint registry only |
 | Job / Retry / DLQ | W10 | Async execution state only |
 | ExecutionInbox / ExecutionOutbox | W10 | Async delivery/execution records only |
 | OperationalIdempotency | W10 | Platform execution idempotency only |
