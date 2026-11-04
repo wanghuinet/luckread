@@ -341,3 +341,33 @@ describe('Media upload access', () => {
     expect(inventory).toContain('uploadIdempotencyKey')
     expect(inventory).toContain('uploadFingerprint')
   })
+
+
+it('keeps composer media URL lookups owner-scoped and bounded', () => {
+  const route = read('src/app/api/v1/media/route.ts')
+  const urlLookup = route.indexOf("const requestedUrls = url.searchParams.getAll('url')")
+  const ownerFilter = route.indexOf("ownerUserId: { equals: payloadUserId }")
+  expect(urlLookup).toBeGreaterThan(-1)
+  expect(route).toContain('requestedUrls.length > 4')
+  expect(route).toContain('isCanonicalMediaDeliveryUrl(value)')
+  expect(ownerFilter).toBeGreaterThan(urlLookup)
+  expect(route).toContain('matchingUrls.map((mediaUrl) => ({ url: { equals: mediaUrl } }))')
+  expect(route).toContain('alt: doc.alt')
+})
+
+it('only exposes published image descriptions after W03 visibility and entitlement authorization', () => {
+  const route = read('src/app/api/v1/media/metadata/route.ts')
+  const delivery = read('src/app/api/media-delivery/[...key]/route.ts')
+  expect(route).toContain('resolveOptionalCookieContentPrincipal(request)')
+  expect(route).toContain("pathname: '/internal/content/public-media-reference?url='")
+  expect(route).toContain('access.allowed && (access.isPublic || access.isMemberContent)')
+  expect(route).toContain('mediaUrls.length > 4')
+  expect(route).toContain("collection: 'media'")
+  expect(route).toContain('select: { url: true, alt: true, mimeType: true }')
+  expect(route).toContain("'cache-control': 'private, no-store'")
+  expect(route).not.toContain('cachedPublicGet(')
+  // The existing media byte-delivery gate and owner-only media detail route remain in place.
+  expect(delivery).toContain('public-media-reference?url=')
+  const ownerRoute = read('src/app/api/v1/media/[mediaId]/route.ts')
+  expect(ownerRoute).toContain("'cache-control': 'private, no-store'")
+})
