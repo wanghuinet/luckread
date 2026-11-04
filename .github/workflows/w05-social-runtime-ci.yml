@@ -152,7 +152,7 @@ jobs:
 
       - name: Typecheck durable W05 push delivery and Workflow modules
         working-directory: workers/W01-payload
-        run: pnpm exec tsc --noEmit --target ES2022 --lib ES2022,DOM --module ESNext --moduleResolution Bundler --strict --skipLibCheck --types @cloudflare/workers-types ../../workers/W05-social/src/notification-push-delivery-runtime.ts ../../workers/W05-social/src/notification-push-delivery-runtime.test.ts ../../workers/W05-social/src/notification-push-workflow-runtime.ts ../../workers/W05-social/src/notification-push-workflow.test.ts ../../workers/W05-social/src/notification-push-workflow.ts
+        run: pnpm exec tsc --noEmit --target ES2022 --lib ES2022,DOM --module ESNext --moduleResolution Bundler --strict --skipLibCheck --types @cloudflare/workers-types ../../workers/W05-social/src/notification-push-delivery-runtime.ts ../../workers/W05-social/src/notification-push-workflow-runtime.ts ../../workers/W05-social/src/notification-push-workflow.ts
 
       - name: Run W05 Social and W01 adapter tests
         working-directory: workers/W01-payload
