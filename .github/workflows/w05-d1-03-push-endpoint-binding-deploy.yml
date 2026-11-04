@@ -64,6 +64,7 @@ jobs:
           assert c['services'][0]['binding'] == 'W03_CONTENT'
           assert 'queues' not in c
           assert c.get('vars', {}).get('PUSH_DELIVERY_ENABLED') == 'false'
+          assert 'nodejs_compat' in c.get('compatibility_flags', [])
           workflows = c.get('workflows', [])
           assert workflows == [{
               'name': 'luckread-w05-notification-push',
