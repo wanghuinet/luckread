@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 
 const camera = readFileSync(new URL('../components/CameraCaptureModal.tsx', import.meta.url), 'utf8');
 const composer = readFileSync(new URL('../app/publish.tsx', import.meta.url), 'utf8');
+const mediaActionSheet = readFileSync(new URL('../components/PublishMediaActionSheet.tsx', import.meta.url), 'utf8');
 const appConfig = JSON.parse(readFileSync(new URL('../app.json', import.meta.url), 'utf8'));
 const packageJson = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 
@@ -29,7 +30,9 @@ test('camera is mounted only while the user opens the capture surface', () => {
   expect(camera).toContain('if (!visible) return null;');
   expect(camera).toContain('onRequestClose={onClose}');
   expect(camera).toContain('onMountError');
-  expect(composer).toContain('onPress={() => setCameraVisible(true)}');
+  expect(composer).toContain('onTakePhoto={() => setCameraVisible(true)}');
+  expect(mediaActionSheet).toContain("dismissForAction('camera')");
+  expect(mediaActionSheet).toContain("if (pendingAction === 'camera') onTakePhoto();");
   expect(composer).toContain('<CameraCaptureModal');
   expect(composer).toContain('visible={cameraVisible}');
 });
