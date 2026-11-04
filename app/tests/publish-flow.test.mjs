@@ -1,5 +1,6 @@
 import { expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
+import { computeAutoSaveDelay, createPublishDraftFingerprint } from '../lib/publish-draft-autosave.ts';
 
 const composer = readFileSync(new URL('../app/publish.tsx', import.meta.url), 'utf8');
 const feedItem = readFileSync(new URL('../components/FeedItem.tsx', import.meta.url), 'utf8');
@@ -20,7 +21,7 @@ test('native publisher uses the shared media API helpers and existing W01 state 
 });
 
 test('publishing and editing failures surface the backend HTTP status, error code and request ID', () => {
-  expect(composer).toContain('apiFailureDiagnostic(result, \'Unable to load this post for editing.\')');
+  expect(composer).toContain("restoringDraft ? 'Unable to restore this draft.' : 'Unable to load this post for editing.'");
   expect(composer).toContain('apiFailureDiagnostic(result, \'Unable to save post changes.\')');
   expect(composer).toContain('apiFailureDiagnostic(created, \'Unable to create the post.\')');
   expect(composer).toMatch(/apiFailureDiagnostic\(\s*pollResult\s*,/);
@@ -38,7 +39,7 @@ test('publisher uses permanent server media references and stable per-operation 
 });
 
 test('editing is ETag guarded and returns to a refreshed authoritative timeline', () => {
-  expect(composer).toContain("useLocalSearchParams<{ contentId?: string | string[] }>()");
+  expect(composer).toContain("useLocalSearchParams<{ contentId?: string | string[]; draftId?: string | string[] }>()");
   expect(composer).toContain("headers: { 'If-Match': record.etag }");
   expect(composer).toContain('idempotencyKey: attempt.mutationKey');
   expect(composer).toContain("router.replace(('/?published=' + encodeURIComponent(contentId) + '&refresh=' + Date.now()) as never)");
@@ -179,4 +180,52 @@ test('native composer reuses Gorhom bottom sheet for camera and photo-library me
   expect(mediaActionSheet).toContain('Choose from library');
   // Native pickers are invoked only after the bottom sheet has fully dismissed.
   expect(mediaActionSheet.indexOf('onDismiss={handleDismiss}')).toBeGreaterThan(-1);
+});
+
+
+test('native publisher auto-saves server drafts, restores them by draft ID, and flushes before close or publish', () => {
+  expect(composer).toContain("draftId?: string | string[]");
+  expect(composer).toContain("fetchContentBodyReference(record.bodyRef)");
+  expect(composer).toContain("apiRequest<Record<string, unknown>>('/contents'");
+  expect(composer).toContain("'/contents/' + encodeURIComponent(draft.id)");
+  expect(composer).toContain("headers: { 'If-Match': draft.etag }");
+  expect(composer).toContain("router.setParams({ draftId: draft.id } as never)");
+  expect(composer).toContain('draftCreatePendingRef.current');
+  expect(composer).toContain('draftSaveInFlightPromiseRef.current');
+  expect(composer).toContain('await saveDraftSnapshot();');
+  expect(composer).toContain("onPress={() => { void closeComposer(); }}");
+  expect(composer).toContain("usePreventRemove(shouldPreventRemove, handlePreventRemove)");
+  expect(composer).toContain('navigation.dispatch(data.action)');
+  expect(composer).toContain('draftWasPublishedRef.current = true');
+  expect(composer).toContain("to: 'PUBLISHED'");
+  expect(composer).toContain('fetchContentBodyReference');
+  expect(composer).toContain('draftSavedFingerprintRef.current = fingerprint;');
+  expect(composer).toContain('if (pollEnabled && !contentId && !pollConfiguredRef.current)');
+  expect(composer).toContain('草稿已自动保存。');
+  expect(composer).toContain('Complete the poll before saving the draft.');
+  expect(composer).not.toContain('localStorage');
+});
+
+test('native draft autosave uses the proven W01 debounce and minimum write interval', () => {
+  expect(computeAutoSaveDelay(1_000, null)).toBe(1_800);
+  expect(computeAutoSaveDelay(2_000, 1_000)).toBe(4_000);
+  expect(computeAutoSaveDelay(20_000, 1_000)).toBe(1_800);
+});
+
+test('native draft fingerprints are stable and change when persisted content changes', () => {
+  const input = {
+    body: 'A private draft',
+    accessMode: 'PUBLIC',
+    mediaRefs: ['https://img.luckread.com/a.jpg'],
+    coverRef: 'https://img.luckread.com/a.jpg',
+    pollEnabled: false,
+    pollOptions: [],
+    pollDurationHours: 24,
+  };
+  const fingerprint = createPublishDraftFingerprint(input);
+  expect(createPublishDraftFingerprint(input)).toBe(fingerprint);
+  expect(createPublishDraftFingerprint({ ...input, body: 'Changed draft' })).not.toBe(fingerprint);
+  expect(createPublishDraftFingerprint({ ...input, accessMode: 'MEMBERS_ONLY' })).not.toBe(fingerprint);
+  expect(createPublishDraftFingerprint({ ...input, pollEnabled: true, pollOptions: ['Yes', 'No'] })).not.toBe(fingerprint);
+  expect(fingerprint).not.toContain(input.body);
 });
