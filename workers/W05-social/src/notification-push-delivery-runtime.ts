@@ -237,9 +237,10 @@ async function claimDueReceipts(db: D1Database, now: Date): Promise<ClaimedRecei
   const nowIso = now.toISOString()
   const candidates = await db.prepare(
     "SELECT delivery_id, notification_id, endpoint_id, expo_ticket_id FROM social_notification_push_deliveries " +
-    "WHERE status = 'RECEIPT_PENDING' AND expo_ticket_id IS NOT NULL AND next_attempt_at <= ? " +
+    "WHERE ((status = 'RECEIPT_PENDING' AND expo_ticket_id IS NOT NULL AND next_attempt_at <= ?) " +
+    "OR (status = 'RECEIPT_LEASED' AND lease_expires_at IS NOT NULL AND lease_expires_at <= ?)) " +
     'ORDER BY next_attempt_at ASC, created_at ASC LIMIT ?',
-  ).bind(nowIso, RECEIPT_LIMIT).all<{
+  ).bind(nowIso, nowIso, RECEIPT_LIMIT).all<{
     delivery_id: string; notification_id: string; endpoint_id: string; expo_ticket_id: string
   }>()
 
