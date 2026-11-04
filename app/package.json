@@ -30,7 +30,8 @@
     "postinstall": "node scripts/apply-hyperswitch-rn88-compat.mjs",
     "test:hyperswitch-compat": "bun test tests/hyperswitch-rn88-compat.test.mjs",
     "test:feed-query": "bun test tests/feed-query.test.mjs tests/native-query-cache.test.mjs",
-    "test:image-upload-preparation": "bun test tests/image-upload-preparation.test.mjs"
+    "test:image-upload-preparation": "bun test tests/image-upload-preparation.test.mjs",
+    "test:network-status": "bun test tests/network-status.test.mjs"
   },
   "dependencies": {
     "@codeherence/react-native-header": "^0.14.0",
