@@ -22,7 +22,7 @@ type ClaimedReceipt = Readonly<{
   expoTicketId: string; leaseToken: string; attemptCount: number; receiptPollCount: number; pushTokenHash: string
 }>
 export type NotificationPushBatchResult = Readonly<{
-  status: 'COMPLETED' | 'DISABLED'; fannedOut: number; sent: number; delivered: number
+  status: 'COMPLETED' | 'DISABLED'; fannedOut: number; sent: number; providerAccepted: number
   retried: number; failed: number; skipped: number
 }>
 
@@ -309,7 +309,7 @@ async function claimDueReceipts(db: D1Database, now: Date): Promise<ClaimedRecei
 
 async function applyReceipt(
   db: D1Database, endpointDb: D1Database, task: ClaimedReceipt, receipt: PushReceiptLike | undefined, now: Date,
-): Promise<'delivered' | 'retried' | 'failed' | 'pending'> {
+): Promise<'provider-accepted' | 'retried' | 'failed' | 'pending'> {
   if (!receipt) {
     if (task.receiptPollCount >= MAX_RECEIPT_POLLS) {
       await db.prepare(
@@ -328,11 +328,11 @@ async function applyReceipt(
 
   if (receipt.status === 'ok') {
     await db.prepare(
-      "UPDATE social_notification_push_deliveries SET status = 'DELIVERED', lease_token = NULL, " +
+      "UPDATE social_notification_push_deliveries SET status = 'PROVIDER_ACCEPTED', lease_token = NULL, " +
       "lease_expires_at = NULL, last_error_code = NULL, updated_at = ? " +
       "WHERE delivery_id = ? AND status = 'RECEIPT_LEASED' AND lease_token = ?",
     ).bind(now.toISOString(), task.deliveryId, task.leaseToken).run()
-    return 'delivered'
+    return 'provider-accepted'
   }
 
   const errorCode = String(receipt.details?.error ?? 'EXPO_RECEIPT_ERROR')
@@ -392,8 +392,8 @@ async function processSendBatch(
 
 async function processReceiptBatch(
   db: D1Database, endpointDb: D1Database, client: Expo, tasks: ClaimedReceipt[], now: Date,
-): Promise<{ delivered: number; retried: number; failed: number; pending: number }> {
-  const result = { delivered: 0, retried: 0, failed: 0, pending: 0 }
+): Promise<{ providerAccepted: number; retried: number; failed: number; pending: number }> {
+  const result = { providerAccepted: 0, retried: 0, failed: 0, pending: 0 }
   if (!tasks.length) return result
   let receipts: Record<string, PushReceiptLike> = {}
   try {
@@ -409,7 +409,7 @@ async function processReceiptBatch(
   }
   for (const task of tasks) {
     const outcome = await applyReceipt(db, endpointDb, task, receipts[task.expoTicketId], now)
-    if (outcome === 'delivered') result.delivered += 1
+    if (outcome === 'provider-accepted') result.providerAccepted += 1
     else if (outcome === 'retried') result.retried += 1
     else if (outcome === 'failed') result.failed += 1
     else result.pending += 1
@@ -422,7 +422,7 @@ export async function runNotificationPushBatch(
   now = new Date(),
 ): Promise<NotificationPushBatchResult> {
   if (env.PUSH_DELIVERY_ENABLED !== 'true') {
-    return { status: 'DISABLED', fannedOut: 0, sent: 0, delivered: 0, retried: 0, failed: 0, skipped: 0 }
+    return { status: 'DISABLED', fannedOut: 0, sent: 0, providerAccepted: 0, retried: 0, failed: 0, skipped: 0 }
   }
   if (!env.DB || !env.D1_03) throw new Error('W05_PUSH_DELIVERY_D1_BINDING_MISSING')
 
@@ -437,7 +437,7 @@ export async function runNotificationPushBatch(
     status: 'COMPLETED',
     fannedOut,
     sent: sendResult.sent,
-    delivered: receiptResult.delivered,
+    providerAccepted: receiptResult.providerAccepted,
     retried: sendResult.retried + receiptResult.retried,
     failed: sendResult.failed + receiptResult.failed,
     skipped: deliveries.length - sendResult.sent - sendResult.retried - sendResult.failed,
