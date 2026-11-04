@@ -1,4 +1,4 @@
-import React, { useReducer, useState } from 'react';
+import React, { useEffect, useReducer, useState } from 'react';
 import {
     Text,
     TouchableOpacity,
@@ -32,6 +32,7 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 import { EngagementActions } from './EngagementActions';
 import { MenuView, type MenuAction } from '@expo/ui/community/menu';
 import { apiRequest, getApiErrorMessage } from '~/lib/api-client';
+import { fetchPublishedMediaAltText } from '~/lib/media-alt-text';
 import { useAuthStore } from '~/store/auth-store';
 import { blockUser, muteUser } from '~/lib/social-screen-api';
 import { setProfilePin, useProfilePinSnapshot } from '~/lib/profile-pin-state';
@@ -63,6 +64,7 @@ export type FeedMediaAttachment = {
     kind: 'image' | 'video';
     headers?: Record<string, string>;
     requiresAuthentication?: boolean;
+    alt?: string;
 };
 
 export interface FeedContent {
@@ -186,12 +188,37 @@ const FeedMediaGallery = ({
 }) => {
     const [viewerStartIndex, setViewerStartIndex] = useState<number | null>(null);
     const [viewerIndex, setViewerIndex] = useState(0);
+    const [resolvedAltText, setResolvedAltText] = useState<Record<string, string>>({});
     const { width, height } = useWindowDimensions();
     const insets = useSafeAreaInsets();
+    const altTextRequestKey = JSON.stringify(
+        items.filter((media) => media.kind === 'image' && !media.alt).slice(0, 4).map((media) => media.src),
+    );
+
+    useEffect(() => {
+        const urls = JSON.parse(altTextRequestKey) as string[];
+        setResolvedAltText({});
+        if (urls.length === 0) return;
+        let active = true;
+        const controller = new AbortController();
+        void fetchPublishedMediaAltText(urls, controller.signal).then((descriptions) => {
+            if (active) setResolvedAltText(descriptions);
+        }).catch(() => {
+            if (active) setResolvedAltText({});
+        });
+        return () => {
+            active = false;
+            controller.abort();
+        };
+    }, [altTextRequestKey]);
 
     if (items.length === 0) return null;
 
-    const imageItems = items.filter((media) => media.kind === 'image');
+    const accessibleItems = items.map((media) => ({
+        ...media,
+        alt: media.alt || resolvedAltText[media.src] || (media.kind === 'video' ? '视频附件' : '图片附件'),
+    }));
+    const imageItems = accessibleItems.filter((media) => media.kind === 'image');
     const requiresAuthenticatedViewer = imageItems.some(
         (media) => media.requiresAuthentication || Boolean(media.headers),
     );
@@ -199,7 +226,7 @@ const FeedMediaGallery = ({
     let imageIndex = 0;
     const mediaContent = (
         <View className={detailView ? "mt-4 flex-row flex-wrap gap-2" : "mt-2 flex-row flex-wrap gap-2"}>
-            {items.map((media, index) => {
+            {accessibleItems.map((media, index) => {
                 const currentImageIndex = media.kind === 'image' ? imageIndex++ : -1;
                 return (
                     <View
@@ -222,6 +249,8 @@ const FeedMediaGallery = ({
                                     source={{ uri: media.src, headers: media.headers }}
                                     className="w-full aspect-square"
                                     contentFit="cover"
+                                    accessible
+                                    accessibilityLabel={media.alt}
                                 />
                             </TouchableOpacity>
                         ) : (
@@ -230,6 +259,8 @@ const FeedMediaGallery = ({
                                     source={{ uri: media.src }}
                                     className="w-full aspect-square"
                                     contentFit="cover"
+                                    accessible
+                                    accessibilityLabel={media.alt}
                                 />
                             </Galeria.Image>
                         )}
@@ -284,6 +315,8 @@ const FeedMediaGallery = ({
                                         source={{ uri: item.src, headers: item.headers }}
                                         style={{ width, height }}
                                         contentFit="contain"
+                                        accessible
+                                        accessibilityLabel={item.alt}
                                     />
                                 </View>
                             )}
