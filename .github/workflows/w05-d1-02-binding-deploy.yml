@@ -79,6 +79,24 @@ jobs:
           print('W05_D1_03_MIGRATION_PREREQUISITE=PASS')
           PY
 
+      - name: Verify the default-disabled push Workflow contract
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          c = json.loads(Path('workers/W05-social/wrangler.jsonc').read_text())
+          assert c.get('vars', {}).get('PUSH_DELIVERY_ENABLED') == 'false'
+          assert c.get('queues') in (None, [])
+          workflows = c.get('workflows', [])
+          assert workflows == [{
+              'name': 'luckread-w05-notification-push',
+              'binding': 'NOTIFICATION_PUSH_WORKFLOW',
+              'class_name': 'NotificationPushWorkflow',
+              'schedules': ['* * * * *'],
+          }]
+          print('W05_PUSH_WORKFLOW_DEFAULT_DISABLED=PASS')
+          PY
+
       - name: Verify binding contract before deployment
         run: |
           set -euo pipefail
