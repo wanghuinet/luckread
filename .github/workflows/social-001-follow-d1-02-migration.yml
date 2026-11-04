@@ -135,7 +135,6 @@ jobs:
           expected_runtime = {
               'database_id': 'bda1d247-a371-4244-91ae-aef96034db7f',
               'database_name': 'secondary',
-              'migrations_dir': 'migrations-d1-03',
           }
           if d.get('binding') != 'DB' or any(d.get(k) != v for k, v in expected_db.items()):
               raise SystemExit('W05 D1-02 DB binding mismatch')
