@@ -47,6 +47,7 @@ export default function RootLayout() {
   const segments = useSegments();
   const router = useRouter();
   const navigationState = useRootNavigationState();
+  const lastNotificationResponse = Notifications.useLastNotificationResponse();
 
   useEffect(() => {
     void bootstrap();
@@ -75,21 +76,25 @@ export default function RootLayout() {
     let active = true;
     let syncInFlight = false;
     let syncQueued = false;
-    const syncPushEndpoint = () => {
+    let queuedDevicePushToken: Notifications.DevicePushToken | undefined;
+    const syncPushEndpoint = (devicePushToken?: Notifications.DevicePushToken) => {
       if (!active) return;
       if (syncInFlight) {
         syncQueued = true;
+        if (devicePushToken) queuedDevicePushToken = devicePushToken;
         return;
       }
       syncInFlight = true;
       // Permission reconciliation never displays a system prompt.
-      void syncPushEndpointForAuthenticatedUser(userId)
+      void syncPushEndpointForAuthenticatedUser(userId, devicePushToken)
         .catch(() => undefined)
         .finally(() => {
           syncInFlight = false;
           if (active && syncQueued) {
             syncQueued = false;
-            syncPushEndpoint();
+            const nextDevicePushToken = queuedDevicePushToken;
+            queuedDevicePushToken = undefined;
+            syncPushEndpoint(nextDevicePushToken);
           }
         });
     };
@@ -98,8 +103,9 @@ export default function RootLayout() {
     const appStateSubscription = AppState.addEventListener('change', (nextState) => {
       if (nextState === 'active') syncPushEndpoint();
     });
-    const tokenSubscription = Notifications.addPushTokenListener(() => {
-      syncPushEndpoint();
+    const tokenSubscription = Notifications.addPushTokenListener((devicePushToken) => {
+      // Reuse the SDK's new native token instead of fetching it a second time.
+      syncPushEndpoint(devicePushToken);
     });
 
     return () => {
@@ -110,29 +116,13 @@ export default function RootLayout() {
   }, [status, userId]);
 
   useEffect(() => {
-    if (!navigationState?.key || Platform.OS === 'web') return;
+    if (!navigationState?.key || !lastNotificationResponse || Platform.OS === 'web') return;
 
-    const handledResponseIds = new Set<string>();
-    const handleNotificationResponse = (response: Notifications.NotificationResponse | null) => {
-      if (!response) return;
-      const identifier = response.notification.request.identifier;
-      if (handledResponseIds.has(identifier)) return;
-      handledResponseIds.add(identifier);
-
-      // Notification payloads are untrusted input. Always open the in-app inbox
-      // instead of navigating to a URL supplied by a push payload.
-      router.push('/notifications' as never);
-      void Notifications.clearLastNotificationResponseAsync().catch(() => undefined);
-    };
-
-    const subscription = Notifications.addNotificationResponseReceivedListener(handleNotificationResponse);
-    void Notifications.getLastNotificationResponseAsync()
-      .then(handleNotificationResponse)
-      .catch(() => undefined);
-
-    return () => subscription.remove();
-  }, [navigationState?.key, router]);
-
+    // Expo's hook handles both cold-start and in-app notification responses.
+    // Push payloads remain untrusted; always open LuckRead's own inbox.
+    router.push('/notifications' as never);
+    Notifications.clearLastNotificationResponse();
+  }, [lastNotificationResponse, navigationState?.key, router]);
 
   useEffect(() => {
     if (!navigationState?.key || !isLoaded || status === 'loading') return;
