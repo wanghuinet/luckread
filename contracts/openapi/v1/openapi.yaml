@@ -1032,6 +1032,48 @@ paths:
         '428': { $ref: '#/components/responses/PreconditionRequired' }
 
   /media:
+    get:
+      tags: [Media]
+      summary: List current user's media, optionally matching up to four exact media URLs
+      operationId: listOwnMedia
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 50, default: 24 }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: url
+          in: query
+          description: Repeated exact first-party media URLs; when supplied, only matching records owned by the current user are returned.
+          style: form
+          explode: true
+          schema:
+            type: array
+            minItems: 1
+            maxItems: 4
+            uniqueItems: true
+            items: { type: string, format: uri }
+      responses:
+        '200':
+          description: Current user's media records. URL-filtered results include only the matching metadata projection.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [docs, requestId]
+                properties:
+                  docs:
+                    type: array
+                    maxItems: 50
+                    items: { $ref: '#/components/schemas/Media' }
+                  totalDocs: { type: integer }
+                  page: { type: integer }
+                  totalPages: { type: integer }
+                  requestId: { $ref: '#/components/schemas/RequestId' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '422': { $ref: '#/components/responses/ClientError' }
+        '429': { $ref: '#/components/responses/RateLimited' }
     post:
       tags: [Media]
       summary: Initiate an upload (single or multipart)
@@ -1059,6 +1101,68 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Media' }
         '415': { $ref: '#/components/responses/UnsupportedMediaType' }
+
+  /media/metadata:
+    get:
+      tags: [Media]
+      summary: Read image descriptions for media referenced by published, viewer-authorized posts
+      description: >-
+        W01 validates each canonical first-party media URL and asks W03 to
+        authorize the published reference for the current viewer. Metadata is
+        returned only for URLs that pass the same public/member entitlement
+        gate used by media delivery. The response is private and non-cacheable.
+      operationId: getPublishedMediaMetadata
+      security:
+        - bearerAuth: []
+        - {}
+      parameters:
+        - name: url
+          in: query
+          required: true
+          description: One to four canonical HTTPS image/video delivery URLs, repeated as url parameters.
+          style: form
+          explode: true
+          schema:
+            type: array
+            minItems: 1
+            maxItems: 4
+            uniqueItems: true
+            items:
+              type: string
+              format: uri
+              pattern: '^https://(img|video)\\.luckread\\.com/.+'
+      responses:
+        '200':
+          description: Only authorized published media descriptions; unauthorized or unreferenced URLs are omitted.
+          headers:
+            Cache-Control: { schema: { type: string, const: 'private, no-store' } }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, requestId]
+                additionalProperties: false
+                properties:
+                  data:
+                    type: object
+                    required: [items]
+                    additionalProperties: false
+                    properties:
+                      items:
+                        type: array
+                        maxItems: 4
+                        items:
+                          type: object
+                          required: [url, alt, mimeType]
+                          additionalProperties: false
+                          properties:
+                            url: { type: string, format: uri }
+                            alt: { type: string, maxLength: 1000 }
+                            mimeType: { type: [string, 'null'] }
+                  requestId: { $ref: '#/components/schemas/RequestId' }
+        '422': { $ref: '#/components/responses/ClientError' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
   /media/{mediaId}:
     parameters:
