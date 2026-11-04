@@ -108,9 +108,10 @@ const isUniquePushTokenConflict = (error: unknown): boolean => {
 }
 
 /**
- * W05 owns notification routing endpoints. This table is deliberately placed
- * in the scoped D1-03 runtime boundary, separate from social inbox state in
- * D1-02. The authenticated principal is always supplied by W01 transport.
+ * W09 owns this D1-03 platform runtime entity. W05 is only the explicitly
+ * delegated T14 writer for self-service Expo endpoint registration/deletion.
+ * Social inbox and notification preferences remain authoritative in D1-02.
+ * The authenticated principal is always supplied by W01 transport.
  */
 export async function upsertPushEndpoint(
   db: D1Database | undefined,
