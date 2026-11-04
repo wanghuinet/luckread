@@ -30,7 +30,7 @@ const mocks = vi.hoisted(() => {
     enforceWriteEndpointRateLimit: vi.fn(async (_endpoint: string) => undefined),
     rateLimitResponse: vi.fn((_request: Request) => Response.json({ error: { code: 'RATE_LIMITED' } }, { status: 429 })),
     resolvePrincipal: vi.fn(async (_request: Request) => ({ userId: 'user_test_01', layer: 'L2', verified: true })),
-    callW05Social: vi.fn(async (_input: unknown) => Response.json({ data: { endpointId: 'endpoint-1', status: 'ACTIVE' } })),
+    callW05Social: vi.fn(async (input: { method: string }) => input.method === 'DELETE' ? new Response(null, { status: 204 }) : Response.json({ data: { endpointId: 'endpoint-1', status: 'ACTIVE' } })),
   }
 })
 
@@ -85,7 +85,7 @@ beforeEach(() => {
   mocks.resolvePrincipal.mockReset()
   mocks.resolvePrincipal.mockResolvedValue({ userId: 'user_test_01', layer: 'L2', verified: true })
   mocks.callW05Social.mockReset()
-  mocks.callW05Social.mockResolvedValue(Response.json({ data: { endpointId: 'endpoint-1', status: 'ACTIVE' } }))
+  mocks.callW05Social.mockImplementation(async (input: { method: string }) => input.method === 'DELETE' ? new Response(null, { status: 204 }) : Response.json({ data: { endpointId: 'endpoint-1', status: 'ACTIVE' } }))
   mocks.callW08Creator.mockReset()
   mocks.callW08Creator.mockResolvedValue(Response.json({
     decision: 'ALLOW', action: 'notification.update.self', resourceType: 'Notification',
@@ -115,7 +115,7 @@ describe('v1 Expo push endpoint adapter', () => {
     const deleteResponse = await DELETE(requestFor('DELETE'), context)
 
     expect(putResponse.status).toBe(200)
-    expect(deleteResponse.status).toBe(200)
+    expect(deleteResponse.status).toBe(204)
     expect(mocks.callW05Social).toHaveBeenNthCalledWith(1, expect.objectContaining({
       pathname: '/internal/social/push-endpoints/' + installationId,
       method: 'PUT',
