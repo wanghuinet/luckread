@@ -23,6 +23,8 @@ mock.module('../lib/api-client.ts', () => ({
 const {
   fetchBookmarksPage,
   fetchDiscoveryTopics,
+  fetchOwnPostDraftsPage,
+  deleteOwnPostDraft,
   fetchNotificationsPage,
   fetchNotificationById,
   fetchUserRelationshipsPage,
@@ -281,4 +283,29 @@ test('keeps the public For You feed independent of stale native session credenti
   expect(feedQuerySource).toContain("auth: input.kind === 'following',");
   expect(feedQuerySource).toContain("if (input.kind === 'for-you') params.set('type', 'post');");
   expect(feedQuerySource).toContain("if (response.status === 401 && input.kind === 'following')");
+});
+
+test('lists only the authenticated account draft posts through W01 with cursor pagination', async () => {
+  const controller = new AbortController();
+  await fetchOwnPostDraftsPage({ cursor: 'draft-next', limit: 15, signal: controller.signal });
+
+  expect(calls).toHaveLength(1);
+  expect(calls[0].path).toBe('/contents?status=DRAFT&type=post&limit=15&cursor=draft-next');
+  expect(calls[0].options.method).toBe('GET');
+  expect(calls[0].options.signal).toBe(controller.signal);
+});
+
+test('rejects invalid draft delete preconditions before calling the API', () => {
+  expect(() => deleteOwnPostDraft('../other-user-draft', 'W/"1"')).toThrow('A valid draft ID is required.');
+  expect(() => deleteOwnPostDraft('draft_123', '*')).toThrow('A current draft version is required.');
+  expect(calls).toHaveLength(0);
+});
+
+test('deletes a selected own draft with the W03 ETag and unique idempotency key', async () => {
+  await deleteOwnPostDraft('draft_123', 'W/"4"');
+  expect(calls).toHaveLength(1);
+  expect(calls[0].path).toBe('/contents/draft_123');
+  expect(calls[0].options.method).toBe('DELETE');
+  expect(calls[0].options.headers).toEqual({ 'If-Match': 'W/"4"' });
+  expect(calls[0].options.idempotencyKey).toBe('native-draft-delete:draft_123:test-key-1');
 });
