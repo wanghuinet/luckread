@@ -17,22 +17,74 @@
   ],
   "operations": [
     {
-      "operationId": "createUploadIntent",
+      "operationId": "cancelProcessingJob",
       "method": "POST",
-      "path": "/media/upload-intents",
+      "path": "/media/processing/{jobId}/cancel",
       "visibility": "public_authenticated",
-      "capability": "media_upload_intent",
+      "capability": "media_processing_cancel",
       "status": "MISSING",
-      "authorization": { "required": true, "permission": "media.upload", "scope": "self_or_tenant" },
-      "resource": { "class": "SINGLE_AUTHORITATIVE_WRITE", "d1ReadMax": 1, "d1WriteMax": 1, "d1ReadRowsMax": 4, "d1WriteRowsMax": 2, "rpcMax": 0, "requestBodyBytesMax": 65536, "responseBytesMax": 65536 },
-      "cache": { "mode": "NO_STORE", "shared": false },
-      "retry": { "maxAttempts": 1, "clientRetrySafe": true, "requiresIdempotency": true },
-      "event": { "syncConsumersMax": 0, "asyncEventsMax": 1, "fanoutMax": 0 },
-      "queue": { "enqueueMax": 0 },
-      "antiAbuse": { "required": true, "scopes": ["account", "device", "ip", "endpoint", "resource", "global"], "actions": ["ALLOW", "THROTTLE", "CHALLENGE", "BLOCK", "REVIEW"] },
-      "idempotency": { "required": true, "semantic": "same logical upload intent returns the same bounded intent or deterministic conflict" },
-      "security": ["owner_bound", "content_type_allowlist", "declared_size_limit", "filename_normalized", "tenant_scope_enforced", "malware_policy_hook"],
-      "evidence": { "openapi": "MISSING", "permission": "PASS", "state": "MISSING", "resource": "PASS", "cache": "PASS", "antiAbuse": "MISSING", "integration": "MISSING", "securityE2E": "MISSING" }
+      "authorization": {
+        "required": true,
+        "permission": "media.update",
+        "scope": "job_owner_or_tenant"
+      },
+      "resource": {
+        "class": "SINGLE_AUTHORITATIVE_WRITE",
+        "d1ReadMax": 1,
+        "d1WriteMax": 1,
+        "d1ReadRowsMax": 2,
+        "d1WriteRowsMax": 2,
+        "rpcMax": 0
+      },
+      "cache": {
+        "mode": "NO_STORE",
+        "shared": false
+      },
+      "retry": {
+        "maxAttempts": 1,
+        "clientRetrySafe": true,
+        "requiresIdempotency": true
+      },
+      "event": {
+        "syncConsumersMax": 0,
+        "asyncEventsMax": 1,
+        "fanoutMax": 0
+      },
+      "queue": {
+        "enqueueMax": 1,
+        "taskType": "media_processing_cancel"
+      },
+      "antiAbuse": {
+        "required": true,
+        "scopes": [
+          "account",
+          "device",
+          "endpoint",
+          "global"
+        ],
+        "actions": [
+          "ALLOW",
+          "BLOCK"
+        ]
+      },
+      "idempotency": {
+        "required": true
+      },
+      "security": [
+        "job_owner_only",
+        "terminal_state_is_immutable",
+        "cancel_is_not_delete"
+      ],
+      "evidence": {
+        "openapi": "MISSING",
+        "permission": "MISSING",
+        "state": "MISSING",
+        "resource": "PASS",
+        "cache": "PASS",
+        "antiAbuse": "MISSING",
+        "integration": "MISSING",
+        "securityE2E": "MISSING"
+      }
     },
     {
       "operationId": "completeUpload",
@@ -41,16 +93,75 @@
       "visibility": "public_authenticated",
       "capability": "media_upload_complete",
       "status": "MISSING",
-      "authorization": { "required": true, "permission": "media.upload", "scope": "upload_owner" },
-      "resource": { "class": "SINGLE_AUTHORITATIVE_WRITE", "d1ReadMax": 1, "d1WriteMax": 1, "d1ReadRowsMax": 4, "d1WriteRowsMax": 2, "rpcMax": 0, "requestBodyBytesMax": 65536 },
-      "cache": { "mode": "NO_STORE", "shared": false },
-      "retry": { "maxAttempts": 1, "clientRetrySafe": true, "requiresIdempotency": true },
-      "event": { "syncConsumersMax": 0, "asyncEventsMax": 1, "fanoutMax": 0 },
-      "queue": { "enqueueMax": 1, "taskType": "media_processing" },
-      "antiAbuse": { "required": true, "scopes": ["account", "device", "ip", "endpoint", "resource", "global"], "actions": ["ALLOW", "THROTTLE", "BLOCK", "REVIEW"] },
-      "idempotency": { "required": true },
-      "security": ["upload_owner_only", "object_exists_verification", "size_verification", "checksum_verification_when_available", "immutable_source_object_reference"],
-      "evidence": { "openapi": "MISSING", "permission": "PASS", "state": "MISSING", "resource": "PASS", "cache": "PASS", "antiAbuse": "MISSING", "integration": "MISSING", "securityE2E": "MISSING" }
+      "authorization": {
+        "required": true,
+        "permission": "media.upload",
+        "scope": "upload_owner"
+      },
+      "resource": {
+        "class": "SINGLE_AUTHORITATIVE_WRITE",
+        "d1ReadMax": 1,
+        "d1WriteMax": 1,
+        "d1ReadRowsMax": 4,
+        "d1WriteRowsMax": 2,
+        "rpcMax": 0,
+        "requestBodyBytesMax": 65536
+      },
+      "cache": {
+        "mode": "NO_STORE",
+        "shared": false
+      },
+      "retry": {
+        "maxAttempts": 1,
+        "clientRetrySafe": true,
+        "requiresIdempotency": true
+      },
+      "event": {
+        "syncConsumersMax": 0,
+        "asyncEventsMax": 1,
+        "fanoutMax": 0
+      },
+      "queue": {
+        "enqueueMax": 1,
+        "taskType": "media_processing"
+      },
+      "antiAbuse": {
+        "required": true,
+        "scopes": [
+          "account",
+          "device",
+          "ip",
+          "endpoint",
+          "resource",
+          "global"
+        ],
+        "actions": [
+          "ALLOW",
+          "THROTTLE",
+          "BLOCK",
+          "REVIEW"
+        ]
+      },
+      "idempotency": {
+        "required": true
+      },
+      "security": [
+        "upload_owner_only",
+        "object_exists_verification",
+        "size_verification",
+        "checksum_verification_when_available",
+        "immutable_source_object_reference"
+      ],
+      "evidence": {
+        "openapi": "MISSING",
+        "permission": "PASS",
+        "state": "MISSING",
+        "resource": "PASS",
+        "cache": "PASS",
+        "antiAbuse": "MISSING",
+        "integration": "MISSING",
+        "securityE2E": "MISSING"
+      }
     },
     {
       "operationId": "createMedia",
@@ -59,88 +170,73 @@
       "visibility": "public_authenticated",
       "capability": "media_asset_register",
       "status": "CONTRACTED_PARTIAL",
-      "authorization": { "required": true, "permission": "media.upload", "scope": "self_or_tenant" },
-      "resource": { "class": "SINGLE_AUTHORITATIVE_WRITE", "d1ReadMax": 1, "d1WriteMax": 1, "d1ReadRowsMax": 4, "d1WriteRowsMax": 2, "rpcMax": 0 },
-      "cache": { "mode": "NO_STORE", "shared": false },
-      "retry": { "maxAttempts": 1, "clientRetrySafe": true, "requiresIdempotency": true },
-      "event": { "syncConsumersMax": 0, "asyncEventsMax": 1, "fanoutMax": 0 },
-      "queue": { "enqueueMax": 1, "taskType": "media_processing" },
-      "antiAbuse": { "required": true, "scopes": ["account", "device", "endpoint", "resource", "global"], "actions": ["ALLOW", "THROTTLE", "CHALLENGE", "BLOCK", "REVIEW"] },
-      "idempotency": { "required": true },
-      "security": ["owner_bound", "asset_key_immutable", "content_reference_authorized", "source_object_not_client_trusted"],
-      "evidence": { "openapi": "PASS", "permission": "PASS", "state": "MISSING", "resource": "PASS", "cache": "PASS", "antiAbuse": "MISSING", "integration": "MISSING", "securityE2E": "MISSING" }
-    },
-    {
-      "operationId": "getMedia",
-      "method": "GET",
-      "path": "/media/{mediaId}",
-      "visibility": "public_authenticated_owner_scoped",
-      "capability": "media_metadata_read",
-      "status": "CONTRACTED_PARTIAL",
-      "authorization": { "required": true, "permission": "media.read", "scope": "resource_owner" },
-      "resource": { "class": "BOUNDED_READ", "d1ReadMax": 1, "d1WriteMax": 0, "d1ReadRowsMax": 8, "d1WriteRowsMax": 0, "rpcMax": 0 },
-      "cache": { "mode": "NO_STORE", "shared": false, "authorizationBoundary": true, "publicOnlyWhenExplicitlyPublic": false },
-      "retry": { "maxAttempts": 1, "clientRetrySafe": true },
-      "event": { "syncConsumersMax": 0, "asyncEventsMax": 0, "fanoutMax": 0 },
-      "queue": { "enqueueMax": 0 },
-      "antiAbuse": { "required": true, "scopes": ["ip", "device", "endpoint", "resource", "global"], "actions": ["ALLOW", "THROTTLE", "BLOCK"] },
-      "idempotency": { "required": false },
-      "security": ["resource_owner_scope_required", "private_metadata_not_publicly_cached", "deleted_asset_policy", "tenant_isolation"],
-      "evidence": { "openapi": "PASS", "permission": "PASS", "state": "MISSING", "resource": "PASS", "cache": "PASS", "antiAbuse": "MISSING", "integration": "MISSING", "securityE2E": "MISSING" }
-    },
-    {
-      "operationId": "getProcessingJob",
-      "method": "GET",
-      "path": "/media/processing/{jobId}",
-      "visibility": "public_authenticated",
-      "capability": "media_processing_status",
-      "status": "MISSING",
-      "authorization": { "required": true, "permission": "media.read", "scope": "job_owner_or_tenant" },
-      "resource": { "class": "BOUNDED_READ", "d1ReadMax": 1, "d1WriteMax": 0, "d1ReadRowsMax": 4, "d1WriteRowsMax": 0, "rpcMax": 0 },
-      "cache": { "mode": "PRIVATE_SHORT_CACHE", "shared": false },
-      "retry": { "maxAttempts": 1, "clientRetrySafe": true },
-      "event": { "syncConsumersMax": 0, "asyncEventsMax": 0, "fanoutMax": 0 },
-      "queue": { "enqueueMax": 0 },
-      "antiAbuse": { "required": true, "scopes": ["account", "device", "endpoint"], "actions": ["ALLOW", "THROTTLE", "BLOCK"] },
-      "idempotency": { "required": false },
-      "security": ["job_owner_only", "no_internal_worker_details", "bounded_error_projection"],
-      "evidence": { "openapi": "MISSING", "permission": "MISSING", "state": "MISSING", "resource": "PASS", "cache": "PASS", "antiAbuse": "MISSING", "integration": "MISSING", "securityE2E": "MISSING" }
-    },
-    {
-      "operationId": "cancelProcessingJob",
-      "method": "POST",
-      "path": "/media/processing/{jobId}/cancel",
-      "visibility": "public_authenticated",
-      "capability": "media_processing_cancel",
-      "status": "MISSING",
-      "authorization": { "required": true, "permission": "media.update", "scope": "job_owner_or_tenant" },
-      "resource": { "class": "SINGLE_AUTHORITATIVE_WRITE", "d1ReadMax": 1, "d1WriteMax": 1, "d1ReadRowsMax": 2, "d1WriteRowsMax": 2, "rpcMax": 0 },
-      "cache": { "mode": "NO_STORE", "shared": false },
-      "retry": { "maxAttempts": 1, "clientRetrySafe": true, "requiresIdempotency": true },
-      "event": { "syncConsumersMax": 0, "asyncEventsMax": 1, "fanoutMax": 0 },
-      "queue": { "enqueueMax": 1, "taskType": "media_processing_cancel" },
-      "antiAbuse": { "required": true, "scopes": ["account", "device", "endpoint", "global"], "actions": ["ALLOW", "BLOCK"] },
-      "idempotency": { "required": true },
-      "security": ["job_owner_only", "terminal_state_is_immutable", "cancel_is_not_delete"],
-      "evidence": { "openapi": "MISSING", "permission": "MISSING", "state": "MISSING", "resource": "PASS", "cache": "PASS", "antiAbuse": "MISSING", "integration": "MISSING", "securityE2E": "MISSING" }
-    },
-    {
-      "operationId": "listMediaVariants",
-      "method": "GET",
-      "path": "/media/{mediaId}/variants",
-      "visibility": "public_or_private_by_asset_policy",
-      "capability": "media_variant_list",
-      "status": "MISSING",
-      "authorization": { "required": true, "permission": "media.read.own", "scope": "resource_owner" },
-      "resource": { "class": "BOUNDED_READ", "d1ReadMax": 1, "d1WriteMax": 0, "d1ReadRowsMax": 32, "d1WriteRowsMax": 0, "rpcMax": 0 },
-      "cache": { "mode": "PUBLIC_EDGE_IF_PUBLIC_ELSE_PRIVATE", "shared": false },
-      "retry": { "maxAttempts": 1, "clientRetrySafe": true },
-      "event": { "syncConsumersMax": 0, "asyncEventsMax": 0, "fanoutMax": 0 },
-      "queue": { "enqueueMax": 0 },
-      "antiAbuse": { "required": true, "scopes": ["ip", "device", "endpoint", "resource"], "actions": ["ALLOW", "THROTTLE", "BLOCK"] },
-      "idempotency": { "required": false },
-      "security": ["variant_count_bounded", "private_variant_policy", "tenant_isolation"],
-      "evidence": { "openapi": "MISSING", "permission": "MISSING", "state": "MISSING", "resource": "PASS", "cache": "MISSING", "antiAbuse": "MISSING", "integration": "MISSING", "securityE2E": "MISSING" }
+      "authorization": {
+        "required": true,
+        "permission": "media.upload",
+        "scope": "self_or_tenant"
+      },
+      "resource": {
+        "class": "SINGLE_AUTHORITATIVE_WRITE",
+        "d1ReadMax": 1,
+        "d1WriteMax": 1,
+        "d1ReadRowsMax": 4,
+        "d1WriteRowsMax": 2,
+        "rpcMax": 0
+      },
+      "cache": {
+        "mode": "NO_STORE",
+        "shared": false
+      },
+      "retry": {
+        "maxAttempts": 1,
+        "clientRetrySafe": true,
+        "requiresIdempotency": true
+      },
+      "event": {
+        "syncConsumersMax": 0,
+        "asyncEventsMax": 1,
+        "fanoutMax": 0
+      },
+      "queue": {
+        "enqueueMax": 1,
+        "taskType": "media_processing"
+      },
+      "antiAbuse": {
+        "required": true,
+        "scopes": [
+          "account",
+          "device",
+          "endpoint",
+          "resource",
+          "global"
+        ],
+        "actions": [
+          "ALLOW",
+          "THROTTLE",
+          "CHALLENGE",
+          "BLOCK",
+          "REVIEW"
+        ]
+      },
+      "idempotency": {
+        "required": true
+      },
+      "security": [
+        "owner_bound",
+        "asset_key_immutable",
+        "content_reference_authorized",
+        "source_object_not_client_trusted"
+      ],
+      "evidence": {
+        "openapi": "PASS",
+        "permission": "PASS",
+        "state": "MISSING",
+        "resource": "PASS",
+        "cache": "PASS",
+        "antiAbuse": "MISSING",
+        "integration": "MISSING",
+        "securityE2E": "MISSING"
+      }
     },
     {
       "operationId": "createPlaybackAuthorization",
@@ -149,16 +245,153 @@
       "visibility": "public_authenticated_or_public_by_asset_policy",
       "capability": "media_playback_authorization",
       "status": "MISSING",
-      "authorization": { "required": true, "permission": "media.play", "scope": "resource" },
-      "resource": { "class": "BOUNDED_READ", "d1ReadMax": 1, "d1WriteMax": 0, "d1ReadRowsMax": 4, "d1WriteRowsMax": 0, "rpcMax": 0, "responseBytesMax": 16384 },
-      "cache": { "mode": "NO_STORE", "shared": false },
-      "retry": { "maxAttempts": 1, "clientRetrySafe": true },
-      "event": { "syncConsumersMax": 0, "asyncEventsMax": 0, "fanoutMax": 0 },
-      "queue": { "enqueueMax": 0 },
-      "antiAbuse": { "required": true, "scopes": ["ip", "device", "account", "resource", "global"], "actions": ["ALLOW", "THROTTLE", "CHALLENGE", "BLOCK"] },
-      "idempotency": { "required": false },
-      "security": ["short_lived_token", "resource_scoped", "audience_bound", "expiry_required", "private_asset_authorization", "revocation_policy"],
-      "evidence": { "openapi": "MISSING", "permission": "MISSING", "state": "MISSING", "resource": "PASS", "cache": "PASS", "antiAbuse": "MISSING", "integration": "MISSING", "securityE2E": "MISSING" }
+      "authorization": {
+        "required": true,
+        "permission": "media.play",
+        "scope": "resource"
+      },
+      "resource": {
+        "class": "BOUNDED_READ",
+        "d1ReadMax": 1,
+        "d1WriteMax": 0,
+        "d1ReadRowsMax": 4,
+        "d1WriteRowsMax": 0,
+        "rpcMax": 0,
+        "responseBytesMax": 16384
+      },
+      "cache": {
+        "mode": "NO_STORE",
+        "shared": false
+      },
+      "retry": {
+        "maxAttempts": 1,
+        "clientRetrySafe": true
+      },
+      "event": {
+        "syncConsumersMax": 0,
+        "asyncEventsMax": 0,
+        "fanoutMax": 0
+      },
+      "queue": {
+        "enqueueMax": 0
+      },
+      "antiAbuse": {
+        "required": true,
+        "scopes": [
+          "ip",
+          "device",
+          "account",
+          "resource",
+          "global"
+        ],
+        "actions": [
+          "ALLOW",
+          "THROTTLE",
+          "CHALLENGE",
+          "BLOCK"
+        ]
+      },
+      "idempotency": {
+        "required": false
+      },
+      "security": [
+        "short_lived_token",
+        "resource_scoped",
+        "audience_bound",
+        "expiry_required",
+        "private_asset_authorization",
+        "revocation_policy"
+      ],
+      "evidence": {
+        "openapi": "MISSING",
+        "permission": "MISSING",
+        "state": "MISSING",
+        "resource": "PASS",
+        "cache": "PASS",
+        "antiAbuse": "MISSING",
+        "integration": "MISSING",
+        "securityE2E": "MISSING"
+      }
+    },
+    {
+      "operationId": "createUploadIntent",
+      "method": "POST",
+      "path": "/media/upload-intents",
+      "visibility": "public_authenticated",
+      "capability": "media_upload_intent",
+      "status": "MISSING",
+      "authorization": {
+        "required": true,
+        "permission": "media.upload",
+        "scope": "self_or_tenant"
+      },
+      "resource": {
+        "class": "SINGLE_AUTHORITATIVE_WRITE",
+        "d1ReadMax": 1,
+        "d1WriteMax": 1,
+        "d1ReadRowsMax": 4,
+        "d1WriteRowsMax": 2,
+        "rpcMax": 0,
+        "requestBodyBytesMax": 65536,
+        "responseBytesMax": 65536
+      },
+      "cache": {
+        "mode": "NO_STORE",
+        "shared": false
+      },
+      "retry": {
+        "maxAttempts": 1,
+        "clientRetrySafe": true,
+        "requiresIdempotency": true
+      },
+      "event": {
+        "syncConsumersMax": 0,
+        "asyncEventsMax": 1,
+        "fanoutMax": 0
+      },
+      "queue": {
+        "enqueueMax": 0
+      },
+      "antiAbuse": {
+        "required": true,
+        "scopes": [
+          "account",
+          "device",
+          "ip",
+          "endpoint",
+          "resource",
+          "global"
+        ],
+        "actions": [
+          "ALLOW",
+          "THROTTLE",
+          "CHALLENGE",
+          "BLOCK",
+          "REVIEW"
+        ]
+      },
+      "idempotency": {
+        "required": true,
+        "semantic": "same logical upload intent returns the same bounded intent or deterministic conflict"
+      },
+      "security": [
+        "owner_bound",
+        "content_type_allowlist",
+        "declared_size_limit",
+        "filename_normalized",
+        "tenant_scope_enforced",
+        "malware_policy_hook"
+      ],
+      "evidence": {
+        "openapi": "MISSING",
+        "permission": "PASS",
+        "state": "MISSING",
+        "resource": "PASS",
+        "cache": "PASS",
+        "antiAbuse": "MISSING",
+        "integration": "MISSING",
+        "securityE2E": "MISSING"
+      }
     },
     {
       "operationId": "deleteMedia",
@@ -167,16 +400,435 @@
       "visibility": "public_authenticated",
       "capability": "media_delete",
       "status": "MISSING",
-      "authorization": { "required": true, "permission": "media.delete.own", "scope": "resource_owner" },
-      "resource": { "class": "SINGLE_AUTHORITATIVE_WRITE", "d1ReadMax": 1, "d1WriteMax": 1, "d1ReadRowsMax": 2, "d1WriteRowsMax": 2, "rpcMax": 0 },
-      "cache": { "mode": "INVALIDATE_DELIVERY", "shared": false },
-      "retry": { "maxAttempts": 1, "clientRetrySafe": true, "requiresIdempotency": true },
-      "event": { "syncConsumersMax": 0, "asyncEventsMax": 1, "fanoutMax": 0 },
-      "queue": { "enqueueMax": 1, "taskType": "media_retention_delete" },
-      "antiAbuse": { "required": true, "scopes": ["account", "device", "endpoint", "resource", "global"], "actions": ["ALLOW", "CHALLENGE", "BLOCK", "REVIEW"] },
-      "idempotency": { "required": true },
-      "security": ["resource_owner_only", "soft_delete_or_retention_policy", "delivery_revocation", "async_object_deletion", "audit_required"],
-      "evidence": { "openapi": "MISSING", "permission": "MISSING", "state": "MISSING", "resource": "PASS", "cache": "MISSING", "antiAbuse": "MISSING", "integration": "MISSING", "securityE2E": "MISSING" }
+      "authorization": {
+        "required": true,
+        "permission": "media.delete.own",
+        "scope": "resource_owner"
+      },
+      "resource": {
+        "class": "SINGLE_AUTHORITATIVE_WRITE",
+        "d1ReadMax": 1,
+        "d1WriteMax": 1,
+        "d1ReadRowsMax": 2,
+        "d1WriteRowsMax": 2,
+        "rpcMax": 0
+      },
+      "cache": {
+        "mode": "INVALIDATE_DELIVERY",
+        "shared": false
+      },
+      "retry": {
+        "maxAttempts": 1,
+        "clientRetrySafe": true,
+        "requiresIdempotency": true
+      },
+      "event": {
+        "syncConsumersMax": 0,
+        "asyncEventsMax": 1,
+        "fanoutMax": 0
+      },
+      "queue": {
+        "enqueueMax": 1,
+        "taskType": "media_retention_delete"
+      },
+      "antiAbuse": {
+        "required": true,
+        "scopes": [
+          "account",
+          "device",
+          "endpoint",
+          "resource",
+          "global"
+        ],
+        "actions": [
+          "ALLOW",
+          "CHALLENGE",
+          "BLOCK",
+          "REVIEW"
+        ]
+      },
+      "idempotency": {
+        "required": true
+      },
+      "security": [
+        "resource_owner_only",
+        "soft_delete_or_retention_policy",
+        "delivery_revocation",
+        "async_object_deletion",
+        "audit_required"
+      ],
+      "evidence": {
+        "openapi": "MISSING",
+        "permission": "MISSING",
+        "state": "MISSING",
+        "resource": "PASS",
+        "cache": "MISSING",
+        "antiAbuse": "MISSING",
+        "integration": "MISSING",
+        "securityE2E": "MISSING"
+      }
+    },
+    {
+      "operationId": "getMedia",
+      "method": "GET",
+      "path": "/media/{mediaId}",
+      "visibility": "public_authenticated_owner_scoped",
+      "capability": "media_metadata_read",
+      "status": "CONTRACTED_PARTIAL",
+      "authorization": {
+        "required": true,
+        "permission": "media.read",
+        "scope": "resource_owner"
+      },
+      "resource": {
+        "class": "BOUNDED_READ",
+        "d1ReadMax": 1,
+        "d1WriteMax": 0,
+        "d1ReadRowsMax": 8,
+        "d1WriteRowsMax": 0,
+        "rpcMax": 0
+      },
+      "cache": {
+        "mode": "NO_STORE",
+        "shared": false,
+        "authorizationBoundary": true,
+        "publicOnlyWhenExplicitlyPublic": false
+      },
+      "retry": {
+        "maxAttempts": 1,
+        "clientRetrySafe": true
+      },
+      "event": {
+        "syncConsumersMax": 0,
+        "asyncEventsMax": 0,
+        "fanoutMax": 0
+      },
+      "queue": {
+        "enqueueMax": 0
+      },
+      "antiAbuse": {
+        "required": true,
+        "scopes": [
+          "ip",
+          "device",
+          "endpoint",
+          "resource",
+          "global"
+        ],
+        "actions": [
+          "ALLOW",
+          "THROTTLE",
+          "BLOCK"
+        ]
+      },
+      "idempotency": {
+        "required": false
+      },
+      "security": [
+        "resource_owner_scope_required",
+        "private_metadata_not_publicly_cached",
+        "deleted_asset_policy",
+        "tenant_isolation"
+      ],
+      "evidence": {
+        "openapi": "PASS",
+        "permission": "PASS",
+        "state": "MISSING",
+        "resource": "PASS",
+        "cache": "PASS",
+        "antiAbuse": "MISSING",
+        "integration": "MISSING",
+        "securityE2E": "MISSING"
+      }
+    },
+    {
+      "operationId": "getProcessingJob",
+      "method": "GET",
+      "path": "/media/processing/{jobId}",
+      "visibility": "public_authenticated",
+      "capability": "media_processing_status",
+      "status": "MISSING",
+      "authorization": {
+        "required": true,
+        "permission": "media.read",
+        "scope": "job_owner_or_tenant"
+      },
+      "resource": {
+        "class": "BOUNDED_READ",
+        "d1ReadMax": 1,
+        "d1WriteMax": 0,
+        "d1ReadRowsMax": 4,
+        "d1WriteRowsMax": 0,
+        "rpcMax": 0
+      },
+      "cache": {
+        "mode": "PRIVATE_SHORT_CACHE",
+        "shared": false
+      },
+      "retry": {
+        "maxAttempts": 1,
+        "clientRetrySafe": true
+      },
+      "event": {
+        "syncConsumersMax": 0,
+        "asyncEventsMax": 0,
+        "fanoutMax": 0
+      },
+      "queue": {
+        "enqueueMax": 0
+      },
+      "antiAbuse": {
+        "required": true,
+        "scopes": [
+          "account",
+          "device",
+          "endpoint"
+        ],
+        "actions": [
+          "ALLOW",
+          "THROTTLE",
+          "BLOCK"
+        ]
+      },
+      "idempotency": {
+        "required": false
+      },
+      "security": [
+        "job_owner_only",
+        "no_internal_worker_details",
+        "bounded_error_projection"
+      ],
+      "evidence": {
+        "openapi": "MISSING",
+        "permission": "MISSING",
+        "state": "MISSING",
+        "resource": "PASS",
+        "cache": "PASS",
+        "antiAbuse": "MISSING",
+        "integration": "MISSING",
+        "securityE2E": "MISSING"
+      }
+    },
+    {
+      "visibility": "public_or_authenticated_by_published_content_access",
+      "capability": "published_media_accessibility_metadata",
+      "status": "MISSING",
+      "resource": {
+        "class": "BOUNDED_READ",
+        "d1ReadMax": 4,
+        "d1WriteMax": 0,
+        "d1ReadRowsMax": 200,
+        "d1WriteRowsMax": 0,
+        "rpcMax": 4
+      },
+      "cache": {
+        "mode": "NO_STORE",
+        "shared": false,
+        "authorizationBoundary": true
+      },
+      "retry": {
+        "maxAttempts": 1,
+        "clientRetrySafe": true,
+        "requiresIdempotency": false
+      },
+      "event": {
+        "syncConsumersMax": 0,
+        "asyncEventsMax": 0,
+        "fanoutMax": 0
+      },
+      "queue": {
+        "enqueueMax": 0
+      },
+      "antiAbuse": {
+        "required": true,
+        "scopes": [
+          "ip",
+          "device",
+          "endpoint",
+          "resource",
+          "global"
+        ],
+        "actions": [
+          "ALLOW",
+          "THROTTLE",
+          "BLOCK"
+        ]
+      },
+      "idempotency": {
+        "required": false
+      },
+      "evidence": {
+        "openapi": "PASS",
+        "permission": "PASS",
+        "state": "MISSING",
+        "resource": "PASS",
+        "cache": "PASS",
+        "antiAbuse": "PASS",
+        "integration": "MISSING",
+        "securityE2E": "MISSING"
+      },
+      "operationId": "getPublishedMediaMetadata",
+      "method": "GET",
+      "path": "/media/metadata",
+      "authorization": {
+        "required": false,
+        "permission": null,
+        "scope": "published_reference_and_membership"
+      },
+      "security": [
+        "canonical_first_party_https_image_urls_only",
+        "w03_published_reference_authority",
+        "member_entitlement_required_for_protected_references",
+        "unreferenced_media_omitted",
+        "no_media_id_or_owner_disclosure",
+        "private_no_store",
+        "max_four_urls",
+        "image_mime_type_only"
+      ]
+    },
+    {
+      "operationId": "listMediaVariants",
+      "method": "GET",
+      "path": "/media/{mediaId}/variants",
+      "visibility": "public_or_private_by_asset_policy",
+      "capability": "media_variant_list",
+      "status": "MISSING",
+      "authorization": {
+        "required": true,
+        "permission": "media.read.own",
+        "scope": "resource_owner"
+      },
+      "resource": {
+        "class": "BOUNDED_READ",
+        "d1ReadMax": 1,
+        "d1WriteMax": 0,
+        "d1ReadRowsMax": 32,
+        "d1WriteRowsMax": 0,
+        "rpcMax": 0
+      },
+      "cache": {
+        "mode": "PUBLIC_EDGE_IF_PUBLIC_ELSE_PRIVATE",
+        "shared": false
+      },
+      "retry": {
+        "maxAttempts": 1,
+        "clientRetrySafe": true
+      },
+      "event": {
+        "syncConsumersMax": 0,
+        "asyncEventsMax": 0,
+        "fanoutMax": 0
+      },
+      "queue": {
+        "enqueueMax": 0
+      },
+      "antiAbuse": {
+        "required": true,
+        "scopes": [
+          "ip",
+          "device",
+          "endpoint",
+          "resource"
+        ],
+        "actions": [
+          "ALLOW",
+          "THROTTLE",
+          "BLOCK"
+        ]
+      },
+      "idempotency": {
+        "required": false
+      },
+      "security": [
+        "variant_count_bounded",
+        "private_variant_policy",
+        "tenant_isolation"
+      ],
+      "evidence": {
+        "openapi": "MISSING",
+        "permission": "MISSING",
+        "state": "MISSING",
+        "resource": "PASS",
+        "cache": "MISSING",
+        "antiAbuse": "MISSING",
+        "integration": "MISSING",
+        "securityE2E": "MISSING"
+      }
+    },
+    {
+      "visibility": "public_authenticated_owner_scoped",
+      "capability": "media_metadata_list_owned",
+      "status": "MISSING",
+      "resource": {
+        "class": "BOUNDED_READ",
+        "d1ReadMax": 1,
+        "d1WriteMax": 0,
+        "d1ReadRowsMax": 4,
+        "d1WriteRowsMax": 0,
+        "rpcMax": 0
+      },
+      "cache": {
+        "mode": "NO_STORE",
+        "shared": false,
+        "authorizationBoundary": true
+      },
+      "retry": {
+        "maxAttempts": 1,
+        "clientRetrySafe": true,
+        "requiresIdempotency": false
+      },
+      "event": {
+        "syncConsumersMax": 0,
+        "asyncEventsMax": 0,
+        "fanoutMax": 0
+      },
+      "queue": {
+        "enqueueMax": 0
+      },
+      "antiAbuse": {
+        "required": true,
+        "scopes": [
+          "ip",
+          "device",
+          "endpoint",
+          "resource",
+          "global"
+        ],
+        "actions": [
+          "ALLOW",
+          "THROTTLE",
+          "BLOCK"
+        ]
+      },
+      "idempotency": {
+        "required": false
+      },
+      "evidence": {
+        "openapi": "PASS",
+        "permission": "PASS",
+        "state": "MISSING",
+        "resource": "PASS",
+        "cache": "PASS",
+        "antiAbuse": "PASS",
+        "integration": "MISSING",
+        "securityE2E": "MISSING"
+      },
+      "operationId": "listOwnMedia",
+      "method": "GET",
+      "path": "/media",
+      "authorization": {
+        "required": true,
+        "permission": "media.read",
+        "scope": "resource_owner"
+      },
+      "security": [
+        "owner_identity_required",
+        "owner_user_id_filter_required",
+        "exact_url_match_only",
+        "max_four_media_urls",
+        "no_store",
+        "no_cross_account_metadata_disclosure"
+      ]
     }
   ]
 }
