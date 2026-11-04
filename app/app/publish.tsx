@@ -211,7 +211,7 @@ function PublishScreenContent() {
   const bodyUploadRef = useRef<{ text: string; key: string; uploaded?: UploadedMedia } | null>(null);
   const submitAttemptRef = useRef<SubmitAttempt | null>(null);
   const editLoadKeyRef = useRef('');
-  const bodyInputRef = useRef<TextInput | null>(null);
+  const bodyInputRef = useRef<React.ElementRef<typeof TextInput>>(null);
   const pendingCaretRef = useRef<number | null>(null);
 
   const activeComposerToken = findActiveComposerToken(body, textSelection.start);
@@ -882,7 +882,7 @@ function PublishScreenContent() {
     try {
       const result = await fetchOwnPostDraftsPage({ cursor, limit: 20 });
       if (!result.response.ok) throw new Error(apiFailureDiagnostic(result, '暂时无法加载草稿箱。'));
-      const page = result.data?.data;
+      const page = result.data && 'data' in result.data ? result.data.data : undefined;
       if (!page || !Array.isArray(page.items)) throw new Error('草稿箱返回的数据格式无效。');
       setDraftInboxItems((current) => {
         if (!append) return page.items;
@@ -1808,7 +1808,7 @@ function PublishScreenContent() {
                 if (draftInboxHasMore && !draftInboxLoading && draftInboxCursor) void loadDraftInbox(draftInboxCursor, true);
               }}
               onEndReachedThreshold={0.5}
-              ListFooterComponent={draftInboxLoading && draftInboxItems.length > 0 ? <ActivityIndicator color={PRIMARY} style={{ padding: 16 }} /> : null}
+              ListFooterComponent={draftInboxLoading && draftInboxItems.length > 0 ? <ActivityIndicator color={PRIMARY} style={{ padding: 16 }} /> : undefined}
             />
           )}
         </View>
