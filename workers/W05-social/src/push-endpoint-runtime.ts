@@ -72,7 +72,7 @@ const parseRegistration = (value: unknown): PushEndpointRegistrationInput => {
     value.permissionStatus === 'granted' &&
     (
       !submittedToken ||
-      !/^(?:Expo|Exponent)PushToken\\[[A-Za-z0-9_-]{16,480}\\]$/.test(submittedToken)
+      !/^(?:Expo|Exponent)PushToken\[[A-Za-z0-9_-]{16,480}\]$/.test(submittedToken)
     )
   ) {
     throw new PushEndpointRuntimeError('VALIDATION_FAILED', 422)
