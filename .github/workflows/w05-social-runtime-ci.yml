@@ -146,9 +146,13 @@ jobs:
         working-directory: workers/W01-payload
         run: pnpm install --frozen-lockfile --ignore-scripts
 
+      - name: Install W05 Expo SDK dependency from committed lockfile
+        working-directory: workers/W05-social
+        run: npm ci --ignore-scripts --no-audit --fund=false
+
       - name: Run W05 Social and W01 adapter tests
         working-directory: workers/W01-payload
-        run: pnpm exec vitest run --config ./vitest.config.mts ../../workers/W05-social/src/follow-runtime.test.ts ../../workers/W05-social/src/following-feed.test.ts ../../workers/W05-social/src/like-runtime.test.ts ../../workers/W05-social/src/like-list-runtime.test.ts ../../workers/W05-social/src/comment-runtime.test.ts ../../workers/W05-social/src/favorite-runtime.test.ts ../../workers/W05-social/src/share-runtime.test.ts ../../workers/W05-social/src/repost-runtime.test.ts ../../workers/W05-social/src/profile-pin-runtime.test.ts ../../workers/W05-social/src/block-policy.test.ts ../../workers/W05-social/src/relationship-graph-runtime.test.ts ../../workers/W05-social/src/block-mute-runtime.test.ts ../../workers/W05-social/src/index.test.ts ../../workers/W05-social/src/push-endpoint-runtime.test.ts ../../workers/W05-social/src/w03-content-context-client.test.ts ../../workers/W05-social/src/d1-traffic-guard.test.ts tests/int/social-followers-v1-adapter.int.spec.ts tests/int/social-profile-channels-v1-adapter.int.spec.ts tests/int/social-follow-mutation-v1-adapter.int.spec.ts tests/int/social-likes-v1-adapter.int.spec.ts tests/int/social-likers-v1-adapter.int.spec.ts tests/int/social-comments-v1-adapter.int.spec.ts tests/int/social-reply-audience-v1-adapter.int.spec.ts tests/int/social-comment-likes-v1-adapter.int.spec.ts tests/int/social-bookmarks-v1-adapter.int.spec.ts tests/int/social-shares-v1-adapter.int.spec.ts tests/int/social-shares-landing.int.spec.ts tests/int/social-block-mute-v1-adapter.int.spec.ts tests/int/social-reposts-v1-adapter.int.spec.ts tests/int/social-profile-pins-v1-adapter.int.spec.ts tests/int/w05-social-response-forwarding.int.spec.ts tests/int/push-endpoints-v1-adapter.int.spec.ts tests/int/content-detail.int.spec.ts tests/int/content-detail-comments.int.spec.ts tests/int/content-likes-modal.int.spec.ts
+        run: pnpm exec vitest run --config ./vitest.config.mts ../../workers/W05-social/src/follow-runtime.test.ts ../../workers/W05-social/src/following-feed.test.ts ../../workers/W05-social/src/like-runtime.test.ts ../../workers/W05-social/src/like-list-runtime.test.ts ../../workers/W05-social/src/comment-runtime.test.ts ../../workers/W05-social/src/favorite-runtime.test.ts ../../workers/W05-social/src/share-runtime.test.ts ../../workers/W05-social/src/repost-runtime.test.ts ../../workers/W05-social/src/profile-pin-runtime.test.ts ../../workers/W05-social/src/block-policy.test.ts ../../workers/W05-social/src/relationship-graph-runtime.test.ts ../../workers/W05-social/src/block-mute-runtime.test.ts ../../workers/W05-social/src/index.test.ts ../../workers/W05-social/src/push-endpoint-runtime.test.ts ../../workers/W05-social/src/notification-push-delivery-runtime.test.ts ../../workers/W05-social/src/notification-push-workflow.test.ts ../../workers/W05-social/src/w03-content-context-client.test.ts ../../workers/W05-social/src/d1-traffic-guard.test.ts tests/int/social-followers-v1-adapter.int.spec.ts tests/int/social-profile-channels-v1-adapter.int.spec.ts tests/int/social-follow-mutation-v1-adapter.int.spec.ts tests/int/social-likes-v1-adapter.int.spec.ts tests/int/social-likers-v1-adapter.int.spec.ts tests/int/social-comments-v1-adapter.int.spec.ts tests/int/social-reply-audience-v1-adapter.int.spec.ts tests/int/social-comment-likes-v1-adapter.int.spec.ts tests/int/social-bookmarks-v1-adapter.int.spec.ts tests/int/social-shares-v1-adapter.int.spec.ts tests/int/social-shares-landing.int.spec.ts tests/int/social-block-mute-v1-adapter.int.spec.ts tests/int/social-reposts-v1-adapter.int.spec.ts tests/int/social-profile-pins-v1-adapter.int.spec.ts tests/int/w05-social-response-forwarding.int.spec.ts tests/int/push-endpoints-v1-adapter.int.spec.ts tests/int/content-detail.int.spec.ts tests/int/content-detail-comments.int.spec.ts tests/int/content-likes-modal.int.spec.ts
 
       - name: Run W05 reply audience runtime and comment tests
         working-directory: workers/W01-payload
@@ -486,6 +490,50 @@ jobs:
           if any('USE TEMP B-TREE' in row for row in plan):
               raise SystemExit(f'discovery ranking scan requires a temporary sort: {details}')
           print('SOCIAL_DISCOVERY_SCAN_QUERY_PLAN=PASS')
+          PY
+
+      - name: Verify durable notification push migration and atomic outbox trigger
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import sqlite3
+          from pathlib import Path
+          db = sqlite3.connect(':memory:')
+          base = Path('workers/W05-social/migrations')
+          db.executescript((base / '20261002_002_social_003_like_v1.sql').read_text())
+          db.executescript((base / '20261002_005_social_005_comment_likes_v1.sql').read_text())
+          db.executescript((base / '20261008_011_social_closure_v1.sql').read_text())
+          migration = base / '20261104_017_notification_push_delivery_v1.sql'
+          db.executescript(migration.read_text())
+          names = {row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type IN ('table','index','trigger')")}
+          required = {
+              'social_notification_push_outbox',
+              'social_notification_push_deliveries',
+              'ix_social_notification_push_outbox_status_created',
+              'ix_social_notification_push_deliveries_due',
+              'ix_social_notification_push_deliveries_endpoint',
+              'uq_social_notification_push_ticket',
+              'trg_social_notifications_push_outbox_insert',
+          }
+          if not required.issubset(names):
+              raise SystemExit(f'missing notification push schema objects: {sorted(required - names)}')
+          db.execute(
+              'INSERT INTO social_notifications '
+              '(notification_id, recipient_user_id, actor_user_id, notification_type, target_type, target_id, dedupe_key, payload_json, created_at) '
+              'VALUES (?,?,?,?,?,?,?,?,?)',
+              ('n1','recipient-1','actor-1','FOLLOW','user','recipient-1','FOLLOW:recipient-1:actor-1:user:recipient-1','{}','2026-11-04T00:00:00.000Z'),
+          )
+          row = db.execute(
+              'SELECT notification_id, recipient_user_id, status FROM social_notification_push_outbox WHERE notification_id = ?',
+              ('n1',),
+          ).fetchone()
+          if row != ('n1','recipient-1','PENDING'):
+              raise SystemExit(f'outbox trigger did not atomically create the pending delivery intent: {row}')
+          columns = {row[1] for row in db.execute('PRAGMA table_info("social_notification_push_deliveries")')}
+          if 'push_token_hash' not in columns or 'expo_ticket_id' not in columns or 'lease_expires_at' not in columns:
+              raise SystemExit('delivery lease / receipt snapshot fields are missing')
+          print('NOTIFY_003_D1_02_MIGRATION_AND_TRIGGER=PASS')
           PY
 
       - name: Verify scoped D1-03 push endpoint migration isolation
