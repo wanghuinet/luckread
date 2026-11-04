@@ -28,18 +28,15 @@ on:
       - 'package-lock.json'
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   async-runtime:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Checkout PR source branch for the one-time lockfile bootstrap
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.ref || github.ref }}
-          fetch-depth: 0
       - name: Setup Node 24
         uses: actions/setup-node@v4
         with:
@@ -47,18 +44,6 @@ jobs:
           cache: npm
       - name: Install locked repository dependencies
         run: npm ci --ignore-scripts --no-audit --fund=false
-      - name: Bootstrap the pinned W10 SDK lockfile when first introduced
-        if: ${{ github.event_name == 'pull_request' }}
-        run: |
-          set -euo pipefail
-          if [ ! -f workers/W10-async/package-lock.json ]; then
-            npm install --package-lock-only --prefix workers/W10-async --ignore-scripts --no-audit --fund=false
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add workers/W10-async/package-lock.json
-            git commit -m "build(w10): lock official Expo push SDK"
-            git push origin "HEAD:${GITHUB_HEAD_REF}"
-          fi
       - name: Install locked W10 SDK dependency
         run: npm ci --prefix workers/W10-async --ignore-scripts --no-audit --fund=false
       - name: Test W10 async execution and Workflow orchestration
