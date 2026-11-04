@@ -23,7 +23,7 @@ This slice does not implement push sending, W10 scheduling, Queue delivery, noti
 2. Keep social notification inbox, notification preferences, read/unread state, and social event generation in existing W05 D1-02.
 3. Keep authentication sessions, trusted devices, account identity, and session revocation in W02/D1-01. An `installation_id` is an app-generated correlation key only; it is not an authentication factor or trusted device identifier.
 4. Add only the existing D1-03 database as a second, scoped D1 binding on W05 to execute the approved W05/T14 delegation. W09 remains the primary owner. Preserve existing D1-02 binding and its `migrations/` directory unchanged.
-5. Set `migrations_dir=migrations-d1-03` only on W05's D1-03 binding. The controlled migration workflow targets the existing database name `secondary` and verifies the remote schema before the Worker is deployed with the new binding.
+5. Keep the D1-03 migration directory under W09 (`workers/W09-platform/migrations-d1-03`) and use W09's migration-only Wrangler config. W05's D1_03 binding is runtime-only and declares no schema migration directory. The controlled migration workflow targets the existing database name `secondary` and verifies the remote schema before W05 is deployed with the delegated runtime binding.
 6. No Service Binding, Worker, D1 database, Queue, KV namespace, or Payload Core change is introduced.
 
 ## Data boundary
