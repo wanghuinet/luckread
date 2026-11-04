@@ -122,7 +122,15 @@
         "contracts/entity/NOTIFICATION-PUSH-ENDPOINT-CONTRACT.v1.json",
         "contracts/persistence/NOTIFY-002-W05-D1-03-PUSH-ENDPOINT-PERSISTENCE.v1.json",
         "docs/change-control/CC-T14-W05-D1-03-PUSH-ENDPOINT-REGISTRATION-2026-11-04.md"
-      ]
+      ],
+      "primaryOwner": {
+        "worker": "W09",
+        "task": "T25"
+      },
+      "delegatedWriter": {
+        "worker": "W05",
+        "task": "T14"
+      }
     },
     {
       "entityId": "ENT-ORG-MEMBERSHIP",
