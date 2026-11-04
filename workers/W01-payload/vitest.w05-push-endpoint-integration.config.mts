@@ -6,6 +6,13 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['../W05-social/src/push-endpoint-w01-runtime.integration.test.ts'],
+    server: {
+      deps: {
+        // The actual W01 social client imports this Cloudflare context module.
+        // Inline it so Vitest can apply the per-test Service Binding mock.
+        inline: ['@opennextjs/cloudflare'],
+      },
+    },
     testTimeout: 15_000,
     hookTimeout: 15_000,
   },
