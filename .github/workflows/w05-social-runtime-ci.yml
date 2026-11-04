@@ -4,6 +4,14 @@ on:
   pull_request:
     paths:
       - 'workers/W05-social/**'
+      - 'contracts/transport/W05-W09-notification-push-delivery.v1.json'
+      - 'contracts/transport/d1-03-entity-owner-boundary.v1.json'
+      - 'contracts/entity/NOTIFICATION-PUSH-ENDPOINT-CONTRACT.v1.json'
+      - 'contracts/persistence/NOTIFY-002-W05-D1-03-PUSH-ENDPOINT-PERSISTENCE.v1.json'
+      - 'contracts/transport/W05-W09-notification-push-delivery.v1.json'
+      - 'contracts/transport/d1-03-entity-owner-boundary.v1.json'
+      - 'contracts/entity/NOTIFICATION-PUSH-ENDPOINT-CONTRACT.v1.json'
+      - 'contracts/persistence/NOTIFY-002-W05-D1-03-PUSH-ENDPOINT-PERSISTENCE.v1.json'
       - 'workers/W09-platform/wrangler.d1-03-migrations.jsonc'
       - 'workers/W09-platform/migrations-d1-03/**'
       - 'contracts/transport/W05-W03-owned-post-context-http-binding.v1.json'
@@ -494,6 +502,37 @@ jobs:
           if any('USE TEMP B-TREE' in row for row in plan):
               raise SystemExit(f'discovery ranking scan requires a temporary sort: {details}')
           print('SOCIAL_DISCOVERY_SCAN_QUERY_PLAN=PASS')
+          PY
+
+      - name: Verify NOTIFY-003 W05 to W09 endpoint delivery delegation
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          root = Path('.')
+          delivery = json.loads((root / 'contracts/transport/W05-W09-notification-push-delivery.v1.json').read_text())
+          boundary = json.loads((root / 'contracts/transport/d1-03-entity-owner-boundary.v1.json').read_text())
+          persistence = json.loads((root / 'contracts/persistence/NOTIFY-002-W05-D1-03-PUSH-ENDPOINT-PERSISTENCE.v1.json').read_text())
+          entity = json.loads((root / 'contracts/entity/NOTIFICATION-PUSH-ENDPOINT-CONTRACT.v1.json').read_text())
+          assert delivery['primaryOwner'] == {'worker': 'W09', 'task': 'T25', 'entity': 'NotificationPushEndpoint', 'database': 'D1-03', 'databaseName': 'secondary'}
+          assert delivery['delegatedRuntime']['worker'] == 'W05' and delivery['delegatedRuntime']['task'] == 'T14'
+          assert delivery['authority']['maxEndpointsPerRecipient'] == 20
+          operations = {item['id']: item for item in delivery['operations']}
+          assert operations['resolveActiveRecipientPushEndpoints']['kind'] == 'SCOPED_READ'
+          assert operations['resolveActiveRecipientPushEndpoints']['maxRows'] == 20
+          invalidation = operations['clearProviderInvalidExpoToken']
+          assert invalidation['kind'] == 'CONDITIONAL_SCOPED_WRITE'
+          assert 'DeviceNotRegistered' in invalidation['trigger']
+          assert 'current push token SHA-256 equals the hash captured' in invalidation['requiredPredicates'][-1]
+          scoped = boundary['scopedDelegations']['NotificationPushEndpoint']
+          assert scoped['primaryOwner'] == 'W09'
+          assert scoped['delegatedDeliveryRuntime']['contractRef'] == 'contracts/transport/W05-W09-notification-push-delivery.v1.json'
+          assert persistence['authority']['primaryWorker'] == 'W09'
+          assert persistence['authority']['scopedDeliveryRuntime']['contractRef'] == 'contracts/transport/W05-W09-notification-push-delivery.v1.json'
+          assert persistence['security']['publicTokenExposure'] == 'NEVER'
+          assert entity['delegatedDeliveryRuntime']['contractRef'] == 'contracts/transport/W05-W09-notification-push-delivery.v1.json'
+          print('NOTIFY_003_W05_W09_SCOPED_ENDPOINT_DELEGATION=PASS')
           PY
 
       - name: Verify durable notification push migration and atomic outbox trigger
