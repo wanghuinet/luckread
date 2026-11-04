@@ -164,9 +164,10 @@
       ],
       "status": "BLOCKED",
       "extensionEvidenceRefs": [
-        "workers/W05-social/src/push-endpoint-runtime.test.ts",
+        "workers/W01-payload/tests/int/push-endpoints-v1-adapter.int.spec.ts",
+        "workers/W01-payload/tests/int/push-endpoints-w05-binding.int.spec.ts",
         "workers/W05-social/src/index.test.ts",
-        "workers/W01-payload/tests/int/push-endpoints-v1-adapter.int.spec.ts"
+        "workers/W05-social/src/push-endpoint-runtime.test.ts"
       ]
     },
     {
