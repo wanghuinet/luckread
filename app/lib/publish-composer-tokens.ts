@@ -39,8 +39,10 @@ export function replaceActiveComposerToken(
   ) throw new TypeError('The active composer token is invalid.');
   const normalized = value.trim().replace(/^[@#]/, '');
   if (!normalized || /\s/.test(normalized)) throw new TypeError('A single token value is required.');
-  const inserted = token.prefix + normalized + ' ';
-  const nextText = text.slice(0, token.start) + inserted + text.slice(token.end);
+  const suffix = text.slice(token.end);
+  // Preserve an existing separator after the caret instead of introducing double spaces.
+  const inserted = token.prefix + normalized + (/^\\s/u.test(suffix) ? '' : ' ');
+  const nextText = text.slice(0, token.start) + inserted + suffix;
   const caret = token.start + inserted.length;
   return { text: nextText, selection: { start: caret, end: caret } };
 }
