@@ -122,16 +122,15 @@ test('native social composer supports an X-style mixed photo and video attachmen
   expect(composer).toContain('MAX_MEDIA_ITEMS = 4');
   expect(composer).toContain('MAX_VIDEO_ITEMS = 1');
   expect(composer).toContain('existingVideoCount + selectedVideoCount > MAX_VIDEO_ITEMS');
-
   expect(composer).toContain('Add photos or video');
+  expect(composer).toContain('Up to 4 media items');
+  expect(composer).toContain('videoMaxDuration: 60');
+  expect(composer).toContain("contentType: 'post'");
+  expect(composer).toContain('video is an attachment, not a separate video-content record');
   expect(composer).toContain('<PublishMediaActionSheet');
   expect(composer).toContain('remainingCount={MAX_MEDIA_ITEMS - assets.length}');
   expect(composer).toContain('onPickMedia={() => { void pickMedia(); }}');
-});
-  expect(composer).toContain('Up to 4 media items');
-  expect(composer).toContain('videoMaxDuration: 60');
-  expect(composer).toContain('contentType: \'post\'');
-  expect(composer).toContain('video is an attachment, not a separate video-content record');
+  expect(composer).not.toContain('onPress={() => setCameraVisible(true)}');
 });
 
 test('native composer previews attached videos before publishing and preserves playback controls', () => {
