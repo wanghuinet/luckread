@@ -1097,8 +1097,42 @@ const worker = {
         const limitParam = url.searchParams.get('limit')
         const creatorId = url.searchParams.get('creatorId')?.trim() || null
         const contentType = url.searchParams.get('type')?.trim() || null
+        const status = url.searchParams.get('status')?.trim() || null
         const limit = parseListLimit(limitParam)
         if (cursor && cursor.length > 2048) throw new ContentRuntimeError('INVALID_CURSOR', 400)
+        if (status !== null) {
+          // Social post drafts belong to the authenticated owner and are readable at L2+.
+          // Keep this separate from public discovery and creator-only article workflows.
+          if (status !== 'DRAFT' || creatorId || (contentType && contentType !== 'post')) {
+            throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+          }
+          const principal = requiredSocialPostPrincipal(request)
+          const page = await listCreatorContents(env.D1_02, principal.userId, cursor, limit, {
+            status: 'DRAFT',
+            contentType: 'post',
+          })
+          return json({
+            data: {
+              items: page.items.map(item => ({
+                id: item.id,
+                contentType: item.contentType,
+                state: item.state,
+                version: item.version,
+                revision: item.revision,
+                etag: item.etag,
+                title: item.title,
+                accessMode: item.accessMode ?? 'PUBLIC',
+                bodyRef: item.bodyRef,
+                mediaRefs: item.mediaRefs,
+                coverRef: item.coverRef,
+                updatedAt: item.updatedAt,
+              })),
+              nextCursor: page.nextCursor,
+              hasMore: page.hasMore,
+            },
+            requestId: createRequestId(),
+          })
+        }
         if (creatorId && !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(creatorId)) {
           throw new ContentRuntimeError('VALIDATION_FAILED', 400)
         }
