@@ -215,6 +215,7 @@ function PublishScreenContent() {
   const pendingCaretRef = useRef<number | null>(null);
 
   const activeComposerToken = findActiveComposerToken(body, textSelection.start);
+  const activeCoverRef = coverRef || assets.find((asset) => asset.mimeType.startsWith('image/'))?.serverUrl || '';
 
   const updateAsset = useCallback((localId: string, patch: Partial<ComposerAsset>) => {
     setAssets((current) => current.map((asset) => asset.localId === localId ? { ...asset, ...patch } : asset));
@@ -580,6 +581,38 @@ function PublishScreenContent() {
                   : 'Upload failed'}
             {typeof asset.size === 'number' ? ' · ' + Math.round(asset.size / 1024) + ' KB' : ''}
           </Text>
+          {asset.mimeType.startsWith('image/') && asset.status === 'ready' && asset.serverUrl ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={asset.serverUrl === activeCoverRef ? '当前封面' : '设为封面'}
+              accessibilityState={{
+                selected: asset.serverUrl === activeCoverRef,
+                disabled: busy || publishPending,
+              }}
+              disabled={busy || publishPending}
+              onPress={() => setCoverRef(asset.serverUrl)}
+              style={{
+                alignSelf: 'flex-start',
+                marginTop: 7,
+                borderWidth: 1,
+                borderColor: asset.serverUrl === activeCoverRef ? PRIMARY : (isDark ? '#52525b' : '#d0d5dd'),
+                borderRadius: 999,
+                paddingHorizontal: 10,
+                paddingVertical: 5,
+                backgroundColor: asset.serverUrl === activeCoverRef
+                  ? (isDark ? '#102a43' : '#e8f4ff')
+                  : 'transparent',
+              }}
+            >
+              <Text style={{
+                color: asset.serverUrl === activeCoverRef ? PRIMARY : (isDark ? '#d4d4d8' : '#475467'),
+                fontSize: 11,
+                fontWeight: '800',
+              }}>
+                {asset.serverUrl === activeCoverRef ? '当前封面' : '设为封面'}
+              </Text>
+            </Pressable>
+          ) : null}
           {asset.error ? <Text numberOfLines={2} style={styles.inlineError}>{asset.error}</Text> : null}
           {(asset.status === 'failed' || asset.status === 'uploaded') && !asset.existing ? (
             <Pressable disabled={busy || publishPending} onPress={() => { void retryAsset(asset); }} style={styles.retryLink}>
@@ -589,7 +622,7 @@ function PublishScreenContent() {
         </View>
       </View>
     ),
-    [busy, isDark, publishPending, removeAsset, retryAsset],
+    [activeCoverRef, busy, isDark, publishPending, removeAsset, retryAsset],
   );
 
   const saveDraftSnapshot = useCallback(async () => {
