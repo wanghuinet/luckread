@@ -5,6 +5,7 @@ const composer = readFileSync(new URL('../app/publish.tsx', import.meta.url), 'u
 const feedItem = readFileSync(new URL('../components/FeedItem.tsx', import.meta.url), 'utf8');
 const home = readFileSync(new URL('../app/(drawer)/(tabs)/(index)/index.tsx', import.meta.url), 'utf8');
 const socialPoll = readFileSync(new URL('../components/SocialPoll.tsx', import.meta.url), 'utf8');
+const mediaActionSheet = readFileSync(new URL('../components/PublishMediaActionSheet.tsx', import.meta.url), 'utf8');
 
 test('native publisher uses the shared media API helpers and existing W01 state endpoint', () => {
   expect(composer).toContain('prepareImageForUpload(file)');
@@ -121,7 +122,12 @@ test('native social composer supports an X-style mixed photo and video attachmen
   expect(composer).toContain('MAX_MEDIA_ITEMS = 4');
   expect(composer).toContain('MAX_VIDEO_ITEMS = 1');
   expect(composer).toContain('existingVideoCount + selectedVideoCount > MAX_VIDEO_ITEMS');
+
   expect(composer).toContain('Add photos or video');
+  expect(composer).toContain('<PublishMediaActionSheet');
+  expect(composer).toContain('remainingCount={MAX_MEDIA_ITEMS - assets.length}');
+  expect(composer).toContain('onPickMedia={() => { void pickMedia(); }}');
+});
   expect(composer).toContain('Up to 4 media items');
   expect(composer).toContain('videoMaxDuration: 60');
   expect(composer).toContain('contentType: \'post\'');
@@ -158,4 +164,20 @@ test('Keyboard Controller keeps the publish header stable and scrolls focused ed
   expect(composer).toContain('bottomOffset={16}');
   expect(composer).not.toContain('KeyboardAvoidingView');
   expect(composer).not.toContain('<ScrollView');
+});
+
+
+test('native composer reuses Gorhom bottom sheet for camera and photo-library media actions', () => {
+  expect(mediaActionSheet).toContain("from '@gorhom/bottom-sheet'");
+  expect(mediaActionSheet).toContain('<BottomSheetModal');
+  expect(mediaActionSheet).toContain('remainingCount');
+  expect(mediaActionSheet).toContain("pendingActionRef.current = 'camera'");
+  expect(mediaActionSheet).toContain("pendingActionRef.current = 'library'");
+  expect(mediaActionSheet).toContain("pendingActionRef.current === 'camera'");
+  expect(mediaActionSheet).toContain("pendingActionRef.current === 'library'");
+  expect(mediaActionSheet).toContain('onDismiss={handleDismiss}');
+  expect(mediaActionSheet).toContain('Take photo');
+  expect(mediaActionSheet).toContain('Choose from library');
+  // Native pickers are invoked only after the bottom sheet has fully dismissed.
+  expect(mediaActionSheet.indexOf('onDismiss={handleDismiss}')).toBeGreaterThan(-1);
 });
