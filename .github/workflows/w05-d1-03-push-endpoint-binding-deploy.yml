@@ -66,6 +66,11 @@ jobs:
           print('W05_D1_03_BINDING_SOURCE=PASS')
           PY
 
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
       - name: Verify migrated D1-03 target before deployment
         working-directory: workers/W05-social
         env:
@@ -82,11 +87,6 @@ jobs:
               raise SystemExit('D1-03 push endpoint migration must be applied before W05 deployment')
           print('W05_D1_03_MIGRATION_PREREQUISITE=PASS')
           PY
-
-      - name: Setup Node 24
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
 
       - name: Deploy W05 with existing D1-02 and scoped D1-03 bindings
         working-directory: workers/W05-social
