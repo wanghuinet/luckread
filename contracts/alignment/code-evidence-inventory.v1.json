@@ -858,6 +858,7 @@
       ],
       "testRefs": [
         "workers/W01-payload/tests/int/push-endpoints-v1-adapter.int.spec.ts",
+        "workers/W01-payload/tests/int/push-endpoints-w05-binding.int.spec.ts",
         "workers/W05-social/src/index.test.ts",
         "workers/W05-social/src/push-endpoint-runtime.test.ts"
       ],
@@ -3200,6 +3201,7 @@
       ],
       "testRefs": [
         "workers/W01-payload/tests/int/push-endpoints-v1-adapter.int.spec.ts",
+        "workers/W01-payload/tests/int/push-endpoints-w05-binding.int.spec.ts",
         "workers/W05-social/src/index.test.ts",
         "workers/W05-social/src/push-endpoint-runtime.test.ts"
       ],
@@ -3379,9 +3381,10 @@
         "workers/W01-payload/src/app/api/v1/push/endpoints/[installationId]/route.ts"
       ],
       "testRefs": [
-        "workers/W05-social/src/push-endpoint-runtime.test.ts",
+        "workers/W01-payload/tests/int/push-endpoints-v1-adapter.int.spec.ts",
+        "workers/W01-payload/tests/int/push-endpoints-w05-binding.int.spec.ts",
         "workers/W05-social/src/index.test.ts",
-        "workers/W01-payload/tests/int/push-endpoints-v1-adapter.int.spec.ts"
+        "workers/W05-social/src/push-endpoint-runtime.test.ts"
       ],
       "schemaEvidenceRefs": [
         "contracts/entity/NOTIFICATION-PUSH-ENDPOINT-CONTRACT.v1.json",
@@ -3509,7 +3512,9 @@
         "workers/W01-payload/src/app/auth/refresh/route.ts",
         "workers/W01-payload/src/app/auth/logout/route.ts"
       ],
-      "testRefs": [],
+      "testRefs": [
+        "workers/W02-identity/src/session/session-runtime.test.ts"
+      ],
       "schemaEvidenceRefs": [
         "workers/W01-payload/src/migrations/20260921_003203_MIG_AUTH_002_SESSION_V1.ts",
         "contracts/persistence/AUTH-002-minimum-session-extension-persistence-contract.v1.1.json",
@@ -5982,76 +5987,86 @@
       "evidenceId": "FIELD:ENT-USER-F-AVATAR",
       "subjectType": "FIELD",
       "subjectId": "ENT-USER-F-AVATAR",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "workers/W01-payload/src/collections/Users.ts"
+      ],
       "testRefs": [],
-      "schemaEvidenceRefs": [],
+      "schemaEvidenceRefs": [
+        "workers/W01-payload/src/collections/Users.ts"
+      ],
       "sourceRefs": [
         "contracts/entity/entity-field-contract.v1.json"
       ],
-      "blockers": [
-        "Field implementation evidence is incomplete"
-      ]
+      "blockers": []
     },
     {
       "evidenceId": "FIELD:ENT-USER-F-BIO",
       "subjectType": "FIELD",
       "subjectId": "ENT-USER-F-BIO",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "workers/W01-payload/src/collections/Users.ts"
+      ],
       "testRefs": [],
-      "schemaEvidenceRefs": [],
+      "schemaEvidenceRefs": [
+        "workers/W01-payload/src/collections/Users.ts"
+      ],
       "sourceRefs": [
         "contracts/entity/entity-field-contract.v1.json"
       ],
-      "blockers": [
-        "Field implementation evidence is incomplete"
-      ]
+      "blockers": []
     },
     {
       "evidenceId": "FIELD:ENT-USER-F-DISPLAY-NAME",
       "subjectType": "FIELD",
       "subjectId": "ENT-USER-F-DISPLAY-NAME",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "workers/W01-payload/src/collections/Users.ts"
+      ],
       "testRefs": [],
-      "schemaEvidenceRefs": [],
+      "schemaEvidenceRefs": [
+        "workers/W01-payload/src/collections/Users.ts"
+      ],
       "sourceRefs": [
         "contracts/entity/entity-field-contract.v1.json"
       ],
-      "blockers": [
-        "Field implementation evidence is incomplete"
-      ]
+      "blockers": []
     },
     {
       "evidenceId": "FIELD:ENT-USER-F-IDENTITY-ID",
       "subjectType": "FIELD",
       "subjectId": "ENT-USER-F-IDENTITY-ID",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "workers/W01-payload/src/collections/Users.ts"
+      ],
       "testRefs": [],
-      "schemaEvidenceRefs": [],
+      "schemaEvidenceRefs": [
+        "workers/W01-payload/src/collections/Users.ts"
+      ],
       "sourceRefs": [
         "contracts/entity/entity-field-contract.v1.json"
       ],
-      "blockers": [
-        "Field implementation evidence is incomplete"
-      ]
+      "blockers": []
     },
     {
       "evidenceId": "FIELD:ENT-USER-F-LOCALE",
       "subjectType": "FIELD",
       "subjectId": "ENT-USER-F-LOCALE",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "workers/W01-payload/src/collections/Users.ts"
+      ],
       "testRefs": [],
-      "schemaEvidenceRefs": [],
+      "schemaEvidenceRefs": [
+        "workers/W01-payload/src/collections/Users.ts"
+      ],
       "sourceRefs": [
         "contracts/entity/entity-field-contract.v1.json"
       ],
-      "blockers": [
-        "Field implementation evidence is incomplete"
-      ]
+      "blockers": []
     },
     {
       "evidenceId": "FIELD:ENT-USER-F-MFA-ENROLLED-AT",
@@ -6072,16 +6087,18 @@
       "evidenceId": "FIELD:ENT-USER-F-TIMEZONE",
       "subjectType": "FIELD",
       "subjectId": "ENT-USER-F-TIMEZONE",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "workers/W01-payload/src/collections/Users.ts"
+      ],
       "testRefs": [],
-      "schemaEvidenceRefs": [],
+      "schemaEvidenceRefs": [
+        "workers/W01-payload/src/collections/Users.ts"
+      ],
       "sourceRefs": [
         "contracts/entity/entity-field-contract.v1.json"
       ],
-      "blockers": [
-        "Field implementation evidence is incomplete"
-      ]
+      "blockers": []
     },
     {
       "evidenceId": "FIELD:ENT-USER-F-TWO-FACTOR-ENABLED",
@@ -6102,16 +6119,18 @@
       "evidenceId": "FIELD:ENT-USER-F-USERNAME",
       "subjectType": "FIELD",
       "subjectId": "ENT-USER-F-USERNAME",
-      "implementationStatus": "UNRESOLVED",
-      "implementationRefs": [],
+      "implementationStatus": "IMPLEMENTED",
+      "implementationRefs": [
+        "workers/W01-payload/src/collections/Users.ts"
+      ],
       "testRefs": [],
-      "schemaEvidenceRefs": [],
+      "schemaEvidenceRefs": [
+        "workers/W01-payload/src/collections/Users.ts"
+      ],
       "sourceRefs": [
         "contracts/entity/entity-field-contract.v1.json"
       ],
-      "blockers": [
-        "Field implementation evidence is incomplete"
-      ]
+      "blockers": []
     },
     {
       "evidenceId": "PAYLOAD_COLLECTION:media",
