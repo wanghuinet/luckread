@@ -81,6 +81,26 @@ describe('W05 notification push endpoint runtime', () => {
     expect(prepare).not.toHaveBeenCalled()
   })
 
+  it('does not allow another account to claim an existing installation identifier', async () => {
+    let sql = ''
+    const db = {
+      prepare: vi.fn((value: string) => {
+        sql = value
+        return {
+          bind: () => ({ first: async () => null }),
+        }
+      }),
+    } as unknown as D1Database
+
+    await expect(upsertPushEndpoint(db, 'attacker-user', installationId, {
+      platform: 'ios',
+      permissionStatus: 'granted',
+      expoPushToken: pushToken,
+    })).rejects.toMatchObject({ code: 'CONFLICT', status: 409 })
+
+    expect(sql).toContain('WHERE notification_push_endpoints.owner_user_id = excluded.owner_user_id')
+  })
+
   it('rejects a token already assigned to a different installation without leaking SQL details', async () => {
     const db = {
       prepare: () => ({
