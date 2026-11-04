@@ -110,9 +110,18 @@
       "evidenceRefs": [
         "contracts/entity/NOTIFICATION-PUSH-ENDPOINT-CONTRACT.v1.json",
         "contracts/persistence/NOTIFY-002-W05-D1-03-PUSH-ENDPOINT-PERSISTENCE.v1.json",
-        "workers/W05-social/migrations-d1-03/0001_notification_push_endpoints.sql",
+        "workers/W09-platform/migrations-d1-03/0001_notification_push_endpoints.sql",
         "docs/change-control/CC-T14-W05-D1-03-PUSH-ENDPOINT-REGISTRATION-2026-11-04.md"
-      ]
+      ],
+      "primaryOwner": {
+        "worker": "W09",
+        "task": "T25"
+      },
+      "delegatedWriter": {
+        "worker": "W05",
+        "task": "T14",
+        "scope": "Self-service PUT/DELETE for the current user's Expo push endpoint only."
+      }
     },
     {
       "entityId": "ENT-ORDER",
