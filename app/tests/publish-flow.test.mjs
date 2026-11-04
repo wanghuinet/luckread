@@ -9,6 +9,7 @@ const home = readFileSync(new URL('../app/(drawer)/(tabs)/(index)/index.tsx', im
 const socialPoll = readFileSync(new URL('../components/SocialPoll.tsx', import.meta.url), 'utf8');
 const mediaActionSheet = readFileSync(new URL('../components/PublishMediaActionSheet.tsx', import.meta.url), 'utf8');
 const w01SocialRoute = readFileSync(new URL('../../workers/W01-payload/src/app/api/v1/contents/[contentId]/social/route.ts', import.meta.url), 'utf8');
+const socialScreenApiSource = readFileSync(new URL('../lib/social-screen-api.ts', import.meta.url), 'utf8');
 
 test('native publisher uses the shared media API helpers and existing W01 state endpoint', () => {
   expect(composer).toContain('prepareImageForUpload(file)');
@@ -242,7 +243,7 @@ test('native publisher lists, restores, paginates and deletes the owner-only dra
   expect(composer).toContain('<Modal');
   expect(composer).toContain('草稿箱');
   expect(composer).toContain('删除草稿');
-  expect(composer).toContain('headers: { \'If-Match\': etag }');
+  expect(socialScreenApiSource).toContain("headers: { 'If-Match': etag }");
 });
 
 test('native composer inserts only the active @mention or #topic at the caret', () => {
@@ -260,7 +261,7 @@ test('native composer inserts only the active @mention or #topic at the caret', 
 test('published native posts sync mention and topic tokens through W01 and W05 authorities', () => {
   expect(composer).toContain("'/contents/' + encodeURIComponent(contentIdValue) + '/social'");
   expect(composer).toContain('syncPublishedSocialTokens(draft.id, trimmedBody)');
-  expect(composer).toContain('resolveSocialMentionTargets(text)');
+  expect(w01SocialRoute).toContain('resolveSocialMentionTargets(text)');
   expect(w01SocialRoute).toContain("pathname: '/internal/social/contents/' + encodeURIComponent(contentId) + '/tokens'");
   expect(w01SocialRoute).toContain('mentions = await resolveSocialMentionTargets(text)');
 });
