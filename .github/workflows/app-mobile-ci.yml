@@ -158,6 +158,8 @@ jobs:
         run: bun run test:publish-flow
       - name: Test native notifications, bookmarks, relationships and discovery API routes
         run: bun run test:social-screen-api
+      - name: Test native Expo push endpoint registration, permission lifecycle and logout cleanup
+        run: bun run test:push-notifications
       - name: Test native subscription management API
         run: bun run test:subscriptions-api
       - name: Test native paid-content entitlement and paywall closure
