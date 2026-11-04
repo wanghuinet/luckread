@@ -1420,6 +1420,78 @@ paths:
         in: path
         required: true
         schema: { type: string, format: uuid, minLength: 36, maxLength: 36 }
+      - name: Idempotency-Key
+        in: header
+        required: true
+        description: Stable retry key for this endpoint mutation and its durable W06 audit intent.
+        schema: { type: string, minLength: 1, maxLength: 128, pattern: '^[A-Za-z0-9_-]+    put:
+      tags: [Notifications]
+      summary: Register or update the current user's Expo push endpoint
+      operationId: upsertPushEndpoint
+      description: Idempotent app-installation registration. The owner is derived from the authenticated session. installationId is not a trusted device or session identity. Push tokens are never returned.
+      security:
+        - sessionCookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [platform, permissionStatus, expoPushToken]
+              properties:
+                platform: { type: string, enum: [ios, android] }
+                permissionStatus: { type: string, enum: [granted, denied, undetermined] }
+                expoPushToken: { type: string, nullable: true, minLength: 20, maxLength: 512, description: 'Required for granted permission. If permission is denied or undetermined, any supplied token is ignored and the stored token is cleared.' }
+                appVersion: { type: string, nullable: true, maxLength: 64 }
+      responses:
+        '200':
+          description: Push endpoint registered or updated; the push token is never returned.
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, requestId]
+                properties:
+                  data:
+                    type: object
+                    required: [endpointId, status]
+                    properties:
+                      endpointId: { type: string, format: uuid }
+                      status: { type: string, enum: [ACTIVE, DISABLED] }
+                  requestId: { type: string }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '409': { $ref: '#/components/responses/InvalidState' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    delete:
+      tags: [Notifications]
+      summary: Remove the current user's Expo push endpoint
+      operationId: deletePushEndpoint
+      description: Idempotent owner-scoped deletion by app installation identifier. Does not revoke an authentication session or trusted device.
+      security:
+        - sessionCookieAuth: []
+        - bearerAuth: []
+      responses:
+        '204':
+          description: Push endpoint removed or already absent.
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+ }
     put:
       tags: [Notifications]
       summary: Register or update the current user's Expo push endpoint
