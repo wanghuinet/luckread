@@ -16,7 +16,7 @@ type ClaimedDelivery = Readonly<{
 }>
 type ClaimedReceipt = Readonly<{
   deliveryId: string; notificationId: string; endpointId: string; recipientUserId: string
-  expoTicketId: string; leaseToken: string; attemptCount: number
+  expoTicketId: string; leaseToken: string; attemptCount: number; receiptPollCount: number; pushTokenHash: string
 }>
 export type NotificationPushBatchResult = Readonly<{
   status: 'COMPLETED' | 'DISABLED'; fannedOut: number; sent: number; delivered: number
@@ -32,6 +32,10 @@ const LEASE_SECONDS = 180
 const RECEIPT_DELAY_SECONDS = 15 * 60
 const RECEIPT_RETRY_SECONDS = 5 * 60
 const isoAfter = (now: Date, seconds: number) => new Date(now.getTime() + seconds * 1000).toISOString()
+async function hashPushToken(token: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token))
+  return Array.from(new Uint8Array(digest), (value) => value.toString(16).padStart(2, '0')).join('')
+}
 
 export function calculatePushRetryDelaySeconds(attemptCount: number): number {
   const attempt = Number.isSafeInteger(attemptCount) && attemptCount > 0 ? attemptCount : 1
@@ -163,6 +167,12 @@ async function claimDueDeliveries(db: D1Database, endpointDb: D1Database, now: D
       continue
     }
 
+    const pushTokenHash = await hashPushToken(endpoint.push_token)
+    const tokenSnapshotSaved = await db.prepare(
+      'UPDATE social_notification_push_deliveries SET push_token_hash = ?, updated_at = ? WHERE delivery_id = ? AND status = ? AND lease_token = ?',
+    ).bind(pushTokenHash, nowIso, updated.delivery_id, 'LEASED', leaseToken).run()
+    if (Number(tokenSnapshotSaved.meta?.changes ?? 0) !== 1) continue
+
     claimed.push({
       deliveryId: updated.delivery_id,
       notificationId: updated.notification_id,
@@ -239,10 +249,12 @@ async function claimDueReceipts(db: D1Database, now: Date): Promise<ClaimedRecei
     const row = await db.prepare(
       "UPDATE social_notification_push_deliveries SET status = 'RECEIPT_LEASED', lease_token = ?, " +
       'lease_expires_at = ?, receipt_poll_count = receipt_poll_count + 1, updated_at = ? ' +
-      "WHERE delivery_id = ? AND status = 'RECEIPT_PENDING' AND next_attempt_at <= ? " +
-      'RETURNING delivery_id, notification_id, endpoint_id, expo_ticket_id, attempt_count',
-    ).bind(leaseToken, isoAfter(now, LEASE_SECONDS), nowIso, candidate.delivery_id, nowIso).first<{
-      delivery_id: string; notification_id: string; endpoint_id: string; expo_ticket_id: string; attempt_count: number
+      "WHERE delivery_id = ? AND ((status = 'RECEIPT_PENDING' AND next_attempt_at <= ?) " +
+      "OR (status = 'RECEIPT_LEASED' AND lease_expires_at IS NOT NULL AND lease_expires_at <= ?)) " +
+      'RETURNING delivery_id, notification_id, endpoint_id, expo_ticket_id, attempt_count, receipt_poll_count, push_token_hash',
+    ).bind(leaseToken, isoAfter(now, LEASE_SECONDS), nowIso, candidate.delivery_id, nowIso, nowIso).first<{
+      delivery_id: string; notification_id: string; endpoint_id: string; expo_ticket_id: string
+      attempt_count: number; receipt_poll_count: number; push_token_hash: string | null
     }>()
     if (!row) continue
     const owner = await db.prepare(
@@ -263,6 +275,8 @@ async function claimDueReceipts(db: D1Database, now: Date): Promise<ClaimedRecei
       expoTicketId: row.expo_ticket_id,
       leaseToken,
       attemptCount: row.attempt_count,
+      receiptPollCount: row.receipt_poll_count,
+      pushTokenHash: row.push_token_hash ?? '',
     })
   }
   return claimed
@@ -272,6 +286,13 @@ async function applyReceipt(
   db: D1Database, endpointDb: D1Database, task: ClaimedReceipt, receipt: PushReceiptLike | undefined, now: Date,
 ): Promise<'delivered' | 'retried' | 'failed' | 'pending'> {
   if (!receipt) {
+    if (task.receiptPollCount >= MAX_RECEIPT_POLLS) {
+      await db.prepare(
+        "UPDATE social_notification_push_deliveries SET status = 'FAILED', lease_token = NULL, lease_expires_at = NULL, " +
+        "last_error_code = 'RECEIPT_TIMEOUT', updated_at = ? WHERE delivery_id = ? AND status = 'RECEIPT_LEASED' AND lease_token = ?",
+      ).bind(now.toISOString(), task.deliveryId, task.leaseToken).run()
+      return 'failed'
+    }
     await db.prepare(
       "UPDATE social_notification_push_deliveries SET status = 'RECEIPT_PENDING', next_attempt_at = ?, " +
       "lease_token = NULL, lease_expires_at = NULL, last_error_code = 'RECEIPT_NOT_READY', updated_at = ? " +
@@ -290,11 +311,16 @@ async function applyReceipt(
   }
 
   const errorCode = String(receipt.details?.error ?? 'EXPO_RECEIPT_ERROR')
-  if (errorCode === 'DeviceNotRegistered') {
-    await endpointDb.prepare(
-      "UPDATE notification_push_endpoints SET permission_status = 'undetermined', push_token = NULL, " +
-      'updated_at = ?, last_seen_at = ? WHERE endpoint_id = ? AND owner_user_id = ? AND provider = ?',
-    ).bind(now.toISOString(), now.toISOString(), task.endpointId, task.recipientUserId, 'expo').run()
+  if (errorCode === 'DeviceNotRegistered' && task.pushTokenHash) {
+    const endpoint = await endpointDb.prepare(
+      'SELECT push_token FROM notification_push_endpoints WHERE endpoint_id = ? AND owner_user_id = ? AND provider = ? LIMIT 1',
+    ).bind(task.endpointId, task.recipientUserId, 'expo').first<{ push_token: string | null }>()
+    if (endpoint?.push_token && await hashPushToken(endpoint.push_token) === task.pushTokenHash) {
+      await endpointDb.prepare(
+        "UPDATE notification_push_endpoints SET permission_status = 'undetermined', push_token = NULL, " +
+        'updated_at = ?, last_seen_at = ? WHERE endpoint_id = ? AND owner_user_id = ? AND provider = ? AND push_token = ?',
+      ).bind(now.toISOString(), now.toISOString(), task.endpointId, task.recipientUserId, 'expo', endpoint.push_token).run()
+    }
   }
   const canRetry = isRetryableExpoError(errorCode) && task.attemptCount < MAX_SEND_ATTEMPTS
   const status = canRetry ? 'RETRY' : 'FAILED'
