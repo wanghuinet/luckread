@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "version": "1.0.0",
+  "status": "CONTRACTED_NOT_VERIFIED",
+  "featureIds": [
+    "NOTIFY-002"
+  ],
+  "entityId": "ENT-NOTIFICATION-PUSH-ENDPOINT",
+  "authority": {
+    "domainId": "D1-03",
+    "taskId": "T14",
+    "primaryWorker": "W05",
+    "workerName": "luckread-w05",
+    "databaseUuid": "bda1d247-a371-4244-91ae-aef96034db7f",
+    "databaseName": "secondary",
+    "scope": "Expo push routing endpoints only; not authentication devices, sessions, notification inbox records, or delivery execution records."
+  },
+  "persistence": {
+    "adapter": "Cloudflare D1",
+    "table": "notification_push_endpoints",
+    "migrationRef": "workers/W05-social/migrations-d1-03/0001_notification_push_endpoints.sql",
+    "migrationId": "MIG-NOTIFY-002-PUSH-ENDPOINTS-V1",
+    "executionStatus": "NOT_EXECUTED",
+    "forwardOnly": true,
+    "idempotent": true,
+    "transactionBoundary": "single D1-03 migration",
+    "constraints": [
+      "installation_id is unique and represents an app installation identifier, not a trusted device identity.",
+      "provider is fixed to expo.",
+      "provider + push_token is unique when push_token is present.",
+      "permissionStatus=granted requires a token; denied/undetermined requires a null token.",
+      "owner_user_id is derived from the W01-authenticated W02 principal and is never accepted in request data.",
+      "No cross-D1 foreign key to identity/session/account records is permitted."
+    ],
+    "indexes": [
+      "uq_notification_push_endpoints_provider_token UNIQUE (provider, push_token) WHERE push_token IS NOT NULL",
+      "ix_notification_push_endpoints_owner_status (owner_user_id, permission_status, updated_at)"
+    ]
+  },
+  "apiOperations": [
+    {
+      "method": "PUT",
+      "path": "/v1/push/endpoints/{installationId}",
+      "operationId": "upsertPushEndpoint",
+      "semantics": "Idempotent upsert; repeated registration for the same installation replaces token/permission/platform/app-version state."
+    },
+    {
+      "method": "DELETE",
+      "path": "/v1/push/endpoints/{installationId}",
+      "operationId": "deletePushEndpoint",
+      "semantics": "Idempotent owner-scoped deletion; does not revoke an authentication session or trusted device."
+    }
+  ],
+  "security": {
+    "publicTokenExposure": "NEVER",
+    "tokenLogging": "FORBIDDEN",
+    "clientSuppliedOwner": "FORBIDDEN",
+    "clientSuppliedTrustedDeviceState": "FORBIDDEN",
+    "caller": "W01 only through authenticated W02 session resolution",
+    "minimumInteractionLayer": "L2",
+    "rateLimit": "W01 origin/IP write limit plus W05 global and authenticated-principal limit",
+    "deliveryRead": "Only W05 internal delivery runtime may read tokens under the separate notification-delivery contract."
+  },
+  "nonGoals": [
+    "No Expo Push API sending in this module.",
+    "No W10 Workflow or Queue behavior in this module.",
+    "No authentication/session/device authority changes.",
+    "No new Worker, D1 database, Queue, public direct Worker route, or Service Binding."
+  ],
+  "evidenceRequired": [
+    "W05 D1-03 scoped binding and exact Worker source SHA",
+    "Remote migration ledger entry and D1-03 schema/index readback",
+    "W05 registration and owner-scoped deletion runtime tests",
+    "W01 bearer-session adapter contract tests",
+    "Negative tests for caller spoofing, token collision, denied permission, missing D1-03 binding, and unauthorized deletion",
+    "Production Expo push-token privacy and authorization E2E"
+  ]
+}
