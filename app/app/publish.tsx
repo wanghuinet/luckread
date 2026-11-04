@@ -826,18 +826,19 @@ function PublishScreenContent() {
           </View>
 
           {assets.length > 0 ? (
-            <Sortable.Grid
-              columns={assets.length === 1 ? 1 : 2}
-              data={assets}
-              keyExtractor={(asset) => asset.localId}
-              renderItem={renderComposerAsset}
-              onDragEnd={({ data }) => setAssets(data)}
-              sortEnabled={!busy && !publishPending && assets.length > 1}
-              customHandle
-              rowGap={10}
-              columnGap={10}
-              style={styles.assetGrid}
-            />
+            <View style={styles.assetGrid}>
+              <Sortable.Grid
+                columns={assets.length === 1 ? 1 : 2}
+                data={assets}
+                keyExtractor={(asset) => asset.localId}
+                renderItem={renderComposerAsset}
+                onDragEnd={({ data }) => setAssets(data)}
+                sortEnabled={!busy && !publishPending && assets.length > 1}
+                customHandle
+                rowGap={10}
+                columnGap={10}
+              />
+            </View>
           ) : null}
 
           <View style={styles.mediaActions}>
