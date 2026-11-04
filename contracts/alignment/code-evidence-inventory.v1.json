@@ -3385,14 +3385,14 @@
       ],
       "schemaEvidenceRefs": [
         "contracts/entity/NOTIFICATION-PUSH-ENDPOINT-CONTRACT.v1.json",
-        "workers/W05-social/migrations-d1-03/0001_notification_push_endpoints.sql"
+        "workers/W09-platform/migrations-d1-03/0001_notification_push_endpoints.sql"
       ],
       "sourceRefs": [
         "contracts/entity/entity-catalog.v1.json",
         "contracts/entity/entity-implementation-evidence.v1.json"
       ],
       "blockers": [
-        "W05 D1-03 remote migration and live scoped binding deployment are pending."
+        "W09 D1-03 remote migration and W05 delegated runtime binding deployment are pending."
       ]
     },
     {
