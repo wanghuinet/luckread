@@ -128,6 +128,7 @@
         "GET /v1/media/{mediaId}/playback",
         "GET /v1/media/{mediaId}/processing",
         "GET /v1/media/{mediaId}/variants",
+        "PATCH /v1/media/{mediaId}",
         "POST /v1/media",
         "POST /v1/media/uploads",
         "POST /v1/media/uploads/{uploadId}/complete",
