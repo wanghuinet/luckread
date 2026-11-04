@@ -33,7 +33,7 @@ const validUserId = (value: string): string => {
 const validInstallationId = (value: string): string => {
   const normalized = value.trim().toLowerCase()
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(normalized)) {
-    throw new PushEndpointRuntimeError('VALIDATION_FAILED', 400)
+    throw new PushEndpointRuntimeError('VALIDATION_FAILED', 422)
   }
   return normalized
 }
@@ -42,27 +42,27 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
 
 const parseRegistration = (value: unknown): PushEndpointRegistrationInput => {
-  if (!isRecord(value)) throw new PushEndpointRuntimeError('VALIDATION_FAILED', 400)
+  if (!isRecord(value)) throw new PushEndpointRuntimeError('VALIDATION_FAILED', 422)
 
   const allowedKeys = new Set(['platform', 'permissionStatus', 'expoPushToken', 'appVersion'])
   if (Object.keys(value).some(key => !allowedKeys.has(key))) {
-    throw new PushEndpointRuntimeError('VALIDATION_FAILED', 400)
+    throw new PushEndpointRuntimeError('VALIDATION_FAILED', 422)
   }
 
   if (value.platform !== 'ios' && value.platform !== 'android') {
-    throw new PushEndpointRuntimeError('VALIDATION_FAILED', 400)
+    throw new PushEndpointRuntimeError('VALIDATION_FAILED', 422)
   }
   if (
     value.permissionStatus !== 'granted' &&
     value.permissionStatus !== 'denied' &&
     value.permissionStatus !== 'undetermined'
   ) {
-    throw new PushEndpointRuntimeError('VALIDATION_FAILED', 400)
+    throw new PushEndpointRuntimeError('VALIDATION_FAILED', 422)
   }
 
   const rawToken = value.expoPushToken
   if (rawToken !== null && typeof rawToken !== 'string') {
-    throw new PushEndpointRuntimeError('VALIDATION_FAILED', 400)
+    throw new PushEndpointRuntimeError('VALIDATION_FAILED', 422)
   }
   const token = typeof rawToken === 'string' ? rawToken.trim() : null
   if (value.permissionStatus === 'granted') {
@@ -71,12 +71,12 @@ const parseRegistration = (value: unknown): PushEndpointRegistrationInput => {
       token.length > MAX_PUSH_TOKEN ||
       !/^(?:Expo|Exponent)PushToken\[[A-Za-z0-9_-]{16,480}\]$/.test(token)
     ) {
-      throw new PushEndpointRuntimeError('VALIDATION_FAILED', 400)
+      throw new PushEndpointRuntimeError('VALIDATION_FAILED', 422)
     }
   } else if (token !== null) {
     // Revoked/undetermined permission must never leave an old token eligible
     // for delivery.
-    throw new PushEndpointRuntimeError('VALIDATION_FAILED', 400)
+    throw new PushEndpointRuntimeError('VALIDATION_FAILED', 422)
   }
 
   let appVersion: string | null = null
@@ -87,7 +87,7 @@ const parseRegistration = (value: unknown): PushEndpointRegistrationInput => {
       value.appVersion.trim().length > MAX_APP_VERSION ||
       !/^[A-Za-z0-9.+_-]+$/.test(value.appVersion.trim())
     ) {
-      throw new PushEndpointRuntimeError('VALIDATION_FAILED', 400)
+      throw new PushEndpointRuntimeError('VALIDATION_FAILED', 422)
     }
     appVersion = value.appVersion.trim()
   }
