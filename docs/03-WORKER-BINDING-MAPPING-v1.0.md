@@ -85,6 +85,7 @@ Exactly five D1 domains are authoritative. D1-01..D1-04 retain existing business
 
 - Primary D1-02 authority for T11/T12/T13/T14 content/community-side state assigned by the Blueprint.
 - D1-03 access is limited to scoped notification/runtime delivery state.
+- The first admitted T14 D1-03 entity is NotificationPushEndpoint only; notification inbox, preferences, and social event writes remain in D1-02.
 - Does not become general D1-03 operational authority.
 
 ### W06
