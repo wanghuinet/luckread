@@ -187,6 +187,7 @@ function PublishScreenContent() {
   const [deletingDraftId, setDeletingDraftId] = useState<string | null>(null);
   const [textSelection, setTextSelection] = useState({ start: 0, end: 0 });
   const [topicSuggestions, setTopicSuggestions] = useState<DiscoveryTopicOption[]>([]);
+  const [topicSuggestionsLoading, setTopicSuggestionsLoading] = useState(false);
   const [mentionSuggestion, setMentionSuggestion] = useState<MentionSuggestion | null>(null);
   const [mentionLookupLoading, setMentionLookupLoading] = useState(false);
 
@@ -924,6 +925,7 @@ function PublishScreenContent() {
 
   const restoreDraftFromInbox = useCallback((draft: NativePostDraft) => {
     setDraftInboxVisible(false);
+    if (draftId === draft.id) return;
     if (draftSaveTimerRef.current) {
       clearTimeout(draftSaveTimerRef.current);
       draftSaveTimerRef.current = null;
@@ -947,7 +949,7 @@ function PublishScreenContent() {
     setStatusMessage('');
     setDraftSaveStatus('idle');
     router.setParams({ contentId: undefined, draftId: draft.id } as never);
-  }, [router]);
+  }, [draftId, router]);
 
   const removeDraftFromInbox = useCallback((draft: NativePostDraft) => {
     Alert.alert('删除草稿', '删除后无法恢复这条草稿。', [
@@ -1022,6 +1024,7 @@ function PublishScreenContent() {
     if (activeComposerToken?.kind !== 'topic' || topicSuggestionsLoadedRef.current) return;
     topicSuggestionsLoadedRef.current = true;
     let active = true;
+    setTopicSuggestionsLoading(true);
     void fetchDiscoveryTopics().then((result) => {
       if (!result.response.ok) throw new Error('Topics unavailable');
       const root = result.data as { data?: { items?: unknown[] } } | null;
@@ -1033,10 +1036,12 @@ function PublishScreenContent() {
         return typeof value.topicId === 'string' && typeof value.name === 'string' && typeof value.displayName === 'string';
       }));
     }).catch(() => {
-      topicSuggestionsLoadedRef.current = false;
+      if (active) topicSuggestionsLoadedRef.current = false;
+    }).finally(() => {
+      if (active) setTopicSuggestionsLoading(false);
     });
     return () => { active = false; };
-  }, [activeComposerToken?.kind]);
+  }, [activeComposerToken?.kind, activeComposerToken?.query]);
 
   useEffect(() => {
     const query = activeComposerToken?.kind === 'mention' ? activeComposerToken.query : '';
@@ -1045,6 +1050,8 @@ function PublishScreenContent() {
       setMentionLookupLoading(false);
       return;
     }
+    setMentionSuggestion(null);
+    setMentionLookupLoading(false);
     const controller = new AbortController();
     const timer = setTimeout(() => {
       setMentionLookupLoading(true);
@@ -1556,7 +1563,7 @@ function PublishScreenContent() {
                     </View>
                   </Pressable>
                 ))}
-              {topicSuggestions.length === 0 ? <Text style={[styles.suggestionMeta, isDark && { color: '#a1a1aa' }]}>暂无热门话题；可以继续输入自定义话题。</Text> : null}
+              {topicSuggestionsLoading ? <Text style={[styles.suggestionMeta, isDark && { color: '#a1a1aa' }]}>正在加载热门话题…</Text> : topicSuggestions.length === 0 ? <Text style={[styles.suggestionMeta, isDark && { color: '#a1a1aa' }]}>暂无热门话题；可以继续输入自定义话题。</Text> : null}
             </View>
           ) : activeComposerToken?.kind === 'mention' && activeComposerToken.query.length >= 2 ? (
             <View style={[styles.suggestionPanel, isDark && styles.suggestionPanelDark]}>
