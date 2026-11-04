@@ -1076,6 +1076,117 @@ describe('W06 runtime', () => {
       moderationRuntime: 'enabled',
     })
   })
+
+  it('persists a token-free push endpoint mutation intent using the authenticated W01 actor', async () => {
+    const inserted: unknown[][] = []
+    const prepare = vi.fn((sql: string) => ({
+      bind: (...values: unknown[]) => ({
+        first: async () => null,
+        run: async () => {
+          if (sql.includes('INSERT INTO audit_events')) inserted.push(values)
+          return { success: true, meta: { changes: 1 } }
+        },
+      }),
+    }))
+    const db = { prepare } as unknown as D1Database
+    const runtime = await import('./index')
+    const eventId = 'evt_push_endpoint_' + 'a'.repeat(64)
+    const idempotencyKey = 'idem_push_register_0001'
+    const response = await runtime.default.fetch(
+      new Request('https://w06.internal/internal/audit-events/push-endpoint-mutation-requested', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'Idempotency-Key': idempotencyKey,
+          'X-LuckRead-Caller': 'W01',
+          'X-LuckRead-Transport-Version': '1.0',
+          'X-LuckRead-Principal-User-Id': 'push_owner_001',
+          'X-LuckRead-Principal-Layer': 'L2',
+          'X-LuckRead-Correlation-Id': 'push-audit-correlation',
+          'X-LuckRead-Request-Id': 'req_push_audit_001',
+        },
+        body: JSON.stringify({
+          eventId,
+          installationId: '6b6d9f5a-4e61-4c50-9d17-9e97f36e6e3c',
+          operation: 'REGISTER',
+          idempotencyKey,
+          platform: 'android',
+          permissionStatus: 'granted',
+        }),
+      }),
+      { D1_03: db },
+    )
+
+    expect(response.status).toBe(201)
+    await expect(response.json()).resolves.toMatchObject({
+      eventId,
+      action: 'notification.push_endpoint.mutation_requested',
+      targetType: 'NotificationPushEndpoint',
+      targetId: '6b6d9f5a-4e61-4c50-9d17-9e97f36e6e3c',
+      replayed: false,
+    })
+    expect(inserted).toHaveLength(1)
+    const values = inserted[0] ?? []
+    expect(JSON.parse(String(values[3]))).toMatchObject({
+      actorId: 'push_owner_001',
+      actorType: 'user',
+      layer: 'L2',
+    })
+    expect(values[4]).toBe('notification.push_endpoint.mutation_requested')
+    expect(values[5]).toBe('NotificationPushEndpoint')
+    expect(values[6]).toBe('6b6d9f5a-4e61-4c50-9d17-9e97f36e6e3c')
+    expect(JSON.parse(String(values[8]))).toEqual({
+      operation: 'REGISTER',
+      provider: 'expo',
+      platform: 'android',
+      permissionStatus: 'granted',
+    })
+    expect(JSON.stringify(values)).not.toContain('ExponentPushToken')
+  })
+
+  it('rejects an idempotency mismatch and L1 audit attempt before D1 access', async () => {
+    const prepare = vi.fn()
+    const db = { prepare } as unknown as D1Database
+    const runtime = await import('./index')
+    const body = {
+      eventId: 'evt_push_endpoint_' + 'b'.repeat(64),
+      installationId: '6b6d9f5a-4e61-4c50-9d17-9e97f36e6e3c',
+      operation: 'REMOVE',
+      idempotencyKey: 'idem_push_remove_0001',
+      platform: null,
+      permissionStatus: null,
+    }
+    const headers = {
+      'content-type': 'application/json',
+      'Idempotency-Key': 'idem_push_remove_other',
+      'X-LuckRead-Caller': 'W01',
+      'X-LuckRead-Transport-Version': '1.0',
+      'X-LuckRead-Principal-User-Id': 'push_owner_001',
+      'X-LuckRead-Principal-Layer': 'L2',
+      'X-LuckRead-Correlation-Id': 'push-audit-correlation',
+      'X-LuckRead-Request-Id': 'req_push_audit_002',
+    }
+    const mismatch = await runtime.default.fetch(
+      new Request('https://w06.internal/internal/audit-events/push-endpoint-mutation-requested', {
+        method: 'POST', headers, body: JSON.stringify(body),
+      }),
+      { D1_03: db },
+    )
+    expect(mismatch.status).toBe(409)
+    expect(prepare).not.toHaveBeenCalled()
+
+    const lowLayer = await runtime.default.fetch(
+      new Request('https://w06.internal/internal/audit-events/push-endpoint-mutation-requested', {
+        method: 'POST',
+        headers: { ...headers, 'Idempotency-Key': body.idempotencyKey, 'X-LuckRead-Principal-Layer': 'L1' },
+        body: JSON.stringify(body),
+      }),
+      { D1_03: db },
+    )
+    expect(lowLayer.status).toBe(403)
+    expect(prepare).not.toHaveBeenCalled()
+  })
+
 })
 
 export type RuntimeAuditEvent = AuditEvent
