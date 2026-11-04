@@ -49,7 +49,10 @@ for (const entity of entityRecords) {
     subjectId: entity.entityId,
     implementationStatus: ev.implementationStatus ?? 'UNRESOLVED',
     implementationRefs: ev.implementationRefs ?? [],
-    testRefs: ev.testEvidenceRefs ?? [],
+    testRefs: [...new Set([
+      ...(ev.testEvidenceRefs ?? []),
+      ...(ev.extensionEvidenceRefs ?? []).filter((ref) => /\\.(test|spec)\\./.test(ref)),
+    ])],
     schemaEvidenceRefs: ev.schemaEvidenceRefs ?? [],
     sourceRefs: [entityCatalogPath, entityEvidencePath],
     blockers: ev.blockers ?? [],
