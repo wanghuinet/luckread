@@ -195,6 +195,15 @@ export default function NotificationPreferencesScreen() {
     }
   }, [accountId, devicePushBusy, devicePushPermission]);
 
+  const openSystemNotificationSettings = useCallback(async () => {
+    setDevicePushError('');
+    try {
+      await Linking.openSettings();
+    } catch {
+      setDevicePushError('无法打开系统设置，请在设备设置中找到 LuckRead 的通知权限。');
+    }
+  }, []);
+
   const dirty = useMemo(
     () => !equalPreferences(preferences, savedPreferences),
     [preferences, savedPreferences],
@@ -323,6 +332,13 @@ export default function NotificationPreferencesScreen() {
                       : '启用设备推送'}
                 </Text>
               )}
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => void openSystemNotificationSettings()}
+              className="mt-2 min-h-10 items-center justify-center rounded-full px-5 py-2"
+            >
+              <Text className="font-semibold text-sky-600 dark:text-sky-400">管理系统通知</Text>
             </Pressable>
           </View>
 
