@@ -26,7 +26,7 @@
     "test:paid-content": "bun test tests/paid-content-entitlement.test.mjs",
     "test:native-menu": "bun test tests/native-menu-dependencies.test.mjs",
     "test:ui-button": "bun test tests/ui-button-component.test.mjs",
-    "test:media-gallery": "bun test tests/feed-media-gallery.test.mjs",
+    "test:media-gallery": "bun test tests/feed-media-gallery.test.mjs tests/media-alt-text.test.mjs",
     "postinstall": "node scripts/apply-hyperswitch-rn88-compat.mjs",
     "test:hyperswitch-compat": "bun test tests/hyperswitch-rn88-compat.test.mjs",
     "test:feed-query": "bun test tests/feed-query.test.mjs tests/native-query-cache.test.mjs",
