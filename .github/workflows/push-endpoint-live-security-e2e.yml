@@ -1,0 +1,90 @@
+name: Push Endpoint Live Security E2E
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/push-endpoint-live-security-e2e.mjs'
+      - '.github/workflows/push-endpoint-live-security-e2e.yml'
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: Run after W09 D1-03 migration and W05 push endpoint deployment have succeeded
+        required: true
+        type: choice
+        options:
+          - CANCEL
+          - RUN_PUSH_ENDPOINT_SECURITY_E2E
+        default: CANCEL
+      base_url:
+        description: HTTPS LuckRead API origin to probe
+        required: true
+        type: string
+        default: https://api.luckread.com
+
+permissions:
+  contents: read
+
+concurrency:
+  group: push-endpoint-live-security-e2e
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    if: \${{ github.event_name == 'pull_request' }}
+    name: Validate live security harness without production access
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Syntax-check push endpoint live security harness
+        run: node --check scripts/push-endpoint-live-security-e2e.mjs
+
+  security-e2e:
+    if: \${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.confirm == 'RUN_PUSH_ENDPOINT_SECURITY_E2E' }}
+    name: Verify live push endpoint ownership and token secrecy
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      LUCKREAD_API_BASE_URL: \${{ inputs.base_url }}
+      LUCKREAD_BROWSER_ORIGIN: https://luckread.com
+      LUCKREAD_APP_AUTH_SMOKE_EMAIL: \${{ secrets.LUCKREAD_APP_AUTH_SMOKE_EMAIL }}
+      LUCKREAD_APP_AUTH_SMOKE_PASSWORD: \${{ secrets.LUCKREAD_APP_AUTH_SMOKE_PASSWORD }}
+      LUCKREAD_CREATOR_E2E_APPLICANT_EMAIL: \${{ secrets.LUCKREAD_CREATOR_E2E_APPLICANT_EMAIL }}
+      LUCKREAD_CREATOR_E2E_APPLICANT_PASSWORD: \${{ secrets.LUCKREAD_CREATOR_E2E_APPLICANT_PASSWORD }}
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Require main and merged push endpoint sources
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/heads/main"
+          test -f scripts/push-endpoint-live-security-e2e.mjs
+          test -f workers/W05-social/src/push-endpoint-runtime.ts
+          test -f workers/W09-platform/migrations-d1-03/0001_notification_push_endpoints.sql
+          grep -q "notification.update.self" workers/W01-payload/src/app/api/v1/push/endpoints/\\[installationId\\]/route.ts
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Validate and run two-account live security probes
+        run: |
+          set -euo pipefail
+          node --check scripts/push-endpoint-live-security-e2e.mjs
+          node scripts/push-endpoint-live-security-e2e.mjs
+
+      - name: Upload sanitized security evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: push-endpoint-live-security-e2e-\${{ github.run_id }}-\${{ github.run_attempt }}
+          path: artifacts/push-endpoint-live-security-e2e/*.json
+          if-no-files-found: warn
+          retention-days: 30
