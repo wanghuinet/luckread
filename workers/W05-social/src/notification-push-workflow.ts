@@ -1,3 +1,4 @@
+/// <reference types="@cloudflare/workers-types" />
 import { WorkflowEntrypoint, type WorkflowEvent, type WorkflowStep } from 'cloudflare:workers'
 import {
   runScheduledNotificationPush,
