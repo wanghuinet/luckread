@@ -615,7 +615,7 @@
       "status": "CONTRACTED_PARTIAL",
       "resource": {
         "class": "BOUNDED_READ",
-        "d1ReadMax": 4,
+        "d1ReadMax": 5,
         "d1WriteMax": 0,
         "d1ReadRowsMax": 200,
         "d1WriteRowsMax": 0,
@@ -660,7 +660,7 @@
       "evidence": {
         "openapi": "PASS",
         "permission": "PASS",
-        "state": "MISSING",
+        "state": "N/A",
         "resource": "PASS",
         "cache": "PASS",
         "antiAbuse": "PASS",
@@ -761,7 +761,7 @@
       "status": "CONTRACTED_PARTIAL",
       "resource": {
         "class": "BOUNDED_READ",
-        "d1ReadMax": 1,
+        "d1ReadMax": 2,
         "d1WriteMax": 0,
         "d1ReadRowsMax": 4,
         "d1WriteRowsMax": 0,
@@ -806,7 +806,7 @@
       "evidence": {
         "openapi": "PASS",
         "permission": "PASS",
-        "state": "MISSING",
+        "state": "N/A",
         "resource": "PASS",
         "cache": "PASS",
         "antiAbuse": "PASS",
@@ -844,7 +844,7 @@
       },
       "resource": {
         "class": "SINGLE_AUTHORITATIVE_WRITE",
-        "d1ReadMax": 1,
+        "d1ReadMax": 2,
         "d1WriteMax": 1,
         "d1ReadRowsMax": 1,
         "d1WriteRowsMax": 1,
