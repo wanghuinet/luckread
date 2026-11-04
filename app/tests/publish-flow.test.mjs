@@ -210,12 +210,12 @@ test('native draft autosave uses the proven W01 debounce and minimum write inter
 test('native draft fingerprints are stable and change when persisted content changes', () => {
   const input = {
     body: 'A private draft',
-    accessMode: 'PUBLIC' as const,
+    accessMode: 'PUBLIC',
     mediaRefs: ['https://img.luckread.com/a.jpg'],
     coverRef: 'https://img.luckread.com/a.jpg',
     pollEnabled: false,
     pollOptions: [],
-    pollDurationHours: 24 as const,
+    pollDurationHours: 24,
   };
   const fingerprint = createPublishDraftFingerprint(input);
   expect(createPublishDraftFingerprint(input)).toBe(fingerprint);
