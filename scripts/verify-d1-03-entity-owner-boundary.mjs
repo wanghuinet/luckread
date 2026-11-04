@@ -28,6 +28,21 @@ if (contract.crossCutting?.AuditEvent?.owner !== 'W09') {
 }
 if (seen.has('AuditEvent')) throw new Error('AuditEvent must not also appear in ordinary owner lists')
 
+const pushDelegation = contract.scopedDelegations?.NotificationPushEndpoint
+if (
+  seen.get('NotificationPushEndpoint') !== 'W09' ||
+  pushDelegation?.primaryOwner !== 'W09' ||
+  pushDelegation?.primaryTask !== 'T25' ||
+  pushDelegation?.delegatedWriter !== 'W05' ||
+  pushDelegation?.delegatedTask !== 'T14' ||
+  !Array.isArray(pushDelegation.allowedOperations) ||
+  pushDelegation.allowedOperations.length !== 2 ||
+  !pushDelegation.allowedOperations.includes('PUT /v1/push/endpoints/{installationId}') ||
+  !pushDelegation.allowedOperations.includes('DELETE /v1/push/endpoints/{installationId}')
+) {
+  throw new Error('NotificationPushEndpoint must remain W09-owned with only the explicit W05/T14 self-service writer delegation')
+}
+
 for (const rule of contract.boundaryRules ?? []) {
   if (typeof rule !== 'string' || rule.length === 0) throw new Error('Invalid D1-03 boundary rule')
 }
@@ -35,5 +50,5 @@ for (const rule of contract.boundaryRules ?? []) {
 console.log('D1_03_ENTITY_OWNER_BOUNDARY=PASS')
 console.log(JSON.stringify({
   entityOwners: Object.fromEntries(seen),
-  auditEventOwner: contract.crossCutting.AuditEvent.owner,
+  auditEventOwner: contract.crossCutting.AuditEvent.owner,\n  notificationPushEndpointOwner: seen.get('NotificationPushEndpoint'),\n  notificationPushEndpointDelegatedWriter: pushDelegation.delegatedWriter,
 }, null, 2))
