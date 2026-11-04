@@ -8,9 +8,8 @@
   "entityId": "ENT-NOTIFICATION-PUSH-ENDPOINT",
   "authority": {
     "domainId": "D1-03",
-    "taskId": "T14",
+    "taskId": "T25",
     "primaryWorker": "W09",
-    "workerName": "luckread-w09",
     "databaseUuid": "bda1d247-a371-4244-91ae-aef96034db7f",
     "databaseName": "secondary",
     "scope": "W09-owned D1-03 push routing state; W05/T14 is a narrowly delegated self-service writer only, not a general D1-03 entity owner.",
