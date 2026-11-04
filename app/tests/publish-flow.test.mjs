@@ -268,3 +268,12 @@ test('published native posts sync mention and topic tokens through W01 and W05 a
   expect(w01SocialRoute).toContain("pathname: '/internal/social/contents/' + encodeURIComponent(contentId) + '/tokens'");
   expect(w01SocialRoute).toContain('mentions = await resolveSocialMentionTargets(text)');
 });
+
+test('native publisher lets authors choose an uploaded image as the post cover', () => {
+  expect(composer).toContain("const activeCoverRef = coverRef || assets.find((asset) => asset.mimeType.startsWith('image/'))?.serverUrl || '';");
+  expect(composer).toContain("asset.mimeType.startsWith('image/') && asset.status === 'ready' && asset.serverUrl");
+  expect(composer).toContain("onPress={() => setCoverRef(asset.serverUrl)}");
+  expect(composer).toContain("asset.serverUrl === activeCoverRef ? '当前封面' : '设为封面'");
+  // The chosen cover continues through the existing draft and publish contracts.
+  expect(composer).toContain('coverRef: nextCover');
+});
