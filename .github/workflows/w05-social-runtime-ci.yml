@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - 'workers/W05-social/**'
+      - 'workers/W09-platform/wrangler.d1-03-migrations.jsonc'
+      - 'workers/W09-platform/migrations-d1-03/**'
       - 'contracts/transport/W05-W03-owned-post-context-http-binding.v1.json'
       - 'workers/W01-payload/src/app/api/v1/content/[contentId]/reposts/**'
       - 'workers/W01-payload/src/app/api/v1/content/[contentId]/pin/**'
@@ -502,8 +504,16 @@ jobs:
           assert bindings['DB']['migrations_dir'] == 'migrations'
           assert bindings['D1_03']['database_id'] == 'bda1d247-a371-4244-91ae-aef96034db7f'
           assert bindings['D1_03']['database_name'] == 'secondary'
-          assert bindings['D1_03']['migrations_dir'] == 'migrations-d1-03'
-          sql_path = Path('workers/W05-social/migrations-d1-03/0001_notification_push_endpoints.sql')
+          assert bindings['D1_03'].get('migrations_dir') is None
+          owner_config = json.loads(Path('workers/W09-platform/wrangler.d1-03-migrations.jsonc').read_text())
+          assert owner_config['name'] == 'luckread-w09'
+          owner_bindings = owner_config['d1_databases']
+          assert len(owner_bindings) == 1
+          assert owner_bindings[0]['binding'] == 'D1_03'
+          assert owner_bindings[0]['database_id'] == 'bda1d247-a371-4244-91ae-aef96034db7f'
+          assert owner_bindings[0]['database_name'] == 'secondary'
+          assert owner_bindings[0]['migrations_dir'] == 'migrations-d1-03'
+          sql_path = Path('workers/W09-platform/migrations-d1-03/0001_notification_push_endpoints.sql')
           db = sqlite3.connect(':memory:')
           db.executescript(sql_path.read_text())
           columns = [row[1] for row in db.execute('PRAGMA table_info("notification_push_endpoints")')]
