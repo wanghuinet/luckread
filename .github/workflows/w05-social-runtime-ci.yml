@@ -593,6 +593,7 @@ jobs:
           from pathlib import Path
           config = json.loads(Path('workers/W05-social/wrangler.jsonc').read_text())
           assert config['name'] == 'luckread-w05'
+          assert 'nodejs_compat' in config.get('compatibility_flags', [])
           bindings = {item['binding']: item for item in config['d1_databases']}
           assert set(bindings) == {'DB', 'D1_03'}
           assert bindings['DB']['database_id'] == '6c342634-97f6-4248-9f4a-85772af4f22c'
