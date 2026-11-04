@@ -13,8 +13,8 @@ on:
       - 'workers/W01-payload/src/social/w05-social-client.ts'
       - 'workers/W01-payload/src/social/w05-response.ts'
       - 'workers/W01-payload/tests/int/w05-social-response-forwarding.int.spec.ts'
-      - 'workers/W01-payload/tests/int/push-endpoints-v1-adapter.int.spec.ts
-      - 'workers/W01-payload/tests/int/push-endpoints-w05-binding.int.spec.ts''
+      - 'workers/W01-payload/tests/int/push-endpoints-v1-adapter.int.spec.ts'
+      - 'workers/W01-payload/tests/int/push-endpoints-w05-binding.int.spec.ts'
       - 'workers/W01-payload/src/app/(frontend)/components/reuse/LuckReadSocialPostCard.tsx'
       - 'workers/W01-payload/src/app/(frontend)/users/[userId]/UserProfilePage.tsx'
       - 'workers/W01-payload/src/app/(twitter-clone)/users/[userId]/page.tsx'
