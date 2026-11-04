@@ -51,7 +51,7 @@ jobs:
           python - <<'PY'
           import json
           from pathlib import Path
-          config = json.loads(Path('workers/W09-social/wrangler.d1-03-migrations.jsonc').read_text())
+          config = json.loads(Path('workers/W09-platform/wrangler.d1-03-migrations.jsonc').read_text())
           assert config['name'] == 'luckread-w09'
           bindings = config['d1_databases']
           assert len(bindings) == 1
@@ -60,10 +60,10 @@ jobs:
           assert target['database_name'] == 'secondary'
           assert target['database_id'] == 'bda1d247-a371-4244-91ae-aef96034db7f'
           assert target['migrations_dir'] == 'migrations-d1-03'
-          migration = Path('workers/W09-social/migrations-d1-03/0001_notification_push_endpoints.sql')
+          migration = Path('workers/W09-platform/migrations-d1-03/0001_notification_push_endpoints.sql')
           assert migration.is_file()
           assert 'MIG-NOTIFY-002-PUSH-ENDPOINTS-V1' in migration.read_text()
-          assert not list(Path('workers/W09-social/migrations-d1-03').glob('*.sql')) == []
+          assert not list(Path('workers/W09-platform/migrations-d1-03').glob('*.sql')) == []
           print('W09_D1_03_PUSH_ENDPOINT_SOURCE=PASS')
           PY
 
@@ -78,7 +78,7 @@ jobs:
           python - <<'PY'
           import sqlite3
           from pathlib import Path
-          path = Path('workers/W09-social/migrations-d1-03/0001_notification_push_endpoints.sql')
+          path = Path('workers/W09-platform/migrations-d1-03/0001_notification_push_endpoints.sql')
           db = sqlite3.connect(':memory:')
           db.executescript(path.read_text())
           columns = [r[1] for r in db.execute('PRAGMA table_info("notification_push_endpoints")')]
@@ -119,7 +119,7 @@ jobs:
           PY
 
       - name: Apply only the D1-03 migration directory remotely
-        working-directory: workers/W09-social
+        working-directory: workers/W09-platform
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -128,7 +128,7 @@ jobs:
           npx --yes "wrangler@$WRANGLER_VERSION" d1 migrations apply "$EXPECTED_DB_NAME" --remote --config wrangler.d1-03-migrations.jsonc
 
       - name: Verify remote migration ledger, schema and indexes
-        working-directory: workers/W09-social
+        working-directory: workers/W09-platform
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
