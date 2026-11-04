@@ -92,7 +92,7 @@
         "resource": "PASS",
         "cache": "PASS",
         "antiAbuse": "PASS",
-        "integration": "PASS",
+        "integration": "MISSING",
         "securityE2E": "MISSING"
       }
     },
@@ -173,7 +173,7 @@
         "resource": "PASS",
         "cache": "PASS",
         "antiAbuse": "PASS",
-        "integration": "PASS",
+        "integration": "MISSING",
         "securityE2E": "MISSING"
       }
     }
