@@ -21,7 +21,7 @@ test('native publisher uses the shared media API helpers and existing W01 state 
 });
 
 test('publishing and editing failures surface the backend HTTP status, error code and request ID', () => {
-  expect(composer).toContain('apiFailureDiagnostic(result, \'Unable to load this post for editing.\')');
+  expect(composer).toContain("restoringDraft ? 'Unable to restore this draft.' : 'Unable to load this post for editing.'");
   expect(composer).toContain('apiFailureDiagnostic(result, \'Unable to save post changes.\')');
   expect(composer).toContain('apiFailureDiagnostic(created, \'Unable to create the post.\')');
   expect(composer).toMatch(/apiFailureDiagnostic\(\s*pollResult\s*,/);
@@ -39,7 +39,7 @@ test('publisher uses permanent server media references and stable per-operation 
 });
 
 test('editing is ETag guarded and returns to a refreshed authoritative timeline', () => {
-  expect(composer).toContain("useLocalSearchParams<{ contentId?: string | string[] }>()");
+  expect(composer).toContain("useLocalSearchParams<{ contentId?: string | string[]; draftId?: string | string[] }>()");
   expect(composer).toContain("headers: { 'If-Match': record.etag }");
   expect(composer).toContain('idempotencyKey: attempt.mutationKey');
   expect(composer).toContain("router.replace(('/?published=' + encodeURIComponent(contentId) + '&refresh=' + Date.now()) as never)");
