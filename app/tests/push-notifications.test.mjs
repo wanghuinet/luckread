@@ -3,6 +3,8 @@ import { beforeEach, expect, mock, test } from 'bun:test';
 
 const calls = [];
 const events = [];
+const expoTokenRequests = [];
+const UUID_PATTERN_FOR_TEST = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const secureValues = new Map();
 const platformState = { OS: 'android' };
 const permissionState = {
@@ -30,8 +32,9 @@ mock.module('expo-notifications', () => ({
   setNotificationChannelAsync: async () => {
     events.push('create-android-channel');
   },
-  getExpoPushTokenAsync: async ({ projectId }) => {
-    events.push('get-expo-token:' + projectId);
+  getExpoPushTokenAsync: async (options) => {
+    expoTokenRequests.push(options);
+    events.push('get-expo-token:' + options.projectId);
     return { data: pushToken };
   },
 }));
@@ -68,6 +71,7 @@ const {
 beforeEach(() => {
   calls.length = 0;
   events.length = 0;
+  expoTokenRequests.length = 0;
   secureValues.clear();
   permissionState.current = { status: 'undetermined', canAskAgain: true };
   permissionState.requested = { status: 'granted', canAskAgain: false };
@@ -125,6 +129,19 @@ test('installation correlation IDs are stable per account and isolated across ac
   expect(firstId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
   expect(secondId).toMatch(UUID_PATTERN_FOR_TEST);
   expect(firstId).not.toBe(secondId);
+});
+
+test('native token rotation reuses the token supplied by the Expo listener', async () => {
+  permissionState.current = { status: 'granted', canAskAgain: false };
+  const devicePushToken = { type: 'android', data: 'rotated-fcm-device-token' };
+
+  const result = await syncPushEndpointForAuthenticatedUser('user-1', devicePushToken);
+
+  expect(result).toBe('enabled');
+  expect(expoTokenRequests).toHaveLength(1);
+  expect(expoTokenRequests[0].devicePushToken).toEqual(devicePushToken);
+  expect(expoTokenRequests[0].projectId).toBe('123e4567-e89b-42d3-a456-426614174000');
+  expect(JSON.parse(calls[0].options.body).expoPushToken).toBe(pushToken);
 });
 
 test('denied permission clears an existing endpoint without requesting permission again', async () => {
