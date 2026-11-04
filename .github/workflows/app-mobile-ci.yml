@@ -80,6 +80,8 @@ jobs:
         run: bun run test:native-menu
       - name: Test native reusable Button component
         run: bun run test:ui-button
+      - name: Test Expo Network offline status behavior
+        run: bun run test:network-status
       - name: Verify generated Android Release signing configuration
         run: |
           bunx expo prebuild --platform android --clean --no-install

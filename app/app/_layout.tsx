@@ -13,6 +13,7 @@ import { StatusBar } from 'expo-status-bar';
 
 import { useAuthStore } from '../store/auth-store';
 import { ReplyComposerProvider } from '../components/ReplyComposerProvider';
+import { NetworkStatusBanner } from '../components/NetworkStatusBanner';
 import { isThemePreference, THEME_PREFERENCE_KEY } from '../lib/theme-preference';
 import { syncPushEndpointForAuthenticatedUser } from '../lib/push-notifications';
 
@@ -162,6 +163,7 @@ export default function RootLayout() {
       <BottomSheetModalProvider>
         <ReplyComposerProvider>
           <View style={styles.flex}>
+          <NetworkStatusBanner />
           <Stack>
             <Stack.Screen name="(drawer)" options={{ headerShown: false }} />
             <Stack.Screen name="login" options={{ headerShown: false, gestureEnabled: false }} />
