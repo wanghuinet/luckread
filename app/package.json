@@ -30,7 +30,8 @@
     "postinstall": "node scripts/apply-hyperswitch-rn88-compat.mjs",
     "test:hyperswitch-compat": "bun test tests/hyperswitch-rn88-compat.test.mjs",
     "test:feed-query": "bun test tests/feed-query.test.mjs tests/native-query-cache.test.mjs",
-    "test:image-upload-preparation": "bun test tests/image-upload-preparation.test.mjs"
+    "test:image-upload-preparation": "bun test tests/image-upload-preparation.test.mjs",
+    "test:push-notifications": "bun test tests/push-notifications.test.mjs"
   },
   "dependencies": {
     "@codeherence/react-native-header": "^0.14.0",
@@ -93,7 +94,8 @@
     "@tanstack/react-query": "5.105.3",
     "expo-network": "~58.0.4",
     "expo-image-manipulator": "~58.0.16",
-    "expo-camera": "~58.0.14"
+    "expo-camera": "~58.0.14",
+    "expo-notifications": "~58.1.7"
   },
   "devDependencies": {
     "@babel/core": "^7.29.7",
