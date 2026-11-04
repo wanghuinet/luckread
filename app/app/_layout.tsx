@@ -1,18 +1,20 @@
 import '../global.css';
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { AppState, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { type ErrorBoundaryProps, Stack, useRootNavigationState, useRouter, useSegments } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { QueryProvider } from '~/lib/query-provider';
 import * as SecureStore from 'expo-secure-store';
+import * as Notifications from 'expo-notifications';
 import { useColorScheme } from 'nativewind';
 import { StatusBar } from 'expo-status-bar';
 
 import { useAuthStore } from '../store/auth-store';
 import { ReplyComposerProvider } from '../components/ReplyComposerProvider';
 import { isThemePreference, THEME_PREFERENCE_KEY } from '../lib/theme-preference';
+import { syncPushEndpointForAuthenticatedUser } from '../lib/push-notifications';
 
 export const unstable_settings = {
   initialRouteName: '(drawer)',
@@ -38,6 +40,7 @@ export default function RootLayout() {
   const [isLoaded, setIsLoaded] = useState(false);
   const [isThemeLoaded, setIsThemeLoaded] = useState(false);
   const status = useAuthStore((state) => state.status);
+  const userId = useAuthStore((state) => state.user?.id ?? null);
   const bootstrap = useAuthStore((state) => state.bootstrap);
   const { colorScheme, setColorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
@@ -65,6 +68,47 @@ export default function RootLayout() {
       active = false;
     };
   }, [setColorScheme]);
+
+  useEffect(() => {
+    if (status !== 'authenticated' || !userId || Platform.OS === 'web') return;
+
+    const syncPushEndpoint = () => {
+      // Permission reconciliation never displays a system prompt.
+      void syncPushEndpointForAuthenticatedUser(userId).catch(() => undefined);
+    };
+
+    syncPushEndpoint();
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') syncPushEndpoint();
+    });
+
+    return () => subscription.remove();
+  }, [status, userId]);
+
+  useEffect(() => {
+    if (!navigationState?.key || Platform.OS === 'web') return;
+
+    const handledResponseIds = new Set<string>();
+    const handleNotificationResponse = (response: Notifications.NotificationResponse | null) => {
+      if (!response) return;
+      const identifier = response.notification.request.identifier;
+      if (handledResponseIds.has(identifier)) return;
+      handledResponseIds.add(identifier);
+
+      // Notification payloads are untrusted input. Always open the in-app inbox
+      // instead of navigating to a URL supplied by a push payload.
+      router.push('/notifications' as never);
+      void Notifications.clearLastNotificationResponseAsync().catch(() => undefined);
+    };
+
+    const subscription = Notifications.addNotificationResponseReceivedListener(handleNotificationResponse);
+    void Notifications.getLastNotificationResponseAsync()
+      .then(handleNotificationResponse)
+      .catch(() => undefined);
+
+    return () => subscription.remove();
+  }, [navigationState?.key, router]);
+
 
   useEffect(() => {
     if (!navigationState?.key || !isLoaded || status === 'loading') return;
