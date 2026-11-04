@@ -7,7 +7,7 @@ import {
   callW03Content,
   W03ContentClientError,
   type ContentPrincipal,
-} from '../../../../../content/w03-content-client'
+} from '@/content/w03-content-client'
 import {
   TrafficLimitError,
   enforcePublicReadRateLimit,
