@@ -2039,3 +2039,43 @@ describe('W05 social poll transport', () => {
 
 })
 
+
+
+describe('W05 notification deep-link transport', () => {
+  it('filters the notification list by both authenticated recipient and requested notification ID', async () => {
+    const statements: Array<{ sql: string; values: unknown[] }> = []
+    const row = {
+      notification_id: 'notification-1',
+      notification_type: 'REPLY',
+      actor_user_id: 'actor-1',
+      target_type: 'comment',
+      target_id: 'comment-1',
+      payload_json: JSON.stringify({ contentId: 'content-1' }),
+      read_at: null,
+      created_at: '2026-11-04T10:00:00.000Z',
+    }
+    const db = {
+      prepare: (sql: string) => ({
+        bind: (...values: unknown[]) => {
+          statements.push({ sql, values })
+          return {
+            all: async () => ({ results: sql.includes('SELECT notification_id') ? [row] : [] }),
+            first: async () => ({ count: 1 }),
+          }
+        },
+      }),
+    } as unknown as D1Database
+
+    const response = await worker.fetch(
+      request('/internal/social/notifications?limit=1&notificationId=notification-1', transportHeaders),
+      { DB: db },
+    )
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      data: { items: [{ id: 'notification-1', type: 'REPLY', payload: { contentId: 'content-1' } }] },
+    })
+    expect(statements[0]?.sql).toContain('recipient_user_id = ?')
+    expect(statements[0]?.sql).toContain('notification_id = ?')
+    expect(statements[0]?.values).toEqual(['viewer-1', 'notification-1', 2])
+  })
+})

@@ -7,6 +7,7 @@ type PageRequestOptions = {
   cursor?: string | null;
   signal?: AbortSignal;
   limit?: number | string;
+  notificationId?: string | null;
 };
 
 function pageQuery(limit: number | string = 20, cursor?: string | null): URLSearchParams {
@@ -21,10 +22,20 @@ export function fetchNotificationsPage(options: PageRequestOptions & {
 } = {}) {
   const query = pageQuery(options.limit, options.cursor);
   if (options.filter === 'mentions') query.set('type', 'MENTION');
+  if (options.notificationId) query.set('notificationId', options.notificationId);
   return apiRequest<unknown>('/notifications?' + query.toString(), {
     method: 'GET',
     signal: options.signal,
   });
+}
+
+/** Fetch one notification by its server-owned ID, scoped to the current account. */
+export function fetchNotificationById(notificationIdValue: string, signal?: AbortSignal) {
+  const notificationId = notificationIdValue.trim();
+  if (!/^[A-Za-z0-9_-]{1,128}$/.test(notificationId)) {
+    throw new TypeError('A valid notification ID is required.');
+  }
+  return fetchNotificationsPage({ limit: 1, notificationId, signal });
 }
 
 /** Mark one real notification as read. */

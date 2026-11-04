@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 import { describe, expect, it, vi } from 'vitest'
-import { enqueueNotification, extractSocialTokens, getContentSocialSummary, getSocialTargets, listDiscoveryTopics, syncSocialTokens } from './social-closure-runtime.js'
+import { enqueueNotification, extractSocialTokens, getContentSocialSummary, getSocialTargets, listDiscoveryTopics, listNotifications, syncSocialTokens } from './social-closure-runtime.js'
 
 describe('W05 unified social closure', () => {
   it('normalizes and deduplicates mentions and hashtags', () => {
@@ -632,4 +632,49 @@ describe('W05 unified social closure', () => {
     }
   })
 
+})
+
+
+describe('W05 notification deep-link lookup', () => {
+  it('returns only the requested notification owned by the authenticated recipient', async () => {
+    const row = {
+      notification_id: 'notification-1',
+      notification_type: 'COMMENT',
+      actor_user_id: 'actor-1',
+      target_type: 'content',
+      target_id: 'content-1',
+      payload_json: '{}',
+      read_at: null,
+      created_at: '2026-11-04T10:00:00.000Z',
+    }
+    const statements: Array<{ sql: string; values: unknown[] }> = []
+    const db = {
+      prepare: (sql: string) => ({
+        bind: (...values: unknown[]) => {
+          statements.push({ sql, values })
+          return {
+            all: async () => ({ results: sql.includes('SELECT notification_id') ? [row] : [] }),
+            first: async () => ({ count: 3 }),
+          }
+        },
+      }),
+    } as unknown as D1Database
+
+    await expect(listNotifications(db, 'recipient-1', null, '1', null, 'notification-1'))
+      .resolves.toMatchObject({
+        items: [{ id: 'notification-1', type: 'COMMENT', actorUserId: 'actor-1', targetId: 'content-1' }],
+        unreadCount: 3,
+      })
+    expect(statements[0]?.sql).toContain('WHERE recipient_user_id = ?')
+    expect(statements[0]?.sql).toContain('AND notification_id = ?')
+    expect(statements[0]?.values).toEqual(['recipient-1', 'notification-1', 2])
+  })
+
+  it('rejects malformed notification IDs before querying the database', async () => {
+    const prepare = vi.fn()
+    const db = { prepare } as unknown as D1Database
+    await expect(listNotifications(db, 'recipient-1', null, '1', null, 'n'.repeat(129)))
+      .rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 })
+    expect(prepare).not.toHaveBeenCalled()
+  })
 })

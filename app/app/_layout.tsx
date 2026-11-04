@@ -1,5 +1,5 @@
 import '../global.css';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AppState, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { type ErrorBoundaryProps, Stack, useRootNavigationState, useRouter, useSegments } from 'expo-router';
@@ -48,6 +48,7 @@ export default function RootLayout() {
   const router = useRouter();
   const navigationState = useRootNavigationState();
   const lastNotificationResponse = Notifications.useLastNotificationResponse();
+  const handledNotificationResponseRef = useRef<string | null>(null);
 
   useEffect(() => {
     void bootstrap();
@@ -116,11 +117,33 @@ export default function RootLayout() {
   }, [status, userId]);
 
   useEffect(() => {
-    if (!navigationState?.key || !lastNotificationResponse || Platform.OS === 'web') return;
+    if (!lastNotificationResponse) {
+      handledNotificationResponseRef.current = null;
+      return;
+    }
+    if (!navigationState?.key || Platform.OS === 'web') return;
 
-    // Expo's hook handles both cold-start and in-app notification responses.
-    // Push payloads remain untrusted; always open LuckRead's own inbox.
-    router.push('/notifications' as never);
+    const responseKey = [
+      lastNotificationResponse.notification.request.identifier,
+      lastNotificationResponse.actionIdentifier,
+    ].join(':');
+    if (handledNotificationResponseRef.current === responseKey) return;
+    handledNotificationResponseRef.current = responseKey;
+
+    const payload = lastNotificationResponse.notification.request.content.data;
+    const rawNotificationId = payload?.notificationId;
+    const notificationId = typeof rawNotificationId === 'string' &&
+      /^[A-Za-z0-9_-]{1,128}$/.test(rawNotificationId)
+      ? rawNotificationId
+      : null;
+
+    // Only the notification ID is accepted as a lookup hint. Target IDs and URLs
+    // in push data are untrusted and never determine the destination.
+    if (notificationId) {
+      router.push({ pathname: '/notifications', params: { notificationId } } as never);
+    } else {
+      router.push('/notifications' as never);
+    }
     Notifications.clearLastNotificationResponse();
   }, [lastNotificationResponse, navigationState?.key, router]);
 
