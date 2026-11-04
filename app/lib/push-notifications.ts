@@ -215,6 +215,7 @@ export async function requestDevicePushPermission(
  * account so one account can never take over another account's endpoint row.
  */
 export async function unregisterPushEndpointForUser(userId: string): Promise<void> {
+  if (!nativePlatform()) return;
   const key = accountInstallationKey(userId);
   const installationId = await readInstallationId(userId);
   if (!installationId) return;
