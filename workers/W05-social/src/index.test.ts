@@ -1982,5 +1982,59 @@ describe('W05 social poll transport', () => {
     expect((d1_03 as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
   })
 
+
+  it('applies W05 origin and authenticated-actor write limits to push endpoint registration', async () => {
+    const globalLimiter = { limit: vi.fn(async () => ({ success: true })) }
+    const actorLimiter = { limit: vi.fn(async () => ({ success: true })) }
+    const d1_03 = dbFor([{ endpoint_id: 'endpoint-1', permission_status: 'granted' }])
+    const response = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/push-endpoints/6b6d9f5a-4e61-4c50-9d17-9e97f36e6e3c', {
+        method: 'PUT',
+        headers: { ...transportHeaders, 'content-type': 'application/json' },
+        body: JSON.stringify({
+          platform: 'ios',
+          permissionStatus: 'granted',
+          expoPushToken: 'ExponentPushToken[abcdefghijklmnop_1234567890]',
+        }),
+      }),
+      {
+        DB: dbFor(),
+        D1_03: d1_03,
+        SOCIAL_ORIGIN_GLOBAL_LIMITER: globalLimiter,
+        SOCIAL_WRITE_LIMITER: actorLimiter,
+      },
+    )
+
+    expect(response.status).toBe(200)
+    expect(globalLimiter.limit).toHaveBeenCalledWith({
+      key: 'origin:write:/internal/social/push-endpoints',
+    })
+    expect(actorLimiter.limit).toHaveBeenCalledWith({
+      key: 'write:/internal/social/push-endpoints:user:viewer-1',
+    })
+  })
+
+  it('rejects a push endpoint write when the authenticated-actor limiter blocks it', async () => {
+    const actorLimiter = { limit: vi.fn(async () => ({ success: false })) }
+    const d1_03 = dbFor()
+    const response = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/push-endpoints/6b6d9f5a-4e61-4c50-9d17-9e97f36e6e3c', {
+        method: 'DELETE',
+        headers: transportHeaders,
+      }),
+      {
+        DB: dbFor(),
+        D1_03: d1_03,
+        SOCIAL_WRITE_LIMITER: actorLimiter,
+      },
+    )
+
+    expect(response.status).toBe(429)
+    expect(actorLimiter.limit).toHaveBeenCalledWith({
+      key: 'write:/internal/social/push-endpoints:user:viewer-1',
+    })
+    expect((d1_03 as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
+  })
+
 })
 
