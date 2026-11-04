@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://luckread.com/contracts/v1/transport/W01-W08-creator-http-binding.v1.json",
   "title": "W01 to W08 Creator Qualification API Internal HTTP Binding",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "status": "CONTRACTED_PARTIAL",
   "caller": {
     "logicalWorker": "W01",
@@ -81,6 +81,20 @@
       "minimumGlobalLayer": "L3",
       "cache": "NO_STORE",
       "bodyAuthority": "Only action, resourceType, and resourceAttributes are accepted; W08 resolves actor, layer, account state, and roles through W02/D1-01 and CASL."
+    },
+    {
+      "operationId": "checkNotificationPushEndpointPermission",
+      "method": "POST",
+      "publicPath": "/api/v1/push/endpoints/{installationId}",
+      "internalPath": "/internal/authz/check-permission",
+      "principalRequired": true,
+      "minimumGlobalLayer": "L2",
+      "permission": "notification.update.self",
+      "resourceType": "Notification",
+      "resourceScope": "self",
+      "cache": "NO_STORE",
+      "bodyAuthority": "W01 derives resourceAttributes.ownerId from the W02 session principal. W08 independently resolves the same session through W02/D1-01, loads account/layer/role facts, and evaluates notification.update.self through CASL. Client-supplied subjectId, layer, accountState, and ownerId are never trusted.",
+      "successRule": "W01 forwards the endpoint mutation to W05 only after an ALLOW decision matches action=notification.update.self, resourceType=Notification, policyVersion=casl-l0-l8-v1, and the W02-derived principal layer."
     }
   ],
   "trustBoundary": {
