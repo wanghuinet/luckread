@@ -22,6 +22,8 @@ async function forwardPushEndpoint(
     const principal = await resolveSocialPrincipal(request)
     if (principal instanceof Response) return principal
     await enforceW01WriteAccountRateLimit(principal.userId)
+    await enforceW01WriteEndpointRateLimit(method === 'PUT' ? 'upsertPushEndpoint' : 'deletePushEndpoint')
+    await enforceW01WriteAccountRateLimit(principal.userId)
     await enforceW01WriteEndpointRateLimit('push-endpoint-registration')
 
     const { installationId } = await context.params
