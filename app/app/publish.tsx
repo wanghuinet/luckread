@@ -1474,7 +1474,7 @@ function PublishScreenContent() {
     } finally {
       setBusy(false);
     }
-  }, [accessMode, assets, body, contentId, coverRef, pollDurationHours, pollEnabled, pollOptions, publishPending, router, saveDraftSnapshot]);
+  }, [accessMode, assets, body, contentId, coverRef, pollDurationHours, pollEnabled, pollOptions, publishPending, router, saveDraftSnapshot, syncPublishedSocialTokens]);
 
   if (authStatus !== 'authenticated') {
     return (
