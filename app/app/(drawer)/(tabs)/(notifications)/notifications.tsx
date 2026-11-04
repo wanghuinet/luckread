@@ -106,6 +106,7 @@ export default function Notifications() {
   const [readAllBusy, setReadAllBusy] = useState(false);
   const [busyIds, setBusyIds] = useState<Set<string>>(() => new Set());
   const [error, setError] = useState('');
+  const [deepLinkRetryNonce, setDeepLinkRetryNonce] = useState(0);
   const [authRequired, setAuthRequired] = useState(false);
   const requestIdRef = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
@@ -282,6 +283,7 @@ export default function Notifications() {
     handledDeepLinkIdRef.current = notificationId;
     const controller = new AbortController();
     let active = true;
+    setError('');
 
     void (async () => {
       const result = await fetchNotificationById(notificationId, controller.signal);
@@ -299,6 +301,7 @@ export default function Notifications() {
       openNotification(item);
     })().catch((cause) => {
       if (active && !controller.signal.aborted) {
+        handledDeepLinkIdRef.current = null;
         setError(cause instanceof Error ? cause.message : '无法打开这条通知，请重试。');
       }
     });
@@ -307,7 +310,17 @@ export default function Notifications() {
       active = false;
       controller.abort();
     };
-  }, [authStatus, deepLinkedNotificationId, loadActorProfiles, openNotification]);
+  }, [authStatus, deepLinkRetryNonce, deepLinkedNotificationId, loadActorProfiles, openNotification]);
+
+  const retryNotificationLoad = useCallback(() => {
+    setError('');
+    if (deepLinkedNotificationId) {
+      handledDeepLinkIdRef.current = null;
+      setDeepLinkRetryNonce((current) => current + 1);
+      return;
+    }
+    void loadPage(null, false);
+  }, [deepLinkedNotificationId, loadPage]);
 
   const renderItem = useCallback(({ item }: { item: SocialNotification }) => {
     const profile = actorProfiles[item.actorUserId];
@@ -405,7 +418,7 @@ export default function Notifications() {
       {error ? (
         <View className="flex-row items-center justify-between px-4 py-3">
           <Text className="mr-3 flex-1 text-sm text-red-600">{error}</Text>
-          <Pressable onPress={() => void loadPage(null, false)}>
+          <Pressable onPress={retryNotificationLoad}>
             <Text className="font-semibold text-sky-600">重试</Text>
           </Pressable>
         </View>
@@ -448,7 +461,7 @@ export default function Notifications() {
                 <Text className="mt-2 text-center text-sm text-neutral-500">
                   {error ? '请检查网络后重试。' : '当有人关注、点赞、评论或提及你时，会显示在这里。'}
                 </Text>
-                {error ? <Pressable onPress={() => void loadPage(null, false)} className="mt-4 rounded-full border border-neutral-300 px-4 py-2"><Text className="font-semibold text-neutral-800 dark:text-neutral-100">重试</Text></Pressable> : null}
+                {error ? <Pressable onPress={retryNotificationLoad} className="mt-4 rounded-full border border-neutral-300 px-4 py-2"><Text className="font-semibold text-neutral-800 dark:text-neutral-100">重试</Text></Pressable> : null}
               </>
             )}
           </View>
