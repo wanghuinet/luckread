@@ -81,7 +81,7 @@ export async function GET(request: Request): Promise<Response> {
         principal,
       })
       if (!response.ok) throw new W03ContentClientError(503, 'SERVICE_UNAVAILABLE', 'Content authorization unavailable')
-      const access = readAccess(await response.json().catch(() => null))
+      const access = readAccess(await response.json().catch((): null => null))
       if (!access) throw new W03ContentClientError(503, 'SERVICE_UNAVAILABLE', 'Content authorization response invalid')
       return {
         url: mediaUrl,
