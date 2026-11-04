@@ -115,7 +115,7 @@ describe('v1 Expo push endpoint adapter', () => {
     const deleteResponse = await DELETE(requestFor('DELETE'), context)
 
     expect(putResponse.status).toBe(200)
-    expect(deleteResponse.status).toBe(204)
+    expect(deleteResponse.status, await deleteResponse.clone().text()).toBe(204)
     expect(mocks.callW05Social).toHaveBeenNthCalledWith(1, expect.objectContaining({
       pathname: '/internal/social/push-endpoints/' + installationId,
       method: 'PUT',
@@ -219,7 +219,11 @@ describe('v1 Expo push endpoint adapter', () => {
   it('rejects malformed registration bodies without forwarding them', async () => {
     const request = new Request('https://www.luckread.com/api/v1/push/endpoints/' + installationId, {
       method: 'PUT',
-      headers: { Authorization: 'Bearer test-session-token', 'content-type': 'application/json' },
+      headers: {
+        Authorization: 'Bearer test-session-token',
+        'Idempotency-Key': 'idem_malformed_test_0001',
+        'content-type': 'application/json',
+      },
       body: '{invalid json',
     })
     const response = await PUT(request, context)
