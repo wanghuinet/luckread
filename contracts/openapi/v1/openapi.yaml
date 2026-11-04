@@ -1198,6 +1198,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Media' }
+        '400': { $ref: '#/components/responses/ClientError' }
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '403': { $ref: '#/components/responses/PermissionDenied' }
         '404': { $ref: '#/components/responses/NotFound' }
@@ -5600,7 +5601,7 @@ components:
         bodyRef: { type: string, description: R2 object reference }
     Media:
       type: object
-      required: [id, mimeType, size, checksum, status]
+      required: [id, mimeType, alt, size, checksum, status]
       properties:
         id: { $ref: '#/components/schemas/ResourceId' }
         mimeType: { type: string }
