@@ -612,6 +612,7 @@ function PublishScreenContent() {
     // If a create timed out, replay its exact idempotent request before writing
     // newer text. This prevents a second DRAFT row from being created.
     const pendingCreate = draftCreatePendingRef.current;
+    let createdThisCall = false;
     if (!draft?.id) {
       const createKey = pendingCreate?.key || draftCreateKeyRef.current || createIdempotencyKey();
       const createPayload = pendingCreate?.payload || serializedPayload;
@@ -667,6 +668,7 @@ function PublishScreenContent() {
         state: 'DRAFT',
       };
       recordRef.current = draft;
+      createdThisCall = true;
       draftCreatePendingRef.current = null;
       draftCreateKeyRef.current = '';
       editLoadKeyRef.current = draft.id;
@@ -675,7 +677,7 @@ function PublishScreenContent() {
     }
 
     if (!draft?.id) throw new Error('The draft could not be identified after saving.');
-    if (draftSavedFingerprintRef.current !== fingerprint) {
+    if (!createdThisCall && draftSavedFingerprintRef.current !== fingerprint) {
       if (!draft.etag || draft.etag === '*') {
         const detail = await apiRequest<Record<string, unknown>>(
           '/contents/' + encodeURIComponent(draft.id),
@@ -858,6 +860,10 @@ function PublishScreenContent() {
       setErrorMessage('媒体仍未全部上传成功，请重试或移除失败附件后再关闭。');
       return;
     }
+    if (!contentId && !body.trim() && (assets.length > 0 || pollEnabled)) {
+      setErrorMessage('请先填写动态正文，再保存或关闭这份草稿。');
+      return;
+    }
     if (!contentId && body.trim() && !publishPending) {
       if (draftSaveTimerRef.current) {
         clearTimeout(draftSaveTimerRef.current);
@@ -875,7 +881,7 @@ function PublishScreenContent() {
       }
     }
     router.back();
-  }, [assets, body, busy, contentId, loadingEdit, publishPending, router, saveDraftSnapshot]);
+  }, [assets, body, busy, contentId, loadingEdit, pollEnabled, publishPending, router, saveDraftSnapshot]);
 
   const submit = useCallback(async () => {
     const trimmedBody = body.trim();
