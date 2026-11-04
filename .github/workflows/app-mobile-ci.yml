@@ -150,6 +150,8 @@ jobs:
         run: bun run test:media-gallery
       - name: Test native camera photo capture and composer upload integration
         run: bun test tests/camera-capture.test.mjs
+      - name: Test native share sheet and clipboard copy-link actions
+        run: bun test tests/content-share-actions.test.mjs
       - name: Test native publishing and media upload contracts
         run: bun run test:publish-api
       - name: Test native image upload preparation and fallback behavior
