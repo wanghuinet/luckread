@@ -597,11 +597,11 @@ export default {
         const actorUserId = requirePrincipal(request)
         requireInteractionLayer(request)
         const installationId = decodePathPart(pushEndpointMatch[1])
-        if (installationId === null) throw new PushEndpointRuntimeError('VALIDATION_FAILED', 400)
+        if (installationId === null) throw new PushEndpointRuntimeError('VALIDATION_FAILED', 422)
         if (request.method === 'PUT') {
           let body: unknown
           try { body = await request.json() } catch {
-            throw new PushEndpointRuntimeError('VALIDATION_FAILED', 400)
+            throw new PushEndpointRuntimeError('VALIDATION_FAILED', 422)
           }
           const data = await upsertPushEndpoint(env.D1_03, actorUserId, installationId, body)
           return json({ data, requestId: createRequestId() })
