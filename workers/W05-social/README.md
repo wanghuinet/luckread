@@ -4,7 +4,7 @@ Canonical Worker identity: **W05**
 Canonical responsibility: **Social / Community / Messaging / Notification**
 Primary Tasks: **T11, T12, T13, T14**
 Primary D1 authority: **D1-02**; scoped D1-03 runtime delivery state only where explicitly contracted.
-- Scoped D1-03 entity: `notification_push_endpoints` (Expo routing endpoints only; separate `migrations-d1-03/` directory).
+- Scoped D1-03 write delegation: W09 owns `notification_push_endpoints`; W05/T14 may only register/delete the current user's Expo routing endpoint. Separate `migrations-d1-03/` directory.
 - Scoped D1-03 entity: `notification_push_endpoints` (Expo routing endpoints only; separate `migrations-d1-03/` directory).
 
 Canonical repository path: `workers/W05-social`.
