@@ -9,11 +9,18 @@
   "authority": {
     "domainId": "D1-03",
     "taskId": "T14",
-    "primaryWorker": "W05",
-    "workerName": "luckread-w05",
+    "primaryWorker": "W09",
+    "workerName": "luckread-w09",
     "databaseUuid": "bda1d247-a371-4244-91ae-aef96034db7f",
     "databaseName": "secondary",
-    "scope": "Expo push routing endpoints only; not authentication devices, sessions, notification inbox records, or delivery execution records."
+    "scope": "W09-owned D1-03 push routing state; W05/T14 is a narrowly delegated self-service writer only, not a general D1-03 entity owner.",
+    "primaryTask": "T25",
+    "scopedWriter": {
+      "task": "T14",
+      "worker": "W05",
+      "workerName": "luckread-w05",
+      "scope": "Self-service registration/deletion for the current user's Expo endpoint only."
+    }
   },
   "persistence": {
     "adapter": "Cloudflare D1",
