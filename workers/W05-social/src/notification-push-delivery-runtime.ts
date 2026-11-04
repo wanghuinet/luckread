@@ -11,7 +11,7 @@ export interface NotificationPushDeliveryEnv {
 type ActiveEndpointRow = Readonly<{ endpoint_id: string; owner_user_id: string; push_token: string }>
 type ClaimedDelivery = Readonly<{
   deliveryId: string; notificationId: string; endpointId: string; recipientUserId: string
-  pushToken: string; notificationType: 'FOLLOW' | 'LIKE' | 'COMMENT' | 'REPLY' | 'MENTION'
+  pushToken: string; pushTokenHash: string; notificationType: 'FOLLOW' | 'LIKE' | 'COMMENT' | 'REPLY' | 'MENTION'
   targetType: 'user' | 'content' | 'comment'; targetId: string; leaseToken: string; attemptCount: number
 }>
 type ClaimedReceipt = Readonly<{
@@ -184,6 +184,7 @@ async function claimDueDeliveries(db: D1Database, endpointDb: D1Database, now: D
       endpointId: updated.endpoint_id,
       recipientUserId: notification.recipient_user_id,
       pushToken: endpoint.push_token,
+      pushTokenHash,
       notificationType: notification.notification_type,
       targetType: notification.target_type,
       targetId: notification.target_id,
@@ -194,12 +195,21 @@ async function claimDueDeliveries(db: D1Database, endpointDb: D1Database, now: D
   return claimed
 }
 
-async function deactivateInvalidEndpoint(endpointDb: D1Database, task: ClaimedDelivery, now: Date): Promise<void> {
+export async function deactivateInvalidEndpoint(
+  endpointDb: D1Database,
+  task: Readonly<{ endpointId: string; recipientUserId: string; pushTokenHash: string }>,
+  now: Date,
+): Promise<boolean> {
+  const endpoint = await endpointDb.prepare(
+    'SELECT push_token FROM notification_push_endpoints WHERE endpoint_id = ? AND owner_user_id = ? AND provider = ? LIMIT 1',
+  ).bind(task.endpointId, task.recipientUserId, 'expo').first<{ push_token: string | null }>()
+  if (!endpoint?.push_token || await hashPushToken(endpoint.push_token) !== task.pushTokenHash) return false
+
   await endpointDb.prepare(
     "UPDATE notification_push_endpoints SET permission_status = 'undetermined', push_token = NULL, " +
-    'updated_at = ? WHERE endpoint_id = ? AND owner_user_id = ? ' +
-    "AND provider = 'expo' AND push_token = ?",
-  ).bind(now.toISOString(), task.endpointId, task.recipientUserId, task.pushToken).run()
+    'updated_at = ? WHERE endpoint_id = ? AND owner_user_id = ? AND provider = ? AND push_token = ?',
+  ).bind(now.toISOString(), task.endpointId, task.recipientUserId, 'expo', endpoint.push_token).run()
+  return true
 }
 
 async function scheduleDeliveryRetry(
@@ -323,15 +333,7 @@ async function applyReceipt(
 
   const errorCode = String(receipt.details?.error ?? 'EXPO_RECEIPT_ERROR')
   if (errorCode === 'DeviceNotRegistered' && task.pushTokenHash) {
-    const endpoint = await endpointDb.prepare(
-      'SELECT push_token FROM notification_push_endpoints WHERE endpoint_id = ? AND owner_user_id = ? AND provider = ? LIMIT 1',
-    ).bind(task.endpointId, task.recipientUserId, 'expo').first<{ push_token: string | null }>()
-    if (endpoint?.push_token && await hashPushToken(endpoint.push_token) === task.pushTokenHash) {
-      await endpointDb.prepare(
-        "UPDATE notification_push_endpoints SET permission_status = 'undetermined', push_token = NULL, " +
-        'updated_at = ? WHERE endpoint_id = ? AND owner_user_id = ? AND provider = ? AND push_token = ?',
-      ).bind(now.toISOString(), task.endpointId, task.recipientUserId, 'expo', endpoint.push_token).run()
-    }
+    await deactivateInvalidEndpoint(endpointDb, task, now)
   }
   const canRetry = isRetryableExpoError(errorCode) && task.attemptCount < MAX_SEND_ATTEMPTS
   const status = canRetry ? 'RETRY' : 'FAILED'
