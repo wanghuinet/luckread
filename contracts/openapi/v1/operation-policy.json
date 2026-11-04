@@ -394,7 +394,7 @@
         "mode": "permission"
       },
       "permissions": [
-        "user.update.self"
+        "notification.update.self"
       ],
       "auditRequired": true,
       "optimisticLockRequired": false,
@@ -2947,7 +2947,7 @@
         "mode": "permission"
       },
       "permissions": [
-        "user.update.self"
+        "notification.update.self"
       ],
       "auditRequired": true,
       "optimisticLockRequired": false,
