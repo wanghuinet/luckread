@@ -389,6 +389,19 @@
       "stateMachine": "none"
     },
     {
+      "operationId": "deletePushEndpointsInstallationId",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none",
+      "x-luckread-contract-status": "DISCOVERY_DRAFT",
+      "x-luckread-source": "contracts/api/api-inventory.v1.json"
+    },
+    {
       "operationId": "unfollow",
       "auth": {
         "mode": "permission"
@@ -1663,6 +1676,19 @@
       "x-luckread-source": "contracts/api/api-inventory.v1.json"
     },
     {
+      "operationId": "batchUpdateNotificationsOp",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "user.update.self"
+      ],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none"
+    },
+    {
       "operationId": "patchUsersUserId",
       "auth": {
         "mode": "permission"
@@ -2924,6 +2950,19 @@
       "auditRequired": true,
       "optimisticLockRequired": true,
       "idempotencyRequired": true,
+      "stateMachine": "none"
+    },
+    {
+      "operationId": "listNotificationsOp",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "user.read.self"
+      ],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
       "stateMachine": "none"
     }
   ]

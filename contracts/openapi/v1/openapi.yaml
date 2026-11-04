@@ -1483,6 +1483,16 @@ paths:
           description: Notifications updated.
         '4XX': { $ref: '#/components/responses/ClientError' }
 
+
+    delete:
+      tags: [Notifications]
+      summary: Discovery draft for DELETE undefined
+      operationId: deletePushEndpointsInstallationId
+      x-luckread-contract-status: DISCOVERY_DRAFT
+      x-luckread-source: contracts/api/api-inventory.v1.json
+      responses:
+        default:
+          description: Discovery-only operation; detailed response contract remains to be closed.
   /creators/me:
     get:
       tags: [Creators]
