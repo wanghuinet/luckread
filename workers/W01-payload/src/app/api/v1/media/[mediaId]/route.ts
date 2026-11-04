@@ -1,9 +1,13 @@
+import { getPayload } from 'payload'
+import config from '@payload-config'
+
+import { getBetterAuthPrincipal, W02AuthClientError } from '@/auth/w02-session-client'
 import { TrafficLimitError, enforcePublicReadRateLimit, enforceW01WriteRateLimit, rateLimitResponse } from '@/auth/traffic-limit'
 import { apiErrorResponse, appendRequestIdToJsonResponse, normalizeApiErrorResponse } from '@/lib/api-response'
-import { DELETE as payloadMediaDelete, GET as payloadMediaGet, PATCH as payloadMediaPatch } from '../../../../(payload)/api/[...slug]/route'
+import { resolvePayloadOwnerUserId } from '@/media/media-owner'
+import { DELETE as payloadMediaDelete, GET as payloadMediaGet } from '../../../../(payload)/api/[...slug]/route'
 
 type PayloadRouteContext = Parameters<typeof payloadMediaGet>[1]
-type PayloadPatchRouteContext = Parameters<typeof payloadMediaPatch>[1]
 
 type MediaDocument = {
   id?: string | number
@@ -14,6 +18,7 @@ type MediaDocument = {
   height?: number | null
   filename?: string | null
   alt?: string | null
+  ownerUserId?: string | number | null
   [key: string]: unknown
 }
 
@@ -131,7 +136,9 @@ export async function PATCH(
   context: { params: Promise<{ mediaId: string }> },
 ): Promise<Response> {
   const { mediaId } = await context.params
-  if (!mediaId?.trim()) return apiErrorResponse(404, 'NOT_FOUND', 'Media not found')
+  if (!mediaId?.trim() || mediaId.length > 256) {
+    return apiErrorResponse(404, 'NOT_FOUND', 'Media not found')
+  }
 
   try {
     await enforceW01WriteRateLimit(request)
@@ -140,13 +147,81 @@ export async function PATCH(
     return apiErrorResponse(503, 'SERVICE_UNAVAILABLE', 'Media service unavailable')
   }
 
-  const target = new URL('/api/media/' + encodeURIComponent(mediaId), request.url)
-  const payloadContext: PayloadPatchRouteContext = {
-    params: Promise.resolve({ slug: ['media', mediaId] }),
+  let payloadBody: unknown
+  try {
+    payloadBody = await request.clone().json()
+  } catch {
+    return apiErrorResponse(422, 'VALIDATION_FAILED', 'Valid JSON media metadata is required')
+  }
+  if (
+    !payloadBody ||
+    typeof payloadBody !== 'object' ||
+    Array.isArray(payloadBody) ||
+    Object.keys(payloadBody).some((key) => key !== 'alt') ||
+    typeof (payloadBody as { alt?: unknown }).alt !== 'string'
+  ) {
+    return apiErrorResponse(422, 'VALIDATION_FAILED', 'Only the media alt text field can be updated')
+  }
+  const alt = (payloadBody as { alt: string }).alt.normalize('NFKC').trim()
+  if (!alt || alt.length > 1000) {
+    return apiErrorResponse(422, 'VALIDATION_FAILED', 'Media alt text must contain between 1 and 1000 characters')
   }
 
-  const response = await payloadMediaPatch(new Request(target, request.clone()), payloadContext)
-  return response.ok
-    ? appendRequestIdToJsonResponse(response)
-    : normalizeApiErrorResponse(response, 'Media service unavailable')
+  try {
+    // W02 is the identity authority. Resolve its principal to the W01/Payload
+    // profile and enforce exact ownership before performing the narrow update.
+    const principal = await getBetterAuthPrincipal(request)
+    const payload = await getPayload({ config })
+    const payloadUserId = await resolvePayloadOwnerUserId(payload, principal.userId)
+    if (!payloadUserId) {
+      return apiErrorResponse(401, 'UNAUTHENTICATED', 'Account profile is not available')
+    }
+
+    const ownedMedia = await payload.findByID({
+      collection: 'media',
+      id: mediaId,
+      depth: 0,
+      overrideAccess: true,
+    }).catch((): null => null) as unknown as MediaDocument | null
+    if (!ownedMedia || String(ownedMedia.ownerUserId ?? '') !== payloadUserId) {
+      return apiErrorResponse(404, 'NOT_FOUND', 'Media not found')
+    }
+
+    // ownerUserId and all upload/storage fields are immutable here; only alt
+    // is accepted from the client. The preceding W02-to-Payload owner check
+    // is the authorization gate for this explicit overrideAccess update.
+    const updated = await payload.update({
+      collection: 'media',
+      id: ownedMedia.id ?? mediaId,
+      data: { alt },
+      depth: 0,
+      overrideAccess: true,
+    }) as unknown as MediaDocument
+    const projected = {
+      id: updated.id ?? mediaId,
+      url: updated.url ?? null,
+      filename: updated.filename ?? null,
+      mimeType: updated.mimeType ?? null,
+      filesize: updated.filesize ?? null,
+      width: updated.width ?? null,
+      height: updated.height ?? null,
+      alt: typeof updated.alt === 'string' ? updated.alt : alt,
+    }
+    return await appendRequestIdToJsonResponse(new Response(JSON.stringify({ doc: projected }), {
+      status: 200,
+      headers: {
+        'content-type': 'application/json; charset=utf-8',
+        'cache-control': 'private, no-store',
+      },
+    }))
+  } catch (error) {
+    if (error instanceof W02AuthClientError) {
+      return apiErrorResponse(
+        error.status,
+        error.code ?? (error.status === 401 ? 'UNAUTHENTICATED' : 'SERVICE_UNAVAILABLE'),
+        error.status === 401 ? 'Authentication required' : 'Media service unavailable',
+      )
+    }
+    return apiErrorResponse(503, 'SERVICE_UNAVAILABLE', 'Media service unavailable')
+  }
 }

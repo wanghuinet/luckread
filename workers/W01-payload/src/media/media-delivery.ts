@@ -38,6 +38,31 @@ export function mediaHostKind(hostname: string): MediaHostKind | null {
   return null
 }
 
+/** Accept only canonical first-party HTTPS media URLs with a safe object key. */
+export function isCanonicalMediaDeliveryUrl(value: unknown): value is string {
+  if (typeof value !== 'string' || value.length === 0 || value.length > 2048) return false
+  try {
+    const url = new URL(value)
+    if (
+      url.protocol !== 'https:' ||
+      !mediaHostKind(url.hostname) ||
+      url.username ||
+      url.password ||
+      url.port ||
+      url.search ||
+      url.hash ||
+      url.pathname === '/' ||
+      url.toString() !== value
+    ) return false
+    const segments = url.pathname.slice(1).split('/').map((segment) => {
+      try { return decodeURIComponent(segment) } catch { return '' }
+    })
+    return resolveMediaObjectKey(segments) !== null
+  } catch {
+    return false
+  }
+}
+
 export function isVideoMediaKey(key: string): boolean {
   const filename = key.slice(key.lastIndexOf('/') + 1)
   const dot = filename.lastIndexOf('.')

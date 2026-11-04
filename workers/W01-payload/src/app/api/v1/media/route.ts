@@ -6,6 +6,8 @@ import { POST as payloadMediaPost } from '../../../(payload)/api/[...slug]/route
 import { getBetterAuthPrincipal, W02AuthClientError } from '@/auth/w02-session-client'
 import { TrafficLimitError, enforcePublicReadRateLimit, enforceW01WriteRateLimit, rateLimitResponse } from '@/auth/traffic-limit'
 import { apiErrorResponse, appendRequestIdToJsonResponse, normalizeApiErrorResponse } from '@/lib/api-response'
+import { isCanonicalMediaDeliveryUrl } from '@/media/media-delivery'
+import { resolvePayloadOwnerUserId } from '@/media/media-owner'
 
 type PayloadRouteContext = Parameters<typeof payloadMediaPost>[1]
 
@@ -17,24 +19,6 @@ async function authenticate(request: Request) {
   return { payload, identityId: principal.userId }
 }
 
-async function resolvePayloadOwnerUserId(
-  payload: Awaited<ReturnType<typeof getPayload>>,
-  identityId: string,
-): Promise<string | null> {
-  const profileResult = await payload.find({
-    collection: 'users',
-    where: { identityId: { equals: identityId } },
-    limit: 1,
-    page: 1,
-    depth: 0,
-    overrideAccess: true,
-    select: { id: true } as any,
-  })
-  const profileId = profileResult.docs[0]?.id
-  if (profileId === undefined || profileId === null) return null
-  const normalizedId = String(profileId).trim()
-  return normalizedId || null
-}
 
 type MediaFailureStage =
   | 'write_rate_limit'
@@ -143,8 +127,16 @@ export async function GET(request: Request): Promise<Response> {
   const url = new URL(request.url)
   const requestedLimit = Number.parseInt(url.searchParams.get('limit') ?? '24', 10)
   const requestedPage = Number.parseInt(url.searchParams.get('page') ?? '1', 10)
+  const requestedUrls = url.searchParams.getAll('url')
+  if (
+    requestedUrls.length > 4 ||
+    requestedUrls.some((value) => !isCanonicalMediaDeliveryUrl(value))
+  ) {
+    return apiErrorResponse(422, 'VALIDATION_FAILED', 'Provide at most four canonical LuckRead media URLs')
+  }
+  const matchingUrls = [...new Set(requestedUrls)]
   const limit = Number.isFinite(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 50) : 24
-  const page = Number.isFinite(requestedPage) ? Math.max(requestedPage, 1) : 1
+  const page = matchingUrls.length > 0 ? 1 : Number.isFinite(requestedPage) ? Math.max(requestedPage, 1) : 1
 
   try {
     const payloadUserId = await resolvePayloadOwnerUserId(authenticated.payload, authenticated.identityId)
@@ -154,15 +146,39 @@ export async function GET(request: Request): Promise<Response> {
 
     const result = await authenticated.payload.find({
       collection: 'media',
-      where: { ownerUserId: { equals: payloadUserId } },
+      where: matchingUrls.length > 0
+        ? {
+            and: [
+              { ownerUserId: { equals: payloadUserId } },
+              { or: matchingUrls.map((mediaUrl) => ({ url: { equals: mediaUrl } })) },
+            ],
+          } as any
+        : { ownerUserId: { equals: payloadUserId } },
       sort: '-createdAt',
-      limit,
+      limit: matchingUrls.length > 0 ? matchingUrls.length : limit,
       page,
       depth: 0,
       overrideAccess: true,
     })
+    const responseValue = matchingUrls.length > 0
+      ? {
+          ...result,
+          docs: result.docs
+            .filter((doc) => typeof doc.url === 'string' && matchingUrls.includes(doc.url))
+            .map((doc) => ({
+              id: doc.id,
+              url: doc.url,
+              filename: doc.filename,
+              mimeType: doc.mimeType,
+              filesize: doc.filesize,
+              width: doc.width,
+              height: doc.height,
+              alt: typeof doc.alt === 'string' ? doc.alt : '',
+            })),
+        }
+      : result
 
-    return await appendRequestIdToJsonResponse(new Response(JSON.stringify(result), {
+    return await appendRequestIdToJsonResponse(new Response(JSON.stringify(responseValue), {
       status: 200,
       headers: {
         'content-type': 'application/json; charset=utf-8',

@@ -1032,6 +1032,59 @@ paths:
         '428': { $ref: '#/components/responses/PreconditionRequired' }
 
   /media:
+    get:
+      tags: [Media]
+      summary: List current user's media, optionally matching up to four exact media URLs
+      operationId: listOwnMedia
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 50, default: 24 }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: url
+          in: query
+          description: Repeated exact first-party media URLs; when supplied, only matching records owned by the current user are returned.
+          style: form
+          explode: true
+          schema:
+            type: array
+            minItems: 1
+            maxItems: 4
+            items: { type: string, format: uri }
+      responses:
+        '200':
+          description: Current user's media records. URL-filtered results include only the matching metadata projection.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [docs, requestId]
+                properties:
+                  docs:
+                    type: array
+                    maxItems: 50
+                    items:
+                      type: object
+                      required: [id, url, filename, mimeType]
+                      properties:
+                        id: { type: [string, integer] }
+                        url: { type: string, format: uri }
+                        filename: { type: string }
+                        mimeType: { type: string }
+                        filesize: { type: [integer, 'null'], minimum: 0 }
+                        width: { type: [integer, 'null'], minimum: 1 }
+                        height: { type: [integer, 'null'], minimum: 1 }
+                        alt: { type: [string, 'null'], maxLength: 1000 }
+                  totalDocs: { type: integer }
+                  page: { type: integer }
+                  totalPages: { type: integer }
+                  requestId: { $ref: '#/components/schemas/RequestId' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '422': { $ref: '#/components/responses/ClientError' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
     post:
       tags: [Media]
       summary: Initiate an upload (single or multipart)
@@ -1060,9 +1113,114 @@ paths:
               schema: { $ref: '#/components/schemas/Media' }
         '415': { $ref: '#/components/responses/UnsupportedMediaType' }
 
+  /media/metadata:
+    get:
+      tags: [Media]
+      summary: Read image descriptions for media referenced by published, viewer-authorized posts
+      description: >-
+        W01 validates each canonical first-party media URL and asks W03 to
+        authorize the published reference for the current viewer. Metadata is
+        returned only for URLs that pass the same public/member entitlement
+        gate used by media delivery. The response is private and non-cacheable.
+      operationId: getPublishedMediaMetadata
+      security:
+        - bearerAuth: []
+        - {}
+      parameters:
+        - name: url
+          in: query
+          required: true
+          description: One to four canonical HTTPS image delivery URLs, repeated as url parameters.
+          style: form
+          explode: true
+          schema:
+            type: array
+            minItems: 1
+            maxItems: 4
+            items:
+              type: string
+              format: uri
+              pattern: '^https://img\.luckread\.com/.+'
+      responses:
+        '200':
+          description: Only authorized published media descriptions; unauthorized or unreferenced URLs are omitted.
+          headers:
+            Cache-Control: { schema: { type: string, const: 'private, no-store' } }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, requestId]
+                additionalProperties: false
+                properties:
+                  data:
+                    type: object
+                    required: [items]
+                    additionalProperties: false
+                    properties:
+                      items:
+                        type: array
+                        maxItems: 4
+                        items:
+                          type: object
+                          required: [url, alt, mimeType]
+                          additionalProperties: false
+                          properties:
+                            url: { type: string, format: uri }
+                            alt: { type: string, maxLength: 1000 }
+                            mimeType: { type: string }
+                  requestId: { $ref: '#/components/schemas/RequestId' }
+        '422': { $ref: '#/components/responses/ClientError' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
   /media/{mediaId}:
     parameters:
       - $ref: '#/components/parameters/MediaId'
+    patch:
+      tags: [Media]
+      summary: Update metadata for a media asset owned by the current account
+      description: Only owner-editable metadata is accepted. The current RN composer updates the required image alt text field.
+      operationId: updateOwnMedia
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [alt]
+              additionalProperties: false
+              properties:
+                alt: { type: string, minLength: 1, maxLength: 1000 }
+      responses:
+        '200':
+          description: Owner media metadata updated.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [doc, requestId]
+                properties:
+                  doc:
+                    type: object
+                    required: [id, url, filename, mimeType, alt]
+                    properties:
+                      id: { $ref: '#/components/schemas/ResourceId' }
+                      url: { type: [string, 'null'], format: uri }
+                      filename: { type: [string, 'null'] }
+                      mimeType: { type: [string, 'null'] }
+                      filesize: { type: [integer, 'null'], minimum: 0 }
+                      width: { type: [integer, 'null'], minimum: 1 }
+                      height: { type: [integer, 'null'], minimum: 1 }
+                      alt: { type: string, minLength: 1, maxLength: 1000 }
+                  requestId: { $ref: '#/components/schemas/RequestId' }
+        '400': { $ref: '#/components/responses/ClientError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ClientError' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
     get:
       tags: [Media]
       summary: Get media metadata
@@ -5459,10 +5617,11 @@ components:
         bodyRef: { type: string, description: R2 object reference }
     Media:
       type: object
-      required: [id, mimeType, size, checksum, status]
+      required: [id, mimeType, alt, size, checksum, status]
       properties:
         id: { $ref: '#/components/schemas/ResourceId' }
         mimeType: { type: string }
+        alt: { type: [string, 'null'], maxLength: 1000 }
         size: { type: integer, minimum: 1 }
         checksum: { type: string }
         status: { enum: [INITIATED, UPLOADING, READY, FAILED, QUARANTINED] }

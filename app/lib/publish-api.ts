@@ -15,6 +15,7 @@ export type UploadedMedia = {
   filename: string;
   mimeType: string;
   filesize?: number | null;
+  alt?: string;
 };
 
 export type MediaPlayback = UploadedMedia & {
@@ -29,6 +30,7 @@ type MediaEnvelope = {
   filename?: string | null;
   mimeType?: string | null;
   filesize?: number | null;
+  alt?: string | null;
   status?: string;
   error?: { message?: string };
 };
@@ -128,7 +130,28 @@ export function normalizeUploadedMedia(value: unknown): UploadedMedia | null {
       ? media.mimeType
       : 'application/octet-stream',
     filesize: typeof media.filesize === 'number' ? media.filesize : null,
+    alt: typeof media.alt === 'string' ? media.alt : undefined,
   };
+}
+
+/** Resolve media references to the current user's own Payload records for editing. */
+export async function getOwnedMediaMetadata(urls: readonly string[]): Promise<UploadedMedia[]> {
+  const uniqueUrls = [...new Set(urls.filter((url) => typeof url === 'string' && url.trim()))].slice(0, 4);
+  if (uniqueUrls.length === 0) return [];
+
+  const query = new URLSearchParams();
+  uniqueUrls.forEach((url) => query.append('url', url));
+  const result = await apiRequest<{ docs?: unknown[] }>('/media?' + query.toString(), { method: 'GET' });
+  if (!result.response.ok) {
+    throw new Error(apiFailureMessage(result, 'Unable to read owned media metadata.'));
+  }
+  const docs = result.data && typeof result.data === 'object' && Array.isArray((result.data as { docs?: unknown[] }).docs)
+    ? (result.data as { docs: unknown[] }).docs
+    : [];
+  const requested = new Set(uniqueUrls);
+  return docs
+    .map((doc) => normalizeUploadedMedia(doc))
+    .filter((media): media is UploadedMedia => Boolean(media && requested.has(media.url)));
 }
 
 export async function uploadMediaFile(

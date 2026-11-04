@@ -29,6 +29,7 @@ export const Media: CollectionConfig = {
       name: 'alt',
       type: 'text',
       required: true,
+      maxLength: 1000,
     },
     {
       name: 'ownerUserId',
