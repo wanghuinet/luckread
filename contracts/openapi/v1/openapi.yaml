@@ -1177,6 +1177,33 @@ paths:
   /media/{mediaId}:
     parameters:
       - $ref: '#/components/parameters/MediaId'
+    patch:
+      tags: [Media]
+      summary: Update metadata for a media asset owned by the current account
+      description: Only owner-editable metadata is accepted. The current RN composer updates the required image alt text field.
+      operationId: updateOwnMedia
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [alt]
+              additionalProperties: false
+              properties:
+                alt: { type: string, minLength: 1, maxLength: 1000 }
+      responses:
+        '200':
+          description: Owner media metadata updated.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Media' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ClientError' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
     get:
       tags: [Media]
       summary: Get media metadata
@@ -5577,6 +5604,7 @@ components:
       properties:
         id: { $ref: '#/components/schemas/ResourceId' }
         mimeType: { type: string }
+        alt: { type: string, maxLength: 1000 }
         size: { type: integer, minimum: 1 }
         checksum: { type: string }
         status: { enum: [INITIATED, UPLOADING, READY, FAILED, QUARANTINED] }
