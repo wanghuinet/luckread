@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useNavigation, usePreventRemove, type NavigationAction } from '@react-navigation/native';
 import { Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import CameraCaptureModal, { type CapturedCameraPhoto } from '~/components/CameraCaptureModal';
@@ -129,6 +130,7 @@ function PublishScreenContent() {
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
   const router = useRouter();
+  const navigation = useNavigation();
   const params = useLocalSearchParams<{ contentId?: string | string[]; draftId?: string | string[] }>();
   const contentId = Array.isArray(params.contentId) ? params.contentId[0] : params.contentId;
   const draftId = Array.isArray(params.draftId) ? params.draftId[0] : params.draftId;
@@ -165,6 +167,7 @@ function PublishScreenContent() {
   const draftSavedFingerprintRef = useRef('');
   const draftAutoSaveSchedulerRef = useRef<() => void>(() => {});
   const pollConfiguredRef = useRef(false);
+  const draftWasPublishedRef = useRef(false);
   const originalAccessModeRef = useRef<'PUBLIC' | 'MEMBERS_ONLY'>('PUBLIC');
   const originalBodyRef = useRef<{ text: string; bodyRef: string | null }>({ text: '', bodyRef: null });
   const bodyUploadRef = useRef<{ text: string; key: string; uploaded?: UploadedMedia } | null>(null);
@@ -851,37 +854,52 @@ function PublishScreenContent() {
     if (draftSaveTimerRef.current) clearTimeout(draftSaveTimerRef.current);
   }, []);
 
-  const closeComposer = useCallback(async () => {
+  const handlePreventRemove = useCallback(({ data }: { data: { action: NavigationAction } }) => {
+    void (async () => {
+      if (busy || loadingEdit || publishPending) {
+        Alert.alert('请稍候', '当前操作尚未完成，完成后再关闭发布窗口。');
+        return;
+      }
+      if (assets.some((asset) => !asset.existing && asset.status !== 'ready')) {
+        setErrorMessage('媒体仍未全部上传成功，请重试或移除失败附件后再关闭。');
+        return;
+      }
+      if (!body.trim() && (assets.length > 0 || pollEnabled)) {
+        setErrorMessage('请先填写动态正文，再保存或关闭这份草稿。');
+        return;
+      }
+      if (body.trim()) {
+        if (draftSaveTimerRef.current) {
+          clearTimeout(draftSaveTimerRef.current);
+          draftSaveTimerRef.current = null;
+        }
+        draftSaveChangeTokenRef.current += 1;
+        const pendingSave = draftSaveInFlightPromiseRef.current;
+        if (pendingSave) await pendingSave;
+        try {
+          await saveDraftSnapshot();
+        } catch (error) {
+          setDraftSaveStatus('error');
+          setErrorMessage(error instanceof Error ? error.message : '草稿保存失败，请检查网络后重试。');
+          return;
+        }
+      }
+      navigation.dispatch(data.action);
+    })();
+  }, [assets, body, busy, loadingEdit, navigation, pollEnabled, publishPending, saveDraftSnapshot]);
+
+  const closeComposer = useCallback(() => {
     if (busy || loadingEdit || publishPending) {
       Alert.alert('请稍候', '当前操作尚未完成，完成后再关闭发布窗口。');
       return;
     }
-    if (assets.some((asset) => !asset.existing && asset.status !== 'ready')) {
-      setErrorMessage('媒体仍未全部上传成功，请重试或移除失败附件后再关闭。');
-      return;
-    }
-    if (!contentId && !body.trim() && (assets.length > 0 || pollEnabled)) {
-      setErrorMessage('请先填写动态正文，再保存或关闭这份草稿。');
-      return;
-    }
-    if (!contentId && body.trim() && !publishPending) {
-      if (draftSaveTimerRef.current) {
-        clearTimeout(draftSaveTimerRef.current);
-        draftSaveTimerRef.current = null;
-      }
-      draftSaveChangeTokenRef.current += 1;
-      const pendingSave = draftSaveInFlightPromiseRef.current;
-      if (pendingSave) await pendingSave;
-      try {
-        await saveDraftSnapshot();
-      } catch (error) {
-        setDraftSaveStatus('error');
-        setErrorMessage(error instanceof Error ? error.message : '草稿保存失败，请检查网络后重试。');
-        return;
-      }
-    }
     router.back();
-  }, [assets, body, busy, contentId, loadingEdit, pollEnabled, publishPending, router, saveDraftSnapshot]);
+  }, [busy, loadingEdit, publishPending, router]);
+
+  const shouldPreventRemove = !contentId &&
+    !draftWasPublishedRef.current &&
+    (Boolean(body.trim()) || assets.length > 0 || pollEnabled);
+  usePreventRemove(shouldPreventRemove, handlePreventRemove);
 
   const submit = useCallback(async () => {
     const trimmedBody = body.trim();
@@ -1173,6 +1191,7 @@ function PublishScreenContent() {
 
       submitAttemptRef.current = null;
       recordRef.current = null;
+      draftWasPublishedRef.current = true;
       draftSaveDirtyRef.current = false;
       setDraftSaveStatus('idle');
       const publishedId = draft.id;
