@@ -112,6 +112,19 @@ const requestFor = (method: 'PUT' | 'DELETE', body?: unknown, key = 'idem_w05_bi
     ...(method === 'PUT' ? { body: JSON.stringify(body) } : {}),
   })
 
+async function expectRouteStatus(response: Response, expected: number): Promise<void> {
+  const body = expected === 204 ? '' : await response.clone().text()
+  expect(response.status, JSON.stringify({
+    body,
+    calls: {
+      resolvePrincipal: bridge.resolvePrincipal.mock.calls.length,
+      authorize: bridge.authorize.mock.calls.length,
+      audit: bridge.audit.mock.calls.length,
+      w05: bridge.w05Fetch.mock.calls.length,
+    },
+  })).toBe(expected)
+}
+
 describe('W01 to W05 push endpoint service-binding integration', () => {
   beforeEach(() => {
     d1 = createD1Sqlite()
@@ -164,7 +177,7 @@ describe('W01 to W05 push endpoint service-binding integration', () => {
       appVersion: '1.0.0',
     }), context)
 
-    expect(response.status).toBe(200)
+    await expectRouteStatus(response, 200)
     const responseBody = await response.json() as { data: { endpointId: string; status: string } }
     expect(responseBody.data).toMatchObject({ status: 'ACTIVE' })
     expect(responseBody.data.endpointId).toMatch(/^[0-9a-f-]{36}$/i)
@@ -198,7 +211,7 @@ describe('W01 to W05 push endpoint service-binding integration', () => {
     const first = await PUT(requestFor('PUT', {
       platform: 'ios', permissionStatus: 'granted', expoPushToken: token,
     }, 'idem_owner_first_0001'), context)
-    expect(first.status).toBe(200)
+    await expectRouteStatus(first, 200)
 
     bridge.resolvePrincipal.mockResolvedValueOnce({
       userId: 'w02-user-0002', layer: 'L2', verified: true,
@@ -209,7 +222,7 @@ describe('W01 to W05 push endpoint service-binding integration', () => {
       expoPushToken: 'ExponentPushToken[second_user_token_1234567890]',
     }, 'idem_owner_second_0002'), context)
 
-    expect(second.status).toBe(409)
+    await expectRouteStatus(second, 409)
     const stored = d1.sqlite.prepare(
       'SELECT owner_user_id, push_token FROM notification_push_endpoints WHERE installation_id = ?',
     ).get(installationId) as { owner_user_id: string; push_token: string }
@@ -225,7 +238,7 @@ describe('W01 to W05 push endpoint service-binding integration', () => {
     const disabled = await PUT(requestFor('PUT', {
       platform: 'android', permissionStatus: 'denied', expoPushToken: null,
     }, 'idem_disable_device_0002'), context)
-    expect(disabled.status).toBe(200)
+    await expectRouteStatus(disabled, 200)
     expect(await disabled.json()).toMatchObject({ data: { status: 'DISABLED' } })
 
     const stored = d1.sqlite.prepare(
@@ -238,18 +251,18 @@ describe('W01 to W05 push endpoint service-binding integration', () => {
     const registered = await PUT(requestFor('PUT', {
       platform: 'ios', permissionStatus: 'granted', expoPushToken: token,
     }, 'idem_register_for_delete_0001'), context)
-    expect(registered.status).toBe(200)
+    await expectRouteStatus(registered, 200)
 
     bridge.resolvePrincipal.mockResolvedValueOnce({
       userId: 'w02-user-0002', layer: 'L2', verified: true,
     })
     const otherOwnerDelete = await DELETE(requestFor('DELETE', undefined, 'idem_wrong_owner_delete_0002'), context)
-    expect(otherOwnerDelete.status).toBe(204)
+    await expectRouteStatus(otherOwnerDelete, 204)
     expect(d1.sqlite.prepare('SELECT endpoint_id FROM notification_push_endpoints WHERE installation_id = ?')
       .get(installationId)).toBeTruthy()
 
     const ownerDelete = await DELETE(requestFor('DELETE', undefined, 'idem_right_owner_delete_0003'), context)
-    expect(ownerDelete.status).toBe(204)
+    await expectRouteStatus(ownerDelete, 204)
     expect(d1.sqlite.prepare('SELECT endpoint_id FROM notification_push_endpoints WHERE installation_id = ?')
       .get(installationId)).toBeUndefined()
   })
