@@ -655,7 +655,6 @@ function PublishScreenContent() {
         state: 'DRAFT',
       };
       recordRef.current = draft;
-      draftSavedFingerprintRef.current = createFingerprint;
       draftCreatePendingRef.current = null;
       draftCreateKeyRef.current = '';
       editLoadKeyRef.current = draft.id;
@@ -696,7 +695,6 @@ function PublishScreenContent() {
       }
       draft = { ...updatedRecord, etag: updatedEtag };
       recordRef.current = draft;
-      draftSavedFingerprintRef.current = fingerprint;
       originalBodyRef.current = { text: trimmedBody, bodyRef };
     }
 
@@ -733,6 +731,9 @@ function PublishScreenContent() {
       }
       pollConfiguredRef.current = false;
     }
+    // Only mark the fingerprint saved after both content and poll mutations succeed.
+    draftSavedFingerprintRef.current = fingerprint;
+    originalBodyRef.current = { text: trimmedBody, bodyRef };
   }, [
     accessMode,
     assets,
@@ -837,6 +838,14 @@ function PublishScreenContent() {
   }, []);
 
   const closeComposer = useCallback(async () => {
+    if (busy || loadingEdit) {
+      Alert.alert('请稍候', '当前操作尚未完成，完成后再关闭发布窗口。');
+      return;
+    }
+    if (assets.some((asset) => !asset.existing && asset.status !== 'ready')) {
+      setErrorMessage('媒体仍未全部上传成功，请重试或移除失败附件后再关闭。');
+      return;
+    }
     if (!contentId && body.trim() && !publishPending) {
       if (draftSaveTimerRef.current) {
         clearTimeout(draftSaveTimerRef.current);
@@ -854,7 +863,7 @@ function PublishScreenContent() {
       }
     }
     router.back();
-  }, [body, contentId, publishPending, router, saveDraftSnapshot]);
+  }, [assets, body, busy, contentId, loadingEdit, publishPending, router, saveDraftSnapshot]);
 
   const submit = useCallback(async () => {
     const trimmedBody = body.trim();
@@ -923,6 +932,14 @@ function PublishScreenContent() {
       draftSaveChangeTokenRef.current += 1;
       const pendingDraftSave = draftSaveInFlightPromiseRef.current;
       if (pendingDraftSave) await pendingDraftSave;
+      try {
+        // Settle the authoritative DRAFT first; replay ambiguous creates with the original key.
+        await saveDraftSnapshot();
+      } catch (error) {
+        setErrorMessage(error instanceof Error ? error.message : '草稿保存失败，暂时无法发布。');
+        setStatusMessage('');
+        return;
+      }
     }
     setBusy(true);
     setErrorMessage('');
@@ -1180,7 +1197,7 @@ function PublishScreenContent() {
     <View style={[styles.page, isDark && { backgroundColor: '#000000' }]}>
       <Stack.Screen options={{ title: contentId ? 'Edit post' : 'New post', headerShown: false }} />
       <View style={[styles.header, isDark && { backgroundColor: '#000000', borderBottomColor: '#27272a' }]}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Close composer" onPress={() => { void closeComposer(); }} style={styles.iconButton}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Close composer" disabled={busy || loadingEdit} onPress={() => { void closeComposer(); }} style={[styles.iconButton, (busy || loadingEdit) && styles.disabledButton]}>
           <Feather name="x" size={22} color={isDark ? '#e5e7eb' : '#111827'} />
         </Pressable>
         <Text style={[styles.headerTitle, isDark && { color: '#f9fafb' }]}>{contentId ? 'Edit post' : 'New post'}</Text>
