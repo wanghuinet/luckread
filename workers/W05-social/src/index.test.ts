@@ -1931,7 +1931,7 @@ describe('W05 social poll transport', () => {
         body: JSON.stringify({
           platform: 'android',
           permissionStatus: 'denied',
-          expoPushToken: null,
+          expoPushToken: 'ExponentPushToken[abcdefghijklmnop_1234567890]',
         }),
       }),
       { DB: dbFor(), D1_03: d1_03 },
