@@ -6,45 +6,15 @@
   "serverPrefix": "https://api.luckread.com/v1",
   "records": [
     {
-      "operationId": "applyForCreator",
-      "method": "POST",
-      "path": "/v1/creator-applications",
-      "openapiPath": "/creator-applications",
-      "domain": "creator_ip_mcn",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/creator-applications",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
-      "operationId": "authCredentialAdd",
-      "method": "POST",
-      "path": "/v1/auth/credentials",
-      "openapiPath": "/auth/credentials",
+      "operationId": "deleteAccountSessionsSessionId",
+      "method": "DELETE",
+      "path": "/v1/account/sessions/{sessionId}",
+      "openapiPath": "/account/sessions/{sessionId}",
       "domain": "auth_identity",
       "status": "DISCOVERED",
       "featureIds": [],
       "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/auth/credentials",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
-      "operationId": "authCredentialList",
-      "method": "GET",
-      "path": "/v1/auth/credentials",
-      "openapiPath": "/auth/credentials",
-      "domain": "auth_identity",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/auth/credentials",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#delete:/account/sessions/{sessionId}",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
         "contracts/api/api-inventory.v1.json"
@@ -66,171 +36,6 @@
       ]
     },
     {
-      "operationId": "authCredentialReplace",
-      "method": "PUT",
-      "path": "/v1/auth/credentials/{credentialId}",
-      "openapiPath": "/auth/credentials/{credentialId}",
-      "domain": "auth_identity",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#put:/auth/credentials/{credentialId}",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
-      "operationId": "authLogin",
-      "method": "POST",
-      "path": "/v1/auth/login",
-      "openapiPath": "/auth/login",
-      "domain": "auth_identity",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/auth/login",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
-      "operationId": "authLogout",
-      "method": "POST",
-      "path": "/v1/auth/logout",
-      "openapiPath": "/auth/logout",
-      "domain": "auth_identity",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/auth/logout",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
-      "operationId": "authPasswordChange",
-      "method": "POST",
-      "path": "/v1/auth/password/change",
-      "openapiPath": "/auth/password/change",
-      "domain": "auth_identity",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/auth/password/change",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
-      "operationId": "authPasswordResetConfirm",
-      "method": "POST",
-      "path": "/v1/auth/password/reset/confirm",
-      "openapiPath": "/auth/password/reset/confirm",
-      "domain": "auth_identity",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/auth/password/reset/confirm",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
-      "operationId": "authPasswordResetRequest",
-      "method": "POST",
-      "path": "/v1/auth/password/reset/request",
-      "openapiPath": "/auth/password/reset/request",
-      "domain": "auth_identity",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/auth/password/reset/request",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
-      "operationId": "authPrincipalGet",
-      "method": "GET",
-      "path": "/v1/auth/principal",
-      "openapiPath": "/auth/principal",
-      "domain": "auth_identity",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/auth/principal",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
-      "operationId": "authRefresh",
-      "method": "POST",
-      "path": "/v1/auth/refresh",
-      "openapiPath": "/auth/refresh",
-      "domain": "auth_identity",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/auth/refresh",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
-      "operationId": "authRegister",
-      "method": "POST",
-      "path": "/v1/auth/register",
-      "openapiPath": "/auth/register",
-      "domain": "auth_identity",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/auth/register",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
-      "operationId": "authSessionGet",
-      "method": "GET",
-      "path": "/v1/auth/session",
-      "openapiPath": "/auth/session",
-      "domain": "auth_identity",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/auth/session",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
-      "operationId": "authSessionList",
-      "method": "GET",
-      "path": "/v1/auth/sessions",
-      "openapiPath": "/auth/sessions",
-      "domain": "auth_identity",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/auth/sessions",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
       "operationId": "authSessionRevoke",
       "method": "DELETE",
       "path": "/v1/auth/sessions/{sessionId}",
@@ -240,307 +45,6 @@
       "featureIds": [],
       "schemaRef": "",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#delete:/auth/sessions/{sessionId}",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
-      "operationId": "batchUpdateNotifications",
-      "method": "PATCH",
-      "path": "/v1/notifications",
-      "openapiPath": "/notifications",
-      "domain": "notification",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#patch:/notifications",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
-      "operationId": "blockUser",
-      "method": "POST",
-      "path": "/v1/interactions/blocks",
-      "openapiPath": "/interactions/blocks",
-      "domain": "interaction",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/interactions/blocks",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
-      "operationId": "cancelSubscription",
-      "method": "POST",
-      "path": "/v1/memberships/subscriptions/{subscriptionId}/cancel",
-      "openapiPath": "/memberships/subscriptions/{subscriptionId}/cancel",
-      "domain": "subscription_entitlement_payment",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/memberships/subscriptions/{subscriptionId}/cancel",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
-      "operationId": "changeOrganizationMemberRole",
-      "method": "POST",
-      "path": "/v1/organizations/{organizationId}/members/{memberId}/role",
-      "openapiPath": "/organizations/{organizationId}/members/{memberId}/role",
-      "domain": "creator_ip_mcn",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/organizations/{organizationId}/members/{memberId}/role",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
-      "operationId": "changeSubscriptionPlan",
-      "method": "POST",
-      "path": "/v1/memberships/subscriptions/{subscriptionId}/change-plan",
-      "openapiPath": "/memberships/subscriptions/{subscriptionId}/change-plan",
-      "domain": "subscription_entitlement_payment",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/memberships/subscriptions/{subscriptionId}/change-plan",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
-      "operationId": "checkEntitlement",
-      "method": "POST",
-      "path": "/v1/entitlements/check",
-      "openapiPath": "/entitlements/check",
-      "domain": "subscription_entitlement_payment",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/entitlements/check",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
-      "operationId": "checkoutSubscriptionPlanUpgrade",
-      "method": "POST",
-      "path": "/v1/memberships/subscriptions/{subscriptionId}/change-plan/checkout",
-      "openapiPath": "/memberships/subscriptions/{subscriptionId}/change-plan/checkout",
-      "domain": "subscription_entitlement_payment",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/memberships/subscriptions/{subscriptionId}/change-plan/checkout",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json",
-        "contracts/api/commerce-operation-policy.v1.json"
-      ]
-    },
-    {
-      "operationId": "completeUpload",
-      "method": "POST",
-      "path": "/v1/media/uploads/{uploadId}/complete",
-      "openapiPath": "/media/uploads/{uploadId}/complete",
-      "domain": "media",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/media/uploads/{uploadId}/complete",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
-      "operationId": "createAppeal",
-      "method": "POST",
-      "path": "/v1/appeals",
-      "openapiPath": "/appeals",
-      "domain": "audit_compliance",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/appeals",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
-      "operationId": "createComment",
-      "method": "POST",
-      "path": "/v1/contents/{contentId}/comments",
-      "openapiPath": "/contents/{contentId}/comments",
-      "domain": "interaction",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/contents/{contentId}/comments",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
-      "operationId": "createContent",
-      "method": "POST",
-      "path": "/v1/contents",
-      "openapiPath": "/contents",
-      "domain": "content",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/contents",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
-      "operationId": "createIp",
-      "method": "POST",
-      "path": "/v1/ips",
-      "openapiPath": "/ips",
-      "domain": "creator_ip_mcn",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/ips",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
-      "operationId": "createMedia",
-      "method": "POST",
-      "path": "/v1/media",
-      "openapiPath": "/media",
-      "domain": "media",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/media",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
-      "operationId": "createOrganization",
-      "method": "POST",
-      "path": "/v1/organizations",
-      "openapiPath": "/organizations",
-      "domain": "creator_ip_mcn",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/organizations",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
-      "operationId": "createReport",
-      "method": "POST",
-      "path": "/v1/reports",
-      "openapiPath": "/reports",
-      "domain": "audit_compliance",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/reports",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
-      "operationId": "createShare",
-      "method": "POST",
-      "path": "/v1/content/{contentId}/shares",
-      "openapiPath": "/content/{contentId}/shares",
-      "domain": "content",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/content/{contentId}/shares",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
-      "operationId": "createSubscription",
-      "method": "POST",
-      "path": "/v1/memberships/subscriptions",
-      "openapiPath": "/memberships/subscriptions",
-      "domain": "subscription_entitlement_payment",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/memberships/subscriptions",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
-      "operationId": "decideCreatorApplication",
-      "method": "POST",
-      "path": "/v1/admin/creator-applications",
-      "openapiPath": "/admin/creator-applications",
-      "domain": "creator_ip_mcn",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/admin/creator-applications",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
-      "operationId": "decideModerationCase",
-      "method": "POST",
-      "path": "/v1/admin/moderation/cases/{caseId}/decision",
-      "openapiPath": "/admin/moderation/cases/{caseId}/decision",
-      "domain": "audit_compliance",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/admin/moderation/cases/{caseId}/decision",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
-      "operationId": "deleteAccountSessionsSessionId",
-      "method": "DELETE",
-      "path": "/v1/account/sessions/{sessionId}",
-      "openapiPath": "/account/sessions/{sessionId}",
-      "domain": "auth_identity",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#delete:/account/sessions/{sessionId}",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
         "contracts/api/api-inventory.v1.json"
@@ -571,21 +75,6 @@
       "featureIds": [],
       "schemaRef": "",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#delete:/comments/{commentId}/likes",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
-      "operationId": "deleteContent",
-      "method": "DELETE",
-      "path": "/v1/contents/{contentId}",
-      "openapiPath": "/contents/{contentId}",
-      "domain": "content",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#delete:/contents/{contentId}",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
         "contracts/api/api-inventory.v1.json"
@@ -667,6 +156,21 @@
       ]
     },
     {
+      "operationId": "deleteContent",
+      "method": "DELETE",
+      "path": "/v1/contents/{contentId}",
+      "openapiPath": "/contents/{contentId}",
+      "domain": "content",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#delete:/contents/{contentId}",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
       "operationId": "deleteContentsContentIdPoll",
       "method": "DELETE",
       "path": "/v1/contents/{contentId}/poll",
@@ -712,6 +216,66 @@
       ]
     },
     {
+      "operationId": "unblockUser",
+      "method": "DELETE",
+      "path": "/v1/interactions/blocks/{targetUserId}",
+      "openapiPath": "/interactions/blocks/{targetUserId}",
+      "domain": "interaction",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#delete:/interactions/blocks/{targetUserId}",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "unlike",
+      "method": "DELETE",
+      "path": "/v1/interactions/likes",
+      "openapiPath": "/interactions/likes",
+      "domain": "interaction",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#delete:/interactions/likes",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "unmuteUser",
+      "method": "DELETE",
+      "path": "/v1/interactions/mutes/{targetUserId}",
+      "openapiPath": "/interactions/mutes/{targetUserId}",
+      "domain": "interaction",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#delete:/interactions/mutes/{targetUserId}",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "removeIpMember",
+      "method": "DELETE",
+      "path": "/v1/ips/{ipId}/members",
+      "openapiPath": "/ips/{ipId}/members",
+      "domain": "creator_ip_mcn",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#delete:/ips/{ipId}/members",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
       "operationId": "deleteMcnOrganizationsOrgIdMembersUserId",
       "method": "DELETE",
       "path": "/v1/mcn/organizations/{orgId}/members/{userId}",
@@ -736,6 +300,54 @@
       "featureIds": [],
       "schemaRef": "",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#delete:/media/{mediaId}",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "removeOrganizationMember",
+      "method": "DELETE",
+      "path": "/v1/organizations/{organizationId}/members/{memberId}",
+      "openapiPath": "/organizations/{organizationId}/members/{memberId}",
+      "domain": "creator_ip_mcn",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#delete:/organizations/{organizationId}/members/{memberId}",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "deletePushEndpoint",
+      "method": "DELETE",
+      "path": "/v1/push/endpoints/{installationId}",
+      "openapiPath": "/push/endpoints/{installationId}",
+      "domain": "notification",
+      "status": "DISCOVERED",
+      "featureIds": [
+        "NOTIFY-002"
+      ],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#delete:/push/endpoints/{installationId}",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json",
+        "contracts/api/notification-operation-policy.v1.json"
+      ]
+    },
+    {
+      "operationId": "unfollow",
+      "method": "DELETE",
+      "path": "/v1/social/follows",
+      "openapiPath": "/social/follows",
+      "domain": "interaction",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#delete:/social/follows",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
         "contracts/api/api-inventory.v1.json"
@@ -772,36 +384,6 @@
       ]
     },
     {
-      "operationId": "exportMyAccountData",
-      "method": "POST",
-      "path": "/v1/account/data-export",
-      "openapiPath": "/account/data-export",
-      "domain": "audit_compliance",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/account/data-export",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
-      "operationId": "follow",
-      "method": "POST",
-      "path": "/v1/social/follows",
-      "openapiPath": "/social/follows",
-      "domain": "interaction",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/social/follows",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
       "operationId": "getAccountDataExport",
       "method": "GET",
       "path": "/v1/account/data-export",
@@ -811,6 +393,21 @@
       "featureIds": [],
       "schemaRef": "",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/account/data-export",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "getAccountSessions",
+      "method": "GET",
+      "path": "/v1/account/sessions",
+      "openapiPath": "/account/sessions",
+      "domain": "auth_identity",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/account/sessions",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
         "contracts/api/api-inventory.v1.json"
@@ -832,15 +429,60 @@
       ]
     },
     {
-      "operationId": "getAccountSessions",
+      "operationId": "listCreatorApplicationsForReview",
       "method": "GET",
-      "path": "/v1/account/sessions",
-      "openapiPath": "/account/sessions",
-      "domain": "auth_identity",
+      "path": "/v1/admin/creator-applications",
+      "openapiPath": "/admin/creator-applications",
+      "domain": "creator_ip_mcn",
       "status": "DISCOVERED",
       "featureIds": [],
       "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/account/sessions",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/admin/creator-applications",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "listModerationCases",
+      "method": "GET",
+      "path": "/v1/admin/moderation",
+      "openapiPath": "/admin/moderation",
+      "domain": "audit_compliance",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/admin/moderation",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "getModerationCase",
+      "method": "GET",
+      "path": "/v1/admin/moderation/cases/{caseId}",
+      "openapiPath": "/admin/moderation/cases/{caseId}",
+      "domain": "audit_compliance",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/admin/moderation/cases/{caseId}",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "listModerationQueue",
+      "method": "GET",
+      "path": "/v1/admin/moderation/queue",
+      "openapiPath": "/admin/moderation/queue",
+      "domain": "audit_compliance",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/admin/moderation/queue",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
         "contracts/api/api-inventory.v1.json"
@@ -877,15 +519,60 @@
       ]
     },
     {
-      "operationId": "getContent",
+      "operationId": "authCredentialList",
       "method": "GET",
-      "path": "/v1/contents/{contentId}",
-      "openapiPath": "/contents/{contentId}",
-      "domain": "content",
+      "path": "/v1/auth/credentials",
+      "openapiPath": "/auth/credentials",
+      "domain": "auth_identity",
       "status": "DISCOVERED",
       "featureIds": [],
       "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/contents/{contentId}",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/auth/credentials",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "authPrincipalGet",
+      "method": "GET",
+      "path": "/v1/auth/principal",
+      "openapiPath": "/auth/principal",
+      "domain": "auth_identity",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/auth/principal",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "authSessionGet",
+      "method": "GET",
+      "path": "/v1/auth/session",
+      "openapiPath": "/auth/session",
+      "domain": "auth_identity",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/auth/session",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "authSessionList",
+      "method": "GET",
+      "path": "/v1/auth/sessions",
+      "openapiPath": "/auth/sessions",
+      "domain": "auth_identity",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/auth/sessions",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
         "contracts/api/api-inventory.v1.json"
@@ -937,15 +624,45 @@
       ]
     },
     {
-      "operationId": "getContentRevision",
+      "operationId": "listContents",
       "method": "GET",
-      "path": "/v1/contents/{contentId}/revisions/{revisionId}",
-      "openapiPath": "/contents/{contentId}/revisions/{revisionId}",
+      "path": "/v1/contents",
+      "openapiPath": "/contents",
       "domain": "content",
       "status": "DISCOVERED",
       "featureIds": [],
       "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/contents/{contentId}/revisions/{revisionId}",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/contents",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "getContent",
+      "method": "GET",
+      "path": "/v1/contents/{contentId}",
+      "openapiPath": "/contents/{contentId}",
+      "domain": "content",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/contents/{contentId}",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "listComments",
+      "method": "GET",
+      "path": "/v1/contents/{contentId}/comments",
+      "openapiPath": "/contents/{contentId}/comments",
+      "domain": "interaction",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/contents/{contentId}/comments",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
         "contracts/api/api-inventory.v1.json"
@@ -961,6 +678,51 @@
       "featureIds": [],
       "schemaRef": "",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/contents/{contentId}/poll",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "listContentRevisions",
+      "method": "GET",
+      "path": "/v1/contents/{contentId}/revisions",
+      "openapiPath": "/contents/{contentId}/revisions",
+      "domain": "content",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/contents/{contentId}/revisions",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "getContentRevision",
+      "method": "GET",
+      "path": "/v1/contents/{contentId}/revisions/{revisionId}",
+      "openapiPath": "/contents/{contentId}/revisions/{revisionId}",
+      "domain": "content",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/contents/{contentId}/revisions/{revisionId}",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "getMyCreatorApplication",
+      "method": "GET",
+      "path": "/v1/creator-applications",
+      "openapiPath": "/creator-applications",
+      "domain": "creator_ip_mcn",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/creator-applications",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
         "contracts/api/api-inventory.v1.json"
@@ -991,6 +753,21 @@
       "featureIds": [],
       "schemaRef": "",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/creator/profile",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "getMyCreator",
+      "method": "GET",
+      "path": "/v1/creators/me",
+      "openapiPath": "/creators/me",
+      "domain": "creator_ip_mcn",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/creators/me",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
         "contracts/api/api-inventory.v1.json"
@@ -1072,6 +849,21 @@
       ]
     },
     {
+      "operationId": "listEntitlements",
+      "method": "GET",
+      "path": "/v1/entitlements",
+      "openapiPath": "/entitlements",
+      "domain": "subscription_entitlement_payment",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/entitlements",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
       "operationId": "getEntitlements",
       "method": "GET",
       "path": "/v1/entitlements/{subjectId}",
@@ -1096,6 +888,21 @@
       "featureIds": [],
       "schemaRef": "",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/feed",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "getFollowingFeed",
+      "method": "GET",
+      "path": "/v1/feed/following",
+      "openapiPath": "/feed/following",
+      "domain": "feed",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/feed/following",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
         "contracts/api/api-inventory.v1.json"
@@ -1132,21 +939,6 @@
       ]
     },
     {
-      "operationId": "getFollowingFeed",
-      "method": "GET",
-      "path": "/v1/feed/following",
-      "openapiPath": "/feed/following",
-      "domain": "feed",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/feed/following",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
       "operationId": "getGalleriesGalleryId",
       "method": "GET",
       "path": "/v1/galleries/{galleryId}",
@@ -1162,6 +954,36 @@
       ]
     },
     {
+      "operationId": "listBlockedUsers",
+      "method": "GET",
+      "path": "/v1/interactions/blocks",
+      "openapiPath": "/interactions/blocks",
+      "domain": "interaction",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/interactions/blocks",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "listMutedUsers",
+      "method": "GET",
+      "path": "/v1/interactions/mutes",
+      "openapiPath": "/interactions/mutes",
+      "domain": "interaction",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/interactions/mutes",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
       "operationId": "getIpAssets",
       "method": "GET",
       "path": "/v1/ip/assets",
@@ -1171,6 +993,21 @@
       "featureIds": [],
       "schemaRef": "",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/ip/assets",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "listIpContents",
+      "method": "GET",
+      "path": "/v1/ips/{ipId}/contents",
+      "openapiPath": "/ips/{ipId}/contents",
+      "domain": "creator_ip_mcn",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/ips/{ipId}/contents",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
         "contracts/api/api-inventory.v1.json"
@@ -1222,21 +1059,6 @@
       ]
     },
     {
-      "operationId": "getMe",
-      "method": "GET",
-      "path": "/v1/users/me",
-      "openapiPath": "/users/me",
-      "domain": "auth_identity",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/users/me",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
       "operationId": "getMedia",
       "method": "GET",
       "path": "/v1/media/{mediaId}",
@@ -1282,45 +1104,60 @@
       ]
     },
     {
-      "operationId": "getModerationCase",
+      "operationId": "listMediaVariants",
       "method": "GET",
-      "path": "/v1/admin/moderation/cases/{caseId}",
-      "openapiPath": "/admin/moderation/cases/{caseId}",
-      "domain": "audit_compliance",
+      "path": "/v1/media/{mediaId}/variants",
+      "openapiPath": "/media/{mediaId}/variants",
+      "domain": "media",
       "status": "DISCOVERED",
       "featureIds": [],
       "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/admin/moderation/cases/{caseId}",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/media/{mediaId}/variants",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
         "contracts/api/api-inventory.v1.json"
       ]
     },
     {
-      "operationId": "getMyCreator",
+      "operationId": "listMembershipSubscriptions",
       "method": "GET",
-      "path": "/v1/creators/me",
-      "openapiPath": "/creators/me",
-      "domain": "creator_ip_mcn",
+      "path": "/v1/memberships/subscriptions",
+      "openapiPath": "/memberships/subscriptions",
+      "domain": "subscription_entitlement_payment",
       "status": "DISCOVERED",
       "featureIds": [],
       "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/creators/me",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/memberships/subscriptions",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
         "contracts/api/api-inventory.v1.json"
       ]
     },
     {
-      "operationId": "getMyCreatorApplication",
+      "operationId": "getSubscription",
       "method": "GET",
-      "path": "/v1/creator-applications",
-      "openapiPath": "/creator-applications",
-      "domain": "creator_ip_mcn",
+      "path": "/v1/memberships/subscriptions/{subscriptionId}",
+      "openapiPath": "/memberships/subscriptions/{subscriptionId}",
+      "domain": "subscription_entitlement_payment",
       "status": "DISCOVERED",
       "featureIds": [],
       "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/creator-applications",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/memberships/subscriptions/{subscriptionId}",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "previewSubscriptionPlanChange",
+      "method": "GET",
+      "path": "/v1/memberships/subscriptions/{subscriptionId}/change-plan-preview",
+      "openapiPath": "/memberships/subscriptions/{subscriptionId}/change-plan-preview",
+      "domain": "subscription_entitlement_payment",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/memberships/subscriptions/{subscriptionId}/change-plan-preview",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
         "contracts/api/api-inventory.v1.json"
@@ -1336,6 +1173,36 @@
       "featureIds": [],
       "schemaRef": "",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/notification-preferences",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "listNotifications",
+      "method": "GET",
+      "path": "/v1/notifications",
+      "openapiPath": "/notifications",
+      "domain": "notification",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/notifications",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "listOrganizationMembers",
+      "method": "GET",
+      "path": "/v1/organizations/{organizationId}/members",
+      "openapiPath": "/organizations/{organizationId}/members",
+      "domain": "creator_ip_mcn",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/organizations/{organizationId}/members",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
         "contracts/api/api-inventory.v1.json"
@@ -1417,6 +1284,21 @@
       ]
     },
     {
+      "operationId": "searchContent",
+      "method": "GET",
+      "path": "/v1/search",
+      "openapiPath": "/search",
+      "domain": "search_discovery",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/search",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
       "operationId": "getSearchSuggestions",
       "method": "GET",
       "path": "/v1/search/suggestions",
@@ -1447,15 +1329,15 @@
       ]
     },
     {
-      "operationId": "getSubscription",
+      "operationId": "resolveShare",
       "method": "GET",
-      "path": "/v1/memberships/subscriptions/{subscriptionId}",
-      "openapiPath": "/memberships/subscriptions/{subscriptionId}",
-      "domain": "subscription_entitlement_payment",
+      "path": "/v1/shares/{shareId}",
+      "openapiPath": "/shares/{shareId}",
+      "domain": "content",
       "status": "DISCOVERED",
       "featureIds": [],
       "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/memberships/subscriptions/{subscriptionId}",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/shares/{shareId}",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
         "contracts/api/api-inventory.v1.json"
@@ -1501,21 +1383,6 @@
       "featureIds": [],
       "schemaRef": "",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/users/{userId}",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
-      "operationId": "getUsersByUsernameUsername",
-      "method": "GET",
-      "path": "/v1/users/by-username/{username}",
-      "openapiPath": "/users/by-username/{username}",
-      "domain": "users_accounts",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/users/by-username/{username}",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
         "contracts/api/api-inventory.v1.json"
@@ -1582,270 +1449,30 @@
       ]
     },
     {
-      "operationId": "inviteIpMember",
-      "method": "POST",
-      "path": "/v1/ips/{ipId}/members",
-      "openapiPath": "/ips/{ipId}/members",
-      "domain": "creator_ip_mcn",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/ips/{ipId}/members",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
-      "operationId": "inviteOrganizationMember",
-      "method": "POST",
-      "path": "/v1/organizations/{organizationId}/members/invitations",
-      "openapiPath": "/organizations/{organizationId}/members/invitations",
-      "domain": "creator_ip_mcn",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/organizations/{organizationId}/members/invitations",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
-      "operationId": "like",
-      "method": "POST",
-      "path": "/v1/interactions/likes",
-      "openapiPath": "/interactions/likes",
-      "domain": "interaction",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/interactions/likes",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
-      "operationId": "listBlockedUsers",
+      "operationId": "getUsersByUsernameUsername",
       "method": "GET",
-      "path": "/v1/interactions/blocks",
-      "openapiPath": "/interactions/blocks",
-      "domain": "interaction",
+      "path": "/v1/users/by-username/{username}",
+      "openapiPath": "/users/by-username/{username}",
+      "domain": "users_accounts",
       "status": "DISCOVERED",
       "featureIds": [],
       "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/interactions/blocks",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/users/by-username/{username}",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
         "contracts/api/api-inventory.v1.json"
       ]
     },
     {
-      "operationId": "listComments",
+      "operationId": "getMe",
       "method": "GET",
-      "path": "/v1/contents/{contentId}/comments",
-      "openapiPath": "/contents/{contentId}/comments",
-      "domain": "interaction",
+      "path": "/v1/users/me",
+      "openapiPath": "/users/me",
+      "domain": "auth_identity",
       "status": "DISCOVERED",
       "featureIds": [],
       "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/contents/{contentId}/comments",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
-      "operationId": "listContentRevisions",
-      "method": "GET",
-      "path": "/v1/contents/{contentId}/revisions",
-      "openapiPath": "/contents/{contentId}/revisions",
-      "domain": "content",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/contents/{contentId}/revisions",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
-      "operationId": "listContents",
-      "method": "GET",
-      "path": "/v1/contents",
-      "openapiPath": "/contents",
-      "domain": "content",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/contents",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
-      "operationId": "listCreatorApplicationsForReview",
-      "method": "GET",
-      "path": "/v1/admin/creator-applications",
-      "openapiPath": "/admin/creator-applications",
-      "domain": "creator_ip_mcn",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/admin/creator-applications",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
-      "operationId": "listEntitlements",
-      "method": "GET",
-      "path": "/v1/entitlements",
-      "openapiPath": "/entitlements",
-      "domain": "subscription_entitlement_payment",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/entitlements",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
-      "operationId": "listIpContents",
-      "method": "GET",
-      "path": "/v1/ips/{ipId}/contents",
-      "openapiPath": "/ips/{ipId}/contents",
-      "domain": "creator_ip_mcn",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/ips/{ipId}/contents",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
-      "operationId": "listMediaVariants",
-      "method": "GET",
-      "path": "/v1/media/{mediaId}/variants",
-      "openapiPath": "/media/{mediaId}/variants",
-      "domain": "media",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/media/{mediaId}/variants",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
-      "operationId": "listMembershipSubscriptions",
-      "method": "GET",
-      "path": "/v1/memberships/subscriptions",
-      "openapiPath": "/memberships/subscriptions",
-      "domain": "subscription_entitlement_payment",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/memberships/subscriptions",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
-      "operationId": "listModerationCases",
-      "method": "GET",
-      "path": "/v1/admin/moderation",
-      "openapiPath": "/admin/moderation",
-      "domain": "audit_compliance",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/admin/moderation",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
-      "operationId": "listModerationQueue",
-      "method": "GET",
-      "path": "/v1/admin/moderation/queue",
-      "openapiPath": "/admin/moderation/queue",
-      "domain": "audit_compliance",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/admin/moderation/queue",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
-      "operationId": "listMutedUsers",
-      "method": "GET",
-      "path": "/v1/interactions/mutes",
-      "openapiPath": "/interactions/mutes",
-      "domain": "interaction",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/interactions/mutes",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
-      "operationId": "listNotifications",
-      "method": "GET",
-      "path": "/v1/notifications",
-      "openapiPath": "/notifications",
-      "domain": "notification",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/notifications",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
-      "operationId": "listOrganizationMembers",
-      "method": "GET",
-      "path": "/v1/organizations/{organizationId}/members",
-      "openapiPath": "/organizations/{organizationId}/members",
-      "domain": "creator_ip_mcn",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/organizations/{organizationId}/members",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
-      "operationId": "muteUser",
-      "method": "POST",
-      "path": "/v1/interactions/mutes",
-      "openapiPath": "/interactions/mutes",
-      "domain": "interaction",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/interactions/mutes",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/users/me",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
         "contracts/api/api-inventory.v1.json"
@@ -1906,6 +1533,21 @@
       "featureIds": [],
       "schemaRef": "",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#patch:/content/{contentId}",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "updateContent",
+      "method": "PATCH",
+      "path": "/v1/contents/{contentId}",
+      "openapiPath": "/contents/{contentId}",
+      "domain": "content",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#patch:/contents/{contentId}",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
         "contracts/api/api-inventory.v1.json"
@@ -1987,6 +1629,21 @@
       ]
     },
     {
+      "operationId": "batchUpdateNotifications",
+      "method": "PATCH",
+      "path": "/v1/notifications",
+      "openapiPath": "/notifications",
+      "domain": "notification",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#patch:/notifications",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
       "operationId": "patchPostsPostId",
       "method": "PATCH",
       "path": "/v1/posts/{postId}",
@@ -2017,15 +1674,30 @@
       ]
     },
     {
-      "operationId": "pauseSubscription",
-      "method": "POST",
-      "path": "/v1/memberships/subscriptions/{subscriptionId}/pause",
-      "openapiPath": "/memberships/subscriptions/{subscriptionId}/pause",
-      "domain": "subscription_entitlement_payment",
+      "operationId": "updateMe",
+      "method": "PATCH",
+      "path": "/v1/users/me",
+      "openapiPath": "/users/me",
+      "domain": "auth_identity",
       "status": "DISCOVERED",
       "featureIds": [],
       "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/memberships/subscriptions/{subscriptionId}/pause",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#patch:/users/me",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "exportMyAccountData",
+      "method": "POST",
+      "path": "/v1/account/data-export",
+      "openapiPath": "/account/data-export",
+      "domain": "audit_compliance",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/account/data-export",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
         "contracts/api/api-inventory.v1.json"
@@ -2107,6 +1779,36 @@
       ]
     },
     {
+      "operationId": "decideCreatorApplication",
+      "method": "POST",
+      "path": "/v1/admin/creator-applications",
+      "openapiPath": "/admin/creator-applications",
+      "domain": "creator_ip_mcn",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/admin/creator-applications",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "decideModerationCase",
+      "method": "POST",
+      "path": "/v1/admin/moderation/cases/{caseId}/decision",
+      "openapiPath": "/admin/moderation/cases/{caseId}/decision",
+      "domain": "audit_compliance",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/admin/moderation/cases/{caseId}/decision",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
       "operationId": "postAnalyticsBatch",
       "method": "POST",
       "path": "/v1/analytics/batch",
@@ -2137,6 +1839,21 @@
       ]
     },
     {
+      "operationId": "createAppeal",
+      "method": "POST",
+      "path": "/v1/appeals",
+      "openapiPath": "/appeals",
+      "domain": "audit_compliance",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/appeals",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
       "operationId": "postArticles",
       "method": "POST",
       "path": "/v1/articles",
@@ -2146,6 +1863,126 @@
       "featureIds": [],
       "schemaRef": "",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/articles",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "authCredentialAdd",
+      "method": "POST",
+      "path": "/v1/auth/credentials",
+      "openapiPath": "/auth/credentials",
+      "domain": "auth_identity",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/auth/credentials",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "authLogin",
+      "method": "POST",
+      "path": "/v1/auth/login",
+      "openapiPath": "/auth/login",
+      "domain": "auth_identity",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/auth/login",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "authLogout",
+      "method": "POST",
+      "path": "/v1/auth/logout",
+      "openapiPath": "/auth/logout",
+      "domain": "auth_identity",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/auth/logout",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "authPasswordChange",
+      "method": "POST",
+      "path": "/v1/auth/password/change",
+      "openapiPath": "/auth/password/change",
+      "domain": "auth_identity",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/auth/password/change",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "authPasswordResetConfirm",
+      "method": "POST",
+      "path": "/v1/auth/password/reset/confirm",
+      "openapiPath": "/auth/password/reset/confirm",
+      "domain": "auth_identity",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/auth/password/reset/confirm",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "authPasswordResetRequest",
+      "method": "POST",
+      "path": "/v1/auth/password/reset/request",
+      "openapiPath": "/auth/password/reset/request",
+      "domain": "auth_identity",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/auth/password/reset/request",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "authRefresh",
+      "method": "POST",
+      "path": "/v1/auth/refresh",
+      "openapiPath": "/auth/refresh",
+      "domain": "auth_identity",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/auth/refresh",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "authRegister",
+      "method": "POST",
+      "path": "/v1/auth/register",
+      "openapiPath": "/auth/register",
+      "domain": "auth_identity",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/auth/register",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
         "contracts/api/api-inventory.v1.json"
@@ -2287,6 +2124,21 @@
       ]
     },
     {
+      "operationId": "createShare",
+      "method": "POST",
+      "path": "/v1/content/{contentId}/shares",
+      "openapiPath": "/content/{contentId}/shares",
+      "domain": "content",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/content/{contentId}/shares",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
       "operationId": "postContentContentIdUnpublish",
       "method": "POST",
       "path": "/v1/content/{contentId}/unpublish",
@@ -2296,6 +2148,36 @@
       "featureIds": [],
       "schemaRef": "",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/content/{contentId}/unpublish",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "createContent",
+      "method": "POST",
+      "path": "/v1/contents",
+      "openapiPath": "/contents",
+      "domain": "content",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/contents",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "createComment",
+      "method": "POST",
+      "path": "/v1/contents/{contentId}/comments",
+      "openapiPath": "/contents/{contentId}/comments",
+      "domain": "interaction",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/contents/{contentId}/comments",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
         "contracts/api/api-inventory.v1.json"
@@ -2326,6 +2208,51 @@
       "featureIds": [],
       "schemaRef": "",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/contents/{contentId}/poll/votes",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "rollbackContentRevision",
+      "method": "POST",
+      "path": "/v1/contents/{contentId}/revisions/{revisionId}/rollback",
+      "openapiPath": "/contents/{contentId}/revisions/{revisionId}/rollback",
+      "domain": "content",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/contents/{contentId}/revisions/{revisionId}/rollback",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "transitionContentState",
+      "method": "POST",
+      "path": "/v1/contents/{contentId}/state",
+      "openapiPath": "/contents/{contentId}/state",
+      "domain": "content",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/contents/{contentId}/state",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "applyForCreator",
+      "method": "POST",
+      "path": "/v1/creator-applications",
+      "openapiPath": "/creator-applications",
+      "domain": "creator_ip_mcn",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/creator-applications",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
         "contracts/api/api-inventory.v1.json"
@@ -2392,6 +2319,21 @@
       ]
     },
     {
+      "operationId": "checkEntitlement",
+      "method": "POST",
+      "path": "/v1/entitlements/check",
+      "openapiPath": "/entitlements/check",
+      "domain": "subscription_entitlement_payment",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/entitlements/check",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
       "operationId": "postGalleries",
       "method": "POST",
       "path": "/v1/galleries",
@@ -2407,6 +2349,51 @@
       ]
     },
     {
+      "operationId": "blockUser",
+      "method": "POST",
+      "path": "/v1/interactions/blocks",
+      "openapiPath": "/interactions/blocks",
+      "domain": "interaction",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/interactions/blocks",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "like",
+      "method": "POST",
+      "path": "/v1/interactions/likes",
+      "openapiPath": "/interactions/likes",
+      "domain": "interaction",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/interactions/likes",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "muteUser",
+      "method": "POST",
+      "path": "/v1/interactions/mutes",
+      "openapiPath": "/interactions/mutes",
+      "domain": "interaction",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/interactions/mutes",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
       "operationId": "postIpAssets",
       "method": "POST",
       "path": "/v1/ip/assets",
@@ -2416,6 +2403,36 @@
       "featureIds": [],
       "schemaRef": "",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/ip/assets",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "createIp",
+      "method": "POST",
+      "path": "/v1/ips",
+      "openapiPath": "/ips",
+      "domain": "creator_ip_mcn",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/ips",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "inviteIpMember",
+      "method": "POST",
+      "path": "/v1/ips/{ipId}/members",
+      "openapiPath": "/ips/{ipId}/members",
+      "domain": "creator_ip_mcn",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/ips/{ipId}/members",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
         "contracts/api/api-inventory.v1.json"
@@ -2452,6 +2469,21 @@
       ]
     },
     {
+      "operationId": "createMedia",
+      "method": "POST",
+      "path": "/v1/media",
+      "openapiPath": "/media",
+      "domain": "media",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/media",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
       "operationId": "postMediaMediaIdProcess",
       "method": "POST",
       "path": "/v1/media/{mediaId}/process",
@@ -2482,6 +2514,160 @@
       ]
     },
     {
+      "operationId": "completeUpload",
+      "method": "POST",
+      "path": "/v1/media/uploads/{uploadId}/complete",
+      "openapiPath": "/media/uploads/{uploadId}/complete",
+      "domain": "media",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/media/uploads/{uploadId}/complete",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "createSubscription",
+      "method": "POST",
+      "path": "/v1/memberships/subscriptions",
+      "openapiPath": "/memberships/subscriptions",
+      "domain": "subscription_entitlement_payment",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/memberships/subscriptions",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "cancelSubscription",
+      "method": "POST",
+      "path": "/v1/memberships/subscriptions/{subscriptionId}/cancel",
+      "openapiPath": "/memberships/subscriptions/{subscriptionId}/cancel",
+      "domain": "subscription_entitlement_payment",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/memberships/subscriptions/{subscriptionId}/cancel",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "changeSubscriptionPlan",
+      "method": "POST",
+      "path": "/v1/memberships/subscriptions/{subscriptionId}/change-plan",
+      "openapiPath": "/memberships/subscriptions/{subscriptionId}/change-plan",
+      "domain": "subscription_entitlement_payment",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/memberships/subscriptions/{subscriptionId}/change-plan",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "checkoutSubscriptionPlanUpgrade",
+      "method": "POST",
+      "path": "/v1/memberships/subscriptions/{subscriptionId}/change-plan/checkout",
+      "openapiPath": "/memberships/subscriptions/{subscriptionId}/change-plan/checkout",
+      "domain": "subscription_entitlement_payment",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/memberships/subscriptions/{subscriptionId}/change-plan/checkout",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json",
+        "contracts/api/commerce-operation-policy.v1.json"
+      ]
+    },
+    {
+      "operationId": "scheduleSubscriptionBillingIntervalChange",
+      "method": "POST",
+      "path": "/v1/memberships/subscriptions/{subscriptionId}/change-plan/interval-schedule",
+      "openapiPath": "/memberships/subscriptions/{subscriptionId}/change-plan/interval-schedule",
+      "domain": "subscription_entitlement_payment",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/memberships/subscriptions/{subscriptionId}/change-plan/interval-schedule",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json",
+        "contracts/api/commerce-operation-policy.v1.json"
+      ]
+    },
+    {
+      "operationId": "scheduleSubscriptionPlanDowngrade",
+      "method": "POST",
+      "path": "/v1/memberships/subscriptions/{subscriptionId}/change-plan/schedule",
+      "openapiPath": "/memberships/subscriptions/{subscriptionId}/change-plan/schedule",
+      "domain": "subscription_entitlement_payment",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/memberships/subscriptions/{subscriptionId}/change-plan/schedule",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json",
+        "contracts/api/commerce-operation-policy.v1.json"
+      ]
+    },
+    {
+      "operationId": "pauseSubscription",
+      "method": "POST",
+      "path": "/v1/memberships/subscriptions/{subscriptionId}/pause",
+      "openapiPath": "/memberships/subscriptions/{subscriptionId}/pause",
+      "domain": "subscription_entitlement_payment",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/memberships/subscriptions/{subscriptionId}/pause",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "resumeSubscription",
+      "method": "POST",
+      "path": "/v1/memberships/subscriptions/{subscriptionId}/resume",
+      "openapiPath": "/memberships/subscriptions/{subscriptionId}/resume",
+      "domain": "subscription_entitlement_payment",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/memberships/subscriptions/{subscriptionId}/resume",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "startSubscriptionTrial",
+      "method": "POST",
+      "path": "/v1/memberships/subscriptions/trial",
+      "openapiPath": "/memberships/subscriptions/trial",
+      "domain": "subscription_entitlement_payment",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/memberships/subscriptions/trial",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json",
+        "contracts/api/commerce-operation-policy.v1.json"
+      ]
+    },
+    {
       "operationId": "postNotificationsNotificationIdRead",
       "method": "POST",
       "path": "/v1/notifications/{notificationId}/read",
@@ -2506,6 +2692,51 @@
       "featureIds": [],
       "schemaRef": "",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/notifications/read-all",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "createOrganization",
+      "method": "POST",
+      "path": "/v1/organizations",
+      "openapiPath": "/organizations",
+      "domain": "creator_ip_mcn",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/organizations",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "changeOrganizationMemberRole",
+      "method": "POST",
+      "path": "/v1/organizations/{organizationId}/members/{memberId}/role",
+      "openapiPath": "/organizations/{organizationId}/members/{memberId}/role",
+      "domain": "creator_ip_mcn",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/organizations/{organizationId}/members/{memberId}/role",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "inviteOrganizationMember",
+      "method": "POST",
+      "path": "/v1/organizations/{organizationId}/members/invitations",
+      "openapiPath": "/organizations/{organizationId}/members/invitations",
+      "domain": "creator_ip_mcn",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/organizations/{organizationId}/members/invitations",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
         "contracts/api/api-inventory.v1.json"
@@ -2572,6 +2803,36 @@
       ]
     },
     {
+      "operationId": "createReport",
+      "method": "POST",
+      "path": "/v1/reports",
+      "openapiPath": "/reports",
+      "domain": "audit_compliance",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/reports",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "follow",
+      "method": "POST",
+      "path": "/v1/social/follows",
+      "openapiPath": "/social/follows",
+      "domain": "interaction",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/social/follows",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
       "operationId": "postSubscriptions",
       "method": "POST",
       "path": "/v1/subscriptions",
@@ -2581,6 +2842,21 @@
       "featureIds": [],
       "schemaRef": "",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/subscriptions",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "transitionAccountState",
+      "method": "POST",
+      "path": "/v1/users/{userId}/account-state",
+      "openapiPath": "/users/{userId}/account-state",
+      "domain": "users_accounts",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/users/{userId}/account-state",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
         "contracts/api/api-inventory.v1.json"
@@ -2602,276 +2878,36 @@
       ]
     },
     {
-      "operationId": "previewSubscriptionPlanChange",
-      "method": "GET",
-      "path": "/v1/memberships/subscriptions/{subscriptionId}/change-plan-preview",
-      "openapiPath": "/memberships/subscriptions/{subscriptionId}/change-plan-preview",
-      "domain": "subscription_entitlement_payment",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/memberships/subscriptions/{subscriptionId}/change-plan-preview",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
-      "operationId": "removeIpMember",
-      "method": "DELETE",
-      "path": "/v1/ips/{ipId}/members",
-      "openapiPath": "/ips/{ipId}/members",
-      "domain": "creator_ip_mcn",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#delete:/ips/{ipId}/members",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
-      "operationId": "removeOrganizationMember",
-      "method": "DELETE",
-      "path": "/v1/organizations/{organizationId}/members/{memberId}",
-      "openapiPath": "/organizations/{organizationId}/members/{memberId}",
-      "domain": "creator_ip_mcn",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#delete:/organizations/{organizationId}/members/{memberId}",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
-      "operationId": "resolveShare",
-      "method": "GET",
-      "path": "/v1/shares/{shareId}",
-      "openapiPath": "/shares/{shareId}",
-      "domain": "content",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/shares/{shareId}",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
-      "operationId": "resumeSubscription",
-      "method": "POST",
-      "path": "/v1/memberships/subscriptions/{subscriptionId}/resume",
-      "openapiPath": "/memberships/subscriptions/{subscriptionId}/resume",
-      "domain": "subscription_entitlement_payment",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/memberships/subscriptions/{subscriptionId}/resume",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
-      "operationId": "rollbackContentRevision",
-      "method": "POST",
-      "path": "/v1/contents/{contentId}/revisions/{revisionId}/rollback",
-      "openapiPath": "/contents/{contentId}/revisions/{revisionId}/rollback",
-      "domain": "content",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/contents/{contentId}/revisions/{revisionId}/rollback",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
-      "operationId": "scheduleSubscriptionPlanDowngrade",
-      "method": "POST",
-      "path": "/v1/memberships/subscriptions/{subscriptionId}/change-plan/schedule",
-      "openapiPath": "/memberships/subscriptions/{subscriptionId}/change-plan/schedule",
-      "domain": "subscription_entitlement_payment",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/memberships/subscriptions/{subscriptionId}/change-plan/schedule",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json",
-        "contracts/api/commerce-operation-policy.v1.json"
-      ]
-    },
-    {
-      "operationId": "searchContent",
-      "method": "GET",
-      "path": "/v1/search",
-      "openapiPath": "/search",
-      "domain": "search_discovery",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/search",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
-      "operationId": "startSubscriptionTrial",
-      "method": "POST",
-      "path": "/v1/memberships/subscriptions/trial",
-      "openapiPath": "/memberships/subscriptions/trial",
-      "domain": "subscription_entitlement_payment",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/memberships/subscriptions/trial",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json",
-        "contracts/api/commerce-operation-policy.v1.json"
-      ]
-    },
-    {
-      "operationId": "transitionAccountState",
-      "method": "POST",
-      "path": "/v1/users/{userId}/account-state",
-      "openapiPath": "/users/{userId}/account-state",
-      "domain": "users_accounts",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/users/{userId}/account-state",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
-      "operationId": "transitionContentState",
-      "method": "POST",
-      "path": "/v1/contents/{contentId}/state",
-      "openapiPath": "/contents/{contentId}/state",
-      "domain": "content",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/contents/{contentId}/state",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
-      "operationId": "unblockUser",
-      "method": "DELETE",
-      "path": "/v1/interactions/blocks/{targetUserId}",
-      "openapiPath": "/interactions/blocks/{targetUserId}",
-      "domain": "interaction",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#delete:/interactions/blocks/{targetUserId}",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
-      "operationId": "unfollow",
-      "method": "DELETE",
-      "path": "/v1/social/follows",
-      "openapiPath": "/social/follows",
-      "domain": "interaction",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#delete:/social/follows",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
-      "operationId": "unlike",
-      "method": "DELETE",
-      "path": "/v1/interactions/likes",
-      "openapiPath": "/interactions/likes",
-      "domain": "interaction",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#delete:/interactions/likes",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
-      "operationId": "unmuteUser",
-      "method": "DELETE",
-      "path": "/v1/interactions/mutes/{targetUserId}",
-      "openapiPath": "/interactions/mutes/{targetUserId}",
-      "domain": "interaction",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#delete:/interactions/mutes/{targetUserId}",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
-      "operationId": "updateContent",
-      "method": "PATCH",
-      "path": "/v1/contents/{contentId}",
-      "openapiPath": "/contents/{contentId}",
-      "domain": "content",
-      "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#patch:/contents/{contentId}",
-      "sourceRefs": [
-        "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
-      ]
-    },
-    {
-      "operationId": "updateMe",
-      "method": "PATCH",
-      "path": "/v1/users/me",
-      "openapiPath": "/users/me",
+      "operationId": "authCredentialReplace",
+      "method": "PUT",
+      "path": "/v1/auth/credentials/{credentialId}",
+      "openapiPath": "/auth/credentials/{credentialId}",
       "domain": "auth_identity",
       "status": "DISCOVERED",
       "featureIds": [],
       "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#patch:/users/me",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#put:/auth/credentials/{credentialId}",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
         "contracts/api/api-inventory.v1.json"
       ]
     },
     {
-      "operationId": "scheduleSubscriptionBillingIntervalChange",
-      "method": "POST",
-      "path": "/v1/memberships/subscriptions/{subscriptionId}/change-plan/interval-schedule",
-      "openapiPath": "/memberships/subscriptions/{subscriptionId}/change-plan/interval-schedule",
-      "domain": "subscription_entitlement_payment",
+      "operationId": "upsertPushEndpoint",
+      "method": "PUT",
+      "path": "/v1/push/endpoints/{installationId}",
+      "openapiPath": "/push/endpoints/{installationId}",
+      "domain": "notification",
       "status": "DISCOVERED",
-      "featureIds": [],
+      "featureIds": [
+        "NOTIFY-002"
+      ],
       "schemaRef": "",
-      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/memberships/subscriptions/{subscriptionId}/change-plan/interval-schedule",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#put:/push/endpoints/{installationId}",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
         "contracts/api/api-inventory.v1.json",
-        "contracts/api/commerce-operation-policy.v1.json"
+        "contracts/api/notification-operation-policy.v1.json"
       ]
     }
   ]
