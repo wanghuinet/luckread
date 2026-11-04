@@ -87,13 +87,13 @@
       ],
       "evidence": {
         "openapi": "PASS",
-        "permission": "CONTRACTED",
-        "state": "PRESENT",
-        "resource": "BOUNDED",
-        "cache": "NO_STORE",
-        "antiAbuse": "PRESENT",
-        "integration": "PENDING",
-        "securityE2E": "PENDING"
+        "permission": "PASS",
+        "state": "MISSING",
+        "resource": "PASS",
+        "cache": "PASS",
+        "antiAbuse": "PASS",
+        "integration": "MISSING",
+        "securityE2E": "MISSING"
       }
     },
     {
@@ -168,13 +168,13 @@
       ],
       "evidence": {
         "openapi": "PASS",
-        "permission": "CONTRACTED",
-        "state": "PRESENT",
-        "resource": "BOUNDED",
-        "cache": "NO_STORE",
-        "antiAbuse": "PRESENT",
-        "integration": "PENDING",
-        "securityE2E": "PENDING"
+        "permission": "PASS",
+        "state": "MISSING",
+        "resource": "PASS",
+        "cache": "PASS",
+        "antiAbuse": "PASS",
+        "integration": "MISSING",
+        "securityE2E": "MISSING"
       }
     }
   ]
