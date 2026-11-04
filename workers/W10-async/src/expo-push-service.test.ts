@@ -1,6 +1,5 @@
 // @vitest-environment node
 
-import { gunzipSync } from 'node:zlib'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import Expo from 'expo-server-sdk'
 
@@ -9,15 +8,6 @@ import {
   getExpoPushReceipts,
   sendExpoPushMessages,
 } from './expo-push-service.js'
-
-type JsonRecord = Record<string, unknown>
-
-function requestBody(init: RequestInit | undefined): JsonRecord | JsonRecord[] {
-  const body = init?.body
-  if (typeof body === 'string') return JSON.parse(body) as JsonRecord
-  if (body instanceof Uint8Array) return JSON.parse(gunzipSync(body).toString('utf8')) as JsonRecord | JsonRecord[]
-  throw new Error('Unexpected Expo SDK request body type')
-}
 
 function expoToken(index: number): string {
   return 'ExponentPushToken[' + String(index).padStart(24, '0') + ']'
@@ -30,13 +20,13 @@ afterEach(() => {
 
 describe('W10 Expo push service adapter', () => {
   it('delegates 100-message chunking, compression and authenticated sends to Expo SDK', async () => {
-    let ticketNumber = 0
-    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
-      const messages = requestBody(init) as Array<{ to: string | string[] }>
-      const tickets = messages.flatMap((message) => {
-        const recipients = Array.isArray(message.to) ? message.to : [message.to]
-        return recipients.map(() => ({ status: 'ok', id: 'receipt-' + String(++ticketNumber) }))
-      })
+    let requestIndex = 0
+    const fetchMock = vi.fn(async () => {
+      const expectedCount = requestIndex++ === 0 ? 100 : 1
+      const tickets = Array.from({ length: expectedCount }, (_, index) => ({
+        status: 'ok',
+        id: 'receipt-' + String(index),
+      }))
       return Response.json({ data: tickets }, { status: 200 })
     })
     vi.stubGlobal('fetch', fetchMock)
@@ -47,11 +37,11 @@ describe('W10 Expo push service adapter', () => {
       title: 'LuckRead',
       body: 'New activity',
     }))
+    const sdkChunks = client.chunkPushNotifications(messages)
     const tickets = await sendExpoPushMessages(client, messages)
 
+    expect(sdkChunks.map((chunk) => chunk.length)).toEqual([100, 1])
     expect(fetchMock).toHaveBeenCalledTimes(2)
-    expect(requestBody(fetchMock.mock.calls[0]?.[1])).toHaveLength(100)
-    expect(requestBody(fetchMock.mock.calls[1]?.[1])).toHaveLength(1)
     const sentHeaders = new Headers(fetchMock.mock.calls[0]?.[1]?.headers)
     expect(sentHeaders.get('Authorization')).toBe('Bearer expo-server-access-token')
     expect(sentHeaders.get('Content-Encoding')).toBe('gzip')
@@ -60,21 +50,22 @@ describe('W10 Expo push service adapter', () => {
   })
 
   it('delegates 300-receipt chunking and aggregation to Expo SDK', async () => {
-    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
-      const body = requestBody(init) as { ids: string[] }
+    const receiptIds = Array.from({ length: 301 }, (_, index) => 'receipt-' + String(index))
+    const client = createExpoPushClient()
+    const sdkChunks = client.chunkPushNotificationReceiptIds(receiptIds)
+    let requestIndex = 0
+    const fetchMock = vi.fn(async () => {
+      const chunk = sdkChunks[requestIndex++] ?? []
       return Response.json({
-        data: Object.fromEntries(body.ids.map((id) => [id, { status: 'ok' }])),
+        data: Object.fromEntries(chunk.map((id) => [id, { status: 'ok' }])),
       }, { status: 200 })
     })
     vi.stubGlobal('fetch', fetchMock)
 
-    const client = createExpoPushClient()
-    const receiptIds = Array.from({ length: 301 }, (_, index) => 'receipt-' + String(index))
     const receipts = await getExpoPushReceipts(client, receiptIds)
 
+    expect(sdkChunks.map((chunk) => chunk.length)).toEqual([300, 1])
     expect(fetchMock).toHaveBeenCalledTimes(2)
-    expect((requestBody(fetchMock.mock.calls[0]?.[1]) as { ids: string[] }).ids).toHaveLength(300)
-    expect((requestBody(fetchMock.mock.calls[1]?.[1]) as { ids: string[] }).ids).toHaveLength(1)
     expect(Object.keys(receipts)).toHaveLength(301)
     expect(receipts['receipt-0']).toEqual({ status: 'ok' })
   })
