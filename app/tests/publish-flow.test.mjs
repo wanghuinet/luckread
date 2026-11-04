@@ -172,8 +172,8 @@ test('native composer reuses Gorhom bottom sheet for camera and photo-library me
   expect(mediaActionSheet).toContain('remainingCount');
   expect(mediaActionSheet).toContain("dismissForAction('camera')");
   expect(mediaActionSheet).toContain("dismissForAction('library')");
-  expect(mediaActionSheet).toContain("pendingActionRef.current === 'camera'");
-  expect(mediaActionSheet).toContain("pendingActionRef.current === 'library'");
+  expect(mediaActionSheet).toContain("pendingAction === 'camera'");
+  expect(mediaActionSheet).toContain("pendingAction === 'library'");
   expect(mediaActionSheet).toContain('onDismiss={handleDismiss}');
   expect(mediaActionSheet).toContain('Take photo');
   expect(mediaActionSheet).toContain('Choose from library');
