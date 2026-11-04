@@ -69,7 +69,9 @@
         "required": true,
         "naturalKey": "ownerUserId:installationId:operation",
         "header": "Idempotency-Key",
-        "duplicateResult": "EXACT_SEMANTIC_REPLAY"
+        "pattern": "^[A-Za-z0-9_-]{1,128}$",
+        "eventId": "evt_push_endpoint_sha256(UTF-8(JSON.stringify([userId, installationId, operation, idempotencyKey])))",
+        "duplicateResult": "W06 exact semantic intent replay returns 200; changed actor/target/operation/platform/permission facts return 409"
       },
       "state": {
         "required": [
@@ -84,7 +86,8 @@
         "push_token_never_returned",
         "push_token_never_logged",
         "denied_permission_clears_token",
-        "cross_d1_reference_only"
+        "cross_d1_reference_only",
+        "w06_intent_audit_before_w05_mutation"
       ],
       "evidence": {
         "openapi": "PASS",
@@ -154,7 +157,9 @@
         "required": true,
         "naturalKey": "ownerUserId:installationId:operation",
         "header": "Idempotency-Key",
-        "duplicateResult": "EXACT_SEMANTIC_REPLAY"
+        "pattern": "^[A-Za-z0-9_-]{1,128}$",
+        "eventId": "evt_push_endpoint_sha256(UTF-8(JSON.stringify([userId, installationId, operation, idempotencyKey])))",
+        "duplicateResult": "W06 exact semantic intent replay returns 200; changed actor/target/operation/platform/permission facts return 409"
       },
       "state": {
         "required": [
@@ -167,7 +172,8 @@
         "actor_server_derived",
         "owner_scoped_delete",
         "installation_id_not_trusted_device",
-        "no_auth_session_revocation"
+        "no_auth_session_revocation",
+        "w06_intent_audit_before_w05_mutation"
       ],
       "evidence": {
         "openapi": "PASS",
