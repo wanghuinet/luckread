@@ -137,6 +137,20 @@ test('native composer previews attached videos before publishing and preserves p
 });
 
 
+test('native composer displays a sortable X-style attachment grid and preserves the selected media order', () => {
+  expect(composer).toContain("import Sortable from 'react-native-sortables';");
+  expect(composer).toContain('<Sortable.Grid');
+  expect(composer).toContain('columns={assets.length === 1 ? 1 : 2}');
+  expect(composer).toContain('data={assets}');
+  expect(composer).toContain('keyExtractor={(asset) => asset.localId}');
+  expect(composer).toContain('renderItem={renderComposerAsset}');
+  expect(composer).toContain('onDragEnd={({ data }) => setAssets(data)}');
+  expect(composer).toContain('sortEnabled={!busy && !publishPending && assets.length > 1}');
+  expect(composer).toContain('customHandle');
+  expect(composer).toContain('const mediaRefs = Array.from(new Set(assets.map((asset) => asset.serverUrl)))');
+  expect(composer).not.toContain('{assets.map((asset) => (');
+});
+
 test('Keyboard Controller keeps the publish header stable and scrolls focused editor fields above the keyboard', () => {
   expect(composer).toContain("from 'react-native-keyboard-controller'");
   expect(composer).toContain('<KeyboardProvider preload={false}>');
