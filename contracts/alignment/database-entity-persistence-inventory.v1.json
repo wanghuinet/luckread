@@ -112,7 +112,7 @@
       "domainId": "D1-03",
       "entityStatus": "PROPOSED",
       "implementationRef": "workers/W05-social/src/push-endpoint-runtime.ts",
-      "persistenceStatus": "CONTRACTED_NOT_VERIFIED",
+      "persistenceStatus": "NOT_VERIFIED",
       "adapter": "Cloudflare D1 / W09 D1-03 schema owner; W05 scoped D1_03 writer delegation",
       "migrationRefs": [
         "workers/W09-platform/migrations-d1-03/0001_notification_push_endpoints.sql"
