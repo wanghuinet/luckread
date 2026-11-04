@@ -18,7 +18,7 @@ Accordingly, this slice keeps notification delivery inside the existing W05 noti
 - W05 reads only active endpoints belonging to the persisted W05 notification recipient (maximum 20 rows) and may conditionally clear only the exact token hash that Expo reported as `DeviceNotRegistered`; this is governed by `contracts/transport/W05-W09-notification-push-delivery.v1.json`. W09 remains the primary endpoint owner.
 - Expo tokens are never returned through public APIs, logged, copied into Workflow results, or included in error messages.
 - Push payloads contain only the notification ID and stable target references. Taps continue to open the in-app notification inbox; no untrusted URL is accepted.
-- Delivery is at-least-once. Stable notification IDs, endpoint-scoped idempotency, leases, Expo receipts, bounded retry and invalid-token deactivation mitigate duplicates and stale endpoints.
+- Delivery is at-least-once. Stable notification IDs, endpoint-scoped idempotency, leases, Expo receipts, bounded retry and invalid-token deactivation mitigate duplicates and stale endpoints. An Expo `ok` receipt is recorded as `PROVIDER_ACCEPTED`; it confirms provider acceptance, not that the operating system displayed the notification to the user.
 
 ## Activation and deployment gates
 
