@@ -1130,7 +1130,7 @@ paths:
             items:
               type: string
               format: uri
-              pattern: '^https://(img|video)\\.luckread\\.com/.+'
+              pattern: '^https://(img|video)\.luckread\.com/.+'
       responses:
         '200':
           description: Only authorized published media descriptions; unauthorized or unreferenced URLs are omitted.
