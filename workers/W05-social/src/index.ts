@@ -31,6 +31,11 @@ import {
   setNotificationPreferences,
   syncSocialTokens,
 } from './social-closure-runtime.js'
+import {
+  PushEndpointRuntimeError,
+  deletePushEndpoint,
+  upsertPushEndpoint,
+} from './push-endpoint-runtime.js'
 import { castContentPollVote, configureContentPoll, deleteContentPoll, getContentPoll, SocialPollError } from './poll-runtime.js'
 import {
   FollowRuntimeError,
@@ -47,6 +52,7 @@ type RateLimitBinding = { limit(input: { key: string }): Promise<{ success: bool
 
 interface Env {
   DB: D1Database
+  D1_03?: D1Database
   W03_CONTENT?: W03ContentBinding
   SOCIAL_READ_LIMITER?: RateLimitBinding
   SOCIAL_WRITE_LIMITER?: RateLimitBinding
@@ -586,6 +592,27 @@ export default {
         })
       }
 
+      const pushEndpointMatch = /^\\/internal\\/social\\/push-endpoints\\/([^/]+)$/.exec(url.pathname)
+      if (pushEndpointMatch) {
+        const actorUserId = requirePrincipal(request)
+        requireInteractionLayer(request)
+        const installationId = decodePathPart(pushEndpointMatch[1])
+        if (installationId === null) throw new PushEndpointRuntimeError('VALIDATION_FAILED', 400)
+        if (request.method === 'PUT') {
+          let body: unknown
+          try { body = await request.json() } catch {
+            throw new PushEndpointRuntimeError('VALIDATION_FAILED', 400)
+          }
+          const data = await upsertPushEndpoint(env.D1_03, actorUserId, installationId, body)
+          return json({ data, requestId: createRequestId() })
+        }
+        if (request.method === 'DELETE') {
+          await deletePushEndpoint(env.D1_03, actorUserId, installationId)
+          return new Response(null, { status: 204 })
+        }
+        return new Response(null, { status: 405, headers: { Allow: 'PUT, DELETE' } })
+      }
+
       if (url.pathname === '/internal/social/notifications') {
         if (request.method !== 'GET') return new Response(null, { status: 405, headers: { Allow: 'GET' } })
         const actorUserId = requirePrincipal(request)
@@ -1123,6 +1150,7 @@ export default {
       })
     } catch (error) {
       if (
+        error instanceof PushEndpointRuntimeError ||
         error instanceof SocialPollError ||
         error instanceof FollowRuntimeError ||
         error instanceof LikeRuntimeError ||
