@@ -199,7 +199,7 @@ async function deactivateInvalidEndpoint(endpointDb: D1Database, task: ClaimedDe
     "UPDATE notification_push_endpoints SET permission_status = 'undetermined', push_token = NULL, " +
     'updated_at = ?, last_seen_at = ? WHERE endpoint_id = ? AND owner_user_id = ? ' +
     "AND provider = 'expo' AND push_token = ?",
-  ).bind(now.toISOString(), now.toISOString(), task.endpointId, task.recipientUserId, task.pushToken).run()
+  ).bind(now.toISOString(), task.endpointId, task.recipientUserId, task.pushToken).run()
 }
 
 async function scheduleDeliveryRetry(
@@ -329,8 +329,8 @@ async function applyReceipt(
     if (endpoint?.push_token && await hashPushToken(endpoint.push_token) === task.pushTokenHash) {
       await endpointDb.prepare(
         "UPDATE notification_push_endpoints SET permission_status = 'undetermined', push_token = NULL, " +
-        'updated_at = ?, last_seen_at = ? WHERE endpoint_id = ? AND owner_user_id = ? AND provider = ? AND push_token = ?',
-      ).bind(now.toISOString(), now.toISOString(), task.endpointId, task.recipientUserId, 'expo', endpoint.push_token).run()
+        'updated_at = ? WHERE endpoint_id = ? AND owner_user_id = ? AND provider = ? AND push_token = ?',
+      ).bind(now.toISOString(), task.endpointId, task.recipientUserId, 'expo', endpoint.push_token).run()
     }
   }
   const canRetry = isRetryableExpoError(errorCode) && task.attemptCount < MAX_SEND_ATTEMPTS
