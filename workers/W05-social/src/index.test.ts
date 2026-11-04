@@ -1942,7 +1942,7 @@ describe('W05 social poll transport', () => {
     })
   })
 
-  it('deletes only the current user's push endpoint from D1-03', async () => {
+  it("deletes only the current user's push endpoint from D1-03", async () => {
     const d1_03 = dbFor()
     const response = await worker.fetch(
       new Request('https://luckread-w05.internal/internal/social/push-endpoints/6b6d9f5a-4e61-4c50-9d17-9e97f36e6e3c', {
