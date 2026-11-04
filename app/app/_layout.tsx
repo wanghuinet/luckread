@@ -72,17 +72,41 @@ export default function RootLayout() {
   useEffect(() => {
     if (status !== 'authenticated' || !userId || Platform.OS === 'web') return;
 
+    let active = true;
+    let syncInFlight = false;
+    let syncQueued = false;
     const syncPushEndpoint = () => {
+      if (!active) return;
+      if (syncInFlight) {
+        syncQueued = true;
+        return;
+      }
+      syncInFlight = true;
       // Permission reconciliation never displays a system prompt.
-      void syncPushEndpointForAuthenticatedUser(userId).catch(() => undefined);
+      void syncPushEndpointForAuthenticatedUser(userId)
+        .catch(() => undefined)
+        .finally(() => {
+          syncInFlight = false;
+          if (active && syncQueued) {
+            syncQueued = false;
+            syncPushEndpoint();
+          }
+        });
     };
 
     syncPushEndpoint();
-    const subscription = AppState.addEventListener('change', (nextState) => {
+    const appStateSubscription = AppState.addEventListener('change', (nextState) => {
       if (nextState === 'active') syncPushEndpoint();
     });
+    const tokenSubscription = Notifications.addPushTokenListener(() => {
+      syncPushEndpoint();
+    });
 
-    return () => subscription.remove();
+    return () => {
+      active = false;
+      appStateSubscription.remove();
+      tokenSubscription.remove();
+    };
   }, [status, userId]);
 
   useEffect(() => {
