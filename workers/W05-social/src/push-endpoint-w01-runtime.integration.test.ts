@@ -6,7 +6,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const bridge = vi.hoisted(() => ({
   w05Fetch: vi.fn(),
-  cloudflareContext: vi.fn(),
   resolvePrincipal: vi.fn(),
   authorize: vi.fn(),
   audit: vi.fn(),
@@ -22,15 +21,16 @@ const bridge = vi.hoisted(() => ({
 // Keep the real W01 W05 client and its transport-header/response-relay code.
 // Only the platform-provided binding lookup is substituted so it points at the
 // actual W05 Worker fetch entrypoint inside this local integration test.
-vi.mock('@opennextjs/cloudflare', () => ({
-  getCloudflareContext: bridge.cloudflareContext,
-}))
-
 vi.mock('../../W01-payload/src/social/w05-social-client.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../W01-payload/src/social/w05-social-client.js')>()
+  const { createW05SocialCaller } = await import('../../W01-payload/src/social/w05-social-transport.js')
+  const callW05Social = createW05SocialCaller(async () => ({
+    fetch: (input: RequestInfo | URL, init?: RequestInit) => bridge.w05Fetch(input, init),
+  }))
   return {
     ...actual,
     resolveSocialPrincipal: bridge.resolvePrincipal,
+    callW05Social,
   }
 })
 
@@ -115,7 +115,6 @@ async function expectRouteStatus(response: Response, expected: number): Promise<
       resolvePrincipal: bridge.resolvePrincipal.mock.calls.length,
       authorize: bridge.authorize.mock.calls.length,
       audit: bridge.audit.mock.calls.length,
-      cloudflareContext: bridge.cloudflareContext.mock.calls.length,
       w05: bridge.w05Fetch.mock.calls.length,
     },
   })).toBe(expected)
@@ -126,13 +125,6 @@ describe('W01 to W05 push endpoint service-binding integration', () => {
     d1 = createD1Sqlite()
     vi.clearAllMocks()
     bridge.resolvePrincipal.mockResolvedValue(principal)
-    bridge.cloudflareContext.mockResolvedValue({
-      env: {
-        W05_SOCIAL: {
-          fetch: (input: RequestInfo | URL, init?: RequestInit) => bridge.w05Fetch(input, init),
-        },
-      },
-    })
     bridge.authorize.mockImplementation(async (request: Request) => {
       const body = await request.clone().json() as Record<string, unknown>
       return Response.json({
