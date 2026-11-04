@@ -69,7 +69,9 @@ test('edit and delete controls are only shown for the authenticated owner and us
 });
 
 test('successful publishing confirms success and offers a direct link to the published post', () => {
-  expect(composer).toContain("Alert.alert('发布成功', '你的动态已发布，现在可以在公开信息流中查看。'");
+  expect(composer).toContain("Alert.alert('发布成功', socialSyncWarning");
+  expect(composer).toContain("'你的动态已发布，现在可以在公开信息流中查看。'");
+  expect(composer).toContain("'你的动态已发布，但 @提及和 #话题同步暂时失败；之后编辑动态可以重试同步。'");
   expect(composer).toContain("text: '查看动态'");
   expect(composer).toContain("('/post/' + encodeURIComponent(publishedId))");
   expect(composer).toContain("('/?published=' + encodeURIComponent(publishedId) + '&refresh=' + Date.now())");
