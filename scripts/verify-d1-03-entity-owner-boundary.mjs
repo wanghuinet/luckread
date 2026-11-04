@@ -50,5 +50,7 @@ for (const rule of contract.boundaryRules ?? []) {
 console.log('D1_03_ENTITY_OWNER_BOUNDARY=PASS')
 console.log(JSON.stringify({
   entityOwners: Object.fromEntries(seen),
-  auditEventOwner: contract.crossCutting.AuditEvent.owner,\n  notificationPushEndpointOwner: seen.get('NotificationPushEndpoint'),\n  notificationPushEndpointDelegatedWriter: pushDelegation.delegatedWriter,
+  auditEventOwner: contract.crossCutting.AuditEvent.owner,
+  notificationPushEndpointOwner: seen.get('NotificationPushEndpoint'),
+  notificationPushEndpointDelegatedWriter: pushDelegation.delegatedWriter,
 }, null, 2))
