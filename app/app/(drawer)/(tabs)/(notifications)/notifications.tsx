@@ -10,12 +10,12 @@ import {
   View,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useColorScheme } from 'nativewind';
 import { useTabBarScroll } from '~/components/TabBarScroll';
 
 import { getApiErrorMessage } from '~/lib/api-client';
-import { fetchNotificationsPage, markAllNotificationsRead, markNotificationRead } from '~/lib/social-screen-api';
+import { fetchNotificationById, fetchNotificationsPage, markAllNotificationsRead, markNotificationRead } from '~/lib/social-screen-api';
 import { resolvePublicProfileById, unwrapApiData } from '~/lib/content-adapter';
 import { useAuthStore } from '~/store/auth-store';
 
@@ -84,6 +84,15 @@ export default function Notifications() {
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
   const router = useRouter();
+  const routeParams = useLocalSearchParams<{ notificationId?: string | string[] }>();
+  const rawNotificationId = Array.isArray(routeParams.notificationId)
+    ? routeParams.notificationId[0]
+    : routeParams.notificationId;
+  const deepLinkedNotificationId = typeof rawNotificationId === 'string' &&
+    /^[A-Za-z0-9_-]{1,128}$/.test(rawNotificationId)
+    ? rawNotificationId
+    : null;
+  const handledDeepLinkIdRef = useRef<string | null>(null);
   const authStatus = useAuthStore((state) => state.status);
   const [items, setItems] = useState<SocialNotification[]>([]);
   const [actorProfiles, setActorProfiles] = useState<Record<string, PublicUser>>({});
@@ -259,10 +268,46 @@ export default function Notifications() {
       return;
     }
     const actor = actorProfiles[item.actorUserId];
-    if (actor?.username || actor?.id) {
-      router.push(('/profile/' + encodeURIComponent(actor.username || actor.id)) as never);
+    const actorRoute = actor?.username || actor?.id || item.actorUserId;
+    if (actorRoute) {
+      router.push(('/profile/' + encodeURIComponent(actorRoute)) as never);
     }
   }, [actorProfiles, markRead, router]);
+
+  useEffect(() => {
+    const notificationId = deepLinkedNotificationId;
+    if (authStatus !== 'authenticated' || !notificationId ||
+        handledDeepLinkIdRef.current === notificationId) return;
+
+    handledDeepLinkIdRef.current = notificationId;
+    const controller = new AbortController();
+    let active = true;
+
+    void (async () => {
+      const result = await fetchNotificationById(notificationId, controller.signal);
+      if (!active || controller.signal.aborted) return;
+      const page = result.response.ok ? unwrapApiData<NotificationPage>(result.data) : null;
+      const item = page?.items?.find((candidate) => candidate.id === notificationId);
+      if (!item) {
+        throw new Error('这条通知暂时无法打开，请从通知列表查看。');
+      }
+
+      setItems((current) => current.some((candidate) => candidate.id === item.id)
+        ? current.map((candidate) => candidate.id === item.id ? item : candidate)
+        : [item, ...current]);
+      void loadActorProfiles([item], controller.signal);
+      openNotification(item);
+    })().catch((cause) => {
+      if (active && !controller.signal.aborted) {
+        setError(cause instanceof Error ? cause.message : '无法打开这条通知，请重试。');
+      }
+    });
+
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [authStatus, deepLinkedNotificationId, loadActorProfiles, openNotification]);
 
   const renderItem = useCallback(({ item }: { item: SocialNotification }) => {
     const profile = actorProfiles[item.actorUserId];
