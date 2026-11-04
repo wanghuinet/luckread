@@ -294,4 +294,32 @@ describe('v1 Expo push endpoint adapter', () => {
     expect(mocks.callW05Social).not.toHaveBeenCalled()
   })
 
+
+  it('does not call W05 when W06 cannot durably record the push endpoint intent', async () => {
+    mocks.callW06PushEndpointMutationAudit.mockResolvedValueOnce(
+      Response.json({ error: 'AUDIT_EVENT_PERSISTENCE_FAILED' }, { status: 503 }),
+    )
+    const response = await PUT(requestFor('PUT', {
+      platform: 'ios',
+      permissionStatus: 'granted',
+      expoPushToken: token,
+    }), context)
+
+    expect(response.status).toBe(503)
+    expect(mocks.callW06PushEndpointMutationAudit).toHaveBeenCalledTimes(1)
+    expect(mocks.callW05Social).not.toHaveBeenCalled()
+  })
+
+  it('requires Idempotency-Key before W08 authorization, W06 audit, or W05 mutation', async () => {
+    const request = new Request('https://www.luckread.com/api/v1/push/endpoints/' + installationId, {
+      method: 'DELETE',
+      headers: { Authorization: 'Bearer test-session-token' },
+    })
+    const response = await DELETE(request, context)
+    expect(response.status).toBe(428)
+    expect(mocks.callW08Creator).not.toHaveBeenCalled()
+    expect(mocks.callW06PushEndpointMutationAudit).not.toHaveBeenCalled()
+    expect(mocks.callW05Social).not.toHaveBeenCalled()
+  })
+
 })
