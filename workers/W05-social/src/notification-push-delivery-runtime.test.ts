@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   calculatePushRetryDelaySeconds,
+  deactivateInvalidEndpoint,
   isRetryableExpoError,
   notificationPushMessage,
   runNotificationPushBatch,
@@ -41,6 +42,68 @@ describe('W05 durable Expo push delivery runtime', () => {
     expect(calculatePushRetryDelaySeconds(2)).toBe(60)
     expect(calculatePushRetryDelaySeconds(6)).toBe(960)
     expect(calculatePushRetryDelaySeconds(20)).toBe(3600)
+  })
+
+
+  it('does not clear a rotated token when an older Expo receipt reports DeviceNotRegistered', async () => {
+    const oldToken = 'ExponentPushToken[old_token_1234567890]'
+    const newToken = 'ExponentPushToken[new_token_1234567890]'
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(oldToken))
+    const oldTokenHash = Array.from(new Uint8Array(digest), (value) => value.toString(16).padStart(2, '0')).join('')
+    const update = vi.fn(async () => ({ success: true, meta: { changes: 1 } }))
+    const db = {
+      prepare: vi.fn((sql: string) => ({
+        bind: (..._values: unknown[]) => ({
+          first: async () => sql.startsWith('SELECT') ? { push_token: newToken } : null,
+          run: update,
+        }),
+      })),
+    } as unknown as D1Database
+
+    await expect(deactivateInvalidEndpoint(db, {
+      endpointId: 'endpoint-1',
+      recipientUserId: 'recipient-1',
+      pushTokenHash: oldTokenHash,
+    }, new Date('2026-11-04T00:00:00.000Z'))).resolves.toBe(false)
+
+    expect(update).not.toHaveBeenCalled()
+  })
+
+  it('clears only the exact current Expo token and never rewrites last_seen_at', async () => {
+    const currentToken = 'ExponentPushToken[current_token_12345678]'
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(currentToken))
+    const currentTokenHash = Array.from(new Uint8Array(digest), (value) => value.toString(16).padStart(2, '0')).join('')
+    let updateSql = ''
+    let updateBindings: unknown[] = []
+    const db = {
+      prepare: vi.fn((sql: string) => ({
+        bind: (...values: unknown[]) => {
+          if (sql.startsWith('UPDATE')) {
+            updateSql = sql
+            updateBindings = values
+            return { run: async () => ({ success: true, meta: { changes: 1 } }) }
+          }
+          return { first: async () => ({ push_token: currentToken }) }
+        },
+      })),
+    } as unknown as D1Database
+
+    await expect(deactivateInvalidEndpoint(db, {
+      endpointId: 'endpoint-1',
+      recipientUserId: 'recipient-1',
+      pushTokenHash: currentTokenHash,
+    }, new Date('2026-11-04T00:00:00.000Z'))).resolves.toBe(true)
+
+    expect(updateSql).toContain("permission_status = 'undetermined'")
+    expect(updateSql).toContain('AND push_token = ?')
+    expect(updateSql).not.toContain('last_seen_at')
+    expect(updateBindings).toEqual([
+      '2026-11-04T00:00:00.000Z',
+      'endpoint-1',
+      'recipient-1',
+      'expo',
+      currentToken,
+    ])
   })
 
   it('retries transient provider errors but not permanent device or payload errors', () => {
