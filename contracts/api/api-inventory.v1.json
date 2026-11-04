@@ -180,12 +180,14 @@
     "notification": {
       "required": true,
       "endpoint_groups": [
+        "DELETE /v1/push/endpoints/{installationId}",
         "GET /v1/notification-preferences",
         "GET /v1/notifications",
         "PATCH /v1/notification-preferences",
         "PATCH /v1/notifications",
         "POST /v1/notifications/read-all",
-        "POST /v1/notifications/{notificationId}/read"
+        "POST /v1/notifications/{notificationId}/read",
+        "PUT /v1/push/endpoints/{installationId}"
       ]
     },
     "search_discovery": {
