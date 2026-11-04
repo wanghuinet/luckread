@@ -594,7 +594,8 @@ function PublishScreenContent() {
       const media = asset.uploaded;
       if (!media?.id) continue;
       const alt = (asset.altText ?? media.alt ?? asset.filename).normalize('NFKC').trim();
-      if (alt && alt !== (media.alt || '').trim()) {
+      if (!alt) throw new Error('图片替代文本不能为空。');
+      if (alt !== (media.alt || '').trim()) {
         await saveAssetAltText(asset, alt);
       }
     }
