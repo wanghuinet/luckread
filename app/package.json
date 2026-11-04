@@ -29,7 +29,8 @@
     "test:media-gallery": "bun test tests/feed-media-gallery.test.mjs",
     "postinstall": "node scripts/apply-hyperswitch-rn88-compat.mjs",
     "test:hyperswitch-compat": "bun test tests/hyperswitch-rn88-compat.test.mjs",
-    "test:image-upload-preparation": "bun test tests/image-upload-preparation.test.mjs"
+    "test:image-upload-preparation": "bun test tests/image-upload-preparation.test.mjs",
+    "test:network-status": "bun test tests/network-status.test.mjs"
   },
   "dependencies": {
     "@codeherence/react-native-header": "^0.14.0",
@@ -90,7 +91,8 @@
     "tailwind-merge": "^3.5.0",
     "expo-image-manipulator": "~58.0.16",
     "expo-camera": "~58.0.14",
-    "@expo/ui": "~58.0.26"
+    "@expo/ui": "~58.0.26",
+    "expo-network": "~58.0.4"
   },
   "devDependencies": {
     "@babel/core": "^7.29.7",
