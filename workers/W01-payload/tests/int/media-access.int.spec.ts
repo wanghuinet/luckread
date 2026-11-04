@@ -352,7 +352,7 @@ it('keeps composer media URL lookups owner-scoped and bounded', () => {
   expect(route).toContain('isCanonicalMediaDeliveryUrl(value)')
   expect(ownerFilter).toBeGreaterThan(urlLookup)
   expect(route).toContain('matchingUrls.map((mediaUrl) => ({ url: { equals: mediaUrl } }))')
-  expect(route).toContain('alt: doc.alt')
+  expect(route).toContain("alt: typeof doc.alt === 'string' ? doc.alt : ''")
 })
 
 it('only exposes published image descriptions after W03 visibility and entitlement authorization', () => {
