@@ -1084,6 +1084,7 @@ paths:
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '422': { $ref: '#/components/responses/ClientError' }
         '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
     post:
       tags: [Media]
       summary: Initiate an upload (single or multipart)
@@ -1129,7 +1130,7 @@ paths:
         - name: url
           in: query
           required: true
-          description: One to four canonical HTTPS image/video delivery URLs, repeated as url parameters.
+          description: One to four canonical HTTPS image delivery URLs, repeated as url parameters.
           style: form
           explode: true
           schema:
