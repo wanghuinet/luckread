@@ -56,7 +56,11 @@ test('edit and delete controls are only shown for the authenticated owner and us
   expect(feedItem).toContain("id: 'delete-own-post'");
   expect(feedItem).toContain("case 'delete-own-post': removeOwnPost(); break;");
   expect(home).toContain('onDeleted={(contentId) => {');
-  expect(home).toContain('current.filter((post) => post.contentId !== contentId)');
+  // Feed pages are stored as TanStack InfiniteData; remove the post from every cached page.
+  expect(home).toContain('queryClient.setQueryData<InfiniteData<NativeFeedPage, string | null>>(queryKey, (current) => {');
+  expect(home).toContain('pages: current.pages.map((page) => ({');
+  expect(home).toContain('items: page.items.filter((post) => post.id !== contentId)');
+  expect(home).toContain('setHydratedState((current) => {');
 });
 
 test('successful publishing confirms success and offers a direct link to the published post', () => {
@@ -66,7 +70,10 @@ test('successful publishing confirms success and offers a direct link to the pub
   expect(composer).toContain("('/?published=' + encodeURIComponent(publishedId) + '&refresh=' + Date.now())");
   expect(home).toContain("useLocalSearchParams<{ published?: string; refresh?: string }>()");
   expect(home).toContain('refreshSignal={refreshSignal}');
-  expect(home).toContain('[loadPage, refreshKey, refreshSignal]');
+  // Publishing returns to the authoritative W01 feed and invalidates its cache.
+  expect(home).toContain('previousRefreshSignal.current !== refreshSignal && refreshSignal');
+  expect(home).toContain('queryClient.invalidateQueries({ queryKey })');
+  expect(home).toContain('[queryClient, queryKey, refreshSignal]');
 });
 
 
