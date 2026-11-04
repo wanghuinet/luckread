@@ -305,7 +305,7 @@
       "internalPath": "/internal/audit-events/push-endpoint-mutation-requested",
       "principalRequired": true,
       "actorAuthority": "W06 derives actor userId and layer from trusted W01 private transport headers; request data cannot supply actor identity.",
-      "eventId": "Deterministic evt_push_endpoint_{sha256(userId, installationId, operation, Idempotency-Key)}; one durable request-intent audit per idempotent endpoint mutation.",
+      "eventId": "Deterministic evt_push_endpoint_{sha256(UTF-8(JSON.stringify([userId, installationId, operation, Idempotency-Key])))}; one durable request-intent audit per idempotent endpoint mutation.",
       "targetType": "NotificationPushEndpoint",
       "auditRequired": true,
       "idempotency": "Idempotency-Key is required and must match the body. Exact semantic replay confirms the same actor, target, operation and permission metadata; conflicting facts return 409.",
@@ -377,7 +377,8 @@
     "forwarded": [
       "If-Match on decideModerationCase",
       "Idempotency-Key on decideModerationCase",
-      "If-Match on membership plan publish"
+      "If-Match on membership plan publish",
+      "Idempotency-Key on auditPushEndpointMutationRequest"
     ],
     "forbidden": [
       "Authorization bearer credential",
