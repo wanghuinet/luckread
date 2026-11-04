@@ -197,6 +197,8 @@ test('native publisher auto-saves server drafts, restores them by draft ID, and 
   expect(composer).toContain("to: 'PUBLISHED'");
   expect(composer).toContain('fetchContentBodyReference');
   expect(composer).toContain('draftSavedFingerprintRef.current = fingerprint;');
+  expect(composer).toContain('if (pollEnabled && !contentId && !pollConfiguredRef.current)');
+  expect(composer).toContain('草稿已自动保存。');
   expect(composer).toContain('Complete the poll before saving the draft.');
   expect(composer).not.toContain('localStorage');
 });
