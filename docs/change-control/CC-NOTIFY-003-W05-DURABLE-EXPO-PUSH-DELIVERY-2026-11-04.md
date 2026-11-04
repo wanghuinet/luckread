@@ -2,7 +2,7 @@
 
 - Change: NOTIFY-003-W05-DURABLE-EXPO-PUSH-DELIVERY
 - Owner: W05 / T14
-- Authority: W05 D1-02 social notifications and W05's explicitly delegated D1-03 NotificationPushEndpoint access
+- Authority: W05 D1-02 social notifications; W09 remains primary D1-03 NotificationPushEndpoint owner; W05 T14 receives only the separate delivery-runtime delegation in `contracts/transport/W05-W09-notification-push-delivery.v1.json`
 - Base: feat/w10-expo-server-sdk-adapter (stacked after the endpoint registration and Expo SDK adapter work)
 
 ## Decision
@@ -15,7 +15,7 @@ Accordingly, this slice keeps notification delivery inside the existing W05 noti
 
 - social_notifications and the push outbox/delivery state remain in W05 D1-02.
 - A D1-02 trigger creates a delivery intent atomically with a new inbox notification. Existing notifications are not backfilled.
-- W05 reads and invalidates only its delegated NotificationPushEndpoint rows in D1-03.
+- W05 reads only active endpoints belonging to the persisted W05 notification recipient (maximum 20 rows) and may conditionally clear only the exact token hash that Expo reported as `DeviceNotRegistered`; this is governed by `contracts/transport/W05-W09-notification-push-delivery.v1.json`. W09 remains the primary endpoint owner.
 - Expo tokens are never returned through public APIs, logged, copied into Workflow results, or included in error messages.
 - Push payloads contain only the notification ID and stable target references. Taps continue to open the in-app notification inbox; no untrusted URL is accepted.
 - Delivery is at-least-once. Stable notification IDs, endpoint-scoped idempotency, leases, Expo receipts, bounded retry and invalid-token deactivation mitigate duplicates and stale endpoints.
