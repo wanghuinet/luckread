@@ -10,6 +10,11 @@ const mocks = vi.hoisted(() => {
   return {
     MockTrafficLimitError,
     MockW05SocialClientError,
+    MockW08CreatorClientError: class MockW08CreatorClientError extends Error {},
+    callW08Creator: vi.fn(async (_request: Request, _path: string, _method: 'GET' | 'POST') => Response.json({
+      decision: 'ALLOW', action: 'notification.update.self', resourceType: 'Notification',
+      policyVersion: 'casl-l0-l8-v1', layer: 'L2',
+    })),
     enforceWriteRateLimit: vi.fn(async (_request: Request) => undefined),
     enforceWriteAccountRateLimit: vi.fn(async (_accountId: string) => undefined),
     enforceWriteEndpointRateLimit: vi.fn(async (_endpoint: string) => undefined),
@@ -31,6 +36,11 @@ vi.mock('../../src/social/w05-social-client.js', () => ({
   callW05Social: mocks.callW05Social,
   resolveSocialPrincipal: mocks.resolvePrincipal,
   W05SocialClientError: mocks.MockW05SocialClientError,
+}))
+
+vi.mock('../../src/auth/w08-creator-client.js', () => ({
+  callW08Creator: mocks.callW08Creator,
+  W08CreatorClientError: mocks.MockW08CreatorClientError,
 }))
 
 import { DELETE, PUT } from '../../src/app/api/v1/push/endpoints/[installationId]/route.js'
@@ -61,6 +71,11 @@ beforeEach(() => {
   mocks.resolvePrincipal.mockResolvedValue({ userId: 'user_test_01', layer: 'L2', verified: true })
   mocks.callW05Social.mockReset()
   mocks.callW05Social.mockResolvedValue(Response.json({ data: { endpointId: 'endpoint-1', status: 'ACTIVE' } }))
+  mocks.callW08Creator.mockReset()
+  mocks.callW08Creator.mockResolvedValue(Response.json({
+    decision: 'ALLOW', action: 'notification.update.self', resourceType: 'Notification',
+    policyVersion: 'casl-l0-l8-v1', layer: 'L2',
+  }))
 })
 
 describe('v1 Expo push endpoint adapter', () => {
@@ -82,11 +97,24 @@ describe('v1 Expo push endpoint adapter', () => {
       principal: { userId: 'user_test_01', layer: 'L2', verified: true },
       body: registrationBody,
     }))
+    expect(mocks.callW08Creator).toHaveBeenNthCalledWith(
+      1,
+      expect.any(Request),
+      '/internal/authz/check-permission',
+      'POST',
+    )
+    const w08PermissionRequest = mocks.callW08Creator.mock.calls[0]?.[0] as Request
+    await expect(w08PermissionRequest.clone().json()).resolves.toEqual({
+      action: 'notification.update.self',
+      resourceType: 'Notification',
+      resourceAttributes: { ownerId: 'user_test_01' },
+    })
     expect(mocks.callW05Social).toHaveBeenNthCalledWith(2, expect.objectContaining({
       pathname: '/internal/social/push-endpoints/' + installationId,
       method: 'DELETE',
       principal: { userId: 'user_test_01', layer: 'L2', verified: true },
     }))
+    expect(mocks.callW08Creator).toHaveBeenCalledTimes(2)
     expect(JSON.stringify(await putResponse.clone().json())).not.toContain(token)
   })
 
@@ -151,4 +179,43 @@ describe('v1 Expo push endpoint adapter', () => {
     expect(response.status).toBe(422)
     expect(mocks.callW05Social).not.toHaveBeenCalled()
   })
+
+  it('does not call W05 when W08 denies notification.update.self', async () => {
+    mocks.callW08Creator.mockResolvedValueOnce(Response.json({
+      decision: 'DENY',
+      action: 'notification.update.self',
+      resourceType: 'Notification',
+      policyVersion: 'casl-l0-l8-v1',
+      layer: 'L2',
+      reasonCode: 'PERMISSION_DENIED',
+    }))
+    const response = await PUT(requestFor('PUT', {
+      platform: 'ios',
+      permissionStatus: 'granted',
+      expoPushToken: token,
+    }), context)
+
+    expect(response.status).toBe(403)
+    expect(mocks.callW08Creator).toHaveBeenCalledTimes(1)
+    expect(mocks.callW05Social).not.toHaveBeenCalled()
+  })
+
+  it('fails closed when W08 returns an unverifiable authorization response', async () => {
+    mocks.callW08Creator.mockResolvedValueOnce(Response.json({
+      decision: 'ALLOW',
+      action: 'user.update.self',
+      resourceType: 'User',
+      policyVersion: 'casl-l0-l8-v1',
+      layer: 'L2',
+    }))
+    const response = await PUT(requestFor('PUT', {
+      platform: 'ios',
+      permissionStatus: 'granted',
+      expoPushToken: token,
+    }), context)
+
+    expect(response.status).toBe(503)
+    expect(mocks.callW05Social).not.toHaveBeenCalled()
+  })
+
 })
