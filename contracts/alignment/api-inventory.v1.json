@@ -327,15 +327,12 @@
       "openapiPath": "/push/endpoints/{installationId}",
       "domain": "notification",
       "status": "DISCOVERED",
-      "featureIds": [
-        "NOTIFY-002"
-      ],
+      "featureIds": [],
       "schemaRef": "",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#delete:/push/endpoints/{installationId}",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json",
-        "contracts/api/notification-operation-policy.v1.json"
+        "contracts/api/api-inventory.v1.json"
       ]
     },
     {
@@ -2899,15 +2896,12 @@
       "openapiPath": "/push/endpoints/{installationId}",
       "domain": "notification",
       "status": "DISCOVERED",
-      "featureIds": [
-        "NOTIFY-002"
-      ],
+      "featureIds": [],
       "schemaRef": "",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#put:/push/endpoints/{installationId}",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json",
-        "contracts/api/notification-operation-policy.v1.json"
+        "contracts/api/api-inventory.v1.json"
       ]
     }
   ]
