@@ -114,12 +114,17 @@ async function fanOutPendingNotifications(db: D1Database, endpointDb: D1Database
 
 async function claimDueDeliveries(db: D1Database, endpointDb: D1Database, now: Date): Promise<ClaimedDelivery[]> {
   const nowIso = now.toISOString()
+  await db.prepare(
+    "UPDATE social_notification_push_deliveries SET status = 'FAILED', lease_token = NULL, lease_expires_at = NULL, " +
+    "last_error_code = 'SEND_LEASE_EXPIRED_MAX_ATTEMPTS', updated_at = ? " +
+    "WHERE status = 'LEASED' AND lease_expires_at IS NOT NULL AND lease_expires_at <= ? AND attempt_count >= ?",
+  ).bind(nowIso, nowIso, MAX_SEND_ATTEMPTS).run()
   const candidates = await db.prepare(
     'SELECT delivery_id, notification_id, endpoint_id FROM social_notification_push_deliveries ' +
-    "WHERE ((status IN ('PENDING','RETRY') AND next_attempt_at <= ?) " +
-    "OR (status = 'LEASED' AND lease_expires_at IS NOT NULL AND lease_expires_at <= ?)) " +
+    "WHERE ((status IN ('PENDING','RETRY') AND next_attempt_at <= ? AND attempt_count < ?) " +
+    "OR (status = 'LEASED' AND lease_expires_at IS NOT NULL AND lease_expires_at <= ? AND attempt_count < ?)) " +
     'ORDER BY next_attempt_at ASC, created_at ASC LIMIT ?',
-  ).bind(nowIso, nowIso, DELIVERY_LIMIT).all<{ delivery_id: string; notification_id: string; endpoint_id: string }>()
+  ).bind(nowIso, MAX_SEND_ATTEMPTS, nowIso, MAX_SEND_ATTEMPTS, DELIVERY_LIMIT).all<{ delivery_id: string; notification_id: string; endpoint_id: string }>()
 
   const claimed: ClaimedDelivery[] = []
   for (const candidate of candidates.results ?? []) {
@@ -127,10 +132,10 @@ async function claimDueDeliveries(db: D1Database, endpointDb: D1Database, now: D
     const updated = await db.prepare(
       "UPDATE social_notification_push_deliveries SET status = 'LEASED', lease_token = ?, lease_expires_at = ?, " +
       'attempt_count = attempt_count + 1, updated_at = ? WHERE delivery_id = ? AND ' +
-      "((status IN ('PENDING','RETRY') AND next_attempt_at <= ?) " +
-      "OR (status = 'LEASED' AND lease_expires_at IS NOT NULL AND lease_expires_at <= ?)) " +
+      "((status IN ('PENDING','RETRY') AND next_attempt_at <= ? AND attempt_count < ?) " +
+      "OR (status = 'LEASED' AND lease_expires_at IS NOT NULL AND lease_expires_at <= ? AND attempt_count < ?)) " +
       'RETURNING delivery_id, notification_id, endpoint_id, attempt_count',
-    ).bind(leaseToken, isoAfter(now, LEASE_SECONDS), nowIso, candidate.delivery_id, nowIso, nowIso)
+    ).bind(leaseToken, isoAfter(now, LEASE_SECONDS), nowIso, candidate.delivery_id, nowIso, MAX_SEND_ATTEMPTS, nowIso, MAX_SEND_ATTEMPTS)
       .first<{ delivery_id: string; notification_id: string; endpoint_id: string; attempt_count: number }>()
     if (!updated) continue
 
@@ -222,7 +227,7 @@ async function recordPushTicket(
 ): Promise<'sent' | 'retried' | 'failed'> {
   if (ticket.status === 'ok' && typeof ticket.id === 'string' && ticket.id.trim()) {
     await db.prepare(
-      "UPDATE social_notification_push_deliveries SET status = 'RECEIPT_PENDING', expo_ticket_id = ?, " +
+      "UPDATE social_notification_push_deliveries SET status = 'RECEIPT_PENDING', expo_ticket_id = ?, receipt_poll_count = 0, " +
       'next_attempt_at = ?, lease_token = NULL, lease_expires_at = NULL, last_error_code = NULL, updated_at = ? ' +
       "WHERE delivery_id = ? AND status = 'LEASED' AND lease_token = ?",
     ).bind(ticket.id, isoAfter(now, RECEIPT_DELAY_SECONDS), now.toISOString(), task.deliveryId, task.leaseToken).run()
@@ -235,12 +240,17 @@ async function recordPushTicket(
 
 async function claimDueReceipts(db: D1Database, now: Date): Promise<ClaimedReceipt[]> {
   const nowIso = now.toISOString()
+  await db.prepare(
+    "UPDATE social_notification_push_deliveries SET status = 'FAILED', lease_token = NULL, lease_expires_at = NULL, " +
+    "last_error_code = 'RECEIPT_LEASE_EXPIRED_MAX_POLLS', updated_at = ? " +
+    "WHERE status = 'RECEIPT_LEASED' AND lease_expires_at IS NOT NULL AND lease_expires_at <= ? AND receipt_poll_count >= ?",
+  ).bind(nowIso, nowIso, MAX_RECEIPT_POLLS).run()
   const candidates = await db.prepare(
     "SELECT delivery_id, notification_id, endpoint_id, expo_ticket_id FROM social_notification_push_deliveries " +
-    "WHERE ((status = 'RECEIPT_PENDING' AND expo_ticket_id IS NOT NULL AND next_attempt_at <= ?) " +
-    "OR (status = 'RECEIPT_LEASED' AND lease_expires_at IS NOT NULL AND lease_expires_at <= ?)) " +
+    "WHERE ((status = 'RECEIPT_PENDING' AND expo_ticket_id IS NOT NULL AND next_attempt_at <= ? AND receipt_poll_count < ?) " +
+    "OR (status = 'RECEIPT_LEASED' AND lease_expires_at IS NOT NULL AND lease_expires_at <= ? AND receipt_poll_count < ?)) " +
     'ORDER BY next_attempt_at ASC, created_at ASC LIMIT ?',
-  ).bind(nowIso, nowIso, RECEIPT_LIMIT).all<{
+  ).bind(nowIso, MAX_RECEIPT_POLLS, nowIso, MAX_RECEIPT_POLLS, RECEIPT_LIMIT).all<{
     delivery_id: string; notification_id: string; endpoint_id: string; expo_ticket_id: string
   }>()
 
@@ -250,10 +260,10 @@ async function claimDueReceipts(db: D1Database, now: Date): Promise<ClaimedRecei
     const row = await db.prepare(
       "UPDATE social_notification_push_deliveries SET status = 'RECEIPT_LEASED', lease_token = ?, " +
       'lease_expires_at = ?, receipt_poll_count = receipt_poll_count + 1, updated_at = ? ' +
-      "WHERE delivery_id = ? AND ((status = 'RECEIPT_PENDING' AND next_attempt_at <= ?) " +
-      "OR (status = 'RECEIPT_LEASED' AND lease_expires_at IS NOT NULL AND lease_expires_at <= ?)) " +
+      "WHERE delivery_id = ? AND ((status = 'RECEIPT_PENDING' AND next_attempt_at <= ? AND receipt_poll_count < ?) " +
+      "OR (status = 'RECEIPT_LEASED' AND lease_expires_at IS NOT NULL AND lease_expires_at <= ? AND receipt_poll_count < ?)) " +
       'RETURNING delivery_id, notification_id, endpoint_id, expo_ticket_id, attempt_count, receipt_poll_count, push_token_hash',
-    ).bind(leaseToken, isoAfter(now, LEASE_SECONDS), nowIso, candidate.delivery_id, nowIso, nowIso).first<{
+    ).bind(leaseToken, isoAfter(now, LEASE_SECONDS), nowIso, candidate.delivery_id, nowIso, MAX_RECEIPT_POLLS, nowIso, MAX_RECEIPT_POLLS).first<{
       delivery_id: string; notification_id: string; endpoint_id: string; expo_ticket_id: string
       attempt_count: number; receipt_poll_count: number; push_token_hash: string | null
     }>()
