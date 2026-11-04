@@ -139,6 +139,13 @@ test('native social composer supports an X-style mixed photo and video attachmen
   expect(composer).not.toContain('onPress={() => setCameraVisible(true)}');
 });
 
+
+test('native publisher preserves animated GIFs in the picker and when restoring media references', () => {
+  expect(composer).toContain('allowsEditing: false,');
+  expect(composer).toContain('quality: 1.0,');
+  expect(composer).toContain("if (/\\.gif(?:[?#].*)?$/i.test(url)) return 'image/gif';");
+});
+
 test('native composer previews attached videos before publishing and preserves playback controls', () => {
   expect(composer).toContain("import { VideoView, useVideoPlayer } from 'expo-video'");
   expect(composer).toContain('function ComposerVideoPreview');

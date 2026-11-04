@@ -132,6 +132,7 @@ function mimeFromUrl(url: string): string {
   if (/\.(mp4|webm|mov|m4v|avi|mkv)(?:[?#].*)?$/i.test(url) || url.startsWith('https://video.luckread.com/')) return 'video/mp4';
   if (/\.png(?:[?#].*)?$/i.test(url)) return 'image/png';
   if (/\.webp(?:[?#].*)?$/i.test(url)) return 'image/webp';
+  if (/\.gif(?:[?#].*)?$/i.test(url)) return 'image/gif';
   return 'image/jpeg';
 }
 
@@ -450,7 +451,10 @@ function PublishScreenContent() {
       mediaTypes: ImagePicker.MediaTypeOptions.All,
       allowsMultipleSelection: true,
       selectionLimit: available,
-      quality: 0.9,
+      // Expo SDK 58 requires quality=1 and editing disabled to preserve animated GIFs on Android.
+      // Static JPEG/PNG optimization remains centralized in prepareImageForUpload.
+      allowsEditing: false,
+      quality: 1.0,
       videoMaxDuration: 60,
     });
     if (result.canceled || !result.assets?.length) return;
