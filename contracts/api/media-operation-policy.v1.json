@@ -672,7 +672,6 @@
       "path": "/media/metadata",
       "authorization": {
         "required": false,
-        "permission": null,
         "scope": "published_reference_and_membership"
       },
       "security": [
@@ -839,7 +838,6 @@
       "status": "CONTRACTED_PARTIAL",
       "authorization": {
         "required": true,
-        "permission": null,
         "scope": "resource_owner"
       },
       "resource": {
