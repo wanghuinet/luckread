@@ -59,7 +59,7 @@ jobs:
           assert actual['DB']['database_name'] == 'luckreadpro'
           assert actual['D1_03']['database_id'] == 'bda1d247-a371-4244-91ae-aef96034db7f'
           assert actual['D1_03']['database_name'] == 'secondary'
-          assert actual['D1_03']['migrations_dir'] == 'migrations-d1-03'
+          assert actual['D1_03'].get('migrations_dir') is None
           assert len(c.get('services', [])) == 1
           assert c['services'][0]['binding'] == 'W03_CONTENT'
           assert 'queues' not in c and 'workflows' not in c
@@ -71,14 +71,14 @@ jobs:
         with:
           node-version: 24
 
-      - name: Verify migrated D1-03 target before deployment
-        working-directory: workers/W05-social
+      - name: Verify W09-owned migrated D1-03 target before deployment
+        working-directory: workers/W09-platform
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
-          npx --yes wrangler@4.116.0 d1 execute secondary --remote --json --config wrangler.jsonc --command "SELECT name FROM d1_migrations WHERE name IN ('0001_notification_push_endpoints.sql','0001_notification_push_endpoints');" > /tmp/w05-push-migration-ready.json
+          npx --yes wrangler@4.116.0 d1 execute secondary --remote --json --config wrangler.d1-03-migrations.jsonc --command "SELECT name FROM d1_migrations WHERE name IN ('0001_notification_push_endpoints.sql','0001_notification_push_endpoints');" > /tmp/w05-push-migration-ready.json
           python - <<'PY'
           import json
           value = json.load(open('/tmp/w05-push-migration-ready.json'))
