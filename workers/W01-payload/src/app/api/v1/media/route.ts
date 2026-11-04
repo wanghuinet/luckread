@@ -190,7 +190,7 @@ export async function GET(request: Request): Promise<Response> {
               filesize: doc.filesize,
               width: doc.width,
               height: doc.height,
-              alt: doc.alt,
+              alt: typeof doc.alt === 'string' ? doc.alt : '',
             })),
         }
       : result
