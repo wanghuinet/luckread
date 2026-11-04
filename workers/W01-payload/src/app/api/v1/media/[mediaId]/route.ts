@@ -182,7 +182,7 @@ export async function PATCH(
       id: mediaId,
       depth: 0,
       overrideAccess: true,
-    }).catch(() => null) as MediaDocument | null
+    }).catch((): null => null) as unknown as MediaDocument | null
     if (!ownedMedia || String(ownedMedia.ownerUserId ?? '') !== payloadUserId) {
       return apiErrorResponse(404, 'NOT_FOUND', 'Media not found')
     }
@@ -196,7 +196,7 @@ export async function PATCH(
       data: { alt },
       depth: 0,
       overrideAccess: true,
-    }) as MediaDocument
+    }) as unknown as MediaDocument
     const projected = {
       id: updated.id ?? mediaId,
       url: updated.url ?? null,
