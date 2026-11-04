@@ -1892,10 +1892,11 @@ describe('W05 social poll transport', () => {
     )
 
     expect(response.status).toBe(200)
-    await expect(response.json()).resolves.toMatchObject({
+    const responseText = await response.text()
+    expect(JSON.parse(responseText)).toMatchObject({
       data: { endpointId: 'endpoint-1', status: 'ACTIVE' },
     })
-    expect(JSON.stringify(await response.clone().text())).not.toContain(token)
+    expect(responseText).not.toContain(token)
     expect((d1_02 as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
     expect((d1_03 as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).toHaveBeenCalledTimes(1)
     expect((d1_03 as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare.mock.calls[0]?.[0])
