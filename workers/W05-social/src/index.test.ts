@@ -1872,5 +1872,114 @@ describe('W05 social poll transport', () => {
     )
     expect(missingKey.status).toBe(428)
   })
+
+  it('registers Expo push endpoints only in scoped D1-03 using the W01-derived principal', async () => {
+    const token = 'ExponentPushToken[abcdefghijklmnop_1234567890]'
+    const d1_02 = dbFor()
+    const d1_03 = dbFor([{ endpoint_id: 'endpoint-1', permission_status: 'granted' }])
+    const response = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/push-endpoints/6b6d9f5a-4e61-4c50-9d17-9e97f36e6e3c', {
+        method: 'PUT',
+        headers: { ...transportHeaders, 'content-type': 'application/json' },
+        body: JSON.stringify({
+          platform: 'ios',
+          permissionStatus: 'granted',
+          expoPushToken: token,
+          appVersion: '1.0.0',
+        }),
+      }),
+      { DB: d1_02, D1_03: d1_03 },
+    )
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      data: { endpointId: 'endpoint-1', status: 'ACTIVE' },
+    })
+    expect(JSON.stringify(await response.clone().text())).not.toContain(token)
+    expect((d1_02 as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
+    expect((d1_03 as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).toHaveBeenCalledTimes(1)
+    expect((d1_03 as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare.mock.calls[0]?.[0])
+      .toContain('notification_push_endpoints')
+  })
+
+  it('rejects caller-supplied owner fields before touching D1-03', async () => {
+    const d1_03 = dbFor()
+    const response = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/push-endpoints/6b6d9f5a-4e61-4c50-9d17-9e97f36e6e3c', {
+        method: 'PUT',
+        headers: { ...transportHeaders, 'content-type': 'application/json' },
+        body: JSON.stringify({
+          ownerUserId: 'attacker',
+          platform: 'ios',
+          permissionStatus: 'granted',
+          expoPushToken: 'ExponentPushToken[abcdefghijklmnop_1234567890]',
+        }),
+      }),
+      { DB: dbFor(), D1_03: d1_03 },
+    )
+    expect(response.status).toBe(422)
+    expect((d1_03 as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
+  })
+
+  it('clears an endpoint token when permission is no longer granted', async () => {
+    const d1_03 = dbFor([{ endpoint_id: 'endpoint-1', permission_status: 'denied' }])
+    const response = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/push-endpoints/6b6d9f5a-4e61-4c50-9d17-9e97f36e6e3c', {
+        method: 'PUT',
+        headers: { ...transportHeaders, 'content-type': 'application/json' },
+        body: JSON.stringify({
+          platform: 'android',
+          permissionStatus: 'denied',
+          expoPushToken: null,
+        }),
+      }),
+      { DB: dbFor(), D1_03: d1_03 },
+    )
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      data: { endpointId: 'endpoint-1', status: 'DISABLED' },
+    })
+  })
+
+  it('deletes only the current user's push endpoint from D1-03', async () => {
+    const d1_03 = dbFor()
+    const response = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/push-endpoints/6b6d9f5a-4e61-4c50-9d17-9e97f36e6e3c', {
+        method: 'DELETE',
+        headers: transportHeaders,
+      }),
+      { DB: dbFor(), D1_03: d1_03 },
+    )
+    expect(response.status).toBe(204)
+    expect((d1_03 as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare.mock.calls[0]?.[0])
+      .toContain('WHERE owner_user_id = ? AND installation_id = ?')
+  })
+
+  it('fails closed when the scoped W05 D1-03 binding is missing', async () => {
+    const socialDb = dbFor()
+    const response = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/push-endpoints/6b6d9f5a-4e61-4c50-9d17-9e97f36e6e3c', {
+        method: 'DELETE',
+        headers: transportHeaders,
+      }),
+      { DB: socialDb },
+    )
+    expect(response.status).toBe(503)
+    expect((socialDb as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
+  })
+
+  it('requires L2 before push endpoint registration touches D1-03', async () => {
+    const d1_03 = dbFor()
+    const response = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/push-endpoints/6b6d9f5a-4e61-4c50-9d17-9e97f36e6e3c', {
+        method: 'DELETE',
+        headers: { ...transportHeaders, 'X-LuckRead-Principal-Layer': 'L1' },
+      }),
+      { DB: dbFor(), D1_03: d1_03 },
+    )
+    expect(response.status).toBe(403)
+    expect((d1_03 as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
+  })
+
 })
 
