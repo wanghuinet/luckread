@@ -52,7 +52,7 @@ if (
 }
 
 const w05Source = readFileSync(w05SourcePath, 'utf8')
-const d1_03References = w05Source.match(/env\\.D1_03/g) ?? []
+const d1_03References = w05Source.match(/env\.D1_03/g) ?? []
 if (
   d1_03References.length !== 2 ||
   !w05Source.includes('upsertPushEndpoint(env.D1_03') ||
