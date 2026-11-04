@@ -552,6 +552,18 @@ function PublishScreenContent() {
     const trimmedBody = body.trim();
     if (!trimmedBody || trimmedBody.length > MAX_TEXT_LENGTH) return;
     if (assets.some((asset) => !asset.existing && asset.status !== 'ready')) return;
+    if (pollEnabled) {
+      const cleanOptions = pollOptions.map((option) => option.normalize('NFKC').trim());
+      const optionKeys = cleanOptions.map((option) => option.toLocaleLowerCase('en-US'));
+      if (
+        cleanOptions.length < MIN_POLL_OPTIONS ||
+        cleanOptions.length > MAX_POLL_OPTIONS ||
+        cleanOptions.some((option) => !option || [...option].length > MAX_POLL_OPTION_LENGTH) ||
+        new Set(optionKeys).size !== optionKeys.length
+      ) {
+        throw new Error('A poll needs 2–4 different, non-empty options. Complete the poll before saving the draft.');
+      }
+    }
     if (assets.some((asset) => !asset.serverUrl || !/^https?:\/\//i.test(asset.serverUrl))) return;
 
     const mediaRefs = Array.from(new Set(assets.map((asset) => asset.serverUrl)));
@@ -838,7 +850,7 @@ function PublishScreenContent() {
   }, []);
 
   const closeComposer = useCallback(async () => {
-    if (busy || loadingEdit) {
+    if (busy || loadingEdit || publishPending) {
       Alert.alert('请稍候', '当前操作尚未完成，完成后再关闭发布窗口。');
       return;
     }
