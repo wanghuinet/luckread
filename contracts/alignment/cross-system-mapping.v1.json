@@ -4827,13 +4827,14 @@
         "workers/W05-social/src/index.test.ts",
         "workers/W05-social/src/push-endpoint-runtime.ts",
         "workers/W05-social/src/push-endpoint-runtime.test.ts",
-        "workers/W05-social/migrations-d1-03/0001_notification_push_endpoints.sql"
+        "workers/W09-platform/migrations-d1-03/0001_notification_push_endpoints.sql"
       ],
       "evidence": [
         "contracts/alignment/mapping-batches/MSG-001-008-NOTIFY-001-008-real-evidence-reconciliation.v1.md",
         "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
         "contracts/persistence/NOTIFY-002-W05-D1-03-PUSH-ENDPOINT-PERSISTENCE.v1.json",
-        "docs/change-control/CC-T14-W05-D1-03-PUSH-ENDPOINT-REGISTRATION-2026-11-04.md"
+        "docs/change-control/CC-T14-W05-D1-03-PUSH-ENDPOINT-REGISTRATION-2026-11-04.md",
+        "contracts/transport/d1-03-entity-owner-boundary.v1.json"
       ],
       "blockers": [
         "W05 D1-03 remote migration and live scoped binding deployment are pending.",
