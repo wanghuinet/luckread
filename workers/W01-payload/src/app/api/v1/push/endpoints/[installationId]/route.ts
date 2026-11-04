@@ -3,7 +3,7 @@ import {
   resolveSocialPrincipal,
   W05SocialClientError,
 } from '../../../../../../social/w05-social-client.js'
-import { TrafficLimitError, enforceW01WriteRateLimit, rateLimitResponse } from '../../../../../../auth/traffic-limit.js'
+import { TrafficLimitError, enforceW01WriteAccountRateLimit, enforceW01WriteEndpointRateLimit, enforceW01WriteRateLimit, rateLimitResponse } from '../../../../../../auth/traffic-limit.js'
 
 const errorResponse = (status: number, code: string, message: string) =>
   Response.json(
@@ -21,6 +21,8 @@ async function forwardPushEndpoint(
     await enforceW01WriteRateLimit(request)
     const principal = await resolveSocialPrincipal(request)
     if (principal instanceof Response) return principal
+    await enforceW01WriteAccountRateLimit(principal.userId)
+    await enforceW01WriteEndpointRateLimit('push-endpoint-registration')
 
     const { installationId } = await context.params
     if (!installationId?.trim() || installationId.length > 64) {
