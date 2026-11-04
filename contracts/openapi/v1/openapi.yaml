@@ -1439,7 +1439,7 @@ paths:
               properties:
                 platform: { type: string, enum: [ios, android] }
                 permissionStatus: { type: string, enum: [granted, denied, undetermined] }
-                expoPushToken: { type: string, nullable: true, minLength: 20, maxLength: 512 }
+                expoPushToken: { type: string, nullable: true, minLength: 20, maxLength: 512, description: 'Required for granted permission. If permission is denied or undetermined, any supplied token is ignored and the stored token is cleared.' }
                 appVersion: { type: string, nullable: true, maxLength: 64 }
       responses:
         '200':
