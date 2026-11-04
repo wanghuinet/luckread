@@ -50,6 +50,22 @@ export function isRetryableExpoError(errorCode: string): boolean {
   return ['MessageRateExceeded', 'InternalServerError', 'ExpoServerError', 'ServiceUnavailable', 'NetworkError'].includes(errorCode)
 }
 
+type PushMessageTask = Pick<ClaimedDelivery,
+  'notificationId' | 'pushToken' | 'notificationType' | 'targetType' | 'targetId'
+>
+
+export function createPushMessageDeliveryIndex<T extends PushMessageTask>(
+  tasks: readonly T[],
+): Readonly<{ messages: ExpoPushMessage[]; taskByMessage: Map<ExpoPushMessage, T> }> {
+  const taskByMessage = new Map<ExpoPushMessage, T>()
+  const messages = tasks.map((task) => {
+    const message = notificationPushMessage(task)
+    taskByMessage.set(message, task)
+    return message
+  })
+  return { messages, taskByMessage }
+}
+
 export function notificationPushMessage(task: Pick<ClaimedDelivery,
   'notificationId' | 'pushToken' | 'notificationType' | 'targetType' | 'targetId'
 >): ExpoPushMessage {
@@ -361,17 +377,19 @@ async function processSendBatch(
 ): Promise<{ sent: number; retried: number; failed: number }> {
   const result = { sent: 0, retried: 0, failed: 0 }
   if (!tasks.length) return result
-  const byToken = new Map(tasks.map((task) => [task.pushToken, task]))
-  const messages = tasks.map(notificationPushMessage)
+  // A recipient device can receive several notifications in the same batch.
+  // Map by the message object, never by Expo token: tokens are intentionally
+  // shared across notification rows for the same endpoint.
+  const { messages, taskByMessage } = createPushMessageDeliveryIndex(tasks)
 
   for (const chunk of client.chunkPushNotifications(messages)) {
-    const chunkTasks = chunk.map((message) => byToken.get(String(message.to)))
+    const chunkTasks = chunk.map((message) => taskByMessage.get(message))
       .filter((task): task is ClaimedDelivery => Boolean(task))
     try {
       const tickets = await client.sendPushNotificationsAsync(chunk)
       for (let index = 0; index < chunk.length; index += 1) {
         const message = chunk[index]
-        const task = message ? byToken.get(String(message.to)) : undefined
+        const task = message ? taskByMessage.get(message) : undefined
         const ticket = tickets[index]
         if (!task || !ticket) continue
         const outcome = await recordPushTicket(db, endpointDb, task, ticket, now)
