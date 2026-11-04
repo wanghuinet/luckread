@@ -673,8 +673,8 @@ describe('W05 notification deep-link lookup', () => {
   it('rejects malformed notification IDs before querying the database', async () => {
     const prepare = vi.fn()
     const db = { prepare } as unknown as D1Database
-    await expect(listNotifications(db, 'recipient-1', null, '1', null, '   '))
-      .resolves.toMatchObject({ items: [] })
-    expect(prepare).toHaveBeenCalled()
+    await expect(listNotifications(db, 'recipient-1', null, '1', null, 'n'.repeat(129)))
+      .rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 })
+    expect(prepare).not.toHaveBeenCalled()
   })
 })
