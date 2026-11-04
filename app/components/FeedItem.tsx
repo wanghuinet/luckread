@@ -1,6 +1,5 @@
 import React, { useReducer, useState } from 'react';
 import {
-    ActionSheetIOS,
     Text,
     TouchableOpacity,
     View,
@@ -31,7 +30,7 @@ import { VideoView, useVideoPlayer } from 'expo-video';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { EngagementActions } from './EngagementActions';
-import { MenuView, type MenuAction } from '@react-native-menu/menu';
+import { MenuView, type MenuAction } from '@expo/ui/community/menu';
 import { apiRequest, getApiErrorMessage } from '~/lib/api-client';
 import { useAuthStore } from '~/store/auth-store';
 import { blockUser, muteUser } from '~/lib/social-screen-api';
@@ -621,45 +620,9 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
         }
     };
 
-    const showIosActionSheet = (menu: 'context' | 'dropdown') => {
-        const sourceActions = menu === 'context' ? contextMenuActions : dropdownMenuActions;
-        const items = sourceActions
-            .filter((action) => !action.attributes?.disabled && !action.subactions)
-            .map((action) => ({
-                id: action.id ?? '',
-                title: action.title,
-                destructive: action.attributes?.destructive === true,
-            }));
-
-        if (menu === 'dropdown' && !isOwnPost && targetUserId) {
-            items.push(
-                { id: 'mute', title: 'Mute @' + authorHandle, destructive: false },
-                { id: 'block', title: 'Block @' + authorHandle, destructive: true },
-            );
-        }
-        if (items.length === 0) return;
-
-        const cancelButtonIndex = items.length;
-        const destructiveButtonIndex = items.findIndex((item) => item.destructive);
-        ActionSheetIOS.showActionSheetWithOptions(
-            {
-                title: menu === 'context' ? 'Post options' : '@' + authorHandle,
-                options: [...items.map((item) => item.title), 'Cancel'],
-                cancelButtonIndex,
-                ...(destructiveButtonIndex >= 0 ? { destructiveButtonIndex } : {}),
-                userInterfaceStyle: colorScheme === 'dark' ? 'dark' : 'light',
-            },
-            (selectedIndex) => {
-                const selected = items[selectedIndex];
-                if (selected) runMenuAction(selected.id);
-            },
-        );
-    };
-
     const feedCard = (
         <TouchableOpacity
             onPress={onPress}
-            onLongPress={Platform.OS === 'ios' ? () => showIosActionSheet('context') : undefined}
             className="p-1 py-2 pr-4 border-b border-neutral-200 dark:border-neutral-800"
         >
             {isProfilePinned ? (
@@ -687,22 +650,16 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
                             </View>
                         </TouchableOpacity>
                         {!detailView && (
-                            Platform.OS === 'android' ? (
-                                <MenuView
-                                    actions={dropdownMenuActions}
-                                    isAnchoredToRight
-                                    onPressAction={({ nativeEvent }) => runMenuAction(nativeEvent.event)}
-                                    style={{ width: 28, height: 28 }}
-                                >
-                                    <View className="p-1 -m-1 opacity-70">
-                                        <Feather name="more-horizontal" size={18} color={colorScheme === 'dark' ? 'white' : 'black'} />
-                                    </View>
-                                </MenuView>
-                            ) : (
-                                <TouchableOpacity onPress={() => showIosActionSheet('dropdown')} className="p-1 -m-1 opacity-70">
+                            <MenuView
+                                actions={dropdownMenuActions}
+                                colorScheme={colorScheme === 'dark' ? 'dark' : 'light'}
+                                onPressAction={({ nativeEvent }) => runMenuAction(nativeEvent.event)}
+                                style={{ width: 28, height: 28 }}
+                            >
+                                <View className="p-1 -m-1 opacity-70">
                                     <Feather name="more-horizontal" size={18} color={colorScheme === 'dark' ? 'white' : 'black'} />
-                                </TouchableOpacity>
-                            )
+                                </View>
+                            </MenuView>
                         )}
                     </View>
                     {itemData.accessMode === 'MEMBERS_ONLY' && itemData.accessGranted !== true ? (
@@ -724,7 +681,16 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
 
     return (
         <>
-            {feedCard}
+            {Platform.OS === 'ios' ? (
+                <MenuView
+                    actions={contextMenuActions}
+                    colorScheme={colorScheme === 'dark' ? 'dark' : 'light'}
+                    onPressAction={({ nativeEvent }) => runMenuAction(nativeEvent.event)}
+                    shouldOpenOnLongPress
+                >
+                    {feedCard}
+                </MenuView>
+            ) : feedCard}
             <ReportPostDialog visible={reportDialogOpen} contentId={itemData.contentId} onClose={() => setReportDialogOpen(false)} />
         </>
     );
