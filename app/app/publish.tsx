@@ -1193,7 +1193,7 @@ function PublishScreenContent() {
     } finally {
       setBusy(false);
     }
-  }, [accessMode, assets, body, contentId, coverRef, pollDurationHours, pollEnabled, pollOptions, publishPending, router]);
+  }, [accessMode, assets, body, contentId, coverRef, pollDurationHours, pollEnabled, pollOptions, publishPending, router, saveDraftSnapshot]);
 
   if (authStatus !== 'authenticated') {
     return (
