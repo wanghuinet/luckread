@@ -3,6 +3,7 @@ import {
   resolveSocialPrincipal,
   W05SocialClientError,
 } from '../../../../../../social/w05-social-client.js'
+import { callW08Creator, W08CreatorClientError } from '../../../../../../auth/w08-creator-client.js'
 import { TrafficLimitError, enforceW01WriteAccountRateLimit, enforceW01WriteEndpointRateLimit, enforceW01WriteRateLimit, rateLimitResponse } from '../../../../../../auth/traffic-limit.js'
 
 const errorResponse = (status: number, code: string, message: string) =>
@@ -10,6 +11,55 @@ const errorResponse = (status: number, code: string, message: string) =>
     { error: { code, message, details: {} }, requestId: `req_${crypto.randomUUID()}` },
     { status, headers: { 'cache-control': 'no-store' } },
   )
+
+
+async function authorizePushEndpoint(request: Request, principal: { userId: string; layer: string | null }): Promise<Response | null> {
+  const headers = new Headers(request.headers)
+  headers.delete('host')
+  headers.delete('content-length')
+  headers.set('content-type', 'application/json; charset=utf-8')
+  const permissionRequest = new Request(request.url, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      action: 'notification.update.self',
+      resourceType: 'Notification',
+      resourceAttributes: { ownerId: principal.userId },
+    }),
+  })
+
+  let response: Response
+  try {
+    response = await callW08Creator(permissionRequest, '/internal/authz/check-permission', 'POST')
+  } catch (error) {
+    if (error instanceof W08CreatorClientError) {
+      return errorResponse(503, 'AUTHORIZATION_UNAVAILABLE', 'Notification authorization unavailable')
+    }
+    return errorResponse(503, 'AUTHORIZATION_UNAVAILABLE', 'Notification authorization unavailable')
+  }
+  if (!response.ok) {
+    return errorResponse(503, 'AUTHORIZATION_UNAVAILABLE', 'Notification authorization unavailable')
+  }
+
+  const value: unknown = await response.json().catch((): null => null)
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return errorResponse(503, 'AUTHORIZATION_UNAVAILABLE', 'Notification authorization response could not be verified')
+  }
+  const result = value as Record<string, unknown>
+  if (result.decision === 'DENY') {
+    return errorResponse(403, 'PERMISSION_DENIED', 'Notification endpoint permission required')
+  }
+  if (
+    result.decision !== 'ALLOW' ||
+    result.action !== 'notification.update.self' ||
+    result.resourceType !== 'Notification' ||
+    result.policyVersion !== 'casl-l0-l8-v1' ||
+    result.layer !== principal.layer
+  ) {
+    return errorResponse(503, 'AUTHORIZATION_UNAVAILABLE', 'Notification authorization response could not be verified')
+  }
+  return null
+}
 
 async function forwardPushEndpoint(
   request: Request,
@@ -23,8 +73,8 @@ async function forwardPushEndpoint(
     if (principal instanceof Response) return principal
     await enforceW01WriteAccountRateLimit(principal.userId)
     await enforceW01WriteEndpointRateLimit(method === 'PUT' ? 'upsertPushEndpoint' : 'deletePushEndpoint')
-    await enforceW01WriteAccountRateLimit(principal.userId)
-    await enforceW01WriteEndpointRateLimit('push-endpoint-registration')
+    const authorizationDenied = await authorizePushEndpoint(request, principal)
+    if (authorizationDenied) return authorizationDenied
 
     const { installationId } = await context.params
     if (!installationId?.trim() || installationId.length > 64) {
