@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS social_notification_push_deliveries (
   notification_id TEXT NOT NULL,
   endpoint_id TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'PENDING'
-    CHECK (status IN ('PENDING','LEASED','RECEIPT_PENDING','RECEIPT_LEASED','DELIVERED','RETRY','FAILED','CANCELLED')),
+    CHECK (status IN ('PENDING','LEASED','RECEIPT_PENDING','RECEIPT_LEASED','PROVIDER_ACCEPTED','RETRY','FAILED','CANCELLED')),
   attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
   receipt_poll_count INTEGER NOT NULL DEFAULT 0 CHECK (receipt_poll_count >= 0),
   next_attempt_at TEXT NOT NULL,
