@@ -35,8 +35,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Checkout
+      - name: Checkout PR source branch for the one-time lockfile bootstrap
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref || github.ref }}
+          fetch-depth: 0
       - name: Setup Node 24
         uses: actions/setup-node@v4
         with:
