@@ -14,7 +14,7 @@ import {
   rateLimitResponse,
 } from '../../../../../auth/traffic-limit'
 import { apiErrorResponse, appendRequestIdToJsonResponse } from '../../../../../lib/api-response'
-import { isCanonicalMediaDeliveryUrl } from '../../../../../media/media-delivery'
+import { isCanonicalMediaDeliveryUrl, mediaHostKind } from '../../../../../media/media-delivery'
 
 type MediaAccess = {
   isPublic: boolean
@@ -42,12 +42,16 @@ function readAccess(value: unknown): MediaAccess | null {
 
 export async function GET(request: Request): Promise<Response> {
   const url = new URL(request.url)
-  const mediaUrls = [...new Set(url.searchParams.getAll('url'))]
+  const requestedUrls = url.searchParams.getAll('url')
+  const mediaUrls = [...new Set(requestedUrls)]
   if (
-    mediaUrls.length < 1 ||
-    mediaUrls.length > 4 ||
+    requestedUrls.length < 1 ||
+    requestedUrls.length > 4 ||
     [...url.searchParams.keys()].some((key) => key !== 'url') ||
-    mediaUrls.some((mediaUrl) => !isCanonicalMediaDeliveryUrl(mediaUrl))
+    mediaUrls.some((mediaUrl) =>
+      !isCanonicalMediaDeliveryUrl(mediaUrl) ||
+      mediaHostKind(new URL(mediaUrl).hostname) !== 'image'
+    )
   ) {
     return apiErrorResponse(422, 'VALIDATION_FAILED', 'Provide one to four canonical LuckRead media URLs')
   }
@@ -58,11 +62,9 @@ export async function GET(request: Request): Promise<Response> {
       await enforcePublicReadRateLimit(request)
     }
     const resolved = await resolveOptionalCookieContentPrincipal(request)
-    if (resolved instanceof Response) {
-      if (resolved.status !== 401) return resolved
-    } else {
-      principal = resolved
-    }
+    // Match the byte-delivery path: invalid/unavailable optional identity is
+    // treated as anonymous. W03 will still deny every member-only reference.
+    if (!(resolved instanceof Response)) principal = resolved
   } catch (error) {
     if (error instanceof TrafficLimitError) return rateLimitResponse(request)
     return apiErrorResponse(503, 'SERVICE_UNAVAILABLE', 'Media metadata service unavailable')
@@ -111,11 +113,16 @@ export async function GET(request: Request): Promise<Response> {
     })
     const allowedSet = new Set(allowedUrls)
     const items = result.docs
-      .filter((doc) => typeof doc.url === 'string' && allowedSet.has(doc.url))
+      .filter((doc) =>
+        typeof doc.url === 'string' &&
+        allowedSet.has(doc.url) &&
+        typeof doc.mimeType === 'string' &&
+        doc.mimeType.startsWith('image/')
+      )
       .map((doc) => ({
         url: doc.url,
         alt: typeof doc.alt === 'string' ? doc.alt : '',
-        mimeType: typeof doc.mimeType === 'string' ? doc.mimeType : null,
+        mimeType: doc.mimeType,
       }))
     return await appendRequestIdToJsonResponse(new Response(JSON.stringify({
       data: { items },
