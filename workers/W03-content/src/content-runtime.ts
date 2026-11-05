@@ -18,6 +18,10 @@ export type ContentState =
 
 export type ContentType = 'article' | 'post' | 'video'
 export type ContentAccessMode = 'PUBLIC' | 'MEMBERS_ONLY'
+export type ContentMediaWarning = 'NUDITY' | 'VIOLENCE' | 'SENSITIVE'
+
+const isContentMediaWarning = (value: unknown): value is ContentMediaWarning =>
+  value === 'NUDITY' || value === 'VIOLENCE' || value === 'SENSITIVE'
 
 export interface ContentInput {
   contentType: ContentType
@@ -26,6 +30,7 @@ export interface ContentInput {
   mediaRefs: string[]
   coverRef: string | null
   accessMode?: ContentAccessMode
+  mediaWarning?: ContentMediaWarning | null
 }
 
 export interface ContentRecord {
@@ -46,6 +51,7 @@ export interface ContentRecord {
   bodyRef: string
   mediaRefs: string[]
   coverRef: string | null
+  mediaWarning?: ContentMediaWarning | null
   etag: string
   createdAt: string
   updatedAt: string
@@ -69,6 +75,7 @@ export interface ContentRevision {
   bodyRef: string
   mediaRefs: string[]
   coverRef: string | null
+  mediaWarning?: ContentMediaWarning | null
   etag: string
   reason: string | null
   correlationId: string
@@ -96,6 +103,7 @@ interface ContentRow {
   body_ref: string
   media_refs_json: string
   cover_ref: string | null
+  media_warning?: ContentMediaWarning | null
   etag: string
   created_at: string
   updated_at: string
@@ -117,6 +125,7 @@ interface ContentRevisionRow {
   body_ref: string
   media_refs_json: string
   cover_ref: string | null
+  media_warning?: ContentMediaWarning | null
   etag: string
   reason: string | null
   correlation_id: string
@@ -204,6 +213,7 @@ const toContent = (row: ContentRow): ContentRecord => ({
   bodyRef: row.body_ref,
   mediaRefs: JSON.parse(row.media_refs_json || '[]') as string[],
   coverRef: row.cover_ref,
+  mediaWarning: row.media_warning ?? null,
   etag: row.etag,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
@@ -227,6 +237,7 @@ export const publicContent = (content: ContentRecord) => {
     bodyRef: accessGranted ? content.bodyRef : '',
     mediaRefs: accessGranted ? content.mediaRefs : [],
     coverRef: accessGranted ? content.coverRef : null,
+    mediaWarning: accessGranted ? content.mediaWarning ?? null : null,
   }
 }
 
@@ -415,15 +426,18 @@ export const validateInput = (input: unknown): ContentInput => {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
     throw new ContentRuntimeError('VALIDATION_FAILED', 400)
   }
-  const candidate = input as { contentType?: unknown; title?: unknown; bodyRef?: unknown; mediaRefs?: unknown; coverRef?: unknown; accessMode?: unknown }
+  const candidate = input as { contentType?: unknown; title?: unknown; bodyRef?: unknown; mediaRefs?: unknown; coverRef?: unknown; accessMode?: unknown; mediaWarning?: unknown }
   const contentType = candidate.contentType === undefined ? 'article' : candidate.contentType
   const mediaRefs = candidate.mediaRefs === undefined ? [] : candidate.mediaRefs
   // Keep omission backward-compatible in the canonical idempotency hash.
   // Persistence and read-time defaults still resolve omitted accessMode to PUBLIC.
   const accessMode = candidate.accessMode
+  const mediaWarning = candidate.mediaWarning
   if (
     !['article', 'post', 'video'].includes(String(contentType)) ||
     (accessMode !== undefined && !['PUBLIC', 'MEMBERS_ONLY'].includes(String(accessMode))) ||
+    (mediaWarning !== undefined && mediaWarning !== null && !isContentMediaWarning(mediaWarning)) ||
+    (mediaWarning !== undefined && mediaWarning !== null && (contentType !== 'post' || !Array.isArray(mediaRefs) || mediaRefs.length === 0)) ||
     !Array.isArray(mediaRefs) || mediaRefs.length > 20 ||
     (contentType === 'video' && mediaRefs.length === 0) ||
     mediaRefs.some(ref => typeof ref !== 'string' || ref.trim().length === 0 || ref.length > 2048) ||
@@ -437,7 +451,7 @@ export const validateInput = (input: unknown): ContentInput => {
   ) {
     throw new ContentRuntimeError('VALIDATION_FAILED', 400)
   }
-  return { contentType: contentType as ContentType, title: candidate.title.trim(), bodyRef: candidate.bodyRef.trim(), mediaRefs: mediaRefs.map(ref => ref.trim()), coverRef: candidate.coverRef === undefined || candidate.coverRef === null ? null : candidate.coverRef.trim(), accessMode: accessMode as ContentAccessMode | undefined }
+  return { contentType: contentType as ContentType, title: candidate.title.trim(), bodyRef: candidate.bodyRef.trim(), mediaRefs: mediaRefs.map(ref => ref.trim()), coverRef: candidate.coverRef === undefined || candidate.coverRef === null ? null : candidate.coverRef.trim(), accessMode: accessMode as ContentAccessMode | undefined, mediaWarning: mediaWarning as ContentMediaWarning | null | undefined }
 }
 
 const canonicalize = (value: unknown): unknown => {
@@ -504,6 +518,7 @@ const toRevision = (row: ContentRevisionRow): ContentRevision => ({
   bodyRef: row.body_ref,
   mediaRefs: JSON.parse(row.media_refs_json || '[]') as string[],
   coverRef: row.cover_ref,
+  mediaWarning: row.media_warning ?? null,
   etag: row.etag,
   reason: row.reason,
   correlationId: row.correlation_id,
@@ -522,12 +537,12 @@ const normalizeCorrelationId = (value: string): string => {
 const insertRevision = (db: ContentD1, revision: ContentRevision): D1PreparedStatement =>
   db.prepare(`INSERT INTO content_revisions
     (id, content_id, revision, content_version, actor_user_id, source_revision, operation,
-     state, access_mode, slug, title, body_ref, media_refs_json, cover_ref, etag, reason, correlation_id, created_at)
-   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(
+     state, access_mode, slug, title, body_ref, media_refs_json, cover_ref, media_warning, etag, reason, correlation_id, created_at)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(
     revision.id, revision.contentId, revision.revision, revision.contentVersion,
     revision.actorUserId, revision.sourceRevision, revision.operation, revision.state,
     revision.accessMode ?? 'PUBLIC', revision.slug, revision.title, revision.bodyRef, JSON.stringify(revision.mediaRefs), revision.coverRef,
-    revision.etag, revision.reason, revision.correlationId, revision.createdAt,
+    revision.mediaWarning ?? null, revision.etag, revision.reason, revision.correlationId, revision.createdAt,
   )
 const emptyIdempotency = (): IdempotencyRow => ({
   idem_id: null,
@@ -549,7 +564,7 @@ const loadMutationRow = async (
   const row = await db.prepare(
     `SELECT
         c.id, c.content_type, c.owner_user_id, c.creator_id, c.ip_id, c.state, c.scheduled_at, c.access_mode, c.version, c.revision,
-        c.slug, c.title, c.body_ref, c.media_refs_json, c.cover_ref, c.etag, c.created_at, c.updated_at,
+        c.slug, c.title, c.body_ref, c.media_refs_json, c.cover_ref, c.media_warning, c.etag, c.created_at, c.updated_at,
         i.id AS idem_id,
         i.owner_user_id AS idem_owner_user_id,
         i.request_hash AS idem_request_hash,
@@ -662,7 +677,7 @@ export async function getContent(
   assertContentReference(contentId)
   const row = await db.prepare(
     `SELECT id, content_type, owner_user_id, creator_id, ip_id, state, scheduled_at, access_mode, version, revision,
-            slug, title, body_ref, media_refs_json, cover_ref, etag, created_at, updated_at
+            slug, title, body_ref, media_refs_json, cover_ref, media_warning, etag, created_at, updated_at
        FROM contents
       WHERE (id = ? OR slug = ?)
         AND (state = 'PUBLISHED' OR owner_user_id = ?)`,
@@ -922,7 +937,7 @@ export async function listContentRevisions(
   const rows = await db.prepare(`
     SELECT r.id, r.content_id, r.revision, r.content_version, r.actor_user_id,
            r.source_revision, r.operation, r.state, r.access_mode, r.slug, r.title, r.body_ref,
-           r.media_refs_json, r.cover_ref, r.etag, r.reason, r.correlation_id, r.created_at
+           r.media_refs_json, r.cover_ref, r.media_warning, r.etag, r.reason, r.correlation_id, r.created_at
       FROM content_revisions r
       JOIN contents c ON c.id = r.content_id
      WHERE r.content_id = ? AND c.owner_user_id = ? ${cursorClause}
@@ -946,7 +961,7 @@ export async function getContentRevision(
   const row = await db.prepare(`
     SELECT r.id, r.content_id, r.revision, r.content_version, r.actor_user_id,
            r.source_revision, r.operation, r.state, r.access_mode, r.slug, r.title, r.body_ref,
-           r.media_refs_json, r.cover_ref, r.etag, r.reason, r.correlation_id, r.created_at
+           r.media_refs_json, r.cover_ref, r.media_warning, r.etag, r.reason, r.correlation_id, r.created_at
       FROM content_revisions r
       JOIN contents c ON c.id = r.content_id
      WHERE r.id = ? AND r.content_id = ? AND c.owner_user_id = ?`).bind(revisionId, contentId, principalUserId).first<ContentRevisionRow>()
@@ -1002,7 +1017,7 @@ export async function listCreatorContents(
   }
   const rows = await db.prepare(
     `SELECT id, content_type, owner_user_id, creator_id, ip_id, state, scheduled_at, access_mode, version, revision,
-            slug, title, body_ref, media_refs_json, cover_ref, etag, created_at, updated_at
+            slug, title, body_ref, media_refs_json, cover_ref, media_warning, etag, created_at, updated_at
        FROM contents
       WHERE ${conditions.join(' AND ')}
       ORDER BY updated_at DESC, id DESC
@@ -1035,7 +1050,7 @@ export async function listPublishedContentsByIds(
   const rows = await db.prepare(
     `SELECT c.id, c.content_type, c.owner_user_id, c.creator_id, c.ip_id, c.state,
             c.scheduled_at, c.access_mode, c.version, c.revision, c.slug, c.title, c.body_ref,
-            c.media_refs_json, c.cover_ref, c.etag, c.created_at, c.updated_at
+            c.media_refs_json, c.cover_ref, c.media_warning, c.etag, c.created_at, c.updated_at
        FROM json_each(?) AS requested
        INNER JOIN contents AS c ON c.id = requested.value
       WHERE c.state = 'PUBLISHED'
@@ -1085,7 +1100,7 @@ export async function listContents(
 
   const rows = await db.prepare(
     `SELECT id, content_type, owner_user_id, creator_id, ip_id, state, scheduled_at, access_mode, version, revision,
-            slug, title, body_ref, media_refs_json, cover_ref, etag, created_at, updated_at
+            slug, title, body_ref, media_refs_json, cover_ref, media_warning, etag, created_at, updated_at
        FROM contents
       WHERE ${conditions.join(' AND ')}
       ORDER BY created_at DESC, id DESC
@@ -1237,7 +1252,7 @@ export async function listFollowingOwnerContents(
   const rows = await db.prepare(`
     SELECT c.id, c.content_type, c.owner_user_id, c.creator_id, c.ip_id, c.state,
            c.scheduled_at, c.access_mode, c.version, c.revision, c.slug, c.title, c.body_ref,
-           c.media_refs_json, c.cover_ref, c.etag, c.created_at, c.updated_at
+           c.media_refs_json, c.cover_ref, c.media_warning, c.etag, c.created_at, c.updated_at
       FROM contents c
      WHERE c.state = 'PUBLISHED'
        AND c.owner_user_id IN (SELECT value FROM json_each(?))
@@ -1367,6 +1382,7 @@ export async function createContent(
     bodyRef: normalized.bodyRef,
     mediaRefs: normalized.mediaRefs,
     coverRef: normalized.coverRef,
+    mediaWarning: normalized.mediaWarning ?? null,
     etag: etagForVersion(1),
     createdAt,
     updatedAt: createdAt,
@@ -1377,9 +1393,9 @@ export async function createContent(
     insertCompletedIdempotency(db, ownerUserId, operationId, idempotencyKey, hash, 201, JSON.stringify(createdContent), createdAt, expiresAt),
     db.prepare(
       `INSERT INTO contents
-        (id, content_type, owner_user_id, creator_id, ip_id, state, scheduled_at, access_mode, version, revision, slug, title, body_ref, media_refs_json, cover_ref, etag, created_at, updated_at)
-       VALUES (?, ?, ?, ?, NULL, 'DRAFT', NULL, ?, 1, 1, ?, ?, ?, ?, ?, ?, ?, ?) `,
-    ).bind(contentId, normalized.contentType, ownerUserId, creatorId, normalized.accessMode ?? 'PUBLIC', slug, normalized.title, normalized.bodyRef, JSON.stringify(normalized.mediaRefs), normalized.coverRef, createdContent.etag, createdAt, createdAt),
+        (id, content_type, owner_user_id, creator_id, ip_id, state, scheduled_at, access_mode, version, revision, slug, title, body_ref, media_refs_json, cover_ref, media_warning, etag, created_at, updated_at)
+       VALUES (?, ?, ?, ?, NULL, 'DRAFT', NULL, ?, 1, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?) `,
+    ).bind(contentId, normalized.contentType, ownerUserId, creatorId, normalized.accessMode ?? 'PUBLIC', slug, normalized.title, normalized.bodyRef, JSON.stringify(normalized.mediaRefs), normalized.coverRef, createdContent.mediaWarning ?? null, createdContent.etag, createdAt, createdAt),
     atomicGuard(db),
     insertRevision(db, {
       id: crypto.randomUUID(),
@@ -1396,6 +1412,7 @@ export async function createContent(
       bodyRef: normalized.bodyRef,
       mediaRefs: normalized.mediaRefs,
       coverRef: createdContent.coverRef,
+      mediaWarning: createdContent.mediaWarning,
       etag: createdContent.etag,
       reason: null,
       correlationId: normalizeCorrelationId(correlationId),
@@ -1442,6 +1459,10 @@ export async function updateContent(
   }
   const currentAccessMode = content.accessMode ?? 'PUBLIC'
   const nextAccessMode = normalized.accessMode ?? currentAccessMode
+  const nextMediaWarning = normalized.mediaWarning === undefined ? content.mediaWarning ?? null : normalized.mediaWarning
+  if (nextMediaWarning !== null && (content.contentType !== 'post' || normalized.mediaRefs.length === 0)) {
+    throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+  }
   let nextCreatorId = content.creatorId
   if (normalized.accessMode !== undefined) {
     if (!verifiedCreatorId) throw new ContentRuntimeError('PERMISSION_DENIED', 403)
@@ -1473,6 +1494,7 @@ export async function updateContent(
     bodyRef: normalized.bodyRef,
     mediaRefs: normalized.mediaRefs,
     coverRef: normalized.coverRef,
+    mediaWarning: nextMediaWarning,
     version: nextVersion,
     revision: nextRevision,
     etag: etagForVersion(nextVersion),
@@ -1486,9 +1508,9 @@ export async function updateContent(
     insertCompletedIdempotency(db, principalUserId, operationId, idempotencyKey, hash, 200, idempotencyResponseBody, updatedAt, expiresAt),
     db.prepare(
       `UPDATE contents
-          SET creator_id = ?, title = ?, body_ref = ?, media_refs_json = ?, cover_ref = ?, access_mode = ?, version = ?, revision = ?, etag = ?, updated_at = ?
+          SET creator_id = ?, title = ?, body_ref = ?, media_refs_json = ?, cover_ref = ?, media_warning = ?, access_mode = ?, version = ?, revision = ?, etag = ?, updated_at = ?
         WHERE id = ? AND owner_user_id = ? AND version = ? AND etag = ?`,
-    ).bind(nextCreatorId, updated.title, updated.bodyRef, JSON.stringify(updated.mediaRefs), updated.coverRef, nextAccessMode, nextVersion, nextRevision, updated.etag, updatedAt, content.id, principalUserId, content.version, content.etag),
+    ).bind(nextCreatorId, updated.title, updated.bodyRef, JSON.stringify(updated.mediaRefs), updated.coverRef, updated.mediaWarning ?? null, nextAccessMode, nextVersion, nextRevision, updated.etag, updatedAt, content.id, principalUserId, content.version, content.etag),
     atomicGuard(db),
     insertRevision(db, {
       id: crypto.randomUUID(),
@@ -1505,6 +1527,7 @@ export async function updateContent(
       bodyRef: updated.bodyRef,
       mediaRefs: updated.mediaRefs,
       coverRef: updated.coverRef,
+      mediaWarning: updated.mediaWarning,
       etag: updated.etag,
       reason: null,
       correlationId: normalizeCorrelationId(correlationId),
@@ -1551,7 +1574,7 @@ export async function rollbackContentRevision(
   }
 
   const source = await db.prepare(`SELECT id, content_id, revision, content_version, actor_user_id, source_revision, operation,
-       state, access_mode, slug, title, body_ref, media_refs_json, cover_ref, etag, reason, correlation_id, created_at
+       state, access_mode, slug, title, body_ref, media_refs_json, cover_ref, media_warning, etag, reason, correlation_id, created_at
   FROM content_revisions
  WHERE id = ? AND content_id = ?`).bind(revisionId, contentId).first<ContentRevisionRow>()
   if (!source) throw new ContentRuntimeError('NOT_FOUND', 404)
@@ -1577,6 +1600,7 @@ export async function rollbackContentRevision(
     bodyRef: source.body_ref,
     mediaRefs: JSON.parse(source.media_refs_json || '[]') as string[],
     coverRef: source.cover_ref,
+    mediaWarning: source.media_warning ?? null,
     version: nextVersion,
     revision: nextRevision,
     etag: etagForVersion(nextVersion),
@@ -1588,9 +1612,9 @@ export async function rollbackContentRevision(
     expireMutationRow(db, principalUserId, operationId, idempotencyKey, updatedAt),
     insertCompletedIdempotency(db, principalUserId, operationId, idempotencyKey, hash, 200, JSON.stringify(result), updatedAt, expiresAt),
     db.prepare(`UPDATE contents
-   SET title = ?, body_ref = ?, media_refs_json = ?, cover_ref = ?, access_mode = ?, version = ?, revision = ?, etag = ?, updated_at = ?
+   SET title = ?, body_ref = ?, media_refs_json = ?, cover_ref = ?, media_warning = ?, access_mode = ?, version = ?, revision = ?, etag = ?, updated_at = ?
  WHERE id = ? AND owner_user_id = ? AND version = ? AND etag = ?`).bind(
-      updated.title, updated.bodyRef, JSON.stringify(updated.mediaRefs), updated.coverRef, updated.accessMode ?? 'PUBLIC',
+      updated.title, updated.bodyRef, JSON.stringify(updated.mediaRefs), updated.coverRef, updated.mediaWarning ?? null, updated.accessMode ?? 'PUBLIC',
       nextVersion, nextRevision, updated.etag, updatedAt,
       content.id, principalUserId, content.version, content.etag,
     ),
@@ -1610,6 +1634,7 @@ export async function rollbackContentRevision(
       bodyRef: updated.bodyRef,
       mediaRefs: updated.mediaRefs,
       coverRef: updated.coverRef,
+      mediaWarning: updated.mediaWarning,
       etag: updated.etag,
       reason: reason?.trim() || null,
       correlationId: normalizedCorrelationId,
