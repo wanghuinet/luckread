@@ -1623,6 +1623,133 @@ describe('W03 content contract core', () => {
     })
   })
 
+  it('serves scheduled due candidates only to the credential-free W01 background transport', async () => {
+    let query = ''
+    let databaseReads = 0
+    const db = {
+      prepare(sql: string) {
+        query = sql
+        return {
+          bind: () => ({
+            all: async () => {
+              databaseReads++
+              return { results: [{
+                id: 'scheduled_route_1',
+                owner_user_id: 'owner_1',
+                creator_id: 'creator_1',
+                version: 3,
+                scheduled_at: '2026-10-08T12:00:00.000Z',
+              }] }
+            },
+          }),
+        }
+      },
+    }
+    const limiter = { limit: async () => ({ success: true }) }
+    const env = {
+      D1_02: db,
+      CONTENT_ORIGIN_GLOBAL_LIMITER: limiter,
+      CONTENT_PUBLIC_READ_LIMITER: limiter,
+      CONTENT_MUTATION_LIMITER: limiter,
+    } as never
+    const headers = {
+      'X-LuckRead-Caller': 'W01',
+      'X-LuckRead-Transport-Version': '1.0',
+      'X-LuckRead-Correlation-Id': 'scheduled-due-route-test',
+      'X-LuckRead-Rate-Key': 'scheduled-publish',
+    }
+
+    const response = await w03Worker.fetch(
+      new Request('https://luckread-w03.internal/internal/content/scheduled-due?limit=50', { headers }),
+      env,
+    )
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      data: {
+        items: [{
+          contentId: 'scheduled_route_1',
+          ownerUserId: 'owner_1',
+          creatorId: 'creator_1',
+          version: 3,
+        }],
+      },
+    })
+    expect(query).toContain("state = 'SCHEDULED'")
+    expect(databaseReads).toBe(1)
+
+    const denied = await w03Worker.fetch(
+      new Request('https://luckread-w03.internal/internal/content/scheduled-due?limit=50', {
+        headers: { ...headers, Cookie: 'must-not-cross-internal-transport' },
+      }),
+      env,
+    )
+    expect(denied.status).toBe(403)
+    expect(databaseReads).toBe(1)
+  })
+
+  it('routes W08 authorization evidence to the final W03 compare-and-set', async () => {
+    const updates: Array<{ sql: string; bindings: unknown[] }> = []
+    const db = {
+      prepare(sql: string) {
+        return {
+          bind(...bindings: unknown[]) {
+            updates.push({ sql, bindings })
+            return { sql, bindings }
+          },
+        }
+      },
+      batch: async (statements: Array<{ sql: string }>) =>
+        statements.map(() => ({ meta: { changes: 1 } })),
+    }
+    const limiter = { limit: async () => ({ success: true }) }
+    const env = {
+      D1_02: db,
+      CONTENT_ORIGIN_GLOBAL_LIMITER: limiter,
+      CONTENT_PUBLIC_READ_LIMITER: limiter,
+      CONTENT_MUTATION_LIMITER: limiter,
+    } as never
+    const response = await w03Worker.fetch(
+      new Request('https://luckread-w03.internal/internal/content/scheduled-publish/commit', {
+        method: 'POST',
+        headers: {
+          'X-LuckRead-Caller': 'W01',
+          'X-LuckRead-Transport-Version': '1.0',
+          'X-LuckRead-Correlation-Id': 'scheduled-commit-route-test',
+          'X-LuckRead-Rate-Key': 'scheduled-publish',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          items: [{
+            contentId: 'scheduled_route_2',
+            ownerUserId: 'owner_2',
+            creatorId: 'creator_2',
+            version: 2,
+            scheduledAt: '2026-10-08T12:00:00.000Z',
+            authorization: {
+              decision: 'ALLOW',
+              policyVersion: 'casl-l0-l8-v1',
+              layer: 'L4',
+              action: 'content.publish.own',
+              resourceType: 'Content',
+              ownerUserId: 'owner_2',
+              creatorId: 'creator_2',
+            },
+          }],
+        }),
+      }),
+      env,
+    )
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      data: { scanned: 1, authorized: 1, published: 1, rejected: 0 },
+    })
+    expect(updates).toHaveLength(1)
+    expect(updates[0]?.sql).toContain('owner_user_id = ?')
+    expect(updates[0]?.sql).toContain('creator_id = ?')
+    expect(updates[0]?.sql).toContain("state = 'SCHEDULED'")
+    expect(updates[0]?.sql).toContain('version = ?')
+  })
+
   it('requires at least one media reference for video content', () => {
     expect(() =>
       validateInput({
