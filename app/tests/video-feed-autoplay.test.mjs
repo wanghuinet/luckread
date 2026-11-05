@@ -9,14 +9,14 @@ import { readFileSync } from 'node:fs';
 const settings = readFileSync(new URL('../app/(drawer)/settings.tsx', import.meta.url), 'utf8');
 const videoFeed = readFileSync(new URL('../app/(drawer)/(tabs)/(video)/video.tsx', import.meta.url), 'utf8');
 
-function createStorage(initialValue: string | null = null) {
+function createStorage(initialValue = null) {
   let value = initialValue;
   return {
-    getItemAsync: async (key: string) => {
+    getItemAsync: async (key) => {
       expect(key).toBe(VIDEO_FEED_AUTOPLAY_PREFERENCE_KEY);
       return value;
     },
-    setItemAsync: async (key: string, nextValue: string) => {
+    setItemAsync: async (key, nextValue) => {
       expect(key).toBe(VIDEO_FEED_AUTOPLAY_PREFERENCE_KEY);
       value = nextValue;
     },
