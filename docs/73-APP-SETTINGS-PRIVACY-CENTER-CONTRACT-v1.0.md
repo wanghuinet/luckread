@@ -36,7 +36,7 @@ A signed-in user must be able to:
 - manage blocks and mutes;
 - choose which activity creates in-app/account notifications and whether this device may receive push notifications;
 - control appearance and basic accessibility preferences;
-- control content preferences without being forced into opaque recommendations;
+- control available device-level playback and storage behavior without being forced into opaque recommendations; W04-owned account-level interests and recommendation controls are a 2.0 scope;
 - reach official policy links, app information, and supported account lifecycle actions;
 - understand whether a choice applies to this device, this account, a conversation, or an individual post;
 - see the saved state, recover from errors, and know when a setting is unavailable.
@@ -118,8 +118,8 @@ Settings & privacy
 │   ├── Mentions and tagging permissions
 │   ├── Message requests and read receipts (when messaging is available)
 │   ├── Blocked and muted accounts
-│   ├── Hidden words
-│   └── Sensitive-content preference
+│   ├── Hidden words (2.0 candidate; hidden in 1.0)
+│   └── Sensitive-content preference (2.0 candidate; hidden in 1.0)
 ├── Notifications
 │   ├── In-app / account activity preferences
 │   ├── Push notification permission for this device
@@ -141,13 +141,13 @@ Settings & privacy
 ├── Storage and data
 │   ├── Media / cache usage
 │   ├── Clear local cache (device-only)
-│   └── Export personal data (when supported)
+│   └── Export personal data (2.0 candidate after USER-010/legal/security admission; hidden in 1.0)
 ├── Creator and subscriptions
 │   └── Link to existing Creator / subscription surfaces; do not duplicate billing state
 ├── About and legal information (1.0)
 │   ├── Terms and privacy policy
 │   └── App version / native build
-└── Help and support services (2.0 deferred)
+├── Help and support services (2.0 deferred)
     ├── Help center
     ├── Report a problem
     ├── Appeals / account status
@@ -178,7 +178,7 @@ Not every proposed row must appear in 1.0. A row is visible only when its end-to
 
 ### 6.2 P0 conditional controls — include only after API verification
 
-These are important X/Threads parity controls but require a domain/API audit before they can be admitted into the 1.0 UI:
+These X/Threads parity controls are not admitted for 1.0 and must remain hidden unless a separate release decision is made after domain/API admission. They are candidates for 2.0; they are not 1.0 release blockers:
 
 - account visibility / protected profile;
 - who can follow, mention, tag, reply, quote or interact;
