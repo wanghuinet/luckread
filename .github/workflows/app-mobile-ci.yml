@@ -130,6 +130,13 @@ jobs:
         run: |
           test -f android/gradle.properties
           grep -Fxq "newArchEnabled=true" android/gradle.properties
+          WRAPPER_PROPERTIES="android/gradle/wrapper/gradle-wrapper.properties"
+          if grep -q '^networkTimeout=' "$WRAPPER_PROPERTIES"; then
+            sed -i 's/^networkTimeout=.*/networkTimeout=120000/' "$WRAPPER_PROPERTIES"
+          else
+            printf '\nnetworkTimeout=120000\n' >> "$WRAPPER_PROPERTIES"
+          fi
+          grep -Fxq 'networkTimeout=120000' "$WRAPPER_PROPERTIES"
           chmod +x android/gradlew
           cd android
           ./gradlew generateCodegenArtifactsFromSchema --no-daemon
@@ -178,6 +185,8 @@ jobs:
         run: bun run test:video-feed-api
       - name: Test native video-feed autoplay preference
         run: bun test tests/video-feed-autoplay.test.mjs
+      - name: Test native device-local image cache management
+        run: bun test tests/image-cache-management.test.mjs
       - name: Test native bottom tab navigation visibility
         run: bun test tests/tab-navigation-ui.test.mjs
       - name: Test native feed comment navigation
