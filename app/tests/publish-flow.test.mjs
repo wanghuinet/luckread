@@ -37,6 +37,21 @@ test('native composer uses the existing Expo UI date-time picker for future sche
   expect(composer).toContain('服务端会在到点后重新检查创作者权限，再自动发布。');
 });
 
+test('native composer lists, reschedules and cancels only owner-scoped scheduled posts', () => {
+  expect(composer).toContain('fetchOwnScheduledPostsPage({ cursor, limit: 20 })');
+  expect(composer).toContain('transitionOwnScheduledPostState(item, \'DRAFT\')');
+  expect(composer).toContain('transitionOwnScheduledPostState(updatedDraft, \'SCHEDULED\', scheduledAt)');
+  expect(composer).toContain('setScheduledInboxVisible(true)');
+  expect(composer).toContain('setScheduledInboxItems((current) => current.filter((candidate) => candidate.id !== item.id))');
+  expect(composer).toContain('openScheduleEditPicker(item)');
+  expect(composer).toContain('cancelScheduledPost(item)');
+  expect(composer).toContain('visible={scheduledInboxVisible}');
+  expect(composer).toContain('定时发布');
+  expect(composer).toContain('修改时间');
+  expect(composer).toContain('取消定时');
+  expect(composer).toContain('原定时已取消，内容已安全转为草稿；重新安排失败：');
+});
+
 test('native composer prevents scheduling polls before poll expiry starts', () => {
   expect(composer).toContain('Polls cannot be scheduled yet. Turn off the poll or publish immediately.');
   expect(composer).toContain('disabled={busy || loadingEdit || publishPending || scheduleEnabled}');
