@@ -1092,6 +1092,38 @@ function PublishScreenContent() {
     }
   }, []);
 
+  const loadScheduledInbox = useCallback(async (cursor: string | null = null, append = false) => {
+    setScheduledInboxLoading(true);
+    setScheduledInboxError('');
+    try {
+      const result = await fetchOwnScheduledPostsPage({ cursor, limit: 20 });
+      if (!result.response.ok) {
+        throw new Error(apiFailureDiagnostic(result, '暂时无法加载定时发布列表。'));
+      }
+      const page = result.data && 'data' in result.data ? result.data.data : undefined;
+      if (!page || !Array.isArray(page.items)) {
+        throw new Error('定时发布列表返回的数据格式无效。');
+      }
+      setScheduledInboxItems((current) => {
+        if (!append) return page.items;
+        const known = new Set(current.map((item) => item.id));
+        return [...current, ...page.items.filter((item) => !known.has(item.id))];
+      });
+      setScheduledInboxCursor(page.nextCursor || null);
+      setScheduledInboxHasMore(page.hasMore === true);
+    } catch (cause) {
+      setScheduledInboxError(cause instanceof Error ? cause.message : '暂时无法加载定时发布列表。');
+    } finally {
+      setScheduledInboxLoading(false);
+    }
+  }, []);
+
+  const openScheduledInbox = useCallback(async () => {
+    if (busy || loadingEdit || publishPending) return;
+    setScheduledInboxVisible(true);
+    await loadScheduledInbox(null, false);
+  }, [busy, loadScheduledInbox, loadingEdit, publishPending]);
+
   const openDraftInbox = useCallback(async () => {
     if (busy || loadingEdit || publishPending) return;
     setDraftInboxVisible(true);
@@ -1115,6 +1147,113 @@ function PublishScreenContent() {
     }
     await loadDraftInbox(null, false);
   }, [busy, contentId, loadDraftInbox, loadingEdit, publishPending, saveDraftSnapshot]);
+
+  const cancelScheduledPost = useCallback((item: NativeScheduledPost) => {
+    Alert.alert(
+      '取消定时发布',
+      '“' + item.title + '”将转为草稿，不会删除内容。',
+      [
+        { text: '保留定时', style: 'cancel' },
+        {
+          text: '转为草稿',
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              setScheduledActionId(item.id);
+              setScheduledInboxError('');
+              try {
+                const result = await transitionOwnScheduledPostState(item, 'DRAFT');
+                if (!result.response.ok) {
+                  throw new Error(apiFailureDiagnostic(result, '取消定时发布失败。'));
+                }
+                setScheduledInboxItems((current) => current.filter((candidate) => candidate.id !== item.id));
+                setScheduledInboxError('');
+                await loadScheduledInbox(null, false);
+              } catch (cause) {
+                setScheduledInboxError(cause instanceof Error ? cause.message : '取消定时发布失败。');
+              } finally {
+                setScheduledActionId(null);
+              }
+            })();
+          },
+        },
+      ],
+    );
+  }, [loadScheduledInbox]);
+
+  const rescheduleScheduledPost = useCallback(async (item: NativeScheduledPost, scheduledAt: string) => {
+    if (scheduledActionId) return;
+    setScheduledActionId(item.id);
+    setScheduledInboxError('');
+    let movedToDraft = false;
+    try {
+      // Use the existing lifecycle state machine rather than adding a self-transition.
+      const unscheduled = await transitionOwnScheduledPostState(item, 'DRAFT');
+      if (!unscheduled.response.ok) {
+        throw new Error(apiFailureDiagnostic(unscheduled, '原定时未能取消，内容状态未改变。'));
+      }
+      movedToDraft = true;
+      setScheduledInboxItems((current) => current.filter((candidate) => candidate.id !== item.id));
+
+      const transitionData = unscheduled.data && typeof unscheduled.data === 'object'
+        ? unscheduled.data as Record<string, unknown>
+        : null;
+      const nextEtag = typeof transitionData?.etag === 'string' ? transitionData.etag : '';
+      if (!nextEtag || nextEtag === '*') {
+        throw new Error('原定时已取消，内容已转为草稿；服务器未返回新版本，暂时无法重新安排。请从草稿箱继续编辑。');
+      }
+
+      const updatedDraft = { ...item, etag: nextEtag };
+      const scheduled = await transitionOwnScheduledPostState(updatedDraft, 'SCHEDULED', scheduledAt);
+      if (!scheduled.response.ok) {
+        throw new Error(
+          '原定时已取消，内容已安全转为草稿；重新安排失败：' +
+          apiFailureDiagnostic(scheduled, '请从草稿箱重新安排发布时间。'),
+        );
+      }
+
+      await loadScheduledInbox(null, false);
+      Alert.alert('定时已更新', '新的发布时间：' + new Date(scheduledAt).toLocaleString() + '（本机时间）。');
+    } catch (cause) {
+      if (movedToDraft) {
+        setScheduledInboxItems((current) => current.filter((candidate) => candidate.id !== item.id));
+      }
+      setScheduledInboxError(cause instanceof Error ? cause.message : '修改发布时间失败。');
+    } finally {
+      setScheduledActionId(null);
+    }
+  }, [loadScheduledInbox, scheduledActionId]);
+
+  const openScheduleEditPicker = useCallback((item: NativeScheduledPost) => {
+    const existing = Date.parse(item.scheduledAt);
+    const candidate = Number.isFinite(existing) && existing > Date.now() + MIN_SCHEDULE_LEAD_TIME_MS
+      ? new Date(existing)
+      : getDefaultScheduledPublishDate();
+    setScheduleEditTarget(item);
+    setSchedulePickerDraft(candidate);
+    setSchedulePickerVisible(true);
+    setScheduledInboxVisible(false);
+  }, []);
+
+  const confirmSchedulePicker = useCallback(() => {
+    const iso = toScheduledPublishISO(schedulePickerDraft);
+    if (!iso) {
+      if (scheduleEditTarget) setScheduledInboxError('请选择至少一分钟后的时间。');
+      else setErrorMessage('请选择至少一分钟后的时间。');
+      return;
+    }
+    if (scheduleEditTarget) {
+      const target = scheduleEditTarget;
+      setScheduleEditTarget(null);
+      setSchedulePickerVisible(false);
+      void rescheduleScheduledPost(target, iso);
+      return;
+    }
+    setScheduleDate(new Date(iso));
+    setScheduleEnabled(true);
+    setSchedulePickerVisible(false);
+    setErrorMessage('');
+  }, [rescheduleScheduledPost, scheduleEditTarget, schedulePickerDraft]);
 
   const restoreDraftFromInbox = useCallback((draft: NativePostDraft) => {
     setDraftInboxVisible(false);
