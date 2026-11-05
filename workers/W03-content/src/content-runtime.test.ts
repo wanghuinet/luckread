@@ -920,6 +920,9 @@ describe('W03 content contract core', () => {
     expect(canTransitionContentState('DRAFT', 'PUBLISHED', 'CREATOR', true)).toBe(false)
     expect(canTransitionContentState('DRAFT', 'PUBLISHED', 'CREATOR', true, undefined, 'article')).toBe(false)
     expect(canTransitionContentState('DRAFT', 'PUBLISHED', 'CREATOR', true, undefined, 'post')).toBe(true)
+    expect(canTransitionContentState('DRAFT', 'SCHEDULED', 'CREATOR', true, undefined, 'post')).toBe(true)
+    expect(canTransitionContentState('DRAFT', 'SCHEDULED', 'CREATOR', true, undefined, 'article')).toBe(false)
+    expect(canTransitionContentState('DRAFT', 'SCHEDULED', 'SOCIAL_AUTHOR', true, undefined, 'post')).toBe(false)
     expect(canTransitionContentState('DRAFT', 'PENDING_REVIEW', 'SOCIAL_AUTHOR', true, undefined, 'post')).toBe(false)
     expect(canTransitionContentState('DRAFT', 'PUBLISHED', 'SOCIAL_AUTHOR', true, undefined, 'post')).toBe(true)
     expect(canTransitionContentState('DRAFT', 'PUBLISHED', 'SOCIAL_AUTHOR', false, undefined, 'post')).toBe(false)
@@ -1256,6 +1259,122 @@ describe('W03 content contract core', () => {
         },
       },
     )).rejects.toMatchObject({ code: 'PERMISSION_DENIED', status: 403 })
+  })
+
+  it('schedules a draft social post only after W03 publish preflight succeeds', async () => {
+    const row = {
+      id: 'content_scheduled_post_1',
+      content_type: 'post',
+      owner_user_id: 'user_creator_schedule',
+      creator_id: 'user_creator_schedule',
+      ip_id: null,
+      state: 'DRAFT',
+      scheduled_at: null,
+      access_mode: 'PUBLIC',
+      version: 1,
+      revision: 1,
+      slug: 'scheduled-post-1',
+      title: 'A useful update',
+      body_ref: 'https://img.luckread.com/media/scheduled-body.txt',
+      media_refs_json: '[]',
+      cover_ref: null,
+      etag: 'W/"1"',
+      created_at: '2026-10-16T00:00:00.000Z',
+      updated_at: '2026-10-16T00:00:00.000Z',
+      idem_id: null,
+      idem_owner_user_id: null,
+      idem_request_hash: null,
+      idem_status: null,
+      idem_response_status: null,
+      idem_response_json: null,
+      idem_expires_at: null,
+    }
+    let batchCalls = 0
+    const db = {
+      prepare() { return { bind: () => ({ first: async () => row }) } },
+      batch: async () => { batchCalls += 1; return [] },
+    } as never
+    const scheduledAt = '2026-10-16T00:30:00.000Z'
+    const preflight = {
+      contentType: 'post',
+      title: 'A useful update',
+      body: 'I am sharing a useful update from our recent work and a few lessons learned along the way.',
+      mediaRefs: [],
+      coverRef: null,
+      aiMode: 'none',
+      humanContribution: 'substantial',
+    }
+
+    const result = await transitionContentState(
+      db,
+      'user_creator_schedule',
+      'L3',
+      row.id,
+      'SCHEDULED',
+      undefined,
+      row.etag,
+      'schedule-draft-social-post',
+      new Date('2026-10-16T00:01:00.000Z'),
+      { scheduledAt, preflight },
+    )
+
+    expect(result).toMatchObject({
+      from: 'DRAFT',
+      to: 'SCHEDULED',
+      version: 2,
+      etag: 'W/"2"',
+      scheduledAt,
+    })
+    expect(batchCalls).toBe(1)
+  })
+
+  it('does not schedule a draft social post when its W03 publish preflight is missing', async () => {
+    const row = {
+      id: 'content_scheduled_post_missing_preflight',
+      content_type: 'post',
+      owner_user_id: 'user_creator_schedule',
+      creator_id: 'user_creator_schedule',
+      ip_id: null,
+      state: 'DRAFT',
+      scheduled_at: null,
+      access_mode: 'PUBLIC',
+      version: 1,
+      revision: 1,
+      slug: 'scheduled-post-missing-preflight',
+      title: 'A useful update',
+      body_ref: 'https://img.luckread.com/media/scheduled-body.txt',
+      media_refs_json: '[]',
+      cover_ref: null,
+      etag: 'W/"1"',
+      created_at: '2026-10-16T00:00:00.000Z',
+      updated_at: '2026-10-16T00:00:00.000Z',
+      idem_id: null,
+      idem_owner_user_id: null,
+      idem_request_hash: null,
+      idem_status: null,
+      idem_response_status: null,
+      idem_response_json: null,
+      idem_expires_at: null,
+    }
+    let batchCalls = 0
+    const db = {
+      prepare() { return { bind: () => ({ first: async () => row }) } },
+      batch: async () => { batchCalls += 1; return [] },
+    } as never
+
+    await expect(transitionContentState(
+      db,
+      'user_creator_schedule',
+      'L3',
+      row.id,
+      'SCHEDULED',
+      undefined,
+      row.etag,
+      'schedule-without-preflight',
+      new Date('2026-10-16T00:01:00.000Z'),
+      { scheduledAt: '2026-10-16T00:30:00.000Z' },
+    )).rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 })
+    expect(batchCalls).toBe(0)
   })
 
   it('requires a future timestamp before scheduling an approved content item', async () => {
