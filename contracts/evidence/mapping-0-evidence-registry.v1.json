@@ -1583,6 +1583,40 @@
       "checkId": "127392195252",
       "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/42069246867",
       "note": "Exact-SHA AUTH-010 controlled local W01/W02 + local D1 runtime assertions passed: profile read; login cookie authenticates session API; 50-item bound and cursor continuation (50 + 6); stable current-session marker; secret fields excluded; no-store; malformed cursor rejected; cross-account list isolation and cross-account revoke no-op; owned revoke removes native session; repeated revoke idempotent; synthetic identities/sessions cleaned; no secrets captured. Environment is CONTROLLED_LOCAL_D1 only; this does not prove remote/deployed behavior. Evidence remains CREATED pending current tested-commit and canonical admission review; AUTH-010 remains BLOCKED_NOT_GREEN."
+    },
+    {
+      "evidenceId": "EVD-AUTH001-REGISTRATION-RUNTIME-LOCAL-004",
+      "type": "INTEGRATION_TEST",
+      "claimId": "AUTH-001::REGISTRATION_D1_BATCH",
+      "subjectType": "FEATURE",
+      "subjectId": "AUTH-001",
+      "source": "GitHub Actions AUTH-001 Registration Local Runtime Evidence against exact W01/W02 source SHA",
+      "sourceRef": "https://github.com/wanghuinet/luckread/actions/runs/42070183019/artifacts/13436460882",
+      "commitSha": "7777da399e4224c1a4d095ba508e2d33d9fba80c",
+      "timestamp": "2026-11-05T17:02:45Z",
+      "producer": "AUTH-001 Registration Local Runtime Evidence / run 42070183019 / job 127395670457",
+      "result": "PASS",
+      "status": "CREATED",
+      "checkId": "127395670457",
+      "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/42070183019",
+      "note": "Exact-SHA controlled local W01 OpenNext + W02 Worker runtime on local D1. PASS assertions: successful email registration; W01 profile projection bound to the Better Auth identityId; no Payload-native password hash/salt in the projection; no legacy Payload session created; response digest matched the committed envelope; idempotent replay and key-reuse conflict; forced downstream rollback removed the W01 profile projection and W02 identity; duplicate identity concurrency produced one 201 and one 409; same Idempotency-Key concurrency produced one 201 and one 409. Observed accountState=PENDING_VERIFICATION. Source SHA is 7777da399e4224c1a4d095ba508e2d33d9fba80c. Environment is CONTROLLED_LOCAL_D1_SHARED_W02_W01_OPENNEXT_WORKERS only; no remote D1 read-back or production Worker deployment is claimed. Evidence remains CREATED pending current tested-commit and canonical admission review."
+    },
+    {
+      "evidenceId": "EVD-AUTH010-B16-SESSION-LIST-REVOKE-LOCAL-006",
+      "type": "INTEGRATION_TEST",
+      "claimId": "AUTH-010::SESSION-LIST-REVOKE-LOCAL-RUNTIME",
+      "subjectType": "FEATURE",
+      "subjectId": "AUTH-010",
+      "source": "GitHub Actions AUTH-001 Registration Local Runtime Evidence — exact-SHA AUTH-010 session list/revoke local runtime probe",
+      "sourceRef": "https://github.com/wanghuinet/luckread/actions/runs/42070183019/artifacts/13436460882",
+      "commitSha": "7777da399e4224c1a4d095ba508e2d33d9fba80c",
+      "timestamp": "2026-11-05T17:02:45Z",
+      "producer": "AUTH-001 Registration Local Runtime Evidence / run 42070183019 / job 127395670457",
+      "result": "PASS",
+      "status": "CREATED",
+      "checkId": "127395670457",
+      "workflowRef": "https://github.com/wanghuinet/luckread/actions/runs/42070183019",
+      "note": "Exact-SHA AUTH-010 controlled local W01/W02 + local D1 runtime assertions passed: profile read; login cookie authenticates session API; 50-item bound and cursor continuation (50 + 6); stable current-session marker; secret fields excluded; no-store; malformed cursor rejected; cross-account list isolation and cross-account revoke no-op; owned revoke removes native session; repeated revoke idempotent; synthetic identities/sessions cleaned; no secrets captured. Environment is CONTROLLED_LOCAL_D1 only; this does not prove remote/deployed behavior. Evidence remains CREATED pending current tested-commit and canonical admission review; AUTH-010 remains BLOCKED_NOT_GREEN."
     }
   ],
   "testedCommitSha": "53e3bcbb855be8e1240171390c69dd034bf04f8b"
