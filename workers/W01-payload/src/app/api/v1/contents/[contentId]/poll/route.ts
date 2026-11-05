@@ -48,15 +48,27 @@ export async function POST(
     try { body = await request.json() } catch { return errorResponse(422, 'VALIDATION_FAILED', 'Invalid poll request') }
     if (!body || typeof body !== 'object' || Array.isArray(body)) return errorResponse(422, 'VALIDATION_FAILED', 'Invalid poll request')
     const raw = body as Record<string, unknown>
-    if (!Array.isArray(raw.options) || (raw.durationHours !== undefined && typeof raw.durationHours !== 'number')) {
+    const hasDurationMinutes = Object.prototype.hasOwnProperty.call(raw, 'durationMinutes')
+    const hasLegacyDurationHours = Object.prototype.hasOwnProperty.call(raw, 'durationHours')
+    if (
+      !Array.isArray(raw.options) ||
+      (hasDurationMinutes && hasLegacyDurationHours) ||
+      (hasDurationMinutes && (typeof raw.durationMinutes !== 'number' || !Number.isSafeInteger(raw.durationMinutes) || raw.durationMinutes < 5 || raw.durationMinutes > 10080)) ||
+      (hasLegacyDurationHours && (typeof raw.durationHours !== 'number' || ![24, 72, 168].includes(raw.durationHours)))
+    ) {
       return errorResponse(422, 'VALIDATION_FAILED', 'Invalid poll options or duration')
     }
+    const durationMinutes = hasDurationMinutes
+      ? raw.durationMinutes
+      : hasLegacyDurationHours
+        ? Number(raw.durationHours) * 60
+        : 1440
     return await callW05Social({
       request,
       pathname: '/internal/social/contents/' + encodeURIComponent(contentId) + '/poll',
       method: 'POST',
       principal,
-      body: { options: raw.options, durationHours: raw.durationHours },
+      body: { options: raw.options, durationMinutes },
     })
   } catch (error) {
     if (error instanceof W05SocialClientError) return errorResponse(error.status, error.code, error.message)
