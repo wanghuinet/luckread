@@ -99,7 +99,12 @@ export async function handleScheduledPublishPermission(
     ).bind(body.creatorId, body.creatorId, body.creatorId)
       .first<{ creatorId: string; userId: string }>()
 
-    if (!creator || creator.creatorId !== body.creatorId || !isIdentifier(creator.userId)) {
+    if (
+      !creator ||
+      !isIdentifier(creator.creatorId, 256) ||
+      !isIdentifier(creator.userId) ||
+      (creator.creatorId !== body.creatorId && creator.userId !== body.creatorId)
+    ) {
       return deny('CREATOR_NOT_ACTIVE')
     }
 
