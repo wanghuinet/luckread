@@ -915,10 +915,11 @@ paths:
           in: query
           required: false
           description: >-
-            Optional owner-only native social draft listing. Only DRAFT is supported;
-            requests must be authenticated, are scoped to the caller's W02 identity,
-            return only post drafts, and are never placed in the shared public cache.
-          schema: { type: string, enum: [DRAFT] }
+            Optional owner-only native social lifecycle listing. DRAFT requires L2+
+            and SCHEDULED requires L3/L4 Creator. Requests must be authenticated,
+            are scoped to the caller's W02 identity, return only social posts, and
+            are never placed in the shared public cache.
+          schema: { type: string, enum: [DRAFT, SCHEDULED] }
       responses:
         '200':
           description: Public content list or authenticated owner-scoped social post drafts.
@@ -1030,6 +1031,115 @@ paths:
         '409': { $ref: '#/components/responses/InvalidState' }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
+
+  /contents/{contentId}/thread:
+    parameters:
+      - $ref: '#/components/parameters/ContentId'
+    get:
+      tags: [Contents]
+      summary: Read a social post thread
+      description: >-
+        Returns the ordered chain of independently-addressable social posts.
+        Public callers receive only the contiguous PUBLISHED/PUBLIC chain.
+        An authenticated owner may also read their own DRAFT posts. A thread
+        contains at most 50 posts.
+      operationId: listPostThread
+      security:
+        - bearerAuth: []
+        - sessionCookieAuth: []
+        - {}
+      responses:
+        '200':
+          description: Ordered thread segments rooted at the first post.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, schemaVersion, requestId]
+                properties:
+                  data:
+                    type: object
+                    required: [rootContentId, items]
+                    properties:
+                      rootContentId: { $ref: '#/components/schemas/ResourceId' }
+                      items:
+                        type: array
+                        maxItems: 50
+                        items:
+                          type: object
+                          required: [id, slug, position, contentType, state, accessMode, title, bodyRef, mediaRefs, coverRef, createdAt]
+                          properties:
+                            id: { $ref: '#/components/schemas/ResourceId' }
+                            slug: { type: string }
+                            position: { type: integer, minimum: 0, maximum: 49 }
+                            contentType: { type: string, const: post }
+                            state: { type: string, enum: [DRAFT, PUBLISHED] }
+                            accessMode: { type: string, const: PUBLIC }
+                            title: { type: string }
+                            bodyRef: { type: string, format: uri }
+                            mediaRefs:
+                              type: array
+                              maxItems: 4
+                              items: { type: string, format: uri }
+                            coverRef: { type: [string, 'null'], format: uri }
+                            createdAt: { type: string, format: date-time }
+                  schemaVersion: { type: string, const: '1.0' }
+                  requestId: { $ref: '#/components/schemas/RequestId' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    post:
+      tags: [Contents]
+      summary: Append one social post to the end of a thread
+      description: >-
+        W03 accepts only two public social posts owned by the same authenticated
+        account. Each post can have one predecessor and one successor. The
+        operation rejects cycles, forks, merges, invalid lifecycle states and
+        chains longer than 50 posts. Existing posts retain their own IDs and URLs.
+      operationId: appendPostThreadNext
+      security:
+        - bearerAuth: []
+        - sessionCookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nextContentId]
+              additionalProperties: false
+              properties:
+                nextContentId: { $ref: '#/components/schemas/ResourceId' }
+      responses:
+        '201':
+          description: The ordered thread relationship was created.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, schemaVersion, requestId]
+                properties:
+                  data:
+                    type: object
+                    required: [relationshipId, sourceId, targetId, relationType, status]
+                    properties:
+                      relationshipId: { $ref: '#/components/schemas/ResourceId' }
+                      sourceId: { $ref: '#/components/schemas/ResourceId' }
+                      targetId: { $ref: '#/components/schemas/ResourceId' }
+                      relationType: { type: string, const: thread-next }
+                      status: { type: string, const: ACTIVE }
+                  schemaVersion: { type: string, const: '1.0' }
+                  requestId: { $ref: '#/components/schemas/RequestId' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
   /media:
     get:
