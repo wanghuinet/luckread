@@ -17,7 +17,7 @@ test('native publisher uses the shared media API helpers and existing W01 state 
   expect(composer).toContain('getMediaPlayback(uploaded.id)');
   expect(composer).toContain('uploadTextBody(');
   expect(composer).toContain("'/contents/' + encodeURIComponent(draft.id) + '/state'");
-  expect(composer).toContain("to: 'PUBLISHED'");
+  expect(composer).toContain("to: scheduleEnabled ? 'SCHEDULED' : 'PUBLISHED'");
   expect(composer).toContain('preflight: {');
   expect(composer).toContain("contentType: 'post'");
   expect(composer).not.toMatch(/\bfetch\s*\(/);
@@ -230,7 +230,7 @@ test('native publisher auto-saves server drafts, restores them by draft ID, and 
   expect(composer).toContain("usePreventRemove(shouldPreventRemove, handlePreventRemove)");
   expect(composer).toContain('navigation.dispatch(data.action)');
   expect(composer).toContain('draftWasPublishedRef.current = true');
-  expect(composer).toContain("to: 'PUBLISHED'");
+  expect(composer).toContain("to: scheduleEnabled ? 'SCHEDULED' : 'PUBLISHED'");
   expect(composer).toContain('fetchContentBodyReference');
   expect(composer).toContain('draftSavedFingerprintRef.current = fingerprint;');
   expect(composer).toContain('if (pollEnabled && !contentId && !pollConfiguredRef.current)');
