@@ -63,6 +63,32 @@ jobs:
           print('W03_MEDIA_WARNING_MIGRATION_SQLITE=PASS')
           PY
 
+      - name: Verify W03 migrations and media warning constraints with SQLite
+        run: |
+          python - <<'PY'
+          import sqlite3
+          from pathlib import Path
+          migration_dir = Path('workers/W03-content/migrations')
+          migrations = sorted(migration_dir.glob('*.sql'))
+          if not migrations:
+              raise SystemExit('W03 migrations directory is empty')
+          database = sqlite3.connect(':memory:')
+          for migration in migrations:
+              database.executescript(migration.read_text())
+          for table in ('contents', 'content_revisions'):
+              columns = {row[1] for row in database.execute(f'PRAGMA table_info("{table}")')}
+              if 'media_warning' not in columns:
+                  raise SystemExit(f'{table}.media_warning is missing')
+              table_sql = database.execute(
+                  "SELECT sql FROM sqlite_master WHERE type='table' AND name=?",
+                  (table,),
+              ).fetchone()[0]
+              for category in ("'NUDITY'", "'VIOLENCE'", "'SENSITIVE'"):
+                  if category not in table_sql:
+                      raise SystemExit(f'{table} missing warning check {category}')
+          print('W03_MEDIA_WARNING_MIGRATION_SQLITE=PASS')
+          PY
+
       - name: Run W03 content unit tests
         run: npx --yes vitest@3.2.4 run workers/W03-content/src/content-runtime.test.ts workers/W03-content/src/content-snowflake-id.test.ts workers/W03-content/src/publish-preflight.test.ts workers/W03-content/src/d1-traffic-guard.test.ts workers/W03-content/src/following-feed.test.ts workers/W03-content/src/content-search.test.ts
 
