@@ -1,6 +1,6 @@
 # LuckRead APP Settings & Privacy Center Contract v1.0
 
-**Status:** PRE-DEVELOPMENT / PRODUCT-CONTRACT-READY / IMPLEMENTATION-NOT-STARTED  
+**Status:** IMPLEMENTATION-IN-PROGRESS / SETTINGS HOME + NOTIFICATIONS + VIDEO AUTOPLAY + IMAGE CACHE + HELP & ABOUT IMPLEMENTED / BLOCK-MUTE + APPEARANCE AWAITING UNIFIED CLOSEOUT / SESSION + PRIVACY NOT ADMITTED / CONTENT PREFERENCES PARTIAL  
 **Target:** LuckRead native APP (Android + iOS), 1.0 baseline  
 **Reference experience:** X mobile + Threads mobile  
 **Related contracts:**  
@@ -12,7 +12,7 @@
 
 ## 1. Purpose and Decision
 
-This document defines the APP settings experience before implementation. It turns the existing broad User Center contract into a screen-level product, navigation, ownership, security, and acceptance contract.
+This document defines the APP settings experience, implementation sequence, domain ownership, security admission and acceptance contract for the 1.0 release. Implementation and admission status is tracked in sections 4, 6, 16 and 17.
 
 The target is the **control quality and information architecture** of X and Threads, not a pixel-for-pixel copy of either product. LuckRead keeps its own visual identity and domain boundaries.
 
@@ -71,7 +71,7 @@ Availability of reference features can vary by country, age, account type, and r
 
 ## 4. Existing LuckRead Baseline (Main Branch Inspection)
 
-Inspected repository: `wanghuinet/luckread`, default branch `main`. The inspected main snapshot is anchored to the latest commit observed during this review: `1754cb5e5d7efc99d789512bfe2d801d478dccf4` (2026-11-05). No open PR was returned by the open-PR queries during this inspection.
+Inspected repository: `wanghuinet/luckread`, default branch `main`. The current implementation/status baseline is `main @ 22e608558169b5bc9a3df399065c4dc984cbc5a6` (2026-11-05).
 
 ### 4.1 Existing APP behavior found
 
@@ -189,6 +189,23 @@ These are important X/Threads parity controls but require a domain/API audit bef
 - content-interest and recommendation controls.
 
 For every conditional control, the implementation admission record must identify: authoritative owner, existing API path and schema, permission, persisted scope, supported clients, failure semantics, and tests. If any part is missing, hide the control from 1.0 rather than emulate it locally.
+
+### 6.2.1 Privacy-control admission audit — 2026-11-05
+
+**Inspected baseline:** `wanghuinet/luckread` `main` at `22e608558169b5bc9a3df399065c4dc984cbc5a6`.
+
+The current repository supports the following bounded capabilities, but they do not establish a complete account-level privacy-settings API:
+
+| Capability | Verified implementation | Scope and admission decision |
+|---|---|---|
+| Post reply audience | Native composer `app/app/publish.tsx`; W01 route `/api/v1/contents/[contentId]/reply-audience`; W05 `reply-audience-runtime.ts` and `social_content_reply_policies` | **Admitted only per post.** The owner selects `everyone`, `verified`, `following`, `mentioned`, or `followingNetwork`. W05 verifies post ownership and enforces the policy during reply eligibility. Keep this control in the composer; it is not an account-wide default or profile-visibility setting. |
+| Block and mute | Existing W01 block/mute routes and W05 `social_user_interactions`; native destination `/blocked-muted` | **Admitted under Step 3 only.** It does not imply support for private accounts, follow approvals, or other privacy preferences. |
+| Follow relationship | W01 `/v1/social/follows/{targetUserId}`; W05 `follow-runtime.ts` | **Not admitted as protected-account behavior.** The current runtime creates or deletes an active follow relationship. This audit found no pending follow-request state, owner approval/rejection workflow, or account-level protected-profile setting. |
+| Profile visibility, mention/tag permissions, contact permissions, hidden words, sensitive-content preference, message requests and read receipts | No corresponding account-scoped W01 privacy-settings route and W05/Messaging-owned preference schema or end-to-end permission contract was identified in this baseline audit | **Not admitted.** Do not expose local-only switches or placeholder destinations. |
+
+**Step 6 decision: NOT ADMITTED — no new account-scoped privacy control is ready for the 1.0 Settings UI.** Preserve the existing per-post reply selector in the publish composer and the existing block/mute destination. Keep protected-account, follow-request, discoverability, mention/tag, messaging, hidden-word and sensitive-content controls hidden until their authoritative owner, persisted scope, W01 API contract, server-side enforcement, cross-client behavior, and positive/negative security tests exist.
+
+A future protected-account implementation must not stop at a UI boolean. Its server contract must define visibility across profile/content/feed/search surfaces and implement the follow-request lifecycle (create, list, approve, reject, cancel) with block/mute interaction rules and tests. No new Worker, D1, Queue, or Service Binding is authorized by this audit.
 
 ### 6.3 2.0 / later enhancements
 
@@ -408,17 +425,17 @@ For every conditional feature admitted into 1.0, add positive, negative, permiss
 
 Implementation must proceed in small, reviewable increments. Complete and verify one module, stop, report evidence and remaining work, and wait for the next instruction.
 
-| Step | Module | Exit condition |
-|---|---|---|
-| 0 | Read-only implementation inventory | Exact route/API/test/owner matrix exists; no code change |
-| 1 | Settings home and navigation | One discoverable root; existing routes continue to work |
-| 2 | Notification preferences integration | Existing four preferences and OS push permission work end-to-end |
-| 3 | Blocked/muted integration | Existing lists/actions accessible from Privacy & safety with no duplicate state |
-| 4 | Appearance integration | Light/dark/system centralized and consistent after relaunch |
-| 5 | Account/security admission | Only verified W02 account/session controls are shown and tested |
-| 6 | Privacy controls admission | Only verified W03/W05/Messaging capabilities are shown and tested |
-| 7 | Content preferences and data controls | Only supported server-owned preferences and device-local data options are shown |
-| 8 | Help/about and final APP polish | Working destinations, version info, accessibility and all release gates pass |
+| Step | Module | Current status | Exit condition |
+|---|---|---|---|
+| 0 | Read-only implementation inventory | DONE — contract and source inventory recorded | Exact route/API/test/owner matrix exists; no code change |
+| 1 | Settings home and navigation | IMPLEMENTED — PR #1553 merged | One discoverable root; existing routes continue to work |
+| 2 | Notification preferences integration | IMPLEMENTED — PR #1554 merged | Existing account preferences and OS push permission use the existing server/device paths |
+| 3 | Blocked and muted integration | IMPLEMENTED IN CODE — existing W05 screen/API plus account-context isolation merged in PR #1564; awaiting authenticated real-account closeout | Pagination, unblock/unmute persistence, account switching, same-account reauthentication, expired-session recovery, accessibility and Android/iOS runtime acceptance |
+| 4 | Appearance settings integration | IMPLEMENTED IN CODE — shared store and app-wide hydration in PR #1565; awaiting unified runtime acceptance | Persistence across relaunch, system-mode behavior and theme consistency across subpages, modals, loading/error states and Android/iOS |
+| 5 | Account and session security | WAITING FOR ADMISSION — PR #1555 remains a hidden candidate and is not admitted for release | W01/W02 self-scope, current-session denial, rate limiting, account/session isolation and authenticated Android/iOS runtime evidence must be accepted before exposing or merging for release; password, MFA/passkeys, login history and bulk revocation remain hidden |
+| 6 | Privacy controls | BLOCKED_NOT_ADMITTED — see docs/75-APP-PRIVACY-CONTROLS-ADMISSION-AUDIT-v1.0.md | Each control needs a proven domain owner, persisted scope, W01 API, server-side enforcement, cross-client behavior and positive/negative security tests |
+| 7 | Content preferences and data controls | PARTIAL — device-local video autoplay and image-cache controls merged; account-level interests, recommendation controls, content history and data export remain unavailable | Implement only supported server-owned preferences and clearly scoped device-local controls; no fake settings or generic settings authority |
+| 8 | Help, about and final polish | HELP/ABOUT BASE IMPLEMENTED — PR #1563 merged; full help center, live support and ticketing not connected | Verified legal/help destinations, native version/build, accessibility and final Settings release acceptance |
 
 Do not batch unrelated modules. Do not start Step 2 in the same round as Step 1. Stop immediately after each module reaches its own exit condition.
 
@@ -436,5 +453,4 @@ The APP Settings 1.0 baseline is complete only when:
 - no 2.0-only feature is required for the 1.0 release gate;
 - evidence is attached to the exact commit/build tested.
 
-**Current contract status: PRE-DEVELOPMENT / READY FOR STEP 0 INVENTORY ONLY.**  
-No APP implementation is authorized by this document alone; begin with the read-only route/API/test inventory and then proceed one module at a time.
+**Current contract status:** Steps 0–2 implemented; Steps 3–4 have code merged/in review and remain awaiting authenticated runtime closeout; Step 5 is not admitted; Step 6 is blocked/not admitted; Step 7 is partially implemented; Step 8 Help/About base is implemented while full support remains out of scope. A merged PR or green CI alone does not equal unified Settings release acceptance.
