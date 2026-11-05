@@ -1794,6 +1794,22 @@ export async function transitionContentState(
   if (!ownsContent) {
     throw new ContentRuntimeError('PERMISSION_DENIED', 403)
   }
+  // A scheduled item must retain the canonical W08 Creator identity so the
+  // execution-time permission check can re-resolve current account and role facts.
+  // Legacy public content may have ownerUserId mirrored into creatorId; only that
+  // self-owned placeholder may be rebound to the verified W08 Creator ID.
+  if (to === 'SCHEDULED') {
+    if (!options.verifiedCreatorId) {
+      throw new ContentRuntimeError('PERMISSION_DENIED', 403)
+    }
+    if (
+      content.creatorId !== null &&
+      content.creatorId !== principalUserId &&
+      content.creatorId !== options.verifiedCreatorId
+    ) {
+      throw new ContentRuntimeError('PERMISSION_DENIED', 403)
+    }
+  }
   if (kind === 'SOCIAL_AUTHOR') {
     if (content.contentType !== 'post') {
       throw new ContentRuntimeError('PERMISSION_DENIED', 403)
@@ -1849,9 +1865,19 @@ export async function transitionContentState(
     expireMutationRow(db, principalUserId, operationId, idempotencyKey, updatedAt),
     insertCompletedIdempotency(db, principalUserId, operationId, idempotencyKey, hash, 200, JSON.stringify(result), updatedAt, expiresAt),
     db.prepare(
-      `UPDATE contents SET state=?, scheduled_at=?, version=?, etag=?, updated_at=?
+      `UPDATE contents SET state=?, scheduled_at=?, creator_id=?, version=?, etag=?, updated_at=?
         WHERE id=? AND version=? AND etag=?`,
-    ).bind(to, scheduledAt, nextVersion, result.etag, updatedAt, content.id, content.version, content.etag),
+    ).bind(
+      to,
+      scheduledAt,
+      to === 'SCHEDULED' ? options.verifiedCreatorId : content.creatorId,
+      nextVersion,
+      result.etag,
+      updatedAt,
+      content.id,
+      content.version,
+      content.etag,
+    ),
     atomicGuard(db),
   ])
 
