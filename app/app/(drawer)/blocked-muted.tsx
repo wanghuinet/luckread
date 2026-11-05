@@ -144,6 +144,8 @@ export default function BlockedMutedScreen() {
     setLoadedAccountId(null);
     setCursor(null);
     setHasMore(false);
+    setLoadingMore(false);
+    setRefreshing(false);
     setPendingTargetId(null);
     setError('');
     void loadPage(null, false);
