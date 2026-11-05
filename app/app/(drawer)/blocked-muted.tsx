@@ -57,6 +57,7 @@ export default function BlockedMutedScreen() {
   const [kind, setKind] = useState<ManagedRelationshipKind>('blocks');
   const [rows, setRows] = useState<RelationRow[]>([]);
   const [loadedAccountId, setLoadedAccountId] = useState<string | null>(null);
+  const loadedAccountIdRef = useRef<string | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -69,6 +70,7 @@ export default function BlockedMutedScreen() {
   const loadPage = useCallback(async (nextCursor: string | null, append: boolean, pullRefresh = false) => {
     if (authStatus !== 'authenticated') {
       setRows([]);
+      loadedAccountIdRef.current = null;
       setLoadedAccountId(null);
       setCursor(null);
       setHasMore(false);
@@ -79,7 +81,7 @@ export default function BlockedMutedScreen() {
     }
 
     if (append && requestRef.current) return;
-    if (append && loadedAccountId !== accountId) return;
+    if (append && loadedAccountIdRef.current !== accountId) return;
     requestRef.current?.abort();
     const controller = new AbortController();
     requestRef.current = controller;
@@ -95,7 +97,7 @@ export default function BlockedMutedScreen() {
         signal: controller.signal,
       });
       if (result.response.status === 401) {
-        if (!controller.signal.aborted) {
+        if (!controller.signal.aborted && accountIdRef.current === accountId) {
           router.replace(('/login?returnTo=' + encodeURIComponent('/blocked-muted')) as never);
         }
         return;
@@ -113,6 +115,7 @@ export default function BlockedMutedScreen() {
       }));
       if (controller.signal.aborted || accountIdRef.current !== accountId) return;
 
+      loadedAccountIdRef.current = accountId;
       setLoadedAccountId(accountId);
       setRows((current) => {
         if (!append) return resolved;
@@ -122,21 +125,22 @@ export default function BlockedMutedScreen() {
       setCursor(page.nextCursor || null);
       setHasMore(page.hasMore);
     } catch (cause) {
-      if (!controller.signal.aborted) {
+      if (!controller.signal.aborted && accountIdRef.current === accountId) {
         setError(cause instanceof Error ? cause.message : '无法读取列表，请重试。');
       }
     } finally {
       if (requestRef.current === controller) requestRef.current = null;
-      if (!controller.signal.aborted) {
+      if (!controller.signal.aborted && accountIdRef.current === accountId) {
         setLoading(false);
         setLoadingMore(false);
         setRefreshing(false);
       }
     }
-  }, [accountId, authStatus, kind, loadedAccountId, router]);
+  }, [accountId, authStatus, kind, router]);
 
   useEffect(() => {
     setRows([]);
+    loadedAccountIdRef.current = null;
     setLoadedAccountId(null);
     setCursor(null);
     setHasMore(false);
@@ -168,7 +172,7 @@ export default function BlockedMutedScreen() {
                 const result = isBlock ? await unblockUser(targetId) : await unmuteUser(targetId);
                 if (accountIdRef.current !== operationAccountId) return;
                 if (result.response.status === 401) {
-                  router.push(('/login?returnTo=' + encodeURIComponent('/blocked-muted')) as never);
+                  router.replace(('/login?returnTo=' + encodeURIComponent('/blocked-muted')) as never);
                   return;
                 }
                 if (!result.response.ok) {
