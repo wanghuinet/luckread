@@ -1342,7 +1342,7 @@ const worker = {
           bodyRef: content.bodyRef,
           mediaRefs: content.mediaRefs,
           coverRef: content.coverRef,
-          mediaWarning: content.accessGranted === false ? null : content.mediaWarning ?? null,
+          mediaWarning: content.mediaWarning ?? null,
           scheduledAt: content.scheduledAt,
           updatedAt: content.updatedAt,
           requestId: createRequestId(),
