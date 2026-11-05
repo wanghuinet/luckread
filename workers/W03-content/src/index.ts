@@ -667,6 +667,7 @@ const worker = {
                 bodyRef: membersOnly ? '' : item.bodyRef,
                 mediaRefs: membersOnly ? [] : item.mediaRefs,
                 coverRef: membersOnly ? null : item.coverRef,
+                mediaWarning: membersOnly ? null : item.mediaWarning ?? null,
                 createdAt: item.createdAt,
                 updatedAt: item.updatedAt,
               }
@@ -1082,6 +1083,7 @@ const worker = {
               bodyRef: item.bodyRef,
               mediaRefs: item.mediaRefs,
               coverRef: item.coverRef,
+              mediaWarning: item.mediaWarning ?? null,
               scheduledAt: item.scheduledAt,
               updatedAt: item.updatedAt,
             })),
@@ -1125,6 +1127,7 @@ const worker = {
                 bodyRef: item.bodyRef,
                 mediaRefs: item.mediaRefs,
                 coverRef: item.coverRef,
+              mediaWarning: item.mediaWarning ?? null,
                 updatedAt: item.updatedAt,
               })),
               nextCursor: page.nextCursor,
@@ -1166,6 +1169,7 @@ const worker = {
                 bodyRef: membersOnly ? '' : item.bodyRef,
                 mediaRefs: membersOnly ? [] : item.mediaRefs,
                 coverRef: membersOnly ? null : item.coverRef,
+                mediaWarning: membersOnly ? null : item.mediaWarning ?? null,
                 scheduledAt: item.scheduledAt,
               }
             }),
@@ -1266,6 +1270,7 @@ const worker = {
           bodyRef: content.bodyRef,
           mediaRefs: content.mediaRefs,
           coverRef: content.coverRef,
+          mediaWarning: content.mediaWarning ?? null,
           requestId: createRequestId(),
         }, 201)
       }
@@ -1337,6 +1342,7 @@ const worker = {
           bodyRef: content.bodyRef,
           mediaRefs: content.mediaRefs,
           coverRef: content.coverRef,
+          mediaWarning: content.mediaWarning ?? null,
           scheduledAt: content.scheduledAt,
           updatedAt: content.updatedAt,
           requestId: createRequestId(),
