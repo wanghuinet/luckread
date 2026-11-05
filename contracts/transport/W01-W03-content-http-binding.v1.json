@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://luckread.com/contracts/v1/transport/W01-W03-content-http-binding.v1.json",
   "title": "1.0 W01 to W03 Content Internal HTTP Binding",
-  "version": "1.0.0",
+  "version": "1.1",
   "status": "CONTRACTED_PARTIAL",
   "caller": {
     "logicalWorker": "W01",
@@ -92,7 +92,8 @@
       "internalPath": "/internal/content/contents/{contentId}/state",
       "principalRequired": true,
       "precondition": "If-Match",
-      "idempotency": "Idempotency-Key"
+      "idempotency": "Idempotency-Key",
+      "scheduledPublishIdentity": "For target state SCHEDULED, W01 resolves the current ACTIVE Creator through the existing W08_CREATOR Service Binding and forwards its canonical creatorId in X-LuckRead-Verified-Creator-Id. W03 accepts the header only over the authenticated W01 internal transport, binds the verified creatorId to the owned content record, and keeps W03 as the content-state authority."
     },
     {
       "operationId": "preflightContent",
@@ -126,7 +127,13 @@
       "W01 forwards If-Match and Idempotency-Key exactly when the public operation requires them.",
       "W01 does not forward end-user Authorization credentials to W03.",
       "W03 treats missing/invalid caller or required principal headers as fail-closed transport/authentication failure."
-    ]
+    ],
+    "verifiedCreator": {
+      "header": "X-LuckRead-Verified-Creator-Id",
+      "requiredFor": "SCHEDULED content state transition",
+      "source": "W01 resolves the caller's current active Creator identity through the existing private W08_CREATOR Service Binding; never copied from the public request body",
+      "failClosed": true
+    }
   },
   "failurePolicy": {
     "timeoutMs": 2000,
@@ -137,7 +144,9 @@
       "missing caller marker",
       "unsupported transport version",
       "missing required principal",
-      "invalid W03 response envelope"
+      "invalid W03 response envelope",
+      "missing or invalid W08-verified Creator identity on a scheduled content transition",
+      "content.creatorId conflicts with the authenticated owner's current W08 Creator identity"
     ]
   },
   "security": {
