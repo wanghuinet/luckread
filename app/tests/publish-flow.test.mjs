@@ -23,6 +23,27 @@ test('native publisher uses the shared media API helpers and existing W01 state 
   expect(composer).not.toMatch(/\bfetch\s*\(/);
 });
 
+test('native composer uses the existing Expo UI date-time picker for future scheduled publishing', () => {
+  expect(composer).toContain("import DateTimePicker from '@expo/ui/community/datetime-picker';");
+  expect(composer).toContain('mode="datetime"');
+  expect(composer).toContain('presentation="inline"');
+  expect(composer).toContain('minimumDate={new Date(Date.now() + MIN_SCHEDULE_LEAD_TIME_MS)}');
+  expect(composer).toContain('toScheduledPublishISO(schedulePickerDraft)');
+  expect(composer).toContain('toScheduledPublishISO(scheduleDate)');
+  expect(composer).toContain("to: scheduleEnabled ? 'SCHEDULED' : 'PUBLISHED'");
+  expect(composer).toContain('...(normalizedScheduledAt ? { scheduledAt: normalizedScheduledAt } : {})');
+  expect(composer).toContain("Alert.alert('定时发布已安排'");
+  expect(composer).toContain('scheduleDate.toLocaleString()');
+  expect(composer).toContain('服务端会在到点后重新检查创作者权限，再自动发布。');
+});
+
+test('native composer prevents scheduling polls before poll expiry starts', () => {
+  expect(composer).toContain('Polls cannot be scheduled yet. Turn off the poll or publish immediately.');
+  expect(composer).toContain('disabled={busy || loadingEdit || publishPending || scheduleEnabled}');
+  expect(composer).toContain('disabled={busy || loadingEdit || publishPending || pollEnabled}');
+  expect(composer).toContain("if (scheduleEnabled && pollEnabled)");
+});
+
 test('publishing and editing failures surface the backend HTTP status, error code and request ID', () => {
   expect(composer).toContain("restoringDraft ? 'Unable to restore this draft.' : 'Unable to load this post for editing.'");
   expect(composer).toContain('apiFailureDiagnostic(result, \'Unable to save post changes.\')');
