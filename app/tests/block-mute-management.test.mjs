@@ -64,6 +64,7 @@ test('isolates relationship lists and pending mutations when the signed-in accou
   expect(screenSource).toContain("accountIdRef.current !== accountId");
   expect(screenSource).toContain("[accountId, loadPage]");
   expect(screenSource).toContain("accountIdRef.current === operationAccountId");
+  expect(screenSource).toContain("if (accountIdRef.current !== operationAccountId) return");
   expect(screenSource).toContain("setLoadingMore(false)");
   expect(screenSource).toContain("setRefreshing(false)");
 });
