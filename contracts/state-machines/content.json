@@ -20,6 +20,7 @@
   "required": ["initial", "transitions"],
   "x-transitions": [
     { "from": "DRAFT", "to": "PENDING_REVIEW", "actor": "creator", "permission": "content.submit_review.own", "event": "content.submitted" },
+    { "from": "DRAFT", "to": "SCHEDULED", "actor": "creator", "permission": "content.schedule.own", "precondition": "content_type_post_and_creator_layer", "event": "content.scheduled" },
     { "from": "PENDING_REVIEW", "to": "APPROVED", "actor": "moderator", "permission": "moderation.decide", "event": "content.approved" },
     { "from": "PENDING_REVIEW", "to": "REJECTED", "actor": "moderator", "permission": "moderation.decide", "event": "content.rejected" },
     { "from": "REJECTED", "to": "DRAFT", "actor": "creator", "permission": "content.update.own", "event": "content.reopened" },
