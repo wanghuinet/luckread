@@ -677,13 +677,14 @@ function PublishScreenContent() {
     setErrorMessage('');
     setStatusMessage('Saving selected media on this device…');
     setBusy(true);
+    const durableAssets: ComposerAsset[] = [];
     try {
-      const durableAssets: ComposerAsset[] = [];
       for (const asset of newAssets) {
         const durable = await persistPendingAsset(asset);
-        durableAssets.push({ ...asset, uri: durable.uri });
+        const durableAsset = { ...asset, uri: durable.uri };
+        durableAssets.push(durableAsset);
+        setAssets((current) => [...current, durableAsset]);
       }
-      setAssets((current) => [...current, ...durableAssets]);
       setStatusMessage('Uploading selected media to LuckRead…');
       const uploadResults: boolean[] = [];
       for (const asset of durableAssets) uploadResults.push(await uploadAsset(asset));
@@ -693,6 +694,12 @@ function PublishScreenContent() {
         setStatusMessage('Some media uploads failed. Files are saved on this device; retry them from the composer.');
       }
     } catch (error) {
+      if (durableAssets.length > 0) {
+        const recoverableIds = new Set(durableAssets.map((asset) => asset.localId));
+        setAssets((current) => current.map((asset) => recoverableIds.has(asset.localId)
+          ? { ...asset, status: 'failed', error: '文件已保存在本机，但本次上传尚未开始。点击重试继续上传。' }
+          : asset));
+      }
       setErrorMessage(error instanceof Error ? error.message : 'Selected media could not be saved for recovery.');
       setStatusMessage('');
     } finally {
