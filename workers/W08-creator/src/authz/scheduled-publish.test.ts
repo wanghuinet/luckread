@@ -20,8 +20,10 @@ class FakeStatement {
     this.db.reads++
     if (this.db.fail) throw new Error('D1 unavailable')
 
-    if (this.sql.includes('FROM creators WHERE creator_id = ?')) {
-      const creator = this.db.creators.get(String(this.values[0]))
+    if (this.sql.includes('FROM creators') && this.sql.includes("status = 'ACTIVE'")) {
+      const lookup = String(this.values[0])
+      const creator = this.db.creators.get(lookup) ??
+        [...this.db.creators.values()].find((item) => item.userId === lookup)
       if (!creator || creator.status !== 'ACTIVE') return null
       return { creatorId: creator.creatorId, userId: creator.userId } as T
     }
@@ -113,6 +115,22 @@ describe('W08 background scheduled-publish permission', () => {
       creatorId: 'creator-123',
     })
     expect(db.reads).toBe(3)
+  })
+
+  it('resolves a legacy ownerUserId creator_id placeholder to the canonical active Creator ID', async () => {
+    const { env } = setup()
+    const response = await handleScheduledPublishPermission(
+      makeRequest({ creatorId: 'creator-user-1' }),
+      env,
+    )
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      decision: 'ALLOW',
+      layer: 'L3',
+      ownerUserId: 'creator-user-1',
+      creatorId: 'creator-123',
+    })
   })
 
   it('routes the existing W01-to-W08 service binding operation without a user session', async () => {
