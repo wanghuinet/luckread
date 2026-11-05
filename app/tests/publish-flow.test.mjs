@@ -147,6 +147,18 @@ test('native post detail reads poll state and submits votes through existing W01
   expect(socialPoll).toContain('poll.closed');
 });
 
+test('native composer reports real attachment upload progress before publish is enabled', () => {
+  expect(composer).toContain('uploadProgress?: number | null;');
+  expect(composer).toContain('uploadLoadedBytes?: number;');
+  expect(composer).toContain('uploadTotalBytes?: number;');
+  expect(composer).toContain('uploadMediaFile(uploadFile, asset.uploadKey, (progress) => {');
+  expect(composer).toContain('uploadProgress: progress.percent');
+  expect(composer).toContain('uploadLoadedBytes: progress.loaded');
+  expect(composer).toContain('Uploading to LuckRead · ');
+  expect(composer).toContain('accessibilityRole="progressbar"');
+  expect(composer).toContain('Math.min(100, Math.max(0, asset.uploadProgress))');
+});
+
 test('media upload success is reported only when every attachment is ready', () => {
   expect(composer).toContain('return true;');
   expect(composer).toContain('return false;');
