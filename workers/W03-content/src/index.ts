@@ -36,6 +36,8 @@ import {
   createContentRelationship,
   listContentRelationships,
   revokeContentRelationship,
+  appendPostThreadNext,
+  listPostThread,
   type ContentRelationshipDirection,
 } from './content-relationships.js'
 import {
@@ -271,7 +273,7 @@ const resolveCreatorMembershipAccess = async (
   return decision.allowed
 }
 
-const getPath = (pathname: string): {id?: string; state?: boolean; preflight?: boolean; revisions?: boolean; relationships?: boolean; relationshipId?: string; revisionId?: string; rollback?: boolean; series?: boolean; seriesMembers?: boolean; seriesMemberContentId?: string; collections?: boolean; collectionMembers?: boolean; collectionMemberContentId?: string} | null => {
+const getPath = (pathname: string): {id?: string; state?: boolean; preflight?: boolean; revisions?: boolean; relationships?: boolean; relationshipId?: string; revisionId?: string; rollback?: boolean; thread?: boolean; series?: boolean; seriesMembers?: boolean; seriesMemberContentId?: string; collections?: boolean; collectionMembers?: boolean; collectionMemberContentId?: string} | null => {
   const parts = pathname.split('/').filter(Boolean)
   if (parts.length === 3 && parts[0] === 'internal' && parts[1] === 'content' && parts[2] === 'contents') {
     return {}
@@ -290,6 +292,9 @@ const getPath = (pathname: string): {id?: string; state?: boolean; preflight?: b
   }
   if (parts.length === 5 && parts[0] === 'internal' && parts[1] === 'content' && parts[2] === 'contents' && parts[4] === 'relationships') {
     return { id: decodePathSegment(parts[3]), relationships: true }
+  }
+  if (parts.length === 5 && parts[0] === 'internal' && parts[1] === 'content' && parts[2] === 'contents' && parts[4] === 'thread') {
+    return { id: decodePathSegment(parts[3]), thread: true }
   }
   if (parts.length === 6 && parts[0] === 'internal' && parts[1] === 'content' && parts[2] === 'contents' && parts[4] === 'relationships') {
     return { id: decodePathSegment(parts[3]), relationships: true, relationshipId: decodePathSegment(parts[5]) }
@@ -994,6 +999,27 @@ const worker = {
           requireIdempotency(request),
         )
         return new Response(null, { status: 204 })
+      }
+
+      if (path && path.thread && path.id && request.method === 'GET') {
+        const viewerUserId = request.headers.get('X-LuckRead-Principal-User-Id')?.trim() || null
+        if (viewerUserId) requiredSocialPostPrincipal(request)
+        const thread = await listPostThread(env.D1_02, path.id, viewerUserId)
+        return json({ data: thread, schemaVersion: '1.0', requestId: createRequestId() })
+      }
+
+      if (path && path.thread && path.id && request.method === 'POST') {
+        const principal = requiredSocialPostPrincipal(request)
+        const body = await parseBody(request)
+        const nextContentId = typeof body.nextContentId === 'string' ? body.nextContentId.trim() : ''
+        const relationship = await appendPostThreadNext(
+          env.D1_02,
+          principal.userId,
+          path.id,
+          nextContentId,
+          requireIdempotency(request),
+        )
+        return json({ data: relationship, schemaVersion: '1.0', requestId: createRequestId() }, 201)
       }
 
       if (path && path.relationships && path.id && request.method === 'GET' && !path.relationshipId) {

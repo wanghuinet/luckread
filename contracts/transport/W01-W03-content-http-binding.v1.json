@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://luckread.com/contracts/v1/transport/W01-W03-content-http-binding.v1.json",
   "title": "1.0 W01 to W03 Content Internal HTTP Binding",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "status": "CONTRACTED_PARTIAL",
   "caller": {
     "logicalWorker": "W01",
@@ -30,6 +30,26 @@
       "principalRequired": false,
       "idempotency": false,
       "conditionalPrincipal": "For status=DRAFT, W01 must authenticate via W02; W03 requires L2+ and returns only caller-owned DRAFT social posts. For status=SCHEDULED, W01 must authenticate via W02; W03 requires L3/L4 Creator permission and returns only caller-owned SCHEDULED social posts. Both private status filters are never shared-cache eligible."
+    },
+    {
+      "operationId": "listPostThread",
+      "method": "GET",
+      "publicPath": "/api/v1/contents/{contentId}/thread",
+      "internalPath": "/internal/content/contents/{contentId}/thread",
+      "principalRequired": false,
+      "idempotency": false,
+      "visibility": "Public callers receive only the contiguous PUBLISHED/PUBLIC prefix. An authenticated owner may also read their own DRAFT posts."
+    },
+    {
+      "operationId": "appendPostThreadNext",
+      "method": "POST",
+      "publicPath": "/api/v1/contents/{contentId}/thread",
+      "internalPath": "/internal/content/contents/{contentId}/thread",
+      "principalRequired": true,
+      "requiredLayer": "L2+",
+      "idempotency": "Idempotency-Key",
+      "body": "{ nextContentId }",
+      "authority": "W03/D1-02 requires both content records to be social posts, owned by the same authenticated user, PUBLIC, and in DRAFT or PUBLISHED state. Each post has at most one predecessor and successor; the append operation rejects forks, merges, cycles, and chains longer than 50 items."
     },
     {
       "operationId": "listCreatorContents",

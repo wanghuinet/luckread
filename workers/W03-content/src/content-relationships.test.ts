@@ -165,3 +165,149 @@ describe('W03 content relationship foundation', () => {
     })
   })
 })
+
+
+describe('W03 native social post thread authority', () => {
+  it('adds ordered links only between the same owner public social posts', async () => {
+    const statements: string[] = [];
+    const db = {
+      prepare(query: string) {
+        statements.push(query);
+        return {
+          bind: (...values: unknown[]) => ({
+            first: async () => {
+              if (query.includes('AS source_owner_user_id')) {
+                return {
+                  source_id: 'post_root',
+                  source_owner_user_id: 'user_1',
+                  source_content_type: 'post',
+                  source_state: 'DRAFT',
+                  source_access_mode: 'PUBLIC',
+                  target_id: 'post_next',
+                  target_owner_user_id: 'user_1',
+                  target_content_type: 'post',
+                  target_state: 'DRAFT',
+                  target_access_mode: 'PUBLIC',
+                  idem_id: null,
+                  idem_owner_user_id: null,
+                  idem_request_hash: null,
+                  idem_status: null,
+                  idem_response_json: null,
+                  idem_expires_at: null,
+                };
+              }
+              return {
+                previous_count: 1,
+                next_count: 1,
+                would_cycle: 0,
+                source_has_next: 0,
+                target_has_previous: 0,
+              };
+            },
+          }),
+        };
+      },
+      batch: async (batch: unknown[]) => { expect(batch).toHaveLength(4); return []; },
+    } as never;
+
+    const relation = await appendPostThreadNext(db, 'user_1', 'post_root', 'post_next', 'thread-link-1');
+    expect(relation).toMatchObject({
+      sourceId: 'post_root',
+      targetId: 'post_next',
+      relationType: 'thread-next',
+      status: 'ACTIVE',
+    });
+    expect(statements[1]).toContain('WITH RECURSIVE');
+    expect(statements[2]).toContain('NOT EXISTS (SELECT 1 FROM descendants WHERE id = s.id)');
+    expect(statements[2]).toContain("r.relation_type = 'thread-next'");
+  });
+
+  it('rejects malformed IDs before any D1 access', async () => {
+    const db = { prepare() { throw new Error('database should not be reached'); } } as never;
+    await expect(appendPostThreadNext(db, 'user_1', '../root', 'post_next', 'idem')).rejects.toMatchObject({
+      code: 'VALIDATION_FAILED',
+      status: 400,
+    });
+  });
+
+  it('reads an ordered thread through one recursive D1 query and keeps owner drafts private', async () => {
+    const queryLog: string[] = [];
+    const db = {
+      prepare(query: string) {
+        queryLog.push(query);
+        return {
+          bind: () => ({
+            all: async () => ({
+              results: [
+                {
+                  id: 'post_root', slug: 'root', position: 0, state: 'DRAFT', access_mode: 'PUBLIC',
+                  title: 'First post', body_ref: 'https://img.luckread.com/body/1.txt',
+                  media_refs_json: '[]', cover_ref: null, created_at: '2026-11-05T00:00:00.000Z',
+                },
+                {
+                  id: 'post_next', slug: 'next', position: 1, state: 'DRAFT', access_mode: 'PUBLIC',
+                  title: 'Second post', body_ref: 'https://img.luckread.com/body/2.txt',
+                  media_refs_json: '["https://img.luckread.com/photo.jpg"]',
+                  cover_ref: 'https://img.luckread.com/photo.jpg', created_at: '2026-11-05T00:01:00.000Z',
+                },
+              ],
+            }),
+          }),
+        };
+      },
+    } as never;
+
+    const thread = await listPostThread(db, 'post_next', 'user_1');
+    expect(queryLog).toHaveLength(1);
+    expect(queryLog[0]).toContain('WITH RECURSIVE');
+    expect(queryLog[0]).toContain("root_content.state = 'PUBLISHED' AND root_content.access_mode = 'PUBLIC'");
+    expect(thread.rootContentId).toBe('post_root');
+    expect(thread.items.map(item => item.id)).toEqual(['post_root', 'post_next']);
+    expect(thread.items[1].mediaRefs).toEqual(['https://img.luckread.com/photo.jpg']);
+  });
+
+  it('routes thread reads publicly while keeping append behind the W01 authenticated social principal', async () => {
+    const db = {
+      prepare() {
+        return {
+          bind: () => ({
+            all: async () => ({ results: [{
+              id: 'post_root', slug: 'root', position: 0, state: 'PUBLISHED', access_mode: 'PUBLIC',
+              title: 'First post', body_ref: 'https://img.luckread.com/body/1.txt',
+              media_refs_json: '[]', cover_ref: null, created_at: '2026-11-05T00:00:00.000Z',
+            }] }),
+            first: async () => ({
+              source_id: 'post_root', source_owner_user_id: 'user_1', source_content_type: 'post',
+              source_state: 'PUBLISHED', source_access_mode: 'PUBLIC', target_id: 'post_next',
+              target_owner_user_id: 'user_1', target_content_type: 'post', target_state: 'PUBLISHED',
+              target_access_mode: 'PUBLIC', idem_id: null, idem_owner_user_id: null,
+              idem_request_hash: null, idem_status: null, idem_response_json: null, idem_expires_at: null,
+            }),
+          }),
+        };
+      },
+      batch: async () => [],
+    } as never;
+    const headers = {
+      'X-LuckRead-Caller': 'W01',
+      'X-LuckRead-Transport-Version': '1.0',
+      'X-LuckRead-Correlation-Id': 'thread-route-test',
+    };
+    const publicResponse = await w03Worker.fetch(
+      new Request('https://luckread-w03.internal/internal/content/contents/post_root/thread', { headers }),
+      { D1_02: db },
+    );
+    expect(publicResponse.status).toBe(200);
+    await expect(publicResponse.json()).resolves.toMatchObject({ data: { rootContentId: 'post_root' } });
+
+    const deniedResponse = await w03Worker.fetch(
+      new Request('https://luckread-w03.internal/internal/content/contents/post_root/thread', {
+        method: 'POST',
+        headers: { ...headers, 'content-type': 'application/json', 'Idempotency-Key': 'thread-link' },
+        body: JSON.stringify({ nextContentId: 'post_next' }),
+      }),
+      { D1_02: db },
+    );
+    expect(deniedResponse.status).toBe(401);
+  });
+});
