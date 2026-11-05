@@ -565,7 +565,7 @@ function PublishScreenContent() {
       });
       return false;
     }
-  }, [updateAsset]);
+  }, [persistPendingAsset, updateAsset]);
 
   const addCapturedPhoto = useCallback(async (photo: CapturedCameraPhoto) => {
     if (busy || loadingEdit || publishPending) return;
@@ -587,22 +587,27 @@ function PublishScreenContent() {
       serverUrl: '',
       status: 'uploading',
     };
-    setAssets((current) => [...current, asset]);
     setCameraVisible(false);
     setErrorMessage('');
-    setStatusMessage('Uploading camera photo to LuckRead…');
+    setStatusMessage('Preparing camera photo for recoverable upload…');
     setBusy(true);
     try {
-      const succeeded = await uploadAsset(asset);
+      const durable = await persistPendingAsset(asset);
+      const durableAsset = { ...asset, uri: durable.uri };
+      setAssets((current) => [...current, durableAsset]);
+      const succeeded = await uploadAsset(durableAsset);
       setStatusMessage(
         succeeded
           ? 'Camera photo uploaded. Server media references are ready to publish.'
-          : 'Camera photo upload failed. Retry this file before publishing.',
+          : 'Camera photo upload failed. The file is saved on this device; retry it from the composer.',
       );
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'The camera photo could not be saved for recovery.');
+      setStatusMessage('');
     } finally {
       setBusy(false);
     }
-  }, [assets.length, busy, loadingEdit, publishPending, uploadAsset]);
+  }, [assets.length, busy, loadingEdit, persistPendingAsset, publishPending, uploadAsset]);
 
   const handleCameraCapture = useCallback((photo: CapturedCameraPhoto) => {
     setCameraVisible(false);
@@ -669,22 +674,31 @@ function PublishScreenContent() {
         status: 'uploading',
       };
     });
-    setAssets((current) => [...current, ...newAssets]);
     setErrorMessage('');
-    setStatusMessage('Uploading selected media to LuckRead…');
+    setStatusMessage('Saving selected media on this device…');
     setBusy(true);
     try {
+      const durableAssets: ComposerAsset[] = [];
+      for (const asset of newAssets) {
+        const durable = await persistPendingAsset(asset);
+        durableAssets.push({ ...asset, uri: durable.uri });
+      }
+      setAssets((current) => [...current, ...durableAssets]);
+      setStatusMessage('Uploading selected media to LuckRead…');
       const uploadResults: boolean[] = [];
-      for (const asset of newAssets) uploadResults.push(await uploadAsset(asset));
+      for (const asset of durableAssets) uploadResults.push(await uploadAsset(asset));
       if (uploadResults.every(Boolean)) {
         setStatusMessage('Media upload complete. Server media references are ready to publish.');
       } else {
-        setStatusMessage('Some media uploads failed. Retry failed files before publishing.');
+        setStatusMessage('Some media uploads failed. Files are saved on this device; retry them from the composer.');
       }
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Selected media could not be saved for recovery.');
+      setStatusMessage('');
     } finally {
       setBusy(false);
     }
-  }, [assets, busy, loadingEdit, publishPending, uploadAsset]);
+  }, [assets, busy, loadingEdit, persistPendingAsset, publishPending, uploadAsset]);
 
   const retryAsset = useCallback(async (asset: ComposerAsset) => {
     setBusy(true);
