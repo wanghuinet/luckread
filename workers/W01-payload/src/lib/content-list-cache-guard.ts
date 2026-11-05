@@ -42,8 +42,10 @@ export const validateContentListQuery = (url: URL): URLSearchParams => {
         throw new ContentListQueryError('VALIDATION_FAILED', 422)
       }
     } else if (key === 'status') {
-      // Private owner-scoped draft lists share this route but never enter the public cache.
-      if (value !== 'DRAFT') throw new ContentListQueryError('VALIDATION_FAILED', 422)
+      // Owner-scoped lifecycle lists are private and never enter the public cache.
+      if (value !== 'DRAFT' && value !== 'SCHEDULED') {
+        throw new ContentListQueryError('VALIDATION_FAILED', 422)
+      }
     } else if (!CONTENT_TYPES.has(value)) {
       throw new ContentListQueryError('VALIDATION_FAILED', 422)
     }
