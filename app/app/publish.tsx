@@ -42,8 +42,11 @@ import {
   deleteOwnPostDraft,
   fetchDiscoveryTopics,
   fetchOwnPostDraftsPage,
+  fetchOwnScheduledPostsPage,
   findPublicUserByUsername,
+  transitionOwnScheduledPostState,
   type NativePostDraft,
+  type NativeScheduledPost,
 } from '~/lib/social-screen-api';
 import {
   findActiveComposerToken,
@@ -188,7 +191,9 @@ function PublishScreenContent() {
   const [scheduleDate, setScheduleDate] = useState(() => getDefaultScheduledPublishDate());
   const [schedulePickerVisible, setSchedulePickerVisible] = useState(false);
   const [schedulePickerDraft, setSchedulePickerDraft] = useState(() => getDefaultScheduledPublishDate());
+  const [scheduleEditTarget, setScheduleEditTarget] = useState<NativeScheduledPost | null>(null);
   const openSchedulePicker = useCallback(() => {
+    setScheduleEditTarget(null);
     const now = Date.now();
     const candidate = scheduleDate.getTime() > now + MIN_SCHEDULE_LEAD_TIME_MS
       ? scheduleDate
@@ -205,6 +210,13 @@ function PublishScreenContent() {
   const [draftInboxLoading, setDraftInboxLoading] = useState(false);
   const [draftInboxError, setDraftInboxError] = useState('');
   const [deletingDraftId, setDeletingDraftId] = useState<string | null>(null);
+  const [scheduledInboxVisible, setScheduledInboxVisible] = useState(false);
+  const [scheduledInboxItems, setScheduledInboxItems] = useState<NativeScheduledPost[]>([]);
+  const [scheduledInboxCursor, setScheduledInboxCursor] = useState<string | null>(null);
+  const [scheduledInboxHasMore, setScheduledInboxHasMore] = useState(false);
+  const [scheduledInboxLoading, setScheduledInboxLoading] = useState(false);
+  const [scheduledInboxError, setScheduledInboxError] = useState('');
+  const [scheduledActionId, setScheduledActionId] = useState<string | null>(null);
   const [textSelection, setTextSelection] = useState({ start: 0, end: 0 });
   const [topicSuggestions, setTopicSuggestions] = useState<DiscoveryTopicOption[]>([]);
   const [topicSuggestionsLoading, setTopicSuggestionsLoading] = useState(false);
