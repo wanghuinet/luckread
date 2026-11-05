@@ -208,7 +208,7 @@
         "workers/W02-identity/migrations/0005_better_auth_identity_core.sql"
       ],
       "evidence": [
-        "CC-1.1-ACCOUNT-CENTER-PAYLOAD-BOUNDARY-2026-10-05",
+        "docs/change-control/CC-1.1-ACCOUNT-CENTER-PAYLOAD-BOUNDARY-2026-10-05.md",
         "contracts/openapi/v1/openapi.yaml",
         "contracts/dto/auth-dto-contract.v1.json",
         "contracts/entity/AUTH-002-session-field-contract.v1.json",
