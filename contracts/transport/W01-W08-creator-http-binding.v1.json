@@ -107,8 +107,8 @@
       "resourceType": "Content",
       "resourceScope": "active creator's own content",
       "cache": "NO_STORE",
-      "bodyAuthority": "The caller supplies only creatorId, obtained by W01 from the due content candidate returned by W03. W08 resolves creatorId to the canonical userId using the ACTIVE creators record in D1-01, then loads current account state and time-valid role assignments from D1-01. ownerUserId, subjectId, layer, accountState, roles, and permission decisions are never accepted from the caller.",
-      "successRule": "W08 returns ALLOW only when the Creator record is ACTIVE, its linked user account is ACTIVE, the current resolved global layer is L3 or L4, and CASL allows content.publish.own for Content with ownerId equal to the W08-derived userId. The response includes the canonical creatorId and ownerUserId for W01/W03 resource matching.",
+      "bodyAuthority": "The caller supplies only creatorId from the W03 due candidate. For legacy rows where contents.creator_id is null or mirrors owner_user_id, W08 may resolve the hint by user_id, but only through an ACTIVE creators record. W08 derives the linked user, current account state and time-valid role assignments from D1-01; ownerUserId, subjectId, layer, accountState, roles and permission decisions are never accepted from the caller.",
+      "successRule": "W08 returns ALLOW only when the resolved Creator record and linked user account are ACTIVE, the current resolved global layer is L3 or L4, and CASL allows content.publish.own for Content with ownerId equal to the W08-derived userId. The response always returns the canonical creatorId and ownerUserId, even when the input was a legacy ownerUserId placeholder; W01 must match ownerUserId to the W03 candidate and W03 must CAS-rebind the stored placeholder to that canonical creatorId.",
       "failureBehavior": "DENY for inactive/missing Creator, inactive/missing account, missing or expired role assignment, non-L3/L4 layer, and CASL denial; return 503 DENY when D1-01 or authorization facts are unavailable."
     }
   ],
