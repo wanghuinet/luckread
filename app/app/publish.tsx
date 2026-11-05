@@ -5,6 +5,7 @@ import {
   Image,
   Modal,
   FlatList,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -14,6 +15,7 @@ import {
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useNavigation, usePreventRemove, type NavigationAction } from '@react-navigation/native';
 import { Feather } from '@expo/vector-icons';
+import DateTimePicker from '@expo/ui/community/datetime-picker';
 import * as ImagePicker from 'expo-image-picker';
 import CameraCaptureModal, { type CapturedCameraPhoto } from '~/components/CameraCaptureModal';
 import { VideoView, useVideoPlayer } from 'expo-video';
@@ -24,6 +26,7 @@ import PublishMediaActionSheet from '~/components/PublishMediaActionSheet';
 
 import { apiRequest, createIdempotencyKey, fetchContentBodyReference } from '~/lib/api-client';
 import { computeAutoSaveDelay, createPublishDraftFingerprint } from '~/lib/publish-draft-autosave';
+import { getDefaultScheduledPublishDate, MIN_SCHEDULE_LEAD_TIME_MS, toScheduledPublishISO } from '~/lib/publish-schedule';
 import {
   apiFailureDiagnostic,
   getMediaPlayback,
@@ -181,6 +184,10 @@ function PublishScreenContent() {
   const [pollEnabled, setPollEnabled] = useState(false);
   const [pollOptions, setPollOptions] = useState<string[]>(['', '']);
   const [pollDurationHours, setPollDurationHours] = useState<PollDurationHours>(24);
+  const [scheduleEnabled, setScheduleEnabled] = useState(false);
+  const [scheduleDate, setScheduleDate] = useState(() => getDefaultScheduledPublishDate());
+  const [schedulePickerVisible, setSchedulePickerVisible] = useState(false);
+  const [schedulePickerDraft, setSchedulePickerDraft] = useState(() => getDefaultScheduledPublishDate());
   const [draftSaveStatus, setDraftSaveStatus] = useState<'idle' | 'scheduled' | 'saving' | 'saved' | 'error'>('idle');
   const [draftInboxVisible, setDraftInboxVisible] = useState(false);
   const [draftInboxItems, setDraftInboxItems] = useState<NativePostDraft[]>([]);
@@ -1364,11 +1371,21 @@ function PublishScreenContent() {
       }
     }
 
+    if (scheduleEnabled && pollEnabled) {
+      setErrorMessage('Polls cannot be scheduled yet. Turn off the poll or publish immediately.');
+      return;
+    }
+    const normalizedScheduledAt = scheduleEnabled ? toScheduledPublishISO(scheduleDate) : null;
+    if (scheduleEnabled && !normalizedScheduledAt) {
+      setErrorMessage('Choose a publish time at least one minute in the future.');
+      return;
+    }
+
     const mediaRefs = Array.from(new Set(assets.map((asset) => asset.serverUrl)));
     const nextCover = coverRef && mediaRefs.includes(coverRef)
       ? coverRef
       : assets.find((asset) => asset.mimeType.startsWith('image/'))?.serverUrl || null;
-    const fingerprint = JSON.stringify([contentId || '', trimmedBody, mediaRefs, nextCover, accessMode, pollEnabled, cleanPollOptions, pollEnabled ? pollDurationHours : null]);
+    const fingerprint = JSON.stringify([contentId || '', trimmedBody, mediaRefs, nextCover, accessMode, pollEnabled, cleanPollOptions, pollEnabled ? pollDurationHours : null, normalizedScheduledAt]);
     let attempt = submitAttemptRef.current;
     if (attempt && attempt.fingerprint !== fingerprint) {
       if (!contentId && !recordRef.current && publishPending) {
@@ -1407,7 +1424,7 @@ function PublishScreenContent() {
     }
     setBusy(true);
     setErrorMessage('');
-    setStatusMessage(contentId ? 'Saving your changes…' : 'Publishing your post…');
+    setStatusMessage(contentId ? 'Saving your changes…' : scheduleEnabled ? 'Scheduling your post…' : 'Publishing your post…');
     try {
       await savePendingAssetAltText();
       let bodyRef: string | null = null;
@@ -1603,7 +1620,8 @@ function PublishScreenContent() {
           method: 'POST',
           headers: { 'If-Match': draft.etag },
           body: JSON.stringify({
-            to: 'PUBLISHED',
+            to: scheduleEnabled ? 'SCHEDULED' : 'PUBLISHED',
+            ...(normalizedScheduledAt ? { scheduledAt: normalizedScheduledAt } : {}),
             preflight: {
               contentType: 'post',
               title: trimmedBody,
@@ -1621,6 +1639,23 @@ function PublishScreenContent() {
           transitioned,
           'The post was created but could not be published yet. Retry to finish publishing this same post.',
         ));
+      }
+
+      if (scheduleEnabled) {
+        submitAttemptRef.current = null;
+        recordRef.current = null;
+        draftWasPublishedRef.current = true;
+        draftSaveDirtyRef.current = false;
+        setDraftSaveStatus('idle');
+        const localScheduleLabel = scheduleDate.toLocaleString();
+        setStatusMessage('定时发布已安排');
+        Alert.alert('定时发布已安排', '动态已保存，将于 ' + localScheduleLabel + '（本机时间）自动发布。', [
+          {
+            text: '完成',
+            onPress: () => router.replace(('/?refresh=' + Date.now()) as never),
+          },
+        ]);
+        return;
       }
 
       // W01 resolves @handles to canonical W02 identities; W05 persists mention/topic edges.
@@ -1650,7 +1685,7 @@ function PublishScreenContent() {
     } finally {
       setBusy(false);
     }
-  }, [accessMode, assets, body, contentId, coverRef, pollDurationHours, pollEnabled, pollOptions, publishPending, router, saveDraftSnapshot, savePendingAssetAltText, syncPublishedSocialTokens]);
+  }, [accessMode, assets, body, contentId, coverRef, pollDurationHours, pollEnabled, pollOptions, publishPending, router, saveDraftSnapshot, savePendingAssetAltText, scheduleDate, scheduleEnabled, syncPublishedSocialTokens]);
 
   if (authStatus !== 'authenticated') {
     return (
