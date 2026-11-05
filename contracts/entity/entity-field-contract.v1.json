@@ -1,5 +1,5 @@
 {
-  "version": "1.6",
+  "version": "1.7",
   "status": "NOT_GREEN",
   "sourceOfTruth": "contracts/entity/entity-catalog.v1.json",
   "featureInventoryRef": "contracts/alignment/feature-inventory.v1.json",
@@ -3646,11 +3646,62 @@
             "contracts/entity/AUTH-007-mfa-factor-field-contract.v1.json",
             "workers/W02-identity/migrations/0006_better_auth_two_factor.sql"
           ]
+        },
+        {
+          "fieldId": "ENT-USER-F-DELETION-REQUESTED-AT",
+          "name": "deletion_requested_at",
+          "type": "datetime",
+          "nullable": true,
+          "required": false,
+          "unique": false,
+          "indexed": false,
+          "lifecycle": "set-on-ACTIVE-to-DELETION_REQUESTED; retained through DELETED; cleared on cancellation or REACTIVATED-to-ACTIVE",
+          "classification": "ACCOUNT_LIFECYCLE_METADATA",
+          "status": "CONTRACTED_NOT_VERIFIED",
+          "payloadNative": false,
+          "sourceRef": "workers/W02-identity/migrations/0009_auth_015_lifecycle_windows.sql",
+          "payloadConfigRef": "contracts/entity/non-payload-d1-authority",
+          "apiExposure": "NONE",
+          "adminExposure": "NONE",
+          "eventExposure": "IDENTITY_ACCOUNT_STATE_CHANGED",
+          "migrationVersion": "0009_auth_015_lifecycle_windows.sql",
+          "postgresqlPortability": "PORTABLE",
+          "evidenceRefs": [
+            "contracts/persistence/AUTH-015-account-lifecycle-window-persistence-contract.v1.json",
+            "docs/change-control/CC-AUTH-015-W02-LIFECYCLE-WINDOW-PERSISTENCE-2026-11-06.md"
+          ]
+        },
+        {
+          "fieldId": "ENT-USER-F-DELETED-AT",
+          "name": "deleted_at",
+          "type": "datetime",
+          "nullable": true,
+          "required": false,
+          "unique": false,
+          "indexed": false,
+          "lifecycle": "set-on-DELETION_PENDING-to-DELETED; retained through REACTIVATED; cleared on REACTIVATED-to-ACTIVE",
+          "classification": "ACCOUNT_LIFECYCLE_METADATA",
+          "status": "CONTRACTED_NOT_VERIFIED",
+          "payloadNative": false,
+          "sourceRef": "workers/W02-identity/migrations/0009_auth_015_lifecycle_windows.sql",
+          "payloadConfigRef": "contracts/entity/non-payload-d1-authority",
+          "apiExposure": "NONE",
+          "adminExposure": "NONE",
+          "eventExposure": "IDENTITY_ACCOUNT_STATE_CHANGED",
+          "migrationVersion": "0009_auth_015_lifecycle_windows.sql",
+          "postgresqlPortability": "PORTABLE",
+          "evidenceRefs": [
+            "contracts/persistence/AUTH-015-account-lifecycle-window-persistence-contract.v1.json",
+            "docs/change-control/CC-AUTH-015-W02-LIFECYCLE-WINDOW-PERSISTENCE-2026-11-06.md"
+          ]
         }
       ],
       "evidenceRefs": [
         "workers/W01-payload/src/collections/Users.ts",
-        "workers/W01-payload/src/payload.config.ts"
+        "workers/W01-payload/src/payload.config.ts",
+        "contracts/persistence/AUTH-015-account-lifecycle-window-persistence-contract.v1.json",
+        "workers/W02-identity/migrations/0009_auth_015_lifecycle_windows.sql",
+        "docs/change-control/CC-AUTH-015-W02-LIFECYCLE-WINDOW-PERSISTENCE-2026-11-06.md"
       ]
     },
     {
