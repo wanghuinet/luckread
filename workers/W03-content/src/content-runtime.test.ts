@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-import { canTransitionContentState, ContentRuntimeError, createContent, createRequestId, deleteContent, decodeContentListCursor, decodeCursor, decodeScopedCursor, encodeContentListCursor, encodeCursor, encodeScopedCursor, isState, listContents, listPublishedContentsByIds, listContentRevisions, listCreatorContents, listDueScheduledContentCandidates, publishAuthorizedScheduledContents, publicContent, toErrorResponse, transitionContentState, updateContent, validateInput, validateListFilters } from './content-runtime.js'
+import { canTransitionContentState, ContentRuntimeError, type ContentRecord, createContent, createRequestId, deleteContent, decodeContentListCursor, decodeCursor, decodeScopedCursor, encodeContentListCursor, encodeCursor, encodeScopedCursor, isState, listContents, listPublishedContentsByIds, listContentRevisions, listCreatorContents, listDueScheduledContentCandidates, publishAuthorizedScheduledContents, publicContent, toErrorResponse, transitionContentState, updateContent, validateInput, validateListFilters } from './content-runtime.js'
 import w03Worker, { hasCreatorContentPermission, hasSocialPostPermission, parseListLimit } from './index.js'
 
 describe('W03 content contract core', () => {
@@ -3003,4 +3003,74 @@ describe('W03 username redirect eligibility', () => {
     expect(unpublishedOrMissing.status).toBe(404)
   })
 
+})
+
+
+describe('creator-selected sensitive media warning', () => {
+  const base = {
+    contentType: 'post',
+    title: 'A post with media',
+    bodyRef: 'https://img.luckread.com/body/post.txt',
+    mediaRefs: ['https://img.luckread.com/media/post.webp'],
+    coverRef: 'https://img.luckread.com/media/post.webp',
+  }
+
+  it('accepts only the supported warning categories on media posts', () => {
+    expect(validateInput({ ...base, mediaWarning: 'NUDITY' }).mediaWarning).toBe('NUDITY')
+    expect(validateInput({ ...base, mediaWarning: 'VIOLENCE' }).mediaWarning).toBe('VIOLENCE')
+    expect(validateInput({ ...base, mediaWarning: 'SENSITIVE' }).mediaWarning).toBe('SENSITIVE')
+    expect(validateInput(base).mediaWarning).toBeUndefined()
+    expect(validateInput({ ...base, mediaWarning: null }).mediaWarning).toBeNull()
+  })
+
+  it('rejects unsupported categories, non-post warnings, and warnings without attached media', () => {
+    for (const mediaWarning of ['POLITICS', 'UNKNOWN', 1, {}]) {
+      expect(() => validateInput({ ...base, mediaWarning })).toThrowError(ContentRuntimeError)
+    }
+    expect(() => validateInput({ ...base, contentType: 'article', mediaWarning: 'NUDITY' }))
+      .toThrowError(ContentRuntimeError)
+    expect(() => validateInput({ ...base, mediaRefs: [], coverRef: null, mediaWarning: 'SENSITIVE' }))
+      .toThrowError(ContentRuntimeError)
+  })
+
+  it('redacts warning metadata together with private media in member-only previews', () => {
+    const content: ContentRecord = {
+      id: 'sensitive-warning-content',
+      contentType: 'post',
+      ownerUserId: 'owner_1',
+      creatorId: 'creator_1',
+      ipId: null,
+      state: 'PUBLISHED',
+      revision: 1,
+      updatedAt: '2026-11-05T00:00:00.000Z',
+      scheduledAt: null,
+      accessMode: 'MEMBERS_ONLY',
+      version: 1,
+      etag: 'W/"1"',
+      slug: 'sensitive-warning-content',
+      title: 'Private post',
+      bodyRef: 'https://img.luckread.com/body/private.txt',
+      mediaRefs: ['https://img.luckread.com/media/private.webp'],
+      coverRef: 'https://img.luckread.com/media/private.webp',
+      mediaWarning: 'NUDITY',
+    }
+    expect(publicContent({ ...content, accessGranted: false })).toMatchObject({
+      mediaRefs: [],
+      coverRef: null,
+      mediaWarning: null,
+    })
+    expect(publicContent({ ...content, accessGranted: true })).toMatchObject({
+      mediaWarning: 'NUDITY',
+    })
+  })
+
+  it('adds a nullable, database-constrained warning to content and revision history', () => {
+    const migration = readFileSync(
+      resolve(process.cwd(), 'workers/W03-content/migrations/0015_content_media_warning.sql'),
+      'utf8',
+    )
+    expect(migration).toContain('ALTER TABLE contents')
+    expect(migration).toContain('ALTER TABLE content_revisions')
+    expect(migration).toContain("'NUDITY', 'VIOLENCE', 'SENSITIVE'")
+  })
 })

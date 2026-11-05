@@ -5715,6 +5715,10 @@ components:
         state: { $ref: '#/components/schemas/ContentState' }
         version: { type: integer, minimum: 1 }
         etag: { $ref: '#/components/schemas/ETag' }
+        mediaWarning:
+          type: [string, 'null']
+          enum: [NUDITY, VIOLENCE, SENSITIVE, null]
+          description: Creator-selected warning for media attached to a social post.
         creator:
           description: Optional public author projection included by list endpoints to avoid per-item profile requests.
           $ref: '#/components/schemas/PublicAuthor'
@@ -5732,6 +5736,10 @@ components:
       properties:
         title: { type: string, minLength: 1, maxLength: 512 }
         bodyRef: { type: string, description: R2 object reference }
+        mediaWarning:
+          type: [string, 'null']
+          enum: [NUDITY, VIOLENCE, SENSITIVE, null]
+          description: Optional creator-selected warning for media on social posts; W03 rejects this field for articles, videos, or posts without media.
     Media:
       type: object
       required: [id, mimeType, alt, size, checksum, status]
@@ -5985,6 +5993,10 @@ components:
         state: { $ref: '#/components/schemas/ContentState' }
         version: { type: integer, minimum: 1 }
         etag: { $ref: '#/components/schemas/ETag' }
+        mediaWarning:
+          type: [string, 'null']
+          enum: [NUDITY, VIOLENCE, SENSITIVE, null]
+          description: Creator-selected warning for media attached to a social post.
         creator:
           description: Optional public author projection included by list endpoints to avoid per-item profile requests.
           $ref: '#/components/schemas/PublicAuthor'
@@ -6002,6 +6014,10 @@ components:
       properties:
         title: { type: string, minLength: 1, maxLength: 512 }
         bodyRef: { type: string, description: R2 object reference }
+        mediaWarning:
+          type: [string, 'null']
+          enum: [NUDITY, VIOLENCE, SENSITIVE, null]
+          description: Optional creator-selected warning for media on social posts; W03 rejects this field for articles, videos, or posts without media.
     Media:
       type: object
       required: [id, mimeType, size, checksum, status]
@@ -6235,6 +6251,10 @@ components:
         state: { $ref: '#/components/schemas/ContentState' }
         version: { type: integer, minimum: 1 }
         etag: { $ref: '#/components/schemas/ETag' }
+        mediaWarning:
+          type: [string, 'null']
+          enum: [NUDITY, VIOLENCE, SENSITIVE, null]
+          description: Creator-selected warning for media attached to a social post.
         creator:
           description: Optional public author projection included by list endpoints to avoid per-item profile requests.
           $ref: '#/components/schemas/PublicAuthor'
@@ -6252,6 +6272,10 @@ components:
       properties:
         title: { type: string, minLength: 1, maxLength: 512 }
         bodyRef: { type: string, description: R2 object reference }
+        mediaWarning:
+          type: [string, 'null']
+          enum: [NUDITY, VIOLENCE, SENSITIVE, null]
+          description: Optional creator-selected warning for media on social posts; W03 rejects this field for articles, videos, or posts without media.
     Media:
       type: object
       required: [id, mimeType, size, checksum, status]
@@ -6497,6 +6521,10 @@ components:
         state: { $ref: '#/components/schemas/ContentState' }
         version: { type: integer, minimum: 1 }
         etag: { $ref: '#/components/schemas/ETag' }
+        mediaWarning:
+          type: [string, 'null']
+          enum: [NUDITY, VIOLENCE, SENSITIVE, null]
+          description: Creator-selected warning for media attached to a social post.
         creator:
           description: Optional public author projection included by list endpoints to avoid per-item profile requests.
           $ref: '#/components/schemas/PublicAuthor'
@@ -6514,6 +6542,10 @@ components:
       properties:
         title: { type: string, minLength: 1, maxLength: 512 }
         bodyRef: { type: string, description: R2 object reference }
+        mediaWarning:
+          type: [string, 'null']
+          enum: [NUDITY, VIOLENCE, SENSITIVE, null]
+          description: Optional creator-selected warning for media on social posts; W03 rejects this field for articles, videos, or posts without media.
     Media:
       type: object
       required: [id, mimeType, size, checksum, status]

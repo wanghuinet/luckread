@@ -31,6 +31,7 @@ type ContentItem = {
   bodyRef?: string
   mediaRefs?: string[]
   coverRef?: string | null
+  mediaWarning?: 'NUDITY' | 'VIOLENCE' | 'SENSITIVE' | null
   updatedAt?: string
 }
 type ContentPage = {
@@ -204,6 +205,7 @@ export default function ContentBrowsePage() {
                     author={item.creator ?? item.author}
                     coverRef={item.coverRef}
                     mediaRefs={item.mediaRefs}
+                    mediaWarning={item.mediaWarning}
                     createdAt={item.createdAt}
                     updatedAt={item.updatedAt}
                     presentation="x-timeline"

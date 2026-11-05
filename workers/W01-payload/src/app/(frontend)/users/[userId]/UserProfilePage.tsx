@@ -36,6 +36,7 @@ type PublicContent = {
   title: string
   mediaRefs?: string[]
   coverRef?: string | null
+  mediaWarning?: 'NUDITY' | 'VIOLENCE' | 'SENSITIVE' | null
   updatedAt?: string
 }
 
@@ -826,6 +827,7 @@ export default function PublicProfilePage({
                       presentation="x-timeline"
                       coverRef={item.coverRef}
                       mediaRefs={item.mediaRefs}
+                      mediaWarning={item.mediaWarning}
                       createdAt={item.createdAt}
                       updatedAt={item.updatedAt}
                       locale="zh"

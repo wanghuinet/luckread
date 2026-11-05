@@ -71,6 +71,7 @@ export async function PATCH(
     if ('status' in mediaValidation) return mediaReferenceValidationResponse(mediaValidation)
 
     const changesAccessMode = body && typeof body === 'object' && !Array.isArray(body) && Object.hasOwn(body, 'accessMode')
+    const changesMediaWarning = body && typeof body === 'object' && !Array.isArray(body) && Object.hasOwn(body, 'mediaWarning')
     let verifiedCreatorId: string | undefined
     if (changesAccessMode) {
       const resolved = await resolveVerifiedContentCreatorId(request, principal)
@@ -88,15 +89,14 @@ export async function PATCH(
     })
     if (response.ok) {
       await invalidatePublicContentThreads()
-      if (changesAccessMode) {
-        await invalidatePublicContentVisibility(contentId)
+      if (changesAccessMode) await invalidatePublicContentVisibility(contentId)
+      if (changesAccessMode || changesMediaWarning) {
         const updatedValue: unknown = await response.clone().json().catch((): null => null)
         const updatedState = updatedValue && typeof updatedValue === 'object' && !Array.isArray(updatedValue)
           ? (updatedValue as { state?: unknown }).state
           : undefined
-        // Drafts are not part of anonymous public lists. Only bump their shared
-        // generation after an access-mode edit if W03 confirms the content is
-        // currently published; never flush the global list for draft-only edits.
+        // Drafts are not part of anonymous public lists; only published warning or visibility changes
+        // require a public-list generation bump.
         if (updatedState === 'PUBLISHED') await invalidatePublicContentList(request)
       }
       await invalidatePublicContentDetail(request, contentId)

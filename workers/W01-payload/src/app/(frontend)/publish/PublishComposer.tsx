@@ -56,6 +56,7 @@ type ContentResponse = {
   bodyRef?: string
   mediaRefs?: string[]
   coverRef?: string | null
+  mediaWarning?: 'NUDITY' | 'VIOLENCE' | 'SENSITIVE' | null
 }
 
 type PollOptionView = { optionId: string; text: string; position: number; votes: number }
@@ -210,6 +211,7 @@ export default function PublishComposer({
   const [assets, setAssets] = useState<UploadedAsset[]>([])
   const modalMediaInputRef = useRef<HTMLInputElement>(null)
   const [coverRef, setCoverRef] = useState('')
+  const [mediaWarning, setMediaWarning] = useState<'NUDITY' | 'VIOLENCE' | 'SENSITIVE' | null>(null)
   const [pollEnabled, setPollEnabled] = useState(false)
   // Only call W05 to remove a poll if this draft actually has a persisted poll.
   // New text/video posts must not depend on an optional poll route being deployed.
@@ -316,6 +318,7 @@ export default function PublishComposer({
           setSavedArticleSerialized('')
         }
         setCoverRef(recovered.coverRef ?? '')
+        setMediaWarning(recovered.mediaWarning ?? null)
         pollConfiguredRef.current = Boolean(recoveredPoll)
         setPollEnabled(Boolean(recoveredPoll))
         setPollOptions(recoveredPoll ? recoveredPoll.options.map((option) => option.text) : ['', ''])
@@ -434,7 +437,9 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
 
   function removeAsset(id: string) {
     const removed = assets.find((asset) => asset.id === id)
-    setAssets((current) => current.filter((asset) => asset.id !== id))
+    const remainingAssets = assets.filter((asset) => asset.id !== id)
+    setAssets(remainingAssets)
+    if (remainingAssets.length === 0) setMediaWarning(null)
     if (removed) {
       setVideoMetadataByAssetId((current) => {
         if (!current[removed.id]) return current
@@ -611,6 +616,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
           coverRef,
           type === 'article' ? mediaRefsFromArticleDocument(articleDocument) : [],
         ),
+        mediaWarning: type === 'post' ? mediaWarning : null,
       }
 
       const isUpdate = Boolean(currentDraft?.id && currentDraft.etag)
@@ -677,6 +683,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
       setBody(plainTextFromArticleDocument(articleDocument))
     }
     setType(nextType)
+    if (nextType !== 'post') setMediaWarning(null)
     if (nextType === 'video' && !coverRef.trim()) {
       const firstImage = assets.find(isImageAsset)
       if (firstImage) setCoverRef(firstImage.url)
@@ -769,7 +776,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
         autoSaveTimerRef.current = null
       }
     }
-  }, [title, body, type, assets, coverRef, busy, articleDocument, pollEnabled, pollOptions, pollDurationMinutes, replyAudience])
+  }, [title, body, type, assets, coverRef, busy, articleDocument, pollEnabled, pollOptions, pollDurationMinutes, replyAudience, mediaWarning])
 
   function startNewContent() {
     latestDraftRef.current = null
@@ -781,6 +788,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
     setBody('')
     setAssets([])
     setCoverRef('')
+    setMediaWarning(null)
     setReplyAudience('everyone')
     pollConfiguredRef.current = false
     setPollEnabled(false)
@@ -853,6 +861,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
         coverRef,
         type === 'article' ? mediaRefsFromArticleDocument(articleDocument) : [],
       ),
+      mediaWarning: type === 'post' ? mediaWarning : null,
       ...(type === 'article' ? {
         aiMode,
         humanContribution: humanConfirmed ? 'substantial' : 'light',
@@ -961,6 +970,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
       setBody('')
       setAssets([])
       setCoverRef('')
+      setMediaWarning(null)
       if (!isTweetModal) {
         const nextUrl = new URL(window.location.href)
         nextUrl.searchParams.delete('draft')
@@ -1303,6 +1313,48 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
         </>
       )}
 
+
+      {type === 'post' && assets.length > 0 ? (
+        <section
+          className={isTweetModal
+            ? "mx-3.5 mb-3 grid gap-2 rounded-xl border border-[#2f3336] p-3 text-[#e7e9ea]"
+            : isXWorkspace
+              ? "my-3 grid gap-2 border-y border-light-border px-4 py-4 dark:border-dark-border"
+              : "lr-media-box"}
+          aria-label="媒体内容警告"
+        >
+          <div className="grid gap-1">
+            <strong className={isTweetModal ? "text-sm" : "text-sm font-semibold"}>媒体内容警告</strong>
+            <span className={isTweetModal ? "text-xs leading-5 text-[#71767b]" : "text-xs leading-5 text-light-secondary dark:text-dark-secondary"}>为可能包含敏感内容的图片或视频添加提示，读者可以选择是否查看。</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {([
+              { value: null, label: '无' },
+              { value: 'NUDITY', label: '裸露' },
+              { value: 'VIOLENCE', label: '暴力' },
+              { value: 'SENSITIVE', label: '敏感事件' },
+            ] as const).map((option) => {
+              const selected = mediaWarning === option.value
+              return (
+                <button
+                  aria-pressed={selected}
+                  className={selected
+                    ? "rounded-full border border-main-accent bg-main-accent/10 px-3 py-2 text-xs font-semibold text-main-accent"
+                    : isTweetModal
+                      ? "rounded-full border border-[#536471] px-3 py-2 text-xs font-semibold text-[#e7e9ea]"
+                      : "rounded-full border border-light-border px-3 py-2 text-xs font-semibold text-light-secondary dark:border-dark-border dark:text-dark-secondary"}
+                  disabled={busy || reviewLocked}
+                  key={option.value ?? 'none'}
+                  onClick={() => { setMediaWarning(option.value); markDirty() }}
+                  type="button"
+                >
+                  {option.label}
+                </button>
+              )
+            })}
+          </div>
+        </section>
+      ) : null}
 
       {type === 'post' && (pollEnabled || !isTweetModal) ? (
         <section className={isTweetModal ? "mx-3.5 mb-3 grid gap-3 rounded-xl border border-[#2f3336] p-3" : isXWorkspace ? "my-4 border-y border-light-border px-4 py-4 dark:border-dark-border" : "lr-media-box"} aria-label="投票设置">

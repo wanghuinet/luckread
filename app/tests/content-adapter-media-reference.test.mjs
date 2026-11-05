@@ -143,3 +143,29 @@ test('unentitled member-only content never exposes its media references to the n
 
   expect(mapped.media_items).toEqual([]);
 });
+
+
+test('maps the creator media warning for public posts', () => {
+  const mapped = mapContentToFeedContent({
+    id: 'warning-public-post',
+    contentType: 'post',
+    accessMode: 'PUBLIC',
+    accessGranted: true,
+    mediaWarning: 'VIOLENCE',
+    mediaRefs: ['https://img.luckread.com/users/1/scene.webp'],
+  });
+  expect(mapped.mediaWarning).toBe('VIOLENCE');
+});
+
+test('does not expose a media warning for an unentitled member-only preview', () => {
+  const mapped = mapContentToFeedContent({
+    id: 'warning-locked-post',
+    contentType: 'post',
+    accessMode: 'MEMBERS_ONLY',
+    accessGranted: false,
+    mediaWarning: 'NUDITY',
+    mediaRefs: ['https://img.luckread.com/members/creator/locked.webp'],
+  });
+  expect(mapped.mediaWarning).toBeNull();
+  expect(mapped.media_items).toEqual([]);
+});

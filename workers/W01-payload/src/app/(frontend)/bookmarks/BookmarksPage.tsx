@@ -23,6 +23,7 @@ type BookmarkItem = {
   bodyRef?: string
   mediaRefs?: string[]
   coverRef?: string | null
+  mediaWarning?: 'NUDITY' | 'VIOLENCE' | 'SENSITIVE' | null
 }
 
 type BookmarkPage = {
@@ -241,6 +242,7 @@ export default function BookmarksPage() {
                     creatorId={item.creatorId}
                     coverRef={item.coverRef}
                     mediaRefs={item.mediaRefs}
+                    mediaWarning={item.mediaWarning}
                     createdAt={item.createdAt}
                     updatedAt={item.updatedAt}
                     presentation="x-timeline"

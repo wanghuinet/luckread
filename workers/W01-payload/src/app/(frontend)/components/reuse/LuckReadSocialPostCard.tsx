@@ -57,6 +57,44 @@ function TimelineIcon({ name, filled = false }: { name: TimelineIconName; filled
   return <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24" fill={filled && (name === 'like' || name === 'bookmark') ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d={paths[name]} /></svg>
 }
 
+type ContentMediaWarning = 'NUDITY' | 'VIOLENCE' | 'SENSITIVE'
+
+function SensitiveMediaNotice({
+  warning,
+  locale,
+  onReveal,
+}: {
+  warning: ContentMediaWarning
+  locale: PublicLocale
+  onReveal: () => void
+}) {
+  const english = locale === 'en'
+  const traditional = locale === 'tw'
+  const category = warning === 'NUDITY'
+    ? english ? 'Nudity or adult content' : traditional ? '裸露或成人內容' : '裸露或成人内容'
+    : warning === 'VIOLENCE'
+      ? english ? 'Violence' : traditional ? '暴力內容' : '暴力内容'
+      : english ? 'Sensitive events' : traditional ? '敏感事件' : '敏感事件'
+  return (
+    <div className="mt-3 flex min-h-[220px] flex-col items-center justify-center gap-3 rounded-2xl border border-light-border bg-neutral-900 px-6 py-8 text-center text-white dark:border-dark-border">
+      <span aria-hidden="true" className="text-2xl">⚠</span>
+      <strong className="text-base font-semibold">
+        {english ? 'Potentially sensitive media' : traditional ? '可能包含敏感內容' : '可能包含敏感内容'}
+      </strong>
+      <p className="max-w-sm text-sm leading-5 text-neutral-300">
+        {english ? 'The author added a warning: ' : traditional ? '作者已標記：' : '作者已标记：'}{category}
+      </p>
+      <button
+        className="rounded-full border border-neutral-500 px-5 py-2 text-sm font-semibold text-white transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+        onClick={onReveal}
+        type="button"
+      >
+        {english ? 'View media' : traditional ? '查看媒體' : '查看媒体'}
+      </button>
+    </div>
+  )
+}
+
 type Props = {
   contentId: string
   slug?: string
@@ -66,6 +104,7 @@ type Props = {
   author?: PublicProfile | null
   coverRef?: string | null
   mediaRefs?: string[]
+  mediaWarning?: ContentMediaWarning | null
   createdAt?: string
   updatedAt?: string
   presentation?: 'content' | 'x-timeline'
@@ -82,6 +121,7 @@ export default function LuckReadSocialPostCard({
   author,
   coverRef,
   mediaRefs,
+  mediaWarning = null,
   createdAt,
   updatedAt,
   presentation = 'content',
@@ -122,6 +162,10 @@ export default function LuckReadSocialPostCard({
 
   const contentHref = buildPublicContentHref({ id: contentId, slug, contentType: 'post', creator: profile || author })
   const mediaItems = resolveSocialPostMedia(mediaRefs, coverRef)
+  const mediaSourceKey = JSON.stringify(mediaItems.map((media) => media.src))
+  const mediaRevealKey = contentId + ':' + (mediaWarning ?? 'none') + ':' + mediaSourceKey
+  const [revealedMediaKey, setRevealedMediaKey] = useState<string | null>(null)
+  const mediaRevealed = !mediaWarning || revealedMediaKey === mediaRevealKey
   const singleMedia = mediaItems.length === 1 ? mediaItems[0] : undefined
   const profileName = profile?.displayName?.trim() || profile?.username || ''
   const username = profile?.username ? '@' + profile.username : ''
@@ -733,7 +777,9 @@ export default function LuckReadSocialPostCard({
             <Link className="block whitespace-pre-wrap break-words text-[15px] leading-5 text-light-primary dark:text-dark-primary" href={contentHref} data-umami-event="content-open" data-umami-event-content-type="post">
               {title}
             </Link>
-            {singleMedia ? (
+            {mediaWarning && !mediaRevealed ? (
+              <SensitiveMediaNotice warning={mediaWarning} locale={locale} onReveal={() => setRevealedMediaKey(mediaRevealKey)} />
+            ) : singleMedia ? (
               <div className="mt-3 overflow-hidden rounded-2xl border border-light-border dark:border-dark-border">
                 {singleMedia.kind === 'video' ? <video aria-label={title} className="block max-h-[510px] w-full bg-black object-contain" controls muted playsInline preload="metadata" poster={singleMedia.poster} src={singleMedia.src} /> : <img alt={title} className="block max-h-[510px] w-full object-cover" loading="lazy" src={singleMedia.src} />}
               </div>
@@ -786,7 +832,9 @@ export default function LuckReadSocialPostCard({
 
         <h3>{title}</h3>
 
-        {singleMedia ? (
+        {mediaWarning && !mediaRevealed ? (
+          <SensitiveMediaNotice warning={mediaWarning} locale={locale} onReveal={() => setRevealedMediaKey(mediaRevealKey)} />
+        ) : singleMedia ? (
           <div className="content-feed-cover">
             {singleMedia.kind === 'video' ? (
               <video
