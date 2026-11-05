@@ -1210,8 +1210,7 @@ function PublishScreenContent() {
       !body.trim() ||
       body.trim().length > MAX_TEXT_LENGTH ||
       loadingEdit ||
-      publishPending ||
-      assets.some((asset) => !asset.existing && asset.status !== 'ready')
+      publishPending
     ) {
       setDraftSaveStatus('idle');
       return;
@@ -1500,6 +1499,9 @@ function PublishScreenContent() {
             try {
               const result = await deleteOwnPostDraft(draft.id, draft.etag);
               if (!result.response.ok) throw new Error(apiFailureDiagnostic(result, '删除草稿失败。'));
+              if (user?.id) {
+                await deletePendingMediaRecoveryForDraft(user.id, draft.id).catch(() => undefined);
+              }
               setDraftInboxItems((current) => current.filter((item) => item.id !== draft.id));
               if (recordRef.current?.id === draft.id) {
                 recordRef.current = null;
@@ -1528,7 +1530,7 @@ function PublishScreenContent() {
         },
       },
     ]);
-  }, [loadDraftInbox, router]);
+  }, [loadDraftInbox, router, user?.id]);
 
   const insertComposerToken = useCallback((value: string) => {
     const token = findActiveComposerToken(body, textSelection.start);
@@ -1661,12 +1663,8 @@ function PublishScreenContent() {
         Alert.alert('请稍候', '当前操作尚未完成，完成后再关闭发布窗口。');
         return;
       }
-      if (assets.some((asset) => !asset.existing && asset.status !== 'ready')) {
-        setErrorMessage('媒体仍未全部上传成功，请重试或移除失败附件后再关闭。');
-        return;
-      }
-      if (!body.trim() && (assets.length > 0 || pollEnabled)) {
-        setErrorMessage('请先填写动态正文，再保存或关闭这份草稿。');
+      if (!body.trim() && pollEnabled) {
+        setErrorMessage('请先填写动态正文，再保存这份投票草稿。');
         return;
       }
       if (body.trim()) {
