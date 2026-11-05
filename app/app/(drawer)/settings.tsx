@@ -157,7 +157,7 @@ function ThemeModeOption({
 export default function SettingsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { colorScheme, setColorScheme } = useColorScheme();
+  const { colorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
   const authStatus = useAuthStore((state) => state.status);
   const user = useAuthStore((state) => state.user);
