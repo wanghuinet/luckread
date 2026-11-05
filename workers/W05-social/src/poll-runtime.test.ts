@@ -21,7 +21,7 @@ const publishedPollContext = (
 
 type PollDbScenario = {
   content?: { id: string; content_type: string; state: string; owner_user_id: string; updated_at: string }
-  poll?: { poll_id: string; content_id: string; owner_user_id: string; duration_hours: number; ends_at: string | null; created_at: string; updated_at: string }
+  poll?: { poll_id: string; content_id: string; owner_user_id: string; duration_minutes: number; ends_at: string | null; created_at: string; updated_at: string }
   options?: Array<{ option_id: string; option_text: string; position: number; votes: number }>
   viewerOptionId?: string | null
   voteCreatedAt?: string
@@ -99,6 +99,50 @@ describe('W05 poll runtime', () => {
     expect((db as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
   })
 
+  it('rejects poll durations outside 5 minutes through 7 days before touching D1', async () => {
+    const db = noDatabase()
+    const context = {
+      contentId: 'content-1',
+      ownerUserId: 'author-1',
+      contentType: 'post',
+      state: 'DRAFT',
+      updatedAt: '2026-10-17T04:00:00.000Z',
+    } as const
+    for (const duration of [4, 10081, 5.5, Number.NaN, '5']) {
+      await expect(configureContentPoll(db, 'author-1', 'content-1', ['Yes', 'No'], duration, context))
+        .rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 })
+    }
+    expect((db as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
+  })
+
+  it('supports a 5-minute poll and computes expiry from the post publication time', async () => {
+    const { db } = pollDb({
+      content: {
+        id: 'content-1', content_type: 'post', state: 'PUBLISHED',
+        owner_user_id: 'author-1', updated_at: '2026-10-17T04:00:00.000Z',
+      },
+      poll: {
+        poll_id: 'poll-1', content_id: 'content-1', owner_user_id: 'author-1',
+        duration_minutes: 5, ends_at: null,
+        created_at: '2026-10-16T04:00:00.000Z', updated_at: '2026-10-16T04:00:00.000Z',
+      },
+      options: [
+        { option_id: 'option-1', option_text: 'Yes', position: 0, votes: 0 },
+        { option_id: 'option-2', option_text: 'No', position: 1, votes: 0 },
+      ],
+    })
+    await expect(getContentPoll(
+      db,
+      'content-1',
+      null,
+      publishedPollContext('author-1', '2026-10-17T04:00:00.000Z'),
+    )).resolves.toMatchObject({
+      durationMinutes: 5,
+      durationHours: 5 / 60,
+      endsAt: '2026-10-17T04:05:00.000Z',
+    })
+  })
+
   it('returns public poll results and the current viewer vote', async () => {
     const { db } = pollDb({
       content: {
@@ -107,7 +151,7 @@ describe('W05 poll runtime', () => {
       },
       poll: {
         poll_id: 'poll-1', content_id: 'content-1', owner_user_id: 'author-1',
-        duration_hours: 24, ends_at: '2026-10-18T04:00:00.000Z',
+        duration_minutes: 1440, ends_at: '2026-10-18T04:00:00.000Z',
         created_at: '2026-10-17T04:00:00.000Z', updated_at: '2026-10-17T04:00:00.000Z',
       },
       options: [
@@ -139,7 +183,7 @@ describe('W05 poll runtime', () => {
       },
       poll: {
         poll_id: 'poll-1', content_id: 'content-1', owner_user_id: 'author-1',
-        duration_hours: 24, ends_at: null,
+        duration_minutes: 1440, ends_at: null,
         created_at: '2026-10-16T04:00:00.000Z', updated_at: '2026-10-16T04:00:00.000Z',
       },
       options: [
@@ -184,7 +228,7 @@ describe('W05 poll runtime', () => {
       poll_id: 'poll-1',
       content_id: 'content-1',
       owner_user_id: 'author-1',
-      duration_hours: 24,
+      duration_minutes: 1440,
       ends_at: null,
       created_at: '2026-10-17T04:00:00.000Z',
       updated_at: '2026-10-17T04:00:00.000Z',
@@ -222,6 +266,7 @@ describe('W05 poll runtime', () => {
         pollId: 'poll-1',
         contentId: 'content-1',
         options: [{ text: 'Yes' }, { text: 'No' }],
+        durationMinutes: 1440,
         durationHours: 24,
       })
     expect(batch).toHaveBeenCalledTimes(1)
@@ -262,7 +307,7 @@ describe('W05 poll runtime', () => {
       },
       poll: {
         poll_id: 'poll-1', content_id: 'content-1', owner_user_id: 'author-1',
-        duration_hours: 24, ends_at: '2026-10-16T04:00:00.000Z',
+        duration_minutes: 1440, ends_at: '2026-10-16T04:00:00.000Z',
         created_at: '2026-10-15T04:00:00.000Z', updated_at: '2026-10-15T04:00:00.000Z',
       },
       options: [
@@ -283,7 +328,7 @@ describe('W05 poll runtime', () => {
     const { db, prepare } = pollDb({
       poll: {
         poll_id: 'poll-1', content_id: 'content-1', owner_user_id: 'author-1',
-        duration_hours: 24, ends_at: '2099-10-16T04:00:00.000Z',
+        duration_minutes: 1440, ends_at: '2099-10-16T04:00:00.000Z',
         created_at: '2026-10-15T04:00:00.000Z', updated_at: '2026-10-15T04:00:00.000Z',
       },
       options: [
@@ -322,7 +367,7 @@ describe('W05 poll runtime', () => {
     const scenario = {
       poll: {
         poll_id: 'poll-1', content_id: 'content-1', owner_user_id: 'author-1',
-        duration_hours: 24, ends_at: '2099-10-16T04:00:00.000Z',
+        duration_minutes: 1440, ends_at: '2099-10-16T04:00:00.000Z',
         created_at: '2026-10-15T04:00:00.000Z', updated_at: '2026-10-15T04:00:00.000Z',
       },
       options: [
