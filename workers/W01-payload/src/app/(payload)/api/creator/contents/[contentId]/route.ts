@@ -4,6 +4,7 @@ import {
   invalidatePublicContentList,
   invalidatePublicContentVisibility,
   invalidatePublicContentRelationships,
+  invalidatePublicContentThreads,
 } from '../../../../../../lib/public-response-cache.js'
 import {
   callW03Content,
@@ -59,6 +60,7 @@ export async function DELETE(
       await invalidatePublicContentComments(contentId)
       await invalidatePublicContentVisibility(contentId)
       await invalidatePublicContentRelationships(contentId)
+      await invalidatePublicContentThreads()
       await invalidatePublicContentDetail(request, contentId)
       await invalidatePublicContentList(request)
     }
@@ -104,6 +106,7 @@ export async function PATCH(
       verifiedCreatorId,
     })
     if (response.ok) {
+      await invalidatePublicContentThreads()
       if (changesAccessMode) {
         await invalidatePublicContentVisibility(contentId)
         await invalidatePublicContentList(request)

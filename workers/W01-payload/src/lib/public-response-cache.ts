@@ -304,8 +304,8 @@ export const invalidatePublicContentRelationships = async (contentIdValue: strin
 
 /** A thread edge changes the assembled view for every segment in both chains. */
 export const invalidatePublicContentThreads = async (): Promise<void> => {
-  const cache = (globalThis.caches as unknown as { default: Cache }).default
   try {
+    const cache = (globalThis.caches as unknown as { default: Cache }).default
     await cache.put(
       CONTENT_THREADS_GENERATION_KEY,
       generationResponse(generateContentListGeneration()),

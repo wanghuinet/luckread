@@ -1,3 +1,5 @@
+import { invalidatePublicContentThreads } from './public-response-cache.js'
+
 type InternalService = {
   fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>
 }
@@ -243,6 +245,7 @@ export async function runAuthorizedScheduledPublish(
     }
     summary.published = Number(commitData.published)
     summary.rejected = Number(commitData.rejected)
+    if (summary.published > 0) await invalidatePublicContentThreads()
   }
 
   // A service failure is visible as a failed Cron invocation. Already-published
