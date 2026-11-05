@@ -1382,7 +1382,7 @@ const worker = {
           etag: content.etag,
           title: content.title,
           bodyRef: content.bodyRef,
-          mediaWarning: content.mediaWarning ?? null,
+          mediaWarning: content.accessGranted === false ? null : content.mediaWarning ?? null,
           scheduledAt: content.scheduledAt,
           requestId: createRequestId(),
         })
