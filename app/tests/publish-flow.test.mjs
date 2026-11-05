@@ -91,7 +91,7 @@ test('native post composer validates and configures a real poll on the same draf
   expect(composer).toContain("pollKey: createIdempotencyKey()");
   expect(composer).toContain("'/contents/' + encodeURIComponent(draft.id) + '/poll'");
   expect(composer).toContain('options: cleanPollOptions');
-  expect(composer).toContain('durationHours: pollDurationHours');
+  expect(composer).toContain('durationMinutes: pollDurationMinutes');
   expect(composer).toContain('idempotencyKey: attempt.pollKey');
   expect(composer).toContain("setPublishPending(true)");
   expect(composer.indexOf("'/contents/' + encodeURIComponent(draft.id) + '/poll'"))
@@ -232,7 +232,7 @@ test('native draft fingerprints are stable and change when persisted content cha
     coverRef: 'https://img.luckread.com/a.jpg',
     pollEnabled: false,
     pollOptions: [],
-    pollDurationHours: 24,
+    pollDurationMinutes: 1440,
   };
   const fingerprint = createPublishDraftFingerprint(input);
   expect(createPublishDraftFingerprint(input)).toBe(fingerprint);
