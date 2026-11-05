@@ -1759,7 +1759,7 @@ describe('W05 social poll transport', () => {
       new Request('https://luckread-w05.internal/internal/social/contents/content-1/poll', {
         method: 'POST',
         headers,
-        body: JSON.stringify({ options: ['Yes', 'No'], durationHours: 24 }),
+        body: JSON.stringify({ options: ['Yes', 'No'], durationMinutes: 5 }),
       }),
       { DB: configureDb },
     )
