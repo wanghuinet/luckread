@@ -29,7 +29,6 @@ export type AccountStateTransitionInput = {
   }
   permission?: string | null
   approvalLevel?: string | null
-  preconditionSatisfied?: boolean
   now?: string
   correlationId?: string
   causationId?: string
@@ -109,6 +108,124 @@ const SESSION_INVALIDATION_STATES = new Set<AccountState>([
   'DELETED',
 ])
 
+const COOLING_OFF_WINDOW_MS = 15 * 24 * 60 * 60 * 1000
+const REACTIVATION_WINDOW_MS = 30 * 24 * 60 * 60 * 1000
+
+const TIMED_LIFECYCLE_PRECONDITIONS = new Set([
+  'within_cooling_off',
+  'cooling_off_elapsed',
+  'within_reactivation_window',
+])
+
+type LifecycleWindowSnapshot = {
+  deletionRequestedAt: string | null
+  deletedAt: string | null
+}
+
+function assertTimestampWindow(
+  timestamp: string | null,
+  now: string,
+  windowMs: number,
+  expected: 'within' | 'elapsed',
+  precondition: string,
+): void {
+  const timestampMs = Date.parse(timestamp ?? '')
+  const nowMs = Date.parse(now)
+  if (!Number.isFinite(timestampMs) || !Number.isFinite(nowMs) || timestampMs > nowMs) {
+    throw new AccountStateTransitionError('PRECONDITION_FAILED', 'trusted lifecycle timestamp is missing or invalid')
+  }
+
+  const elapsedMs = nowMs - timestampMs
+  const satisfied = expected === 'within' ? elapsedMs < windowMs : elapsedMs >= windowMs
+  if (!satisfied) {
+    throw new AccountStateTransitionError('PRECONDITION_FAILED', 'precondition failed: ' + precondition)
+  }
+}
+
+function assertRequirements(
+  rule: TransitionRule,
+  input: AccountStateTransitionInput,
+  now: string,
+  lifecycleWindow: LifecycleWindowSnapshot | null,
+  trustedPreconditions: ReadonlySet<string>,
+): void {
+  if (rule.precondition) {
+    if (TIMED_LIFECYCLE_PRECONDITIONS.has(rule.precondition)) {
+      if (!lifecycleWindow) {
+        throw new AccountStateTransitionError('PRECONDITION_FAILED', 'trusted lifecycle timestamp is unavailable')
+      }
+      if (rule.precondition === 'within_cooling_off') {
+        assertTimestampWindow(
+          lifecycleWindow.deletionRequestedAt,
+          now,
+          COOLING_OFF_WINDOW_MS,
+          'within',
+          rule.precondition,
+        )
+      } else if (rule.precondition === 'cooling_off_elapsed') {
+        assertTimestampWindow(
+          lifecycleWindow.deletionRequestedAt,
+          now,
+          COOLING_OFF_WINDOW_MS,
+          'elapsed',
+          rule.precondition,
+        )
+      } else {
+        assertTimestampWindow(
+          lifecycleWindow.deletedAt,
+          now,
+          REACTIVATION_WINDOW_MS,
+          'within',
+          rule.precondition,
+        )
+      }
+    } else if (!trustedPreconditions.has(rule.precondition)) {
+      // Unknown/provider-owned preconditions remain fail-closed. They can only
+      // be satisfied by a dedicated W02 service after proving its authority.
+      throw new AccountStateTransitionError('PRECONDITION_FAILED', 'precondition failed: ' + rule.precondition)
+    }
+  }
+
+  if (rule.requiresApproval) {
+    const requiredLevel = rule.requiresApproval === true ? 'L7' : rule.requiresApproval
+    if (input.approvalLevel !== requiredLevel) {
+      throw new AccountStateTransitionError('FORBIDDEN', 'approval level ' + requiredLevel + ' is required')
+    }
+  }
+}
+
+function lifecycleTimestampAssignments(
+  from: AccountState,
+  to: AccountState,
+  now: string,
+): { assignments: string[]; bindings: string[] } {
+  if (from === 'ACTIVE' && to === 'DELETION_REQUESTED') {
+    return {
+      assignments: ['deletion_requested_at = ?', 'deleted_at = NULL'],
+      bindings: [now],
+    }
+  }
+
+  if (
+    ((from === 'DELETION_REQUESTED' || from === 'DELETION_PENDING') && to === 'ACTIVE') ||
+    (from === 'REACTIVATED' && to === 'ACTIVE')
+  ) {
+    return {
+      assignments: ['deletion_requested_at = NULL', 'deleted_at = NULL'],
+      bindings: [],
+    }
+  }
+
+  if (from === 'DELETION_PENDING' && to === 'DELETED') {
+    return {
+      assignments: ['deleted_at = ?'],
+      bindings: [now],
+    }
+  }
+
+  return { assignments: [], bindings: [] }
+}
+
 function assertInput(input: AccountStateTransitionInput): void {
   if (!input || typeof input.userId !== 'string' || input.userId.length === 0) {
     throw new AccountStateTransitionError('INVALID_INPUT', 'userId is required')
@@ -121,6 +238,9 @@ function assertInput(input: AccountStateTransitionInput): void {
   }
   if (!input.actor || typeof input.actor.id !== 'string' || input.actor.id.length === 0) {
     throw new AccountStateTransitionError('INVALID_INPUT', 'actor id is required')
+  }
+  if (input.now !== undefined && !Number.isFinite(Date.parse(input.now))) {
+    throw new AccountStateTransitionError('INVALID_INPUT', 'now must be a valid ISO timestamp')
   }
   for (const [field, value] of [['correlationId', input.correlationId], ['causationId', input.causationId]] as const) {
     if (value !== undefined && (value.length === 0 || value.length > 255)) {
@@ -291,19 +411,6 @@ function assertActor(rule: TransitionRule, input: AccountStateTransitionInput): 
   }
 }
 
-function assertRequirements(rule: TransitionRule, input: AccountStateTransitionInput): void {
-  if (rule.precondition && input.preconditionSatisfied !== true) {
-    throw new AccountStateTransitionError('PRECONDITION_FAILED', 'precondition failed: ' + rule.precondition)
-  }
-
-  if (rule.requiresApproval) {
-    const requiredLevel = rule.requiresApproval === true ? 'L7' : rule.requiresApproval
-    if (input.approvalLevel !== requiredLevel) {
-      throw new AccountStateTransitionError('FORBIDDEN', 'approval level ' + requiredLevel + ' is required')
-    }
-  }
-}
-
 function buildActor(input: AccountStateTransitionInput): AccountStateChangedEvent['actor'] {
   if (input.actor.type === 'operator') {
     return {
@@ -360,8 +467,10 @@ async function applyAccountStateTransitionInternal(
   db: D1Database,
   input: AccountStateTransitionInput,
   additionalStatements: D1PreparedStatement[] = [],
+  trustedPreconditions: ReadonlySet<string> = new Set(),
 ): Promise<AccountStateTransitionResult> {
   assertInput(input)
+  const now = input.now ?? new Date().toISOString()
 
   const current = await db
     .prepare(
@@ -382,19 +491,38 @@ async function applyAccountStateTransitionInternal(
   }
 
   assertActor(rule, input)
-  assertRequirements(rule, input)
 
-  const now = input.now ?? new Date().toISOString()
+  let lifecycleWindow: LifecycleWindowSnapshot | null = null
+  if (rule.precondition && TIMED_LIFECYCLE_PRECONDITIONS.has(rule.precondition)) {
+    const timestamps = await db
+      .prepare(
+        'SELECT deletion_requested_at AS deletionRequestedAt, deleted_at AS deletedAt FROM "user" WHERE id = ? LIMIT 1',
+      )
+      .bind(input.userId)
+      .first<LifecycleWindowSnapshot>()
+    if (!timestamps) {
+      throw new AccountStateTransitionError('NOT_FOUND', 'user lifecycle timestamps not found')
+    }
+    lifecycleWindow = timestamps
+  }
+  assertRequirements(rule, input, now, lifecycleWindow, trustedPreconditions)
+
   const nextVersion = input.expectedVersion + 1
   const event = buildEvent(input, from, nextVersion, now)
   const journalId = crypto.randomUUID()
   const payload = JSON.stringify(event)
 
+  const lifecycleAssignments = lifecycleTimestampAssignments(from, input.to, now)
+  const lifecycleSetSql = lifecycleAssignments.assignments.length > 0
+    ? ', ' + lifecycleAssignments.assignments.join(', ')
+    : ''
   const updateStatement = db
     .prepare(
-      'UPDATE "user" SET account_state = ?, account_state_version = account_state_version + 1, updated_at = ? WHERE id = ? AND account_state = ? AND account_state_version = ?',
+      'UPDATE "user" SET account_state = ?, account_state_version = account_state_version + 1, updated_at = ?' +
+      lifecycleSetSql +
+      ' WHERE id = ? AND account_state = ? AND account_state_version = ?',
     )
-    .bind(input.to, now, input.userId, from, input.expectedVersion)
+    .bind(input.to, now, ...lifecycleAssignments.bindings, input.userId, from, input.expectedVersion)
 
   const journalStatement = db
     .prepare(
@@ -538,6 +666,7 @@ export async function activateEmailVerifiedAccount(
         now,
       },
       [roleAssignmentStatement],
+      new Set(['phone_or_email_verified']),
     )
 
     return {
