@@ -9,6 +9,7 @@ export type PublishDraftFingerprintInput = {
   pollEnabled: boolean;
   pollOptions: string[];
   pollDurationMinutes: number;
+  mediaWarning: 'NUDITY' | 'VIOLENCE' | 'SENSITIVE' | null;
 };
 
 /** Match the proven W01 web composer cadence: debounce typing and cap write frequency. */
@@ -30,6 +31,7 @@ export function createPublishDraftFingerprint(input: PublishDraftFingerprintInpu
     input.pollEnabled,
     input.pollEnabled ? input.pollOptions.map((option) => option.normalize('NFKC').trim()) : [],
     input.pollEnabled ? input.pollDurationMinutes : null,
+    input.mediaWarning,
   ]);
   let first = 0x811c9dc5;
   let second = 0x9e3779b9;
