@@ -26,8 +26,13 @@ type ScheduledPublishAuthorization = {
   creatorId?: string
 }
 
-type AuthorizedCandidate = DueCandidate & {
+type AuthorizedCandidate = {
+  contentId: string
+  ownerUserId: string
+  expectedCreatorId: string | null
   creatorId: string
+  version: number
+  scheduledAt: string
   authorization: ScheduledPublishAuthorization
 }
 
@@ -98,7 +103,10 @@ const isAllowedForCandidate = (
     decision.action === 'content.publish.own' &&
     decision.resourceType === 'Content' &&
     decision.ownerUserId === candidate.ownerUserId &&
-    decision.creatorId === candidate.creatorId
+    isIdentifier(decision.creatorId, 256) &&
+    (decision.creatorId === candidate.creatorId ||
+      candidate.creatorId === null ||
+      candidate.creatorId === candidate.ownerUserId)
   )
 }
 
@@ -107,10 +115,10 @@ async function authorizeCandidate(
   candidate: DueCandidate,
   correlationId: string,
 ): Promise<{ authorized: AuthorizedCandidate | null; failed: boolean }> {
-  // W08 owns the current Creator, account and role facts. A candidate without
-  // a canonical creator identity cannot be authorized and is safely skipped.
-  if (!candidate.creatorId) return { authorized: null, failed: false }
-
+  // W08 owns the current Creator, account and role facts. For legacy rows
+  // whose creator_id is null or mirrors owner_user_id, W08 accepts that
+  // W03-derived hint and resolves it to the canonical ACTIVE Creator ID.
+  const creatorIdentityHint = candidate.creatorId ?? candidate.ownerUserId
   const headers = serviceHeaders(correlationId)
   headers.set('content-type', 'application/json; charset=utf-8')
   const response = await env.W08_CREATOR.fetch(new Request(
@@ -118,7 +126,7 @@ async function authorizeCandidate(
     {
       method: 'POST',
       headers,
-      body: JSON.stringify({ creatorId: candidate.creatorId }),
+      body: JSON.stringify({ creatorId: creatorIdentityHint }),
     },
   ))
 
@@ -126,8 +134,12 @@ async function authorizeCandidate(
   if (isAllowedForCandidate(payload, candidate)) {
     return {
       authorized: {
-        ...candidate,
-        creatorId: candidate.creatorId,
+        contentId: candidate.contentId,
+        ownerUserId: candidate.ownerUserId,
+        expectedCreatorId: candidate.creatorId,
+        creatorId: payload.creatorId as string,
+        version: candidate.version,
+        scheduledAt: candidate.scheduledAt,
         authorization: payload,
       },
       failed: false,
