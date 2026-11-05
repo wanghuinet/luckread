@@ -11,7 +11,7 @@ test('Help and About is reachable from Settings and remains hidden from the draw
   expect(settings).toContain('title="帮助与关于"');
   expect(settings).toContain("router.push('/about' as never)");
   expect(drawer).toContain('<Drawer.Screen name="about"');
-  expect(drawer).toContain("name="about" options={{ headerShown: false, drawerItemStyle: { display: 'none' } }}");
+  expect(drawer).toContain('name="about" options={{ headerShown: false, drawerItemStyle: { display: \'none\' } }}');
 });
 
 test('About page reuses the exact Terms and Privacy URLs already used at registration', () => {
