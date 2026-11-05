@@ -1,6 +1,6 @@
 import { expect, mock, test } from 'bun:test';
 
-let storedPreference: string | null = 'dark';
+let storedPreference = 'dark';
 let readCount = 0;
 let failWrites = false;
 
