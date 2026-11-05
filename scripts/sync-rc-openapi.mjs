@@ -471,7 +471,7 @@ function ensureDiscoveryDraftPathParameters(raw) {
         const parameterLines = [];
         if (parametersStart < 0) parameterLines.push('      parameters:');
         for (const name of missing) {
-          parameterLines.push(\`        - name: \${name}\`);
+          parameterLines.push('        - name: ' + name);
           parameterLines.push('          in: path');
           parameterLines.push('          required: true');
           parameterLines.push("          schema: { $ref: '#/components/schemas/ResourceId' }");
