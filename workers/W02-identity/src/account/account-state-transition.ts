@@ -29,7 +29,6 @@ export type AccountStateTransitionInput = {
   }
   permission?: string | null
   approvalLevel?: string | null
-  now?: string
   correlationId?: string
   causationId?: string
 }
@@ -241,9 +240,6 @@ function assertInput(input: AccountStateTransitionInput): void {
   if (!input.actor || typeof input.actor.id !== 'string' || input.actor.id.length === 0) {
     throw new AccountStateTransitionError('INVALID_INPUT', 'actor id is required')
   }
-  if (input.now !== undefined && !Number.isFinite(Date.parse(input.now))) {
-    throw new AccountStateTransitionError('INVALID_INPUT', 'now must be a valid ISO timestamp')
-  }
   for (const [field, value] of [['correlationId', input.correlationId], ['causationId', input.causationId]] as const) {
     if (value !== undefined && (value.length === 0 || value.length > 255)) {
       throw new AccountStateTransitionError('INVALID_INPUT', field + ' must be 1-255 characters')
@@ -317,9 +313,9 @@ async function resolveSubjectAuthorization(
 
 export async function authorizeAccountStateTransition(
   db: D1Database,
-  input: { subjectId: string; targetUserId: string; to: AccountState; now?: string },
+  input: { subjectId: string; targetUserId: string; to: AccountState },
 ): Promise<AccountAuthorizationResult> {
-  const now = input.now ?? new Date().toISOString()
+  const now = new Date().toISOString()
   if (!input.subjectId || !input.targetUserId) {
     throw new AccountStateTransitionError('FORBIDDEN', 'authenticated subject is required')
   }
@@ -470,9 +466,13 @@ async function applyAccountStateTransitionInternal(
   input: AccountStateTransitionInput,
   additionalStatements: D1PreparedStatement[] = [],
   trustedPreconditions: ReadonlySet<string> = new Set(),
+  trustedNow?: string,
 ): Promise<AccountStateTransitionResult> {
   assertInput(input)
-  const now = input.now ?? new Date().toISOString()
+  const now = trustedNow ?? new Date().toISOString()
+  if (!Number.isFinite(Date.parse(now)) || new Date(Date.parse(now)).toISOString() !== now) {
+    throw new AccountStateTransitionError('INVALID_INPUT', 'trusted W02 timestamp must be canonical UTC ISO-8601')
+  }
 
   const current = await db
     .prepare(
@@ -625,8 +625,8 @@ export async function activateEmailVerifiedAccount(
   if (typeof userId !== 'string' || userId.length === 0 || userId.length > 128) {
     throw new AccountStateTransitionError('INVALID_INPUT', 'userId is invalid')
   }
-  if (!Number.isFinite(Date.parse(now))) {
-    throw new AccountStateTransitionError('INVALID_INPUT', 'activation timestamp is invalid')
+  if (!Number.isFinite(Date.parse(now)) || new Date(Date.parse(now)).toISOString() !== now) {
+    throw new AccountStateTransitionError('INVALID_INPUT', 'activation timestamp must be canonical UTC ISO-8601')
   }
 
   const current = await db
@@ -668,6 +668,7 @@ export async function activateEmailVerifiedAccount(
       },
       [roleAssignmentStatement],
       new Set(['phone_or_email_verified']),
+      now,
     )
 
     return {
