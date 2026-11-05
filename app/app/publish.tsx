@@ -1662,6 +1662,10 @@ function PublishScreenContent() {
         Alert.alert('请稍候', '当前操作尚未完成，完成后再关闭发布窗口。');
         return;
       }
+      if (contentId && assets.some((asset) => !asset.existing && asset.status !== 'ready')) {
+        setErrorMessage('编辑中的媒体尚未全部上传。请重试或移除失败附件后再退出，避免丢失尚未保存的修改。');
+        return;
+      }
       if (!body.trim() && pollEnabled) {
         setErrorMessage('请先填写动态正文，再保存这份投票草稿。');
         return;
@@ -1859,6 +1863,13 @@ function PublishScreenContent() {
           throw new Error(apiFailureDiagnostic(replyPolicyResult, 'Post changes were saved, but reply permissions could not be updated.'));
         }
         replyAudienceSavedFingerprintRef.current = replyAudienceFingerprint;
+        if (user?.id) {
+          await Promise.all(
+            assets
+              .filter((asset) => !asset.existing)
+              .map((asset) => deletePendingMediaRecovery(user.id, asset.localId)),
+          );
+        }
         const socialSyncWarning = recordRef.current?.state === 'PUBLISHED'
           ? await syncPublishedSocialTokens(contentId, trimmedBody)
           : null;
@@ -2080,7 +2091,7 @@ function PublishScreenContent() {
     } finally {
       setBusy(false);
     }
-  }, [accessMode, assets, body, contentId, coverRef, mediaWarning, pollDurationMinutes, pollEnabled, pollOptions, publishPending, replyAudience, router, saveDraftSnapshot, savePendingAssetAltText, scheduleDate, scheduleEnabled, syncPublishedSocialTokens]);
+  }, [accessMode, assets, body, contentId, coverRef, mediaWarning, pollDurationMinutes, pollEnabled, pollOptions, publishPending, replyAudience, router, saveDraftSnapshot, savePendingAssetAltText, scheduleDate, scheduleEnabled, syncPublishedSocialTokens, user?.id]);
 
   if (authStatus !== 'authenticated') {
     return (
