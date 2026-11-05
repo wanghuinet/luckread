@@ -13,7 +13,7 @@ test('registers one discoverable Settings & privacy route from the main drawer',
 test('settings home links only to existing profile, notification and block/mute destinations', () => {
   expect(screen).toContain("router.push('/profile' as never)");
   expect(screen).toContain("router.push('/notification-preferences' as never)");
-  expect(screen).toContain("router.push(('/blocked-muted' as never))");
+  expect(screen).toContain("router.push('/blocked-muted' as never)");
   expect(screen).not.toContain('showUnavailable');
   expect(screen).not.toContain('TODO');
 });
