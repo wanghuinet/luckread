@@ -11,7 +11,7 @@ import { Feather } from '@expo/vector-icons';
 import { Stack, useRouter } from 'expo-router';
 import { useColorScheme } from 'nativewind';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Constants from 'expo-constants';
+import * as Application from 'expo-application';
 
 const TERMS_URL = 'https://luckread.com/terms';
 const PRIVACY_URL = 'https://luckread.com/privacy';
@@ -110,12 +110,8 @@ export default function HelpAboutScreen() {
     }
   }, [openingPolicy]);
 
-  const appVersion = Constants.expoConfig?.version?.trim() || '当前运行环境未提供';
-  const nativeBuildNumber = Platform.OS === 'android'
-    ? Constants.platform?.android?.versionCode
-    : Platform.OS === 'ios'
-      ? Constants.platform?.ios?.buildNumber
-      : null;
+  const appVersion = Application.nativeApplicationVersion?.trim() || '当前运行环境未提供';
+  const nativeBuildNumber = Application.nativeBuildVersion;
   const buildLabel = typeof nativeBuildNumber === 'string' || typeof nativeBuildNumber === 'number'
     ? String(nativeBuildNumber)
     : '当前运行环境未提供';
