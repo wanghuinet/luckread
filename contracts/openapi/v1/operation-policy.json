@@ -2997,6 +2997,24 @@
       "stateMachine": "none",
       "x-luckread-contract-status": "CONTRACTED_PARTIAL",
       "x-luckread-source": "contracts/api/notification-operation-policy.v1.json"
+    },
+    {
+      "operationId": "listPostThread",
+      "auth": { "mode": "permission" },
+      "permissions": ["content.read.public"],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none"
+    },
+    {
+      "operationId": "appendPostThreadNext",
+      "auth": { "mode": "authenticated" },
+      "permissions": [],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": true,
+      "stateMachine": "none"
     }
   ]
 }
