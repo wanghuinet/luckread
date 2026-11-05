@@ -330,3 +330,30 @@ This update records current-head discovery facts only. It does not modify:
 - any Worker, D1, Queue, binding, or runtime source.
 
 The required next decision is to reconcile the W08/W10 execution-owner contradiction and formally admit the canonical deletion/request/cancel/restoration API and data model before implementation. No feature implementation is authorized by this evidence update.
+
+
+## 18. 2026-11-06 W02 trusted lifecycle-window implementation slice
+
+The repository owner explicitly authorized the narrow W02 implementation slice recorded in:
+`docs/change-control/CC-AUTH-015-W02-TRUSTED-LIFECYCLE-WINDOWS-2026-11-06.md`.
+
+The implementation now targets the current Better Auth `"user"` table in D1-01, created by `workers/W02-identity/migrations/0005_better_auth_identity_core.sql`. It does not use the legacy Payload `users` table from the historical AUTH-013 `0002` migration and does not use `auth_013_publication_journal` as lifecycle timestamp authority.
+
+The slice introduces two nullable W02-owned timestamp fields under a new, not-yet-executed migration:
+
+- `deletion_requested_at`: the W02 server timestamp for `ACTIVE -> DELETION_REQUESTED`;
+- `deleted_at`: the W02 server timestamp for `DELETION_PENDING -> DELETED`.
+
+W02 evaluates the existing state-machine preconditions using those persisted timestamps and the server clock: cancellation is permitted strictly before the 15-day cooling-off boundary; deletion progression is permitted at or after that boundary; self-reactivation is permitted strictly before the 30-day window following `deleted_at`. Exact-boundary, missing, malformed, non-canonical, or future timestamps fail closed. No client timestamp or client-supplied `preconditionSatisfied` flag is trusted.
+
+The timestamp write is part of the same compare-and-set update as Account State and `account_state_version`; the existing AUTH-013 publication journal remains in the same D1 batch. The migration is additive-only and blocks pre-existing rows in deletion lifecycle states because their historical timestamps cannot be reconstructed safely. It does not backfill user data.
+
+**Current evidence disposition:**
+- W02 source/tests and the new persistence/field contracts are present on the AUTH-015 implementation branch.
+- Migration `0009_auth_015_lifecycle_windows.sql` has not yet been executed on remote D1-01.
+- Controlled migration read-back for both new columns and the `d1_migrations` entry remains required.
+- The dedicated deletion/cancel API operations remain `MISSING`; no request/eligibility/idempotency, legal-hold, deletion job, or cross-domain erasure work is claimed.
+- B01 `implementationAuthorized: false` is unchanged as a batch-wide flag; B01 remains `NOT_GREEN`.
+- AUTH-015 remains `PARTIAL / NOT_GREEN`; this implementation slice does not promote any Mapping-0 or Evidence Registry status.
+
+The earlier no-runtime-implementation disposition is superseded only for this explicitly authorized W02 trusted timestamp/window slice. Its remaining non-authorizations continue to apply.
