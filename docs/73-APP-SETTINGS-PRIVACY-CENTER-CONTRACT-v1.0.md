@@ -148,11 +148,11 @@ Settings & privacy
 │   ├── Terms and privacy policy
 │   └── App version / native build
 ├── Help and support services (2.0 deferred)
-    ├── Help center
-    ├── Report a problem
-    ├── Appeals / account status
-    ├── Live support
-    └── Ticketing
+│   ├── Help center
+│   ├── Report a problem
+│   ├── Appeals / account status
+│   ├── Live support
+│   └── Ticketing
 └── Account actions
     ├── Log out
     ├── Deactivate account (when supported)
