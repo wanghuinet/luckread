@@ -8,8 +8,16 @@ export class SocialPollError extends Error {
   constructor(readonly code: string, readonly status: number) { super(code) }
 }
 
-export const POLL_DURATIONS = [24, 72, 168] as const
-export type PollDurationHours = typeof POLL_DURATIONS[number]
+export const POLL_MIN_DURATION_MINUTES = 5
+export const POLL_MAX_DURATION_MINUTES = 7 * 24 * 60
+export const POLL_DEFAULT_DURATION_MINUTES = 24 * 60
+export type PollDurationMinutes = number
+
+export const isValidPollDurationMinutes = (value: unknown): value is PollDurationMinutes =>
+  typeof value === 'number' &&
+  Number.isSafeInteger(value) &&
+  value >= POLL_MIN_DURATION_MINUTES &&
+  value <= POLL_MAX_DURATION_MINUTES
 
 export type PollOptionView = {
   optionId: string
@@ -22,7 +30,9 @@ export type PollView = {
   pollId: string
   contentId: string
   options: PollOptionView[]
-  durationHours: PollDurationHours
+  durationMinutes: PollDurationMinutes
+  /** @deprecated Use durationMinutes. Retained for older API consumers. */
+  durationHours: number
   endsAt: string | null
   totalVotes: number
   viewerOptionId: string | null
@@ -60,12 +70,10 @@ const validateOptions = (input: unknown): string[] => {
   return options
 }
 
-const validateDuration = (value: unknown): PollDurationHours => {
-  if (value === undefined || value === null) return 24
-  if (typeof value !== 'number' || !POLL_DURATIONS.includes(value as PollDurationHours)) {
-    throw new SocialPollError('VALIDATION_FAILED', 400)
-  }
-  return value as PollDurationHours
+const validateDurationMinutes = (value: unknown): PollDurationMinutes => {
+  if (value === undefined || value === null) return POLL_DEFAULT_DURATION_MINUTES
+  if (!isValidPollDurationMinutes(value)) throw new SocialPollError('VALIDATION_FAILED', 400)
+  return value
 }
 
 const isBlocked = async (db: D1Database, viewerUserId: string, ownerUserId: string): Promise<boolean> => {
@@ -93,7 +101,7 @@ type PollRow = {
   poll_id: string
   content_id: string
   owner_user_id: string
-  duration_hours: number
+  duration_minutes: number
   ends_at: string | null
   created_at: string
   updated_at: string
@@ -147,7 +155,7 @@ const rowFromPollContentContext = (
 }
 
 const readPollRow = (db: D1Database, contentId: string) => db.prepare(
-  `SELECT poll_id, content_id, owner_user_id, duration_hours, ends_at, created_at, updated_at
+  `SELECT poll_id, content_id, owner_user_id, duration_minutes, ends_at, created_at, updated_at
      FROM social_polls
     WHERE content_id = ?
     LIMIT 1`,
@@ -158,7 +166,7 @@ const effectiveEndTime = (row: PollRow, contentUpdatedAt: string, published: boo
   if (!published) return null
   const publishedAt = Date.parse(contentUpdatedAt)
   if (!Number.isFinite(publishedAt)) throw new SocialPollError('INTERNAL_ERROR', 500)
-  return new Date(publishedAt + Number(row.duration_hours) * 60 * 60 * 1000).toISOString()
+  return new Date(publishedAt + Number(row.duration_minutes) * 60_000).toISOString()
 }
 
 export async function getContentPoll(
@@ -184,8 +192,8 @@ export async function getContentPoll(
   if (!poll) return null
   if (poll.owner_user_id !== content.owner_user_id) throw new SocialPollError('CONFLICT', 409)
 
-  const durationHours = Number(poll.duration_hours)
-  if (!POLL_DURATIONS.includes(durationHours as PollDurationHours)) throw new SocialPollError('INTERNAL_ERROR', 500)
+  const durationMinutes = Number(poll.duration_minutes)
+  if (!isValidPollDurationMinutes(durationMinutes)) throw new SocialPollError('INTERNAL_ERROR', 500)
   const endsAt = effectiveEndTime(poll, content.updated_at, isPublic)
   if (isPublic && !poll.ends_at && endsAt) {
     await db.prepare('UPDATE social_polls SET ends_at = ? WHERE poll_id = ? AND ends_at IS NULL')
@@ -222,7 +230,8 @@ export async function getContentPoll(
     pollId: poll.poll_id,
     contentId,
     options,
-    durationHours: durationHours as PollDurationHours,
+    durationMinutes,
+    durationHours: durationMinutes / 60,
     endsAt,
     totalVotes,
     viewerOptionId,
@@ -241,7 +250,7 @@ export async function configureContentPoll(
   const actorUserId = validateId(actorUserIdValue, 'UNAUTHENTICATED')
   const contentId = validateId(contentIdValue)
   const options = validateOptions(optionsInput)
-  const durationHours = validateDuration(durationInput)
+  const durationMinutes = validateDurationMinutes(durationInput)
   if (!contentContext) throw new SocialPollError('SERVICE_UNAVAILABLE', 503)
   const content = rowFromOwnedPostContext(contentId, contentContext)
 
@@ -256,7 +265,7 @@ export async function configureContentPoll(
       'SELECT option_text FROM social_poll_options WHERE poll_id = ? ORDER BY position ASC',
     ).bind(existing.poll_id).all<{ option_text: string }>()
     const sameOptions = (existingOptions.results ?? []).map(row => row.option_text)
-    if (existing.duration_hours !== durationHours || JSON.stringify(sameOptions) !== JSON.stringify(options)) {
+    if (existing.duration_minutes !== durationMinutes || JSON.stringify(sameOptions) !== JSON.stringify(options)) {
       throw new SocialPollError('CONFLICT', 409)
     }
     const current = await getContentPoll(db, contentId, actorUserId, contentContext)
@@ -274,13 +283,13 @@ export async function configureContentPoll(
     ).bind(existing.poll_id).first<{ count: number }>()
     const sameOptions = JSON.stringify(currentOptions) === JSON.stringify(options)
     if (Number(voteCount?.count ?? 0) > 0) {
-      if (sameOptions && Number(existing.duration_hours) === durationHours) {
+      if (sameOptions && Number(existing.duration_minutes) === durationMinutes) {
         const current = await getContentPoll(db, contentId, actorUserId, contentContext)
         if (current) return current
       }
       throw new SocialPollError('CONFLICT', 409)
     }
-    if (sameOptions && Number(existing.duration_hours) === durationHours) {
+    if (sameOptions && Number(existing.duration_minutes) === durationMinutes) {
       const current = await getContentPoll(db, contentId, actorUserId, contentContext)
       if (current) return current
     }
@@ -288,8 +297,8 @@ export async function configureContentPoll(
     const now = new Date().toISOString()
     const statements = [
       db.prepare(
-        'UPDATE social_polls SET duration_hours = ?, ends_at = NULL, updated_at = ? WHERE poll_id = ? AND NOT EXISTS (SELECT 1 FROM social_poll_votes WHERE poll_id = ?)',
-      ).bind(durationHours, now, existing.poll_id, existing.poll_id),
+        'UPDATE social_polls SET duration_minutes = ?, ends_at = NULL, updated_at = ? WHERE poll_id = ? AND NOT EXISTS (SELECT 1 FROM social_poll_votes WHERE poll_id = ?)',
+      ).bind(durationMinutes, now, existing.poll_id, existing.poll_id),
       db.prepare(
         'DELETE FROM social_poll_options WHERE poll_id = ? AND EXISTS (SELECT 1 FROM social_polls WHERE poll_id = ? AND updated_at = ?)',
       ).bind(existing.poll_id, existing.poll_id, now),
@@ -311,8 +320,8 @@ export async function configureContentPoll(
   const now = new Date().toISOString()
   const statements = [
     db.prepare(
-      'INSERT OR IGNORE INTO social_polls (poll_id, content_id, owner_user_id, duration_hours, ends_at, created_at, updated_at) VALUES (?, ?, ?, ?, NULL, ?, ?)',
-    ).bind(pollId, contentId, actorUserId, durationHours, now, now),
+      'INSERT OR IGNORE INTO social_polls (poll_id, content_id, owner_user_id, duration_minutes, ends_at, created_at, updated_at) VALUES (?, ?, ?, ?, NULL, ?, ?)',
+    ).bind(pollId, contentId, actorUserId, durationMinutes, now, now),
     ...options.map((text, position) => db.prepare(
       `INSERT OR IGNORE INTO social_poll_options (option_id, poll_id, option_text, position)
        SELECT ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM social_polls WHERE poll_id = ?)`,
@@ -321,7 +330,7 @@ export async function configureContentPoll(
   await db.batch(statements)
   const configured = await getContentPoll(db, contentId, actorUserId, contentContext)
   if (!configured || configured.options.length !== options.length ||
-      configured.durationHours !== durationHours ||
+      configured.durationMinutes !== durationMinutes ||
       configured.options.some((option, i) => option.text !== options[i])) {
     throw new SocialPollError('CONFLICT', 409)
   }
