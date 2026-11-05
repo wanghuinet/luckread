@@ -19,11 +19,9 @@ import {
 } from '@gorhom/bottom-sheet';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useWindowDimensions } from 'react-native';
-import * as SecureStore from 'expo-secure-store';
 
 import { resolvePublicProfileById, type ApiPublicProfile } from '~/lib/content-adapter';
 import { useAuthStore } from '~/store/auth-store';
-import { isThemePreference, THEME_PREFERENCE_KEY, type ThemePreference } from '~/lib/theme-preference';
 
 type DrawerMenuItemProps = {
   icon: keyof typeof Feather.glyphMap;
@@ -47,39 +45,6 @@ function DrawerMenuItem({ icon, label, onPress, isDark }: DrawerMenuItemProps) {
   );
 }
 
-function ThemeModeOption({
-  label,
-  value,
-  selected,
-  onPress,
-}: {
-  label: string;
-  value: ThemePreference;
-  selected: boolean;
-  onPress: (value: ThemePreference) => void;
-}) {
-  return (
-    <TouchableOpacity
-      accessibilityRole="radio"
-      accessibilityState={{ selected }}
-      accessibilityLabel={label}
-      onPress={() => onPress(value)}
-      className="min-h-[56px] flex-row items-center justify-between px-1"
-      activeOpacity={0.72}
-    >
-      <Text className="text-[17px] text-neutral-900 dark:text-neutral-100">{label}</Text>
-      <View
-        className={
-          'h-6 w-6 items-center justify-center rounded-full border-2 ' +
-          (selected ? 'border-sky-500' : 'border-neutral-400 dark:border-neutral-500')
-        }
-      >
-        {selected ? <View className="h-3 w-3 rounded-full bg-sky-500" /> : null}
-      </View>
-    </TouchableOpacity>
-  );
-}
-
 function CustomDrawerContent(props: any) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -93,23 +58,8 @@ function CustomDrawerContent(props: any) {
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileError, setProfileError] = useState('');
   const [signOutBusy, setSignOutBusy] = useState(false);
-  const [themePreference, setThemePreference] = useState<ThemePreference>('system');
   const accountSheetRef = useRef<BottomSheetModal>(null);
-  const themeSheetRef = useRef<BottomSheetModal>(null);
   const accountSnapPoints = useMemo(() => ['32%'], []);
-  const themeSnapPoints = useMemo(() => ['36%'], []);
-
-  useEffect(() => {
-    let active = true;
-    void SecureStore.getItemAsync(THEME_PREFERENCE_KEY)
-      .then((savedPreference) => {
-        if (active && isThemePreference(savedPreference)) setThemePreference(savedPreference);
-      })
-      .catch(() => undefined);
-    return () => {
-      active = false;
-    };
-  }, []);
 
   useEffect(() => {
     let active = true;
@@ -149,17 +99,6 @@ function CustomDrawerContent(props: any) {
   const showUnavailable = useCallback((name: string) => {
     Alert.alert(name, '该模块尚未接入 LuckRead 1.0 Beta APP。');
   }, []);
-
-  const selectTheme = useCallback(async (preference: ThemePreference) => {
-    setThemePreference(preference);
-    setColorScheme(preference);
-    try {
-      await SecureStore.setItemAsync(THEME_PREFERENCE_KEY, preference);
-    } catch {
-      // The selected mode still applies for this session if secure storage is unavailable.
-    }
-    themeSheetRef.current?.dismiss();
-  }, [setColorScheme]);
 
   const handleSignOut = useCallback(async () => {
     if (signOutBusy) return;
@@ -236,6 +175,12 @@ function CustomDrawerContent(props: any) {
         swipeEdgeWidth={width}
       >
         <DrawerMenuItem icon="user" label="个人资料" onPress={openMyProfile} isDark={isDark} />
+        <DrawerMenuItem
+          icon="settings"
+          label="设置与隐私"
+          onPress={() => router.push('/settings' as never)}
+          isDark={isDark}
+        />
         <DrawerMenuItem
           icon="award"
           label="Premium"
@@ -314,15 +259,6 @@ function CustomDrawerContent(props: any) {
       >
         <TouchableOpacity
           accessibilityRole="button"
-          accessibilityLabel="夜间模式设置"
-          onPress={() => themeSheetRef.current?.present()}
-          className="flex-row items-center gap-3 py-3"
-        >
-          <Feather name="moon" size={21} color={isDark ? '#d1d5db' : '#374151'} />
-          <Text className="text-base font-semibold text-neutral-800 dark:text-neutral-200">夜间模式</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          accessibilityRole="button"
           accessibilityLabel="账户与登录"
           onPress={() => accountSheetRef.current?.present()}
           className="flex-row items-center gap-3 py-3"
@@ -331,24 +267,6 @@ function CustomDrawerContent(props: any) {
           <Text className="text-sm font-semibold text-neutral-700 dark:text-neutral-200">账户与登录</Text>
         </TouchableOpacity>
       </View>
-
-      <BottomSheetModal
-        ref={themeSheetRef}
-        index={0}
-        snapPoints={themeSnapPoints}
-        backdropComponent={(sheetProps) => (
-          <BottomSheetBackdrop {...sheetProps} appearsOnIndex={0} disappearsOnIndex={-1} />
-        )}
-        handleIndicatorStyle={{ backgroundColor: isDark ? '#333333' : '#d1d5db', height: 5, width: 36 }}
-        backgroundStyle={{ backgroundColor: drawerBackground, borderRadius: 26 }}
-      >
-        <BottomSheetView className="flex-1 px-6 pt-2 bg-white dark:bg-black">
-          <Text className={'mb-3 text-lg font-bold ' + sheetTextClass}>夜间模式</Text>
-          <ThemeModeOption label="关闭" value="light" selected={themePreference === 'light'} onPress={selectTheme} />
-          <ThemeModeOption label="开启" value="dark" selected={themePreference === 'dark'} onPress={selectTheme} />
-          <ThemeModeOption label="使用设备设置" value="system" selected={themePreference === 'system'} onPress={selectTheme} />
-        </BottomSheetView>
-      </BottomSheetModal>
 
       <BottomSheetModal
         ref={accountSheetRef}
@@ -417,6 +335,7 @@ function DrawerLayout() {
       <Drawer.Screen name="index" options={{ headerShown: false }} />
       <Drawer.Screen name="(tabs)" options={{ headerShown: false }} />
       <Drawer.Screen name="profile" options={{ headerShown: false }} />
+      <Drawer.Screen name="settings" options={{ headerShown: false }} />
       <Drawer.Screen name="bookmarks" options={{ headerShown: false }} />
       <Drawer.Screen name="notification-preferences" options={{ headerShown: false }} />
       <Drawer.Screen name="blocked-muted" options={{ headerShown: false }} />
