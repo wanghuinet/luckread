@@ -437,7 +437,9 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
 
   function removeAsset(id: string) {
     const removed = assets.find((asset) => asset.id === id)
-    setAssets((current) => current.filter((asset) => asset.id !== id))
+    const remainingAssets = assets.filter((asset) => asset.id !== id)
+    setAssets(remainingAssets)
+    if (remainingAssets.length === 0) setMediaWarning(null)
     if (removed) {
       setVideoMetadataByAssetId((current) => {
         if (!current[removed.id]) return current
@@ -767,13 +769,6 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
   }, [scheduleAutoSave])
 
   useEffect(() => {
-    if (assets.length === 0 && mediaWarning !== null) {
-      setMediaWarning(null)
-      markDirty()
-    }
-  }, [assets.length, mediaWarning])
-
-  useEffect(() => {
     if (autoSaveDirtyRef.current) autoSaveSchedulerRef.current()
     return () => {
       if (autoSaveTimerRef.current) {
@@ -975,6 +970,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
       setBody('')
       setAssets([])
       setCoverRef('')
+      setMediaWarning(null)
       if (!isTweetModal) {
         const nextUrl = new URL(window.location.href)
         nextUrl.searchParams.delete('draft')
