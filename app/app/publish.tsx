@@ -102,6 +102,9 @@ type ComposerAsset = {
   serverUrl: string;
   playbackUrl?: string;
   status: 'uploading' | 'uploaded' | 'ready' | 'failed';
+  uploadProgress?: number | null;
+  uploadLoadedBytes?: number;
+  uploadTotalBytes?: number;
   error?: string;
   existing?: boolean;
 };
@@ -504,7 +507,13 @@ function PublishScreenContent() {
     try {
       if (!uploaded) {
         if (!asset.uri || !asset.uploadKey) throw new Error('The selected file is missing retry information.');
-        updateAsset(asset.localId, { status: 'uploading', error: undefined });
+        updateAsset(asset.localId, {
+          status: 'uploading',
+          error: undefined,
+          uploadProgress: 0,
+          uploadLoadedBytes: 0,
+          uploadTotalBytes: asset.size ?? undefined,
+        });
         const file: LocalMediaFile = {
           uri: asset.uri,
           name: asset.filename,
@@ -542,7 +551,13 @@ function PublishScreenContent() {
           width: uploadFile.width,
           height: uploadFile.height,
         });
-        uploaded = await uploadMediaFile(uploadFile, asset.uploadKey);
+        uploaded = await uploadMediaFile(uploadFile, asset.uploadKey, (progress) => {
+          updateAsset(asset.localId, {
+            uploadProgress: progress.percent,
+            uploadLoadedBytes: progress.loaded,
+            uploadTotalBytes: progress.total || undefined,
+          });
+        });
         if (user?.id) {
           await markPendingMediaRecoveryUploaded(user.id, asset.localId, uploaded.url).catch(() => undefined);
         }
@@ -551,6 +566,9 @@ function PublishScreenContent() {
           altText: uploaded.alt || asset.altText || asset.filename,
           serverUrl: uploaded.url,
           status: 'uploaded',
+          uploadProgress: 100,
+          uploadLoadedBytes: uploadFile.size ?? asset.size ?? undefined,
+          uploadTotalBytes: uploadFile.size ?? asset.size ?? undefined,
           error: undefined,
         });
       }
@@ -836,12 +854,37 @@ function PublishScreenContent() {
             {asset.filename}
           </Text>
           <Text style={[styles.assetStatus, isDark && { color: '#9ca3af' }, asset.status === 'failed' ? styles.errorText : null]}>
-            {asset.status === 'uploading' ? 'Uploading to LuckRead…'
+            {asset.status === 'uploading'
+              ? typeof asset.uploadProgress === 'number'
+                ? 'Uploading to LuckRead · ' + Math.round(asset.uploadProgress) + '%'
+                : typeof asset.uploadLoadedBytes === 'number' && asset.uploadLoadedBytes > 0
+                  ? 'Uploading to LuckRead · ' + Math.max(1, Math.round(asset.uploadLoadedBytes / 1024)) + ' KB sent'
+                  : 'Uploading to LuckRead…'
               : asset.status === 'uploaded' ? 'Uploaded; playback authorization needs retry'
                 : asset.status === 'ready' ? 'Ready'
                   : 'Upload failed'}
             {typeof asset.size === 'number' ? ' · ' + Math.round(asset.size / 1024) + ' KB' : ''}
           </Text>
+          {asset.status === 'uploading' && typeof asset.uploadProgress === 'number' ? (
+            <View
+              accessibilityRole="progressbar"
+              accessibilityLabel={'Upload progress for ' + asset.filename}
+              accessibilityValue={{ min: 0, max: 100, now: Math.round(asset.uploadProgress) }}
+              style={{
+                height: 4,
+                marginTop: 6,
+                overflow: 'hidden',
+                borderRadius: 999,
+                backgroundColor: isDark ? '#27272a' : '#eaecf0',
+              }}
+            >
+              <View style={{
+                height: '100%',
+                width: Math.min(100, Math.max(0, asset.uploadProgress)) + '%',
+                backgroundColor: PRIMARY,
+              }} />
+            </View>
+          ) : null}
           {asset.mimeType.startsWith('image/') ? (
             <View style={{ marginTop: 10 }}>
               <Text style={[styles.assetStatus, isDark && { color: '#d4d4d8' }]}>替代文本（无障碍图片说明）</Text>

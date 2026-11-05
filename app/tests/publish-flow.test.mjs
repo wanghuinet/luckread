@@ -14,7 +14,7 @@ const socialScreenApiSource = readFileSync(new URL('../lib/social-screen-api.ts'
 
 test('native publisher uses the shared media API helpers and existing W01 state endpoint', () => {
   expect(composer).toContain('prepareImageForUpload(file)');
-  expect(composer).toContain('uploadMediaFile(uploadFile, asset.uploadKey)');
+  expect(composer).toContain('uploadMediaFile(uploadFile, asset.uploadKey, (progress) => {');
   expect(composer).toContain('getMediaPlayback(uploaded.id)');
   expect(composer).toContain('uploadTextBody(');
   expect(composer).toContain("'/contents/' + encodeURIComponent(draft.id) + '/state'");
@@ -174,6 +174,18 @@ test('native post detail reads poll state and submits votes through existing W01
   expect(socialPoll).toContain('viewerOptionId');
   expect(socialPoll).toContain('option.votes / poll.totalVotes');
   expect(socialPoll).toContain('poll.closed');
+});
+
+test('native composer reports real attachment upload progress before publish is enabled', () => {
+  expect(composer).toContain('uploadProgress?: number | null;');
+  expect(composer).toContain('uploadLoadedBytes?: number;');
+  expect(composer).toContain('uploadTotalBytes?: number;');
+  expect(composer).toContain('uploadMediaFile(uploadFile, asset.uploadKey, (progress) => {');
+  expect(composer).toContain('uploadProgress: progress.percent');
+  expect(composer).toContain('uploadLoadedBytes: progress.loaded');
+  expect(composer).toContain('Uploading to LuckRead · ');
+  expect(composer).toContain('accessibilityRole="progressbar"');
+  expect(composer).toContain('Math.min(100, Math.max(0, asset.uploadProgress))');
 });
 
 test('media upload success is reported only when every attachment is ready', () => {

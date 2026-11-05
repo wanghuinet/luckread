@@ -4,6 +4,7 @@ let storedToken = 'secure-test-token';
 let savedTokens = [];
 let pendingFetch;
 const originalFetch = globalThis.fetch;
+const originalXMLHttpRequest = globalThis.XMLHttpRequest;
 
 mock.module('../lib/secure-session.ts', () => ({
   readSessionToken: async () => storedToken,
@@ -57,6 +58,11 @@ beforeEach(() => {
 
 afterEach(() => {
   globalThis.fetch = originalFetch;
+  if (originalXMLHttpRequest) {
+    globalThis.XMLHttpRequest = originalXMLHttpRequest;
+  } else {
+    Reflect.deleteProperty(globalThis, 'XMLHttpRequest');
+  }
 });
 
 test('adds the secure bearer session and an idempotency key to JSON writes at the canonical public API URL', async () => {
@@ -975,6 +981,75 @@ test('rejects untrusted body-reference origins before making a network request',
   expect(requestCount).toBe(0);
 });
 
+
+test('uses authenticated XHR multipart transport when upload progress is requested', async () => {
+  const requests = [];
+  class FakeXMLHttpRequest {
+    upload = { onprogress: null };
+    requestHeaders = new Map();
+    status = 201;
+    statusText = 'Created';
+    responseText = JSON.stringify({ data: { id: 'media-progress-1' } });
+
+    open(method, url, async) {
+      this.method = method;
+      this.url = url;
+      this.async = async;
+    }
+
+    setRequestHeader(name, value) {
+      this.requestHeaders.set(name.toLowerCase(), value);
+    }
+
+    send(body) {
+      this.body = body;
+      requests.push(this);
+      this.upload.onprogress?.({ lengthComputable: true, loaded: 64, total: 128 });
+      this.upload.onprogress?.({ lengthComputable: false, loaded: 96, total: 0 });
+      this.onload?.();
+    }
+
+    getAllResponseHeaders() {
+      return 'Content-Type: application/json\r\nX-LuckRead-Session-Token: renewed-upload-token\r\n';
+    }
+  }
+
+  globalThis.XMLHttpRequest = FakeXMLHttpRequest;
+  let fetchCount = 0;
+  pendingFetch = async () => {
+    fetchCount += 1;
+    throw new Error('Fetch must not be used for progress-enabled multipart uploads.');
+  };
+
+  const form = new FormData();
+  form.append('file', new Blob(['native-media']), 'native-media.mp4');
+  const progress = [];
+  const result = await apiRequest('/media', {
+    method: 'POST',
+    body: form,
+    idempotencyKey: 'media-progress-retry-key',
+    headers: { 'X-LuckRead-Upload-Fingerprint': 'lr-up1-progress-test' },
+    onUploadProgress: (event) => progress.push(event),
+  });
+
+  expect(result.response.status).toBe(201);
+  expect(result.data).toEqual({ data: { id: 'media-progress-1' } });
+  expect(requests).toHaveLength(1);
+  expect(fetchCount).toBe(0);
+  expect(requests[0].url).toBe('https://api.luckread.com/v1/media');
+  expect(requests[0].method).toBe('POST');
+  expect(requests[0].async).toBe(true);
+  expect(requests[0].body).toBe(form);
+  expect(requests[0].requestHeaders.get('authorization')).toBe('Bearer secure-test-token');
+  expect(requests[0].requestHeaders.get('idempotency-key')).toBe('media-progress-retry-key');
+  expect(requests[0].requestHeaders.get('x-luckread-upload-fingerprint')).toBe('lr-up1-progress-test');
+  expect(requests[0].requestHeaders.has('content-type')).toBe(false);
+  expect(progress).toEqual([
+    { loaded: 64, total: 128, percent: 50 },
+    { loaded: 96, total: 0, percent: null },
+  ]);
+  expect(savedTokens).toEqual(['renewed-upload-token']);
+});
 
 test('reuses the same generated key after a transport failure, even if the caller creates a fresh key', async () => {
   const seenKeys = [];
