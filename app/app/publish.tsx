@@ -938,7 +938,8 @@ function PublishScreenContent() {
   );
 
   const saveDraftSnapshot = useCallback(async () => {
-    if (contentId || loadingEdit || publishPending || authStatus !== 'authenticated') return;
+    const ownerId = user?.id;
+    if (contentId || loadingEdit || publishPending || authStatus !== 'authenticated' || !ownerId) return;
     const trimmedBody = body.trim();
     if (!trimmedBody || trimmedBody.length > MAX_TEXT_LENGTH) return;
     if (pollEnabled) {
@@ -982,7 +983,7 @@ function PublishScreenContent() {
       replyAudienceSavedFingerprintRef.current === replyAudienceFingerprint
     ) {
       await bindPendingMediaRecoveryToDraft(
-        user.id,
+        ownerId,
         recordRef.current.id,
         pendingAssets.map((asset) => asset.localId),
       );
@@ -1166,14 +1167,14 @@ function PublishScreenContent() {
     // written to W03. Once ready refs are safely saved, their local copies can
     // be removed without affecting the server draft.
     await bindPendingMediaRecoveryToDraft(
-      user.id,
+      ownerId,
       draft.id,
       pendingAssets.map((asset) => asset.localId),
     );
     await Promise.all(
       readyAssets
         .filter((asset) => !asset.existing)
-        .map((asset) => deletePendingMediaRecovery(user.id, asset.localId)),
+        .map((asset) => deletePendingMediaRecovery(ownerId, asset.localId)),
     );
 
     // Only mark the content fingerprint saved after content, poll and reply policy succeed.
@@ -1224,7 +1225,6 @@ function PublishScreenContent() {
       if (
         changeToken !== draftSaveChangeTokenRef.current ||
         draftSaveInFlightRef.current ||
-        busy ||
         !draftSaveDirtyRef.current
       ) {
         return;
@@ -1258,7 +1258,6 @@ function PublishScreenContent() {
   }, [
     assets,
     body,
-    busy,
     contentId,
     loadingEdit,
     publishPending,
