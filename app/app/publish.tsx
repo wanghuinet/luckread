@@ -1870,9 +1870,14 @@ function PublishScreenContent() {
         <Pressable accessibilityRole="button" accessibilityLabel="Close composer" disabled={busy || loadingEdit} onPress={() => { void closeComposer(); }} style={[styles.iconButton, (busy || loadingEdit) && styles.disabledButton]}>
           <Feather name="x" size={22} color={isDark ? '#e5e7eb' : '#111827'} />
         </Pressable>
-        {!contentId ? (
+        {!contentId && Platform.OS !== 'web' ? (
           <Pressable accessibilityRole="button" accessibilityLabel="Open drafts" onPress={() => { void openDraftInbox(); }} style={styles.iconButton}>
             <Feather name="file-text" size={19} color={isDark ? '#e5e7eb' : '#344054'} />
+          </Pressable>
+        ) : null}
+        {!contentId && Platform.OS !== 'web' ? (
+          <Pressable accessibilityRole="button" accessibilityLabel="Open scheduled posts" onPress={() => { void openScheduledInbox(); }} style={styles.iconButton}>
+            <Feather name="calendar-clock" size={19} color={isDark ? '#e5e7eb' : '#344054'} />
           </Pressable>
         ) : null}
         <Text style={[styles.headerTitle, isDark && { color: '#f9fafb' }]}>{contentId ? 'Edit post' : 'New post'}</Text>
@@ -2182,34 +2187,38 @@ function PublishScreenContent() {
         visible={schedulePickerVisible && Platform.OS !== 'web'}
         animationType="slide"
         presentationStyle="pageSheet"
-        onRequestClose={() => setSchedulePickerVisible(false)}
+        onRequestClose={() => {
+          setSchedulePickerVisible(false);
+          setScheduleEditTarget(null);
+        }}
       >
         <View style={[styles.schedulePickerModal, isDark && styles.schedulePickerModalDark]}>
           <View style={[styles.schedulePickerHeader, isDark && { borderBottomColor: '#27272a' }]}>
-            <Pressable accessibilityRole="button" onPress={() => setSchedulePickerVisible(false)} style={styles.schedulePickerActionHit}>
-              <Text style={styles.schedulePickerCancel}>取消</Text>
-            </Pressable>
-            <Text style={[styles.schedulePickerTitle, isDark && { color: '#f9fafb' }]}>设置发布时间</Text>
             <Pressable
               accessibilityRole="button"
               onPress={() => {
-                const iso = toScheduledPublishISO(schedulePickerDraft);
-                if (!iso) {
-                  setErrorMessage('请选择至少一分钟后的时间。');
-                  return;
-                }
-                setScheduleDate(new Date(iso));
-                setScheduleEnabled(true);
                 setSchedulePickerVisible(false);
-                setErrorMessage('');
+                setScheduleEditTarget(null);
               }}
+              style={styles.schedulePickerActionHit}
+            >
+              <Text style={styles.schedulePickerCancel}>取消</Text>
+            </Pressable>
+            <Text style={[styles.schedulePickerTitle, isDark && { color: '#f9fafb' }]}>
+              {scheduleEditTarget ? '修改发布时间' : '设置发布时间'}
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              onPress={confirmSchedulePicker}
               style={styles.schedulePickerActionHit}
             >
               <Text style={styles.schedulePickerConfirm}>确认</Text>
             </Pressable>
           </View>
           <Text style={[styles.schedulePickerHint, isDark && { color: '#9ca3af' }]}>
-            时间按手机当前时区显示。最早可选择一分钟后。
+            {scheduleEditTarget
+              ? '修改时会先取消原定时并转为草稿，再按当前创作者权限重新安排。时间按手机当前时区显示。'
+              : '时间按手机当前时区显示。最早可选择一分钟后。'}
           </Text>
           <DateTimePicker
             value={schedulePickerDraft}
@@ -2270,12 +2279,96 @@ function PublishScreenContent() {
           )}
         </View>
       </Modal>
+      <Modal
+        visible={scheduledInboxVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setScheduledInboxVisible(false)}
+      >
+        <View style={[styles.draftsModal, isDark && styles.draftsModalDark]}>
+          <View style={[styles.draftsHeader, isDark && { borderBottomColor: '#27272a' }]}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Close scheduled posts" onPress={() => setScheduledInboxVisible(false)} style={styles.iconButton}>
+              <Feather name="x" size={22} color={isDark ? '#e5e7eb' : '#111827'} />
+            </Pressable>
+            <Text style={[styles.draftsTitle, isDark && { color: '#f9fafb' }]}>定时发布</Text>
+            <Pressable accessibilityRole="button" accessibilityLabel="Refresh scheduled posts" disabled={scheduledInboxLoading} onPress={() => { void loadScheduledInbox(null, false); }} style={styles.iconButton}>
+              <Feather name="refresh-cw" size={18} color={isDark ? '#e5e7eb' : '#344054'} />
+            </Pressable>
+          </View>
+          {scheduledInboxError ? <Text style={styles.draftsError}>{scheduledInboxError}</Text> : null}
+          {scheduledInboxLoading && scheduledInboxItems.length === 0 ? (
+            <View style={styles.draftsEmpty}>
+              <ActivityIndicator color={PRIMARY} />
+              <Text style={[styles.suggestionMeta, isDark && { color: '#a1a1aa' }]}>正在加载定时动态…</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={scheduledInboxItems}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={scheduledInboxItems.length === 0 ? styles.draftsEmptyList : styles.draftsList}
+              ListEmptyComponent={
+                <Text style={[styles.draftsEmptyText, isDark && { color: '#a1a1aa' }]}>
+                  还没有待发布的定时动态。
+                </Text>
+              }
+              renderItem={({ item }) => (
+                <View style={[styles.scheduledItem, isDark && { borderBottomColor: '#27272a' }]}>
+                  <View style={styles.scheduledItemMain}>
+                    <Text numberOfLines={3} style={[styles.draftItemTitle, isDark && { color: '#f4f4f5' }]}>
+                      {item.title?.trim() || '未命名动态'}
+                    </Text>
+                    <Text style={[styles.draftItemMeta, isDark && { color: '#a1a1aa' }]}>
+                      计划于 {new Date(item.scheduledAt).toLocaleString()} 发布
+                    </Text>
+                    <Text style={[styles.draftItemMeta, isDark && { color: '#a1a1aa' }]}>
+                      {item.mediaRefs?.length ? item.mediaRefs.length + ' 个附件 · ' : ''}
+                      {item.accessMode === 'MEMBERS_ONLY' ? '会员专享' : '公开'}
+                      {' · '}v{item.version}
+                    </Text>
+                    <View style={styles.scheduledActions}>
+                      <Pressable
+                        accessibilityRole="button"
+                        disabled={scheduledActionId !== null}
+                        onPress={() => openScheduleEditPicker(item)}
+                        style={[styles.scheduledActionButton, isDark && { borderColor: '#52525b' }]}
+                      >
+                        <Feather name="calendar-clock" size={14} color={PRIMARY} />
+                        <Text style={styles.scheduledActionText}>修改时间</Text>
+                      </Pressable>
+                      <Pressable
+                        accessibilityRole="button"
+                        disabled={scheduledActionId !== null}
+                        onPress={() => cancelScheduledPost(item)}
+                        style={[styles.scheduledActionButton, styles.scheduledCancelButton, isDark && { borderColor: '#7f1d1d' }]}
+                      >
+                        {scheduledActionId === item.id
+                          ? <ActivityIndicator size="small" color="#b42318" />
+                          : <Feather name="x-circle" size={14} color="#b42318" />}
+                        <Text style={styles.scheduledCancelText}>取消定时</Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                </View>
+              )}
+              onEndReached={() => {
+                if (scheduledInboxHasMore && !scheduledInboxLoading && scheduledInboxCursor) {
+                  void loadScheduledInbox(scheduledInboxCursor, true);
+                }
+              }}
+              onEndReachedThreshold={0.5}
+              ListFooterComponent={scheduledInboxLoading && scheduledInboxItems.length > 0
+                ? <ActivityIndicator color={PRIMARY} style={{ padding: 16 }} />
+                : undefined}
+            />
+          )}
+        </View>
+      </Modal>
     </View>
   );
 }
 
 
-export default function PublishScreen() {
+export default function PublishScreen {
   return (
     <KeyboardProvider preload={false}>
       <PublishScreenContent />
