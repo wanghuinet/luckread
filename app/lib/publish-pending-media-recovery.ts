@@ -71,8 +71,16 @@ function getRecordFile(directory: Directory, localId: string): File {
 }
 
 function parseRecoveryRecord(value: unknown): PendingMediaRecoveryRecord | null {
-  if (!value || typeof value !== 'object') return null;
-  const record = value as Partial<PendingMediaRecoveryRecord>;
+  let parsed = value;
+  if (typeof value === 'string') {
+    try {
+      parsed = JSON.parse(value) as unknown;
+    } catch {
+      return null;
+    }
+  }
+  if (!parsed || typeof parsed !== 'object') return null;
+  const record = parsed as Partial<PendingMediaRecoveryRecord>;
   const asset = record.asset as Partial<PendingMediaRecoveryAsset> | undefined;
   if (
     record.version !== 1 ||
