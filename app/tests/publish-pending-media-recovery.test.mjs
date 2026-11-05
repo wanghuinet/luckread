@@ -83,6 +83,7 @@ const {
   deletePendingMediaRecovery,
   deletePendingMediaRecoveryForDraft,
   listPendingMediaRecovery,
+  markPendingMediaRecoveryUploaded,
   persistPendingMediaRecovery,
 } = await import('../lib/publish-pending-media-recovery.ts');
 
@@ -150,6 +151,18 @@ test('replacing an optimized recovery copy removes the old extension without cha
   expect(restored).toHaveLength(1);
   expect(restored[0].uri).toBe(optimized.uri);
   expect(files.get(optimized.uri)?.content).toBe('optimized');
+});
+
+test('recovery metadata remembers a completed W01 upload URL without losing the local retry file', async () => {
+  await persistPendingMediaRecovery('user-1', 'draft-1', asset);
+  const uploadedUrl = 'https://img.luckread.com/user-1/photo.png';
+
+  await markPendingMediaRecoveryUploaded('user-1', asset.localId, uploadedUrl);
+
+  const restored = await listPendingMediaRecovery('user-1', 'draft-1');
+  expect(restored).toHaveLength(1);
+  expect(restored[0].uploadedUrl).toBe(uploadedUrl);
+  expect(files.has(restored[0].uri)).toBe(true);
 });
 
 test('recovery records are isolated by account and by server draft', async () => {
