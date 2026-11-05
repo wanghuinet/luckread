@@ -179,6 +179,8 @@ jobs:
         run: bun run test:billing-api
       - name: Test native Settings and privacy home navigation
         run: bun test tests/settings-home.test.mjs
+      - name: Test shared appearance preference hydration and persistence
+        run: bun test tests/theme-preference-store.test.mjs
       - name: Test native Help and About page
         run: bun test tests/settings-about.test.mjs
       - name: Test native block and mute management
