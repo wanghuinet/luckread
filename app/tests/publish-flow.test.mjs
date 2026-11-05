@@ -14,7 +14,7 @@ const socialScreenApiSource = readFileSync(new URL('../lib/social-screen-api.ts'
 
 test('native publisher uses the shared media API helpers and existing W01 state endpoint', () => {
   expect(composer).toContain('prepareImageForUpload(file)');
-  expect(composer).toContain('uploadMediaFile(uploadFile, asset.uploadKey)');
+  expect(composer).toContain('uploadMediaFile(uploadFile, asset.uploadKey, (progress) => {');
   expect(composer).toContain('getMediaPlayback(uploaded.id)');
   expect(composer).toContain('uploadTextBody(');
   expect(composer).toContain("'/contents/' + encodeURIComponent(draft.id) + '/state'");
