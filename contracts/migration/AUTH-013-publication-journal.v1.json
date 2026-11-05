@@ -18,41 +18,168 @@
     "databaseBinding": "workers/W02-identity/wrangler.jsonc:D1_01"
   },
   "columns": [
-    {"column":"journal_id","dbType":"TEXT","nullable":false,"primaryKey":true},
-    {"column":"event_id","dbType":"TEXT","nullable":false,"unique":true},
-    {"column":"event_type","dbType":"TEXT","nullable":false,"constant":"identity.account_state_changed"},
-    {"column":"schema_version","dbType":"TEXT","nullable":false,"constant":"1.0"},
-    {"column":"resource_id","dbType":"TEXT","nullable":false},
-    {"column":"source_version","dbType":"INTEGER","nullable":false,"minimum":1},
-    {"column":"payload","dbType":"TEXT","nullable":false,"immutable":true},
-    {"column":"status","dbType":"TEXT","nullable":false,"enum":["PENDING","PUBLISHED","FAILED"]},
-    {"column":"attempt","dbType":"INTEGER","nullable":false,"minimum":1,"default":1},
-    {"column":"next_attempt_at","dbType":"TEXT","nullable":true},
-    {"column":"created_at","dbType":"TEXT","nullable":false},
-    {"column":"published_at","dbType":"TEXT","nullable":true},
-    {"column":"last_error_code","dbType":"TEXT","nullable":true,"maxLength":128}
+    {
+      "column": "journal_id",
+      "dbType": "TEXT",
+      "nullable": false,
+      "primaryKey": true
+    },
+    {
+      "column": "event_id",
+      "dbType": "TEXT",
+      "nullable": false,
+      "unique": true
+    },
+    {
+      "column": "event_type",
+      "dbType": "TEXT",
+      "nullable": false,
+      "constant": "identity.account_state_changed"
+    },
+    {
+      "column": "schema_version",
+      "dbType": "TEXT",
+      "nullable": false,
+      "constant": "1.0"
+    },
+    {
+      "column": "resource_id",
+      "dbType": "TEXT",
+      "nullable": false
+    },
+    {
+      "column": "source_version",
+      "dbType": "INTEGER",
+      "nullable": false,
+      "minimum": 1
+    },
+    {
+      "column": "payload",
+      "dbType": "TEXT",
+      "nullable": false,
+      "immutable": true
+    },
+    {
+      "column": "status",
+      "dbType": "TEXT",
+      "nullable": false,
+      "enum": [
+        "PENDING",
+        "PUBLISHED",
+        "FAILED"
+      ]
+    },
+    {
+      "column": "attempt",
+      "dbType": "INTEGER",
+      "nullable": false,
+      "minimum": 1,
+      "default": 1
+    },
+    {
+      "column": "next_attempt_at",
+      "dbType": "TEXT",
+      "nullable": true
+    },
+    {
+      "column": "created_at",
+      "dbType": "TEXT",
+      "nullable": false
+    },
+    {
+      "column": "published_at",
+      "dbType": "TEXT",
+      "nullable": true
+    },
+    {
+      "column": "last_error_code",
+      "dbType": "TEXT",
+      "nullable": true,
+      "maxLength": 128
+    }
   ],
   "constraints": {
-    "resourceVersionUniqueness":["resource_id","event_type","source_version"],
-    "statusValues":["PENDING","PUBLISHED","FAILED"],
-    "eventType":"identity.account_state_changed",
-    "schemaVersion":"1.0"
+    "resourceVersionUniqueness": [
+      "resource_id",
+      "event_type",
+      "source_version"
+    ],
+    "statusValues": [
+      "PENDING",
+      "PUBLISHED",
+      "FAILED"
+    ],
+    "eventType": "identity.account_state_changed",
+    "schemaVersion": "1.0"
   },
-  "indexes":["auth_013_publication_journal_status_next_attempt_idx"],
+  "indexes": [
+    "auth_013_publication_journal_status_next_attempt_idx"
+  ],
   "rules": {
-    "journalIsNotAccountStateAuthority":true,
-    "w02IsAuthoritativeWriter":true,
-    "w02MustNotWriteD1_03":true,
-    "sameD1AtomicityRequiredForTransitionAndJournalInsert":true,
-    "publisherRetriesMustReuseTheSameEventId":true,
-    "consumerIdempotencyRemainsW06Responsibility":true
+    "journalIsNotAccountStateAuthority": true,
+    "w02IsAuthoritativeWriter": true,
+    "w02MustNotWriteD1_03": true,
+    "sameD1AtomicityRequiredForTransitionAndJournalInsert": true,
+    "publisherRetriesMustReuseTheSameEventId": true,
+    "consumerIdempotencyRemainsW06Responsibility": true
   },
   "remoteExecution": {
-    "workflow":".github/workflows/auth-013-publication-journal-migration.yml",
-    "mode":"CONTROLLED_REMOTE_D1",
-    "mutation":"NOT_EXECUTED"
+    "workflow": ".github/workflows/auth-013-publication-journal-migration.yml",
+    "mode": "CONTROLLED_REMOTE_D1",
+    "mutation": "APPLIED",
+    "reconciliationRef": "docs/change-control/CC-MAPPING-0-AUTH-013-PUBLICATION-JOURNAL-MIGRATION-EXECUTION-RECONCILIATION-2026-09-24.md",
+    "executionEvidence": {
+      "workflowRun": 36000833449,
+      "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/36000833449",
+      "executedAt": "2026-09-24T12:43:09Z",
+      "result": "SUCCESS",
+      "sourceCommitSha": "202244cd2a67d54733fe0ddd6518a8b4a41a7251",
+      "worker": "luckread-w02",
+      "databaseName": "luckread",
+      "databaseId": "2f80471e-3756-49f9-8db1-7707a433ad64",
+      "binding": "D1_01",
+      "migration": {
+        "id": "MIG-AUTH-013-PUBLICATION-JOURNAL-V1",
+        "file": "0003_auth_013_publication_journal.sql",
+        "pathAtExecution": "workers/W02-content/migrations/0003_auth_013_publication_journal.sql",
+        "currentPath": "workers/W02-identity/migrations/0003_auth_013_publication_journal.sql",
+        "blobSha256": "ff903644db255ada37e1948226085f76a595e63c",
+        "applyResult": "SUCCESS"
+      },
+      "preflight": {
+        "targetTableAbsent": true,
+        "result": "PASS"
+      },
+      "postMigrationVerification": {
+        "schema": "PASS",
+        "requiredColumnCount": 13,
+        "index": "PASS",
+        "requiredIndex": "auth_013_publication_journal_status_next_attempt_idx"
+      },
+      "migrationLedger": {
+        "capture": "CAPTURED",
+        "artifactFile": "d1-migrations.json",
+        "contentReview": "NOT_INDEPENDENTLY_VERIFIED",
+        "note": "The workflow captured SELECT * FROM d1_migrations into the uploaded artifact; its contents are not independently re-reviewed in this reconciliation."
+      },
+      "artifact": {
+        "id": 10807623109,
+        "name": "auth-013-journal-migration-36000833449",
+        "sha256": "3d161d99dc741d07cf8f2b9eb69edeefc2aaea3f93a7d1bfd229c8391e579284",
+        "sizeBytes": 2328,
+        "retentionDays": 14,
+        "availableAtReconciliation": false
+      }
+    },
+    "staticVerification": {
+      "workflowRun": 36000971085,
+      "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/36000971085",
+      "sourceCommitSha": "202244cd2a67d54733fe0ddd6518a8b4a41a7251",
+      "result": "PASS",
+      "scope": "SOURCE_SCHEMA_ONLY"
+    }
   },
-  "evidenceRequirements":[
+  "evidenceRequirements": [
     "static migration audit",
     "exact source SHA",
     "D1_01 binding and UUID verification",
