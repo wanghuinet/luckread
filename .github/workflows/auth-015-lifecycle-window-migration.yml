@@ -1,0 +1,163 @@
+name: AUTH-015 W02 Lifecycle Window D1-01 Migration
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact source SHA containing migration 0009
+        required: true
+        type: string
+      database_name:
+        description: Cloudflare D1-01 display name bound to W02
+        required: true
+        default: luckread
+        type: string
+      confirm:
+        description: Type APPLY to permit the controlled remote D1 migration
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  migrate:
+    if: ${{ inputs.confirm == 'APPLY' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact source commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha }}
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Validate source, D1-01 binding and migration file
+        working-directory: workers/W02-identity
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          DATABASE_NAME: ${{ inputs.database_name }}
+          EXPECTED_DATABASE_ID: "2f80471e-3756-49f9-8db1-7707a433ad64"
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          test -f migrations/0009_auth_015_lifecycle_windows.sql
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs'
+          const config = JSON.parse(fs.readFileSync('wrangler.jsonc', 'utf8'))
+          const target = config.d1_databases?.find((item) => item.binding === 'D1_01')
+          if (!target) throw new Error('D1_01 binding missing')
+          if (target.database_name !== process.env.DATABASE_NAME) throw new Error('database_name mismatch')
+          if (target.database_id !== process.env.EXPECTED_DATABASE_ID) throw new Error('D1-01 UUID mismatch')
+          if (target.migrations_dir !== 'migrations') throw new Error('unexpected migrations_dir')
+          console.log(JSON.stringify({sourceSha:process.env.SOURCE_SHA,binding:target.binding,databaseName:target.database_name,databaseId:target.database_id,migrationsDir:target.migrations_dir},null,2))
+          NODE
+
+      - name: Read-only preflight of schema, rows and complete migration ledger
+        working-directory: workers/W02-identity
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          DATABASE_NAME: ${{ inputs.database_name }}
+        run: |
+          set -euo pipefail
+          out="$GITHUB_WORKSPACE/artifacts/mapping-0/auth-015-lifecycle-window-migration"
+          mkdir -p "$out"
+          npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc --command 'PRAGMA table_info("user");' > "$out/preflight-user-schema.json"
+          npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc --command "SELECT COUNT(*) AS deletion_lifecycle_rows FROM \"user\" WHERE account_state IN ('DELETION_REQUESTED','DELETION_PENDING','DELETED','REACTIVATED');" > "$out/preflight-deletion-state-count.json"
+          npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc --command 'SELECT * FROM d1_migrations ORDER BY id;' > "$out/preflight-d1-migrations.json"
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs'
+          const base = process.env.GITHUB_WORKSPACE + '/artifacts/mapping-0/auth-015-lifecycle-window-migration/'
+          const read = (name) => JSON.parse(fs.readFileSync(base + name, 'utf8'))
+          const schemaEnvelope = read('preflight-user-schema.json')
+          const countEnvelope = read('preflight-deletion-state-count.json')
+          const ledgerEnvelope = read('preflight-d1-migrations.json')
+          const valid = (value) => Array.isArray(value) && value.length === 1 && value[0]?.success === true && Array.isArray(value[0]?.results)
+          if (!valid(schemaEnvelope) || !valid(countEnvelope) || !valid(ledgerEnvelope)) throw new Error('AUTH-015 preflight query did not return a successful D1 result')
+          const columns = schemaEnvelope[0].results
+          for (const required of ['id', 'account_state', 'account_state_version']) if (!columns.some((column) => column.name === required)) throw new Error('required user column missing: ' + required)
+          for (const forbidden of ['deletion_requested_at', 'deleted_at']) if (columns.some((column) => column.name === forbidden)) throw new Error('target column already exists; stop for manual reconciliation: ' + forbidden)
+          if (countEnvelope[0].results.length !== 1 || Number(countEnvelope[0].results[0]?.deletion_lifecycle_rows) !== 0) throw new Error('AUTH-015 fail-closed: existing deletion lifecycle rows have no admitted timestamp provenance')
+          const applied = new Set(ledgerEnvelope[0].results.map((row) => row.name))
+          const requiredPrior = ['0001_role_assignments.sql','0002_auth_013_account_state.sql','0003_auth_013_publication_journal.sql','0004_auth_003_credentials.sql','0005_better_auth_identity_core.sql','0006_better_auth_two_factor.sql','0007_l8_genesis_bootstrap_audit.sql','0008_auth_007_mfa_publication_journal.sql']
+          const missing = requiredPrior.filter((name) => !applied.has(name))
+          if (missing.length) throw new Error('Prior W02 migrations are not all recorded; refusing to apply the full migration directory: ' + missing.join(', '))
+          if (applied.has('0009_auth_015_lifecycle_windows.sql')) throw new Error('AUTH-015 migration already recorded')
+          console.log(JSON.stringify({userSchemaVerified:true,deletionLifecycleRows:0,targetColumnsAbsent:true,priorMigrationsVerified:requiredPrior,priorMigrationCount:applied.size},null,2))
+          NODE
+
+      - name: Apply AUTH-015 migration to the existing D1-01 only
+        working-directory: workers/W02-identity
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          DATABASE_NAME: ${{ inputs.database_name }}
+        run: npx --yes wrangler@4.116.0 d1 migrations apply "$DATABASE_NAME" --remote --config wrangler.jsonc
+
+      - name: Verify columns, no backfill and exactly one new migration
+        working-directory: workers/W02-identity
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          DATABASE_NAME: ${{ inputs.database_name }}
+        run: |
+          set -euo pipefail
+          out="$GITHUB_WORKSPACE/artifacts/mapping-0/auth-015-lifecycle-window-migration"
+          npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc --command 'PRAGMA table_info("user");' > "$out/post-user-schema.json"
+          npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc --command "SELECT COUNT(*) AS deletion_lifecycle_rows FROM \"user\" WHERE account_state IN ('DELETION_REQUESTED','DELETION_PENDING','DELETED','REACTIVATED');" > "$out/post-deletion-state-count.json"
+          npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote --json --config wrangler.jsonc --command 'SELECT * FROM d1_migrations ORDER BY id;' > "$out/post-d1-migrations.json"
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs'
+          const base = process.env.GITHUB_WORKSPACE + '/artifacts/mapping-0/auth-015-lifecycle-window-migration/'
+          const read = (name) => JSON.parse(fs.readFileSync(base + name, 'utf8'))
+          const schemaEnvelope = read('post-user-schema.json')
+          const countEnvelope = read('post-deletion-state-count.json')
+          const beforeEnvelope = read('preflight-d1-migrations.json')
+          const afterEnvelope = read('post-d1-migrations.json')
+          const valid = (value) => Array.isArray(value) && value.length === 1 && value[0]?.success === true && Array.isArray(value[0]?.results)
+          if (!valid(schemaEnvelope) || !valid(countEnvelope) || !valid(beforeEnvelope) || !valid(afterEnvelope)) throw new Error('AUTH-015 post-migration query did not return a successful D1 result')
+          const columns = schemaEnvelope[0].results
+          for (const name of ['deletion_requested_at', 'deleted_at']) {
+            const column = columns.find((item) => item.name === name)
+            if (!column || column.type !== 'TEXT' || column.notnull !== 0 || column.dflt_value !== null) throw new Error('AUTH-015 nullable TEXT column verification failed: ' + name)
+          }
+          if (countEnvelope[0].results.length !== 1 || Number(countEnvelope[0].results[0]?.deletion_lifecycle_rows) !== 0) throw new Error('unexpected deletion-state population after schema-only migration')
+          const before = new Set(beforeEnvelope[0].results.map((row) => row.name))
+          const after = new Set(afterEnvelope[0].results.map((row) => row.name))
+          const added = [...after].filter((name) => !before.has(name))
+          if (added.length !== 1 || added[0] !== '0009_auth_015_lifecycle_windows.sql') throw new Error('unexpected D1 migration ledger delta: ' + added.join(', '))
+          console.log(JSON.stringify({AUTH_015_MIGRATION:'PASS',databaseName:process.env.DATABASE_NAME,columns:['deletion_requested_at','deleted_at'],deletionLifecycleRows:0,newlyAppliedMigration:added[0]},null,2))
+          NODE
+
+      - name: Capture exact-source migration provenance
+        if: success()
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          DATABASE_NAME: ${{ inputs.database_name }}
+        run: |
+          set -euo pipefail
+          out="$GITHUB_WORKSPACE/artifacts/mapping-0/auth-015-lifecycle-window-migration"
+          cat > "$out/provenance.txt" <<EOF
+          workflow=AUTH-015 W02 Lifecycle Window D1-01 Migration
+          source_sha=$SOURCE_SHA
+          database_name=$DATABASE_NAME
+          database_id=2f80471e-3756-49f9-8db1-7707a433ad64
+          binding=D1_01
+          migration=0009_auth_015_lifecycle_windows.sql
+          remote_mutation=APPLIED_AND_VERIFIED
+          timestamp_backfill=false
+          EOF
+
+      - name: Upload controlled migration evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: auth-015-lifecycle-window-migration-${{ github.run_id }}
+          path: artifacts/mapping-0/auth-015-lifecycle-window-migration/
+          if-no-files-found: error
+          retention-days: 14
