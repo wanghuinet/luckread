@@ -175,6 +175,7 @@ export default function BlockedMutedScreen() {
               setPendingTargetId(targetId);
               setError('');
               try {
+                if (accountIdRef.current !== operationAccountId) return;
                 const result = isBlock ? await unblockUser(targetId) : await unmuteUser(targetId);
                 if (accountIdRef.current !== operationAccountId) return;
                 if (result.response.status === 401) {
