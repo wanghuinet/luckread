@@ -56,3 +56,38 @@ test('management screen wires existing list and remove APIs with confirmation', 
   expect(drawerSource).toContain('name="blocked-muted"');
   expect(drawerSource).toContain("router.push('/blocked-muted' as never)");
 });
+
+test('isolates relationship lists and pending mutations when the signed-in account changes', () => {
+  expect(screenSource).toContain("const authUser = useAuthStore((state) => state.user)");
+  expect(screenSource).toContain('const accountId = authUser?.id ?? null');
+  expect(screenSource).toContain("const visibleRows = accountDataReady ? rows : []");
+  expect(screenSource).toContain("loadedAccountIdRef.current = null");
+  expect(screenSource).toContain("accountIdRef.current !== accountId");
+  expect(screenSource).toContain("[accountId, loadPage]");
+  expect(screenSource).toContain("accountIdRef.current === operationAccountId");
+  expect(screenSource).toContain("if (accountIdRef.current !== operationAccountId || authUserRef.current !== operationUser) return");
+  expect(screenSource).toContain("setLoadingMore(false)");
+  expect(screenSource).toContain("setRefreshing(false)");
+});
+
+test('isolates stale reads and confirmation callbacks after same-account reauthentication', () => {
+  expect(screenSource).toContain("const authUser = useAuthStore((state) => state.user)");
+  expect(screenSource).toContain('authUserRef.current !== authUser');
+  expect(screenSource).toContain('authUserRef.current === authUser');
+  expect(screenSource).toContain('const operationUser = authUser');
+  expect(screenSource).toContain('authUserRef.current !== operationUser');
+  expect(screenSource).toContain('[accountId, authStatus, authUser, kind, router]');
+});
+
+test('returns to the intended settings route when a block or mute read expires', () => {
+  expect(screenSource).toContain("router.replace(('/login?returnTo=' + encodeURIComponent('/blocked-muted')) as never)");
+  expect(screenSource).toContain('accessibilityRole="alert"');
+});
+
+test('prevents duplicate pagination requests and keeps the list server-authoritative', () => {
+  expect(screenSource).toContain('if (append && requestRef.current) return');
+  expect(screenSource).toContain("fetchManagedRelationshipsPage(kind,");
+  expect(screenSource).toContain("if (!result.response.ok)");
+  expect(screenSource).toContain("setCursor(page.nextCursor || null)");
+  expect(screenSource).toContain("setHasMore(page.hasMore)");
+});
