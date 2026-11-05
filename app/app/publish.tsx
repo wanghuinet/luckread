@@ -63,6 +63,7 @@ import {
   deletePendingMediaRecovery,
   deletePendingMediaRecoveryForDraft,
   listPendingMediaRecovery,
+  markPendingMediaRecoveryUploaded,
   persistPendingMediaRecovery,
 } from '~/lib/publish-pending-media-recovery';
 
@@ -437,7 +438,15 @@ function PublishScreenContent() {
         };
       });
       const pendingRecoveries = await listPendingMediaRecovery(user.id, targetContentId);
-      const recoveredPendingAssets: ComposerAsset[] = pendingRecoveries.map((asset) => ({
+      const alreadyAttachedRecoveries = pendingRecoveries.filter((asset) =>
+        Boolean(asset.uploadedUrl && restoredMediaRefs.includes(asset.uploadedUrl)),
+      );
+      await Promise.all(
+        alreadyAttachedRecoveries.map((asset) => deletePendingMediaRecovery(user.id, asset.localId)),
+      );
+      const recoveredPendingAssets: ComposerAsset[] = pendingRecoveries
+        .filter((asset) => !alreadyAttachedRecoveries.some((attached) => attached.localId === asset.localId))
+        .map((asset) => ({
         ...asset,
         serverUrl: '',
         status: 'failed',
@@ -532,6 +541,9 @@ function PublishScreenContent() {
           height: uploadFile.height,
         });
         uploaded = await uploadMediaFile(uploadFile, asset.uploadKey);
+        if (user?.id) {
+          await markPendingMediaRecoveryUploaded(user.id, asset.localId, uploaded.url).catch(() => undefined);
+        }
         updateAsset(asset.localId, {
           uploaded,
           altText: uploaded.alt || asset.altText || asset.filename,
