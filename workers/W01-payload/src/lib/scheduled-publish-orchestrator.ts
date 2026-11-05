@@ -111,14 +111,13 @@ async function authorizeCandidate(
   // a canonical creator identity cannot be authorized and is safely skipped.
   if (!candidate.creatorId) return { authorized: null, failed: false }
 
+  const headers = serviceHeaders(correlationId)
+  headers.set('content-type', 'application/json; charset=utf-8')
   const response = await env.W08_CREATOR.fetch(new Request(
     'https://luckread-w08-creator.internal/internal/authz/check-scheduled-publish',
     {
       method: 'POST',
-      headers: new Headers([
-        ...serviceHeaders(correlationId),
-        ['content-type', 'application/json; charset=utf-8'],
-      ]),
+      headers,
       body: JSON.stringify({ creatorId: candidate.creatorId }),
     },
   ))
@@ -152,7 +151,6 @@ async function authorizeCandidate(
  */
 export async function runAuthorizedScheduledPublish(
   env: ScheduledPublishEnvironment,
-  scheduledTime: number,
 ): Promise<ScheduledPublishSummary> {
   const runId = 'scheduled-publish-' + crypto.randomUUID()
   const dueResponse = await env.W03_CONTENT.fetch(new Request(
@@ -205,14 +203,13 @@ export async function runAuthorizedScheduledPublish(
   }
 
   if (authorized.length > 0) {
+    const commitHeaders = serviceHeaders(runId + '-commit')
+    commitHeaders.set('content-type', 'application/json; charset=utf-8')
     const commitResponse = await env.W03_CONTENT.fetch(new Request(
       'https://luckread-w03.internal/internal/content/scheduled-publish/commit',
       {
         method: 'POST',
-        headers: new Headers([
-          ...serviceHeaders(runId + '-commit'),
-          ['content-type', 'application/json; charset=utf-8'],
-        ]),
+        headers: commitHeaders,
         body: JSON.stringify({ items: authorized }),
       },
     ))
