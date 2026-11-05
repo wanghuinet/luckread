@@ -188,6 +188,15 @@ function PublishScreenContent() {
   const [scheduleDate, setScheduleDate] = useState(() => getDefaultScheduledPublishDate());
   const [schedulePickerVisible, setSchedulePickerVisible] = useState(false);
   const [schedulePickerDraft, setSchedulePickerDraft] = useState(() => getDefaultScheduledPublishDate());
+  const openSchedulePicker = useCallback(() => {
+    const now = Date.now();
+    const candidate = scheduleDate.getTime() > now + MIN_SCHEDULE_LEAD_TIME_MS
+      ? scheduleDate
+      : getDefaultScheduledPublishDate();
+    setSchedulePickerDraft(candidate);
+    setSchedulePickerVisible(true);
+    setErrorMessage('');
+  }, [scheduleDate]);
   const [draftSaveStatus, setDraftSaveStatus] = useState<'idle' | 'scheduled' | 'saving' | 'saved' | 'error'>('idle');
   const [draftInboxVisible, setDraftInboxVisible] = useState(false);
   const [draftInboxItems, setDraftInboxItems] = useState<NativePostDraft[]>([]);
@@ -1795,7 +1804,7 @@ function PublishScreenContent() {
             </Text>
           ) : null}
 
-          {!contentId ? (
+          {!contentId && Platform.OS !== 'web' ? (
             <View style={[styles.scheduleSection, isDark && { borderBottomColor: '#27272a' }]}>
               <Text style={[styles.scheduleSectionTitle, isDark && { color: '#f9fafb' }]}>发布时间</Text>
               <View style={styles.scheduleModeRow}>
@@ -1815,11 +1824,7 @@ function PublishScreenContent() {
                   accessibilityRole="button"
                   accessibilityState={{ selected: scheduleEnabled, disabled: busy || loadingEdit || publishPending || pollEnabled }}
                   disabled={busy || loadingEdit || publishPending || pollEnabled}
-                  onPress={() => {
-                    setSchedulePickerDraft(scheduleDate);
-                    setSchedulePickerVisible(true);
-                    setErrorMessage('');
-                  }}
+                  onPress={openSchedulePicker}
                   style={[styles.scheduleModeOption, scheduleEnabled && styles.scheduleModeOptionSelected, isDark && { borderColor: scheduleEnabled ? PRIMARY : '#52525b', backgroundColor: scheduleEnabled ? '#102a43' : '#09090b' }]}
                 >
                   <Text style={[styles.scheduleModeOptionText, isDark && { color: scheduleEnabled ? '#ffffff' : '#e5e7eb' }, scheduleEnabled && styles.scheduleModeOptionTextSelected]}>定时发布</Text>
@@ -1830,10 +1835,7 @@ function PublishScreenContent() {
                   accessibilityRole="button"
                   accessibilityLabel="Change scheduled publish time"
                   disabled={busy || loadingEdit || publishPending}
-                  onPress={() => {
-                    setSchedulePickerDraft(scheduleDate);
-                    setSchedulePickerVisible(true);
-                  }}
+                  onPress={openSchedulePicker}
                   style={[styles.scheduleDateButton, isDark && { borderColor: '#52525b', backgroundColor: '#09090b' }]}
                 >
                   <View style={styles.scheduleDateButtonContent}>
@@ -2026,7 +2028,7 @@ function PublishScreenContent() {
         onCapture={handleCameraCapture}
       />
       <Modal
-        visible={schedulePickerVisible}
+        visible={schedulePickerVisible && Platform.OS !== 'web'}
         animationType="slide"
         presentationStyle="pageSheet"
         onRequestClose={() => setSchedulePickerVisible(false)}
