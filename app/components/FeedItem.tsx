@@ -182,10 +182,12 @@ const FeedVideoAttachment = ({ uri, headers }: { uri: string; headers?: Record<s
 
 const FeedMediaGallery = ({
     items,
+    contentId = '',
     mediaWarning = null,
     detailView = false,
 }: {
     items: FeedMediaAttachment[];
+    contentId?: string;
     mediaWarning?: 'NUDITY' | 'VIOLENCE' | 'SENSITIVE' | null;
     detailView?: boolean;
 }) => {
@@ -193,7 +195,7 @@ const FeedMediaGallery = ({
     const [viewerIndex, setViewerIndex] = useState(0);
     const [resolvedAltText, setResolvedAltText] = useState<Record<string, string>>({});
     const mediaSourceKey = JSON.stringify(items.map((media) => media.src));
-    const mediaRevealKey = (mediaWarning ?? 'none') + ':' + mediaSourceKey;
+    const mediaRevealKey = contentId + ':' + (mediaWarning ?? 'none') + ':' + mediaSourceKey;
     const [revealedMediaKey, setRevealedMediaKey] = useState<string | null>(null);
     const mediaRevealed = !mediaWarning || revealedMediaKey === mediaRevealKey;
     const { width, height } = useWindowDimensions();
@@ -735,7 +737,7 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
                         </View>
                     ) : null}
                     <Text className="text-black dark:text-white mt-1 text-lg leading-6">{itemData.message}</Text>
-                    <FeedMediaGallery items={mediaItems} mediaWarning={itemData.accessGranted === false ? null : itemData.mediaWarning} />
+                    <FeedMediaGallery items={mediaItems} contentId={itemData.contentId} mediaWarning={itemData.accessGranted === false ? null : itemData.mediaWarning} />
                     {detailView && itemData.contentType === 'post' && itemData.contentId ? (
                         <SocialPoll contentId={itemData.contentId} />
                     ) : null}
@@ -836,7 +838,7 @@ export const FeedItemDetailView: React.FC<FeedItemProps> = ({ itemData, onPress,
             <View className="mt-2">
                 <Text className="text-lg text-black dark:text-white">{itemData.message}</Text>
 
-                <FeedMediaGallery items={mediaItems} mediaWarning={itemData.accessGranted === false ? null : itemData.mediaWarning} detailView />
+                <FeedMediaGallery items={mediaItems} contentId={itemData.contentId} mediaWarning={itemData.accessGranted === false ? null : itemData.mediaWarning} detailView />
 
 
                 <View className="flex-row items-center mt-2 gap-2">
