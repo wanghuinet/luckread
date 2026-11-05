@@ -2096,3 +2096,83 @@ describe('W05 notification deep-link transport', () => {
     expect(statements[0]?.values).toEqual(['viewer-1', 'notification-1', 2])
   })
 })
+
+describe('W05 notification preferences transport', () => {
+  it('returns default-on preferences scoped to the authenticated W01 principal', async () => {
+    const statements: Array<{ sql: string; values: unknown[] }> = []
+    const db = {
+      prepare: (sql: string) => ({
+        bind: (...values: unknown[]) => {
+          statements.push({ sql, values })
+          return { first: async () => null }
+        },
+      }),
+    } as unknown as D1Database
+    const response = await worker.fetch(request('/internal/social/notification-preferences', transportHeaders), { DB: db })
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      data: { follow: true, like: true, comment: true, mention: true },
+    })
+    expect(statements).toHaveLength(1)
+    expect(statements[0]?.sql).toContain('FROM social_notification_preferences WHERE user_id = ?')
+    expect(statements[0]?.values).toEqual(['viewer-1'])
+  })
+
+  it('persists a partial PATCH atomically and returns the canonical four-field state', async () => {
+    const statements: Array<{ sql: string; values: unknown[] }> = []
+    const db = {
+      prepare: (sql: string) => ({
+        bind: (...values: unknown[]) => {
+          statements.push({ sql, values })
+          return { first: async () => ({
+            follow_enabled: 1, like_enabled: 0, comment_enabled: 1, mention_enabled: 1,
+          }) }
+        },
+      }),
+    } as unknown as D1Database
+    const response = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/notification-preferences', {
+        method: 'PATCH',
+        headers: { ...transportHeaders, 'content-type': 'application/json' },
+        body: JSON.stringify({ like: false }),
+      }),
+      { DB: db },
+    )
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      data: { follow: true, like: false, comment: true, mention: true },
+    })
+    expect(statements).toHaveLength(1)
+    expect(statements[0]?.sql).toContain('ON CONFLICT(user_id) DO UPDATE')
+    expect(statements[0]?.sql).toContain('COALESCE(?, social_notification_preferences.follow_enabled)')
+    expect(statements[0]?.sql).toContain('RETURNING follow_enabled, like_enabled, comment_enabled, mention_enabled')
+    expect(statements[0]?.values).toEqual(['viewer-1', null, 0, null, null, null, 0, null, null])
+  })
+
+  it('rejects empty, unknown, and non-boolean fields without touching D1', async () => {
+    const prepare = vi.fn()
+    const db = { prepare } as unknown as D1Database
+    for (const body of [{}, { follow: true, ownerUserId: 'attacker' }, { like: 'false' }]) {
+      const response = await worker.fetch(
+        new Request('https://luckread-w05.internal/internal/social/notification-preferences', {
+          method: 'PATCH',
+          headers: { ...transportHeaders, 'content-type': 'application/json' },
+          body: JSON.stringify(body),
+        }),
+        { DB: db },
+      )
+      expect(response.status).toBe(400)
+    }
+    expect(prepare).not.toHaveBeenCalled()
+  })
+
+  it('rejects an L1 principal before D1 access', async () => {
+    const prepare = vi.fn()
+    const db = { prepare } as unknown as D1Database
+    const response = await worker.fetch(request('/internal/social/notification-preferences', {
+      ...transportHeaders, 'X-LuckRead-Principal-Layer': 'L1',
+    }), { DB: db })
+    expect(response.status).toBe(403)
+    expect(prepare).not.toHaveBeenCalled()
+  })
+})

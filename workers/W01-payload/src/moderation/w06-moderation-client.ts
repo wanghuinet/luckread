@@ -261,6 +261,24 @@ export async function callW06PushEndpointMutationAudit(input: {
   })
 }
 
+/** Durable audit for an authenticated user's notification preference change. */
+export async function callW06NotificationPreferencesMutationAudit(input: {
+  request: Request
+  principal: ContentPrincipal
+  body: {
+    eventId: string
+    preferences: Partial<{ follow: boolean; like: boolean; comment: boolean; mention: boolean }>
+  }
+}): Promise<Response> {
+  return callW06Moderation({
+    request: input.request,
+    pathname: '/internal/audit-events/notification-preferences-update-requested',
+    method: 'POST',
+    principal: input.principal,
+    body: input.body,
+  })
+}
+
 export async function callW06Moderation(input: {
   request: Request
   pathname: string
