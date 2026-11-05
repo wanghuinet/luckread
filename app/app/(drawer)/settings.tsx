@@ -57,11 +57,9 @@ function SettingsRow({
 function SettingsSection({
   title,
   children,
-  isDark,
 }: {
   title: string;
   children: React.ReactNode;
-  isDark: boolean;
 }) {
   return (
     <View className="mx-4 mb-4 overflow-hidden rounded-2xl border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-black">
@@ -80,13 +78,11 @@ function ThemeModeOption({
   value,
   selected,
   onPress,
-  isDark,
 }: {
   label: string;
   value: ThemePreference;
   selected: boolean;
   onPress: (value: ThemePreference) => void;
-  isDark: boolean;
 }) {
   return (
     <Pressable
@@ -190,7 +186,7 @@ export default function SettingsScreen() {
           ) : null}
         </View>
 
-        <SettingsSection title="账户" isDark={isDark}>
+        <SettingsSection title="账户">
           <SettingsRow
             icon="user"
             title="个人主页"
@@ -200,17 +196,17 @@ export default function SettingsScreen() {
           />
         </SettingsSection>
 
-        <SettingsSection title="隐私与安全" isDark={isDark}>
+        <SettingsSection title="隐私与安全">
           <SettingsRow
             icon="shield"
             title="屏蔽和静音"
             description="查看并管理你屏蔽或静音的账号"
-            onPress={() => router.push(('/blocked-muted' as never))}
+            onPress={() => router.push('/blocked-muted' as never)}
             isDark={isDark}
           />
         </SettingsSection>
 
-        <SettingsSection title="通知" isDark={isDark}>
+        <SettingsSection title="通知">
           <SettingsRow
             icon="bell"
             title="通知设置"
@@ -220,7 +216,7 @@ export default function SettingsScreen() {
           />
         </SettingsSection>
 
-        <SettingsSection title="显示" isDark={isDark}>
+        <SettingsSection title="显示">
           <SettingsRow
             icon="moon"
             title="外观"
@@ -248,7 +244,7 @@ export default function SettingsScreen() {
       >
         <BottomSheetView className="flex-1 bg-white px-6 pt-2 dark:bg-black">
           <Text className="mb-3 text-lg font-bold text-neutral-900 dark:text-neutral-100">外观</Text>
-          <ThemeModeOption label="浅色" value="light" selected={themePreference === 'light'} onPress={selectTheme} isDark={isDark} />
+          <ThemeModeOption label="浅色" value="light" selected={themePreference === 'light'} onPress={selectTheme} />
           <ThemeModeOption label="深色" value="dark" selected={themePreference === 'dark'} onPress={selectTheme} isDark={isDark} />
           <ThemeModeOption label="跟随系统设置" value="system" selected={themePreference === 'system'} onPress={selectTheme} isDark={isDark} />
         </BottomSheetView>
