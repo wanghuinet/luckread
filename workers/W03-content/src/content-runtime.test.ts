@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-import { canTransitionContentState, ContentRuntimeError, createContent, createRequestId, deleteContent, decodeContentListCursor, decodeCursor, decodeScopedCursor, encodeContentListCursor, encodeCursor, encodeScopedCursor, isState, listContents, listPublishedContentsByIds, listContentRevisions, listCreatorContents, publishDueScheduledContent, publicContent, toErrorResponse, transitionContentState, updateContent, validateInput, validateListFilters } from './content-runtime.js'
+import { canTransitionContentState, ContentRuntimeError, createContent, createRequestId, deleteContent, decodeContentListCursor, decodeCursor, decodeScopedCursor, encodeContentListCursor, encodeCursor, encodeScopedCursor, isState, listContents, listPublishedContentsByIds, listContentRevisions, listCreatorContents, listDueScheduledContentCandidates, publishAuthorizedScheduledContents, publicContent, toErrorResponse, transitionContentState, updateContent, validateInput, validateListFilters } from './content-runtime.js'
 import w03Worker, { hasCreatorContentPermission, hasSocialPostPermission, parseListLimit } from './index.js'
 
 describe('W03 content contract core', () => {
@@ -1478,48 +1478,149 @@ describe('W03 content contract core', () => {
     ).rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 })
   })
 
-  it('publishes only due scheduled rows and converges concurrent execution safely', async () => {
-    const statements: Array<{ query: string; bindings: unknown[] }> = []
+  it('lists only due scheduled candidates with canonical owner and Creator IDs', async () => {
+    let query = ''
+    let bindings: unknown[] = []
     const dueRows = [
-      { id: 'scheduled_due_1', version: 4, scheduled_at: '2026-10-08T12:00:00.000Z' },
-      { id: 'scheduled_due_2', version: 7, scheduled_at: '2026-10-08T12:01:00.000Z' },
+      {
+        id: 'scheduled_due_1',
+        owner_user_id: 'owner_1',
+        creator_id: 'creator_1',
+        version: 4,
+        scheduled_at: '2026-10-08T12:00:00.000Z',
+      },
     ]
     const db = {
-      prepare(query: string) {
-        if (query.includes('FROM contents')) {
-          return {
-            bind: (...bindings: unknown[]) => ({
-              all: async () => ({ results: dueRows }),
-              first: async () => undefined,
-              bindings,
-            }),
-          }
-        }
+      prepare(sql: string) {
+        query = sql
         return {
-          bind: (...bindings: unknown[]) => {
+          bind(...values: unknown[]) {
+            bindings = values
+            return { all: async () => ({ results: dueRows }) }
+          },
+        }
+      },
+    } as never
+
+    await expect(
+      listDueScheduledContentCandidates(db, new Date('2026-10-08T12:02:00.000Z'), 50),
+    ).resolves.toEqual([{
+      contentId: 'scheduled_due_1',
+      ownerUserId: 'owner_1',
+      creatorId: 'creator_1',
+      version: 4,
+      scheduledAt: '2026-10-08T12:00:00.000Z',
+    }])
+    expect(query).toContain("state = 'SCHEDULED'")
+    expect(query).toContain('scheduled_at <= ?')
+    expect(query).toContain('owner_user_id')
+    expect(query).toContain('creator_id')
+    expect(bindings).toEqual(['2026-10-08T12:02:00.000Z', 50])
+  })
+
+  it('commits only W08-authorized candidates with a final owner/creator/version/time CAS', async () => {
+    const statements: Array<{ query: string; bindings: unknown[] }> = []
+    const db = {
+      prepare(query: string) {
+        return {
+          bind(...bindings: unknown[]) {
             statements.push({ query, bindings })
             return { query, bindings }
           },
         }
       },
-      batch: async (items: Array<{ query: string }>) => items.map(() => ({ meta: { changes: 1 } })),
+      batch: async (items: Array<{ query: string }>) =>
+        items.map(() => ({ meta: { changes: 1 } })),
     } as never
+    const now = new Date('2026-10-08T12:02:00.000Z')
+    const authorized = {
+      decision: 'ALLOW',
+      policyVersion: 'casl-l0-l8-v1',
+      layer: 'L3',
+      action: 'content.publish.own',
+      resourceType: 'Content',
+      ownerUserId: 'owner_1',
+      creatorId: 'creator_1',
+    }
 
-    await expect(
-      publishDueScheduledContent(db, new Date('2026-10-08T12:02:00.000Z'), 50),
-    ).resolves.toEqual({ scanned: 2, published: 2 })
+    await expect(publishAuthorizedScheduledContents(db, [
+      {
+        contentId: 'scheduled_due_1',
+        ownerUserId: 'owner_1',
+        creatorId: 'creator_1',
+        version: 4,
+        scheduledAt: '2026-10-08T12:00:00.000Z',
+        authorization: authorized,
+      },
+      {
+        contentId: 'scheduled_due_2',
+        ownerUserId: 'owner_2',
+        creatorId: 'creator_2',
+        version: 7,
+        scheduledAt: '2026-10-08T12:01:00.000Z',
+        authorization: { ...authorized, ownerUserId: 'someone-else' },
+      },
+      {
+        contentId: 'scheduled_due_3',
+        ownerUserId: 'owner_3',
+        creatorId: 'creator_3',
+        version: 2,
+        scheduledAt: '2026-10-08T12:03:00.000Z',
+        authorization: { ...authorized, ownerUserId: 'owner_3', creatorId: 'creator_3' },
+      },
+    ], now)).resolves.toEqual({
+      scanned: 3,
+      authorized: 1,
+      published: 1,
+      rejected: 2,
+    })
 
-    expect(statements).toHaveLength(2)
+    expect(statements).toHaveLength(1)
     expect(statements[0]?.query).toContain("SET state = 'PUBLISHED', scheduled_at = NULL")
-    expect(statements[0]?.query).toContain("WHERE id = ? AND state = 'SCHEDULED'")
+    expect(statements[0]?.query).toContain('owner_user_id = ?')
+    expect(statements[0]?.query).toContain('creator_id = ?')
+    expect(statements[0]?.query).toContain("state = 'SCHEDULED'")
+    expect(statements[0]?.query).toContain('scheduled_at <= ?')
+    expect(statements[0]?.query).toContain('version = ?')
     expect(statements[0]?.bindings).toEqual([
       5,
       'W/"5"',
       '2026-10-08T12:02:00.000Z',
       'scheduled_due_1',
+      'owner_1',
+      'creator_1',
       '2026-10-08T12:00:00.000Z',
+      '2026-10-08T12:02:00.000Z',
       4,
     ])
+  })
+
+  it('does not publish when the final compare-and-set loses a concurrent race', async () => {
+    const db = {
+      prepare: () => ({ bind: () => ({}) }),
+      batch: async (items: unknown[]) => items.map(() => ({ meta: { changes: 0 } })),
+    } as never
+    await expect(publishAuthorizedScheduledContents(db, [{
+      contentId: 'scheduled_race_1',
+      ownerUserId: 'owner_1',
+      creatorId: 'creator_1',
+      version: 4,
+      scheduledAt: '2026-10-08T12:00:00.000Z',
+      authorization: {
+        decision: 'ALLOW',
+        policyVersion: 'casl-l0-l8-v1',
+        layer: 'L3',
+        action: 'content.publish.own',
+        resourceType: 'Content',
+        ownerUserId: 'owner_1',
+        creatorId: 'creator_1',
+      },
+    }], new Date('2026-10-08T12:02:00.000Z'))).resolves.toMatchObject({
+      scanned: 1,
+      authorized: 1,
+      published: 0,
+      rejected: 0,
+    })
   })
 
   it('requires at least one media reference for video content', () => {
@@ -2093,13 +2194,26 @@ describe('1.1 content revision history', () => {
       resolve(process.cwd(), 'workers/W03-content/wrangler.jsonc'),
       'utf8',
     )
-    expect(wrangler).toContain('"crons": ["* * * * *"]')
-    const runtime = readFileSync(
+    expect(wrangler).not.toContain('"crons"')
+    const w01Wrangler = readFileSync(
+      resolve(process.cwd(), 'workers/W01-payload/wrangler.jsonc'),
+      'utf8',
+    )
+    expect(w01Wrangler).toContain('"main": "src/worker.ts"')
+    expect(w01Wrangler).toContain('"crons": [\n      "* * * * *"\n    ]')
+    const w01Worker = readFileSync(
+      resolve(process.cwd(), 'workers/W01-payload/src/worker.ts'),
+      'utf8',
+    )
+    expect(w01Worker).toContain('openNextWorker.fetch')
+    expect(w01Worker).toContain('async scheduled(controller: ScheduledController, env: ScheduledEnv)')
+    expect(w01Worker).toContain('runAuthorizedScheduledPublish')
+    const w03Index = readFileSync(
       resolve(process.cwd(), 'workers/W03-content/src/index.ts'),
       'utf8',
     )
-    expect(runtime).toContain('async scheduled(controller: ScheduledController, env: Env)')
-    expect(runtime).toContain('publishDueScheduledContent')
+    expect(w03Index).toContain('/internal/content/scheduled-due')
+    expect(w03Index).toContain('/internal/content/scheduled-publish/commit')
   })
 
   it('defines the stable slug migration and trigger payload', () => {
