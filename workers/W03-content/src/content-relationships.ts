@@ -587,6 +587,7 @@ export async function appendPostThreadNext(
   }
   if (
     !['DRAFT', 'PUBLISHED'].includes(row.source_state) ||
+    row.target_state === null ||
     !['DRAFT', 'PUBLISHED'].includes(row.target_state) ||
     row.source_access_mode !== 'PUBLIC' ||
     row.target_access_mode !== 'PUBLIC'
