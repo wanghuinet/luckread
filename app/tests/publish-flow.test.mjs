@@ -308,6 +308,6 @@ test('native composer persists warning metadata and hides media until the reader
   expect(composer).toContain('媒体内容警告');
   expect(composer).toContain('mediaWarning,');
   expect(feedItem).toContain('可能包含敏感内容');
-  expect(feedItem).toContain('onPress={() => setMediaRevealed(true)}');
+  expect(feedItem).toContain('onPress={() => setRevealedMediaKey(mediaRevealKey)}');
   expect(feedItem).toContain('mediaWarning={itemData.accessGranted === false ? null : itemData.mediaWarning}');
 });
