@@ -77,9 +77,19 @@
         "resource": "PASS",
         "cache": "PASS",
         "antiAbuse": "PASS",
-        "runtimeIntegration": "PENDING_CI",
-        "productionSecurityE2E": "MISSING"
-      }
+        "integration": "MISSING",
+        "securityE2E": "MISSING"
+      },
+      "idempotency": {
+        "required": false,
+        "reason": "Read-only account preference lookup; no mutation or replay key is applicable."
+      },
+      "security": [
+        "actor_server_derived",
+        "principal_self_scope",
+        "no_shared_cache",
+        "push_tokens_excluded"
+      ]
     },
     {
       "operationId": "patchNotificationPreferences",
@@ -153,9 +163,21 @@
         "resource": "PASS",
         "cache": "PASS",
         "antiAbuse": "PASS",
-        "w01W08W06W05Runtime": "PENDING_CI",
-        "productionSecurityE2E": "MISSING"
-      }
+        "integration": "MISSING",
+        "securityE2E": "MISSING"
+      },
+      "idempotency": {
+        "required": false,
+        "reason": "The request sets explicit boolean state rather than toggling it; client retries remain disabled. W01 creates a fresh immutable W06 intent event for each attempt."
+      },
+      "security": [
+        "actor_server_derived",
+        "owner_id_never_client_supplied",
+        "w08_self_authorization",
+        "w06_audit_before_w05_mutation",
+        "no_shared_cache",
+        "push_tokens_excluded"
+      ]
     },
     {
       "operationId": "upsertPushEndpoint",
