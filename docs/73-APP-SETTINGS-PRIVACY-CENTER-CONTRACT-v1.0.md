@@ -71,7 +71,7 @@ Availability of reference features can vary by country, age, account type, and r
 
 ## 4. Existing LuckRead Baseline (Main Branch Inspection)
 
-Inspected repository: `wanghuinet/luckread`, default branch `main`. The current implementation/status baseline is `main @ 13ade337a258d3949b5ad43b19359e60eeda1974` (2026-11-05).
+Inspected repository: `wanghuinet/luckread`, default branch `main`. The current implementation/status baseline is `main @ 22e608558169b5bc9a3df399065c4dc984cbc5a6` (2026-11-05).
 
 ### 4.1 Existing APP behavior found
 
@@ -192,7 +192,7 @@ For every conditional control, the implementation admission record must identify
 
 ### 6.2.1 Privacy-control admission audit — 2026-11-05
 
-**Inspected baseline:** `wanghuinet/luckread` `main` at `13ade337a258d3949b5ad43b19359e60eeda1974`.
+**Inspected baseline:** `wanghuinet/luckread` `main` at `22e608558169b5bc9a3df399065c4dc984cbc5a6`.
 
 The current repository supports the following bounded capabilities, but they do not establish a complete account-level privacy-settings API:
 
@@ -430,7 +430,7 @@ Implementation must proceed in small, reviewable increments. Complete and verify
 | 0 | Read-only implementation inventory | DONE — contract and source inventory recorded | Exact route/API/test/owner matrix exists; no code change |
 | 1 | Settings home and navigation | IMPLEMENTED — PR #1553 merged | One discoverable root; existing routes continue to work |
 | 2 | Notification preferences integration | IMPLEMENTED — PR #1554 merged | Existing account preferences and OS push permission use the existing server/device paths |
-| 3 | Blocked and muted integration | IMPLEMENTED IN CODE — existing W05 screen/API plus account-context isolation in PR #1564; awaiting authenticated real-account closeout | Pagination, unblock/unmute persistence, account switching, same-account reauthentication, expired-session recovery, accessibility and Android/iOS runtime acceptance |
+| 3 | Blocked and muted integration | IMPLEMENTED IN CODE — existing W05 screen/API plus account-context isolation merged in PR #1564; awaiting authenticated real-account closeout | Pagination, unblock/unmute persistence, account switching, same-account reauthentication, expired-session recovery, accessibility and Android/iOS runtime acceptance |
 | 4 | Appearance settings integration | IMPLEMENTED IN CODE — shared store and app-wide hydration in PR #1565; awaiting unified runtime acceptance | Persistence across relaunch, system-mode behavior and theme consistency across subpages, modals, loading/error states and Android/iOS |
 | 5 | Account and session security | WAITING FOR ADMISSION — PR #1555 remains a hidden candidate and is not admitted for release | W01/W02 self-scope, current-session denial, rate limiting, account/session isolation and authenticated Android/iOS runtime evidence must be accepted before exposing or merging for release; password, MFA/passkeys, login history and bulk revocation remain hidden |
 | 6 | Privacy controls | BLOCKED_NOT_ADMITTED — see docs/75-APP-PRIVACY-CONTROLS-ADMISSION-AUDIT-v1.0.md | Each control needs a proven domain owner, persisted scope, W01 API, server-side enforcement, cross-client behavior and positive/negative security tests |
