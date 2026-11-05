@@ -49,7 +49,7 @@ describe('native scheduled content list boundary', () => {
     expect(route).toContain('if (ownerScopedLifecycleRequest)')
     expect(route).toContain('hasAuthenticatedSessionCredential(request)')
     expect(route).toContain('resolveCookieContentPrincipal(request)')
-    expect(route).not.toContain("cachedPublicGet(")
+    expect(route.indexOf('if (ownerScopedLifecycleRequest)')).toBeLessThan(route.indexOf('return await cachedPublicGet'))
     expect(guard).toContain("value !== 'DRAFT' && value !== 'SCHEDULED'")
     expect(w03Index).toContain("if (status === 'SCHEDULED')")
     expect(w03Index).toContain('requiredCreatorPrincipal(request)')
