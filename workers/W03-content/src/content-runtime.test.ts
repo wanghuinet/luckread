@@ -2513,8 +2513,13 @@ describe('creator-selected sensitive media warning', () => {
   it('redacts warning metadata together with private media in member-only previews', () => {
     const content = {
       id: 'sensitive-warning-content',
+      contentType: 'post',
+      ownerUserId: 'owner_1',
       creatorId: 'creator_1',
+      ipId: null,
       state: 'PUBLISHED',
+      revision: 1,
+      updatedAt: '2026-11-05T00:00:00.000Z',
       scheduledAt: null,
       accessMode: 'MEMBERS_ONLY',
       version: 1,
