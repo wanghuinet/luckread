@@ -33,6 +33,36 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
+      - name: Verify W03 migrations and nullable media warning constraints
+        run: |
+          python - <<'PY'
+          import sqlite3
+          from pathlib import Path
+          root = Path('workers/W03-content/migrations')
+          database = sqlite3.connect(':memory:')
+          migrations = sorted(root.glob('*.sql'))
+          if not migrations:
+              raise SystemExit('W03 migrations were not found')
+          for migration in migrations:
+              database.executescript(migration.read_text())
+          expected_tables = {
+              'contents': 'media_warning',
+              'content_revisions': 'media_warning',
+          }
+          for table, column in expected_tables.items():
+              names = {row[1] for row in database.execute(f'PRAGMA table_info("{table}")')}
+              if column not in names:
+                  raise SystemExit(f'{table}.{column} was not added by W03 migrations')
+              sql = database.execute(
+                  "SELECT sql FROM sqlite_master WHERE type='table' AND name=?",
+                  (table,),
+              ).fetchone()[0]
+              for category in ["'NUDITY'", "'VIOLENCE'", "'SENSITIVE'"]:
+                  if category not in sql:
+                      raise SystemExit(f'{table} is missing warning constraint for {category}')
+          print('W03_MEDIA_WARNING_MIGRATION_SQLITE=PASS')
+          PY
+
       - name: Run W03 content unit tests
         run: npx --yes vitest@3.2.4 run workers/W03-content/src/content-runtime.test.ts workers/W03-content/src/content-snowflake-id.test.ts workers/W03-content/src/publish-preflight.test.ts workers/W03-content/src/d1-traffic-guard.test.ts workers/W03-content/src/following-feed.test.ts workers/W03-content/src/content-search.test.ts
 
