@@ -130,6 +130,28 @@ test('copies a pending media file to persistent app storage before upload and re
   expect(files.get(stored.uri)?.content).toBe('abc');
 });
 
+test('replacing an optimized recovery copy removes the old extension without changing its upload key', async () => {
+  const original = await persistPendingMediaRecovery('user-1', null, asset);
+  const optimizedSource = 'content://picker/photo-1-optimized';
+  files.set(optimizedSource, { content: 'optimized', size: 9 });
+
+  const optimized = await persistPendingMediaRecovery('user-1', null, {
+    ...asset,
+    uri: optimizedSource,
+    filename: 'photo-optimized.jpg',
+    mimeType: 'image/jpeg',
+    size: null,
+  });
+
+  expect(optimized.uri).toContain('media-local-1.jpg');
+  expect(optimized.uploadKey).toBe(asset.uploadKey);
+  expect(files.has(original.uri)).toBe(false);
+  const restored = await listPendingMediaRecovery('user-1', null);
+  expect(restored).toHaveLength(1);
+  expect(restored[0].uri).toBe(optimized.uri);
+  expect(files.get(optimized.uri)?.content).toBe('optimized');
+});
+
 test('recovery records are isolated by account and by server draft', async () => {
   await persistPendingMediaRecovery('user-1', null, asset);
 
