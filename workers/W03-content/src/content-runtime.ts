@@ -1902,7 +1902,8 @@ export type ScheduledPublishAuthorization = Readonly<{
   creatorId: string
 }>
 
-export type AuthorizedScheduledPublishCandidate = DueScheduledContentCandidate & Readonly<{
+export type AuthorizedScheduledPublishCandidate = Omit<DueScheduledContentCandidate, 'creatorId'> & Readonly<{
+  expectedCreatorId: string | null
   creatorId: string
   authorization: ScheduledPublishAuthorization
 }>
@@ -1981,10 +1982,11 @@ export async function publishAuthorizedScheduledContents(
 
     const candidateValid =
       Object.keys(candidate).every((key) => [
-        'contentId', 'ownerUserId', 'creatorId', 'version', 'scheduledAt', 'authorization',
+        'contentId', 'ownerUserId', 'expectedCreatorId', 'creatorId', 'version', 'scheduledAt', 'authorization',
       ].includes(key)) &&
       scheduledPublishIdentifier(contentId) &&
       scheduledPublishIdentifier(ownerUserId) &&
+      (candidate.expectedCreatorId === null || scheduledPublishIdentifier(candidate.expectedCreatorId, 256)) &&
       scheduledPublishIdentifier(creatorId, 256) &&
       Number.isSafeInteger(version) &&
       Number(version) >= 1 &&
@@ -2012,21 +2014,22 @@ export async function publishAuthorizedScheduledContents(
     const nextVersion = Number(version) + 1
     statements.push(db.prepare(
       `UPDATE contents
-          SET state = 'PUBLISHED', scheduled_at = NULL, version = ?, etag = ?, updated_at = ?
+          SET state = 'PUBLISHED', scheduled_at = NULL, creator_id = ?, version = ?, etag = ?, updated_at = ?
         WHERE id = ?
           AND owner_user_id = ?
-          AND creator_id = ?
+          AND creator_id IS ?
           AND state = 'SCHEDULED'
           AND scheduled_at = ?
           AND scheduled_at <= ?
           AND version = ?`,
     ).bind(
+      creatorId,
       nextVersion,
       etagForVersion(nextVersion),
       nowIso,
       contentId,
       ownerUserId,
-      creatorId,
+      candidate.expectedCreatorId,
       scheduledAt,
       nowIso,
       version,
