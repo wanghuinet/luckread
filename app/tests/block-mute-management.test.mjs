@@ -58,7 +58,8 @@ test('management screen wires existing list and remove APIs with confirmation', 
 });
 
 test('isolates relationship lists and pending mutations when the signed-in account changes', () => {
-  expect(screenSource).toContain("const accountId = useAuthStore((state) => state.user?.id ?? null)");
+  expect(screenSource).toContain("const authUser = useAuthStore((state) => state.user)");
+  expect(screenSource).toContain('const accountId = authUser?.id ?? null');
   expect(screenSource).toContain("const visibleRows = accountDataReady ? rows : []");
   expect(screenSource).toContain("loadedAccountIdRef.current = null");
   expect(screenSource).toContain("accountIdRef.current !== accountId");
