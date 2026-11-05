@@ -85,6 +85,7 @@ export interface FeedContent {
     message: string;
     media_url?: string;
     media_items?: FeedMediaAttachment[];
+    mediaWarning?: 'NUDITY' | 'VIOLENCE' | 'SENSITIVE' | null;
     like_count?: number;
     retweet_count?: number;
     reply_count?: number;
@@ -181,14 +182,18 @@ const FeedVideoAttachment = ({ uri, headers }: { uri: string; headers?: Record<s
 
 const FeedMediaGallery = ({
     items,
+    mediaWarning = null,
     detailView = false,
 }: {
     items: FeedMediaAttachment[];
+    mediaWarning?: 'NUDITY' | 'VIOLENCE' | 'SENSITIVE' | null;
     detailView?: boolean;
 }) => {
     const [viewerStartIndex, setViewerStartIndex] = useState<number | null>(null);
     const [viewerIndex, setViewerIndex] = useState(0);
     const [resolvedAltText, setResolvedAltText] = useState<Record<string, string>>({});
+    const [mediaRevealed, setMediaRevealed] = useState(false);
+    const mediaSourceKey = JSON.stringify(items.map((media) => media.src));
     const { width, height } = useWindowDimensions();
     const insets = useSafeAreaInsets();
     const altTextRequestKey = JSON.stringify(
@@ -211,6 +216,10 @@ const FeedMediaGallery = ({
             controller.abort();
         };
     }, [altTextRequestKey]);
+
+    useEffect(() => {
+        setMediaRevealed(false);
+    }, [mediaWarning, mediaSourceKey]);
 
     if (items.length === 0) return null;
 
@@ -272,6 +281,28 @@ const FeedMediaGallery = ({
 
     return (
         <>
+            {mediaWarning && !mediaRevealed ? (
+                <TouchableOpacity
+                    accessibilityRole="button"
+                    accessibilityLabel="查看可能含有敏感内容的媒体"
+                    accessibilityHint="媒体由作者标记了内容警告。点击后查看。"
+                    activeOpacity={0.9}
+                    onPress={() => setMediaRevealed(true)}
+                    className={detailView
+                        ? "mt-4 min-h-[220px] w-full items-center justify-center gap-3 rounded-xl bg-neutral-900 px-6 py-8"
+                        : "mt-2 min-h-[220px] w-full items-center justify-center gap-3 rounded-xl bg-neutral-900 px-6 py-8"}
+                >
+                    <Feather name="eye-off" size={28} color="#d1d5db" />
+                    <Text className="text-base font-semibold text-white">可能包含敏感内容</Text>
+                    <Text className="text-center text-sm leading-5 text-neutral-300">
+                        {mediaWarning === 'NUDITY' ? '作者标记：裸露或成人内容' : mediaWarning === 'VIOLENCE' ? '作者标记：暴力内容' : '作者标记：敏感事件或其他敏感内容'}
+                    </Text>
+                    <View className="rounded-full border border-neutral-500 px-5 py-2">
+                        <Text className="text-sm font-semibold text-white">点击查看媒体</Text>
+                    </View>
+                </TouchableOpacity>
+            ) : (
+            <>
             {!requiresAuthenticatedViewer && imageItems.length > 0 ? (
                 <Galeria urls={imageItems.map((media) => media.src)}>
                     {mediaContent}
@@ -356,6 +387,8 @@ const FeedMediaGallery = ({
                     </View>
                 </Modal>
             ) : null}
+            </>
+            )}
         </>
     );
 };
@@ -702,7 +735,7 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
                         </View>
                     ) : null}
                     <Text className="text-black dark:text-white mt-1 text-lg leading-6">{itemData.message}</Text>
-                    <FeedMediaGallery items={mediaItems} />
+                    <FeedMediaGallery items={mediaItems} mediaWarning={itemData.accessGranted === false ? null : itemData.mediaWarning} />
                     {detailView && itemData.contentType === 'post' && itemData.contentId ? (
                         <SocialPoll contentId={itemData.contentId} />
                     ) : null}
@@ -803,7 +836,7 @@ export const FeedItemDetailView: React.FC<FeedItemProps> = ({ itemData, onPress,
             <View className="mt-2">
                 <Text className="text-lg text-black dark:text-white">{itemData.message}</Text>
 
-                <FeedMediaGallery items={mediaItems} detailView />
+                <FeedMediaGallery items={mediaItems} mediaWarning={itemData.accessGranted === false ? null : itemData.mediaWarning} detailView />
 
 
                 <View className="flex-row items-center mt-2 gap-2">
