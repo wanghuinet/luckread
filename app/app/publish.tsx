@@ -60,6 +60,7 @@ type ContentRecord = {
   bodyRef?: string;
   mediaRefs?: string[];
   coverRef?: string | null;
+  mediaWarning?: 'NUDITY' | 'VIOLENCE' | 'SENSITIVE' | null;
   creatorId?: string | null;
   ownerUserId?: string;
 };
@@ -172,6 +173,7 @@ function PublishScreenContent() {
   const [cameraVisible, setCameraVisible] = useState(false);
   const [mediaActionsVisible, setMediaActionsVisible] = useState(false);
   const [coverRef, setCoverRef] = useState('');
+  const [mediaWarning, setMediaWarning] = useState<'NUDITY' | 'VIOLENCE' | 'SENSITIVE' | null>(null);
   const [busy, setBusy] = useState(false);
   const [loadingEdit, setLoadingEdit] = useState(Boolean(contentId));
   const [errorMessage, setErrorMessage] = useState('');
@@ -223,6 +225,10 @@ function PublishScreenContent() {
 
   const activeComposerToken = findActiveComposerToken(body, textSelection.start);
   const activeCoverRef = coverRef || assets.find((asset) => asset.mimeType.startsWith('image/'))?.serverUrl || '';
+
+  useEffect(() => {
+    if (assets.length === 0 && mediaWarning !== null) setMediaWarning(null);
+  }, [assets.length, mediaWarning]);
 
   const updateAsset = useCallback((localId: string, patch: Partial<ComposerAsset>) => {
     setAssets((current) => current.map((asset) => asset.localId === localId ? { ...asset, ...patch } : asset));
@@ -319,6 +325,7 @@ function PublishScreenContent() {
       setAccessMode(loadedAccessMode);
       setBody(restoredBody);
       setCoverRef(record.coverRef || '');
+      setMediaWarning(record.mediaWarning ?? null);
       setAssets(restoredAssets);
       pollConfiguredRef.current = Boolean(restoredPoll);
       setPollEnabled(Boolean(restoredPoll));
@@ -333,6 +340,7 @@ function PublishScreenContent() {
           pollEnabled: Boolean(restoredPoll),
           pollOptions: restoredPoll ? restoredPoll.options.map((option) => option.text) : [],
           pollDurationMinutes: restoredPoll?.durationMinutes ?? DEFAULT_POLL_DURATION_MINUTES,
+          mediaWarning: record.mediaWarning ?? null,
         });
         draftSaveLastSavedAtRef.current = Date.now();
         draftSaveDirtyRef.current = false;
@@ -797,6 +805,7 @@ function PublishScreenContent() {
       pollEnabled,
       pollOptions,
       pollDurationMinutes: pollDurationMinutes ?? -1,
+      mediaWarning,
     });
     if (recordRef.current?.id && draftSavedFingerprintRef.current === fingerprint) return;
 
@@ -823,6 +832,7 @@ function PublishScreenContent() {
       bodyRef,
       mediaRefs,
       coverRef: nextCover,
+      mediaWarning,
       ...(accessMode === 'MEMBERS_ONLY' || originalAccessModeRef.current === 'MEMBERS_ONLY' ? { accessMode } : {}),
     };
     const serializedPayload = JSON.stringify(payload);
@@ -1356,6 +1366,11 @@ function PublishScreenContent() {
       return;
     }
 
+    if (mediaWarning !== null && assets.length === 0) {
+      setErrorMessage('Add at least one photo or video before applying a media warning.');
+      return;
+    }
+
     const cleanPollOptions = pollEnabled
       ? pollOptions.map((option) => option.normalize('NFKC').trim())
       : [];
@@ -1380,7 +1395,7 @@ function PublishScreenContent() {
     const nextCover = coverRef && mediaRefs.includes(coverRef)
       ? coverRef
       : assets.find((asset) => asset.mimeType.startsWith('image/'))?.serverUrl || null;
-    const fingerprint = JSON.stringify([contentId || '', trimmedBody, mediaRefs, nextCover, accessMode, pollEnabled, cleanPollOptions, pollEnabled ? pollDurationMinutes : null]);
+    const fingerprint = JSON.stringify([contentId || '', trimmedBody, mediaRefs, nextCover, accessMode, pollEnabled, cleanPollOptions, pollEnabled ? pollDurationMinutes : null, mediaWarning]);
     let attempt = submitAttemptRef.current;
     if (attempt && attempt.fingerprint !== fingerprint) {
       if (!contentId && !recordRef.current && publishPending) {
@@ -1452,6 +1467,7 @@ function PublishScreenContent() {
         bodyRef,
         mediaRefs,
         coverRef: nextCover,
+        mediaWarning,
         ...(includeAccessMode ? { accessMode } : {}),
       };
 
@@ -1662,7 +1678,7 @@ function PublishScreenContent() {
     } finally {
       setBusy(false);
     }
-  }, [accessMode, assets, body, contentId, coverRef, pollDurationMinutes, pollEnabled, pollOptions, publishPending, router, saveDraftSnapshot, savePendingAssetAltText, syncPublishedSocialTokens]);
+  }, [accessMode, assets, body, contentId, coverRef, mediaWarning, pollDurationMinutes, pollEnabled, pollOptions, publishPending, router, saveDraftSnapshot, savePendingAssetAltText, syncPublishedSocialTokens]);
 
   if (authStatus !== 'authenticated') {
     return (
@@ -1819,6 +1835,44 @@ function PublishScreenContent() {
                 rowGap={10}
                 columnGap={10}
               />
+            </View>
+          ) : null}
+
+          {assets.length > 0 ? (
+            <View style={[styles.mediaWarningSection, isDark && { borderBottomColor: '#27272a' }]}>
+              <Text style={[styles.accessModeTitle, isDark && { color: '#f9fafb' }]}>媒体内容警告</Text>
+              <Text style={[styles.accessModeDescription, isDark && { color: '#9ca3af' }]}>为可能包含敏感内容的图片或视频添加提示。读者可以选择是否查看。</Text>
+              <View style={styles.mediaWarningOptions}>
+                {([
+                  { value: null, label: '无' },
+                  { value: 'NUDITY', label: '裸露' },
+                  { value: 'VIOLENCE', label: '暴力' },
+                  { value: 'SENSITIVE', label: '敏感事件' },
+                ] as const).map((option) => {
+                  const selected = mediaWarning === option.value;
+                  return (
+                    <Pressable
+                      key={option.value ?? 'none'}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected, disabled: busy || loadingEdit || publishPending }}
+                      disabled={busy || loadingEdit || publishPending}
+                      onPress={() => setMediaWarning(option.value)}
+                      style={[
+                        styles.mediaWarningOption,
+                        isDark && { borderColor: '#52525b' },
+                        selected && styles.mediaWarningOptionSelected,
+                        isDark && selected && { backgroundColor: '#102a43', borderColor: PRIMARY },
+                      ]}
+                    >
+                      <Text style={[
+                        styles.mediaWarningOptionText,
+                        isDark && { color: '#e5e7eb' },
+                        selected && styles.mediaWarningOptionTextSelected,
+                      ]}>{option.label}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
             </View>
           ) : null}
 
@@ -2075,6 +2129,12 @@ const styles = StyleSheet.create({
   mediaButton: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: '#d0d5dd', borderRadius: 999, paddingHorizontal: 15, paddingVertical: 10 },
   mediaButtonText: { color: PRIMARY, fontSize: 13, fontWeight: '800' },
   mediaLimitHint: { alignSelf: 'center', color: '#667085', fontSize: 11 },
+  mediaWarningSection: { marginTop: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#eaecf0', paddingBottom: 14, gap: 8 },
+  mediaWarningOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
+  mediaWarningOption: { borderWidth: 1, borderColor: '#d0d5dd', borderRadius: 999, paddingVertical: 8, paddingHorizontal: 13 },
+  mediaWarningOptionSelected: { backgroundColor: '#e8f4ff', borderColor: PRIMARY },
+  mediaWarningOptionText: { color: '#344054', fontSize: 12, fontWeight: '700' },
+  mediaWarningOptionTextSelected: { color: PRIMARY },
   pollSection: { marginTop: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#eaecf0', paddingBottom: 14 },
   pollToggle: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 8, borderWidth: 1, borderColor: '#d0d5dd', borderRadius: 999, paddingHorizontal: 15, paddingVertical: 10 },
   pollEditor: { marginTop: 12, padding: 12, borderWidth: 1, borderColor: '#d0d5dd', borderRadius: 14 },
