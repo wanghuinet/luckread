@@ -80,3 +80,7 @@ if (errors.length) {
 const green = api.status === 'GREEN' && authz.status === 'GREEN' && state.status === 'GREEN';
 console.log(`R5_FOUNDATION_GATE=${green ? 'PASS' : 'NOT_GREEN'}`);
 console.log(`R5_RECORDS=api:${api.records.length},authz:${authz.records.length},state:${state.records.length}`);
+if (!green) {
+  console.error('R5_FOUNDATION_GATE_BLOCKED: API, Authz and State registries must all be GREEN before FULL admission.');
+  process.exit(1);
+}
