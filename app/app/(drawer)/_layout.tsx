@@ -49,7 +49,7 @@ function CustomDrawerContent(props: any) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const { colorScheme, setColorScheme } = useColorScheme();
+  const { colorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
   const user = useAuthStore((state) => state.user);
   const authStatus = useAuthStore((state) => state.status);
