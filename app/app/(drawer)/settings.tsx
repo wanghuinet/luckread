@@ -245,8 +245,8 @@ export default function SettingsScreen() {
         <BottomSheetView className="flex-1 bg-white px-6 pt-2 dark:bg-black">
           <Text className="mb-3 text-lg font-bold text-neutral-900 dark:text-neutral-100">外观</Text>
           <ThemeModeOption label="浅色" value="light" selected={themePreference === 'light'} onPress={selectTheme} />
-          <ThemeModeOption label="深色" value="dark" selected={themePreference === 'dark'} onPress={selectTheme} isDark={isDark} />
-          <ThemeModeOption label="跟随系统设置" value="system" selected={themePreference === 'system'} onPress={selectTheme} isDark={isDark} />
+          <ThemeModeOption label="深色" value="dark" selected={themePreference === 'dark'} onPress={selectTheme} />
+          <ThemeModeOption label="跟随系统设置" value="system" selected={themePreference === 'system'} onPress={selectTheme} />
         </BottomSheetView>
       </BottomSheetModal>
     </View>
