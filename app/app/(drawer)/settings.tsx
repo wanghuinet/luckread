@@ -227,6 +227,16 @@ export default function SettingsScreen() {
           />
         </SettingsSection>
 
+        <SettingsSection title="帮助">
+          <SettingsRow
+            icon="help-circle"
+            title="帮助与关于"
+            description="查看官方政策、应用版本和构建信息"
+            onPress={() => router.push('/about' as never)}
+            isDark={isDark}
+          />
+        </SettingsSection>
+
         <Text className="px-6 pb-3 text-center text-xs leading-5 text-neutral-400 dark:text-neutral-500">
           账户偏好由对应服务保存；外观设置保存在此设备。未开放的控制不会显示为可操作选项。
         </Text>
