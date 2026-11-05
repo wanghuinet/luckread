@@ -153,7 +153,21 @@ const roleLayerPriority = [...roleToLayer.entries()].sort(([roleA, layerA], [rol
   layerB - layerA || (roleA < roleB ? -1 : roleA > roleB ? 1 : 0),
 )
 
-async function resolveSubjectLayer(db: D1Database, subjectId: string, now: string): Promise<number> {
+const rolePermissions = new Map<string, Set<string>>()
+for (const role of permissions['x-role-permissions'].roles) {
+  rolePermissions.set(role.role, new Set(role.permissions))
+}
+
+type SubjectAuthorization = {
+  layer: number
+  grantedPermissions: Set<string>
+}
+
+async function resolveSubjectAuthorization(
+  db: D1Database,
+  subjectId: string,
+  now: string,
+): Promise<SubjectAuthorization> {
   const layerCase = roleLayerPriority.map(() => 'WHEN ? THEN ?').join(' ')
   const roleLayerBindings = roleLayerPriority.flatMap(([roleId, layer]) => [roleId, layer])
   const rows = await db.prepare(
@@ -161,18 +175,22 @@ async function resolveSubjectLayer(db: D1Database, subjectId: string, now: strin
      FROM role_assignments
      WHERE subject_id = ? AND status = 'ACTIVE' AND valid_from <= ?
        AND (valid_until IS NULL OR ? < valid_until)
-       AND scope_type = 'global'
+       AND scope_type = 'global' AND scope_id IS NULL
      ORDER BY CASE role_id ${layerCase} ELSE -1 END DESC, role_id ASC
      LIMIT ${MAX_AUTHORIZATION_ROLE_ASSIGNMENT_ROWS}`,
   ).bind(subjectId, now, now, ...roleLayerBindings).all<{ roleId: string; scopeType: string }>()
 
   let maxLayer = 0
+  const grantedPermissions = new Set<string>()
   for (const row of rows.results) {
     if (row.scopeType !== 'global') continue
     const layer = roleToLayer.get(row.roleId)
     if (layer && layer > maxLayer) maxLayer = layer
+    for (const permission of rolePermissions.get(row.roleId) ?? []) {
+      grantedPermissions.add(permission)
+    }
   }
-  return maxLayer
+  return { layer: maxLayer, grantedPermissions }
 }
 
 export async function authorizeAccountStateTransition(
@@ -213,9 +231,23 @@ export async function authorizeAccountStateTransition(
   }
 
   const requiredLayer = Number(minimumLayer.slice(1))
-  const subjectLayer = await resolveSubjectLayer(db, input.subjectId, now)
-  if (subjectLayer < requiredLayer) {
+  const subjectAuthorization = await resolveSubjectAuthorization(db, input.subjectId, now)
+  if (subjectAuthorization.layer < requiredLayer) {
     throw new AccountStateTransitionError('FORBIDDEN', 'transition permission denied')
+  }
+
+  if (rule.actor === 'user') {
+    // Self-owned permissionful transitions still require an effective role
+    // that explicitly grants the permission; layer membership alone is not
+    // an authorization grant.
+    if (!subjectAuthorization.grantedPermissions.has(rule.permission)) {
+      throw new AccountStateTransitionError('FORBIDDEN', 'transition permission is not granted by an effective role')
+    }
+    return {
+      actor: { id: input.subjectId, type: 'user' },
+      permission: rule.permission,
+      approvalLevel: null,
+    }
   }
 
   const actorType = rule.actor

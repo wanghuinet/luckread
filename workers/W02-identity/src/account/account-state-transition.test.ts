@@ -509,6 +509,52 @@ describe('AUTH-013 trusted-principal authorization boundary', () => {
     expect(result.approvalLevel).toBe('L7')
   })
 
+  it('authorizes self reactivation through the explicit L1 user role grant', async () => {
+    const result = await authorizeAccountStateTransition(
+      authorizationDb('DELETED', [{ roleId: 'user', scopeType: 'global' }]),
+      {
+        subjectId: '42',
+        targetUserId: '42',
+        to: 'REACTIVATED',
+        now: '2026-11-06T12:00:00.000Z',
+      },
+    )
+
+    expect(result).toEqual({
+      actor: { id: '42', type: 'user' },
+      permission: 'user.reactivate',
+      approvalLevel: null,
+    })
+  })
+
+  it('does not infer self reactivation permission from layer membership alone', async () => {
+    await expect(
+      authorizeAccountStateTransition(
+        authorizationDb('DELETED', [{ roleId: 'mcn_admin', scopeType: 'global' }]),
+        {
+          subjectId: '42',
+          targetUserId: '42',
+          to: 'REACTIVATED',
+          now: '2026-11-06T12:00:00.000Z',
+        },
+      ),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' })
+  })
+
+  it('requires the authenticated subject to be the target for permissionful self transitions', async () => {
+    await expect(
+      authorizeAccountStateTransition(
+        authorizationDb('DELETED', [{ roleId: 'user', scopeType: 'global' }]),
+        {
+          subjectId: 'different-user',
+          targetUserId: '42',
+          to: 'REACTIVATED',
+          now: '2026-11-06T12:00:00.000Z',
+        },
+      ),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' })
+  })
+
   it('requires a self principal for permissionless user-owned transitions', async () => {
     await expect(
       authorizeAccountStateTransition(
