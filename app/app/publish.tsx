@@ -24,6 +24,7 @@ import PublishMediaActionSheet from '~/components/PublishMediaActionSheet';
 
 import { apiRequest, createIdempotencyKey, fetchContentBodyReference } from '~/lib/api-client';
 import { computeAutoSaveDelay, createPublishDraftFingerprint } from '~/lib/publish-draft-autosave';
+import { DEFAULT_POLL_DURATION_MINUTES, getPollDurationMinutes, getPollDurationParts, type PollDurationParts } from '~/lib/poll-duration';
 import {
   apiFailureDiagnostic,
   getMediaPlayback,
@@ -85,8 +86,6 @@ type ComposerAsset = {
   error?: string;
   existing?: boolean;
 };
-
-type PollDurationHours = 24 | 72 | 168;
 
 type DiscoveryTopicOption = {
   topicId: string;
@@ -180,7 +179,11 @@ function PublishScreenContent() {
   const [publishPending, setPublishPending] = useState(false);
   const [pollEnabled, setPollEnabled] = useState(false);
   const [pollOptions, setPollOptions] = useState<string[]>(['', '']);
-  const [pollDurationHours, setPollDurationHours] = useState<PollDurationHours>(24);
+  const [pollDurationParts, setPollDurationParts] = useState<PollDurationParts>(() => getPollDurationParts(DEFAULT_POLL_DURATION_MINUTES));
+  const pollDurationMinutes = getPollDurationMinutes(pollDurationParts);
+  const updatePollDurationPart = (unit: keyof PollDurationParts, value: string) => {
+    setPollDurationParts((current) => ({ ...current, [unit]: value.replace(/[^0-9]/g, '').slice(0, 2) }));
+  };
   const [draftSaveStatus, setDraftSaveStatus] = useState<'idle' | 'scheduled' | 'saving' | 'saved' | 'error'>('idle');
   const [draftInboxVisible, setDraftInboxVisible] = useState(false);
   const [draftInboxItems, setDraftInboxItems] = useState<NativePostDraft[]>([]);
@@ -264,20 +267,25 @@ function PublishScreenContent() {
         restoredBody = await bodyResponse.text();
       }
 
-      let restoredPoll: { options: Array<{ text: string }>; durationHours: PollDurationHours } | null = null;
+      let restoredPoll: { options: Array<{ text: string }>; durationMinutes: number } | null = null;
       if (restoringDraft) {
-        const pollResult = await apiRequest<{ data?: { poll?: { options?: Array<{ text?: string }>; durationHours?: number } | null } }>(
+        const pollResult = await apiRequest<{ data?: { poll?: { options?: Array<{ text?: string }>; durationMinutes?: number; durationHours?: number } | null } }>(
           '/contents/' + encodeURIComponent(targetContentId) + '/poll',
           { method: 'GET' },
         );
-        const pollEnvelope = pollResult.data as { data?: { poll?: { options?: Array<{ text?: string }>; durationHours?: number } | null } } | null;
+        const pollEnvelope = pollResult.data as { data?: { poll?: { options?: Array<{ text?: string }>; durationMinutes?: number; durationHours?: number } | null } } | null;
         const poll = pollResult.response.ok ? pollEnvelope?.data?.poll : null;
         const options = Array.isArray(poll?.options)
           ? poll.options.map((option) => typeof option.text === 'string' ? option.text : '').filter(Boolean)
           : [];
-        const duration = Number(poll?.durationHours);
-        if (options.length >= MIN_POLL_OPTIONS && options.length <= MAX_POLL_OPTIONS && [24, 72, 168].includes(duration)) {
-          restoredPoll = { options: options.map((text) => ({ text })), durationHours: duration as PollDurationHours };
+        const duration = typeof poll?.durationMinutes === 'number'
+          ? poll.durationMinutes
+          : typeof poll?.durationHours === 'number'
+            ? poll.durationHours * 60
+            : Number.NaN;
+        if (options.length >= MIN_POLL_OPTIONS && options.length <= MAX_POLL_OPTIONS &&
+            Number.isSafeInteger(duration) && duration >= 5 && duration <= 10080) {
+          restoredPoll = { options: options.map((text) => ({ text })), durationMinutes: duration };
         }
       }
 
@@ -315,7 +323,7 @@ function PublishScreenContent() {
       pollConfiguredRef.current = Boolean(restoredPoll);
       setPollEnabled(Boolean(restoredPoll));
       setPollOptions(restoredPoll ? restoredPoll.options.map((option) => option.text) : ['', '']);
-      setPollDurationHours(restoredPoll?.durationHours ?? 24);
+      setPollDurationParts(getPollDurationParts(restoredPoll?.durationMinutes ?? DEFAULT_POLL_DURATION_MINUTES));
       if (restoringDraft) {
         draftSavedFingerprintRef.current = createPublishDraftFingerprint({
           body: restoredBody,
@@ -324,7 +332,7 @@ function PublishScreenContent() {
           coverRef: record.coverRef || null,
           pollEnabled: Boolean(restoredPoll),
           pollOptions: restoredPoll ? restoredPoll.options.map((option) => option.text) : [],
-          pollDurationHours: restoredPoll?.durationHours ?? 24,
+          pollDurationMinutes: restoredPoll?.durationMinutes ?? DEFAULT_POLL_DURATION_MINUTES,
         });
         draftSaveLastSavedAtRef.current = Date.now();
         draftSaveDirtyRef.current = false;
@@ -788,7 +796,7 @@ function PublishScreenContent() {
       coverRef: nextCover,
       pollEnabled,
       pollOptions,
-      pollDurationHours,
+      pollDurationMinutes: pollDurationMinutes ?? -1,
     });
     if (recordRef.current?.id && draftSavedFingerprintRef.current === fingerprint) return;
 
@@ -928,7 +936,7 @@ function PublishScreenContent() {
     if (pollEnabled) {
       const cleanOptions = pollOptions.map((option) => option.normalize('NFKC').trim());
       const optionKeys = cleanOptions.map((option) => option.toLocaleLowerCase('en-US'));
-      const validPoll = cleanOptions.length >= MIN_POLL_OPTIONS &&
+      const validPoll = pollDurationMinutes !== null && cleanOptions.length >= MIN_POLL_OPTIONS &&
         cleanOptions.length <= MAX_POLL_OPTIONS &&
         cleanOptions.every((option) => option.length > 0 && [...option].length <= MAX_POLL_OPTION_LENGTH) &&
         new Set(optionKeys).size === optionKeys.length;
@@ -937,7 +945,7 @@ function PublishScreenContent() {
           '/contents/' + encodeURIComponent(draft.id) + '/poll',
           {
             method: 'POST',
-            body: JSON.stringify({ options: cleanOptions, durationHours: pollDurationHours }),
+            body: JSON.stringify({ options: cleanOptions, durationMinutes: pollDurationMinutes ?? DEFAULT_POLL_DURATION_MINUTES }),
             idempotencyKey: createIdempotencyKey(),
           },
         );
@@ -967,7 +975,7 @@ function PublishScreenContent() {
     contentId,
     coverRef,
     loadingEdit,
-    pollDurationHours,
+    pollDurationMinutes,
     pollEnabled,
     pollOptions,
     publishPending,
@@ -1276,7 +1284,7 @@ function PublishScreenContent() {
     draftSaveDirtyRef.current = true;
     draftSaveChangeTokenRef.current += 1;
     draftAutoSaveSchedulerRef.current();
-  }, [accessMode, assets, body, busy, contentId, coverRef, loadingEdit, pollDurationHours, pollEnabled, pollOptions, publishPending]);
+  }, [accessMode, assets, body, busy, contentId, coverRef, loadingEdit, pollDurationMinutes, pollEnabled, pollOptions, publishPending]);
 
   useEffect(() => () => {
     if (draftSaveTimerRef.current) clearTimeout(draftSaveTimerRef.current);
@@ -1352,6 +1360,10 @@ function PublishScreenContent() {
       ? pollOptions.map((option) => option.normalize('NFKC').trim())
       : [];
     if (pollEnabled) {
+      if (pollDurationMinutes === null) {
+        setErrorMessage('Poll duration must be between 5 minutes and 7 days.');
+        return;
+      }
       const optionKeys = cleanPollOptions.map((option) => option.toLocaleLowerCase('en-US'));
       if (
         cleanPollOptions.length < MIN_POLL_OPTIONS ||
@@ -1368,7 +1380,7 @@ function PublishScreenContent() {
     const nextCover = coverRef && mediaRefs.includes(coverRef)
       ? coverRef
       : assets.find((asset) => asset.mimeType.startsWith('image/'))?.serverUrl || null;
-    const fingerprint = JSON.stringify([contentId || '', trimmedBody, mediaRefs, nextCover, accessMode, pollEnabled, cleanPollOptions, pollEnabled ? pollDurationHours : null]);
+    const fingerprint = JSON.stringify([contentId || '', trimmedBody, mediaRefs, nextCover, accessMode, pollEnabled, cleanPollOptions, pollEnabled ? pollDurationMinutes : null]);
     let attempt = submitAttemptRef.current;
     if (attempt && attempt.fingerprint !== fingerprint) {
       if (!contentId && !recordRef.current && publishPending) {
@@ -1484,7 +1496,7 @@ function PublishScreenContent() {
         coverRef: nextCover,
         pollEnabled,
         pollOptions,
-        pollDurationHours,
+        pollDurationMinutes: pollDurationMinutes ?? -1,
       });
       if (draft?.id && draftSavedFingerprintRef.current !== currentDraftFingerprint) {
         if (!draft.etag || draft.etag === '*') {
@@ -1575,7 +1587,7 @@ function PublishScreenContent() {
               method: 'POST',
               body: JSON.stringify({
                 options: cleanPollOptions,
-                durationHours: pollDurationHours,
+                durationMinutes: pollDurationMinutes,
               }),
               idempotencyKey: attempt.pollKey,
             },
@@ -1650,7 +1662,7 @@ function PublishScreenContent() {
     } finally {
       setBusy(false);
     }
-  }, [accessMode, assets, body, contentId, coverRef, pollDurationHours, pollEnabled, pollOptions, publishPending, router, saveDraftSnapshot, savePendingAssetAltText, syncPublishedSocialTokens]);
+  }, [accessMode, assets, body, contentId, coverRef, pollDurationMinutes, pollEnabled, pollOptions, publishPending, router, saveDraftSnapshot, savePendingAssetAltText, syncPublishedSocialTokens]);
 
   if (authStatus !== 'authenticated') {
     return (
@@ -1883,30 +1895,31 @@ function PublishScreenContent() {
                       <Text style={styles.mediaButtonText}>Add option</Text>
                     </Pressable>
                   ) : null}
-                  <Text style={styles.pollHelper}>Poll duration</Text>
-                  <View style={styles.pollDurationRow}>
-                    {([24, 72, 168] as const).map((duration) => (
-                      <Pressable
-                        key={duration}
-                        accessibilityRole="button"
-                        accessibilityState={{ selected: pollDurationHours === duration, disabled: busy || publishPending }}
-                        disabled={busy || publishPending}
-                        onPress={() => setPollDurationHours(duration)}
-                        style={[
-                          styles.pollDurationOption, isDark && { borderColor: '#52525b' },
-                          pollDurationHours === duration && styles.pollDurationSelected,
-                          isDark && pollDurationHours === duration && { backgroundColor: '#102a43', borderColor: PRIMARY },
-                        ]}
-                      >
-                        <Text style={[
-                          styles.pollDurationText, isDark && { color: '#e5e7eb' },
-                          pollDurationHours === duration && styles.pollDurationSelectedText,
-                        ]}>
-                          {duration === 24 ? '1 day' : duration === 72 ? '3 days' : '7 days'}
-                        </Text>
-                      </Pressable>
+                  <Text style={styles.pollHelper}>Poll duration · 5 minutes to 7 days</Text>
+                  <View style={styles.pollDurationPartsRow}>
+                    {([
+                      { key: 'days', label: 'Days' },
+                      { key: 'hours', label: 'Hours' },
+                      { key: 'minutes', label: 'Minutes' },
+                    ] as const).map((part) => (
+                      <View key={part.key} style={styles.pollDurationPart}>
+                        <Text style={[styles.pollDurationPartLabel, isDark && { color: '#9ca3af' }]}>{part.label}</Text>
+                        <TextInput
+                          accessibilityLabel={'Poll duration ' + part.label}
+                          editable={!busy && !publishPending}
+                          keyboardType="number-pad"
+                          maxLength={2}
+                          onChangeText={(value) => updatePollDurationPart(part.key, value)}
+                          selectTextOnFocus
+                          style={[styles.pollDurationPartInput, isDark && { borderColor: '#52525b', backgroundColor: '#18181b', color: '#f9fafb' }]}
+                          value={pollDurationParts[part.key]}
+                        />
+                      </View>
                     ))}
                   </View>
+                  {pollDurationMinutes === null ? (
+                    <Text accessibilityLiveRegion="polite" style={styles.inlineError}>Choose a duration from 5 minutes through 7 days.</Text>
+                  ) : null}
                 </View>
               ) : null}
             </View>
@@ -2070,7 +2083,10 @@ const styles = StyleSheet.create({
   pollOptionInput: { flex: 1, minHeight: 42, borderWidth: 1, borderColor: '#d0d5dd', borderRadius: 9, paddingHorizontal: 10, color: '#101828', fontSize: 14 },
   pollRemoveButton: { width: 32, height: 36, alignItems: 'center', justifyContent: 'center' },
   pollAddOption: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 6, paddingVertical: 8 },
-  pollDurationRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
+  pollDurationPartsRow: { flexDirection: 'row', gap: 10, marginTop: 4 },
+  pollDurationPart: { flex: 1, gap: 5 },
+  pollDurationPartLabel: { color: '#667085', fontSize: 11, fontWeight: '700' },
+  pollDurationPartInput: { minHeight: 42, borderWidth: 1, borderColor: '#d0d5dd', borderRadius: 9, paddingHorizontal: 10, color: '#101828', fontSize: 14, textAlign: 'center' },
   pollDurationOption: { borderWidth: 1, borderColor: '#d0d5dd', borderRadius: 999, paddingVertical: 8, paddingHorizontal: 14 },
   pollDurationSelected: { backgroundColor: '#e8f4ff', borderColor: PRIMARY },
   pollDurationText: { color: '#344054', fontSize: 12, fontWeight: '700' },
