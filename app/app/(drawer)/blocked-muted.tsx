@@ -51,8 +51,16 @@ export default function BlockedMutedScreen() {
   const isDark = colorScheme === 'dark';
   const router = useRouter();
   const authStatus = useAuthStore((state) => state.status);
+  const authUser = useAuthStore((state) => state.user);
+  const accountId = authUser?.id ?? null;
+  const authUserRef = useRef(authUser);
+  authUserRef.current = authUser;
+  const accountIdRef = useRef(accountId);
+  accountIdRef.current = accountId;
   const [kind, setKind] = useState<ManagedRelationshipKind>('blocks');
   const [rows, setRows] = useState<RelationRow[]>([]);
+  const [loadedAccountId, setLoadedAccountId] = useState<string | null>(null);
+  const loadedAccountIdRef = useRef<string | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -65,6 +73,8 @@ export default function BlockedMutedScreen() {
   const loadPage = useCallback(async (nextCursor: string | null, append: boolean, pullRefresh = false) => {
     if (authStatus !== 'authenticated') {
       setRows([]);
+      loadedAccountIdRef.current = null;
+      setLoadedAccountId(null);
       setCursor(null);
       setHasMore(false);
       setLoading(false);
@@ -73,13 +83,19 @@ export default function BlockedMutedScreen() {
       return;
     }
 
+    if (append && requestRef.current) return;
+    if (append && loadedAccountIdRef.current !== accountId) return;
     requestRef.current?.abort();
     const controller = new AbortController();
     requestRef.current = controller;
-    if (append) setLoadingMore(true);
-    else setLoading(true);
+    if (append) {
+      setLoadingMore(true);
+    } else {
+      setLoading(true);
+      setLoadingMore(false);
+    }
     setError('');
-    if (pullRefresh) setRefreshing(true);
+    setRefreshing(pullRefresh);
 
     try {
       const result = await fetchManagedRelationshipsPage(kind, {
@@ -88,7 +104,9 @@ export default function BlockedMutedScreen() {
         signal: controller.signal,
       });
       if (result.response.status === 401) {
-        if (!controller.signal.aborted) setError('登录已失效，请重新登录后继续。');
+        if (!controller.signal.aborted && accountIdRef.current === accountId && authUserRef.current === authUser) {
+          router.replace(('/login?returnTo=' + encodeURIComponent('/blocked-muted')) as never);
+        }
         return;
       }
       const page = result.response.ok ? unwrapApiData<RelationPage>(result.data) : null;
@@ -102,8 +120,10 @@ export default function BlockedMutedScreen() {
         const profile = await resolvePublicProfileById(relation.targetUserId, controller.signal);
         return { relation, profile };
       }));
-      if (controller.signal.aborted) return;
+      if (controller.signal.aborted || accountIdRef.current !== accountId || authUserRef.current !== authUser) return;
 
+      loadedAccountIdRef.current = accountId;
+      setLoadedAccountId(accountId);
       setRows((current) => {
         if (!append) return resolved;
         const known = new Set(current.map((row) => row.relation.relationshipId));
@@ -112,31 +132,38 @@ export default function BlockedMutedScreen() {
       setCursor(page.nextCursor || null);
       setHasMore(page.hasMore);
     } catch (cause) {
-      if (!controller.signal.aborted) {
+      if (!controller.signal.aborted && accountIdRef.current === accountId && authUserRef.current === authUser) {
         setError(cause instanceof Error ? cause.message : '无法读取列表，请重试。');
       }
     } finally {
       if (requestRef.current === controller) requestRef.current = null;
-      if (!controller.signal.aborted) {
+      if (!controller.signal.aborted && accountIdRef.current === accountId && authUserRef.current === authUser) {
         setLoading(false);
         setLoadingMore(false);
         setRefreshing(false);
       }
     }
-  }, [authStatus, kind]);
+  }, [accountId, authStatus, authUser, kind, router]);
 
   useEffect(() => {
     setRows([]);
+    loadedAccountIdRef.current = null;
+    setLoadedAccountId(null);
     setCursor(null);
     setHasMore(false);
+    setLoadingMore(false);
+    setRefreshing(false);
+    setPendingTargetId(null);
     setError('');
     void loadPage(null, false);
     return () => requestRef.current?.abort();
-  }, [loadPage]);
+  }, [accountId, loadPage]);
 
   const confirmRemove = useCallback((row: RelationRow) => {
     if (pendingTargetId) return;
     const targetId = row.relation.targetUserId;
+    const operationAccountId = accountId;
+    const operationUser = authUser;
     const name = row.profile?.displayName?.trim() || row.profile?.username || '该用户';
     const isBlock = kind === 'blocks';
 
@@ -152,9 +179,11 @@ export default function BlockedMutedScreen() {
               setPendingTargetId(targetId);
               setError('');
               try {
+                if (accountIdRef.current !== operationAccountId || authUserRef.current !== operationUser) return;
                 const result = isBlock ? await unblockUser(targetId) : await unmuteUser(targetId);
+                if (accountIdRef.current !== operationAccountId || authUserRef.current !== operationUser) return;
                 if (result.response.status === 401) {
-                  router.push(('/login?returnTo=' + encodeURIComponent('/blocked-muted')) as never);
+                  router.replace(('/login?returnTo=' + encodeURIComponent('/blocked-muted')) as never);
                   return;
                 }
                 if (!result.response.ok) {
@@ -166,16 +195,18 @@ export default function BlockedMutedScreen() {
                 }
                 setRows((current) => current.filter((item) => item.relation.targetUserId !== targetId));
               } catch (cause) {
-                setError(cause instanceof Error ? cause.message : '操作失败，请重试。');
+                if (accountIdRef.current === operationAccountId && authUserRef.current === operationUser) {
+                  setError(cause instanceof Error ? cause.message : '操作失败，请重试。');
+                }
               } finally {
-                setPendingTargetId(null);
+                if (accountIdRef.current === operationAccountId && authUserRef.current === operationUser) setPendingTargetId(null);
               }
             })();
           },
         },
       ],
     );
-  }, [kind, pendingTargetId, router]);
+  }, [accountId, authUser, kind, pendingTargetId, router]);
 
   if (authStatus === 'loading') {
     return (
@@ -202,6 +233,11 @@ export default function BlockedMutedScreen() {
       </View>
     );
   }
+
+  const accountDataReady = loadedAccountId === accountId;
+  const visibleRows = accountDataReady ? rows : [];
+  const visibleHasMore = accountDataReady && hasMore;
+  const visibleCursor = accountDataReady ? cursor : null;
 
   return (
     <View className="flex-1 bg-white dark:bg-black">
@@ -238,7 +274,7 @@ export default function BlockedMutedScreen() {
 
       {error ? (
         <View className="flex-row items-center px-4 py-3">
-          <Text className="mr-3 flex-1 text-sm text-rose-600">{error}</Text>
+          <Text accessibilityRole="alert" className="mr-3 flex-1 text-sm text-rose-600">{error}</Text>
           <Pressable accessibilityRole="button" onPress={() => void loadPage(null, false)} disabled={loading}>
             <Text className="font-bold text-sky-600">重试</Text>
           </Pressable>
@@ -246,7 +282,7 @@ export default function BlockedMutedScreen() {
       ) : null}
 
       <FlatList
-        data={rows}
+        data={visibleRows}
         keyExtractor={(item) => item.relation.relationshipId}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void loadPage(null, false, true)} />}
         renderItem={({ item }) => {
@@ -282,7 +318,7 @@ export default function BlockedMutedScreen() {
         }}
         ListEmptyComponent={(
           <View className="items-center px-8 py-14">
-            {loading ? <ActivityIndicator color={PRIMARY} /> : (
+            {loading || !accountDataReady ? <ActivityIndicator color={PRIMARY} /> : (
               <>
                 <Feather name={kind === 'blocks' ? 'slash' : 'volume-x'} size={32} color="#9ca3af" />
                 <Text className="mt-4 text-base font-semibold text-neutral-800 dark:text-neutral-100">
@@ -297,13 +333,13 @@ export default function BlockedMutedScreen() {
         )}
         ListFooterComponent={loadingMore ? (
           <ActivityIndicator className="py-5" color={PRIMARY} />
-        ) : hasMore && cursor ? (
-          <Pressable accessibilityRole="button" onPress={() => void loadPage(cursor, true)} disabled={loadingMore} className="items-center py-5">
+        ) : visibleHasMore && visibleCursor ? (
+          <Pressable accessibilityRole="button" onPress={() => void loadPage(visibleCursor, true)} disabled={loadingMore} className="items-center py-5">
             <Text className="font-bold text-sky-600">加载更多</Text>
           </Pressable>
         ) : <View className="h-5" />}
         onEndReached={() => {
-          if (hasMore && cursor && !loadingMore && !loading && !error) void loadPage(cursor, true);
+          if (visibleHasMore && visibleCursor && !loadingMore && !loading && !error) void loadPage(visibleCursor, true);
         }}
         onEndReachedThreshold={0.4}
       />
