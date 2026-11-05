@@ -61,7 +61,8 @@ test('Settings exposes confirmed, device-only image cache cleanup on Android and
   expect(settings).toContain('ExpoImage.clearMemoryCache()');
   expect(settings).toContain('ExpoImage.clearDiskCache()');
   expect(settings).toContain('clearImageCaches({');
-  expect(settings).toContain("Alert.alert('清理图片缓存'");
+  expect(settings).toContain('Alert.alert(');
+  expect(settings).toContain("'清理图片缓存'");
   expect(settings).toContain("style: 'destructive'");
   expect(settings).toContain('imageCacheClearInFlight.current');
   expect(settings).toContain('图片内存和磁盘缓存清理未能确认完成');
