@@ -183,6 +183,7 @@ describe('unified W05 social closure adapters', () => {
     expect(webComposer).toContain('aria-label="媒体内容警告"')
     expect(webComposer).toContain('mediaWarning: type === \'post\' ? mediaWarning : null')
     expect(webCard).toContain('SensitiveMediaNotice')
+    expect(webCard).toContain('onReveal={() => setRevealedMediaKey(mediaRevealKey)}')
     expect(webCard).toContain('onReveal={() => setMediaRevealed(true)}')
     expect(openapi).toContain('enum: [NUDITY, VIOLENCE, SENSITIVE, null]')
   })
