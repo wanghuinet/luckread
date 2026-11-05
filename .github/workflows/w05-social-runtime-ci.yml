@@ -197,7 +197,7 @@ jobs:
           from pathlib import Path
           db = sqlite3.connect(':memory:')
           base = Path('workers/W05-social/migrations/20261017_014_social_polls_v1.sql')
-          upgrade = Path('workers/W05-social/migrations/20261105_016_social_poll_duration_minutes.sql')
+          upgrade = Path('workers/W05-social/migrations/20261105_018_social_poll_duration_minutes.sql')
           db.executescript(base.read_text())
           db.executemany(
               'INSERT INTO social_polls VALUES (?,?,?,?,?,?,?)',
