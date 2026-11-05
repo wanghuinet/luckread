@@ -131,6 +131,12 @@ const replyAudienceLabels: Record<NativeReplyAudience, string> = {
   followingNetwork: '你关注的账号及其关注的账号可以回复',
 };
 
+function readReplyAudienceFromResult(data: unknown): NativeReplyAudience | null {
+  if (!data || typeof data !== 'object' || !('data' in data)) return null;
+  const payload = (data as { data?: { replyAudience?: unknown } }).data;
+  return isNativeReplyAudience(payload?.replyAudience) ? payload.replyAudience : null;
+}
+
 type SubmitAttempt = {
   fingerprint: string;
   contentKey: string;
@@ -314,7 +320,7 @@ function PublishScreenContent() {
       }
 
       const replyPolicyResult = await fetchOwnPostReplyAudience(targetContentId);
-      const restoredReplyAudience = replyPolicyResult.data?.data?.replyAudience;
+      const restoredReplyAudience = readReplyAudienceFromResult(replyPolicyResult.data);
       if (!replyPolicyResult.response.ok || !isNativeReplyAudience(restoredReplyAudience)) {
         throw new Error(apiFailureDiagnostic(replyPolicyResult, 'Unable to restore reply permissions for this post.'));
       }
@@ -1028,7 +1034,7 @@ function PublishScreenContent() {
     // The owner policy is persisted in W05; W01 resolves @mentions to canonical IDs.
     if (replyAudienceSavedFingerprintRef.current !== replyAudienceFingerprint) {
       const replyPolicyResult = await saveOwnPostReplyAudience(draft.id, replyAudience, trimmedBody);
-      if (!replyPolicyResult.response.ok || !isNativeReplyAudience(replyPolicyResult.data?.data?.replyAudience)) {
+      if (!replyPolicyResult.response.ok || !readReplyAudienceFromResult(replyPolicyResult.data)) {
         throw new Error(apiFailureDiagnostic(replyPolicyResult, 'Unable to save who can reply to this post.'));
       }
       replyAudienceSavedFingerprintRef.current = replyAudienceFingerprint;
@@ -1702,7 +1708,7 @@ function PublishScreenContent() {
         }
         const replyAudienceFingerprint = createReplyAudienceFingerprint(trimmedBody, replyAudience);
         const replyPolicyResult = await saveOwnPostReplyAudience(contentId, replyAudience, trimmedBody);
-        if (!replyPolicyResult.response.ok || !isNativeReplyAudience(replyPolicyResult.data?.data?.replyAudience)) {
+        if (!replyPolicyResult.response.ok || !readReplyAudienceFromResult(replyPolicyResult.data)) {
           throw new Error(apiFailureDiagnostic(replyPolicyResult, 'Post changes were saved, but reply permissions could not be updated.'));
         }
         replyAudienceSavedFingerprintRef.current = replyAudienceFingerprint;
@@ -1848,7 +1854,7 @@ function PublishScreenContent() {
       const replyAudienceFingerprint = createReplyAudienceFingerprint(trimmedBody, replyAudience);
       if (replyAudienceSavedFingerprintRef.current !== replyAudienceFingerprint) {
         const replyPolicyResult = await saveOwnPostReplyAudience(draft.id, replyAudience, trimmedBody);
-        if (!replyPolicyResult.response.ok || !isNativeReplyAudience(replyPolicyResult.data?.data?.replyAudience)) {
+        if (!replyPolicyResult.response.ok || !readReplyAudienceFromResult(replyPolicyResult.data)) {
           setPublishPending(true);
           throw new Error(apiFailureDiagnostic(replyPolicyResult, 'The post draft exists, but reply permissions could not be saved. Retry to finish the same post.'));
         }
