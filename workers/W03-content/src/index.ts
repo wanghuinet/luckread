@@ -25,7 +25,8 @@ import {
   listContentRevisions,
   getContentRevision,
   rollbackContentRevision,
-  publishDueScheduledContent,
+  listDueScheduledContentCandidates,
+  publishAuthorizedScheduledContents,
   updateContent,
   type ContentState,
   type ContentD1,
@@ -110,6 +111,21 @@ const requireTransport = (request: Request): void => {
     request.headers.get('X-LuckRead-Caller') !== 'W01' ||
     request.headers.get('X-LuckRead-Transport-Version') !== '1.0' ||
     !(request.headers.get('X-LuckRead-Correlation-Id')?.trim())
+  ) {
+    throw new ContentRuntimeError('PERMISSION_DENIED', 403)
+  }
+}
+
+const requireBackgroundTransport = (request: Request): void => {
+  requireTransport(request)
+  if (
+    request.headers.has('Authorization') ||
+    request.headers.has('Cookie') ||
+    request.headers.has('X-LuckRead-Principal-User-Id') ||
+    request.headers.has('X-LuckRead-Principal-Layer') ||
+    request.headers.has('X-LuckRead-Principal-Verified') ||
+    request.headers.has('X-LuckRead-Verified-Creator-Id') ||
+    request.headers.get('X-LuckRead-Rate-Key') !== 'scheduled-publish'
   ) {
     throw new ContentRuntimeError('PERMISSION_DENIED', 403)
   }
@@ -608,6 +624,39 @@ const worker = {
 
 
       requireTransport(request)
+
+      if (url.pathname === '/internal/content/scheduled-due') {
+        if (request.method !== 'GET') {
+          return new Response(null, { status: 405, headers: { Allow: 'GET' } })
+        }
+        requireBackgroundTransport(request)
+        if ([...url.searchParams.keys()].some((key) => key !== 'limit') ||
+            url.searchParams.getAll('limit').length > 1) {
+          throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        }
+        const limit = parseListLimit(url.searchParams.get('limit') ?? '50')
+        const items = await listDueScheduledContentCandidates(env.D1_02, new Date(), limit)
+        return json({ data: { items }, requestId: createRequestId() })
+      }
+
+      if (url.pathname === '/internal/content/scheduled-publish/commit') {
+        if (request.method !== 'POST') {
+          return new Response(null, { status: 405, headers: { Allow: 'POST' } })
+        }
+        requireBackgroundTransport(request)
+        if (url.search !== '') throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        const body = await parseBody(request)
+        if (
+          Object.keys(body).some((key) => key !== 'items') ||
+          !Array.isArray(body.items) ||
+          body.items.length > 50
+        ) {
+          throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        }
+        const result = await publishAuthorizedScheduledContents(env.D1_02, body.items, new Date())
+        return json({ data: result, requestId: createRequestId() })
+      }
+
       if (url.pathname === '/internal/content/public-media-reference') {
         if (request.method !== 'GET') {
           return new Response(null, { status: 405, headers: { Allow: 'GET' } })
