@@ -36,6 +36,28 @@ describe('content state adapters', () => {
   })
 })
 
+describe('native scheduled content list boundary', () => {
+  it('keeps scheduled posts authenticated, owner-scoped, Creator-only and outside public caching', () => {
+    const route = read('src/app/api/v1/contents/route.ts')
+    const guard = read('src/lib/content-list-cache-guard.ts')
+    const w03Index = readFileSync(
+      resolve(process.cwd(), '../W03-content/src/index.ts'),
+      'utf8',
+    )
+
+    expect(route).toContain("['DRAFT', 'SCHEDULED'].includes(query.get('status') ?? '')")
+    expect(route).toContain('if (ownerScopedLifecycleRequest)')
+    expect(route).toContain('hasAuthenticatedSessionCredential(request)')
+    expect(route).toContain('resolveCookieContentPrincipal(request)')
+    expect(route).not.toContain("cachedPublicGet(")
+    expect(guard).toContain("value !== 'DRAFT' && value !== 'SCHEDULED'")
+    expect(w03Index).toContain("if (status === 'SCHEDULED')")
+    expect(w03Index).toContain('requiredCreatorPrincipal(request)')
+    expect(w03Index).toContain("status: 'SCHEDULED'")
+    expect(w03Index).toContain("contentType: 'post'")
+  })
+})
+
 describe('creator content lifecycle cache adapters', () => {
   it('invalidates public content views after Creator Center state transitions', () => {
     const route = read('src/app/(payload)/api/creator/contents/[contentId]/state/route.ts')
