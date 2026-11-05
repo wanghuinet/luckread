@@ -1450,15 +1450,6 @@ const worker = {
     }
   },
 
-  async scheduled(controller: ScheduledController, env: Env): Promise<void> {
-    if (controller.cron !== '* * * * *') return
-    const result = await publishDueScheduledContent(env.D1_02, new Date(controller.scheduledTime), 50)
-    console.log(JSON.stringify({
-      event: 'content.scheduled-publish',
-      cron: controller.cron,
-      scheduledTime: new Date(controller.scheduledTime).toISOString(),
-      ...result,
-    }))
-  },
+
 }
 export default worker
