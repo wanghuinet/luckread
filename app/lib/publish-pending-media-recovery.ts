@@ -95,7 +95,7 @@ function parseRecoveryRecord(value: unknown): PendingMediaRecoveryRecord | null 
     typeof asset.filename !== 'string' ||
     typeof asset.mimeType !== 'string' ||
     typeof asset.uploadKey !== 'string' ||
-    (record.uploadedUrl !== undefined && typeof record.uploadedUrl !== 'string') ||
+    (record.uploadedUrl !== undefined && (typeof record.uploadedUrl !== 'string' || !/^https:\/\//i.test(record.uploadedUrl))) ||
     !asset.localId ||
     !asset.filename ||
     !asset.mimeType ||
