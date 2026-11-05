@@ -1983,7 +1983,7 @@ describe('W03 content contract core', () => {
     const l2Denied = await w03Worker.fetch(makeRequest('L2'), { D1_02: db }, {} as never)
     expect(l2Denied.status).toBe(403)
     const wrongType = await w03Worker.fetch(makeRequest('L3', '?status=SCHEDULED&type=article'), { D1_02: db }, {} as never)
-    expect(wrongType.status).toBe(400)
+    expect(wrongType.status).toBe(422)
     expect(statements).toHaveLength(readsBeforeDeny)
   })
 
