@@ -2,6 +2,61 @@ import { apiRequest, createIdempotencyKey } from './api-client';
 
 export type NotificationScreenFilter = 'all' | 'mentions';
 export type UserRelationshipKind = 'followers' | 'following';
+export type NativeReplyAudience = 'everyone' | 'verified' | 'following' | 'mentioned' | 'followingNetwork';
+
+type NativeReplyAudienceEnvelope = {
+  data?: { replyAudience?: unknown };
+  error?: { code?: string; message?: string };
+};
+
+const isValidContentId = (value: string): boolean =>
+  /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(value);
+
+export function isNativeReplyAudience(value: unknown): value is NativeReplyAudience {
+  return value === 'everyone' ||
+    value === 'verified' ||
+    value === 'following' ||
+    value === 'mentioned' ||
+    value === 'followingNetwork';
+}
+
+/** Read the current owner's reply policy through the canonical W01 -> W05 route. */
+export function fetchOwnPostReplyAudience(contentIdValue: string, signal?: AbortSignal) {
+  const contentId = contentIdValue.trim();
+  if (!isValidContentId(contentId)) {
+    throw new TypeError('A valid post ID is required to read reply permissions.');
+  }
+  return apiRequest<NativeReplyAudienceEnvelope>(
+    '/contents/' + encodeURIComponent(contentId) + '/reply-audience',
+    { method: 'GET', signal },
+  );
+}
+
+/** Save reply policy; W01 resolves @mentions to canonical user IDs on the server. */
+export function saveOwnPostReplyAudience(
+  contentIdValue: string,
+  replyAudience: NativeReplyAudience,
+  text: string,
+) {
+  const contentId = contentIdValue.trim();
+  if (!isValidContentId(contentId)) {
+    throw new TypeError('A valid post ID is required to save reply permissions.');
+  }
+  if (!isNativeReplyAudience(replyAudience)) {
+    throw new TypeError('A supported reply permission is required.');
+  }
+  if (typeof text !== 'string' || text.length > 10_000) {
+    throw new TypeError('Post text is invalid for reply permission resolution.');
+  }
+  return apiRequest<NativeReplyAudienceEnvelope>(
+    '/contents/' + encodeURIComponent(contentId) + '/reply-audience',
+    {
+      method: 'PUT',
+      body: JSON.stringify({ replyAudience, text }),
+      idempotencyKey: 'native-reply-audience:' + contentId + ':' + createIdempotencyKey(),
+    },
+  );
+}
 
 type PageRequestOptions = {
   cursor?: string | null;
@@ -106,6 +161,87 @@ export function fetchOwnPostDraftsPage(options: PageRequestOptions = {}) {
     '/contents?' + query.toString(),
     { method: 'GET', signal: options.signal },
   );
+}
+
+export type NativeScheduledPost = {
+  id: string;
+  contentType: 'post';
+  state: 'SCHEDULED';
+  version: number;
+  revision: number;
+  etag: string;
+  title: string;
+  accessMode: 'PUBLIC' | 'MEMBERS_ONLY';
+  bodyRef: string;
+  mediaRefs: string[];
+  coverRef: string | null;
+  scheduledAt: string;
+  updatedAt: string;
+};
+
+export type NativeScheduledPostPage = {
+  items: NativeScheduledPost[];
+  nextCursor: string | null;
+  hasMore: boolean;
+};
+
+/** List only the signed-in Creator's scheduled social posts; W03 enforces L3/L4 and owner scope. */
+export function fetchOwnScheduledPostsPage(options: PageRequestOptions = {}) {
+  const query = new URLSearchParams({ status: 'SCHEDULED', type: 'post', limit: String(options.limit ?? 20) });
+  if (options.cursor) query.set('cursor', options.cursor);
+  return apiRequest<{ data?: NativeScheduledPostPage; error?: { code?: string; message?: string } }>(
+    '/contents?' + query.toString(),
+    { method: 'GET', signal: options.signal },
+  );
+}
+
+/**
+ * Reuse the existing W01/W03 lifecycle state operation. Rescheduling is modeled
+ * as SCHEDULED -> DRAFT -> SCHEDULED, so every write has its own fresh ETag and
+ * W08 Creator re-check instead of introducing a second scheduled-time mutation API.
+ */
+export function transitionOwnScheduledPostState(
+  item: NativeScheduledPost,
+  to: 'DRAFT' | 'SCHEDULED',
+  scheduledAt?: string,
+) {
+  const contentId = item.id.trim();
+  const etag = item.etag.trim();
+  if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(contentId)) {
+    throw new TypeError('A valid scheduled post ID is required.');
+  }
+  if (!etag || etag === '*' || etag.length > 256) {
+    throw new TypeError('A current scheduled post version is required.');
+  }
+
+  let body: Record<string, unknown> = { to: 'DRAFT' };
+  if (to === 'SCHEDULED') {
+    const timestamp = typeof scheduledAt === 'string' ? Date.parse(scheduledAt) : Number.NaN;
+    if (!Number.isFinite(timestamp) || timestamp <= Date.now() + 60_000) {
+      throw new TypeError('A future scheduled publish time is required.');
+    }
+    if (!item.title.trim() || !item.bodyRef || !Array.isArray(item.mediaRefs)) {
+      throw new TypeError('The scheduled post is missing its publish metadata.');
+    }
+    body = {
+      to: 'SCHEDULED',
+      scheduledAt: new Date(timestamp).toISOString(),
+      preflight: {
+        contentType: 'post',
+        title: item.title,
+        body: item.title,
+        mediaRefs: item.mediaRefs,
+        coverRef: item.coverRef,
+      },
+    };
+  }
+
+  return apiRequest<unknown>('/contents/' + encodeURIComponent(contentId) + '/state', {
+    method: 'POST',
+    headers: { 'If-Match': etag },
+    body: JSON.stringify(body),
+    idempotencyKey: 'native-scheduled-post-' + to.toLowerCase() + ':' + contentId + ':' + createIdempotencyKey(),
+  });
 }
 
 /** Soft-delete an owner draft with the current W03 ETag and a unique operation key. */

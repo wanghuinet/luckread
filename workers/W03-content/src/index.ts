@@ -25,7 +25,8 @@ import {
   listContentRevisions,
   getContentRevision,
   rollbackContentRevision,
-  publishDueScheduledContent,
+  listDueScheduledContentCandidates,
+  publishAuthorizedScheduledContents,
   updateContent,
   type ContentState,
   type ContentD1,
@@ -35,6 +36,8 @@ import {
   createContentRelationship,
   listContentRelationships,
   revokeContentRelationship,
+  appendPostThreadNext,
+  listPostThread,
   type ContentRelationshipDirection,
 } from './content-relationships.js'
 import {
@@ -110,6 +113,21 @@ const requireTransport = (request: Request): void => {
     request.headers.get('X-LuckRead-Caller') !== 'W01' ||
     request.headers.get('X-LuckRead-Transport-Version') !== '1.0' ||
     !(request.headers.get('X-LuckRead-Correlation-Id')?.trim())
+  ) {
+    throw new ContentRuntimeError('PERMISSION_DENIED', 403)
+  }
+}
+
+const requireBackgroundTransport = (request: Request): void => {
+  requireTransport(request)
+  if (
+    request.headers.has('Authorization') ||
+    request.headers.has('Cookie') ||
+    request.headers.has('X-LuckRead-Principal-User-Id') ||
+    request.headers.has('X-LuckRead-Principal-Layer') ||
+    request.headers.has('X-LuckRead-Principal-Verified') ||
+    request.headers.has('X-LuckRead-Verified-Creator-Id') ||
+    request.headers.get('X-LuckRead-Rate-Key') !== 'scheduled-publish'
   ) {
     throw new ContentRuntimeError('PERMISSION_DENIED', 403)
   }
@@ -255,7 +273,7 @@ const resolveCreatorMembershipAccess = async (
   return decision.allowed
 }
 
-const getPath = (pathname: string): {id?: string; state?: boolean; preflight?: boolean; revisions?: boolean; relationships?: boolean; relationshipId?: string; revisionId?: string; rollback?: boolean; series?: boolean; seriesMembers?: boolean; seriesMemberContentId?: string; collections?: boolean; collectionMembers?: boolean; collectionMemberContentId?: string} | null => {
+const getPath = (pathname: string): {id?: string; state?: boolean; preflight?: boolean; revisions?: boolean; relationships?: boolean; relationshipId?: string; revisionId?: string; rollback?: boolean; thread?: boolean; series?: boolean; seriesMembers?: boolean; seriesMemberContentId?: string; collections?: boolean; collectionMembers?: boolean; collectionMemberContentId?: string} | null => {
   const parts = pathname.split('/').filter(Boolean)
   if (parts.length === 3 && parts[0] === 'internal' && parts[1] === 'content' && parts[2] === 'contents') {
     return {}
@@ -274,6 +292,9 @@ const getPath = (pathname: string): {id?: string; state?: boolean; preflight?: b
   }
   if (parts.length === 5 && parts[0] === 'internal' && parts[1] === 'content' && parts[2] === 'contents' && parts[4] === 'relationships') {
     return { id: decodePathSegment(parts[3]), relationships: true }
+  }
+  if (parts.length === 5 && parts[0] === 'internal' && parts[1] === 'content' && parts[2] === 'contents' && parts[4] === 'thread') {
+    return { id: decodePathSegment(parts[3]), thread: true }
   }
   if (parts.length === 6 && parts[0] === 'internal' && parts[1] === 'content' && parts[2] === 'contents' && parts[4] === 'relationships') {
     return { id: decodePathSegment(parts[3]), relationships: true, relationshipId: decodePathSegment(parts[5]) }
@@ -608,6 +629,42 @@ const worker = {
 
 
       requireTransport(request)
+
+      if (url.pathname === '/internal/content/scheduled-due') {
+        if (request.method !== 'GET') {
+          return new Response(null, { status: 405, headers: { Allow: 'GET' } })
+        }
+        requireBackgroundTransport(request)
+        let hasUnexpectedQueryParameter = false
+        url.searchParams.forEach((_value, key) => {
+          if (key !== 'limit') hasUnexpectedQueryParameter = true
+        })
+        if (hasUnexpectedQueryParameter || url.searchParams.getAll('limit').length > 1) {
+          throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        }
+        const limit = parseListLimit(url.searchParams.get('limit') ?? '50')
+        const items = await listDueScheduledContentCandidates(env.D1_02, new Date(), limit)
+        return json({ data: { items }, requestId: createRequestId() })
+      }
+
+      if (url.pathname === '/internal/content/scheduled-publish/commit') {
+        if (request.method !== 'POST') {
+          return new Response(null, { status: 405, headers: { Allow: 'POST' } })
+        }
+        requireBackgroundTransport(request)
+        if (url.search !== '') throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        const body = await parseBody(request)
+        if (
+          Object.keys(body).some((key) => key !== 'items') ||
+          !Array.isArray(body.items) ||
+          body.items.length > 50
+        ) {
+          throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+        }
+        const result = await publishAuthorizedScheduledContents(env.D1_02, body.items, new Date())
+        return json({ data: result, requestId: createRequestId() })
+      }
+
       if (url.pathname === '/internal/content/public-media-reference') {
         if (request.method !== 'GET') {
           return new Response(null, { status: 405, headers: { Allow: 'GET' } })
@@ -945,6 +1002,32 @@ const worker = {
         return new Response(null, { status: 204 })
       }
 
+      if (path && path.thread && path.id && request.method === 'GET') {
+        let viewerUserId: string | null = null
+        if (request.headers.has('X-LuckRead-Principal-User-Id') || request.headers.has('X-LuckRead-Principal-Layer')) {
+          const principal = requiredPrincipal(request)
+          // Low-layer signed-in users may still read public threads; only L2+
+          // receives the owner-scoped draft visibility mode.
+          if (hasSocialPostPermission(principal.layer)) viewerUserId = principal.userId
+        }
+        const thread = await listPostThread(env.D1_02, path.id, viewerUserId)
+        return json({ data: thread, schemaVersion: '1.0', requestId: createRequestId() })
+      }
+
+      if (path && path.thread && path.id && request.method === 'POST') {
+        const principal = requiredSocialPostPrincipal(request)
+        const body = await parseBody(request)
+        const nextContentId = typeof body.nextContentId === 'string' ? body.nextContentId.trim() : ''
+        const relationship = await appendPostThreadNext(
+          env.D1_02,
+          principal.userId,
+          path.id,
+          nextContentId,
+          requireIdempotency(request),
+        )
+        return json({ data: relationship, schemaVersion: '1.0', requestId: createRequestId() }, 201)
+      }
+
       if (path && path.relationships && path.id && request.method === 'GET' && !path.relationshipId) {
         const directionParam = url.searchParams.get('direction')?.trim() || 'out'
         if (!['out', 'in', 'both'].includes(directionParam)) {
@@ -1103,38 +1186,73 @@ const worker = {
         const limit = parseListLimit(limitParam)
         if (cursor && cursor.length > 2048) throw new ContentRuntimeError('INVALID_CURSOR', 400)
         if (status !== null) {
-          // Social post drafts belong to the authenticated owner and are readable at L2+.
-          // Keep this separate from public discovery and creator-only article workflows.
-          if (status !== 'DRAFT' || creatorId || (contentType && contentType !== 'post')) {
+          // Private owner-scoped social lifecycle lists never fall through to public discovery.
+          if (creatorId || (contentType && contentType !== 'post')) {
             throw new ContentRuntimeError('VALIDATION_FAILED', 400)
           }
-          const principal = requiredSocialPostPrincipal(request)
-          const page = await listCreatorContents(env.D1_02, principal.userId, cursor, limit, {
-            status: 'DRAFT',
-            contentType: 'post',
-          })
-          return json({
-            data: {
-              items: page.items.map(item => ({
-                id: item.id,
-                contentType: item.contentType,
-                state: item.state,
-                version: item.version,
-                revision: item.revision,
-                etag: item.etag,
-                title: item.title,
-                accessMode: item.accessMode ?? 'PUBLIC',
-                bodyRef: item.bodyRef,
-                mediaRefs: item.mediaRefs,
-                coverRef: item.coverRef,
+          if (status === 'DRAFT') {
+            // L2+ authors may read only their own social post drafts.
+            const principal = requiredSocialPostPrincipal(request)
+            const page = await listCreatorContents(env.D1_02, principal.userId, cursor, limit, {
+              status: 'DRAFT',
+              contentType: 'post',
+            })
+            return json({
+              data: {
+                items: page.items.map(item => ({
+                  id: item.id,
+                  contentType: item.contentType,
+                  state: item.state,
+                  version: item.version,
+                  revision: item.revision,
+                  etag: item.etag,
+                  title: item.title,
+                  accessMode: item.accessMode ?? 'PUBLIC',
+                  bodyRef: item.bodyRef,
+                  mediaRefs: item.mediaRefs,
+                  coverRef: item.coverRef,
                 mediaWarning: item.mediaWarning ?? null,
-                updatedAt: item.updatedAt,
-              })),
-              nextCursor: page.nextCursor,
-              hasMore: page.hasMore,
-            },
-            requestId: createRequestId(),
-          })
+                  updatedAt: item.updatedAt,
+                })),
+                nextCursor: page.nextCursor,
+                hasMore: page.hasMore,
+              },
+              requestId: createRequestId(),
+            })
+          }
+          if (status === 'SCHEDULED') {
+            // Scheduled publication is a Creator-only capability. W03 applies
+            // L3/L4 and owner scope before returning any edit/cancel preconditions.
+            const principal = requiredCreatorPrincipal(request)
+            const page = await listCreatorContents(env.D1_02, principal.userId, cursor, limit, {
+              status: 'SCHEDULED',
+              contentType: 'post',
+            })
+            return json({
+              data: {
+                items: page.items.map(item => ({
+                  id: item.id,
+                  contentType: item.contentType,
+                  state: item.state,
+                  version: item.version,
+                  revision: item.revision,
+                  etag: item.etag,
+                  title: item.title,
+                  accessMode: item.accessMode ?? 'PUBLIC',
+                  bodyRef: item.bodyRef,
+                  mediaRefs: item.mediaRefs,
+                  coverRef: item.coverRef,
+                mediaWarning: item.mediaWarning ?? null,
+                  scheduledAt: item.scheduledAt,
+                  updatedAt: item.updatedAt,
+                })),
+                nextCursor: page.nextCursor,
+                hasMore: page.hasMore,
+              },
+              requestId: createRequestId(),
+            })
+          }
+          throw new ContentRuntimeError('VALIDATION_FAILED', 400)
         }
         if (creatorId && !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(creatorId)) {
           throw new ContentRuntimeError('VALIDATION_FAILED', 400)
@@ -1408,15 +1526,6 @@ const worker = {
     }
   },
 
-  async scheduled(controller: ScheduledController, env: Env): Promise<void> {
-    if (controller.cron !== '* * * * *') return
-    const result = await publishDueScheduledContent(env.D1_02, new Date(controller.scheduledTime), 50)
-    console.log(JSON.stringify({
-      event: 'content.scheduled-publish',
-      cron: controller.cron,
-      scheduledTime: new Date(controller.scheduledTime).toISOString(),
-      ...result,
-    }))
-  },
+
 }
 export default worker

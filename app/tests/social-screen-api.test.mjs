@@ -24,6 +24,10 @@ const {
   fetchBookmarksPage,
   fetchDiscoveryTopics,
   fetchOwnPostDraftsPage,
+  fetchOwnPostReplyAudience,
+  saveOwnPostReplyAudience,
+  fetchOwnScheduledPostsPage,
+  transitionOwnScheduledPostState,
   deleteOwnPostDraft,
   fetchNotificationsPage,
   fetchNotificationById,
@@ -295,6 +299,78 @@ test('lists only the authenticated account draft posts through W01 with cursor p
   expect(calls[0].options.signal).toBe(controller.signal);
 });
 
+test('lists only the authenticated Creator\'s scheduled social posts with cursor pagination', async () => {
+  const controller = new AbortController();
+  await fetchOwnScheduledPostsPage({ cursor: 'scheduled-next', limit: 15, signal: controller.signal });
+
+  expect(calls).toHaveLength(1);
+  expect(calls[0].path).toBe('/contents?status=SCHEDULED&type=post&limit=15&cursor=scheduled-next');
+  expect(calls[0].options.method).toBe('GET');
+  expect(calls[0].options.signal).toBe(controller.signal);
+});
+
+test('cancels an owned scheduled post through the existing ETag-guarded state operation', async () => {
+  const item = {
+    id: 'scheduled_123', contentType: 'post', state: 'SCHEDULED', version: 4,
+    revision: 2, etag: 'W/"4"', title: 'Queued post', accessMode: 'PUBLIC',
+    bodyRef: 'https://img.luckread.com/body.txt', mediaRefs: ['https://img.luckread.com/photo.jpg'],
+    coverRef: 'https://img.luckread.com/photo.jpg', scheduledAt: '2026-11-08T18:30:00.000Z',
+    updatedAt: '2026-11-05T10:00:00.000Z',
+  };
+  await transitionOwnScheduledPostState(item, 'DRAFT');
+
+  expect(calls).toHaveLength(1);
+  expect(calls[0].path).toBe('/contents/scheduled_123/state');
+  expect(calls[0].options.method).toBe('POST');
+  expect(calls[0].options.headers).toEqual({ 'If-Match': 'W/"4"' });
+  expect(JSON.parse(calls[0].options.body)).toEqual({ to: 'DRAFT' });
+  expect(calls[0].options.idempotencyKey).toMatch(/^native-scheduled-post-draft:scheduled_123:/);
+});
+
+test('reschedules through the existing draft-to-scheduled transition with stored-post preflight', async () => {
+  const item = {
+    id: 'scheduled_123', contentType: 'post', state: 'SCHEDULED', version: 4,
+    revision: 2, etag: 'W/"4"', title: 'Queued post', accessMode: 'PUBLIC',
+    bodyRef: 'https://img.luckread.com/body.txt', mediaRefs: ['https://img.luckread.com/photo.jpg'],
+    coverRef: 'https://img.luckread.com/photo.jpg', scheduledAt: '2026-11-08T18:30:00.000Z',
+    updatedAt: '2026-11-05T10:00:00.000Z',
+  };
+  const nextDate = new Date(Date.now() + 5 * 60_000).toISOString();
+  await transitionOwnScheduledPostState(item, 'SCHEDULED', nextDate);
+
+  expect(calls).toHaveLength(1);
+  expect(calls[0].path).toBe('/contents/scheduled_123/state');
+  expect(calls[0].options.method).toBe('POST');
+  expect(calls[0].options.headers).toEqual({ 'If-Match': 'W/"4"' });
+  expect(JSON.parse(calls[0].options.body)).toMatchObject({
+    to: 'SCHEDULED',
+    scheduledAt: nextDate,
+    preflight: {
+      contentType: 'post',
+      title: 'Queued post',
+      body: 'Queued post',
+      mediaRefs: ['https://img.luckread.com/photo.jpg'],
+      coverRef: 'https://img.luckread.com/photo.jpg',
+    },
+  });
+  expect(calls[0].options.idempotencyKey).toMatch(/^native-scheduled-post-scheduled:scheduled_123:/);
+});
+
+test('rejects malformed scheduled-post IDs, stale ETags and non-future reschedule times', () => {
+  const item = {
+    id: '../other-user', contentType: 'post', state: 'SCHEDULED', version: 4,
+    revision: 2, etag: 'W/"4"', title: 'Queued post', accessMode: 'PUBLIC',
+    bodyRef: 'https://img.luckread.com/body.txt', mediaRefs: [], coverRef: null,
+    scheduledAt: '2026-11-08T18:30:00.000Z', updatedAt: '2026-11-05T10:00:00.000Z',
+  };
+  expect(() => transitionOwnScheduledPostState(item, 'DRAFT')).toThrow('A valid scheduled post ID is required.');
+  expect(() => transitionOwnScheduledPostState({ ...item, id: 'scheduled_123', etag: '*' }, 'DRAFT'))
+    .toThrow('A current scheduled post version is required.');
+  expect(() => transitionOwnScheduledPostState({ ...item, id: 'scheduled_123' }, 'SCHEDULED', new Date(Date.now() + 30_000).toISOString()))
+    .toThrow('A future scheduled publish time is required.');
+  expect(calls).toHaveLength(0);
+});
+
 test('rejects invalid draft delete preconditions before calling the API', () => {
   expect(() => deleteOwnPostDraft('../other-user-draft', 'W/"1"')).toThrow('A valid draft ID is required.');
   expect(() => deleteOwnPostDraft('draft_123', '*')).toThrow('A current draft version is required.');
@@ -308,4 +384,35 @@ test('deletes a selected own draft with the W03 ETag and unique idempotency key'
   expect(calls[0].options.method).toBe('DELETE');
   expect(calls[0].options.headers).toEqual({ 'If-Match': 'W/"4"' });
   expect(calls[0].options.idempotencyKey).toBe('native-draft-delete:draft_123:test-key-1');
+});
+
+
+test('reads the signed-in owner post reply policy through the existing W01 route', async () => {
+  const controller = new AbortController();
+  await fetchOwnPostReplyAudience('post_123', controller.signal);
+
+  expect(calls).toHaveLength(1);
+  expect(calls[0].path).toBe('/contents/post_123/reply-audience');
+  expect(calls[0].options.method).toBe('GET');
+  expect(calls[0].options.signal).toBe(controller.signal);
+});
+
+test('saves reply audience with post text so W01 resolves mention identities server-side', async () => {
+  await saveOwnPostReplyAudience('post_123', 'mentioned', 'Hello @alice');
+
+  expect(calls).toHaveLength(1);
+  expect(calls[0].path).toBe('/contents/post_123/reply-audience');
+  expect(calls[0].options.method).toBe('PUT');
+  expect(JSON.parse(calls[0].options.body)).toEqual({
+    replyAudience: 'mentioned',
+    text: 'Hello @alice',
+  });
+  expect(calls[0].options.idempotencyKey).toMatch(/^native-reply-audience:post_123:/);
+});
+
+test('rejects invalid post IDs, reply audiences and oversized text before calling the API', () => {
+  expect(() => fetchOwnPostReplyAudience('../other')).toThrow('A valid post ID is required to read reply permissions.');
+  expect(() => saveOwnPostReplyAudience('post_123', 'everyone; DROP TABLE', 'hello')).toThrow('A supported reply permission is required.');
+  expect(() => saveOwnPostReplyAudience('post_123', 'everyone', 'x'.repeat(10_001))).toThrow('Post text is invalid for reply permission resolution.');
+  expect(calls).toHaveLength(0);
 });

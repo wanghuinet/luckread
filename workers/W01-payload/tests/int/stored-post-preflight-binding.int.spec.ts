@@ -114,6 +114,82 @@ describe('bind direct social post publishing to the stored body asset', () => {
     expect(result.preflight.body).not.toBe(submitted.preflight.body)
   })
 
+  it('binds public scheduled posts to the canonical active W08 Creator identity', async () => {
+    const request = makeRequest()
+    const scheduledAt = '2026-11-05T12:00:00.000Z'
+    const scheduled = {
+      ...submitted,
+      to: 'SCHEDULED',
+      scheduledAt,
+    }
+    // Public draft creation historically mirrors ownerUserId into creatorId.
+    // Scheduling must replace that placeholder with W08's canonical creator ID.
+    callW03ContentMock.mockResolvedValue(new Response(JSON.stringify(storedPost({
+      accessMode: 'PUBLIC',
+      creatorId: principal.userId,
+    })), { status: 200 }))
+    const r2Get = vi.fn(async (key: string) => makeR2Object('authoritative scheduled public post body'))
+    getCloudflareContextMock.mockResolvedValue({ env: { R2: { get: r2Get } } })
+
+    const binding = await bindPreflightToStoredPost(
+      request,
+      'post-1',
+      principal,
+      scheduled,
+      makeErrorResponse,
+    )
+    if (binding instanceof Response) throw new Error('Expected a verified public scheduled post')
+    const result = binding.body as typeof scheduled
+
+    expect(resolveVerifiedCreatorMock).toHaveBeenCalledWith(request, principal)
+    expect(binding.verifiedCreatorId).toBe('creator-1')
+    expect(result.to).toBe('SCHEDULED')
+    expect(result.scheduledAt).toBe(scheduledAt)
+    expect(result.preflight.title).toBe('authoritative stored title')
+    expect(result.preflight.body).toBe('authoritative scheduled public post body')
+  })
+
+  it('binds scheduled draft social posts to canonical body and owned media before W03 scheduling', async () => {
+    const request = makeRequest()
+    const scheduledAt = '2026-11-05T12:00:00.000Z'
+    const scheduled = {
+      ...submitted,
+      to: 'SCHEDULED',
+      scheduledAt,
+    }
+    callW03ContentMock.mockResolvedValue(new Response(JSON.stringify(storedPost({
+      accessMode: 'MEMBERS_ONLY',
+      creatorId: 'creator-1',
+    })), { status: 200 }))
+    const r2Get = vi.fn(async (key: string) => makeR2Object('authoritative scheduled post body'))
+    getCloudflareContextMock.mockResolvedValue({ env: { R2: { get: r2Get } } })
+
+    const binding = await bindPreflightToStoredPost(
+      request,
+      'post-1',
+      principal,
+      scheduled,
+      makeErrorResponse,
+    )
+    if (binding instanceof Response) throw new Error('Expected a bound scheduled social post')
+    const result = binding.body as typeof scheduled
+
+    expect(resolveVerifiedCreatorMock).toHaveBeenCalledWith(request, principal)
+    expect(binding.verifiedCreatorId).toBe('creator-1')
+    expect(validateMediaReferencesMock).toHaveBeenCalledWith(
+      principal.userId,
+      expect.objectContaining({ mediaRefs: ['https://img.luckread.com/media/photo.png'] }),
+      'https://api.luckread.com',
+    )
+    expect(r2Get).toHaveBeenCalledWith('media/post-body.txt')
+    expect(result.to).toBe('SCHEDULED')
+    expect(result.scheduledAt).toBe(scheduledAt)
+    expect(result.preflight.title).toBe('authoritative stored title')
+    expect(result.preflight.body).toBe('authoritative scheduled post body')
+    expect(result.preflight.mediaRefs).toEqual(['https://img.luckread.com/media/photo.png'])
+    expect(result.preflight.coverRef).toBeNull()
+  })
+
   it('requires an active matching W08 creator identity for member-only post publication', async () => {
     const request = makeRequest()
     callW03ContentMock.mockResolvedValue(new Response(JSON.stringify(storedPost({

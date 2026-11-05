@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-import { canTransitionContentState, ContentRuntimeError, type ContentRecord, createContent, createRequestId, deleteContent, decodeContentListCursor, decodeCursor, decodeScopedCursor, encodeContentListCursor, encodeCursor, encodeScopedCursor, isState, listContents, listPublishedContentsByIds, listContentRevisions, listCreatorContents, publishDueScheduledContent, publicContent, toErrorResponse, transitionContentState, updateContent, validateInput, validateListFilters } from './content-runtime.js'
+import { canTransitionContentState, ContentRuntimeError, type ContentRecord, createContent, createRequestId, deleteContent, decodeContentListCursor, decodeCursor, decodeScopedCursor, encodeContentListCursor, encodeCursor, encodeScopedCursor, isState, listContents, listPublishedContentsByIds, listContentRevisions, listCreatorContents, listDueScheduledContentCandidates, publishAuthorizedScheduledContents, publicContent, toErrorResponse, transitionContentState, updateContent, validateInput, validateListFilters } from './content-runtime.js'
 import w03Worker, { hasCreatorContentPermission, hasSocialPostPermission, parseListLimit } from './index.js'
 
 describe('W03 content contract core', () => {
@@ -920,6 +920,9 @@ describe('W03 content contract core', () => {
     expect(canTransitionContentState('DRAFT', 'PUBLISHED', 'CREATOR', true)).toBe(false)
     expect(canTransitionContentState('DRAFT', 'PUBLISHED', 'CREATOR', true, undefined, 'article')).toBe(false)
     expect(canTransitionContentState('DRAFT', 'PUBLISHED', 'CREATOR', true, undefined, 'post')).toBe(true)
+    expect(canTransitionContentState('DRAFT', 'SCHEDULED', 'CREATOR', true, undefined, 'post')).toBe(true)
+    expect(canTransitionContentState('DRAFT', 'SCHEDULED', 'CREATOR', true, undefined, 'article')).toBe(false)
+    expect(canTransitionContentState('DRAFT', 'SCHEDULED', 'SOCIAL_AUTHOR', true, undefined, 'post')).toBe(false)
     expect(canTransitionContentState('DRAFT', 'PENDING_REVIEW', 'SOCIAL_AUTHOR', true, undefined, 'post')).toBe(false)
     expect(canTransitionContentState('DRAFT', 'PUBLISHED', 'SOCIAL_AUTHOR', true, undefined, 'post')).toBe(true)
     expect(canTransitionContentState('DRAFT', 'PUBLISHED', 'SOCIAL_AUTHOR', false, undefined, 'post')).toBe(false)
@@ -1258,6 +1261,200 @@ describe('W03 content contract core', () => {
     )).rejects.toMatchObject({ code: 'PERMISSION_DENIED', status: 403 })
   })
 
+  it('schedules a draft social post only after W03 publish preflight succeeds', async () => {
+    const row = {
+      id: 'content_scheduled_post_1',
+      content_type: 'post',
+      owner_user_id: 'user_creator_schedule',
+      creator_id: 'user_creator_schedule',
+      ip_id: null,
+      state: 'DRAFT',
+      scheduled_at: null,
+      access_mode: 'PUBLIC',
+      version: 1,
+      revision: 1,
+      slug: 'scheduled-post-1',
+      title: 'A useful update',
+      body_ref: 'https://img.luckread.com/media/scheduled-body.txt',
+      media_refs_json: '[]',
+      cover_ref: null,
+      etag: 'W/"1"',
+      created_at: '2026-10-16T00:00:00.000Z',
+      updated_at: '2026-10-16T00:00:00.000Z',
+      idem_id: null,
+      idem_owner_user_id: null,
+      idem_request_hash: null,
+      idem_status: null,
+      idem_response_status: null,
+      idem_response_json: null,
+      idem_expires_at: null,
+    }
+    let batchCalls = 0
+    const prepared: Array<{ sql: string; values: unknown[] }> = []
+    const db = {
+      prepare(sql: string) {
+        return {
+          bind: (...values: unknown[]) => {
+            prepared.push({ sql, values })
+            return { first: async () => row }
+          },
+        }
+      },
+      batch: async () => { batchCalls += 1; return [] },
+    } as never
+    const scheduledAt = '2026-10-16T00:30:00.000Z'
+    const preflight = {
+      contentType: 'post',
+      title: 'A useful update',
+      body: 'I am sharing a useful update from our recent work and a few lessons learned along the way.',
+      mediaRefs: [],
+      coverRef: null,
+      aiMode: 'none',
+      humanContribution: 'substantial',
+    }
+
+    const result = await transitionContentState(
+      db,
+      'user_creator_schedule',
+      'L3',
+      row.id,
+      'SCHEDULED',
+      undefined,
+      row.etag,
+      'schedule-draft-social-post',
+      new Date('2026-10-16T00:01:00.000Z'),
+      { scheduledAt, preflight, verifiedCreatorId: 'creator-canonical-1' },
+    )
+
+    expect(result).toMatchObject({
+      from: 'DRAFT',
+      to: 'SCHEDULED',
+      version: 2,
+      etag: 'W/"2"',
+      scheduledAt,
+    })
+    expect(batchCalls).toBe(1)
+    const contentUpdate = prepared.find(({ sql }) => sql.includes('UPDATE contents SET state=?, scheduled_at=?, creator_id=?'))
+    expect(contentUpdate?.values.slice(0, 3)).toEqual([
+      'SCHEDULED',
+      scheduledAt,
+      'creator-canonical-1',
+    ])
+  })
+
+  it('does not schedule a draft social post when its W03 publish preflight is missing', async () => {
+    const row = {
+      id: 'content_scheduled_post_missing_preflight',
+      content_type: 'post',
+      owner_user_id: 'user_creator_schedule',
+      creator_id: 'user_creator_schedule',
+      ip_id: null,
+      state: 'DRAFT',
+      scheduled_at: null,
+      access_mode: 'PUBLIC',
+      version: 1,
+      revision: 1,
+      slug: 'scheduled-post-missing-preflight',
+      title: 'A useful update',
+      body_ref: 'https://img.luckread.com/media/scheduled-body.txt',
+      media_refs_json: '[]',
+      cover_ref: null,
+      etag: 'W/"1"',
+      created_at: '2026-10-16T00:00:00.000Z',
+      updated_at: '2026-10-16T00:00:00.000Z',
+      idem_id: null,
+      idem_owner_user_id: null,
+      idem_request_hash: null,
+      idem_status: null,
+      idem_response_status: null,
+      idem_response_json: null,
+      idem_expires_at: null,
+    }
+    let batchCalls = 0
+    const db = {
+      prepare() { return { bind: () => ({ first: async () => row }) } },
+      batch: async () => { batchCalls += 1; return [] },
+    } as never
+
+    await expect(transitionContentState(
+      db,
+      'user_creator_schedule',
+      'L3',
+      row.id,
+      'SCHEDULED',
+      undefined,
+      row.etag,
+      'schedule-without-preflight',
+      new Date('2026-10-16T00:01:00.000Z'),
+      {
+        scheduledAt: '2026-10-16T00:30:00.000Z',
+        verifiedCreatorId: 'creator-canonical-1',
+      },
+    )).rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 })
+    expect(batchCalls).toBe(0)
+  })
+
+  it('rejects scheduled publication when W08 has not verified a canonical Creator identity', async () => {
+    const row = {
+      id: 'content_scheduled_post_without_creator_identity',
+      content_type: 'post',
+      owner_user_id: 'user_creator_schedule',
+      creator_id: 'user_creator_schedule',
+      ip_id: null,
+      state: 'DRAFT',
+      scheduled_at: null,
+      access_mode: 'PUBLIC',
+      version: 1,
+      revision: 1,
+      slug: 'scheduled-post-without-creator',
+      title: 'A useful update',
+      body_ref: 'https://img.luckread.com/media/scheduled-body.txt',
+      media_refs_json: '[]',
+      cover_ref: null,
+      etag: 'W/"1"',
+      created_at: '2026-10-16T00:00:00.000Z',
+      updated_at: '2026-10-16T00:00:00.000Z',
+      idem_id: null,
+      idem_owner_user_id: null,
+      idem_request_hash: null,
+      idem_status: null,
+      idem_response_status: null,
+      idem_response_json: null,
+      idem_expires_at: null,
+    }
+    let batchCalls = 0
+    const db = {
+      prepare() { return { bind: () => ({ first: async () => row }) } },
+      batch: async () => { batchCalls += 1; return [] },
+    } as never
+    const preflight = {
+      contentType: 'post',
+      title: 'A useful update',
+      body: 'A useful update with enough detail to pass the basic post preflight validation.',
+      mediaRefs: [],
+      coverRef: null,
+      aiMode: 'none',
+      humanContribution: 'substantial',
+    }
+
+    await expect(transitionContentState(
+      db,
+      'user_creator_schedule',
+      'L3',
+      row.id,
+      'SCHEDULED',
+      undefined,
+      row.etag,
+      'schedule-without-creator-verification',
+      new Date('2026-10-16T00:01:00.000Z'),
+      {
+        scheduledAt: '2026-10-16T00:30:00.000Z',
+        preflight,
+      },
+    )).rejects.toMatchObject({ code: 'PERMISSION_DENIED', status: 403 })
+    expect(batchCalls).toBe(0)
+  })
+
   it('requires a future timestamp before scheduling an approved content item', async () => {
     const db = {
       prepare() {
@@ -1281,48 +1478,283 @@ describe('W03 content contract core', () => {
     ).rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 })
   })
 
-  it('publishes only due scheduled rows and converges concurrent execution safely', async () => {
-    const statements: Array<{ query: string; bindings: unknown[] }> = []
+  it('lists only due scheduled candidates with canonical owner and Creator IDs', async () => {
+    let query = ''
+    let bindings: unknown[] = []
     const dueRows = [
-      { id: 'scheduled_due_1', version: 4, scheduled_at: '2026-10-08T12:00:00.000Z' },
-      { id: 'scheduled_due_2', version: 7, scheduled_at: '2026-10-08T12:01:00.000Z' },
+      {
+        id: 'scheduled_due_1',
+        owner_user_id: 'owner_1',
+        creator_id: 'creator_1',
+        version: 4,
+        scheduled_at: '2026-10-08T12:00:00.000Z',
+      },
     ]
     const db = {
-      prepare(query: string) {
-        if (query.includes('FROM contents')) {
-          return {
-            bind: (...bindings: unknown[]) => ({
-              all: async () => ({ results: dueRows }),
-              first: async () => undefined,
-              bindings,
-            }),
-          }
-        }
+      prepare(sql: string) {
+        query = sql
         return {
-          bind: (...bindings: unknown[]) => {
+          bind(...values: unknown[]) {
+            bindings = values
+            return { all: async () => ({ results: dueRows }) }
+          },
+        }
+      },
+    } as never
+
+    await expect(
+      listDueScheduledContentCandidates(db, new Date('2026-10-08T12:02:00.000Z'), 50),
+    ).resolves.toEqual([{
+      contentId: 'scheduled_due_1',
+      ownerUserId: 'owner_1',
+      creatorId: 'creator_1',
+      version: 4,
+      scheduledAt: '2026-10-08T12:00:00.000Z',
+    }])
+    expect(query).toContain("state = 'SCHEDULED'")
+    expect(query).toContain('scheduled_at <= ?')
+    expect(query).toContain('owner_user_id')
+    expect(query).toContain('creator_id')
+    expect(bindings).toEqual(['2026-10-08T12:02:00.000Z', 50])
+  })
+
+  it('commits only W08-authorized candidates with a final owner/creator/version/time CAS', async () => {
+    const statements: Array<{ query: string; bindings: unknown[] }> = []
+    const db = {
+      prepare(query: string) {
+        return {
+          bind(...bindings: unknown[]) {
             statements.push({ query, bindings })
             return { query, bindings }
           },
         }
       },
-      batch: async (items: Array<{ query: string }>) => items.map(() => ({ meta: { changes: 1 } })),
+      batch: async (items: Array<{ query: string }>) =>
+        items.map(() => ({ meta: { changes: 1 } })),
     } as never
+    const now = new Date('2026-10-08T12:02:00.000Z')
+    const authorized = {
+      decision: 'ALLOW',
+      policyVersion: 'casl-l0-l8-v1',
+      layer: 'L3',
+      action: 'content.publish.own',
+      resourceType: 'Content',
+      ownerUserId: 'owner_1',
+      creatorId: 'creator_1',
+    }
 
-    await expect(
-      publishDueScheduledContent(db, new Date('2026-10-08T12:02:00.000Z'), 50),
-    ).resolves.toEqual({ scanned: 2, published: 2 })
+    await expect(publishAuthorizedScheduledContents(db, [
+      {
+        contentId: 'scheduled_due_1',
+        ownerUserId: 'owner_1',
+        expectedCreatorId: 'owner_1',
+        creatorId: 'creator_1',
+        version: 4,
+        scheduledAt: '2026-10-08T12:00:00.000Z',
+        authorization: authorized,
+      },
+      {
+        contentId: 'scheduled_due_2',
+        ownerUserId: 'owner_2',
+        expectedCreatorId: 'creator_2',
+        creatorId: 'creator_2',
+        version: 7,
+        scheduledAt: '2026-10-08T12:01:00.000Z',
+        authorization: { ...authorized, ownerUserId: 'someone-else' },
+      },
+      {
+        contentId: 'scheduled_due_3',
+        ownerUserId: 'owner_3',
+        expectedCreatorId: 'creator_3',
+        creatorId: 'creator_3',
+        version: 2,
+        scheduledAt: '2026-10-08T12:03:00.000Z',
+        authorization: { ...authorized, ownerUserId: 'owner_3', creatorId: 'creator_3' },
+      },
+    ], now)).resolves.toEqual({
+      scanned: 3,
+      authorized: 1,
+      published: 1,
+      rejected: 2,
+    })
 
-    expect(statements).toHaveLength(2)
+    expect(statements).toHaveLength(1)
     expect(statements[0]?.query).toContain("SET state = 'PUBLISHED', scheduled_at = NULL")
-    expect(statements[0]?.query).toContain("WHERE id = ? AND state = 'SCHEDULED'")
+    expect(statements[0]?.query).toContain('owner_user_id = ?')
+    expect(statements[0]?.query).toContain('creator_id IS ?')
+    expect(statements[0]?.query).toContain('creator_id = ?')
+    expect(statements[0]?.query).toContain("state = 'SCHEDULED'")
+    expect(statements[0]?.query).toContain('scheduled_at <= ?')
+    expect(statements[0]?.query).toContain('version = ?')
     expect(statements[0]?.bindings).toEqual([
+      'creator_1',
       5,
       'W/"5"',
       '2026-10-08T12:02:00.000Z',
       'scheduled_due_1',
+      'owner_1',
+      'owner_1',
       '2026-10-08T12:00:00.000Z',
+      '2026-10-08T12:02:00.000Z',
       4,
     ])
+  })
+
+  it('does not publish when the final compare-and-set loses a concurrent race', async () => {
+    const db = {
+      prepare: () => ({ bind: () => ({}) }),
+      batch: async (items: unknown[]) => items.map(() => ({ meta: { changes: 0 } })),
+    } as never
+    await expect(publishAuthorizedScheduledContents(db, [{
+      contentId: 'scheduled_race_1',
+      ownerUserId: 'owner_1',
+      expectedCreatorId: 'creator_1',
+      creatorId: 'creator_1',
+      version: 4,
+      scheduledAt: '2026-10-08T12:00:00.000Z',
+      authorization: {
+        decision: 'ALLOW',
+        policyVersion: 'casl-l0-l8-v1',
+        layer: 'L3',
+        action: 'content.publish.own',
+        resourceType: 'Content',
+        ownerUserId: 'owner_1',
+        creatorId: 'creator_1',
+      },
+    }], new Date('2026-10-08T12:02:00.000Z'))).resolves.toMatchObject({
+      scanned: 1,
+      authorized: 1,
+      published: 0,
+      rejected: 0,
+    })
+  })
+
+  it('serves scheduled due candidates only to the credential-free W01 background transport', async () => {
+    let query = ''
+    let databaseReads = 0
+    const db = {
+      prepare(sql: string) {
+        query = sql
+        return {
+          bind: () => ({
+            all: async () => {
+              databaseReads++
+              return { results: [{
+                id: 'scheduled_route_1',
+                owner_user_id: 'owner_1',
+                creator_id: 'creator_1',
+                version: 3,
+                scheduled_at: '2026-10-08T12:00:00.000Z',
+              }] }
+            },
+          }),
+        }
+      },
+    }
+    const limiter = { limit: async () => ({ success: true }) }
+    const env = {
+      D1_02: db,
+      CONTENT_ORIGIN_GLOBAL_LIMITER: limiter,
+      CONTENT_PUBLIC_READ_LIMITER: limiter,
+      CONTENT_MUTATION_LIMITER: limiter,
+    } as never
+    const headers = {
+      'X-LuckRead-Caller': 'W01',
+      'X-LuckRead-Transport-Version': '1.0',
+      'X-LuckRead-Correlation-Id': 'scheduled-due-route-test',
+      'X-LuckRead-Rate-Key': 'scheduled-publish',
+    }
+
+    const response = await w03Worker.fetch(
+      new Request('https://luckread-w03.internal/internal/content/scheduled-due?limit=50', { headers }),
+      env,
+    )
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      data: {
+        items: [{
+          contentId: 'scheduled_route_1',
+          ownerUserId: 'owner_1',
+          creatorId: 'creator_1',
+          version: 3,
+        }],
+      },
+    })
+    expect(query).toContain("state = 'SCHEDULED'")
+    expect(databaseReads).toBe(1)
+
+    const denied = await w03Worker.fetch(
+      new Request('https://luckread-w03.internal/internal/content/scheduled-due?limit=50', {
+        headers: { ...headers, Cookie: 'must-not-cross-internal-transport' },
+      }),
+      env,
+    )
+    expect(denied.status).toBe(403)
+    expect(databaseReads).toBe(1)
+  })
+
+  it('routes W08 authorization evidence to the final W03 compare-and-set', async () => {
+    const updates: Array<{ sql: string; bindings: unknown[] }> = []
+    const db = {
+      prepare(sql: string) {
+        return {
+          bind(...bindings: unknown[]) {
+            updates.push({ sql, bindings })
+            return { sql, bindings }
+          },
+        }
+      },
+      batch: async (statements: Array<{ sql: string }>) =>
+        statements.map(() => ({ meta: { changes: 1 } })),
+    }
+    const limiter = { limit: async () => ({ success: true }) }
+    const env = {
+      D1_02: db,
+      CONTENT_ORIGIN_GLOBAL_LIMITER: limiter,
+      CONTENT_PUBLIC_READ_LIMITER: limiter,
+      CONTENT_MUTATION_LIMITER: limiter,
+    } as never
+    const response = await w03Worker.fetch(
+      new Request('https://luckread-w03.internal/internal/content/scheduled-publish/commit', {
+        method: 'POST',
+        headers: {
+          'X-LuckRead-Caller': 'W01',
+          'X-LuckRead-Transport-Version': '1.0',
+          'X-LuckRead-Correlation-Id': 'scheduled-commit-route-test',
+          'X-LuckRead-Rate-Key': 'scheduled-publish',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          items: [{
+            contentId: 'scheduled_route_2',
+            ownerUserId: 'owner_2',
+            expectedCreatorId: 'creator_2',
+            creatorId: 'creator_2',
+            version: 2,
+            scheduledAt: '2026-10-08T12:00:00.000Z',
+            authorization: {
+              decision: 'ALLOW',
+              policyVersion: 'casl-l0-l8-v1',
+              layer: 'L4',
+              action: 'content.publish.own',
+              resourceType: 'Content',
+              ownerUserId: 'owner_2',
+              creatorId: 'creator_2',
+            },
+          }],
+        }),
+      }),
+      env,
+    )
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      data: { scanned: 1, authorized: 1, published: 1, rejected: 0 },
+    })
+    expect(updates).toHaveLength(1)
+    expect(updates[0]?.sql).toContain('owner_user_id = ?')
+    expect(updates[0]?.sql).toContain('creator_id = ?')
+    expect(updates[0]?.sql).toContain("state = 'SCHEDULED'")
+    expect(updates[0]?.sql).toContain('version = ?')
   })
 
   it('requires at least one media reference for video content', () => {
@@ -1476,6 +1908,84 @@ describe('W03 content contract core', () => {
     expect(denied.status).toBe(403);
     expect(statements).toHaveLength(1);
   });
+
+  it('lists only the authenticated Creator\'s scheduled social posts and returns edit preconditions', async () => {
+    const statements: Array<{ query: string; bindings: unknown[] }> = []
+    const row = {
+      id: 'scheduled_post_123',
+      content_type: 'post',
+      owner_user_id: 'creator_owner_123',
+      creator_id: 'creator_123',
+      ip_id: null,
+      state: 'SCHEDULED',
+      scheduled_at: '2026-11-08T18:30:00.000Z',
+      access_mode: 'PUBLIC',
+      version: 4,
+      revision: 2,
+      slug: 'scheduled-post-123',
+      title: 'Scheduled post',
+      body_ref: 'https://img.luckread.com/body.txt',
+      media_refs_json: JSON.stringify(['https://img.luckread.com/photo.jpg']),
+      cover_ref: 'https://img.luckread.com/photo.jpg',
+      etag: 'W/"4"',
+      created_at: '2026-11-05T10:00:00.000Z',
+      updated_at: '2026-11-05T10:05:00.000Z',
+    }
+    const db = {
+      prepare(query: string) {
+        return {
+          bind: (...bindings: unknown[]) => ({
+            all: async () => {
+              statements.push({ query, bindings })
+              return { results: [row] }
+            },
+          }),
+        }
+      },
+    } as never
+    const makeRequest = (layer = 'L3', query = '?status=SCHEDULED&type=post&limit=20') =>
+      new Request('https://luckread-w03.internal/internal/content/contents' + query, {
+        headers: {
+          'X-LuckRead-Caller': 'W01',
+          'X-LuckRead-Transport-Version': '1.0',
+          'X-LuckRead-Correlation-Id': 'native-scheduled-list',
+          'X-LuckRead-Principal-User-Id': 'creator_owner_123',
+          'X-LuckRead-Principal-Layer': layer,
+        },
+      })
+
+    const response = await w03Worker.fetch(makeRequest(), { D1_02: db }, {} as never)
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      data: {
+        items: [{
+          id: 'scheduled_post_123',
+          contentType: 'post',
+          state: 'SCHEDULED',
+          version: 4,
+          etag: 'W/"4"',
+          scheduledAt: '2026-11-08T18:30:00.000Z',
+          bodyRef: 'https://img.luckread.com/body.txt',
+          mediaRefs: ['https://img.luckread.com/photo.jpg'],
+          coverRef: 'https://img.luckread.com/photo.jpg',
+        }],
+        hasMore: false,
+        nextCursor: null,
+      },
+    })
+    expect(statements).toHaveLength(1)
+    expect(statements[0]?.query).toContain('owner_user_id = ?')
+    expect(statements[0]?.query).toContain('state = ?')
+    expect(statements[0]?.query).toContain('content_type = ?')
+    expect(statements[0]?.bindings.slice(0, 3)).toEqual(['creator_owner_123', 'SCHEDULED', 'post'])
+
+    const readsBeforeDeny = statements.length
+    const l2Denied = await w03Worker.fetch(makeRequest('L2'), { D1_02: db }, {} as never)
+    expect(l2Denied.status).toBe(403)
+    const wrongType = await w03Worker.fetch(makeRequest('L3', '?status=SCHEDULED&type=article'), { D1_02: db }, {} as never)
+    expect(wrongType.status).toBe(422)
+    expect(statements).toHaveLength(readsBeforeDeny)
+  })
 
   it('returns the canonical error envelope for an unmatched internal route', async () => {
     const db = {
@@ -1896,13 +2406,26 @@ describe('1.1 content revision history', () => {
       resolve(process.cwd(), 'workers/W03-content/wrangler.jsonc'),
       'utf8',
     )
-    expect(wrangler).toContain('"crons": ["* * * * *"]')
-    const runtime = readFileSync(
+    expect(wrangler).not.toContain('"crons"')
+    const w01Wrangler = readFileSync(
+      resolve(process.cwd(), 'workers/W01-payload/wrangler.jsonc'),
+      'utf8',
+    )
+    expect(w01Wrangler).toContain('"main": "src/worker.ts"')
+    expect(w01Wrangler).toContain('"crons": [\n      "* * * * *"\n    ]')
+    const w01Worker = readFileSync(
+      resolve(process.cwd(), 'workers/W01-payload/src/worker.ts'),
+      'utf8',
+    )
+    expect(w01Worker).toContain('openNextWorker.fetch')
+    expect(w01Worker).toContain('async scheduled(controller: ScheduledController, env: ScheduledEnv)')
+    expect(w01Worker).toContain('runAuthorizedScheduledPublish')
+    const w03Index = readFileSync(
       resolve(process.cwd(), 'workers/W03-content/src/index.ts'),
       'utf8',
     )
-    expect(runtime).toContain('async scheduled(controller: ScheduledController, env: Env)')
-    expect(runtime).toContain('publishDueScheduledContent')
+    expect(w03Index).toContain('/internal/content/scheduled-due')
+    expect(w03Index).toContain('/internal/content/scheduled-publish/commit')
   })
 
   it('defines the stable slug migration and trigger payload', () => {

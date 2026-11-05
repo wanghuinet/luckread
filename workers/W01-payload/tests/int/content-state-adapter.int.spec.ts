@@ -36,6 +36,28 @@ describe('content state adapters', () => {
   })
 })
 
+describe('native scheduled content list boundary', () => {
+  it('keeps scheduled posts authenticated, owner-scoped, Creator-only and outside public caching', () => {
+    const route = read('src/app/api/v1/contents/route.ts')
+    const guard = read('src/lib/content-list-cache-guard.ts')
+    const w03Index = readFileSync(
+      resolve(process.cwd(), '../W03-content/src/index.ts'),
+      'utf8',
+    )
+
+    expect(route).toContain("['DRAFT', 'SCHEDULED'].includes(query.get('status') ?? '')")
+    expect(route).toContain('if (ownerScopedLifecycleRequest)')
+    expect(route).toContain('hasAuthenticatedSessionCredential(request)')
+    expect(route).toContain('resolveCookieContentPrincipal(request)')
+    expect(route.indexOf('if (ownerScopedLifecycleRequest)')).toBeLessThan(route.indexOf('return await cachedPublicGet'))
+    expect(guard).toContain("value !== 'DRAFT' && value !== 'SCHEDULED'")
+    expect(w03Index).toContain("if (status === 'SCHEDULED')")
+    expect(w03Index).toContain('requiredCreatorPrincipal(request)')
+    expect(w03Index).toContain("status: 'SCHEDULED'")
+    expect(w03Index).toContain("contentType: 'post'")
+  })
+})
+
 describe('creator content lifecycle cache adapters', () => {
   it('invalidates public content views after Creator Center state transitions', () => {
     const route = read('src/app/(payload)/api/creator/contents/[contentId]/state/route.ts')
@@ -91,6 +113,9 @@ describe('scheduled publication cache window', () => {
       publicListRoute.indexOf('export async function POST'),
     )
     const cache = read('src/lib/public-response-cache.ts')
+    const w01Wrangler = read('wrangler.jsonc')
+    const w01Worker = read('src/worker.ts')
+    const orchestrator = read('src/lib/scheduled-publish-orchestrator.ts')
     const w03Index = readFileSync(
       resolve(process.cwd(), '../W03-content/src/index.ts'),
       'utf8',
@@ -99,10 +124,23 @@ describe('scheduled publication cache window', () => {
       resolve(process.cwd(), '../W03-content/src/content-runtime.ts'),
       'utf8',
     )
-    const scheduledHandler = w03Index.slice(w03Index.indexOf('async scheduled('))
+    const w03Wrangler = readFileSync(
+      resolve(process.cwd(), '../W03-content/wrangler.jsonc'),
+      'utf8',
+    )
 
-    expect(scheduledHandler).toContain("controller.cron !== '* * * * *'")
-    expect(scheduledHandler).toContain('publishDueScheduledContent(env.D1_02')
+    expect(w01Wrangler).toContain('"main": "src/worker.ts"')
+    expect(w01Wrangler).toContain('"crons": [')
+    expect(w01Worker).toContain('openNextWorker.fetch')
+    expect(w01Worker).toContain("controller.cron !== '* * * * *'")
+    expect(w01Worker).toContain('runAuthorizedScheduledPublish')
+    expect(orchestrator).toContain('/internal/authz/check-scheduled-publish')
+    expect(orchestrator).toContain('/internal/content/scheduled-due')
+    expect(orchestrator).toContain('/internal/content/scheduled-publish/commit')
+    expect(orchestrator).toContain('summary.authorizationFailures > 0')
+    expect(w03Index).toContain('/internal/content/scheduled-due')
+    expect(w03Index).toContain('/internal/content/scheduled-publish/commit')
+    expect(w03Wrangler).not.toContain('"crons"')
     expect(w03Runtime).toContain("SET state = 'PUBLISHED', scheduled_at = NULL")
     expect(listHandler).toContain("'content-list'")
     expect(listHandler).toContain("      30,\n    )")
@@ -190,7 +228,8 @@ describe('1.1 content lifecycle closeout', () => {
     expect(w03Runtime).toContain("from === 'DRAFT' && to === 'PENDING_REVIEW'")
     expect(w03Runtime).toContain("from === 'APPROVED' && to === 'PUBLISHED'")
     expect(w03Runtime).toContain("from === 'APPROVED' && to === 'SCHEDULED'")
-    expect(w03Runtime).toContain("publishDueScheduledContent")
+    expect(w03Runtime).toContain("listDueScheduledContentCandidates")
+    expect(w03Runtime).toContain("publishAuthorizedScheduledContents")
     expect(w03Runtime).toContain("scheduled_at")
     expect(w03Runtime).toContain("from === 'PUBLISHED' && (to === 'UNPUBLISHED' || to === 'ARCHIVED')")
     expect(w03Runtime).toContain("from === 'UNPUBLISHED' && (to === 'PUBLISHED' || to === 'DRAFT')")
@@ -230,5 +269,21 @@ describe('1.1 content lifecycle closeout', () => {
     expect(publisher).toContain("if (rollbackBodyAssetId) await cleanupUploadedBodyAsset(rollbackBodyAssetId)")
     expect(publisher).toContain("rollbackBodyAssetId = null")
     expect(publisher).toContain("Idempotency-Key': crypto.randomUUID()")
+  })
+})
+
+describe('thread cache generation invalidation across content lifecycle mutations', () => {
+  it('invalidates all cached thread segments after every public and Creator content mutation', () => {
+    const publicContent = read('src/app/api/v1/contents/[contentId]/route.ts')
+    const publicState = read('src/app/api/v1/contents/[contentId]/state/route.ts')
+    const publicRelationshipRevoke = read('src/app/api/v1/contents/[contentId]/relationships/[relationshipId]/route.ts')
+    const creatorContent = read('src/app/(payload)/api/creator/contents/[contentId]/route.ts')
+    const creatorState = read('src/app/(payload)/api/creator/contents/[contentId]/state/route.ts')
+    const orchestrator = read('src/lib/scheduled-publish-orchestrator.ts')
+
+    for (const route of [publicContent, publicState, publicRelationshipRevoke, creatorContent, creatorState]) {
+      expect(route).toContain('invalidatePublicContentThreads()')
+    }
+    expect(orchestrator).toContain('if (summary.published > 0) await invalidatePublicContentThreads()')
   })
 })

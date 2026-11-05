@@ -228,18 +228,30 @@ export async function bindPreflightToStoredPost(
 
   const content = await contentResponse.json() as ContentForPublishCheck
   let verifiedCreatorId: string | undefined
-  if (content.accessMode === 'MEMBERS_ONLY') {
+  const isScheduledMutation = mutation.to === 'SCHEDULED'
+  if (content.accessMode === 'MEMBERS_ONLY' || isScheduledMutation) {
     const verified = await resolveVerifiedContentCreatorId(request, principal)
     if (verified instanceof Response) return verified
-    if (typeof content.creatorId !== 'string' || verified !== content.creatorId) {
+    if (content.accessMode === 'MEMBERS_ONLY' &&
+        (typeof content.creatorId !== 'string' || verified !== content.creatorId)) {
       return makeErrorResponse(403, 'PERMISSION_DENIED', 'An active matching creator identity is required to publish member-only content')
+    }
+    // Public content created before this binding stores ownerUserId in creatorId.
+    // Rebind only that self-owned placeholder (or a null value) to W08's
+    // canonical Creator ID during scheduling; never replace another Creator.
+    if (isScheduledMutation &&
+        content.creatorId !== null &&
+        (typeof content.creatorId !== 'string' ||
+          (content.creatorId !== principal.userId && content.creatorId !== verified))) {
+      return makeErrorResponse(403, 'PERMISSION_DENIED', 'The scheduled content is linked to a different creator identity')
     }
     verifiedCreatorId = verified
   }
 
-  // Only direct publication of a draft social post needs the canonical body/media
-  // rebinding. Creator article/video transitions still receive the verified ID.
-  if (mutation.to !== 'PUBLISHED' || content.contentType !== 'post' || content.state !== 'DRAFT' ||
+  // Direct and scheduled publication of a draft social post both bind the
+  // canonical body/media and owner checks before W03 accepts the state change.
+  if ((mutation.to !== 'PUBLISHED' && mutation.to !== 'SCHEDULED') ||
+      content.contentType !== 'post' || content.state !== 'DRAFT' ||
       !mutation.preflight || typeof mutation.preflight !== 'object' || Array.isArray(mutation.preflight)) {
     return { body: submitted, ...(verifiedCreatorId ? { verifiedCreatorId } : {}) }
   }
