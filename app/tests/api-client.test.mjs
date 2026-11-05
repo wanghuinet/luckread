@@ -1010,7 +1010,7 @@ test('uses authenticated XHR multipart transport when upload progress is request
     }
 
     getAllResponseHeaders() {
-      return 'Content-Type: application/json\\r\\nX-LuckRead-Session-Token: renewed-upload-token\\r\\n';
+      return 'Content-Type: application/json\r\nX-LuckRead-Session-Token: renewed-upload-token\r\n';
     }
   }
 
