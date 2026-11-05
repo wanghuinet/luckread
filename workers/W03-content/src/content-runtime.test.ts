@@ -1547,6 +1547,7 @@ describe('W03 content contract core', () => {
       {
         contentId: 'scheduled_due_1',
         ownerUserId: 'owner_1',
+        expectedCreatorId: 'owner_1',
         creatorId: 'creator_1',
         version: 4,
         scheduledAt: '2026-10-08T12:00:00.000Z',
@@ -1555,6 +1556,7 @@ describe('W03 content contract core', () => {
       {
         contentId: 'scheduled_due_2',
         ownerUserId: 'owner_2',
+        expectedCreatorId: 'creator_2',
         creatorId: 'creator_2',
         version: 7,
         scheduledAt: '2026-10-08T12:01:00.000Z',
@@ -1563,6 +1565,7 @@ describe('W03 content contract core', () => {
       {
         contentId: 'scheduled_due_3',
         ownerUserId: 'owner_3',
+        expectedCreatorId: 'creator_3',
         creatorId: 'creator_3',
         version: 2,
         scheduledAt: '2026-10-08T12:03:00.000Z',
@@ -1578,17 +1581,19 @@ describe('W03 content contract core', () => {
     expect(statements).toHaveLength(1)
     expect(statements[0]?.query).toContain("SET state = 'PUBLISHED', scheduled_at = NULL")
     expect(statements[0]?.query).toContain('owner_user_id = ?')
+    expect(statements[0]?.query).toContain('creator_id IS ?')
     expect(statements[0]?.query).toContain('creator_id = ?')
     expect(statements[0]?.query).toContain("state = 'SCHEDULED'")
     expect(statements[0]?.query).toContain('scheduled_at <= ?')
     expect(statements[0]?.query).toContain('version = ?')
     expect(statements[0]?.bindings).toEqual([
+      'creator_1',
       5,
       'W/"5"',
       '2026-10-08T12:02:00.000Z',
       'scheduled_due_1',
       'owner_1',
-      'creator_1',
+      'owner_1',
       '2026-10-08T12:00:00.000Z',
       '2026-10-08T12:02:00.000Z',
       4,
@@ -1603,6 +1608,7 @@ describe('W03 content contract core', () => {
     await expect(publishAuthorizedScheduledContents(db, [{
       contentId: 'scheduled_race_1',
       ownerUserId: 'owner_1',
+      expectedCreatorId: 'creator_1',
       creatorId: 'creator_1',
       version: 4,
       scheduledAt: '2026-10-08T12:00:00.000Z',
@@ -1722,6 +1728,7 @@ describe('W03 content contract core', () => {
           items: [{
             contentId: 'scheduled_route_2',
             ownerUserId: 'owner_2',
+            expectedCreatorId: 'creator_2',
             creatorId: 'creator_2',
             version: 2,
             scheduledAt: '2026-10-08T12:00:00.000Z',
