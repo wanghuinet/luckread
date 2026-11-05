@@ -2481,3 +2481,68 @@ describe('W03 username redirect eligibility', () => {
   })
 
 })
+
+
+describe('creator-selected sensitive media warning', () => {
+  const base = {
+    contentType: 'post',
+    title: 'A post with media',
+    bodyRef: 'https://img.luckread.com/body/post.txt',
+    mediaRefs: ['https://img.luckread.com/media/post.webp'],
+    coverRef: 'https://img.luckread.com/media/post.webp',
+  }
+
+  it('accepts only the supported warning categories on media posts', () => {
+    expect(validateInput({ ...base, mediaWarning: 'NUDITY' }).mediaWarning).toBe('NUDITY')
+    expect(validateInput({ ...base, mediaWarning: 'VIOLENCE' }).mediaWarning).toBe('VIOLENCE')
+    expect(validateInput({ ...base, mediaWarning: 'SENSITIVE' }).mediaWarning).toBe('SENSITIVE')
+    expect(validateInput(base).mediaWarning).toBeUndefined()
+    expect(validateInput({ ...base, mediaWarning: null }).mediaWarning).toBeNull()
+  })
+
+  it('rejects unsupported categories, non-post warnings, and warnings without attached media', () => {
+    for (const mediaWarning of ['POLITICS', 'UNKNOWN', 1, {}]) {
+      expect(() => validateInput({ ...base, mediaWarning })).toThrowError(ContentRuntimeError)
+    }
+    expect(() => validateInput({ ...base, contentType: 'article', mediaWarning: 'NUDITY' }))
+      .toThrowError(ContentRuntimeError)
+    expect(() => validateInput({ ...base, mediaRefs: [], coverRef: null, mediaWarning: 'SENSITIVE' }))
+      .toThrowError(ContentRuntimeError)
+  })
+
+  it('redacts warning metadata together with private media in member-only previews', () => {
+    const content = {
+      id: 'sensitive-warning-content',
+      creatorId: 'creator_1',
+      state: 'PUBLISHED',
+      scheduledAt: null,
+      accessMode: 'MEMBERS_ONLY',
+      version: 1,
+      etag: 'W/"1"',
+      slug: 'sensitive-warning-content',
+      title: 'Private post',
+      bodyRef: 'https://img.luckread.com/body/private.txt',
+      mediaRefs: ['https://img.luckread.com/media/private.webp'],
+      coverRef: 'https://img.luckread.com/media/private.webp',
+      mediaWarning: 'NUDITY',
+    } as const
+    expect(publicContent({ ...content, accessGranted: false })).toMatchObject({
+      mediaRefs: [],
+      coverRef: null,
+      mediaWarning: null,
+    })
+    expect(publicContent({ ...content, accessGranted: true })).toMatchObject({
+      mediaWarning: 'NUDITY',
+    })
+  })
+
+  it('adds a nullable, database-constrained warning to content and revision history', () => {
+    const migration = readFileSync(
+      resolve(process.cwd(), 'workers/W03-content/migrations/0015_content_media_warning.sql'),
+      'utf8',
+    )
+    expect(migration).toContain('ALTER TABLE contents')
+    expect(migration).toContain('ALTER TABLE content_revisions')
+    expect(migration).toContain("'NUDITY', 'VIOLENCE', 'SENSITIVE'")
+  })
+})
