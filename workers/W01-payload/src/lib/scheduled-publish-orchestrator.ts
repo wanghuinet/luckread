@@ -55,6 +55,13 @@ const isDueCandidate = (value: unknown): value is DueCandidate => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false
   const item = value as Record<string, unknown>
   return (
+    Object.keys(item).every((key) =>
+      key === 'contentId' ||
+      key === 'ownerUserId' ||
+      key === 'creatorId' ||
+      key === 'version' ||
+      key === 'scheduledAt'
+    ) &&
     isIdentifier(item.contentId) &&
     isIdentifier(item.ownerUserId) &&
     (item.creatorId === null || isIdentifier(item.creatorId, 256)) &&
