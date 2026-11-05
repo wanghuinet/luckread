@@ -18,6 +18,7 @@ import { useIsFocused } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColorScheme } from 'nativewind';
+import * as SecureStore from 'expo-secure-store';
 
 import Comment from '~/assets/svg/comment.svg';
 import Views from '~/assets/svg/views.svg';
@@ -41,6 +42,7 @@ import { settleVideoFeedEnrichment, type VideoPlaybackResult } from '~/lib/video
 import { readSessionToken } from '~/lib/secure-session';
 import { fetchVideoFeedPage } from '~/lib/video-feed-api';
 import { getApiErrorMessage } from '~/lib/api-client';
+import { readVideoFeedAutoplayEnabled } from '~/lib/video-feed-autoplay-preference';
 import { useAuthStore } from '~/store/auth-store';
 import type { FeedContent } from '~/components/FeedItem';
 
@@ -100,12 +102,14 @@ function VideoPlayerSurface({
   isVisible,
   isFocused,
   muted,
+  autoPlayEnabled,
   onRetry,
 }: {
   source: NonNullable<VideoPlaybackResult['source']>;
   isVisible: boolean;
   isFocused: boolean;
   muted: boolean;
+  autoPlayEnabled: boolean;
   onRetry: () => void;
 }) {
   const player = useVideoPlayer(source, (instance) => {
@@ -113,23 +117,36 @@ function VideoPlayerSurface({
   });
   const { isPlaying } = useEvent(player, 'playingChange', { isPlaying: player.playing });
   const { status, error } = useEvent(player, 'statusChange', { status: player.status });
+  const [manualPlaybackOverride, setManualPlaybackOverride] = useState<'play' | 'pause' | null>(null);
 
   useEffect(() => {
     if (!isFocused || !isVisible) {
       player.pause();
+      setManualPlaybackOverride(null);
       return;
     }
+
+    const shouldPlay = manualPlaybackOverride === 'play' ||
+      (manualPlaybackOverride === null && autoPlayEnabled);
+    if (!shouldPlay || manualPlaybackOverride === 'pause') {
+      player.pause();
+      return;
+    }
+
     player.muted = muted;
     try {
       player.play();
     } catch {
       // Playback can be interrupted while the user changes tabs.
     }
-  }, [isFocused, isVisible, muted, player]);
+  }, [autoPlayEnabled, isFocused, isVisible, manualPlaybackOverride, muted, player]);
 
   const togglePlayPause = useCallback(() => {
-    if (isPlaying) player.pause();
-    else {
+    if (isPlaying) {
+      setManualPlaybackOverride('pause');
+      player.pause();
+    } else {
+      setManualPlaybackOverride('play');
       player.muted = muted;
       player.play();
     }
@@ -183,6 +200,7 @@ function VideoItem({
   isVisible,
   isFocused,
   muted,
+  autoPlayEnabled,
   onToggleMute,
   onOpenPost,
   onRetry,
@@ -191,6 +209,7 @@ function VideoItem({
   isVisible: boolean;
   isFocused: boolean;
   muted: boolean;
+  autoPlayEnabled: boolean;
   onToggleMute: () => void;
   onOpenPost: () => void;
   onRetry: () => void;
@@ -217,6 +236,7 @@ function VideoItem({
           isVisible={isVisible}
           isFocused={isFocused}
           muted={muted}
+          autoPlayEnabled={autoPlayEnabled}
           onRetry={onRetry}
         />
       ) : item.mediaLoading ? (
@@ -338,8 +358,20 @@ export default function VideoFeed() {
   const [refreshing, setRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [muted, setMuted] = useState(true);
+  const [autoPlayEnabled, setAutoPlayEnabled] = useState(false);
   const requestIdRef = useRef(0);
   const loadingMoreRef = useRef(false);
+
+  useEffect(() => {
+    if (!isFocused) return;
+    let active = true;
+    void readVideoFeedAutoplayEnabled(SecureStore).then((enabled) => {
+      if (active) setAutoPlayEnabled(enabled);
+    });
+    return () => {
+      active = false;
+    };
+  }, [isFocused]);
 
   const loadPage = useCallback(async (nextCursor: string | null = null, append = false) => {
     if (append && loadingMoreRef.current) return;
@@ -567,6 +599,7 @@ export default function VideoFeed() {
             isVisible={item.contentId === currentId && currentIndex >= 0}
             isFocused={isFocused}
             muted={muted}
+            autoPlayEnabled={autoPlayEnabled}
             onToggleMute={() => setMuted((value) => !value)}
             onOpenPost={() => openPost(item.contentId)}
             onRetry={retry}
