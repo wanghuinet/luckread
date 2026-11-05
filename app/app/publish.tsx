@@ -217,6 +217,7 @@ function PublishScreenContent() {
   const [scheduledInboxLoading, setScheduledInboxLoading] = useState(false);
   const [scheduledInboxError, setScheduledInboxError] = useState('');
   const [scheduledActionId, setScheduledActionId] = useState<string | null>(null);
+  const scheduledActionInFlightRef = useRef(false);
   const [textSelection, setTextSelection] = useState({ start: 0, end: 0 });
   const [topicSuggestions, setTopicSuggestions] = useState<DiscoveryTopicOption[]>([]);
   const [topicSuggestionsLoading, setTopicSuggestionsLoading] = useState(false);
@@ -1149,6 +1150,7 @@ function PublishScreenContent() {
   }, [busy, contentId, loadDraftInbox, loadingEdit, publishPending, saveDraftSnapshot]);
 
   const cancelScheduledPost = useCallback((item: NativeScheduledPost) => {
+    if (scheduledActionInFlightRef.current) return;
     Alert.alert(
       '取消定时发布',
       '“' + item.title + '”将转为草稿，不会删除内容。',
@@ -1159,6 +1161,8 @@ function PublishScreenContent() {
           style: 'destructive',
           onPress: () => {
             void (async () => {
+              if (scheduledActionInFlightRef.current) return;
+              scheduledActionInFlightRef.current = true;
               setScheduledActionId(item.id);
               setScheduledInboxError('');
               try {
@@ -1172,6 +1176,7 @@ function PublishScreenContent() {
               } catch (cause) {
                 setScheduledInboxError(cause instanceof Error ? cause.message : '取消定时发布失败。');
               } finally {
+                scheduledActionInFlightRef.current = false;
                 setScheduledActionId(null);
               }
             })();
@@ -1182,7 +1187,8 @@ function PublishScreenContent() {
   }, [loadScheduledInbox]);
 
   const rescheduleScheduledPost = useCallback(async (item: NativeScheduledPost, scheduledAt: string) => {
-    if (scheduledActionId) return;
+    if (scheduledActionInFlightRef.current || scheduledActionId) return;
+    scheduledActionInFlightRef.current = true;
     setScheduledActionId(item.id);
     setScheduledInboxError('');
     let movedToDraft = false;
@@ -1220,6 +1226,7 @@ function PublishScreenContent() {
       }
       setScheduledInboxError(cause instanceof Error ? cause.message : '修改发布时间失败。');
     } finally {
+      scheduledActionInFlightRef.current = false;
       setScheduledActionId(null);
       setScheduledInboxVisible(true);
     }
@@ -1239,8 +1246,7 @@ function PublishScreenContent() {
   const confirmSchedulePicker = useCallback(() => {
     const iso = toScheduledPublishISO(schedulePickerDraft);
     if (!iso) {
-      if (scheduleEditTarget) setScheduledInboxError('请选择至少一分钟后的时间。');
-      else setErrorMessage('请选择至少一分钟后的时间。');
+      Alert.alert('时间无效', '请选择至少一分钟后的时间。');
       return;
     }
     if (scheduleEditTarget) {
