@@ -1386,8 +1386,72 @@ describe('W03 content contract core', () => {
       row.etag,
       'schedule-without-preflight',
       new Date('2026-10-16T00:01:00.000Z'),
-      { scheduledAt: '2026-10-16T00:30:00.000Z' },
+      {
+        scheduledAt: '2026-10-16T00:30:00.000Z',
+        verifiedCreatorId: 'creator-canonical-1',
+      },
     )).rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 })
+    expect(batchCalls).toBe(0)
+  })
+
+  it('rejects scheduled publication when W08 has not verified a canonical Creator identity', async () => {
+    const row = {
+      id: 'content_scheduled_post_without_creator_identity',
+      content_type: 'post',
+      owner_user_id: 'user_creator_schedule',
+      creator_id: 'user_creator_schedule',
+      ip_id: null,
+      state: 'DRAFT',
+      scheduled_at: null,
+      access_mode: 'PUBLIC',
+      version: 1,
+      revision: 1,
+      slug: 'scheduled-post-without-creator',
+      title: 'A useful update',
+      body_ref: 'https://img.luckread.com/media/scheduled-body.txt',
+      media_refs_json: '[]',
+      cover_ref: null,
+      etag: 'W/"1"',
+      created_at: '2026-10-16T00:00:00.000Z',
+      updated_at: '2026-10-16T00:00:00.000Z',
+      idem_id: null,
+      idem_owner_user_id: null,
+      idem_request_hash: null,
+      idem_status: null,
+      idem_response_status: null,
+      idem_response_json: null,
+      idem_expires_at: null,
+    }
+    let batchCalls = 0
+    const db = {
+      prepare() { return { bind: () => ({ first: async () => row }) } },
+      batch: async () => { batchCalls += 1; return [] },
+    } as never
+    const preflight = {
+      contentType: 'post',
+      title: 'A useful update',
+      body: 'A useful update with enough detail to pass the basic post preflight validation.',
+      mediaRefs: [],
+      coverRef: null,
+      aiMode: 'none',
+      humanContribution: 'substantial',
+    }
+
+    await expect(transitionContentState(
+      db,
+      'user_creator_schedule',
+      'L3',
+      row.id,
+      'SCHEDULED',
+      undefined,
+      row.etag,
+      'schedule-without-creator-verification',
+      new Date('2026-10-16T00:01:00.000Z'),
+      {
+        scheduledAt: '2026-10-16T00:30:00.000Z',
+        preflight,
+      },
+    )).rejects.toMatchObject({ code: 'PERMISSION_DENIED', status: 403 })
     expect(batchCalls).toBe(0)
   })
 
