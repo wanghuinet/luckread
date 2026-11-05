@@ -385,10 +385,10 @@ export default function SettingsScreen() {
           ) : null}
         </SettingsSection>
 
-        <SettingsSection title="帮助">
+        <SettingsSection title="关于">
           <SettingsRow
-            icon="help-circle"
-            title="帮助与关于"
+            icon="info"
+            title="关于 LuckRead"
             description="查看官方政策、应用版本和构建信息"
             onPress={() => router.push('/about' as never)}
             isDark={isDark}
