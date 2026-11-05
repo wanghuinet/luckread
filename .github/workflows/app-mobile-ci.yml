@@ -176,6 +176,8 @@ jobs:
         run: bun test tests/block-mute-management.test.mjs
       - name: Test native video feed API requests
         run: bun run test:video-feed-api
+      - name: Test native video-feed autoplay preference
+        run: bun test tests/video-feed-autoplay.test.mjs
       - name: Test native bottom tab navigation visibility
         run: bun test tests/tab-navigation-ui.test.mjs
       - name: Test native feed comment navigation

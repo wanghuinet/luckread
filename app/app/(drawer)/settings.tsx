@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, Switch, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import {
   BottomSheetBackdrop,
@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
 
 import { isThemePreference, THEME_PREFERENCE_KEY, type ThemePreference } from '~/lib/theme-preference';
+import { readVideoFeedAutoplayEnabled, writeVideoFeedAutoplayEnabled } from '~/lib/video-feed-autoplay-preference';
 import { useAuthStore } from '~/store/auth-store';
 
 type SettingsRowProps = {
@@ -51,6 +52,44 @@ function SettingsRow({
       ) : null}
       <Feather name="chevron-right" size={19} color={isDark ? '#737373' : '#9ca3af'} />
     </Pressable>
+  );
+}
+
+
+type SettingsSwitchRowProps = {
+  title: string;
+  description: string;
+  value: boolean;
+  disabled?: boolean;
+  onValueChange: (value: boolean) => void;
+  isDark: boolean;
+};
+
+function SettingsSwitchRow({
+  title,
+  description,
+  value,
+  disabled = false,
+  onValueChange,
+  isDark,
+}: SettingsSwitchRowProps) {
+  return (
+    <View className="min-h-[72px] flex-row items-center px-4 py-3">
+      <View className="mr-3 flex-1">
+        <Text className="text-[15px] font-semibold text-neutral-900 dark:text-neutral-100">{title}</Text>
+        <Text className="mt-1 text-xs leading-5 text-neutral-500 dark:text-neutral-400">{description}</Text>
+      </View>
+      <Switch
+        accessibilityLabel={title}
+        accessibilityHint={description}
+        accessibilityState={{ checked: value, disabled }}
+        disabled={disabled}
+        value={value}
+        onValueChange={onValueChange}
+        trackColor={{ false: isDark ? '#404040' : '#d1d5db', true: '#1d9bf0' }}
+        thumbColor={isDark ? '#f4f4f5' : '#ffffff'}
+      />
+    </View>
   );
 }
 
@@ -113,6 +152,10 @@ export default function SettingsScreen() {
   const authStatus = useAuthStore((state) => state.status);
   const user = useAuthStore((state) => state.user);
   const [themePreference, setThemePreference] = useState<ThemePreference>('system');
+  const [videoAutoPlayEnabled, setVideoAutoPlayEnabled] = useState(true);
+  const [videoAutoPlayLoaded, setVideoAutoPlayLoaded] = useState(false);
+  const [videoAutoPlaySaving, setVideoAutoPlaySaving] = useState(false);
+  const [videoAutoPlayError, setVideoAutoPlayError] = useState('');
   const themeSheetRef = useRef<BottomSheetModal>(null);
   const themeSnapPoints = useMemo(() => ['36%'], []);
 
@@ -127,6 +170,32 @@ export default function SettingsScreen() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    void readVideoFeedAutoplayEnabled(SecureStore).then((enabled) => {
+      if (!active) return;
+      setVideoAutoPlayEnabled(enabled);
+      setVideoAutoPlayLoaded(true);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const updateVideoAutoPlay = useCallback(async (enabled: boolean) => {
+    if (!videoAutoPlayLoaded || videoAutoPlaySaving) return;
+    setVideoAutoPlaySaving(true);
+    setVideoAutoPlayError('');
+    try {
+      await writeVideoFeedAutoplayEnabled(SecureStore, enabled);
+      setVideoAutoPlayEnabled(enabled);
+    } catch {
+      setVideoAutoPlayError('保存失败。此设备的视频自动播放设置未更改，请重试。');
+    } finally {
+      setVideoAutoPlaySaving(false);
+    }
+  }, [videoAutoPlayLoaded, videoAutoPlaySaving]);
 
   const selectTheme = useCallback(async (preference: ThemePreference) => {
     setThemePreference(preference);
@@ -227,8 +296,27 @@ export default function SettingsScreen() {
           />
         </SettingsSection>
 
+        <SettingsSection title="数据使用">
+          <SettingsSwitchRow
+            title="视频信息流自动播放"
+            description="关闭后，视频信息流需要点击播放；此设置仅保存在当前设备。"
+            value={videoAutoPlayEnabled}
+            disabled={!videoAutoPlayLoaded || videoAutoPlaySaving}
+            onValueChange={(enabled) => { void updateVideoAutoPlay(enabled); }}
+            isDark={isDark}
+          />
+          {!videoAutoPlayLoaded ? (
+            <Text className="px-4 pb-3 text-xs text-neutral-500 dark:text-neutral-400">正在读取此设备的设置…</Text>
+          ) : null}
+          {videoAutoPlayError ? (
+            <Text accessibilityLiveRegion="assertive" className="px-4 pb-3 text-xs text-red-600 dark:text-red-400">
+              {videoAutoPlayError}
+            </Text>
+          ) : null}
+        </SettingsSection>
+
         <Text className="px-6 pb-3 text-center text-xs leading-5 text-neutral-400 dark:text-neutral-500">
-          账户偏好由对应服务保存；外观设置保存在此设备。未开放的控制不会显示为可操作选项。
+          账户偏好由对应服务保存；外观和视频自动播放设置保存在此设备。未开放的控制不会显示为可操作选项。
         </Text>
       </ScrollView>
 
