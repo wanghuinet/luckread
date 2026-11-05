@@ -190,6 +190,49 @@ jobs:
         working-directory: workers/W01-payload
         run: pnpm exec vitest run --config ./vitest.w05-social-profile-channels.config.mts ../W05-social/src/index.test.ts --testNamePattern="serves liked content identifiers through a bounded public GET route"
 
+      - name: Verify poll duration minutes migration preserves existing poll data
+        run: |
+          python - <<'PY'
+          import sqlite3
+          from pathlib import Path
+          db = sqlite3.connect(':memory:')
+          base = Path('workers/W05-social/migrations/20261017_014_social_polls_v1.sql')
+          upgrade = Path('workers/W05-social/migrations/20261105_016_social_poll_duration_minutes.sql')
+          db.executescript(base.read_text())
+          db.executemany(
+              'INSERT INTO social_polls VALUES (?,?,?,?,?,?,?)',
+              [
+                  ('p24','c24','u1',24,None,'created','updated'),
+                  ('p72','c72','u1',72,None,'created','updated'),
+                  ('p168','c168','u1',168,None,'created','updated'),
+              ],
+          )
+          db.execute("INSERT INTO social_poll_options VALUES ('o1','p24','Yes',0)")
+          db.execute("INSERT INTO social_poll_votes VALUES ('v1','p24','o1','u2','voted')")
+          db.executescript(upgrade.read_text())
+          columns = [row[1] for row in db.execute('PRAGMA table_info("social_polls")').fetchall()]
+          expected = ['poll_id','content_id','owner_user_id','duration_minutes','ends_at','created_at','updated_at']
+          if columns != expected:
+              raise SystemExit(f'unexpected poll duration schema: {columns}')
+          durations = dict(db.execute('SELECT poll_id, duration_minutes FROM social_polls').fetchall())
+          if durations != {'p24':1440,'p72':4320,'p168':10080}:
+              raise SystemExit(f'legacy poll durations were not preserved: {durations}')
+          if db.execute('SELECT COUNT(*) FROM social_poll_options').fetchone()[0] != 1:
+              raise SystemExit('poll options were lost during migration')
+          if db.execute('SELECT COUNT(*) FROM social_poll_votes').fetchone()[0] != 1:
+              raise SystemExit('poll votes were lost during migration')
+          for invalid in [4, 10081]:
+              try:
+                  db.execute(
+                      "INSERT INTO social_polls VALUES (?,?,?,?,?,?,?)",
+                      ('bad'+str(invalid),'bad'+str(invalid),'u1',invalid,None,'created','updated'),
+                  )
+              except sqlite3.IntegrityError:
+                  continue
+              raise SystemExit(f'invalid poll duration was accepted: {invalid}')
+          print('SOCIAL_016_POLL_DURATION_MINUTES_MIGRATION=PASS')
+          PY
+
       - name: Verify reply audience migration shape
         run: |
           python - <<'PY'
