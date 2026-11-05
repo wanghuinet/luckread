@@ -1360,11 +1360,13 @@ function PublishScreenContent() {
                 editLoadKeyRef.current = '';
                 draftSaveRestoreCompleteRef.current = false;
                 draftSavedFingerprintRef.current = '';
+                replyAudienceSavedFingerprintRef.current = '';
                 pollConfiguredRef.current = false;
                 setBody('');
                 setAssets([]);
                 setCoverRef('');
                 setAccessMode('PUBLIC');
+                setReplyAudience('everyone');
                 setPollEnabled(false);
                 setPollOptions(['', '']);
                 setDraftSaveStatus('idle');
