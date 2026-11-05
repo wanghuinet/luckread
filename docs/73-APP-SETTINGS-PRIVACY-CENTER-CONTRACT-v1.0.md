@@ -190,6 +190,24 @@ These are important X/Threads parity controls but require a domain/API audit bef
 
 For every conditional control, the implementation admission record must identify: authoritative owner, existing API path and schema, permission, persisted scope, supported clients, failure semantics, and tests. If any part is missing, hide the control from 1.0 rather than emulate it locally.
 
+### 6.2.1 Privacy-control admission audit — 2026-11-05
+
+**Inspected baseline:** `wanghuinet/luckread` `main` at `340adef1efb89c14604a5aaed7f7c3a93090e281`.
+
+The current repository supports the following bounded capabilities, but they do not establish a complete account-level privacy-settings API:
+
+| Capability | Verified implementation | Scope and admission decision |
+|---|---|---|
+| Post reply audience | Native composer `app/app/publish.tsx`; W01 route `/api/v1/contents/[contentId]/reply-audience`; W05 `reply-audience-runtime.ts` and `social_content_reply_policies` | **Admitted only per post.** The owner selects `everyone`, `verified`, `following`, `mentioned`, or `followingNetwork`. W05 verifies post ownership and enforces the policy during reply eligibility. Keep this control in the composer; it is not an account-wide default or profile-visibility setting. |
+| Block and mute | Existing W01 block/mute routes and W05 `social_user_interactions`; native destination `/blocked-muted` | **Admitted under Step 3 only.** It does not imply support for private accounts, follow approvals, or other privacy preferences. |
+| Follow relationship | W01 `/v1/social/follows/{targetUserId}`; W05 `follow-runtime.ts` | **Not admitted as protected-account behavior.** The current runtime creates or deletes an active follow relationship. This audit found no pending follow-request state, owner approval/rejection workflow, or account-level protected-profile setting. |
+| Profile visibility, mention/tag permissions, contact permissions, hidden words, sensitive-content preference, message requests and read receipts | No corresponding account-scoped W01 privacy-settings route and W05/Messaging-owned preference schema or end-to-end permission contract was identified in this baseline audit | **Not admitted.** Do not expose local-only switches or placeholder destinations. |
+
+**Step 6 decision: NOT ADMITTED — no new account-scoped privacy control is ready for the 1.0 Settings UI.** Preserve the existing per-post reply selector in the publish composer and the existing block/mute destination. Keep protected-account, follow-request, discoverability, mention/tag, messaging, hidden-word and sensitive-content controls hidden until their authoritative owner, persisted scope, W01 API contract, server-side enforcement, cross-client behavior, and positive/negative security tests exist.
+
+A future protected-account implementation must not stop at a UI boolean. Its server contract must define visibility across profile/content/feed/search surfaces and implement the follow-request lifecycle (create, list, approve, reject, cancel) with block/mute interaction rules and tests. No new Worker, D1, Queue, or Service Binding is authorized by this audit.
+
+
 ### 6.3 2.0 / later enhancements
 
 Do not block APP 1.0 on the following advanced controls unless a separate product decision promotes them:
@@ -416,7 +434,7 @@ Implementation must proceed in small, reviewable increments. Complete and verify
 | 3 | Blocked/muted integration | Existing lists/actions accessible from Privacy & safety with no duplicate state |
 | 4 | Appearance integration | Light/dark/system centralized and consistent after relaunch |
 | 5 | Account/security admission | Only verified W02 account/session controls are shown and tested |
-| 6 | Privacy controls admission | Only verified W03/W05/Messaging capabilities are shown and tested |
+| 6 | Privacy controls admission | Only verified account-scoped W03/W05/Messaging controls are shown; otherwise remain explicitly not admitted—never substitute post-level or device-local state |
 | 7 | Content preferences and data controls | Only supported server-owned preferences and device-local data options are shown |
 | 8 | Help/about and final APP polish | Working destinations, version info, accessibility and all release gates pass |
 
