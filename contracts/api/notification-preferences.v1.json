@@ -139,7 +139,7 @@
     "Push tokens never appear in preference responses or preference audit payloads."
   ],
   "evidence": {
-    "openapi": "PENDING_CONTRACT_COMMIT",
+    "openapi": "CONTRACTED",
     "w08Permission": "EXISTING_PERMISSION_AND_CASL_RULE",
     "w01W08W06W05Runtime": "PENDING_CI",
     "productionDeploymentAndSecurityE2E": "MISSING"
