@@ -226,10 +226,6 @@ function PublishScreenContent() {
   const activeComposerToken = findActiveComposerToken(body, textSelection.start);
   const activeCoverRef = coverRef || assets.find((asset) => asset.mimeType.startsWith('image/'))?.serverUrl || '';
 
-  useEffect(() => {
-    if (assets.length === 0 && mediaWarning !== null) setMediaWarning(null);
-  }, [assets.length, mediaWarning]);
-
   const updateAsset = useCallback((localId: string, patch: Partial<ComposerAsset>) => {
     setAssets((current) => current.map((asset) => asset.localId === localId ? { ...asset, ...patch } : asset));
   }, []);
@@ -569,10 +565,11 @@ function PublishScreenContent() {
     const target = assets.find((asset) => asset.localId === localId);
     const nextAssets = assets.filter((asset) => asset.localId !== localId);
     setAssets(nextAssets);
+    if (nextAssets.length === 0) setMediaWarning(null);
     if (target && coverRef === target.serverUrl) {
       setCoverRef(nextAssets.find((asset) => asset.mimeType.startsWith('image/'))?.serverUrl || '');
     }
-  }, [assets, busy, coverRef, publishPending]);
+  }, [assets, busy, coverRef, mediaWarning, publishPending]);
 
   const moveAsset = useCallback((localId: string, direction: -1 | 1) => {
     if (busy || publishPending) return;
