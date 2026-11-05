@@ -203,6 +203,8 @@ const FeedMediaGallery = ({
     useEffect(() => {
         const urls = JSON.parse(altTextRequestKey) as string[];
         setResolvedAltText({});
+        // Do not fetch image descriptions before the reader explicitly reveals a warned post.
+        if (mediaWarning && !mediaRevealed) return;
         if (urls.length === 0) return;
         let active = true;
         const controller = new AbortController();
@@ -215,7 +217,7 @@ const FeedMediaGallery = ({
             active = false;
             controller.abort();
         };
-    }, [altTextRequestKey]);
+    }, [altTextRequestKey, mediaWarning, mediaRevealed]);
 
     useEffect(() => {
         setMediaRevealed(false);
