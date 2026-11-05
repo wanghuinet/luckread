@@ -363,7 +363,7 @@ const isAmbiguousMutationStatus = (status: number): boolean =>
 
 function xhrRequestWithUploadProgress(
   requestUrl: string,
-  init: RequestInit & { method: string; headers: Headers },
+  init: RequestInit & { method: string; headers: Headers; body: FormData },
   onUploadProgress: (progress: ApiUploadProgress) => void,
 ): Promise<Response> {
   return new Promise((resolve, reject) => {
@@ -418,7 +418,7 @@ function xhrRequestWithUploadProgress(
           if (name && value) responseHeaders.append(name, value);
         });
 
-        const noResponseBody = [204, 205, 304].includes(xhr.status);
+        const noResponseBody = [204, 205].includes(xhr.status);
         const responseBody = noResponseBody ? null : (xhr.responseText ?? '');
         settled = true;
         cleanup();
@@ -441,7 +441,7 @@ function xhrRequestWithUploadProgress(
         signal.addEventListener('abort', handleAbort, { once: true });
       }
 
-      xhr.send(init.body ?? null);
+      xhr.send(init.body);
     } catch {
       fail(new TypeError('The upload connection failed.'));
     }
@@ -531,7 +531,7 @@ export async function apiRequest<T>(
     response = onUploadProgress && isFormDataBody(init.body)
       ? await xhrRequestWithUploadProgress(
           requestUrl,
-          { ...requestInit, method, headers },
+          { ...requestInit, method, headers, body: init.body as FormData },
           onUploadProgress,
         )
       : await fetch(requestUrl, requestInit);
