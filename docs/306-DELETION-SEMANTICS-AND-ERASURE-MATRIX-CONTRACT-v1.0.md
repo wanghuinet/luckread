@@ -3,6 +3,7 @@
 **Status:** P0 / CANONICAL
 **Related:** `docs/160-DATA-LIFECYCLE-RETENTION-ERASURE-CONTRACT-v1.0.md`（保留/擦除策略，本文档补**删除语义术语与逐实体矩阵**）
 **Related:** `docs/306` 是本文档；`docs/160` 仍是 Retention/Erasure 的 Canonical Source
+**Worker Ownership:** `docs/change-control/CC-MAPPING-0-AUTH-015-W08-W10-DELETION-EXECUTION-OWNERSHIP-RECONCILIATION-2026-11-06.md` reconciles the historical W08 job wording with the current Worker Master.
 
 ---
 
@@ -123,7 +124,7 @@ L5 擦除（含派生/备份/缓存/索引）—— 合规删除
 
 - 恢复**不保证**恢复原有分发位、推荐权重、粉丝关系。
 - 恢复必须审计 + 发事件。
-- 超过窗口的对象由 W08 作业推进到下一删除层级。
+- 超过窗口的对象由各实体的权威 Worker 按适用生命周期合同推进；W10 仅可在获准的 Worker/Task 与 Workflow/Job 合同下执行异步步骤。W08 的 CASL 策略评估职责不构成删除作业所有权。
 
 ---
 
@@ -144,9 +145,11 @@ L5 擦除（含派生/备份/缓存/索引）—— 合规删除
 
 ## 7. 作业与幂等
 
-- 删除推进由 **W08** 执行，必须幂等（`job_run_id`）。
-- 删除作业**必须**先软删除再异步清理派生数据，**禁止**同步大范围级联删除。
-- 每个删除层级推进必须写审计。
+- 删除资格、业务状态变更与实体删除语义由对应实体的权威 Worker/Task 决定和执行；账号状态及 D1-01 身份/账户事实仍由 **W02** 独占写入。
+- **W10** 只在已有且明确批准的 Worker/Task、事件、Queue 或 Workflow 合同授权下执行异步步骤；W10 不成为删除业务所有者，不直接写入其他域的业务事实，其 D1-03 写入仅限合同明确分配的 Job/Execution/Idempotency/Retry/DLQ 运行记录。
+- **W08** 的职责是依据可信服务端上下文执行 CASL 权限策略评估；它不拥有删除作业执行权，不替代 W02 或其他实体所有 Worker 的生命周期、授权、权益或业务状态检查。
+- 删除作业必须幂等（`job_run_id`），**必须**先软删除再异步清理派生数据，**禁止**同步大范围级联删除。
+- 每个删除层级推进必须写审计；跨域步骤必须通过明确的拥有者合同、事件/Queue、重试、对账和审计边界执行，不允许泛化的跨 D1 级联写入。
 
 ---
 
