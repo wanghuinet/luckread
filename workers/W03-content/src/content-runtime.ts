@@ -1149,7 +1149,7 @@ export async function searchPublishedContents(
 
   const rows = await db.prepare(`
     SELECT id, content_type, owner_user_id, creator_id, ip_id, state, scheduled_at, access_mode,
-           version, revision, slug, title, body_ref, media_refs_json, cover_ref,
+           version, revision, slug, title, body_ref, media_refs_json, cover_ref, media_warning,
            etag, created_at, updated_at
       FROM contents
      WHERE state = 'PUBLISHED'
@@ -1459,8 +1459,12 @@ export async function updateContent(
   }
   const currentAccessMode = content.accessMode ?? 'PUBLIC'
   const nextAccessMode = normalized.accessMode ?? currentAccessMode
-  const nextMediaWarning = normalized.mediaWarning === undefined ? content.mediaWarning ?? null : normalized.mediaWarning
-  if (nextMediaWarning !== null && (content.contentType !== 'post' || normalized.mediaRefs.length === 0)) {
+  const nextMediaWarning = normalized.mediaRefs.length === 0
+    ? null
+    : normalized.mediaWarning === undefined
+      ? content.mediaWarning ?? null
+      : normalized.mediaWarning
+  if (nextMediaWarning !== null && content.contentType !== 'post') {
     throw new ContentRuntimeError('VALIDATION_FAILED', 400)
   }
   let nextCreatorId = content.creatorId
