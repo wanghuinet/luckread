@@ -25,6 +25,8 @@ import { useAuthStore } from '~/store/auth-store';
 
 const PRIMARY = '#1d9bf0';
 const SESSION_RETURN_TO = '/sessions';
+// Step 5 remains hidden until security admission and unified device acceptance.
+const SESSION_MANAGEMENT_ADMITTED = false;
 
 function formatSessionDate(value: string): string {
   return new Date(value).toLocaleString(undefined, {
@@ -39,8 +41,15 @@ export default function SessionsScreen() {
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
   const authStatus = useAuthStore((state) => state.status);
-  const accountId = useAuthStore((state) => state.user?.id ?? null);
+  const authUser = useAuthStore((state) => state.user);
+  const accountId = authUser?.id ?? null;
+  const authUserRef = useRef(authUser);
+  authUserRef.current = authUser;
+  const accountIdRef = useRef(accountId);
+  accountIdRef.current = accountId;
   const [sessions, setSessions] = useState<SessionListItem[]>([]);
+  const [loadedAccountId, setLoadedAccountId] = useState<string | null>(null);
+  const [loadedAuthUser, setLoadedAuthUser] = useState<typeof authUser>(null);
   const [currentSessionId, setCurrentSessionId] = useState('');
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -56,7 +65,7 @@ export default function SessionsScreen() {
     append: boolean,
     pullRefresh = false,
   ) => {
-    if (authStatus === 'loading') return;
+    if (!SESSION_MANAGEMENT_ADMITTED || authStatus === 'loading') return;
     if (authStatus !== 'authenticated') {
       requestRef.current?.abort();
       requestRef.current = null;
@@ -84,7 +93,7 @@ export default function SessionsScreen() {
         cursor,
         signal: controller.signal,
       });
-      if (controller.signal.aborted) return;
+      if (controller.signal.aborted || accountIdRef.current !== accountId || authUserRef.current !== authUser) return;
 
       if (result.response.status === 401) {
         router.replace(('/login?returnTo=' + encodeURIComponent(SESSION_RETURN_TO)) as never);
@@ -107,28 +116,34 @@ export default function SessionsScreen() {
       });
       setCurrentSessionId(page.currentSessionId);
       setNextCursor(page.nextCursor);
+      setLoadedAccountId(accountId);
+      setLoadedAuthUser(authUser);
     } catch (cause) {
-      if (!controller.signal.aborted) {
+      if (!controller.signal.aborted && accountIdRef.current === accountId && authUserRef.current === authUser) {
         setError(cause instanceof Error ? cause.message : '无法读取登录会话，请重试。');
       }
     } finally {
       if (requestRef.current === controller) {
         requestRef.current = null;
-        if (!controller.signal.aborted) {
+        if (!controller.signal.aborted && accountIdRef.current === accountId && authUserRef.current === authUser) {
           setLoading(false);
           setLoadingMore(false);
           setRefreshing(false);
         }
       }
     }
-  }, [authStatus, router]);
+  }, [accountId, authStatus, authUser, router]);
 
   useEffect(() => {
+    if (!SESSION_MANAGEMENT_ADMITTED) return;
     setSessions([]);
+    setLoadedAccountId(null);
+    setLoadedAuthUser(null);
     setCurrentSessionId('');
     setNextCursor(null);
     setError('');
     setNotice('');
+    setRevokingId(null);
     void loadPage(null, false);
     return () => {
       requestRef.current?.abort();
@@ -136,14 +151,20 @@ export default function SessionsScreen() {
     };
   }, [accountId, loadPage]);
 
-  const runRevoke = useCallback(async (sessionId: string) => {
-    if (sessionId === currentSessionId || revokingId) return;
+  const runRevoke = useCallback(async (
+    sessionId: string,
+    operationAccountId: string | null,
+    operationUser: typeof authUser,
+  ) => {
+    if (!SESSION_MANAGEMENT_ADMITTED || sessionId === currentSessionId || revokingId ||
+        accountIdRef.current !== operationAccountId || authUserRef.current !== operationUser) return;
 
     setRevokingId(sessionId);
     setError('');
     setNotice('');
     try {
       const result = await revokeSession(sessionId);
+      if (accountIdRef.current !== operationAccountId || authUserRef.current !== operationUser) return;
       if (result.response.status === 401) {
         router.replace(('/login?returnTo=' + encodeURIComponent(SESSION_RETURN_TO)) as never);
         return;
@@ -159,14 +180,20 @@ export default function SessionsScreen() {
       setSessions((current) => current.filter((item) => item.sessionId !== sessionId));
       setNotice('已退出该登录会话。');
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : '退出此登录会话失败，请重试。');
+      if (accountIdRef.current === operationAccountId && authUserRef.current === operationUser) {
+        setError(cause instanceof Error ? cause.message : '退出此登录会话失败，请重试。');
+      }
     } finally {
-      setRevokingId(null);
+      if (accountIdRef.current === operationAccountId && authUserRef.current === operationUser) {
+        setRevokingId(null);
+      }
     }
-  }, [currentSessionId, revokingId, router]);
+  }, [accountId, authUser, currentSessionId, revokingId, router]);
 
   const confirmRevoke = useCallback((sessionId: string) => {
-    if (!sessionId || sessionId === currentSessionId || revokingId) return;
+    if (!SESSION_MANAGEMENT_ADMITTED || !sessionId || sessionId === currentSessionId || revokingId) return;
+    const operationAccountId = accountId;
+    const operationUser = authUser;
     Alert.alert(
       '退出此会话',
       '退出后，该登录会话将立即失效；对应设备需要重新登录才能继续使用 LuckRead。',
@@ -175,11 +202,11 @@ export default function SessionsScreen() {
         {
           text: '退出会话',
           style: 'destructive',
-          onPress: () => { void runRevoke(sessionId); },
+          onPress: () => { void runRevoke(sessionId, operationAccountId, operationUser); },
         },
       ],
     );
-  }, [currentSessionId, revokingId, runRevoke]);
+  }, [accountId, authUser, currentSessionId, revokingId, runRevoke]);
 
   const retry = useCallback(() => {
     void loadPage(null, false);
@@ -189,6 +216,23 @@ export default function SessionsScreen() {
     if (!nextCursor || loading || loadingMore) return;
     void loadPage(nextCursor, true);
   }, [loadPage, loading, loadingMore, nextCursor]);
+
+  if (!SESSION_MANAGEMENT_ADMITTED) {
+    return (
+      <View className="flex-1 items-center justify-center bg-white px-6 dark:bg-black" style={{ paddingTop: insets.top }}>
+        <StatusBar style={isDark ? 'light' : 'dark'} />
+        <Feather name="lock" size={32} color={PRIMARY} />
+        <Text className="mt-4 text-lg font-bold text-neutral-900 dark:text-white">设备与会话管理暂未开放</Text>
+        <Text className="mt-2 text-center text-sm text-neutral-500 dark:text-neutral-400">此功能仍在安全准入和统一验收阶段。</Text>
+        <Pressable accessibilityRole="button" onPress={() => router.back()} className="mt-5 min-h-11 items-center justify-center rounded-full border border-neutral-300 px-6 dark:border-neutral-700">
+          <Text className="font-bold text-sky-600">返回设置</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  const accountDataReady = loadedAccountId === accountId && loadedAuthUser === authUser;
+  const visibleSessions = accountDataReady ? sessions : [];
 
   if (authStatus === 'loading') {
     return (
@@ -277,14 +321,14 @@ export default function SessionsScreen() {
           </View>
         ) : null}
 
-        {loading && sessions.length === 0 ? (
+        {loading && visibleSessions.length === 0 ? (
           <View className="items-center py-12">
             <ActivityIndicator color={PRIMARY} />
             <Text className="mt-3 text-sm text-neutral-500">正在加载登录会话…</Text>
           </View>
         ) : null}
 
-        {!loading && sessions.length === 0 && !error ? (
+        {!loading && visibleSessions.length === 0 && !error ? (
           <View className="items-center px-8 py-12">
             <Feather name="smartphone" size={32} color="#9ca3af" />
             <Text className="mt-4 text-base font-semibold text-neutral-800 dark:text-neutral-100">
@@ -296,7 +340,7 @@ export default function SessionsScreen() {
           </View>
         ) : null}
 
-        {sessions.map((session) => {
+        {visibleSessions.map((session) => {
           const isCurrent = session.sessionId === currentSessionId;
           const isRevoking = revokingId === session.sessionId;
           return (
