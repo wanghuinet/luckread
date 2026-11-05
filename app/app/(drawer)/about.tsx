@@ -74,11 +74,9 @@ function PolicyRow({
 function InformationRow({
   label,
   value,
-  isDark,
 }: {
   label: string;
   value: string;
-  isDark: boolean;
 }) {
   return (
     <View className="min-h-[54px] flex-row items-center justify-between px-4 py-3">
@@ -181,13 +179,13 @@ export default function HelpAboutScreen() {
         </Section>
 
         <Section title="应用信息">
-          <InformationRow label="应用名称" value="LuckRead" isDark={isDark} />
+          <InformationRow label="应用名称" value="LuckRead" />
           <View className="mx-4 h-px bg-neutral-100 dark:bg-neutral-800" />
-          <InformationRow label="应用版本" value={appVersion} isDark={isDark} />
+          <InformationRow label="应用版本" value={appVersion} />
           <View className="mx-4 h-px bg-neutral-100 dark:bg-neutral-800" />
-          <InformationRow label={buildKind} value={buildLabel} isDark={isDark} />
+          <InformationRow label={buildKind} value={buildLabel} />
           <View className="mx-4 h-px bg-neutral-100 dark:bg-neutral-800" />
-          <InformationRow label="平台" value={Platform.OS} isDark={isDark} />
+          <InformationRow label="平台" value={Platform.OS} />
           <View className="px-4 pb-4 pt-2">
             <Text className="text-xs leading-5 text-neutral-500 dark:text-neutral-400">
               构建信息取自当前安装的原生应用清单。开发环境或 Expo Go 未提供构建号时会明确显示不可用，不会用 OTA 更新编号代替原生构建号。
