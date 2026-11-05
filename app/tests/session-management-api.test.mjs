@@ -96,12 +96,17 @@ test('wires session management into Settings and keeps the active session protec
   const settings = readFileSync(resolve(process.cwd(), 'app/(drawer)/settings.tsx'), 'utf8');
   const drawer = readFileSync(resolve(process.cwd(), 'app/(drawer)/_layout.tsx'), 'utf8');
 
-  expect(settings).toContain("router.push('/sessions' as never)");
-  expect(drawer).toContain('name="sessions"');
+  expect(settings).not.toContain("router.push('/sessions' as never)");
+  expect(drawer).not.toContain('name="sessions"');
+  expect(screen).toContain('const SESSION_MANAGEMENT_ADMITTED = false');
+  expect(screen).toContain('设备与会话管理暂未开放');
   expect(screen).toContain('fetchSessionListPage(');
   expect(screen).toContain('Alert.alert(');
   expect(screen).toContain('sessionId === currentSessionId');
   expect(screen).toContain('revokeSession(sessionId)');
+  expect(screen).toContain('authUserRef.current !== authUser');
+  expect(screen).toContain('authUserRef.current !== operationUser');
+  expect(screen).toContain('loadedAuthUser === authUser');
   expect(api).toContain("method: 'DELETE'");
   expect(screen).toContain("'/login?returnTo='");
   expect(screen).not.toContain('session.deviceId}</Text>');
