@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://luckread.com/contracts/v1/transport/W01-W03-content-http-binding.v1.json",
   "title": "1.0 W01 to W03 Content Internal HTTP Binding",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "status": "CONTRACTED_PARTIAL",
   "caller": {
     "logicalWorker": "W01",
@@ -20,7 +20,7 @@
     "targetWorker": "luckread-w03",
     "publicExposure": false
   },
-  "wireRule": "W01 maps the public /api/v1/contents family to the exact internal operations below; status=DRAFT is an authenticated owner-only social post list scoped by W03 to the W02 principal and must bypass shared public caching. Creator Center also uses the authenticated application route /api/creator/contents for owner-scoped reads; W03 never owns a public API namespace.",
+  "wireRule": "W01 maps the public /api/v1/contents family to the exact internal operations below; status=DRAFT is an authenticated owner-only social post list scoped by W03 to the W02 principal at L2+ and status=SCHEDULED is an authenticated owner-only scheduled social post list scoped by W03 to L3/L4 Creator principals. Both private lifecycle lists bypass shared public caching. Creator Center also uses the authenticated application route /api/creator/contents for owner-scoped reads; W03 never owns a public API namespace.",
   "operations": [
     {
       "operationId": "listContents",
@@ -29,7 +29,7 @@
       "internalPath": "/internal/content/contents",
       "principalRequired": false,
       "idempotency": false,
-      "conditionalPrincipal": "For status=DRAFT, W01 must authenticate via W02; W03 requires L2+ and returns only caller-owned DRAFT posts. The request is never shared-cache eligible."
+      "conditionalPrincipal": "For status=DRAFT, W01 must authenticate via W02; W03 requires L2+ and returns only caller-owned DRAFT social posts. For status=SCHEDULED, W01 must authenticate via W02; W03 requires L3/L4 Creator permission and returns only caller-owned SCHEDULED social posts. Both private status filters are never shared-cache eligible."
     },
     {
       "operationId": "listCreatorContents",
