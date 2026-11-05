@@ -123,7 +123,7 @@ export default function HelpAboutScreen() {
 
   return (
     <View className="flex-1 bg-neutral-50 dark:bg-black" style={{ paddingTop: insets.top }}>
-      <Stack.Screen options={{ headerShown: false, title: '帮助与关于' }} />
+      <Stack.Screen options={{ headerShown: false, title: '关于 LuckRead' }} />
       <View className="flex-row items-center border-b border-neutral-200 bg-white px-4 py-3 dark:border-neutral-800 dark:bg-black">
         <Pressable
           accessibilityRole="button"
