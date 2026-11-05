@@ -1221,6 +1221,7 @@ function PublishScreenContent() {
       setScheduledInboxError(cause instanceof Error ? cause.message : '修改发布时间失败。');
     } finally {
       setScheduledActionId(null);
+      setScheduledInboxVisible(true);
     }
   }, [loadScheduledInbox, scheduledActionId]);
 
@@ -1877,7 +1878,7 @@ function PublishScreenContent() {
         ) : null}
         {!contentId && Platform.OS !== 'web' ? (
           <Pressable accessibilityRole="button" accessibilityLabel="Open scheduled posts" onPress={() => { void openScheduledInbox(); }} style={styles.iconButton}>
-            <Feather name="calendar-clock" size={19} color={isDark ? '#e5e7eb' : '#344054'} />
+            <Feather name="calendar" size={19} color={isDark ? '#e5e7eb' : '#344054'} />
           </Pressable>
         ) : null}
         <Text style={[styles.headerTitle, isDark && { color: '#f9fafb' }]}>{contentId ? 'Edit post' : 'New post'}</Text>
@@ -2188,8 +2189,10 @@ function PublishScreenContent() {
         animationType="slide"
         presentationStyle="pageSheet"
         onRequestClose={() => {
+          const wasEditing = scheduleEditTarget !== null;
           setSchedulePickerVisible(false);
           setScheduleEditTarget(null);
+          if (wasEditing) setScheduledInboxVisible(true);
         }}
       >
         <View style={[styles.schedulePickerModal, isDark && styles.schedulePickerModalDark]}>
@@ -2197,8 +2200,10 @@ function PublishScreenContent() {
             <Pressable
               accessibilityRole="button"
               onPress={() => {
+                const wasEditing = scheduleEditTarget !== null;
                 setSchedulePickerVisible(false);
                 setScheduleEditTarget(null);
+                if (wasEditing) setScheduledInboxVisible(true);
               }}
               style={styles.schedulePickerActionHit}
             >
@@ -2332,7 +2337,7 @@ function PublishScreenContent() {
                         onPress={() => openScheduleEditPicker(item)}
                         style={[styles.scheduledActionButton, isDark && { borderColor: '#52525b' }]}
                       >
-                        <Feather name="calendar-clock" size={14} color={PRIMARY} />
+                        <Feather name="calendar" size={14} color={PRIMARY} />
                         <Text style={styles.scheduledActionText}>修改时间</Text>
                       </Pressable>
                       <Pressable
