@@ -204,7 +204,7 @@ jobs:
               [
                   ('p24','c24','u1',24,None,'created','updated'),
                   ('p72','c72','u1',72,None,'created','updated'),
-                  ('p168','c168','u1',168,None,'created','updated'),
+                  ('p168','c168','u1',168,'expires-168','created','updated'),
               ],
           )
           db.execute("INSERT INTO social_poll_options VALUES ('o1','p24','Yes',0)")
@@ -217,6 +217,11 @@ jobs:
           durations = dict(db.execute('SELECT poll_id, duration_minutes FROM social_polls').fetchall())
           if durations != {'p24':1440,'p72':4320,'p168':10080}:
               raise SystemExit(f'legacy poll durations were not preserved: {durations}')
+          preserved = db.execute(
+              "SELECT poll_id, content_id, owner_user_id, ends_at, created_at, updated_at FROM social_polls WHERE poll_id='p168'"
+          ).fetchone()
+          if preserved != ('p168','c168','u1','expires-168','created','updated'):
+              raise SystemExit(f'poll identity or expiry metadata changed: {preserved}')
           if db.execute('SELECT COUNT(*) FROM social_poll_options').fetchone()[0] != 1:
               raise SystemExit('poll options were lost during migration')
           if db.execute('SELECT COUNT(*) FROM social_poll_votes').fetchone()[0] != 1:
