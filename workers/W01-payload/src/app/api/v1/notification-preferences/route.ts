@@ -28,7 +28,7 @@ const errorResponse = (status: number, code: string, message: string) => Respons
 
 async function readPreferencesPatch(request: Request): Promise<NotificationPreferencesPatch | null> {
   const declaredLength = request.headers.get('content-length')
-  if (declaredLength !== null && (!/^\\d+$/.test(declaredLength) || Number(declaredLength) > 2048)) return null
+  if (declaredLength !== null && (!/^\d+$/.test(declaredLength) || Number(declaredLength) > 2048)) return null
   if (!request.body) return null
   const reader = request.body.getReader()
   const chunks: Uint8Array[] = []

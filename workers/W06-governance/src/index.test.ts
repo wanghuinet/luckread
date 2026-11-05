@@ -1187,6 +1187,81 @@ describe('W06 runtime', () => {
     expect(prepare).not.toHaveBeenCalled()
   })
 
+  it('persists a notification-preferences mutation intent with the authenticated W01 actor', async () => {
+    const inserted: unknown[][] = []
+    const prepare = vi.fn((sql: string) => ({
+      bind: (...values: unknown[]) => ({
+        first: async () => null,
+        run: async () => {
+          if (sql.includes('INSERT INTO audit_events')) inserted.push(values)
+          return { success: true, meta: { changes: 1 } }
+        },
+      }),
+    }))
+    const db = { prepare } as unknown as D1Database
+    const runtime = await import('./index')
+    const eventId = 'evt_notification_preferences_123e4567-e89b-42d3-a456-426614174000'
+    const response = await runtime.default.fetch(
+      new Request('https://w06.internal/internal/audit-events/notification-preferences-update-requested', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'X-LuckRead-Caller': 'W01',
+          'X-LuckRead-Transport-Version': '1.0',
+          'X-LuckRead-Principal-User-Id': 'preferences-owner-001',
+          'X-LuckRead-Principal-Layer': 'L2',
+          'X-LuckRead-Correlation-Id': 'preferences-audit-correlation',
+          'X-LuckRead-Request-Id': 'req_preferences_audit_001',
+        },
+        body: JSON.stringify({ eventId, preferences: { follow: false, mention: true } }),
+      }),
+      { D1_03: db },
+    )
+    expect(response.status).toBe(201)
+    await expect(response.json()).resolves.toMatchObject({
+      eventId, action: 'notification.preferences.update_requested',
+      targetType: 'Notification', targetId: 'preferences-owner-001', replayed: false,
+    })
+    expect(inserted).toHaveLength(1)
+    const values = inserted[0] ?? []
+    expect(JSON.parse(String(values[3]))).toMatchObject({
+      actorId: 'preferences-owner-001', actorType: 'user', layer: 'L2',
+    })
+    expect(values[4]).toBe('notification.preferences.update_requested')
+    expect(values[5]).toBe('Notification')
+    expect(values[6]).toBe('preferences-owner-001')
+    expect(JSON.parse(String(values[8]))).toEqual({ preferences: { follow: false, mention: true } })
+  })
+
+  it('rejects spoofed owner fields and an L1 audit before D1 access', async () => {
+    const prepare = vi.fn()
+    const db = { prepare } as unknown as D1Database
+    const runtime = await import('./index')
+    const eventId = 'evt_notification_preferences_123e4567-e89b-42d3-a456-426614174001'
+    const headers = {
+      'X-LuckRead-Caller': 'W01', 'X-LuckRead-Transport-Version': '1.0',
+      'X-LuckRead-Principal-User-Id': 'preferences-owner-001', 'X-LuckRead-Principal-Layer': 'L2',
+      'X-LuckRead-Correlation-Id': 'preferences-audit-correlation', 'X-LuckRead-Request-Id': 'req_preferences_audit_002',
+    }
+    const spoofed = await runtime.default.fetch(
+      new Request('https://w06.internal/internal/audit-events/notification-preferences-update-requested', {
+        method: 'POST', headers,
+        body: JSON.stringify({ eventId, preferences: { follow: false }, userId: 'attacker' }),
+      }),
+      { D1_03: db },
+    )
+    expect(spoofed.status).toBe(400)
+    const lowLayer = await runtime.default.fetch(
+      new Request('https://w06.internal/internal/audit-events/notification-preferences-update-requested', {
+        method: 'POST', headers: { ...headers, 'X-LuckRead-Principal-Layer': 'L1' },
+        body: JSON.stringify({ eventId, preferences: { follow: false } }),
+      }),
+      { D1_03: db },
+    )
+    expect(lowLayer.status).toBe(403)
+    expect(prepare).not.toHaveBeenCalled()
+  })
+
 })
 
 export type RuntimeAuditEvent = AuditEvent
