@@ -1715,6 +1715,7 @@ export const canTransitionContentState = (
     )
   }
   if (contentType === 'post' && from === 'DRAFT' && to === 'PUBLISHED') return true
+  if (contentType === 'post' && from === 'DRAFT' && to === 'SCHEDULED') return kind === 'CREATOR'
 
   if (from === 'DRAFT' && to === 'PENDING_REVIEW') return true
   if (from === 'REJECTED' && to === 'DRAFT') return true
@@ -1805,9 +1806,10 @@ export async function transitionContentState(
     }
   }
 
-  // Direct publication is narrowly available for draft social posts only.
-  // Re-run the risk/quality preflight at the content authority before any write.
-  if (content.state === 'DRAFT' && content.contentType === 'post' && to === 'PUBLISHED') {
+  // Direct and scheduled publication of draft social posts share the same
+  // risk/quality preflight at the content authority before any state write.
+  if (content.state === 'DRAFT' && content.contentType === 'post' &&
+      (to === 'PUBLISHED' || to === 'SCHEDULED')) {
     if (!options.preflight || typeof options.preflight !== 'object' || Array.isArray(options.preflight)) {
       throw new ContentRuntimeError('VALIDATION_FAILED', 400)
     }
