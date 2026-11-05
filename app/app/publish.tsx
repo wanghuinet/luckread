@@ -979,7 +979,9 @@ function PublishScreenContent() {
     if (pendingAssets.some((asset) => !asset.uri || !asset.uploadKey)) {
       throw new Error('An unfinished attachment is missing its local recovery file. Remove it or select it again.');
     }
-    await Promise.all(pendingAssets.map((asset) => persistPendingAsset(asset)));
+    // Picker and camera flows already copied these files to persistent
+    // storage. Draft autosave only binds their IDs after the server draft exists;
+    // it must not race a concurrent image-optimization replacement.
     const readyAssets = assets.filter((asset) => asset.existing || asset.status === 'ready');
     if (readyAssets.some((asset) => !asset.serverUrl || !/^https?:\/\//i.test(asset.serverUrl))) return;
 
