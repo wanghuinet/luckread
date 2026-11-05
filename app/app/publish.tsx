@@ -58,6 +58,13 @@ import {
   replaceActiveComposerToken,
 } from '~/lib/publish-composer-tokens';
 import { moveComposerAsset } from '~/lib/publish-composer-assets';
+import {
+  bindPendingMediaRecoveryToDraft,
+  deletePendingMediaRecovery,
+  deletePendingMediaRecoveryForDraft,
+  listPendingMediaRecovery,
+  persistPendingMediaRecovery,
+} from '~/lib/publish-pending-media-recovery';
 
 type ContentRecord = {
   id: string;
