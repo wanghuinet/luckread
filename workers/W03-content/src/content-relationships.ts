@@ -678,18 +678,31 @@ export async function appendPostThreadNext(
       JSON.stringify(relationship), createdAt, expiresAt,
     ),
     db.prepare(`
-      WITH RECURSIVE descendants(id, depth, visited) AS (
-        SELECT ?, 0, '|' || ? || '|'
-        UNION ALL
-        SELECT r.target_id, d.depth + 1, d.visited || r.target_id || '|'
-          FROM descendants d
-          JOIN content_relationships r
-            ON r.source_id = d.id
-           AND r.relation_type = 'thread-next'
-           AND r.status = 'ACTIVE'
-         WHERE d.depth < ?
-           AND instr(d.visited, '|' || r.target_id || '|') = 0
-      )
+      WITH RECURSIVE
+        descendants(id, depth, visited) AS (
+          SELECT ?, 0, '|' || ? || '|'
+          UNION ALL
+          SELECT r.target_id, d.depth + 1, d.visited || r.target_id || '|'
+            FROM descendants d
+            JOIN content_relationships r
+              ON r.source_id = d.id
+             AND r.relation_type = 'thread-next'
+             AND r.status = 'ACTIVE'
+           WHERE d.depth < ?
+             AND instr(d.visited, '|' || r.target_id || '|') = 0
+        ),
+        ancestors(id, depth, visited) AS (
+          SELECT ?, 0, '|' || ? || '|'
+          UNION ALL
+          SELECT r.source_id, a.depth + 1, a.visited || r.source_id || '|'
+            FROM ancestors a
+            JOIN content_relationships r
+              ON r.target_id = a.id
+             AND r.relation_type = 'thread-next'
+             AND r.status = 'ACTIVE'
+           WHERE a.depth < ?
+             AND instr(a.visited, '|' || r.source_id || '|') = 0
+        )
       INSERT INTO content_relationships
         (relationship_id, source_type, source_id, target_type, target_id, relation_type,
          position, schema_version, status, actor_id, provenance_ref, authorization_ref, created_at, updated_at)
@@ -711,25 +724,13 @@ export async function appendPostThreadNext(
          )
          AND NOT EXISTS (SELECT 1 FROM descendants WHERE id = s.id)
          AND (SELECT COUNT(*) FROM descendants) +
-             (SELECT COUNT(*) FROM (
-               WITH RECURSIVE ancestors(id, depth, visited) AS (
-                 SELECT ?, 0, '|' || ? || '|'
-                 UNION ALL
-                 SELECT r.source_id, a.depth + 1, a.visited || r.source_id || '|'
-                   FROM ancestors a
-                   JOIN content_relationships r
-                     ON r.target_id = a.id
-                    AND r.relation_type = 'thread-next'
-                    AND r.status = 'ACTIVE'
-                  WHERE a.depth < ? AND instr(a.visited, '|' || r.source_id || '|') = 0
-               )
-               SELECT id FROM ancestors
-             )) <= ?
+             (SELECT COUNT(*) FROM ancestors) <= ?
     `).bind(
       targetContentId, targetContentId, MAX_POST_THREAD_ITEMS,
+      sourceContentId, sourceContentId, MAX_POST_THREAD_ITEMS,
       relationship.relationshipId, ownerUserId, createdAt, createdAt,
       targetContentId, sourceContentId, ownerUserId, ownerUserId,
-      sourceContentId, sourceContentId, MAX_POST_THREAD_ITEMS, MAX_POST_THREAD_ITEMS,
+      MAX_POST_THREAD_ITEMS,
     ),
     db.prepare('INSERT OR REPLACE INTO content_txn_guard(id, successful) VALUES (1, changes())'),
   ]);
@@ -749,42 +750,47 @@ export async function listPostThread(
 
   const rows = await db.prepare(`
     WITH RECURSIVE
-      ancestors(id, depth, visited) AS (
-        SELECT id, 0, '|' || id || '|' FROM contents WHERE id = ?
+      ancestors(id, owner_user_id, depth, visited) AS (
+        SELECT id, owner_user_id, 0, '|' || id || '|' FROM contents WHERE id = ?
         UNION ALL
-        SELECT r.source_id, a.depth + 1, a.visited || r.source_id || '|'
+        SELECT r.source_id, a.owner_user_id, a.depth + 1, a.visited || r.source_id || '|'
           FROM ancestors a
           JOIN content_relationships r
             ON r.target_id = a.id
            AND r.relation_type = 'thread-next'
            AND r.status = 'ACTIVE'
+          JOIN contents previous_content
+            ON previous_content.id = r.source_id
+           AND previous_content.owner_user_id = a.owner_user_id
          WHERE a.depth < ?
            AND instr(a.visited, '|' || r.source_id || '|') = 0
       ),
-      root(id) AS (
-        SELECT id FROM ancestors ORDER BY depth DESC LIMIT 1
+      root(id, owner_user_id) AS (
+        SELECT id, owner_user_id FROM ancestors ORDER BY depth DESC LIMIT 1
       ),
-      thread(id, position, visited) AS (
-        SELECT root.id, 0, '|' || root.id || '|'
+      thread(id, owner_user_id, position, visited) AS (
+        SELECT root.id, root.owner_user_id, 0, '|' || root.id || '|'
           FROM root
           JOIN contents root_content ON root_content.id = root.id
          WHERE (
            (root_content.state = 'PUBLISHED' AND root_content.access_mode = 'PUBLIC')
-           OR (? IS NOT NULL AND root_content.owner_user_id = ? AND root_content.state IN ('DRAFT', 'PUBLISHED'))
+           OR (? IS NOT NULL AND root.owner_user_id = ? AND root_content.state IN ('DRAFT', 'PUBLISHED'))
          )
         UNION ALL
-        SELECT r.target_id, t.position + 1, t.visited || r.target_id || '|'
+        SELECT r.target_id, t.owner_user_id, t.position + 1, t.visited || r.target_id || '|'
           FROM thread t
           JOIN content_relationships r
             ON r.source_id = t.id
            AND r.relation_type = 'thread-next'
            AND r.status = 'ACTIVE'
-          JOIN contents next_content ON next_content.id = r.target_id
+          JOIN contents next_content
+            ON next_content.id = r.target_id
+           AND next_content.owner_user_id = t.owner_user_id
          WHERE t.position + 1 < ?
            AND instr(t.visited, '|' || r.target_id || '|') = 0
            AND (
              (next_content.state = 'PUBLISHED' AND next_content.access_mode = 'PUBLIC')
-             OR (? IS NOT NULL AND next_content.owner_user_id = ? AND next_content.state IN ('DRAFT', 'PUBLISHED'))
+             OR (? IS NOT NULL AND t.owner_user_id = ? AND next_content.state IN ('DRAFT', 'PUBLISHED'))
            )
       )
     SELECT

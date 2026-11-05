@@ -1002,8 +1002,13 @@ const worker = {
       }
 
       if (path && path.thread && path.id && request.method === 'GET') {
-        const viewerUserId = request.headers.get('X-LuckRead-Principal-User-Id')?.trim() || null
-        if (viewerUserId) requiredSocialPostPrincipal(request)
+        let viewerUserId: string | null = null
+        if (request.headers.has('X-LuckRead-Principal-User-Id') || request.headers.has('X-LuckRead-Principal-Layer')) {
+          const principal = requiredPrincipal(request)
+          // Low-layer signed-in users may still read public threads; only L2+
+          // receives the owner-scoped draft visibility mode.
+          if (hasSocialPostPermission(principal.layer)) viewerUserId = principal.userId
+        }
         const thread = await listPostThread(env.D1_02, path.id, viewerUserId)
         return json({ data: thread, schemaVersion: '1.0', requestId: createRequestId() })
       }

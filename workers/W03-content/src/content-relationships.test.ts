@@ -20,6 +20,15 @@ describe('W03 content relationship foundation', () => {
     expect(migration).toContain('CREATE UNIQUE INDEX content_relationships_active_unique_idx')
     expect(migration).toContain('content.relationship.created')
     expect(migration).toContain('content.relationship.revoked')
+    const threadMigration = readFileSync(
+      resolve(process.cwd(), 'workers/W03-content/migrations/0011_content_post_threads.sql'),
+      'utf8',
+    )
+    expect(threadMigration).toContain("'thread-next'")
+    expect(threadMigration).toContain('CREATE UNIQUE INDEX content_relationships_thread_next_unique_idx')
+    expect(threadMigration).toContain('CREATE UNIQUE INDEX content_relationships_thread_previous_unique_idx')
+    expect(threadMigration).toContain('FROM content_relationships;')
+    expect(threadMigration).toContain("'content.thread.next.attached'")
   })
 
   it('lists only active relationships between published content in one bounded D1 read', async () => {
@@ -218,7 +227,7 @@ describe('W03 native social post thread authority', () => {
       status: 'ACTIVE',
     });
     expect(statements[1]).toContain('WITH RECURSIVE');
-    expect(statements[2]).toContain('NOT EXISTS (SELECT 1 FROM descendants WHERE id = s.id)');
+    expect(statements[4]).toContain('NOT EXISTS (SELECT 1 FROM descendants WHERE id = s.id)');
     expect(statements[2]).toContain("r.relation_type = 'thread-next'");
   });
 
@@ -299,6 +308,18 @@ describe('W03 native social post thread authority', () => {
     );
     expect(publicResponse.status).toBe(200);
     await expect(publicResponse.json()).resolves.toMatchObject({ data: { rootContentId: 'post_root' } });
+
+    const lowLayerResponse = await w03Worker.fetch(
+      new Request('https://luckread-w03.internal/internal/content/contents/post_root/thread', {
+        headers: {
+          ...headers,
+          'X-LuckRead-Principal-User-Id': 'user_low',
+          'X-LuckRead-Principal-Layer': 'L1',
+        },
+      }),
+      { D1_02: db },
+    );
+    expect(lowLayerResponse.status).toBe(200);
 
     const deniedResponse = await w03Worker.fetch(
       new Request('https://luckread-w03.internal/internal/content/contents/post_root/thread', {
