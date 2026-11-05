@@ -413,15 +413,15 @@ Implementation must proceed in small, reviewable increments. Complete and verify
 
 | Step | Module | Current status | Exit condition |
 |---|---|---|---|
-| 0 | Read-only implementation inventory | DONE — contract/inventory PR #1552 | Exact route/API/test/owner matrix exists; no code change |
-| 1 | Settings home and navigation | MERGED — PR #1553 | One discoverable root; existing routes continue to work |
-| 2 | Notification preferences integration | MERGED — PR #1554 | Four account preferences and OS push permission use the existing server/device paths |
-| 3 | Blocked/muted integration | MERGED — PR #1553 | Existing lists/actions accessible from Privacy & safety with no duplicate state |
-| 4 | Appearance integration | MERGED — PR #1553 | Light/dark/system centralized and consistent after relaunch |
-| 5 | Account/security admission | IN PROGRESS — native session screen on this branch | Reuse verified W01/W02 session list/revoke operations; password change and other unadmitted controls stay hidden |
-| 6 | Privacy controls admission | NOT STARTED | Only verified W03/W05/Messaging capabilities are shown and tested |
-| 7 | Content preferences and data controls | NOT STARTED | Only supported server-owned preferences and device-local data options are shown |
-| 8 | Help/about and final APP polish | NOT STARTED | Working destinations, version info, accessibility and all release gates pass |
+| 0 | Read-only implementation inventory | DONE — PR #1552 / contract inventory | Exact route/API/test/owner matrix exists; no code change |
+| 1 | Settings home and navigation | IMPLEMENTED — PR #1553 merged | One discoverable root; existing routes continue to work |
+| 2 | Notification preferences integration | IMPLEMENTED — PR #1554 merged | Four account preferences and OS push permission use the existing server/device paths |
+| 3 | Blocked and muted integration | WAITING FOR CLOSEOUT — existing APP screen/API are present | Real-account pagination, unblock/unmute persistence, error recovery, accessibility and Android/iOS verification are complete |
+| 4 | Appearance settings integration | WAITING FOR CLOSEOUT — light/dark/system implementation is present | Relaunch persistence and theme consistency across every Settings subpage, modal, loading/error state and Android/iOS are verified |
+| 5 | Account and session security | WAITING FOR ADMISSION — PR #1555 is a candidate implementation; automated Native App CI passed | Security/API/permission admission and authenticated Android/iOS runtime evidence are accepted before merge/release; password, MFA/passkeys, login history and bulk revocation remain hidden |
+| 6 | Privacy controls | WAITING FOR ADMISSION | Each candidate control has a proven W03/W05/Messaging owner, existing API/schema, permission, persistence, cross-client behavior and negative/security tests before UI exposure |
+| 7 | Content preferences and data controls | NOT IMPLEMENTED | Only supported server-owned preferences and clearly device-local controls are implemented; no fake settings or generic settings authority |
+| 8 | Help, about and final polish | NOT IMPLEMENTED | Verified help/policy/report destinations, real app version/build, accessibility and all settings release gates pass |
 
 Do not batch unrelated modules. Do not start Step 2 in the same round as Step 1. Stop immediately after each module reaches its own exit condition.
 
@@ -439,5 +439,5 @@ The APP Settings 1.0 baseline is complete only when:
 - no 2.0-only feature is required for the 1.0 release gate;
 - evidence is attached to the exact commit/build tested.
 
-**Current contract status: IMPLEMENTATION-IN-PROGRESS / STEPS 0–4 MERGED / STEP 5 (DEVICE AND SESSION MANAGEMENT) IN REVIEW.**  
-The current APP implementation reuses existing W01/W02 session operations; it does not introduce a new Worker, D1, Queue, Service Binding, or persistence authority. A merged screen and passing CI do not replace real authenticated Android/iOS runtime verification. Continue one module at a time; password changes, login history, MFA/passkeys and account lifecycle controls remain hidden until their own API, permission and security evidence is admitted.
+**Current contract status: STEPS 0–2 IMPLEMENTED / STEPS 3–4 WAITING FOR CLOSEOUT / STEPS 5–6 WAITING FOR ADMISSION / STEPS 7–8 NOT IMPLEMENTED.**  
+PR #1555 adds a candidate native session page and passed automated Native App CI, but Step 5 is not admitted or release-complete: do not merge/expose it until the account/session security admission and real authenticated Android/iOS runtime evidence are accepted. The APP continues to reuse existing W01/W02 session operations without a new Worker, D1, Queue, Service Binding, or persistence authority. Password changes, MFA/passkeys, login history and bulk revocation remain hidden. Complete Steps 3 and 4 closeout independently; do not treat merged code as end-to-end acceptance.
