@@ -163,7 +163,7 @@ export default function LuckReadSocialPostCard({
   const contentHref = buildPublicContentHref({ id: contentId, slug, contentType: 'post', creator: profile || author })
   const mediaItems = resolveSocialPostMedia(mediaRefs, coverRef)
   const mediaSourceKey = JSON.stringify(mediaItems.map((media) => media.src))
-  const mediaRevealKey = (mediaWarning ?? 'none') + ':' + mediaSourceKey
+  const mediaRevealKey = contentId + ':' + (mediaWarning ?? 'none') + ':' + mediaSourceKey
   const [revealedMediaKey, setRevealedMediaKey] = useState<string | null>(null)
   const mediaRevealed = !mediaWarning || revealedMediaKey === mediaRevealKey
   const singleMedia = mediaItems.length === 1 ? mediaItems[0] : undefined
