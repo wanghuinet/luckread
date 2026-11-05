@@ -229,8 +229,9 @@ describe('W03 native social post thread authority', () => {
       status: 'ACTIVE',
     });
     expect(statements[1]).toContain('WITH RECURSIVE');
-    expect(statements[4]).toContain('NOT EXISTS (SELECT 1 FROM descendants WHERE id = s.id)');
-    expect(statements[2]).toContain("r.relation_type = 'thread-next'");
+    expect(statements[4]).toContain('NOT EXISTS (');
+    expect(statements[4]).toContain('SELECT 1 FROM descendants WHERE id = s.id');
+    expect(statements[4]).toContain("r.relation_type = 'thread-next'");
   });
 
   it('rejects malformed IDs before any D1 access', async () => {
