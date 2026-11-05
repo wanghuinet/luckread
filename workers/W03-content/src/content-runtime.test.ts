@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-import { canTransitionContentState, ContentRuntimeError, createContent, createRequestId, deleteContent, decodeContentListCursor, decodeCursor, decodeScopedCursor, encodeContentListCursor, encodeCursor, encodeScopedCursor, isState, listContents, listPublishedContentsByIds, listContentRevisions, listCreatorContents, publishDueScheduledContent, publicContent, toErrorResponse, transitionContentState, updateContent, validateInput, validateListFilters } from './content-runtime.js'
+import { canTransitionContentState, ContentRuntimeError, type ContentRecord, createContent, createRequestId, deleteContent, decodeContentListCursor, decodeCursor, decodeScopedCursor, encodeContentListCursor, encodeCursor, encodeScopedCursor, isState, listContents, listPublishedContentsByIds, listContentRevisions, listCreatorContents, publishDueScheduledContent, publicContent, toErrorResponse, transitionContentState, updateContent, validateInput, validateListFilters } from './content-runtime.js'
 import w03Worker, { hasCreatorContentPermission, hasSocialPostPermission, parseListLimit } from './index.js'
 
 describe('W03 content contract core', () => {
@@ -2511,7 +2511,7 @@ describe('creator-selected sensitive media warning', () => {
   })
 
   it('redacts warning metadata together with private media in member-only previews', () => {
-    const content = {
+    const content: ContentRecord = {
       id: 'sensitive-warning-content',
       contentType: 'post',
       ownerUserId: 'owner_1',
@@ -2530,7 +2530,7 @@ describe('creator-selected sensitive media warning', () => {
       mediaRefs: ['https://img.luckread.com/media/private.webp'],
       coverRef: 'https://img.luckread.com/media/private.webp',
       mediaWarning: 'NUDITY',
-    } as const
+    }
     expect(publicContent({ ...content, accessGranted: false })).toMatchObject({
       mediaRefs: [],
       coverRef: null,
