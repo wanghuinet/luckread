@@ -237,9 +237,10 @@ export async function bindPreflightToStoredPost(
     verifiedCreatorId = verified
   }
 
-  // Only direct publication of a draft social post needs the canonical body/media
-  // rebinding. Creator article/video transitions still receive the verified ID.
-  if (mutation.to !== 'PUBLISHED' || content.contentType !== 'post' || content.state !== 'DRAFT' ||
+  // Direct and scheduled publication of a draft social post both bind the
+  // canonical body/media and owner checks before W03 accepts the state change.
+  if ((mutation.to !== 'PUBLISHED' && mutation.to !== 'SCHEDULED') ||
+      content.contentType !== 'post' || content.state !== 'DRAFT' ||
       !mutation.preflight || typeof mutation.preflight !== 'object' || Array.isArray(mutation.preflight)) {
     return { body: submitted, ...(verifiedCreatorId ? { verifiedCreatorId } : {}) }
   }
