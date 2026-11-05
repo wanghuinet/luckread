@@ -329,22 +329,41 @@
         "ENT-SESSION"
       ],
       "payloadCollections": [],
-      "codeEvidenceRefs": [],
+      "codeEvidenceRefs": [
+        "workers/W01-payload/src/app/(twitter-clone)/me/sessions/page.tsx",
+        "workers/W01-payload/src/app/auth/sessions/[[...segments]]/route.ts",
+        "workers/W01-payload/src/app/api/v1/auth/sessions/[[...segments]]/route.ts",
+        "workers/W02-identity/src/auth/session-list.ts",
+        "workers/W02-identity/src/auth/session-revoke.ts",
+        "workers/W02-identity/src/auth/session-list.test.ts",
+        "workers/W02-identity/src/auth/session-revoke.test.ts",
+        "workers/W02-identity/src/index.ts",
+        "workers/W02-identity/migrations/0005_better_auth_identity_core.sql"
+      ],
       "securityIds": [
         "user.session.read",
         "user.session.revoke"
       ],
       "evidence": [
-        "contracts/alignment/mapping-batches/AUTH-010-permission-scope-reconciliation.v1.md",
-        "contracts/alignment/mapping-batches/AUTH-010-real-evidence-reconciliation.v1.md",
-        "contracts/alignment/mapping-batches/AUTH-010-reconciliation.v1.md",
+        "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md:L41",
+        "docs/change-control/CC-1.1-ACCOUNT-CENTER-PAYLOAD-BOUNDARY-2026-10-05.md",
+        "docs/change-control/CC-MAPPING-0-AUTH-010-CURRENT-BETTER-AUTH-SESSION-MAPPING-2026-11-06.md",
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/dto/auth-dto-contract.v1.json",
+        "contracts/entity/AUTH-002-session-field-contract.v1.json",
         "contracts/alignment/mapping-batches/AUTH-010-session-field-binding.v1.md",
+        "contracts/alignment/mapping-batches/AUTH-010-real-evidence-reconciliation.v1.md",
+        "contracts/api/auth-operation-policy.v1.json",
+        "contracts/evidence/mapping-0-evidence-registry.v1.json",
         "contracts/alignment/mapping-batches/B01-B03-identity-user-authz-org.v1.json",
-        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json",
-        "contracts/dto/auth-dto-contract.v1.json"
+        "https://github.com/wanghuinet/luckread/actions/runs/42070183019"
       ],
       "blockers": [
-        "Page/DTO/Entity/Field/Event/Worker/D1/Test/Evidence IDs not fully reconciled"
+        "Current W02 Better Auth session list/revoke handlers have controlled local W01/W02 + local D1 evidence only; the matching Evidence Registry record is CREATED and no exact-current-source remote/deployed E2E is admitted.",
+        "The historical AUTH-002 Payload users.sessions[] + auth_session_state persistence contracts do not match the current W02 Better Auth D1-01 session table. Session physical persistence, canonical fields and secret handling require a reconciled contract before ENT-SESSION persistence can be VERIFIED.",
+        "The current session-list response returns lastSeenAt=null and no stable device identifier. IP address and userAgent are not inferred as device identity.",
+        "The discovered session-management page is H5/Web. A native RN APP settings screen and authenticated APP E2E acceptance have not been admitted.",
+        "ENT-DEVICE-RECORD remains PROPOSED with no admitted field/persistence contract; full device-registry closure is not claimed."
       ]
     },
     {
