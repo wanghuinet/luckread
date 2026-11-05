@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://luckread.com/contracts/v1/transport/W01-W08-creator-http-binding.v1.json",
   "title": "W01 to W08 Creator Qualification API Internal HTTP Binding",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "status": "CONTRACTED_PARTIAL",
   "caller": {
     "logicalWorker": "W01",
@@ -95,6 +95,21 @@
       "cache": "NO_STORE",
       "bodyAuthority": "W01 derives resourceAttributes.ownerId from the W02 session principal. W08 independently resolves the same session through W02/D1-01, loads account/layer/role facts, and evaluates notification.update.self through CASL. Client-supplied subjectId, layer, accountState, and ownerId are never trusted.",
       "successRule": "W01 forwards the endpoint mutation to W05 only after an ALLOW decision matches action=notification.update.self, resourceType=Notification, policyVersion=casl-l0-l8-v1, and the W02-derived principal layer."
+    },
+    {
+      "operationId": "authorizeScheduledContentPublish",
+      "method": "POST",
+      "publicPath": null,
+      "internalPath": "/internal/authz/check-scheduled-publish",
+      "principalRequired": false,
+      "serviceCaller": "W01 via the existing private W08_CREATOR Service Binding",
+      "permission": "content.publish.own",
+      "resourceType": "Content",
+      "resourceScope": "active creator's own content",
+      "cache": "NO_STORE",
+      "bodyAuthority": "The caller supplies only creatorId, obtained by W01 from the due content candidate returned by W03. W08 resolves creatorId to the canonical userId using the ACTIVE creators record in D1-01, then loads current account state and time-valid role assignments from D1-01. ownerUserId, subjectId, layer, accountState, roles, and permission decisions are never accepted from the caller.",
+      "successRule": "W08 returns ALLOW only when the Creator record is ACTIVE, its linked user account is ACTIVE, the current resolved global layer is L3 or L4, and CASL allows content.publish.own for Content with ownerId equal to the W08-derived userId. The response includes the canonical creatorId and ownerUserId for W01/W03 resource matching.",
+      "failureBehavior": "DENY for inactive/missing Creator, inactive/missing account, missing or expired role assignment, non-L3/L4 layer, and CASL denial; return 503 DENY when D1-01 or authorization facts are unavailable."
     }
   ],
   "trustBoundary": {
@@ -104,7 +119,8 @@
     "sessionCredentialCarriers": [
       "HttpOnly Better Auth browser session cookie",
       "Authorization: Bearer <canonical Better Auth session token>"
-    ]
+    ],
+    "backgroundScheduledAuthorization": "This operation is workload-to-workload only over the existing W01 W08_CREATOR Service Binding; it has no public route and requires no end-user cookie or Bearer credential. W08 derives the principal from the ACTIVE creatorId mapping in D1-01 and never accepts caller-supplied owner identity or authorization context. W03 remains the authority for the scheduled content record and final publication state."
   },
   "failurePolicy": {
     "timeoutMs": 2000,
@@ -117,7 +133,13 @@
       "reviewer below L7",
       "missing If-Match on an undecided application",
       "missing or invalid Idempotency-Key",
-      "role grant not confirmed by W02"
+      "role grant not confirmed by W02",
+      "invalid background caller marker or transport version",
+      "end-user cookie or Authorization credential on the scheduled publish authorization operation",
+      "missing or inactive Creator record",
+      "non-ACTIVE user account",
+      "missing, expired, or non-L3/L4 global authorization layer",
+      "CASL denial for content.publish.own"
     ]
   },
   "security": {
