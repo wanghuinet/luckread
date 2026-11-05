@@ -410,7 +410,7 @@ function xhrRequestWithUploadProgress(
 
         const responseHeaders = new Headers();
         const rawHeaders = xhr.getAllResponseHeaders();
-        rawHeaders.split(/[\\r\\n]+/).forEach((line) => {
+        rawHeaders.split(/[\r\n]+/).forEach((line) => {
           const separator = line.indexOf(':');
           if (separator <= 0) return;
           const name = line.slice(0, separator).trim();
