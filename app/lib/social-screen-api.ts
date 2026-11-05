@@ -108,6 +108,87 @@ export function fetchOwnPostDraftsPage(options: PageRequestOptions = {}) {
   );
 }
 
+export type NativeScheduledPost = {
+  id: string;
+  contentType: 'post';
+  state: 'SCHEDULED';
+  version: number;
+  revision: number;
+  etag: string;
+  title: string;
+  accessMode: 'PUBLIC' | 'MEMBERS_ONLY';
+  bodyRef: string;
+  mediaRefs: string[];
+  coverRef: string | null;
+  scheduledAt: string;
+  updatedAt: string;
+};
+
+export type NativeScheduledPostPage = {
+  items: NativeScheduledPost[];
+  nextCursor: string | null;
+  hasMore: boolean;
+};
+
+/** List only the signed-in Creator's scheduled social posts; W03 enforces L3/L4 and owner scope. */
+export function fetchOwnScheduledPostsPage(options: PageRequestOptions = {}) {
+  const query = new URLSearchParams({ status: 'SCHEDULED', type: 'post', limit: String(options.limit ?? 20) });
+  if (options.cursor) query.set('cursor', options.cursor);
+  return apiRequest<{ data?: NativeScheduledPostPage; error?: { code?: string; message?: string } }>(
+    '/contents?' + query.toString(),
+    { method: 'GET', signal: options.signal },
+  );
+}
+
+/**
+ * Reuse the existing W01/W03 lifecycle state operation. Rescheduling is modeled
+ * as SCHEDULED -> DRAFT -> SCHEDULED, so every write has its own fresh ETag and
+ * W08 Creator re-check instead of introducing a second scheduled-time mutation API.
+ */
+export function transitionOwnScheduledPostState(
+  item: NativeScheduledPost,
+  to: 'DRAFT' | 'SCHEDULED',
+  scheduledAt?: string,
+) {
+  const contentId = item.id.trim();
+  const etag = item.etag.trim();
+  if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(contentId)) {
+    throw new TypeError('A valid scheduled post ID is required.');
+  }
+  if (!etag || etag === '*' || etag.length > 256) {
+    throw new TypeError('A current scheduled post version is required.');
+  }
+
+  let body: Record<string, unknown> = { to: 'DRAFT' };
+  if (to === 'SCHEDULED') {
+    const timestamp = typeof scheduledAt === 'string' ? Date.parse(scheduledAt) : Number.NaN;
+    if (!Number.isFinite(timestamp) || timestamp <= Date.now() + 60_000) {
+      throw new TypeError('A future scheduled publish time is required.');
+    }
+    if (!item.title.trim() || !item.bodyRef || !Array.isArray(item.mediaRefs)) {
+      throw new TypeError('The scheduled post is missing its publish metadata.');
+    }
+    body = {
+      to: 'SCHEDULED',
+      scheduledAt: new Date(timestamp).toISOString(),
+      preflight: {
+        contentType: 'post',
+        title: item.title,
+        body: item.title,
+        mediaRefs: item.mediaRefs,
+        coverRef: item.coverRef,
+      },
+    };
+  }
+
+  return apiRequest<unknown>('/contents/' + encodeURIComponent(contentId) + '/state', {
+    method: 'POST',
+    headers: { 'If-Match': etag },
+    body: JSON.stringify(body),
+    idempotencyKey: 'native-scheduled-post-' + to.toLowerCase() + ':' + contentId + ':' + createIdempotencyKey(),
+  });
+}
+
 /** Soft-delete an owner draft with the current W03 ETag and a unique operation key. */
 export function deleteOwnPostDraft(contentIdValue: string, etagValue: string) {
   const contentId = contentIdValue.trim();
