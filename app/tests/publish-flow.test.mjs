@@ -24,6 +24,28 @@ test('native publisher uses the shared media API helpers and existing W01 state 
   expect(composer).not.toMatch(/\bfetch\s*\(/);
 });
 
+test('native publisher preserves pending media in app-private storage and restores by user and draft', () => {
+  expect(composer).toContain("from '~/lib/publish-pending-media-recovery'");
+  expect(composer).toContain('persistPendingMediaRecovery(');
+  expect(composer).toContain('listPendingMediaRecovery(user.id, null)');
+  expect(composer).toContain('listPendingMediaRecovery(user.id, targetContentId)');
+  expect(composer).toContain('bindPendingMediaRecoveryToDraft(');
+  expect(composer).toContain('deletePendingMediaRecoveryForDraft(user.id, draft.id)');
+  expect(composer).toContain('上次上传中断。本机已保留文件，点击重试即可继续。');
+  expect(composer).toContain('setAssets(pending.map((asset) => ({');
+});
+
+test('native draft autosave persists text without treating unfinished local uploads as server media refs', () => {
+  expect(composer).toContain("const pendingAssets = assets.filter((asset) => !asset.existing && asset.status !== 'ready');");
+  expect(composer).toContain("const readyAssets = assets.filter((asset) => asset.existing || asset.status === 'ready');");
+  expect(composer).toContain('const mediaRefs = Array.from(new Set(readyAssets.map((asset) => asset.serverUrl)));');
+  expect(composer).toContain('await bindPendingMediaRecoveryToDraft(');
+  expect(composer).toContain('Files are saved on this device; retry them from the composer.');
+  expect(composer).toContain('if (!body.trim() && pollEnabled)');
+  expect(composer).not.toContain("if (assets.some((asset) => !asset.existing && asset.status !== 'ready')) return;");
+  expect(composer).not.toContain("assets.some((asset) => !asset.existing && asset.status !== 'ready')\\n    ) {");
+});
+
 test('native composer uses the existing Expo UI date-time picker for future scheduled publishing', () => {
   expect(composer).toContain("import DateTimePicker from '@expo/ui/community/datetime-picker';");
   expect(composer).toContain('mode="datetime"');
