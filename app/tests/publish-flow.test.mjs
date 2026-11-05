@@ -2,6 +2,7 @@ import { expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { computeAutoSaveDelay, createPublishDraftFingerprint, createReplyAudienceFingerprint } from '../lib/publish-draft-autosave.ts';
 import { findActiveComposerToken, replaceActiveComposerToken } from '../lib/publish-composer-tokens.ts';
+import { getPollDurationMinutes, getPollDurationParts } from '../lib/poll-duration.ts';
 
 const composer = readFileSync(new URL('../app/publish.tsx', import.meta.url), 'utf8');
 const feedItem = readFileSync(new URL('../components/FeedItem.tsx', import.meta.url), 'utf8');
@@ -127,7 +128,7 @@ test('native post composer validates and configures a real poll on the same draf
   expect(composer).toContain("pollKey: createIdempotencyKey()");
   expect(composer).toContain("'/contents/' + encodeURIComponent(draft.id) + '/poll'");
   expect(composer).toContain('options: cleanPollOptions');
-  expect(composer).toContain('durationHours: pollDurationHours');
+  expect(composer).toContain('durationMinutes: pollDurationMinutes');
   expect(composer).toContain('idempotencyKey: attempt.pollKey');
   expect(composer).toContain("setPublishPending(true)");
   expect(composer.indexOf("'/contents/' + encodeURIComponent(draft.id) + '/poll'"))
@@ -268,7 +269,7 @@ test('native draft fingerprints are stable and change when persisted content cha
     coverRef: 'https://img.luckread.com/a.jpg',
     pollEnabled: false,
     pollOptions: [],
-    pollDurationHours: 24,
+    pollDurationMinutes: 1440,
   };
   const fingerprint = createPublishDraftFingerprint(input);
   expect(createPublishDraftFingerprint(input)).toBe(fingerprint);
@@ -341,4 +342,17 @@ test('reply policy autosave fingerprints change for audience or mentioned text w
   expect(createReplyAudienceFingerprint('Hello @bob', 'mentioned')).not.toBe(initial);
   expect(createReplyAudienceFingerprint('Hello @alice', 'everyone')).not.toBe(initial);
   expect(initial).not.toContain('Hello');
+});
+
+test('native poll duration matches X bounds and keeps day/hour/minute precision', () => {
+  expect(getPollDurationParts(1440)).toEqual({ days: '1', hours: '0', minutes: '0' });
+  expect(getPollDurationMinutes({ days: '0', hours: '0', minutes: '5' })).toBe(5);
+  expect(getPollDurationMinutes({ days: '0', hours: '6', minutes: '30' })).toBe(390);
+  expect(getPollDurationMinutes({ days: '7', hours: '0', minutes: '0' })).toBe(10080);
+  expect(getPollDurationMinutes({ days: '0', hours: '0', minutes: '4' })).toBeNull();
+  expect(getPollDurationMinutes({ days: '7', hours: '0', minutes: '1' })).toBeNull();
+  expect(getPollDurationMinutes({ days: '0', hours: '24', minutes: '0' })).toBeNull();
+  expect(composer).toContain('durationMinutes: pollDurationMinutes');
+  expect(composer).toContain('Poll duration · 5 minutes to 7 days');
+  expect(composer).toContain('getPollDurationParts');
 });

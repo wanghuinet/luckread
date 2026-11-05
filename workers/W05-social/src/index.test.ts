@@ -1759,7 +1759,7 @@ describe('W05 social poll transport', () => {
       new Request('https://luckread-w05.internal/internal/social/contents/content-1/poll', {
         method: 'POST',
         headers,
-        body: JSON.stringify({ options: ['Yes', 'No'], durationHours: 24 }),
+        body: JSON.stringify({ options: ['Yes', 'No'], durationMinutes: 5 }),
       }),
       { DB: configureDb },
     )
@@ -1845,6 +1845,23 @@ describe('W05 social poll transport', () => {
     expect(response.status).toBe(422)
     await expect(response.json()).resolves.toMatchObject({ error: { code: 'VALIDATION_FAILED' } })
     expect((d1 as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
+  })
+
+  it('rejects mixed minute and legacy hour durations before resolving W03 or touching D1', async () => {
+    const binding = { fetch: vi.fn(async () => Response.json({ error: { code: 'SHOULD_NOT_BE_CALLED' } }, { status: 500 })) }
+    const db = dbFor()
+    const response = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/contents/content-1/poll', {
+        method: 'POST',
+        headers: { ...transportHeaders, 'content-type': 'application/json', 'Idempotency-Key': 'poll-mixed-duration' },
+        body: JSON.stringify({ options: ['Yes', 'No'], durationMinutes: 5, durationHours: 24 }),
+      }),
+      { DB: db, W03_CONTENT: binding },
+    )
+    expect(response.status).toBe(422)
+    await expect(response.json()).resolves.toMatchObject({ error: { code: 'VALIDATION_FAILED' } })
+    expect(binding.fetch).not.toHaveBeenCalled()
+    expect((db as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
   })
 
   it('requires the canonical interaction layer and idempotency key before poll mutations', async () => {

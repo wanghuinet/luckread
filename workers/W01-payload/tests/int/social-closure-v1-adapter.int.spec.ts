@@ -117,7 +117,7 @@ describe('unified W05 social closure adapters', () => {
 
     expect(openapi).toContain('ContentPollOption:')
     expect(openapi).toContain('ContentPoll:')
-    expect(openapi).toContain("enum: [24, 72, 168]")
+    expect(openapi).toContain('durationMinutes: { type: integer, minimum: 5, maximum: 10080 }')
     expect(openapi).toContain("#/components/parameters/IdempotencyKeyRequired")
   })
 
@@ -130,10 +130,14 @@ describe('unified W05 social closure adapters', () => {
     const worker = read('../../workers/W05-social/src/index.ts')
     const runtime = read('../../workers/W05-social/src/poll-runtime.ts')
     const migration = read('../../workers/W05-social/migrations/20261017_014_social_polls_v1.sql')
+    const durationMigration = read('../../workers/W05-social/migrations/20261105_018_social_poll_duration_minutes.sql')
 
     expect(pollRoute).toContain('/internal/social/contents/')
     expect(pollRoute).toContain('resolveCookieSocialPrincipal')
     expect(pollRoute).toContain('enforcePublicReadRateLimit')
+    expect(pollRoute).toContain('durationMinutes')
+    expect(pollRoute).toContain('hasLegacyDurationHours')
+    expect(pollRoute).toContain('Number(raw.durationHours) * 60')
     expect(voteRoute).toContain('/poll/votes')
     expect(voteRoute).toContain('Idempotency-Key')
     expect(composer).toContain('syncDraftPoll(savedDraft.id)')
@@ -147,6 +151,9 @@ describe('unified W05 social closure adapters', () => {
     expect(runtime).toContain("content.state !== 'PUBLISHED'")
     expect(migration).toContain('UNIQUE (poll_id, user_id)')
     expect(migration).toContain('CREATE TABLE IF NOT EXISTS social_polls')
+    expect(durationMigration).toContain('ADD COLUMN duration_minutes INTEGER NOT NULL DEFAULT 1440')
+    expect(durationMigration).toContain('duration_hours * 60')
+    expect(durationMigration).toContain('duration_hours * 60')
     expect(migration).toContain('UNIQUE (poll_id, user_id)')
   })
 

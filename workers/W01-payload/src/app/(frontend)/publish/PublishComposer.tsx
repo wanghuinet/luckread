@@ -59,8 +59,8 @@ type ContentResponse = {
 }
 
 type PollOptionView = { optionId: string; text: string; position: number; votes: number }
-type DraftPoll = { options: PollOptionView[]; durationHours: 24 | 72 | 168 }
-type PollApiResponse = { data?: { poll?: { options?: PollOptionView[]; durationHours?: number } | null }; error?: { message?: string } }
+type DraftPoll = { options: PollOptionView[]; durationMinutes: number }
+type PollApiResponse = { data?: { poll?: { options?: PollOptionView[]; durationMinutes?: number; durationHours?: number } | null }; error?: { message?: string } }
 
 const CONTENT_MUTATED_EVENT = 'luckread:content-mutated'
 
@@ -215,7 +215,7 @@ export default function PublishComposer({
   // New text/video posts must not depend on an optional poll route being deployed.
   const pollConfiguredRef = useRef(false)
   const [pollOptions, setPollOptions] = useState<string[]>(['', ''])
-  const [pollDurationHours, setPollDurationHours] = useState<24 | 72 | 168>(24)
+  const [pollDurationMinutes, setPollDurationMinutes] = useState(1440)
   const [videoMetadataByAssetId, setVideoMetadataByAssetId] = useState<Record<string, VideoMetadata>>({})
   const [draft, setDraft] = useState<ContentResponse | null>(null)
   // Keep the latest server etag outside render closures so a publish queued behind autosave uses the new version.
@@ -286,11 +286,14 @@ export default function PublishComposer({
             { method: 'GET', signal: controller.signal, headers: { accept: 'application/json' } },
           )
           const poll = pollResult.response.ok ? pollResult.data?.data?.poll : null
-          if (poll && Array.isArray(poll.options) && [24, 72, 168].includes(Number(poll.durationHours))) {
-            recoveredPoll = {
-              options: poll.options,
-              durationHours: Number(poll.durationHours) as 24 | 72 | 168,
-            }
+          const durationMinutes = typeof poll?.durationMinutes === 'number'
+            ? poll.durationMinutes
+            : typeof poll?.durationHours === 'number'
+              ? poll.durationHours * 60
+              : Number.NaN
+          if (poll && Array.isArray(poll.options) &&
+              Number.isSafeInteger(durationMinutes) && durationMinutes >= 5 && durationMinutes <= 10080) {
+            recoveredPoll = { options: poll.options, durationMinutes }
           }
         }
         if (cancelled) return
@@ -316,7 +319,7 @@ export default function PublishComposer({
         pollConfiguredRef.current = Boolean(recoveredPoll)
         setPollEnabled(Boolean(recoveredPoll))
         setPollOptions(recoveredPoll ? recoveredPoll.options.map((option) => option.text) : ['', ''])
-        setPollDurationHours(recoveredPoll?.durationHours ?? 24)
+        setPollDurationMinutes(recoveredPoll?.durationMinutes ?? 1440)
         setAssets((recovered.mediaRefs ?? []).map((url: string) => ({
           id: url,
           url,
@@ -486,9 +489,27 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
   }
 
   function assertPollConfigurationValid() {
-    if (pollEnabled && !readValidPollOptions()) {
-      throw new Error('投票需要填写 2–4 个不重复的选项，每项最多 50 个字符。')
+    if (pollEnabled && (!readValidPollOptions() || pollDurationMinutes < 5 || pollDurationMinutes > 10080)) {
+      throw new Error('投票需要填写 2–4 个不重复的选项，时长必须在 5 分钟至 7 天之间。')
     }
+  }
+
+  const pollDurationParts = {
+    days: Math.floor(pollDurationMinutes / 1440),
+    hours: Math.floor((pollDurationMinutes % 1440) / 60),
+    minutes: pollDurationMinutes % 60,
+  }
+
+  function updatePollDurationPart(unit: 'days' | 'hours' | 'minutes', rawValue: string) {
+    const limits = { days: 7, hours: 23, minutes: 59 }
+    const parsed = rawValue === '' ? 0 : Number(rawValue)
+    const safeValue = Number.isFinite(parsed)
+      ? Math.min(limits[unit], Math.max(0, Math.trunc(parsed)))
+      : 0
+    const next = { ...pollDurationParts, [unit]: safeValue }
+    const total = next.days * 1440 + next.hours * 60 + next.minutes
+    setPollDurationMinutes(Math.min(10080, total))
+    markDirty()
   }
 
   async function syncDraftReplyAudience(contentId: string) {
@@ -513,7 +534,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
     if (type !== 'post') return
     if (pollEnabled) {
       const options = readValidPollOptions()
-      if (!options) {
+      if (!options || pollDurationMinutes < 5 || pollDurationMinutes > 10080) {
         if (strict) assertPollConfigurationValid()
         return
       }
@@ -525,7 +546,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
             'content-type': 'application/json',
             'Idempotency-Key': 'social-poll-config:' + contentId + ':' + crypto.randomUUID(),
           },
-          body: JSON.stringify({ options, durationHours: pollDurationHours }),
+          body: JSON.stringify({ options, durationMinutes: pollDurationMinutes }),
         },
       )
       if (!response.ok) throw new Error(getApiErrorMessage(data, '投票保存失败，请稍后重试。'))
@@ -748,7 +769,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
         autoSaveTimerRef.current = null
       }
     }
-  }, [title, body, type, assets, coverRef, busy, articleDocument, pollEnabled, pollOptions, pollDurationHours, replyAudience])
+  }, [title, body, type, assets, coverRef, busy, articleDocument, pollEnabled, pollOptions, pollDurationMinutes, replyAudience])
 
   function startNewContent() {
     latestDraftRef.current = null
@@ -764,7 +785,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
     pollConfiguredRef.current = false
     setPollEnabled(false)
     setPollOptions(['', ''])
-    setPollDurationHours(24)
+    setPollDurationMinutes(1440)
     setPreview(false)
     setCopied(false)
     cancelPendingAutoSave()
@@ -1366,23 +1387,32 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
                   + 添加选项
                 </button>
               ) : null}
-              <label className={isTweetModal ? "grid gap-1 text-sm text-[#e7e9ea]" : "lr-field"}>
-                <span>投票时长</span>
-                <select
-                  className={isTweetModal ? "w-full rounded-lg border border-[#2f3336] bg-black px-3 py-2.5 text-sm text-[#e7e9ea]" : isXWorkspace ? "rounded-md border border-light-border bg-main-background px-3 py-2.5 text-sm text-light-primary outline-none focus:border-main-accent dark:border-dark-border dark:text-dark-primary" : undefined}
-                  aria-label="投票时长"
-                  disabled={busy || reviewLocked}
-                  value={pollDurationHours}
-                  onChange={(event) => {
-                    setPollDurationHours(Number(event.target.value) as 24 | 72 | 168)
-                    markDirty()
-                  }}
-                >
-                  <option value={24}>1 天</option>
-                  <option value={72}>3 天</option>
-                  <option value={168}>7 天</option>
-                </select>
-              </label>
+              <div className={isTweetModal ? "grid gap-2 text-sm text-[#e7e9ea]" : "grid gap-2"}>
+                <span className={isTweetModal ? "text-sm" : "text-sm text-light-secondary dark:text-dark-secondary"}>投票时长（5 分钟至 7 天）</span>
+                <div className="grid grid-cols-3 gap-2">
+                  {([
+                    { key: 'days', label: '天', max: 7 },
+                    { key: 'hours', label: '小时', max: 23 },
+                    { key: 'minutes', label: '分钟', max: 59 },
+                  ] as const).map((part) => (
+                    <label className="grid gap-1 text-xs text-light-secondary dark:text-dark-secondary" key={part.key}>
+                      <span>{part.label}</span>
+                      <input
+                        aria-label={'投票时长' + part.label}
+                        className={isTweetModal
+                          ? "w-full rounded-lg border border-[#2f3336] bg-black px-3 py-2.5 text-sm text-[#e7e9ea]"
+                          : "w-full rounded-md border border-light-border bg-main-background px-3 py-2.5 text-sm text-light-primary outline-none focus:border-main-accent dark:border-dark-border dark:text-dark-primary"}
+                        disabled={busy || reviewLocked}
+                        max={part.max}
+                        min={0}
+                        onChange={(event) => updatePollDurationPart(part.key, event.target.value)}
+                        type="number"
+                        value={pollDurationParts[part.key]}
+                      />
+                    </label>
+                  ))}
+                </div>
+              </div>
               <p className={isTweetModal ? "text-xs leading-5 text-[#71767b]" : "text-xs text-light-secondary dark:text-dark-secondary"}>投票会随动态一起发布；每个账号只能投一次，发布后不能修改选项。</p>
             </div>
           ) : null}
@@ -1421,32 +1451,42 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
               </div>
             ))}
           </div>
-          <div className="flex items-center justify-between gap-2.5">
-            {pollOptions.length < 4 ? (
-              <button
-                className="flex-none cursor-pointer border-0 bg-transparent text-xs text-main-accent"
-                disabled={busy || reviewLocked}
-                onClick={() => {
-                  setPollOptions((current) => [...current, ''])
-                  markDirty()
-                }}
-                type="button"
-              >+ 添加选项</button>
-            ) : <span />}
-            <select
-              className="rounded-full border border-[#536471] bg-black px-2.5 py-1.5 text-xs text-[#e7e9ea] outline-none"
-              aria-label="投票时长"
-              disabled={busy || reviewLocked}
-              value={pollDurationHours}
-              onChange={(event) => {
-                setPollDurationHours(Number(event.target.value) as 24 | 72 | 168)
-                markDirty()
-              }}
-            >
-              <option value={24}>1 天</option>
-              <option value={72}>3 天</option>
-              <option value={168}>7 天</option>
-            </select>
+          <div className="grid gap-2.5">
+            <div className="flex items-center justify-between gap-2.5">
+              {pollOptions.length < 4 ? (
+                <button
+                  className="flex-none cursor-pointer border-0 bg-transparent text-xs text-main-accent"
+                  disabled={busy || reviewLocked}
+                  onClick={() => {
+                    setPollOptions((current) => [...current, ''])
+                    markDirty()
+                  }}
+                  type="button"
+                >+ 添加选项</button>
+              ) : <span />}
+              <small className="text-xs text-[#71767b]">5 分钟至 7 天</small>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {([
+                { key: 'days', label: '天', max: 7 },
+                { key: 'hours', label: '小时', max: 23 },
+                { key: 'minutes', label: '分钟', max: 59 },
+              ] as const).map((part) => (
+                <label className="grid gap-1 text-xs text-[#71767b]" key={part.key}>
+                  <span>{part.label}</span>
+                  <input
+                    aria-label={'投票时长' + part.label}
+                    className="w-full rounded-lg border border-[#2f3336] bg-black px-2.5 py-2 text-sm text-[#e7e9ea] outline-none"
+                    disabled={busy || reviewLocked}
+                    max={part.max}
+                    min={0}
+                    onChange={(event) => updatePollDurationPart(part.key, event.target.value)}
+                    type="number"
+                    value={pollDurationParts[part.key]}
+                  />
+                </label>
+              ))}
+            </div>
           </div>
         </section>
       ) : null}
@@ -1600,7 +1640,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
                 {pollOptions.filter((option) => option.trim()).map((option, index) => (
                   <div key={index} className={isXWorkspace ? "rounded-lg border border-light-border px-3 py-2 text-sm dark:border-dark-border" : "rounded-full border border-light-border px-3 py-2 text-sm dark:border-dark-border"}>{option}</div>
                 ))}
-                <small className={isXWorkspace ? "text-xs text-light-secondary dark:text-dark-secondary" : undefined}>{pollDurationHours === 24 ? '1 天' : pollDurationHours === 72 ? '3 天' : '7 天'}</small>
+                <small className={isXWorkspace ? "text-xs text-light-secondary dark:text-dark-secondary" : undefined}>{pollDurationParts.days} 天 {pollDurationParts.hours} 小时 {pollDurationParts.minutes} 分钟</small>
               </section>
             ) : null}
           </article>

@@ -724,13 +724,21 @@ export default {
           try { body = await request.json() } catch { throw new SocialPollError('VALIDATION_FAILED', 400) }
           if (!body || typeof body !== 'object' || Array.isArray(body)) throw new SocialPollError('VALIDATION_FAILED', 400)
           const raw = body as Record<string, unknown>
+          const hasDurationMinutes = Object.prototype.hasOwnProperty.call(raw, 'durationMinutes')
+          const hasLegacyDurationHours = Object.prototype.hasOwnProperty.call(raw, 'durationHours')
+          if (hasDurationMinutes && hasLegacyDurationHours) throw new SocialPollError('VALIDATION_FAILED', 400)
+          const durationInput = hasDurationMinutes
+            ? raw.durationMinutes
+            : hasLegacyDurationHours
+              ? typeof raw.durationHours === 'number' ? raw.durationHours * 60 : raw.durationHours
+              : undefined
           const contentContext = await fetchOwnedPostContext(env.W03_CONTENT, {
             principalUserId: actorUserId,
             principalLayer: request.headers.get('X-LuckRead-Principal-Layer')?.trim() ?? '',
             contentId,
             correlationId: request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '',
           })
-          const poll = await configureContentPoll(env.DB, actorUserId, contentId, raw.options, raw.durationHours, contentContext)
+          const poll = await configureContentPoll(env.DB, actorUserId, contentId, raw.options, durationInput, contentContext)
           return json({ data: { poll }, requestId: createRequestId() }, 200)
         }
         if (request.method === 'DELETE') {
