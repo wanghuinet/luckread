@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://luckread.com/contracts/v1/transport/W01-W08-creator-http-binding.v1.json",
   "title": "W01 to W08 Creator Qualification API Internal HTTP Binding",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "status": "CONTRACTED_PARTIAL",
   "caller": {
     "logicalWorker": "W01",
