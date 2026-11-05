@@ -941,7 +941,6 @@ function PublishScreenContent() {
     if (contentId || loadingEdit || publishPending || authStatus !== 'authenticated') return;
     const trimmedBody = body.trim();
     if (!trimmedBody || trimmedBody.length > MAX_TEXT_LENGTH) return;
-    if (assets.some((asset) => !asset.existing && asset.status !== 'ready')) return;
     if (pollEnabled) {
       const cleanOptions = pollOptions.map((option) => option.normalize('NFKC').trim());
       const optionKeys = cleanOptions.map((option) => option.toLocaleLowerCase('en-US'));
@@ -954,12 +953,18 @@ function PublishScreenContent() {
         throw new Error('A poll needs 2–4 different, non-empty options. Complete the poll before saving the draft.');
       }
     }
-    if (assets.some((asset) => !asset.serverUrl || !/^https?:\/\//i.test(asset.serverUrl))) return;
+    const pendingAssets = assets.filter((asset) => !asset.existing && asset.status !== 'ready');
+    if (pendingAssets.some((asset) => !asset.uri || !asset.uploadKey)) {
+      throw new Error('An unfinished attachment is missing its local recovery file. Remove it or select it again.');
+    }
+    await Promise.all(pendingAssets.map((asset) => persistPendingAsset(asset)));
+    const readyAssets = assets.filter((asset) => asset.existing || asset.status === 'ready');
+    if (readyAssets.some((asset) => !asset.serverUrl || !/^https?:\/\//i.test(asset.serverUrl))) return;
 
-    const mediaRefs = Array.from(new Set(assets.map((asset) => asset.serverUrl)));
+    const mediaRefs = Array.from(new Set(readyAssets.map((asset) => asset.serverUrl)));
     const nextCover = coverRef && mediaRefs.includes(coverRef)
       ? coverRef
-      : assets.find((asset) => asset.mimeType.startsWith('image/'))?.serverUrl || null;
+      : readyAssets.find((asset) => asset.mimeType.startsWith('image/'))?.serverUrl || null;
     const fingerprint = createPublishDraftFingerprint({
       body: trimmedBody,
       accessMode,
@@ -975,7 +980,14 @@ function PublishScreenContent() {
       recordRef.current?.id &&
       draftSavedFingerprintRef.current === fingerprint &&
       replyAudienceSavedFingerprintRef.current === replyAudienceFingerprint
-    ) return;
+    ) {
+      await bindPendingMediaRecoveryToDraft(
+        user.id,
+        recordRef.current.id,
+        pendingAssets.map((asset) => asset.localId),
+      );
+      return;
+    }
 
     let bodyRef = originalBodyRef.current.text === trimmedBody
       ? originalBodyRef.current.bodyRef
@@ -1150,6 +1162,20 @@ function PublishScreenContent() {
       }
       replyAudienceSavedFingerprintRef.current = replyAudienceFingerprint;
     }
+    // Pending files remain local and recoverable; only permanent media refs are
+    // written to W03. Once ready refs are safely saved, their local copies can
+    // be removed without affecting the server draft.
+    await bindPendingMediaRecoveryToDraft(
+      user.id,
+      draft.id,
+      pendingAssets.map((asset) => asset.localId),
+    );
+    await Promise.all(
+      readyAssets
+        .filter((asset) => !asset.existing)
+        .map((asset) => deletePendingMediaRecovery(user.id, asset.localId)),
+    );
+
     // Only mark the content fingerprint saved after content, poll and reply policy succeed.
     draftSavedFingerprintRef.current = fingerprint;
     originalBodyRef.current = { text: trimmedBody, bodyRef };
@@ -1162,12 +1188,14 @@ function PublishScreenContent() {
     coverRef,
     loadingEdit,
     mediaWarning,
+    persistPendingAsset,
     pollDurationMinutes,
     pollEnabled,
     pollOptions,
     publishPending,
     replyAudience,
     router,
+    user?.id,
   ]);
 
   const scheduleDraftAutoSave = useCallback(() => {
