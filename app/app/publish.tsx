@@ -1688,7 +1688,7 @@ function PublishScreenContent() {
       }
       navigation.dispatch(data.action);
     })();
-  }, [assets, body, busy, loadingEdit, navigation, pollEnabled, publishPending, saveDraftSnapshot]);
+  }, [assets, body, busy, contentId, loadingEdit, navigation, pollEnabled, publishPending, saveDraftSnapshot]);
 
   const closeComposer = useCallback(() => {
     if (busy || loadingEdit || publishPending) {
