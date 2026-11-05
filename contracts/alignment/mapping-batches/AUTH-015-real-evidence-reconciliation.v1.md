@@ -169,7 +169,9 @@ The canonical B01 binding explicitly references:
 - `user.reactivate`: self-scoped reactivation capability;
 - `user.restore`: privileged platform-scoped restoration capability with sensitive/audited semantics.
 
-The state machine uses `system.job` for system-driven lifecycle steps. The current contract does not assign a new deletion-request permission ID, so none is invented here.
+The account operation policy previously referenced `account.delete.self` for request/cancel, but that identifier does not exist in the canonical permission catalog. The authoritative state machine instead defines `ACTIVE -> DELETION_REQUESTED` and the cooling-off cancellation transitions as `actor=user` with `permission=null`. The policy now references the existing state-machine authorization model (`per_transition_from_account_state_machine`, enforced by W02) rather than adding an unsupported permission ID. This is a contract alignment only: request/cancel API operations remain `MISSING`, and W02 must still derive the authenticated subject/target equality and evaluate real cooling-off preconditions before any transition can execute.
+
+The state machine uses `system.job` for system-driven lifecycle steps. No new deletion-request permission ID is invented.
 
 Required security proof includes:
 
