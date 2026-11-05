@@ -85,10 +85,14 @@ export default function BlockedMutedScreen() {
     requestRef.current?.abort();
     const controller = new AbortController();
     requestRef.current = controller;
-    if (append) setLoadingMore(true);
-    else setLoading(true);
+    if (append) {
+      setLoadingMore(true);
+    } else {
+      setLoading(true);
+      setLoadingMore(false);
+    }
     setError('');
-    if (pullRefresh) setRefreshing(true);
+    setRefreshing(pullRefresh);
 
     try {
       const result = await fetchManagedRelationshipsPage(kind, {
