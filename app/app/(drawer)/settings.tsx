@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, Switch, Text, View } from 'react-native';
+import { Alert, Platform, Pressable, ScrollView, Switch, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import {
   BottomSheetBackdrop,
@@ -10,9 +10,11 @@ import { Stack, useRouter } from 'expo-router';
 import { useColorScheme } from 'nativewind';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
+import { Image as ExpoImage } from 'expo-image';
 
 import { isThemePreference, THEME_PREFERENCE_KEY, type ThemePreference } from '~/lib/theme-preference';
 import { readVideoFeedAutoplayEnabled, writeVideoFeedAutoplayEnabled } from '~/lib/video-feed-autoplay-preference';
+import { clearImageCaches } from '~/lib/image-cache-management';
 import { useAuthStore } from '~/store/auth-store';
 
 type SettingsRowProps = {
@@ -22,6 +24,7 @@ type SettingsRowProps = {
   value?: string;
   onPress: () => void;
   isDark: boolean;
+  disabled?: boolean;
 };
 
 function SettingsRow({
@@ -31,14 +34,17 @@ function SettingsRow({
   value,
   onPress,
   isDark,
+  disabled = false,
 }: SettingsRowProps) {
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={title}
       accessibilityHint={description}
+      accessibilityState={{ disabled }}
+      disabled={disabled}
       onPress={onPress}
-      className="min-h-[72px] flex-row items-center px-4 py-3 active:bg-neutral-100 dark:active:bg-neutral-900"
+      className={disabled ? 'min-h-[72px] flex-row items-center px-4 py-3 opacity-60' : 'min-h-[72px] flex-row items-center px-4 py-3 active:bg-neutral-100 dark:active:bg-neutral-900'}
     >
       <View className="mr-3 h-10 w-10 items-center justify-center rounded-full bg-neutral-100 dark:bg-neutral-900">
         <Feather name={icon} size={19} color={isDark ? '#d1d5db' : '#536471'} />
@@ -156,6 +162,9 @@ export default function SettingsScreen() {
   const [videoAutoPlayLoaded, setVideoAutoPlayLoaded] = useState(false);
   const [videoAutoPlaySaving, setVideoAutoPlaySaving] = useState(false);
   const [videoAutoPlayError, setVideoAutoPlayError] = useState('');
+  const [imageCacheClearing, setImageCacheClearing] = useState(false);
+  const [imageCacheError, setImageCacheError] = useState('');
+  const imageCacheClearInFlight = useRef(false);
   const themeSheetRef = useRef<BottomSheetModal>(null);
   const themeSnapPoints = useMemo(() => ['36%'], []);
 
@@ -196,6 +205,54 @@ export default function SettingsScreen() {
       setVideoAutoPlaySaving(false);
     }
   }, [videoAutoPlayLoaded, videoAutoPlaySaving]);
+
+  const confirmClearImageCache = useCallback(() => {
+    if (imageCacheClearing || imageCacheClearInFlight.current) return;
+
+    Alert.alert(
+      '清理图片缓存',
+      '将清除此设备中图片组件使用的内存和磁盘缓存。之后浏览图片时可能需要重新加载。不会删除原始媒体、发布草稿、待上传文件、视频缓存或账号数据。',
+      [
+        { text: '取消', style: 'cancel' },
+        {
+          text: '清理',
+          style: 'destructive',
+          onPress: () => {
+            if (imageCacheClearInFlight.current) return;
+            imageCacheClearInFlight.current = true;
+            setImageCacheClearing(true);
+            setImageCacheError('');
+            void (async () => {
+              try {
+                const result = await clearImageCaches({
+                  clearMemoryCache: () => ExpoImage.clearMemoryCache(),
+                  clearDiskCache: () => ExpoImage.clearDiskCache(),
+                });
+                if (result.complete) {
+                  Alert.alert('清理完成', '此设备的图片内存和磁盘缓存已清理。再次浏览图片时会重新加载。');
+                  return;
+                }
+
+                const failedAreas: string[] = [];
+                if (!result.memoryCacheCleared) failedAreas.push('内存');
+                if (!result.diskCacheCleared) failedAreas.push('磁盘');
+                setImageCacheError(
+                  failedAreas.length === 2
+                    ? '图片内存和磁盘缓存清理未能确认完成。请重试。'
+                    : `图片${failedAreas[0]}缓存未能确认清除。请重试。`,
+                );
+              } catch {
+                setImageCacheError('图片缓存清理失败。请检查应用状态后重试。');
+              } finally {
+                imageCacheClearInFlight.current = false;
+                setImageCacheClearing(false);
+              }
+            })();
+          },
+        },
+      ],
+    );
+  }, [imageCacheClearing]);
 
   const selectTheme = useCallback(async (preference: ThemePreference) => {
     setThemePreference(preference);
@@ -313,10 +370,29 @@ export default function SettingsScreen() {
               {videoAutoPlayError}
             </Text>
           ) : null}
+          {Platform.OS === 'ios' || Platform.OS === 'android' ? (
+            <>
+              <View className="mx-4 h-px bg-neutral-100 dark:bg-neutral-800" />
+              <SettingsRow
+                icon="trash-2"
+                title={imageCacheClearing ? '正在清理图片缓存…' : '清理图片缓存'}
+                description="清除此设备的图片内存与磁盘缓存；不会删除草稿、待上传文件、视频或账号数据。"
+                value={imageCacheClearing ? '处理中' : undefined}
+                onPress={confirmClearImageCache}
+                isDark={isDark}
+                disabled={imageCacheClearing}
+              />
+              {imageCacheError ? (
+                <Text accessibilityLiveRegion="assertive" className="px-4 pb-3 text-xs text-red-600 dark:text-red-400">
+                  {imageCacheError}
+                </Text>
+              ) : null}
+            </>
+          ) : null}
         </SettingsSection>
 
         <Text className="px-6 pb-3 text-center text-xs leading-5 text-neutral-400 dark:text-neutral-500">
-          账户偏好由对应服务保存；外观和视频自动播放设置保存在此设备。未开放的控制不会显示为可操作选项。
+          账户偏好由对应服务保存；外观、视频自动播放和图片缓存操作均限于此设备。未开放的控制不会显示为可操作选项。
         </Text>
       </ScrollView>
 
