@@ -91,6 +91,9 @@ describe('scheduled publication cache window', () => {
       publicListRoute.indexOf('export async function POST'),
     )
     const cache = read('src/lib/public-response-cache.ts')
+    const w01Wrangler = read('wrangler.jsonc')
+    const w01Worker = read('src/worker.ts')
+    const orchestrator = read('src/lib/scheduled-publish-orchestrator.ts')
     const w03Index = readFileSync(
       resolve(process.cwd(), '../W03-content/src/index.ts'),
       'utf8',
@@ -99,10 +102,23 @@ describe('scheduled publication cache window', () => {
       resolve(process.cwd(), '../W03-content/src/content-runtime.ts'),
       'utf8',
     )
-    const scheduledHandler = w03Index.slice(w03Index.indexOf('async scheduled('))
+    const w03Wrangler = readFileSync(
+      resolve(process.cwd(), '../W03-content/wrangler.jsonc'),
+      'utf8',
+    )
 
-    expect(scheduledHandler).toContain("controller.cron !== '* * * * *'")
-    expect(scheduledHandler).toContain('publishDueScheduledContent(env.D1_02')
+    expect(w01Wrangler).toContain('"main": "src/worker.ts"')
+    expect(w01Wrangler).toContain('"crons": [')
+    expect(w01Worker).toContain('openNextWorker.fetch')
+    expect(w01Worker).toContain("controller.cron !== '* * * * *'")
+    expect(w01Worker).toContain('runAuthorizedScheduledPublish')
+    expect(orchestrator).toContain('/internal/authz/check-scheduled-publish')
+    expect(orchestrator).toContain('/internal/content/scheduled-due')
+    expect(orchestrator).toContain('/internal/content/scheduled-publish/commit')
+    expect(orchestrator).toContain('summary.authorizationFailures > 0')
+    expect(w03Index).toContain('/internal/content/scheduled-due')
+    expect(w03Index).toContain('/internal/content/scheduled-publish/commit')
+    expect(w03Wrangler).not.toContain('"crons"')
     expect(w03Runtime).toContain("SET state = 'PUBLISHED', scheduled_at = NULL")
     expect(listHandler).toContain("'content-list'")
     expect(listHandler).toContain("      30,\n    )")
@@ -190,7 +206,8 @@ describe('1.1 content lifecycle closeout', () => {
     expect(w03Runtime).toContain("from === 'DRAFT' && to === 'PENDING_REVIEW'")
     expect(w03Runtime).toContain("from === 'APPROVED' && to === 'PUBLISHED'")
     expect(w03Runtime).toContain("from === 'APPROVED' && to === 'SCHEDULED'")
-    expect(w03Runtime).toContain("publishDueScheduledContent")
+    expect(w03Runtime).toContain("listDueScheduledContentCandidates")
+    expect(w03Runtime).toContain("publishAuthorizedScheduledContents")
     expect(w03Runtime).toContain("scheduled_at")
     expect(w03Runtime).toContain("from === 'PUBLISHED' && (to === 'UNPUBLISHED' || to === 'ARCHIVED')")
     expect(w03Runtime).toContain("from === 'UNPUBLISHED' && (to === 'PUBLISHED' || to === 'DRAFT')")
