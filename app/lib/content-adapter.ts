@@ -41,6 +41,7 @@ export type ApiContentRecord = {
   createdAt?: string;
   updatedAt?: string;
   coverRef?: string | null;
+  mediaWarning?: 'NUDITY' | 'VIOLENCE' | 'SENSITIVE' | null;
   mediaRefs?: string[];
   author?: ApiAuthor | null;
   creator?: ApiAuthor | null;
@@ -241,6 +242,7 @@ export function mapContentToFeedContent(
     message,
     media_url: cover || mediaItems[0]?.src,
     media_items: mediaItems,
+    mediaWarning: accessGranted ? item.mediaWarning ?? null : null,
     like_count: firstNonNegativeInteger(counts?.likes, item.likeCount, item.like_count),
     retweet_count: firstNonNegativeInteger(counts?.retweets, counts?.reposts, item.retweetCount, item.retweet_count),
     reply_count: firstNonNegativeInteger(counts?.comments, counts?.replies, item.replyCount, item.reply_count),
