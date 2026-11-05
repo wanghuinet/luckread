@@ -728,11 +728,14 @@ function PublishScreenContent() {
     const target = assets.find((asset) => asset.localId === localId);
     const nextAssets = assets.filter((asset) => asset.localId !== localId);
     setAssets(nextAssets);
+    if (target && !target.existing && user?.id) {
+      void deletePendingMediaRecovery(user.id, target.localId).catch(() => undefined);
+    }
     if (nextAssets.length === 0) setMediaWarning(null);
     if (target && coverRef === target.serverUrl) {
       setCoverRef(nextAssets.find((asset) => asset.mimeType.startsWith('image/'))?.serverUrl || '');
     }
-  }, [assets, busy, coverRef, mediaWarning, publishPending]);
+  }, [assets, busy, coverRef, mediaWarning, publishPending, user?.id]);
 
   const moveAsset = useCallback((localId: string, direction: -1 | 1) => {
     if (busy || publishPending) return;
