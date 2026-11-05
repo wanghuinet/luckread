@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { DatabaseSync } from 'node:sqlite'
 import {
@@ -8,6 +8,15 @@ import {
   type AccountStateTransitionInput,
 } from './account-state-transition.js'
 
+beforeEach(() => {
+  vi.useFakeTimers()
+  vi.setSystemTime(new Date('2026-09-24T12:00:00.000Z'))
+})
+
+afterEach(() => {
+  vi.useRealTimers()
+})
+
 function input(overrides: Partial<AccountStateTransitionInput> = {}): AccountStateTransitionInput {
   return {
     userId: '42',
@@ -16,7 +25,6 @@ function input(overrides: Partial<AccountStateTransitionInput> = {}): AccountSta
     expectedVersion: 7,
     actor: { id: 'operator-1', type: 'operator' },
     permission: 'user.restrict.limited',
-    now: '2026-09-24T12:00:00.000Z',
     ...overrides,
   }
 }
@@ -532,7 +540,7 @@ describe('AUTH-013 trusted-principal authorization boundary', () => {
         preparedSql,
         preparedBindings,
       ),
-      { subjectId: 'operator-1', targetUserId: '42', to: 'RESTRICTED', now: '2026-09-28T12:00:00.000Z' },
+      { subjectId: 'operator-1', targetUserId: '42', to: 'RESTRICTED' },
     )
 
     const roleQuery = preparedSql.find((sql) => sql.includes('FROM role_assignments'))
@@ -548,7 +556,7 @@ describe('AUTH-013 trusted-principal authorization boundary', () => {
   it('derives operator permission and actor class from canonical role layer', async () => {
     const result = await authorizeAccountStateTransition(
       authorizationDb('ACTIVE', [{ roleId: 'operator', scopeType: 'global' }]),
-      { subjectId: 'operator-1', targetUserId: '42', to: 'RESTRICTED', now: '2026-09-28T12:00:00.000Z' },
+      { subjectId: 'operator-1', targetUserId: '42', to: 'RESTRICTED' },
     )
 
     expect(result).toEqual({
@@ -585,7 +593,6 @@ describe('AUTH-013 trusted-principal authorization boundary', () => {
         subjectId: '42',
         targetUserId: '42',
         to: 'REACTIVATED',
-        now: '2026-11-06T12:00:00.000Z',
       },
     )
 
@@ -604,8 +611,7 @@ describe('AUTH-013 trusted-principal authorization boundary', () => {
           subjectId: '42',
           targetUserId: '42',
           to: 'REACTIVATED',
-          now: '2026-11-06T12:00:00.000Z',
-        },
+          },
       ),
     ).rejects.toMatchObject({ code: 'FORBIDDEN' })
   })
@@ -618,8 +624,7 @@ describe('AUTH-013 trusted-principal authorization boundary', () => {
           subjectId: 'different-user',
           targetUserId: '42',
           to: 'REACTIVATED',
-          now: '2026-11-06T12:00:00.000Z',
-        },
+          },
       ),
     ).rejects.toMatchObject({ code: 'FORBIDDEN' })
   })
@@ -645,7 +650,6 @@ describe('AUTH-015 trusted lifecycle time-window evaluation', () => {
         to: 'DELETION_REQUESTED',
         actor: { id: '42', type: 'user' },
         permission: null,
-        now,
       }),
     )
 
@@ -669,7 +673,6 @@ describe('AUTH-015 trusted lifecycle time-window evaluation', () => {
         to: 'ACTIVE',
         actor: { id: '42', type: 'user' },
         permission: null,
-        now,
       }),
     )
 
@@ -690,8 +693,7 @@ describe('AUTH-015 trusted lifecycle time-window evaluation', () => {
           to: 'ACTIVE',
           actor: { id: '42', type: 'user' },
           permission: null,
-          now,
-        }),
+          }),
       ),
     ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' })
 
@@ -712,8 +714,7 @@ describe('AUTH-015 trusted lifecycle time-window evaluation', () => {
           to: 'DELETED',
           actor: { id: 'job:account-lifecycle', type: 'job' },
           permission: 'system.job',
-          now,
-        }),
+          }),
       ),
     ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' })
     expect(early.batchCalls()).toBe(0)
@@ -729,7 +730,6 @@ describe('AUTH-015 trusted lifecycle time-window evaluation', () => {
         to: 'DELETED',
         actor: { id: 'job:account-lifecycle', type: 'job' },
         permission: 'system.job',
-        now,
       }),
     )
     expect(elapsed.row).toMatchObject({ state: 'DELETED', deletedAt: now })
@@ -748,7 +748,6 @@ describe('AUTH-015 trusted lifecycle time-window evaluation', () => {
         to: 'REACTIVATED',
         actor: { id: '42', type: 'user' },
         permission: 'user.reactivate',
-        now,
       }),
     )
 
@@ -769,8 +768,7 @@ describe('AUTH-015 trusted lifecycle time-window evaluation', () => {
           to: 'REACTIVATED',
           actor: { id: '42', type: 'user' },
           permission: 'user.reactivate',
-          now,
-        }),
+          }),
       ),
     ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' })
 
@@ -782,8 +780,7 @@ describe('AUTH-015 trusted lifecycle time-window evaluation', () => {
           to: 'REACTIVATED',
           actor: { id: '42', type: 'user' },
           permission: 'user.reactivate',
-          now,
-        }),
+          }),
       ),
     ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' })
     expect(exact.batchCalls()).toBe(0)
@@ -804,8 +801,7 @@ describe('AUTH-015 trusted lifecycle time-window evaluation', () => {
             to: 'ACTIVE',
             actor: { id: '42', type: 'user' },
             permission: null,
-            now,
-          }),
+              }),
         ),
       ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' })
       expect(fake.batchCalls()).toBe(0)
