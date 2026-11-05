@@ -234,12 +234,14 @@ test('native draft fingerprints are stable and change when persisted content cha
     pollEnabled: false,
     pollOptions: [],
     pollDurationMinutes: 1440,
+    mediaWarning: null,
   };
   const fingerprint = createPublishDraftFingerprint(input);
   expect(createPublishDraftFingerprint(input)).toBe(fingerprint);
   expect(createPublishDraftFingerprint({ ...input, body: 'Changed draft' })).not.toBe(fingerprint);
   expect(createPublishDraftFingerprint({ ...input, accessMode: 'MEMBERS_ONLY' })).not.toBe(fingerprint);
   expect(createPublishDraftFingerprint({ ...input, pollEnabled: true, pollOptions: ['Yes', 'No'] })).not.toBe(fingerprint);
+  expect(createPublishDraftFingerprint({ ...input, mediaWarning: 'VIOLENCE' })).not.toBe(fingerprint);
   expect(fingerprint).not.toContain(input.body);
 });
 
@@ -297,4 +299,15 @@ test('native poll duration matches X bounds and keeps day/hour/minute precision'
   expect(composer).toContain('durationMinutes: pollDurationMinutes');
   expect(composer).toContain('Poll duration · 5 minutes to 7 days');
   expect(composer).toContain('getPollDurationParts');
+});
+
+
+test('native composer persists warning metadata and hides media until the reader reveals it', () => {
+  expect(composer).toContain('mediaWarning');
+  expect(composer).toContain('setMediaWarning(record.mediaWarning ?? null)');
+  expect(composer).toContain('媒体内容警告');
+  expect(composer).toContain('mediaWarning,');
+  expect(feedItem).toContain('可能包含敏感内容');
+  expect(feedItem).toContain('onPress={() => setMediaRevealed(true)}');
+  expect(feedItem).toContain('mediaWarning={itemData.accessGranted === false ? null : itemData.mediaWarning}');
 });
