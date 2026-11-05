@@ -131,7 +131,9 @@ function assertTimestampWindow(
 ): void {
   const timestampMs = Date.parse(timestamp ?? '')
   const nowMs = Date.parse(now)
-  if (!Number.isFinite(timestampMs) || !Number.isFinite(nowMs) || timestampMs > nowMs) {
+  const isCanonicalUtc = Number.isFinite(timestampMs) &&
+    new Date(timestampMs).toISOString() === timestamp
+  if (!isCanonicalUtc || !Number.isFinite(nowMs) || timestampMs > nowMs) {
     throw new AccountStateTransitionError('PRECONDITION_FAILED', 'trusted lifecycle timestamp is missing or invalid')
   }
 
@@ -662,7 +664,6 @@ export async function activateEmailVerifiedAccount(
         expectedVersion: current.accountStateVersion,
         actor: { id: userId, type: 'user' },
         permission: null,
-        preconditionSatisfied: true,
         now,
       },
       [roleAssignmentStatement],
