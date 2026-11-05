@@ -502,9 +502,27 @@ function PublishScreenContent() {
           width: asset.width,
           height: asset.height,
         };
-        const uploadFile = await prepareImageForUpload(file);
-        // Persist the prepared local URI and matching metadata before network I/O.
-        // A retry then uploads the exact same bytes with the same idempotency key.
+        let uploadFile = await prepareImageForUpload(file);
+        if (uploadFile.uri !== asset.uri) {
+          try {
+            const durableAsset = await persistPendingAsset({
+              ...asset,
+              uri: uploadFile.uri,
+              filename: uploadFile.name,
+              mimeType: uploadFile.mimeType,
+              size: uploadFile.size,
+              width: uploadFile.width,
+              height: uploadFile.height,
+            });
+            uploadFile = { ...uploadFile, uri: durableAsset.uri };
+          } catch {
+            // Optional image optimization must not make a previously durable
+            // original file unusable when device storage is nearly full.
+            uploadFile = file;
+          }
+        }
+        // Upload from the app-private persistent URI. The same URI, bytes,
+        // fingerprint and idempotency key survive a process restart.
         updateAsset(asset.localId, {
           uri: uploadFile.uri,
           filename: uploadFile.name,
