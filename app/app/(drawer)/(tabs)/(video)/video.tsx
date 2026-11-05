@@ -128,7 +128,7 @@ function VideoPlayerSurface({
 
     const shouldPlay = manualPlaybackOverride === 'play' ||
       (manualPlaybackOverride === null && autoPlayEnabled);
-    if (!shouldPlay || manualPlaybackOverride === 'pause') {
+    if (!shouldPlay) {
       player.pause();
       return;
     }
