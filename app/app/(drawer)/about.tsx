@@ -134,7 +134,7 @@ export default function HelpAboutScreen() {
           <Feather name="arrow-left" size={22} color={isDark ? '#d1d5db' : '#536471'} />
         </Pressable>
         <View className="flex-1">
-          <Text className="text-lg font-bold text-neutral-900 dark:text-white">帮助与关于</Text>
+          <Text className="text-lg font-bold text-neutral-900 dark:text-white">关于 LuckRead</Text>
           <Text className="text-xs text-neutral-500 dark:text-neutral-400">LuckRead APP 1.0 Beta</Text>
         </View>
       </View>
@@ -142,15 +142,6 @@ export default function HelpAboutScreen() {
       <ScrollView
         contentContainerStyle={{ paddingTop: 18, paddingBottom: Math.max(insets.bottom, 16) + 20 }}
       >
-        <Section title="帮助与支持">
-          <View className="flex-row items-start px-4 pb-4 pt-2">
-            <Feather name="info" size={18} color={isDark ? '#9ca3af' : '#667085'} style={{ marginTop: 2, marginRight: 10 }} />
-            <Text className="flex-1 text-sm leading-6 text-neutral-600 dark:text-neutral-400">
-              帮助中心、在线客服和工单系统尚未接入 APP 1.0。当前可用的官方资料包括用户协议和隐私政策；我们不会显示未经验证的客服邮箱或空白支持入口。
-            </Text>
-          </View>
-        </Section>
-
         <Section title="官方政策">
           <PolicyRow
             title="用户协议"
