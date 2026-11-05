@@ -93,7 +93,8 @@ export async function PATCH(
         const updatedState = updatedValue && typeof updatedValue === 'object' && !Array.isArray(updatedValue)
           ? (updatedValue as { state?: unknown }).state
           : undefined
-        // Public feed/list caches contain this projection, so invalidate on warning or visibility changes.
+        // Drafts are not part of anonymous public lists; only published warning or visibility changes
+        // require a public-list generation bump.
         if (updatedState === 'PUBLISHED') await invalidatePublicContentList(request)
       }
       await invalidatePublicContentDetail(request, contentId)
