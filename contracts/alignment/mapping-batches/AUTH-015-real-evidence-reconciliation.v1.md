@@ -65,14 +65,35 @@ The cross-system mapping separately records AUTH-015 as `PARTIAL` with blocker `
 
 ## 4. API reconciliation
 
-The API inventory explicitly includes these relevant public surfaces:
+The current generated API alignment inventory identifies two deletion/restoration candidate operations. Both remain discovery-only:
 
-- `POST /v1/account/deletion-request`
-- `POST /v1/accounts/{accountId}/restore`
+| Candidate operationId | Method/path | Domain | API inventory state | OpenAPI state |
+|---|---|---|---|---|
+| `postAccountDeletionRequest` | `POST /v1/account/deletion-request` | `audit_compliance` | `DISCOVERED` | `DISCOVERY_DRAFT`; empty schemaRef; default-only response |
+| `postAccountsAccountIdRestore` | `POST /v1/accounts/{accountId}/restore` | `users_accounts` | `DISCOVERED` | `DISCOVERY_DRAFT`; empty schemaRef; default-only response |
 
-The API inventory requires, before an endpoint can become Contract Green, explicit schema, OpenAPI operation ID, permission, scope, state-machine, cache, read/write classification, resource budget, RPC/retry/event/queue budgets, anti-abuse, idempotency, mapping, examples and integration E2E evidence; sensitive/privileged operations also require security E2E evidence.
+Grounding:
+- `contracts/alignment/api-inventory.v1.json` records both operation IDs with empty `featureIds` and empty `schemaRef`.
+- `contracts/openapi/v1/openapi.yaml` contains matching paths/operation IDs but labels each `DISCOVERY_DRAFT`; each has only a default discovery response.
+- `contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json` still has `AUTH-015.apiRefs = []`.
 
-No canonical operation ID is assigned to AUTH-015 here merely from the route strings. The B01 record has no `apiRefs`, so the route inventory is currently evidence of endpoint coverage intent, not proof of a bound implementation.
+The operation-policy source separately declares:
+- `requestAccountDeletion`, `POST /account/deletion`, status `MISSING`;
+- `cancelAccountDeletion`, `POST /account/deletion/cancel`, status `MISSING`.
+
+Those policy entries are required-contract intent, not current OpenAPI operation bindings. They are not the same identifiers or paths as the discovery candidate `postAccountDeletionRequest`. In particular, no cancel-deletion operation is present in the current OpenAPI discovery inventory.
+
+A separate existing operation, `transitionAccountState` (`POST /users/{userId}/account-state`), is `CONTRACTED_PARTIAL` and is mapped to AUTH-013. The account state machine permits the self-actor transition `ACTIVE -> DELETION_REQUESTED`; the current generic state-transition source can therefore express that one state change. This does **not** establish the complete AUTH-015 deletion-request workflow: the dedicated request's reauthentication, durable idempotency, eligibility/legal-hold checks, cooling-off deadline, cancel operation, async progression, and retention/erasure semantics are not thereby implemented or evidenced.
+
+Restoration also has two distinct state-machine concepts that must not be conflated:
+- `BANNED -> RESTORED`: privileged admin restoration using `user.restore` and L7 approval;
+- `DELETED -> REACTIVATED`: self-reactivation using `user.reactivate` within the bounded reactivation window.
+
+The current `postAccountsAccountIdRestore` discovery draft does not yet specify which of these cases it implements, its authorization/approval semantics, or its request/response schema.
+
+The API inventory requires explicit schema, OpenAPI binding, permission, scope, state-machine, cache, read/write classification, resource budget, RPC/retry/event/queue budgets, anti-abuse, idempotency, mapping, examples, and integration E2E evidence before Contract Green; sensitive/privileged operations also require security E2E evidence.
+
+**Disposition:** no operation is promoted or newly bound to AUTH-015 in this reconciliation. The existing discovery operation IDs are recorded as candidates only; B01 `apiRefs` remains empty until a Change Control decision admits the canonical deletion/cancel/restoration API surface.
 
 ## 5. Lifecycle and state-machine reconciliation
 
@@ -165,13 +186,19 @@ Required security proof includes:
 
 ## 10. Worker and D1 reconciliation
 
-The current Worker Master is authoritative for current Worker identity. W02 is the canonical Identity / Account / Authorization Worker with primary tasks T01-T03. Historical W00 is not current ownership and must not be reused.
+The current Worker Master is authoritative for current Worker identity:
+- W02 is the sole Identity / Account / Authorization authority for T01-T03 and D1-01 account-state facts.
+- W01 is the public API ingress boundary only; it does not acquire account-data ownership.
+- W10 executes asynchronous jobs under the authority of the owning Worker/Task and may write only its explicitly assigned D1-03 job/execution/idempotency/retry/DLQ/runtime records.
+- W08 owns T04 creator/organization identity relationships and hosts the bounded CASL policy evaluator; it does not perform direct D1 writes or replace the owning Worker's lifecycle/workflow checks.
 
-However, the Worker Master explicitly states that Worker/D1 feature ownership cannot be inferred from code, route, collection or directory names, and that Worker -> D1 binding remains a separate mandatory gate. Therefore AUTH-015 receives no silent Worker assignment here.
+**A canonical-document conflict remains unresolved:** `docs/306-DELETION-SEMANTICS-AND-ERASURE-MATRIX-CONTRACT-v1.0.md` §7 says deletion progression is executed by W08. The current `docs/04-WORKER-MASTER-v1.0.md` and `docs/03-WORKER-BINDING-MAPPING-v1.0.md` do not assign account deletion to W08; they define W08 as T04/CASL and W10 as the async execution boundary. These rules cannot be reconciled by inferring that W10 becomes the business owner: W02 remains the D1-01 account-state authority, and W10 is execution-only. A Change Control decision is required before assigning deletion job orchestration, target-domain side effects, or any additional queue bindings.
 
-The B01 AUTH-015 D1 logical-domain naming conflict is RESOLVED by Change Control: `D01 Core` is canonical for this affected reconciliation surface. This does not prove physical D1 schema or Worker ownership.
+The Worker Master also prohibits deriving Worker/D1 feature ownership from code, routes, collections, or directory names. Therefore AUTH-015 receives no silent Worker assignment from this evidence update.
 
-The registry's `system.job` actor does not by itself prove that W10 owns the deletion workflow; W10 is an async execution boundary and has no artificial Primary Task in the canonical Worker Master.
+The B01 AUTH-015 D1 logical-domain naming conflict is RESOLVED by Change Control: `D01 Core` is canonical for this affected reconciliation surface. This does not by itself prove the physical persistence schema or authorize a new table/database.
+
+The state-machine actor label `system.job` specifies an actor class; it does not select W08 or W10 as the owning Worker.
 
 ## 11. Cross-system side effects and data propagation
 
@@ -234,11 +261,11 @@ AUTH-015 is not authorized for implementation. The repository proves that deleti
 
 The most material blockers are:
 
-- no canonical AUTH-015 API operation bindings;
+- no canonical AUTH-015 API operation bindings (the two current OpenAPI candidates remain discovery-only; request/cancel policy operations remain MISSING);
 - no deletion/restoration DTO contract IDs;
 - no verified canonical deletion/restoration entities and fields;
 - no verified `account_state` / `account_state_version` field implementation;
-- no explicit Worker feature binding;
+- no explicit Worker feature binding and an unresolved W08-vs-W10 deletion-job ownership conflict;
 - no runtime deletion/restoration implementation evidence;
 - no executable lifecycle/security E2E evidence;
 - empty Evidence Registry linkage.
@@ -270,6 +297,9 @@ Until all conditions are met, AUTH-015 remains `BLOCKED_NOT_GREEN`, B01 remains 
 - `contracts/alignment/cross-system-mapping.v1.json`
 - `contracts/alignment/feature-inventory.v1.json`
 - `contracts/api/api-inventory.v1.json`
+- `contracts/alignment/api-inventory.v1.json`
+- `contracts/api/user-account-operation-policy.v1.json`
+- `contracts/openapi/v1/openapi.yaml`
 - `contracts/state-machines/account.json`
 - `contracts/enums/account-state.json`
 - `contracts/authz/permissions.json`
@@ -281,3 +311,15 @@ Until all conditions are met, AUTH-015 remains `BLOCKED_NOT_GREEN`, B01 remains 
 - `docs/04-WORKER-MASTER-v1.0.md`
 - `docs/03-WORKER-BINDING-MAPPING-v1.0.md`
 - `docs/batches/01-FOUNDATION-IDENTITY-IMPLEMENTATION-PLAN-v1.0.md`
+
+
+## 17. 2026-11-06 discovery-evidence update
+
+This update records current-head discovery facts only. It does not modify:
+- `implementationAuthorized: false`;
+- B01 `apiRefs`, `workerRefs`, `testRefs`, or `evidenceRefs`;
+- the AUTH-015 `PARTIAL` mapping status;
+- API/DTO/entity/field/persistence contracts;
+- any Worker, D1, Queue, binding, or runtime source.
+
+The required next decision is to reconcile the W08/W10 execution-owner contradiction and formally admit the canonical deletion/request/cancel/restoration API and data model before implementation. No feature implementation is authorized by this evidence update.
