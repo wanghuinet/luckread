@@ -2,6 +2,61 @@ import { apiRequest, createIdempotencyKey } from './api-client';
 
 export type NotificationScreenFilter = 'all' | 'mentions';
 export type UserRelationshipKind = 'followers' | 'following';
+export type NativeReplyAudience = 'everyone' | 'verified' | 'following' | 'mentioned' | 'followingNetwork';
+
+type NativeReplyAudienceEnvelope = {
+  data?: { replyAudience?: unknown };
+  error?: { code?: string; message?: string };
+};
+
+const isValidContentId = (value: string): boolean =>
+  /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(value);
+
+export function isNativeReplyAudience(value: unknown): value is NativeReplyAudience {
+  return value === 'everyone' ||
+    value === 'verified' ||
+    value === 'following' ||
+    value === 'mentioned' ||
+    value === 'followingNetwork';
+}
+
+/** Read the current owner's reply policy through the canonical W01 -> W05 route. */
+export function fetchOwnPostReplyAudience(contentIdValue: string, signal?: AbortSignal) {
+  const contentId = contentIdValue.trim();
+  if (!isValidContentId(contentId)) {
+    throw new TypeError('A valid post ID is required to read reply permissions.');
+  }
+  return apiRequest<NativeReplyAudienceEnvelope>(
+    '/contents/' + encodeURIComponent(contentId) + '/reply-audience',
+    { method: 'GET', signal },
+  );
+}
+
+/** Save reply policy; W01 resolves @mentions to canonical user IDs on the server. */
+export function saveOwnPostReplyAudience(
+  contentIdValue: string,
+  replyAudience: NativeReplyAudience,
+  text: string,
+) {
+  const contentId = contentIdValue.trim();
+  if (!isValidContentId(contentId)) {
+    throw new TypeError('A valid post ID is required to save reply permissions.');
+  }
+  if (!isNativeReplyAudience(replyAudience)) {
+    throw new TypeError('A supported reply permission is required.');
+  }
+  if (typeof text !== 'string' || text.length > 10_000) {
+    throw new TypeError('Post text is invalid for reply permission resolution.');
+  }
+  return apiRequest<NativeReplyAudienceEnvelope>(
+    '/contents/' + encodeURIComponent(contentId) + '/reply-audience',
+    {
+      method: 'PUT',
+      body: JSON.stringify({ replyAudience, text }),
+      idempotencyKey: 'native-reply-audience:' + contentId + ':' + createIdempotencyKey(),
+    },
+  );
+}
 
 type PageRequestOptions = {
   cursor?: string | null;

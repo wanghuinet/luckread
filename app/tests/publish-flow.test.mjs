@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
-import { computeAutoSaveDelay, createPublishDraftFingerprint } from '../lib/publish-draft-autosave.ts';
+import { computeAutoSaveDelay, createPublishDraftFingerprint, createReplyAudienceFingerprint } from '../lib/publish-draft-autosave.ts';
 import { findActiveComposerToken, replaceActiveComposerToken } from '../lib/publish-composer-tokens.ts';
 
 const composer = readFileSync(new URL('../app/publish.tsx', import.meta.url), 'utf8');
@@ -319,4 +319,26 @@ test('native publisher lets authors choose an uploaded image as the post cover',
   expect(composer).toContain("asset.serverUrl === activeCoverRef ? '当前封面' : '设为封面'");
   // The chosen cover continues through the existing draft and publish contracts.
   expect(composer).toContain('coverRef: nextCover');
+});
+
+
+test('native publisher uses the existing W01/W05 reply-audience policy for create, edit, autosave and restore', () => {
+  expect(composer).toContain("useState<NativeReplyAudience>('everyone')");
+  expect(composer).toContain('fetchOwnPostReplyAudience(targetContentId)');
+  expect(composer).toContain('saveOwnPostReplyAudience(draft.id, replyAudience, trimmedBody)');
+  expect(composer).toContain('saveOwnPostReplyAudience(contentId, replyAudience, trimmedBody)');
+  expect(composer).toContain('replyAudienceSavedFingerprintRef.current');
+  expect(composer).toContain('谁可以回复？');
+  expect(composer).toContain('followingNetwork');
+  expect(composer).toContain('被提及的账号始终可以回复');
+  expect(composer).toContain('isNativeReplyAudience');
+  expect(composer).not.toContain('mentionedUserIds:');
+});
+
+test('reply policy autosave fingerprints change for audience or mentioned text without retaining the text', () => {
+  const initial = createReplyAudienceFingerprint('Hello @alice', 'mentioned');
+  expect(createReplyAudienceFingerprint('Hello @alice', 'mentioned')).toBe(initial);
+  expect(createReplyAudienceFingerprint('Hello @bob', 'mentioned')).not.toBe(initial);
+  expect(createReplyAudienceFingerprint('Hello @alice', 'everyone')).not.toBe(initial);
+  expect(initial).not.toContain('Hello');
 });

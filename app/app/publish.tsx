@@ -25,7 +25,7 @@ import Sortable from 'react-native-sortables';
 import PublishMediaActionSheet from '~/components/PublishMediaActionSheet';
 
 import { apiRequest, createIdempotencyKey, fetchContentBodyReference } from '~/lib/api-client';
-import { computeAutoSaveDelay, createPublishDraftFingerprint } from '~/lib/publish-draft-autosave';
+import { computeAutoSaveDelay, createPublishDraftFingerprint, createReplyAudienceFingerprint } from '~/lib/publish-draft-autosave';
 import { getDefaultScheduledPublishDate, MIN_SCHEDULE_LEAD_TIME_MS, toScheduledPublishISO } from '~/lib/publish-schedule';
 import {
   apiFailureDiagnostic,
@@ -44,7 +44,11 @@ import {
   fetchOwnPostDraftsPage,
   fetchOwnScheduledPostsPage,
   findPublicUserByUsername,
+  fetchOwnPostReplyAudience,
+  saveOwnPostReplyAudience,
+  isNativeReplyAudience,
   transitionOwnScheduledPostState,
+  type NativeReplyAudience,
   type NativePostDraft,
   type NativeScheduledPost,
 } from '~/lib/social-screen-api';
@@ -105,6 +109,26 @@ type MentionSuggestion = {
   username: string;
   displayName: string | null;
   avatar: string | null;
+};
+
+const REPLY_AUDIENCE_OPTIONS: ReadonlyArray<{
+  value: NativeReplyAudience;
+  label: string;
+  description: string;
+}> = [
+  { value: 'everyone', label: '每个人', description: '所有账号都可以回复' },
+  { value: 'verified', label: '认证账号', description: '只有认证账号可以回复' },
+  { value: 'following', label: '你关注的账号', description: '只有你关注的账号可以回复' },
+  { value: 'mentioned', label: '你提及的账号', description: '只有你在帖子中提及的账号可以回复' },
+  { value: 'followingNetwork', label: '你关注的账号及其关注的账号', description: '你关注的账号及其关注的账号可以回复' },
+];
+
+const replyAudienceLabels: Record<NativeReplyAudience, string> = {
+  everyone: '所有人可以回复',
+  verified: '认证账号可以回复',
+  following: '你关注的账号可以回复',
+  mentioned: '只有你提及的账号可以回复',
+  followingNetwork: '你关注的账号及其关注的账号可以回复',
 };
 
 type SubmitAttempt = {
@@ -179,6 +203,8 @@ function PublishScreenContent() {
   const [cameraVisible, setCameraVisible] = useState(false);
   const [mediaActionsVisible, setMediaActionsVisible] = useState(false);
   const [coverRef, setCoverRef] = useState('');
+  const [replyAudience, setReplyAudience] = useState<NativeReplyAudience>('everyone');
+  const [replyAudiencePickerVisible, setReplyAudiencePickerVisible] = useState(false);
   const [busy, setBusy] = useState(false);
   const [loadingEdit, setLoadingEdit] = useState(Boolean(contentId));
   const [errorMessage, setErrorMessage] = useState('');
@@ -225,6 +251,7 @@ function PublishScreenContent() {
   const [mentionLookupLoading, setMentionLookupLoading] = useState(false);
 
   const recordRef = useRef<ContentRecord | null>(null);
+  const replyAudienceSavedFingerprintRef = useRef('');
   const draftSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const draftSaveInFlightRef = useRef(false);
   const draftSaveInFlightPromiseRef = useRef<Promise<void> | null>(null);
@@ -286,6 +313,12 @@ function PublishScreenContent() {
         throw new Error('The server did not return a version for this post. Refresh it before editing.');
       }
 
+      const replyPolicyResult = await fetchOwnPostReplyAudience(targetContentId);
+      const restoredReplyAudience = replyPolicyResult.data?.data?.replyAudience;
+      if (!replyPolicyResult.response.ok || !isNativeReplyAudience(restoredReplyAudience)) {
+        throw new Error(apiFailureDiagnostic(replyPolicyResult, 'Unable to restore reply permissions for this post.'));
+      }
+
       let restoredBody = record.title || '';
       if (restoringDraft && record.bodyRef) {
         const bodyResponse = await fetchContentBodyReference(record.bodyRef);
@@ -339,6 +372,8 @@ function PublishScreenContent() {
       originalBodyRef.current = { text: restoredBody, bodyRef: record.bodyRef || null };
       setAccessMode(loadedAccessMode);
       setBody(restoredBody);
+      setReplyAudience(restoredReplyAudience);
+      replyAudienceSavedFingerprintRef.current = createReplyAudienceFingerprint(restoredBody, restoredReplyAudience);
       setCoverRef(record.coverRef || '');
       setAssets(restoredAssets);
       pollConfiguredRef.current = Boolean(restoredPoll);
@@ -819,7 +854,12 @@ function PublishScreenContent() {
       pollOptions,
       pollDurationHours,
     });
-    if (recordRef.current?.id && draftSavedFingerprintRef.current === fingerprint) return;
+    const replyAudienceFingerprint = createReplyAudienceFingerprint(trimmedBody, replyAudience);
+    if (
+      recordRef.current?.id &&
+      draftSavedFingerprintRef.current === fingerprint &&
+      replyAudienceSavedFingerprintRef.current === replyAudienceFingerprint
+    ) return;
 
     let bodyRef = originalBodyRef.current.text === trimmedBody
       ? originalBodyRef.current.bodyRef
@@ -985,7 +1025,15 @@ function PublishScreenContent() {
       }
       pollConfiguredRef.current = false;
     }
-    // Only mark the fingerprint saved after both content and poll mutations succeed.
+    // The owner policy is persisted in W05; W01 resolves @mentions to canonical IDs.
+    if (replyAudienceSavedFingerprintRef.current !== replyAudienceFingerprint) {
+      const replyPolicyResult = await saveOwnPostReplyAudience(draft.id, replyAudience, trimmedBody);
+      if (!replyPolicyResult.response.ok || !isNativeReplyAudience(replyPolicyResult.data?.data?.replyAudience)) {
+        throw new Error(apiFailureDiagnostic(replyPolicyResult, 'Unable to save who can reply to this post.'));
+      }
+      replyAudienceSavedFingerprintRef.current = replyAudienceFingerprint;
+    }
+    // Only mark the content fingerprint saved after content, poll and reply policy succeed.
     draftSavedFingerprintRef.current = fingerprint;
     originalBodyRef.current = { text: trimmedBody, bodyRef };
   }, [
@@ -1000,6 +1048,7 @@ function PublishScreenContent() {
     pollEnabled,
     pollOptions,
     publishPending,
+    replyAudience,
     router,
   ]);
 
@@ -1272,6 +1321,7 @@ function PublishScreenContent() {
     draftSaveDirtyRef.current = false;
     draftSaveRestoreCompleteRef.current = false;
     draftSavedFingerprintRef.current = '';
+    replyAudienceSavedFingerprintRef.current = '';
     draftCreatePendingRef.current = null;
     draftCreateKeyRef.current = '';
     recordRef.current = null;
@@ -1282,6 +1332,7 @@ function PublishScreenContent() {
     setAssets([]);
     setCoverRef('');
     setAccessMode('PUBLIC');
+    setReplyAudience('everyone');
     setPollEnabled(false);
     setPollOptions(['', '']);
     setErrorMessage('');
@@ -1450,7 +1501,7 @@ function PublishScreenContent() {
     draftSaveDirtyRef.current = true;
     draftSaveChangeTokenRef.current += 1;
     draftAutoSaveSchedulerRef.current();
-  }, [accessMode, assets, body, busy, contentId, coverRef, loadingEdit, pollDurationHours, pollEnabled, pollOptions, publishPending]);
+  }, [accessMode, assets, body, busy, contentId, coverRef, loadingEdit, pollDurationHours, pollEnabled, pollOptions, publishPending, replyAudience]);
 
   useEffect(() => () => {
     if (draftSaveTimerRef.current) clearTimeout(draftSaveTimerRef.current);
@@ -1642,6 +1693,17 @@ function PublishScreenContent() {
         if (!result.response.ok) {
           throw new Error(apiFailureDiagnostic(result, 'Unable to save post changes.'));
         }
+        const updatedRecord = unwrapContent(result.data);
+        const updatedEtag = updatedRecord?.etag || result.response.headers.get('ETag') || undefined;
+        if (updatedRecord?.id && updatedEtag && updatedEtag !== '*') {
+          recordRef.current = { ...(recordRef.current ?? record), ...updatedRecord, etag: updatedEtag };
+        }
+        const replyAudienceFingerprint = createReplyAudienceFingerprint(trimmedBody, replyAudience);
+        const replyPolicyResult = await saveOwnPostReplyAudience(contentId, replyAudience, trimmedBody);
+        if (!replyPolicyResult.response.ok || !isNativeReplyAudience(replyPolicyResult.data?.data?.replyAudience)) {
+          throw new Error(apiFailureDiagnostic(replyPolicyResult, 'Post changes were saved, but reply permissions could not be updated.'));
+        }
+        replyAudienceSavedFingerprintRef.current = replyAudienceFingerprint;
         const socialSyncWarning = recordRef.current?.state === 'PUBLISHED'
           ? await syncPublishedSocialTokens(contentId, trimmedBody)
           : null;
@@ -1781,6 +1843,16 @@ function PublishScreenContent() {
         }
       }
 
+      const replyAudienceFingerprint = createReplyAudienceFingerprint(trimmedBody, replyAudience);
+      if (replyAudienceSavedFingerprintRef.current !== replyAudienceFingerprint) {
+        const replyPolicyResult = await saveOwnPostReplyAudience(draft.id, replyAudience, trimmedBody);
+        if (!replyPolicyResult.response.ok || !isNativeReplyAudience(replyPolicyResult.data?.data?.replyAudience)) {
+          setPublishPending(true);
+          throw new Error(apiFailureDiagnostic(replyPolicyResult, 'The post draft exists, but reply permissions could not be saved. Retry to finish the same post.'));
+        }
+        replyAudienceSavedFingerprintRef.current = replyAudienceFingerprint;
+      }
+
       const transitioned = await apiRequest<Record<string, unknown>>(
         '/contents/' + encodeURIComponent(draft.id) + '/state',
         {
@@ -1852,7 +1924,7 @@ function PublishScreenContent() {
     } finally {
       setBusy(false);
     }
-  }, [accessMode, assets, body, contentId, coverRef, pollDurationHours, pollEnabled, pollOptions, publishPending, router, saveDraftSnapshot, savePendingAssetAltText, scheduleDate, scheduleEnabled, syncPublishedSocialTokens]);
+  }, [accessMode, assets, body, contentId, coverRef, pollDurationHours, pollEnabled, pollOptions, publishPending, replyAudience, router, saveDraftSnapshot, savePendingAssetAltText, scheduleDate, scheduleEnabled, syncPublishedSocialTokens]);
 
   if (authStatus !== 'authenticated') {
     return (
@@ -1957,6 +2029,24 @@ function PublishScreenContent() {
           <View style={[styles.counterRow, isDark && { borderBottomColor: '#27272a' }]}>
             <Text style={[styles.helperText, isDark && { color: '#9ca3af' }]}>Ordinary social posts publish directly; no extra review screen.</Text>
             <Text style={[styles.counter, isDark && { color: '#9ca3af' }]}>{body.length}/{MAX_TEXT_LENGTH}</Text>
+          </View>
+          <View style={[styles.replyAudienceSection, isDark && { borderBottomColor: '#27272a' }]}>
+            <Text style={[styles.replyAudienceHeading, isDark && { color: '#f9fafb' }]}>回复权限</Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Choose who can reply"
+              accessibilityState={{ disabled: busy || loadingEdit || publishPending }}
+              disabled={busy || loadingEdit || publishPending}
+              onPress={() => setReplyAudiencePickerVisible(true)}
+              style={[styles.replyAudienceButton, isDark && { borderColor: '#52525b', backgroundColor: '#09090b' }]}
+            >
+              <Feather name="message-circle" size={18} color={PRIMARY} />
+              <Text style={[styles.replyAudienceButtonText, isDark && { color: '#f4f4f5' }]}>{replyAudienceLabels[replyAudience]}</Text>
+              <Feather name="chevron-right" size={17} color={isDark ? '#a1a1aa' : '#667085'} />
+            </Pressable>
+            <Text style={[styles.replyAudienceHint, isDark && { color: '#9ca3af' }]}>
+              被提及的账号始终可以回复。权限由服务端执行。
+            </Text>
           </View>
           {!contentId && draftSaveStatus !== 'idle' ? (
             <Text accessibilityLiveRegion="polite" style={[styles.draftSaveStatus, isDark && { color: '#9ca3af' }]}>
@@ -2245,6 +2335,46 @@ function PublishScreenContent() {
         </View>
       </Modal>
       <Modal
+        visible={replyAudiencePickerVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setReplyAudiencePickerVisible(false)}
+      >
+        <View style={[styles.replyAudienceModal, isDark && styles.draftsModalDark]}>
+          <View style={[styles.schedulePickerHeader, isDark && { borderBottomColor: '#27272a' }]}>
+            <Pressable accessibilityRole="button" onPress={() => setReplyAudiencePickerVisible(false)} style={styles.schedulePickerActionHit}>
+              <Text style={styles.schedulePickerCancel}>取消</Text>
+            </Pressable>
+            <Text style={[styles.schedulePickerTitle, isDark && { color: '#f9fafb' }]}>谁可以回复？</Text>
+            <View style={styles.schedulePickerActionHit} />
+          </View>
+          <Text style={[styles.schedulePickerHint, isDark && { color: '#9ca3af' }]}>
+            选择可以回复这条动态的账号。只要被提及，账号仍然可以回复。
+          </Text>
+          {REPLY_AUDIENCE_OPTIONS.map((option) => (
+            <Pressable
+              key={option.value}
+              accessibilityRole="button"
+              accessibilityState={{ selected: replyAudience === option.value }}
+              onPress={() => {
+                setReplyAudience(option.value);
+                setReplyAudiencePickerVisible(false);
+                setErrorMessage('');
+              }}
+              style={[styles.replyAudienceOption, isDark && { borderBottomColor: '#27272a' }]}
+            >
+              <View style={styles.replyAudienceOptionCopy}>
+                <Text style={[styles.replyAudienceOptionLabel, isDark && { color: '#f4f4f5' }]}>{option.label}</Text>
+                <Text style={[styles.replyAudienceOptionDescription, isDark && { color: '#a1a1aa' }]}>{option.description}</Text>
+              </View>
+              <View style={[styles.replyAudienceRadio, replyAudience === option.value && styles.replyAudienceRadioSelected]}>
+                {replyAudience === option.value ? <View style={styles.replyAudienceRadioDot} /> : null}
+              </View>
+            </Pressable>
+          ))}
+        </View>
+      </Modal>
+      <Modal
         visible={draftInboxVisible}
         animationType="slide"
         presentationStyle="pageSheet"
@@ -2452,6 +2582,19 @@ const styles = StyleSheet.create({
   scheduleDateButtonContent: { flexDirection: 'row', alignItems: 'center', gap: 9 },
   scheduleDateText: { flex: 1, color: '#101828', fontSize: 13, fontWeight: '700' },
   scheduleHint: { color: '#667085', fontSize: 11, lineHeight: 16, marginTop: 8 },
+  replyAudienceSection: { paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#eaecf0' },
+  replyAudienceHeading: { color: '#101828', fontSize: 14, fontWeight: '800', marginBottom: 9 },
+  replyAudienceButton: { flexDirection: 'row', alignItems: 'center', gap: 9, minHeight: 44, borderWidth: 1, borderColor: '#d0d5dd', borderRadius: 11, paddingHorizontal: 12, backgroundColor: '#ffffff' },
+  replyAudienceButtonText: { flex: 1, color: '#344054', fontSize: 13, fontWeight: '700' },
+  replyAudienceHint: { color: '#667085', fontSize: 11, lineHeight: 16, marginTop: 7 },
+  replyAudienceModal: { flex: 1, backgroundColor: '#ffffff', paddingHorizontal: 16, paddingTop: 12 },
+  replyAudienceOption: { minHeight: 68, flexDirection: 'row', alignItems: 'center', gap: 14, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#eaecf0', paddingHorizontal: 4, paddingVertical: 12 },
+  replyAudienceOptionCopy: { flex: 1, gap: 4 },
+  replyAudienceOptionLabel: { color: '#101828', fontSize: 14, fontWeight: '700' },
+  replyAudienceOptionDescription: { color: '#667085', fontSize: 12, lineHeight: 17 },
+  replyAudienceRadio: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: '#98a2b3', alignItems: 'center', justifyContent: 'center' },
+  replyAudienceRadioSelected: { borderColor: PRIMARY },
+  replyAudienceRadioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: PRIMARY },
   schedulePickerModal: { flex: 1, backgroundColor: '#ffffff', paddingHorizontal: 16, paddingTop: 12 },
   schedulePickerModalDark: { backgroundColor: '#000000' },
   schedulePickerHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#eaecf0', paddingBottom: 12 },

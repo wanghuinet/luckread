@@ -24,6 +24,8 @@ const {
   fetchBookmarksPage,
   fetchDiscoveryTopics,
   fetchOwnPostDraftsPage,
+  fetchOwnPostReplyAudience,
+  saveOwnPostReplyAudience,
   fetchOwnScheduledPostsPage,
   transitionOwnScheduledPostState,
   deleteOwnPostDraft,
@@ -382,4 +384,35 @@ test('deletes a selected own draft with the W03 ETag and unique idempotency key'
   expect(calls[0].options.method).toBe('DELETE');
   expect(calls[0].options.headers).toEqual({ 'If-Match': 'W/"4"' });
   expect(calls[0].options.idempotencyKey).toBe('native-draft-delete:draft_123:test-key-1');
+});
+
+
+test('reads the signed-in owner post reply policy through the existing W01 route', async () => {
+  const controller = new AbortController();
+  await fetchOwnPostReplyAudience('post_123', controller.signal);
+
+  expect(calls).toHaveLength(1);
+  expect(calls[0].path).toBe('/contents/post_123/reply-audience');
+  expect(calls[0].options.method).toBe('GET');
+  expect(calls[0].options.signal).toBe(controller.signal);
+});
+
+test('saves reply audience with post text so W01 resolves mention identities server-side', async () => {
+  await saveOwnPostReplyAudience('post_123', 'mentioned', 'Hello @alice');
+
+  expect(calls).toHaveLength(1);
+  expect(calls[0].path).toBe('/contents/post_123/reply-audience');
+  expect(calls[0].options.method).toBe('PUT');
+  expect(JSON.parse(calls[0].options.body)).toEqual({
+    replyAudience: 'mentioned',
+    text: 'Hello @alice',
+  });
+  expect(calls[0].options.idempotencyKey).toMatch(/^native-reply-audience:post_123:/);
+});
+
+test('rejects invalid post IDs, reply audiences and oversized text before calling the API', () => {
+  expect(() => fetchOwnPostReplyAudience('../other')).toThrow('A valid post ID is required to read reply permissions.');
+  expect(() => saveOwnPostReplyAudience('post_123', 'everyone; DROP TABLE', 'hello')).toThrow('A supported reply permission is required.');
+  expect(() => saveOwnPostReplyAudience('post_123', 'everyone', 'x'.repeat(10_001))).toThrow('Post text is invalid for reply permission resolution.');
+  expect(calls).toHaveLength(0);
 });
