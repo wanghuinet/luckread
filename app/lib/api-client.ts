@@ -39,7 +39,15 @@ export type ApiResult<T> = {
   error: ApiFailure | null;
 };
 
+export type ApiUploadProgress = {
+  loaded: number;
+  total: number;
+  percent: number | null;
+};
+
 type ApiRequestOptions = RequestInit & {
+  /** Called with native multipart upload progress; uses the shared auth/idempotency boundary. */
+  onUploadProgress?: (progress: ApiUploadProgress) => void;
   /** Set false only where the API contract does not use idempotency keys. */
   idempotencyKey?: string | false;
   /** Set false for public authentication endpoints such as login. */
@@ -353,6 +361,93 @@ function releaseMutationKey(lease: PendingMutationLease | null, outcome: Mutatio
 const isAmbiguousMutationStatus = (status: number): boolean =>
   status === 408 || status === 429 || status >= 500;
 
+function xhrRequestWithUploadProgress(
+  requestUrl: string,
+  init: RequestInit & { method: string; headers: Headers; body: FormData },
+  onUploadProgress: (progress: ApiUploadProgress) => void,
+): Promise<Response> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    const signal = init.signal;
+    let settled = false;
+
+    const cleanup = () => {
+      signal?.removeEventListener('abort', handleAbort);
+    };
+    const fail = (error: Error) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(error);
+    };
+    const handleAbort = () => xhr.abort();
+
+    try {
+      xhr.open(init.method, requestUrl, true);
+      if (init.credentials === 'include') xhr.withCredentials = true;
+      init.headers.forEach((value, key) => xhr.setRequestHeader(key, value));
+
+      xhr.upload.onprogress = (event) => {
+        const loaded = Math.max(0, event.loaded);
+        const total = event.lengthComputable ? Math.max(0, event.total) : 0;
+        try {
+          onUploadProgress({
+            loaded,
+            total,
+            percent: total > 0 ? Math.min(100, Math.round((loaded / total) * 100)) : null,
+          });
+        } catch {
+          // A UI progress observer must never interrupt the media transfer.
+        }
+      };
+
+      xhr.onload = () => {
+        if (settled) return;
+        if (xhr.status < 200 || xhr.status > 599) {
+          fail(new TypeError('The upload connection was interrupted.'));
+          return;
+        }
+
+        const responseHeaders = new Headers();
+        const rawHeaders = xhr.getAllResponseHeaders();
+        rawHeaders.split(/[\r\n]+/).forEach((line) => {
+          const separator = line.indexOf(':');
+          if (separator <= 0) return;
+          const name = line.slice(0, separator).trim();
+          const value = line.slice(separator + 1).trim();
+          if (name && value) responseHeaders.append(name, value);
+        });
+
+        const noResponseBody = [204, 205].includes(xhr.status);
+        const responseBody = noResponseBody ? null : (xhr.responseText ?? '');
+        settled = true;
+        cleanup();
+        resolve(new Response(responseBody, {
+          status: xhr.status,
+          statusText: xhr.statusText,
+          headers: responseHeaders,
+        }));
+      };
+
+      xhr.onerror = () => fail(new TypeError('The upload connection failed.'));
+      xhr.ontimeout = () => fail(new TypeError('The upload request timed out.'));
+      xhr.onabort = () => fail(new TypeError('The upload request was cancelled.'));
+
+      if (signal) {
+        if (signal.aborted) {
+          fail(new TypeError('The upload request was cancelled.'));
+          return;
+        }
+        signal.addEventListener('abort', handleAbort, { once: true });
+      }
+
+      xhr.send(init.body);
+    } catch {
+      fail(new TypeError('The upload connection failed.'));
+    }
+  });
+}
+
 /**
  * All native API calls go through this function so auth, content headers,
  * idempotency, no-store caching, renewed session credentials, and errors stay
@@ -362,7 +457,7 @@ export async function apiRequest<T>(
   path: string,
   options: ApiRequestOptions = {},
 ): Promise<ApiResult<T>> {
-  const { auth = true, idempotencyKey, headers: inputHeaders, ...init } = options;
+  const { auth = true, idempotencyKey, onUploadProgress, headers: inputHeaders, ...init } = options;
   const headers = new Headers(inputHeaders || {});
   headers.set('Accept', 'application/json');
 
@@ -427,12 +522,19 @@ export async function apiRequest<T>(
 
   let response: Response;
   try {
-    response = await fetch(requestUrl, {
+    const requestInit = {
       ...init,
       method,
       headers,
-      cache: 'no-store',
-    });
+      cache: 'no-store' as const,
+    };
+    response = onUploadProgress && isFormDataBody(init.body)
+      ? await xhrRequestWithUploadProgress(
+          requestUrl,
+          { ...requestInit, method, headers, body: init.body as FormData },
+          onUploadProgress,
+        )
+      : await fetch(requestUrl, requestInit);
   } catch {
     releaseMutationKey(mutationLease, 'transient');
     // Do not surface transport internals (which may include request details).

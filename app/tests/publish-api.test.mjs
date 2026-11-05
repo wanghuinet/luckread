@@ -104,6 +104,24 @@ test('uploads a selected file as multipart and reuses its supplied idempotency k
   expect(calls[0].options.body.get('file')).toBeTruthy();
 });
 
+test('forwards native upload progress updates through the shared media API call', async () => {
+  const updates = [];
+  await uploadMediaFile({
+    uri: 'content://device/cache/progress-video.mp4',
+    name: 'progress-video.mp4',
+    mimeType: 'video/mp4',
+    size: 1024,
+  }, 'progress-upload-key', (progress) => updates.push(progress));
+
+  expect(typeof calls[0].options.onUploadProgress).toBe('function');
+  calls[0].options.onUploadProgress({ loaded: 512, total: 1024, percent: 50 });
+  calls[0].options.onUploadProgress({ loaded: 768, total: 0, percent: null });
+  expect(updates).toEqual([
+    { loaded: 512, total: 1024, percent: 50 },
+    { loaded: 768, total: 0, percent: null },
+  ]);
+});
+
 test('rejects local temporary paths returned as media URLs', () => {
   expect(normalizeUploadedMedia({
     doc: { id: 'media-2', url: 'content://device/cache/photo.png' },

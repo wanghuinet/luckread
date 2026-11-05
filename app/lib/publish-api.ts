@@ -1,4 +1,4 @@
-import { apiRequest, createIdempotencyKey, getApiBaseUrl, getApiErrorMessage } from './api-client';
+import { apiRequest, createIdempotencyKey, getApiBaseUrl, getApiErrorMessage, type ApiUploadProgress } from './api-client';
 
 export type LocalMediaFile = {
   uri: string;
@@ -157,6 +157,7 @@ export async function getOwnedMediaMetadata(urls: readonly string[]): Promise<Up
 export async function uploadMediaFile(
   file: LocalMediaFile,
   idempotencyKey: string = createIdempotencyKey(),
+  onUploadProgress?: (progress: ApiUploadProgress) => void,
 ): Promise<UploadedMedia> {
   if (!file.uri || !file.name || !file.mimeType) {
     throw new Error('The selected media file is missing its URI or file information.');
@@ -185,6 +186,7 @@ export async function uploadMediaFile(
         file.size ?? null,
       ]),
     },
+    onUploadProgress,
   });
   if (!result.response.ok) {
     throw new Error(apiFailureMessage(result, 'Media upload failed. Please retry.'));
