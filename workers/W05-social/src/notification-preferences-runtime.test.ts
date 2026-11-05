@@ -76,7 +76,7 @@ describe('W05 notification preferences runtime', () => {
     const db = { prepare } as unknown as D1Database
     for (const body of [{}, { follow: true, ownerUserId: 'attacker' }, { like: 'false' }]) {
       const response = await worker.fetch(requestFor('PATCH', body), { DB: db })
-      expect(response.status).toBe(400)
+      expect(response.status).toBe(422)
     }
     expect(prepare).not.toHaveBeenCalled()
   })
