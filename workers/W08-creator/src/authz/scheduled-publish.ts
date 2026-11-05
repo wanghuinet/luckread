@@ -43,9 +43,10 @@ const isIdentifier = (value: unknown, maxLength = 128): value is string =>
  *
  * This endpoint is intentionally separate from the session-bound CASL endpoint:
  * W01 calls it only through the existing private W08_CREATOR Service Binding.
- * The caller supplies a W03-derived creatorId, never a userId, subjectId, layer,
- * account state, or permission result. W08 resolves the active Creator -> User
- * mapping and current authorization facts from its authoritative D1-01.
+ * The caller supplies only a W03-derived creator identity hint: either the
+ * canonical creatorId or a legacy ownerUserId placeholder. W08 resolves that
+ * hint to the ACTIVE Creator -> User mapping and always returns the canonical
+ * creatorId; no layer, account state, role or permission result is accepted.
  */
 export async function handleScheduledPublishPermission(
   request: Request,
@@ -92,8 +93,11 @@ export async function handleScheduledPublishPermission(
 
   try {
     const creator = await env.D1_01.prepare(
-      "SELECT creator_id AS creatorId, user_id AS userId FROM creators WHERE creator_id = ? AND status = 'ACTIVE' LIMIT 1",
-    ).bind(body.creatorId).first<{ creatorId: string; userId: string }>()
+      "SELECT creator_id AS creatorId, user_id AS userId FROM creators " +
+      "WHERE status = 'ACTIVE' AND (creator_id = ? OR user_id = ?) " +
+      "ORDER BY CASE WHEN creator_id = ? THEN 0 ELSE 1 END LIMIT 1",
+    ).bind(body.creatorId, body.creatorId, body.creatorId)
+      .first<{ creatorId: string; userId: string }>()
 
     if (!creator || creator.creatorId !== body.creatorId || !isIdentifier(creator.userId)) {
       return deny('CREATOR_NOT_ACTIVE')
