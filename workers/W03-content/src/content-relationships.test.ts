@@ -3,7 +3,9 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 import {
+  appendPostThreadNext,
   listContentRelationships,
+  listPostThread,
 } from './content-relationships.js'
 import w03Worker from './index.js'
 
