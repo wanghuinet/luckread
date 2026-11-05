@@ -5,6 +5,7 @@ import {
   Image,
   Modal,
   FlatList,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -14,6 +15,7 @@ import {
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useNavigation, usePreventRemove, type NavigationAction } from '@react-navigation/native';
 import { Feather } from '@expo/vector-icons';
+import DateTimePicker from '@expo/ui/community/datetime-picker';
 import * as ImagePicker from 'expo-image-picker';
 import CameraCaptureModal, { type CapturedCameraPhoto } from '~/components/CameraCaptureModal';
 import { VideoView, useVideoPlayer } from 'expo-video';
@@ -23,7 +25,8 @@ import Sortable from 'react-native-sortables';
 import PublishMediaActionSheet from '~/components/PublishMediaActionSheet';
 
 import { apiRequest, createIdempotencyKey, fetchContentBodyReference } from '~/lib/api-client';
-import { computeAutoSaveDelay, createPublishDraftFingerprint } from '~/lib/publish-draft-autosave';
+import { computeAutoSaveDelay, createPublishDraftFingerprint, createReplyAudienceFingerprint } from '~/lib/publish-draft-autosave';
+import { getDefaultScheduledPublishDate, MIN_SCHEDULE_LEAD_TIME_MS, toScheduledPublishISO } from '~/lib/publish-schedule';
 import { DEFAULT_POLL_DURATION_MINUTES, getPollDurationMinutes, getPollDurationParts, type PollDurationParts } from '~/lib/poll-duration';
 import {
   apiFailureDiagnostic,
@@ -40,8 +43,15 @@ import {
   deleteOwnPostDraft,
   fetchDiscoveryTopics,
   fetchOwnPostDraftsPage,
+  fetchOwnScheduledPostsPage,
   findPublicUserByUsername,
+  fetchOwnPostReplyAudience,
+  saveOwnPostReplyAudience,
+  isNativeReplyAudience,
+  transitionOwnScheduledPostState,
+  type NativeReplyAudience,
   type NativePostDraft,
+  type NativeScheduledPost,
 } from '~/lib/social-screen-api';
 import {
   findActiveComposerToken,
@@ -99,6 +109,32 @@ type MentionSuggestion = {
   displayName: string | null;
   avatar: string | null;
 };
+
+const REPLY_AUDIENCE_OPTIONS: ReadonlyArray<{
+  value: NativeReplyAudience;
+  label: string;
+  description: string;
+}> = [
+  { value: 'everyone', label: '每个人', description: '所有账号都可以回复' },
+  { value: 'verified', label: '认证账号', description: '只有认证账号可以回复' },
+  { value: 'following', label: '你关注的账号', description: '只有你关注的账号可以回复' },
+  { value: 'mentioned', label: '你提及的账号', description: '只有你在帖子中提及的账号可以回复' },
+  { value: 'followingNetwork', label: '你关注的账号及其关注的账号', description: '你关注的账号及其关注的账号可以回复' },
+];
+
+const replyAudienceLabels: Record<NativeReplyAudience, string> = {
+  everyone: '所有人可以回复',
+  verified: '认证账号可以回复',
+  following: '你关注的账号可以回复',
+  mentioned: '只有你提及的账号可以回复',
+  followingNetwork: '你关注的账号及其关注的账号可以回复',
+};
+
+function readReplyAudienceFromResult(data: unknown): NativeReplyAudience | null {
+  if (!data || typeof data !== 'object' || !('data' in data)) return null;
+  const payload = (data as { data?: { replyAudience?: unknown } }).data;
+  return isNativeReplyAudience(payload?.replyAudience) ? payload.replyAudience : null;
+}
 
 type SubmitAttempt = {
   fingerprint: string;
@@ -172,6 +208,8 @@ function PublishScreenContent() {
   const [cameraVisible, setCameraVisible] = useState(false);
   const [mediaActionsVisible, setMediaActionsVisible] = useState(false);
   const [coverRef, setCoverRef] = useState('');
+  const [replyAudience, setReplyAudience] = useState<NativeReplyAudience>('everyone');
+  const [replyAudiencePickerVisible, setReplyAudiencePickerVisible] = useState(false);
   const [busy, setBusy] = useState(false);
   const [loadingEdit, setLoadingEdit] = useState(Boolean(contentId));
   const [errorMessage, setErrorMessage] = useState('');
@@ -184,6 +222,21 @@ function PublishScreenContent() {
   const updatePollDurationPart = (unit: keyof PollDurationParts, value: string) => {
     setPollDurationParts((current) => ({ ...current, [unit]: value.replace(/[^0-9]/g, '').slice(0, 2) }));
   };
+  const [scheduleEnabled, setScheduleEnabled] = useState(false);
+  const [scheduleDate, setScheduleDate] = useState(() => getDefaultScheduledPublishDate());
+  const [schedulePickerVisible, setSchedulePickerVisible] = useState(false);
+  const [schedulePickerDraft, setSchedulePickerDraft] = useState(() => getDefaultScheduledPublishDate());
+  const [scheduleEditTarget, setScheduleEditTarget] = useState<NativeScheduledPost | null>(null);
+  const openSchedulePicker = useCallback(() => {
+    setScheduleEditTarget(null);
+    const now = Date.now();
+    const candidate = scheduleDate.getTime() > now + MIN_SCHEDULE_LEAD_TIME_MS
+      ? scheduleDate
+      : getDefaultScheduledPublishDate();
+    setSchedulePickerDraft(candidate);
+    setSchedulePickerVisible(true);
+    setErrorMessage('');
+  }, [scheduleDate]);
   const [draftSaveStatus, setDraftSaveStatus] = useState<'idle' | 'scheduled' | 'saving' | 'saved' | 'error'>('idle');
   const [draftInboxVisible, setDraftInboxVisible] = useState(false);
   const [draftInboxItems, setDraftInboxItems] = useState<NativePostDraft[]>([]);
@@ -192,6 +245,14 @@ function PublishScreenContent() {
   const [draftInboxLoading, setDraftInboxLoading] = useState(false);
   const [draftInboxError, setDraftInboxError] = useState('');
   const [deletingDraftId, setDeletingDraftId] = useState<string | null>(null);
+  const [scheduledInboxVisible, setScheduledInboxVisible] = useState(false);
+  const [scheduledInboxItems, setScheduledInboxItems] = useState<NativeScheduledPost[]>([]);
+  const [scheduledInboxCursor, setScheduledInboxCursor] = useState<string | null>(null);
+  const [scheduledInboxHasMore, setScheduledInboxHasMore] = useState(false);
+  const [scheduledInboxLoading, setScheduledInboxLoading] = useState(false);
+  const [scheduledInboxError, setScheduledInboxError] = useState('');
+  const [scheduledActionId, setScheduledActionId] = useState<string | null>(null);
+  const scheduledActionInFlightRef = useRef(false);
   const [textSelection, setTextSelection] = useState({ start: 0, end: 0 });
   const [topicSuggestions, setTopicSuggestions] = useState<DiscoveryTopicOption[]>([]);
   const [topicSuggestionsLoading, setTopicSuggestionsLoading] = useState(false);
@@ -199,6 +260,7 @@ function PublishScreenContent() {
   const [mentionLookupLoading, setMentionLookupLoading] = useState(false);
 
   const recordRef = useRef<ContentRecord | null>(null);
+  const replyAudienceSavedFingerprintRef = useRef('');
   const draftSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const draftSaveInFlightRef = useRef(false);
   const draftSaveInFlightPromiseRef = useRef<Promise<void> | null>(null);
@@ -260,6 +322,12 @@ function PublishScreenContent() {
         throw new Error('The server did not return a version for this post. Refresh it before editing.');
       }
 
+      const replyPolicyResult = await fetchOwnPostReplyAudience(targetContentId);
+      const restoredReplyAudience = readReplyAudienceFromResult(replyPolicyResult.data);
+      if (!replyPolicyResult.response.ok || !isNativeReplyAudience(restoredReplyAudience)) {
+        throw new Error(apiFailureDiagnostic(replyPolicyResult, 'Unable to restore reply permissions for this post.'));
+      }
+
       let restoredBody = record.title || '';
       if (restoringDraft && record.bodyRef) {
         const bodyResponse = await fetchContentBodyReference(record.bodyRef);
@@ -318,6 +386,8 @@ function PublishScreenContent() {
       originalBodyRef.current = { text: restoredBody, bodyRef: record.bodyRef || null };
       setAccessMode(loadedAccessMode);
       setBody(restoredBody);
+      setReplyAudience(restoredReplyAudience);
+      replyAudienceSavedFingerprintRef.current = createReplyAudienceFingerprint(restoredBody, restoredReplyAudience);
       setCoverRef(record.coverRef || '');
       setAssets(restoredAssets);
       pollConfiguredRef.current = Boolean(restoredPoll);
@@ -798,7 +868,12 @@ function PublishScreenContent() {
       pollOptions,
       pollDurationMinutes: pollDurationMinutes ?? -1,
     });
-    if (recordRef.current?.id && draftSavedFingerprintRef.current === fingerprint) return;
+    const replyAudienceFingerprint = createReplyAudienceFingerprint(trimmedBody, replyAudience);
+    if (
+      recordRef.current?.id &&
+      draftSavedFingerprintRef.current === fingerprint &&
+      replyAudienceSavedFingerprintRef.current === replyAudienceFingerprint
+    ) return;
 
     let bodyRef = originalBodyRef.current.text === trimmedBody
       ? originalBodyRef.current.bodyRef
@@ -964,7 +1039,15 @@ function PublishScreenContent() {
       }
       pollConfiguredRef.current = false;
     }
-    // Only mark the fingerprint saved after both content and poll mutations succeed.
+    // The owner policy is persisted in W05; W01 resolves @mentions to canonical IDs.
+    if (replyAudienceSavedFingerprintRef.current !== replyAudienceFingerprint) {
+      const replyPolicyResult = await saveOwnPostReplyAudience(draft.id, replyAudience, trimmedBody);
+      if (!replyPolicyResult.response.ok || !readReplyAudienceFromResult(replyPolicyResult.data)) {
+        throw new Error(apiFailureDiagnostic(replyPolicyResult, 'Unable to save who can reply to this post.'));
+      }
+      replyAudienceSavedFingerprintRef.current = replyAudienceFingerprint;
+    }
+    // Only mark the content fingerprint saved after content, poll and reply policy succeed.
     draftSavedFingerprintRef.current = fingerprint;
     originalBodyRef.current = { text: trimmedBody, bodyRef };
   }, [
@@ -979,6 +1062,7 @@ function PublishScreenContent() {
     pollEnabled,
     pollOptions,
     publishPending,
+    replyAudience,
     router,
   ]);
 
@@ -1072,6 +1156,38 @@ function PublishScreenContent() {
     }
   }, []);
 
+  const loadScheduledInbox = useCallback(async (cursor: string | null = null, append = false) => {
+    setScheduledInboxLoading(true);
+    setScheduledInboxError('');
+    try {
+      const result = await fetchOwnScheduledPostsPage({ cursor, limit: 20 });
+      if (!result.response.ok) {
+        throw new Error(apiFailureDiagnostic(result, '暂时无法加载定时发布列表。'));
+      }
+      const page = result.data && 'data' in result.data ? result.data.data : undefined;
+      if (!page || !Array.isArray(page.items)) {
+        throw new Error('定时发布列表返回的数据格式无效。');
+      }
+      setScheduledInboxItems((current) => {
+        if (!append) return page.items;
+        const known = new Set(current.map((item) => item.id));
+        return [...current, ...page.items.filter((item) => !known.has(item.id))];
+      });
+      setScheduledInboxCursor(page.nextCursor || null);
+      setScheduledInboxHasMore(page.hasMore === true);
+    } catch (cause) {
+      setScheduledInboxError(cause instanceof Error ? cause.message : '暂时无法加载定时发布列表。');
+    } finally {
+      setScheduledInboxLoading(false);
+    }
+  }, []);
+
+  const openScheduledInbox = useCallback(async () => {
+    if (busy || loadingEdit || publishPending) return;
+    setScheduledInboxVisible(true);
+    await loadScheduledInbox(null, false);
+  }, [busy, loadScheduledInbox, loadingEdit, publishPending]);
+
   const openDraftInbox = useCallback(async () => {
     if (busy || loadingEdit || publishPending) return;
     setDraftInboxVisible(true);
@@ -1096,6 +1212,119 @@ function PublishScreenContent() {
     await loadDraftInbox(null, false);
   }, [busy, contentId, loadDraftInbox, loadingEdit, publishPending, saveDraftSnapshot]);
 
+  const cancelScheduledPost = useCallback((item: NativeScheduledPost) => {
+    if (scheduledActionInFlightRef.current) return;
+    Alert.alert(
+      '取消定时发布',
+      '“' + item.title + '”将转为草稿，不会删除内容。',
+      [
+        { text: '保留定时', style: 'cancel' },
+        {
+          text: '转为草稿',
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              if (scheduledActionInFlightRef.current) return;
+              scheduledActionInFlightRef.current = true;
+              setScheduledActionId(item.id);
+              setScheduledInboxError('');
+              try {
+                const result = await transitionOwnScheduledPostState(item, 'DRAFT');
+                if (!result.response.ok) {
+                  throw new Error(apiFailureDiagnostic(result, '取消定时发布失败。'));
+                }
+                setScheduledInboxItems((current) => current.filter((candidate) => candidate.id !== item.id));
+                setScheduledInboxError('');
+                await loadScheduledInbox(null, false);
+              } catch (cause) {
+                setScheduledInboxError(cause instanceof Error ? cause.message : '取消定时发布失败。');
+              } finally {
+                scheduledActionInFlightRef.current = false;
+                setScheduledActionId(null);
+              }
+            })();
+          },
+        },
+      ],
+    );
+  }, [loadScheduledInbox]);
+
+  const rescheduleScheduledPost = useCallback(async (item: NativeScheduledPost, scheduledAt: string) => {
+    if (scheduledActionInFlightRef.current || scheduledActionId) return;
+    scheduledActionInFlightRef.current = true;
+    setScheduledActionId(item.id);
+    setScheduledInboxError('');
+    let movedToDraft = false;
+    try {
+      // Use the existing lifecycle state machine rather than adding a self-transition.
+      const unscheduled = await transitionOwnScheduledPostState(item, 'DRAFT');
+      if (!unscheduled.response.ok) {
+        throw new Error(apiFailureDiagnostic(unscheduled, '原定时未能取消，内容状态未改变。'));
+      }
+      movedToDraft = true;
+      setScheduledInboxItems((current) => current.filter((candidate) => candidate.id !== item.id));
+
+      const transitionData = unscheduled.data && typeof unscheduled.data === 'object'
+        ? unscheduled.data as Record<string, unknown>
+        : null;
+      const nextEtag = typeof transitionData?.etag === 'string' ? transitionData.etag : '';
+      if (!nextEtag || nextEtag === '*') {
+        throw new Error('原定时已取消，内容已转为草稿；服务器未返回新版本，暂时无法重新安排。请从草稿箱继续编辑。');
+      }
+
+      const updatedDraft = { ...item, etag: nextEtag };
+      const scheduled = await transitionOwnScheduledPostState(updatedDraft, 'SCHEDULED', scheduledAt);
+      if (!scheduled.response.ok) {
+        throw new Error(
+          '原定时已取消，内容已安全转为草稿；重新安排失败：' +
+          apiFailureDiagnostic(scheduled, '请从草稿箱重新安排发布时间。'),
+        );
+      }
+
+      await loadScheduledInbox(null, false);
+      Alert.alert('定时已更新', '新的发布时间：' + new Date(scheduledAt).toLocaleString() + '（本机时间）。');
+    } catch (cause) {
+      if (movedToDraft) {
+        setScheduledInboxItems((current) => current.filter((candidate) => candidate.id !== item.id));
+      }
+      setScheduledInboxError(cause instanceof Error ? cause.message : '修改发布时间失败。');
+    } finally {
+      scheduledActionInFlightRef.current = false;
+      setScheduledActionId(null);
+      setScheduledInboxVisible(true);
+    }
+  }, [loadScheduledInbox, scheduledActionId]);
+
+  const openScheduleEditPicker = useCallback((item: NativeScheduledPost) => {
+    const existing = Date.parse(item.scheduledAt);
+    const candidate = Number.isFinite(existing) && existing > Date.now() + MIN_SCHEDULE_LEAD_TIME_MS
+      ? new Date(existing)
+      : getDefaultScheduledPublishDate();
+    setScheduleEditTarget(item);
+    setSchedulePickerDraft(candidate);
+    setSchedulePickerVisible(true);
+    setScheduledInboxVisible(false);
+  }, []);
+
+  const confirmSchedulePicker = useCallback(() => {
+    const iso = toScheduledPublishISO(schedulePickerDraft);
+    if (!iso) {
+      Alert.alert('时间无效', '请选择至少一分钟后的时间。');
+      return;
+    }
+    if (scheduleEditTarget) {
+      const target = scheduleEditTarget;
+      setScheduleEditTarget(null);
+      setSchedulePickerVisible(false);
+      void rescheduleScheduledPost(target, iso);
+      return;
+    }
+    setScheduleDate(new Date(iso));
+    setScheduleEnabled(true);
+    setSchedulePickerVisible(false);
+    setErrorMessage('');
+  }, [rescheduleScheduledPost, scheduleEditTarget, schedulePickerDraft]);
+
   const restoreDraftFromInbox = useCallback((draft: NativePostDraft) => {
     setDraftInboxVisible(false);
     if (draftId === draft.id) return;
@@ -1106,6 +1335,7 @@ function PublishScreenContent() {
     draftSaveDirtyRef.current = false;
     draftSaveRestoreCompleteRef.current = false;
     draftSavedFingerprintRef.current = '';
+    replyAudienceSavedFingerprintRef.current = '';
     draftCreatePendingRef.current = null;
     draftCreateKeyRef.current = '';
     recordRef.current = null;
@@ -1116,6 +1346,7 @@ function PublishScreenContent() {
     setAssets([]);
     setCoverRef('');
     setAccessMode('PUBLIC');
+    setReplyAudience('everyone');
     setPollEnabled(false);
     setPollOptions(['', '']);
     setErrorMessage('');
@@ -1143,11 +1374,13 @@ function PublishScreenContent() {
                 editLoadKeyRef.current = '';
                 draftSaveRestoreCompleteRef.current = false;
                 draftSavedFingerprintRef.current = '';
+                replyAudienceSavedFingerprintRef.current = '';
                 pollConfiguredRef.current = false;
                 setBody('');
                 setAssets([]);
                 setCoverRef('');
                 setAccessMode('PUBLIC');
+                setReplyAudience('everyone');
                 setPollEnabled(false);
                 setPollOptions(['', '']);
                 setDraftSaveStatus('idle');
@@ -1284,7 +1517,7 @@ function PublishScreenContent() {
     draftSaveDirtyRef.current = true;
     draftSaveChangeTokenRef.current += 1;
     draftAutoSaveSchedulerRef.current();
-  }, [accessMode, assets, body, busy, contentId, coverRef, loadingEdit, pollDurationMinutes, pollEnabled, pollOptions, publishPending]);
+  }, [accessMode, assets, body, busy, contentId, coverRef, loadingEdit, pollDurationMinutes, pollEnabled, pollOptions, publishPending, replyAudience]);
 
   useEffect(() => () => {
     if (draftSaveTimerRef.current) clearTimeout(draftSaveTimerRef.current);
@@ -1376,11 +1609,21 @@ function PublishScreenContent() {
       }
     }
 
+    if (scheduleEnabled && pollEnabled) {
+      setErrorMessage('Polls cannot be scheduled yet. Turn off the poll or publish immediately.');
+      return;
+    }
+    const normalizedScheduledAt = scheduleEnabled ? toScheduledPublishISO(scheduleDate) : null;
+    if (scheduleEnabled && !normalizedScheduledAt) {
+      setErrorMessage('Choose a publish time at least one minute in the future.');
+      return;
+    }
+
     const mediaRefs = Array.from(new Set(assets.map((asset) => asset.serverUrl)));
     const nextCover = coverRef && mediaRefs.includes(coverRef)
       ? coverRef
       : assets.find((asset) => asset.mimeType.startsWith('image/'))?.serverUrl || null;
-    const fingerprint = JSON.stringify([contentId || '', trimmedBody, mediaRefs, nextCover, accessMode, pollEnabled, cleanPollOptions, pollEnabled ? pollDurationMinutes : null]);
+    const fingerprint = JSON.stringify([contentId || '', trimmedBody, mediaRefs, nextCover, accessMode, pollEnabled, cleanPollOptions, pollEnabled ? pollDurationMinutes : null, normalizedScheduledAt]);
     let attempt = submitAttemptRef.current;
     if (attempt && attempt.fingerprint !== fingerprint) {
       if (!contentId && !recordRef.current && publishPending) {
@@ -1419,7 +1662,7 @@ function PublishScreenContent() {
     }
     setBusy(true);
     setErrorMessage('');
-    setStatusMessage(contentId ? 'Saving your changes…' : 'Publishing your post…');
+    setStatusMessage(contentId ? 'Saving your changes…' : scheduleEnabled ? 'Scheduling your post…' : 'Publishing your post…');
     try {
       await savePendingAssetAltText();
       let bodyRef: string | null = null;
@@ -1470,6 +1713,17 @@ function PublishScreenContent() {
         if (!result.response.ok) {
           throw new Error(apiFailureDiagnostic(result, 'Unable to save post changes.'));
         }
+        const updatedRecord = unwrapContent(result.data);
+        const updatedEtag = updatedRecord?.etag || result.response.headers.get('ETag') || undefined;
+        if (updatedRecord?.id && updatedEtag && updatedEtag !== '*') {
+          recordRef.current = { ...(recordRef.current ?? record), ...updatedRecord, etag: updatedEtag };
+        }
+        const replyAudienceFingerprint = createReplyAudienceFingerprint(trimmedBody, replyAudience);
+        const replyPolicyResult = await saveOwnPostReplyAudience(contentId, replyAudience, trimmedBody);
+        if (!replyPolicyResult.response.ok || !readReplyAudienceFromResult(replyPolicyResult.data)) {
+          throw new Error(apiFailureDiagnostic(replyPolicyResult, 'Post changes were saved, but reply permissions could not be updated.'));
+        }
+        replyAudienceSavedFingerprintRef.current = replyAudienceFingerprint;
         const socialSyncWarning = recordRef.current?.state === 'PUBLISHED'
           ? await syncPublishedSocialTokens(contentId, trimmedBody)
           : null;
@@ -1609,13 +1863,24 @@ function PublishScreenContent() {
         }
       }
 
+      const replyAudienceFingerprint = createReplyAudienceFingerprint(trimmedBody, replyAudience);
+      if (replyAudienceSavedFingerprintRef.current !== replyAudienceFingerprint) {
+        const replyPolicyResult = await saveOwnPostReplyAudience(draft.id, replyAudience, trimmedBody);
+        if (!replyPolicyResult.response.ok || !readReplyAudienceFromResult(replyPolicyResult.data)) {
+          setPublishPending(true);
+          throw new Error(apiFailureDiagnostic(replyPolicyResult, 'The post draft exists, but reply permissions could not be saved. Retry to finish the same post.'));
+        }
+        replyAudienceSavedFingerprintRef.current = replyAudienceFingerprint;
+      }
+
       const transitioned = await apiRequest<Record<string, unknown>>(
         '/contents/' + encodeURIComponent(draft.id) + '/state',
         {
           method: 'POST',
           headers: { 'If-Match': draft.etag },
           body: JSON.stringify({
-            to: 'PUBLISHED',
+            to: scheduleEnabled ? 'SCHEDULED' : 'PUBLISHED',
+            ...(normalizedScheduledAt ? { scheduledAt: normalizedScheduledAt } : {}),
             preflight: {
               contentType: 'post',
               title: trimmedBody,
@@ -1633,6 +1898,23 @@ function PublishScreenContent() {
           transitioned,
           'The post was created but could not be published yet. Retry to finish publishing this same post.',
         ));
+      }
+
+      if (scheduleEnabled) {
+        submitAttemptRef.current = null;
+        recordRef.current = null;
+        draftWasPublishedRef.current = true;
+        draftSaveDirtyRef.current = false;
+        setDraftSaveStatus('idle');
+        const localScheduleLabel = scheduleDate.toLocaleString();
+        setStatusMessage('定时发布已安排');
+        Alert.alert('定时发布已安排', '动态已保存，将于 ' + localScheduleLabel + '（本机时间）自动发布。', [
+          {
+            text: '完成',
+            onPress: () => router.replace(('/?refresh=' + Date.now()) as never),
+          },
+        ]);
+        return;
       }
 
       // W01 resolves @handles to canonical W02 identities; W05 persists mention/topic edges.
@@ -1662,7 +1944,7 @@ function PublishScreenContent() {
     } finally {
       setBusy(false);
     }
-  }, [accessMode, assets, body, contentId, coverRef, pollDurationMinutes, pollEnabled, pollOptions, publishPending, router, saveDraftSnapshot, savePendingAssetAltText, syncPublishedSocialTokens]);
+  }, [accessMode, assets, body, contentId, coverRef, pollDurationMinutes, pollEnabled, pollOptions, publishPending, replyAudience, router, saveDraftSnapshot, savePendingAssetAltText, scheduleDate, scheduleEnabled, syncPublishedSocialTokens]);
 
   if (authStatus !== 'authenticated') {
     return (
@@ -1687,9 +1969,14 @@ function PublishScreenContent() {
         <Pressable accessibilityRole="button" accessibilityLabel="Close composer" disabled={busy || loadingEdit} onPress={() => { void closeComposer(); }} style={[styles.iconButton, (busy || loadingEdit) && styles.disabledButton]}>
           <Feather name="x" size={22} color={isDark ? '#e5e7eb' : '#111827'} />
         </Pressable>
-        {!contentId ? (
+        {!contentId && Platform.OS !== 'web' ? (
           <Pressable accessibilityRole="button" accessibilityLabel="Open drafts" onPress={() => { void openDraftInbox(); }} style={styles.iconButton}>
             <Feather name="file-text" size={19} color={isDark ? '#e5e7eb' : '#344054'} />
+          </Pressable>
+        ) : null}
+        {!contentId && Platform.OS !== 'web' ? (
+          <Pressable accessibilityRole="button" accessibilityLabel="Open scheduled posts" onPress={() => { void openScheduledInbox(); }} style={styles.iconButton}>
+            <Feather name="calendar" size={19} color={isDark ? '#e5e7eb' : '#344054'} />
           </Pressable>
         ) : null}
         <Text style={[styles.headerTitle, isDark && { color: '#f9fafb' }]}>{contentId ? 'Edit post' : 'New post'}</Text>
@@ -1699,7 +1986,7 @@ function PublishScreenContent() {
           disabled={busy || loadingEdit || !body.trim()}
           style={[styles.publishButton, (busy || loadingEdit || !body.trim()) && styles.disabledButton]}
         >
-          {busy ? <ActivityIndicator color="#ffffff" size="small" /> : <Text style={styles.publishButtonText}>{publishPending ? 'Retry publish' : contentId ? 'Save' : 'Post'}</Text>}
+          {busy ? <ActivityIndicator color="#ffffff" size="small" /> : <Text style={styles.publishButtonText}>{publishPending ? (scheduleEnabled ? 'Retry schedule' : 'Retry publish') : contentId ? 'Save' : scheduleEnabled ? 'Schedule' : 'Post'}</Text>}
         </Pressable>
       </View>
 
@@ -1763,6 +2050,24 @@ function PublishScreenContent() {
             <Text style={[styles.helperText, isDark && { color: '#9ca3af' }]}>Ordinary social posts publish directly; no extra review screen.</Text>
             <Text style={[styles.counter, isDark && { color: '#9ca3af' }]}>{body.length}/{MAX_TEXT_LENGTH}</Text>
           </View>
+          <View style={[styles.replyAudienceSection, isDark && { borderBottomColor: '#27272a' }]}>
+            <Text style={[styles.replyAudienceHeading, isDark && { color: '#f9fafb' }]}>回复权限</Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Choose who can reply"
+              accessibilityState={{ disabled: busy || loadingEdit || publishPending }}
+              disabled={busy || loadingEdit || publishPending}
+              onPress={() => setReplyAudiencePickerVisible(true)}
+              style={[styles.replyAudienceButton, isDark && { borderColor: '#52525b', backgroundColor: '#09090b' }]}
+            >
+              <Feather name="message-circle" size={18} color={PRIMARY} />
+              <Text style={[styles.replyAudienceButtonText, isDark && { color: '#f4f4f5' }]}>{replyAudienceLabels[replyAudience]}</Text>
+              <Feather name="chevron-right" size={17} color={isDark ? '#a1a1aa' : '#667085'} />
+            </Pressable>
+            <Text style={[styles.replyAudienceHint, isDark && { color: '#9ca3af' }]}>
+              被提及的账号始终可以回复。权限由服务端执行。
+            </Text>
+          </View>
           {!contentId && draftSaveStatus !== 'idle' ? (
             <Text accessibilityLiveRegion="polite" style={[styles.draftSaveStatus, isDark && { color: '#9ca3af' }]}>
               {draftSaveStatus === 'scheduled' ? '草稿即将自动保存…'
@@ -1770,6 +2075,55 @@ function PublishScreenContent() {
                   : draftSaveStatus === 'saved' ? '草稿已自动保存。'
                     : '草稿自动保存失败，请检查网络后继续；再次编辑会重试。'}
             </Text>
+          ) : null}
+
+          {!contentId && Platform.OS !== 'web' ? (
+            <View style={[styles.scheduleSection, isDark && { borderBottomColor: '#27272a' }]}>
+              <Text style={[styles.scheduleSectionTitle, isDark && { color: '#f9fafb' }]}>发布时间</Text>
+              <View style={styles.scheduleModeRow}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: !scheduleEnabled, disabled: busy || loadingEdit || publishPending }}
+                  disabled={busy || loadingEdit || publishPending}
+                  onPress={() => {
+                    setScheduleEnabled(false);
+                    setErrorMessage('');
+                  }}
+                  style={[styles.scheduleModeOption, !scheduleEnabled && styles.scheduleModeOptionSelected, isDark && !scheduleEnabled && { backgroundColor: '#102a43', borderColor: PRIMARY }]}
+                >
+                  <Text style={[styles.scheduleModeOptionText, isDark && { color: !scheduleEnabled ? '#ffffff' : '#e5e7eb' }, !scheduleEnabled && styles.scheduleModeOptionTextSelected]}>立即发布</Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: scheduleEnabled, disabled: busy || loadingEdit || publishPending || pollEnabled }}
+                  disabled={busy || loadingEdit || publishPending || pollEnabled}
+                  onPress={openSchedulePicker}
+                  style={[styles.scheduleModeOption, scheduleEnabled && styles.scheduleModeOptionSelected, isDark && { borderColor: scheduleEnabled ? PRIMARY : '#52525b', backgroundColor: scheduleEnabled ? '#102a43' : '#09090b' }]}
+                >
+                  <Text style={[styles.scheduleModeOptionText, isDark && { color: scheduleEnabled ? '#ffffff' : '#e5e7eb' }, scheduleEnabled && styles.scheduleModeOptionTextSelected]}>定时发布</Text>
+                </Pressable>
+              </View>
+              {scheduleEnabled ? (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Change scheduled publish time"
+                  disabled={busy || loadingEdit || publishPending}
+                  onPress={openSchedulePicker}
+                  style={[styles.scheduleDateButton, isDark && { borderColor: '#52525b', backgroundColor: '#09090b' }]}
+                >
+                  <View style={styles.scheduleDateButtonContent}>
+                    <Feather name="calendar" size={17} color={PRIMARY} />
+                    <Text style={[styles.scheduleDateText, isDark && { color: '#f4f4f5' }]}>{scheduleDate.toLocaleString()}</Text>
+                    <Feather name="chevron-right" size={17} color={isDark ? '#a1a1aa' : '#667085'} />
+                  </View>
+                </Pressable>
+              ) : null}
+              <Text style={[styles.scheduleHint, isDark && { color: '#9ca3af' }]}>
+                {pollEnabled
+                  ? '投票暂不支持定时发布；关闭投票后可设置发布时间。'
+                  : '按手机当前时区选择时间。服务端会在到点后重新检查创作者权限，再自动发布。'}
+              </Text>
+            </View>
           ) : null}
 
           <View style={[styles.accessModeSection, isDark && { borderBottomColor: '#27272a' }]}>
@@ -1841,8 +2195,8 @@ function PublishScreenContent() {
             <View style={[styles.pollSection, isDark && { borderBottomColor: '#27272a' }]}>
               <Pressable
                 accessibilityRole="button"
-                accessibilityState={{ selected: pollEnabled, disabled: busy || loadingEdit || publishPending }}
-                disabled={busy || loadingEdit || publishPending}
+                accessibilityState={{ selected: pollEnabled, disabled: busy || loadingEdit || publishPending || scheduleEnabled }}
+                disabled={busy || loadingEdit || publishPending || scheduleEnabled}
                 onPress={() => {
                   setPollEnabled((value) => !value);
                   setErrorMessage('');
@@ -1948,6 +2302,100 @@ function PublishScreenContent() {
         onCapture={handleCameraCapture}
       />
       <Modal
+        visible={schedulePickerVisible && Platform.OS !== 'web'}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => {
+          const wasEditing = scheduleEditTarget !== null;
+          setSchedulePickerVisible(false);
+          setScheduleEditTarget(null);
+          if (wasEditing) setScheduledInboxVisible(true);
+        }}
+      >
+        <View style={[styles.schedulePickerModal, isDark && styles.schedulePickerModalDark]}>
+          <View style={[styles.schedulePickerHeader, isDark && { borderBottomColor: '#27272a' }]}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => {
+                const wasEditing = scheduleEditTarget !== null;
+                setSchedulePickerVisible(false);
+                setScheduleEditTarget(null);
+                if (wasEditing) setScheduledInboxVisible(true);
+              }}
+              style={styles.schedulePickerActionHit}
+            >
+              <Text style={styles.schedulePickerCancel}>取消</Text>
+            </Pressable>
+            <Text style={[styles.schedulePickerTitle, isDark && { color: '#f9fafb' }]}>
+              {scheduleEditTarget ? '修改发布时间' : '设置发布时间'}
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              onPress={confirmSchedulePicker}
+              style={styles.schedulePickerActionHit}
+            >
+              <Text style={styles.schedulePickerConfirm}>确认</Text>
+            </Pressable>
+          </View>
+          <Text style={[styles.schedulePickerHint, isDark && { color: '#9ca3af' }]}>
+            {scheduleEditTarget
+              ? '修改时会先取消原定时并转为草稿，再按当前创作者权限重新安排。时间按手机当前时区显示。'
+              : '时间按手机当前时区显示。最早可选择一分钟后。'}
+          </Text>
+          <DateTimePicker
+            value={schedulePickerDraft}
+            onValueChange={(_event, selectedDate) => setSchedulePickerDraft(selectedDate)}
+            mode="datetime"
+            minimumDate={new Date(Date.now() + MIN_SCHEDULE_LEAD_TIME_MS)}
+            is24Hour
+            presentation="inline"
+            display={Platform.OS === 'ios' ? 'inline' : 'default'}
+            accentColor={PRIMARY}
+            themeVariant={isDark ? 'dark' : 'light'}
+          />
+        </View>
+      </Modal>
+      <Modal
+        visible={replyAudiencePickerVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setReplyAudiencePickerVisible(false)}
+      >
+        <View style={[styles.replyAudienceModal, isDark && styles.draftsModalDark]}>
+          <View style={[styles.schedulePickerHeader, isDark && { borderBottomColor: '#27272a' }]}>
+            <Pressable accessibilityRole="button" onPress={() => setReplyAudiencePickerVisible(false)} style={styles.schedulePickerActionHit}>
+              <Text style={styles.schedulePickerCancel}>取消</Text>
+            </Pressable>
+            <Text style={[styles.schedulePickerTitle, isDark && { color: '#f9fafb' }]}>谁可以回复？</Text>
+            <View style={styles.schedulePickerActionHit} />
+          </View>
+          <Text style={[styles.schedulePickerHint, isDark && { color: '#9ca3af' }]}>
+            选择可以回复这条动态的账号。只要被提及，账号仍然可以回复。
+          </Text>
+          {REPLY_AUDIENCE_OPTIONS.map((option) => (
+            <Pressable
+              key={option.value}
+              accessibilityRole="button"
+              accessibilityState={{ selected: replyAudience === option.value }}
+              onPress={() => {
+                setReplyAudience(option.value);
+                setReplyAudiencePickerVisible(false);
+                setErrorMessage('');
+              }}
+              style={[styles.replyAudienceOption, isDark && { borderBottomColor: '#27272a' }]}
+            >
+              <View style={styles.replyAudienceOptionCopy}>
+                <Text style={[styles.replyAudienceOptionLabel, isDark && { color: '#f4f4f5' }]}>{option.label}</Text>
+                <Text style={[styles.replyAudienceOptionDescription, isDark && { color: '#a1a1aa' }]}>{option.description}</Text>
+              </View>
+              <View style={[styles.replyAudienceRadio, replyAudience === option.value && styles.replyAudienceRadioSelected]}>
+                {replyAudience === option.value ? <View style={styles.replyAudienceRadioDot} /> : null}
+              </View>
+            </Pressable>
+          ))}
+        </View>
+      </Modal>
+      <Modal
         visible={draftInboxVisible}
         animationType="slide"
         presentationStyle="pageSheet"
@@ -1989,6 +2437,90 @@ function PublishScreenContent() {
               }}
               onEndReachedThreshold={0.5}
               ListFooterComponent={draftInboxLoading && draftInboxItems.length > 0 ? <ActivityIndicator color={PRIMARY} style={{ padding: 16 }} /> : undefined}
+            />
+          )}
+        </View>
+      </Modal>
+      <Modal
+        visible={scheduledInboxVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setScheduledInboxVisible(false)}
+      >
+        <View style={[styles.draftsModal, isDark && styles.draftsModalDark]}>
+          <View style={[styles.draftsHeader, isDark && { borderBottomColor: '#27272a' }]}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Close scheduled posts" onPress={() => setScheduledInboxVisible(false)} style={styles.iconButton}>
+              <Feather name="x" size={22} color={isDark ? '#e5e7eb' : '#111827'} />
+            </Pressable>
+            <Text style={[styles.draftsTitle, isDark && { color: '#f9fafb' }]}>定时发布</Text>
+            <Pressable accessibilityRole="button" accessibilityLabel="Refresh scheduled posts" disabled={scheduledInboxLoading} onPress={() => { void loadScheduledInbox(null, false); }} style={styles.iconButton}>
+              <Feather name="refresh-cw" size={18} color={isDark ? '#e5e7eb' : '#344054'} />
+            </Pressable>
+          </View>
+          {scheduledInboxError ? <Text style={styles.draftsError}>{scheduledInboxError}</Text> : null}
+          {scheduledInboxLoading && scheduledInboxItems.length === 0 ? (
+            <View style={styles.draftsEmpty}>
+              <ActivityIndicator color={PRIMARY} />
+              <Text style={[styles.suggestionMeta, isDark && { color: '#a1a1aa' }]}>正在加载定时动态…</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={scheduledInboxItems}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={scheduledInboxItems.length === 0 ? styles.draftsEmptyList : styles.draftsList}
+              ListEmptyComponent={
+                <Text style={[styles.draftsEmptyText, isDark && { color: '#a1a1aa' }]}>
+                  还没有待发布的定时动态。
+                </Text>
+              }
+              renderItem={({ item }) => (
+                <View style={[styles.scheduledItem, isDark && { borderBottomColor: '#27272a' }]}>
+                  <View style={styles.scheduledItemMain}>
+                    <Text numberOfLines={3} style={[styles.draftItemTitle, isDark && { color: '#f4f4f5' }]}>
+                      {item.title?.trim() || '未命名动态'}
+                    </Text>
+                    <Text style={[styles.draftItemMeta, isDark && { color: '#a1a1aa' }]}>
+                      计划于 {new Date(item.scheduledAt).toLocaleString()} 发布
+                    </Text>
+                    <Text style={[styles.draftItemMeta, isDark && { color: '#a1a1aa' }]}>
+                      {item.mediaRefs?.length ? item.mediaRefs.length + ' 个附件 · ' : ''}
+                      {item.accessMode === 'MEMBERS_ONLY' ? '会员专享' : '公开'}
+                      {' · '}v{item.version}
+                    </Text>
+                    <View style={styles.scheduledActions}>
+                      <Pressable
+                        accessibilityRole="button"
+                        disabled={scheduledActionId !== null}
+                        onPress={() => openScheduleEditPicker(item)}
+                        style={[styles.scheduledActionButton, isDark && { borderColor: '#52525b' }]}
+                      >
+                        <Feather name="calendar" size={14} color={PRIMARY} />
+                        <Text style={styles.scheduledActionText}>修改时间</Text>
+                      </Pressable>
+                      <Pressable
+                        accessibilityRole="button"
+                        disabled={scheduledActionId !== null}
+                        onPress={() => cancelScheduledPost(item)}
+                        style={[styles.scheduledActionButton, styles.scheduledCancelButton, isDark && { borderColor: '#7f1d1d' }]}
+                      >
+                        {scheduledActionId === item.id
+                          ? <ActivityIndicator size="small" color="#b42318" />
+                          : <Feather name="x-circle" size={14} color="#b42318" />}
+                        <Text style={styles.scheduledCancelText}>取消定时</Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                </View>
+              )}
+              onEndReached={() => {
+                if (scheduledInboxHasMore && !scheduledInboxLoading && scheduledInboxCursor) {
+                  void loadScheduledInbox(scheduledInboxCursor, true);
+                }
+              }}
+              onEndReachedThreshold={0.5}
+              ListFooterComponent={scheduledInboxLoading && scheduledInboxItems.length > 0
+                ? <ActivityIndicator color={PRIMARY} style={{ padding: 16 }} />
+                : undefined}
             />
           )}
         </View>
@@ -2044,6 +2576,13 @@ const styles = StyleSheet.create({
   draftItemMeta: { color: '#667085', fontSize: 11, lineHeight: 16 },
   draftRestoreLabel: { color: PRIMARY, fontSize: 11, fontWeight: '800', marginTop: 2 },
   draftDeleteButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  scheduledItem: { flexDirection: 'row', alignItems: 'flex-start', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#eaecf0', paddingVertical: 14, gap: 8 },
+  scheduledItemMain: { flex: 1, gap: 5 },
+  scheduledActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingTop: 6 },
+  scheduledActionButton: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderColor: '#d0d5dd', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8 },
+  scheduledActionText: { color: PRIMARY, fontSize: 12, fontWeight: '800' },
+  scheduledCancelButton: { borderColor: '#fecdca' },
+  scheduledCancelText: { color: '#b42318', fontSize: 12, fontWeight: '800' },
   accessModeSection: { paddingVertical: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#eaecf0' },
   accessModeTitle: { color: '#101828', fontSize: 14, fontWeight: '800' },
   accessModeDescription: { color: '#667085', fontSize: 12, lineHeight: 18, marginTop: 4 },
@@ -2053,6 +2592,38 @@ const styles = StyleSheet.create({
   accessModeOptionText: { color: '#344054', fontSize: 13, fontWeight: '700' },
   accessModeOptionTextSelected: { color: '#ffffff' },
   accessModeNotice: { color: '#667085', fontSize: 12, lineHeight: 18, marginTop: 10 },
+  scheduleSection: { paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#eaecf0' },
+  scheduleSectionTitle: { color: '#101828', fontSize: 14, fontWeight: '800' },
+  scheduleModeRow: { flexDirection: 'row', gap: 9, marginTop: 10 },
+  scheduleModeOption: { borderWidth: 1, borderColor: '#d0d5dd', borderRadius: 999, paddingHorizontal: 15, paddingVertical: 9 },
+  scheduleModeOptionSelected: { backgroundColor: PRIMARY, borderColor: PRIMARY },
+  scheduleModeOptionText: { color: '#344054', fontSize: 13, fontWeight: '700' },
+  scheduleModeOptionTextSelected: { color: '#ffffff' },
+  scheduleDateButton: { marginTop: 10, borderWidth: 1, borderColor: '#d0d5dd', borderRadius: 11, paddingHorizontal: 12, paddingVertical: 11 },
+  scheduleDateButtonContent: { flexDirection: 'row', alignItems: 'center', gap: 9 },
+  scheduleDateText: { flex: 1, color: '#101828', fontSize: 13, fontWeight: '700' },
+  scheduleHint: { color: '#667085', fontSize: 11, lineHeight: 16, marginTop: 8 },
+  replyAudienceSection: { paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#eaecf0' },
+  replyAudienceHeading: { color: '#101828', fontSize: 14, fontWeight: '800', marginBottom: 9 },
+  replyAudienceButton: { flexDirection: 'row', alignItems: 'center', gap: 9, minHeight: 44, borderWidth: 1, borderColor: '#d0d5dd', borderRadius: 11, paddingHorizontal: 12, backgroundColor: '#ffffff' },
+  replyAudienceButtonText: { flex: 1, color: '#344054', fontSize: 13, fontWeight: '700' },
+  replyAudienceHint: { color: '#667085', fontSize: 11, lineHeight: 16, marginTop: 7 },
+  replyAudienceModal: { flex: 1, backgroundColor: '#ffffff', paddingHorizontal: 16, paddingTop: 12 },
+  replyAudienceOption: { minHeight: 68, flexDirection: 'row', alignItems: 'center', gap: 14, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#eaecf0', paddingHorizontal: 4, paddingVertical: 12 },
+  replyAudienceOptionCopy: { flex: 1, gap: 4 },
+  replyAudienceOptionLabel: { color: '#101828', fontSize: 14, fontWeight: '700' },
+  replyAudienceOptionDescription: { color: '#667085', fontSize: 12, lineHeight: 17 },
+  replyAudienceRadio: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: '#98a2b3', alignItems: 'center', justifyContent: 'center' },
+  replyAudienceRadioSelected: { borderColor: PRIMARY },
+  replyAudienceRadioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: PRIMARY },
+  schedulePickerModal: { flex: 1, backgroundColor: '#ffffff', paddingHorizontal: 16, paddingTop: 12 },
+  schedulePickerModalDark: { backgroundColor: '#000000' },
+  schedulePickerHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#eaecf0', paddingBottom: 12 },
+  schedulePickerActionHit: { minWidth: 48, minHeight: 40, alignItems: 'center', justifyContent: 'center' },
+  schedulePickerTitle: { color: '#101828', fontSize: 16, fontWeight: '800' },
+  schedulePickerCancel: { color: '#667085', fontSize: 14, fontWeight: '700' },
+  schedulePickerConfirm: { color: PRIMARY, fontSize: 14, fontWeight: '800' },
+  schedulePickerHint: { color: '#667085', fontSize: 12, lineHeight: 18, marginVertical: 12 },
   assetGrid: { width: '100%', marginTop: 12 },
   assetTile: { width: '100%', overflow: 'hidden', borderWidth: 1, borderColor: '#eaecf0', borderRadius: 14, backgroundColor: '#ffffff' },
   assetTilePreview: { width: '100%', height: 148, position: 'relative', overflow: 'hidden', backgroundColor: '#101828' },

@@ -60,10 +60,13 @@ describe('content list cache guard', () => {
     )).toThrow(ContentListQueryError)
   })
 
-  it('accepts only the owner-draft status filter for the authenticated-only list path', () => {
+  it('accepts only owner-scoped draft and scheduled status filters for the private list path', () => {
     expect(validateContentListQuery(
       new URL('https://luckread.com/api/v1/contents?status=DRAFT&type=post&limit=20'),
     ).toString()).toBe('limit=20&status=DRAFT&type=post')
+    expect(validateContentListQuery(
+      new URL('https://luckread.com/api/v1/contents?status=SCHEDULED&type=post&limit=20'),
+    ).toString()).toBe('limit=20&status=SCHEDULED&type=post')
 
     expect(() => validateContentListQuery(
       new URL('https://luckread.com/api/v1/contents?status=PUBLISHED'),

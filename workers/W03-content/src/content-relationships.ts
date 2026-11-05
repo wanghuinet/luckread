@@ -7,7 +7,7 @@ import {
 
 export type ContentRelationshipStatus = 'ACTIVE' | 'REVOKED' | 'SUPERSEDED'
 export type ContentRelationshipDirection = 'out' | 'in' | 'both'
-export type ContentRelationshipType = 'reference'
+export type ContentRelationshipType = 'reference' | 'thread-next'
 
 export interface ContentRelationship {
   relationshipId: string
@@ -133,7 +133,7 @@ const parseStoredRelationship = (value: string | null): ContentRelationship | nu
       parsed.targetType === 'content' &&
       typeof parsed.sourceId === 'string' &&
       typeof parsed.targetId === 'string' &&
-      parsed.relationType === 'reference' &&
+      (parsed.relationType === 'reference' || parsed.relationType === 'thread-next') &&
       (parsed.status === 'ACTIVE' || parsed.status === 'REVOKED') &&
       typeof parsed.schemaVersion === 'number' &&
       typeof parsed.actorId === 'string'
@@ -361,6 +361,7 @@ export async function listContentRelationships(
     " WHERE r.status = 'ACTIVE'" +
     " AND s.state = 'PUBLISHED'" +
     " AND t.state = 'PUBLISHED'" +
+    " AND r.relation_type = 'reference'" +
     ' AND ' + predicate +
     ' ' + cursorClause +
     ' ORDER BY r.created_at DESC, r.relationship_id DESC' +
@@ -471,4 +472,374 @@ export async function revokeContentRelationship(
   ])
 
   return response
+}
+
+
+export const MAX_POST_THREAD_ITEMS = 50;
+
+export interface PostThreadItem {
+  id: string;
+  slug: string;
+  position: number;
+  contentType: 'post';
+  state: 'DRAFT' | 'PUBLISHED';
+  accessMode: 'PUBLIC';
+  title: string;
+  bodyRef: string;
+  mediaRefs: string[];
+  coverRef: string | null;
+  createdAt: string;
+}
+
+interface AppendPostThreadQueryRow {
+  source_id: string;
+  source_owner_user_id: string;
+  source_content_type: string;
+  source_state: string;
+  source_access_mode: string;
+  target_id: string | null;
+  target_owner_user_id: string | null;
+  target_content_type: string | null;
+  target_state: string | null;
+  target_access_mode: string | null;
+  idem_id: string | null;
+  idem_owner_user_id: string | null;
+  idem_request_hash: string | null;
+  idem_status: 'IN_PROGRESS' | 'COMPLETED' | null;
+  idem_response_json: string | null;
+  idem_expires_at: string | null;
+}
+
+interface PostThreadChainStats {
+  previous_count: number;
+  next_count: number;
+  would_cycle: number;
+  source_has_next: number;
+  target_has_previous: number;
+}
+
+/**
+ * Append one independently-addressable social post to a thread.
+ * The content rows remain canonical W03 posts; only the ordered relationship
+ * lives here. Each post can have at most one predecessor and one successor.
+ */
+export async function appendPostThreadNext(
+  db: ContentD1,
+  ownerUserIdValue: string,
+  sourceContentIdValue: string,
+  targetContentIdValue: string,
+  idempotencyKey: string,
+  now = new Date(),
+): Promise<ContentRelationship> {
+  const ownerUserId = ownerUserIdValue.trim();
+  const sourceContentId = sourceContentIdValue.trim();
+  const targetContentId = targetContentIdValue.trim();
+  assertContentId(ownerUserId);
+  assertContentId(sourceContentId);
+  assertContentId(targetContentId);
+  if (sourceContentId === targetContentId) throw new ContentRuntimeError('VALIDATION_FAILED', 400);
+  if (!idempotencyKey || idempotencyKey.length > 256) {
+    throw new ContentRuntimeError('PRECONDITION_REQUIRED', 428);
+  }
+
+  const operationId = 'appendPostThreadNext';
+  const hash = await relationshipHash(operationId, { ownerUserId, sourceContentId, targetContentId });
+  const row = await db.prepare(`
+    SELECT
+      s.id AS source_id,
+      s.owner_user_id AS source_owner_user_id,
+      s.content_type AS source_content_type,
+      s.state AS source_state,
+      s.access_mode AS source_access_mode,
+      t.id AS target_id,
+      t.owner_user_id AS target_owner_user_id,
+      t.content_type AS target_content_type,
+      t.state AS target_state,
+      t.access_mode AS target_access_mode,
+      i.id AS idem_id,
+      i.owner_user_id AS idem_owner_user_id,
+      i.request_hash AS idem_request_hash,
+      i.status AS idem_status,
+      i.response_json AS idem_response_json,
+      i.expires_at AS idem_expires_at
+    FROM contents s
+    LEFT JOIN contents t ON t.id = ?
+    LEFT JOIN (
+      SELECT id, owner_user_id, request_hash, status, response_json, expires_at
+        FROM content_mutation_idempotency
+       WHERE owner_user_id = ? AND operation_id = ? AND idempotency_key = ?
+       ORDER BY created_at DESC
+       LIMIT 1
+    ) i ON 1 = 1
+    WHERE s.id = ?
+  `).bind(targetContentId, ownerUserId, operationId, idempotencyKey, sourceContentId)
+    .first<AppendPostThreadQueryRow>();
+
+  if (!row) throw new ContentRuntimeError('NOT_FOUND', 404);
+  const replay = assertIdempotencyReplay(row, ownerUserId, hash, now);
+  if (replay) return replay;
+
+  if (row.source_owner_user_id !== ownerUserId) throw new ContentRuntimeError('PERMISSION_DENIED', 403);
+  if (!row.target_id) throw new ContentRuntimeError('NOT_FOUND', 404);
+  if (row.target_owner_user_id !== ownerUserId) throw new ContentRuntimeError('PERMISSION_DENIED', 403);
+  if (row.source_content_type !== 'post' || row.target_content_type !== 'post') {
+    throw new ContentRuntimeError('VALIDATION_FAILED', 400);
+  }
+  if (
+    !['DRAFT', 'PUBLISHED'].includes(row.source_state) ||
+    row.target_state === null ||
+    !['DRAFT', 'PUBLISHED'].includes(row.target_state) ||
+    row.source_access_mode !== 'PUBLIC' ||
+    row.target_access_mode !== 'PUBLIC'
+  ) {
+    throw new ContentRuntimeError('INVALID_STATE', 409);
+  }
+
+  // The edge joins the tail of one chain to the head of another. This prevents
+  // forks/merges and checks the combined chain length and cycle condition.
+  const stats = await db.prepare(`
+    WITH RECURSIVE
+      previous(id, depth, visited) AS (
+        SELECT ?, 0, '|' || ? || '|'
+        UNION ALL
+        SELECT r.source_id, p.depth + 1, p.visited || r.source_id || '|'
+          FROM previous p
+          JOIN content_relationships r
+            ON r.target_id = p.id
+           AND r.relation_type = 'thread-next'
+           AND r.status = 'ACTIVE'
+         WHERE p.depth < ?
+           AND instr(p.visited, '|' || r.source_id || '|') = 0
+      ),
+      next(id, depth, visited) AS (
+        SELECT ?, 0, '|' || ? || '|'
+        UNION ALL
+        SELECT r.target_id, n.depth + 1, n.visited || r.target_id || '|'
+          FROM next n
+          JOIN content_relationships r
+            ON r.source_id = n.id
+           AND r.relation_type = 'thread-next'
+           AND r.status = 'ACTIVE'
+         WHERE n.depth < ?
+           AND instr(n.visited, '|' || r.target_id || '|') = 0
+      )
+    SELECT
+      (SELECT COUNT(*) FROM previous) AS previous_count,
+      (SELECT COUNT(*) FROM next) AS next_count,
+      EXISTS(SELECT 1 FROM next WHERE id = ?) AS would_cycle,
+      EXISTS(
+        SELECT 1 FROM content_relationships
+         WHERE source_id = ? AND relation_type = 'thread-next' AND status = 'ACTIVE'
+      ) AS source_has_next,
+      EXISTS(
+        SELECT 1 FROM content_relationships
+         WHERE target_id = ? AND relation_type = 'thread-next' AND status = 'ACTIVE'
+      ) AS target_has_previous
+  `).bind(
+    sourceContentId, sourceContentId, MAX_POST_THREAD_ITEMS,
+    targetContentId, targetContentId, MAX_POST_THREAD_ITEMS,
+    sourceContentId, sourceContentId, targetContentId,
+  ).first<PostThreadChainStats>();
+
+  if (!stats) throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503);
+  if (stats.source_has_next || stats.target_has_previous) throw new ContentRuntimeError('CONFLICT', 409);
+  if (stats.would_cycle) throw new ContentRuntimeError('VALIDATION_FAILED', 400);
+  if (stats.previous_count + stats.next_count > MAX_POST_THREAD_ITEMS) {
+    throw new ContentRuntimeError('VALIDATION_FAILED', 400);
+  }
+
+  const createdAt = now.toISOString();
+  const expiresAt = new Date(now.getTime() + IDEMPOTENCY_TTL_MS).toISOString();
+  const relationship: ContentRelationship = {
+    relationshipId: crypto.randomUUID(),
+    sourceType: 'content',
+    sourceId: sourceContentId,
+    targetType: 'content',
+    targetId: targetContentId,
+    relationType: 'thread-next',
+    schemaVersion: 1,
+    status: 'ACTIVE',
+    actorId: ownerUserId,
+    provenanceRef: null,
+    authorizationRef: null,
+    createdAt,
+    updatedAt: createdAt,
+  };
+
+  await relationshipMutationBatch(db, [
+    db.prepare(
+      'DELETE FROM content_mutation_idempotency WHERE owner_user_id = ? AND operation_id = ? AND idempotency_key = ? AND expires_at <= ?',
+    ).bind(ownerUserId, operationId, idempotencyKey, createdAt),
+    db.prepare(`
+      INSERT INTO content_mutation_idempotency
+        (id, owner_user_id, operation_id, idempotency_key, request_hash, status, response_status, response_json, created_at, expires_at)
+      VALUES (?, ?, ?, ?, ?, 'COMPLETED', 201, ?, ?, ?)
+    `).bind(
+      crypto.randomUUID(), ownerUserId, operationId, idempotencyKey, hash,
+      JSON.stringify(relationship), createdAt, expiresAt,
+    ),
+    db.prepare(`
+      WITH RECURSIVE
+        descendants(id, depth, visited) AS (
+          SELECT ?, 0, '|' || ? || '|'
+          UNION ALL
+          SELECT r.target_id, d.depth + 1, d.visited || r.target_id || '|'
+            FROM descendants d
+            JOIN content_relationships r
+              ON r.source_id = d.id
+             AND r.relation_type = 'thread-next'
+             AND r.status = 'ACTIVE'
+           WHERE d.depth < ?
+             AND instr(d.visited, '|' || r.target_id || '|') = 0
+        ),
+        ancestors(id, depth, visited) AS (
+          SELECT ?, 0, '|' || ? || '|'
+          UNION ALL
+          SELECT r.source_id, a.depth + 1, a.visited || r.source_id || '|'
+            FROM ancestors a
+            JOIN content_relationships r
+              ON r.target_id = a.id
+             AND r.relation_type = 'thread-next'
+             AND r.status = 'ACTIVE'
+           WHERE a.depth < ?
+             AND instr(a.visited, '|' || r.source_id || '|') = 0
+        )
+      INSERT INTO content_relationships
+        (relationship_id, source_type, source_id, target_type, target_id, relation_type,
+         position, schema_version, status, actor_id, provenance_ref, authorization_ref, created_at, updated_at)
+      SELECT ?, 'content', s.id, 'content', t.id, 'thread-next',
+             NULL, 1, 'ACTIVE', ?, NULL, NULL, ?, ?
+        FROM contents s
+        JOIN contents t ON t.id = ?
+       WHERE s.id = ? AND s.owner_user_id = ? AND t.owner_user_id = ?
+         AND s.content_type = 'post' AND t.content_type = 'post'
+         AND s.state IN ('DRAFT', 'PUBLISHED') AND t.state IN ('DRAFT', 'PUBLISHED')
+         AND s.access_mode = 'PUBLIC' AND t.access_mode = 'PUBLIC'
+         AND NOT EXISTS (
+           SELECT 1 FROM content_relationships r
+            WHERE r.source_id = s.id AND r.relation_type = 'thread-next' AND r.status = 'ACTIVE'
+         )
+         AND NOT EXISTS (
+           SELECT 1 FROM content_relationships r
+            WHERE r.target_id = t.id AND r.relation_type = 'thread-next' AND r.status = 'ACTIVE'
+         )
+         AND NOT EXISTS (SELECT 1 FROM descendants WHERE id = s.id)
+         AND (SELECT COUNT(*) FROM descendants) +
+             (SELECT COUNT(*) FROM ancestors) <= ?
+    `).bind(
+      targetContentId, targetContentId, MAX_POST_THREAD_ITEMS,
+      sourceContentId, sourceContentId, MAX_POST_THREAD_ITEMS,
+      relationship.relationshipId, ownerUserId, createdAt, createdAt,
+      targetContentId, sourceContentId, ownerUserId, ownerUserId,
+      MAX_POST_THREAD_ITEMS,
+    ),
+    db.prepare('INSERT OR REPLACE INTO content_txn_guard(id, successful) VALUES (1, changes())'),
+  ]);
+
+  return relationship;
+}
+
+export async function listPostThread(
+  db: ContentD1,
+  contentIdValue: string,
+  viewerUserIdValue: string | null = null,
+): Promise<{ rootContentId: string; items: PostThreadItem[] }> {
+  const contentId = contentIdValue.trim();
+  assertContentId(contentId);
+  const viewerUserId = viewerUserIdValue?.trim() || null;
+  if (viewerUserId) assertContentId(viewerUserId);
+
+  const rows = await db.prepare(`
+    WITH RECURSIVE
+      ancestors(id, owner_user_id, depth, visited) AS (
+        SELECT id, owner_user_id, 0, '|' || id || '|' FROM contents WHERE id = ?
+        UNION ALL
+        SELECT r.source_id, a.owner_user_id, a.depth + 1, a.visited || r.source_id || '|'
+          FROM ancestors a
+          JOIN content_relationships r
+            ON r.target_id = a.id
+           AND r.relation_type = 'thread-next'
+           AND r.status = 'ACTIVE'
+          JOIN contents previous_content
+            ON previous_content.id = r.source_id
+           AND previous_content.owner_user_id = a.owner_user_id
+         WHERE a.depth < ?
+           AND instr(a.visited, '|' || r.source_id || '|') = 0
+      ),
+      root(id, owner_user_id) AS (
+        SELECT id, owner_user_id FROM ancestors ORDER BY depth DESC LIMIT 1
+      ),
+      thread(id, owner_user_id, position, visited) AS (
+        SELECT root.id, root.owner_user_id, 0, '|' || root.id || '|'
+          FROM root
+          JOIN contents root_content ON root_content.id = root.id
+         WHERE (
+           (root_content.state = 'PUBLISHED' AND root_content.access_mode = 'PUBLIC')
+           OR (? IS NOT NULL AND root.owner_user_id = ? AND root_content.state IN ('DRAFT', 'PUBLISHED'))
+         )
+        UNION ALL
+        SELECT r.target_id, t.owner_user_id, t.position + 1, t.visited || r.target_id || '|'
+          FROM thread t
+          JOIN content_relationships r
+            ON r.source_id = t.id
+           AND r.relation_type = 'thread-next'
+           AND r.status = 'ACTIVE'
+          JOIN contents next_content
+            ON next_content.id = r.target_id
+           AND next_content.owner_user_id = t.owner_user_id
+         WHERE t.position + 1 < ?
+           AND instr(t.visited, '|' || r.target_id || '|') = 0
+           AND (
+             (next_content.state = 'PUBLISHED' AND next_content.access_mode = 'PUBLIC')
+             OR (? IS NOT NULL AND t.owner_user_id = ? AND next_content.state IN ('DRAFT', 'PUBLISHED'))
+           )
+      )
+    SELECT
+      c.id, c.slug, t.position, c.state, c.access_mode, c.title,
+      c.body_ref, c.media_refs_json, c.cover_ref, c.created_at
+      FROM thread t
+      JOIN contents c ON c.id = t.id
+     ORDER BY t.position ASC
+  `).bind(
+    contentId, MAX_POST_THREAD_ITEMS,
+    viewerUserId, viewerUserId,
+    MAX_POST_THREAD_ITEMS,
+    viewerUserId, viewerUserId,
+  ).all<{
+    id: string;
+    slug: string;
+    position: number;
+    state: 'DRAFT' | 'PUBLISHED';
+    access_mode: 'PUBLIC';
+    title: string;
+    body_ref: string;
+    media_refs_json: string;
+    cover_ref: string | null;
+    created_at: string;
+  }>();
+
+  if (!rows.results.length) throw new ContentRuntimeError('NOT_FOUND', 404);
+  const items = rows.results.map((row): PostThreadItem => {
+    let mediaRefs: unknown;
+    try { mediaRefs = JSON.parse(row.media_refs_json || '[]'); } catch {
+      throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503);
+    }
+    if (!Array.isArray(mediaRefs) || mediaRefs.some((item) => typeof item !== 'string')) {
+      throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503);
+    }
+    return {
+      id: row.id,
+      slug: row.slug,
+      position: row.position,
+      contentType: 'post',
+      state: row.state,
+      accessMode: row.access_mode,
+      title: row.title,
+      bodyRef: row.body_ref,
+      mediaRefs: mediaRefs as string[],
+      coverRef: row.cover_ref,
+      createdAt: row.created_at,
+    };
+  });
+  return { rootContentId: items[0].id, items };
 }

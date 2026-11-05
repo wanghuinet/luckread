@@ -4,6 +4,7 @@ import {
   invalidatePublicContentList,
   invalidatePublicContentVisibility,
   invalidatePublicContentRelationships,
+  invalidatePublicContentThreads,
 } from '../../../../../lib/public-response-cache.js'
 
 import { TrafficLimitError, rateLimitResponse } from '../../../../../auth/traffic-limit.js'
@@ -86,6 +87,7 @@ export async function PATCH(
       verifiedCreatorId,
     })
     if (response.ok) {
+      await invalidatePublicContentThreads()
       if (changesAccessMode) {
         await invalidatePublicContentVisibility(contentId)
         const updatedValue: unknown = await response.clone().json().catch((): null => null)
@@ -127,6 +129,7 @@ export async function DELETE(
       await invalidatePublicContentComments(contentId)
       await invalidatePublicContentVisibility(contentId)
       await invalidatePublicContentRelationships(contentId)
+      await invalidatePublicContentThreads()
       await invalidatePublicContentDetail(request, contentId)
       await invalidatePublicContentList(request)
     }

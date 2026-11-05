@@ -26,10 +26,10 @@ export async function GET(request: Request): Promise<Response> {
     const url = new URL(request.url)
     const query = validateContentListQuery(url)
     const suffix = query.toString() ? `?${query.toString()}` : ''
-    const ownerDraftRequest = query.get('status') === 'DRAFT'
+    const ownerScopedLifecycleRequest = ['DRAFT', 'SCHEDULED'].includes(query.get('status') ?? '')
 
-    // A private draft-list request is never anonymous and never cacheable.
-    if (ownerDraftRequest) {
+    // Private owner-scoped lifecycle lists are never anonymous or cacheable.
+    if (ownerScopedLifecycleRequest) {
       if (!hasAuthenticatedSessionCredential(request)) {
         return unavailable(new W03ContentClientError(401, 'UNAUTHENTICATED', 'Authentication required'))
       }

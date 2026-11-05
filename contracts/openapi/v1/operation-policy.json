@@ -781,6 +781,19 @@
       "x-luckread-source": "contracts/api/revision.v1.json"
     },
     {
+      "operationId": "listPostThread",
+      "auth": {
+        "mode": "permission"
+      },
+      "permissions": [
+        "content.read.public"
+      ],
+      "auditRequired": false,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": false,
+      "stateMachine": "none"
+    },
+    {
       "operationId": "getMyCreatorApplication",
       "auth": {
         "mode": "authenticated"
@@ -2314,6 +2327,17 @@
       "optimisticLockRequired": true,
       "idempotencyRequired": true,
       "stateMachine": "content"
+    },
+    {
+      "operationId": "appendPostThreadNext",
+      "auth": {
+        "mode": "authenticated"
+      },
+      "permissions": [],
+      "auditRequired": true,
+      "optimisticLockRequired": false,
+      "idempotencyRequired": true,
+      "stateMachine": "none"
     },
     {
       "operationId": "applyForCreator",

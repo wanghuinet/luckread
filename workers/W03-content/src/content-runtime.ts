@@ -1715,6 +1715,7 @@ export const canTransitionContentState = (
     )
   }
   if (contentType === 'post' && from === 'DRAFT' && to === 'PUBLISHED') return true
+  if (contentType === 'post' && from === 'DRAFT' && to === 'SCHEDULED') return kind === 'CREATOR'
 
   if (from === 'DRAFT' && to === 'PENDING_REVIEW') return true
   if (from === 'REJECTED' && to === 'DRAFT') return true
@@ -1793,6 +1794,22 @@ export async function transitionContentState(
   if (!ownsContent) {
     throw new ContentRuntimeError('PERMISSION_DENIED', 403)
   }
+  // A scheduled item must retain the canonical W08 Creator identity so the
+  // execution-time permission check can re-resolve current account and role facts.
+  // Legacy public content may have ownerUserId mirrored into creatorId; only that
+  // self-owned placeholder may be rebound to the verified W08 Creator ID.
+  if (to === 'SCHEDULED') {
+    if (!options.verifiedCreatorId) {
+      throw new ContentRuntimeError('PERMISSION_DENIED', 403)
+    }
+    if (
+      content.creatorId !== null &&
+      content.creatorId !== principalUserId &&
+      content.creatorId !== options.verifiedCreatorId
+    ) {
+      throw new ContentRuntimeError('PERMISSION_DENIED', 403)
+    }
+  }
   if (kind === 'SOCIAL_AUTHOR') {
     if (content.contentType !== 'post') {
       throw new ContentRuntimeError('PERMISSION_DENIED', 403)
@@ -1805,9 +1822,10 @@ export async function transitionContentState(
     }
   }
 
-  // Direct publication is narrowly available for draft social posts only.
-  // Re-run the risk/quality preflight at the content authority before any write.
-  if (content.state === 'DRAFT' && content.contentType === 'post' && to === 'PUBLISHED') {
+  // Direct and scheduled publication of draft social posts share the same
+  // risk/quality preflight at the content authority before any state write.
+  if (content.state === 'DRAFT' && content.contentType === 'post' &&
+      (to === 'PUBLISHED' || to === 'SCHEDULED')) {
     if (!options.preflight || typeof options.preflight !== 'object' || Array.isArray(options.preflight)) {
       throw new ContentRuntimeError('VALIDATION_FAILED', 400)
     }
@@ -1847,50 +1865,184 @@ export async function transitionContentState(
     expireMutationRow(db, principalUserId, operationId, idempotencyKey, updatedAt),
     insertCompletedIdempotency(db, principalUserId, operationId, idempotencyKey, hash, 200, JSON.stringify(result), updatedAt, expiresAt),
     db.prepare(
-      `UPDATE contents SET state=?, scheduled_at=?, version=?, etag=?, updated_at=?
+      `UPDATE contents SET state=?, scheduled_at=?, creator_id=?, version=?, etag=?, updated_at=?
         WHERE id=? AND version=? AND etag=?`,
-    ).bind(to, scheduledAt, nextVersion, result.etag, updatedAt, content.id, content.version, content.etag),
+    ).bind(
+      to,
+      scheduledAt,
+      to === 'SCHEDULED' ? options.verifiedCreatorId : content.creatorId,
+      nextVersion,
+      result.etag,
+      updatedAt,
+      content.id,
+      content.version,
+      content.etag,
+    ),
     atomicGuard(db),
   ])
 
   return result
 }
 
-export async function publishDueScheduledContent(
+export type DueScheduledContentCandidate = Readonly<{
+  contentId: string
+  ownerUserId: string
+  creatorId: string | null
+  version: number
+  scheduledAt: string
+}>
+
+export type ScheduledPublishAuthorization = Readonly<{
+  decision: 'ALLOW'
+  policyVersion: 'casl-l0-l8-v1'
+  layer: 'L3' | 'L4'
+  action: 'content.publish.own'
+  resourceType: 'Content'
+  ownerUserId: string
+  creatorId: string
+}>
+
+export type AuthorizedScheduledPublishCandidate = Omit<DueScheduledContentCandidate, 'creatorId'> & Readonly<{
+  expectedCreatorId: string | null
+  creatorId: string
+  authorization: ScheduledPublishAuthorization
+}>
+
+type DueScheduledContentRow = {
+  id: string
+  owner_user_id: string
+  creator_id: string | null
+  version: number
+  scheduled_at: string
+}
+
+const scheduledPublishIdentifier = (value: unknown, maxLength = 128): value is string =>
+  typeof value === 'string' &&
+  value.length > 0 &&
+  value.length <= maxLength &&
+  /^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(value)
+
+export async function listDueScheduledContentCandidates(
   db: ContentD1,
   now = new Date(),
   limit = 50,
-): Promise<{ scanned: number; published: number }> {
-  const pageSize = Math.min(Math.max(Number.isSafeInteger(limit) ? limit : 50, 1), 50)
+): Promise<DueScheduledContentCandidate[]> {
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 50) {
+    throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+  }
   const nowIso = now.toISOString()
   const rows = await db.prepare(
-    `SELECT id, version, scheduled_at
+    `SELECT id, owner_user_id, creator_id, version, scheduled_at
        FROM contents
       WHERE state = 'SCHEDULED' AND scheduled_at IS NOT NULL AND scheduled_at <= ?
       ORDER BY scheduled_at ASC, id ASC
       LIMIT ?`,
-  ).bind(nowIso, pageSize).all<{ id: string; version: number; scheduled_at: string }>()
+  ).bind(nowIso, limit).all<DueScheduledContentRow>()
 
-  if (!rows.results.length) return { scanned: 0, published: 0 }
+  return (rows.results ?? []).map((row) => ({
+    contentId: row.id,
+    ownerUserId: row.owner_user_id,
+    creatorId: row.creator_id,
+    version: row.version,
+    scheduledAt: row.scheduled_at,
+  }))
+}
 
-  const statements = rows.results.map((row) => {
-    const nextVersion = row.version + 1
-    return db.prepare(
+/**
+ * W03 remains the final content-state authority. Only a W08 ALLOW decision
+ * derived from the current ACTIVE Creator/account/role facts is admitted, and
+ * the final D1 update rechecks owner, creator, lifecycle, due time and version.
+ */
+export async function publishAuthorizedScheduledContents(
+  db: ContentD1,
+  candidatesValue: unknown,
+  now = new Date(),
+): Promise<{ scanned: number; authorized: number; published: number; rejected: number }> {
+  if (!Array.isArray(candidatesValue) || candidatesValue.length > 50) {
+    throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+  }
+
+  const nowIso = now.toISOString()
+  const statements: D1PreparedStatement[] = []
+  let authorized = 0
+  let rejected = 0
+
+  for (const value of candidatesValue) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      rejected++
+      continue
+    }
+    const candidate = value as Record<string, unknown>
+    const authorization = candidate.authorization as Record<string, unknown> | null
+    const contentId = candidate.contentId
+    const ownerUserId = candidate.ownerUserId
+    const creatorId = candidate.creatorId
+    const version = candidate.version
+    const scheduledAt = candidate.scheduledAt
+
+    const candidateValid =
+      Object.keys(candidate).every((key) => [
+        'contentId', 'ownerUserId', 'expectedCreatorId', 'creatorId', 'version', 'scheduledAt', 'authorization',
+      ].includes(key)) &&
+      scheduledPublishIdentifier(contentId) &&
+      scheduledPublishIdentifier(ownerUserId) &&
+      (candidate.expectedCreatorId === null || scheduledPublishIdentifier(candidate.expectedCreatorId, 256)) &&
+      scheduledPublishIdentifier(creatorId, 256) &&
+      Number.isSafeInteger(version) &&
+      Number(version) >= 1 &&
+      typeof scheduledAt === 'string' &&
+      Number.isFinite(Date.parse(scheduledAt)) &&
+      Date.parse(scheduledAt) <= Date.parse(nowIso)
+
+    const authorizationValid =
+      authorization !== null &&
+      typeof authorization === 'object' &&
+      authorization.decision === 'ALLOW' &&
+      authorization.policyVersion === 'casl-l0-l8-v1' &&
+      (authorization.layer === 'L3' || authorization.layer === 'L4') &&
+      authorization.action === 'content.publish.own' &&
+      authorization.resourceType === 'Content' &&
+      authorization.ownerUserId === ownerUserId &&
+      authorization.creatorId === creatorId
+
+    if (!candidateValid || !authorizationValid) {
+      rejected++
+      continue
+    }
+
+    authorized++
+    const nextVersion = Number(version) + 1
+    statements.push(db.prepare(
       `UPDATE contents
-          SET state = 'PUBLISHED', scheduled_at = NULL, version = ?, etag = ?, updated_at = ?
-        WHERE id = ? AND state = 'SCHEDULED' AND scheduled_at = ? AND version = ?`,
+          SET state = 'PUBLISHED', scheduled_at = NULL, creator_id = ?, version = ?, etag = ?, updated_at = ?
+        WHERE id = ?
+          AND owner_user_id = ?
+          AND creator_id IS ?
+          AND state = 'SCHEDULED'
+          AND scheduled_at = ?
+          AND scheduled_at <= ?
+          AND version = ?`,
     ).bind(
+      creatorId,
       nextVersion,
       etagForVersion(nextVersion),
       nowIso,
-      row.id,
-      row.scheduled_at,
-      row.version,
-    )
-  })
+      contentId,
+      ownerUserId,
+      candidate.expectedCreatorId,
+      scheduledAt,
+      nowIso,
+      version,
+    ))
+  }
+
+  if (statements.length === 0) {
+    return { scanned: candidatesValue.length, authorized, published: 0, rejected }
+  }
+
   const results = await db.batch(statements)
   const published = results.reduce((count, result) => count + Number(result.meta?.changes ?? 0), 0)
-  return { scanned: rows.results.length, published }
+  return { scanned: candidatesValue.length, authorized, published, rejected }
 }
 
 export function encodeCursor(updatedAt: string, id: string): string {

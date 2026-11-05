@@ -58,16 +58,16 @@ describe('v1 content adapter', () => {
     expect(createRoute).toContain('status: 428')
   })
 
-  it('keeps private native draft listing authenticated and delegated to the owner-scoped W03 reader', () => {
+  it('keeps private native draft and scheduled listings authenticated and delegated to the owner-scoped W03 reader', () => {
     const createRoute = readFileSync(
       resolve(process.cwd(), 'src/app/api/v1/contents/route.ts'),
       'utf8',
     )
-    expect(createRoute).toContain("query.get('status') === 'DRAFT'")
+    expect(createRoute).toContain("['DRAFT', 'SCHEDULED'].includes(query.get('status') ?? '')")
     expect(createRoute).toContain("'UNAUTHENTICATED'")
     expect(createRoute).toContain('resolveCookieContentPrincipal')
     expect(createRoute).toContain("pathname: `/internal/content/contents${suffix}`")
-    expect(createRoute).toContain('never anonymous and never cacheable')
+    expect(createRoute).toContain('Private owner-scoped lifecycle lists are never anonymous or cacheable.')
   })
 
   it('keeps public GET without mutation preconditions through the shared W01 reader', () => {

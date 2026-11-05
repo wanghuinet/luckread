@@ -1,6 +1,7 @@
 import { admitCreatorDecision, creatorApplicationReplayMatches, parseExpectedVersion, validIdempotencyKey } from './policy.js'
 import { evaluateCreatorApplicationPermission } from './authz/creator-application-permission.js'
 import { handlePermissionCheck } from './authz/handler.js'
+import { handleScheduledPublishPermission } from './authz/scheduled-publish.js'
 import { evaluateCaslPermission, type LayerId } from './authz/casl-policy.js'
 
 interface Env {
@@ -474,6 +475,16 @@ export default {
     if (request.method === 'POST' && url.pathname === '/internal/authz/check-permission') {
       try {
         return await handlePermissionCheck(request, env)
+      } catch {
+        return Response.json(
+          { decision: 'DENY', reasonCode: 'AUTHORIZATION_INPUT_UNAVAILABLE', policyVersion: 'casl-l0-l8-v1' },
+          { status: 503, headers: { 'cache-control': 'no-store' } },
+        )
+      }
+    }
+    if (request.method === 'POST' && url.pathname === '/internal/authz/check-scheduled-publish') {
+      try {
+        return await handleScheduledPublishPermission(request, env)
       } catch {
         return Response.json(
           { decision: 'DENY', reasonCode: 'AUTHORIZATION_INPUT_UNAVAILABLE', policyVersion: 'casl-l0-l8-v1' },

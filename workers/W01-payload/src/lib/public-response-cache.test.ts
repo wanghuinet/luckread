@@ -3,6 +3,7 @@ import {
   cachedPublicGet,
   invalidatePublicContentComments,
   invalidatePublicContentRelationships,
+  invalidatePublicContentThreads,
   invalidatePublicContentList,
   invalidatePublicContentVisibility,
   rememberPublicShareContentId,
@@ -549,6 +550,44 @@ describe('public response cache', () => {
     expect(generationWrite).toBeDefined()
     const body = await generationWrite?.[1]?.clone().json() as { generation?: unknown }
     expect(typeof body.generation).toBe('string')
+    expect(cache.delete).not.toHaveBeenCalled()
+  })
+
+  it('uses one global generation for public thread cache keys', async () => {
+    const cached = new Response(JSON.stringify({ data: 'cached-thread' }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    })
+    cache.match.mockImplementation(async (request: Request) =>
+      request.url.includes('__content-threads-generation') ? generationResponse('thread-g0') : cached,
+    )
+    Object.defineProperty(globalThis, 'caches', { value: { default: cache }, configurable: true })
+
+    const request = new Request('https://luckread.com/api/v1/contents/post-1/thread')
+    const loader = vi.fn(async () => new Response(JSON.stringify({ data: 'origin' }), { status: 200 }))
+    const response = await cachedPublicGet(request, 'content-threads', loader, 30)
+
+    expect(loader).not.toHaveBeenCalled()
+    expect(response.headers.get('X-LuckRead-Cache')).toBe('HIT')
+    expect(cache.match).toHaveBeenCalledWith(
+      new Request('https://cache.luckread.internal/__content-threads-generation?v=1'),
+    )
+    expect(cache.match).toHaveBeenCalledWith(publicCacheKey(request, 'content-threads', 'thread-g0'))
+  })
+
+  it('bumps the global thread generation so every segment view becomes unreachable', async () => {
+    Object.defineProperty(globalThis, 'caches', { value: { default: cache }, configurable: true })
+
+    await invalidatePublicContentThreads()
+
+    const putCalls = cache.put.mock.calls as unknown as Array<[Request, Response | undefined]>
+    const generationWrite = putCalls.find(([request]) =>
+      request.url.includes('__content-threads-generation'),
+    )
+    expect(generationWrite).toBeDefined()
+    const body = await generationWrite?.[1]?.clone().json() as { generation?: unknown }
+    expect(typeof body.generation).toBe('string')
+    expect(body.generation).not.toBe('thread-g0')
     expect(cache.delete).not.toHaveBeenCalled()
   })
 

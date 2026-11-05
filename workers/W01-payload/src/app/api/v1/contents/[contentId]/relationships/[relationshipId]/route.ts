@@ -1,5 +1,6 @@
 import {
   invalidatePublicContentRelationships,
+  invalidatePublicContentThreads,
 } from '../../../../../../../lib/public-response-cache.js'
 import {
   callW03Content,
@@ -40,6 +41,7 @@ export async function DELETE(
     })
     if (response.ok) {
       await invalidatePublicContentRelationships(contentId)
+      await invalidatePublicContentThreads()
     }
     return response
   } catch (error) {
