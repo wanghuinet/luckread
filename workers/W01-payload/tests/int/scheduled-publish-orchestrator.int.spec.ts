@@ -202,6 +202,32 @@ describe('W01 authorized scheduled publish orchestrator', () => {
     expect(w08.fetch).not.toHaveBeenCalled()
   })
 
+  it('rejects unexpected W03 candidate fields before any authorization or commit', async () => {
+    let w08Calls = 0
+    const w03: Service = {
+      fetch: async () => Response.json({
+        data: {
+          items: [{
+            ...candidate('content_due_extra_field', 'owner_1', 'creator_1'),
+            privateBodyRef: 'must-not-cross-the-W03-candidate-contract',
+          }],
+        },
+      }),
+    }
+    const w08: Service = {
+      fetch: async () => {
+        w08Calls++
+        return Response.json(allowed('owner_1', 'creator_1'))
+      },
+    }
+
+    await expect(runAuthorizedScheduledPublish({
+      W03_CONTENT: w03,
+      W08_CREATOR: w08,
+    })).rejects.toThrow('W03_SCHEDULED_DUE_INVALID_CANDIDATE')
+    expect(w08Calls).toBe(0)
+  })
+
   it('surfaces a W08 outage instead of allowing publication', async () => {
     const w03: Service = {
       fetch: async () => Response.json({
