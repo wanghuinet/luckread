@@ -1153,37 +1153,71 @@ const worker = {
         const limit = parseListLimit(limitParam)
         if (cursor && cursor.length > 2048) throw new ContentRuntimeError('INVALID_CURSOR', 400)
         if (status !== null) {
-          // Social post drafts belong to the authenticated owner and are readable at L2+.
-          // Keep this separate from public discovery and creator-only article workflows.
-          if (status !== 'DRAFT' || creatorId || (contentType && contentType !== 'post')) {
+          // Private owner-scoped social lifecycle lists never fall through to public discovery.
+          if (creatorId || (contentType && contentType !== 'post')) {
             throw new ContentRuntimeError('VALIDATION_FAILED', 400)
           }
-          const principal = requiredSocialPostPrincipal(request)
-          const page = await listCreatorContents(env.D1_02, principal.userId, cursor, limit, {
-            status: 'DRAFT',
-            contentType: 'post',
-          })
-          return json({
-            data: {
-              items: page.items.map(item => ({
-                id: item.id,
-                contentType: item.contentType,
-                state: item.state,
-                version: item.version,
-                revision: item.revision,
-                etag: item.etag,
-                title: item.title,
-                accessMode: item.accessMode ?? 'PUBLIC',
-                bodyRef: item.bodyRef,
-                mediaRefs: item.mediaRefs,
-                coverRef: item.coverRef,
-                updatedAt: item.updatedAt,
-              })),
-              nextCursor: page.nextCursor,
-              hasMore: page.hasMore,
-            },
-            requestId: createRequestId(),
-          })
+          if (status === 'DRAFT') {
+            // L2+ authors may read only their own social post drafts.
+            const principal = requiredSocialPostPrincipal(request)
+            const page = await listCreatorContents(env.D1_02, principal.userId, cursor, limit, {
+              status: 'DRAFT',
+              contentType: 'post',
+            })
+            return json({
+              data: {
+                items: page.items.map(item => ({
+                  id: item.id,
+                  contentType: item.contentType,
+                  state: item.state,
+                  version: item.version,
+                  revision: item.revision,
+                  etag: item.etag,
+                  title: item.title,
+                  accessMode: item.accessMode ?? 'PUBLIC',
+                  bodyRef: item.bodyRef,
+                  mediaRefs: item.mediaRefs,
+                  coverRef: item.coverRef,
+                  updatedAt: item.updatedAt,
+                })),
+                nextCursor: page.nextCursor,
+                hasMore: page.hasMore,
+              },
+              requestId: createRequestId(),
+            })
+          }
+          if (status === 'SCHEDULED') {
+            // Scheduled publication is a Creator-only capability. W03 applies
+            // L3/L4 and owner scope before returning any edit/cancel preconditions.
+            const principal = requiredCreatorPrincipal(request)
+            const page = await listCreatorContents(env.D1_02, principal.userId, cursor, limit, {
+              status: 'SCHEDULED',
+              contentType: 'post',
+            })
+            return json({
+              data: {
+                items: page.items.map(item => ({
+                  id: item.id,
+                  contentType: item.contentType,
+                  state: item.state,
+                  version: item.version,
+                  revision: item.revision,
+                  etag: item.etag,
+                  title: item.title,
+                  accessMode: item.accessMode ?? 'PUBLIC',
+                  bodyRef: item.bodyRef,
+                  mediaRefs: item.mediaRefs,
+                  coverRef: item.coverRef,
+                  scheduledAt: item.scheduledAt,
+                  updatedAt: item.updatedAt,
+                })),
+                nextCursor: page.nextCursor,
+                hasMore: page.hasMore,
+              },
+              requestId: createRequestId(),
+            })
+          }
+          throw new ContentRuntimeError('VALIDATION_FAILED', 400)
         }
         if (creatorId && !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(creatorId)) {
           throw new ContentRuntimeError('VALIDATION_FAILED', 400)
