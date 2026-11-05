@@ -8,8 +8,8 @@ const registration = readFileSync(new URL('../app/register.tsx', import.meta.url
 const appConfig = JSON.parse(readFileSync(new URL('../app.json', import.meta.url), 'utf8'));
 const appPackage = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 
-test('Help and About is reachable from Settings and remains hidden from the drawer item list', () => {
-  expect(settings).toContain('title="帮助与关于"');
+test('About LuckRead is reachable from Settings and remains hidden from the drawer item list', () => {
+  expect(settings).toContain('title="关于 LuckRead"');
   expect(settings).toContain("router.push('/about' as never)");
   expect(drawer).toContain('<Drawer.Screen name="about"');
   expect(drawer).toContain('name="about" options={{ headerShown: false, drawerItemStyle: { display: \'none\' } }}');
@@ -25,8 +25,11 @@ test('About page reuses the exact Terms and Privacy URLs already used at registr
   expect(about).toContain('暂时无法打开隐私政策');
 });
 
-test('About page explains unavailable support capabilities rather than showing dead or invented contact buttons', () => {
-  expect(about).toContain('帮助中心、在线客服和工单系统尚未接入 APP 1.0');
+test('About page exposes only working legal information and native app metadata, not deferred help services', () => {
+  expect(about).toContain('关于 LuckRead');
+  expect(about).not.toContain('帮助中心');
+  expect(about).not.toContain('在线客服');
+  expect(about).not.toContain('工单系统');
   expect(about).not.toContain('mailto:');
   expect(about).not.toContain('support@luckread.com');
   expect(about).not.toContain('router.push(\'/help');
