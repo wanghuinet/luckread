@@ -51,7 +51,10 @@ export default function BlockedMutedScreen() {
   const isDark = colorScheme === 'dark';
   const router = useRouter();
   const authStatus = useAuthStore((state) => state.status);
-  const accountId = useAuthStore((state) => state.user?.id ?? null);
+  const authUser = useAuthStore((state) => state.user);
+  const accountId = authUser?.id ?? null;
+  const authUserRef = useRef(authUser);
+  authUserRef.current = authUser;
   const accountIdRef = useRef(accountId);
   accountIdRef.current = accountId;
   const [kind, setKind] = useState<ManagedRelationshipKind>('blocks');
@@ -101,7 +104,7 @@ export default function BlockedMutedScreen() {
         signal: controller.signal,
       });
       if (result.response.status === 401) {
-        if (!controller.signal.aborted && accountIdRef.current === accountId) {
+        if (!controller.signal.aborted && accountIdRef.current === accountId && authUserRef.current === authUser) {
           router.replace(('/login?returnTo=' + encodeURIComponent('/blocked-muted')) as never);
         }
         return;
@@ -117,7 +120,7 @@ export default function BlockedMutedScreen() {
         const profile = await resolvePublicProfileById(relation.targetUserId, controller.signal);
         return { relation, profile };
       }));
-      if (controller.signal.aborted || accountIdRef.current !== accountId) return;
+      if (controller.signal.aborted || accountIdRef.current !== accountId || authUserRef.current !== authUser) return;
 
       loadedAccountIdRef.current = accountId;
       setLoadedAccountId(accountId);
@@ -129,18 +132,18 @@ export default function BlockedMutedScreen() {
       setCursor(page.nextCursor || null);
       setHasMore(page.hasMore);
     } catch (cause) {
-      if (!controller.signal.aborted && accountIdRef.current === accountId) {
+      if (!controller.signal.aborted && accountIdRef.current === accountId && authUserRef.current === authUser) {
         setError(cause instanceof Error ? cause.message : '无法读取列表，请重试。');
       }
     } finally {
       if (requestRef.current === controller) requestRef.current = null;
-      if (!controller.signal.aborted && accountIdRef.current === accountId) {
+      if (!controller.signal.aborted && accountIdRef.current === accountId && authUserRef.current === authUser) {
         setLoading(false);
         setLoadingMore(false);
         setRefreshing(false);
       }
     }
-  }, [accountId, authStatus, kind, router]);
+  }, [accountId, authStatus, authUser, kind, router]);
 
   useEffect(() => {
     setRows([]);
@@ -160,6 +163,7 @@ export default function BlockedMutedScreen() {
     if (pendingTargetId) return;
     const targetId = row.relation.targetUserId;
     const operationAccountId = accountId;
+    const operationUser = authUser;
     const name = row.profile?.displayName?.trim() || row.profile?.username || '该用户';
     const isBlock = kind === 'blocks';
 
@@ -175,9 +179,9 @@ export default function BlockedMutedScreen() {
               setPendingTargetId(targetId);
               setError('');
               try {
-                if (accountIdRef.current !== operationAccountId) return;
+                if (accountIdRef.current !== operationAccountId || authUserRef.current !== operationUser) return;
                 const result = isBlock ? await unblockUser(targetId) : await unmuteUser(targetId);
-                if (accountIdRef.current !== operationAccountId) return;
+                if (accountIdRef.current !== operationAccountId || authUserRef.current !== operationUser) return;
                 if (result.response.status === 401) {
                   router.replace(('/login?returnTo=' + encodeURIComponent('/blocked-muted')) as never);
                   return;
@@ -191,18 +195,18 @@ export default function BlockedMutedScreen() {
                 }
                 setRows((current) => current.filter((item) => item.relation.targetUserId !== targetId));
               } catch (cause) {
-                if (accountIdRef.current === operationAccountId) {
+                if (accountIdRef.current === operationAccountId && authUserRef.current === operationUser) {
                   setError(cause instanceof Error ? cause.message : '操作失败，请重试。');
                 }
               } finally {
-                if (accountIdRef.current === operationAccountId) setPendingTargetId(null);
+                if (accountIdRef.current === operationAccountId && authUserRef.current === operationUser) setPendingTargetId(null);
               }
             })();
           },
         },
       ],
     );
-  }, [accountId, kind, pendingTargetId, router]);
+  }, [accountId, authUser, kind, pendingTargetId, router]);
 
   if (authStatus === 'loading') {
     return (
