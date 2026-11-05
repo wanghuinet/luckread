@@ -5,12 +5,12 @@ let readCount = 0;
 let failWrites = false;
 
 mock.module('expo-secure-store', () => ({
-  getItemAsync: async (key: string) => {
+  getItemAsync: async (key) => {
     expect(key).toBe('luckread.theme-preference');
     readCount += 1;
     return storedPreference;
   },
-  setItemAsync: async (key: string, value: string) => {
+  setItemAsync: async (key, value) => {
     expect(key).toBe('luckread.theme-preference');
     if (failWrites) throw new Error('secure store unavailable');
     storedPreference = value;
