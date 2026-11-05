@@ -1236,13 +1236,15 @@
       "auth": {
         "mode": "permission"
       },
-      "permissions": [],
+      "permissions": [
+        "notification.read.self"
+      ],
       "auditRequired": false,
       "optimisticLockRequired": false,
       "idempotencyRequired": false,
       "stateMachine": "none",
-      "x-luckread-contract-status": "DISCOVERY_DRAFT",
-      "x-luckread-source": "contracts/api/api-inventory.v1.json"
+      "x-luckread-contract-status": "CONTRACTED_PARTIAL",
+      "x-luckread-source": "contracts/api/notification-preferences.v1.json"
     },
     {
       "operationId": "listNotifications",
@@ -1698,13 +1700,15 @@
       "auth": {
         "mode": "permission"
       },
-      "permissions": [],
+      "permissions": [
+        "notification.update.self"
+      ],
       "auditRequired": true,
       "optimisticLockRequired": false,
       "idempotencyRequired": false,
       "stateMachine": "none",
-      "x-luckread-contract-status": "DISCOVERY_DRAFT",
-      "x-luckread-source": "contracts/api/api-inventory.v1.json"
+      "x-luckread-contract-status": "CONTRACTED_PARTIAL",
+      "x-luckread-source": "contracts/api/notification-preferences.v1.json"
     },
     {
       "operationId": "batchUpdateNotifications",

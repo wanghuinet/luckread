@@ -361,6 +361,34 @@
       "d1WriteMax": 0,
       "cache": "PRIVATE_NO_SHARED_CACHE",
       "auditRequired": true
+    },
+    {
+      "operationId": "auditNotificationPreferencesMutationRequest",
+      "method": "POST",
+      "publicPath": "/api/v1/notification-preferences",
+      "internalPath": "/internal/audit-events/notification-preferences-update-requested",
+      "principalRequired": true,
+      "actorAuthority": "W06 derives the actor userId and interaction layer from trusted W01 private transport headers; request data cannot supply actor identity or target ownership.",
+      "eventId": "One W06 immutable audit row per W01 preference-update attempt, keyed by a W01-generated evt_notification_preferences_{UUID}.",
+      "targetType": "Notification",
+      "targetId": "Authenticated principal userId, derived by W06 from W01 transport.",
+      "auditRequired": true,
+      "idempotency": "No public idempotency precondition. Each logical PATCH attempt receives a fresh audit event UUID; W06 confirms durable persistence before W01 calls W05.",
+      "successPolicy": "W01 must validate W08 notification.update.self ALLOW and confirm the immutable W06 audit response before forwarding PATCH to W05. If W06 is unavailable or unverifiable, W05 is not called.",
+      "cache": "NO_STORE",
+      "auditedFields": [
+        "follow",
+        "like",
+        "comment",
+        "mention"
+      ],
+      "sensitiveDataExcluded": [
+        "push token",
+        "session credential",
+        "cookie",
+        "authorization bearer",
+        "raw request body"
+      ]
     }
   ],
   "headers": {
@@ -437,7 +465,8 @@
     "contracts/authz/permissions.json",
     "contracts/authz/layers.json",
     "contracts/transport/W01-W03-content-http-binding.v1.json",
-    "docs/305-CONCURRENCY-ETAG-CONDITIONAL-REQUEST-AND-IDEMPOTENCY-CONTRACT-v1.0.md"
+    "docs/305-CONCURRENCY-ETAG-CONDITIONAL-REQUEST-AND-IDEMPOTENCY-CONTRACT-v1.0.md",
+    "contracts/api/notification-preferences.v1.json"
   ],
   "implementationStatus": {
     "serviceBindingConfig": "NOT_IMPLEMENTED",

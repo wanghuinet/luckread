@@ -661,6 +661,10 @@ export default {
         try { body = await request.json() } catch { throw new SocialClosureRuntimeError('VALIDATION_FAILED', 400) }
         if (!body || typeof body !== 'object' || Array.isArray(body)) throw new SocialClosureRuntimeError('VALIDATION_FAILED', 400)
         const raw = body as Record<string, unknown>
+        const allowed = new Set(['follow', 'like', 'comment', 'mention'])
+        if (Object.keys(raw).length === 0 || Object.keys(raw).some(key => !allowed.has(key))) {
+          throw new SocialClosureRuntimeError('VALIDATION_FAILED', 400)
+        }
         const input: Partial<{ follow: boolean; like: boolean; comment: boolean; mention: boolean }> = {}
         for (const key of ['follow', 'like', 'comment', 'mention'] as const) {
           if (raw[key] === undefined) continue

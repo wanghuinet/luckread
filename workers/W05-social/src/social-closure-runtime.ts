@@ -931,31 +931,36 @@ export async function setNotificationPreferences(
   input: Partial<{ follow: boolean; like: boolean; comment: boolean; mention: boolean }>,
 ) {
   const userId = id(userIdValue, 'UNAUTHENTICATED')
-  const current = await getNotificationPreferences(db, userId)
-  const next = {
-    follow: input.follow === undefined ? current.follow : Boolean(input.follow),
-    like: input.like === undefined ? current.like : Boolean(input.like),
-    comment: input.comment === undefined ? current.comment : Boolean(input.comment),
-    mention: input.mention === undefined ? current.mention : Boolean(input.mention),
+  const values = {
+    follow: input.follow === undefined ? null : input.follow ? 1 : 0,
+    like: input.like === undefined ? null : input.like ? 1 : 0,
+    comment: input.comment === undefined ? null : input.comment ? 1 : 0,
+    mention: input.mention === undefined ? null : input.mention ? 1 : 0,
   }
-  await db.prepare(
+  const row = await db.prepare(
     `INSERT INTO social_notification_preferences
       (user_id, follow_enabled, like_enabled, comment_enabled, mention_enabled, updated_at)
-     VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+     VALUES (?, COALESCE(?, 1), COALESCE(?, 1), COALESCE(?, 1), COALESCE(?, 1), CURRENT_TIMESTAMP)
      ON CONFLICT(user_id) DO UPDATE SET
-       follow_enabled = excluded.follow_enabled,
-       like_enabled = excluded.like_enabled,
-       comment_enabled = excluded.comment_enabled,
-       mention_enabled = excluded.mention_enabled,
-       updated_at = CURRENT_TIMESTAMP`,
+       follow_enabled = COALESCE(?, social_notification_preferences.follow_enabled),
+       like_enabled = COALESCE(?, social_notification_preferences.like_enabled),
+       comment_enabled = COALESCE(?, social_notification_preferences.comment_enabled),
+       mention_enabled = COALESCE(?, social_notification_preferences.mention_enabled),
+       updated_at = CURRENT_TIMESTAMP
+     RETURNING follow_enabled, like_enabled, comment_enabled, mention_enabled`,
   ).bind(
     userId,
-    next.follow ? 1 : 0,
-    next.like ? 1 : 0,
-    next.comment ? 1 : 0,
-    next.mention ? 1 : 0,
-  ).run()
-  return next
+    values.follow, values.like, values.comment, values.mention,
+    values.follow, values.like, values.comment, values.mention,
+  ).first<{ follow_enabled: number; like_enabled: number; comment_enabled: number; mention_enabled: number }>()
+
+  if (!row) throw new SocialClosureRuntimeError('INTERNAL_ERROR', 500)
+  return {
+    follow: Number(row.follow_enabled) === 1,
+    like: Number(row.like_enabled) === 1,
+    comment: Number(row.comment_enabled) === 1,
+    mention: Number(row.mention_enabled) === 1,
+  }
 }
 
 export async function getContentSocialSummary(

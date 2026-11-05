@@ -3782,23 +3782,88 @@ paths:
   /notification-preferences:
     get:
       tags: [Notifications]
-      summary: Discovery draft for GET undefined
+      summary: Get notification preferences for the authenticated account
       operationId: getNotificationPreferences
-      x-luckread-contract-status: DISCOVERY_DRAFT
-      x-luckread-source: contracts/api/api-inventory.v1.json
+      x-luckread-contract-status: CONTRACTED_PARTIAL
+      x-luckread-source: contracts/api/notification-preferences.v1.json
       responses:
-        default:
-          description: Discovery-only operation; detailed response contract remains to be closed.
+        '200':
+          description: The authenticated account's notification preferences.
+          headers:
+            Cache-Control:
+              description: Personal preference data is never shared-cacheable.
+              schema: { type: string, example: no-store }
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [data, requestId]
+                properties:
+                  data:
+                    type: object
+                    additionalProperties: false
+                    required: [follow, like, comment, mention]
+                    properties:
+                      follow: { type: boolean }
+                      like: { type: boolean }
+                      comment: { type: boolean }
+                      mention: { type: boolean }
+                  requestId: { type: string }
+        '401': { description: Authentication required. }
+        '403': { description: The authenticated account cannot read this resource. }
+        '429': { description: Read rate limit exceeded. }
+        '503': { description: The preference authority is unavailable. }
 
     patch:
       tags: [Notifications]
-      summary: Discovery draft for PATCH undefined
+      summary: Update notification preferences for the authenticated account
       operationId: patchNotificationPreferences
-      x-luckread-contract-status: DISCOVERY_DRAFT
-      x-luckread-source: contracts/api/api-inventory.v1.json
+      x-luckread-contract-status: CONTRACTED_PARTIAL
+      x-luckread-source: contracts/api/notification-preferences.v1.json
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              maxProperties: 4
+              additionalProperties: false
+              properties:
+                follow: { type: boolean }
+                like: { type: boolean }
+                comment: { type: boolean }
+                mention: { type: boolean }
       responses:
-        default:
-          description: Discovery-only operation; detailed response contract remains to be closed.
+        '200':
+          description: The canonical preferences after the update.
+          headers:
+            Cache-Control:
+              description: Personal preference data is never shared-cacheable.
+              schema: { type: string, example: no-store }
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [data, requestId]
+                properties:
+                  data:
+                    type: object
+                    additionalProperties: false
+                    required: [follow, like, comment, mention]
+                    properties:
+                      follow: { type: boolean }
+                      like: { type: boolean }
+                      comment: { type: boolean }
+                      mention: { type: boolean }
+                  requestId: { type: string }
+        '401': { description: Authentication required. }
+        '403': { description: The authenticated account cannot update this resource. }
+        '422': { description: Invalid or empty preference patch. }
+        '429': { description: Write rate limit exceeded. }
+        '503': { description: Authorization, audit, or preference authority is unavailable. }
 
   /notifications/{notificationId}/read:
     post:

@@ -412,6 +412,11 @@ type PushEndpointMutationAuditInput = {
   permissionStatus: 'granted' | 'denied' | 'undetermined' | null
 }
 
+type NotificationPreferencesMutationAuditInput = {
+  eventId: string
+  preferences: Partial<{ follow: boolean; like: boolean; comment: boolean; mention: boolean }>
+}
+
 type SubscriptionPlanChangeRequestAuditInput = {
   eventId: string
   attemptId: string
@@ -719,6 +724,26 @@ function parsePushEndpointMutationAuditInput(value: unknown): PushEndpointMutati
     throw new Error('INVALID_PUSH_ENDPOINT_AUDIT')
   }
   return body as PushEndpointMutationAuditInput
+}
+
+function parseNotificationPreferencesMutationAuditInput(value: unknown): NotificationPreferencesMutationAuditInput {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('INVALID_NOTIFICATION_PREFERENCES_AUDIT')
+  const body = value as Record<string, unknown>
+  const allowed = new Set(['eventId', 'preferences'])
+  if (
+    Object.keys(body).length !== allowed.size ||
+    Object.keys(body).some(key => !allowed.has(key)) ||
+    typeof body.eventId !== 'string' ||
+    !/^evt_notification_preferences_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(body.eventId) ||
+    !body.preferences || typeof body.preferences !== 'object' || Array.isArray(body.preferences)
+  ) throw new Error('INVALID_NOTIFICATION_PREFERENCES_AUDIT')
+  const preferences = body.preferences as Record<string, unknown>
+  const keys = Object.keys(preferences)
+  const allowedPreferences = new Set(['follow', 'like', 'comment', 'mention'])
+  if (keys.length === 0 || keys.some(key => !allowedPreferences.has(key)) || keys.some(key => typeof preferences[key] !== 'boolean')) {
+    throw new Error('INVALID_NOTIFICATION_PREFERENCES_AUDIT')
+  }
+  return body as NotificationPreferencesMutationAuditInput
 }
 
 function parseCommerceOrderAuditInput(value: unknown): CommerceOrderAuditInput {
@@ -1415,6 +1440,29 @@ export default {
         occurredAt: new Date().toISOString(),
       }
       return persistMembershipPlanMutationRequestAudit(env, event)
+    }
+
+    if (request.method === 'POST' && url.pathname === '/internal/audit-events/notification-preferences-update-requested') {
+      let principal: ReturnType<typeof requireW01Transport>
+      try { principal = requireW01Transport(request) }
+      catch (error) { return errorResponse(error, request.headers.get('X-LuckRead-Request-Id')?.trim()) }
+      if (!/^L[2-8]$/.test(principal.layer)) return json({ error: 'PERMISSION_DENIED' }, 403)
+      let input: NotificationPreferencesMutationAuditInput
+      try { input = parseNotificationPreferencesMutationAuditInput(await readBoundedAuditJson(request, 2048)) }
+      catch { return json({ error: 'INVALID_NOTIFICATION_PREFERENCES_AUDIT' }, 400) }
+      const event: AuditEvent = {
+        eventId: input.eventId,
+        requestId: principal.requestId,
+        traceId: principal.correlationId,
+        actor: { actorId: principal.userId, actorType: 'user', layer: principal.layer as AuditEvent['actor']['layer'] },
+        action: 'notification.preferences.update_requested',
+        targetType: 'Notification',
+        targetId: principal.userId,
+        before: {},
+        after: { preferences: input.preferences },
+        occurredAt: new Date().toISOString(),
+      }
+      return persistImmutableAuditEvent(env, event)
     }
 
     if (request.method === 'POST' && url.pathname === '/internal/audit-events/payment-method-revocation-requested') {
