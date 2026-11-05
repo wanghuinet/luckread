@@ -13,7 +13,7 @@ Do not add account-wide privacy switches to the native Settings screen yet.
 
 The current main branch has working, server-owned **block/mute relationships** and **per-post reply-audience policies**. It does not currently provide an admitted account-wide privacy preference API for protected profiles, follow approval, discoverability, mention permissions, message requests/read receipts, hidden words, or sensitive-content filtering.
 
-A local APP toggle cannot safely stand in for any of those controls. It would misrepresent the saved state and, for profile visibility in particular, could create a false privacy guarantee while public profile/content readers continue returning data.
+A local APP toggle cannot safely stand in for any of those controls. It would misrepresent the saved state and, for profile visibility in particular, could create a false privacy guarantee while the existing public profile reader still returns a public projection and other content read paths have not been proven to enforce that new setting.
 
 This audit is a readiness/admission record, not an implementation claim. No new UI control, API route, database table, or privacy behavior is introduced by this change.
 
@@ -49,7 +49,7 @@ The current public profile read path is:
 That projection is not gated by an account visibility preference. Meanwhile, the current follow path writes a direct `social_follow_relationships` relationship; it has no `PENDING` state.
 
 Therefore, adding a client-side "private account" switch alone would not:
-- prevent unauthenticated or non-following viewers from reading public profile/content surfaces;
+- prevent the existing public profile reader from returning its public projection to non-approved viewers, or prove that every other content read surface enforces that new policy;
 - prevent cached profile/content responses from being served;
 - convert a follow action into a request awaiting approval;
 - protect profile content across feeds, search, shares, links, or secondary read paths.
