@@ -10,11 +10,11 @@ export type PendingMediaRecoveryAsset = {
   height?: number;
   uploadKey: string;
   altText?: string;
-  uploadedUrl?: string;
 };
 
 export type RecoveredPendingMediaAsset = PendingMediaRecoveryAsset & {
   draftId: string | null;
+  uploadedUrl?: string;
 };
 
 type PendingMediaRecoveryRecord = {
@@ -95,7 +95,7 @@ function parseRecoveryRecord(value: unknown): PendingMediaRecoveryRecord | null 
     typeof asset.filename !== 'string' ||
     typeof asset.mimeType !== 'string' ||
     typeof asset.uploadKey !== 'string' ||
-    (asset.uploadedUrl !== undefined && typeof asset.uploadedUrl !== 'string') ||
+    (record.uploadedUrl !== undefined && typeof record.uploadedUrl !== 'string') ||
     !asset.localId ||
     !asset.filename ||
     !asset.mimeType ||
@@ -207,7 +207,6 @@ export async function persistPendingMediaRecovery(
       height: asset.height,
       uploadKey: asset.uploadKey,
       altText: asset.altText,
-      uploadedUrl: asset.uploadedUrl,
     },
   };
   await writeRecord(directory, record);
@@ -252,6 +251,7 @@ export async function listPendingMediaRecovery(
       ...record.asset,
       uri: localFile.uri,
       draftId: record.draftId,
+      uploadedUrl: record.uploadedUrl,
     });
   }
   return recovered.sort((left, right) => left.localId.localeCompare(right.localId));
