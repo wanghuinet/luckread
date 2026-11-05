@@ -1722,7 +1722,7 @@ function PublishScreenContent() {
           disabled={busy || loadingEdit || !body.trim()}
           style={[styles.publishButton, (busy || loadingEdit || !body.trim()) && styles.disabledButton]}
         >
-          {busy ? <ActivityIndicator color="#ffffff" size="small" /> : <Text style={styles.publishButtonText}>{publishPending ? 'Retry publish' : contentId ? 'Save' : 'Post'}</Text>}
+          {busy ? <ActivityIndicator color="#ffffff" size="small" /> : <Text style={styles.publishButtonText}>{publishPending ? (scheduleEnabled ? 'Retry schedule' : 'Retry publish') : contentId ? 'Save' : scheduleEnabled ? 'Schedule' : 'Post'}</Text>}
         </Pressable>
       </View>
 
@@ -1795,6 +1795,62 @@ function PublishScreenContent() {
             </Text>
           ) : null}
 
+          {!contentId ? (
+            <View style={[styles.scheduleSection, isDark && { borderBottomColor: '#27272a' }]}>
+              <Text style={[styles.scheduleSectionTitle, isDark && { color: '#f9fafb' }]}>发布时间</Text>
+              <View style={styles.scheduleModeRow}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: !scheduleEnabled, disabled: busy || loadingEdit || publishPending }}
+                  disabled={busy || loadingEdit || publishPending}
+                  onPress={() => {
+                    setScheduleEnabled(false);
+                    setErrorMessage('');
+                  }}
+                  style={[styles.scheduleModeOption, !scheduleEnabled && styles.scheduleModeOptionSelected, isDark && !scheduleEnabled && { backgroundColor: '#102a43', borderColor: PRIMARY }]}
+                >
+                  <Text style={[styles.scheduleModeOptionText, isDark && { color: !scheduleEnabled ? '#ffffff' : '#e5e7eb' }, !scheduleEnabled && styles.scheduleModeOptionTextSelected]}>立即发布</Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: scheduleEnabled, disabled: busy || loadingEdit || publishPending || pollEnabled }}
+                  disabled={busy || loadingEdit || publishPending || pollEnabled}
+                  onPress={() => {
+                    setSchedulePickerDraft(scheduleDate);
+                    setSchedulePickerVisible(true);
+                    setErrorMessage('');
+                  }}
+                  style={[styles.scheduleModeOption, scheduleEnabled && styles.scheduleModeOptionSelected, isDark && { borderColor: scheduleEnabled ? PRIMARY : '#52525b', backgroundColor: scheduleEnabled ? '#102a43' : '#09090b' }]}
+                >
+                  <Text style={[styles.scheduleModeOptionText, isDark && { color: scheduleEnabled ? '#ffffff' : '#e5e7eb' }, scheduleEnabled && styles.scheduleModeOptionTextSelected]}>定时发布</Text>
+                </Pressable>
+              </View>
+              {scheduleEnabled ? (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Change scheduled publish time"
+                  disabled={busy || loadingEdit || publishPending}
+                  onPress={() => {
+                    setSchedulePickerDraft(scheduleDate);
+                    setSchedulePickerVisible(true);
+                  }}
+                  style={[styles.scheduleDateButton, isDark && { borderColor: '#52525b', backgroundColor: '#09090b' }]}
+                >
+                  <View style={styles.scheduleDateButtonContent}>
+                    <Feather name="calendar" size={17} color={PRIMARY} />
+                    <Text style={[styles.scheduleDateText, isDark && { color: '#f4f4f5' }]}>{scheduleDate.toLocaleString()}</Text>
+                    <Feather name="chevron-right" size={17} color={isDark ? '#a1a1aa' : '#667085'} />
+                  </View>
+                </Pressable>
+              ) : null}
+              <Text style={[styles.scheduleHint, isDark && { color: '#9ca3af' }]}>
+                {pollEnabled
+                  ? '投票暂不支持定时发布；关闭投票后可设置发布时间。'
+                  : '按手机当前时区选择时间。服务端会在到点后重新检查创作者权限，再自动发布。'}
+              </Text>
+            </View>
+          ) : null}
+
           <View style={[styles.accessModeSection, isDark && { borderBottomColor: '#27272a' }]}>
             <View>
               <Text style={[styles.accessModeTitle, isDark && { color: '#f9fafb' }]}>内容可见范围</Text>
@@ -1864,8 +1920,8 @@ function PublishScreenContent() {
             <View style={[styles.pollSection, isDark && { borderBottomColor: '#27272a' }]}>
               <Pressable
                 accessibilityRole="button"
-                accessibilityState={{ selected: pollEnabled, disabled: busy || loadingEdit || publishPending }}
-                disabled={busy || loadingEdit || publishPending}
+                accessibilityState={{ selected: pollEnabled, disabled: busy || loadingEdit || publishPending || scheduleEnabled }}
+                disabled={busy || loadingEdit || publishPending || scheduleEnabled}
                 onPress={() => {
                   setPollEnabled((value) => !value);
                   setErrorMessage('');
@@ -1969,6 +2025,52 @@ function PublishScreenContent() {
         onClose={() => setCameraVisible(false)}
         onCapture={handleCameraCapture}
       />
+      <Modal
+        visible={schedulePickerVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setSchedulePickerVisible(false)}
+      >
+        <View style={[styles.schedulePickerModal, isDark && styles.schedulePickerModalDark]}>
+          <View style={[styles.schedulePickerHeader, isDark && { borderBottomColor: '#27272a' }]}>
+            <Pressable accessibilityRole="button" onPress={() => setSchedulePickerVisible(false)} style={styles.schedulePickerActionHit}>
+              <Text style={styles.schedulePickerCancel}>取消</Text>
+            </Pressable>
+            <Text style={[styles.schedulePickerTitle, isDark && { color: '#f9fafb' }]}>设置发布时间</Text>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => {
+                const iso = toScheduledPublishISO(schedulePickerDraft);
+                if (!iso) {
+                  setErrorMessage('请选择至少一分钟后的时间。');
+                  return;
+                }
+                setScheduleDate(new Date(iso));
+                setScheduleEnabled(true);
+                setSchedulePickerVisible(false);
+                setErrorMessage('');
+              }}
+              style={styles.schedulePickerActionHit}
+            >
+              <Text style={styles.schedulePickerConfirm}>确认</Text>
+            </Pressable>
+          </View>
+          <Text style={[styles.schedulePickerHint, isDark && { color: '#9ca3af' }]}>
+            时间按手机当前时区显示。最早可选择一分钟后。
+          </Text>
+          <DateTimePicker
+            value={schedulePickerDraft}
+            onValueChange={(_event, selectedDate) => setSchedulePickerDraft(selectedDate)}
+            mode="datetime"
+            minimumDate={new Date(Date.now() + MIN_SCHEDULE_LEAD_TIME_MS)}
+            is24Hour
+            presentation="inline"
+            display={Platform.OS === 'ios' ? 'inline' : 'default'}
+            accentColor={PRIMARY}
+            themeVariant={isDark ? 'dark' : 'light'}
+          />
+        </View>
+      </Modal>
       <Modal
         visible={draftInboxVisible}
         animationType="slide"
@@ -2075,6 +2177,25 @@ const styles = StyleSheet.create({
   accessModeOptionText: { color: '#344054', fontSize: 13, fontWeight: '700' },
   accessModeOptionTextSelected: { color: '#ffffff' },
   accessModeNotice: { color: '#667085', fontSize: 12, lineHeight: 18, marginTop: 10 },
+  scheduleSection: { paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#eaecf0' },
+  scheduleSectionTitle: { color: '#101828', fontSize: 14, fontWeight: '800' },
+  scheduleModeRow: { flexDirection: 'row', gap: 9, marginTop: 10 },
+  scheduleModeOption: { borderWidth: 1, borderColor: '#d0d5dd', borderRadius: 999, paddingHorizontal: 15, paddingVertical: 9 },
+  scheduleModeOptionSelected: { backgroundColor: PRIMARY, borderColor: PRIMARY },
+  scheduleModeOptionText: { color: '#344054', fontSize: 13, fontWeight: '700' },
+  scheduleModeOptionTextSelected: { color: '#ffffff' },
+  scheduleDateButton: { marginTop: 10, borderWidth: 1, borderColor: '#d0d5dd', borderRadius: 11, paddingHorizontal: 12, paddingVertical: 11 },
+  scheduleDateButtonContent: { flexDirection: 'row', alignItems: 'center', gap: 9 },
+  scheduleDateText: { flex: 1, color: '#101828', fontSize: 13, fontWeight: '700' },
+  scheduleHint: { color: '#667085', fontSize: 11, lineHeight: 16, marginTop: 8 },
+  schedulePickerModal: { flex: 1, backgroundColor: '#ffffff', paddingHorizontal: 16, paddingTop: 12 },
+  schedulePickerModalDark: { backgroundColor: '#000000' },
+  schedulePickerHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#eaecf0', paddingBottom: 12 },
+  schedulePickerActionHit: { minWidth: 48, minHeight: 40, alignItems: 'center', justifyContent: 'center' },
+  schedulePickerTitle: { color: '#101828', fontSize: 16, fontWeight: '800' },
+  schedulePickerCancel: { color: '#667085', fontSize: 14, fontWeight: '700' },
+  schedulePickerConfirm: { color: PRIMARY, fontSize: 14, fontWeight: '800' },
+  schedulePickerHint: { color: '#667085', fontSize: 12, lineHeight: 18, marginVertical: 12 },
   assetGrid: { width: '100%', marginTop: 12 },
   assetTile: { width: '100%', overflow: 'hidden', borderWidth: 1, borderColor: '#eaecf0', borderRadius: 14, backgroundColor: '#ffffff' },
   assetTilePreview: { width: '100%', height: 148, position: 'relative', overflow: 'hidden', backgroundColor: '#101828' },
