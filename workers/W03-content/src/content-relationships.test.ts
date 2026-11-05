@@ -124,7 +124,7 @@ describe('W03 content relationship foundation', () => {
     )
     expect(runtime).toContain('export async function createContentRelationship')
     expect(runtime).toContain('export async function revokeContentRelationship')
-    expect(runtime).toContain('Idempotency-Key')
+    expect(runtime).toContain('if (!idempotencyKey || idempotencyKey.length > 256)')
     expect(runtime).toContain('content_txn_guard')
     expect(runtime).toContain('INSERT OR REPLACE INTO content_txn_guard')
     expect(runtime).toContain('WHERE r.relationship_id = ? AND r.source_id = ?')
