@@ -165,6 +165,20 @@ test('recovery metadata remembers a completed W01 upload URL without losing the 
   expect(files.has(restored[0].uri)).toBe(true);
 });
 
+test('concurrent draft binding and upload completion preserve both recovery fields', async () => {
+  await persistPendingMediaRecovery('user-1', null, asset);
+  const uploadedUrl = 'https://img.luckread.com/user-1/photo.png';
+
+  await Promise.all([
+    bindPendingMediaRecoveryToDraft('user-1', 'draft-race', [asset.localId]),
+    markPendingMediaRecoveryUploaded('user-1', asset.localId, uploadedUrl),
+  ]);
+
+  const restored = await listPendingMediaRecovery('user-1', 'draft-race');
+  expect(restored).toHaveLength(1);
+  expect(restored[0].uploadedUrl).toBe(uploadedUrl);
+});
+
 test('recovery records are isolated by account and by server draft', async () => {
   await persistPendingMediaRecovery('user-1', null, asset);
 

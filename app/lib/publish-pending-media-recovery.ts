@@ -18,7 +18,8 @@ export type RecoveredPendingMediaAsset = PendingMediaRecoveryAsset & {
 };
 
 type PendingMediaRecoveryRecord = {
-  version: 1;
+  version: 2;
+  ownerId: string;
   ownerKey: string;
   draftId: string | null;
   fileName: string;
@@ -72,6 +73,29 @@ function getRecordFile(directory: Directory, localId: string): File {
   return new File(directory, safeLocalId(localId) + '.json');
 }
 
+const recordMutationQueues = new Map<string, Promise<void>>();
+
+/** Serialize read/modify/write operations for one account-owned media record. */
+async function withRecordMutationLock<T>(
+  ownerId: string,
+  localId: string,
+  operation: () => Promise<T>,
+): Promise<T> {
+  const lockKey = hashOwnerId(ownerId) + ':' + safeLocalId(localId);
+  const previous = recordMutationQueues.get(lockKey) ?? Promise.resolve();
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  const tail = previous.catch(() => undefined).then(() => gate);
+  recordMutationQueues.set(lockKey, tail);
+  await previous.catch(() => undefined);
+  try {
+    return await operation();
+  } finally {
+    release();
+    if (recordMutationQueues.get(lockKey) === tail) recordMutationQueues.delete(lockKey);
+  }
+}
+
 function parseRecoveryRecord(value: unknown): PendingMediaRecoveryRecord | null {
   let parsed = value;
   if (typeof value === 'string') {
@@ -85,7 +109,9 @@ function parseRecoveryRecord(value: unknown): PendingMediaRecoveryRecord | null 
   const record = parsed as Partial<PendingMediaRecoveryRecord>;
   const asset = record.asset as Partial<PendingMediaRecoveryAsset> | undefined;
   if (
-    record.version !== 1 ||
+    record.version !== 2 ||
+    typeof record.ownerId !== 'string' ||
+    !record.ownerId ||
     typeof record.ownerKey !== 'string' ||
     typeof record.fileName !== 'string' ||
     !/^[a-zA-Z0-9_-]+\.[a-zA-Z0-9]{1,10}$/.test(record.fileName) ||
@@ -124,10 +150,15 @@ async function readRecords(ownerId: string): Promise<{
     if (!(entry instanceof File) || !entry.name.endsWith('.json')) continue;
     try {
       const record = parseRecoveryRecord(await entry.text());
-      if (record && record.ownerKey === hashOwnerId(ownerId)) {
-        records.push({ file: entry, record });
-      } else {
+      if (!record) {
         entry.delete();
+        continue;
+      }
+      // Hashes select a compact directory only; the exact account ID is the
+      // ownership check. Never delete another account's valid record if two
+      // IDs happen to share the same directory hash.
+      if (record.ownerId === ownerId && record.ownerKey === hashOwnerId(ownerId)) {
+        records.push({ file: entry, record });
       }
     } catch {
       entry.delete();
@@ -160,61 +191,70 @@ export async function persistPendingMediaRecovery(
   }
 
   const localId = safeLocalId(asset.localId);
-  const directory = getRecoveryDirectory(ownerId);
-  await ensureDirectory(directory);
+  return withRecordMutationLock(ownerId, localId, async () => {
+    const directory = getRecoveryDirectory(ownerId);
+    await ensureDirectory(directory);
 
-  const fileName = localId + '.' + getFileExtension(asset.filename, asset.mimeType);
-  const destination = new File(directory, fileName);
-  const recordFile = getRecordFile(directory, localId);
-  let previousFileName: string | null = null;
-  if (recordFile.exists) {
-    try {
-      const previous = parseRecoveryRecord(await recordFile.text());
-      if (previous?.ownerKey === hashOwnerId(ownerId)) previousFileName = previous.fileName;
-    } catch {
-      previousFileName = null;
+    const fileName = localId + '.' + getFileExtension(asset.filename, asset.mimeType);
+    const destination = new File(directory, fileName);
+    const recordFile = getRecordFile(directory, localId);
+    let previousFileName: string | null = null;
+    if (recordFile.exists) {
+      try {
+        const previous = parseRecoveryRecord(await recordFile.text());
+        if (previous && previous.ownerId !== ownerId) {
+          throw new Error('Unable to safely isolate this media recovery record for the current account.');
+        }
+        if (previous?.ownerId === ownerId && previous.ownerKey === hashOwnerId(ownerId)) {
+          previousFileName = previous.fileName;
+        }
+      } catch (error) {
+        if (error instanceof Error && error.message.includes('Unable to safely isolate')) throw error;
+        previousFileName = null;
+      }
     }
-  }
-  const source = new File(asset.uri);
-  if (!source.exists) {
-    throw new Error('The selected media file is no longer available on this device.');
-  }
+    const source = new File(asset.uri);
+    if (!source.exists) {
+      throw new Error('The selected media file is no longer available on this device.');
+    }
 
-  if (source.uri !== destination.uri) {
-    if (destination.exists) destination.delete();
-    await source.copy(destination);
-  }
-  if (!destination.exists) {
-    throw new Error('LuckRead could not preserve this media file for recovery.');
-  }
+    if (source.uri !== destination.uri) {
+      if (destination.exists) destination.delete();
+      await source.copy(destination);
+    }
+    if (!destination.exists) {
+      throw new Error('LuckRead could not preserve this media file for recovery.');
+    }
 
-  const recoveredAsset: PendingMediaRecoveryAsset = {
-    ...asset,
-    localId,
-    uri: destination.uri,
-  };
-  const record: PendingMediaRecoveryRecord = {
-    version: 1,
-    ownerKey: hashOwnerId(ownerId),
-    draftId,
-    fileName,
-    asset: {
+    const recoveredAsset: PendingMediaRecoveryAsset = {
+      ...asset,
       localId,
-      filename: asset.filename,
-      mimeType: asset.mimeType,
-      size: asset.size ?? null,
-      width: asset.width,
-      height: asset.height,
-      uploadKey: asset.uploadKey,
-      altText: asset.altText,
-    },
-  };
-  await writeRecord(directory, record);
-  if (previousFileName && previousFileName !== fileName) {
-    const previousFile = new File(directory, previousFileName);
-    if (previousFile.exists) previousFile.delete();
-  }
-  return recoveredAsset;
+      uri: destination.uri,
+    };
+    const record: PendingMediaRecoveryRecord = {
+      version: 2,
+      ownerId,
+      ownerKey: hashOwnerId(ownerId),
+      draftId,
+      fileName,
+      asset: {
+        localId,
+        filename: asset.filename,
+        mimeType: asset.mimeType,
+        size: asset.size ?? null,
+        width: asset.width,
+        height: asset.height,
+        uploadKey: asset.uploadKey,
+        altText: asset.altText,
+      },
+    };
+    await writeRecord(directory, record);
+    if (previousFileName && previousFileName !== fileName) {
+      const previousFile = new File(directory, previousFileName);
+      if (previousFile.exists) previousFile.delete();
+    }
+    return recoveredAsset;
+  });
 }
 
 export async function markPendingMediaRecoveryUploaded(
@@ -225,13 +265,15 @@ export async function markPendingMediaRecoveryUploaded(
   if (!/^https:\/\//i.test(uploadedUrl)) {
     throw new Error('A permanent HTTPS media URL is required for recovery metadata.');
   }
-  const directory = getRecoveryDirectory(ownerId);
-  if (!directory.exists) return;
-  const recordFile = getRecordFile(directory, localId);
-  if (!recordFile.exists) return;
-  const record = parseRecoveryRecord(await recordFile.text());
-  if (!record || record.ownerKey !== hashOwnerId(ownerId)) return;
-  await writeRecord(directory, { ...record, uploadedUrl });
+  return withRecordMutationLock(ownerId, localId, async () => {
+    const directory = getRecoveryDirectory(ownerId);
+    if (!directory.exists) return;
+    const recordFile = getRecordFile(directory, localId);
+    if (!recordFile.exists) return;
+    const record = parseRecoveryRecord(await recordFile.text());
+    if (!record || record.ownerId !== ownerId || record.ownerKey !== hashOwnerId(ownerId)) return;
+    await writeRecord(directory, { ...record, uploadedUrl });
+  });
 }
 
 export async function listPendingMediaRecovery(
@@ -263,11 +305,17 @@ export async function bindPendingMediaRecoveryToDraft(
   localIds: readonly string[],
 ): Promise<void> {
   if (!draftId.trim() || localIds.length === 0) return;
+  const directory = getRecoveryDirectory(ownerId);
   const wanted = new Set(localIds.map(safeLocalId));
-  const { directory, records } = await readRecords(ownerId);
-  for (const { record } of records) {
-    if (!wanted.has(record.asset.localId)) continue;
-    await writeRecord(directory, { ...record, draftId });
+  for (const localId of wanted) {
+    await withRecordMutationLock(ownerId, localId, async () => {
+      if (!directory.exists) return;
+      const recordFile = getRecordFile(directory, localId);
+      if (!recordFile.exists) return;
+      const record = parseRecoveryRecord(await recordFile.text());
+      if (!record || record.ownerId !== ownerId || record.ownerKey !== hashOwnerId(ownerId)) return;
+      await writeRecord(directory, { ...record, draftId });
+    });
   }
 }
 
@@ -276,24 +324,32 @@ export async function deletePendingMediaRecovery(
   ownerId: string,
   localId: string,
 ): Promise<void> {
-  const directory = getRecoveryDirectory(ownerId);
-  if (!directory.exists) return;
-  const safeId = safeLocalId(localId);
-  const recordFile = getRecordFile(directory, safeId);
-  if (!recordFile.exists) return;
+  return withRecordMutationLock(ownerId, localId, async () => {
+    const directory = getRecoveryDirectory(ownerId);
+    if (!directory.exists) return;
+    const safeId = safeLocalId(localId);
+    const recordFile = getRecordFile(directory, safeId);
+    if (!recordFile.exists) return;
 
-  let fileName = '';
-  try {
-    const record = parseRecoveryRecord(await recordFile.text());
-    if (record?.ownerKey === hashOwnerId(ownerId)) fileName = record.fileName;
-  } catch {
-    // A malformed index is removed below; it cannot authorize another path.
-  }
-  recordFile.delete();
-  if (fileName) {
-    const mediaFile = new File(directory, fileName);
-    if (mediaFile.exists) mediaFile.delete();
-  }
+    let fileName = '';
+    try {
+      const record = parseRecoveryRecord(await recordFile.text());
+      if (record?.ownerId === ownerId && record.ownerKey === hashOwnerId(ownerId)) {
+        fileName = record.fileName;
+      } else if (record) {
+        // Do not delete a different account's record in the unlikely event
+        // of a directory-hash collision.
+        return;
+      }
+    } catch {
+      // A malformed index is removed below; it cannot authorize another path.
+    }
+    recordFile.delete();
+    if (fileName) {
+      const mediaFile = new File(directory, fileName);
+      if (mediaFile.exists) mediaFile.delete();
+    }
+  });
 }
 
 export async function deletePendingMediaRecoveryForDraft(
