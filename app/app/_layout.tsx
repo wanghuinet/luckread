@@ -6,7 +6,6 @@ import { type ErrorBoundaryProps, Stack, useRootNavigationState, useRouter, useS
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { QueryProvider } from '~/lib/query-provider';
-import * as SecureStore from 'expo-secure-store';
 import * as Notifications from 'expo-notifications';
 import { useColorScheme } from 'nativewind';
 import { StatusBar } from 'expo-status-bar';
@@ -14,7 +13,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useAuthStore } from '../store/auth-store';
 import { ReplyComposerProvider } from '../components/ReplyComposerProvider';
 import { NetworkStatusBanner } from '../components/NetworkStatusBanner';
-import { isThemePreference, THEME_PREFERENCE_KEY } from '../lib/theme-preference';
+import { useThemePreferenceStore } from '../lib/theme-preference-store';
 import { syncPushEndpointForAuthenticatedUser } from '../lib/push-notifications';
 
 export const unstable_settings = {
@@ -44,6 +43,8 @@ export default function RootLayout() {
   const userId = useAuthStore((state) => state.user?.id ?? null);
   const bootstrap = useAuthStore((state) => state.bootstrap);
   const { colorScheme, setColorScheme } = useColorScheme();
+  const themePreference = useThemePreferenceStore((state) => state.preference);
+  const hydrateThemePreference = useThemePreferenceStore((state) => state.hydrate);
   const isDark = colorScheme === 'dark';
   const segments = useSegments();
   const router = useRouter();
@@ -59,18 +60,20 @@ export default function RootLayout() {
 
   useEffect(() => {
     let active = true;
-    void SecureStore.getItemAsync(THEME_PREFERENCE_KEY)
-      .then((savedPreference) => {
-        if (active && isThemePreference(savedPreference)) setColorScheme(savedPreference);
-      })
-      .catch(() => undefined)
-      .finally(() => {
-        if (active) setIsThemeLoaded(true);
-      });
+    void hydrateThemePreference().then(() => {
+      if (!active) return;
+      setColorScheme(useThemePreferenceStore.getState().preference);
+      setIsThemeLoaded(true);
+    });
     return () => {
       active = false;
     };
-  }, [setColorScheme]);
+  }, [hydrateThemePreference, setColorScheme]);
+
+  useEffect(() => {
+    if (!isThemeLoaded) return;
+    setColorScheme(themePreference);
+  }, [isThemeLoaded, setColorScheme, themePreference]);
 
   useEffect(() => {
     if (status !== 'authenticated' || !userId || Platform.OS === 'web') return;
