@@ -1770,10 +1770,8 @@ function PublishScreenContent() {
       }
     }
 
-    if (scheduleEnabled && pollEnabled) {
-      setErrorMessage('Polls cannot be scheduled yet. Turn off the poll or publish immediately.');
-      return;
-    }
+    // Polls are configured on the DRAFT before it is scheduled. W05 starts the vote window
+    // from W03's canonical published updatedAt, including the scheduled-publish CAS timestamp.
     const normalizedScheduledAt = scheduleEnabled ? toScheduledPublishISO(scheduleDate) : null;
     if (scheduleEnabled && !normalizedScheduledAt) {
       setErrorMessage('Choose a publish time at least one minute in the future.');
@@ -2265,8 +2263,8 @@ function PublishScreenContent() {
                 </Pressable>
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityState={{ selected: scheduleEnabled, disabled: busy || loadingEdit || publishPending || pollEnabled }}
-                  disabled={busy || loadingEdit || publishPending || pollEnabled}
+                  accessibilityState={{ selected: scheduleEnabled, disabled: busy || loadingEdit || publishPending }}
+                  disabled={busy || loadingEdit || publishPending}
                   onPress={openSchedulePicker}
                   style={[styles.scheduleModeOption, scheduleEnabled && styles.scheduleModeOptionSelected, isDark && { borderColor: scheduleEnabled ? PRIMARY : '#52525b', backgroundColor: scheduleEnabled ? '#102a43' : '#09090b' }]}
                 >
@@ -2403,8 +2401,8 @@ function PublishScreenContent() {
             <View style={[styles.pollSection, isDark && { borderBottomColor: '#27272a' }]}>
               <Pressable
                 accessibilityRole="button"
-                accessibilityState={{ selected: pollEnabled, disabled: busy || loadingEdit || publishPending || scheduleEnabled }}
-                disabled={busy || loadingEdit || publishPending || scheduleEnabled}
+                accessibilityState={{ selected: pollEnabled, disabled: busy || loadingEdit || publishPending }}
+                disabled={busy || loadingEdit || publishPending}
                 onPress={() => {
                   setPollEnabled((value) => !value);
                   setErrorMessage('');

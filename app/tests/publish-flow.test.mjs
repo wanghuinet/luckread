@@ -77,11 +77,16 @@ test('native composer lists, reschedules and cancels only owner-scoped scheduled
   expect(composer).toContain('原定时已取消，内容已安全转为草稿；重新安排失败：');
 });
 
-test('native composer prevents scheduling polls before poll expiry starts', () => {
-  expect(composer).toContain('Polls cannot be scheduled yet. Turn off the poll or publish immediately.');
-  expect(composer).toContain('disabled={busy || loadingEdit || publishPending || scheduleEnabled}');
-  expect(composer).toContain('disabled={busy || loadingEdit || publishPending || pollEnabled}');
-  expect(composer).toContain("if (scheduleEnabled && pollEnabled)");
+test('native composer supports polls on scheduled posts and configures the poll before scheduling', () => {
+  expect(composer).toContain('disabled={busy || loadingEdit || publishPending}');
+  expect(composer).not.toContain('Polls cannot be scheduled yet.');
+  expect(composer).not.toContain("if (scheduleEnabled && pollEnabled)");
+
+  const pollConfigurationIndex = composer.indexOf("'/contents/' + encodeURIComponent(draft.id) + '/poll'");
+  const stateTransitionIndex = composer.indexOf("'/contents/' + encodeURIComponent(draft.id) + '/state'");
+  expect(pollConfigurationIndex).toBeGreaterThan(-1);
+  expect(stateTransitionIndex).toBeGreaterThan(pollConfigurationIndex);
+  expect(composer).toContain("to: scheduleEnabled ? 'SCHEDULED' : 'PUBLISHED'");
 });
 
 test('publishing and editing failures surface the backend HTTP status, error code and request ID', () => {
