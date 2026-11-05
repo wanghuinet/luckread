@@ -114,6 +114,41 @@ describe('bind direct social post publishing to the stored body asset', () => {
     expect(result.preflight.body).not.toBe(submitted.preflight.body)
   })
 
+  it('binds public scheduled posts to the canonical active W08 Creator identity', async () => {
+    const request = makeRequest()
+    const scheduledAt = '2026-11-05T12:00:00.000Z'
+    const scheduled = {
+      ...submitted,
+      to: 'SCHEDULED',
+      scheduledAt,
+    }
+    // Public draft creation historically mirrors ownerUserId into creatorId.
+    // Scheduling must replace that placeholder with W08's canonical creator ID.
+    callW03ContentMock.mockResolvedValue(new Response(JSON.stringify(storedPost({
+      accessMode: 'PUBLIC',
+      creatorId: principal.userId,
+    })), { status: 200 }))
+    const r2Get = vi.fn(async (key: string) => makeR2Object('authoritative scheduled public post body'))
+    getCloudflareContextMock.mockResolvedValue({ env: { R2: { get: r2Get } } })
+
+    const binding = await bindPreflightToStoredPost(
+      request,
+      'post-1',
+      principal,
+      scheduled,
+      makeErrorResponse,
+    )
+    if (binding instanceof Response) throw new Error('Expected a verified public scheduled post')
+    const result = binding.body as typeof scheduled
+
+    expect(resolveVerifiedCreatorMock).toHaveBeenCalledWith(request, principal)
+    expect(binding.verifiedCreatorId).toBe('creator-1')
+    expect(result.to).toBe('SCHEDULED')
+    expect(result.scheduledAt).toBe(scheduledAt)
+    expect(result.preflight.title).toBe('authoritative stored title')
+    expect(result.preflight.body).toBe('authoritative scheduled public post body')
+  })
+
   it('binds scheduled draft social posts to canonical body and owned media before W03 scheduling', async () => {
     const request = makeRequest()
     const scheduledAt = '2026-11-05T12:00:00.000Z'
