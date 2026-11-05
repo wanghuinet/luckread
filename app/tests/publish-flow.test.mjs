@@ -2,6 +2,7 @@ import { expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { computeAutoSaveDelay, createPublishDraftFingerprint } from '../lib/publish-draft-autosave.ts';
 import { findActiveComposerToken, replaceActiveComposerToken } from '../lib/publish-composer-tokens.ts';
+import { getPollDurationMinutes, getPollDurationParts } from '../lib/poll-duration.ts';
 
 const composer = readFileSync(new URL('../app/publish.tsx', import.meta.url), 'utf8');
 const feedItem = readFileSync(new URL('../components/FeedItem.tsx', import.meta.url), 'utf8');
@@ -283,4 +284,17 @@ test('native publisher lets authors choose an uploaded image as the post cover',
   expect(composer).toContain("asset.serverUrl === activeCoverRef ? '当前封面' : '设为封面'");
   // The chosen cover continues through the existing draft and publish contracts.
   expect(composer).toContain('coverRef: nextCover');
+});
+
+test('native poll duration matches X bounds and keeps day/hour/minute precision', () => {
+  expect(getPollDurationParts(1440)).toEqual({ days: '1', hours: '0', minutes: '0' });
+  expect(getPollDurationMinutes({ days: '0', hours: '0', minutes: '5' })).toBe(5);
+  expect(getPollDurationMinutes({ days: '0', hours: '6', minutes: '30' })).toBe(390);
+  expect(getPollDurationMinutes({ days: '7', hours: '0', minutes: '0' })).toBe(10080);
+  expect(getPollDurationMinutes({ days: '0', hours: '0', minutes: '4' })).toBeNull();
+  expect(getPollDurationMinutes({ days: '7', hours: '0', minutes: '1' })).toBeNull();
+  expect(getPollDurationMinutes({ days: '0', hours: '24', minutes: '0' })).toBeNull();
+  expect(composer).toContain('durationMinutes: pollDurationMinutes');
+  expect(composer).toContain('Poll duration · 5 minutes to 7 days');
+  expect(composer).toContain('getPollDurationParts');
 });
