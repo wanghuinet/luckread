@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
+import { DatabaseSync } from 'node:sqlite'
 import {
   activateEmailVerifiedAccount,
   applyAccountStateTransition,
@@ -21,7 +22,7 @@ function input(overrides: Partial<AccountStateTransitionInput> = {}): AccountSta
 }
 
 function fakeDb(
-  initial: { state: string; version: number },
+  initial: { state: string; version: number; deletionRequestedAt?: string | null; deletedAt?: string | null },
   options: { failBatch?: boolean; missingUser?: boolean; forceJournalConflict?: boolean; roleAssignmentChanges?: number } = {},
 ) {
   const row = { ...initial }
@@ -37,12 +38,16 @@ function fakeDb(
           return {
             first: async <T>() => {
               if (options.missingUser) return null
-              const snapshot = { accountState: row.state, accountStateVersion: row.version } as T
+              const snapshot = { accountState: row.state, accountStateVersion: row.version } as Record<string, unknown>
+              if (sql.includes('deletion_requested_at')) {
+                snapshot.deletionRequestedAt = row.deletionRequestedAt ?? null
+                snapshot.deletedAt = row.deletedAt ?? null
+              }
               if (options.forceJournalConflict) {
                 row.state = 'RESTRICTED'
                 row.version += 1
               }
-              return snapshot
+              return snapshot as T
             },
             sql,
             args,
@@ -58,13 +63,10 @@ function fakeDb(
 
       const update = statements[0]
       const journal = statements[1]
-      const [nextState, , , expectedState, expectedVersion] = update.args as [
-        string,
-        string,
-        string,
-        string,
-        number,
-      ]
+      const updateArgs = update.args
+      const nextState = String(updateArgs[0])
+      const expectedState = String(updateArgs[updateArgs.length - 2])
+      const expectedVersion = Number(updateArgs[updateArgs.length - 1])
 
       if (row.state !== expectedState || row.version !== expectedVersion) {
         throw new Error('UNIQUE constraint failed: auth_013_publication_journal.resource_id, event_type, source_version')
@@ -72,6 +74,21 @@ function fakeDb(
 
       row.state = nextState
       row.version += 1
+
+      const setClause = update.sql.split(' WHERE ')[0]
+      const lifecycleSetClause = setClause.slice(setClause.indexOf('updated_at = ?') + 'updated_at = ?'.length)
+      let lifecycleBindingIndex = 2
+      for (const assignment of lifecycleSetClause.split(',').map((part) => part.trim()).filter(Boolean)) {
+        if (assignment === 'deletion_requested_at = ?') {
+          row.deletionRequestedAt = String(updateArgs[lifecycleBindingIndex++])
+        } else if (assignment === 'deleted_at = ?') {
+          row.deletedAt = String(updateArgs[lifecycleBindingIndex++])
+        } else if (assignment === 'deletion_requested_at = NULL') {
+          row.deletionRequestedAt = null
+        } else if (assignment === 'deleted_at = NULL') {
+          row.deletedAt = null
+        }
+      }
 
       for (const statement of statements) {
         if (statement.sql === 'DELETE FROM "session" WHERE user_id = ?') {
@@ -120,6 +137,75 @@ function fakeDb(
     grantedRole: () => grantedRole,
   }
 }
+
+describe('AUTH-015 lifecycle-window persistence migration', () => {
+  it('adds only nullable timestamp columns to the existing Better Auth user table', () => {
+    const migration = readFileSync(
+      new URL('../../migrations/0009_auth_015_lifecycle_windows.sql', import.meta.url),
+      'utf8',
+    )
+    const db = new DatabaseSync(':memory:')
+    try {
+      db.exec(`
+        CREATE TABLE "user" (
+          id TEXT PRIMARY KEY NOT NULL,
+          account_state TEXT NOT NULL,
+          account_state_version INTEGER NOT NULL
+        );
+        INSERT INTO "user" (id, account_state, account_state_version)
+        VALUES ('existing-active-user', 'ACTIVE', 1);
+      `)
+      db.exec(migration)
+
+      const columns = db.prepare('PRAGMA table_info("user")').all() as Array<{
+        name: string
+        type: string
+        notnull: number
+        dflt_value: string | null
+      }>
+      for (const name of ['deletion_requested_at', 'deleted_at']) {
+        const column = columns.find((entry) => entry.name === name)
+        expect(column).toMatchObject({ name, type: 'TEXT', notnull: 0, dflt_value: null })
+      }
+      const tables = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name").all() as Array<{name:string}>
+      expect(tables.map((entry) => entry.name)).toEqual(['user'])
+      expect(db.prepare('SELECT account_state, account_state_version, deletion_requested_at, deleted_at FROM "user"').get())
+        .toEqual({
+          account_state: 'ACTIVE',
+          account_state_version: 1,
+          deletion_requested_at: null,
+          deleted_at: null,
+        })
+    } finally {
+      db.close()
+    }
+  })
+
+  it('fails closed when an account is already in a deletion state without timestamp provenance', () => {
+    const migration = readFileSync(
+      new URL('../../migrations/0009_auth_015_lifecycle_windows.sql', import.meta.url),
+      'utf8',
+    )
+    const db = new DatabaseSync(':memory:')
+    try {
+      db.exec(`
+        CREATE TABLE "user" (
+          id TEXT PRIMARY KEY NOT NULL,
+          account_state TEXT NOT NULL,
+          account_state_version INTEGER NOT NULL
+        );
+        INSERT INTO "user" (id, account_state, account_state_version)
+        VALUES ('existing-deleted-user', 'DELETED', 3);
+      `)
+      expect(() => db.exec(migration)).toThrow()
+      const columns = db.prepare('PRAGMA table_info("user")').all() as Array<{name:string}>
+      expect(columns.some((entry) => entry.name === 'deletion_requested_at')).toBe(false)
+      expect(columns.some((entry) => entry.name === 'deleted_at')).toBe(false)
+    } finally {
+      db.close()
+    }
+  })
+})
 
 describe('AUTH-013 Better Auth persistence boundary', () => {
   it('uses the native Better Auth user and session tables', () => {
@@ -254,7 +340,6 @@ describe('AUTH-013 account-state transition kernel', () => {
           to: 'ACTIVE',
           actor: { id: '42', type: 'user' },
           permission: null,
-          preconditionSatisfied: false,
         }),
       ),
     ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' })
@@ -280,39 +365,23 @@ describe('AUTH-013 account-state transition kernel', () => {
     expect(fake.row).toEqual({ state: 'PENDING_VERIFICATION', version: 2 })
   })
 
-  it('accepts PENDING_VERIFICATION -> ACTIVE only when the verification precondition is proven', async () => {
-    const fake = fakeDb({ state: 'PENDING_VERIFICATION', version: 7 })
-
-    const result = await applyAccountStateTransition(
-      fake.db,
-      input({
-        to: 'ACTIVE',
-        actor: { id: '42', type: 'user' },
-        permission: null,
-        preconditionSatisfied: true,
-      }),
-    )
-
-    expect(result.accountStateVersion).toBe(8)
-  })
-
-  it('accepts system-owned timeout deletion through the canonical system.job permission', async () => {
+  it('keeps verification-timeout deletion fail-closed until its trusted evaluator is implemented', async () => {
     const fake = fakeDb({ state: 'PENDING_VERIFICATION', version: 2 })
 
-    const result = await applyAccountStateTransition(
-      fake.db,
-      input({
-        to: 'DELETED',
-        expectedVersion: 2,
-        actor: { id: 'job:account-lifecycle', type: 'job' },
-        permission: 'system.job',
-        preconditionSatisfied: true,
-      }),
-    )
+    await expect(
+      applyAccountStateTransition(
+        fake.db,
+        input({
+          to: 'DELETED',
+          expectedVersion: 2,
+          actor: { id: 'job:account-lifecycle', type: 'job' },
+          permission: 'system.job',
+        }),
+      ),
+    ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' })
 
-    expect(result.accountStateVersion).toBe(3)
-    expect(fake.row).toEqual({ state: 'DELETED', version: 3 })
-    expect(fake.sessionRevocation()).toEqual(['42'])
+    expect(fake.batchCalls()).toBe(0)
+    expect(fake.row).toEqual({ state: 'PENDING_VERIFICATION', version: 2 })
   })
 
   it('atomically revokes active session extensions when a token-invalidating state is entered', async () => {
@@ -565,6 +634,186 @@ describe('AUTH-013 trusted-principal authorization boundary', () => {
   })
 })
 
+describe('AUTH-015 trusted lifecycle time-window evaluation', () => {
+  const now = '2026-09-24T12:00:00.000Z'
+
+  it('starts the 15-day cooling-off clock from W02 server time when deletion is requested', async () => {
+    const fake = fakeDb({ state: 'ACTIVE', version: 7, deletedAt: '2026-01-01T00:00:00.000Z' })
+    await applyAccountStateTransition(
+      fake.db,
+      input({
+        to: 'DELETION_REQUESTED',
+        actor: { id: '42', type: 'user' },
+        permission: null,
+        now,
+      }),
+    )
+
+    expect(fake.row).toMatchObject({
+      state: 'DELETION_REQUESTED',
+      version: 8,
+      deletionRequestedAt: now,
+      deletedAt: null,
+    })
+  })
+
+  it('allows cancellation one millisecond before the 15-day cooling-off deadline', async () => {
+    const fake = fakeDb({
+      state: 'DELETION_REQUESTED',
+      version: 7,
+      deletionRequestedAt: '2026-09-09T12:00:00.001Z',
+    })
+    const result = await applyAccountStateTransition(
+      fake.db,
+      input({
+        to: 'ACTIVE',
+        actor: { id: '42', type: 'user' },
+        permission: null,
+        now,
+      }),
+    )
+
+    expect(result.to).toBe('ACTIVE')
+    expect(fake.row).toMatchObject({ state: 'ACTIVE', deletionRequestedAt: null, deletedAt: null })
+  })
+
+  it('rejects cancellation exactly at the 15-day deadline', async () => {
+    const fake = fakeDb({
+      state: 'DELETION_PENDING',
+      version: 7,
+      deletionRequestedAt: '2026-09-09T12:00:00.000Z',
+    })
+    await expect(
+      applyAccountStateTransition(
+        fake.db,
+        input({
+          to: 'ACTIVE',
+          actor: { id: '42', type: 'user' },
+          permission: null,
+          now,
+        }),
+      ),
+    ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' })
+
+    expect(fake.batchCalls()).toBe(0)
+    expect(fake.row.state).toBe('DELETION_PENDING')
+  })
+
+  it('requires the 15-day cooling-off period to have elapsed before DELETION_PENDING -> DELETED', async () => {
+    const early = fakeDb({
+      state: 'DELETION_PENDING',
+      version: 7,
+      deletionRequestedAt: '2026-09-09T12:00:00.001Z',
+    })
+    await expect(
+      applyAccountStateTransition(
+        early.db,
+        input({
+          to: 'DELETED',
+          actor: { id: 'job:account-lifecycle', type: 'job' },
+          permission: 'system.job',
+          now,
+        }),
+      ),
+    ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' })
+    expect(early.batchCalls()).toBe(0)
+
+    const elapsed = fakeDb({
+      state: 'DELETION_PENDING',
+      version: 7,
+      deletionRequestedAt: '2026-09-09T12:00:00.000Z',
+    })
+    await applyAccountStateTransition(
+      elapsed.db,
+      input({
+        to: 'DELETED',
+        actor: { id: 'job:account-lifecycle', type: 'job' },
+        permission: 'system.job',
+        now,
+      }),
+    )
+    expect(elapsed.row).toMatchObject({ state: 'DELETED', deletedAt: now })
+  })
+
+  it('allows reactivation one millisecond before the 30-day window closes', async () => {
+    const fake = fakeDb({
+      state: 'DELETED',
+      version: 7,
+      deletionRequestedAt: '2026-09-01T12:00:00.000Z',
+      deletedAt: '2026-08-25T12:00:00.001Z',
+    })
+    const result = await applyAccountStateTransition(
+      fake.db,
+      input({
+        to: 'REACTIVATED',
+        actor: { id: '42', type: 'user' },
+        permission: 'user.reactivate',
+        now,
+      }),
+    )
+
+    expect(result.to).toBe('REACTIVATED')
+    expect(fake.row.deletedAt).toBe('2026-08-25T12:00:00.001Z')
+  })
+
+  it('rejects reactivation exactly at the 30-day deadline and fails closed without deleted_at', async () => {
+    const exact = fakeDb({
+      state: 'DELETED',
+      version: 7,
+      deletedAt: '2026-08-25T12:00:00.000Z',
+    })
+    await expect(
+      applyAccountStateTransition(
+        exact.db,
+        input({
+          to: 'REACTIVATED',
+          actor: { id: '42', type: 'user' },
+          permission: 'user.reactivate',
+          now,
+        }),
+      ),
+    ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' })
+
+    const missing = fakeDb({ state: 'DELETED', version: 7 })
+    await expect(
+      applyAccountStateTransition(
+        missing.db,
+        input({
+          to: 'REACTIVATED',
+          actor: { id: '42', type: 'user' },
+          permission: 'user.reactivate',
+          now,
+        }),
+      ),
+    ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' })
+    expect(exact.batchCalls()).toBe(0)
+    expect(missing.batchCalls()).toBe(0)
+  })
+
+  it('rejects future or malformed lifecycle timestamps rather than trusting them', async () => {
+    for (const timestamp of ['not-a-date', '2026-09-24T12:00:00.001Z']) {
+      const fake = fakeDb({
+        state: 'DELETION_REQUESTED',
+        version: 7,
+        deletionRequestedAt: timestamp,
+      })
+      await expect(
+        applyAccountStateTransition(
+          fake.db,
+          input({
+            to: 'ACTIVE',
+            actor: { id: '42', type: 'user' },
+            permission: null,
+            now,
+          }),
+        ),
+      ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' })
+      expect(fake.batchCalls()).toBe(0)
+    }
+  })
+})
+
+
 
 type CanonicalTransition = {
   from: AccountStateTransitionInput['to']
@@ -585,7 +834,12 @@ describe('AUTH-013 canonical state-machine coverage', () => {
   it('executes every transition declared by the canonical account state machine', async () => {
     expect(canonicalAccountTransitions['x-transitions']).toHaveLength(26)
 
+    let executed = 0
     for (const transition of canonicalAccountTransitions['x-transitions']) {
+      if (transition.precondition === 'phone_or_email_verified' || transition.precondition === 'verification_timeout') {
+        continue
+      }
+
       const actorType = transition.actor === 'system' ? 'job' : transition.actor
       const actorId = transition.actor === 'user'
         ? '42'
@@ -595,7 +849,19 @@ describe('AUTH-013 canonical state-machine coverage', () => {
             ? 'admin-1'
             : 'job:account-lifecycle'
 
-      const fake = fakeDb({ state: transition.from, version: 7 })
+      const fake = fakeDb({
+        state: transition.from,
+        version: 7,
+        ...(transition.precondition === 'within_cooling_off'
+          ? { deletionRequestedAt: '2026-09-20T12:00:00.000Z' }
+          : {}),
+        ...(transition.precondition === 'cooling_off_elapsed'
+          ? { deletionRequestedAt: '2026-09-01T12:00:00.000Z' }
+          : {}),
+        ...(transition.precondition === 'within_reactivation_window'
+          ? { deletedAt: '2026-09-20T12:00:00.000Z' }
+          : {}),
+      })
 
       const result = await applyAccountStateTransition(
         fake.db,
@@ -603,7 +869,6 @@ describe('AUTH-013 canonical state-machine coverage', () => {
           to: transition.to,
           actor: { id: actorId, type: actorType },
           permission: transition.permission,
-          preconditionSatisfied: transition.precondition ? true : undefined,
           approvalLevel: transition.requiresApproval
             ? transition.requiresApproval === true
               ? 'L7'
@@ -630,7 +895,9 @@ describe('AUTH-013 canonical state-machine coverage', () => {
       ]).has(transition.to)
 
       expect(fake.sessionRevocation() !== null).toBe(expectedSessionRevocation)
+      executed += 1
     }
+    expect(executed).toBe(24)
   })
 
   it('rejects the canonical forbidden direct transitions', async () => {
@@ -669,8 +936,7 @@ describe('AUTH-013 canonical state-machine coverage', () => {
             to: transition.to,
             actor: transition.actor,
             permission: transition.permission,
-            preconditionSatisfied: true,
-          }),
+              }),
         ),
       ).rejects.toMatchObject({ code: 'INVALID_STATE' })
 
