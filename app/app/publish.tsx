@@ -985,6 +985,7 @@ function PublishScreenContent() {
     contentId,
     coverRef,
     loadingEdit,
+    mediaWarning,
     pollDurationMinutes,
     pollEnabled,
     pollOptions,
@@ -1294,7 +1295,7 @@ function PublishScreenContent() {
     draftSaveDirtyRef.current = true;
     draftSaveChangeTokenRef.current += 1;
     draftAutoSaveSchedulerRef.current();
-  }, [accessMode, assets, body, busy, contentId, coverRef, loadingEdit, pollDurationMinutes, pollEnabled, pollOptions, publishPending]);
+  }, [accessMode, assets, body, busy, contentId, coverRef, loadingEdit, mediaWarning, pollDurationMinutes, pollEnabled, pollOptions, publishPending]);
 
   useEffect(() => () => {
     if (draftSaveTimerRef.current) clearTimeout(draftSaveTimerRef.current);
@@ -1513,6 +1514,7 @@ function PublishScreenContent() {
         pollEnabled,
         pollOptions,
         pollDurationMinutes: pollDurationMinutes ?? -1,
+        mediaWarning,
       });
       if (draft?.id && draftSavedFingerprintRef.current !== currentDraftFingerprint) {
         if (!draft.etag || draft.etag === '*') {
