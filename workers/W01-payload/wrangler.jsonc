@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "main": ".open-next/worker.js",
+  "main": "src/worker.ts",
   "name": "luckread-w01-payload",
   "compatibility_date": "2025-08-15",
   "compatibility_flags": [
@@ -154,5 +154,10 @@
       "binding": "R2",
       "bucket_name": "luckread-w01-assets-placeholder"
     }
-  ]
+  ],
+  "triggers": {
+    "crons": [
+      "* * * * *"
+    ]
+  }
 }

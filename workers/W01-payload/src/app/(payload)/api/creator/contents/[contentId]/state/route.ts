@@ -4,6 +4,7 @@ import {
   invalidatePublicContentList,
   invalidatePublicContentVisibility,
   invalidatePublicContentRelationships,
+  invalidatePublicContentThreads,
 } from '../../../../../../../lib/public-response-cache.js'
 
 import {
@@ -68,6 +69,7 @@ export async function POST(
       await invalidatePublicContentComments(contentId)
       await invalidatePublicContentVisibility(contentId)
       await invalidatePublicContentRelationships(contentId)
+      await invalidatePublicContentThreads()
       await invalidatePublicContentDetail(request, contentId)
       await invalidatePublicContentList(request)
     }

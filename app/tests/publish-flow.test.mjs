@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
-import { computeAutoSaveDelay, createPublishDraftFingerprint } from '../lib/publish-draft-autosave.ts';
+import { computeAutoSaveDelay, createPublishDraftFingerprint, createReplyAudienceFingerprint } from '../lib/publish-draft-autosave.ts';
 import { findActiveComposerToken, replaceActiveComposerToken } from '../lib/publish-composer-tokens.ts';
 
 const composer = readFileSync(new URL('../app/publish.tsx', import.meta.url), 'utf8');
@@ -17,10 +17,46 @@ test('native publisher uses the shared media API helpers and existing W01 state 
   expect(composer).toContain('getMediaPlayback(uploaded.id)');
   expect(composer).toContain('uploadTextBody(');
   expect(composer).toContain("'/contents/' + encodeURIComponent(draft.id) + '/state'");
-  expect(composer).toContain("to: 'PUBLISHED'");
+  expect(composer).toContain("to: scheduleEnabled ? 'SCHEDULED' : 'PUBLISHED'");
   expect(composer).toContain('preflight: {');
   expect(composer).toContain("contentType: 'post'");
   expect(composer).not.toMatch(/\bfetch\s*\(/);
+});
+
+test('native composer uses the existing Expo UI date-time picker for future scheduled publishing', () => {
+  expect(composer).toContain("import DateTimePicker from '@expo/ui/community/datetime-picker';");
+  expect(composer).toContain('mode="datetime"');
+  expect(composer).toContain('presentation="inline"');
+  expect(composer).toContain('minimumDate={new Date(Date.now() + MIN_SCHEDULE_LEAD_TIME_MS)}');
+  expect(composer).toContain('toScheduledPublishISO(schedulePickerDraft)');
+  expect(composer).toContain('toScheduledPublishISO(scheduleDate)');
+  expect(composer).toContain("to: scheduleEnabled ? 'SCHEDULED' : 'PUBLISHED'");
+  expect(composer).toContain('...(normalizedScheduledAt ? { scheduledAt: normalizedScheduledAt } : {})');
+  expect(composer).toContain("Alert.alert('定时发布已安排'");
+  expect(composer).toContain('scheduleDate.toLocaleString()');
+  expect(composer).toContain('服务端会在到点后重新检查创作者权限，再自动发布。');
+});
+
+test('native composer lists, reschedules and cancels only owner-scoped scheduled posts', () => {
+  expect(composer).toContain('fetchOwnScheduledPostsPage({ cursor, limit: 20 })');
+  expect(composer).toContain('transitionOwnScheduledPostState(item, \'DRAFT\')');
+  expect(composer).toContain('transitionOwnScheduledPostState(updatedDraft, \'SCHEDULED\', scheduledAt)');
+  expect(composer).toContain('setScheduledInboxVisible(true)');
+  expect(composer).toContain('setScheduledInboxItems((current) => current.filter((candidate) => candidate.id !== item.id))');
+  expect(composer).toContain('openScheduleEditPicker(item)');
+  expect(composer).toContain('cancelScheduledPost(item)');
+  expect(composer).toContain('visible={scheduledInboxVisible}');
+  expect(composer).toContain('定时发布');
+  expect(composer).toContain('修改时间');
+  expect(composer).toContain('取消定时');
+  expect(composer).toContain('原定时已取消，内容已安全转为草稿；重新安排失败：');
+});
+
+test('native composer prevents scheduling polls before poll expiry starts', () => {
+  expect(composer).toContain('Polls cannot be scheduled yet. Turn off the poll or publish immediately.');
+  expect(composer).toContain('disabled={busy || loadingEdit || publishPending || scheduleEnabled}');
+  expect(composer).toContain('disabled={busy || loadingEdit || publishPending || pollEnabled}');
+  expect(composer).toContain("if (scheduleEnabled && pollEnabled)");
 });
 
 test('publishing and editing failures surface the backend HTTP status, error code and request ID', () => {
@@ -209,7 +245,7 @@ test('native publisher auto-saves server drafts, restores them by draft ID, and 
   expect(composer).toContain("usePreventRemove(shouldPreventRemove, handlePreventRemove)");
   expect(composer).toContain('navigation.dispatch(data.action)');
   expect(composer).toContain('draftWasPublishedRef.current = true');
-  expect(composer).toContain("to: 'PUBLISHED'");
+  expect(composer).toContain("to: scheduleEnabled ? 'SCHEDULED' : 'PUBLISHED'");
   expect(composer).toContain('fetchContentBodyReference');
   expect(composer).toContain('draftSavedFingerprintRef.current = fingerprint;');
   expect(composer).toContain('if (pollEnabled && !contentId && !pollConfiguredRef.current)');
@@ -283,4 +319,26 @@ test('native publisher lets authors choose an uploaded image as the post cover',
   expect(composer).toContain("asset.serverUrl === activeCoverRef ? '当前封面' : '设为封面'");
   // The chosen cover continues through the existing draft and publish contracts.
   expect(composer).toContain('coverRef: nextCover');
+});
+
+
+test('native publisher uses the existing W01/W05 reply-audience policy for create, edit, autosave and restore', () => {
+  expect(composer).toContain("useState<NativeReplyAudience>('everyone')");
+  expect(composer).toContain('fetchOwnPostReplyAudience(targetContentId)');
+  expect(composer).toContain('saveOwnPostReplyAudience(draft.id, replyAudience, trimmedBody)');
+  expect(composer).toContain('saveOwnPostReplyAudience(contentId, replyAudience, trimmedBody)');
+  expect(composer).toContain('replyAudienceSavedFingerprintRef.current');
+  expect(composer).toContain('谁可以回复？');
+  expect(composer).toContain('followingNetwork');
+  expect(composer).toContain('被提及的账号始终可以回复');
+  expect(composer).toContain('isNativeReplyAudience');
+  expect(composer).not.toContain('mentionedUserIds:');
+});
+
+test('reply policy autosave fingerprints change for audience or mentioned text without retaining the text', () => {
+  const initial = createReplyAudienceFingerprint('Hello @alice', 'mentioned');
+  expect(createReplyAudienceFingerprint('Hello @alice', 'mentioned')).toBe(initial);
+  expect(createReplyAudienceFingerprint('Hello @bob', 'mentioned')).not.toBe(initial);
+  expect(createReplyAudienceFingerprint('Hello @alice', 'everyone')).not.toBe(initial);
+  expect(initial).not.toContain('Hello');
 });
