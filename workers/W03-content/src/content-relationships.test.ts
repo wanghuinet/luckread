@@ -4,6 +4,7 @@ import { resolve } from 'node:path'
 
 import {
   appendPostThreadNext,
+  createContentRelationship,
   listContentRelationships,
   listPostThread,
 } from './content-relationships.js'
@@ -179,6 +180,25 @@ describe('W03 content relationship foundation', () => {
 
 
 describe('W03 native social post thread authority', () => {
+  it('prevents the generic reference API from creating thread edges', async () => {
+    const db = {
+      prepare() {
+        throw new Error('generic relationship writes must reject thread-next before D1');
+      },
+    } as never;
+
+    await expect(createContentRelationship(
+      db,
+      'user_1',
+      'post_root',
+      { targetContentId: 'post_next', relationType: 'thread-next' },
+      'thread-link-1',
+    )).rejects.toMatchObject({
+      code: 'VALIDATION_FAILED',
+      status: 400,
+    });
+  });
+
   it('adds ordered links only between the same owner public social posts', async () => {
     const statements: string[] = [];
     const db = {
