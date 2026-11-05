@@ -110,6 +110,44 @@ describe('W01 authorized scheduled publish orchestrator', () => {
     })
   })
 
+  it('normalizes a legacy owner-as-creator placeholder to the W08 canonical Creator ID', async () => {
+    let committedItems: Array<Record<string, unknown>> = []
+    const legacy = candidate('content_legacy_creator', 'owner_legacy', 'owner_legacy')
+    const w03: Service = {
+      fetch: async (input, init) => {
+        const request = toRequest(input, init)
+        if (new URL(request.url).pathname.endsWith('/scheduled-due')) {
+          return Response.json({ data: { items: [legacy] } })
+        }
+        const body = await request.json() as { items?: Array<Record<string, unknown>> }
+        committedItems = body.items ?? []
+        return Response.json({
+          data: { scanned: 1, authorized: 1, published: 1, rejected: 0 },
+        })
+      },
+    }
+    const w08: Service = {
+      fetch: async () => Response.json(allowed('owner_legacy', 'creator_canonical')),
+    }
+
+    await expect(runAuthorizedScheduledPublish({
+      W03_CONTENT: w03,
+      W08_CREATOR: w08,
+    })).resolves.toMatchObject({
+      scanned: 1,
+      authorized: 1,
+      published: 1,
+      rejected: 0,
+    })
+    expect(committedItems).toEqual([expect.objectContaining({
+      contentId: 'content_legacy_creator',
+      ownerUserId: 'owner_legacy',
+      expectedCreatorId: 'owner_legacy',
+      creatorId: 'creator_canonical',
+      authorization: allowed('owner_legacy', 'creator_canonical'),
+    })])
+  })
+
   it('fails closed when W08 returns an ALLOW for a different owner or Creator', async () => {
     const w03Calls: string[] = []
     const w03: Service = {
