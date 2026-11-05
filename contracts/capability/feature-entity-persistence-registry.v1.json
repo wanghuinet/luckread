@@ -88,6 +88,39 @@
       ]
     },
     {
+      "featureId": "AUTH-013",
+      "domainId": "D01 Core",
+      "entityIds": [
+        "ENT-USER"
+      ],
+      "persistenceMode": "LUCKREAD_EXTENSION",
+      "owner": "W02",
+      "status": "BLOCKED",
+      "evidenceRefs": [
+        "contracts/alignment/cross-system-mapping.v1.json",
+        "contracts/alignment/mapping-batches/AUTH-013-real-evidence-reconciliation.v1.md",
+        "contracts/capability/reconciliation-batches/B01-identity-auth-account.v1.json",
+        "contracts/entity/entity-catalog.v1.json",
+        "contracts/entity/entity-field-contract.v1.json",
+        "contracts/persistence/AUTH-013-account-state-persistence-contract.v1.json",
+        "contracts/migration/AUTH-013-account-state-migration.v1.json",
+        "contracts/migration/AUTH-013-publication-journal.v1.json",
+        "workers/W02-identity/wrangler.jsonc",
+        "workers/W02-identity/migrations/0002_auth_013_account_state.sql",
+        "workers/W02-identity/migrations/0003_auth_013_publication_journal.sql",
+        "workers/W02-identity/src/account/account-state-transition.ts",
+        "contracts/evidence/mapping-0-evidence-registry.v1.json",
+        "docs/change-control/MAPPING-0-AUTHORITY-DECISIONS-2026-09-20.md",
+        "docs/change-control/CC-MAPPING-0-AUTH-013-PERSISTENCE-EXECUTION-RECONCILIATION-2026-09-29.md",
+        "docs/change-control/CC-MAPPING-0-AUTH-013-EVIDENCE-REGISTRY-RECONCILIATION-2026-09-29.md",
+        "docs/change-control/CC-MAPPING-0-AUTH-013-LIFECYCLE-MATRIX-INHERITANCE-2026-10-04.md",
+        "https://github.com/wanghuinet/luckread/actions/runs/35937873769",
+        "https://github.com/wanghuinet/luckread/actions/runs/36213786102/artifacts/10895984205",
+        "https://github.com/wanghuinet/luckread/actions/runs/36503534440",
+        "https://github.com/wanghuinet/luckread/actions/runs/37208063552#artifact-11305782085"
+      ]
+    },
+    {
       "featureId": "PAY-001",
       "domainId": "D1-04",
       "entityIds": [
