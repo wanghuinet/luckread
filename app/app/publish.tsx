@@ -299,10 +299,56 @@ function PublishScreenContent() {
     setAssets((current) => current.map((asset) => asset.localId === localId ? { ...asset, ...patch } : asset));
   }, []);
 
+  const persistPendingAsset = useCallback(async (asset: ComposerAsset) => {
+    if (!user?.id || !asset.uri || !asset.uploadKey) {
+      throw new Error('The selected media cannot be saved for recovery on this account.');
+    }
+    return persistPendingMediaRecovery(
+      user.id,
+      draftId || contentId || recordRef.current?.id || null,
+      {
+        localId: asset.localId,
+        uri: asset.uri,
+        filename: asset.filename,
+        mimeType: asset.mimeType,
+        size: asset.size,
+        width: asset.width,
+        height: asset.height,
+        uploadKey: asset.uploadKey,
+        altText: asset.altText,
+      },
+    );
+  }, [contentId, draftId, user?.id]);
+
   const loadExistingContent = useCallback(async () => {
     const targetContentId = draftId || contentId;
     const restoringDraft = Boolean(draftId && !contentId);
-    if (!targetContentId || authStatus !== 'authenticated' || editLoadKeyRef.current === targetContentId) return;
+    if (authStatus !== 'authenticated' || !user?.id) return;
+    if (!targetContentId) {
+      if (editLoadKeyRef.current === '__new-composer__') {
+        draftSaveRestoreCompleteRef.current = true;
+        return;
+      }
+      editLoadKeyRef.current = '__new-composer__';
+      try {
+        const pending = await listPendingMediaRecovery(user.id, null);
+        if (pending.length > 0) {
+          setAssets(pending.map((asset) => ({
+            ...asset,
+            serverUrl: '',
+            status: 'failed',
+            error: '上次上传中断。本机已保留文件，点击重试即可继续。',
+          })));
+          setStatusMessage('已恢复上次未完成的媒体上传。');
+        }
+      } catch {
+        setErrorMessage('无法读取本机保存的待上传媒体，请重新选择文件。');
+      } finally {
+        draftSaveRestoreCompleteRef.current = true;
+      }
+      return;
+    }
+    if (editLoadKeyRef.current === targetContentId) return;
     editLoadKeyRef.current = targetContentId;
     setLoadingEdit(true);
     setErrorMessage('');
@@ -390,6 +436,14 @@ function PublishScreenContent() {
           existing: true,
         };
       });
+      const pendingRecoveries = await listPendingMediaRecovery(user.id, targetContentId);
+      const recoveredPendingAssets: ComposerAsset[] = pendingRecoveries.map((asset) => ({
+        ...asset,
+        serverUrl: '',
+        status: 'failed',
+        error: '上次上传中断。本机已保留文件，点击重试即可继续。',
+      }));
+      const combinedRestoredAssets = [...restoredAssets, ...recoveredPendingAssets];
 
       originalAccessModeRef.current = loadedAccessMode;
       originalBodyRef.current = { text: restoredBody, bodyRef: record.bodyRef || null };
@@ -399,7 +453,7 @@ function PublishScreenContent() {
       replyAudienceSavedFingerprintRef.current = createReplyAudienceFingerprint(restoredBody, restoredReplyAudience);
       setCoverRef(record.coverRef || '');
       setMediaWarning(record.mediaWarning ?? null);
-      setAssets(restoredAssets);
+      setAssets(combinedRestoredAssets);
       pollConfiguredRef.current = Boolean(restoredPoll);
       setPollEnabled(Boolean(restoredPoll));
       setPollOptions(restoredPoll ? restoredPoll.options.map((option) => option.text) : ['', '']);
