@@ -1,7 +1,25 @@
 {
-  "$schema":"https://luckread.com/contracts/v1/state/feature-state-registry.v1.schema.json",
-  "version":"1.0",
-  "status":"NOT_GREEN",
-  "sourceOfTruth":"docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
-  "records":[]
+  "$schema": "https://luckread.com/contracts/v1/state/feature-state-registry.v1.schema.json",
+  "version": "1.0",
+  "status": "NOT_GREEN",
+  "sourceOfTruth": "docs/00-LUCKREAD-ULTIMATE-FEATURE-BLUEPRINT-v2.0.md",
+  "records": [
+    {
+      "featureId": "AUTH-013",
+      "domainId": "user-account",
+      "stateMachineId": "AccountStateMachine",
+      "stateField": "account_state",
+      "versionField": "account_state_version",
+      "status": "MAPPED",
+      "evidenceRefs": [
+        "contracts/state-machines/account.json",
+        "contracts/enums/account-state.json",
+        "contracts/api/user-account-operation-policy.v1.json",
+        "workers/W02-identity/src/account/account-state-transition.ts",
+        "workers/W02-identity/src/account/account-state-transition.test.ts",
+        "docs/change-control/CC-MAPPING-0-AUTH-013-PUBLIC-HTTP-E2E-SUCCESS-2026-09-29.md",
+        "contracts/alignment/cross-system-mapping.v1.json"
+      ]
+    }
+  ]
 }
