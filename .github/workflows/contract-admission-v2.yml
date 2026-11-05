@@ -227,7 +227,10 @@ jobs:
   openapi-lint:
     name: OpenAPI Lint
     runs-on: ubuntu-latest
-    needs: contract-full
+    # Run syntax lint independently so an unrelated full-alignment blocker
+    # does not suppress the OpenAPI result; Contract Admission Gate (full)
+    # still enforces FULL-mode downstream gates before admission can pass.
+    needs: contract
     steps:
       - uses: actions/checkout@v4
         with:
