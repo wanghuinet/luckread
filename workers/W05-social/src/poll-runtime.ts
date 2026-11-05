@@ -76,6 +76,12 @@ const validateDurationMinutes = (value: unknown): PollDurationMinutes => {
   return value
 }
 
+// Keep the old constrained hour column valid for already deployed W05 versions.
+// Custom minute values use the legacy 24-hour default only as a compatibility placeholder.
+const toLegacyDurationHours = (durationMinutes: number): 24 | 72 | 168 =>
+  durationMinutes === 4320 ? 72 : durationMinutes === 10080 ? 168 : 24
+
+
 const isBlocked = async (db: D1Database, viewerUserId: string, ownerUserId: string): Promise<boolean> => {
   if (viewerUserId === ownerUserId) return false
   const row = await db.prepare(
@@ -297,8 +303,8 @@ export async function configureContentPoll(
     const now = new Date().toISOString()
     const statements = [
       db.prepare(
-        'UPDATE social_polls SET duration_minutes = ?, ends_at = NULL, updated_at = ? WHERE poll_id = ? AND NOT EXISTS (SELECT 1 FROM social_poll_votes WHERE poll_id = ?)',
-      ).bind(durationMinutes, now, existing.poll_id, existing.poll_id),
+        'UPDATE social_polls SET duration_minutes = ?, duration_hours = ?, ends_at = NULL, updated_at = ? WHERE poll_id = ? AND NOT EXISTS (SELECT 1 FROM social_poll_votes WHERE poll_id = ?)',
+      ).bind(durationMinutes, toLegacyDurationHours(durationMinutes), now, existing.poll_id, existing.poll_id),
       db.prepare(
         'DELETE FROM social_poll_options WHERE poll_id = ? AND EXISTS (SELECT 1 FROM social_polls WHERE poll_id = ? AND updated_at = ?)',
       ).bind(existing.poll_id, existing.poll_id, now),
@@ -320,8 +326,8 @@ export async function configureContentPoll(
   const now = new Date().toISOString()
   const statements = [
     db.prepare(
-      'INSERT OR IGNORE INTO social_polls (poll_id, content_id, owner_user_id, duration_minutes, ends_at, created_at, updated_at) VALUES (?, ?, ?, ?, NULL, ?, ?)',
-    ).bind(pollId, contentId, actorUserId, durationMinutes, now, now),
+      'INSERT OR IGNORE INTO social_polls (poll_id, content_id, owner_user_id, duration_hours, duration_minutes, ends_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, NULL, ?, ?)',
+    ).bind(pollId, contentId, actorUserId, toLegacyDurationHours(durationMinutes), durationMinutes, now, now),
     ...options.map((text, position) => db.prepare(
       `INSERT OR IGNORE INTO social_poll_options (option_id, poll_id, option_text, position)
        SELECT ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM social_polls WHERE poll_id = ?)`,
