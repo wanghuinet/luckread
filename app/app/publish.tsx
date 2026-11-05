@@ -2379,7 +2379,7 @@ function PublishScreenContent() {
 }
 
 
-export default function PublishScreen {
+export default function PublishScreen() {
   return (
     <KeyboardProvider preload={false}>
       <PublishScreenContent />
