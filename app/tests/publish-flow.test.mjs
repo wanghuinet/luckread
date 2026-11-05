@@ -30,6 +30,8 @@ test('native publisher preserves pending media in app-private storage and restor
   expect(composer).toContain('listPendingMediaRecovery(user.id, null)');
   expect(composer).toContain('listPendingMediaRecovery(user.id, targetContentId)');
   expect(composer).toContain('bindPendingMediaRecoveryToDraft(');
+  expect(composer).toContain('markPendingMediaRecoveryUploaded(user.id, asset.localId, uploaded.url)');
+  expect(composer).toContain('asset.uploadedUrl && restoredMediaRefs.includes(asset.uploadedUrl)');
   expect(composer).toContain('deletePendingMediaRecoveryForDraft(user.id, draft.id)');
   expect(composer).toContain('上次上传中断。本机已保留文件，点击重试即可继续。');
   expect(composer).toContain('setAssets(pending.map((asset) => ({');
