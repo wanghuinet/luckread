@@ -162,6 +162,16 @@ export async function persistPendingMediaRecovery(
 
   const fileName = localId + '.' + getFileExtension(asset.filename, asset.mimeType);
   const destination = new File(directory, fileName);
+  const recordFile = getRecordFile(directory, localId);
+  let previousFileName: string | null = null;
+  if (recordFile.exists) {
+    try {
+      const previous = parseRecoveryRecord(await recordFile.text());
+      if (previous?.ownerKey === hashOwnerId(ownerId)) previousFileName = previous.fileName;
+    } catch {
+      previousFileName = null;
+    }
+  }
   const source = new File(asset.uri);
   if (!source.exists) {
     throw new Error('The selected media file is no longer available on this device.');
@@ -197,6 +207,10 @@ export async function persistPendingMediaRecovery(
     },
   };
   await writeRecord(directory, record);
+  if (previousFileName && previousFileName !== fileName) {
+    const previousFile = new File(directory, previousFileName);
+    if (previousFile.exists) previousFile.delete();
+  }
   return recoveredAsset;
 }
 
