@@ -403,6 +403,96 @@ function addOpenApiOperations(raw, missing) {
   }
   return { raw: next, added };
 }
+function ensureDiscoveryDraftPathParameters(raw) {
+  const lines = raw.split(/\r?\n/);
+  const insertions = [];
+  const methodLine = /^    (get|post|put|patch|delete|head|options|trace):\s*$/i;
+  const pathLine = /^  (\/[^:#]+):\s*$/;
+  const lowerFirst = (value) => value.charAt(0).toLowerCase() + value.slice(1);
+  const parameterRefName = (line) => {
+    const match = line.match(/#\/components\/parameters\/([A-Za-z0-9_-]+)/);
+    return match ? lowerFirst(match[1]) : null;
+  };
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const pathMatch = lines[index].match(pathLine);
+    if (!pathMatch) continue;
+    const rawPath = pathMatch[1];
+    const expected = pathParameterNames(rawPath);
+    if (!expected.length) continue;
+
+    let pathEnd = lines.length;
+    for (let cursor = index + 1; cursor < lines.length; cursor += 1) {
+      if (pathLine.test(lines[cursor]) || lines[cursor] === 'components:') {
+        pathEnd = cursor;
+        break;
+      }
+    }
+
+    const pathItemBlock = lines.slice(index + 1, pathEnd);
+    const pathParametersStart = pathItemBlock.findIndex((line) => line === '    parameters:');
+    const pathParameterNamesSet = new Set();
+    if (pathParametersStart >= 0) {
+      for (let cursor = pathParametersStart + 1; cursor < pathItemBlock.length; cursor += 1) {
+        if (/^    [A-Za-z][A-Za-z0-9_-]*:\s*$/.test(pathItemBlock[cursor])) break;
+        const nameMatch = pathItemBlock[cursor].match(/^\s+- name:\s*([A-Za-z0-9_-]+)/);
+        if (nameMatch) pathParameterNamesSet.add(nameMatch[1]);
+        const referenceName = parameterRefName(pathItemBlock[cursor]);
+        if (referenceName) pathParameterNamesSet.add(referenceName);
+      }
+    }
+
+    for (let cursor = index + 1; cursor < pathEnd; cursor += 1) {
+      if (!methodLine.test(lines[cursor])) continue;
+      let operationEnd = cursor + 1;
+      while (operationEnd < pathEnd && !methodLine.test(lines[operationEnd])) operationEnd += 1;
+      const operation = lines.slice(cursor, operationEnd);
+      if (!operation.some((line) => /^\s*x-luckread-contract-status:\s*DISCOVERY_DRAFT\s*$/.test(line))) {
+        cursor = operationEnd - 1;
+        continue;
+      }
+
+      const parametersStart = operation.findIndex((line) => line === '      parameters:');
+      let parametersEnd = operation.length;
+      const existing = new Set(pathParameterNamesSet);
+      if (parametersStart >= 0) {
+        parametersEnd = operation.findIndex((line, offset) => offset > parametersStart && /^      [A-Za-z][A-Za-z0-9_-]*:\s*$/.test(line));
+        if (parametersEnd < 0) parametersEnd = operation.length;
+        for (let offset = parametersStart + 1; offset < parametersEnd; offset += 1) {
+          const nameMatch = operation[offset].match(/^\s+- name:\s*([A-Za-z0-9_-]+)/);
+          if (nameMatch) existing.add(nameMatch[1]);
+          const referenceName = parameterRefName(operation[offset]);
+          if (referenceName) existing.add(referenceName);
+        }
+      }
+
+      const missing = expected.filter((name) => !existing.has(name));
+      if (missing.length) {
+        const parameterLines = [];
+        if (parametersStart < 0) parameterLines.push('      parameters:');
+        for (const name of missing) {
+          parameterLines.push(\`        - name: \${name}\`);
+          parameterLines.push('          in: path');
+          parameterLines.push('          required: true');
+          parameterLines.push("          schema: { $ref: '#/components/schemas/ResourceId' }");
+        }
+        const responseIndex = operation.findIndex((line) => line === '      responses:');
+        const insertAt = parametersStart >= 0
+          ? cursor + parametersEnd
+          : cursor + (responseIndex >= 0 ? responseIndex : operation.length);
+        insertions.push({ at: insertAt, lines: parameterLines });
+      }
+      cursor = operationEnd - 1;
+    }
+    index = pathEnd - 1;
+  }
+
+  for (const insertion of insertions.sort((left, right) => right.at - left.at)) {
+    lines.splice(insertion.at, 0, ...insertion.lines);
+  }
+  return lines.join('\n');
+}
+
 function buildOpenApiOperation({ operationId, method, canonicalPath, domain }) {
   const commerceBlock = buildCommerceOpenApiOperation({ operationId, method });
   if (commerceBlock) return commerceBlock;
@@ -485,7 +575,8 @@ for (const [key, record] of inventoryMap) {
   missingOpenApi.push({ operationId, method, path, domain: record.domain });
 }
 
-const { raw: openapiNext, added: addedToOpenApi } = addOpenApiOperations(openapiRaw, missingOpenApi);
+const { raw: openapiWithOperations, added: addedToOpenApi } = addOpenApiOperations(openapiRaw, missingOpenApi);
+const openapiNext = ensureDiscoveryDraftPathParameters(openapiWithOperations);
 if (openapiNext !== openapiRaw) fs.writeFileSync(`${root}/${openapiPath}`, openapiNext);
 
 
