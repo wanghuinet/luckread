@@ -6,6 +6,7 @@ const settings = readFileSync(new URL('../app/(drawer)/settings.tsx', import.met
 const about = readFileSync(new URL('../app/(drawer)/about.tsx', import.meta.url), 'utf8');
 const registration = readFileSync(new URL('../app/register.tsx', import.meta.url), 'utf8');
 const appConfig = JSON.parse(readFileSync(new URL('../app.json', import.meta.url), 'utf8'));
+const appPackage = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 
 test('Help and About is reachable from Settings and remains hidden from the drawer item list', () => {
   expect(settings).toContain('title="帮助与关于"');
@@ -32,10 +33,10 @@ test('About page explains unavailable support capabilities rather than showing d
 });
 
 test('About page reads app version and platform build information from native configuration', () => {
-  expect(about).toContain("Constants.expoConfig?.version?.trim()");
-  expect(about).toContain('Constants.platform?.android?.versionCode');
-  expect(about).toContain('Constants.platform?.ios?.buildNumber');
+  expect(about).toContain('Application.nativeApplicationVersion?.trim()');
+  expect(about).toContain('Application.nativeBuildVersion');
   expect(about).toContain('当前运行环境未提供');
+  expect(appPackage.dependencies['expo-application']).toBe('~58.1.2');
   expect(appConfig.expo.version).toBeTruthy();
 });
 
