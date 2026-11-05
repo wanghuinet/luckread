@@ -96,7 +96,7 @@ BEGIN
     CASE
       WHEN NEW.relation_type = 'series-member' THEN 'content.series.attached'
       WHEN NEW.relation_type = 'collection-member' THEN 'content.collection.attached'
-      WHEN NEW.relation_type = 'thread-next' THEN 'content.thread.next.attached'
+      WHEN NEW.relation_type = 'thread-next' THEN 'content.relationship.created'
       ELSE 'content.relationship.created'
     END,
     NEW.source_id,

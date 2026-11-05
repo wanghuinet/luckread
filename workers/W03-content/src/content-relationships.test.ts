@@ -23,14 +23,14 @@ describe('W03 content relationship foundation', () => {
     expect(migration).toContain('content.relationship.created')
     expect(migration).toContain('content.relationship.revoked')
     const threadMigration = readFileSync(
-      resolve(process.cwd(), 'workers/W03-content/migrations/0011_content_post_threads.sql'),
+      resolve(process.cwd(), 'workers/W03-content/migrations/0014_content_post_threads.sql'),
       'utf8',
     )
     expect(threadMigration).toContain("'thread-next'")
     expect(threadMigration).toContain('CREATE UNIQUE INDEX content_relationships_thread_next_unique_idx')
     expect(threadMigration).toContain('CREATE UNIQUE INDEX content_relationships_thread_previous_unique_idx')
     expect(threadMigration).toContain('FROM content_relationships;')
-    expect(threadMigration).toContain("'content.thread.next.attached'")
+    expect(threadMigration).toContain("'content.relationship.created'")
   })
 
   it('lists only active relationships between published content in one bounded D1 read', async () => {
