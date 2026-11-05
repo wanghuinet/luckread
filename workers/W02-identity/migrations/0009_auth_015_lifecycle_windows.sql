@@ -5,9 +5,11 @@
 -- Existing deletion lifecycle rows without timestamp provenance must block this migration.
 -- No user data is backfilled and no other table/Worker/Queue/Binding is created.
 
-CREATE TABLE auth_015_migration_guard_20261106 (
+CREATE TABLE IF NOT EXISTS auth_015_migration_guard_20261106 (
   marker INTEGER NOT NULL CHECK (marker = 1)
 );
+
+DELETE FROM auth_015_migration_guard_20261106;
 
 INSERT INTO auth_015_migration_guard_20261106 (marker)
 SELECT CASE
