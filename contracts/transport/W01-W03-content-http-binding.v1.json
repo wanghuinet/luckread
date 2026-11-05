@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://luckread.com/contracts/v1/transport/W01-W03-content-http-binding.v1.json",
   "title": "1.0 W01 to W03 Content Internal HTTP Binding",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "status": "CONTRACTED_PARTIAL",
   "caller": {
     "logicalWorker": "W01",
@@ -126,8 +126,8 @@
       "principalRequired": false,
       "serviceCaller": "W01 scheduled handler via the existing W03_CONTENT Service Binding",
       "maxBatchSize": 50,
-      "bodyAuthority": "Each item must contain the exact W03 candidate fields plus the fresh raw W08 ALLOW decision for content.publish.own. W03 validates policyVersion=casl-l0-l8-v1, layer L3/L4, action, resourceType, ownerUserId and creatorId equality. No caller-supplied user, layer, role or state is trusted.",
-      "finalMutation": "W03 performs the final D1-02 compare-and-set against id, owner_user_id, creator_id, state=SCHEDULED, scheduled_at (still due), and version before setting PUBLISHED and clearing scheduled_at.",
+      "bodyAuthority": "Each item must contain the exact W03 candidate fields, expectedCreatorId (the current stored creator_id, including null or the legacy ownerUserId placeholder), the canonical creatorId returned by W08, and that fresh W08 ALLOW decision. W03 validates policyVersion=casl-l0-l8-v1, layer L3/L4, action, resourceType, ownerUserId and canonical creatorId equality.",
+      "finalMutation": "W03 performs the final D1-02 compare-and-set against id, owner_user_id, expectedCreatorId (including NULL equality), state=SCHEDULED, scheduled_at (still due), and version before setting PUBLISHED, replacing creator_id with the W08 canonical creatorId, and clearing scheduled_at.",
       "idempotency": "Concurrent/duplicate executions converge through the final state/version/time/owner/creator CAS; a row that no longer matches is not published again.",
       "d1Owner": "W03 / D1-02 only"
     }
@@ -221,6 +221,7 @@
     "cronExpression": "* * * * *",
     "orchestration": "W01 reads due candidates from W03, obtains a fresh W08 ALLOW decision for each canonical creator identity, and submits only matching ALLOW decisions to the W03 final CAS endpoint.",
     "triggerOwnership": "The existing one-minute scheduled trigger is moved from W03 to W01; W03 has no scheduled trigger after this change. No additional Worker or trigger is created.",
-    "boundedWork": "At most 50 due candidates per tick; W01 limits W08 authorization concurrency to 8."
+    "boundedWork": "At most 50 due candidates per tick; W01 limits W08 authorization concurrency to 8.",
+    "legacyIdentityCompatibility": "For legacy scheduled records with creator_id NULL or creator_id=owner_user_id, W08 may resolve the W03-provided identity hint via an ACTIVE creators.user_id row. W01 verifies that W08 ownerUserId equals the W03 ownerUserId. W03 only replaces the exact expectedCreatorId in the final CAS; a different or transferred Creator identity is rejected."
   }
 }
