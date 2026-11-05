@@ -626,8 +626,10 @@
       "status": "MISSING",
       "authorization": {
         "required": true,
-        "permission": "account.delete.self",
-        "scope": "self"
+        "permission": "per_transition_from_account_state_machine",
+        "scope": "self",
+        "authority": "contracts/state-machines/account.json",
+        "enforcement": "W02 authorizeAccountStateTransition"
       },
       "resource": {
         "class": "SINGLE_AUTHORITATIVE_WRITE",
@@ -703,8 +705,10 @@
       "status": "MISSING",
       "authorization": {
         "required": true,
-        "permission": "account.delete.self",
-        "scope": "self"
+        "permission": "per_transition_from_account_state_machine",
+        "scope": "self",
+        "authority": "contracts/state-machines/account.json",
+        "enforcement": "W02 authorizeAccountStateTransition"
       },
       "resource": {
         "class": "SINGLE_AUTHORITATIVE_WRITE",
