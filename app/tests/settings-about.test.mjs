@@ -46,3 +46,10 @@ test('About page preserves accessibility and app theme support', () => {
   expect(about).toContain('dark:bg-black');
   expect(about).toContain('accessibilityLiveRegion="assertive"');
 });
+
+test('About page never substitutes OTA metadata for the installed native binary version or build', () => {
+  expect(about).toContain('Application.nativeApplicationVersion');
+  expect(about).toContain('Application.nativeBuildVersion');
+  expect(about).not.toContain('Updates.manifest');
+  expect(about).not.toContain('Updates.runtimeVersion');
+});
