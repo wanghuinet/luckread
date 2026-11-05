@@ -58,6 +58,14 @@ import {
   replaceActiveComposerToken,
 } from '~/lib/publish-composer-tokens';
 import { moveComposerAsset } from '~/lib/publish-composer-assets';
+import {
+  bindPendingMediaRecoveryToDraft,
+  deletePendingMediaRecovery,
+  deletePendingMediaRecoveryForDraft,
+  listPendingMediaRecovery,
+  markPendingMediaRecoveryUploaded,
+  persistPendingMediaRecovery,
+} from '~/lib/publish-pending-media-recovery';
 
 type ContentRecord = {
   id: string;
@@ -292,10 +300,56 @@ function PublishScreenContent() {
     setAssets((current) => current.map((asset) => asset.localId === localId ? { ...asset, ...patch } : asset));
   }, []);
 
+  const persistPendingAsset = useCallback(async (asset: ComposerAsset) => {
+    if (!user?.id || !asset.uri || !asset.uploadKey) {
+      throw new Error('The selected media cannot be saved for recovery on this account.');
+    }
+    return persistPendingMediaRecovery(
+      user.id,
+      draftId || contentId || recordRef.current?.id || null,
+      {
+        localId: asset.localId,
+        uri: asset.uri,
+        filename: asset.filename,
+        mimeType: asset.mimeType,
+        size: asset.size,
+        width: asset.width,
+        height: asset.height,
+        uploadKey: asset.uploadKey,
+        altText: asset.altText,
+      },
+    );
+  }, [contentId, draftId, user?.id]);
+
   const loadExistingContent = useCallback(async () => {
     const targetContentId = draftId || contentId;
     const restoringDraft = Boolean(draftId && !contentId);
-    if (!targetContentId || authStatus !== 'authenticated' || editLoadKeyRef.current === targetContentId) return;
+    if (authStatus !== 'authenticated' || !user?.id) return;
+    if (!targetContentId) {
+      if (editLoadKeyRef.current === '__new-composer__') {
+        draftSaveRestoreCompleteRef.current = true;
+        return;
+      }
+      editLoadKeyRef.current = '__new-composer__';
+      try {
+        const pending = await listPendingMediaRecovery(user.id, null);
+        if (pending.length > 0) {
+          setAssets(pending.map((asset) => ({
+            ...asset,
+            serverUrl: '',
+            status: 'failed',
+            error: '上次上传中断。本机已保留文件，点击重试即可继续。',
+          })));
+          setStatusMessage('已恢复上次未完成的媒体上传。');
+        }
+      } catch {
+        setErrorMessage('无法读取本机保存的待上传媒体，请重新选择文件。');
+      } finally {
+        draftSaveRestoreCompleteRef.current = true;
+      }
+      return;
+    }
+    if (editLoadKeyRef.current === targetContentId) return;
     editLoadKeyRef.current = targetContentId;
     setLoadingEdit(true);
     setErrorMessage('');
@@ -383,6 +437,24 @@ function PublishScreenContent() {
           existing: true,
         };
       });
+      const pendingRecoveries = await listPendingMediaRecovery(user.id, targetContentId).catch(() => []);
+      const alreadyAttachedRecoveries = pendingRecoveries.filter((asset) =>
+        Boolean(asset.uploadedUrl && restoredMediaRefs.includes(asset.uploadedUrl)),
+      );
+      await Promise.all(
+        alreadyAttachedRecoveries.map((asset) =>
+          deletePendingMediaRecovery(user.id, asset.localId).catch(() => undefined),
+        ),
+      );
+      const recoveredPendingAssets: ComposerAsset[] = pendingRecoveries
+        .filter((asset) => !alreadyAttachedRecoveries.some((attached) => attached.localId === asset.localId))
+        .map((asset) => ({
+        ...asset,
+        serverUrl: '',
+        status: 'failed',
+        error: '上次上传中断。本机已保留文件，点击重试即可继续。',
+      }));
+      const combinedRestoredAssets = [...restoredAssets, ...recoveredPendingAssets];
 
       originalAccessModeRef.current = loadedAccessMode;
       originalBodyRef.current = { text: restoredBody, bodyRef: record.bodyRef || null };
@@ -392,7 +464,7 @@ function PublishScreenContent() {
       replyAudienceSavedFingerprintRef.current = createReplyAudienceFingerprint(restoredBody, restoredReplyAudience);
       setCoverRef(record.coverRef || '');
       setMediaWarning(record.mediaWarning ?? null);
-      setAssets(restoredAssets);
+      setAssets(combinedRestoredAssets);
       pollConfiguredRef.current = Boolean(restoredPoll);
       setPollEnabled(Boolean(restoredPoll));
       setPollOptions(restoredPoll ? restoredPoll.options.map((option) => option.text) : ['', '']);
@@ -441,9 +513,27 @@ function PublishScreenContent() {
           width: asset.width,
           height: asset.height,
         };
-        const uploadFile = await prepareImageForUpload(file);
-        // Persist the prepared local URI and matching metadata before network I/O.
-        // A retry then uploads the exact same bytes with the same idempotency key.
+        let uploadFile = await prepareImageForUpload(file);
+        if (uploadFile.uri !== asset.uri) {
+          try {
+            const durableAsset = await persistPendingAsset({
+              ...asset,
+              uri: uploadFile.uri,
+              filename: uploadFile.name,
+              mimeType: uploadFile.mimeType,
+              size: uploadFile.size,
+              width: uploadFile.width,
+              height: uploadFile.height,
+            });
+            uploadFile = { ...uploadFile, uri: durableAsset.uri };
+          } catch {
+            // Optional image optimization must not make a previously durable
+            // original file unusable when device storage is nearly full.
+            uploadFile = file;
+          }
+        }
+        // Upload from the app-private persistent URI. The same URI, bytes,
+        // fingerprint and idempotency key survive a process restart.
         updateAsset(asset.localId, {
           uri: uploadFile.uri,
           filename: uploadFile.name,
@@ -453,6 +543,9 @@ function PublishScreenContent() {
           height: uploadFile.height,
         });
         uploaded = await uploadMediaFile(uploadFile, asset.uploadKey);
+        if (user?.id) {
+          await markPendingMediaRecoveryUploaded(user.id, asset.localId, uploaded.url).catch(() => undefined);
+        }
         updateAsset(asset.localId, {
           uploaded,
           altText: uploaded.alt || asset.altText || asset.filename,
@@ -486,7 +579,7 @@ function PublishScreenContent() {
       });
       return false;
     }
-  }, [updateAsset]);
+  }, [persistPendingAsset, updateAsset]);
 
   const addCapturedPhoto = useCallback(async (photo: CapturedCameraPhoto) => {
     if (busy || loadingEdit || publishPending) return;
@@ -508,22 +601,27 @@ function PublishScreenContent() {
       serverUrl: '',
       status: 'uploading',
     };
-    setAssets((current) => [...current, asset]);
     setCameraVisible(false);
     setErrorMessage('');
-    setStatusMessage('Uploading camera photo to LuckRead…');
+    setStatusMessage('Preparing camera photo for recoverable upload…');
     setBusy(true);
     try {
-      const succeeded = await uploadAsset(asset);
+      const durable = await persistPendingAsset(asset);
+      const durableAsset = { ...asset, uri: durable.uri };
+      setAssets((current) => [...current, durableAsset]);
+      const succeeded = await uploadAsset(durableAsset);
       setStatusMessage(
         succeeded
           ? 'Camera photo uploaded. Server media references are ready to publish.'
-          : 'Camera photo upload failed. Retry this file before publishing.',
+          : 'Camera photo upload failed. The file is saved on this device; retry it from the composer.',
       );
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'The camera photo could not be saved for recovery.');
+      setStatusMessage('');
     } finally {
       setBusy(false);
     }
-  }, [assets.length, busy, loadingEdit, publishPending, uploadAsset]);
+  }, [assets.length, busy, loadingEdit, persistPendingAsset, publishPending, uploadAsset]);
 
   const handleCameraCapture = useCallback((photo: CapturedCameraPhoto) => {
     setCameraVisible(false);
@@ -590,22 +688,38 @@ function PublishScreenContent() {
         status: 'uploading',
       };
     });
-    setAssets((current) => [...current, ...newAssets]);
     setErrorMessage('');
-    setStatusMessage('Uploading selected media to LuckRead…');
+    setStatusMessage('Saving selected media on this device…');
     setBusy(true);
+    const durableAssets: ComposerAsset[] = [];
     try {
+      for (const asset of newAssets) {
+        const durable = await persistPendingAsset(asset);
+        const durableAsset = { ...asset, uri: durable.uri };
+        durableAssets.push(durableAsset);
+        setAssets((current) => [...current, durableAsset]);
+      }
+      setStatusMessage('Uploading selected media to LuckRead…');
       const uploadResults: boolean[] = [];
-      for (const asset of newAssets) uploadResults.push(await uploadAsset(asset));
+      for (const asset of durableAssets) uploadResults.push(await uploadAsset(asset));
       if (uploadResults.every(Boolean)) {
         setStatusMessage('Media upload complete. Server media references are ready to publish.');
       } else {
-        setStatusMessage('Some media uploads failed. Retry failed files before publishing.');
+        setStatusMessage('Some media uploads failed. Files are saved on this device; retry them from the composer.');
       }
+    } catch (error) {
+      if (durableAssets.length > 0) {
+        const recoverableIds = new Set(durableAssets.map((asset) => asset.localId));
+        setAssets((current) => current.map((asset) => recoverableIds.has(asset.localId)
+          ? { ...asset, status: 'failed', error: '文件已保存在本机，但本次上传尚未开始。点击重试继续上传。' }
+          : asset));
+      }
+      setErrorMessage(error instanceof Error ? error.message : 'Selected media could not be saved for recovery.');
+      setStatusMessage('');
     } finally {
       setBusy(false);
     }
-  }, [assets, busy, loadingEdit, publishPending, uploadAsset]);
+  }, [assets, busy, loadingEdit, persistPendingAsset, publishPending, uploadAsset]);
 
   const retryAsset = useCallback(async (asset: ComposerAsset) => {
     setBusy(true);
@@ -635,11 +749,14 @@ function PublishScreenContent() {
     const target = assets.find((asset) => asset.localId === localId);
     const nextAssets = assets.filter((asset) => asset.localId !== localId);
     setAssets(nextAssets);
+    if (target && !target.existing && user?.id) {
+      void deletePendingMediaRecovery(user.id, target.localId).catch(() => undefined);
+    }
     if (nextAssets.length === 0) setMediaWarning(null);
     if (target && coverRef === target.serverUrl) {
       setCoverRef(nextAssets.find((asset) => asset.mimeType.startsWith('image/'))?.serverUrl || '');
     }
-  }, [assets, busy, coverRef, mediaWarning, publishPending]);
+  }, [assets, busy, coverRef, mediaWarning, publishPending, user?.id]);
 
   const moveAsset = useCallback((localId: string, direction: -1 | 1) => {
     if (busy || publishPending) return;
@@ -842,10 +959,10 @@ function PublishScreenContent() {
   );
 
   const saveDraftSnapshot = useCallback(async () => {
-    if (contentId || loadingEdit || publishPending || authStatus !== 'authenticated') return;
+    const ownerId = user?.id;
+    if (contentId || loadingEdit || publishPending || authStatus !== 'authenticated' || !ownerId) return;
     const trimmedBody = body.trim();
     if (!trimmedBody || trimmedBody.length > MAX_TEXT_LENGTH) return;
-    if (assets.some((asset) => !asset.existing && asset.status !== 'ready')) return;
     if (pollEnabled) {
       const cleanOptions = pollOptions.map((option) => option.normalize('NFKC').trim());
       const optionKeys = cleanOptions.map((option) => option.toLocaleLowerCase('en-US'));
@@ -858,12 +975,20 @@ function PublishScreenContent() {
         throw new Error('A poll needs 2–4 different, non-empty options. Complete the poll before saving the draft.');
       }
     }
-    if (assets.some((asset) => !asset.serverUrl || !/^https?:\/\//i.test(asset.serverUrl))) return;
+    const pendingAssets = assets.filter((asset) => !asset.existing && asset.status !== 'ready');
+    if (pendingAssets.some((asset) => !asset.uri || !asset.uploadKey)) {
+      throw new Error('An unfinished attachment is missing its local recovery file. Remove it or select it again.');
+    }
+    // Picker and camera flows already copied these files to persistent
+    // storage. Draft autosave only binds their IDs after the server draft exists;
+    // it must not race a concurrent image-optimization replacement.
+    const readyAssets = assets.filter((asset) => asset.existing || asset.status === 'ready');
+    if (readyAssets.some((asset) => !asset.serverUrl || !/^https?:\/\//i.test(asset.serverUrl))) return;
 
-    const mediaRefs = Array.from(new Set(assets.map((asset) => asset.serverUrl)));
+    const mediaRefs = Array.from(new Set(readyAssets.map((asset) => asset.serverUrl)));
     const nextCover = coverRef && mediaRefs.includes(coverRef)
       ? coverRef
-      : assets.find((asset) => asset.mimeType.startsWith('image/'))?.serverUrl || null;
+      : readyAssets.find((asset) => asset.mimeType.startsWith('image/'))?.serverUrl || null;
     const fingerprint = createPublishDraftFingerprint({
       body: trimmedBody,
       accessMode,
@@ -879,7 +1004,14 @@ function PublishScreenContent() {
       recordRef.current?.id &&
       draftSavedFingerprintRef.current === fingerprint &&
       replyAudienceSavedFingerprintRef.current === replyAudienceFingerprint
-    ) return;
+    ) {
+      await bindPendingMediaRecoveryToDraft(
+        ownerId,
+        recordRef.current.id,
+        pendingAssets.map((asset) => asset.localId),
+      );
+      return;
+    }
 
     let bodyRef = originalBodyRef.current.text === trimmedBody
       ? originalBodyRef.current.bodyRef
@@ -1054,6 +1186,20 @@ function PublishScreenContent() {
       }
       replyAudienceSavedFingerprintRef.current = replyAudienceFingerprint;
     }
+    // Pending files remain local and recoverable; only permanent media refs are
+    // written to W03. Once ready refs are safely saved, their local copies can
+    // be removed without affecting the server draft.
+    await bindPendingMediaRecoveryToDraft(
+      ownerId,
+      draft.id,
+      pendingAssets.map((asset) => asset.localId),
+    );
+    await Promise.all(
+      readyAssets
+        .filter((asset) => !asset.existing)
+        .map((asset) => deletePendingMediaRecovery(ownerId, asset.localId).catch(() => undefined)),
+    );
+
     // Only mark the content fingerprint saved after content, poll and reply policy succeed.
     draftSavedFingerprintRef.current = fingerprint;
     originalBodyRef.current = { text: trimmedBody, bodyRef };
@@ -1066,12 +1212,14 @@ function PublishScreenContent() {
     coverRef,
     loadingEdit,
     mediaWarning,
+    persistPendingAsset,
     pollDurationMinutes,
     pollEnabled,
     pollOptions,
     publishPending,
     replyAudience,
     router,
+    user?.id,
   ]);
 
   const scheduleDraftAutoSave = useCallback(() => {
@@ -1086,8 +1234,7 @@ function PublishScreenContent() {
       !body.trim() ||
       body.trim().length > MAX_TEXT_LENGTH ||
       loadingEdit ||
-      publishPending ||
-      assets.some((asset) => !asset.existing && asset.status !== 'ready')
+      publishPending
     ) {
       setDraftSaveStatus('idle');
       return;
@@ -1101,7 +1248,6 @@ function PublishScreenContent() {
       if (
         changeToken !== draftSaveChangeTokenRef.current ||
         draftSaveInFlightRef.current ||
-        busy ||
         !draftSaveDirtyRef.current
       ) {
         return;
@@ -1135,7 +1281,6 @@ function PublishScreenContent() {
   }, [
     assets,
     body,
-    busy,
     contentId,
     loadingEdit,
     publishPending,
@@ -1376,6 +1521,9 @@ function PublishScreenContent() {
             try {
               const result = await deleteOwnPostDraft(draft.id, draft.etag);
               if (!result.response.ok) throw new Error(apiFailureDiagnostic(result, '删除草稿失败。'));
+              if (user?.id) {
+                await deletePendingMediaRecoveryForDraft(user.id, draft.id).catch(() => undefined);
+              }
               setDraftInboxItems((current) => current.filter((item) => item.id !== draft.id));
               if (recordRef.current?.id === draft.id) {
                 recordRef.current = null;
@@ -1404,7 +1552,7 @@ function PublishScreenContent() {
         },
       },
     ]);
-  }, [loadDraftInbox, router]);
+  }, [loadDraftInbox, router, user?.id]);
 
   const insertComposerToken = useCallback((value: string) => {
     const token = findActiveComposerToken(body, textSelection.start);
@@ -1537,12 +1685,12 @@ function PublishScreenContent() {
         Alert.alert('请稍候', '当前操作尚未完成，完成后再关闭发布窗口。');
         return;
       }
-      if (assets.some((asset) => !asset.existing && asset.status !== 'ready')) {
-        setErrorMessage('媒体仍未全部上传成功，请重试或移除失败附件后再关闭。');
+      if (contentId && assets.some((asset) => !asset.existing && asset.status !== 'ready')) {
+        setErrorMessage('编辑中的媒体尚未全部上传。请重试或移除失败附件后再退出，避免丢失尚未保存的修改。');
         return;
       }
-      if (!body.trim() && (assets.length > 0 || pollEnabled)) {
-        setErrorMessage('请先填写动态正文，再保存或关闭这份草稿。');
+      if (!body.trim() && pollEnabled) {
+        setErrorMessage('请先填写动态正文，再保存这份投票草稿。');
         return;
       }
       if (body.trim()) {
@@ -1563,7 +1711,7 @@ function PublishScreenContent() {
       }
       navigation.dispatch(data.action);
     })();
-  }, [assets, body, busy, loadingEdit, navigation, pollEnabled, publishPending, saveDraftSnapshot]);
+  }, [assets, body, busy, contentId, loadingEdit, navigation, pollEnabled, publishPending, saveDraftSnapshot]);
 
   const closeComposer = useCallback(() => {
     if (busy || loadingEdit || publishPending) {
@@ -1738,6 +1886,13 @@ function PublishScreenContent() {
           throw new Error(apiFailureDiagnostic(replyPolicyResult, 'Post changes were saved, but reply permissions could not be updated.'));
         }
         replyAudienceSavedFingerprintRef.current = replyAudienceFingerprint;
+        if (user?.id) {
+          await Promise.all(
+            assets
+              .filter((asset) => !asset.existing)
+              .map((asset) => deletePendingMediaRecovery(user.id, asset.localId).catch(() => undefined)),
+          );
+        }
         const socialSyncWarning = recordRef.current?.state === 'PUBLISHED'
           ? await syncPublishedSocialTokens(contentId, trimmedBody)
           : null;
@@ -1959,7 +2114,7 @@ function PublishScreenContent() {
     } finally {
       setBusy(false);
     }
-  }, [accessMode, assets, body, contentId, coverRef, mediaWarning, pollDurationMinutes, pollEnabled, pollOptions, publishPending, replyAudience, router, saveDraftSnapshot, savePendingAssetAltText, scheduleDate, scheduleEnabled, syncPublishedSocialTokens]);
+  }, [accessMode, assets, body, contentId, coverRef, mediaWarning, pollDurationMinutes, pollEnabled, pollOptions, publishPending, replyAudience, router, saveDraftSnapshot, savePendingAssetAltText, scheduleDate, scheduleEnabled, syncPublishedSocialTokens, user?.id]);
 
   if (authStatus !== 'authenticated') {
     return (
