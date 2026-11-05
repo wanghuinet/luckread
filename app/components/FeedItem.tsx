@@ -192,8 +192,10 @@ const FeedMediaGallery = ({
     const [viewerStartIndex, setViewerStartIndex] = useState<number | null>(null);
     const [viewerIndex, setViewerIndex] = useState(0);
     const [resolvedAltText, setResolvedAltText] = useState<Record<string, string>>({});
-    const [mediaRevealed, setMediaRevealed] = useState(false);
     const mediaSourceKey = JSON.stringify(items.map((media) => media.src));
+    const mediaRevealKey = (mediaWarning ?? 'none') + ':' + mediaSourceKey;
+    const [revealedMediaKey, setRevealedMediaKey] = useState<string | null>(null);
+    const mediaRevealed = !mediaWarning || revealedMediaKey === mediaRevealKey;
     const { width, height } = useWindowDimensions();
     const insets = useSafeAreaInsets();
     const altTextRequestKey = JSON.stringify(
@@ -218,10 +220,6 @@ const FeedMediaGallery = ({
             controller.abort();
         };
     }, [altTextRequestKey, mediaWarning, mediaRevealed]);
-
-    useEffect(() => {
-        setMediaRevealed(false);
-    }, [mediaWarning, mediaSourceKey]);
 
     if (items.length === 0) return null;
 
@@ -289,7 +287,7 @@ const FeedMediaGallery = ({
                     accessibilityLabel="查看可能含有敏感内容的媒体"
                     accessibilityHint="媒体由作者标记了内容警告。点击后查看。"
                     activeOpacity={0.9}
-                    onPress={() => setMediaRevealed(true)}
+                    onPress={() => setRevealedMediaKey(mediaRevealKey)}
                     className={detailView
                         ? "mt-4 min-h-[220px] w-full items-center justify-center gap-3 rounded-xl bg-neutral-900 px-6 py-8"
                         : "mt-2 min-h-[220px] w-full items-center justify-center gap-3 rounded-xl bg-neutral-900 px-6 py-8"}
