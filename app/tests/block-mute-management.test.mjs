@@ -69,6 +69,15 @@ test('isolates relationship lists and pending mutations when the signed-in accou
   expect(screenSource).toContain("setRefreshing(false)");
 });
 
+test('isolates stale reads and confirmation callbacks after same-account reauthentication', () => {
+  expect(screenSource).toContain("const authUser = useAuthStore((state) => state.user)");
+  expect(screenSource).toContain('authUserRef.current !== authUser');
+  expect(screenSource).toContain('authUserRef.current === authUser');
+  expect(screenSource).toContain('const operationUser = authUser');
+  expect(screenSource).toContain('authUserRef.current !== operationUser');
+  expect(screenSource).toContain('[accountId, authStatus, authUser, kind, router]');
+});
+
 test('returns to the intended settings route when a block or mute read expires', () => {
   expect(screenSource).toContain("router.replace(('/login?returnTo=' + encodeURIComponent('/blocked-muted')) as never)");
   expect(screenSource).toContain('accessibilityRole="alert"');
