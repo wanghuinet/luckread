@@ -130,7 +130,7 @@ describe('unified W05 social closure adapters', () => {
     const worker = read('../../workers/W05-social/src/index.ts')
     const runtime = read('../../workers/W05-social/src/poll-runtime.ts')
     const migration = read('../../workers/W05-social/migrations/20261017_014_social_polls_v1.sql')
-    const durationMigration = read('../../workers/W05-social/migrations/20261105_016_social_poll_duration_minutes.sql')
+    const durationMigration = read('../../workers/W05-social/migrations/20261105_018_social_poll_duration_minutes.sql')
 
     expect(pollRoute).toContain('/internal/social/contents/')
     expect(pollRoute).toContain('resolveCookieSocialPrincipal')
