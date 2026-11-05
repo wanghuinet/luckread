@@ -10,10 +10,11 @@ test('registers one discoverable Settings & privacy route from the main drawer',
   expect(drawer).toContain('<Drawer.Screen name="settings"');
 });
 
-test('settings home links only to existing profile, notification and block/mute destinations', () => {
+test('settings home links only to existing profile, notification, block/mute and help/about destinations', () => {
   expect(screen).toContain("router.push('/profile' as never)");
   expect(screen).toContain("router.push('/notification-preferences' as never)");
   expect(screen).toContain("router.push('/blocked-muted' as never)");
+  expect(screen).toContain("router.push('/about' as never)");
   expect(screen).not.toContain('showUnavailable');
   expect(screen).not.toContain('TODO');
 });
