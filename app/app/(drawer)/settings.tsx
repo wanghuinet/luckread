@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import {
@@ -9,9 +9,9 @@ import {
 import { Stack, useRouter } from 'expo-router';
 import { useColorScheme } from 'nativewind';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as SecureStore from 'expo-secure-store';
 
-import { isThemePreference, THEME_PREFERENCE_KEY, type ThemePreference } from '~/lib/theme-preference';
+import { type ThemePreference } from '~/lib/theme-preference';
+import { useThemePreferenceStore } from '~/lib/theme-preference-store';
 import { useAuthStore } from '~/store/auth-store';
 
 type SettingsRowProps = {
@@ -78,19 +78,22 @@ function ThemeModeOption({
   value,
   selected,
   onPress,
+  disabled,
 }: {
   label: string;
   value: ThemePreference;
   selected: boolean;
   onPress: (value: ThemePreference) => void;
+  disabled: boolean;
 }) {
   return (
     <Pressable
       accessibilityRole="radio"
-      accessibilityState={{ selected }}
+      accessibilityState={{ selected, disabled }}
       accessibilityLabel={label}
+      disabled={disabled}
       onPress={() => onPress(value)}
-      className="min-h-[56px] flex-row items-center justify-between px-1"
+      className={disabled ? 'min-h-[56px] flex-row items-center justify-between px-1 opacity-50' : 'min-h-[56px] flex-row items-center justify-between px-1'}
     >
       <Text className="text-[16px] text-neutral-900 dark:text-neutral-100">{label}</Text>
       <View
@@ -112,32 +115,22 @@ export default function SettingsScreen() {
   const isDark = colorScheme === 'dark';
   const authStatus = useAuthStore((state) => state.status);
   const user = useAuthStore((state) => state.user);
-  const [themePreference, setThemePreference] = useState<ThemePreference>('system');
+  const themePreference = useThemePreferenceStore((state) => state.preference);
+  const hydrateThemePreference = useThemePreferenceStore((state) => state.hydrate);
+  const saveThemePreference = useThemePreferenceStore((state) => state.savePreference);
+  const themeSaving = useThemePreferenceStore((state) => state.saving);
+  const themeError = useThemePreferenceStore((state) => state.error);
   const themeSheetRef = useRef<BottomSheetModal>(null);
   const themeSnapPoints = useMemo(() => ['36%'], []);
 
   useEffect(() => {
-    let active = true;
-    void SecureStore.getItemAsync(THEME_PREFERENCE_KEY)
-      .then((savedPreference) => {
-        if (active && isThemePreference(savedPreference)) setThemePreference(savedPreference);
-      })
-      .catch(() => undefined);
-    return () => {
-      active = false;
-    };
-  }, []);
+    void hydrateThemePreference();
+  }, [hydrateThemePreference]);
 
   const selectTheme = useCallback(async (preference: ThemePreference) => {
-    setThemePreference(preference);
-    setColorScheme(preference);
-    try {
-      await SecureStore.setItemAsync(THEME_PREFERENCE_KEY, preference);
-    } catch {
-      // The selected mode still applies for this session if secure storage is unavailable.
-    }
-    themeSheetRef.current?.dismiss();
-  }, [setColorScheme]);
+    const saved = await saveThemePreference(preference);
+    if (saved) themeSheetRef.current?.dismiss();
+  }, [saveThemePreference]);
 
   const themeLabel = themePreference === 'light'
     ? '浅色'
@@ -244,9 +237,15 @@ export default function SettingsScreen() {
       >
         <BottomSheetView className="flex-1 bg-white px-6 pt-2 dark:bg-black">
           <Text className="mb-3 text-lg font-bold text-neutral-900 dark:text-neutral-100">外观</Text>
-          <ThemeModeOption label="浅色" value="light" selected={themePreference === 'light'} onPress={selectTheme} />
-          <ThemeModeOption label="深色" value="dark" selected={themePreference === 'dark'} onPress={selectTheme} />
-          <ThemeModeOption label="跟随系统设置" value="system" selected={themePreference === 'system'} onPress={selectTheme} />
+          <ThemeModeOption label="浅色" value="light" selected={themePreference === 'light'} onPress={selectTheme} disabled={themeSaving} />
+          <ThemeModeOption label="深色" value="dark" selected={themePreference === 'dark'} onPress={selectTheme} disabled={themeSaving} />
+          <ThemeModeOption label="跟随系统设置" value="system" selected={themePreference === 'system'} onPress={selectTheme} disabled={themeSaving} />
+          {themeSaving ? (
+            <Text className="mt-2 text-center text-xs text-neutral-500">正在保存外观设置…</Text>
+          ) : null}
+          {themeError ? (
+            <Text accessibilityRole="alert" className="mt-2 text-sm text-rose-600">{themeError}</Text>
+          ) : null}
         </BottomSheetView>
       </BottomSheetModal>
     </View>
