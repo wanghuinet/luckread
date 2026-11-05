@@ -1909,6 +1909,84 @@ describe('W03 content contract core', () => {
     expect(statements).toHaveLength(1);
   });
 
+  it('lists only the authenticated Creator\'s scheduled social posts and returns edit preconditions', async () => {
+    const statements: Array<{ query: string; bindings: unknown[] }> = []
+    const row = {
+      id: 'scheduled_post_123',
+      content_type: 'post',
+      owner_user_id: 'creator_owner_123',
+      creator_id: 'creator_123',
+      ip_id: null,
+      state: 'SCHEDULED',
+      scheduled_at: '2026-11-08T18:30:00.000Z',
+      access_mode: 'PUBLIC',
+      version: 4,
+      revision: 2,
+      slug: 'scheduled-post-123',
+      title: 'Scheduled post',
+      body_ref: 'https://img.luckread.com/body.txt',
+      media_refs_json: JSON.stringify(['https://img.luckread.com/photo.jpg']),
+      cover_ref: 'https://img.luckread.com/photo.jpg',
+      etag: 'W/"4"',
+      created_at: '2026-11-05T10:00:00.000Z',
+      updated_at: '2026-11-05T10:05:00.000Z',
+    }
+    const db = {
+      prepare(query: string) {
+        return {
+          bind: (...bindings: unknown[]) => ({
+            all: async () => {
+              statements.push({ query, bindings })
+              return { results: [row] }
+            },
+          }),
+        }
+      },
+    } as never
+    const makeRequest = (layer = 'L3', query = '?status=SCHEDULED&type=post&limit=20') =>
+      new Request('https://luckread-w03.internal/internal/content/contents' + query, {
+        headers: {
+          'X-LuckRead-Caller': 'W01',
+          'X-LuckRead-Transport-Version': '1.0',
+          'X-LuckRead-Correlation-Id': 'native-scheduled-list',
+          'X-LuckRead-Principal-User-Id': 'creator_owner_123',
+          'X-LuckRead-Principal-Layer': layer,
+        },
+      })
+
+    const response = await w03Worker.fetch(makeRequest(), { D1_02: db }, {} as never)
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      data: {
+        items: [{
+          id: 'scheduled_post_123',
+          contentType: 'post',
+          state: 'SCHEDULED',
+          version: 4,
+          etag: 'W/"4"',
+          scheduledAt: '2026-11-08T18:30:00.000Z',
+          bodyRef: 'https://img.luckread.com/body.txt',
+          mediaRefs: ['https://img.luckread.com/photo.jpg'],
+          coverRef: 'https://img.luckread.com/photo.jpg',
+        }],
+        hasMore: false,
+        nextCursor: null,
+      },
+    })
+    expect(statements).toHaveLength(1)
+    expect(statements[0]?.query).toContain('owner_user_id = ?')
+    expect(statements[0]?.query).toContain('state = ?')
+    expect(statements[0]?.query).toContain('content_type = ?')
+    expect(statements[0]?.bindings.slice(0, 3)).toEqual(['creator_owner_123', 'SCHEDULED', 'post'])
+
+    const readsBeforeDeny = statements.length
+    const l2Denied = await w03Worker.fetch(makeRequest('L2'), { D1_02: db }, {} as never)
+    expect(l2Denied.status).toBe(403)
+    const wrongType = await w03Worker.fetch(makeRequest('L3', '?status=SCHEDULED&type=article'), { D1_02: db }, {} as never)
+    expect(wrongType.status).toBe(400)
+    expect(statements).toHaveLength(readsBeforeDeny)
+  })
+
   it('returns the canonical error envelope for an unmatched internal route', async () => {
     const db = {
       prepare() {
