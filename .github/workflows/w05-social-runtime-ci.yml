@@ -211,7 +211,7 @@ jobs:
           db.execute("INSERT INTO social_poll_votes VALUES ('v1','p24','o1','u2','voted')")
           db.executescript(upgrade.read_text())
           columns = [row[1] for row in db.execute('PRAGMA table_info("social_polls")').fetchall()]
-          expected = ['poll_id','content_id','owner_user_id','duration_minutes','ends_at','created_at','updated_at']
+          expected = ['poll_id','content_id','owner_user_id','duration_hours','ends_at','created_at','updated_at','duration_minutes']
           if columns != expected:
               raise SystemExit(f'unexpected poll duration schema: {columns}')
           durations = dict(db.execute('SELECT poll_id, duration_minutes FROM social_polls').fetchall())
@@ -229,8 +229,8 @@ jobs:
           for invalid in [4, 10081]:
               try:
                   db.execute(
-                      "INSERT INTO social_polls VALUES (?,?,?,?,?,?,?)",
-                      ('bad'+str(invalid),'bad'+str(invalid),'u1',invalid,None,'created','updated'),
+                      "INSERT INTO social_polls (poll_id,content_id,owner_user_id,duration_hours,duration_minutes,ends_at,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)",
+                      ('bad'+str(invalid),'bad'+str(invalid),'u1',24,invalid,None,'created','updated'),
                   )
               except sqlite3.IntegrityError:
                   continue
