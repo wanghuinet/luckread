@@ -1,6 +1,6 @@
 # LuckRead APP Settings & Privacy Center Contract v1.0
 
-**Status:** PRE-DEVELOPMENT / PRODUCT-CONTRACT-READY / IMPLEMENTATION-NOT-STARTED  
+**Status:** IMPLEMENTATION-IN-PROGRESS / SETTINGS HOME, NOTIFICATIONS, BLOCK-MUTE AND APPEARANCE MERGED / NATIVE SESSION MANAGEMENT IN REVIEW  
 **Target:** LuckRead native APP (Android + iOS), 1.0 baseline  
 **Reference experience:** X mobile + Threads mobile  
 **Related contracts:**  
@@ -12,7 +12,7 @@
 
 ## 1. Purpose and Decision
 
-This document defines the APP settings experience before implementation. It turns the existing broad User Center contract into a screen-level product, navigation, ownership, security, and acceptance contract.
+This document defines the APP settings experience and its implementation/admission rules for the 1.0 release. It turns the existing broad User Center contract into a screen-level product, navigation, ownership, security, and acceptance contract; implementation status is tracked in sections 4 and 16.
 
 The target is the **control quality and information architecture** of X and Threads, not a pixel-for-pixel copy of either product. LuckRead keeps its own visual identity and domain boundaries.
 
@@ -71,28 +71,29 @@ Availability of reference features can vary by country, age, account type, and r
 
 ## 4. Existing LuckRead Baseline (Main Branch Inspection)
 
-Inspected repository: `wanghuinet/luckread`, default branch `main`. The inspected main snapshot is anchored to the latest commit observed during this review: `1754cb5e5d7efc99d789512bfe2d801d478dccf4` (2026-11-05). No open PR was returned by the open-PR queries during this inspection.
+Inspected repository: `wanghuinet/luckread`, default branch `main`. The baseline for this update is `340adef1efb89c14604a5aaed7f7c3a93090e281` (2026-11-05 10:33:22 UTC). No open PR was returned by the open-PR query at that baseline. The settings home/navigation is merged in PR #1553; notification preference API/security integration is merged in PR #1554.
 
 ### 4.1 Existing APP behavior found
 
 | Existing surface | Repository evidence | Current behavior | Contract treatment |
 |---|---|---|---|
-| Drawer menu | `app/app/(drawer)/_layout.tsx` | Provides separate notification and block/mute links, a quick theme picker, and an account bottom sheet | Consolidate discoverability under Settings; preserve the existing behavior and routes |
-| Notification preferences | `app/app/(drawer)/notification-preferences.tsx` | Account-level toggles for new followers, likes, comments and mentions; explicit native push permission / token synchronization and system notification settings entry | Reuse as the first notification subpage; expand only after checking the notification API contract |
+| Drawer menu | `app/app/(drawer)/_layout.tsx` | Provides a discoverable Settings & privacy entry and retains profile/account actions | Keep one settings entry; do not duplicate notification or privacy controls in the drawer |
+| Settings home | `app/app/(drawer)/settings.tsx` | Groups profile, security, notification and appearance destinations; stores light/dark/system preference locally | Reuse as the single settings index; add only routes whose API and behavior are admitted |
+| Notification preferences | `app/app/(drawer)/notification-preferences.tsx`, `app/lib/notification-preferences-api.ts` | Account-level toggles for new followers, likes, comments and mentions; explicit native push permission / token synchronization and system notification settings entry | Reuse the existing screen and W01/W05/W06-backed preference API; do not fork state |
 | Blocked / muted management | `app/app/(drawer)/blocked-muted.tsx` | Reads managed social relationships, paginates, resolves public profiles, and supports unblock/unmute | Reuse as the Privacy & safety > Blocked and muted destination |
-| Theme preference | `app/lib/theme-preference.ts`, drawer theme sheet, `app/app/_layout.tsx` | Supports light, dark and system theme; preference is currently stored on-device using SecureStore | Reuse the three-state preference; decide explicitly whether future account sync is needed |
+| Theme preference | `app/lib/theme-preference.ts`, `app/app/(drawer)/settings.tsx`, `app/app/_layout.tsx` | Supports light, dark and system theme; preference is stored on-device using SecureStore and selected from Settings | Reuse the three-state preference; do not create a second appearance control |
 | User Center architecture | `docs/72-USER-CENTER-PROFILE-SETTINGS-AND-ACCOUNT-LIFECYCLE-CONTRACT-v1.0.md` | Defines account, security, privacy, notifications, preferences, sessions, export and account lifecycle responsibilities | This document specializes its APP navigation and acceptance criteria; it does not replace domain ownership |
 
-### 4.2 Important gaps from the inspected APP entry points
+### 4.2 Current gaps and admission boundaries
 
 These are **not confirmed complete** merely because the broader User Center contract describes them:
 
-- There is no single Settings home in the inspected drawer route.
+- The unified Settings home now exists; security, privacy and account lifecycle subpages still require their own API/evidence admission.
 - The account bottom sheet is primarily login/logout; it is not a complete account/security center.
 - Notification settings currently expose four activity preferences; broader categories, quiet hours, filters, and email controls require separate capability verification.
 - Theme selection exists, but the full display/accessibility/data-usage area is not established by the inspected files.
 - Block/mute management exists; privacy controls such as account visibility, discoverability, message requests, reply/mention permissions, hidden words, sensitive content, and read receipts need endpoint/authority verification.
-- Session listing/revocation, login history, two-factor or passkey controls, data export, deactivation, and deletion must not be described as available until the actual implementation and runtime path are verified.
+- The web app already has a W01/W02 session-list and per-session revoke path. The native session screen is being added in this PR using those existing operations. Login/security history, two-factor/passkey controls, password/identity changes, data export, deactivation, and deletion remain unavailable until their native paths and required runtime/security evidence are admitted.
 
 **Evidence rule:** code presence is not production acceptance. Each existing surface still needs source-level tests and real authenticated APP verification on the exact merged build.
 
@@ -172,6 +173,7 @@ Not every proposed row must appear in 1.0. A row is visible only when its end-to
 | SET-006 | Appearance | Light, dark and follow-system behavior; preserve current setting after relaunch | Reuse current theme preference implementation; ensure every settings subpage follows the global theme |
 | SET-007 | Help and app information | Provide working help/report/policy links and visible app version/build information | Use verified destinations; no placeholder buttons |
 | SET-008 | Settings states | Loading, empty, saved, retry, permission-denied, expired-session and server-error states | Apply the shared UX contract in section 12 |
+| SET-009 | Device and session management | Show the current session and paginated valid sessions; allow revoking an individual other session after confirmation | Reuse existing W01 `GET /v1/auth/sessions` and `DELETE /v1/auth/sessions/{sessionId}`; retain W02 as session authority and the shared APP API client |
 
 ### 6.2 P0 conditional controls — include only after API verification
 
@@ -183,7 +185,7 @@ These are important X/Threads parity controls but require a domain/API audit bef
 - hidden words / phrase filters;
 - sensitive-content preference;
 - notification pause/quiet hours and quality filters;
-- session list and individual/all-other-session revocation;
+- all-other-session bulk revocation and login/security history;
 - password/identity changes and step-up verification;
 - language, text size and reduced-motion preferences;
 - content-interest and recommendation controls.
@@ -210,7 +212,7 @@ Do not block APP 1.0 on the following advanced controls unless a separate produc
 - Primary entry: profile/avatar drawer > **Settings & privacy**.
 - Secondary entry: account/profile area > settings shortcut.
 - Do not add a permanent bottom-tab item for Settings.
-- Notification settings and block/mute must be reachable from the central Settings hierarchy.
+- Notification settings, block/mute, and device/session management must be reachable from the central Settings hierarchy.
 - Existing deep links must remain valid during migration. The existing `/notification-preferences` and `/blocked-muted` routes must either remain the canonical subpages or route safely to their new canonical locations.
 
 ### 7.2 Home page layout
@@ -399,6 +401,7 @@ A setting is not DONE because the screen renders. Each applicable row must pass:
 8. Switch accounts and verify no previous account's settings appear, even briefly.
 9. Simulate offline/timeout/401/403/5xx during reads and writes; verify clear errors and safe recovery.
 10. Verify no visible 1.0 setting is a nonfunctional placeholder.
+11. Open Device & sessions, verify the current session cannot be revoked from this page, revoke a second session, refresh and verify it remains absent; test pagination, 401, 403, 429 and 5xx behavior.
 
 ### 15.2 Conditional settings acceptance
 
@@ -408,17 +411,17 @@ For every conditional feature admitted into 1.0, add positive, negative, permiss
 
 Implementation must proceed in small, reviewable increments. Complete and verify one module, stop, report evidence and remaining work, and wait for the next instruction.
 
-| Step | Module | Exit condition |
-|---|---|---|
-| 0 | Read-only implementation inventory | Exact route/API/test/owner matrix exists; no code change |
-| 1 | Settings home and navigation | One discoverable root; existing routes continue to work |
-| 2 | Notification preferences integration | Existing four preferences and OS push permission work end-to-end |
-| 3 | Blocked/muted integration | Existing lists/actions accessible from Privacy & safety with no duplicate state |
-| 4 | Appearance integration | Light/dark/system centralized and consistent after relaunch |
-| 5 | Account/security admission | Only verified W02 account/session controls are shown and tested |
-| 6 | Privacy controls admission | Only verified W03/W05/Messaging capabilities are shown and tested |
-| 7 | Content preferences and data controls | Only supported server-owned preferences and device-local data options are shown |
-| 8 | Help/about and final APP polish | Working destinations, version info, accessibility and all release gates pass |
+| Step | Module | Current status | Exit condition |
+|---|---|---|---|
+| 0 | Read-only implementation inventory | DONE — contract/inventory PR #1552 | Exact route/API/test/owner matrix exists; no code change |
+| 1 | Settings home and navigation | MERGED — PR #1553 | One discoverable root; existing routes continue to work |
+| 2 | Notification preferences integration | MERGED — PR #1554 | Four account preferences and OS push permission use the existing server/device paths |
+| 3 | Blocked/muted integration | MERGED — PR #1553 | Existing lists/actions accessible from Privacy & safety with no duplicate state |
+| 4 | Appearance integration | MERGED — PR #1553 | Light/dark/system centralized and consistent after relaunch |
+| 5 | Account/security admission | IN PROGRESS — native session screen on this branch | Reuse verified W01/W02 session list/revoke operations; password change and other unadmitted controls stay hidden |
+| 6 | Privacy controls admission | NOT STARTED | Only verified W03/W05/Messaging capabilities are shown and tested |
+| 7 | Content preferences and data controls | NOT STARTED | Only supported server-owned preferences and device-local data options are shown |
+| 8 | Help/about and final APP polish | NOT STARTED | Working destinations, version info, accessibility and all release gates pass |
 
 Do not batch unrelated modules. Do not start Step 2 in the same round as Step 1. Stop immediately after each module reaches its own exit condition.
 
@@ -436,5 +439,5 @@ The APP Settings 1.0 baseline is complete only when:
 - no 2.0-only feature is required for the 1.0 release gate;
 - evidence is attached to the exact commit/build tested.
 
-**Current contract status: PRE-DEVELOPMENT / READY FOR STEP 0 INVENTORY ONLY.**  
-No APP implementation is authorized by this document alone; begin with the read-only route/API/test inventory and then proceed one module at a time.
+**Current contract status: IMPLEMENTATION-IN-PROGRESS / STEPS 0–4 MERGED / STEP 5 (DEVICE AND SESSION MANAGEMENT) IN REVIEW.**  
+The current APP implementation reuses existing W01/W02 session operations; it does not introduce a new Worker, D1, Queue, Service Binding, or persistence authority. A merged screen and passing CI do not replace real authenticated Android/iOS runtime verification. Continue one module at a time; password changes, login history, MFA/passkeys and account lifecycle controls remain hidden until their own API, permission and security evidence is admitted.
