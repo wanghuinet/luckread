@@ -10,6 +10,7 @@ export type PendingMediaRecoveryAsset = {
   height?: number;
   uploadKey: string;
   altText?: string;
+  uploadedUrl?: string;
 };
 
 export type RecoveredPendingMediaAsset = PendingMediaRecoveryAsset & {
@@ -21,6 +22,7 @@ type PendingMediaRecoveryRecord = {
   ownerKey: string;
   draftId: string | null;
   fileName: string;
+  uploadedUrl?: string;
   asset: Omit<PendingMediaRecoveryAsset, 'uri'>;
 };
 
@@ -93,6 +95,7 @@ function parseRecoveryRecord(value: unknown): PendingMediaRecoveryRecord | null 
     typeof asset.filename !== 'string' ||
     typeof asset.mimeType !== 'string' ||
     typeof asset.uploadKey !== 'string' ||
+    (asset.uploadedUrl !== undefined && typeof asset.uploadedUrl !== 'string') ||
     !asset.localId ||
     !asset.filename ||
     !asset.mimeType ||
@@ -204,6 +207,7 @@ export async function persistPendingMediaRecovery(
       height: asset.height,
       uploadKey: asset.uploadKey,
       altText: asset.altText,
+      uploadedUrl: asset.uploadedUrl,
     },
   };
   await writeRecord(directory, record);
@@ -212,6 +216,23 @@ export async function persistPendingMediaRecovery(
     if (previousFile.exists) previousFile.delete();
   }
   return recoveredAsset;
+}
+
+export async function markPendingMediaRecoveryUploaded(
+  ownerId: string,
+  localId: string,
+  uploadedUrl: string,
+): Promise<void> {
+  if (!/^https:\/\//i.test(uploadedUrl)) {
+    throw new Error('A permanent HTTPS media URL is required for recovery metadata.');
+  }
+  const directory = getRecoveryDirectory(ownerId);
+  if (!directory.exists) return;
+  const recordFile = getRecordFile(directory, localId);
+  if (!recordFile.exists) return;
+  const record = parseRecoveryRecord(await recordFile.text());
+  if (!record || record.ownerKey !== hashOwnerId(ownerId)) return;
+  await writeRecord(directory, { ...record, uploadedUrl });
 }
 
 export async function listPendingMediaRecovery(
