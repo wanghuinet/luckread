@@ -1364,10 +1364,17 @@ paths:
                   maxItems: 4
                   uniqueItems: true
                   items: { type: string, minLength: 1, maxLength: 50 }
+                durationMinutes:
+                  type: integer
+                  minimum: 5
+                  maximum: 10080
+                  default: 1440
+                  description: Mutually exclusive with the deprecated durationHours field.
                 durationHours:
                   type: integer
                   enum: [24, 72, 168]
-                  default: 24
+                  deprecated: true
+                  description: Legacy request compatibility; use durationMinutes.
       responses:
         '200':
           description: Current poll configuration and results.
@@ -5646,7 +5653,7 @@ components:
         votes: { type: integer, minimum: 0 }
     ContentPoll:
       type: object
-      required: [pollId, contentId, options, durationHours, endsAt, totalVotes, viewerOptionId, closed]
+      required: [pollId, contentId, options, durationMinutes, endsAt, totalVotes, viewerOptionId, closed]
       additionalProperties: false
       properties:
         pollId: { $ref: '#/components/schemas/ResourceId' }
@@ -5656,7 +5663,8 @@ components:
           minItems: 2
           maxItems: 4
           items: { $ref: '#/components/schemas/ContentPollOption' }
-        durationHours: { type: integer, enum: [24, 72, 168] }
+        durationMinutes: { type: integer, minimum: 5, maximum: 10080 }
+        durationHours: { type: number, deprecated: true, description: Legacy compatibility projection; use durationMinutes. }
         endsAt: { type: [string, 'null'], format: date-time }
         totalVotes: { type: integer, minimum: 0 }
         viewerOptionId: { type: [string, 'null'], maxLength: 128 }
@@ -5914,7 +5922,7 @@ components:
         votes: { type: integer, minimum: 0 }
     ContentPoll:
       type: object
-      required: [pollId, contentId, options, durationHours, endsAt, totalVotes, viewerOptionId, closed]
+      required: [pollId, contentId, options, durationMinutes, endsAt, totalVotes, viewerOptionId, closed]
       additionalProperties: false
       properties:
         pollId: { $ref: '#/components/schemas/ResourceId' }
@@ -5924,7 +5932,8 @@ components:
           minItems: 2
           maxItems: 4
           items: { $ref: '#/components/schemas/ContentPollOption' }
-        durationHours: { type: integer, enum: [24, 72, 168] }
+        durationMinutes: { type: integer, minimum: 5, maximum: 10080 }
+        durationHours: { type: number, deprecated: true, description: Legacy compatibility projection; use durationMinutes. }
         endsAt: { type: [string, 'null'], format: date-time }
         totalVotes: { type: integer, minimum: 0 }
         viewerOptionId: { type: [string, 'null'], maxLength: 128 }
@@ -6163,7 +6172,7 @@ components:
         votes: { type: integer, minimum: 0 }
     ContentPoll:
       type: object
-      required: [pollId, contentId, options, durationHours, endsAt, totalVotes, viewerOptionId, closed]
+      required: [pollId, contentId, options, durationMinutes, endsAt, totalVotes, viewerOptionId, closed]
       additionalProperties: false
       properties:
         pollId: { $ref: '#/components/schemas/ResourceId' }
@@ -6173,7 +6182,8 @@ components:
           minItems: 2
           maxItems: 4
           items: { $ref: '#/components/schemas/ContentPollOption' }
-        durationHours: { type: integer, enum: [24, 72, 168] }
+        durationMinutes: { type: integer, minimum: 5, maximum: 10080 }
+        durationHours: { type: number, deprecated: true, description: Legacy compatibility projection; use durationMinutes. }
         endsAt: { type: [string, 'null'], format: date-time }
         totalVotes: { type: integer, minimum: 0 }
         viewerOptionId: { type: [string, 'null'], maxLength: 128 }
@@ -6424,7 +6434,7 @@ components:
         votes: { type: integer, minimum: 0 }
     ContentPoll:
       type: object
-      required: [pollId, contentId, options, durationHours, endsAt, totalVotes, viewerOptionId, closed]
+      required: [pollId, contentId, options, durationMinutes, endsAt, totalVotes, viewerOptionId, closed]
       additionalProperties: false
       properties:
         pollId: { $ref: '#/components/schemas/ResourceId' }
@@ -6434,7 +6444,8 @@ components:
           minItems: 2
           maxItems: 4
           items: { $ref: '#/components/schemas/ContentPollOption' }
-        durationHours: { type: integer, enum: [24, 72, 168] }
+        durationMinutes: { type: integer, minimum: 5, maximum: 10080 }
+        durationHours: { type: number, deprecated: true, description: Legacy compatibility projection; use durationMinutes. }
         endsAt: { type: [string, 'null'], format: date-time }
         totalVotes: { type: integer, minimum: 0 }
         viewerOptionId: { type: [string, 'null'], maxLength: 128 }
