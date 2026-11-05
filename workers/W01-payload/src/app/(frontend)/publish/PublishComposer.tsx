@@ -534,7 +534,7 @@ async function uploadFile(file: File): Promise<UploadedAsset> {
     if (type !== 'post') return
     if (pollEnabled) {
       const options = readValidPollOptions()
-      if (!options) {
+      if (!options || pollDurationMinutes < 5 || pollDurationMinutes > 10080) {
         if (strict) assertPollConfigurationValid()
         return
       }
