@@ -1,6 +1,6 @@
 import {
   cachedPublicGet,
-  invalidatePublicContentRelationships,
+  invalidatePublicContentThreads,
 } from '../../../../../../lib/public-response-cache.js'
 import { TrafficLimitError, enforcePublicReadRateLimit, rateLimitResponse } from '../../../../../../auth/traffic-limit.js'
 import { hasAuthenticatedSessionCredential } from '../../../../../../lib/content-list-cache-guard.js'
@@ -44,7 +44,7 @@ export async function GET(
     }
     return await cachedPublicGet(
       request,
-      'content-relationships',
+      'content-threads',
       () => callW03Content({
         request,
         pathname: threadPath(contentId),
@@ -86,10 +86,7 @@ export async function POST(
       body: { nextContentId },
       principal,
     })
-    if (response.ok) {
-      await invalidatePublicContentRelationships(contentId)
-      await invalidatePublicContentRelationships(nextContentId)
-    }
+    if (response.ok) await invalidatePublicContentThreads()
     return response
   } catch (error) {
     if (error instanceof W03ContentClientError) return errorResponse(error.status, error.code, 'Content service unavailable')

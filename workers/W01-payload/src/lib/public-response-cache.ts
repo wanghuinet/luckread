@@ -14,10 +14,15 @@ const DEFAULT_CONTENT_LIST_GENERATION = '0'
 const FOLLOW_LIST_GENERATION_VERSION = '1'
 const CONTENT_COMMENTS_GENERATION_VERSION = '1'
 const CONTENT_RELATIONSHIPS_GENERATION_VERSION = '1'
+const CONTENT_THREADS_GENERATION_VERSION = '1'
 const SHARE_DETAIL_VISIBILITY_GENERATION_VERSION = '1'
 const SHARE_DETAIL_CONTENT_MAPPING_TTL_SECONDS = 3600
 const CONTENT_LIST_GENERATION_KEY = new Request(
   `https://cache.luckread.internal/__content-list-generation?v=${CACHE_VERSION}`,
+)
+const CONTENT_THREADS_GENERATION_KEY = new Request(
+  'https://cache.luckread.internal/__content-threads-generation?v=' + CONTENT_THREADS_GENERATION_VERSION,
+  { method: 'GET' },
 )
 const cacheMissHistory = new Map<string, number[]>()
 
@@ -77,6 +82,7 @@ const CACHE_QUERY_KEYS: Record<string, readonly string[]> = {
   'content-detail': [],
   'content-comments': ['cursor', 'limit', 'sort'],
   'content-relationships': ['cursor', 'limit', 'direction'],
+  'content-threads': [],
   followers: ['cursor', 'limit'],
   following: ['cursor', 'limit'],
   'share-detail': [],
@@ -296,6 +302,19 @@ export const invalidatePublicContentRelationships = async (contentIdValue: strin
   }
 }
 
+/** A thread edge changes the assembled view for every segment in both chains. */
+export const invalidatePublicContentThreads = async (): Promise<void> => {
+  const cache = (globalThis.caches as unknown as { default: Cache }).default
+  try {
+    await cache.put(
+      CONTENT_THREADS_GENERATION_KEY,
+      generationResponse(generateContentListGeneration()),
+    )
+  } catch {
+    // Best-effort invalidation. The thread cache TTL remains the fallback bound.
+  }
+}
+
 const contentCommentsIdentity = (request: Request): string | null => {
   const match = new URL(request.url).pathname.match(
     /^\/api\/v1\/contents\/([^/]+)\/comments$/,
@@ -486,6 +505,24 @@ const readContentListGeneration = async (cache: Cache): Promise<string | null> =
   }
 }
 
+const readContentThreadsGeneration = async (cache: Cache): Promise<string | null> => {
+  try {
+    const marker = await cache.match(CONTENT_THREADS_GENERATION_KEY)
+    if (!marker) {
+      const generation = generateContentListGeneration()
+      await cache.put(CONTENT_THREADS_GENERATION_KEY, generationResponse(generation))
+      return generation
+    }
+    const value = await marker.json() as unknown
+    const generation = value && typeof value === 'object' && 'generation' in value
+      ? (value as { generation?: unknown }).generation
+      : null
+    return isValidContentListGeneration(generation) ? generation : null
+  } catch {
+    return null
+  }
+}
+
 export const publicCacheKey = (
   request: Request,
   namespace: string,
@@ -505,6 +542,7 @@ export const publicCacheKey = (
     namespace === 'following' ||
     namespace === 'content-comments' ||
     namespace === 'content-relationships' ||
+    namespace === 'content-threads' ||
     namespace === 'share-detail'
   ) {
     keyUrl.searchParams.set('g', generation)
@@ -612,7 +650,11 @@ export const cachedPublicGet = async (
     const resolvedGeneration = await readContentRelationshipsGeneration(cache, request)
     if (!resolvedGeneration) return loader()
     generation = resolvedGeneration
-  } else if (namespace === 'share-detail') {
+  } else if (namespace === 'content-threads') {
+    const resolvedGeneration = await readContentThreadsGeneration(cache)
+    if (!resolvedGeneration) return loader()
+    generation = resolvedGeneration
+  } else if (namespace === 'share-detail')
     const resolvedGeneration = await readShareDetailGeneration(cache, request)
     if (!resolvedGeneration) return loader()
     generation = resolvedGeneration
