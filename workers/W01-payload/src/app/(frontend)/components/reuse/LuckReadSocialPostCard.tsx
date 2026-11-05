@@ -163,7 +163,9 @@ export default function LuckReadSocialPostCard({
   const contentHref = buildPublicContentHref({ id: contentId, slug, contentType: 'post', creator: profile || author })
   const mediaItems = resolveSocialPostMedia(mediaRefs, coverRef)
   const mediaSourceKey = JSON.stringify(mediaItems.map((media) => media.src))
-  const [mediaRevealed, setMediaRevealed] = useState(false)
+  const mediaRevealKey = (mediaWarning ?? 'none') + ':' + mediaSourceKey
+  const [revealedMediaKey, setRevealedMediaKey] = useState<string | null>(null)
+  const mediaRevealed = !mediaWarning || revealedMediaKey === mediaRevealKey
   const singleMedia = mediaItems.length === 1 ? mediaItems[0] : undefined
   const profileName = profile?.displayName?.trim() || profile?.username || ''
   const username = profile?.username ? '@' + profile.username : ''
@@ -177,10 +179,6 @@ export default function LuckReadSocialPostCard({
     contentVersion > 0 &&
     contentEtag,
   )
-  useEffect(() => {
-    setMediaRevealed(false)
-  }, [contentId, mediaWarning, mediaSourceKey])
-
   const formattedDate = postTimestamp && Number.isFinite(Date.parse(postTimestamp))
     ? new Date(postTimestamp).toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' })
     : ''
@@ -780,7 +778,7 @@ export default function LuckReadSocialPostCard({
               {title}
             </Link>
             {mediaWarning && !mediaRevealed ? (
-              <SensitiveMediaNotice warning={mediaWarning} locale={locale} onReveal={() => setMediaRevealed(true)} />
+              <SensitiveMediaNotice warning={mediaWarning} locale={locale} onReveal={() => setRevealedMediaKey(mediaRevealKey)} />
             ) : singleMedia ? (
               <div className="mt-3 overflow-hidden rounded-2xl border border-light-border dark:border-dark-border">
                 {singleMedia.kind === 'video' ? <video aria-label={title} className="block max-h-[510px] w-full bg-black object-contain" controls muted playsInline preload="metadata" poster={singleMedia.poster} src={singleMedia.src} /> : <img alt={title} className="block max-h-[510px] w-full object-cover" loading="lazy" src={singleMedia.src} />}
@@ -835,7 +833,7 @@ export default function LuckReadSocialPostCard({
         <h3>{title}</h3>
 
         {mediaWarning && !mediaRevealed ? (
-          <SensitiveMediaNotice warning={mediaWarning} locale={locale} onReveal={() => setMediaRevealed(true)} />
+          <SensitiveMediaNotice warning={mediaWarning} locale={locale} onReveal={() => setRevealedMediaKey(mediaRevealKey)} />
         ) : singleMedia ? (
           <div className="content-feed-cover">
             {singleMedia.kind === 'video' ? (
