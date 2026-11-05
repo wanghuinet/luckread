@@ -178,6 +178,8 @@ jobs:
         run: bun run test:video-feed-api
       - name: Test native video-feed autoplay preference
         run: bun test tests/video-feed-autoplay.test.mjs
+      - name: Test native device-local image cache management
+        run: bun test tests/image-cache-management.test.mjs
       - name: Test native bottom tab navigation visibility
         run: bun test tests/tab-navigation-ui.test.mjs
       - name: Test native feed comment navigation
