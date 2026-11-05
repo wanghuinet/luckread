@@ -92,6 +92,7 @@ test('rejects an empty or oversized session id before making a request', async (
 
 test('wires session management into Settings and keeps the active session protected', () => {
   const screen = readFileSync(resolve(process.cwd(), 'app/(drawer)/sessions.tsx'), 'utf8');
+  const api = readFileSync(resolve(process.cwd(), 'lib/session-management-api.ts'), 'utf8');
   const settings = readFileSync(resolve(process.cwd(), 'app/(drawer)/settings.tsx'), 'utf8');
   const drawer = readFileSync(resolve(process.cwd(), 'app/(drawer)/_layout.tsx'), 'utf8');
 
@@ -101,7 +102,7 @@ test('wires session management into Settings and keeps the active session protec
   expect(screen).toContain('Alert.alert(');
   expect(screen).toContain('sessionId === currentSessionId');
   expect(screen).toContain('revokeSession(sessionId)');
-  expect(screen).toContain("method: 'DELETE'");
+  expect(api).toContain("method: 'DELETE'");
   expect(screen).toContain("'/login?returnTo='");
   expect(screen).not.toContain('session.deviceId}</Text>');
 });
