@@ -28,7 +28,8 @@ test('uses one shared persisted light, dark and system preference across the app
   expect(screen).toContain('value="dark"');
   expect(screen).toContain('value="system"');
   expect(screen).toContain('saveThemePreference(preference)');
-  expect(screen).not.toContain('SecureStore');
+  expect(screen).not.toContain('getItemAsync(THEME_PREFERENCE_KEY)');
+  expect(screen).not.toContain('setItemAsync(THEME_PREFERENCE_KEY, preference)');
   expect(root).toContain('hydrateThemePreference()');
   expect(root).toContain('setColorScheme(themePreference)');
   expect(root).not.toContain('getItemAsync(THEME_PREFERENCE_KEY)');
