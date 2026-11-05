@@ -654,7 +654,7 @@ export const cachedPublicGet = async (
     const resolvedGeneration = await readContentThreadsGeneration(cache)
     if (!resolvedGeneration) return loader()
     generation = resolvedGeneration
-  } else if (namespace === 'share-detail')
+  } else if (namespace === 'share-detail') {
     const resolvedGeneration = await readShareDetailGeneration(cache, request)
     if (!resolvedGeneration) return loader()
     generation = resolvedGeneration
