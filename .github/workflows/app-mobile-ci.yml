@@ -130,6 +130,13 @@ jobs:
         run: |
           test -f android/gradle.properties
           grep -Fxq "newArchEnabled=true" android/gradle.properties
+          WRAPPER_PROPERTIES="android/gradle/wrapper/gradle-wrapper.properties"
+          if grep -q '^networkTimeout=' "$WRAPPER_PROPERTIES"; then
+            sed -i 's/^networkTimeout=.*/networkTimeout=120000/' "$WRAPPER_PROPERTIES"
+          else
+            printf '\nnetworkTimeout=120000\n' >> "$WRAPPER_PROPERTIES"
+          fi
+          grep -Fxq 'networkTimeout=120000' "$WRAPPER_PROPERTIES"
           chmod +x android/gradlew
           cd android
           ./gradlew generateCodegenArtifactsFromSchema --no-daemon
