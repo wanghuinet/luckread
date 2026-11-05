@@ -14,6 +14,150 @@
   ],
   "operations": [
     {
+      "operationId": "getNotificationPreferences",
+      "method": "GET",
+      "path": "/notification-preferences",
+      "visibility": "public_authenticated",
+      "capability": "notification.preferences.read",
+      "status": "CONTRACTED_PARTIAL",
+      "authorization": {
+        "required": true,
+        "permission": "notification.read.self",
+        "scope": "actor_self"
+      },
+      "resource": {
+        "class": "SINGLE_AUTHORITATIVE_READ",
+        "d1ReadMax": 1,
+        "d1WriteMax": 0,
+        "d1ReadRowsMax": 1,
+        "d1WriteRowsMax": 0,
+        "rpcMax": 0,
+        "eventCountMax": 0
+      },
+      "cache": {
+        "mode": "NO_STORE",
+        "shared": false
+      },
+      "retry": {
+        "maxAttempts": 1,
+        "clientRetrySafe": false
+      },
+      "event": {
+        "syncConsumersMax": 0,
+        "asyncEventsMax": 0,
+        "fanoutMax": 0
+      },
+      "queue": {
+        "enqueueMax": 0,
+        "depthBounded": true
+      },
+      "state": {
+        "required": [
+          "authenticated_actor_active",
+          "interaction_layer_l2_or_higher"
+        ],
+        "terminal": "ACTIVE"
+      },
+      "antiAbuse": {
+        "required": true,
+        "scopes": [
+          "ip"
+        ],
+        "actions": [
+          "ALLOW",
+          "THROTTLE",
+          "BLOCK"
+        ]
+      },
+      "auditRequired": false,
+      "evidence": {
+        "openapi": "PASS",
+        "permission": "PASS",
+        "state": "PASS",
+        "resource": "PASS",
+        "cache": "PASS",
+        "antiAbuse": "PASS",
+        "runtimeIntegration": "PENDING_CI",
+        "productionSecurityE2E": "MISSING"
+      }
+    },
+    {
+      "operationId": "patchNotificationPreferences",
+      "method": "PATCH",
+      "path": "/notification-preferences",
+      "visibility": "public_authenticated",
+      "capability": "notification.preferences.update",
+      "status": "CONTRACTED_PARTIAL",
+      "authorization": {
+        "required": true,
+        "permission": "notification.update.self",
+        "scope": "actor_self"
+      },
+      "resource": {
+        "class": "SINGLE_AUTHORITATIVE_WRITE_WITH_GOVERNANCE_INTENT",
+        "d1ReadMax": 0,
+        "d1WriteMax": 1,
+        "d1ReadRowsMax": 0,
+        "d1WriteRowsMax": 1,
+        "rpcMax": 0,
+        "eventCountMax": 0,
+        "atomicPartialUpdate": true
+      },
+      "cache": {
+        "mode": "NO_STORE",
+        "shared": false
+      },
+      "retry": {
+        "maxAttempts": 1,
+        "clientRetrySafe": false
+      },
+      "event": {
+        "syncConsumersMax": 0,
+        "asyncEventsMax": 0,
+        "fanoutMax": 0
+      },
+      "queue": {
+        "enqueueMax": 0,
+        "depthBounded": true
+      },
+      "state": {
+        "required": [
+          "authenticated_actor_active",
+          "interaction_layer_l2_or_higher"
+        ],
+        "terminal": "ACTIVE"
+      },
+      "antiAbuse": {
+        "required": true,
+        "scopes": [
+          "ip",
+          "account",
+          "endpoint"
+        ],
+        "actions": [
+          "ALLOW",
+          "THROTTLE",
+          "BLOCK"
+        ]
+      },
+      "auditRequired": true,
+      "audit": {
+        "authority": "W06 D1-03",
+        "beforeMutation": true,
+        "action": "notification.preferences.update_requested"
+      },
+      "evidence": {
+        "openapi": "PASS",
+        "permission": "PASS",
+        "state": "PASS",
+        "resource": "PASS",
+        "cache": "PASS",
+        "antiAbuse": "PASS",
+        "w01W08W06W05Runtime": "PENDING_CI",
+        "productionSecurityE2E": "MISSING"
+      }
+    },
+    {
       "operationId": "upsertPushEndpoint",
       "method": "PUT",
       "path": "/push/endpoints/{installationId}",
@@ -187,5 +331,6 @@
       },
       "auditRequired": true
     }
-  ]
+  ],
+  "preferenceGreenRule": "Notification preference code is complete only after W01 W08 self-authorization, W06 durable audit-before-write, W05 D1-02 persistence, and end-to-end evidence are verified; production GREEN also requires deployment evidence."
 }

@@ -1,0 +1,147 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/api/notification-preferences.v1.json",
+  "title": "LuckRead Notification Preferences API Contract",
+  "version": "1.0.0",
+  "status": "CONTRACTED_PARTIAL",
+  "domain": "notification",
+  "authority": {
+    "publicGateway": "W01 Payload API",
+    "identityAuthority": "W02 authenticated principal",
+    "authorizationAuthority": "W08 CASL self permissions",
+    "preferenceAuthority": "W05 Social",
+    "preferenceDatabase": "D1-02",
+    "preferenceTable": "social_notification_preferences",
+    "auditAuthority": "W06 durable request-intent audit in D1-03",
+    "clientDatabaseAccess": false
+  },
+  "schemas": {
+    "NotificationPreferences": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "follow",
+        "like",
+        "comment",
+        "mention"
+      ],
+      "properties": {
+        "follow": {
+          "type": "boolean"
+        },
+        "like": {
+          "type": "boolean"
+        },
+        "comment": {
+          "type": "boolean"
+        },
+        "mention": {
+          "type": "boolean"
+        }
+      }
+    },
+    "NotificationPreferencesPatch": {
+      "type": "object",
+      "minProperties": 1,
+      "maxProperties": 4,
+      "additionalProperties": false,
+      "properties": {
+        "follow": {
+          "type": "boolean"
+        },
+        "like": {
+          "type": "boolean"
+        },
+        "comment": {
+          "type": "boolean"
+        },
+        "mention": {
+          "type": "boolean"
+        }
+      }
+    }
+  },
+  "operations": [
+    {
+      "operationId": "getNotificationPreferences",
+      "method": "GET",
+      "path": "/v1/notification-preferences",
+      "authorization": {
+        "permission": "notification.read.self",
+        "minimumLayer": "L2",
+        "scope": "actor_self",
+        "ownerSource": "W02 principal, never request data"
+      },
+      "resource": {
+        "authority": "W05 D1-02",
+        "readMax": 1,
+        "writeMax": 0
+      },
+      "cache": "NO_STORE",
+      "response": "NotificationPreferences",
+      "status": "CONTRACTED_PARTIAL"
+    },
+    {
+      "operationId": "patchNotificationPreferences",
+      "method": "PATCH",
+      "path": "/v1/notification-preferences",
+      "authorization": {
+        "permission": "notification.update.self",
+        "minimumLayer": "L2",
+        "scope": "actor_self",
+        "ownerSource": "W02 principal, never request data"
+      },
+      "resource": {
+        "authority": "W05 D1-02",
+        "readMax": 0,
+        "writeMax": 1,
+        "atomicPartialUpdate": true
+      },
+      "audit": {
+        "required": true,
+        "beforeMutation": true,
+        "authority": "W06 D1-03",
+        "action": "notification.preferences.update_requested",
+        "targetType": "Notification",
+        "targetId": "authenticated principal userId",
+        "fields": [
+          "follow",
+          "like",
+          "comment",
+          "mention"
+        ],
+        "sensitiveValuesExcluded": [
+          "session credentials",
+          "push tokens"
+        ]
+      },
+      "antiAbuse": {
+        "required": true,
+        "limits": [
+          "ip",
+          "account",
+          "fixed endpoint"
+        ]
+      },
+      "cache": "NO_STORE",
+      "request": "NotificationPreferencesPatch",
+      "response": "NotificationPreferences",
+      "status": "CONTRACTED_PARTIAL"
+    }
+  ],
+  "invariants": [
+    "The authenticated W02 principal is the only source of preference ownership.",
+    "W08 notification.read.self and notification.update.self are checked by W01 before W05 is called.",
+    "A PATCH is durably recorded by W06 before W01 forwards it to W05; an unconfirmed audit prevents the mutation.",
+    "W05 owns account preference reads and writes in D1-02; W06 stores only governance audit in D1-03.",
+    "An omitted field in a partial PATCH preserves the current value atomically; omitted fields on first creation default to true.",
+    "Account preferences are separate from device OS notification permission and Expo push endpoint registration.",
+    "Push tokens never appear in preference responses or preference audit payloads."
+  ],
+  "evidence": {
+    "openapi": "PENDING_CONTRACT_COMMIT",
+    "w08Permission": "EXISTING_PERMISSION_AND_CASL_RULE",
+    "w01W08W06W05Runtime": "PENDING_CI",
+    "productionDeploymentAndSecurityE2E": "MISSING"
+  }
+}
