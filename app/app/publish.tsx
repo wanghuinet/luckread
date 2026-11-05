@@ -437,12 +437,14 @@ function PublishScreenContent() {
           existing: true,
         };
       });
-      const pendingRecoveries = await listPendingMediaRecovery(user.id, targetContentId);
+      const pendingRecoveries = await listPendingMediaRecovery(user.id, targetContentId).catch(() => []);
       const alreadyAttachedRecoveries = pendingRecoveries.filter((asset) =>
         Boolean(asset.uploadedUrl && restoredMediaRefs.includes(asset.uploadedUrl)),
       );
       await Promise.all(
-        alreadyAttachedRecoveries.map((asset) => deletePendingMediaRecovery(user.id, asset.localId)),
+        alreadyAttachedRecoveries.map((asset) =>
+          deletePendingMediaRecovery(user.id, asset.localId).catch(() => undefined),
+        ),
       );
       const recoveredPendingAssets: ComposerAsset[] = pendingRecoveries
         .filter((asset) => !alreadyAttachedRecoveries.some((attached) => attached.localId === asset.localId))
@@ -1193,7 +1195,7 @@ function PublishScreenContent() {
     await Promise.all(
       readyAssets
         .filter((asset) => !asset.existing)
-        .map((asset) => deletePendingMediaRecovery(ownerId, asset.localId)),
+        .map((asset) => deletePendingMediaRecovery(ownerId, asset.localId).catch(() => undefined)),
     );
 
     // Only mark the content fingerprint saved after content, poll and reply policy succeed.
@@ -1886,7 +1888,7 @@ function PublishScreenContent() {
           await Promise.all(
             assets
               .filter((asset) => !asset.existing)
-              .map((asset) => deletePendingMediaRecovery(user.id, asset.localId)),
+              .map((asset) => deletePendingMediaRecovery(user.id, asset.localId).catch(() => undefined)),
           );
         }
         const socialSyncWarning = recordRef.current?.state === 'PUBLISHED'
