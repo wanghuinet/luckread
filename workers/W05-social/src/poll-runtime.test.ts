@@ -261,7 +261,7 @@ describe('W05 poll runtime', () => {
       updatedAt: '2026-10-17T04:00:00.000Z',
     } as const
 
-    await expect(configureContentPoll(db, 'author-1', 'content-1', ['Yes', 'No'], 24, context))
+    await expect(configureContentPoll(db, 'author-1', 'content-1', ['Yes', 'No'], 1440, context))
       .resolves.toMatchObject({
         pollId: 'poll-1',
         contentId: 'content-1',
