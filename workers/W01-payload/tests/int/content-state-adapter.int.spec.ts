@@ -271,3 +271,19 @@ describe('1.1 content lifecycle closeout', () => {
     expect(publisher).toContain("Idempotency-Key': crypto.randomUUID()")
   })
 })
+
+describe('thread cache generation invalidation across content lifecycle mutations', () => {
+  it('invalidates all cached thread segments after every public and Creator content mutation', () => {
+    const publicContent = read('src/app/api/v1/contents/[contentId]/route.ts')
+    const publicState = read('src/app/api/v1/contents/[contentId]/state/route.ts')
+    const publicRelationshipRevoke = read('src/app/api/v1/contents/[contentId]/relationships/[relationshipId]/route.ts')
+    const creatorContent = read('src/app/(payload)/api/creator/contents/[contentId]/route.ts')
+    const creatorState = read('src/app/(payload)/api/creator/contents/[contentId]/state/route.ts')
+    const orchestrator = read('src/lib/scheduled-publish-orchestrator.ts')
+
+    for (const route of [publicContent, publicState, publicRelationshipRevoke, creatorContent, creatorState]) {
+      expect(route).toContain('invalidatePublicContentThreads()')
+    }
+    expect(orchestrator).toContain('if (summary.published > 0) await invalidatePublicContentThreads()')
+  })
+})
