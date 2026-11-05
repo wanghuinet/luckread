@@ -16,7 +16,8 @@ type Poll = {
   pollId: string
   contentId: string
   options: PollOption[]
-  durationHours: 24 | 72 | 168
+  durationMinutes: number
+  durationHours?: number
   endsAt: string | null
   totalVotes: number
   viewerOptionId: string | null
