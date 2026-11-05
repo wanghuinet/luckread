@@ -630,8 +630,11 @@ const worker = {
           return new Response(null, { status: 405, headers: { Allow: 'GET' } })
         }
         requireBackgroundTransport(request)
-        if ([...url.searchParams.keys()].some((key) => key !== 'limit') ||
-            url.searchParams.getAll('limit').length > 1) {
+        let hasUnexpectedQueryParameter = false
+        url.searchParams.forEach((_value, key) => {
+          if (key !== 'limit') hasUnexpectedQueryParameter = true
+        })
+        if (hasUnexpectedQueryParameter || url.searchParams.getAll('limit').length > 1) {
           throw new ContentRuntimeError('VALIDATION_FAILED', 400)
         }
         const limit = parseListLimit(url.searchParams.get('limit') ?? '50')
