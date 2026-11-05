@@ -192,9 +192,14 @@ The current Worker Master is authoritative for current Worker identity:
 - W10 executes asynchronous jobs under the authority of the owning Worker/Task and may write only its explicitly assigned D1-03 job/execution/idempotency/retry/DLQ/runtime records.
 - W08 owns T04 creator/organization identity relationships and hosts the bounded CASL policy evaluator; it does not perform direct D1 writes or replace the owning Worker's lifecycle/workflow checks.
 
-**A canonical-document conflict remains unresolved:** `docs/306-DELETION-SEMANTICS-AND-ERASURE-MATRIX-CONTRACT-v1.0.md` §7 says deletion progression is executed by W08. The current `docs/04-WORKER-MASTER-v1.0.md` and `docs/03-WORKER-BINDING-MAPPING-v1.0.md` do not assign account deletion to W08; they define W08 as T04/CASL and W10 as the async execution boundary. These rules cannot be reconciled by inferring that W10 becomes the business owner: W02 remains the D1-01 account-state authority, and W10 is execution-only. A Change Control decision is required before assigning deletion job orchestration, target-domain side effects, or any additional queue bindings.
+The historical W08 deletion-job wording is reconciled by `docs/change-control/CC-MAPPING-0-AUTH-015-W08-W10-DELETION-EXECUTION-OWNERSHIP-RECONCILIATION-2026-11-06.md` and the corresponding correction to `docs/306`:
+- W08 is limited to T04 creator/organization identity relationships and the bounded CASL evaluator; it does not own deletion job execution.
+- W10 is the async execution boundary and may execute jobs only under an explicitly approved owning Worker/Task and Workflow/Job contract. W10 does not become the business owner and its D1-03 writes remain limited to assigned runtime records.
+- W02 remains the sole account-state authority and D1-01 writer. Each cross-domain deletion side effect remains with its own authoritative Worker and requires explicit event/Queue, retry, idempotency, audit, and reconciliation contracts.
 
-The Worker Master also prohibits deriving Worker/D1 feature ownership from code, routes, collections, or directory names. Therefore AUTH-015 receives no silent Worker assignment from this evidence update.
+This resolves the **documentary W08-vs-W10 role contradiction only**. It does not assign AUTH-015 an end-to-end Worker map, approve any new Queue/binding, or prove an executable deletion job. The B01 `workerRefs` remains empty until the feature-specific ownership and transport contracts are admitted.
+
+The Worker Master continues to prohibit deriving Worker/D1 feature ownership from code, routes, collections, or directory names. Therefore AUTH-015 receives no silent Worker assignment from this reconciliation.
 
 The B01 AUTH-015 D1 logical-domain naming conflict is RESOLVED by Change Control: `D01 Core` is canonical for this affected reconciliation surface. This does not by itself prove the physical persistence schema or authorize a new table/database.
 
