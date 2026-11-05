@@ -1290,8 +1290,16 @@ describe('W03 content contract core', () => {
       idem_expires_at: null,
     }
     let batchCalls = 0
+    const prepared: Array<{ sql: string; values: unknown[] }> = []
     const db = {
-      prepare() { return { bind: () => ({ first: async () => row }) } },
+      prepare(sql: string) {
+        return {
+          bind: (...values: unknown[]) => {
+            prepared.push({ sql, values })
+            return { first: async () => row }
+          },
+        }
+      },
       batch: async () => { batchCalls += 1; return [] },
     } as never
     const scheduledAt = '2026-10-16T00:30:00.000Z'
@@ -1315,7 +1323,7 @@ describe('W03 content contract core', () => {
       row.etag,
       'schedule-draft-social-post',
       new Date('2026-10-16T00:01:00.000Z'),
-      { scheduledAt, preflight },
+      { scheduledAt, preflight, verifiedCreatorId: 'creator-canonical-1' },
     )
 
     expect(result).toMatchObject({
@@ -1326,6 +1334,12 @@ describe('W03 content contract core', () => {
       scheduledAt,
     })
     expect(batchCalls).toBe(1)
+    const contentUpdate = prepared.find(({ sql }) => sql.includes('UPDATE contents SET state=?, scheduled_at=?, creator_id=?'))
+    expect(contentUpdate?.values.slice(0, 3)).toEqual([
+      'SCHEDULED',
+      scheduledAt,
+      'creator-canonical-1',
+    ])
   })
 
   it('does not schedule a draft social post when its W03 publish preflight is missing', async () => {
