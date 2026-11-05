@@ -196,6 +196,16 @@ export default function SettingsScreen() {
           />
         </SettingsSection>
 
+        <SettingsSection title="账户安全">
+          <SettingsRow
+            icon="smartphone"
+            title="设备与会话"
+            description="查看当前账号的有效登录会话，并退出不再使用的会话"
+            onPress={() => router.push('/sessions' as never)}
+            isDark={isDark}
+          />
+        </SettingsSection>
+
         <SettingsSection title="隐私与安全">
           <SettingsRow
             icon="shield"
