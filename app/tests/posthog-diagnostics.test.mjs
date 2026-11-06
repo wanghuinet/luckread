@@ -5,6 +5,9 @@ const appPackage = JSON.parse(readFileSync(new URL('../package.json', import.met
 const diagnostics = readFileSync(new URL('../lib/posthog.tsx', import.meta.url), 'utf8');
 const rootLayout = readFileSync(new URL('../app/_layout.tsx', import.meta.url), 'utf8');
 const envExample = readFileSync(new URL('../.env.example', import.meta.url), 'utf8');
+const appConfigSource = readFileSync(new URL('../app.config.js', import.meta.url), 'utf8');
+const require = (await import('node:module')).createRequire(import.meta.url);
+const appConfigFactory = require('../app.config.js');
 
 test('pins the PostHog native crash capture SDK and Expo peer dependencies', () => {
   expect(appPackage.dependencies['posthog-react-native']).toBe('4.85.3');
@@ -49,4 +52,55 @@ test('documents only the public ingestion key and never a personal CLI credentia
   expect(envExample).toContain('EXPO_PUBLIC_POSTHOG_HOST=');
   expect(envExample).toContain('Do not put a personal PostHog API key / CLI token');
   expect(envExample).not.toContain('POSTHOG_CLI_TOKEN=');
+});
+
+test('keeps native symbol upload disabled until private EAS CLI credentials exist', () => {
+  const previous = {
+    apiKey: process.env.POSTHOG_CLI_API_KEY,
+    projectId: process.env.POSTHOG_CLI_PROJECT_ID,
+    host: process.env.POSTHOG_CLI_HOST,
+  };
+
+  try {
+    delete process.env.POSTHOG_CLI_API_KEY;
+    delete process.env.POSTHOG_CLI_PROJECT_ID;
+    delete process.env.POSTHOG_CLI_HOST;
+
+    const baseConfig = { name: 'LuckRead', plugins: ['expo-router'] };
+    const withoutCredentials = appConfigFactory({ config: baseConfig });
+    expect(withoutCredentials.plugins).toEqual(['expo-router']);
+
+    process.env.POSTHOG_CLI_API_KEY = 'test-personal-key';
+    process.env.POSTHOG_CLI_PROJECT_ID = '715723';
+    process.env.POSTHOG_CLI_HOST = 'https://us.posthog.com';
+
+    const withCredentials = appConfigFactory({ config: baseConfig });
+    const symbolPlugin = withCredentials.plugins.find(
+      (plugin) => Array.isArray(plugin) && plugin[0] === 'posthog-react-native/expo',
+    );
+
+    expect(symbolPlugin).toBeDefined();
+    expect(symbolPlugin[1].uploadNativeSymbols).toBe(true);
+    expect(symbolPlugin[1].skipOnConflict).toBe(true);
+    expect(symbolPlugin[1].patchMainActivityNewIntent).toBe(false);
+    expect(symbolPlugin[1].uploadNativeSymbols).not.toHaveProperty('includeSource');
+  } finally {
+    if (previous.apiKey === undefined) delete process.env.POSTHOG_CLI_API_KEY;
+    else process.env.POSTHOG_CLI_API_KEY = previous.apiKey;
+    if (previous.projectId === undefined) delete process.env.POSTHOG_CLI_PROJECT_ID;
+    else process.env.POSTHOG_CLI_PROJECT_ID = previous.projectId;
+    if (previous.host === undefined) delete process.env.POSTHOG_CLI_HOST;
+    else process.env.POSTHOG_CLI_HOST = previous.host;
+  }
+});
+
+test('documents the separate private PostHog CLI credentials for EAS symbol uploads', () => {
+  expect(appConfigSource).toContain('POSTHOG_CLI_API_KEY');
+  expect(appConfigSource).toContain('POSTHOG_CLI_PROJECT_ID');
+  expect(appConfigSource).toContain('uploadNativeSymbols: true');
+  expect(appConfigSource).toContain('patchMainActivityNewIntent: false');
+  expect(envExample).toContain('POSTHOG_CLI_PROJECT_ID=715723');
+  expect(envExample).toContain('POSTHOG_CLI_HOST=https://us.posthog.com');
+  expect(envExample).toContain('Set POSTHOG_CLI_API_KEY as an EAS Secret');
+  expect(envExample).not.toContain('POSTHOG_CLI_API_KEY=phx_');
 });
