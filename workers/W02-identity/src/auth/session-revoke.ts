@@ -117,8 +117,23 @@ export async function handleCurrentUserSessionRevoke(
     // committed atomically. If the outbox cannot be written, D1 rolls back the
     // DELETE and the caller receives 503 rather than an unaudited revocation.
     const committed = await env.D1_01.batch([
-      env.D1_01.prepare('DELETE FROM "session" WHERE id = ? AND user_id = ?')
-        .bind(target.id, userId),
+      env.D1_01.prepare(`
+        DELETE FROM "session"
+        WHERE id = ? AND user_id = ?
+          AND EXISTS (
+            SELECT 1
+            FROM "user" AS account
+            INNER JOIN role_assignments AS assignment ON assignment.subject_id = account.id
+            WHERE account.id = ?
+              AND account.account_state IN ('PENDING_VERIFICATION', 'ACTIVE')
+              AND assignment.role_id = 'user'
+              AND assignment.scope_type = 'global'
+              AND assignment.scope_id IS NULL
+              AND assignment.status = 'ACTIVE'
+              AND assignment.valid_from <= ?
+              AND (assignment.valid_until IS NULL OR ? < assignment.valid_until)
+          )
+      `).bind(target.id, userId, userId, now, now),
       buildSessionRevocationOutboxInsert(env.D1_01, event),
     ])
     const deleted = committed[0]
