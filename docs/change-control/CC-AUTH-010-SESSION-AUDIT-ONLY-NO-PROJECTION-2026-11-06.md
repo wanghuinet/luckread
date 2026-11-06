@@ -44,6 +44,6 @@ The semantic task designation and source implementation for both targeted revoca
 
 - Both canonical operation-policy entries identify `session_revocation_audit`.
 - The AUTH-010 event contract states that no separate session-state projection is required.
-- W01/W02 logout source tests cover Cookie and Bearer identity derivation, self-only deletion, rate limiting, no-op replay, atomic outbox failure, and Better Auth cookie clearing.
+- W01/W02 logout source tests cover Cookie and Bearer identity derivation, pre-mutation trusted-origin/CSRF denial, self-only deletion, rate limiting, no-op replay, atomic outbox failure, and Better Auth cookie clearing.
 - W06 tests cover the `USER_LOGOUT` immutable audit reason and operation/reason mismatch rejection.
 - Contract Admission and relevant exact-SHA CI checks pass; no production migration, deployment, remote delivery or physical-device acceptance is implied.
