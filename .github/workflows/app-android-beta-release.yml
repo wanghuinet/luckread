@@ -37,10 +37,11 @@ jobs:
     name: Build and verify standalone Android Beta APK
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    environment: ${{ github.event_name == 'pull_request' && 'preview' || 'production' }}
+    # Temporary phone-test APKs must stay on preview; only explicitly published releases use production.
+    environment: ${{ inputs.publish_release == true && 'production' || 'preview' }}
     env:
       EXPO_PROJECT_ID: ${{ vars.EXPO_PROJECT_ID || secrets.EXPO_PROJECT_ID }}
-      EXPO_UPDATE_CHANNEL: ${{ github.event_name == 'pull_request' && 'preview' || 'production' }}
+      EXPO_UPDATE_CHANNEL: ${{ inputs.publish_release == true && 'production' || 'preview' }}
       LUCKREAD_REQUIRE_OTA_CONFIG: ${{ github.event_name == 'pull_request' && '0' || '1' }}
     defaults:
       run:
