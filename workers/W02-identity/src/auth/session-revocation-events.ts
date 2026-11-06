@@ -125,7 +125,7 @@ export function assertSessionRevokedEvent(value: unknown): asserts value is Sess
     envelope.producer !== 'W02' ||
     envelope.resourceType !== 'Session' ||
     !RESOURCE_ID.test(envelope.resourceId) ||
-    !RESOURCE_ID.test(actorValue.actorId as string) ||
+    typeof actorValue.actorId !== 'string' || !RESOURCE_ID.test(actorValue.actorId) ||
     actorValue.actorType !== 'user' ||
     Object.keys(actorValue).some((key) => key !== 'actorId' && key !== 'actorType') ||
     Object.keys(payloadValue).some((key) => !['operationId', 'result', 'reasonCode'].includes(key)) ||
