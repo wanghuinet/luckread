@@ -336,6 +336,23 @@ try {
   const targetSessionId = firstItems.find((item) => item.sessionId !== currentRow.id)?.sessionId
   if (typeof targetSessionId !== 'string') throw new Error('AUTH010_OWNED_REVOKE_TARGET_MISSING')
 
+  currentStage = 'current-session-revoke-protection'
+  const currentRevokeResponse = await fetch(baseUrl + '/api/v1/auth/sessions/' + encodeURIComponent(currentRow.id), {
+    method: 'DELETE',
+    headers: requestHeaders({ cookie: cookieA, 'Idempotency-Key': 'AUTH010-' + suffix + '-CURRENT' }),
+    cache: 'no-store',
+  })
+  const currentRevokePayload = await parseJson(currentRevokeResponse, 'AUTH010_CURRENT_SESSION_REVOKE')
+  if (currentRevokeResponse.status !== 409 || currentRevokePayload?.error?.code !== 'CURRENT_SESSION_PROTECTED') {
+    throw new Error('AUTH010_CURRENT_SESSION_REVOKE_NOT_PROTECTED')
+  }
+  const currentSessionAfterRejectedRevoke = scalar(
+    'SELECT id FROM "session" WHERE id = ? AND user_id = ? LIMIT 1',
+    currentRow.id,
+    userAId,
+  )
+  if (!currentSessionAfterRejectedRevoke) throw new Error('AUTH010_CURRENT_SESSION_WAS_REVOKED')
+
   currentStage = 'cross-account-revoke'
   const crossAccountRevoke = await revokeSession(cookieB, targetSessionId, 'AUTH010-' + suffix + '-CROSS')
   if (crossAccountRevoke.status !== 204) throw new Error('AUTH010_CROSS_ACCOUNT_REVOKE_STATUS_UNEXPECTED')
@@ -376,6 +393,7 @@ try {
       noStore: true,
       malformedCursorRejected: true,
       crossAccountListIsolated: true,
+      currentSessionProtected: true,
       crossAccountRevokeNoOp: true,
       ownedRevokeRemovesNativeSession: true,
       repeatedRevokeIdempotent: true,
@@ -385,6 +403,7 @@ try {
       firstPageCount: firstItems.length,
       secondPageCount: secondItems.length,
       userASessionCountBeforeCleanup: 56,
+      currentRevokeStatus: currentRevokeResponse.status,
       crossAccountRevokeStatus: crossAccountRevoke.status,
       ownRevokeStatus: ownRevoke.status,
       repeatedRevokeStatus: repeatedRevoke.status,
