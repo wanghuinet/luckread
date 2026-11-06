@@ -70,7 +70,7 @@ This is a field-level semantic mapping, not a second permission identifier. No n
 - authentication: required via the current Better Auth cookie or Bearer credential
 - authorization: the authenticated session itself is the self-scope proof; no RoleAssignment or `user.session.revoke` role gate is evaluated
 - account state: no account-state gate is applied to terminating one's own session; a suspended or otherwise restricted account must still be able to log out
-- origin / CSRF: before calling `getSession` or writing D1, a Cookie-bearing request must present an Origin/Referer accepted by the same Better Auth `isTrustedOrigin` resolver; missing, null or untrusted browser origins are rejected with 403. Bearer-only native requests do not require a browser Origin, matching Better Auth's cookie-CSRF boundary
+- origin / CSRF: before calling `getSession` or writing D1, a Cookie-bearing request must present an Origin/Referer accepted by Better Auth `isTrustedOrigin`; `Origin: null` is accepted only with `Sec-Fetch-Site: same-origin` and a trusted inferred request origin. Missing, cross-site-null or untrusted browser origins are rejected with 403. Bearer-only native requests do not require a browser Origin, matching Better Auth's cookie-CSRF boundary
 - identity: W02 derives both `userId` and `sessionId` from `auth.api.getSession`; no client body, query parameter, or target-session ID is accepted
 - mutation: W02 deletes only that exact `(session.id, session.userId)` row and writes the logout audit outbox record in the same D1-01 batch
 - replay: a missing/already-revoked current session is a successful no-op and cannot create a second audit event
