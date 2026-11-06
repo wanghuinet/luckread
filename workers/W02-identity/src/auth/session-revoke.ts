@@ -49,6 +49,14 @@ export async function handleCurrentUserSessionRevoke(
     return sessionRateLimitErrorResponse(error)
   }
 
+  // Protect the authenticated caller's current session at the identity authority
+  // boundary before any lookup of the requested target session.
+  if (sessionId === currentSessionId) {
+    return json({
+      error: { code: 'CURRENT_SESSION_PROTECTED', message: 'Current session cannot be revoked' },
+    }, 409)
+  }
+
   try {
     const target = await env.D1_01
       .prepare('SELECT id, token, user_id AS userId FROM "session" WHERE id = ? LIMIT 1')
