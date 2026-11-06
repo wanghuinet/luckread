@@ -23,10 +23,13 @@ A session-state projection would duplicate authoritative state without a valid d
 
 ## Scope
 
-This change corrects the semantic task designation only. It does not claim the logout operation is already audited:
+The semantic task designation and source implementation for both targeted revocation and current-session logout now use the same immutable audit-only path:
 
-- `authSessionRevoke` has the W02 atomic DELETE + outbox + W06 audit source implementation.
-- W01 `/auth/logout` still delegates to Better Auth `/sign-out` and must be wired to the same audited W02 current-session deletion path before complete logout audit can be claimed.
+- `authSessionRevoke` deletes the selected caller-owned session and inserts its audit outbox event in one W02 D1-01 batch.
+- W01 `/auth/logout` delegates to a W02 self-logout handler. W02 derives the current session from Better Auth Cookie/Bearer authentication and commits the current-session DELETE + `authLogout / USER_LOGOUT` outbox record atomically.
+- Only after the D1-01 batch succeeds, W02 invokes Better Auth's official `/sign-out` handler with the revoked session-token cookie and Authorization removed. Other session-data cookies remain on the cleanup request so Better Auth can expire all configured cookie data without a second session lookup/deletion.
+- W06 accepts only the two exact operation/reason pairs and writes the corresponding immutable AuditEvent reason.
+- Missing or previously revoked sessions produce no additional outbox record; the operation remains safe to retry.
 
 ## Frozen architecture constraints
 
@@ -41,5 +44,6 @@ This change corrects the semantic task designation only. It does not claim the l
 
 - Both canonical operation-policy entries identify `session_revocation_audit`.
 - The AUTH-010 event contract states that no separate session-state projection is required.
-- The AUTH-010 reconciliation identifies logout auditing as the remaining source-code gap.
-- Contract Admission and relevant exact-SHA CI checks pass.
+- W01/W02 logout source tests cover Cookie and Bearer identity derivation, self-only deletion, rate limiting, no-op replay, atomic outbox failure, and Better Auth cookie clearing.
+- W06 tests cover the `USER_LOGOUT` immutable audit reason and operation/reason mismatch rejection.
+- Contract Admission and relevant exact-SHA CI checks pass; no production migration, deployment, remote delivery or physical-device acceptance is implied.
