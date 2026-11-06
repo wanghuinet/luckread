@@ -10,6 +10,7 @@ import { BlurTargetView } from 'expo-blur';
 import {
   FloatingGlassTabBar,
   type TabBarIconComponent,
+  type TabBarNavigation,
   type TabsConfig,
 } from 'react-native-floating-glass-tabbar';
 
@@ -138,9 +139,13 @@ function TabNavigator() {
           ? blurTargets.get(activeRouteKey)
           : undefined;
 
+        // Expo Router's SDK 58 tabBar callback type omits navigation even though
+        // the underlying React Navigation bar supplies it at runtime.
+        const tabBarProps = props as typeof props & { navigation: TabBarNavigation };
+
         return (
           <FloatingGlassTabBar
-            {...props}
+            {...tabBarProps}
             tabs={LuckReadTabs}
             labelMode="none"
             iconSize={26}
