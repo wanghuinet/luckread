@@ -6,6 +6,10 @@ const diagnostics = readFileSync(new URL('../lib/posthog.tsx', import.meta.url),
 const rootLayout = readFileSync(new URL('../app/_layout.tsx', import.meta.url), 'utf8');
 const envExample = readFileSync(new URL('../.env.example', import.meta.url), 'utf8');
 const appConfigSource = readFileSync(new URL('../app.config.js', import.meta.url), 'utf8');
+const androidBetaWorkflow = readFileSync(
+  new URL('../../.github/workflows/app-android-beta-release.yml', import.meta.url),
+  'utf8',
+);
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const appConfigFactory = require('../app.config.js');
@@ -55,7 +59,7 @@ test('documents only the public ingestion key and never a personal CLI credentia
   expect(envExample).not.toContain('POSTHOG_CLI_TOKEN=');
 });
 
-test('keeps native symbol upload disabled until private EAS CLI credentials exist', () => {
+test('keeps native symbol upload disabled until the private CI CLI credential exists', () => {
   const previous = {
     apiKey: process.env.POSTHOG_CLI_API_KEY,
     projectId: process.env.POSTHOG_CLI_PROJECT_ID,
@@ -94,13 +98,18 @@ test('keeps native symbol upload disabled until private EAS CLI credentials exis
   }
 });
 
-test('documents the separate private PostHog CLI credentials for EAS symbol uploads', () => {
+test('documents and wires the separate private PostHog CLI credentials for native symbol uploads', () => {
   expect(appConfigSource).toContain('POSTHOG_CLI_API_KEY');
   expect(appConfigSource).toContain('POSTHOG_CLI_PROJECT_ID');
   expect(appConfigSource).toContain('uploadNativeSymbols: true');
   expect(appConfigSource).toContain('patchMainActivityNewIntent: false');
   expect(envExample).toContain('POSTHOG_CLI_PROJECT_ID=715723');
   expect(envExample).toContain('POSTHOG_CLI_HOST=https://us.posthog.com');
-  expect(envExample).toContain('Set POSTHOG_CLI_API_KEY as an EAS Secret');
+  expect(envExample).toContain('Configure POSTHOG_CLI_API_KEY as a GitHub Actions repository secret');
+  expect(androidBetaWorkflow).toContain('EXPO_PUBLIC_POSTHOG_API_KEY: ${{ vars.EXPO_PUBLIC_POSTHOG_API_KEY }}');
+  expect(androidBetaWorkflow).toContain('POSTHOG_CLI_API_KEY: ${{ secrets.POSTHOG_CLI_API_KEY }}');
+  expect(androidBetaWorkflow).toContain('POSTHOG_CLI_PROJECT_ID: "715723"');
+  expect(androidBetaWorkflow).toContain('POSTHOG_CLI_HOST: "https://us.posthog.com"');
+  expect(androidBetaWorkflow).toContain('EXPO_PUBLIC_POSTHOG_HOST: "https://us.i.posthog.com"');
   expect(envExample).not.toContain('POSTHOG_CLI_API_KEY=phx_');
 });
