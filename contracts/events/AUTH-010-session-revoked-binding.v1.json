@@ -1,0 +1,153 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/v1/events/AUTH-010-session-revoked-binding.v1.json",
+  "title": "AUTH-010 Session Revoked Audit Event v1",
+  "description": "W02-authoritative event emitted only after an owned Better Auth session is atomically deleted with a durable D1-01 outbox record.",
+  "type": "object",
+  "required": [
+    "eventId",
+    "eventType",
+    "schemaVersion",
+    "producer",
+    "resourceType",
+    "resourceId",
+    "occurredAt",
+    "publishedAt",
+    "correlationId",
+    "causationId",
+    "idempotencyKey",
+    "attempt",
+    "sourceVersion",
+    "actor",
+    "payload"
+  ],
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "pattern": "^evt_[a-f0-9]{32}$"
+    },
+    "eventType": {
+      "const": "user.session.revoked"
+    },
+    "schemaVersion": {
+      "const": "1.0"
+    },
+    "producer": {
+      "const": "W02"
+    },
+    "resourceType": {
+      "const": "Session"
+    },
+    "resourceId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$"
+    },
+    "occurredAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "publishedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "correlationId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255
+    },
+    "causationId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255
+    },
+    "idempotencyKey": {
+      "type": "string",
+      "pattern": "^AUTH010_SESSION_REVOKE_[a-f0-9]{32}$"
+    },
+    "attempt": {
+      "const": 1
+    },
+    "sourceVersion": {
+      "const": 1
+    },
+    "actor": {
+      "type": "object",
+      "required": [
+        "actorId",
+        "actorType"
+      ],
+      "properties": {
+        "actorId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$"
+        },
+        "actorType": {
+          "const": "user"
+        }
+      },
+      "additionalProperties": false
+    },
+    "payload": {
+      "type": "object",
+      "required": [
+        "operationId",
+        "result",
+        "reasonCode"
+      ],
+      "properties": {
+        "operationId": {
+          "const": "authSessionRevoke"
+        },
+        "result": {
+          "const": "succeeded"
+        },
+        "reasonCode": {
+          "const": "USER_INITIATED"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "x-luckread": {
+    "canonical": true,
+    "producerAuthority": "W02",
+    "sourceAuthority": "D1-01 Better Auth session",
+    "auditAuthority": "W06 D1-03 AuditEvent",
+    "delivery": {
+      "mode": "AT_LEAST_ONCE",
+      "existingQueueBinding": "AUTH013_QUEUE",
+      "existingQueueName": "luckread-auth013-account-state",
+      "outbox": "W02 D1-01 auth_010_session_revocation_journal",
+      "publisher": "workers/W02-identity/src/auth/session-revocation-publication-journal.ts",
+      "consumer": "workers/W06-governance/src/session-revocation-audit-queue-consumer.ts",
+      "deduplication": "eventId",
+      "newWorkerD1QueueOrServiceBindingAllowed": false
+    },
+    "atomicity": "The Better Auth session DELETE and durable outbox INSERT execute in one D1-01 batch. The outbox INSERT is conditioned on the preceding DELETE changing exactly one row. If the durable event cannot be committed, the session DELETE transaction fails closed.",
+    "payloadPolicy": {
+      "allowedFields": [
+        "operationId",
+        "result",
+        "reasonCode"
+      ],
+      "secretFieldsForbidden": [
+        "sessionToken",
+        "cookie",
+        "authorization",
+        "deviceFingerprint",
+        "ipAddress",
+        "userAgent",
+        "refreshCredentialHash"
+      ],
+      "sessionId": "Only in resourceId; never include the native session token.",
+      "actorAndTargetMustBeServerDerived": true
+    },
+    "nonGoals": [
+      "Does not create a second Session table or override Better Auth session authority.",
+      "Does not implement the separate session_revocation_projection task declared in auth-operation-policy.v1.json.",
+      "Does not add a Worker, D1 database, Queue, or Service Binding.",
+      "Does not claim remote delivery, deployment, or AUTH-010 GREEN."
+    ]
+  }
+}
