@@ -73,7 +73,7 @@ export async function handleCurrentUserSessionLogout(
     // Mirror Better Auth's default CSRF rule: unsafe requests carrying cookies
     // must present an explicit trusted Origin/Referer before any D1 mutation.
     // Bearer-only native requests do not use cookie CSRF validation.
-    if (request.headers.has('cookie') && authContext.options.advanced?.disableCSRFCheck !== true) {
+    if (request.headers.has('cookie')) {
       let origin = request.headers.get('origin') || request.headers.get('referer')
       // Preserve Better Auth's null-origin exception only when Fetch Metadata
       // proves a same-origin browser request; infer the internal request origin
