@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'workers/W02-identity/**'
+      - 'scripts/auth-015-lifecycle-window-migration.test.mjs'
       - 'contracts/authz/**'
       - 'contracts/entity/AUTHZ-role-assignment-authority.v1.json'
       - 'scripts/generate-role-assignment-migration.mjs'
@@ -40,6 +41,7 @@ on:
   pull_request:
     paths:
       - 'workers/W02-identity/**'
+      - 'scripts/auth-015-lifecycle-window-migration.test.mjs'
       - 'contracts/authz/**'
       - 'contracts/entity/AUTHZ-role-assignment-authority.v1.json'
       - 'scripts/generate-role-assignment-migration.mjs'
@@ -106,6 +108,8 @@ jobs:
           git diff --exit-code -- workers/W02-identity/migrations/0003_role_authorization_versions.sql
       - name: Verify role_version mutation trigger semantics
         run: node scripts/verify-role-version-mutation.mjs
+      - name: Test AUTH-015 lifecycle-window migration (local SQLite only)
+        run: node --test scripts/auth-015-lifecycle-window-migration.test.mjs
       - name: Check AUTH-007 rollout admission script syntax
         run: node --check scripts/verify-auth-007-rollout-admission.mjs
       - name: Test AUTH-007 protected-ref rollout admission
