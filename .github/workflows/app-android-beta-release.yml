@@ -225,6 +225,12 @@ jobs:
           NODE
 
       - name: Generate Android native project
+        env:
+          EXPO_PUBLIC_POSTHOG_API_KEY: ${{ vars.EXPO_PUBLIC_POSTHOG_API_KEY }}
+          EXPO_PUBLIC_POSTHOG_HOST: "https://us.i.posthog.com"
+          POSTHOG_CLI_API_KEY: ${{ secrets.POSTHOG_CLI_API_KEY }}
+          POSTHOG_CLI_PROJECT_ID: "715723"
+          POSTHOG_CLI_HOST: "https://us.posthog.com"
         run: bunx expo prebuild --platform android --clean --no-install
 
       - name: Generate and verify Hyperswitch React Native Codegen specs
@@ -246,6 +252,12 @@ jobs:
       - name: Compile signed Release APK with embedded JavaScript bundle
         # Keep the values selected by the preceding step (stable or temporary key).
         # Re-declaring these from repository secrets would blank them in test-key mode.
+        env:
+          EXPO_PUBLIC_POSTHOG_API_KEY: ${{ vars.EXPO_PUBLIC_POSTHOG_API_KEY }}
+          EXPO_PUBLIC_POSTHOG_HOST: "https://us.i.posthog.com"
+          POSTHOG_CLI_API_KEY: ${{ secrets.POSTHOG_CLI_API_KEY }}
+          POSTHOG_CLI_PROJECT_ID: "715723"
+          POSTHOG_CLI_HOST: "https://us.posthog.com"
         run: |
           chmod +x android/gradlew
           cd android
