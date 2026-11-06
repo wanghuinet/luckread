@@ -49,6 +49,24 @@ const mfaEvent: MfaAuditQueueEvent = {
   },
 }
 
+const sessionRevokedEvent = {
+  eventId: 'evt_012345678901234567890123456789ab',
+  eventType: 'user.session.revoked',
+  schemaVersion: '1.0',
+  producer: 'W02',
+  resourceType: 'Session',
+  resourceId: 'session-001',
+  occurredAt: '2026-11-06T01:00:00.000Z',
+  publishedAt: '2026-11-06T01:00:01.000Z',
+  correlationId: 'req_session_revoked_001',
+  causationId: 'trace-session-revoked-001',
+  idempotencyKey: 'AUTH010_SESSION_REVOKE_012345678901234567890123456789ab',
+  attempt: 1,
+  sourceVersion: 1,
+  actor: { actorId: 'user-001', actorType: 'user' },
+  payload: { operationId: 'authSessionRevoke', result: 'succeeded', reasonCode: 'USER_INITIATED' },
+}
+
 type TestMessage = {
   body: unknown
   attempts?: number
@@ -95,6 +113,19 @@ describe('W06 audit queue reuse of W10 batch executor', () => {
     expect(auth.retry).not.toHaveBeenCalled()
     expect(mfa.ack).toHaveBeenCalledOnce()
     expect(mfa.retry).not.toHaveBeenCalled()
+  })
+
+  it('routes user.session.revoked to the dedicated immutable Session AuditEvent consumer', async () => {
+    const { db, prepare } = createDb()
+    const session = message(sessionRevokedEvent)
+
+    await invokeQueue([session], db)
+
+    expect(session.ack).toHaveBeenCalledOnce()
+    expect(session.retry).not.toHaveBeenCalled()
+    expect(prepare).toHaveBeenCalledTimes(2)
+    expect(prepare).toHaveBeenCalledWith(expect.stringContaining('FROM audit_events WHERE event_id = ?'))
+    expect(prepare).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO audit_events'))
   })
 
   it('classifies malformed envelopes as poison and continues processing the batch', async () => {
