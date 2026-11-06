@@ -1,4 +1,5 @@
 import type { PropsWithChildren } from 'react';
+import { Platform } from 'react-native';
 import PostHog, { PostHogProvider } from 'posthog-react-native';
 
 const apiKey = process.env.EXPO_PUBLIC_POSTHOG_API_KEY?.trim();
@@ -12,6 +13,7 @@ const allowedHosts = new Set([
 // This optional client only starts when both public project settings are supplied.
 // The project token is an ingestion key, not a personal PostHog API key.
 export const posthog =
+  (Platform.OS === 'android' || Platform.OS === 'ios') &&
   apiKey && apiHost && allowedHosts.has(apiHost)
     ? new PostHog(apiKey, {
         host: apiHost,
