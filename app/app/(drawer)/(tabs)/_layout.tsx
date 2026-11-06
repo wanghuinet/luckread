@@ -4,7 +4,6 @@ import { Tabs } from 'expo-router';
 import { Platform, View, type StyleProp, type ViewStyle } from 'react-native';
 import Foundation from '@expo/vector-icons/Foundation';
 import { useColorScheme } from 'nativewind';
-import { useIsFocused } from '@react-navigation/native';
 import type { SvgProps } from 'react-native-svg';
 import { BlurTargetView } from 'expo-blur';
 import {
@@ -68,13 +67,12 @@ function TabBlurTargetScene({
   children: ReactNode;
 }) {
   const targetRef = useRef<ComponentRef<typeof View>>(null);
-  const isFocused = useIsFocused();
-
+  // screenLayout is a route-scene wrapper, not a navigation screen hook scope.
+  // Register by route key and let the parent select the focused route's target.
   useEffect(() => {
-    if (!isFocused) return;
     onTargetChange(routeKey, targetRef);
     return () => onTargetChange(routeKey, null);
-  }, [isFocused, onTargetChange, routeKey]);
+  }, [onTargetChange, routeKey]);
 
   return (
     <BlurTargetView ref={targetRef} style={{ flex: 1 }}>

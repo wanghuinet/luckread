@@ -44,7 +44,9 @@ test('targets the active Android tab scene for native BlurView background sampli
   expect(tabLayoutSource).toContain('screenLayout={screenLayout}');
   expect(tabLayoutSource).toContain('<TabBlurTargetScene');
   expect(tabLayoutSource).toContain('<BlurTargetView ref={targetRef} style={{ flex: 1 }}>');
-  expect(tabLayoutSource).toContain('useIsFocused()');
+  expect(tabLayoutSource).not.toContain('useIsFocused()');
+  expect(tabLayoutSource).toContain('onTargetChange(routeKey, targetRef)');
+  expect(tabLayoutSource).toContain('onTargetChange(routeKey, null)');
   expect(tabLayoutSource).toContain('blurTargets.get(activeRouteKey)');
   expect(tabLayoutSource).toContain("blurMethod: 'dimezisBlurViewSdk31Plus'");
   expect(tabLayoutSource).toContain('blurTarget: activeBlurTarget');
