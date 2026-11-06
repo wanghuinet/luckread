@@ -84,11 +84,21 @@ jobs:
           for (const forbidden of ['deletion_requested_at', 'deleted_at']) if (columns.some((column) => column.name === forbidden)) throw new Error('target column already exists; stop for manual reconciliation: ' + forbidden)
           if (countEnvelope[0].results.length !== 1 || Number(countEnvelope[0].results[0]?.deletion_lifecycle_rows) !== 0) throw new Error('AUTH-015 fail-closed: existing deletion lifecycle rows have no admitted timestamp provenance')
           const applied = new Set(ledgerEnvelope[0].results.map((row) => row.name))
-          const requiredPrior = ['0001_role_assignments.sql','0002_auth_013_account_state.sql','0003_auth_013_publication_journal.sql','0004_auth_003_credentials.sql','0005_better_auth_identity_core.sql','0006_better_auth_two_factor.sql','0007_l8_genesis_bootstrap_audit.sql','0008_auth_007_mfa_publication_journal.sql']
-          const missing = requiredPrior.filter((name) => !applied.has(name))
-          if (missing.length) throw new Error('Prior W02 migrations are not all recorded; refusing to apply the full migration directory: ' + missing.join(', '))
-          if (applied.has('0009_auth_015_lifecycle_windows.sql')) throw new Error('AUTH-015 migration already recorded')
-          console.log(JSON.stringify({userSchemaVerified:true,deletionLifecycleRows:0,targetColumnsAbsent:true,priorMigrationsVerified:requiredPrior,priorMigrationCount:applied.size},null,2))
+          const migrationFiles = fs.readdirSync('migrations').filter((name) => name.endsWith('.sql')).sort()
+          const targetMigration = '0009_auth_015_lifecycle_windows.sql'
+          if (!migrationFiles.includes(targetMigration)) throw new Error('AUTH-015 migration file is absent from the W02 migration directory')
+          const pending = migrationFiles.filter((name) => !applied.has(name))
+          if (pending.length !== 1 || pending[0] !== targetMigration) {
+            throw new Error('The full Wrangler migration directory contains unrelated pending migrations; refusing remote apply: ' + pending.join(', '))
+          }
+          console.log(JSON.stringify({
+            userSchemaVerified:true,
+            deletionLifecycleRows:0,
+            targetColumnsAbsent:true,
+            allPriorW02MigrationsRecorded:true,
+            onlyPendingMigration:targetMigration,
+            priorMigrationCount:applied.size
+          },null,2))
           NODE
 
       - name: Apply AUTH-015 migration to the existing D1-01 only
