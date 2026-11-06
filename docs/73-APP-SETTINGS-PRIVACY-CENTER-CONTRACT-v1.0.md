@@ -1,6 +1,6 @@
 # LuckRead APP Settings & Privacy Center Contract v1.0
 
-**Status:** IMPLEMENTATION-IN-PROGRESS / SETTINGS HOME + NOTIFICATIONS + VIDEO AUTOPLAY + IMAGE CACHE + HELP & ABOUT IMPLEMENTED / BLOCK-MUTE + APPEARANCE AWAITING UNIFIED CLOSEOUT / SESSION + PRIVACY NOT ADMITTED / CONTENT PREFERENCES PARTIAL  
+**Status:** 1.0 SETTINGS BASELINE IN PROGRESS / SETTINGS HOME + NOTIFICATIONS + VIDEO AUTOPLAY + IMAGE CACHE + POLICY LINKS + APP INFO IMPLEMENTED / BLOCK-MUTE + APPEARANCE AWAITING REAL-ACCOUNT RUNTIME CLOSEOUT / SESSION SECURITY AWAITING ADMISSION / W04 PERSONALIZATION + FULL HELP CENTER/SUPPORT/TICKETING DEFERRED TO 2.0  
 **Target:** LuckRead native APP (Android + iOS), 1.0 baseline  
 **Reference experience:** X mobile + Threads mobile  
 **Related contracts:**  
@@ -36,8 +36,8 @@ A signed-in user must be able to:
 - manage blocks and mutes;
 - choose which activity creates in-app/account notifications and whether this device may receive push notifications;
 - control appearance and basic accessibility preferences;
-- control content preferences without being forced into opaque recommendations;
-- reach help, reporting, policy, and account lifecycle actions;
+- control available device-level playback and storage behavior without being forced into opaque recommendations; W04-owned account-level interests and recommendation controls are a 2.0 scope;
+- reach official policy links, app information, and supported account lifecycle actions;
 - understand whether a choice applies to this device, this account, a conversation, or an individual post;
 - see the saved state, recover from errors, and know when a setting is unavailable.
 
@@ -118,19 +118,19 @@ Settings & privacy
 │   ├── Mentions and tagging permissions
 │   ├── Message requests and read receipts (when messaging is available)
 │   ├── Blocked and muted accounts
-│   ├── Hidden words
-│   └── Sensitive-content preference
+│   ├── Hidden words (2.0 candidate; hidden in 1.0)
+│   └── Sensitive-content preference (2.0 candidate; hidden in 1.0)
 ├── Notifications
 │   ├── In-app / account activity preferences
 │   ├── Push notification permission for this device
 │   ├── Quiet hours / pause (when supported)
 │   ├── Notification quality filters (when supported)
 │   └── Email notifications (when supported)
-├── Content and feed preferences
+├── Content and feed preferences (2.0 deferred — W04 authority required)
 │   ├── Interests and followed topics
 │   ├── Not interested / content controls
 │   ├── Recommendation personalization
-│   └── History controls (when supported)
+│   └── History controls (when supported; not shown in 1.0)
 ├── Accessibility, display and language
 │   ├── Appearance: light / dark / system
 │   ├── Text size
@@ -141,15 +141,18 @@ Settings & privacy
 ├── Storage and data
 │   ├── Media / cache usage
 │   ├── Clear local cache (device-only)
-│   └── Export personal data (when supported)
+│   └── Export personal data (2.0 candidate after USER-010/legal/security admission; hidden in 1.0)
 ├── Creator and subscriptions
 │   └── Link to existing Creator / subscription surfaces; do not duplicate billing state
-├── Help and about
+├── About and legal information (1.0)
+│   ├── Terms and privacy policy
+│   └── App version / native build
+├── Help and support services (2.0 deferred)
 │   ├── Help center
 │   ├── Report a problem
 │   ├── Appeals / account status
-│   ├── Terms and privacy policy
-│   └── App version
+│   ├── Live support
+│   └── Ticketing
 └── Account actions
     ├── Log out
     ├── Deactivate account (when supported)
@@ -170,12 +173,12 @@ Not every proposed row must appear in 1.0. A row is visible only when its end-to
 | SET-004 | Native push permission | Show supported/unsupported, granted/denied/not-yet-requested and the appropriate system-settings action | Reuse the existing Expo Notifications registration flow; request permission only after explicit user action |
 | SET-005 | Blocked and muted accounts | Reach existing paginated management screen and support safe unblock/unmute | Reuse `blocked-muted.tsx` and the Social API authority |
 | SET-006 | Appearance | Light, dark and follow-system behavior; preserve current setting after relaunch | Reuse current theme preference implementation; ensure every settings subpage follows the global theme |
-| SET-007 | Help and app information | Provide working help/report/policy links and visible app version/build information | Use verified destinations; no placeholder buttons |
+| SET-007 | Official policies and app information | Provide working terms/privacy links and actual native app version/build information only | Keep verified policy destinations and native metadata; Help Center, live support, appeals and ticketing are explicitly excluded from 1.0 |
 | SET-008 | Settings states | Loading, empty, saved, retry, permission-denied, expired-session and server-error states | Apply the shared UX contract in section 12 |
 
 ### 6.2 P0 conditional controls — include only after API verification
 
-These are important X/Threads parity controls but require a domain/API audit before they can be admitted into the 1.0 UI:
+These X/Threads parity controls are not admitted for 1.0 and must remain hidden unless a separate release decision is made after domain/API admission. They are candidates for 2.0; they are not 1.0 release blockers:
 
 - account visibility / protected profile;
 - who can follow, mention, tag, reply, quote or interact;
@@ -186,7 +189,6 @@ These are important X/Threads parity controls but require a domain/API audit bef
 - session list and individual/all-other-session revocation;
 - password/identity changes and step-up verification;
 - language, text size and reduced-motion preferences;
-- content-interest and recommendation controls.
 
 For every conditional control, the implementation admission record must identify: authoritative owner, existing API path and schema, permission, persisted scope, supported clients, failure semantics, and tests. If any part is missing, hide the control from 1.0 rather than emulate it locally.
 
@@ -218,6 +220,10 @@ Do not block APP 1.0 on the following advanced controls unless a separate produc
 - advanced community moderation and group-management settings;
 - family/supervision controls;
 - federated-network settings unless federation is enabled for LuckRead;
+- W04-owned interests, followed topics, not-interested feedback, recommendation personalization and content history;
+- full Help Center, reporting intake, appeals workflow, live support and ticketing;
+- account-level privacy controls (protected profiles, follow requests, discoverability, mention/tag and messaging preferences) after domain ownership and enforcement are admitted;
+- data export/portability only after separate USER-010 authority, security controls, legal basis and end-to-end workflow are admitted; do not represent it with a 1.0 placeholder button.
 - advanced media quality / per-network autoplay policies beyond the basic data-saver requirement.
 
 ## 7. Navigation and Interaction Contract
@@ -432,10 +438,10 @@ Implementation must proceed in small, reviewable increments. Complete and verify
 | 2 | Notification preferences integration | IMPLEMENTED — PR #1554 merged | Existing account preferences and OS push permission use the existing server/device paths |
 | 3 | Blocked and muted integration | IMPLEMENTED IN CODE — existing W05 screen/API plus account-context isolation merged in PR #1564; awaiting authenticated real-account closeout | Pagination, unblock/unmute persistence, account switching, same-account reauthentication, expired-session recovery, accessibility and Android/iOS runtime acceptance |
 | 4 | Appearance settings integration | IMPLEMENTED IN CODE — shared store and app-wide hydration in PR #1565; awaiting unified runtime acceptance | Persistence across relaunch, system-mode behavior and theme consistency across subpages, modals, loading/error states and Android/iOS |
-| 5 | Account and session security | WAITING FOR ADMISSION — PR #1555 remains a hidden candidate and is not admitted for release | W01/W02 self-scope, current-session denial, rate limiting, account/session isolation and authenticated Android/iOS runtime evidence must be accepted before exposing or merging for release; password, MFA/passkeys, login history and bulk revocation remain hidden |
-| 6 | Privacy controls | BLOCKED_NOT_ADMITTED — see docs/75-APP-PRIVACY-CONTROLS-ADMISSION-AUDIT-v1.0.md | Each control needs a proven domain owner, persisted scope, W01 API, server-side enforcement, cross-client behavior and positive/negative security tests |
-| 7 | Content preferences and data controls | PARTIAL — device-local video autoplay and image-cache controls merged; account-level interests, recommendation controls, content history and data export remain unavailable | Implement only supported server-owned preferences and clearly scoped device-local controls; no fake settings or generic settings authority |
-| 8 | Help, about and final polish | HELP/ABOUT BASE IMPLEMENTED — PR #1563 merged; full help center, live support and ticketing not connected | Verified legal/help destinations, native version/build, accessibility and final Settings release acceptance |
+| 5 | Account and session security | WAITING FOR ADMISSION — refreshed hidden candidate PR #1568; CI green, real-account Android/iOS runtime acceptance outstanding | W01/W02 self-scope, current-session denial, rate limiting, account/session isolation and authenticated Android/iOS evidence must be accepted before exposing or merging for release; password, MFA/passkeys, login history and bulk revocation remain out of scope |
+| 6 | Privacy controls | NOT ADMITTED / HIDDEN — no account-level privacy placeholder is shown in 1.0; detailed implementation is a 2.0 candidate | Any future control needs a proven domain owner, persisted scope, W01 API, server-side enforcement, cross-client behavior and positive/negative security tests; this does not block 1.0 while excluded from UI |
+| 7 | Content preferences and data controls | 1.0 BOUNDED BASELINE — device-local video autoplay and image-cache controls merged; W04 interests/recommendation/history explicitly deferred to 2.0; data export awaits separate USER-010/legal/security admission | Keep only working device-local controls in 1.0; do not add W04 buttons or represent data export as available |
+| 8 | About and legal information | 1.0 BASE IMPLEMENTED — PR #1563 merged; actual terms/privacy links and native version/build remain; full Help Center, support, appeals and ticketing deferred to 2.0 | Keep only functional policy destinations and real app metadata in 1.0; deferred support services are not release blockers |
 
 Do not batch unrelated modules. Do not start Step 2 in the same round as Step 1. Stop immediately after each module reaches its own exit condition.
 
@@ -453,4 +459,4 @@ The APP Settings 1.0 baseline is complete only when:
 - no 2.0-only feature is required for the 1.0 release gate;
 - evidence is attached to the exact commit/build tested.
 
-**Current contract status:** Steps 0–2 implemented; Steps 3–4 have code merged/in review and remain awaiting authenticated runtime closeout; Step 5 is not admitted; Step 6 is blocked/not admitted; Step 7 is partially implemented; Step 8 Help/About base is implemented while full support remains out of scope. A merged PR or green CI alone does not equal unified Settings release acceptance.
+**Current contract status:** Steps 0–2 are implemented. Steps 3–4 have code merged and await authenticated real-account runtime closeout. Step 5 (PR #1568) remains hidden pending security admission and Android/iOS real-account evidence. Step 6 privacy preferences remain unadmitted and hidden, but do not block 1.0. Step 7 is limited to working device-local autoplay and image-cache controls; W04 personalization/history is explicitly 2.0, while data export requires separate USER-010 and legal/security admission. Step 8 provides only working legal links and app metadata; Help Center, live support, appeals and ticketing are deferred to 2.0. No deferred 2.0 capability is a 1.0 release gate. A merged PR or green CI alone does not equal unified Settings release acceptance.

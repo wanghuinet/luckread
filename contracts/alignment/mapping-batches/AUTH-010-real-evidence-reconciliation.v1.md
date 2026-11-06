@@ -123,7 +123,7 @@ W01 continues to enforce origin/IP guardrails. This PR adds policy-matched scope
 
 1. Policy-matched account + endpoint limits for listing and account + caller-session + endpoint limits for revocation execute before D1 session-row access. Same-SHA W02 session/principal/rate-limit tests and W01 Foundation CI passed at `fc70945471ee1630d65ac64cfe730527370ca3e5`; the operation-policy `antiAbuse` evidence fields are `PASS`. The local runtime record is `EVD-AUTH010-B14-SESSION-LIST-REVOKE-LOCAL-004` (`CREATED`); formal registry admission and remote/deployed verification remain open.
 2. Latest exact-SHA local runtime evidence is recorded as `EVD-AUTH010-B14-SESSION-LIST-REVOKE-LOCAL-004` (`CREATED`); B13, B12 and B11 are `SUPERSEDED`. Do not mark B14 `VERIFIED` or alter the global tested-commit anchor without canonical evidence-admission authorization. Mapping 0 remains `NOT_GREEN`.
-3. Remote/deployed exact-SHA verification remains blocked and NOT EXECUTED: the native-session-compatible guarded harness has now been added to candidate branch `fix/api-closeout-session-route-v1` (`.github/workflows/auth-010-remote-e2e.yml` and `scripts/auth-010-session-runtime-e2e.mjs`). It checks for a successful deployment artifact whose provenance names the exact source SHA and only exercises sessions created by two dedicated test-account logins through the public W01 HTTP API; it performs no direct D1 writes and creates no synthetic accounts. PR #991 is still open, so the candidate is not yet considered deployed evidence. Merge the candidate, deploy that exact SHA through the controlled W01/W02 workflow, configure the four dedicated test-account secrets, and manually dispatch the remote workflow with `RUN_AUTH010_REMOTE_E2E`. Until the resulting remote probe passes, remote runtime remains unverified.
+3. Remote/deployed exact-SHA verification remains blocked and NOT EXECUTED: the native-session-compatible guarded harness has now been added to candidate branch `fix/api-closeout-session-route-v1` (`.github/workflows/auth-010-remote-e2e.yml` and `scripts/auth-010-session-runtime-e2e.mjs`). It checks for a successful deployment artifact whose provenance names the exact source SHA and only exercises sessions created by two dedicated test-account logins through the public W01 HTTP API; it performs no direct D1 writes and creates no synthetic accounts. PR #991 was merged on 2026-10-13 (merge commit `196eab002adc39bb6c6f72c9a086ae487cff13b6`). However, the B09/B10 remote evidence was produced against the earlier implementation source `5def70a5edd2d64bd585fe4251f5ba97f2f792aa`; it does not establish remote/deployed behavior for the current W02 Better Auth session-list/revoke handlers added later. The current handler source requires a new exact-SHA remote acceptance run before remote status can be claimed. Merge the candidate, deploy that exact SHA through the controlled W01/W02 workflow, configure the four dedicated test-account secrets, and manually dispatch the remote workflow with `RUN_AUTH010_REMOTE_E2E`. Until the resulting remote probe passes, remote runtime remains unverified.
 4. Keep the AUTH-002 native-session authority intact. This PR proves the list/revoke runtime path; it does not, by itself, prove every extension-table/device field in the full `ENT-SESSION` contract.
 5. `ENT-DEVICE-RECORD` remains proposed. Do not describe this session API closeout as a complete device registry until a separate canonical device contract is established.
 
@@ -146,3 +146,45 @@ Proceed in this order, one item at a time:
 1. assess formal admission of `EVD-AUTH010-B14-SESSION-LIST-REVOKE-LOCAL-004` under the registry's tested-source/freshness rules; keep its status `CREATED` unless admission requirements are independently satisfied, preserve Mapping 0 `NOT_GREEN`, and do not rewrite the tested-commit anchor;
 2. the guarded native-session remote harness is now present on the candidate branch; after merge, exact-SHA W01/W02 deployment, and configuration of the two dedicated test accounts, execute it with explicit `RUN_AUTH010_REMOTE_E2E` confirmation. Controlled local-D1 evidence alone does not prove deployed behavior;
 3. revisit AUTH-010's full feature status only after device authority and remaining canonical mapping requirements are genuinely closed.
+
+
+## 11. Current-head Better Auth session authority reconciliation — 2026-11-06
+
+### Active implementation observed
+
+The 1.1 account-center decision `docs/change-control/CC-1.1-ACCOUNT-CENTER-PAYLOAD-BOUNDARY-2026-10-05.md` makes W02 / Better Auth the platform User, Identity, Credential, Session and Account State authority. The current session-management execution path matches that boundary:
+
+- W01 H5 page: `workers/W01-payload/src/app/(twitter-clone)/me/sessions/page.tsx`.
+- W01 public API adapter: `workers/W01-payload/src/app/auth/sessions/[[...segments]]/route.ts`, re-exported at `workers/W01-payload/src/app/api/v1/auth/sessions/[[...segments]]/route.ts`.
+- W02 list and revoke handlers: `workers/W02-identity/src/auth/session-list.ts` and `workers/W02-identity/src/auth/session-revoke.ts`.
+- W02 authoritative session service: Better Auth `createLuckReadAuth(...).api.getSession`, `revokeSession`, and D1-01 `"session"` rows.
+- W02 physical schema source: `workers/W02-identity/migrations/0005_better_auth_identity_core.sql`.
+
+The DTO contract already binds `authSessionList` to `DTO-AUTH-SESSION-LIST-RESPONSE`, and `authSessionRevoke` to its session-path and no-content response DTOs. The operation policy records self-scope permission, bounded reads/writes, no-store behavior and anti-abuse evidence for both operations. The AUTH-010 page and operation bindings are now reflected in `B01-B03-identity-user-authz-org.v1.json`; the feature remains `PARTIAL`.
+
+### Exact-SHA local evidence
+
+- Run: `42070183019`
+- Artifact: `13436460882`
+- Tested source: `7777da399e4224c1a4d095ba508e2d33d9fba80c`
+- Environment: `CONTROLLED_LOCAL_D1`
+- Evidence record: `EVD-AUTH010-B16-SESSION-LIST-REVOKE-LOCAL-006`, status `CREATED`.
+
+The B16 test covered profile read, login-cookie authentication, bounded cursor pagination (50 + 6), current-session marker, secret-field exclusion, no-store responses, malformed cursor rejection, cross-account isolation, self-only revoke, repeated revoke idempotency and fixture cleanup. The W01 page, W01 API routes, W02 handlers, their tests, W02 index routing and migration 0005 are byte-identical between B16's tested source and current PR head `4494670a357b30b5f5d03ec09d64b1fc17139ff8`. This supports unchanged-scope inheritance for the *local* test claims only; it does not turn the CREATED Evidence Registry record into VERIFIED or prove remote deployment.
+
+### Superseded session persistence contract conflict
+
+The older `AUTH-002-session-persistence-migration-runtime-contract.v1.json` and `AUTH-002-minimum-session-extension-persistence-contract.v1.1.json` describe Payload-native `users.sessions[]` plus an `auth_session_state` extension. The current W02 session-management handlers instead query and revoke Better Auth's D1-01 `"session"` table. The old contract must not be treated as a physical mapping for the current implementation without a new Change Control and persistence-field reconciliation.
+
+The W02 Better Auth migration defines the session columns `id`, `token`, `user_id`, `expires_at`, `created_at`, `updated_at`, `ip_address` and `user_agent`. The revoke handler reads the stored token only inside W02 and passes it to Better Auth; the session token is not returned by the session-list DTO. The canonical Session contract's `refreshCredentialHash`, `deviceId`, `lastSeenAt` and revocation-field semantics are not yet reconciled to this physical model.
+
+### Remaining blockers — not promoted
+
+1. The current list response returns `lastSeenAt: null`; the H5 page falls back to “Device identifier not provided”. Neither a device registry entity nor a device identifier is inferred from IP address or user agent.
+2. `ENT-DEVICE-RECORD` remains PROPOSED and has no admitted field/persistence contract.
+3. The native RN APP settings surface has not been bound to a session/device-management screen or accepted by authenticated APP E2E. The discovered page is W01 H5/Web, not proof of APP parity.
+4. The physical session persistence/secret-field contract must be reconciled to the current W02 Better Auth D1-01 schema; do not mark `ENT-SESSION.persistenceStatus` VERIFIED from the superseded Payload-native contract.
+5. B09/B10 remote E2E remains historical evidence for the older tested source; current W02 Better Auth handlers need a new exact-deployed-SHA remote test before remote acceptance is claimed.
+6. B15/B16 local runtime records remain CREATED pending canonical Evidence Registry admission. Do not rewrite the global `testedCommitSha` or promote AUTH-010 / Mapping 0.
+
+**Disposition:** AUTH-010 remains `PARTIAL / BLOCKED_NOT_GREEN`. API, DTO, permission, current code and H5 page references are now explicit. Session persistence authority, device entity, native APP UI and exact-current-SHA remote evidence remain open.

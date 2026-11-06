@@ -197,8 +197,8 @@ paths:
                       active: { type: boolean }
                       userId: { type: string, minLength: 1 }
                       email: { type: string, format: email }
-                      username: { type: string, nullable: true }
-                      layer: { type: string, nullable: true }
+                      username: { type: [string, 'null'] }
+                      layer: { type: [string, 'null'] }
                   requestId: { type: string }
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '429': { $ref: '#/components/responses/RateLimited' }
@@ -541,14 +541,12 @@ paths:
                           type: string
                           format: date-time
                         lastSeenAt:
-                          type: string
+                          type: [string, 'null']
                           format: date-time
-                          nullable: true
                   currentSessionId:
                     $ref: '#/components/schemas/ResourceId'
                   nextCursor:
-                    type: string
-                    nullable: true
+                    type: [string, 'null']
         '4XX': { $ref: '#/components/responses/ClientError' }
 
   /auth/sessions/{sessionId}:
@@ -2422,7 +2420,7 @@ paths:
       responses:
         '201': { description: Trial started after the W06 audit event is durably confirmed; no immediate payment or Order is created. }
         '200': { description: Idempotent replay of the same trial request. }
-        '409': { description: Trial is not configured for the plan, or the subscriber already has an active creator membership or a prior trial for this creator. }
+        '409': { description: "Trial is not configured for the plan, or the subscriber already has an active creator membership or a prior trial for this creator." }
         '428': { description: Idempotency-Key is required. }
         '4XX': { $ref: '#/components/responses/ClientError' }
 
@@ -2856,6 +2854,11 @@ paths:
       operationId: deleteAccountSessionsSessionId
       x-luckread-contract-status: DISCOVERY_DRAFT
       x-luckread-source: contracts/api/api-inventory.v1.json
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
         default:
           description: Discovery-only operation; detailed response contract remains to be closed.
@@ -2867,6 +2870,11 @@ paths:
       operationId: getAccountsAccountId
       x-luckread-contract-status: DISCOVERY_DRAFT
       x-luckread-source: contracts/api/api-inventory.v1.json
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
         default:
           description: Discovery-only operation; detailed response contract remains to be closed.
@@ -2877,6 +2885,11 @@ paths:
       operationId: patchAccountsAccountId
       x-luckread-contract-status: DISCOVERY_DRAFT
       x-luckread-source: contracts/api/api-inventory.v1.json
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
         default:
           description: Discovery-only operation; detailed response contract remains to be closed.
@@ -2888,6 +2901,11 @@ paths:
       operationId: postAccountsAccountIdRestore
       x-luckread-contract-status: DISCOVERY_DRAFT
       x-luckread-source: contracts/api/api-inventory.v1.json
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
         default:
           description: Discovery-only operation; detailed response contract remains to be closed.
@@ -2899,6 +2917,11 @@ paths:
       operationId: postAccountsAccountIdSuspend
       x-luckread-contract-status: DISCOVERY_DRAFT
       x-luckread-source: contracts/api/api-inventory.v1.json
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
         default:
           description: Discovery-only operation; detailed response contract remains to be closed.
@@ -3074,6 +3097,11 @@ paths:
       operationId: getArticlesArticleId
       x-luckread-contract-status: DISCOVERY_DRAFT
       x-luckread-source: contracts/api/api-inventory.v1.json
+      parameters:
+        - name: articleId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
         default:
           description: Discovery-only operation; detailed response contract remains to be closed.
@@ -3084,6 +3112,11 @@ paths:
       operationId: patchArticlesArticleId
       x-luckread-contract-status: DISCOVERY_DRAFT
       x-luckread-source: contracts/api/api-inventory.v1.json
+      parameters:
+        - name: articleId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
         default:
           description: Discovery-only operation; detailed response contract remains to be closed.
@@ -3164,6 +3197,11 @@ paths:
       operationId: deleteCommentsCommentId
       x-luckread-contract-status: DISCOVERY_DRAFT
       x-luckread-source: contracts/api/api-inventory.v1.json
+      parameters:
+        - name: commentId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
         default:
           description: Discovery-only operation; detailed response contract remains to be closed.
@@ -3174,6 +3212,11 @@ paths:
       operationId: patchCommentsCommentId
       x-luckread-contract-status: DISCOVERY_DRAFT
       x-luckread-source: contracts/api/api-inventory.v1.json
+      parameters:
+        - name: commentId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
         default:
           description: Discovery-only operation; detailed response contract remains to be closed.
@@ -3185,6 +3228,11 @@ paths:
       operationId: deleteCommentsCommentIdLikes
       x-luckread-contract-status: DISCOVERY_DRAFT
       x-luckread-source: contracts/api/api-inventory.v1.json
+      parameters:
+        - name: commentId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
         default:
           description: Discovery-only operation; detailed response contract remains to be closed.
@@ -3195,6 +3243,11 @@ paths:
       operationId: postCommentsCommentIdLikes
       x-luckread-contract-status: DISCOVERY_DRAFT
       x-luckread-source: contracts/api/api-inventory.v1.json
+      parameters:
+        - name: commentId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
         default:
           description: Discovery-only operation; detailed response contract remains to be closed.
@@ -3217,6 +3270,11 @@ paths:
       operationId: deleteContentContentId
       x-luckread-contract-status: DISCOVERY_DRAFT
       x-luckread-source: contracts/api/api-inventory.v1.json
+      parameters:
+        - name: contentId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
         default:
           description: Discovery-only operation; detailed response contract remains to be closed.
@@ -3227,6 +3285,11 @@ paths:
       operationId: getContentContentId
       x-luckread-contract-status: DISCOVERY_DRAFT
       x-luckread-source: contracts/api/api-inventory.v1.json
+      parameters:
+        - name: contentId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
         default:
           description: Discovery-only operation; detailed response contract remains to be closed.
@@ -3237,6 +3300,11 @@ paths:
       operationId: patchContentContentId
       x-luckread-contract-status: DISCOVERY_DRAFT
       x-luckread-source: contracts/api/api-inventory.v1.json
+      parameters:
+        - name: contentId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
         default:
           description: Discovery-only operation; detailed response contract remains to be closed.
@@ -3248,6 +3316,11 @@ paths:
       operationId: getContentContentIdComments
       x-luckread-contract-status: DISCOVERY_DRAFT
       x-luckread-source: contracts/api/api-inventory.v1.json
+      parameters:
+        - name: contentId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
         default:
           description: Discovery-only operation; detailed response contract remains to be closed.
@@ -3258,6 +3331,11 @@ paths:
       operationId: postContentContentIdComments
       x-luckread-contract-status: DISCOVERY_DRAFT
       x-luckread-source: contracts/api/api-inventory.v1.json
+      parameters:
+        - name: contentId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
         default:
           description: Discovery-only operation; detailed response contract remains to be closed.
@@ -3269,6 +3347,11 @@ paths:
       operationId: deleteContentContentIdFavorites
       x-luckread-contract-status: DISCOVERY_DRAFT
       x-luckread-source: contracts/api/api-inventory.v1.json
+      parameters:
+        - name: contentId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
         default:
           description: Discovery-only operation; detailed response contract remains to be closed.
@@ -3279,6 +3362,11 @@ paths:
       operationId: postContentContentIdFavorites
       x-luckread-contract-status: DISCOVERY_DRAFT
       x-luckread-source: contracts/api/api-inventory.v1.json
+      parameters:
+        - name: contentId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
         default:
           description: Discovery-only operation; detailed response contract remains to be closed.
@@ -3290,6 +3378,11 @@ paths:
       operationId: deleteContentContentIdLikes
       x-luckread-contract-status: DISCOVERY_DRAFT
       x-luckread-source: contracts/api/api-inventory.v1.json
+      parameters:
+        - name: contentId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
         default:
           description: Discovery-only operation; detailed response contract remains to be closed.
@@ -3300,6 +3393,11 @@ paths:
       operationId: postContentContentIdLikes
       x-luckread-contract-status: DISCOVERY_DRAFT
       x-luckread-source: contracts/api/api-inventory.v1.json
+      parameters:
+        - name: contentId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
         default:
           description: Discovery-only operation; detailed response contract remains to be closed.
@@ -3311,6 +3409,11 @@ paths:
       operationId: postContentContentIdPublish
       x-luckread-contract-status: DISCOVERY_DRAFT
       x-luckread-source: contracts/api/api-inventory.v1.json
+      parameters:
+        - name: contentId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
         default:
           description: Discovery-only operation; detailed response contract remains to be closed.
@@ -3322,6 +3425,11 @@ paths:
       operationId: getContentContentIdRelated
       x-luckread-contract-status: DISCOVERY_DRAFT
       x-luckread-source: contracts/api/api-inventory.v1.json
+      parameters:
+        - name: contentId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
         default:
           description: Discovery-only operation; detailed response contract remains to be closed.
@@ -3333,6 +3441,11 @@ paths:
       operationId: postContentContentIdUnpublish
       x-luckread-contract-status: DISCOVERY_DRAFT
       x-luckread-source: contracts/api/api-inventory.v1.json
+      parameters:
+        - name: contentId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
         default:
           description: Discovery-only operation; detailed response contract remains to be closed.
@@ -3387,6 +3500,11 @@ paths:
       operationId: deleteDeveloperApiKeysKeyId
       x-luckread-contract-status: DISCOVERY_DRAFT
       x-luckread-source: contracts/api/api-inventory.v1.json
+      parameters:
+        - name: keyId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
         default:
           description: Discovery-only operation; detailed response contract remains to be closed.
@@ -3419,6 +3537,11 @@ paths:
       operationId: patchDeveloperAppsAppId
       x-luckread-contract-status: DISCOVERY_DRAFT
       x-luckread-source: contracts/api/api-inventory.v1.json
+      parameters:
+        - name: appId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
         default:
           description: Discovery-only operation; detailed response contract remains to be closed.
@@ -3473,6 +3596,11 @@ paths:
       operationId: deleteDeveloperWebhooksWebhookId
       x-luckread-contract-status: DISCOVERY_DRAFT
       x-luckread-source: contracts/api/api-inventory.v1.json
+      parameters:
+        - name: webhookId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
         default:
           description: Discovery-only operation; detailed response contract remains to be closed.
@@ -3591,6 +3719,11 @@ paths:
       operationId: getFeedUserUserId
       x-luckread-contract-status: DISCOVERY_DRAFT
       x-luckread-source: contracts/api/api-inventory.v1.json
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
         default:
           description: Discovery-only operation; detailed response contract remains to be closed.
@@ -3613,6 +3746,11 @@ paths:
       operationId: getGalleriesGalleryId
       x-luckread-contract-status: DISCOVERY_DRAFT
       x-luckread-source: contracts/api/api-inventory.v1.json
+      parameters:
+        - name: galleryId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
         default:
           description: Discovery-only operation; detailed response contract remains to be closed.
@@ -3623,6 +3761,11 @@ paths:
       operationId: patchGalleriesGalleryId
       x-luckread-contract-status: DISCOVERY_DRAFT
       x-luckread-source: contracts/api/api-inventory.v1.json
+      parameters:
+        - name: galleryId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
         default:
           description: Discovery-only operation; detailed response contract remains to be closed.
@@ -3655,6 +3798,11 @@ paths:
       operationId: patchIpAssetsAssetId
       x-luckread-contract-status: DISCOVERY_DRAFT
       x-luckread-source: contracts/api/api-inventory.v1.json
+      parameters:
+        - name: assetId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
         default:
           description: Discovery-only operation; detailed response contract remains to be closed.
@@ -3687,6 +3835,11 @@ paths:
       operationId: getMcnOrganizationsOrgId
       x-luckread-contract-status: DISCOVERY_DRAFT
       x-luckread-source: contracts/api/api-inventory.v1.json
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
         default:
           description: Discovery-only operation; detailed response contract remains to be closed.
@@ -3698,6 +3851,11 @@ paths:
       operationId: postMcnOrganizationsOrgIdMembers
       x-luckread-contract-status: DISCOVERY_DRAFT
       x-luckread-source: contracts/api/api-inventory.v1.json
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
         default:
           description: Discovery-only operation; detailed response contract remains to be closed.
@@ -3709,6 +3867,15 @@ paths:
       operationId: deleteMcnOrganizationsOrgIdMembersUserId
       x-luckread-contract-status: DISCOVERY_DRAFT
       x-luckread-source: contracts/api/api-inventory.v1.json
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
+        - name: userId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
         default:
           description: Discovery-only operation; detailed response contract remains to be closed.
@@ -3720,6 +3887,11 @@ paths:
       operationId: getMediaMediaIdPlayback
       x-luckread-contract-status: DISCOVERY_DRAFT
       x-luckread-source: contracts/api/api-inventory.v1.json
+      parameters:
+        - name: mediaId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
         default:
           description: Discovery-only operation; detailed response contract remains to be closed.
@@ -3731,6 +3903,11 @@ paths:
       operationId: postMediaMediaIdProcess
       x-luckread-contract-status: DISCOVERY_DRAFT
       x-luckread-source: contracts/api/api-inventory.v1.json
+      parameters:
+        - name: mediaId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
         default:
           description: Discovery-only operation; detailed response contract remains to be closed.
@@ -3742,6 +3919,11 @@ paths:
       operationId: getMediaMediaIdProcessing
       x-luckread-contract-status: DISCOVERY_DRAFT
       x-luckread-source: contracts/api/api-inventory.v1.json
+      parameters:
+        - name: mediaId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
         default:
           description: Discovery-only operation; detailed response contract remains to be closed.
@@ -3753,6 +3935,11 @@ paths:
       operationId: listMediaVariants
       x-luckread-contract-status: DISCOVERY_DRAFT
       x-luckread-source: contracts/api/api-inventory.v1.json
+      parameters:
+        - name: mediaId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
         default:
           description: Discovery-only operation; detailed response contract remains to be closed.
@@ -3775,6 +3962,11 @@ paths:
       operationId: completeUpload
       x-luckread-contract-status: DISCOVERY_DRAFT
       x-luckread-source: contracts/api/api-inventory.v1.json
+      parameters:
+        - name: uploadId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
         default:
           description: Discovery-only operation; detailed response contract remains to be closed.
@@ -3863,7 +4055,7 @@ paths:
         '403': { description: The authenticated account cannot update this resource. }
         '422': { description: Invalid or empty preference patch. }
         '429': { description: Write rate limit exceeded. }
-        '503': { description: Authorization, audit, or preference authority is unavailable. }
+        '503': { description: "Authorization, audit, or preference authority is unavailable." }
 
   /notifications/{notificationId}/read:
     post:
@@ -3872,6 +4064,11 @@ paths:
       operationId: postNotificationsNotificationIdRead
       x-luckread-contract-status: DISCOVERY_DRAFT
       x-luckread-source: contracts/api/api-inventory.v1.json
+      parameters:
+        - name: notificationId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
         default:
           description: Discovery-only operation; detailed response contract remains to be closed.
@@ -4002,6 +4199,11 @@ paths:
       operationId: getPaymentsPaymentId
       x-luckread-contract-status: DISCOVERY_DRAFT
       x-luckread-source: contracts/api/api-inventory.v1.json
+      parameters:
+        - name: paymentId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
         default:
           description: Discovery-only operation; detailed response contract remains to be closed.
@@ -4119,7 +4321,7 @@ paths:
           description: The original revocation key differs or was reused for another method.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
         '428': { $ref: '#/components/responses/IdempotencyKeyRequired' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
@@ -4298,6 +4500,11 @@ paths:
       operationId: getPostsPostId
       x-luckread-contract-status: DISCOVERY_DRAFT
       x-luckread-source: contracts/api/api-inventory.v1.json
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
         default:
           description: Discovery-only operation; detailed response contract remains to be closed.
@@ -4308,6 +4515,11 @@ paths:
       operationId: patchPostsPostId
       x-luckread-contract-status: DISCOVERY_DRAFT
       x-luckread-source: contracts/api/api-inventory.v1.json
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
         default:
           description: Discovery-only operation; detailed response contract remains to be closed.
@@ -4443,6 +4655,11 @@ paths:
       operationId: deleteSubscriptionsSubscriptionId
       x-luckread-contract-status: DISCOVERY_DRAFT
       x-luckread-source: contracts/api/api-inventory.v1.json
+      parameters:
+        - name: subscriptionId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
         default:
           description: Discovery-only operation; detailed response contract remains to be closed.
@@ -4454,6 +4671,11 @@ paths:
       operationId: getUserProfile
       x-luckread-contract-status: DISCOVERY_DRAFT
       x-luckread-source: contracts/api/api-inventory.v1.json
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
         default:
           description: Discovery-only operation; detailed response contract remains to be closed.
@@ -4464,6 +4686,11 @@ paths:
       operationId: patchUsersUserId
       x-luckread-contract-status: DISCOVERY_DRAFT
       x-luckread-source: contracts/api/api-inventory.v1.json
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
         default:
           description: Discovery-only operation; detailed response contract remains to be closed.
@@ -4475,6 +4702,11 @@ paths:
       operationId: deleteUsersUserIdFollow
       x-luckread-contract-status: DISCOVERY_DRAFT
       x-luckread-source: contracts/api/api-inventory.v1.json
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
         default:
           description: Discovery-only operation; detailed response contract remains to be closed.
@@ -4485,6 +4717,11 @@ paths:
       operationId: postUsersUserIdFollow
       x-luckread-contract-status: DISCOVERY_DRAFT
       x-luckread-source: contracts/api/api-inventory.v1.json
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
         default:
           description: Discovery-only operation; detailed response contract remains to be closed.
@@ -4496,6 +4733,11 @@ paths:
       operationId: getUsersUserIdFollowers
       x-luckread-contract-status: DISCOVERY_DRAFT
       x-luckread-source: contracts/api/api-inventory.v1.json
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
         default:
           description: Discovery-only operation; detailed response contract remains to be closed.
@@ -4507,6 +4749,11 @@ paths:
       operationId: getUsersUserIdFollowing
       x-luckread-contract-status: DISCOVERY_DRAFT
       x-luckread-source: contracts/api/api-inventory.v1.json
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
         default:
           description: Discovery-only operation; detailed response contract remains to be closed.
@@ -4519,6 +4766,11 @@ paths:
       operationId: getUsersUserIdProfile
       x-luckread-contract-status: DISCOVERY_DRAFT
       x-luckread-source: contracts/api/api-inventory.v1.json
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/ResourceId' }
       responses:
         default:
           description: Discovery-only operation; detailed response contract remains to be closed.
@@ -4861,7 +5113,7 @@ paths:
       security: []
       operationId: getUsersUserIdPinnedContent
       responses:
-        '200': { description: Pinned-content reference, or null when no public pin exists. }
+        '200': { description: "Pinned-content reference, or null when no public pin exists." }
         '4XX': { $ref: '#/components/responses/ClientError' }
   /topics/{topicName}:
     get:
@@ -5142,7 +5394,7 @@ paths:
                       etag: { $ref: '#/components/schemas/ETag' }
                       replayed: { type: boolean }
                   requestId: { $ref: '#/components/schemas/RequestId' }
-        '403': { $ref: '#/components/responses/Forbidden' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
         '404': { $ref: '#/components/responses/NotFound' }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
@@ -6001,257 +6253,6 @@ components:
       properties:
         currentPassword: { type: string, minLength: 1, writeOnly: true }
         code: { type: string, pattern: '^[0-9]{6}$', writeOnly: true }
-    ResourceId:
-      type: string
-      minLength: 1
-      maxLength: 128
-    Credential:
-      type: object
-      required: [credentialId, kind, active]
-      additionalProperties: false
-      properties:
-        credentialId:
-          $ref: '#/components/schemas/ResourceId'
-        kind:
-          type: string
-          enum: [username, email, phone]
-        active:
-          type: boolean
-    Cursor:
-      $ref: '../../schemas/common/cursor.json'
-    RequestId:
-      $ref: '../../schemas/common/request-id.json'
-    TraceId:
-      $ref: '../../schemas/common/trace-id.json'
-    ETag:
-      type: string
-      minLength: 1
-      maxLength: 256
-    AuthRegistrationConsent:
-      type: object
-      required: [purpose, policyVersion]
-      properties:
-        purpose: { type: string, enum: [ACCOUNT_REGISTRATION] }
-        policyVersion: { type: string }
-      additionalProperties: false
-    AccountState:
-      $ref: '../../enums/account-state.json'
-    ContentState:
-      $ref: '../../enums/content-state.json'
-    ErrorResponse:
-      $ref: '../../schemas/common/error-response.json'
-    ListResponse:
-      $ref: '../../schemas/common/list-response.json'
-    User:
-      type: object
-      required: [id, username, accountState, layer]
-      properties:
-        id: { $ref: '#/components/schemas/ResourceId' }
-        username: { type: string }
-        accountState: { $ref: '#/components/schemas/AccountState' }
-        layer: { type: string, pattern: '^L[0-8]$' }
-    Content:
-      type: object
-      required: [id, state, version, etag]
-      properties:
-        id: { $ref: '#/components/schemas/ResourceId' }
-        state: { $ref: '#/components/schemas/ContentState' }
-        version: { type: integer, minimum: 1 }
-        etag: { $ref: '#/components/schemas/ETag' }
-        mediaWarning:
-          type: [string, 'null']
-          enum: [NUDITY, VIOLENCE, SENSITIVE, null]
-          description: Creator-selected warning for media attached to a social post.
-        creator:
-          description: Optional public author projection included by list endpoints to avoid per-item profile requests.
-          $ref: '#/components/schemas/PublicAuthor'
-    PublicAuthor:
-      type: object
-      required: [id, username, displayName, avatar]
-      properties:
-        id: { $ref: '#/components/schemas/ResourceId' }
-        username: { type: string }
-        displayName: { type: [string, 'null'] }
-        avatar: { type: [string, 'null'] }
-    ContentInput:
-      type: object
-      required: [title, bodyRef]
-      properties:
-        title: { type: string, minLength: 1, maxLength: 512 }
-        bodyRef: { type: string, description: R2 object reference }
-        mediaWarning:
-          type: [string, 'null']
-          enum: [NUDITY, VIOLENCE, SENSITIVE, null]
-          description: Optional creator-selected warning for media on social posts; W03 rejects this field for articles, videos, or posts without media.
-    Media:
-      type: object
-      required: [id, mimeType, size, checksum, status]
-      properties:
-        id: { $ref: '#/components/schemas/ResourceId' }
-        mimeType: { type: string }
-        size: { type: integer, minimum: 1 }
-        checksum: { type: string }
-        status: { enum: [INITIATED, UPLOADING, READY, FAILED, QUARANTINED] }
-    Comment:
-      type: object
-      required: [id, body, state]
-      properties:
-        id: { $ref: '#/components/schemas/ResourceId' }
-        body: { type: string }
-        state: { enum: [PENDING, PUBLISHED, REJECTED] }
-        author:
-          description: Optional public author projection included by list endpoints to avoid per-comment profile requests.
-          $ref: '#/components/schemas/PublicAuthor'
-    ContentPollOption:
-      type: object
-      required: [optionId, text, position, votes]
-      additionalProperties: false
-      properties:
-        optionId: { $ref: '#/components/schemas/ResourceId' }
-        text: { type: string, minLength: 1, maxLength: 50 }
-        position: { type: integer, minimum: 0, maximum: 3 }
-        votes: { type: integer, minimum: 0 }
-    ContentPoll:
-      type: object
-      required: [pollId, contentId, options, durationMinutes, endsAt, totalVotes, viewerOptionId, closed]
-      additionalProperties: false
-      properties:
-        pollId: { $ref: '#/components/schemas/ResourceId' }
-        contentId: { $ref: '#/components/schemas/ResourceId' }
-        options:
-          type: array
-          minItems: 2
-          maxItems: 4
-          items: { $ref: '#/components/schemas/ContentPollOption' }
-        durationMinutes: { type: integer, minimum: 5, maximum: 10080 }
-        durationHours: { type: number, deprecated: true, description: Legacy compatibility projection; use durationMinutes. }
-        endsAt: { type: [string, 'null'], format: date-time }
-        totalVotes: { type: integer, minimum: 0 }
-        viewerOptionId: { type: [string, 'null'], maxLength: 128 }
-        closed: { type: boolean }
-    InteractionTarget:
-      type: object
-      required: [targetType, targetId]
-      properties:
-        targetType: { enum: [content, comment, creator, ip] }
-        targetId: { $ref: '#/components/schemas/ResourceId' }
-    Creator:
-      type: object
-      required: [id, userId, displayName]
-      properties:
-        id: { $ref: '#/components/schemas/ResourceId' }
-        userId: { $ref: '#/components/schemas/ResourceId' }
-        displayName: { type: string }
-    IP:
-      type: object
-      required: [id, name]
-      properties:
-        id: { $ref: '#/components/schemas/ResourceId' }
-        name: { type: string }
-    Organization:
-      type: object
-      required: [id, name]
-      properties:
-        id: { $ref: '#/components/schemas/ResourceId' }
-        name: { type: string }
-    ModerationQueueItem:
-      type: object
-      additionalProperties: false
-      required: [caseId, targetType, targetId, policyVersion, state, priority, version, createdAt]
-      properties:
-        caseId: { $ref: '#/components/schemas/ResourceId' }
-        targetType: { type: string, enum: [content, comment, creator, ip, user] }
-        targetId: { $ref: '#/components/schemas/ResourceId' }
-        policyVersion: { type: string, minLength: 1, maxLength: 128 }
-        state: { $ref: '../../enums/moderation-case-state.json' }
-        priority: { type: integer, minimum: 0 }
-        version: { type: integer, minimum: 1 }
-        createdAt: { type: string, format: date-time }
-    ModerationQueueResponse:
-      type: object
-      additionalProperties: false
-      required: [items, nextCursor, hasMore, requestId]
-      properties:
-        items:
-          type: array
-          maxItems: 50
-          items: { $ref: '#/components/schemas/ModerationQueueItem' }
-        nextCursor:
-          type: [string, 'null']
-        hasMore: { type: boolean }
-        requestId: { $ref: '#/components/schemas/RequestId' }
-    ModerationCaseResponse:
-      type: object
-      additionalProperties: false
-      required: [caseId, target, contentReference, policyVersion, currentDecision, evidenceRefs, status, version, createdAt, updatedAt]
-      properties:
-        caseId: { $ref: '#/components/schemas/ResourceId' }
-        target:
-          $ref: '#/components/schemas/ModerationTarget'
-        contentReference:
-          $ref: '#/components/schemas/ModerationContentReference'
-        policyVersion: { type: string, minLength: 1, maxLength: 128 }
-        currentDecision:
-          anyOf:
-            - { $ref: '#/components/schemas/ModerationDecisionSummary' }
-            - { type: 'null' }
-        evidenceRefs:
-          type: array
-          maxItems: 50
-          items: { type: string }
-        status:
-          $ref: '../../enums/moderation-case-state.json'
-        version: { type: integer, minimum: 1 }
-        createdAt: { type: string, format: date-time }
-        updatedAt: { type: string, format: date-time }
-    ModerationTarget:
-      type: object
-      additionalProperties: false
-      required: [targetType, targetId]
-      properties:
-        targetType: { type: string, enum: [content, comment, creator, ip, user] }
-        targetId: { $ref: '#/components/schemas/ResourceId' }
-    ModerationContentReference:
-      type: object
-      additionalProperties: false
-      required: [contentId]
-      properties:
-        contentId: { $ref: '#/components/schemas/ResourceId' }
-    ModerationDecisionSummary:
-      type: object
-      additionalProperties: false
-      required: [decisionId, outcome, policyVersion, effectiveAt]
-      properties:
-        decisionId: { $ref: '#/components/schemas/ResourceId' }
-        outcome: { type: string, enum: [APPROVED, REJECTED] }
-        policyVersion: { type: string, minLength: 1, maxLength: 128 }
-        effectiveAt: { type: string, format: date-time }
-    ModerationDecisionRequest:
-      type: object
-      additionalProperties: false
-      required: [expectedVersion, decision, policyVersion, reasonCode, severity, scope, effectiveAt]
-      properties:
-        expectedVersion: { type: integer, minimum: 1 }
-        decision: { type: string, enum: [APPROVED, REJECTED] }
-        policyVersion: { type: string, minLength: 1, maxLength: 128 }
-        reasonCode: { type: string, minLength: 1, maxLength: 128 }
-        severity: { type: string, minLength: 1, maxLength: 64 }
-        scope: { type: string, minLength: 1, maxLength: 128 }
-        effectiveAt: { type: string, format: date-time }
-        expiresAt:
-          type: [string, 'null']
-          format: date-time
-    ModerationDecisionResponse:
-      type: object
-      additionalProperties: false
-      required: [caseId, decisionId, outcome, version, effectiveAt, requestId]
-      properties:
-        caseId: { $ref: '#/components/schemas/ResourceId' }
-        decisionId: { $ref: '#/components/schemas/ResourceId' }
-        outcome: { type: string, enum: [APPROVED, REJECTED] }
-        version: { type: integer, minimum: 1 }
-        effectiveAt: { type: string, format: date-time }
-        requestId: { $ref: '#/components/schemas/RequestId' }
     AuthMfaRecoveryCodesRotateRequest:
       type: object
       required: [currentPassword, code]
@@ -6259,257 +6260,6 @@ components:
       properties:
         currentPassword: { type: string, minLength: 1, writeOnly: true }
         code: { type: string, pattern: '^[0-9]{6}$', writeOnly: true }
-    ResourceId:
-      type: string
-      minLength: 1
-      maxLength: 128
-    Credential:
-      type: object
-      required: [credentialId, kind, active]
-      additionalProperties: false
-      properties:
-        credentialId:
-          $ref: '#/components/schemas/ResourceId'
-        kind:
-          type: string
-          enum: [username, email, phone]
-        active:
-          type: boolean
-    Cursor:
-      $ref: '../../schemas/common/cursor.json'
-    RequestId:
-      $ref: '../../schemas/common/request-id.json'
-    TraceId:
-      $ref: '../../schemas/common/trace-id.json'
-    ETag:
-      type: string
-      minLength: 1
-      maxLength: 256
-    AuthRegistrationConsent:
-      type: object
-      required: [purpose, policyVersion]
-      properties:
-        purpose: { type: string, enum: [ACCOUNT_REGISTRATION] }
-        policyVersion: { type: string }
-      additionalProperties: false
-    AccountState:
-      $ref: '../../enums/account-state.json'
-    ContentState:
-      $ref: '../../enums/content-state.json'
-    ErrorResponse:
-      $ref: '../../schemas/common/error-response.json'
-    ListResponse:
-      $ref: '../../schemas/common/list-response.json'
-    User:
-      type: object
-      required: [id, username, accountState, layer]
-      properties:
-        id: { $ref: '#/components/schemas/ResourceId' }
-        username: { type: string }
-        accountState: { $ref: '#/components/schemas/AccountState' }
-        layer: { type: string, pattern: '^L[0-8]$' }
-    Content:
-      type: object
-      required: [id, state, version, etag]
-      properties:
-        id: { $ref: '#/components/schemas/ResourceId' }
-        state: { $ref: '#/components/schemas/ContentState' }
-        version: { type: integer, minimum: 1 }
-        etag: { $ref: '#/components/schemas/ETag' }
-        mediaWarning:
-          type: [string, 'null']
-          enum: [NUDITY, VIOLENCE, SENSITIVE, null]
-          description: Creator-selected warning for media attached to a social post.
-        creator:
-          description: Optional public author projection included by list endpoints to avoid per-item profile requests.
-          $ref: '#/components/schemas/PublicAuthor'
-    PublicAuthor:
-      type: object
-      required: [id, username, displayName, avatar]
-      properties:
-        id: { $ref: '#/components/schemas/ResourceId' }
-        username: { type: string }
-        displayName: { type: [string, 'null'] }
-        avatar: { type: [string, 'null'] }
-    ContentInput:
-      type: object
-      required: [title, bodyRef]
-      properties:
-        title: { type: string, minLength: 1, maxLength: 512 }
-        bodyRef: { type: string, description: R2 object reference }
-        mediaWarning:
-          type: [string, 'null']
-          enum: [NUDITY, VIOLENCE, SENSITIVE, null]
-          description: Optional creator-selected warning for media on social posts; W03 rejects this field for articles, videos, or posts without media.
-    Media:
-      type: object
-      required: [id, mimeType, size, checksum, status]
-      properties:
-        id: { $ref: '#/components/schemas/ResourceId' }
-        mimeType: { type: string }
-        size: { type: integer, minimum: 1 }
-        checksum: { type: string }
-        status: { enum: [INITIATED, UPLOADING, READY, FAILED, QUARANTINED] }
-    Comment:
-      type: object
-      required: [id, body, state]
-      properties:
-        id: { $ref: '#/components/schemas/ResourceId' }
-        body: { type: string }
-        state: { enum: [PENDING, PUBLISHED, REJECTED] }
-        author:
-          description: Optional public author projection included by list endpoints to avoid per-comment profile requests.
-          $ref: '#/components/schemas/PublicAuthor'
-    ContentPollOption:
-      type: object
-      required: [optionId, text, position, votes]
-      additionalProperties: false
-      properties:
-        optionId: { $ref: '#/components/schemas/ResourceId' }
-        text: { type: string, minLength: 1, maxLength: 50 }
-        position: { type: integer, minimum: 0, maximum: 3 }
-        votes: { type: integer, minimum: 0 }
-    ContentPoll:
-      type: object
-      required: [pollId, contentId, options, durationMinutes, endsAt, totalVotes, viewerOptionId, closed]
-      additionalProperties: false
-      properties:
-        pollId: { $ref: '#/components/schemas/ResourceId' }
-        contentId: { $ref: '#/components/schemas/ResourceId' }
-        options:
-          type: array
-          minItems: 2
-          maxItems: 4
-          items: { $ref: '#/components/schemas/ContentPollOption' }
-        durationMinutes: { type: integer, minimum: 5, maximum: 10080 }
-        durationHours: { type: number, deprecated: true, description: Legacy compatibility projection; use durationMinutes. }
-        endsAt: { type: [string, 'null'], format: date-time }
-        totalVotes: { type: integer, minimum: 0 }
-        viewerOptionId: { type: [string, 'null'], maxLength: 128 }
-        closed: { type: boolean }
-    InteractionTarget:
-      type: object
-      required: [targetType, targetId]
-      properties:
-        targetType: { enum: [content, comment, creator, ip] }
-        targetId: { $ref: '#/components/schemas/ResourceId' }
-    Creator:
-      type: object
-      required: [id, userId, displayName]
-      properties:
-        id: { $ref: '#/components/schemas/ResourceId' }
-        userId: { $ref: '#/components/schemas/ResourceId' }
-        displayName: { type: string }
-    IP:
-      type: object
-      required: [id, name]
-      properties:
-        id: { $ref: '#/components/schemas/ResourceId' }
-        name: { type: string }
-    Organization:
-      type: object
-      required: [id, name]
-      properties:
-        id: { $ref: '#/components/schemas/ResourceId' }
-        name: { type: string }
-    ModerationQueueItem:
-      type: object
-      additionalProperties: false
-      required: [caseId, targetType, targetId, policyVersion, state, priority, version, createdAt]
-      properties:
-        caseId: { $ref: '#/components/schemas/ResourceId' }
-        targetType: { type: string, enum: [content, comment, creator, ip, user] }
-        targetId: { $ref: '#/components/schemas/ResourceId' }
-        policyVersion: { type: string, minLength: 1, maxLength: 128 }
-        state: { $ref: '../../enums/moderation-case-state.json' }
-        priority: { type: integer, minimum: 0 }
-        version: { type: integer, minimum: 1 }
-        createdAt: { type: string, format: date-time }
-    ModerationQueueResponse:
-      type: object
-      additionalProperties: false
-      required: [items, nextCursor, hasMore, requestId]
-      properties:
-        items:
-          type: array
-          maxItems: 50
-          items: { $ref: '#/components/schemas/ModerationQueueItem' }
-        nextCursor:
-          type: [string, 'null']
-        hasMore: { type: boolean }
-        requestId: { $ref: '#/components/schemas/RequestId' }
-    ModerationCaseResponse:
-      type: object
-      additionalProperties: false
-      required: [caseId, target, contentReference, policyVersion, currentDecision, evidenceRefs, status, version, createdAt, updatedAt]
-      properties:
-        caseId: { $ref: '#/components/schemas/ResourceId' }
-        target:
-          $ref: '#/components/schemas/ModerationTarget'
-        contentReference:
-          $ref: '#/components/schemas/ModerationContentReference'
-        policyVersion: { type: string, minLength: 1, maxLength: 128 }
-        currentDecision:
-          anyOf:
-            - { $ref: '#/components/schemas/ModerationDecisionSummary' }
-            - { type: 'null' }
-        evidenceRefs:
-          type: array
-          maxItems: 50
-          items: { type: string }
-        status:
-          $ref: '../../enums/moderation-case-state.json'
-        version: { type: integer, minimum: 1 }
-        createdAt: { type: string, format: date-time }
-        updatedAt: { type: string, format: date-time }
-    ModerationTarget:
-      type: object
-      additionalProperties: false
-      required: [targetType, targetId]
-      properties:
-        targetType: { type: string, enum: [content, comment, creator, ip, user] }
-        targetId: { $ref: '#/components/schemas/ResourceId' }
-    ModerationContentReference:
-      type: object
-      additionalProperties: false
-      required: [contentId]
-      properties:
-        contentId: { $ref: '#/components/schemas/ResourceId' }
-    ModerationDecisionSummary:
-      type: object
-      additionalProperties: false
-      required: [decisionId, outcome, policyVersion, effectiveAt]
-      properties:
-        decisionId: { $ref: '#/components/schemas/ResourceId' }
-        outcome: { type: string, enum: [APPROVED, REJECTED] }
-        policyVersion: { type: string, minLength: 1, maxLength: 128 }
-        effectiveAt: { type: string, format: date-time }
-    ModerationDecisionRequest:
-      type: object
-      additionalProperties: false
-      required: [expectedVersion, decision, policyVersion, reasonCode, severity, scope, effectiveAt]
-      properties:
-        expectedVersion: { type: integer, minimum: 1 }
-        decision: { type: string, enum: [APPROVED, REJECTED] }
-        policyVersion: { type: string, minLength: 1, maxLength: 128 }
-        reasonCode: { type: string, minLength: 1, maxLength: 128 }
-        severity: { type: string, minLength: 1, maxLength: 64 }
-        scope: { type: string, minLength: 1, maxLength: 128 }
-        effectiveAt: { type: string, format: date-time }
-        expiresAt:
-          type: [string, 'null']
-          format: date-time
-    ModerationDecisionResponse:
-      type: object
-      additionalProperties: false
-      required: [caseId, decisionId, outcome, version, effectiveAt, requestId]
-      properties:
-        caseId: { $ref: '#/components/schemas/ResourceId' }
-        decisionId: { $ref: '#/components/schemas/ResourceId' }
-        outcome: { type: string, enum: [APPROVED, REJECTED] }
-        version: { type: integer, minimum: 1 }
-        effectiveAt: { type: string, format: date-time }
-        requestId: { $ref: '#/components/schemas/RequestId' }
     AuthMfaRecoveryCodesRotateResponse:
       type: object
       required: [recoveryCodes]
@@ -6529,254 +6279,3 @@ components:
         name: { type: [string, 'null'] }
         emailVerified: { type: boolean }
         image: { type: [string, 'null'], format: uri }
-    ResourceId:
-      type: string
-      minLength: 1
-      maxLength: 128
-    Credential:
-      type: object
-      required: [credentialId, kind, active]
-      additionalProperties: false
-      properties:
-        credentialId:
-          $ref: '#/components/schemas/ResourceId'
-        kind:
-          type: string
-          enum: [username, email, phone]
-        active:
-          type: boolean
-    Cursor:
-      $ref: '../../schemas/common/cursor.json'
-    RequestId:
-      $ref: '../../schemas/common/request-id.json'
-    TraceId:
-      $ref: '../../schemas/common/trace-id.json'
-    ETag:
-      type: string
-      minLength: 1
-      maxLength: 256
-    AuthRegistrationConsent:
-      type: object
-      required: [purpose, policyVersion]
-      properties:
-        purpose: { type: string, enum: [ACCOUNT_REGISTRATION] }
-        policyVersion: { type: string }
-      additionalProperties: false
-    AccountState:
-      $ref: '../../enums/account-state.json'
-    ContentState:
-      $ref: '../../enums/content-state.json'
-    ErrorResponse:
-      $ref: '../../schemas/common/error-response.json'
-    ListResponse:
-      $ref: '../../schemas/common/list-response.json'
-    User:
-      type: object
-      required: [id, username, accountState, layer]
-      properties:
-        id: { $ref: '#/components/schemas/ResourceId' }
-        username: { type: string }
-        accountState: { $ref: '#/components/schemas/AccountState' }
-        layer: { type: string, pattern: '^L[0-8]$' }
-    Content:
-      type: object
-      required: [id, state, version, etag]
-      properties:
-        id: { $ref: '#/components/schemas/ResourceId' }
-        state: { $ref: '#/components/schemas/ContentState' }
-        version: { type: integer, minimum: 1 }
-        etag: { $ref: '#/components/schemas/ETag' }
-        mediaWarning:
-          type: [string, 'null']
-          enum: [NUDITY, VIOLENCE, SENSITIVE, null]
-          description: Creator-selected warning for media attached to a social post.
-        creator:
-          description: Optional public author projection included by list endpoints to avoid per-item profile requests.
-          $ref: '#/components/schemas/PublicAuthor'
-    PublicAuthor:
-      type: object
-      required: [id, username, displayName, avatar]
-      properties:
-        id: { $ref: '#/components/schemas/ResourceId' }
-        username: { type: string }
-        displayName: { type: [string, 'null'] }
-        avatar: { type: [string, 'null'] }
-    ContentInput:
-      type: object
-      required: [title, bodyRef]
-      properties:
-        title: { type: string, minLength: 1, maxLength: 512 }
-        bodyRef: { type: string, description: R2 object reference }
-        mediaWarning:
-          type: [string, 'null']
-          enum: [NUDITY, VIOLENCE, SENSITIVE, null]
-          description: Optional creator-selected warning for media on social posts; W03 rejects this field for articles, videos, or posts without media.
-    Media:
-      type: object
-      required: [id, mimeType, size, checksum, status]
-      properties:
-        id: { $ref: '#/components/schemas/ResourceId' }
-        mimeType: { type: string }
-        size: { type: integer, minimum: 1 }
-        checksum: { type: string }
-        status: { enum: [INITIATED, UPLOADING, READY, FAILED, QUARANTINED] }
-    Comment:
-      type: object
-      required: [id, body, state]
-      properties:
-        id: { $ref: '#/components/schemas/ResourceId' }
-        body: { type: string }
-        state: { enum: [PENDING, PUBLISHED, REJECTED] }
-        author:
-          description: Optional public author projection included by list endpoints to avoid per-comment profile requests.
-          $ref: '#/components/schemas/PublicAuthor'
-    ContentPollOption:
-      type: object
-      required: [optionId, text, position, votes]
-      additionalProperties: false
-      properties:
-        optionId: { $ref: '#/components/schemas/ResourceId' }
-        text: { type: string, minLength: 1, maxLength: 50 }
-        position: { type: integer, minimum: 0, maximum: 3 }
-        votes: { type: integer, minimum: 0 }
-    ContentPoll:
-      type: object
-      required: [pollId, contentId, options, durationMinutes, endsAt, totalVotes, viewerOptionId, closed]
-      additionalProperties: false
-      properties:
-        pollId: { $ref: '#/components/schemas/ResourceId' }
-        contentId: { $ref: '#/components/schemas/ResourceId' }
-        options:
-          type: array
-          minItems: 2
-          maxItems: 4
-          items: { $ref: '#/components/schemas/ContentPollOption' }
-        durationMinutes: { type: integer, minimum: 5, maximum: 10080 }
-        durationHours: { type: number, deprecated: true, description: Legacy compatibility projection; use durationMinutes. }
-        endsAt: { type: [string, 'null'], format: date-time }
-        totalVotes: { type: integer, minimum: 0 }
-        viewerOptionId: { type: [string, 'null'], maxLength: 128 }
-        closed: { type: boolean }
-    InteractionTarget:
-      type: object
-      required: [targetType, targetId]
-      properties:
-        targetType: { enum: [content, comment, creator, ip] }
-        targetId: { $ref: '#/components/schemas/ResourceId' }
-    Creator:
-      type: object
-      required: [id, userId, displayName]
-      properties:
-        id: { $ref: '#/components/schemas/ResourceId' }
-        userId: { $ref: '#/components/schemas/ResourceId' }
-        displayName: { type: string }
-    IP:
-      type: object
-      required: [id, name]
-      properties:
-        id: { $ref: '#/components/schemas/ResourceId' }
-        name: { type: string }
-    Organization:
-      type: object
-      required: [id, name]
-      properties:
-        id: { $ref: '#/components/schemas/ResourceId' }
-        name: { type: string }
-    ModerationQueueItem:
-      type: object
-      additionalProperties: false
-      required: [caseId, targetType, targetId, policyVersion, state, priority, version, createdAt]
-      properties:
-        caseId: { $ref: '#/components/schemas/ResourceId' }
-        targetType: { type: string, enum: [content, comment, creator, ip, user] }
-        targetId: { $ref: '#/components/schemas/ResourceId' }
-        policyVersion: { type: string, minLength: 1, maxLength: 128 }
-        state: { $ref: '../../enums/moderation-case-state.json' }
-        priority: { type: integer, minimum: 0 }
-        version: { type: integer, minimum: 1 }
-        createdAt: { type: string, format: date-time }
-    ModerationQueueResponse:
-      type: object
-      additionalProperties: false
-      required: [items, nextCursor, hasMore, requestId]
-      properties:
-        items:
-          type: array
-          maxItems: 50
-          items: { $ref: '#/components/schemas/ModerationQueueItem' }
-        nextCursor:
-          type: [string, 'null']
-        hasMore: { type: boolean }
-        requestId: { $ref: '#/components/schemas/RequestId' }
-    ModerationCaseResponse:
-      type: object
-      additionalProperties: false
-      required: [caseId, target, contentReference, policyVersion, currentDecision, evidenceRefs, status, version, createdAt, updatedAt]
-      properties:
-        caseId: { $ref: '#/components/schemas/ResourceId' }
-        target:
-          $ref: '#/components/schemas/ModerationTarget'
-        contentReference:
-          $ref: '#/components/schemas/ModerationContentReference'
-        policyVersion: { type: string, minLength: 1, maxLength: 128 }
-        currentDecision:
-          anyOf:
-            - { $ref: '#/components/schemas/ModerationDecisionSummary' }
-            - { type: 'null' }
-        evidenceRefs:
-          type: array
-          maxItems: 50
-          items: { type: string }
-        status:
-          $ref: '../../enums/moderation-case-state.json'
-        version: { type: integer, minimum: 1 }
-        createdAt: { type: string, format: date-time }
-        updatedAt: { type: string, format: date-time }
-    ModerationTarget:
-      type: object
-      additionalProperties: false
-      required: [targetType, targetId]
-      properties:
-        targetType: { type: string, enum: [content, comment, creator, ip, user] }
-        targetId: { $ref: '#/components/schemas/ResourceId' }
-    ModerationContentReference:
-      type: object
-      additionalProperties: false
-      required: [contentId]
-      properties:
-        contentId: { $ref: '#/components/schemas/ResourceId' }
-    ModerationDecisionSummary:
-      type: object
-      additionalProperties: false
-      required: [decisionId, outcome, policyVersion, effectiveAt]
-      properties:
-        decisionId: { $ref: '#/components/schemas/ResourceId' }
-        outcome: { type: string, enum: [APPROVED, REJECTED] }
-        policyVersion: { type: string, minLength: 1, maxLength: 128 }
-        effectiveAt: { type: string, format: date-time }
-    ModerationDecisionRequest:
-      type: object
-      additionalProperties: false
-      required: [expectedVersion, decision, policyVersion, reasonCode, severity, scope, effectiveAt]
-      properties:
-        expectedVersion: { type: integer, minimum: 1 }
-        decision: { type: string, enum: [APPROVED, REJECTED] }
-        policyVersion: { type: string, minLength: 1, maxLength: 128 }
-        reasonCode: { type: string, minLength: 1, maxLength: 128 }
-        severity: { type: string, minLength: 1, maxLength: 64 }
-        scope: { type: string, minLength: 1, maxLength: 128 }
-        effectiveAt: { type: string, format: date-time }
-        expiresAt:
-          type: [string, 'null']
-          format: date-time
-    ModerationDecisionResponse:
-      type: object
-      additionalProperties: false
-      required: [caseId, decisionId, outcome, version, effectiveAt, requestId]
-      properties:
-        caseId: { $ref: '#/components/schemas/ResourceId' }
-        decisionId: { $ref: '#/components/schemas/ResourceId' }
-        outcome: { type: string, enum: [APPROVED, REJECTED] }
-        version: { type: integer, minimum: 1 }
-        effectiveAt: { type: string, format: date-time }
-        requestId: { $ref: '#/components/schemas/RequestId' }
