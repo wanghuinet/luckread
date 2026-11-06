@@ -53,11 +53,16 @@ Both permissions are granted to the global base `user` role in `x-role-permissio
 - revocation must dominate stale cache state
 - audit is required by the existing permission catalog entry
 
-## Important distinction
+## Explicit self/own scope mapping
 
-`scope: self` in the API policy and `scope: own` in the permission catalog represent the same intended ownership boundary for this operation, but the canonical mapping must explicitly document that equivalence rather than silently assuming it.
+For these two operations, API policy `scope: self` maps to permission catalog `scope: own` using the same server-derived Better Auth subject predicate:
 
-No new permission identifier is invented in this document. `user.session.read` is referenced only because it already exists as the canonical requirement in the AUTH-010 API operation policy.
+- subject is derived only from the authenticated current Better Auth session;
+- the target session row must have `user_id = current.user.id`;
+- no client-supplied owner ID or role label establishes scope;
+- the current session itself is not a valid revoke target.
+
+This is a field-level semantic mapping, not a second permission identifier. No new permission is invented.
 
 ## Candidate runtime enforcement and remaining blockers
 
@@ -69,13 +74,20 @@ The current hidden PR #1568 candidate adds a fail-closed W02 check for both oper
 - Permission and the bounded session/target query are evaluated in one D1 statement. Missing role assignment or disallowed account state returns `403 PERMISSION_DENIED`.
 - The authenticated current session is rejected with `409 CURRENT_SESSION_PROTECTED` before any target-session lookup. Other-account targets remain indistinguishable from missing targets.
 
-These are candidate source changes and tests, not formal admission evidence. The exact-source-SHA W02 unit and controlled local W01/W02 runtime checks must pass before source-level permission behavior can be considered verified.
+Candidate permission behavior and local runtime evidence are now present on the exact PR source SHA. The hidden implementation also now writes a durable audit event atomically with the authoritative session deletion:
+
+- W02 deletes only the target session owned by the authenticated user and inserts `user.session.revoked` into the new D1-01 `auth_010_session_revocation_journal` in the same D1 batch. The journal insert is conditional on the preceding DELETE changing one row; if the journal write fails, the session deletion transaction fails closed.
+- W02's existing scheduled publisher drains that journal with bounded retry/backoff through the already provisioned `AUTH013_QUEUE`; no Queue, Worker, D1 database or Service Binding is added.
+- W06 now explicitly dispatches `user.session.revoked` to a dedicated consumer and persists an immutable `AuditEvent` with Session target, authenticated user actor and no session token/device fingerprint/IP/user-agent data.
+- The event schema is `contracts/events/AUTH-010-session-revoked-binding.v1.json`; the migration contract is `contracts/migration/AUTH-010-session-revocation-journal.v1.json`.
+
+This closes the source implementation for the permission catalog's `auditRequired` obligation only after the new exact-SHA tests pass; it does not yet prove deployed delivery or formal evidence admission.
 
 The following blockers remain:
 
-1. `user.session.revoke` is `auditRequired: true`; the current handler does not yet emit/admit the canonical `user.session.revoked` audit/event record.
-2. `authSessionRevoke` policy requires one `session_revocation_projection` async task. W02 currently has no session-revocation queue producer or admitted event/outbox implementation. Do not add a new Queue/Worker; reconcile against the existing W10/Queue architecture first.
-3. No exact-current-deployed-SHA remote security E2E is admitted for the current W02 handlers.
+1. `authSessionRevoke` policy separately requires one `session_revocation_projection` async task. The existing W04 projection queue/consumer is specifically bound to `identity.account_state_changed`; it must not be fed session events without an admitted projection contract and matching consumer. The audit queue is not claimed as a substitute for this projection task. Do not add a new Queue/Worker; reconcile the task against the existing W10/Queue architecture first.
+2. The new `0012_auth_010_session_revocation_journal.sql` migration has source/contract but no production D1 migration, schema read-back or deployed W02 cron/queue delivery evidence. No production migration was run.
+3. No exact-current-deployed-SHA remote security E2E is admitted for the current W01/W02 handlers.
 4. No authenticated real-account native APP acceptance on both Android and iOS is admitted.
 5. `ENT-DEVICE-RECORD` remains PROPOSED; the current API does not provide a stable device identifier. The candidate UI is therefore described as login-session management, not device management.
 
@@ -89,6 +101,11 @@ Until these blockers close:
 ## Evidence chain
 
 - `contracts/api/auth-operation-policy.v1.json`
+- `contracts/events/AUTH-010-session-revoked-binding.v1.json`
+- `contracts/migration/AUTH-010-session-revocation-journal.v1.json`
+- `workers/W02-identity/src/auth/session-revocation-events.ts`
+- `workers/W02-identity/src/auth/session-revocation-publication-journal.ts`
+- `workers/W06-governance/src/session-revocation-audit-queue-consumer.ts`
 - `contracts/authz/permissions.json`
 - `contracts/dto/auth-dto-contract.v1.json`
 - `contracts/entity/AUTH-002-session-field-contract.v1.json`
@@ -97,8 +114,8 @@ Until these blockers close:
 
 ## Next closure gate
 
-1. Verify the candidate permission checks on the exact current source SHA, including missing/revoked/expired base RoleAssignment and disallowed account-state denial.
-2. Reconcile `scope:self` with permission `scope:own` in the canonical mapping and formally bind the W02 handler evidence.
-3. Implement/admit the required revocation audit/event/outbox path using the existing architecture and the one-task policy; do not create new Workers, D1 databases or Queues.
-4. Pass exact-SHA local W01/W02 runtime and controlled remote/deployed verification.
-5. Complete authenticated real-account native APP acceptance on both Android and iOS, then admit the evidence. Only after all gates close may the settings entry be exposed.
+1. Verify candidate permission denial for missing/revoked/expired base RoleAssignment and disallowed account state on the exact source SHA.
+2. Complete the separately required `session_revocation_projection` transport/consumer design without repurposing the W04 account-state queue or creating new infrastructure.
+3. Apply migration 0012 only through its controlled, exact-SHA deployment workflow and verify remote D1 schema/ledger read-back.
+4. Pass exact-current-SHA remote W01/W02 security E2E and prove live W02 → existing audit queue → W06 AuditEvent delivery.
+5. Complete authenticated real-account native APP acceptance on both Android and iOS. Only after all gates close may the settings entry be exposed.
