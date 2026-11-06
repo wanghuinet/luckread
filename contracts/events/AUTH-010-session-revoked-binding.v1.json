@@ -53,12 +53,14 @@
     "correlationId": {
       "type": "string",
       "minLength": 1,
-      "maxLength": 255
+      "maxLength": 255,
+      "pattern": "^req_[A-Za-z0-9_-]{1,123}$"
     },
     "causationId": {
       "type": "string",
       "minLength": 1,
-      "maxLength": 255
+      "maxLength": 255,
+      "pattern": "^[A-Za-z0-9._:-]{1,128}$"
     },
     "idempotencyKey": {
       "type": "string",
