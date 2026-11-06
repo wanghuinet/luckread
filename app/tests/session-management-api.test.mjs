@@ -99,7 +99,9 @@ test('wires session management into Settings and keeps the active session protec
   expect(settings).not.toContain("router.push('/sessions' as never)");
   expect(drawer).toContain("name=\"sessions\" options={{ headerShown: false, drawerItemStyle: { display: 'none' } }}");
   expect(screen).toContain('const SESSION_MANAGEMENT_ADMITTED = false');
-  expect(screen).toContain('设备与会话管理暂未开放');
+  expect(screen).toContain('登录会话管理暂未开放');
+  expect(screen).toContain('登录会话');
+  expect(screen).not.toContain('设备管理');
   expect(screen).toContain('fetchSessionListPage(');
   expect(screen).toContain('Alert.alert(');
   expect(screen).toContain('sessionId === currentSessionId');
