@@ -4,6 +4,9 @@ const REQUEST_ID = /^req_[A-Za-z0-9_-]{1,123}$/
 const TRACE_ID = /^[A-Za-z0-9._:-]{1,128}$/
 const IDEMPOTENCY_KEY = /^AUTH010_SESSION_REVOKE_[a-f0-9]{32}$/
 
+export type SessionRevocationOperation = 'authSessionRevoke' | 'authLogout'
+export type SessionRevocationReason = 'USER_INITIATED' | 'USER_LOGOUT'
+
 export type SessionRevokedEvent = {
   eventId: string
   eventType: 'user.session.revoked'
@@ -20,15 +23,16 @@ export type SessionRevokedEvent = {
   sourceVersion: 1
   actor: { actorId: string; actorType: 'user' }
   payload: {
-    operationId: 'authSessionRevoke'
+    operationId: SessionRevocationOperation
     result: 'succeeded'
-    reasonCode: 'USER_INITIATED'
+    reasonCode: SessionRevocationReason
   }
 }
 
 export async function buildSessionRevokedEvent(input: {
   sessionId: string
   userId: string
+  operationId?: SessionRevocationOperation
   occurredAt?: string
   correlationId?: string | null
   causationId?: string | null
@@ -57,6 +61,11 @@ export async function buildSessionRevokedEvent(input: {
     ? input.causationId
     : eventId
 
+  const operationId = input.operationId ?? 'authSessionRevoke'
+  const reasonCode: SessionRevocationReason = operationId === 'authLogout'
+    ? 'USER_LOGOUT'
+    : 'USER_INITIATED'
+
   return {
     eventId,
     eventType: 'user.session.revoked',
@@ -73,9 +82,9 @@ export async function buildSessionRevokedEvent(input: {
     sourceVersion: 1,
     actor: { actorId: input.userId, actorType: 'user' },
     payload: {
-      operationId: 'authSessionRevoke',
+      operationId,
       result: 'succeeded',
-      reasonCode: 'USER_INITIATED',
+      reasonCode,
     },
   }
 }
@@ -124,6 +133,9 @@ export async function assertSessionRevokedEvent(value: unknown): Promise<Session
   }
   const actorValue = actor as Record<string, unknown>
   const payloadValue = payload as Record<string, unknown>
+  const validOperationReason =
+    (payloadValue.operationId === 'authSessionRevoke' && payloadValue.reasonCode === 'USER_INITIATED') ||
+    (payloadValue.operationId === 'authLogout' && payloadValue.reasonCode === 'USER_LOGOUT')
   if (
     typeof event.eventId !== 'string' || !EVENT_ID.test(event.eventId) ||
     event.eventType !== 'user.session.revoked' ||
@@ -142,9 +154,8 @@ export async function assertSessionRevokedEvent(value: unknown): Promise<Session
     actorValue.actorType !== 'user' ||
     Object.keys(actorValue).some((key) => key !== 'actorId' && key !== 'actorType') ||
     Object.keys(payloadValue).some((key) => !['operationId', 'result', 'reasonCode'].includes(key)) ||
-    payloadValue.operationId !== 'authSessionRevoke' ||
+    !validOperationReason ||
     payloadValue.result !== 'succeeded' ||
-    payloadValue.reasonCode !== 'USER_INITIATED' ||
     Object.keys(event).some((key) => ![
       'eventId', 'eventType', 'schemaVersion', 'producer', 'resourceType', 'resourceId',
       'occurredAt', 'publishedAt', 'correlationId', 'causationId', 'idempotencyKey',
