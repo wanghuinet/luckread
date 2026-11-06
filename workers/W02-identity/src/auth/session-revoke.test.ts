@@ -73,12 +73,24 @@ describe('W02 policy-scoped session revoke', () => {
       'auth010:session-revoke:endpoint',
       'd1:target-session',
     ])
-    expect(db.statement.bind).toHaveBeenCalledWith('target-session')
+    expect(db.statement.bind).toHaveBeenCalledWith('user-1', expect.any(String), expect.any(String), 'target-session', 'user-1')
+    expect(db.prepare).toHaveBeenCalledWith(expect.stringContaining('role_assignments'))
+    expect(db.prepare).toHaveBeenCalledWith(expect.stringContaining("account.account_state IN ('PENDING_VERIFICATION', 'ACTIVE')"))
     expect(mocks.revokeSession).toHaveBeenCalledWith({
       headers: expect.any(Headers),
       body: { token: 'private-native-session-token' },
     })
     expect(JSON.stringify(payload)).not.toContain('private-native-session-token')
+  })
+
+  it('denies revoke when the explicit user role permission is not effective', async () => {
+    const db = makeEnv({ permissionGranted: 0, id: null, token: null, userId: null })
+    const response = await handleCurrentUserSessionRevoke(db.env, request('target-session'))
+    const payload = await response.json() as { error?: { code?: string } }
+
+    expect(response.status).toBe(403)
+    expect(payload.error?.code).toBe('PERMISSION_DENIED')
+    expect(mocks.revokeSession).not.toHaveBeenCalled()
   })
 
   it('returns 429 without reading the target when a required scope is exhausted', async () => {
