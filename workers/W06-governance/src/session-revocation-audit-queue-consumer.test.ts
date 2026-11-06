@@ -57,6 +57,52 @@ describe('AUTH-010 W06 session revocation audit consumer', () => {
     expect(run).not.toHaveBeenCalled()
   })
 
+  it('treats a concurrent identical insert winner as a duplicate delivery', async () => {
+    const existingRow = {
+      eventId: event.eventId,
+      requestId: event.correlationId,
+      traceId: event.causationId,
+      actorJson: JSON.stringify(event.actor),
+      action: event.eventType,
+      targetType: 'Session',
+      targetId: event.resourceId,
+      beforeJson: JSON.stringify({ status: 'ACTIVE' }),
+      afterJson: JSON.stringify({ status: 'REVOKED' }),
+      reason: 'USER_INITIATED',
+      occurredAt: event.occurredAt,
+    }
+    const db = createDb(false, false)
+    db.first
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(existingRow)
+
+    await expect(consumeSessionRevokedAuditEvent(db.db, event)).resolves.toBe('duplicate')
+    expect(db.prepare).toHaveBeenCalledTimes(3)
+    expect(db.run).toHaveBeenCalledTimes(1)
+  })
+
+  it('rejects a concurrent insert winner with conflicting event identity', async () => {
+    const db = createDb(false, false)
+    db.first
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        eventId: event.eventId,
+        requestId: event.correlationId,
+        traceId: event.causationId,
+        actorJson: JSON.stringify({ actorId: 'attacker', actorType: 'user' }),
+        action: event.eventType,
+        targetType: 'Session',
+        targetId: event.resourceId,
+        beforeJson: JSON.stringify({ status: 'ACTIVE' }),
+        afterJson: JSON.stringify({ status: 'REVOKED' }),
+        reason: 'USER_INITIATED',
+        occurredAt: event.occurredAt,
+      })
+
+    await expect(consumeSessionRevokedAuditEvent(db.db, event))
+      .rejects.toThrow('SESSION_AUDIT_EVENT_IDENTITY_CONFLICT')
+  })
+
   it('rejects reused event IDs whose actor, action, target or state differs', async () => {
     for (const overrides of [
       { action: 'identity.account_state_changed' },
