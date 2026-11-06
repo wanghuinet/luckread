@@ -39,22 +39,18 @@ test('uses the pinned upstream floating glass tab bar without replacing LuckRead
   expect(tabLayoutSource).toContain("if (props.state.routes[props.state.index]?.name === '(video)') return null;");
 });
 
-test('targets the active Android tab scene for native BlurView background sampling', () => {
-  expect(tabLayoutSource).toContain("import { BlurTargetView } from 'expo-blur'");
-  expect(tabLayoutSource).toContain('screenLayout={screenLayout}');
-  expect(tabLayoutSource).toContain('<TabBlurTargetScene');
-  expect(tabLayoutSource).toContain('<BlurTargetView ref={targetRef} style={{ flex: 1 }}>');
-  expect(tabLayoutSource).not.toContain('useIsFocused()');
-  expect(tabLayoutSource).toContain('onTargetChange(routeKey, targetRef)');
-  expect(tabLayoutSource).toContain('onTargetChange(routeKey, null)');
-  expect(tabLayoutSource).toContain('blurTargets.get(activeRouteKey)');
-  expect(tabLayoutSource).toContain("blurMethod: 'dimezisBlurViewSdk31Plus'");
-  expect(tabLayoutSource).toContain('blurTarget: activeBlurTarget');
-  expect(tabLayoutSource).toContain("Platform.OS === 'android'");
-
-  // The blur target wraps each route scene, not the navigator containing the
-  // floating bar, so the bar samples page content without sampling itself.
-  expect(tabLayoutSource).not.toContain('<BlurTargetView ref={targetRef}><Tabs');
+test('uses the upstream tab-bar integration without wrapping route scenes in custom native views', () => {
+  // Match the upstream Expo Router example: the tab bar receives the navigator
+  // props directly; route scenes remain owned by Expo Router / React Navigation.
+  expect(tabLayoutSource).toContain('tabBar={(props) => {');
+  expect(tabLayoutSource).toContain('const tabBarProps = props as typeof props & { navigation: TabBarNavigation };');
+  expect(tabLayoutSource).toContain('<FloatingGlassTabBar');
+  expect(tabLayoutSource).toContain('{...tabBarProps}');
+  expect(tabLayoutSource).not.toContain('screenLayout=');
+  expect(tabLayoutSource).not.toContain('BlurTargetView');
+  expect(tabLayoutSource).not.toContain('TabBlurTargetScene');
+  expect(tabLayoutSource).not.toContain('blurProps=');
+  expect(tabLayoutSource).not.toContain('blurTargets');
 });
 
 test('does not register or ship the upstream Grok demo route', () => {
