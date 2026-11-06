@@ -110,8 +110,8 @@ export async function handleCurrentUserSessionRevoke(
       sessionId: target.id,
       userId,
       occurredAt,
-      correlationId: request.headers.get('X-LuckRead-Correlation-Id'),
-      causationId: request.headers.get('X-LuckRead-Request-Id'),
+      correlationId: request.headers.get('X-LuckRead-Request-Id'),
+      causationId: request.headers.get('X-LuckRead-Correlation-Id'),
     })
     // Better Auth's native D1-01 session row and the durable audit outbox are
     // committed atomically. If the outbox cannot be written, D1 rolls back the
