@@ -15,6 +15,30 @@ const tabBarScrollSource = readFileSync(
   'utf8',
 );
 
+const appPackage = JSON.parse(
+  readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
+);
+
+test('uses the pinned upstream floating glass tab bar without replacing LuckRead routes', () => {
+  expect(appPackage.dependencies['react-native-floating-glass-tabbar']).toBe('0.1.0');
+  expect(tabLayoutSource).toContain("from 'react-native-floating-glass-tabbar'");
+  expect(tabLayoutSource).toContain('<FloatingGlassTabBar');
+  expect(tabLayoutSource).toContain('tabs={LuckReadTabs}');
+  expect(tabLayoutSource).toContain('labelMode="none"');
+  expect(tabLayoutSource).toContain('floatGap={10}');
+  expect(tabLayoutSource).toContain('glassTint:');
+  expect(tabLayoutSource).toContain('blurTint:');
+  expect(tabLayoutSource).toContain('style={tabBarAnimationStyle}');
+
+  for (const routeName of ['(index)', '(search)', '(video)', '(notifications)', '(messages)']) {
+    expect(tabLayoutSource).toContain(`'${routeName}':`);
+    expect(tabLayoutSource).toContain(`name="${routeName}"`);
+  }
+
+  // The immersive video route stays full-screen; all other registered routes share the glass bar.
+  expect(tabLayoutSource).toContain("if (props.state.routes[props.state.index]?.name === '(video)') return null;");
+});
+
 test('does not register or ship the upstream Grok demo route', () => {
   expect(tabLayoutSource).not.toContain('name="(grok)"');
   expect(existsSync(upstreamGrokRoute)).toBe(false);
