@@ -14,6 +14,7 @@ test('pins the PostHog native crash capture SDK and Expo peer dependencies', () 
 });
 
 test('initializes diagnostics only when a valid public project key and supported host are configured', () => {
+  expect(diagnostics).toContain("Platform.OS === 'android' || Platform.OS === 'ios'");
   expect(diagnostics).toContain('EXPO_PUBLIC_POSTHOG_API_KEY');
   expect(diagnostics).toContain('EXPO_PUBLIC_POSTHOG_HOST');
   expect(diagnostics).toContain("allowedHosts.has(apiHost)");
