@@ -147,9 +147,17 @@
     },
     "nonGoals": [
       "Does not create a second Session table or override Better Auth session authority.",
-      "Does not implement the separate session_revocation_projection task declared in auth-operation-policy.v1.json.",
+      "Does not create a derived session-state projection: D1-01 Better Auth session remains authoritative and current W01 session reads are no-store.",
       "Does not add a Worker, D1 database, Queue, or Service Binding.",
       "Does not claim remote delivery, deployment, or AUTH-010 GREEN."
-    ]
+    ],
+    "sessionStateProjection": {
+      "required": false,
+      "sourceAuthority": "D1-01 Better Auth session",
+      "readPath": "W02 verifies and reads the authoritative native session state",
+      "cacheMode": "NO_STORE",
+      "rationale": "There is no independent session-state projection or authorization cache to invalidate. Revocation deletes the authoritative D1-01 session row; immutable audit delivery is the only asynchronous side effect.",
+      "w04QueueUse": false
+    }
   }
 }

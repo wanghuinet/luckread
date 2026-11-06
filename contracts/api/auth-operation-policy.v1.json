@@ -355,7 +355,7 @@
       },
       "queue": {
         "enqueueMax": 1,
-        "taskType": "session_revocation_projection"
+        "taskType": "session_revocation_audit"
       },
       "antiAbuse": {
         "required": true,
@@ -610,7 +610,7 @@
       },
       "queue": {
         "enqueueMax": 1,
-        "taskType": "session_revocation_projection"
+        "taskType": "session_revocation_audit"
       },
       "antiAbuse": {
         "required": true,

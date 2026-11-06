@@ -85,7 +85,7 @@ This closes the source implementation for the permission catalog's `auditRequire
 
 The following blockers remain:
 
-1. Both `authLogout` and `authSessionRevoke` in `contracts/api/auth-operation-policy.v1.json` declare one `session_revocation_projection` async task. This PR only implements the audit outbox for the targeted `authSessionRevoke` operation. The current W01 `/auth/logout` route still proxies Better Auth `/sign-out` and is not wired to this outbox, so no all-session-revocation audit claim is made. The existing W04 projection queue/consumer is specifically bound to `identity.account_state_changed`; it must not be fed session events without an admitted projection contract and matching consumer. The historical AUTH-002 extension field `auth_session_state.revoked_at` is not an available projection target: the canonical extension contract marks that table `CONTRACT_ONLY_UNTIL_MIGRATION_EVIDENCE`, the active W02 migration directory has no `auth_session_state` migration, and the previous matching implementation is in the archived legacy Payload tree only. Current active W02 authority is Better Auth D1-01 `session`; this PR deletes that authoritative row and stores a separate audit outbox record, but does not silently mint the unadmitted extension table. The audit queue is not claimed as a substitute for the projection task. Do not add a new Worker/Queue; reconcile the task against the existing W10/Queue architecture or formally correct the stale policy contract through its own change-control.
+1. **Logout audit path remains incomplete.** The operation policy has been formally corrected by `CC-AUTH-010-SESSION-AUDIT-ONLY-NO-PROJECTION-2026-11-06`: both `authLogout` and `authSessionRevoke` describe the existing `session_revocation_audit` task to W06, not a W04 session-state projection. D1-01 Better Auth `session` is the authoritative state; W01 session responses are `no-store`, so there is no independent session projection to update. The W04 queue remains exclusively for `identity.account_state_changed` and must not receive session events. This PR implements the durable outbox only for `authSessionRevoke`; W01 `/auth/logout` still proxies Better Auth `/sign-out` and is not wired to the W02 outbox. Therefore logout audit is still required before an all-revocation audit claim. No new Worker, D1, Queue, Service Binding, or Payload Core change is permitted.
 2. The new `0012_auth_010_session_revocation_journal.sql` migration has source/contract but no production D1 migration, schema read-back or deployed W02 cron/queue delivery evidence. No production migration was run.
 3. No exact-current-deployed-SHA remote security E2E is admitted for the current W01/W02 handlers.
 4. No authenticated real-account native APP acceptance on both Android and iOS is admitted.
@@ -114,8 +114,7 @@ Until these blockers close:
 
 ## Next closure gate
 
-1. Verify candidate permission denial for missing/revoked/expired base RoleAssignment and disallowed account state on the exact source SHA.
-2. Complete the separately required `session_revocation_projection` transport/consumer design without repurposing the W04 account-state queue or creating new infrastructure.
-3. Apply migration 0012 only through its controlled, exact-SHA deployment workflow and verify remote D1 schema/ledger read-back.
-4. Pass exact-current-SHA remote W01/W02 security E2E and prove live W02 → existing audit queue → W06 AuditEvent delivery.
-5. Complete authenticated real-account native APP acceptance on both Android and iOS. Only after all gates close may the settings entry be exposed.
+1. Implement and test the W01 `/auth/logout` → W02 current-session atomic DELETE + the same durable audit outbox path, preserving browser cookie clearing and native Bearer-session behavior.
+2. Apply migration 0012 only through its controlled, exact-SHA deployment workflow and verify remote D1 schema/ledger read-back.
+3. Pass exact-current-SHA remote W01/W02 security E2E and prove live W02 → existing audit queue → W06 AuditEvent delivery for both targeted session revoke and logout.
+4. Complete authenticated real-account native APP acceptance on both Android and iOS. Only after all gates close may the settings entry be exposed.
