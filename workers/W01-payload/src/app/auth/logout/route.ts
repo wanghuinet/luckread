@@ -1,8 +1,8 @@
-import { proxyBetterAuth } from '../../../auth/w02-session-client.js'
+import { logoutCurrentSession } from '../../../auth/w02-session-client.js'
 
 export async function POST(request: Request): Promise<Response> {
   try {
-    const response = await proxyBetterAuth(request, '/sign-out')
+    const response = await logoutCurrentSession(request)
     if (response.ok || response.status === 401) {
       // W01 logout is a no-content operation. Preserve cookie clearing for
       // browser clients, but never echo the credential being revoked.
