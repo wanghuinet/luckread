@@ -55,7 +55,7 @@ test('captures Expo Router root-boundary exceptions without collecting route or 
 test('documents only the public ingestion key and never a personal CLI credential', () => {
   expect(envExample).toContain('EXPO_PUBLIC_POSTHOG_API_KEY=');
   expect(envExample).toContain('EXPO_PUBLIC_POSTHOG_HOST=');
-  expect(envExample).toContain('Do not put a Personal API Key / CLI token');
+  expect(envExample).toContain('Personal API Key / CLI token in any EXPO_PUBLIC_* variable');
   expect(envExample).not.toContain('POSTHOG_CLI_TOKEN=');
 });
 
