@@ -89,7 +89,7 @@
       "user.deleted_at exists as nullable TEXT",
       "existing non-deletion user rows are unchanged",
       "migration is recorded in d1_migrations",
-      "only migration 0009 is applied by the controlled workflow",
+      "only migration 0011 is applied by the controlled workflow",
       "no new table, Worker, D1, Queue or Service Binding is created"
     ],
     "remoteMutationRequiresControlledWorkflow": true
