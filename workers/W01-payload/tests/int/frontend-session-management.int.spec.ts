@@ -43,6 +43,14 @@ describe('frontend session management', () => {
     expect(client).toContain("'/internal/auth/session/list'")
   })
 
+  it('preserves W02 current-session rejection codes through the W01 session adapter', () => {
+    const client = read('src/auth/w02-session-client.ts')
+    const route = read('src/app/auth/sessions/[[...segments]]/route.ts')
+
+    expect(client).toContain("new W02AuthClientError(response.status, 'session revoke failed', errorCode(payload) ?? undefined)")
+    expect(route).toContain("error.status === 409 && error.code === 'CURRENT_SESSION_PROTECTED'")
+  })
+
   it('revokes only non-current sessions through the existing DELETE API with idempotency', () => {
     const page = read('src/app/(twitter-clone)/me/sessions/page.tsx')
 
