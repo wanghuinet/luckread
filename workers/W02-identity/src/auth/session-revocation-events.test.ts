@@ -74,4 +74,26 @@ describe('AUTH-010 session revocation event', () => {
     await expect(assertSessionRevokedEvent({ ...event, payload: { ...event.payload, token: 'secret' } }))
       .rejects.toThrow('INVALID_AUTH_010_SESSION_EVENT')
   })
+  it('builds and validates an explicit self-logout audit event', async () => {
+    const event = await buildSessionRevokedEvent({
+      sessionId: 'session-logout-1',
+      userId: 'user-logout-1',
+      operationId: 'authLogout',
+    })
+    expect(event.payload).toEqual({
+      operationId: 'authLogout',
+      result: 'succeeded',
+      reasonCode: 'USER_LOGOUT',
+    })
+    await expect(assertSessionRevokedEvent(event)).resolves.toEqual(event)
+    await expect(assertSessionRevokedEvent({
+      ...event,
+      payload: { ...event.payload, reasonCode: 'USER_INITIATED' },
+    })).rejects.toThrow('INVALID_AUTH_010_SESSION_EVENT')
+    await expect(assertSessionRevokedEvent({
+      ...event,
+      payload: { ...event.payload, operationId: 'authSessionRevoke' },
+    })).rejects.toThrow('INVALID_AUTH_010_SESSION_EVENT')
+  })
+
 })
