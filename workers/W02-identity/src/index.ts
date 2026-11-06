@@ -1,6 +1,7 @@
 import { createLuckReadAuth, type RateLimitBinding } from './auth/better-auth.js'
 import { publishPendingAccountStateEvents } from './account/publication-journal-publisher.js'
 import { publishPendingMfaAuditEvents } from './auth/mfa-audit-publication-journal.js'
+import { publishPendingSessionRevocationEvents } from './auth/session-revocation-publication-journal.js'
 import { reconcileMfaAuditOperationReceipts } from './auth/mfa-audit-receipts.js'
 import { runScheduledPublicationTicks } from './auth/scheduled-publication.js'
 import { resolveGlobalLayer } from './authz/role-assignment.js'
@@ -493,6 +494,7 @@ export default {
     })
     await runScheduledPublicationTicks([
       { name: 'account-state', publish: () => publishPendingAccountStateEvents(env) },
+      { name: 'session-audit', publish: () => publishPendingSessionRevocationEvents(env) },
       {
         name: 'mfa-audit',
         publish: async () => {
