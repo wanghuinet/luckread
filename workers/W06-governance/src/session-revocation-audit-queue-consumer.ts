@@ -3,7 +3,8 @@ import type { AuditActor, AuditEvent } from './audit-event'
 
 const RESOURCE_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/
 const EVENT_ID = /^evt_[a-f0-9]{32}$/
-const CORRELATION_ID = /^[A-Za-z0-9._:-]{1,255}$/
+const REQUEST_ID = /^req_[A-Za-z0-9_-]{1,123}$/
+const TRACE_ID = /^[A-Za-z0-9._:-]{1,128}$/
 const IDEMPOTENCY_KEY = /^[A-Za-z0-9_-]{16,255}$/
 
 export type SessionRevokedAuditEvent = {
@@ -50,8 +51,8 @@ function assertSessionRevokedEvent(value: unknown): asserts value is SessionRevo
     typeof event.resourceId !== 'string' || !RESOURCE_ID.test(event.resourceId) ||
     typeof event.occurredAt !== 'string' || !Number.isFinite(Date.parse(event.occurredAt)) ||
     typeof event.publishedAt !== 'string' || !Number.isFinite(Date.parse(event.publishedAt)) ||
-    typeof event.correlationId !== 'string' || !CORRELATION_ID.test(event.correlationId) ||
-    typeof event.causationId !== 'string' || !CORRELATION_ID.test(event.causationId) ||
+    typeof event.correlationId !== 'string' || !REQUEST_ID.test(event.correlationId) ||
+    typeof event.causationId !== 'string' || !TRACE_ID.test(event.causationId) ||
     typeof event.idempotencyKey !== 'string' || !IDEMPOTENCY_KEY.test(event.idempotencyKey) ||
     event.attempt !== 1 ||
     event.sourceVersion !== 1 ||
