@@ -288,6 +288,16 @@ export async function listSessions(
   throw new W02AuthClientError(response.status || 503, 'session list failed', errorCode(payload) ?? undefined)
 }
 
+export async function logoutCurrentSession(request: Request): Promise<Response> {
+  return callW02('/internal/auth/session/logout', {
+    request,
+    headers: {
+      'X-LuckRead-Caller': 'W01',
+      'X-LuckRead-Transport-Version': '1.0',
+    },
+  })
+}
+
 export async function revokeSessionById(request: Request, sessionId: string): Promise<void> {
   const response = await callW02('/internal/auth/session/revoke-by-id', {
     request,
