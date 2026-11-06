@@ -293,7 +293,11 @@ export async function revokeSessionById(request: Request, sessionId: string): Pr
     request,
     body: { sessionId },
   })
-  if (!response.ok) throw new W02AuthClientError(response.status, 'session revoke failed')
+  if (!response.ok) {
+    let payload: unknown = null
+    try { payload = await response.json() } catch {}
+    throw new W02AuthClientError(response.status, 'session revoke failed', errorCode(payload) ?? undefined)
+  }
 }
 
 export async function rollbackRegistrationUser(
