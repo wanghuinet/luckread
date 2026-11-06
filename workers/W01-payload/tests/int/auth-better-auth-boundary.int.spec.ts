@@ -4,11 +4,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   proxyBetterAuth: vi.fn(),
+  logoutCurrentSession: vi.fn(),
   enforceAuthRateLimit: vi.fn(),
 }))
 
 vi.mock('../../src/auth/w02-session-client.js', () => ({
   proxyBetterAuth: mocks.proxyBetterAuth,
+  logoutCurrentSession: mocks.logoutCurrentSession,
 }))
 
 vi.mock('../../src/auth/traffic-limit.js', () => ({
@@ -407,16 +409,17 @@ describe('W01 Better Auth boundary', () => {
     expect(mocks.proxyBetterAuth).toHaveBeenCalledWith(expect.any(Request), '/get-session', { method: 'GET' })
   })
 
-  it('forwards logout to Better Auth and preserves no-store behavior', async () => {
-    mocks.proxyBetterAuth.mockResolvedValue(new Response(null, { status: 204, headers: { 'cache-control': 'no-store' } }))
+  it('delegates logout to the W02 audited self-session path and preserves no-store behavior', async () => {
+    mocks.logoutCurrentSession.mockResolvedValue(new Response(null, { status: 200, headers: { 'cache-control': 'no-store' } }))
     const response = await logout(request('https://luckread.test/api/v1/auth/logout'))
     expect(response.status).toBe(204)
     expect(response.headers.get('cache-control')).toBe('no-store')
-    expect(mocks.proxyBetterAuth).toHaveBeenCalledWith(expect.any(Request), '/sign-out')
+    expect(mocks.logoutCurrentSession).toHaveBeenCalledWith(expect.any(Request))
+    expect(mocks.proxyBetterAuth).not.toHaveBeenCalledWith(expect.any(Request), '/sign-out')
   })
 
-  it('normalizes Better Auth HTTP 200 logout to no-content while preserving cookie clearing', async () => {
-    mocks.proxyBetterAuth.mockResolvedValue(new Response(JSON.stringify({ success: true }), {
+  it('normalizes W02 cookie clearing to no-content while preserving Set-Cookie', async () => {
+    mocks.logoutCurrentSession.mockResolvedValue(new Response(JSON.stringify({ success: true }), {
       status: 200,
       headers: {
         'content-type': 'application/json',
@@ -429,5 +432,13 @@ describe('W01 Better Auth boundary', () => {
     expect(await response.text()).toBe('')
     expect(response.headers.get('set-cookie')).toContain('Max-Age=0')
     expect(response.headers.get('cache-control')).toBe('no-store')
+    expect(mocks.logoutCurrentSession).toHaveBeenCalledWith(expect.any(Request))
+  })
+
+  it('does not turn W02 logout throttling into a successful logout response', async () => {
+    mocks.logoutCurrentSession.mockResolvedValue(new Response(JSON.stringify({ error: { code: 'RATE_LIMITED' } }), { status: 429, headers: { 'cache-control': 'no-store', 'retry-after': '60' } }))
+    const response = await logout(request('https://luckread.test/api/v1/auth/logout'))
+    expect(response.status).toBe(429)
+    expect(response.headers.get('retry-after')).toBe('60')
   })
 })
