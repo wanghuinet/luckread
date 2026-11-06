@@ -1,4 +1,4 @@
-export type ScheduledPublicationName = 'account-state' | 'mfa-audit'
+export type ScheduledPublicationName = 'account-state' | 'mfa-audit' | 'session-audit'
 
 export type ScheduledPublicationTask = {
   name: ScheduledPublicationName
