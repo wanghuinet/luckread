@@ -74,7 +74,13 @@ export async function handleCurrentUserSessionLogout(
     // must present an explicit trusted Origin/Referer before any D1 mutation.
     // Bearer-only native requests do not use cookie CSRF validation.
     if (request.headers.has('cookie') && authContext.options.advanced?.disableCSRFCheck !== true) {
-      const origin = request.headers.get('origin') || request.headers.get('referer')
+      let origin = request.headers.get('origin') || request.headers.get('referer')
+      // Preserve Better Auth's null-origin exception only when Fetch Metadata
+      // proves a same-origin browser request; infer the internal request origin
+      // used by the W01 -> W02 service-binding hop.
+      if (origin === 'null' && request.headers.get('sec-fetch-site') === 'same-origin') {
+        origin = new URL(request.url).origin
+      }
       if (!origin || origin === 'null' || !authContext.isTrustedOrigin(origin, { allowRelativePaths: false })) {
         return json({ error: { code: 'FORBIDDEN', message: 'Invalid request origin' } }, 403)
       }
