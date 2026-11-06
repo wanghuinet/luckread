@@ -12,7 +12,7 @@ vi.mock('./better-auth.js', () => ({
     $context: Promise.resolve({
       authCookies: { sessionToken: { name: 'better-auth.session_token' } },
       options: { advanced: {} },
-      isTrustedOrigin: (origin: string) => origin === 'https://luckread.com',
+      isTrustedOrigin: (origin: string) => origin === 'https://luckread.com' || origin === 'https://luckread-w02.internal',
     }),
   }),
 }))
@@ -229,6 +229,31 @@ describe('W02 authenticated current-session logout', () => {
     expect(response.status).toBe(200)
     expect(db.batch).toHaveBeenCalledTimes(1)
     expect(mocks.handler).toHaveBeenCalledTimes(1)
+  })
+
+  it('preserves Better Auth same-origin null-Origin inference but rejects cross-site metadata', async () => {
+    const original = makeRequest()
+    const trustedHeaders = new Headers(original.headers)
+    trustedHeaders.set('origin', 'null')
+    trustedHeaders.set('sec-fetch-site', 'same-origin')
+    const trustedRequest = new Request(original.url, { method: 'POST', headers: trustedHeaders })
+    const db = makeEnv()
+
+    const trustedResponse = await handleCurrentUserSessionLogout(db.env, trustedRequest)
+    expect(trustedResponse.status).toBe(200)
+    expect(db.batch).toHaveBeenCalledTimes(1)
+
+    vi.clearAllMocks()
+    const crossSiteHeaders = new Headers(original.headers)
+    crossSiteHeaders.set('origin', 'null')
+    crossSiteHeaders.set('sec-fetch-site', 'cross-site')
+    const crossSiteRequest = new Request(original.url, { method: 'POST', headers: crossSiteHeaders })
+    const blockedDb = makeEnv()
+
+    const blockedResponse = await handleCurrentUserSessionLogout(blockedDb.env, crossSiteRequest)
+    expect(blockedResponse.status).toBe(403)
+    expect(blockedDb.batch).not.toHaveBeenCalled()
+    expect(mocks.handler).not.toHaveBeenCalled()
   })
 
 })
