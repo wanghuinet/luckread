@@ -222,7 +222,7 @@ export default function SessionsScreen() {
       <View className="flex-1 items-center justify-center bg-white px-6 dark:bg-black" style={{ paddingTop: insets.top }}>
         <StatusBar style={isDark ? 'light' : 'dark'} />
         <Feather name="lock" size={32} color={PRIMARY} />
-        <Text className="mt-4 text-lg font-bold text-neutral-900 dark:text-white">设备与会话管理暂未开放</Text>
+        <Text className="mt-4 text-lg font-bold text-neutral-900 dark:text-white">登录会话管理暂未开放</Text>
         <Text className="mt-2 text-center text-sm text-neutral-500 dark:text-neutral-400">此功能仍在安全准入和统一验收阶段。</Text>
         <Pressable accessibilityRole="button" onPress={() => router.back()} className="mt-5 min-h-11 items-center justify-center rounded-full border border-neutral-300 px-6 dark:border-neutral-700">
           <Text className="font-bold text-sky-600">返回设置</Text>
@@ -269,7 +269,7 @@ export default function SessionsScreen() {
   return (
     <View className="flex-1 bg-neutral-50 dark:bg-black" style={{ paddingTop: insets.top }}>
       <StatusBar style={isDark ? 'light' : 'dark'} />
-      <Stack.Screen options={{ headerShown: false, title: '设备与会话' }} />
+      <Stack.Screen options={{ headerShown: false, title: '登录会话' }} />
       <View className="flex-row items-center border-b border-neutral-200 bg-white px-4 py-3 dark:border-neutral-800 dark:bg-black">
         <Pressable
           accessibilityRole="button"
@@ -280,8 +280,8 @@ export default function SessionsScreen() {
           <Feather name="arrow-left" size={22} color={isDark ? '#d1d5db' : '#536471'} />
         </Pressable>
         <View className="flex-1">
-          <Text className="text-lg font-bold text-neutral-900 dark:text-white">设备与会话</Text>
-          <Text className="text-xs text-neutral-500 dark:text-neutral-400">管理当前账号的有效登录状态</Text>
+          <Text className="text-lg font-bold text-neutral-900 dark:text-white">登录会话</Text>
+          <Text className="text-xs text-neutral-500 dark:text-neutral-400">查看当前账号的有效登录会话</Text>
         </View>
       </View>
 
