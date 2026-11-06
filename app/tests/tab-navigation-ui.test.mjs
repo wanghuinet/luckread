@@ -39,6 +39,22 @@ test('uses the pinned upstream floating glass tab bar without replacing LuckRead
   expect(tabLayoutSource).toContain("if (props.state.routes[props.state.index]?.name === '(video)') return null;");
 });
 
+test('targets the active Android tab scene for native BlurView background sampling', () => {
+  expect(tabLayoutSource).toContain("import { BlurTargetView } from 'expo-blur'");
+  expect(tabLayoutSource).toContain('screenLayout={screenLayout}');
+  expect(tabLayoutSource).toContain('<TabBlurTargetScene');
+  expect(tabLayoutSource).toContain('<BlurTargetView ref={targetRef} style={{ flex: 1 }}>');
+  expect(tabLayoutSource).toContain('useIsFocused()');
+  expect(tabLayoutSource).toContain('blurTargets.get(activeRouteKey)');
+  expect(tabLayoutSource).toContain("blurMethod: 'dimezisBlurViewSdk31Plus'");
+  expect(tabLayoutSource).toContain('blurTarget: activeBlurTarget');
+  expect(tabLayoutSource).toContain("Platform.OS === 'android'");
+
+  // The blur target wraps each route scene, not the navigator containing the
+  // floating bar, so the bar samples page content without sampling itself.
+  expect(tabLayoutSource).not.toContain('<BlurTargetView ref={targetRef}><Tabs');
+});
+
 test('does not register or ship the upstream Grok demo route', () => {
   expect(tabLayoutSource).not.toContain('name="(grok)"');
   expect(existsSync(upstreamGrokRoute)).toBe(false);
