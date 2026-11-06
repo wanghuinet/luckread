@@ -104,7 +104,6 @@ describe('W02 policy-scoped session revoke', () => {
     expect(db.prepared[0]?.bind).toHaveBeenCalledWith('target-session', 'user-1', 'user-1', expect.any(String), expect.any(String))
     expect(db.prepared[1]?.sql).toContain('INSERT INTO auth_010_session_revocation_journal')
     expect(db.prepared[1]?.sql).toContain('WHERE changes() = 1')
-    expect(db.prepared[0]?.bind).toHaveBeenCalledWith('target-session', 'user-1')
     expect(db.prepared[1]?.bind).toHaveBeenCalledWith(
       expect.any(String),
       expect.stringMatching(/^evt_[a-f0-9]{32}$/),

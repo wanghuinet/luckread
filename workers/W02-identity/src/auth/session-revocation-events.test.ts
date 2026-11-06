@@ -69,7 +69,7 @@ describe('AUTH-010 session revocation event', () => {
     expect(() => assertSessionRevokedEvent(event)).not.toThrow()
     expect(() => assertSessionRevokedEvent({ ...event, eventType: 'identity.account_state_changed' }))
       .toThrow()
-    expect(() => assertSessionRevokedEvent({ ...event, actor: { actorId: 'user-2', actorType: 'user' } }))
+    expect(() => assertSessionRevokedEvent({ ...event, actor: { ...event.actor, clientSupplied: true } }))
       .toThrow('INVALID_AUTH_010_SESSION_EVENT')
   })
 })
