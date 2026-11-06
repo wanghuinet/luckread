@@ -1,7 +1,8 @@
 # LuckRead GPT 自主开发与软件质量治理总契约 v2.0
 
-**状态：PROPOSED / REVIEW REQUIRED**  
-**版本：2.0.0**  
+**Status:** ACTIVE / RELATED OPERATIONAL CONTRACT  
+**Canonical Source:** Related — supplements `docs/DEVELOPMENT-EXECUTION-STANDARD-LUCKREAD-1.0-v1.0.md`; the authority hierarchy remains governed by `docs/74-FINAL-CONTRACT-RECONCILIATION-AND-ADMISSION-GATE-v1.0.md` and the applicable domain contracts.  
+**Version:** 2.0.0  
 **适用范围：LuckRead 仓库内由 GPT 参与的需求分析、代码开发、缺陷修复、测试、PR 审查、合并协助与发布验证**  
 **仓库：`wanghuinet/luckread`**  
 **基线分支：`main`**
@@ -269,7 +270,58 @@ Evidence 应明确：声明、验证方法、预期、实际结果、精确 Comm
 
 只采集完成运维所需的最小数据，遵守现有隐私和保留规则。线上问题进入缺陷流程：事件 → 影响评估 → 根因 → 回归测试 → 修复 → 证据 → 监控确认。没有监控数据时必须明确说明，不得声称“线上稳定”。
 
-## 13. 强制 STOP 条件
+## 13. 重大更新与可追溯记录
+
+重大更新必须留下可从 PR、Commit、测试证据和发布结果相互追溯的记录。记录应复用仓库现有目录与权威，不创建第二套 Changelog、ADR、Evidence Registry 或实施状态台账。
+
+### 13.1 重大更新的判定
+
+以下任一变化通常属于重大更新，必须建立 Change Control 记录：
+
+- 新增、删除或改变已批准的用户可见能力、核心用户旅程或 1.0/2.0 发布范围；
+- 改变架构边界、Worker / D1 / Queue / Service Binding、领域 authority 或跨 Worker 调用；
+- 改变公开 API、DTO、OpenAPI、事件、权限、安全、隐私或数据持久化语义；
+- 新增/变更数据库迁移、数据回填、索引、兼容窗口、删除或保留策略；
+- 引入/替换关键 OSS、第三方服务、运行时、SDK、构建或部署机制；
+- 具有跨模块影响、兼容性风险、数据风险、回滚风险或需要正式验收的发布变更。
+
+纯拼写、格式、低风险局部修复等小变更，保留 PR / Commit 记录即可，不强制新建独立 Change Control 文档。是否重大应按实际影响判定，不以代码行数判断。
+
+### 13.2 记录放置：复用现有目录
+
+| 记录类型 | 现有权威位置 | 使用规则 |
+|---|---|---|
+| 变更范围与影响 | `docs/change-control/` | 重大更新必须建立唯一 Change Control 记录，跟踪决策、范围、影响、兼容和恢复计划 |
+| 长期架构/产品决策 | `docs/decisions/` | 仅当存在需要长期保留的决策、取舍或冲突裁定时建立；不是每个 PR 都建 ADR |
+| 实际实现历史 | GitHub PR、Commit、Review | PR / Commit 是实现记录的事实来源；记录精确 base/head/merge SHA、变更文件和审查结果，不重复抄写代码日志 |
+| 测试与验收证据 | `docs/evidence/` + 176 Evidence Registry | 证据按 L6 claim 绑定精确 SHA；不以 Change Control 中的一句“测试通过”替代正式证据 |
+| 发布与生产验证 | `docs/release/` | 仅在实际发布/部署/生产验收里程碑形成记录；没有部署就不得创建或填写为已发布 |
+
+仓库当前没有统一根目录 `CHANGELOG.md`。GPT 不得自行增加第二套发布日志；如未来确需面向用户的版本 Changelog，须由对应发布合同指定唯一位置和维护规则。
+
+### 13.3 每份重大变更记录的必填字段
+
+Change Control 至少说明：
+
+1. Change ID、标题、日期、负责人/决策主体、触发背景和用户目标；
+2. Feature ID / Issue / 领域合同依据，以及本次明确不做的范围；
+3. 变更前 base SHA、实施 PR/分支、当前 head SHA，合并后补充 merge SHA；
+4. 影响范围：Worker、模块、API/DTO、数据表/迁移、事件/Queue、权限/安全、平台与调用方；
+5. 方案、备选项、复用来源/许可证，以及为何选择最小可行变更；
+6. 兼容性、部署顺序、迁移/回填、幂等、监控、回滚或前向恢复方案；
+7. 对应 L5/L6、测试计划与结果、CI/Review 状态、176 Evidence 引用及其精确 SHA；
+8. 发布环境/版本、Smoke Test 和生产验证结果（仅在实际发生后填写）；
+9. 未解决风险、阻塞、延期项、批准依据和关闭条件。
+
+尚未发生的阶段必须标记 PLANNED / NOT RUN，不得预填 PASS、DEPLOYED 或 PRODUCTION VERIFIED。记录应引用 PR、Commit、ADR、Evidence 和 Release 文档，不复制它们的完整内容。重大变更状态随实际进度更新，但历史失败、跳过和授权例外不得改写成成功。
+
+### 13.4 重大更新闭环
+
+`PROPOSED → APPROVED → IMPLEMENTED → VERIFIED → MERGED → DEPLOYED → PRODUCTION VERIFIED`
+
+每一阶段都必须有与其声明匹配的记录和证据；不适用的阶段明确标为 NOT APPLICABLE。PR 合并不自动触发 DEPLOYED，部署成功也不自动触发 PRODUCTION VERIFIED。
+
+## 14. 强制 STOP 条件
 
 出现以下任一情况，停止当前 Slice 的实现或合并动作：
 
@@ -286,7 +338,7 @@ Evidence 应明确：声明、验证方法、预期、实际结果、精确 Comm
 
 STOP 不是放弃任务。GPT 必须报告：阻塞事实、证据位置、影响、最小可执行解法、需要谁作出的决策。不得以猜测或降级质量门禁继续推进。
 
-## 14. 每轮交接格式
+## 15. 每轮交接格式
 
 每个 Slice 完成、阻塞或停止时，输出以下记录：
 
@@ -298,6 +350,7 @@ Feature ID / Issue / Slice:
 Scope:
 Changed files / modules:
 Authority documents:
+Change Control / Decision / Release refs:
 Reuse source / license:
 Tests executed:
 Tests not executed:
@@ -314,7 +367,7 @@ Stop reason (if any):
 
 缺失内容填写 NOT RUN / UNKNOWN / NOT APPLICABLE，并解释原因；不允许留空后暗示完成。
 
-## 15. Definition of Done
+## 16. Definition of Done
 
 一个 Slice 只有同时满足下列适用条件，才可交付：
 
@@ -324,6 +377,7 @@ Stop reason (if any):
 - 变更及失败路径有适当自动化测试；
 - 新修复的 Bug 有可复现回归测试；
 - 必要测试、CI、Review 与门禁状态真实且可追溯；
+- 重大更新已建立 Change Control，并链接适用的 Decision、PR/Commit、L5/L6、Evidence 和 Release 记录；
 - Evidence 绑定精确 SHA，内容新鲜且与声明一致；
 - 迁移、重试、回滚/恢复和副作用已按适用合同核实；
 - 第三方许可证、来源和归属完整；
@@ -335,7 +389,7 @@ Stop reason (if any):
 
 ---
 
-## 16. 本文件与既有执行标准的关系
+## 17. 本文件与既有执行标准的关系
 
 本文件补充 `docs/DEVELOPMENT-EXECUTION-STANDARD-LUCKREAD-1.0-v1.0.md` 的 GPT 专用上下文恢复、用户指令语义、风险检查、门禁例外、状态报告和持续改进要求。
 
