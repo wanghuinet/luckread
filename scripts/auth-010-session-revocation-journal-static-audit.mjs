@@ -131,7 +131,7 @@ try {
   const saved = db.prepare(
     'SELECT status, attempt, event_type, resource_id FROM auth_010_session_revocation_journal WHERE journal_id = ?',
   ).get('journal-valid-1')
-  assert.deepEqual(saved, {
+  assert.deepEqual({ ...saved }, {
     status: 'PENDING',
     attempt: 1,
     event_type: 'user.session.revoked',
