@@ -23,9 +23,9 @@ export type SessionRevokedAuditEvent = {
   sourceVersion: 1
   actor: { actorId: string; actorType: 'user' }
   payload: {
-    operationId: 'authSessionRevoke'
+    operationId: 'authSessionRevoke' | 'authLogout'
     result: 'succeeded'
-    reasonCode: 'USER_INITIATED'
+    reasonCode: 'USER_INITIATED' | 'USER_LOGOUT'
   }
 }
 
@@ -42,6 +42,9 @@ async function assertSessionRevokedEvent(value: unknown): Promise<SessionRevoked
   }
   const actorValue = actor as Record<string, unknown>
   const payloadValue = payload as Record<string, unknown>
+  const validOperationReason =
+    (payloadValue.operationId === 'authSessionRevoke' && payloadValue.reasonCode === 'USER_INITIATED') ||
+    (payloadValue.operationId === 'authLogout' && payloadValue.reasonCode === 'USER_LOGOUT')
   if (
     typeof event.eventId !== 'string' || !EVENT_ID.test(event.eventId) ||
     event.eventType !== 'user.session.revoked' ||
@@ -62,9 +65,8 @@ async function assertSessionRevokedEvent(value: unknown): Promise<SessionRevoked
     actorValue.actorType !== 'user' ||
     Object.keys(actorValue).some((key) => key !== 'actorId' && key !== 'actorType') ||
     Object.keys(payloadValue).some((key) => !['operationId', 'result', 'reasonCode'].includes(key)) ||
-    payloadValue.operationId !== 'authSessionRevoke' ||
+    !validOperationReason ||
     payloadValue.result !== 'succeeded' ||
-    payloadValue.reasonCode !== 'USER_INITIATED' ||
     Object.keys(event).some((key) => ![
       'eventId', 'eventType', 'schemaVersion', 'producer', 'resourceType', 'resourceId',
       'occurredAt', 'publishedAt', 'correlationId', 'causationId', 'idempotencyKey',
@@ -124,7 +126,7 @@ function matchesPersisted(existing: ExistingSessionAuditRow, event: SessionRevok
     existing.action === event.eventType &&
     existing.targetType === 'Session' &&
     existing.targetId === event.resourceId &&
-    existing.reason === 'USER_INITIATED' &&
+    existing.reason === event.payload.reasonCode &&
     existing.occurredAt === event.occurredAt &&
     sameRecord(parseJsonObject(existing.actorJson), { actorId: event.actor.actorId, actorType: 'user' }) &&
     sameRecord(parseJsonObject(existing.beforeJson), { status: 'ACTIVE' }) &&
@@ -159,7 +161,7 @@ export async function consumeSessionRevokedAuditEvent(
     targetId: event.resourceId,
     before: { status: 'ACTIVE' },
     after: { status: 'REVOKED' },
-    reason: 'USER_INITIATED',
+    reason: event.payload.reasonCode,
     occurredAt: event.occurredAt,
   }
   try {
