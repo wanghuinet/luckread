@@ -1,4 +1,4 @@
-export type ScheduledPublicationName = 'account-state' | 'mfa-audit'
+export type ScheduledPublicationName = 'account-state' | 'mfa-audit' | 'session-audit'
 
 export type ScheduledPublicationTask = {
   name: ScheduledPublicationName
@@ -13,6 +13,20 @@ export type MfaPublicationSummary = {
   receiptEmitted?: number
   receiptFailed?: number
   receiptUnknown?: number
+}
+
+export type SessionPublicationSummary = {
+  selected: number
+  published: number
+  failed: number
+}
+
+function isSessionPublicationSummary(value: unknown): value is SessionPublicationSummary {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const summary = value as Record<string, unknown>
+  return ['selected', 'published', 'failed'].every((key) =>
+    Number.isSafeInteger(summary[key]) && Number(summary[key]) >= 0,
+  )
 }
 
 function isMfaPublicationSummary(value: unknown): value is MfaPublicationSummary {
@@ -42,6 +56,9 @@ export async function runScheduledPublicationTicks(
   logMfaAuditSummary: (summary: MfaPublicationSummary) => void = (summary) => {
     console.info('W02 scheduled publication result', { task: 'mfa-audit', ...summary })
   },
+  logSessionAuditSummary: (summary: SessionPublicationSummary) => void = (summary) => {
+    console.info('W02 scheduled publication result', { task: 'session-audit', ...summary })
+  },
 ): Promise<void> {
   const outcomes = await Promise.allSettled(tasks.map((task) => task.publish()))
   outcomes.forEach((outcome, index) => {
@@ -59,6 +76,10 @@ export async function runScheduledPublicationTicks(
         (summary.receiptFailed ?? 0) > 0 ||
         (summary.receiptUnknown ?? 0) > 0
       ) logMfaAuditSummary(summary)
+    }
+    if (task.name === 'session-audit' && isSessionPublicationSummary(outcome.value)) {
+      const summary = outcome.value
+      if (summary.selected > 0 || summary.failed > 0) logSessionAuditSummary(summary)
     }
   })
 }

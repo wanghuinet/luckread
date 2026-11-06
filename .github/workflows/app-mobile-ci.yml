@@ -183,6 +183,8 @@ jobs:
         run: bun test tests/theme-preference-store.test.mjs
       - name: Test native Help and About page
         run: bun test tests/settings-about.test.mjs
+      - name: Test native session management API and settings entry
+        run: bun test tests/session-management-api.test.mjs
       - name: Test native block and mute management
         run: bun test tests/block-mute-management.test.mjs
       - name: Test native video feed API requests

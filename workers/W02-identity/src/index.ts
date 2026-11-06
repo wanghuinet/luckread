@@ -1,6 +1,7 @@
 import { createLuckReadAuth, type RateLimitBinding } from './auth/better-auth.js'
 import { publishPendingAccountStateEvents } from './account/publication-journal-publisher.js'
 import { publishPendingMfaAuditEvents } from './auth/mfa-audit-publication-journal.js'
+import { publishPendingSessionRevocationEvents } from './auth/session-revocation-publication-journal.js'
 import { reconcileMfaAuditOperationReceipts } from './auth/mfa-audit-receipts.js'
 import { runScheduledPublicationTicks } from './auth/scheduled-publication.js'
 import { resolveGlobalLayer } from './authz/role-assignment.js'
@@ -15,6 +16,7 @@ import {
 import { resolveBetterAuthPrincipal } from './auth/principal.js'
 import { handleCurrentUserSessionList } from './auth/session-list.js'
 import { handleCurrentUserSessionRevoke } from './auth/session-revoke.js'
+import { handleCurrentUserSessionLogout } from './auth/session-logout.js'
 import { handleUsernameChangeRequest, handleUsernameStateRequest } from './auth/username-change.js'
 import { handleMfaStatusRequest } from './auth/mfa-status.js'
 import { handleMfaEnrollmentStartRequest } from './auth/mfa-enrollment-start.js'
@@ -221,6 +223,10 @@ export default {
 
     if (request.method === 'POST' && url.pathname === '/internal/auth/session/revoke-by-id') {
       return handleCurrentUserSessionRevoke(env, request)
+    }
+
+    if (request.method === 'POST' && url.pathname === '/internal/auth/session/logout') {
+      return handleCurrentUserSessionLogout(env, request)
     }
 
     if (request.method === 'POST' && url.pathname === '/internal/authz/resolve-layer') {
@@ -493,6 +499,7 @@ export default {
     })
     await runScheduledPublicationTicks([
       { name: 'account-state', publish: () => publishPendingAccountStateEvents(env) },
+      { name: 'session-audit', publish: () => publishPendingSessionRevocationEvents(env) },
       {
         name: 'mfa-audit',
         publish: async () => {

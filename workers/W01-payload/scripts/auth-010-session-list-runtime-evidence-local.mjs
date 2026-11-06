@@ -336,6 +336,23 @@ try {
   const targetSessionId = firstItems.find((item) => item.sessionId !== currentRow.id)?.sessionId
   if (typeof targetSessionId !== 'string') throw new Error('AUTH010_OWNED_REVOKE_TARGET_MISSING')
 
+  currentStage = 'current-session-revoke-protection'
+  const currentRevokeResponse = await fetch(baseUrl + '/api/v1/auth/sessions/' + encodeURIComponent(currentRow.id), {
+    method: 'DELETE',
+    headers: requestHeaders({ cookie: cookieA, 'Idempotency-Key': 'AUTH010-' + suffix + '-CURRENT' }),
+    cache: 'no-store',
+  })
+  const currentRevokePayload = await parseJson(currentRevokeResponse, 'AUTH010_CURRENT_SESSION_REVOKE')
+  if (currentRevokeResponse.status !== 409 || currentRevokePayload?.error?.code !== 'CURRENT_SESSION_PROTECTED') {
+    throw new Error('AUTH010_CURRENT_SESSION_REVOKE_NOT_PROTECTED')
+  }
+  const currentSessionAfterRejectedRevoke = scalar(
+    'SELECT id FROM "session" WHERE id = ? AND user_id = ? LIMIT 1',
+    currentRow.id,
+    userAId,
+  )
+  if (!currentSessionAfterRejectedRevoke) throw new Error('AUTH010_CURRENT_SESSION_WAS_REVOKED')
+
   currentStage = 'cross-account-revoke'
   const crossAccountRevoke = await revokeSession(cookieB, targetSessionId, 'AUTH010-' + suffix + '-CROSS')
   if (crossAccountRevoke.status !== 204) throw new Error('AUTH010_CROSS_ACCOUNT_REVOKE_STATUS_UNEXPECTED')
@@ -349,6 +366,24 @@ try {
   if (repeatedRevoke.status !== 204) throw new Error('AUTH010_REPEATED_REVOKE_NOT_IDEMPOTENT')
   const targetAfterOwn = scalar('SELECT id FROM "session" WHERE id = ? AND user_id = ? LIMIT 1', targetSessionId, userAId)
   if (targetAfterOwn) throw new Error('AUTH010_OWNED_REVOKE_DID_NOT_REMOVE_NATIVE_SESSION')
+  const sessionAuditRow = scalar(
+    'SELECT event_id AS eventId, event_type AS eventType, resource_id AS resourceId, idempotency_key AS idempotencyKey, status FROM auth_010_session_revocation_journal WHERE resource_id = ? AND event_type = ? LIMIT 1',
+    targetSessionId,
+    'user.session.revoked',
+  )
+  const sessionAuditCount = scalar(
+    'SELECT COUNT(*) AS count FROM auth_010_session_revocation_journal WHERE resource_id = ? AND event_type = ?',
+    targetSessionId,
+    'user.session.revoked',
+  )
+  if (!sessionAuditRow || sessionAuditRow.eventType !== 'user.session.revoked' ||
+      sessionAuditRow.resourceId !== targetSessionId ||
+      !/^evt_[a-f0-9]{32}$/.test(sessionAuditRow.eventId) ||
+      !/^AUTH010_SESSION_REVOKE_[a-f0-9]{32}$/.test(sessionAuditRow.idempotencyKey) ||
+      !['PENDING', 'PUBLISHED'].includes(sessionAuditRow.status) ||
+      Number(sessionAuditCount?.count) !== 1) {
+    throw new Error('AUTH010_REVOCATION_AUDIT_OUTBOX_NOT_DURABLE_OR_IDEMPOTENT')
+  }
 
   currentStage = 'verify-after-revoke'
   const afterRevoke = await listSessions(cookieA, { limit: 100 })
@@ -376,18 +411,25 @@ try {
       noStore: true,
       malformedCursorRejected: true,
       crossAccountListIsolated: true,
+      currentSessionProtected: true,
       crossAccountRevokeNoOp: true,
       ownedRevokeRemovesNativeSession: true,
       repeatedRevokeIdempotent: true,
+      sessionRevocationAuditOutboxDurable: true,
+      repeatedRevokeDoesNotDuplicateAuditEvent: true,
       syntheticIdentitiesAndSessionsCleaned: true,
     },
     observed: {
       firstPageCount: firstItems.length,
       secondPageCount: secondItems.length,
       userASessionCountBeforeCleanup: 56,
+      currentRevokeStatus: currentRevokeResponse.status,
       crossAccountRevokeStatus: crossAccountRevoke.status,
       ownRevokeStatus: ownRevoke.status,
       repeatedRevokeStatus: repeatedRevoke.status,
+      sessionRevocationAuditEventId: sessionAuditRow.eventId,
+      sessionRevocationAuditJournalStatus: sessionAuditRow.status,
+      sessionRevocationAuditCount: Number(sessionAuditCount.count),
     },
     secretsCaptured: false,
   }

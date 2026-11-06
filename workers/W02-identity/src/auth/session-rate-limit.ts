@@ -39,6 +39,17 @@ export async function enforceSessionRevokeRateLimits(
   await checkLimit(env.AUTH_SESSION_WRITE_LIMITER, 'auth010:session-revoke:endpoint')
 }
 
+/** Apply account, caller-session, and endpoint limits to self-logout. */
+export async function enforceSessionLogoutRateLimits(
+  env: BetterAuthEnv,
+  userId: string,
+  currentSessionId: string,
+): Promise<void> {
+  await checkLimit(env.AUTH_SESSION_WRITE_LIMITER, 'auth010:session-logout:account:' + userId)
+  await checkLimit(env.AUTH_SESSION_WRITE_LIMITER, 'auth010:session-logout:session:' + currentSessionId)
+  await checkLimit(env.AUTH_SESSION_WRITE_LIMITER, 'auth010:session-logout:endpoint')
+}
+
 export function sessionRateLimitErrorResponse(error: unknown): Response {
   if (error instanceof SessionRateLimitError && error.reason === 'limited') {
     return Response.json(

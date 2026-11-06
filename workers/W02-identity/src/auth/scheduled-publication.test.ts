@@ -60,6 +60,31 @@ describe('W02 scheduled publication isolation', () => {
     expect(logMfaAuditSummary).toHaveBeenCalledWith(summary)
   })
 
+  it('logs session-audit publication counts without payload or identity details', async () => {
+    const logSessionAuditSummary = vi.fn()
+    const summary = { selected: 2, published: 1, failed: 1 }
+
+    await runScheduledPublicationTicks([
+      { name: 'session-audit', publish: async () => summary },
+    ], vi.fn(), vi.fn(), logSessionAuditSummary)
+
+    expect(logSessionAuditSummary).toHaveBeenCalledTimes(1)
+    expect(logSessionAuditSummary).toHaveBeenCalledWith(summary)
+  })
+
+  it('logs a failed session-audit task using only its fixed task name', async () => {
+    const logFailure = vi.fn()
+    const logSessionAuditSummary = vi.fn()
+
+    await runScheduledPublicationTicks([
+      { name: 'session-audit', publish: async () => { throw new Error('sensitive queue failure') } },
+    ], logFailure, vi.fn(), logSessionAuditSummary)
+
+    expect(logFailure).toHaveBeenCalledOnce()
+    expect(logFailure).toHaveBeenCalledWith('session-audit')
+    expect(logSessionAuditSummary).not.toHaveBeenCalled()
+  })
+
   it('does not emit an empty MFA summary or accept untrusted count shapes', async () => {
     const logMfaAuditSummary = vi.fn()
     await runScheduledPublicationTicks([

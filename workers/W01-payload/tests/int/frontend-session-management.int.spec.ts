@@ -15,8 +15,12 @@ describe('frontend session management', () => {
     const w02 = read('../W02-identity/src/auth/session-list.ts')
     expect(route).toContain('listSessions(request,')
     expect(route).toContain('Math.min(50, requestedLimit)')
-    expect(w02).toContain('WHERE user_id = ?')
-    expect(w02).toContain('ORDER BY created_at DESC, id DESC LIMIT ?')
+    expect(w02).toContain('WITH ${authorizationCte}, ${sessionCte}')
+    expect(w02).toContain('role_assignments')
+    expect(w02).toContain("account.account_state IN ('PENDING_VERIFICATION', 'ACTIVE')")
+    expect(w02).toContain('WHERE user_id = ? AND expires_at > ?')
+    expect(w02).toContain('ORDER BY sessions.createdAt DESC, sessions.sessionId DESC')
+    expect(w02).toContain('LIMIT ?')
     expect(w02).toContain('currentSessionId')
     expect(w02).toContain('nextCursor')
     expect(w02).toContain('limit + 1')
@@ -41,6 +45,14 @@ describe('frontend session management', () => {
     expect(page).toContain("cache: 'no-store'")
     expect(route).toContain('listSessions(request,')
     expect(client).toContain("'/internal/auth/session/list'")
+  })
+
+  it('preserves W02 current-session rejection codes through the W01 session adapter', () => {
+    const client = read('src/auth/w02-session-client.ts')
+    const route = read('src/app/auth/sessions/[[...segments]]/route.ts')
+
+    expect(client).toContain("new W02AuthClientError(response.status, 'session revoke failed', errorCode(payload) ?? undefined)")
+    expect(route).toContain("error.status === 409 && error.code === 'CURRENT_SESSION_PROTECTED'")
   })
 
   it('revokes only non-current sessions through the existing DELETE API with idempotency', () => {

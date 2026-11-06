@@ -18,6 +18,9 @@ const mapError = (error: unknown): Response => {
         code === 'INVALID_CURSOR' ? 'Invalid session list cursor' : 'Invalid session request',
       )
     }
+    if (error.status === 409 && error.code === 'CURRENT_SESSION_PROTECTED') {
+      return apiErrorResponse(409, 'CURRENT_SESSION_PROTECTED', 'Current session cannot be revoked')
+    }
     return normalizeApiErrorResponse(
       new Response(null, { status: error.status }),
       'Session service unavailable',
