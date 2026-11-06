@@ -30,7 +30,7 @@ The columns are nullable because accounts that have never entered deletion do no
 
 ## Migration design and fail-closed conditions
 
-Migration: workers/W02-identity/migrations/0009_auth_015_lifecycle_windows.sql.
+Migration: workers/W02-identity/migrations/0011_auth_015_lifecycle_windows.sql.
 
 It performs only: a temporary retry-safe guard check against existing rows; additive ALTER TABLE operations for the two nullable timestamp fields; and removal of the temporary guard table.
 
