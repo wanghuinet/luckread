@@ -30,7 +30,11 @@ const makeEnv = (target: unknown) => {
   const sequence: string[] = []
   const statement = {
     bind: vi.fn().mockReturnThis(),
-    first: vi.fn().mockResolvedValue(target),
+    first: vi.fn().mockResolvedValue(
+      target && typeof target === 'object'
+        ? { permissionGranted: 1, ...(target as Record<string, unknown>) }
+        : target,
+    ),
   }
   const prepare = vi.fn((_sql: string) => {
     sequence.push('d1:target-session')
