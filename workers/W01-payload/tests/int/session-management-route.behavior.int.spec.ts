@@ -13,9 +13,11 @@ vi.mock('../../src/auth/w02-session-client.js', () => ({
   revokeSessionById: mocks.revokeSessionById,
   W02AuthClientError: class extends Error {
     status: number
-    constructor(status: number, message: string) {
+    code?: string
+    constructor(status: number, message: string, code?: string) {
       super(message)
       this.status = status
+      this.code = code
     }
   },
 }))
@@ -133,6 +135,23 @@ describe('session management route behavior', () => {
     expect(response.status).toBe(429)
     expect(mocks.rateLimitResponse).toHaveBeenCalledWith(request)
     expect(mocks.revokeSessionById).not.toHaveBeenCalled()
+  })
+
+  it('preserves W02 current-session protection as a conflict response', async () => {
+    mocks.revokeSessionById.mockRejectedValueOnce(
+      new W02AuthClientError(409, 'current session cannot be revoked', 'CURRENT_SESSION_PROTECTED'),
+    )
+    const response = await DELETE(
+      new Request('https://luckread.test/api/v1/auth/sessions/session-current', {
+        method: 'DELETE',
+        headers: { 'Idempotency-Key': 'session-current-protect-test' },
+      }),
+      context(['session-current']),
+    )
+    const payload = await response.json() as { error?: { code?: string } }
+
+    expect(response.status).toBe(409)
+    expect(payload.error?.code).toBe('CURRENT_SESSION_PROTECTED')
   })
 
   it('preserves W02 policy-scoped rate limiting as HTTP 429 for list and revoke', async () => {
