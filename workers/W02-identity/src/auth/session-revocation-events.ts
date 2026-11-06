@@ -1,7 +1,8 @@
 import { parseEventEnvelopeMetadata } from '../../../W10-async/src/event-envelope.js'
 
 const RESOURCE_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/
-const CORRELATION_ID = /^[A-Za-z0-9._:-]{1,255}$/
+const REQUEST_ID = /^req_[A-Za-z0-9_-]{1,123}$/
+const TRACE_ID = /^[A-Za-z0-9._:-]{1,128}$/
 
 export type SessionRevokedEvent = {
   eventId: string
@@ -46,13 +47,15 @@ export async function buildSessionRevokedEvent(input: {
     byte.toString(16).padStart(2, '0'),
   ).join('')
   const eventId = 'evt_' + suffix
-  const fallback = eventId
-  const correlationId = input.correlationId && CORRELATION_ID.test(input.correlationId)
+  // AuditEvent.requestId has the canonical req_ shape. W01 passes its
+  // request ID as correlationId; the independent correlation/trace header
+  // remains causationId and is stored in AuditEvent.traceId.
+  const correlationId = input.correlationId && REQUEST_ID.test(input.correlationId)
     ? input.correlationId
-    : fallback
-  const causationId = input.causationId && CORRELATION_ID.test(input.causationId)
+    : 'req_' + suffix
+  const causationId = input.causationId && TRACE_ID.test(input.causationId)
     ? input.causationId
-    : correlationId
+    : eventId
 
   return {
     eventId,
@@ -126,6 +129,8 @@ export function assertSessionRevokedEvent(value: unknown): asserts value is Sess
     envelope.resourceType !== 'Session' ||
     !RESOURCE_ID.test(envelope.resourceId) ||
     typeof actorValue.actorId !== 'string' || !RESOURCE_ID.test(actorValue.actorId) ||
+    typeof envelope.correlationId !== 'string' || !REQUEST_ID.test(envelope.correlationId) ||
+    typeof envelope.causationId !== 'string' || !TRACE_ID.test(envelope.causationId) ||
     actorValue.actorType !== 'user' ||
     Object.keys(actorValue).some((key) => key !== 'actorId' && key !== 'actorType') ||
     Object.keys(payloadValue).some((key) => !['operationId', 'result', 'reasonCode'].includes(key)) ||
