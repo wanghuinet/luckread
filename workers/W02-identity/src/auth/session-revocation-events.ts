@@ -111,7 +111,7 @@ export function buildSessionRevocationOutboxInsert(
   )
 }
 
-export function assertSessionRevokedEvent(value: unknown): asserts value is SessionRevokedEvent {
+export async function assertSessionRevokedEvent(value: unknown): Promise<SessionRevokedEvent> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     throw new Error('INVALID_AUTH_010_SESSION_EVENT')
   }
@@ -153,4 +153,20 @@ export function assertSessionRevokedEvent(value: unknown): asserts value is Sess
   ) {
     throw new Error('INVALID_AUTH_010_SESSION_EVENT')
   }
+
+  // Bind the claimed actor and target to the same deterministic identity used
+  // by W02 when creating the event. This detects actor/session substitution
+  // without disclosing the native session token or adding a new authority.
+  const material = 'AUTH010_SESSION_REVOKE:' + actorValue.actorId + ':' + event.resourceId
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(material))
+  const suffix = Array.from(new Uint8Array(digest).slice(0, 16), (byte) =>
+    byte.toString(16).padStart(2, '0'),
+  ).join('')
+  if (
+    event.eventId !== 'evt_' + suffix ||
+    event.idempotencyKey !== 'AUTH010_SESSION_REVOKE_' + suffix
+  ) {
+    throw new Error('INVALID_AUTH_010_SESSION_EVENT')
+  }
+  return event as unknown as SessionRevokedEvent
 }

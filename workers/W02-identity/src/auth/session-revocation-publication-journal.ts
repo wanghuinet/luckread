@@ -40,8 +40,7 @@ export async function publishPendingSessionRevocationEvents(
   for (const row of rows.results ?? []) {
     let payload: unknown
     try {
-      payload = JSON.parse(row.payload)
-      assertSessionRevokedEvent(payload)
+      payload = await assertSessionRevokedEvent(JSON.parse(row.payload))
     } catch {
       let result: D1Result
       try {

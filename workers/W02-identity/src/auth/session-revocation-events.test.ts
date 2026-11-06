@@ -64,12 +64,14 @@ describe('AUTH-010 session revocation event', () => {
     )
   })
 
-  it('rejects event envelopes with a mismatched event type or client-injected actor', async () => {
+  it('rejects event envelopes with mismatched identity or client-injected fields', async () => {
     const event = await buildSessionRevokedEvent({ sessionId: 'session-1', userId: 'user-1' })
-    expect(() => assertSessionRevokedEvent(event)).not.toThrow()
-    expect(() => assertSessionRevokedEvent({ ...event, eventType: 'identity.account_state_changed' }))
-      .toThrow()
-    expect(() => assertSessionRevokedEvent({ ...event, actor: { ...event.actor, clientSupplied: true } }))
-      .toThrow('INVALID_AUTH_010_SESSION_EVENT')
+    await expect(assertSessionRevokedEvent(event)).resolves.toEqual(event)
+    await expect(assertSessionRevokedEvent({ ...event, eventType: 'identity.account_state_changed' }))
+      .rejects.toThrow('INVALID_AUTH_010_SESSION_EVENT')
+    await expect(assertSessionRevokedEvent({ ...event, actor: { actorId: 'user-2', actorType: 'user' } }))
+      .rejects.toThrow('INVALID_AUTH_010_SESSION_EVENT')
+    await expect(assertSessionRevokedEvent({ ...event, payload: { ...event.payload, token: 'secret' } }))
+      .rejects.toThrow('INVALID_AUTH_010_SESSION_EVENT')
   })
 })

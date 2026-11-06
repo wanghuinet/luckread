@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { consumeSessionRevokedAuditEvent } from './session-revocation-audit-queue-consumer'
 
 const event = {
-  eventId: 'evt_01234567890123456789012345678901',
+  eventId: 'evt_211a595ebdce47b1d5295d0af937dc4a',
   eventType: 'user.session.revoked',
   schemaVersion: '1.0',
   producer: 'W02',
@@ -12,7 +12,7 @@ const event = {
   publishedAt: '2026-11-06T00:00:01.000Z',
   correlationId: 'req_session_revocation_1',
   causationId: 'trace-session-1',
-  idempotencyKey: 'AUTH010_SESSION_REVOKE_01234567890123456789012345678901',
+  idempotencyKey: 'AUTH010_SESSION_REVOKE_211a595ebdce47b1d5295d0af937dc4a',
   attempt: 1,
   sourceVersion: 1,
   actor: { actorId: 'user-1', actorType: 'user' },

@@ -113,8 +113,6 @@ describe('W02 policy-scoped session revoke', () => {
       1,
       expect.stringMatching(/^AUTH010_SESSION_REVOKE_[a-f0-9]{32}$/),
       expect.stringContaining('"eventType":"user.session.revoked"'),
-      expect.stringContaining('"correlationId":"req_session_revoke_test"'),
-      expect.stringContaining('"causationId":"trace-session-revoke-test"'),
       'PENDING',
       1,
       null,
@@ -122,6 +120,14 @@ describe('W02 policy-scoped session revoke', () => {
       null,
       null,
     )
+    const outboxPayload = vi.mocked(db.prepared[1]!.bind).mock.calls[0]?.[7] as string
+    expect(JSON.parse(outboxPayload)).toMatchObject({
+      eventType: 'user.session.revoked',
+      correlationId: 'req_session_revoke_test',
+      causationId: 'trace-session-revoke-test',
+      actor: { actorId: 'user-1', actorType: 'user' },
+      resourceId: 'target-session',
+    })
     expect(response.headers.get('cache-control')).toBe('no-store')
   })
 

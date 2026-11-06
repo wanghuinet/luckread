@@ -29,7 +29,7 @@ export type SessionRevokedAuditEvent = {
   }
 }
 
-function assertSessionRevokedEvent(value: unknown): asserts value is SessionRevokedAuditEvent {
+async function assertSessionRevokedEvent(value: unknown): Promise<SessionRevokedAuditEvent> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     throw new Error('INVALID_AUTH_010_SESSION_EVENT')
   }
@@ -43,7 +43,7 @@ function assertSessionRevokedEvent(value: unknown): asserts value is SessionRevo
   const actorValue = actor as Record<string, unknown>
   const payloadValue = payload as Record<string, unknown>
   if (
-    event.eventId === undefined || typeof event.eventId !== 'string' || !EVENT_ID.test(event.eventId) ||
+    typeof event.eventId !== 'string' || !EVENT_ID.test(event.eventId) ||
     event.eventType !== 'user.session.revoked' ||
     event.schemaVersion !== '1.0' ||
     event.producer !== 'W02' ||
@@ -53,7 +53,9 @@ function assertSessionRevokedEvent(value: unknown): asserts value is SessionRevo
     typeof event.publishedAt !== 'string' || !Number.isFinite(Date.parse(event.publishedAt)) ||
     typeof event.correlationId !== 'string' || !REQUEST_ID.test(event.correlationId) ||
     typeof event.causationId !== 'string' || !TRACE_ID.test(event.causationId) ||
-    typeof event.idempotencyKey !== 'string' || !IDEMPOTENCY_KEY.test(event.idempotencyKey) ||
+    typeof event.idempotencyKey !== 'string' ||
+      event.idempotencyKey !== 'AUTH010_SESSION_REVOKE_' + event.eventId.slice(4) ||
+    !IDEMPOTENCY_KEY.test(event.idempotencyKey) ||
     event.attempt !== 1 ||
     event.sourceVersion !== 1 ||
     typeof actorValue.actorId !== 'string' || !RESOURCE_ID.test(actorValue.actorId) ||
@@ -62,12 +64,26 @@ function assertSessionRevokedEvent(value: unknown): asserts value is SessionRevo
     Object.keys(payloadValue).some((key) => !['operationId', 'result', 'reasonCode'].includes(key)) ||
     payloadValue.operationId !== 'authSessionRevoke' ||
     payloadValue.result !== 'succeeded' ||
-    payloadValue.reasonCode !== 'USER_INITIATED'
+    payloadValue.reasonCode !== 'USER_INITIATED' ||
+    Object.keys(event).some((key) => ![
+      'eventId', 'eventType', 'schemaVersion', 'producer', 'resourceType', 'resourceId',
+      'occurredAt', 'publishedAt', 'correlationId', 'causationId', 'idempotencyKey',
+      'attempt', 'sourceVersion', 'actor', 'payload',
+    ].includes(key))
   ) {
     throw new Error('INVALID_AUTH_010_SESSION_EVENT')
   }
-}
 
+  const material = 'AUTH010_SESSION_REVOKE:' + actorValue.actorId + ':' + event.resourceId
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(material))
+  const suffix = Array.from(new Uint8Array(digest).slice(0, 16), (byte) =>
+    byte.toString(16).padStart(2, '0'),
+  ).join('')
+  if (event.eventId !== 'evt_' + suffix) {
+    throw new Error('INVALID_AUTH_010_SESSION_EVENT')
+  }
+  return event as unknown as SessionRevokedAuditEvent
+}
 type ExistingSessionAuditRow = {
   eventId: string
   requestId: string | null
@@ -120,8 +136,7 @@ export async function consumeSessionRevokedAuditEvent(
   db: D1Database,
   raw: unknown,
 ): Promise<'persisted' | 'duplicate'> {
-  assertSessionRevokedEvent(raw)
-  const event = raw
+  const event = await assertSessionRevokedEvent(raw)
   const existing = await db.prepare(
     'SELECT event_id AS eventId, request_id AS requestId, trace_id AS traceId, ' +
     'actor_json AS actorJson, action, target_type AS targetType, target_id AS targetId, ' +
