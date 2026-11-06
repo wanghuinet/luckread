@@ -23,20 +23,20 @@ function createDb(
   existing = false,
   writeSuccess = true,
   existingOverrides: Record<string, unknown> = {},
-  sourceEvent = event,
+  auditReason = 'USER_INITIATED',
 ) {
   const existingRow = {
-    eventId: sourceEvent.eventId,
-    requestId: sourceEvent.correlationId,
-    traceId: sourceEvent.causationId,
-    actorJson: JSON.stringify(sourceEvent.actor),
-    action: sourceEvent.eventType,
+    eventId: event.eventId,
+    requestId: event.correlationId,
+    traceId: event.causationId,
+    actorJson: JSON.stringify(event.actor),
+    action: event.eventType,
     targetType: 'Session',
-    targetId: sourceEvent.resourceId,
+    targetId: event.resourceId,
     beforeJson: JSON.stringify({ status: 'ACTIVE' }),
     afterJson: JSON.stringify({ status: 'REVOKED' }),
-    reason: sourceEvent.payload.reasonCode,
-    occurredAt: sourceEvent.occurredAt,
+    reason: auditReason,
+    occurredAt: event.occurredAt,
     ...existingOverrides,
   }
   const first = vi.fn().mockResolvedValue(existing ? existingRow : null)
@@ -148,11 +148,11 @@ describe('AUTH-010 W06 session revocation audit consumer', () => {
       ...event,
       payload: { operationId: 'authLogout', result: 'succeeded', reasonCode: 'USER_LOGOUT' },
     }
-    const { db, bind, run } = createDb(false, true, {}, logoutEvent)
+    const { db, bind, run } = createDb(false, true, {}, 'USER_LOGOUT')
     await expect(consumeSessionRevokedAuditEvent(db, logoutEvent)).resolves.toBe('persisted')
     expect(run).toHaveBeenCalledTimes(1)
     expect(bind.mock.calls[1]?.[9]).toBe('USER_LOGOUT')
-    const duplicate = createDb(true, true, {}, logoutEvent)
+    const duplicate = createDb(true, true, {}, 'USER_LOGOUT')
     await expect(consumeSessionRevokedAuditEvent(duplicate.db, logoutEvent)).resolves.toBe('duplicate')
   })
 
