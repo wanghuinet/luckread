@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { ComponentRef, ReactNode, RefObject } from 'react';
+import type { ComponentRef, ComponentType, ReactNode, RefObject } from 'react';
 import { Tabs } from 'expo-router';
 import { Platform, View, type StyleProp, type ViewStyle } from 'react-native';
 import Foundation from '@expo/vector-icons/Foundation';
@@ -24,7 +24,7 @@ import FilledMessages from '~/assets/svg/tabs/filled/messages.svg';
 
 import { TabBarScrollProvider, useTabBarScrollState } from '~/components/TabBarScroll';
 
-type SvgTabIcon = React.ComponentType<SvgProps>;
+type SvgTabIcon = ComponentType<SvgProps>;
 type BlurTargetRef = RefObject<ComponentRef<typeof View> | null>;
 
 function createSvgTabIcon(outline: SvgTabIcon, filled: SvgTabIcon): TabBarIconComponent {
