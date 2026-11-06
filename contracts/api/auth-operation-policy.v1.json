@@ -325,15 +325,15 @@
         "subject": "current_session"
       },
       "authorization": {
-        "required": true,
-        "permission": "user.session.revoke",
+        "required": false,
+        "accountState": "N/A",
         "scope": "self"
       },
       "resource": {
         "class": "SINGLE_AUTHORITATIVE_WRITE",
-        "d1ReadMax": 0,
+        "d1ReadMax": 1,
         "d1WriteMax": 1,
-        "d1ReadRowsMax": 0,
+        "d1ReadRowsMax": 1,
         "d1WriteRowsMax": 2,
         "rpcMax": 0,
         "outboundMax": 0
@@ -366,6 +366,7 @@
         ],
         "actions": [
           "ALLOW",
+          "THROTTLE",
           "BLOCK"
         ]
       },
@@ -376,12 +377,16 @@
       "security": [
         "revocation_cannot_be_overridden_by_cache",
         "revocation_propagation_bounded",
-        "session_secret_not_returned"
+        "session_secret_not_returned",
+        "self_session_only",
+        "session_identity_server_derived_by_W02",
+        "logout_available_regardless_of_account_state",
+        "atomic_session_delete_and_audit_outbox"
       ],
       "evidence": {
         "openapi": "PASS",
         "inventory": "PASS",
-        "permission": "PASS",
+        "permission": "N/A",
         "state": "N/A",
         "resource": "PASS",
         "cache": "PASS",
