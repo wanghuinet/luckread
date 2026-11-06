@@ -133,20 +133,51 @@ jobs:
         with: {node-version: 24, cache: npm}
       - run: npm ci
       - name: Generate R4 evidence gap report
+        id: r4_report
+        continue-on-error: true
         run: node scripts/mapping-0-r4-evidence-gap-report.mjs
-      - run: node scripts/feature-entity-persistence-registry-check.mjs
-      - name: Validate canonical Mapping 0 Evidence Registry
+      - name: Validate feature entity and persistence registry
+        id: r4_feature_entity
         if: ${{ always() }}
+        continue-on-error: true
+        run: node scripts/feature-entity-persistence-registry-check.mjs
+      - name: Validate canonical Mapping 0 Evidence Registry
+        id: evidence_registry
+        if: ${{ always() }}
+        continue-on-error: true
         run: node scripts/mapping-0-evidence-registry-final-check.mjs
       - name: Upload R4 evidence gap report
-        if: ${{ always() }}
+        if: ${{ always() && steps.r4_report.outcome == 'success' }}
         uses: actions/upload-artifact@v4
         with:
           name: mapping-0-r4-evidence-gap-${{ github.run_id }}
           path: artifacts/mapping-0/r4-evidence-gap-report.json
           if-no-files-found: error
           retention-days: 14
-      - run: node scripts/r5-foundation-contract-check.mjs
+      - name: Run R5 foundation contract check
+        id: r5_foundation
+        if: ${{ always() }}
+        continue-on-error: true
+        run: node scripts/r5-foundation-contract-check.mjs
+      - name: Enforce all R4, Evidence Registry and R5 results
+        if: ${{ always() }}
+        env:
+          R4_REPORT_OUTCOME: ${{ steps.r4_report.outcome }}
+          R4_FEATURE_ENTITY_OUTCOME: ${{ steps.r4_feature_entity.outcome }}
+          EVIDENCE_REGISTRY_OUTCOME: ${{ steps.evidence_registry.outcome }}
+          R5_FOUNDATION_OUTCOME: ${{ steps.r5_foundation.outcome }}
+        run: |
+          failed=0
+          for result in "$R4_REPORT_OUTCOME" "$R4_FEATURE_ENTITY_OUTCOME" "$EVIDENCE_REGISTRY_OUTCOME" "$R5_FOUNDATION_OUTCOME"; do
+            if [ "$result" != "success" ]; then
+              echo "STRICT_DOWNSTREAM_NOT_GREEN: component outcome=$result"
+              failed=1
+            fi
+          done
+          if [ "$failed" -ne 0 ]; then
+            exit 1
+          fi
+          echo "STRICT_DOWNSTREAM_GREEN"
 
   alignment:
     name: Five-Way Alignment Admission Gate
@@ -227,7 +258,10 @@ jobs:
   openapi-lint:
     name: OpenAPI Lint
     runs-on: ubuntu-latest
-    needs: contract-full
+    # Run syntax lint independently so an unrelated full-alignment blocker
+    # does not suppress the OpenAPI result; Contract Admission Gate (full)
+    # still enforces FULL-mode downstream gates before admission can pass.
+    needs: contract
     steps:
       - uses: actions/checkout@v4
         with:
