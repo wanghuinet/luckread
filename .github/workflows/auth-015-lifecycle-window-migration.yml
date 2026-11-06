@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       source_sha:
-        description: Exact source SHA containing migration 0009
+        description: Exact source SHA containing migration 0011
         required: true
         type: string
       database_name:
