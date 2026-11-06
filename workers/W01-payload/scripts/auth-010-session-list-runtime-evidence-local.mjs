@@ -366,6 +366,24 @@ try {
   if (repeatedRevoke.status !== 204) throw new Error('AUTH010_REPEATED_REVOKE_NOT_IDEMPOTENT')
   const targetAfterOwn = scalar('SELECT id FROM "session" WHERE id = ? AND user_id = ? LIMIT 1', targetSessionId, userAId)
   if (targetAfterOwn) throw new Error('AUTH010_OWNED_REVOKE_DID_NOT_REMOVE_NATIVE_SESSION')
+  const sessionAuditRow = scalar(
+    'SELECT event_id AS eventId, event_type AS eventType, resource_id AS resourceId, idempotency_key AS idempotencyKey, status FROM auth_010_session_revocation_journal WHERE resource_id = ? AND event_type = ? LIMIT 1',
+    targetSessionId,
+    'user.session.revoked',
+  )
+  const sessionAuditCount = scalar(
+    'SELECT COUNT(*) AS count FROM auth_010_session_revocation_journal WHERE resource_id = ? AND event_type = ?',
+    targetSessionId,
+    'user.session.revoked',
+  )
+  if (!sessionAuditRow || sessionAuditRow.eventType !== 'user.session.revoked' ||
+      sessionAuditRow.resourceId !== targetSessionId ||
+      !/^evt_[a-f0-9]{32}$/.test(sessionAuditRow.eventId) ||
+      !/^AUTH010_SESSION_REVOKE_[a-f0-9]{32}$/.test(sessionAuditRow.idempotencyKey) ||
+      !['PENDING', 'PUBLISHED'].includes(sessionAuditRow.status) ||
+      Number(sessionAuditCount?.count) !== 1) {
+    throw new Error('AUTH010_REVOCATION_AUDIT_OUTBOX_NOT_DURABLE_OR_IDEMPOTENT')
+  }
 
   currentStage = 'verify-after-revoke'
   const afterRevoke = await listSessions(cookieA, { limit: 100 })
@@ -397,6 +415,8 @@ try {
       crossAccountRevokeNoOp: true,
       ownedRevokeRemovesNativeSession: true,
       repeatedRevokeIdempotent: true,
+      sessionRevocationAuditOutboxDurable: true,
+      repeatedRevokeDoesNotDuplicateAuditEvent: true,
       syntheticIdentitiesAndSessionsCleaned: true,
     },
     observed: {
@@ -407,6 +427,9 @@ try {
       crossAccountRevokeStatus: crossAccountRevoke.status,
       ownRevokeStatus: ownRevoke.status,
       repeatedRevokeStatus: repeatedRevoke.status,
+      sessionRevocationAuditEventId: sessionAuditRow.eventId,
+      sessionRevocationAuditJournalStatus: sessionAuditRow.status,
+      sessionRevocationAuditCount: Number(sessionAuditCount.count),
     },
     secretsCaptured: false,
   }
