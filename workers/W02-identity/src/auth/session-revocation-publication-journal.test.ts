@@ -7,8 +7,8 @@ async function makeEvent() {
     sessionId: 'session-1',
     userId: 'user-1',
     occurredAt: '2026-11-06T00:00:00.000Z',
-    correlationId: 'corr-1',
-    causationId: 'request-1',
+    correlationId: 'req_session_audit_1',
+    causationId: 'trace-session-audit-1',
   })
 }
 
