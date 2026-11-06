@@ -3659,12 +3659,12 @@
           "classification": "ACCOUNT_LIFECYCLE_METADATA",
           "status": "CONTRACTED_NOT_VERIFIED",
           "payloadNative": false,
-          "sourceRef": "workers/W02-identity/migrations/0009_auth_015_lifecycle_windows.sql",
+          "sourceRef": "workers/W02-identity/migrations/0011_auth_015_lifecycle_windows.sql",
           "payloadConfigRef": "contracts/entity/non-payload-d1-authority",
           "apiExposure": "NONE",
           "adminExposure": "NONE",
           "eventExposure": "IDENTITY_ACCOUNT_STATE_CHANGED",
-          "migrationVersion": "0009_auth_015_lifecycle_windows.sql",
+          "migrationVersion": "0011_auth_015_lifecycle_windows.sql",
           "postgresqlPortability": "PORTABLE",
           "evidenceRefs": [
             "contracts/persistence/AUTH-015-account-lifecycle-window-persistence-contract.v1.json",
@@ -3683,12 +3683,12 @@
           "classification": "ACCOUNT_LIFECYCLE_METADATA",
           "status": "CONTRACTED_NOT_VERIFIED",
           "payloadNative": false,
-          "sourceRef": "workers/W02-identity/migrations/0009_auth_015_lifecycle_windows.sql",
+          "sourceRef": "workers/W02-identity/migrations/0011_auth_015_lifecycle_windows.sql",
           "payloadConfigRef": "contracts/entity/non-payload-d1-authority",
           "apiExposure": "NONE",
           "adminExposure": "NONE",
           "eventExposure": "IDENTITY_ACCOUNT_STATE_CHANGED",
-          "migrationVersion": "0009_auth_015_lifecycle_windows.sql",
+          "migrationVersion": "0011_auth_015_lifecycle_windows.sql",
           "postgresqlPortability": "PORTABLE",
           "evidenceRefs": [
             "contracts/persistence/AUTH-015-account-lifecycle-window-persistence-contract.v1.json",
@@ -3700,7 +3700,7 @@
         "workers/W01-payload/src/collections/Users.ts",
         "workers/W01-payload/src/payload.config.ts",
         "contracts/persistence/AUTH-015-account-lifecycle-window-persistence-contract.v1.json",
-        "workers/W02-identity/migrations/0009_auth_015_lifecycle_windows.sql",
+        "workers/W02-identity/migrations/0011_auth_015_lifecycle_windows.sql",
         "docs/change-control/CC-AUTH-015-W02-LIFECYCLE-WINDOW-PERSISTENCE-2026-11-06.md"
       ]
     },
