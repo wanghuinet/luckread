@@ -33,6 +33,25 @@ module.exports = ({ config }) => {
     throw new Error('EXPO_UPDATE_CHANNEL contains unsupported characters.');
   }
 
+  const posthogCliApiKey = String(process.env.POSTHOG_CLI_API_KEY || '').trim();
+  const posthogCliProjectId = String(process.env.POSTHOG_CLI_PROJECT_ID || '').trim();
+  const posthogCliHost = String(process.env.POSTHOG_CLI_HOST || 'https://us.posthog.com').trim();
+  const posthogCliHostAllowed = [
+    'https://us.posthog.com',
+    'https://eu.posthog.com',
+  ].includes(posthogCliHost);
+
+  if (posthogCliProjectId && !/^[0-9]+$/.test(posthogCliProjectId)) {
+    throw new Error('POSTHOG_CLI_PROJECT_ID must be a numeric PostHog project ID.');
+  }
+  if (posthogCliApiKey && posthogCliProjectId && !posthogCliHostAllowed) {
+    throw new Error('POSTHOG_CLI_HOST must be a supported PostHog Cloud host.');
+  }
+
+  const posthogNativeSymbolUploadEnabled = Boolean(
+    posthogCliApiKey && posthogCliProjectId && posthogCliHostAllowed,
+  );
+
   const updatesEnabled = Boolean(projectId);
   const resolvedConfig = {
     ...config,
@@ -63,6 +82,21 @@ module.exports = ({ config }) => {
         projectId,
       },
     };
+  }
+
+  if (posthogNativeSymbolUploadEnabled) {
+    resolvedConfig.plugins = [
+      ...(resolvedConfig.plugins || []),
+      [
+        'posthog-react-native/expo',
+        {
+          uploadNativeSymbols: true,
+          skipOnConflict: true,
+          // Preserve LuckRead's existing notification intent handling.
+          patchMainActivityNewIntent: false,
+        },
+      ],
+    ];
   }
 
   return resolvedConfig;
