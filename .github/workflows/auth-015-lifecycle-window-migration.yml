@@ -45,7 +45,7 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
-          test -f migrations/0009_auth_015_lifecycle_windows.sql
+          test -f migrations/0011_auth_015_lifecycle_windows.sql
           node --input-type=module <<'NODE'
           import fs from 'node:fs'
           const config = JSON.parse(fs.readFileSync('wrangler.jsonc', 'utf8'))
@@ -85,7 +85,7 @@ jobs:
           if (countEnvelope[0].results.length !== 1 || Number(countEnvelope[0].results[0]?.deletion_lifecycle_rows) !== 0) throw new Error('AUTH-015 fail-closed: existing deletion lifecycle rows have no admitted timestamp provenance')
           const applied = new Set(ledgerEnvelope[0].results.map((row) => row.name))
           const migrationFiles = fs.readdirSync('migrations').filter((name) => name.endsWith('.sql')).sort()
-          const targetMigration = '0009_auth_015_lifecycle_windows.sql'
+          const targetMigration = '0011_auth_015_lifecycle_windows.sql'
           if (!migrationFiles.includes(targetMigration)) throw new Error('AUTH-015 migration file is absent from the W02 migration directory')
           const pending = migrationFiles.filter((name) => !applied.has(name))
           if (pending.length !== 1 || pending[0] !== targetMigration) {
@@ -140,7 +140,7 @@ jobs:
           const before = new Set(beforeEnvelope[0].results.map((row) => row.name))
           const after = new Set(afterEnvelope[0].results.map((row) => row.name))
           const added = [...after].filter((name) => !before.has(name))
-          if (added.length !== 1 || added[0] !== '0009_auth_015_lifecycle_windows.sql') throw new Error('unexpected D1 migration ledger delta: ' + added.join(', '))
+          if (added.length !== 1 || added[0] !== '0011_auth_015_lifecycle_windows.sql') throw new Error('unexpected D1 migration ledger delta: ' + added.join(', '))
           console.log(JSON.stringify({AUTH_015_MIGRATION:'PASS',databaseName:process.env.DATABASE_NAME,columns:['deletion_requested_at','deleted_at'],deletionLifecycleRows:0,newlyAppliedMigration:added[0]},null,2))
           NODE
 
@@ -158,7 +158,7 @@ jobs:
           database_name=$DATABASE_NAME
           database_id=2f80471e-3756-49f9-8db1-7707a433ad64
           binding=D1_01
-          migration=0009_auth_015_lifecycle_windows.sql
+          migration=0011_auth_015_lifecycle_windows.sql
           remote_mutation=APPLIED_AND_VERIFIED
           timestamp_backfill=false
           EOF
