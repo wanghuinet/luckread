@@ -11,6 +11,8 @@ vi.mock('./better-auth.js', () => ({
     handler: mocks.handler,
     $context: Promise.resolve({
       authCookies: { sessionToken: { name: 'better-auth.session_token' } },
+      options: { advanced: {} },
+      isTrustedOrigin: (origin: string) => origin === 'https://luckread.com',
     }),
   }),
 }))
@@ -188,4 +190,45 @@ describe('W02 authenticated current-session logout', () => {
     expect(db.batch).not.toHaveBeenCalled()
     expect(mocks.handler).not.toHaveBeenCalled()
   })
+  it('rejects missing and untrusted cookie origins before rate limiting or D1 mutation', async () => {
+    const db = makeEnv()
+    const untrusted = new Request(makeRequest(), {
+      headers: {
+        cookie: 'better-auth.session_token=browser-credential',
+        origin: 'https://attacker.example',
+      },
+    })
+    const missing = new Request(makeRequest(), {
+      headers: { cookie: 'better-auth.session_token=browser-credential' },
+    })
+
+    for (const request of [untrusted, missing]) {
+      const response = await handleCurrentUserSessionLogout(db.env, request)
+      const payload = await response.json() as { error?: { code?: string } }
+      expect(response.status).toBe(403)
+      expect(payload.error?.code).toBe('FORBIDDEN')
+    }
+
+    expect(mocks.getSession).not.toHaveBeenCalled()
+    expect(db.limiter.limit).not.toHaveBeenCalled()
+    expect(db.prepare).not.toHaveBeenCalled()
+    expect(db.batch).not.toHaveBeenCalled()
+    expect(mocks.handler).not.toHaveBeenCalled()
+  })
+
+  it('allows a valid Bearer-only native logout without requiring a browser Origin', async () => {
+    const original = makeRequest()
+    const headers = new Headers(original.headers)
+    headers.delete('cookie')
+    headers.delete('origin')
+    const request = new Request(original.url, { method: 'POST', headers })
+    const db = makeEnv()
+
+    const response = await handleCurrentUserSessionLogout(db.env, request)
+
+    expect(response.status).toBe(200)
+    expect(db.batch).toHaveBeenCalledTimes(1)
+    expect(mocks.handler).toHaveBeenCalledTimes(1)
+  })
+
 })
