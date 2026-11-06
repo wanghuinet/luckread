@@ -1,7 +1,9 @@
 # AUTH-010 Permission / Self-Scope Reconciliation v1.0
 
 Status: BLOCKED_NOT_GREEN
-Implementation authorization: false
+Implementation / release admission: NOT_ADMITTED
+
+PR #1568 contains a hidden candidate implementation. This reconciliation does not authorize exposing or releasing session management.
 
 ## Purpose
 
@@ -18,13 +20,12 @@ Source: `contracts/api/auth-operation-policy.v1.json`.
 
 ## Verified permission catalog state
 
-`contracts/authz/permissions.json` currently contains:
+`contracts/authz/permissions.json` currently contains both canonical permission entries:
 
+- `user.session.read` → resource `user`, action `session_read`, minimum layer `L1`, scope `own`.
 - `user.session.revoke` → resource `user`, action `session_revoke`, minimum layer `L1`, scope `own`, audit required.
 
-The catalog does **not** currently contain `user.session.read`, even though AUTH-010 canonical API policy requires that permission for `authSessionList`.
-
-Therefore the authorization contract is not yet fully reconciled.
+Both permissions are granted to the global base `user` role in `x-role-permissions.roles`. The permission identifiers are therefore present; the remaining issue is proving that W02 checks the effective assignment and applies the declared self/own scope at runtime.
 
 ## Frozen authorization semantics
 
@@ -58,16 +59,32 @@ Therefore the authorization contract is not yet fully reconciled.
 
 No new permission identifier is invented in this document. `user.session.read` is referenced only because it already exists as the canonical requirement in the AUTH-010 API operation policy.
 
-## Current blocker
+## Candidate runtime enforcement and remaining blockers
 
-The permission catalog must be reconciled so that `user.session.read` has a canonical catalog entry before AUTH-010 authorization mapping can be considered complete.
+The current hidden PR #1568 candidate adds a fail-closed W02 check for both operations:
 
-Until then:
+- W02 derives the subject only from the authenticated Better Auth session; no client-supplied owner/user identifier is accepted.
+- The candidate reads the canonical `user` role permission grant from `permissions.json` and requires an effective W02-owned RoleAssignment (`role_id=user`, global scope, null `scope_id`, active status, and valid time window).
+- It also requires the account state to remain `PENDING_VERIFICATION` or `ACTIVE`.
+- Permission and the bounded session/target query are evaluated in one D1 statement. Missing role assignment or disallowed account state returns `403 PERMISSION_DENIED`.
+- The authenticated current session is rejected with `409 CURRENT_SESSION_PROTECTED` before any target-session lookup. Other-account targets remain indistinguishable from missing targets.
 
-- no runtime authorization implementation is authorized by this contract;
-- no handler may claim permission enforcement evidence;
-- no security-E2E evidence may be promoted to PASS;
-- AUTH-010 remains NOT_GREEN.
+These are candidate source changes and tests, not formal admission evidence. The exact-source-SHA W02 unit and controlled local W01/W02 runtime checks must pass before source-level permission behavior can be considered verified.
+
+The following blockers remain:
+
+1. `user.session.revoke` is `auditRequired: true`; the current handler does not yet emit/admit the canonical `user.session.revoked` audit/event record.
+2. `authSessionRevoke` policy requires one `session_revocation_projection` async task. W02 currently has no session-revocation queue producer or admitted event/outbox implementation. Do not add a new Queue/Worker; reconcile against the existing W10/Queue architecture first.
+3. No exact-current-deployed-SHA remote security E2E is admitted for the current W02 handlers.
+4. No authenticated real-account native APP acceptance on both Android and iOS is admitted.
+5. `ENT-DEVICE-RECORD` remains PROPOSED; the current API does not provide a stable device identifier. The candidate UI is therefore described as login-session management, not device management.
+
+Until these blockers close:
+
+- AUTH-010 remains NOT_GREEN;
+- no permission or security-E2E evidence is promoted to formal PASS;
+- the APP entry remains absent and `SESSION_MANAGEMENT_ADMITTED` remains false;
+- this PR must not be merged as a release-ready session-management feature.
 
 ## Evidence chain
 
@@ -80,8 +97,8 @@ Until then:
 
 ## Next closure gate
 
-1. Add/reconcile the canonical `user.session.read` permission entry in `contracts/authz/permissions.json`.
-2. Record the exact catalog binding in the AUTH-010 mapping.
-3. Verify `authSessionList` and `authSessionRevoke` against the same self/own ownership predicate.
-4. Only after the authorization contract is closed, bind handler authorization evidence.
-5. Runtime and Evidence Registry remain closed until executable evidence exists.
+1. Verify the candidate permission checks on the exact current source SHA, including missing/revoked/expired base RoleAssignment and disallowed account-state denial.
+2. Reconcile `scope:self` with permission `scope:own` in the canonical mapping and formally bind the W02 handler evidence.
+3. Implement/admit the required revocation audit/event/outbox path using the existing architecture and the one-task policy; do not create new Workers, D1 databases or Queues.
+4. Pass exact-SHA local W01/W02 runtime and controlled remote/deployed verification.
+5. Complete authenticated real-account native APP acceptance on both Android and iOS, then admit the evidence. Only after all gates close may the settings entry be exposed.
