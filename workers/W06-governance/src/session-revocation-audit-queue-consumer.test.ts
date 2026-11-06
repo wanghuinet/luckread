@@ -19,19 +19,24 @@ const event = {
   payload: { operationId: 'authSessionRevoke', result: 'succeeded', reasonCode: 'USER_INITIATED' },
 }
 
-function createDb(existing = false, writeSuccess = true, existingOverrides: Record<string, unknown> = {}) {
+function createDb(
+  existing = false,
+  writeSuccess = true,
+  existingOverrides: Record<string, unknown> = {},
+  sourceEvent = event,
+) {
   const existingRow = {
-    eventId: event.eventId,
-    requestId: event.correlationId,
-    traceId: event.causationId,
-    actorJson: JSON.stringify(event.actor),
-    action: event.eventType,
+    eventId: sourceEvent.eventId,
+    requestId: sourceEvent.correlationId,
+    traceId: sourceEvent.causationId,
+    actorJson: JSON.stringify(sourceEvent.actor),
+    action: sourceEvent.eventType,
     targetType: 'Session',
-    targetId: event.resourceId,
+    targetId: sourceEvent.resourceId,
     beforeJson: JSON.stringify({ status: 'ACTIVE' }),
     afterJson: JSON.stringify({ status: 'REVOKED' }),
-    reason: 'USER_INITIATED',
-    occurredAt: event.occurredAt,
+    reason: sourceEvent.payload.reasonCode,
+    occurredAt: sourceEvent.occurredAt,
     ...existingOverrides,
   }
   const first = vi.fn().mockResolvedValue(existing ? existingRow : null)
@@ -138,4 +143,30 @@ describe('AUTH-010 W06 session revocation audit consumer', () => {
     await expect(consumeSessionRevokedAuditEvent(db, event))
       .rejects.toThrow('AUDIT_EVENT_PERSISTENCE_FAILED')
   })
+  it('persists the distinct logout audit reason without changing event identity', async () => {
+    const logoutEvent = {
+      ...event,
+      payload: { operationId: 'authLogout', result: 'succeeded', reasonCode: 'USER_LOGOUT' },
+    }
+    const { db, bind, run } = createDb(false, true, {}, logoutEvent)
+    await expect(consumeSessionRevokedAuditEvent(db, logoutEvent)).resolves.toBe('persisted')
+    expect(run).toHaveBeenCalledTimes(1)
+    expect(bind.mock.calls[1]?.[9]).toBe('USER_LOGOUT')
+    const duplicate = createDb(true, true, {}, logoutEvent)
+    await expect(consumeSessionRevokedAuditEvent(duplicate.db, logoutEvent)).resolves.toBe('duplicate')
+  })
+
+  it('rejects logout events whose operation and reason do not match', async () => {
+    const malformed = {
+      ...event,
+      payload: { operationId: 'authLogout', result: 'succeeded', reasonCode: 'USER_INITIATED' },
+    }
+    const prepare = vi.fn()
+    await expect(consumeSessionRevokedAuditEvent(
+      { prepare } as unknown as D1Database,
+      malformed,
+    )).rejects.toThrow('INVALID_AUTH_010_SESSION_EVENT')
+    expect(prepare).not.toHaveBeenCalled()
+  })
+
 })
