@@ -68,6 +68,18 @@ export async function handleCurrentUserSessionLogout(
   let current: { user?: { id?: unknown }; session?: { id?: unknown } } | null
   try {
     auth = createLuckReadAuth(env)
+    const authContext = await auth.$context
+
+    // Mirror Better Auth's default CSRF rule: unsafe requests carrying cookies
+    // must present an explicit trusted Origin/Referer before any D1 mutation.
+    // Bearer-only native requests do not use cookie CSRF validation.
+    if (request.headers.has('cookie') && authContext.options.advanced?.disableCSRFCheck !== true) {
+      const origin = request.headers.get('origin') || request.headers.get('referer')
+      if (!origin || origin === 'null' || !authContext.isTrustedOrigin(origin, { allowRelativePaths: false })) {
+        return json({ error: { code: 'FORBIDDEN', message: 'Invalid request origin' } }, 403)
+      }
+    }
+
     current = await auth.api.getSession({
       headers: request.headers,
       query: { disableCookieCache: true, disableRefresh: true },
@@ -114,8 +126,11 @@ export async function handleCurrentUserSessionLogout(
         throw new Error('SESSION_LOGOUT_AUDIT_BATCH_FAILED')
       }
 
-      const deletedChanges = Number(deleted.meta?.changes ?? 0)
-      const journaledChanges = Number(journaled.meta?.changes ?? 0)
+      if (!Number.isInteger(deleted.meta?.changes) || !Number.isInteger(journaled.meta?.changes)) {
+        throw new Error('SESSION_LOGOUT_AUDIT_BATCH_METADATA_MISSING')
+      }
+      const deletedChanges = deleted.meta.changes
+      const journaledChanges = journaled.meta.changes
       if (
         !((deletedChanges === 1 && journaledChanges === 1) ||
           (deletedChanges === 0 && journaledChanges === 0))
