@@ -4,7 +4,7 @@ import { DatabaseSync } from 'node:sqlite'
 import test from 'node:test'
 
 const migration = readFileSync(
-  new URL('../workers/W02-identity/migrations/0009_auth_015_lifecycle_windows.sql', import.meta.url),
+  new URL('../workers/W02-identity/migrations/0011_auth_015_lifecycle_windows.sql', import.meta.url),
   'utf8',
 )
 
