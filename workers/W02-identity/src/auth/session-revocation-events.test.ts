@@ -7,8 +7,8 @@ describe('AUTH-010 session revocation event', () => {
       sessionId: 'session-123',
       userId: 'user-123',
       occurredAt: '2026-11-06T00:00:00.000Z',
-      correlationId: 'corr-123',
-      causationId: 'request-123',
+      correlationId: 'req_1234567890',
+      causationId: 'trace-123',
     }
     const first = await buildSessionRevokedEvent(input)
     const second = await buildSessionRevokedEvent(input)
