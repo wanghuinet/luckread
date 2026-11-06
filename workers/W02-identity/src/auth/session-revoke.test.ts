@@ -114,6 +114,18 @@ describe('W02 policy-scoped session revoke', () => {
     expect(db.prepare).not.toHaveBeenCalled()
   })
 
+  it('rejects revocation of the authenticated current session before any D1 lookup', async () => {
+    const db = makeEnv({ id: 'current-session', token: 'private-token', userId: 'user-1' })
+    const response = await handleCurrentUserSessionRevoke(db.env, request('current-session'))
+    const payload = await response.json() as { error?: { code?: string } }
+
+    expect(response.status).toBe(409)
+    expect(payload.error?.code).toBe('CURRENT_SESSION_PROTECTED')
+    expect(db.limiter.limit).toHaveBeenCalledTimes(3)
+    expect(db.prepare).not.toHaveBeenCalled()
+    expect(mocks.revokeSession).not.toHaveBeenCalled()
+  })
+
   it('keeps cross-account and missing sessions indistinguishable', async () => {
     const db = makeEnv({ id: 'target-session', token: 'private-token', userId: 'other-user' })
     const response = await handleCurrentUserSessionRevoke(db.env, request('target-session'))
