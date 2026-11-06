@@ -6,7 +6,8 @@ const diagnostics = readFileSync(new URL('../lib/posthog.tsx', import.meta.url),
 const rootLayout = readFileSync(new URL('../app/_layout.tsx', import.meta.url), 'utf8');
 const envExample = readFileSync(new URL('../.env.example', import.meta.url), 'utf8');
 const appConfigSource = readFileSync(new URL('../app.config.js', import.meta.url), 'utf8');
-const require = (await import('node:module')).createRequire(import.meta.url);
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
 const appConfigFactory = require('../app.config.js');
 
 test('pins the PostHog native crash capture SDK and Expo peer dependencies', () => {
@@ -83,7 +84,6 @@ test('keeps native symbol upload disabled until private EAS CLI credentials exis
     expect(symbolPlugin[1].uploadNativeSymbols).toBe(true);
     expect(symbolPlugin[1].skipOnConflict).toBe(true);
     expect(symbolPlugin[1].patchMainActivityNewIntent).toBe(false);
-    expect(symbolPlugin[1].uploadNativeSymbols).not.toHaveProperty('includeSource');
   } finally {
     if (previous.apiKey === undefined) delete process.env.POSTHOG_CLI_API_KEY;
     else process.env.POSTHOG_CLI_API_KEY = previous.apiKey;
