@@ -1,3 +1,4 @@
+import permissions from '../../../../contracts/authz/permissions.json'
 import { createLuckReadAuth, type BetterAuthEnv } from './better-auth.js'
 import {
   enforceSessionRevokeRateLimits,
@@ -6,6 +7,10 @@ import {
 
 const json = (body: unknown, status = 200): Response =>
   Response.json(body, { status, headers: { 'cache-control': 'no-store' } })
+
+const userRole = permissions['x-role-permissions'].roles.find((role) => role.role === 'user')
+const SESSION_REVOKE_PERMISSION = 'user.session.revoke'
+const userRoleCanRevokeSessions = userRole?.permissions.includes(SESSION_REVOKE_PERMISSION) === true
 
 /** Revoke a native Better Auth session under self-scope. */
 export async function handleCurrentUserSessionRevoke(
@@ -57,13 +62,45 @@ export async function handleCurrentUserSessionRevoke(
     }, 409)
   }
 
-  try {
-    const target = await env.D1_01
-      .prepare('SELECT id, token, user_id AS userId FROM "session" WHERE id = ? LIMIT 1')
-      .bind(sessionId)
-      .first<{ id: string; token: string; userId: string }>()
+  if (!userRoleCanRevokeSessions) {
+    return json({ error: { code: 'PERMISSION_DENIED', message: 'Session revocation is not permitted' } }, 403)
+  }
 
-    if (!target || String(target.userId) !== String(userId)) {
+  try {
+    const now = new Date().toISOString()
+    const target = await env.D1_01
+      .prepare(`
+        WITH authorization AS (
+          SELECT CASE WHEN EXISTS (
+            SELECT 1
+            FROM "user" AS account
+            INNER JOIN role_assignments AS assignment ON assignment.subject_id = account.id
+            WHERE account.id = ?
+              AND account.account_state IN ('PENDING_VERIFICATION', 'ACTIVE')
+              AND assignment.role_id = 'user'
+              AND assignment.scope_type = 'global'
+              AND assignment.scope_id IS NULL
+              AND assignment.status = 'ACTIVE'
+              AND assignment.valid_from <= ?
+              AND (assignment.valid_until IS NULL OR ? < assignment.valid_until)
+          ) THEN 1 ELSE 0 END AS permissionGranted
+        )
+        SELECT authorization.permissionGranted,
+          target.id, target.token, target.user_id AS userId
+        FROM authorization
+        LEFT JOIN "session" AS target
+          ON authorization.permissionGranted = 1
+          AND target.id = ?
+          AND target.user_id = ?
+      `)
+      .bind(userId, now, now, sessionId, userId)
+      .first<{ permissionGranted: number; id: string | null; token: string | null; userId: string | null }>()
+
+    if (!target) throw new Error('SESSION_REVOKE_AUTHORIZATION_READ_FAILED')
+    if (Number(target.permissionGranted) !== 1) {
+      return json({ error: { code: 'PERMISSION_DENIED', message: 'Session revocation is not permitted' } }, 403)
+    }
+    if (!target.id || !target.token || String(target.userId) !== String(userId)) {
       return json({ revoked: true })
     }
 
