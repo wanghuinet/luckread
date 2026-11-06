@@ -16,6 +16,7 @@ import {
 import { resolveBetterAuthPrincipal } from './auth/principal.js'
 import { handleCurrentUserSessionList } from './auth/session-list.js'
 import { handleCurrentUserSessionRevoke } from './auth/session-revoke.js'
+import { handleCurrentUserSessionLogout } from './auth/session-logout.js'
 import { handleUsernameChangeRequest, handleUsernameStateRequest } from './auth/username-change.js'
 import { handleMfaStatusRequest } from './auth/mfa-status.js'
 import { handleMfaEnrollmentStartRequest } from './auth/mfa-enrollment-start.js'
@@ -222,6 +223,10 @@ export default {
 
     if (request.method === 'POST' && url.pathname === '/internal/auth/session/revoke-by-id') {
       return handleCurrentUserSessionRevoke(env, request)
+    }
+
+    if (request.method === 'POST' && url.pathname === '/internal/auth/session/logout') {
+      return handleCurrentUserSessionLogout(env, request)
     }
 
     if (request.method === 'POST' && url.pathname === '/internal/authz/resolve-layer') {
