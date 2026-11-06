@@ -45,6 +45,7 @@ const decodeCursor = (value: string) => {
 }
 
 const row = (sessionId: string, createdAt: string) => ({
+  permissionGranted: 1,
   sessionId,
   createdAt,
   expiresAt: '2026-12-01T00:00:00.000Z',
@@ -87,9 +88,11 @@ describe('W02 bounded session list', () => {
       createdAt: '2026-10-02T00:00:00.000Z',
       sessionId: 'session-2',
     })
+    expect(db.prepare).toHaveBeenCalledWith(expect.stringContaining('role_assignments'))
+    expect(db.prepare).toHaveBeenCalledWith(expect.stringContaining("account.account_state IN ('PENDING_VERIFICATION', 'ACTIVE')"))
     expect(db.prepare).toHaveBeenCalledWith(expect.stringContaining('WHERE user_id = ? AND expires_at > ?'))
-    expect(db.prepare).toHaveBeenCalledWith(expect.stringContaining('ORDER BY created_at DESC, id DESC LIMIT ?'))
-    expect(db.statement.bind).toHaveBeenCalledWith('user-1', expect.any(String), 3)
+    expect(db.prepare).toHaveBeenCalledWith(expect.stringContaining('ORDER BY created_at DESC, id DESC'))
+    expect(db.statement.bind).toHaveBeenCalledWith('user-1', expect.any(String), expect.any(String), 'user-1', expect.any(String), 3)
     expect(db.statement.all).toHaveBeenCalledTimes(1)
     expect(env.AUTH_SESSION_READ_LIMITER?.limit).toHaveBeenNthCalledWith(1, {
       key: 'auth010:session-list:account:user-1',
@@ -114,11 +117,27 @@ describe('W02 bounded session list', () => {
     expect(db.statement.bind).toHaveBeenCalledWith(
       'user-1',
       expect.any(String),
+      expect.any(String),
+      'user-1',
+      expect.any(String),
       '2026-10-02T00:00:00.000Z',
       '2026-10-02T00:00:00.000Z',
       'session-2',
       11,
     )
+  })
+
+  it('denies session listing when the explicit user role permission is not effective', async () => {
+    const db = makeDatabase([{ permissionGranted: 0, sessionId: null, createdAt: null, expiresAt: null }])
+    const env = makeEnv(db.database)
+
+    const response = await handleCurrentUserSessionList(env, request({ limit: 10 }))
+    const payload = await response.json() as { error?: { code?: string }; items?: unknown[] }
+
+    expect(response.status).toBe(403)
+    expect(payload.error?.code).toBe('PERMISSION_DENIED')
+    expect(payload.items).toBeUndefined()
+    expect(db.statement.all).toHaveBeenCalledTimes(1)
   })
 
   it('rejects invalid limits and cursors before authenticating or querying D1', async () => {
