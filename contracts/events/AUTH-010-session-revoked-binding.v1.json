@@ -98,16 +98,62 @@
       ],
       "properties": {
         "operationId": {
-          "const": "authSessionRevoke"
+          "enum": [
+            "authSessionRevoke",
+            "authLogout"
+          ]
         },
         "result": {
           "const": "succeeded"
         },
         "reasonCode": {
-          "const": "USER_INITIATED"
+          "enum": [
+            "USER_INITIATED",
+            "USER_LOGOUT"
+          ]
         }
       },
-      "additionalProperties": false
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "operationId": {
+                "const": "authSessionRevoke"
+              }
+            },
+            "required": [
+              "operationId"
+            ]
+          },
+          "then": {
+            "properties": {
+              "reasonCode": {
+                "const": "USER_INITIATED"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "operationId": {
+                "const": "authLogout"
+              }
+            },
+            "required": [
+              "operationId"
+            ]
+          },
+          "then": {
+            "properties": {
+              "reasonCode": {
+                "const": "USER_LOGOUT"
+              }
+            }
+          }
+        }
+      ]
     }
   },
   "additionalProperties": false,
