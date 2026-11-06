@@ -1,8 +1,8 @@
-import { parseEventEnvelopeMetadata } from '../../../W10-async/src/event-envelope.js'
-
 const RESOURCE_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/
+const EVENT_ID = /^evt_[a-f0-9]{32}$/
 const REQUEST_ID = /^req_[A-Za-z0-9_-]{1,123}$/
 const TRACE_ID = /^[A-Za-z0-9._:-]{1,128}$/
+const IDEMPOTENCY_KEY = /^AUTH010_SESSION_REVOKE_[a-f0-9]{32}$/
 
 export type SessionRevokedEvent = {
   eventId: string
@@ -112,7 +112,9 @@ export function buildSessionRevocationOutboxInsert(
 }
 
 export function assertSessionRevokedEvent(value: unknown): asserts value is SessionRevokedEvent {
-  const envelope = parseEventEnvelopeMetadata(value)
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('INVALID_AUTH_010_SESSION_EVENT')
+  }
   const event = value as Record<string, unknown>
   const actor = event.actor
   const payload = event.payload
@@ -123,20 +125,31 @@ export function assertSessionRevokedEvent(value: unknown): asserts value is Sess
   const actorValue = actor as Record<string, unknown>
   const payloadValue = payload as Record<string, unknown>
   if (
-    envelope.eventType !== 'user.session.revoked' ||
-    envelope.schemaVersion !== '1.0' ||
-    envelope.producer !== 'W02' ||
-    envelope.resourceType !== 'Session' ||
-    !RESOURCE_ID.test(envelope.resourceId) ||
+    typeof event.eventId !== 'string' || !EVENT_ID.test(event.eventId) ||
+    event.eventType !== 'user.session.revoked' ||
+    event.schemaVersion !== '1.0' ||
+    event.producer !== 'W02' ||
+    event.resourceType !== 'Session' ||
+    typeof event.resourceId !== 'string' || !RESOURCE_ID.test(event.resourceId) ||
+    typeof event.occurredAt !== 'string' || !Number.isFinite(Date.parse(event.occurredAt)) ||
+    typeof event.publishedAt !== 'string' || !Number.isFinite(Date.parse(event.publishedAt)) ||
+    typeof event.correlationId !== 'string' || !REQUEST_ID.test(event.correlationId) ||
+    typeof event.causationId !== 'string' || !TRACE_ID.test(event.causationId) ||
+    typeof event.idempotencyKey !== 'string' || !IDEMPOTENCY_KEY.test(event.idempotencyKey) ||
+    event.attempt !== 1 ||
+    event.sourceVersion !== 1 ||
     typeof actorValue.actorId !== 'string' || !RESOURCE_ID.test(actorValue.actorId) ||
-    typeof envelope.correlationId !== 'string' || !REQUEST_ID.test(envelope.correlationId) ||
-    typeof envelope.causationId !== 'string' || !TRACE_ID.test(envelope.causationId) ||
     actorValue.actorType !== 'user' ||
     Object.keys(actorValue).some((key) => key !== 'actorId' && key !== 'actorType') ||
     Object.keys(payloadValue).some((key) => !['operationId', 'result', 'reasonCode'].includes(key)) ||
     payloadValue.operationId !== 'authSessionRevoke' ||
     payloadValue.result !== 'succeeded' ||
-    payloadValue.reasonCode !== 'USER_INITIATED'
+    payloadValue.reasonCode !== 'USER_INITIATED' ||
+    Object.keys(event).some((key) => ![
+      'eventId', 'eventType', 'schemaVersion', 'producer', 'resourceType', 'resourceId',
+      'occurredAt', 'publishedAt', 'correlationId', 'causationId', 'idempotencyKey',
+      'attempt', 'sourceVersion', 'actor', 'payload',
+    ].includes(key))
   ) {
     throw new Error('INVALID_AUTH_010_SESSION_EVENT')
   }
