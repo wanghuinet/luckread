@@ -15,6 +15,7 @@ import { ReplyComposerProvider } from '../components/ReplyComposerProvider';
 import { NetworkStatusBanner } from '../components/NetworkStatusBanner';
 import { useThemePreferenceStore } from '../lib/theme-preference-store';
 import { syncPushEndpointForAuthenticatedUser } from '../lib/push-notifications';
+import { PostHogDiagnosticsProvider, posthog } from '../lib/posthog';
 
 export const unstable_settings = {
   initialRouteName: '(drawer)',
@@ -22,6 +23,10 @@ export const unstable_settings = {
 
 export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
   const { colorScheme } = useColorScheme();
+
+  useEffect(() => {
+    posthog?.captureException(error);
+  }, [error]);
   const isDark = colorScheme === 'dark';
   return (
     <View style={[styles.errorContainer, isDark && { backgroundColor: '#000000' }]}>
@@ -160,7 +165,8 @@ export default function RootLayout() {
   }, [isLoaded, navigationState?.key, router, segments, status]);
 
   return (
-    <GestureHandlerRootView style={styles.flex}>
+    <PostHogDiagnosticsProvider>
+      <GestureHandlerRootView style={styles.flex}>
       <QueryProvider>
       <StatusBar style={isDark ? 'light' : 'dark'} />
       <BottomSheetModalProvider>
@@ -184,7 +190,8 @@ export default function RootLayout() {
         </ReplyComposerProvider>
       </BottomSheetModalProvider>
       </QueryProvider>
-    </GestureHandlerRootView>
+      </GestureHandlerRootView>
+    </PostHogDiagnosticsProvider>
   );
 }
 
