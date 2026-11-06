@@ -68,7 +68,7 @@
   },
   "migration": {
     "migrationId": "MIG-AUTH-015-LIFECYCLE-WINDOWS-V1",
-    "migrationFile": "workers/W02-identity/migrations/0009_auth_015_lifecycle_windows.sql",
+    "migrationFile": "workers/W02-identity/migrations/0011_auth_015_lifecycle_windows.sql",
     "executionStatus": "NOT_EXECUTED",
     "targetBinding": "D1_01",
     "authorizedScope": "existing D1-01 only; additive nullable columns on Better Auth user table",
