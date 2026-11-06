@@ -50,7 +50,7 @@ const mfaEvent: MfaAuditQueueEvent = {
 }
 
 const sessionRevokedEvent = {
-  eventId: 'evt_012345678901234567890123456789ab',
+  eventId: 'evt_ab6ec6a8de12624389e11427247fc6a9',
   eventType: 'user.session.revoked',
   schemaVersion: '1.0',
   producer: 'W02',
@@ -60,7 +60,7 @@ const sessionRevokedEvent = {
   publishedAt: '2026-11-06T01:00:01.000Z',
   correlationId: 'req_session_revoked_001',
   causationId: 'trace-session-revoked-001',
-  idempotencyKey: 'AUTH010_SESSION_REVOKE_012345678901234567890123456789ab',
+  idempotencyKey: 'AUTH010_SESSION_REVOKE_ab6ec6a8de12624389e11427247fc6a9',
   attempt: 1,
   sourceVersion: 1,
   actor: { actorId: 'user-001', actorType: 'user' },
