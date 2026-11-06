@@ -15,6 +15,7 @@ Reconcile the canonical AUTH-010 operation policy with the permission catalog an
 |---|---|---|---|
 | authSessionList | GET /auth/sessions | user.session.read | self |
 | authSessionRevoke | DELETE /auth/sessions/{sessionId} | user.session.revoke | self |
+| authLogout | POST /auth/logout | Authenticated session ownership (no role permission) | current session only |
 
 Source: `contracts/api/auth-operation-policy.v1.json`.
 
@@ -64,6 +65,17 @@ For these two operations, API policy `scope: self` maps to permission catalog `s
 
 This is a field-level semantic mapping, not a second permission identifier. No new permission is invented.
 
+### authLogout self-termination
+
+- authentication: required via the current Better Auth cookie or Bearer credential
+- authorization: the authenticated session itself is the self-scope proof; no RoleAssignment or `user.session.revoke` role gate is evaluated
+- account state: no account-state gate is applied to terminating one's own session; a suspended or otherwise restricted account must still be able to log out
+- identity: W02 derives both `userId` and `sessionId` from `auth.api.getSession`; no client body, query parameter, or target-session ID is accepted
+- mutation: W02 deletes only that exact `(session.id, session.userId)` row and writes the logout audit outbox record in the same D1-01 batch
+- replay: a missing/already-revoked current session is a successful no-op and cannot create a second audit event
+- browser cookie: W02 invokes Better Auth's sign-out endpoint only after removing the revoked session-token cookie and Bearer header from that internal cleanup request; the request retains other cookies so Better Auth can also expire session-data chunks without a second session deletion
+- native Bearer: W02 validates the Bearer credential before deletion; no revoked token is echoed in the response
+
 ## Candidate runtime enforcement and remaining blockers
 
 The current hidden PR #1568 candidate adds a fail-closed W02 check for both operations:
@@ -85,7 +97,7 @@ This closes the source implementation for the permission catalog's `auditRequire
 
 The following blockers remain:
 
-1. **Logout audit path remains incomplete.** The operation policy has been formally corrected by `CC-AUTH-010-SESSION-AUDIT-ONLY-NO-PROJECTION-2026-11-06`: both `authLogout` and `authSessionRevoke` describe the existing `session_revocation_audit` task to W06, not a W04 session-state projection. D1-01 Better Auth `session` is the authoritative state; W01 session responses are `no-store`, so there is no independent session projection to update. The W04 queue remains exclusively for `identity.account_state_changed` and must not receive session events. This PR implements the durable outbox only for `authSessionRevoke`; W01 `/auth/logout` still proxies Better Auth `/sign-out` and is not wired to the W02 outbox. Therefore logout audit is still required before an all-revocation audit claim. No new Worker, D1, Queue, Service Binding, or Payload Core change is permitted.
+1. **Logout audit source path is implemented on this PR branch; exact-SHA CI remains the acceptance gate.** W01 `/auth/logout` now calls the W02 internal self-logout operation. W02 resolves the current Cookie/Bearer session from Better Auth without refreshing it, applies the existing write-rate-limit binding, and atomically deletes only that authenticated session row while inserting an `authLogout / USER_LOGOUT` event in the same D1-01 batch. Missing/already-revoked sessions are no-op success and do not generate a second event. Only after the transaction succeeds does W02 call Better Auth's official sign-out handler with the revoked session-token cookie and Authorization removed, using it solely to expire the configured browser session/session-data cookies; other session-data cookie chunks are retained on the cleanup request so Better Auth can expire them too. The deleted session is not looked up or deleted a second time. W06 validates the operation/reason pairing and records `USER_LOGOUT` as the immutable AuditEvent reason. Browser cookie clearing, native Bearer revocation, no-store responses, and fail-closed D1 behavior have dedicated source tests. The change uses the existing W02 D1-01 session authority, outbox, `AUTH013_QUEUE` and W06 D1-03 consumer; no new Worker, D1, Queue, Service Binding, W04 projection, or Payload Core change is permitted.
 2. The new `0012_auth_010_session_revocation_journal.sql` migration has source/contract but no production D1 migration, schema read-back or deployed W02 cron/queue delivery evidence. No production migration was run.
 3. No exact-current-deployed-SHA remote security E2E is admitted for the current W01/W02 handlers.
 4. No authenticated real-account native APP acceptance on both Android and iOS is admitted.
@@ -114,7 +126,7 @@ Until these blockers close:
 
 ## Next closure gate
 
-1. Implement and test the W01 `/auth/logout` → W02 current-session atomic DELETE + the same durable audit outbox path, preserving browser cookie clearing and native Bearer-session behavior.
+1. Pass the new logout source tests and all relevant exact-current-SHA CI checks.
 2. Apply migration 0012 only through its controlled, exact-SHA deployment workflow and verify remote D1 schema/ledger read-back.
 3. Pass exact-current-SHA remote W01/W02 security E2E and prove live W02 → existing audit queue → W06 AuditEvent delivery for both targeted session revoke and logout.
 4. Complete authenticated real-account native APP acceptance on both Android and iOS. Only after all gates close may the settings entry be exposed.
