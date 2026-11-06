@@ -147,6 +147,23 @@ export async function consumeSessionRevokedAuditEvent(
     reason: 'USER_INITIATED',
     occurredAt: event.occurredAt,
   }
-  await persistAuditEvent(db, auditEvent)
-  return 'persisted'
+  try {
+    await persistAuditEvent(db, auditEvent)
+    return 'persisted'
+  } catch (error) {
+    // Two at-least-once deliveries can race after both observe no row. If the
+    // unique event_id constraint wins for an identical immutable record, treat
+    // the loser as a duplicate; a different record remains a permanent conflict.
+    const raced = await db.prepare(
+      'SELECT event_id AS eventId, request_id AS requestId, trace_id AS traceId, ' +
+      'actor_json AS actorJson, action, target_type AS targetType, target_id AS targetId, ' +
+      'before_json AS beforeJson, after_json AS afterJson, reason, occurred_at AS occurredAt ' +
+      'FROM audit_events WHERE event_id = ? LIMIT 1',
+    ).bind(event.eventId).first<ExistingSessionAuditRow>()
+    if (raced) {
+      if (!matchesPersisted(raced, event)) throw new Error('SESSION_AUDIT_EVENT_IDENTITY_CONFLICT')
+      return 'duplicate'
+    }
+    throw error
+  }
 }
