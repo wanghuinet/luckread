@@ -9,6 +9,6 @@ This is a schema-only Payload adapter path for the staged Neon migration.
 - Existing W01 physical columns `users.reset_password_requested_at`, `media.prefix`, and `media._objectkey` are retained with Payload's supported Drizzle `afterSchemaInit` extension hook.
 - PostgreSQL migrations are kept in `src/neon-postgres-migrations`; D1 files in `src/migrations` are never imported by this config.
 
-CI uses only a disposable PostgreSQL 18 service database named `luckread_schema`. The verifier rejects any other host/database combination and confirms business tables are empty. It may write the Payload migration bookkeeping row only.
+CI uses disposable PostgreSQL 18 service databases named `luckread_schema` and `luckread_schema_rollback`. The schema verifier rejects other hosts/database names and confirms the primary database's business tables are empty. A second ephemeral database receives one synthetic `payload_kv` fixture to prove the generated `down` migration refuses to drop a non-empty schema and leaves the fixture intact. Only the Payload migration ledger is written during the baseline application.
 
-No workflow step reads Neon credentials, connects to Neon, changes D1, updates the production Payload config, enables automatic schema push, or imports business data. Never point this schema-only config at a remote production database.
+The generated `down` migration first checks every W01 business table is empty, then drops tables in FK-safe order without `CASCADE`; any external dependency also blocks rollback. No workflow step reads Neon credentials, connects to Neon, changes D1, updates the production Payload config, enables automatic schema push, or imports business data. Never point this schema-only config at a remote production database.
