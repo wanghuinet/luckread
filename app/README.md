@@ -11,7 +11,8 @@ cd app
 bun install
 bunx expo install --check
 bunx expo-doctor@latest
-bun run typecheck
+bun run typecheck       # TypeScript 7 native compiler
+bun run typecheck:ts6   # TypeScript 6 API compatibility check
 bun start
 ```
 
