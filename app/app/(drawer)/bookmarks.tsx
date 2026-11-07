@@ -274,7 +274,7 @@ export default function Bookmarks() {
         renderItem={({ item }) => (
           <BookmarkFeedRow
             item={item}
-            viewerId={viewerId}
+            viewerId={viewerId ?? ''}
             onOpen={openPost}
             onRemoved={removeUnbookmarkedItem}
           />
