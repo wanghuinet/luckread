@@ -761,6 +761,11 @@ test('does not hydrate a new viewer from a late previous-viewer bookmark respons
 
   activeViewerId = 'bookmark-viewer-a';
   const pending = refreshContentBookmarkStatus(contentId);
+  // The shared API client asynchronously reads the secure session token before
+  // it reaches fetch. Wait for that boundary before switching the active viewer.
+  for (let attempt = 0; attempt < 8 && typeof releaseResponse !== 'function'; attempt += 1) {
+    await Promise.resolve();
+  }
   expect(typeof releaseResponse).toBe('function');
 
   activeViewerId = 'bookmark-viewer-b';
