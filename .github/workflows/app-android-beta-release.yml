@@ -110,6 +110,15 @@ jobs:
         with:
           node-version: "22.13.1"
 
+      # The PostHog Expo plugin invokes posthog-cli from the Gradle bundle task.
+      # Pin a CLI that supports event-mode Hermes uploads (>= 0.16.0).
+      - name: Install and verify PostHog CLI
+        run: |
+          npm install --global @posthog/cli@0.19.0
+          POSTHOG_CLI_BIN="$(command -v posthog-cli)"
+          test -n "$POSTHOG_CLI_BIN"
+          "$POSTHOG_CLI_BIN" --version
+
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
         with:
