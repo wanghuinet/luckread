@@ -16,17 +16,27 @@ import { createPublicMediaUrl } from './media/public-media-url.js'
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
 
-// Schema generation only: refuse every non-disposable target before Payload
-// initializes its PostgreSQL adapter. CI supplies a local PostgreSQL 18 service.
+// Schema generation is local-only by default. The only remote mode is a
+// separate manual main-branch workflow, explicitly limited to D1-01 / luckread.
 const databaseUrl = process.env.PAYLOAD_SCHEMA_DATABASE_URL
 if (!databaseUrl) throw new Error('PAYLOAD_SCHEMA_DATABASE_URL is required')
 const parsedDatabaseUrl = new URL(databaseUrl)
-if (
-  !new Set(['127.0.0.1', 'localhost', 'postgres']).has(parsedDatabaseUrl.hostname) ||
-  parsedDatabaseUrl.port !== '5432' ||
-  !new Set(['/luckread_schema', '/luckread_schema_rollback']).has(parsedDatabaseUrl.pathname)
-) {
-  throw new Error('Refusing to initialize Payload schema against a non-disposable database')
+const localSchemaTarget =
+  new Set(['127.0.0.1', 'localhost', 'postgres']).has(parsedDatabaseUrl.hostname) &&
+  parsedDatabaseUrl.port === '5432' &&
+  new Set(['/luckread_schema', '/luckread_schema_rollback']).has(parsedDatabaseUrl.pathname)
+const neonD101Target =
+  process.env.NEON_SCHEMA_APPLY === 'true' &&
+  process.env.GITHUB_ACTIONS === 'true' &&
+  process.env.GITHUB_REF === 'refs/heads/main' &&
+  process.env.GITHUB_EVENT_NAME === 'workflow_dispatch' &&
+  ['postgres:', 'postgresql:'].includes(parsedDatabaseUrl.protocol) &&
+  parsedDatabaseUrl.hostname.endsWith('.neon.tech') &&
+  parsedDatabaseUrl.pathname === '/luckread' &&
+  ['require', 'verify-ca', 'verify-full'].includes(parsedDatabaseUrl.searchParams.get('sslmode')) &&
+  parsedDatabaseUrl.searchParams.get('channel_binding') === 'require'
+if (!localSchemaTarget && !neonD101Target) {
+  throw new Error('Refusing to initialize Payload schema against an unauthorized database target')
 }
 
 // R2's adapter is configured only so Payload can derive its real media schema

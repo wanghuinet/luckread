@@ -49,9 +49,30 @@
         "workers/W07-subscription-commerce/migrations",
         "workers/W08-creator/migrations"
       ],
-      "status": "SOURCE_INVENTORY_ADMISSION",
+      "status": "PARTIAL_W01_PAYLOAD_SCHEMA_VERIFIED_REMOTE_APPLY_PENDING",
       "sourceInventoryContract": "contracts/database/neon-d1-01-schema-sources.v1.json",
-      "sourceInventoryWorkflow": ".github/workflows/neon-d1-01-schema-source-inventory.yml"
+      "sourceInventoryWorkflow": ".github/workflows/neon-d1-01-schema-source-inventory.yml",
+      "schemaVerificationEvidence": {
+        "workflowRunId": 42411433154,
+        "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42411433154",
+        "mergedPullRequest": 1610,
+        "mergeCommitSha": "88ce884b0065e4ff346977bb17ac8157f9ec8489",
+        "postgresVersion": "18.6",
+        "payloadTableCount": 11,
+        "businessTableRows": 0,
+        "payloadMigrationLedgerRows": 1,
+        "rollbackGuard": "PASS",
+        "rollbackGuardSyntheticRowPreserved": true
+      },
+      "remoteSchemaApplied": false,
+      "completedSchemaOwners": [
+        "W01-Payload"
+      ],
+      "pendingSchemaOwners": [
+        "W02-Better-Auth-and-custom-identity",
+        "W07-D1-01-subscriptions",
+        "W08-Creator"
+      ]
     },
     {
       "domainId": "D1-02",

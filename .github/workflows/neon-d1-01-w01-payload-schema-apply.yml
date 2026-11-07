@@ -1,0 +1,87 @@
+name: Neon D1-01 W01 Payload Schema Apply
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_target:
+        description: Type the exact confirmation to initialize the empty D1-01 Neon database luckread.
+        required: true
+        type: choice
+        options:
+          - INITIALIZE_EMPTY_D1_01_LUCKREAD
+
+permissions:
+  contents: read
+
+concurrency:
+  group: neon-d1-01-w01-payload-schema-apply
+  cancel-in-progress: false
+
+jobs:
+  apply-d1-01-payload:
+    if: ${{ github.ref == 'refs/heads/main' }}
+    name: Initialize empty Neon luckread database with reviewed W01 Payload schema
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Guard exact main ref and explicit target confirmation
+        shell: bash
+        env:
+          CONFIRM_TARGET: ${{ inputs.confirm_target }}
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REF}" = "refs/heads/main"
+          test "${CONFIRM_TARGET}" = "INITIALIZE_EMPTY_D1_01_LUCKREAD"
+
+      - name: Checkout merged main schema baseline
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Setup pnpm 11
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+          run_install: false
+
+      - name: Install W01 exact dependency graph
+        working-directory: workers/W01-payload
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Recheck Neon D1-01 is still empty (read-only)
+        working-directory: workers/W01-payload
+        env:
+          NEON_DATABASE_URL_LUCKREAD: ${{ secrets.NEON_DATABASE_URL_LUCKREAD }}
+        run: pnpm run neon:schema:preflight
+
+      - name: Apply the reviewed Payload PostgreSQL baseline to Neon D1-01
+        working-directory: workers/W01-payload
+        env:
+          NODE_ENV: production
+          NEON_SCHEMA_APPLY: 'true'
+          PAYLOAD_SECRET: schema-apply-only-not-a-runtime-secret
+          PAYLOAD_SCHEMA_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL_LUCKREAD }}
+          PAYLOAD_CONFIG_PATH: src/neon-postgres-schema.config.ts
+        run: pnpm run neon:schema:apply
+
+      - name: Verify Neon D1-01 schema and empty business tables
+        working-directory: workers/W01-payload
+        env:
+          PAYLOAD_SCHEMA_NEON_VERIFY: 'true'
+          PAYLOAD_SCHEMA_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL_LUCKREAD }}
+          PAYLOAD_SCHEMA_REPORT: artifacts/neon/w01-payload-neon-schema-postflight.json
+        run: pnpm run neon:schema:verify
+
+      - name: Upload D1-01 Neon schema postflight evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: neon-d1-01-luckread-payload-schema-postflight-${{ github.run_id }}
+          path: workers/W01-payload/artifacts/neon/w01-payload-neon-schema-postflight.json
+          if-no-files-found: error
+          retention-days: 90
