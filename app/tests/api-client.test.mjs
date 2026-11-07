@@ -752,21 +752,21 @@ test('keeps one content bookmark relationship separate for two authenticated vie
 test('does not hydrate a new viewer from a late previous-viewer bookmark response', async () => {
   const contentId = 'stage3-bookmark-late-viewer';
   let releaseResponse;
+  let markFetchStarted;
+  const fetchStarted = new Promise((resolve) => { markFetchStarted = resolve; });
   pendingFetch = () => new Promise((resolve) => {
     releaseResponse = () => resolve(new Response(
       JSON.stringify({ data: { favorited: true } }),
       { status: 200 },
     ));
+    markFetchStarted();
   });
 
   activeViewerId = 'bookmark-viewer-a';
   const pending = refreshContentBookmarkStatus(contentId);
-  // The shared API client asynchronously reads the secure session token before
-  // it reaches fetch. Wait for that boundary before switching the active viewer.
-  for (let attempt = 0; attempt < 8 && typeof releaseResponse !== 'function'; attempt += 1) {
-    await Promise.resolve();
-  }
-  expect(typeof releaseResponse).toBe('function');
+  // Wait until the shared client has read the secure session and actually
+  // entered fetch, so the account switch happens while the request is pending.
+  await fetchStarted;
 
   activeViewerId = 'bookmark-viewer-b';
   releaseResponse();
