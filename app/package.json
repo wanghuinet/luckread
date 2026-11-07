@@ -33,7 +33,7 @@
     "test:image-upload-preparation": "bun test tests/image-upload-preparation.test.mjs",
     "test:network-status": "bun test tests/network-status.test.mjs",
     "test:push-notifications": "bun test tests/push-notifications.test.mjs",
-    "typecheck:ts6": "tsc --noEmit"
+    "typecheck:ts6": "node ./node_modules/typescript/bin/tsc --noEmit"
   },
   "dependencies": {
     "@codeherence/react-native-header": "^0.14.0",
