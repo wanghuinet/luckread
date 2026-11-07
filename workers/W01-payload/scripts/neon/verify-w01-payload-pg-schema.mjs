@@ -29,7 +29,7 @@ const expectedTables = Object.keys(snapshot.tables).sort()
 
 const requiredColumns = {
   users: ['username', 'display_name', 'identity_id', 'reset_password_requested_at'],
-  media: ['alt', 'owner_user_id', 'upload_idempotency_key', 'upload_fingerprint', 'prefix'],
+  media: ['alt', 'owner_user_id', 'upload_idempotency_key', 'upload_fingerprint', 'prefix', '_object_key'],
   redirects: [
     'from',
     'redirect_scope',
