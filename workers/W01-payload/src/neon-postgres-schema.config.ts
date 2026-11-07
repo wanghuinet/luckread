@@ -69,11 +69,17 @@ export default buildConfig({
 
         const media = schema.tables.media
         if (!media) throw new Error('W01 PostgreSQL schema is missing the media table')
-        const mediaColumns = {}
-        if (!('prefix' in media)) mediaColumns.prefix = text('prefix').default('media')
-        if (!('_objectKey' in media)) mediaColumns._objectKey = text('_objectkey')
-        if (Object.keys(mediaColumns).length > 0) {
-          extendTable({ table: media, columns: mediaColumns })
+        if (!('prefix' in media)) {
+          extendTable({
+            table: media,
+            columns: { prefix: text('prefix').default('media') },
+          })
+        }
+        if (!('_objectKey' in media)) {
+          extendTable({
+            table: media,
+            columns: { _objectKey: text('_objectkey') },
+          })
         }
 
         return schema
