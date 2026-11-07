@@ -11,7 +11,7 @@ This is a schema-only Payload adapter path for the staged Neon migration.
 
 CI uses disposable PostgreSQL 18 service databases named `luckread_schema` and `luckread_schema_rollback`. The schema verifier rejects other hosts/database names and confirms the primary database's business tables are empty. A second ephemeral database receives one synthetic `payload_kv` fixture to prove the generated `down` migration refuses to drop a non-empty schema and leaves the fixture intact. Only the Payload migration ledger is written during the baseline application.
 
-The generated `down` migration first checks every W01 business table is empty, then drops tables in FK-safe order without `CASCADE`; any external dependency also blocks rollback. No workflow step reads Neon credentials, connects to Neon, changes D1, updates the production Payload config, enables automatic schema push, or imports business data. Never point this schema-only config at a remote production database.
+The generated `down` migration first checks every W01 business table is empty, then drops tables in FK-safe order without `CASCADE`; any external dependency also blocks rollback. The local PostgreSQL generation/test workflow never reads Neon credentials or connects to Neon. Only the separate manually dispatched, main-only apply workflow described below can connect to the one approved Neon target. Neither workflow changes D1, updates the production Payload config, enables automatic schema push, or imports business data. Never point the local-only schema CI workflow at a remote production database.
 
 
 ## Controlled Neon D1-01 application
