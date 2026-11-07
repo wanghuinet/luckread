@@ -44,8 +44,6 @@ export const X_DESIGN_TOKENS = {
   },
 } as const;
 
-export type XDesignColorScheme = keyof typeof X_DESIGN_TOKENS.colors;
-
-export function getXDesignColors(colorScheme: XDesignColorScheme | null | undefined) {
+export function getXDesignColors(colorScheme: string | null | undefined) {
   return colorScheme === 'dark' ? X_DESIGN_TOKENS.colors.dark : X_DESIGN_TOKENS.colors.light;
 }
