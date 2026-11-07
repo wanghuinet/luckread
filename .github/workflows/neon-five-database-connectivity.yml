@@ -57,6 +57,7 @@ jobs:
             { expected: 'allLuck', secret: 'NEON_DATABASE_URL_ALLLUCK' },
           ]
 
+          async function main() {
           const results = []
           let failed = false
 
@@ -215,4 +216,10 @@ jobs:
           } else {
             console.log('All five Neon databases passed the read-only connectivity check.')
           }
+          }
+          main().catch((error) => {
+            const code = typeof error?.code === 'string' ? error.code : 'PROBE_ERROR'
+            console.error('Connectivity probe failed before completion. Safe error code: ' + code)
+            process.exitCode = 1
+          })
           NODE
