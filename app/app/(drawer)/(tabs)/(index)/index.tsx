@@ -24,10 +24,11 @@ import { mapContentToFeedContent, readContentBody, readContentSocial, readConten
 import { fetchNativeFeedPage, incrementNativeFeedReplyCount, nativeFeedQueryKey, type NativeFeedKind, type NativeFeedPage } from '~/lib/feed-query';
 import { useAuthStore } from '~/store/auth-store';
 import { readSessionToken } from '~/lib/secure-session';
+import { getXDesignColors, X_DESIGN_TOKENS } from '~/constants/x-design-tokens';
 
 type FeedKind = NativeFeedKind;
 
-const APP_PRIMARY_COLOR = '#1769aa';
+const APP_PRIMARY_COLOR = X_DESIGN_TOKENS.colors.light.primary;
 
 function HomeScreenSurface({ children, isDark }: { children: React.ReactNode; isDark: boolean }) {
   const style = [styles.container, { backgroundColor: isDark ? '#000000' : '#ffffff' }];
@@ -415,6 +416,7 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
 export default function HomeScreen() {
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
+  const palette = getXDesignColors(colorScheme);
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const params = useLocalSearchParams<{ published?: string; refresh?: string }>();
@@ -424,24 +426,24 @@ export default function HomeScreen() {
   const renderTabBar = (props: any) => (
     <MaterialTabBar
       {...props}
-      indicatorStyle={{ backgroundColor: APP_PRIMARY_COLOR, height: 3, borderRadius: 50 }}
-      activeColor={isDark ? '#ffffff' : '#000000'}
+      indicatorStyle={{ backgroundColor: APP_PRIMARY_COLOR, height: 4, borderRadius: 2 }}
+      activeColor={palette.text}
       scrollEnabled={false}
       style={{
-        paddingHorizontal: 16,
+        paddingHorizontal: 12,
         elevation: 0,
         shadowOpacity: 0,
         borderBottomWidth: StyleSheet.hairlineWidth,
-        borderBottomColor: isDark ? '#262626' : '#e4e7ec',
-        backgroundColor: isDark ? '#000000' : '#ffffff',
+        borderBottomColor: palette.border,
+        backgroundColor: palette.surface,
       }}
       labelStyle={{
         marginHorizontal: 10,
         fontWeight: '700',
         textTransform: 'none',
         textAlign: 'center',
-        fontSize: 15,
-        color: isDark ? '#9ca3af' : '#475467',
+        fontSize: X_DESIGN_TOKENS.typography.author,
+        color: palette.muted,
       }}
     />
   );
