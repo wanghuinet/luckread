@@ -13,7 +13,6 @@ import { Feather } from '@expo/vector-icons';
 import { DrawerActions } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Tabs, MaterialTabBar, useCurrentTabScrollY } from 'react-native-collapsible-tab-view';
-import { type ViewToken } from '@shopify/flash-list';
 import { useInfiniteQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import { useTabBarScrollState, useTabBarVisibilityOnAnimatedScroll } from '~/components/TabBarScroll';
 import { BlurView } from 'expo-blur';
@@ -29,6 +28,10 @@ import { readSessionToken } from '~/lib/secure-session';
 import { getXDesignColors, X_DESIGN_TOKENS } from '~/constants/x-design-tokens';
 
 type FeedKind = NativeFeedKind;
+
+type FeedViewabilityInfo = {
+  viewableItems: Array<{ isViewable: boolean; item: unknown }>;
+};
 
 const APP_PRIMARY_COLOR = X_DESIGN_TOKENS.colors.light.primary;
 
@@ -156,10 +159,12 @@ function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSig
   const hydrationGenerationRef = useRef(0);
   const mountedRef = useRef(false);
   const onViewableItemsChanged = useRef(
-    ({ viewableItems }: { viewableItems: Array<ViewToken<FeedContent>> }) => {
-      const visibleIds = [...new Set(viewableItems.flatMap(({ isViewable, item }) =>
-        isViewable && item?.contentId ? [item.contentId] : [],
-      ))];
+    ({ viewableItems }: FeedViewabilityInfo) => {
+      const visibleIds = [...new Set(viewableItems.flatMap(({ isViewable, item }) => {
+        if (!isViewable || !item || typeof item !== 'object' || !('contentId' in item)) return [];
+        const contentId = item.contentId;
+        return typeof contentId === 'string' && contentId ? [contentId] : [];
+      }))];
       const scope = hydrationScopeRef.current;
 
       setHydrationTargets((current) => {
