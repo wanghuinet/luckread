@@ -24,7 +24,7 @@ const parsedDatabaseUrl = new URL(databaseUrl)
 if (
   !new Set(['127.0.0.1', 'localhost', 'postgres']).has(parsedDatabaseUrl.hostname) ||
   parsedDatabaseUrl.port !== '5432' ||
-  parsedDatabaseUrl.pathname !== '/luckread_schema'
+  !new Set(['/luckread_schema', '/luckread_schema_rollback']).has(parsedDatabaseUrl.pathname)
 ) {
   throw new Error('Refusing to initialize Payload schema against a non-disposable database')
 }
