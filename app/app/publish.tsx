@@ -12,8 +12,8 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useNavigation, usePreventRemove, type NavigationAction } from '@react-navigation/native';
+import { Stack, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
+import { usePreventRemove, type NavigationAction } from '@react-navigation/native';
 import { Feather } from '@expo/vector-icons';
 import DateTimePicker from '@expo/ui/community/datetime-picker';
 import * as ImagePicker from 'expo-image-picker';
