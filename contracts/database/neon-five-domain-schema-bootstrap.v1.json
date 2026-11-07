@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/database/neon-five-domain-schema-bootstrap.v1.json",
+  "title": "LuckRead Neon Five-Domain PostgreSQL Schema Bootstrap Contract",
+  "version": "1.0.0",
+  "status": "APPROVED_FOR_EMPTY_SCHEMA_INITIALIZATION_ONLY",
+  "authorization": {
+    "basis": "Explicit user direction to migrate five existing logical data domains to pre-created Neon PostgreSQL databases from an empty-data baseline.",
+    "productionCutoverAuthorized": false,
+    "businessDataImportAuthorized": false,
+    "schemaOnlyInitializationAuthorized": true
+  },
+  "preflightEvidence": {
+    "workflowRunId": 42408288064,
+    "mainSha": "1eec18510a34ef94ab25c6fcde1ad0212ee70caf",
+    "statusContext": "Neon Empty Schema Preflight",
+    "status": "success",
+    "description": "PASS_EMPTY 5/5",
+    "postgresqlVersion": "18.6"
+  },
+  "architecture": {
+    "logicalDomainCount": 5,
+    "workerCount": 12,
+    "contractTaskCount": 25,
+    "productionAuthorityDuringBootstrap": "Cloudflare D1",
+    "stagedSchemaTarget": "Neon PostgreSQL",
+    "crossDomainForeignKeys": false,
+    "distributedTransactions": false,
+    "dualAuthoritativeWrites": false,
+    "payloadCoreModifications": false,
+    "newWorkers": 0,
+    "newQueues": 0,
+    "newServiceBindings": 0
+  },
+  "domains": [
+    {
+      "domainId": "D1-01",
+      "databaseName": "luckread",
+      "owners": ["W01", "W02", "W07", "W08"],
+      "schemaSources": [
+        "workers/W01-payload/src/collections",
+        "workers/W01-payload/src/migrations",
+        "workers/W02-identity/migrations",
+        "workers/W07-subscription-commerce/migrations",
+        "workers/W08-creator/migrations"
+      ],
+      "status": "PENDING_SCHEMA_GENERATION"
+    },
+    {
+      "domainId": "D1-02",
+      "databaseName": "luckreadpro",
+      "owners": ["W03", "W05"],
+      "schemaSources": [
+        "workers/W03-content/migrations",
+        "workers/W05-social/migrations"
+      ],
+      "status": "PENDING"
+    },
+    {
+      "domainId": "D1-03",
+      "databaseName": "luckread_governance",
+      "owners": ["W05", "W06", "W09"],
+      "schemaSources": [
+        "workers/W05-social",
+        "workers/W06-governance/migrations",
+        "workers/W09-platform/migrations-d1-03"
+      ],
+      "status": "PENDING"
+    },
+    {
+      "domainId": "D1-04",
+      "databaseName": "luckread_finance",
+      "owners": ["W07"],
+      "schemaSources": [
+        "workers/W07-subscription-commerce/migrations-d1-04"
+      ],
+      "status": "PENDING"
+    },
+    {
+      "domainId": "D1-05",
+      "databaseName": "allluck",
+      "owners": ["W11"],
+      "schemaSources": [
+        "workers/W11-growth-campaign-analytics-operations/migrations"
+      ],
+      "status": "PENDING"
+    }
+  ],
+  "businessDataImport": {
+    "accounts": false,
+    "credentials": false,
+    "sessions": false,
+    "content": false,
+    "media": false,
+    "socialGraph": false,
+    "subscriptions": false,
+    "orders": false,
+    "payments": false,
+    "analyticsEvents": false,
+    "migrationBookkeepingRows": true
+  },
+  "security": {
+    "tlsRequired": true,
+    "requiredSslMode": "verify-full",
+    "channelBinding": "require",
+    "connectionStringsInLogs": false,
+    "runtimeRoleCanOwnDatabase": false,
+    "runtimeRoleCanRunDdl": false,
+    "migrationRoleSeparatedFromRuntime": true
+  },
+  "executionOrder": ["D1-01", "D1-02", "D1-03", "D1-04", "D1-05"],
+  "stopConditions": [
+    "unexpected target objects",
+    "unknown schema source or domain owner",
+    "unmapped SQLite/D1 SQL semantics",
+    "migration checksum drift",
+    "Payload Core modification requirement",
+    "dual authoritative write requirement",
+    "missing adapter/runtime compatibility evidence"
+  ],
+  "cutover": {
+    "requiresSeparateChangeControl": true,
+    "requiresPG001ToPG009Evidence": true,
+    "requiresSingleWriterPlan": true,
+    "requiresRollbackPlan": true,
+    "authorized": false
+  }
+}
