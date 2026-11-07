@@ -3,6 +3,12 @@ import { afterEach, beforeEach, expect, mock, test } from 'bun:test';
 let storedToken = 'secure-test-token';
 let savedTokens = [];
 let pendingFetch;
+let activeViewerId = 'stage3-bookmark-viewer';
+const mockedAuthStore = Object.assign(
+  (selector) => selector({ status: 'authenticated', user: { id: activeViewerId } }),
+  { getState: () => ({ status: 'authenticated', user: { id: activeViewerId } }) },
+);
+mock.module('../store/auth-store.ts', () => ({ useAuthStore: mockedAuthStore }));
 const originalFetch = globalThis.fetch;
 const originalXMLHttpRequest = globalThis.XMLHttpRequest;
 
@@ -52,6 +58,7 @@ const { createContentShareLink } = await import('../lib/content-share.ts');
 beforeEach(() => {
   storedToken = 'secure-test-token';
   savedTokens = [];
+  activeViewerId = 'stage3-bookmark-viewer';
   pendingFetch = async () => new Response(JSON.stringify({ data: { ok: true } }), { status: 200 });
   globalThis.fetch = (input, init) => pendingFetch(input, init);
 });
@@ -720,6 +727,50 @@ test('loads authoritative bookmark state from the existing W01/W05 endpoint', as
     pending: false,
     error: null,
   });
+});
+
+
+test('keeps one content bookmark relationship separate for two authenticated viewers', async () => {
+  const contentId = 'stage3-bookmark-two-viewers';
+  let favorited = true;
+  pendingFetch = async () => new Response(JSON.stringify({ data: { favorited } }), { status: 200 });
+
+  activeViewerId = 'bookmark-viewer-a';
+  await refreshContentBookmarkStatus(contentId);
+  expect(getContentBookmarkSnapshot(contentId, 'bookmark-viewer-a'))
+    .toMatchObject({ bookmarked: true, loaded: true });
+
+  activeViewerId = 'bookmark-viewer-b';
+  favorited = false;
+  await refreshContentBookmarkStatus(contentId);
+  expect(getContentBookmarkSnapshot(contentId, 'bookmark-viewer-b'))
+    .toMatchObject({ bookmarked: false, loaded: true });
+  expect(getContentBookmarkSnapshot(contentId, 'bookmark-viewer-a'))
+    .toMatchObject({ bookmarked: true, loaded: true });
+});
+
+test('does not hydrate a new viewer from a late previous-viewer bookmark response', async () => {
+  const contentId = 'stage3-bookmark-late-viewer';
+  let releaseResponse;
+  pendingFetch = () => new Promise((resolve) => {
+    releaseResponse = () => resolve(new Response(
+      JSON.stringify({ data: { favorited: true } }),
+      { status: 200 },
+    ));
+  });
+
+  activeViewerId = 'bookmark-viewer-a';
+  const pending = refreshContentBookmarkStatus(contentId);
+  expect(typeof releaseResponse).toBe('function');
+
+  activeViewerId = 'bookmark-viewer-b';
+  releaseResponse();
+  await pending;
+
+  expect(getContentBookmarkSnapshot(contentId, 'bookmark-viewer-a'))
+    .toMatchObject({ bookmarked: false, loaded: false, loading: false, pending: false });
+  expect(getContentBookmarkSnapshot(contentId, 'bookmark-viewer-b'))
+    .toMatchObject({ bookmarked: false, loaded: false, loading: false, pending: false });
 });
 
 test('creates a bookmark through POST and reconciles the current viewer state', async () => {
