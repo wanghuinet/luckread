@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useSyncExternalStore } from 'react';
 import { apiRequest, createIdempotencyKey } from './api-client';
+import { useAuthStore } from '../store/auth-store';
 
 export type ContentBookmarkSnapshot = {
   bookmarked: boolean;
@@ -30,32 +31,52 @@ function normalizeContentId(contentId?: string): string {
   return typeof contentId === 'string' ? contentId.trim() : '';
 }
 
-export function getContentBookmarkSnapshot(contentId?: string): ContentBookmarkSnapshot {
-  const id = normalizeContentId(contentId);
-  if (!id) return EMPTY_SNAPSHOT;
+function currentViewerId(): string | null {
+  const auth = useAuthStore.getState();
+  return auth.status === 'authenticated' ? auth.user?.id ?? null : null;
+}
 
-  const current = snapshots.get(id);
+function snapshotKey(viewerId: string, contentId: string): string {
+  return viewerId.length + ':' + viewerId + ':' + contentId.length + ':' + contentId;
+}
+
+export function getContentBookmarkSnapshot(
+  contentId?: string,
+  viewerId: string | null = currentViewerId(),
+): ContentBookmarkSnapshot {
+  const id = normalizeContentId(contentId);
+  if (!id || !viewerId) return EMPTY_SNAPSHOT;
+
+  const key = snapshotKey(viewerId, id);
+  const current = snapshots.get(key);
   if (current) return current;
 
-  snapshots.set(id, { ...EMPTY_SNAPSHOT });
-  return snapshots.get(id)!;
+  const initial = { ...EMPTY_SNAPSHOT };
+  snapshots.set(key, initial);
+  return initial;
 }
 
-function publish(contentId: string, patch: Partial<ContentBookmarkSnapshot>): void {
-  const current = getContentBookmarkSnapshot(contentId);
-  snapshots.set(contentId, { ...current, ...patch });
-  for (const listener of listeners.get(contentId) ?? []) listener();
+function publish(
+  viewerId: string,
+  contentId: string,
+  patch: Partial<ContentBookmarkSnapshot>,
+): void {
+  const key = snapshotKey(viewerId, contentId);
+  const current = getContentBookmarkSnapshot(contentId, viewerId);
+  snapshots.set(key, { ...current, ...patch });
+  for (const listener of listeners.get(key) ?? []) listener();
 }
 
-function subscribe(contentId: string, listener: () => void): () => void {
-  if (!contentId) return () => undefined;
-  const subscribers = listeners.get(contentId) ?? new Set<() => void>();
+function subscribe(viewerId: string | null, contentId: string, listener: () => void): () => void {
+  if (!viewerId || !contentId) return () => undefined;
+  const key = snapshotKey(viewerId, contentId);
+  const subscribers = listeners.get(key) ?? new Set<() => void>();
   subscribers.add(listener);
-  listeners.set(contentId, subscribers);
+  listeners.set(key, subscribers);
 
   return () => {
     subscribers.delete(listener);
-    if (subscribers.size === 0) listeners.delete(contentId);
+    if (subscribers.size === 0) listeners.delete(key);
   };
 }
 
@@ -73,23 +94,43 @@ function failureMessage(cause: unknown): string {
     : 'Could not reach LuckRead. Check your connection and try again.';
 }
 
-/** Read the current viewer's bookmark relationship from W01/W05. */
-export async function refreshContentBookmarkStatus(contentId?: string): Promise<void> {
-  const id = normalizeContentId(contentId);
-  if (!id) return;
+function resetStaleViewerSnapshot(viewerId: string, contentId: string): void {
+  publish(viewerId, contentId, {
+    bookmarked: false,
+    loaded: false,
+    loading: false,
+    pending: false,
+    error: null,
+  });
+}
 
-  const current = getContentBookmarkSnapshot(id);
+/** Read one viewer's bookmark relationship from the existing W01/W05 route. */
+export async function refreshContentBookmarkStatus(
+  contentId?: string,
+  viewerId: string | null = currentViewerId(),
+): Promise<void> {
+  const id = normalizeContentId(contentId);
+  if (!id || !viewerId || currentViewerId() !== viewerId) return;
+
+  const current = getContentBookmarkSnapshot(id, viewerId);
   if (current.loading || current.pending) return;
 
-  publish(id, { loading: true, error: null });
+  publish(viewerId, id, { loading: true, error: null });
   try {
     const result = await apiRequest<unknown>(
       '/interactions/bookmarks?targetType=content&targetId=' + encodeURIComponent(id),
       { method: 'GET' },
     );
 
+    // A response started for one viewer is never published into another
+    // viewer's relationship state, even when both accounts remain authenticated.
+    if (currentViewerId() !== viewerId) {
+      resetStaleViewerSnapshot(viewerId, id);
+      return;
+    }
+
     if (!result.response.ok) {
-      publish(id, {
+      publish(viewerId, id, {
         loaded: false,
         loading: false,
         error: result.error?.message ?? 'Could not load this bookmark status.',
@@ -99,7 +140,7 @@ export async function refreshContentBookmarkStatus(contentId?: string): Promise<
 
     const bookmarked = parseBookmarkStatus(result.data);
     if (bookmarked === null) {
-      publish(id, {
+      publish(viewerId, id, {
         loaded: false,
         loading: false,
         error: 'LuckRead returned an invalid bookmark status.',
@@ -107,20 +148,30 @@ export async function refreshContentBookmarkStatus(contentId?: string): Promise<
       return;
     }
 
-    publish(id, { bookmarked, loaded: true, loading: false, error: null });
+    publish(viewerId, id, { bookmarked, loaded: true, loading: false, error: null });
   } catch (cause) {
-    publish(id, { loaded: false, loading: false, error: failureMessage(cause) });
+    if (currentViewerId() !== viewerId) {
+      resetStaleViewerSnapshot(viewerId, id);
+      return;
+    }
+    publish(viewerId, id, { loaded: false, loading: false, error: failureMessage(cause) });
   }
 }
 
-/** Toggle one content bookmark, rolling optimistic state back on all failed writes. */
-export async function toggleContentBookmark(contentId?: string): Promise<ContentBookmarkOperationResult> {
+/** Toggle a bookmark using the active viewer's own scoped relationship snapshot. */
+export async function toggleContentBookmark(
+  contentId?: string,
+  viewerId: string | null = currentViewerId(),
+): Promise<ContentBookmarkOperationResult> {
   const id = normalizeContentId(contentId);
   if (!id) {
     return { ok: false, message: 'This item is not connected to a LuckRead content ID.' };
   }
+  if (!viewerId || currentViewerId() !== viewerId) {
+    return { ok: false, message: 'Sign in to manage this bookmark.' };
+  }
 
-  const current = getContentBookmarkSnapshot(id);
+  const current = getContentBookmarkSnapshot(id, viewerId);
   if (current.loading || current.pending) {
     return { ok: false, message: 'Bookmark status is still syncing. Please try again.' };
   }
@@ -133,22 +184,33 @@ export async function toggleContentBookmark(contentId?: string): Promise<Content
 
   const previousBookmarked = current.bookmarked;
   const nextBookmarked = !previousBookmarked;
-  publish(id, {
+  publish(viewerId, id, {
     bookmarked: nextBookmarked,
     pending: true,
     error: null,
   });
 
   try {
+    // Do not start a mutation from a stale component after the active account changes.
+    if (currentViewerId() !== viewerId) {
+      resetStaleViewerSnapshot(viewerId, id);
+      return { ok: false, message: 'The active account changed. Refresh bookmark status and retry.' };
+    }
+
     const result = await apiRequest<unknown>('/interactions/bookmarks', {
       method: nextBookmarked ? 'POST' : 'DELETE',
       body: JSON.stringify({ targetType: 'content', targetId: id }),
       idempotencyKey: createIdempotencyKey(),
     });
 
+    if (currentViewerId() !== viewerId) {
+      resetStaleViewerSnapshot(viewerId, id);
+      return { ok: false, message: 'The active account changed while the bookmark was updating.' };
+    }
+
     if (!result.response.ok) {
       const message = result.error?.message ?? 'Could not update this bookmark.';
-      publish(id, {
+      publish(viewerId, id, {
         bookmarked: previousBookmarked,
         pending: false,
         loading: false,
@@ -157,12 +219,16 @@ export async function toggleContentBookmark(contentId?: string): Promise<Content
       return { ok: false, status: result.response.status, message };
     }
 
-    publish(id, { bookmarked: nextBookmarked, loaded: true, pending: false, error: null });
-    await refreshContentBookmarkStatus(id);
+    publish(viewerId, id, { bookmarked: nextBookmarked, loaded: true, pending: false, error: null });
+    await refreshContentBookmarkStatus(id, viewerId);
     return { ok: true };
   } catch (cause) {
+    if (currentViewerId() !== viewerId) {
+      resetStaleViewerSnapshot(viewerId, id);
+      return { ok: false, message: 'The active account changed while the bookmark was updating.' };
+    }
     const message = failureMessage(cause);
-    publish(id, {
+    publish(viewerId, id, {
       bookmarked: previousBookmarked,
       pending: false,
       loading: false,
@@ -177,18 +243,31 @@ export function useContentBookmark(contentId?: string): ContentBookmarkSnapshot 
   toggleBookmark: () => Promise<ContentBookmarkOperationResult>;
 } {
   const id = normalizeContentId(contentId);
+  const authStatus = useAuthStore((state) => state.status);
+  const viewerId = useAuthStore((state) => state.user?.id ?? null);
   const subscribeToContent = useCallback(
-    (listener: () => void) => subscribe(id, listener),
-    [id],
+    (listener: () => void) => subscribe(viewerId, id, listener),
+    [id, viewerId],
   );
-  const getSnapshot = useCallback(() => getContentBookmarkSnapshot(id), [id]);
+  const getSnapshot = useCallback(
+    () => getContentBookmarkSnapshot(id, viewerId),
+    [id, viewerId],
+  );
   const snapshot = useSyncExternalStore(subscribeToContent, getSnapshot, getSnapshot);
 
   useEffect(() => {
-    if (id) void refreshContentBookmarkStatus(id);
-  }, [id]);
+    if (id && authStatus === 'authenticated' && viewerId) {
+      void refreshContentBookmarkStatus(id, viewerId);
+    }
+  }, [authStatus, id, viewerId]);
 
-  const refreshStatus = useCallback(() => refreshContentBookmarkStatus(id), [id]);
-  const toggleBookmark = useCallback(() => toggleContentBookmark(id), [id]);
+  const refreshStatus = useCallback(
+    () => refreshContentBookmarkStatus(id, viewerId),
+    [id, viewerId],
+  );
+  const toggleBookmark = useCallback(
+    () => toggleContentBookmark(id, viewerId),
+    [id, viewerId],
+  );
   return { ...snapshot, refreshStatus, toggleBookmark };
 }
