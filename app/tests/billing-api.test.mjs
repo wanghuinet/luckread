@@ -103,7 +103,7 @@ test('connects billing history, refund requests and authenticated navigation in 
   expect(screen).toContain('支付服务商的签名回调');
   expect(screen).toContain('createIdempotencyKey');
   expect(screen).toContain("status === 'FAILED'");
-  expect(screen).toContain('refundIdempotencyKeys.current.delete(item.paymentId)');
+  expect(screen).toContain('refundIdempotencyKeys.current.delete(refundIdempotencyScope)');
   expect(drawer).toContain("router.push('/billing' as never)");
   expect(drawer).toContain('name="billing"');
   expect(workflow).toContain('bun run test:billing-api');
