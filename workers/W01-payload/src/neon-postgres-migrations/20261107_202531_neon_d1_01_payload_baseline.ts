@@ -175,20 +175,44 @@ export async function up({ db, payload, req }: MigrateUpArgs): Promise<void> {
   CREATE INDEX "payload_migrations_created_at_idx" ON "payload_migrations" USING btree ("created_at");`)
 }
 
-export async function down({ db, payload, req }: MigrateDownArgs): Promise<void> {
+export async function down({ db }: MigrateDownArgs): Promise<void> {
+  // Never reverse this baseline after any W01 business row has been written.
+  // The ledger row is migration bookkeeping and is removed by Payload after
+  // this down migration returns successfully.
   await db.execute(sql`
-   DROP TABLE "users_sessions" CASCADE;
-  DROP TABLE "users" CASCADE;
-  DROP TABLE "media" CASCADE;
-  DROP TABLE "redirects" CASCADE;
-  DROP TABLE "redirects_rels" CASCADE;
-  DROP TABLE "payload_kv" CASCADE;
-  DROP TABLE "payload_locked_documents" CASCADE;
-  DROP TABLE "payload_locked_documents_rels" CASCADE;
-  DROP TABLE "payload_preferences" CASCADE;
-  DROP TABLE "payload_preferences_rels" CASCADE;
-  DROP TABLE "payload_migrations" CASCADE;
-  DROP TYPE "public"."enum_redirects_to_type";
-  DROP TYPE "public"."enum_redirects_type";
-  DROP TYPE "public"."enum_redirects_redirect_scope";`)
+    DO $$
+    BEGIN
+      IF EXISTS (SELECT 1 FROM public.users LIMIT 1)
+        OR EXISTS (SELECT 1 FROM public.users_sessions LIMIT 1)
+        OR EXISTS (SELECT 1 FROM public.media LIMIT 1)
+        OR EXISTS (SELECT 1 FROM public.redirects LIMIT 1)
+        OR EXISTS (SELECT 1 FROM public.redirects_rels LIMIT 1)
+        OR EXISTS (SELECT 1 FROM public.payload_kv LIMIT 1)
+        OR EXISTS (SELECT 1 FROM public.payload_locked_documents LIMIT 1)
+        OR EXISTS (SELECT 1 FROM public.payload_locked_documents_rels LIMIT 1)
+        OR EXISTS (SELECT 1 FROM public.payload_preferences LIMIT 1)
+        OR EXISTS (SELECT 1 FROM public.payload_preferences_rels LIMIT 1)
+      THEN
+        RAISE EXCEPTION 'W01_PAYLOAD_BASELINE_ROLLBACK_REFUSED: business tables must be empty';
+      END IF;
+    END
+    $$;
+
+    -- Drop relation tables before their referenced tables. Deliberately omit
+    -- CASCADE so any newly added external FK dependency blocks rollback.
+    DROP TABLE "users_sessions";
+    DROP TABLE "redirects_rels";
+    DROP TABLE "payload_locked_documents_rels";
+    DROP TABLE "payload_preferences_rels";
+    DROP TABLE "users";
+    DROP TABLE "media";
+    DROP TABLE "redirects";
+    DROP TABLE "payload_kv";
+    DROP TABLE "payload_locked_documents";
+    DROP TABLE "payload_preferences";
+    DROP TABLE "payload_migrations";
+    DROP TYPE "public"."enum_redirects_to_type";
+    DROP TYPE "public"."enum_redirects_type";
+    DROP TYPE "public"."enum_redirects_redirect_scope";
+  `)
 }
