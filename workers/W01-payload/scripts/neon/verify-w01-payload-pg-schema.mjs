@@ -180,22 +180,22 @@ try {
     `SELECT source_table.relname AS table_name,
             constraint_row.conname AS constraint_name,
             target_table.relname AS referenced_table,
-            ARRAY(
-              SELECT source_column.attname
+            to_json(ARRAY(
+              SELECT source_column.attname::text
                 FROM unnest(constraint_row.conkey) WITH ORDINALITY AS key_column(attnum, ordinal)
                 JOIN pg_catalog.pg_attribute source_column
                   ON source_column.attrelid = constraint_row.conrelid
                  AND source_column.attnum = key_column.attnum
                ORDER BY key_column.ordinal
-            ) AS columns_from,
-            ARRAY(
-              SELECT target_column.attname
+            )) AS columns_from,
+            to_json(ARRAY(
+              SELECT target_column.attname::text
                 FROM unnest(constraint_row.confkey) WITH ORDINALITY AS key_column(attnum, ordinal)
                 JOIN pg_catalog.pg_attribute target_column
                   ON target_column.attrelid = constraint_row.confrelid
                  AND target_column.attnum = key_column.attnum
                ORDER BY key_column.ordinal
-            ) AS columns_to,
+            )) AS columns_to,
             CASE constraint_row.confdeltype
               WHEN 'a' THEN 'no action' WHEN 'r' THEN 'restrict'
               WHEN 'c' THEN 'cascade' WHEN 'n' THEN 'set null'
