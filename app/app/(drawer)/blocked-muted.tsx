@@ -318,7 +318,7 @@ export default function BlockedMutedScreen() {
         }}
         ListEmptyComponent={(
           <View className="items-center px-8 py-14">
-            {loading || !accountDataReady ? <ActivityIndicator color={PRIMARY} /> : (
+            {loading || (!accountDataReady && !error) ? <ActivityIndicator color={PRIMARY} /> : (
               <>
                 <Feather name={kind === 'blocks' ? 'slash' : 'volume-x'} size={32} color="#9ca3af" />
                 <Text className="mt-4 text-base font-semibold text-neutral-800 dark:text-neutral-100">
