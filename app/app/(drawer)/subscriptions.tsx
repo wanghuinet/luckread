@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import {
   ActivityIndicator,
@@ -27,6 +27,8 @@ import {
 import { useAuthStore } from '~/store/auth-store';
 
 const PRIMARY = '#1d9bf0';
+const EMPTY_SUBSCRIPTIONS: MySubscription[] = [];
+const EMPTY_PAYMENT_METHODS: SavedPaymentMethod[] = [];
 
 const STATUS_LABELS: Record<SubscriptionStatus, string> = {
   PENDING: '待处理',
@@ -142,6 +144,12 @@ export default function MySubscriptionsScreen() {
   const isDark = colorScheme === 'dark';
   const router = useRouter();
   const authStatus = useAuthStore((state) => state.status);
+  const viewerId = useAuthStore((state) => state.user?.id ?? null);
+  const viewerIdRef = useRef<string | null>(viewerId);
+  const previousViewerIdRef = useRef<string | null>(viewerId);
+  const [subscriptionDataViewerId, setSubscriptionDataViewerId] = useState<string | null>(viewerId);
+  const [paymentMethodsViewerId, setPaymentMethodsViewerId] = useState<string | null>(viewerId);
+  const [errorViewerId, setErrorViewerId] = useState<string | null>(null);
   const [items, setItems] = useState<MySubscription[]>([]);
   const [pageNumber, setPageNumber] = useState(1);
   const [hasNextPage, setHasNextPage] = useState(false);
@@ -156,7 +164,29 @@ export default function MySubscriptionsScreen() {
   const paymentMethodRequestRef = useRef<AbortController | null>(null);
   const paymentMethodIdempotencyKeys = useRef(new Map<string, string>());
 
+  const isCurrentSubscriptionData = subscriptionDataViewerId === viewerId;
+  const isCurrentPaymentMethodData = paymentMethodsViewerId === viewerId;
+  const currentItems = isCurrentSubscriptionData ? items : EMPTY_SUBSCRIPTIONS;
+  const currentPaymentMethods = isCurrentPaymentMethodData ? paymentMethods : EMPTY_PAYMENT_METHODS;
+  const currentHasNextPage = isCurrentSubscriptionData && hasNextPage;
+  const currentPageNumber = isCurrentSubscriptionData ? pageNumber : 1;
+  const currentLoading = authStatus === 'loading' || (
+    authStatus === 'authenticated' && Boolean(viewerId) &&
+    (!isCurrentSubscriptionData || loading)
+  );
+  const currentLoadingMore = isCurrentSubscriptionData && loadingMore;
+  const currentRefreshing = isCurrentSubscriptionData && refreshing;
+  const currentPaymentMethodsLoading = authStatus === 'loading' || (
+    authStatus === 'authenticated' && Boolean(viewerId) &&
+    (!isCurrentPaymentMethodData || paymentMethodsLoading)
+  );
+  const currentError = errorViewerId === viewerId ? error : '';
+
   const requestRef = useRef<AbortController | null>(null);
+
+  useLayoutEffect(() => {
+    viewerIdRef.current = viewerId;
+  }, [viewerId]);
 
   const openLogin = useCallback(() => {
     router.push(('/login?returnTo=' + encodeURIComponent('/subscriptions')) as never);
@@ -164,8 +194,9 @@ export default function MySubscriptionsScreen() {
 
   const loadPage = useCallback(async (page: number, append: boolean, pullRefresh = false) => {
     if (authStatus === 'loading') return;
-    if (authStatus !== 'authenticated') {
+    if (authStatus !== 'authenticated' || !viewerId) {
       setAuthRequired(true);
+      setSubscriptionDataViewerId(null);
       setItems([]);
       setLoading(false);
       setLoadingMore(false);
@@ -173,9 +204,12 @@ export default function MySubscriptionsScreen() {
       return;
     }
 
+    const requestViewerId = viewerId;
     requestRef.current?.abort();
     const controller = new AbortController();
     requestRef.current = controller;
+    const isCurrent = () => !controller.signal.aborted &&
+      viewerIdRef.current === requestViewerId;
     if (append) setLoadingMore(true);
     else setLoading(true);
     if (pullRefresh) setRefreshing(true);
@@ -183,9 +217,10 @@ export default function MySubscriptionsScreen() {
 
     try {
       const result = await fetchMySubscriptionsPage({ page, limit: 20, signal: controller.signal });
-      if (controller.signal.aborted) return;
+      if (!isCurrent()) return;
       if (result.response.status === 401) {
         setAuthRequired(true);
+        setSubscriptionDataViewerId(null);
         setItems([]);
         setHasNextPage(false);
         return;
@@ -212,37 +247,45 @@ export default function MySubscriptionsScreen() {
       });
       setPageNumber(Number.isSafeInteger(payload.page) && payload.page > 0 ? payload.page : page);
       setHasNextPage(payload.hasNextPage);
+      setSubscriptionDataViewerId(requestViewerId);
+      setErrorViewerId(null);
       setAuthRequired(false);
     } catch (cause) {
-      if (!controller.signal.aborted) {
+      if (isCurrent()) {
         setError(cause instanceof Error ? cause.message : '订阅读取失败，请稍后重试。');
+        setErrorViewerId(requestViewerId);
       }
     } finally {
       if (requestRef.current === controller) requestRef.current = null;
-      if (!controller.signal.aborted) {
+      if (isCurrent()) {
         setLoading(false);
         setLoadingMore(false);
         setRefreshing(false);
       }
     }
-  }, [authStatus]);
+  }, [authStatus, viewerId]);
 
   const loadPaymentMethods = useCallback(async () => {
     if (authStatus === 'loading') return;
-    if (authStatus !== 'authenticated') {
+    if (authStatus !== 'authenticated' || !viewerId) {
+      setPaymentMethodsViewerId(null);
       setPaymentMethods([]);
       setPaymentMethodsLoading(false);
       return;
     }
+    const requestViewerId = viewerId;
     paymentMethodRequestRef.current?.abort();
     const controller = new AbortController();
     paymentMethodRequestRef.current = controller;
+    const isCurrent = () => !controller.signal.aborted &&
+      viewerIdRef.current === requestViewerId;
     setPaymentMethodsLoading(true);
     try {
       const result = await fetchSavedPaymentMethods({ signal: controller.signal });
-      if (controller.signal.aborted) return;
+      if (!isCurrent()) return;
       if (result.response.status === 401) {
         setAuthRequired(true);
+        setPaymentMethodsViewerId(null);
         setPaymentMethods([]);
         return;
       }
@@ -264,17 +307,25 @@ export default function MySubscriptionsScreen() {
         throw new Error('付款方式服务返回的数据格式无效。');
       }
       setPaymentMethods(payload.docs);
+      setPaymentMethodsViewerId(requestViewerId);
+      setErrorViewerId(null);
     } catch (cause) {
-      if (!controller.signal.aborted) {
+      if (isCurrent()) {
         setError(cause instanceof Error ? cause.message : '付款方式读取失败，请稍后重试。');
+        setErrorViewerId(requestViewerId);
       }
     } finally {
       if (paymentMethodRequestRef.current === controller) paymentMethodRequestRef.current = null;
-      if (!controller.signal.aborted) setPaymentMethodsLoading(false);
+      if (isCurrent()) setPaymentMethodsLoading(false);
     }
-  }, [authStatus]);
+  }, [authStatus, viewerId]);
 
   const confirmRevokePaymentMethod = useCallback((method: SavedPaymentMethod) => {
+    const requestViewerId = viewerId;
+    if (!requestViewerId || viewerIdRef.current !== requestViewerId ||
+        !isCurrentPaymentMethodData || !currentPaymentMethods.some((candidate) =>
+          candidate.savedPaymentMethodId === method.savedPaymentMethodId
+        )) return;
     const label = method.brand
       ? method.brand + (method.last4 ? ' •••• ' + method.last4 : '')
       : '该付款方式';
@@ -287,6 +338,7 @@ export default function MySubscriptionsScreen() {
           text: '确认移除',
           style: 'destructive',
           onPress: () => {
+            if (viewerIdRef.current !== requestViewerId) return;
             setRevokingPaymentMethodId(method.savedPaymentMethodId);
             setError('');
             void (async () => {
@@ -295,6 +347,7 @@ export default function MySubscriptionsScreen() {
                   'remove_' + method.savedPaymentMethodId;
                 paymentMethodIdempotencyKeys.current.set(method.savedPaymentMethodId, idempotencyKey);
                 let result = await revokeSavedPaymentMethod(method.savedPaymentMethodId, idempotencyKey);
+                if (viewerIdRef.current !== requestViewerId) return;
                 // The first response confirms the D1-04 MIT block. Replay the
                 // same idempotent command once to perform provider-side revocation
                 // in a separate request/write-budget window.
@@ -303,6 +356,7 @@ export default function MySubscriptionsScreen() {
                   : null;
                 if (result.response.status === 202 && firstStage?.replayed === false) {
                   result = await revokeSavedPaymentMethod(method.savedPaymentMethodId, idempotencyKey);
+                  if (viewerIdRef.current !== requestViewerId) return;
                 }
                 if (!result.response.ok) {
                   throw new Error(result.error?.message || getApiErrorMessage(
@@ -312,6 +366,7 @@ export default function MySubscriptionsScreen() {
                   ));
                 }
                 await loadPaymentMethods();
+                if (viewerIdRef.current !== requestViewerId) return;
                 if (result.response.status === 202) {
                   Alert.alert('撤销处理中', '新的自动续费扣款已暂缓。收到 Hyperswitch 的签名确认事件后，请返回此页点击“重试移除”，完成支付渠道中的付款方式删除。');
                 } else {
@@ -319,21 +374,45 @@ export default function MySubscriptionsScreen() {
                   Alert.alert('已移除', '付款方式已从支付渠道确认移除。');
                 }
               } catch (cause) {
+                if (viewerIdRef.current !== requestViewerId) return;
                 setError(cause instanceof Error ? cause.message : '付款方式移除失败，请稍后重试。');
+                setErrorViewerId(requestViewerId);
                 // The first request may already have committed the MIT block
                 // even when the provider replay failed; refresh authoritative state.
                 void loadPaymentMethods();
               } finally {
-                setRevokingPaymentMethodId(null);
+                if (viewerIdRef.current === requestViewerId) setRevokingPaymentMethodId(null);
               }
             })();
           },
         },
       ],
     );
-  }, [loadPaymentMethods]);
+  }, [currentPaymentMethods, isCurrentPaymentMethodData, loadPaymentMethods, viewerId]);
 
   useEffect(() => {
+    if (previousViewerIdRef.current !== viewerId) {
+      previousViewerIdRef.current = viewerId;
+      requestRef.current?.abort();
+      paymentMethodRequestRef.current?.abort();
+      requestRef.current = null;
+      paymentMethodRequestRef.current = null;
+      paymentMethodIdempotencyKeys.current.clear();
+      setSubscriptionDataViewerId(null);
+      setPaymentMethodsViewerId(null);
+      setItems([]);
+      setPageNumber(1);
+      setHasNextPage(false);
+      setPaymentMethods([]);
+      setLoading(authStatus === 'authenticated' && Boolean(viewerId));
+      setPaymentMethodsLoading(authStatus === 'authenticated' && Boolean(viewerId));
+      setLoadingMore(false);
+      setRefreshing(false);
+      setAuthRequired(authStatus !== 'authenticated' || !viewerId);
+      setRevokingPaymentMethodId(null);
+      setError('');
+      setErrorViewerId(null);
+    }
     if (authStatus !== 'loading') {
       void loadPage(1, false);
       void loadPaymentMethods();
@@ -342,9 +421,9 @@ export default function MySubscriptionsScreen() {
       requestRef.current?.abort();
       paymentMethodRequestRef.current?.abort();
     };
-  }, [authStatus, loadPage, loadPaymentMethods]);
+  }, [authStatus, loadPage, loadPaymentMethods, viewerId]);
 
-  if (authStatus === 'loading') {
+  if (authStatus === 'loading' || (authStatus === 'authenticated' && !viewerId)) {
     return (
       <View className="flex-1 items-center justify-center bg-white dark:bg-black">
         <StatusBar style={isDark ? 'light' : 'dark'} />
@@ -353,7 +432,7 @@ export default function MySubscriptionsScreen() {
     );
   }
 
-  if (authRequired || authStatus !== 'authenticated') {
+  if (authRequired || authStatus !== 'authenticated' || !viewerId) {
     return (
       <View className="flex-1 items-center justify-center bg-white px-7 dark:bg-black">
         <StatusBar style={isDark ? 'light' : 'dark'} />
@@ -382,8 +461,8 @@ export default function MySubscriptionsScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="刷新订阅"
-          accessibilityState={{ disabled: loading || loadingMore }}
-          disabled={loading || loadingMore}
+          accessibilityState={{ disabled: currentLoading || currentLoadingMore }}
+          disabled={currentLoading || currentLoadingMore}
           onPress={() => void loadPage(1, false)}
           className="rounded-full p-2"
         >
@@ -397,19 +476,19 @@ export default function MySubscriptionsScreen() {
         </Text>
       </View>
 
-      {error ? (
+      {currentError ? (
         <View className="mx-4 mt-3 flex-row items-center gap-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-3 dark:border-rose-900 dark:bg-rose-950/30">
-          <Text accessibilityRole="alert" className="flex-1 text-sm leading-5 text-rose-700 dark:text-rose-300">{error}</Text>
-          <Pressable accessibilityRole="button" onPress={() => void loadPage(1, false)} disabled={loading}>
+          <Text accessibilityRole="alert" className="flex-1 text-sm leading-5 text-rose-700 dark:text-rose-300">{currentError}</Text>
+          <Pressable accessibilityRole="button" onPress={() => void loadPage(1, false)} disabled={currentLoading}>
             <Text className="font-bold text-sky-600">重试</Text>
           </Pressable>
         </View>
       ) : null}
 
       <FlatList
-        data={items}
+        data={currentItems}
         keyExtractor={(item) => item.subscriptionId}
-        refreshControl={<RefreshControl refreshing={refreshing || paymentMethodsLoading} onRefresh={() => {
+        refreshControl={<RefreshControl refreshing={currentRefreshing || currentPaymentMethodsLoading} onRefresh={() => {
           void loadPage(1, false, true);
           void loadPaymentMethods();
         }} />}
@@ -418,18 +497,18 @@ export default function MySubscriptionsScreen() {
           <View className="mx-4 mb-4 rounded-2xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-950">
             <View className="flex-row items-center justify-between">
               <Text className="text-base font-extrabold text-neutral-900 dark:text-white">已保存的付款方式</Text>
-              <Pressable accessibilityRole="button" onPress={() => void loadPaymentMethods()} disabled={paymentMethodsLoading}>
+              <Pressable accessibilityRole="button" onPress={() => void loadPaymentMethods()} disabled={currentPaymentMethodsLoading}>
                 <Text className="text-xs font-bold text-sky-600">刷新</Text>
               </Pressable>
             </View>
             <Text className="mt-1 text-xs leading-5 text-neutral-500 dark:text-neutral-400">
               仅显示已完成付款并经服务器验证保存的付款方式。移除会暂缓新的自动续费扣款，不会自动退款。
             </Text>
-            {paymentMethodsLoading ? (
+            {currentPaymentMethodsLoading ? (
               <ActivityIndicator className="mt-4" color={PRIMARY} />
-            ) : paymentMethods.length === 0 ? (
+            ) : currentPaymentMethods.length === 0 ? (
               <Text className="mt-4 text-sm text-neutral-500 dark:text-neutral-400">暂无已保存的付款方式</Text>
-            ) : paymentMethods.map((method) => (
+            ) : currentPaymentMethods.map((method) => (
               <View key={method.savedPaymentMethodId} className="mt-3 flex-row items-center justify-between border-t border-neutral-100 pt-3 dark:border-neutral-800">
                 <View className="min-w-0 flex-1 pr-3">
                   <Text className="text-sm font-bold text-neutral-900 dark:text-white">
@@ -466,26 +545,26 @@ export default function MySubscriptionsScreen() {
         renderItem={({ item }) => <SubscriptionCard item={item} onManage={() => router.push(('/subscription-change?subscriptionId=' + encodeURIComponent(item.subscriptionId)) as never)} />}
         ListEmptyComponent={(
           <View className="flex-1 items-center justify-center px-8 py-12">
-            {loading ? <ActivityIndicator size="large" color={PRIMARY} /> : (
+            {currentLoading ? <ActivityIndicator size="large" color={PRIMARY} /> : (
               <>
                 <Feather name="credit-card" size={34} color="#9ca3af" />
                 <Text className="mt-4 text-base font-bold text-neutral-800 dark:text-neutral-100">
-                  {error ? '暂时无法显示订阅' : '暂无订阅记录'}
+                  {currentError ? '暂时无法显示订阅' : '暂无订阅记录'}
                 </Text>
                 <Text className="mt-2 text-center text-sm leading-6 text-neutral-500 dark:text-neutral-400">
-                  {error ? '检查网络后重试。' : '你的真实订阅记录会显示在这里。目前无法直接购买新方案。'}
+                  {currentError ? '检查网络后重试。' : '你的真实订阅记录会显示在这里。目前无法直接购买新方案。'}
                 </Text>
               </>
             )}
           </View>
         )}
-        ListFooterComponent={loadingMore ? (
+        ListFooterComponent={currentLoadingMore ? (
           <ActivityIndicator className="py-5" color={PRIMARY} />
-        ) : hasNextPage ? (
+        ) : currentHasNextPage ? (
           <Pressable
             accessibilityRole="button"
-            disabled={loading || loadingMore}
-            onPress={() => void loadPage(pageNumber + 1, true)}
+            disabled={currentLoading || currentLoadingMore}
+            onPress={() => void loadPage(currentPageNumber + 1, true)}
             className="items-center py-5"
           >
             <Text className="font-bold text-sky-600">加载更多订阅</Text>
