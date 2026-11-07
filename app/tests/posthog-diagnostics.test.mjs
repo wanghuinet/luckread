@@ -6,8 +6,13 @@ const diagnostics = readFileSync(new URL('../lib/posthog.tsx', import.meta.url),
 const rootLayout = readFileSync(new URL('../app/_layout.tsx', import.meta.url), 'utf8');
 const envExample = readFileSync(new URL('../.env.example', import.meta.url), 'utf8');
 const appConfigSource = readFileSync(new URL('../app.config.js', import.meta.url), 'utf8');
+const metroConfigSource = readFileSync(new URL('../metro.config.js', import.meta.url), 'utf8');
 const androidBetaWorkflow = readFileSync(
   new URL('../../.github/workflows/app-android-beta-release.yml', import.meta.url),
+  'utf8',
+);
+const otaUpdateWorkflow = readFileSync(
+  new URL('../../.github/workflows/app-ota-update.yml', import.meta.url),
   'utf8',
 );
 import { createRequire } from 'node:module';
@@ -29,6 +34,13 @@ test('initializes diagnostics only when a valid public project key and supported
   expect(diagnostics).toContain("return <>{children}</>");
   expect(diagnostics).toContain('https://us.i.posthog.com');
   expect(diagnostics).toContain('https://eu.i.posthog.com');
+});
+
+test('injects PostHog debug IDs while preserving LuckRead Metro transformers', () => {
+  expect(metroConfigSource).toContain("require('posthog-react-native/metro')");
+  expect(metroConfigSource).toContain('getPostHogExpoConfig(__dirname)');
+  expect(metroConfigSource).toContain("react-native-svg-transformer/expo");
+  expect(metroConfigSource).toContain("withNativeWind(config, { input: './global.css' })");
 });
 
 test('captures exceptions only and disables product analytics, session replay and push telemetry', () => {
@@ -96,6 +108,14 @@ test('keeps native symbol upload disabled until the private CI CLI credential ex
     if (previous.host === undefined) delete process.env.POSTHOG_CLI_HOST;
     else process.env.POSTHOG_CLI_HOST = previous.host;
   }
+});
+
+test('uploads matching Hermes source maps for each published Expo OTA update', () => {
+  expect(otaUpdateWorkflow).toContain('POSTHOG_CLI_API_KEY: ${{ secrets.POSTHOG_CLI_API_KEY }}');
+  expect(otaUpdateWorkflow).toContain('POSTHOG_CLI_PROJECT_ID: "715723"');
+  expect(otaUpdateWorkflow).toContain('npm install --global @posthog/cli@0.19.0');
+  expect(otaUpdateWorkflow).toContain('posthog-cli hermes upload --directory dist');
+  expect(otaUpdateWorkflow).toContain("find dist -type f -name '*.map'");
 });
 
 test('documents and wires the separate private PostHog CLI credentials for native symbol uploads', () => {

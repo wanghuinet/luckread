@@ -15,6 +15,11 @@ const tabBarScrollSource = readFileSync(
   new URL('../components/TabBarScroll.tsx', import.meta.url),
   'utf8',
 );
+const publishScreenSource = readFileSync(new URL('../app/publish.tsx', import.meta.url), 'utf8');
+const profileScreenSource = readFileSync(
+  new URL('../app/(drawer)/(tabs)/(index,search,messages,grok,video,notifications)/profile/[id].tsx', import.meta.url),
+  'utf8',
+);
 
 const appPackage = JSON.parse(
   readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
@@ -57,6 +62,26 @@ test('keeps Expo Router tab scenes inside their native navigation context', () =
   expect(tabLayoutSource).not.toContain('Platform.OS');
   expect(tabBarScrollSource).toContain("import { useFocusEffect } from 'expo-router';");
   expect(tabBarScrollSource).not.toContain("import { useFocusEffect } from '@react-navigation/native';");
+});
+
+test('uses Expo Router navigation context for composer and profile screens', () => {
+  expect(publishScreenSource).toContain("import { Stack, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';");
+  expect(publishScreenSource).not.toContain("import { useNavigation, usePreventRemove");
+  expect(profileScreenSource).toContain("import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';");
+  expect(profileScreenSource).not.toContain("from '@react-navigation/native'");
+});
+
+test('does not crash tab presses when the Expo Router emitter is absent', () => {
+  const navigation = createExpoRouterTabBarNavigation({
+    routes: [{ key: 'search-key', name: '(search)' }],
+    emitter: undefined,
+    navigateToTab() {},
+  });
+
+  expect(navigation.emit({ type: 'tabPress', target: 'search-key', canPreventDefault: true })).toEqual({
+    type: 'tabPress',
+    defaultPrevented: false,
+  });
 });
 
 test('adapts Expo Router 58 tab events to the glass tab bar emitter contract', () => {
