@@ -231,6 +231,8 @@ jobs:
         run: bun run test:comment-navigation
       - name: Test native TanStack Query feed cache and pagination
         run: bun run test:feed-query
+      - name: Test visible-first native feed hydration
+        run: bun test tests/feed-hydration.test.mjs
       - name: Test native public content search
         run: bun run test:content-search
       - name: Test native profile pin and unpin actions
