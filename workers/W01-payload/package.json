@@ -24,7 +24,10 @@
     "test": "pnpm run test:int && pnpm run test:e2e",
     "test:e2e": "cross-env NODE_OPTIONS=\"--no-deprecation --import=tsx/esm\" playwright test --config=playwright.config.ts",
     "test:int": "cross-env NODE_OPTIONS=--no-deprecation vitest run --config ./vitest.config.mts",
-    "predeploy:database": "node ../../scripts/w01-remote-migration-admission.mjs"
+    "predeploy:database": "node ../../scripts/w01-remote-migration-admission.mjs",
+    "neon:schema:generate": "cross-env NODE_OPTIONS=--no-deprecation PAYLOAD_CONFIG_PATH=src/neon-postgres-schema.config.ts payload migrate:create neon_d1_01_payload_baseline --skip-empty",
+    "neon:schema:apply": "cross-env NODE_OPTIONS=--no-deprecation PAYLOAD_CONFIG_PATH=src/neon-postgres-schema.config.ts payload migrate",
+    "neon:schema:verify": "node scripts/neon/verify-w01-payload-pg-schema.mjs"
   },
   "dependencies": {
     "@opennextjs/cloudflare": "1.20.1",
@@ -61,7 +64,9 @@
     "typescript": "5.7.3",
     "vite-tsconfig-paths": "6.0.5",
     "vitest": "5.0.0",
-    "wrangler": "~4.116.0"
+    "wrangler": "~4.116.0",
+    "@payloadcms/db-postgres": "3.90.2",
+    "pg": "8.20.0"
   },
   "engines": {
     "node": ">=24.15.0",
