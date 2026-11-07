@@ -130,6 +130,12 @@ for (const file of expected.w02BuiltIn) {
     })
   }
 }
+const betterAuthTableNames = sourceRows
+  .filter((row) => row.owner === 'W02' && row.kind === 'better-auth-schema-reference-only')
+  .flatMap((row) => row.tableNames ?? [])
+  .sort()
+compareSets('W02 Better Auth core/plugin table definitions', betterAuthTableNames, contract.owners[1].expectedBetterAuthTables)
+
 for (const file of expected.w02Custom) scanSql(`${w02Directory}/${file}`, 'W02')
 
 for (const [owner, dir, expectedFiles] of [
@@ -170,9 +176,7 @@ for (const file of [
       columnCount: columns,
       tableNames: tables,
     }
-    if (tables.length !== payload.expectedCurrentCollectionTables) {
-      failures.push(`W01 latest SQLite schema snapshot expected ${payload.expectedCurrentCollectionTables} tables, found ${tables.length}`)
-    }
+    compareSets('W01 latest Payload SQLite table catalog', tables, payload.expectedCurrentTableNames)
   }
   if (file === payload.config) {
     if (!content.includes('@payloadcms/db-d1-sqlite')) failures.push('W01 current Payload adapter no longer matches the source contract')
