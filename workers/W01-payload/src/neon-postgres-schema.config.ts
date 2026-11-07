@@ -66,6 +66,16 @@ export default buildConfig({
             reset_password_requested_at: text('reset_password_requested_at'),
           },
         })
+
+        const media = schema.tables.media
+        if (!media) throw new Error('W01 PostgreSQL schema is missing the media table')
+        const mediaColumns = {}
+        if (!('prefix' in media)) mediaColumns.prefix = text('prefix').default('media')
+        if (!('_objectKey' in media)) mediaColumns._objectKey = text('_objectkey')
+        if (Object.keys(mediaColumns).length > 0) {
+          extendTable({ table: media, columns: mediaColumns })
+        }
+
         return schema
       },
     ],
@@ -126,7 +136,9 @@ export default buildConfig({
     // v3.90.2's R2 plugin can insert its schema fields while disabled.
     // It adds prefix and _objectKey without enabling upload/storage handlers.
     r2Storage({
-      enabled: false,
+      // Keep the R2 field schema active. The schema CLI's disableOnInit mode
+      // prevents storage initialization and no upload handlers are invoked.
+      alwaysInsertFields: true,
       bucket: Object.freeze({}) as never,
       collections: {
         media: { prefix: 'media', generateFileURL: createPublicMediaUrl },
