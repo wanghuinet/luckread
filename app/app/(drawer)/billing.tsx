@@ -635,6 +635,8 @@ export default function BillingScreen() {
 
   const requiresAuthentication = authRequired || authStatus !== 'authenticated' || !viewerId;
   const currentLoading = authStatus === 'loading' || (
+    authStatus === 'authenticated' && !viewerId
+  ) || (
     authStatus === 'authenticated' && Boolean(viewerId) && !authRequired &&
     (!isCurrentViewerData || loading)
   );
