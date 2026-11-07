@@ -479,7 +479,7 @@ export default function MySubscriptionsScreen() {
       {currentError ? (
         <View className="mx-4 mt-3 flex-row items-center gap-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-3 dark:border-rose-900 dark:bg-rose-950/30">
           <Text accessibilityRole="alert" className="flex-1 text-sm leading-5 text-rose-700 dark:text-rose-300">{currentError}</Text>
-          <Pressable accessibilityRole="button" onPress={() => void loadPage(1, false)} disabled={loading}>
+          <Pressable accessibilityRole="button" onPress={() => void loadPage(1, false)} disabled={currentLoading}>
             <Text className="font-bold text-sky-600">重试</Text>
           </Pressable>
         </View>
