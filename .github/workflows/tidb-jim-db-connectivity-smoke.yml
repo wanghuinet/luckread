@@ -1,0 +1,158 @@
+name: TiDB JIM database connectivity smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_non_production:
+        description: "Confirm this is a non-production connectivity check against jim_db"
+        required: true
+        type: boolean
+        default: false
+
+permissions: {}
+
+concurrency:
+  group: tidb-jim-db-connectivity-smoke
+  cancel-in-progress: false
+
+jobs:
+  connectivity:
+    name: Verify TiDB TLS and jim_db access
+    if: inputs.confirm_non_production == true
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      TIDB_HOST: ${{ secrets.TIDB_HOST }}
+      TIDB_PORT: ${{ secrets.TIDB_PORT }}
+      TIDB_USER: ${{ secrets.TIDB_USER }}
+      TIDB_PASSWORD: ${{ secrets.TIDB_PASSWORD }}
+      TIDB_DATABASE: ${{ secrets.TIDB_DATABASE }}
+      TIDB_TLS_MODE: ${{ secrets.TIDB_TLS_MODE }}
+    steps:
+      - name: Install isolated MySQL client library
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m venv "$RUNNER_TEMP/tidb-venv"
+          "$RUNNER_TEMP/tidb-venv/bin/python" -m pip install \
+            --disable-pip-version-check \
+            --no-input \
+            "PyMySQL==1.1.2"
+
+      - name: Verify required secrets without revealing values
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/tidb-venv/bin/python" - <<'PY'
+          import os
+          import re
+          import sys
+
+          required = (
+              "TIDB_HOST",
+              "TIDB_PORT",
+              "TIDB_USER",
+              "TIDB_PASSWORD",
+              "TIDB_DATABASE",
+              "TIDB_TLS_MODE",
+          )
+          missing = [key for key in required if not os.environ.get(key)]
+          if missing:
+              print("Missing GitHub Actions secrets: " + ", ".join(missing), file=sys.stderr)
+              raise SystemExit(2)
+
+          if os.environ["TIDB_DATABASE"] != "jim_db":
+              print("TIDB_DATABASE must be jim_db for this isolated POC.", file=sys.stderr)
+              raise SystemExit(2)
+          if os.environ["TIDB_TLS_MODE"] != "VERIFY_IDENTITY":
+              print("TIDB_TLS_MODE must be VERIFY_IDENTITY.", file=sys.stderr)
+              raise SystemExit(2)
+          if not re.fullmatch(r"[A-Za-z0-9.-]+", os.environ["TIDB_HOST"]):
+              print("TIDB_HOST format is invalid.", file=sys.stderr)
+              raise SystemExit(2)
+          try:
+              port = int(os.environ["TIDB_PORT"])
+          except ValueError:
+              print("TIDB_PORT must be an integer.", file=sys.stderr)
+              raise SystemExit(2)
+          if not 1 <= port <= 65535:
+              print("TIDB_PORT is outside the valid TCP port range.", file=sys.stderr)
+              raise SystemExit(2)
+          print("Required secret names and non-secret connection settings are present.")
+          PY
+
+      - name: Connect with verified TLS and test jim_db
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/tidb-venv/bin/python" - <<'PY'
+          import os
+          import ssl
+          import sys
+          import pymysql
+
+          connection = None
+          try:
+              tls_context = ssl.create_default_context()
+              tls_context.minimum_version = ssl.TLSVersion.TLSv1_2
+              tls_context.check_hostname = True
+              tls_context.verify_mode = ssl.CERT_REQUIRED
+
+              connection = pymysql.connect(
+                  host=os.environ["TIDB_HOST"],
+                  port=int(os.environ["TIDB_PORT"]),
+                  user=os.environ["TIDB_USER"],
+                  password=os.environ["TIDB_PASSWORD"],
+                  database=os.environ["TIDB_DATABASE"],
+                  ssl=tls_context,
+                  connect_timeout=15,
+                  read_timeout=15,
+                  write_timeout=15,
+                  autocommit=True,
+              )
+
+              with connection.cursor() as cursor:
+                  cursor.execute("SELECT DATABASE(), VERSION()")
+                  database_name, server_version = cursor.fetchone()
+                  if database_name != "jim_db":
+                      raise RuntimeError("Connected database did not match jim_db.")
+
+                  # Session-scoped temporary table: it is automatically discarded
+                  # when this connection closes and leaves no persistent schema/data.
+                  cursor.execute(
+                      "CREATE TEMPORARY TABLE _luckread_tidb_probe "
+                      "(probe_id BIGINT PRIMARY KEY, marker VARCHAR(32) NOT NULL)"
+                  )
+                  cursor.execute(
+                      "INSERT INTO _luckread_tidb_probe (probe_id, marker) VALUES (1, 'luckread-ok')"
+                  )
+                  cursor.execute(
+                      "SELECT marker FROM _luckread_tidb_probe WHERE probe_id = 1"
+                  )
+                  row = cursor.fetchone()
+                  if not row or row[0] != "luckread-ok":
+                      raise RuntimeError("Temporary table round-trip did not return the expected marker.")
+                  cursor.execute("DROP TEMPORARY TABLE _luckread_tidb_probe")
+
+              print("TIDB_CONNECTION_OK")
+              print("database=jim_db")
+              print("tls=verified (certificate chain and hostname)")
+              print("temporary_table_round_trip=OK (no persistent table created)")
+              print("server_version=" + str(server_version).splitlines()[0][:80])
+          except Exception as error:
+              # Do not print exception text: database drivers may include connection
+              # metadata. Emit only a safe error class and MySQL numeric code if present.
+              code = error.args[0] if getattr(error, "args", None) and isinstance(error.args[0], int) else "n/a"
+              print(
+                  "TIDB_CONNECTION_FAILED: "
+                  + type(error).__name__
+                  + " (code="
+                  + str(code)
+                  + ")",
+                  file=sys.stderr,
+              )
+              raise SystemExit(1)
+          finally:
+              if connection is not None:
+                  connection.close()
+          PY
