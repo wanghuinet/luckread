@@ -103,8 +103,39 @@ test('connects billing history, refund requests and authenticated navigation in 
   expect(screen).toContain('支付服务商的签名回调');
   expect(screen).toContain('createIdempotencyKey');
   expect(screen).toContain("status === 'FAILED'");
-  expect(screen).toContain('refundIdempotencyKeys.current.delete(item.paymentId)');
+  expect(screen).toContain('refundIdempotencyKeys.current.delete(refundIdempotencyScope)');
   expect(drawer).toContain("router.push('/billing' as never)");
   expect(drawer).toContain('name="billing"');
   expect(workflow).toContain('bun run test:billing-api');
+});
+
+test('propagates cancellation signals to payment and refund history page reads', async () => {
+  const controller = new AbortController();
+  await fetchPaymentHistoryPage({ limit: 10, signal: controller.signal });
+  await fetchRefundHistoryPage({ limit: 10, signal: controller.signal });
+
+  expect(calls).toHaveLength(2);
+  expect(calls[0]?.options.signal).toBe(controller.signal);
+  expect(calls[1]?.options.signal).toBe(controller.signal);
+});
+
+test('isolates billing records and refund callbacks on direct account switches', () => {
+  const screen = readFileSync(new URL('../app/(drawer)/billing.tsx', import.meta.url), 'utf8');
+
+  expect(screen).toContain("const viewerId = useAuthStore((state) => state.user?.id ?? null);");
+  expect(screen).toContain('useLayoutEffect(() => {');
+  expect(screen).toContain("authStatus === 'authenticated' && !viewerId");
+  expect(screen).toContain('previousViewerIdRef.current !== viewerId');
+  expect(screen).toContain('billingDataViewerIdRef.current = null;');
+  expect(screen).toContain('const visibleDocuments = isCurrentViewerData ? documents : [];');
+  expect(screen).toContain('const visiblePayments = isCurrentViewerData ? payments : [];');
+  expect(screen).toContain('const visibleRefunds = isCurrentViewerData ? refunds : [];');
+  expect(screen).toContain('paginationRequestRef.current?.abort();');
+  expect(screen).toContain('signal: controller.signal');
+  expect(screen).toContain('viewerIdRef.current === requestViewerId');
+  expect(screen).toContain('billingDataViewerIdRef.current === requestViewerId');
+  expect(screen).toContain("const refundIdempotencyScope = requestViewerId + ':' + item.paymentId");
+  expect(screen).toContain('if (!isCurrentViewer()) return;');
+  expect(screen).toContain("refundBusyKey === viewerId + ':' + item.paymentId");
+  expect(screen).toContain('setRefundBusyKey(null)');
 });
