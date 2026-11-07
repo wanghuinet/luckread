@@ -1,6 +1,14 @@
-import type { ComponentType } from 'react';
+import {
+  createRef,
+  useCallback,
+  useRef,
+  type ComponentRef,
+  type ComponentType,
+  type RefObject,
+} from 'react';
 import { Tabs } from 'expo-router';
-import { type StyleProp, type ViewStyle } from 'react-native';
+import { Platform, View, type StyleProp, type ViewStyle } from 'react-native';
+import { BlurTargetView } from 'expo-blur';
 import Foundation from '@expo/vector-icons/Foundation';
 import { useColorScheme } from 'nativewind';
 import type { SvgProps } from 'react-native-svg';
@@ -53,6 +61,18 @@ function TabNavigator() {
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
   const { tabBarTranslateY } = useTabBarScrollState();
+  const blurTargetRefs = useRef(
+    new Map<string, RefObject<ComponentRef<typeof View> | null>>(),
+  ).current;
+  const getBlurTargetRef = useCallback((routeName: string) => {
+    let targetRef = blurTargetRefs.get(routeName);
+    if (!targetRef) {
+      targetRef = createRef<ComponentRef<typeof View> | null>();
+      blurTargetRefs.set(routeName, targetRef);
+    }
+    return targetRef;
+  }, [blurTargetRefs]);
+
   // Keep LuckRead's proven full hide/reveal behavior. The upstream component
   // owns the floating glass UI; this animated style only supplies app scroll state.
   const tabBarAnimationStyle = {
@@ -62,6 +82,13 @@ function TabNavigator() {
   return (
     <Tabs
       screenOptions={{ headerShown: false }}
+      screenLayout={({ children, route }) => (
+        Platform.OS === 'android' ? (
+          <BlurTargetView ref={getBlurTargetRef(route.name)} style={{ flex: 1 }}>
+            {children}
+          </BlurTargetView>
+        ) : children
+      )}
       tabBar={(props) => {
         // Preserve the existing immersive video route behavior.
         if (props.state.routes[props.state.index]?.name === '(video)') return null;
@@ -73,11 +100,21 @@ function TabNavigator() {
           emitter: props.emitter,
           navigateToTab: props.navigateToTab,
         });
+        const activeRouteName = props.state.routes[props.state.index]?.name;
+        const blurTargetRef = activeRouteName ? getBlurTargetRef(activeRouteName) : undefined;
 
         return (
           <FloatingGlassTabBar
             {...props}
             navigation={navigation}
+            blurProps={
+              Platform.OS === 'android' && blurTargetRef
+                ? {
+                    blurMethod: 'dimezisBlurViewSdk31Plus',
+                    blurTarget: blurTargetRef,
+                  }
+                : undefined
+            }
             tabs={LuckReadTabs}
             labelMode="none"
             iconSize={26}
