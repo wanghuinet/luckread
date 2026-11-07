@@ -124,6 +124,7 @@ test('isolates billing records and refund callbacks on direct account switches',
 
   expect(screen).toContain("const viewerId = useAuthStore((state) => state.user?.id ?? null);");
   expect(screen).toContain('useLayoutEffect(() => {');
+  expect(screen).toContain("authStatus === 'authenticated' && !viewerId");
   expect(screen).toContain('previousViewerIdRef.current !== viewerId');
   expect(screen).toContain('billingDataViewerIdRef.current = null;');
   expect(screen).toContain('const visibleDocuments = isCurrentViewerData ? documents : [];');
