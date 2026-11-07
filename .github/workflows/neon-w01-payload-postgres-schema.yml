@@ -95,6 +95,54 @@ jobs:
           PAYLOAD_SCHEMA_REPORT: artifacts/neon/w01-payload-postgres-schema.json
         run: pnpm run neon:schema:verify
 
+      - name: Create second disposable database for rollback guard testing
+        env:
+          PGPASSWORD: postgres
+        run: createdb -h 127.0.0.1 -p 5432 -U postgres luckread_schema_rollback
+
+      - name: Apply W01 baseline to rollback guard test database
+        working-directory: workers/W01-payload
+        env:
+          NODE_ENV: development
+          PAYLOAD_SECRET: schema-generation-only-not-a-runtime-secret
+          PAYLOAD_SCHEMA_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/luckread_schema_rollback
+          PAYLOAD_CONFIG_PATH: src/neon-postgres-schema.config.ts
+        run: pnpm run neon:schema:apply
+
+      - name: Insert synthetic business row to exercise rollback protection
+        env:
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          psql "postgresql://postgres:postgres@127.0.0.1:5432/luckread_schema_rollback" \\
+            -v ON_ERROR_STOP=1 \\
+            -c "INSERT INTO public.payload_kv (key, data) VALUES ('neon-payload-rollback-guard-fixture', '{}'::jsonb);"
+
+      - name: Confirm Payload migrate:down refuses to drop a non-empty schema
+        working-directory: workers/W01-payload
+        env:
+          NODE_ENV: development
+          PAYLOAD_SECRET: schema-generation-only-not-a-runtime-secret
+          PAYLOAD_SCHEMA_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/luckread_schema_rollback
+          PAYLOAD_CONFIG_PATH: src/neon-postgres-schema.config.ts
+        shell: bash
+        run: |
+          set -euo pipefail
+          if pnpm run neon:schema:rollback > /tmp/w01-payload-rollback.log 2>&1; then
+            cat /tmp/w01-payload-rollback.log
+            echo "ERROR: Payload migrate:down unexpectedly succeeded with business data present."
+            exit 1
+          fi
+          cat /tmp/w01-payload-rollback.log
+          grep -F "W01_PAYLOAD_BASELINE_ROLLBACK_REFUSED" /tmp/w01-payload-rollback.log
+
+      - name: Verify schema and synthetic row survived blocked rollback
+        working-directory: workers/W01-payload
+        env:
+          PAYLOAD_SCHEMA_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/luckread_schema_rollback
+          PAYLOAD_SCHEMA_ROLLBACK_REPORT: artifacts/neon/w01-payload-rollback-guard.json
+        run: pnpm run neon:schema:verify-rollback
+
       - name: Upload generated SQL and schema evidence
         uses: actions/upload-artifact@v4
         with:
@@ -102,6 +150,7 @@ jobs:
           path: |
             workers/W01-payload/src/neon-postgres-migrations/
             workers/W01-payload/artifacts/neon/w01-payload-postgres-schema.json
+            workers/W01-payload/artifacts/neon/w01-payload-rollback-guard.json
           if-no-files-found: error
           retention-days: 30
 
