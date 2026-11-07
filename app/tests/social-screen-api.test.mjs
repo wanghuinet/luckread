@@ -9,6 +9,7 @@ const profileScreenSource = readFileSync(resolve(process.cwd(), 'app/(drawer)/(t
 const rootLayoutSource = readFileSync(new URL('../app/_layout.tsx', import.meta.url), 'utf8');
 const notificationsScreenSource = readFileSync(new URL('../app/(drawer)/(tabs)/(notifications)/notifications.tsx', import.meta.url), 'utf8');
 const searchScreenSource = readFileSync(new URL('../app/(drawer)/(tabs)/(search)/search.tsx', import.meta.url), 'utf8');
+const subscriptionsScreenSource = readFileSync(resolve(process.cwd(), 'app/(drawer)/subscriptions.tsx'), 'utf8');
 
 const calls = [];
 let keyCounter = 0;
@@ -70,6 +71,22 @@ test('notification inbox data, actor cache, and pending reads are isolated when 
   expect(notificationsScreenSource).toContain('const currentReadAllBusy = isCurrentViewerData && readAllBusy;');
 });
 
+
+test('subscriptions and saved payment methods are isolated on direct account switches', () => {
+  expect(subscriptionsScreenSource).toContain("const viewerId = useAuthStore((state) => state.user?.id ?? null);");
+  expect(subscriptionsScreenSource).toContain('const viewerIdRef = useRef<string | null>(viewerId);');
+  expect(subscriptionsScreenSource).toContain('const currentItems = isCurrentSubscriptionData ? items : EMPTY_SUBSCRIPTIONS;');
+  expect(subscriptionsScreenSource).toContain('const currentPaymentMethods = isCurrentPaymentMethodData ? paymentMethods : EMPTY_PAYMENT_METHODS;');
+  expect(subscriptionsScreenSource).toContain('viewerIdRef.current = viewerId;');
+  expect(subscriptionsScreenSource).toContain('if (previousViewerIdRef.current !== viewerId)');
+  expect(subscriptionsScreenSource).toContain('requestRef.current?.abort();');
+  expect(subscriptionsScreenSource).toContain('paymentMethodRequestRef.current?.abort();');
+  expect(subscriptionsScreenSource).toContain('paymentMethodIdempotencyKeys.current.clear();');
+  expect(subscriptionsScreenSource).toContain('viewerIdRef.current === requestViewerId');
+  expect(subscriptionsScreenSource).toContain('}, [authStatus, viewerId]);');
+  expect(subscriptionsScreenSource).toContain('currentPaymentMethods.map((method) => (');
+  expect(subscriptionsScreenSource).toContain('data={currentItems}');
+});
 
 test('search screens cancel stale requests and ignore out-of-order responses', () => {
   expect(searchScreenSource).toContain('const contentRequestIdRef = useRef(0);');
