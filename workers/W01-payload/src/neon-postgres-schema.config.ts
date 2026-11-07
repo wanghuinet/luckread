@@ -27,6 +27,9 @@ const localSchemaTarget =
   new Set(['/luckread_schema', '/luckread_schema_rollback']).has(parsedDatabaseUrl.pathname)
 const neonD101Target =
   process.env.NEON_SCHEMA_APPLY === 'true' &&
+  process.env.GITHUB_ACTIONS === 'true' &&
+  process.env.GITHUB_REF === 'refs/heads/main' &&
+  process.env.GITHUB_EVENT_NAME === 'workflow_dispatch' &&
   ['postgres:', 'postgresql:'].includes(parsedDatabaseUrl.protocol) &&
   parsedDatabaseUrl.hostname.endsWith('.neon.tech') &&
   parsedDatabaseUrl.pathname === '/luckread' &&
