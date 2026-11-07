@@ -53,7 +53,7 @@ test('notification inbox data, actor cache, and pending reads are isolated when 
   expect(notificationsScreenSource).toContain("const viewerId = useAuthStore((state) => state.user?.id ?? null);");
   expect(notificationsScreenSource).toContain('const currentItems = isCurrentViewerData ? items : EMPTY_NOTIFICATIONS;');
   expect(notificationsScreenSource).toContain('const currentActorProfiles = isCurrentViewerData ? actorProfiles : EMPTY_PUBLIC_PROFILES;');
-  expect(notificationsScreenSource).toContain('viewerIdRef.current = viewerId;');
+  expect(notificationsScreenSource).toContain('useLayoutEffect(() => {\n    viewerIdRef.current = viewerId;\n  }, [viewerId]);');
   expect(notificationsScreenSource).toContain('previousViewerIdRef.current = viewerId;');
   expect(notificationsScreenSource).toContain('requestedActorsRef.current.clear();');
   expect(notificationsScreenSource).toContain('handledDeepLinkIdRef.current = null;');
