@@ -41,9 +41,9 @@ test('uses the pinned upstream floating glass tab bar without replacing LuckRead
 });
 
 test('keeps Expo Router tab scenes inside their native navigation context', () => {
-  // Tab screens call React Navigation focus hooks. A custom screenLayout native
-  // wrapper sits outside that context on this Expo Router version and breaks
-  // Search / Notifications rendering, so keep scene ownership with the navigator.
+  // Use Expo Router's route-tree-aware focus hook so shared tab screens attach
+  // focus effects to the same navigation context that owns the route scenes.
+  // Keep scene ownership with the navigator; do not add a custom screenLayout.
   expect(tabLayoutSource).toContain('tabBar={(props) => {');
   expect(tabLayoutSource).toContain('createExpoRouterTabBarNavigation({');
   expect(tabLayoutSource).toContain('emitter: props.emitter');
@@ -55,7 +55,8 @@ test('keeps Expo Router tab scenes inside their native navigation context', () =
   expect(tabLayoutSource).not.toContain('BlurTargetView');
   expect(tabLayoutSource).not.toContain('blurProps=');
   expect(tabLayoutSource).not.toContain('Platform.OS');
-  expect(tabBarScrollSource).toContain("import { useFocusEffect } from '@react-navigation/native';");
+  expect(tabBarScrollSource).toContain("import { useFocusEffect } from 'expo-router';");
+  expect(tabBarScrollSource).not.toContain("import { useFocusEffect } from '@react-navigation/native';");
 });
 
 test('adapts Expo Router 58 tab events to the glass tab bar emitter contract', () => {
