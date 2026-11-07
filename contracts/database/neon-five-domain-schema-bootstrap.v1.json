@@ -36,7 +36,12 @@
     {
       "domainId": "D1-01",
       "databaseName": "luckread",
-      "owners": ["W01", "W02", "W07", "W08"],
+      "owners": [
+        "W01",
+        "W02",
+        "W07",
+        "W08"
+      ],
       "schemaSources": [
         "workers/W01-payload/src/collections",
         "workers/W01-payload/src/migrations",
@@ -44,12 +49,17 @@
         "workers/W07-subscription-commerce/migrations",
         "workers/W08-creator/migrations"
       ],
-      "status": "PENDING_SCHEMA_GENERATION"
+      "status": "SOURCE_INVENTORY_ADMISSION",
+      "sourceInventoryContract": "contracts/database/neon-d1-01-schema-sources.v1.json",
+      "sourceInventoryWorkflow": ".github/workflows/neon-d1-01-schema-source-inventory.yml"
     },
     {
       "domainId": "D1-02",
       "databaseName": "luckreadpro",
-      "owners": ["W03", "W05"],
+      "owners": [
+        "W03",
+        "W05"
+      ],
       "schemaSources": [
         "workers/W03-content/migrations",
         "workers/W05-social/migrations"
@@ -59,7 +69,11 @@
     {
       "domainId": "D1-03",
       "databaseName": "luckread_governance",
-      "owners": ["W05", "W06", "W09"],
+      "owners": [
+        "W05",
+        "W06",
+        "W09"
+      ],
       "schemaSources": [
         "workers/W05-social",
         "workers/W06-governance/migrations",
@@ -70,7 +84,9 @@
     {
       "domainId": "D1-04",
       "databaseName": "luckread_finance",
-      "owners": ["W07"],
+      "owners": [
+        "W07"
+      ],
       "schemaSources": [
         "workers/W07-subscription-commerce/migrations-d1-04"
       ],
@@ -79,7 +95,9 @@
     {
       "domainId": "D1-05",
       "databaseName": "allluck",
-      "owners": ["W11"],
+      "owners": [
+        "W11"
+      ],
       "schemaSources": [
         "workers/W11-growth-campaign-analytics-operations/migrations"
       ],
@@ -108,7 +126,13 @@
     "runtimeRoleCanRunDdl": false,
     "migrationRoleSeparatedFromRuntime": true
   },
-  "executionOrder": ["D1-01", "D1-02", "D1-03", "D1-04", "D1-05"],
+  "executionOrder": [
+    "D1-01",
+    "D1-02",
+    "D1-03",
+    "D1-04",
+    "D1-05"
+  ],
   "stopConditions": [
     "unexpected target objects",
     "unknown schema source or domain owner",
