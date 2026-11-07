@@ -1,10 +1,12 @@
 
-const { getDefaultConfig } = require("expo/metro-config");
+const { getPostHogExpoConfig } = require('posthog-react-native/metro');
 const { withNativeWind } = require('nativewind/metro');
 
 /** @type {import('expo/metro-config').MetroConfig} */
 
-const config = getDefaultConfig(__dirname);
+// Inject PostHog debug IDs into Expo/Hermes bundles so uploaded source maps
+// can be matched to runtime exceptions in Error Tracking.
+const config = getPostHogExpoConfig(__dirname);
 
 const { transformer, resolver } = config;
 
