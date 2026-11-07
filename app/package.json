@@ -10,7 +10,7 @@
     "lint": "eslint \"**/*.{js,jsx,ts,tsx}\" && prettier -c \"**/*.{js,jsx,ts,tsx,json}\"",
     "format": "eslint \"**/*.{js,jsx,ts,tsx}\" --fix && prettier \"**/*.{js,jsx,ts,tsx,json}\" --write",
     "web": "expo start --web",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "node ./node_modules/@typescript/native/bin/tsc --noEmit",
     "test:api-client": "bun test tests/api-client.test.mjs",
     "check:api-boundary": "node scripts/verify-api-client-boundary.mjs",
     "check:compat": "expo install --check",
@@ -33,7 +33,7 @@
     "test:image-upload-preparation": "bun test tests/image-upload-preparation.test.mjs",
     "test:network-status": "bun test tests/network-status.test.mjs",
     "test:push-notifications": "bun test tests/push-notifications.test.mjs",
-    "typecheck:ts6": "tsc6 --noEmit"
+    "typecheck:ts6": "tsc --noEmit"
   },
   "dependencies": {
     "@codeherence/react-native-header": "^0.14.0",
@@ -118,7 +118,7 @@
     "prettier": "^3.2.5",
     "prettier-plugin-tailwindcss": "^0.5.11",
     "tailwindcss": "^3.4.0",
-    "typescript": "npm:@typescript/typescript6@6.0.2",
+    "typescript": "~6.0.3",
     "@typescript/native": "npm:typescript@7.0.2"
   },
   "eslintConfig": {
