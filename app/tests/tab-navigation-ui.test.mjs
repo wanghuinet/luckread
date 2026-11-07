@@ -187,8 +187,11 @@ test('home feed renders first-page projections while optional detail hydration r
   expect(homeScreen).toContain('<Tabs.FlatList');
   expect(homeScreen).toContain('data={items}');
 
-  // Body, social and author reads are optional, independent enrichment.
-  expect(homeScreen).toContain('const pendingRecords = records.filter((item) => !hydratedIdsRef.current.has(item.id));');
+  // Hydration is limited to cards that entered the visible list window.
+  expect(homeScreen).toContain('const pendingRecords = selectVisibleFeedHydrationRecords(');
+  expect(homeScreen).toContain('const visibleContentIds = hydrationTargets.scope === hydrationScope ? hydrationTargets.ids : [];');
+  expect(homeScreen).toContain('onViewableItemsChanged={onViewableItemsChanged}');
+  expect(homeScreen).toContain('viewabilityConfig={viewabilityConfig}');
   expect(homeScreen).toContain('const results = await Promise.allSettled(pendingRecords.map(async (item) => {');
   expect(homeScreen).toContain('readContentBody(item, undefined, sessionToken)');
   expect(homeScreen).toContain('readContentSocial(item.id)');
