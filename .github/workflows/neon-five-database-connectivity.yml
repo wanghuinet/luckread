@@ -37,11 +37,11 @@ jobs:
       - name: Inspect all five Neon targets without changing schemas or data
         shell: bash
         env:
-          NEON_DATABASE_URL_LUCKREAD: \${{ secrets.NEON_DATABASE_URL_LUCKREAD }}
-          NEON_DATABASE_URL_LUCKREADPRO: \${{ secrets.NEON_DATABASE_URL_LUCKREADPRO }}
-          NEON_DATABASE_URL_GOVERNANCE: \${{ secrets.NEON_DATABASE_URL_GOVERNANCE }}
-          NEON_DATABASE_URL_FINANCE: \${{ secrets.NEON_DATABASE_URL_FINANCE }}
-          NEON_DATABASE_URL_ALLLUCK: \${{ secrets.NEON_DATABASE_URL_ALLLUCK }}
+          NEON_DATABASE_URL_LUCKREAD: ${{ secrets.NEON_DATABASE_URL_LUCKREAD }}
+          NEON_DATABASE_URL_LUCKREADPRO: ${{ secrets.NEON_DATABASE_URL_LUCKREADPRO }}
+          NEON_DATABASE_URL_GOVERNANCE: ${{ secrets.NEON_DATABASE_URL_GOVERNANCE }}
+          NEON_DATABASE_URL_FINANCE: ${{ secrets.NEON_DATABASE_URL_FINANCE }}
+          NEON_DATABASE_URL_ALLLUCK: ${{ secrets.NEON_DATABASE_URL_ALLLUCK }}
         run: |
           set -euo pipefail
           cd "$RUNNER_TEMP/neon-preflight"
