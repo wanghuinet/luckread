@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -49,6 +49,12 @@ const PRIMARY = '#1d9bf0';
 const SEARCH_PAGE_SIZE = 20;
 
 export default function Search() {
+  const contentRequestIdRef = useRef(0);
+  const contentAbortRef = useRef<AbortController | null>(null);
+  const userRequestIdRef = useRef(0);
+  const userAbortRef = useRef<AbortController | null>(null);
+  const topicsRequestIdRef = useRef(0);
+  const topicsAbortRef = useRef<AbortController | null>(null);
   const tabBarScroll = useTabBarScroll();
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
@@ -74,17 +80,31 @@ export default function Search() {
     const query = (queryValue ?? contentInput).trim();
     Keyboard.dismiss();
     setContentSearchSubmitted(true);
+
+    const requestId = ++contentRequestIdRef.current;
+    contentAbortRef.current?.abort();
+    contentAbortRef.current = null;
+
     if (!query) {
       setContentResults([]);
       setContentCursor(null);
       setContentHasMore(false);
+      setContentBusy(false);
+      setContentLoadingMore(false);
       setContentError('请输入要搜索的内容。');
       return;
     }
 
-    if (append) setContentLoadingMore(true);
-    else {
+    const controller = new AbortController();
+    contentAbortRef.current = controller;
+    const isCurrent = () => requestId === contentRequestIdRef.current && !controller.signal.aborted;
+
+    if (append) {
+      setContentLoadingMore(true);
+      setContentBusy(false);
+    } else {
       setContentBusy(true);
+      setContentLoadingMore(false);
       setContentResults([]);
       setContentCursor(null);
     }
@@ -94,7 +114,9 @@ export default function Search() {
       const result = await fetchContentSearchPage(query, {
         cursor: append ? contentCursor : null,
         limit: SEARCH_PAGE_SIZE,
+        signal: controller.signal,
       });
+      if (!isCurrent()) return;
       if (!result.response.ok) {
         throw new Error(getApiErrorMessage(result.data, '搜索暂时不可用，请稍后重试。', result.response.status));
       }
@@ -103,6 +125,7 @@ export default function Search() {
         throw new Error('搜索接口返回的数据格式无效。');
       }
       const sessionToken = await readSessionToken().catch(() => null);
+      if (!isCurrent()) return;
       const mapped = await Promise.all(
         page.items
           .filter((item): item is ApiContentRecord => Boolean(item && typeof item.id === 'string'))
@@ -116,6 +139,7 @@ export default function Search() {
             return mapContentToFeedContent(item, undefined, social, author, sessionToken);
           }),
       );
+      if (!isCurrent()) return;
       setContentResults((current) => {
         if (!append) return mapped;
         const known = new Set(current.map((item) => item.contentId));
@@ -124,18 +148,29 @@ export default function Search() {
       setContentCursor(page.nextCursor || null);
       setContentHasMore(page.hasMore === true);
     } catch (cause) {
+      if (!isCurrent()) return;
       setContentError(cause instanceof Error ? cause.message : '搜索暂时不可用，请稍后重试。');
     } finally {
-      setContentBusy(false);
-      setContentLoadingMore(false);
+      if (isCurrent()) {
+        setContentBusy(false);
+        setContentLoadingMore(false);
+        if (contentAbortRef.current === controller) contentAbortRef.current = null;
+      }
     }
   }, [contentCursor, contentInput]);
 
   const loadTopics = useCallback(async () => {
+    const requestId = ++topicsRequestIdRef.current;
+    topicsAbortRef.current?.abort();
+    const controller = new AbortController();
+    topicsAbortRef.current = controller;
+    const isCurrent = () => requestId === topicsRequestIdRef.current && !controller.signal.aborted;
+
     setTopicsLoading(true);
     setTopicsError('');
     try {
-      const result = await fetchDiscoveryTopics();
+      const result = await fetchDiscoveryTopics(controller.signal);
+      if (!isCurrent()) return;
       if (!result.response.ok) {
         throw new Error(getApiErrorMessage(result.data, '专题暂时无法加载。', result.response.status));
       }
@@ -145,9 +180,13 @@ export default function Search() {
       }
       setTopics(page.items);
     } catch (cause) {
+      if (!isCurrent()) return;
       setTopicsError(cause instanceof Error ? cause.message : '专题暂时无法加载。');
     } finally {
-      setTopicsLoading(false);
+      if (isCurrent()) {
+        setTopicsLoading(false);
+        if (topicsAbortRef.current === controller) topicsAbortRef.current = null;
+      }
     }
   }, []);
 
@@ -155,20 +194,41 @@ export default function Search() {
     void loadTopics();
   }, [loadTopics]);
 
+  useEffect(() => {
+    return () => {
+      contentRequestIdRef.current += 1;
+      contentAbortRef.current?.abort();
+      userRequestIdRef.current += 1;
+      userAbortRef.current?.abort();
+      topicsRequestIdRef.current += 1;
+      topicsAbortRef.current?.abort();
+    };
+  }, []);
+
   const findUser = useCallback(async () => {
     const username = usernameInput.trim().replace(/^@/, '');
     Keyboard.dismiss();
+
+    const requestId = ++userRequestIdRef.current;
+    userAbortRef.current?.abort();
+    userAbortRef.current = null;
     setUserResult(null);
     setUserError('');
     if (!username) {
+      setUserBusy(false);
       setUserError('请输入完整用户名。');
       return;
     }
 
+    const controller = new AbortController();
+    userAbortRef.current = controller;
+    const isCurrent = () => requestId === userRequestIdRef.current && !controller.signal.aborted;
+
     setUserBusy(true);
     try {
       // Keep username lookup separate from public-content search results.
-      const result = await findPublicUserByUsername(username);
+      const result = await findPublicUserByUsername(username, controller.signal);
+      if (!isCurrent()) return;
       if (!result.response.ok) {
         if (result.response.status === 404) {
           throw new Error('没有找到这个用户名对应的公开资料。');
@@ -179,9 +239,13 @@ export default function Search() {
       if (!profile?.id) throw new Error('用户资料返回的数据格式无效。');
       setUserResult(profile);
     } catch (cause) {
+      if (!isCurrent()) return;
       setUserError(cause instanceof Error ? cause.message : '暂时无法查找该用户。');
     } finally {
-      setUserBusy(false);
+      if (isCurrent()) {
+        setUserBusy(false);
+        if (userAbortRef.current === controller) userAbortRef.current = null;
+      }
     }
   }, [usernameInput]);
 

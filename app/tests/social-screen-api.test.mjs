@@ -8,6 +8,7 @@ const postDetailSource = readFileSync(new URL('../app/(drawer)/(tabs)/(index,sea
 const profileScreenSource = readFileSync(resolve(process.cwd(), 'app/(drawer)/(tabs)/(index,search,messages,grok,video,notifications)/profile/[id].tsx'), 'utf8');
 const rootLayoutSource = readFileSync(new URL('../app/_layout.tsx', import.meta.url), 'utf8');
 const notificationsScreenSource = readFileSync(new URL('../app/(drawer)/(tabs)/(notifications)/notifications.tsx', import.meta.url), 'utf8');
+const searchScreenSource = readFileSync(new URL('../app/(drawer)/(tabs)/(search)/search.tsx', import.meta.url), 'utf8');
 
 const calls = [];
 let keyCounter = 0;
@@ -35,6 +36,7 @@ const {
   fetchUserLikedContentsPage,
   fetchUserRepliesPage,
   fetchUserProfileContentPage,
+  fetchContentSearchPage,
   findPublicUserByUsername,
   markAllNotificationsRead,
   markNotificationRead,
@@ -68,6 +70,22 @@ test('notification inbox data, actor cache, and pending reads are isolated when 
   expect(notificationsScreenSource).toContain('const currentReadAllBusy = isCurrentViewerData && readAllBusy;');
 });
 
+
+test('search screens cancel stale requests and ignore out-of-order responses', () => {
+  expect(searchScreenSource).toContain('const contentRequestIdRef = useRef(0);');
+  expect(searchScreenSource).toContain('const userRequestIdRef = useRef(0);');
+  expect(searchScreenSource).toContain('const topicsRequestIdRef = useRef(0);');
+  expect(searchScreenSource).toContain('contentAbortRef.current?.abort();');
+  expect(searchScreenSource).toContain('userAbortRef.current?.abort();');
+  expect(searchScreenSource).toContain('topicsAbortRef.current?.abort();');
+  expect(searchScreenSource).toContain('signal: controller.signal,');
+  expect(searchScreenSource).toContain('findPublicUserByUsername(username, controller.signal)');
+  expect(searchScreenSource).toContain('fetchDiscoveryTopics(controller.signal)');
+  expect(searchScreenSource).toContain('if (!isCurrent()) return;');
+  expect(searchScreenSource).toContain('contentRequestIdRef.current += 1;');
+  expect(searchScreenSource).toContain('userRequestIdRef.current += 1;');
+  expect(searchScreenSource).toContain('topicsRequestIdRef.current += 1;');
+});
 
 test('loads the first notification page through the shared client', async () => {
   await fetchNotificationsPage();
@@ -234,6 +252,21 @@ test('normalizes @-prefixed usernames and encodes exact username lookup', async 
 
   expect(calls[0].path).toBe('/users/by-username/Alice%20Smith');
   expect(calls[0].options.method).toBe('GET');
+});
+
+test('supports abortable content search with cursor pagination', async () => {
+  const controller = new AbortController();
+  await fetchContentSearchPage('  reading query  ', {
+    cursor: 'search-next',
+    limit: 12,
+    signal: controller.signal,
+  });
+
+  expect(calls).toHaveLength(1);
+  expect(calls[0].path).toBe('/search?q=reading+query&limit=12&cursor=search-next');
+  expect(calls[0].options.method).toBe('GET');
+  expect(calls[0].options.auth).toBe(false);
+  expect(calls[0].options.signal).toBe(controller.signal);
 });
 
 test('loads recent public discovery topics with the existing limit', async () => {
