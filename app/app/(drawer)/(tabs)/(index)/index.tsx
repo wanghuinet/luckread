@@ -29,6 +29,24 @@ type FeedKind = NativeFeedKind;
 
 const APP_PRIMARY_COLOR = '#1769aa';
 
+function HomeScreenSurface({ children, isDark }: { children: React.ReactNode; isDark: boolean }) {
+  const style = [styles.container, { backgroundColor: isDark ? '#000000' : '#ffffff' }];
+
+  // Keep the native BlurView as a separate background sibling. The nested
+  // PagerView/FlatList tree stays outside its native view hierarchy on Android.
+  return (
+    <View style={style} className="flex-1">
+      <BlurView
+        pointerEvents="none"
+        style={StyleSheet.absoluteFill}
+        intensity={80}
+        tint={isDark ? 'dark' : 'light'}
+      />
+      {children}
+    </View>
+  );
+}
+
 const Header = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
@@ -429,7 +447,7 @@ export default function HomeScreen() {
   );
 
   return (
-    <BlurView style={[styles.container, { backgroundColor: isDark ? '#000000' : '#ffffff' }]} className="flex-1" intensity={80} tint={isDark ? 'dark' : 'light'}>
+    <HomeScreenSurface isDark={isDark}>
       <Tabs.Container
         renderHeader={Header}
         renderTabBar={renderTabBar}
@@ -468,7 +486,7 @@ export default function HomeScreen() {
           <Feather name="plus" size={28} color="#ffffff" />
         </Pressable>
       </Animated.View>
-    </BlurView>
+    </HomeScreenSurface>
   );
 }
 
