@@ -13,6 +13,7 @@ on:
 
 permissions:
   contents: read
+  statuses: write
 
 concurrency:
   group: neon-five-database-empty-schema-preflight
@@ -43,6 +44,7 @@ jobs:
             pg@8.16.3
 
       - name: Inspect all five Neon targets without changing schemas or data
+        id: inspect
         shell: bash
         env:
           NEON_DATABASE_URL_LUCKREAD: ${{ secrets.NEON_DATABASE_URL_LUCKREAD }}
@@ -367,6 +369,15 @@ jobs:
               fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary)
             }
 
+            if (process.env.GITHUB_OUTPUT) {
+              fs.appendFileSync(
+                process.env.GITHUB_OUTPUT,
+                'pass_empty_count=' + results.filter((result) => result.status === 'PASS_EMPTY').length + '\n' +
+                'blocked_count=' + results.filter((result) => result.status === 'BLOCKED_NOT_EMPTY').length + '\n' +
+                'failed_count=' + results.filter((result) => result.status === 'FAIL').length + '\n',
+              )
+            }
+
             for (const result of results) {
               console.log(result.name + ': ' + result.status + ' — ' + result.detail)
             }
@@ -386,3 +397,39 @@ jobs:
             process.exitCode = 1
           })
           NODE
+
+      - name: Publish preflight result as a commit status
+        if: always()
+        uses: actions/github-script@v7
+        env:
+          PREFLIGHT_OUTCOME: ${{ steps.inspect.outcome }}
+          PASS_EMPTY_COUNT: ${{ steps.inspect.outputs.pass_empty_count }}
+          BLOCKED_COUNT: ${{ steps.inspect.outputs.blocked_count }}
+          FAILED_COUNT: ${{ steps.inspect.outputs.failed_count }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const passed = Number(process.env.PASS_EMPTY_COUNT || 0)
+            const blocked = Number(process.env.BLOCKED_COUNT || 0)
+            const failed = Number(process.env.FAILED_COUNT || 0)
+            const success =
+              process.env.PREFLIGHT_OUTCOME === 'success' && passed === 5
+            const description = success
+              ? 'PASS_EMPTY ' + passed + '/5'
+              : 'PASS_EMPTY ' + passed + '/5; blocked ' + blocked +
+                '; failed ' + failed + '; inspect workflow run'
+
+            const owner = context.repo.owner
+            const repo = context.repo.repo
+            await github.rest.repos.createCommitStatus({
+              owner,
+              repo,
+              sha: context.sha,
+              state: success ? 'success' : 'failure',
+              context: 'Neon Empty Schema Preflight',
+              description: description.slice(0, 140),
+              target_url:
+                context.serverUrl + '/' + owner + '/' + repo +
+                '/actions/runs/' + context.runId,
+            })
+            core.info('Published Neon Empty Schema Preflight commit status: ' + description)
