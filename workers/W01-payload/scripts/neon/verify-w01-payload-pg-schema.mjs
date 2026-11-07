@@ -7,25 +7,44 @@ const { Pool } = pg
 const scriptDir = path.dirname(fileURLToPath(import.meta.url))
 const packageRoot = path.resolve(scriptDir, '../..')
 const databaseUrl = process.env.PAYLOAD_SCHEMA_DATABASE_URL
+const neonMode = process.env.PAYLOAD_SCHEMA_NEON_VERIFY === 'true'
 
 if (!databaseUrl) throw new Error('PAYLOAD_SCHEMA_DATABASE_URL is required')
 
 const parsedUrl = new URL(databaseUrl)
-const allowedHosts = new Set(['127.0.0.1', 'localhost', 'postgres'])
-if (
-  !allowedHosts.has(parsedUrl.hostname) ||
-  parsedUrl.port !== '5432' ||
-  parsedUrl.pathname !== '/luckread_schema'
-) {
-  throw new Error('Refusing to verify a non-disposable database target')
+const allowedLocalHosts = new Set(['127.0.0.1', 'localhost', 'postgres'])
+const localMode =
+  allowedLocalHosts.has(parsedUrl.hostname) &&
+  parsedUrl.port === '5432' &&
+  parsedUrl.pathname === '/luckread_schema'
+const approvedNeonMode =
+  neonMode &&
+  ['postgres:', 'postgresql:'].includes(parsedUrl.protocol) &&
+  parsedUrl.hostname.endsWith('.neon.tech') &&
+  parsedUrl.pathname === '/luckread' &&
+  ['require', 'verify-ca', 'verify-full'].includes(parsedUrl.searchParams.get('sslmode')) &&
+  parsedUrl.searchParams.get('channel_binding') === 'require'
+
+if (!localMode && !approvedNeonMode) {
+  throw new Error('Refusing to verify a database outside the local schema test or explicit D1-01 Neon target')
 }
 
+const expectedDatabase = neonMode ? 'luckread' : 'luckread_schema'
 const snapshotPath = path.join(
   packageRoot,
   'src/migrations/20261101_163928_username_redirects.json',
 )
 const snapshot = JSON.parse(readFileSync(snapshotPath, 'utf8'))
 const expectedTables = Object.keys(snapshot.tables).sort()
+const expectedColumnsByTable = Object.fromEntries(
+  Object.entries(snapshot.tables).map(([tableName, definition]) => [
+    tableName,
+    Object.keys(definition.columns ?? {}).sort(),
+  ]),
+)
+const expectedIndexNames = Object.values(snapshot.tables)
+  .flatMap((definition) => Object.keys(definition.indexes ?? {}))
+  .sort()
 
 const requiredColumns = {
   users: ['username', 'display_name', 'identity_id', 'reset_password_requested_at'],
@@ -45,26 +64,43 @@ const requiredColumns = {
 const pool = new Pool({
   connectionString: databaseUrl,
   max: 2,
-  connectionTimeoutMillis: 5_000,
+  connectionTimeoutMillis: 10_000,
   idleTimeoutMillis: 1_000,
+  enableChannelBinding: true,
 })
 const failures = []
 const report = {
   reportVersion: 1,
-  scope: 'W01 Payload PostgreSQL schema-only bootstrap against disposable local PostgreSQL; no Neon or D1 production access.',
+  scope: neonMode
+    ? 'W01 Payload PostgreSQL schema postflight against the explicitly approved Neon D1-01 target; no business data import or production Worker switch.'
+    : 'W01 Payload PostgreSQL schema-only bootstrap against disposable local PostgreSQL; no Neon or D1 production access.',
   target: { host: parsedUrl.hostname, database: parsedUrl.pathname.slice(1) },
   productionAuthorityChanged: false,
-  neonConnectionAttempted: false,
+  neonConnectionAttempted: neonMode,
   businessDataImported: false,
 }
 
 try {
+  if (neonMode) {
+    const tlsClient = await pool.connect()
+    try {
+      const tlsSocket = tlsClient.connection?.stream
+      if (tlsSocket?.encrypted !== true || tlsSocket?.authorized !== true) {
+        throw new Error('Neon client TLS verification failed')
+      }
+      await tlsClient.query('SELECT 1')
+    } finally {
+      tlsClient.release()
+    }
+    report.tlsVerified = true
+  }
+
   const server = await pool.query(
     "SELECT current_database() AS database, current_setting('server_version') AS version",
   )
   report.server = server.rows[0]
-  if (report.server.database !== 'luckread_schema' || !String(report.server.version).startsWith('18.')) {
-    throw new Error('Expected disposable PostgreSQL 18 database luckread_schema')
+  if (report.server.database !== expectedDatabase || !String(report.server.version).startsWith('18.')) {
+    throw new Error('Expected PostgreSQL 18 at the exact approved database name')
   }
 
   const tableResult = await pool.query(
@@ -102,6 +138,15 @@ try {
   }
   report.columnsByTable = columnsByTable
 
+  for (const [table, expected] of Object.entries(expectedColumnsByTable)) {
+    const actual = (columnsByTable[table] ?? []).map((column) => column.name).sort()
+    const missing = expected.filter((column) => !actual.includes(column))
+    const unexpected = actual.filter((column) => !expected.includes(column))
+    if (missing.length || unexpected.length) {
+      failures.push({ kind: 'column-catalog-drift', table, missing, unexpected })
+    }
+  }
+
   for (const [table, required] of Object.entries(requiredColumns)) {
     const actual = new Set((columnsByTable[table] ?? []).map((column) => column.name))
     const missing = required.filter((column) => !actual.has(column))
@@ -115,17 +160,9 @@ try {
       ORDER BY tablename, indexname`,
   )
   report.indexes = indexResult.rows
-  const requiredIndexes = [
-    'users_username_idx',
-    'users_email_idx',
-    'users_identity_id_idx',
-    'media_upload_idempotency_key_idx',
-    'redirects_from_idx',
-    'redirects_expires_at_idx',
-  ]
   const actualIndexNames = new Set(indexResult.rows.map((row) => row.index_name))
-  const missingIndexes = requiredIndexes.filter((name) => !actualIndexNames.has(name))
-  if (missingIndexes.length) failures.push({ kind: 'required-index-missing', missingIndexes })
+  const missingIndexes = expectedIndexNames.filter((name) => !actualIndexNames.has(name))
+  if (missingIndexes.length) failures.push({ kind: 'source-index-missing', missingIndexes })
 
   const fkResult = await pool.query(
     `SELECT conrelid::regclass::text AS table_name, conname AS constraint_name,
@@ -149,10 +186,14 @@ try {
 
   const ledger = await pool.query('SELECT COUNT(*)::bigint AS count FROM public.payload_migrations')
   report.payloadMigrationLedgerRows = Number(ledger.rows[0].count)
-  if (report.payloadMigrationLedgerRows < 1) failures.push({ kind: 'payload-migration-ledger-empty' })
+  if (report.payloadMigrationLedgerRows !== 1) {
+    failures.push({ kind: 'payload-migration-ledger-count', expected: 1, actual: report.payloadMigrationLedgerRows })
+  }
 
   report.failures = failures
-  report.status = failures.length === 0 ? 'W01_PAYLOAD_POSTGRES_SCHEMA_PASS' : 'W01_PAYLOAD_POSTGRES_SCHEMA_FAIL'
+  report.status = failures.length === 0
+    ? (neonMode ? 'W01_PAYLOAD_NEON_SCHEMA_PASS' : 'W01_PAYLOAD_POSTGRES_SCHEMA_PASS')
+    : (neonMode ? 'W01_PAYLOAD_NEON_SCHEMA_FAIL' : 'W01_PAYLOAD_POSTGRES_SCHEMA_FAIL')
   const outputPath = process.env.PAYLOAD_SCHEMA_REPORT ?? 'artifacts/neon/w01-payload-postgres-schema.json'
   const absoluteOutput = path.resolve(packageRoot, outputPath)
   mkdirSync(path.dirname(absoluteOutput), { recursive: true })
