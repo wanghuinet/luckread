@@ -22,11 +22,16 @@ import { FeedContent, FeedItem } from '~/components/FeedItem';
 import X from '~/assets/svg/aside/x.svg';
 import { mapContentToFeedContent, readContentBody, readContentSocial, readContentAuthor, type ApiContentRecord } from '~/lib/content-adapter';
 import { fetchNativeFeedPage, incrementNativeFeedReplyCount, nativeFeedQueryKey, type NativeFeedKind, type NativeFeedPage } from '~/lib/feed-query';
+import { selectVisibleFeedHydrationRecords } from '~/lib/feed-hydration';
 import { useAuthStore } from '~/store/auth-store';
 import { readSessionToken } from '~/lib/secure-session';
 import { getXDesignColors, X_DESIGN_TOKENS } from '~/constants/x-design-tokens';
 
 type FeedKind = NativeFeedKind;
+
+type FeedViewabilityInfo = {
+  viewableItems: Array<{ isViewable: boolean; item: unknown }>;
+};
 
 const APP_PRIMARY_COLOR = X_DESIGN_TOKENS.colors.light.primary;
 
@@ -142,6 +147,10 @@ function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSig
     scope: string;
     byId: Record<string, FeedContent>;
   }>({ scope: hydrationScope, byId: {} });
+  const [hydrationTargets, setHydrationTargets] = useState<{
+    scope: string;
+    ids: string[];
+  }>({ scope: hydrationScope, ids: [] });
   // For You list pages remain public/shared, but hydrated social.viewer state is viewer-specific.
   // The scope guard prevents even a one-frame flash from a previous account during switches.
   const hydratedById = hydratedState.scope === hydrationScope ? hydratedState.byId : {};
@@ -149,6 +158,24 @@ function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSig
   const hydrationScopeRef = useRef(hydrationScope);
   const hydrationGenerationRef = useRef(0);
   const mountedRef = useRef(false);
+  const onViewableItemsChanged = useRef(
+    ({ viewableItems }: FeedViewabilityInfo) => {
+      const visibleIds = [...new Set(viewableItems.flatMap(({ isViewable, item }) => {
+        if (!isViewable || !item || typeof item !== 'object' || !('contentId' in item)) return [];
+        const contentId = item.contentId;
+        return typeof contentId === 'string' && contentId ? [contentId] : [];
+      }))];
+      const scope = hydrationScopeRef.current;
+
+      setHydrationTargets((current) => {
+        const unchanged = current.scope === scope &&
+          current.ids.length === visibleIds.length &&
+          current.ids.every((id, index) => id === visibleIds[index]);
+        return unchanged ? current : { scope, ids: visibleIds };
+      });
+    },
+  ).current;
+  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 35 }).current;
   const previousRefreshSignal = useRef(refreshSignal);
 
   useEffect(() => {
@@ -165,10 +192,18 @@ function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSig
     hydrationGenerationRef.current += 1;
     hydratedIdsRef.current.clear();
     setHydratedState({ scope: hydrationScope, byId: {} });
+    // Re-hydrate the currently visible cards for the new viewer without
+    // carrying forward any previously hydrated viewer-specific state.
+    setHydrationTargets((current) => ({ scope: hydrationScope, ids: current.ids }));
   }, [hydrationScope]);
 
   useEffect(() => {
-    const pendingRecords = records.filter((item) => !hydratedIdsRef.current.has(item.id));
+    const visibleContentIds = hydrationTargets.scope === hydrationScope ? hydrationTargets.ids : [];
+    const pendingRecords = selectVisibleFeedHydrationRecords(
+      records,
+      visibleContentIds,
+      hydratedIdsRef.current,
+    );
     if (pendingRecords.length === 0) return;
 
     for (const item of pendingRecords) hydratedIdsRef.current.add(item.id);
@@ -216,7 +251,7 @@ function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSig
         }));
       }
     })();
-  }, [records, hydrationScope]);
+  }, [records, hydrationScope, hydrationTargets]);
 
   useEffect(() => {
     if (previousRefreshSignal.current !== refreshSignal && refreshSignal) {
@@ -394,6 +429,8 @@ function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSig
       refreshing={feedQuery.isRefetching}
       onEndReached={loadMore}
       onEndReachedThreshold={0.5}
+      onViewableItemsChanged={onViewableItemsChanged}
+      viewabilityConfig={viewabilityConfig}
     />
   );
 }

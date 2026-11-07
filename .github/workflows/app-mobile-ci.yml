@@ -23,7 +23,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: app-mobile-ci-${{ github.ref }}
+  group: app-mobile-ci-v2-${{ github.ref }}
   cancel-in-progress: true
 
 env:
@@ -36,6 +36,7 @@ jobs:
     permissions:
       contents: write
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     env:
       EXPO_PROJECT_ID: "00000000-0000-4000-8000-000000000001"
       EXPO_UPDATE_CHANNEL: preview
@@ -165,7 +166,9 @@ jobs:
           grep -Fxq 'networkTimeout=120000' "$WRAPPER_PROPERTIES"
           chmod +x android/gradlew
           cd android
-          ./gradlew generateCodegenArtifactsFromSchema --no-daemon
+          echo "Starting Hyperswitch React Native Codegen (30-minute hard limit)."
+          timeout --signal=TERM --kill-after=60s 30m \
+            ./gradlew generateCodegenArtifactsFromSchema --no-daemon --console=plain --stacktrace --info
           cd ..
           SPEC_ROOT="node_modules/@juspay-tech/react-native-hyperswitch/android/build/generated/source/codegen"
           MODULE_SPEC="$(find "$SPEC_ROOT" -type f -name 'NativeHyperswitchModuleSpec.java' -print -quit)"
@@ -231,6 +234,8 @@ jobs:
         run: bun run test:comment-navigation
       - name: Test native TanStack Query feed cache and pagination
         run: bun run test:feed-query
+      - name: Test visible-first native feed hydration
+        run: bun test tests/feed-hydration.test.mjs
       - name: Test native public content search
         run: bun run test:content-search
       - name: Test native profile pin and unpin actions
