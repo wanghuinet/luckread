@@ -55,6 +55,9 @@ jobs:
       EXPO_UPDATE_CHANNEL: ${{ inputs.channel }}
       LUCKREAD_RUNTIME_VERSION: ${{ inputs.runtime_version }}
       LUCKREAD_REQUIRE_OTA_CONFIG: "1"
+      POSTHOG_CLI_API_KEY: ${{ secrets.POSTHOG_CLI_API_KEY }}
+      POSTHOG_CLI_PROJECT_ID: "715723"
+      POSTHOG_CLI_HOST: "https://us.posthog.com"
     defaults:
       run:
         working-directory: app
@@ -66,6 +69,12 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version: "22.13.1"
+
+      - name: Install and verify PostHog CLI
+        run: |
+          test -n "$POSTHOG_CLI_API_KEY" || { echo "::error::POSTHOG_CLI_API_KEY is required to upload OTA Hermes source maps." >&2; exit 1; }
+          npm install --global @posthog/cli@0.19.0
+          posthog-cli --version
 
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
@@ -214,6 +223,13 @@ jobs:
             --emit-metadata \
             --json \
             > "$RUNNER_TEMP/luckread-eas-update-result.json"
+
+      - name: Upload Expo Hermes source maps to PostHog Error Tracking
+        run: |
+          test -d dist || { echo "::error::EAS Update did not produce the expected dist/ source-map directory." >&2; exit 1; }
+          MAP_COUNT="$(find dist -type f -name '*.map' | wc -l | tr -d ' ')"
+          test "$MAP_COUNT" -gt 0 || { echo "::error::No Hermes/JavaScript source maps were found under dist/; refusing to report OTA diagnostics as symbolicated." >&2; exit 1; }
+          posthog-cli hermes upload --directory dist
 
       - name: Record OTA publication provenance
         env:
