@@ -105,17 +105,23 @@ test('maps glass tab route-name navigation to Expo Router route-key navigation',
   expect(navigatedRouteKeys).toEqual(['search-key']);
 });
 
-test('does not mount the Android home PagerView and feed inside a native BlurView', () => {
+test('keeps native BlurView as an isolated background layer behind the Android home feed', () => {
   const homeScreen = readFileSync(
     new URL('../app/(drawer)/(tabs)/(index)/index.tsx', import.meta.url),
     'utf8',
   );
+  const surfaceStart = homeScreen.indexOf('function HomeScreenSurface');
+  const surfaceEnd = homeScreen.indexOf('const Header =', surfaceStart);
+  const homeSurface = homeScreen.slice(surfaceStart, surfaceEnd);
 
-  expect(homeScreen).toContain("if (Platform.OS === 'android')");
-  expect(homeScreen).toContain('<View style={style} className="flex-1">{children}</View>');
   expect(homeScreen).toContain('<HomeScreenSurface isDark={isDark}>');
-  expect(homeScreen).toContain('<BlurView');
-  expect(homeScreen).toContain('intensity={80}');
+  expect(homeSurface).toContain('<View style={style} className="flex-1">');
+  expect(homeSurface).toContain('<BlurView');
+  expect(homeSurface).toContain('pointerEvents="none"');
+  expect(homeSurface).toContain('style={StyleSheet.absoluteFill}');
+  expect(homeSurface).toContain('intensity={80}');
+  expect(homeSurface.indexOf('<BlurView')).toBeLessThan(homeSurface.indexOf('{children}'));
+  expect(homeScreen).not.toContain("if (Platform.OS === 'android')");
 });
 
 test('does not register or ship the upstream Grok demo route', () => {
