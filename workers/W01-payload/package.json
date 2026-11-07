@@ -27,7 +27,8 @@
     "predeploy:database": "node ../../scripts/w01-remote-migration-admission.mjs",
     "neon:schema:generate": "cross-env NODE_OPTIONS=--no-deprecation PAYLOAD_CONFIG_PATH=src/neon-postgres-schema.config.ts payload migrate:create neon_d1_01_payload_baseline --skip-empty",
     "neon:schema:apply": "cross-env NODE_OPTIONS=--no-deprecation PAYLOAD_CONFIG_PATH=src/neon-postgres-schema.config.ts payload migrate",
-    "neon:schema:verify": "node scripts/neon/verify-w01-payload-pg-schema.mjs"
+    "neon:schema:verify": "node scripts/neon/verify-w01-payload-pg-schema.mjs",
+    "neon:schema:verify-rollback": "node scripts/neon/verify-w01-payload-pg-rollback.mjs"
   },
   "dependencies": {
     "@opennextjs/cloudflare": "1.20.1",
