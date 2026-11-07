@@ -40,9 +40,10 @@ test('uses the pinned upstream floating glass tab bar without replacing LuckRead
   expect(tabLayoutSource).toContain("if (props.state.routes[props.state.index]?.name === '(video)') return null;");
 });
 
-test('uses the upstream tab bar with Expo native Android blur targets', () => {
-  // Match the upstream Expo Router example: the tab bar receives the navigator
-  // props directly; route scenes remain owned by Expo Router / React Navigation.
+test('keeps Expo Router tab scenes inside their native navigation context', () => {
+  // Tab screens call React Navigation focus hooks. A custom screenLayout native
+  // wrapper sits outside that context on this Expo Router version and breaks
+  // Search / Notifications rendering, so keep scene ownership with the navigator.
   expect(tabLayoutSource).toContain('tabBar={(props) => {');
   expect(tabLayoutSource).toContain('createExpoRouterTabBarNavigation({');
   expect(tabLayoutSource).toContain('emitter: props.emitter');
@@ -50,15 +51,11 @@ test('uses the upstream tab bar with Expo native Android blur targets', () => {
   expect(tabLayoutSource).toContain('<FloatingGlassTabBar');
   expect(tabLayoutSource).toContain('{...props}');
   expect(tabLayoutSource).toContain('navigation={navigation}');
-  expect(tabLayoutSource).not.toContain('navigation: TabBarNavigation');
-  expect(tabLayoutSource).toContain("import { BlurTargetView } from 'expo-blur';");
-  expect(tabLayoutSource).toContain("screenLayout={({ children, route }) => (");
-  expect(tabLayoutSource).toContain("Platform.OS === 'android' ? (");
-  expect(tabLayoutSource).toContain('<BlurTargetView ref={getBlurTargetRef(route.name)} style={{ flex: 1 }}>');
-  expect(tabLayoutSource).toContain("blurMethod: 'dimezisBlurViewSdk31Plus'");
-  expect(tabLayoutSource).toContain('blurTarget: blurTargetRef');
-  expect(tabLayoutSource).toContain('blurProps={');
-  expect(tabLayoutSource).not.toContain('TabBlurTargetScene');
+  expect(tabLayoutSource).not.toContain('screenLayout=');
+  expect(tabLayoutSource).not.toContain('BlurTargetView');
+  expect(tabLayoutSource).not.toContain('blurProps=');
+  expect(tabLayoutSource).not.toContain('Platform.OS');
+  expect(tabBarScrollSource).toContain("import { useFocusEffect } from '@react-navigation/native';");
 });
 
 test('adapts Expo Router 58 tab events to the glass tab bar emitter contract', () => {
