@@ -6,12 +6,15 @@ Expo / React Native client source for LuckRead. The root web application and the
 
 Requirements: Node.js 22.13+ for the Expo SDK 58 baseline (CI uses Node.js 22.13.1), Bun 1.1.x, Android Studio for Android builds, and macOS with Xcode + CocoaPods for iOS builds.
 
+The APP dependency graph is pinned by `app/bun.lockb`. Regenerate and commit that lockfile whenever APP dependencies change, using the repository's Bun 1.1.38 toolchain; APP CI verifies the committed lockfile.
+
 ```sh
 cd app
 bun install
 bunx expo install --check
 bunx expo-doctor@latest
-bun run typecheck
+bun run typecheck       # TypeScript 7 native compiler
+bun run typecheck:ts6   # TypeScript 6 API compatibility check
 bun start
 ```
 
