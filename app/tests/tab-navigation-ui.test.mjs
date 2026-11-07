@@ -1,4 +1,5 @@
 import { expect, test } from 'bun:test';
+import { createExpoRouterTabBarNavigation } from '../lib/expo-router-tab-bar-adapter';
 import { existsSync, readFileSync } from 'node:fs';
 
 const tabLayoutSource = readFileSync(
@@ -39,18 +40,88 @@ test('uses the pinned upstream floating glass tab bar without replacing LuckRead
   expect(tabLayoutSource).toContain("if (props.state.routes[props.state.index]?.name === '(video)') return null;");
 });
 
-test('uses the upstream tab-bar integration without wrapping route scenes in custom native views', () => {
-  // Match the upstream Expo Router example: the tab bar receives the navigator
-  // props directly; route scenes remain owned by Expo Router / React Navigation.
+test('keeps Expo Router tab scenes inside their native navigation context', () => {
+  // Tab screens call React Navigation focus hooks. A custom screenLayout native
+  // wrapper sits outside that context on this Expo Router version and breaks
+  // Search / Notifications rendering, so keep scene ownership with the navigator.
   expect(tabLayoutSource).toContain('tabBar={(props) => {');
-  expect(tabLayoutSource).toContain('const tabBarProps = props as typeof props & { navigation: TabBarNavigation };');
+  expect(tabLayoutSource).toContain('createExpoRouterTabBarNavigation({');
+  expect(tabLayoutSource).toContain('emitter: props.emitter');
+  expect(tabLayoutSource).toContain('navigateToTab: props.navigateToTab');
   expect(tabLayoutSource).toContain('<FloatingGlassTabBar');
-  expect(tabLayoutSource).toContain('{...tabBarProps}');
+  expect(tabLayoutSource).toContain('{...props}');
+  expect(tabLayoutSource).toContain('navigation={navigation}');
   expect(tabLayoutSource).not.toContain('screenLayout=');
   expect(tabLayoutSource).not.toContain('BlurTargetView');
-  expect(tabLayoutSource).not.toContain('TabBlurTargetScene');
   expect(tabLayoutSource).not.toContain('blurProps=');
-  expect(tabLayoutSource).not.toContain('blurTargets');
+  expect(tabLayoutSource).not.toContain('Platform.OS');
+  expect(tabBarScrollSource).toContain("import { useFocusEffect } from '@react-navigation/native';");
+});
+
+test('adapts Expo Router 58 tab events to the glass tab bar emitter contract', () => {
+  const events = [];
+  const routes = [
+    { key: 'home-key', name: '(index)' },
+    { key: 'search-key', name: '(search)' },
+  ];
+  const navigation = createExpoRouterTabBarNavigation({
+    routes,
+    emitter: {
+      emit(event) {
+        events.push(event);
+        return { type: event.type, defaultPrevented: true };
+      },
+    },
+    navigateToTab() {},
+  });
+  const event = { type: 'tabPress', target: 'search-key', canPreventDefault: true };
+
+  const result = navigation.emit(event);
+
+  expect(events).toEqual([event]);
+  expect(result).toEqual({ type: 'tabPress', defaultPrevented: true });
+});
+
+test('maps glass tab route-name navigation to Expo Router route-key navigation', () => {
+  const navigatedRouteKeys = [];
+  const navigation = createExpoRouterTabBarNavigation({
+    routes: [
+      { key: 'home-key', name: '(index)' },
+      { key: 'search-key', name: '(search)' },
+    ],
+    emitter: {
+      emit(event) {
+        return { type: event.type };
+      },
+    },
+    navigateToTab(routeKey) {
+      navigatedRouteKeys.push(routeKey);
+    },
+  });
+
+  navigation.navigate('(search)');
+  navigation.navigate('(missing)');
+
+  expect(navigatedRouteKeys).toEqual(['search-key']);
+});
+
+test('keeps native BlurView as an isolated background layer behind the Android home feed', () => {
+  const homeScreen = readFileSync(
+    new URL('../app/(drawer)/(tabs)/(index)/index.tsx', import.meta.url),
+    'utf8',
+  );
+  const surfaceStart = homeScreen.indexOf('function HomeScreenSurface');
+  const surfaceEnd = homeScreen.indexOf('const Header =', surfaceStart);
+  const homeSurface = homeScreen.slice(surfaceStart, surfaceEnd);
+
+  expect(homeScreen).toContain('<HomeScreenSurface isDark={isDark}>');
+  expect(homeSurface).toContain('<View style={style} className="flex-1">');
+  expect(homeSurface).toContain('<BlurView');
+  expect(homeSurface).toContain('pointerEvents="none"');
+  expect(homeSurface).toContain('style={StyleSheet.absoluteFill}');
+  expect(homeSurface).toContain('intensity={80}');
+  expect(homeSurface.indexOf('<BlurView')).toBeLessThan(homeSurface.indexOf('{children}'));
+  expect(homeScreen).not.toContain("if (Platform.OS === 'android')");
 });
 
 test('does not register or ship the upstream Grok demo route', () => {

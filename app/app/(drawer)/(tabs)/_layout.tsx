@@ -1,14 +1,13 @@
-import { useCallback } from 'react';
 import type { ComponentType } from 'react';
 import { Tabs } from 'expo-router';
 import { type StyleProp, type ViewStyle } from 'react-native';
 import Foundation from '@expo/vector-icons/Foundation';
 import { useColorScheme } from 'nativewind';
 import type { SvgProps } from 'react-native-svg';
+import { createExpoRouterTabBarNavigation } from '~/lib/expo-router-tab-bar-adapter';
 import {
   FloatingGlassTabBar,
   type TabBarIconComponent,
-  type TabBarNavigation,
   type TabsConfig,
 } from 'react-native-floating-glass-tabbar';
 
@@ -67,13 +66,17 @@ function TabNavigator() {
         // Preserve the existing immersive video route behavior.
         if (props.state.routes[props.state.index]?.name === '(video)') return null;
 
-        // Expo Router's SDK 58 tabBar callback type omits navigation even though
-        // the underlying React Navigation bar supplies it at runtime.
-        const tabBarProps = props as typeof props & { navigation: TabBarNavigation };
-
+        // Expo Router 58 provides emitter + route-key navigation rather than
+        // the legacy React Navigation `navigation` object expected by this bar.
+        const navigation = createExpoRouterTabBarNavigation({
+          routes: props.state.routes,
+          emitter: props.emitter,
+          navigateToTab: props.navigateToTab,
+        });
         return (
           <FloatingGlassTabBar
-            {...tabBarProps}
+            {...props}
+            navigation={navigation}
             tabs={LuckReadTabs}
             labelMode="none"
             iconSize={26}
