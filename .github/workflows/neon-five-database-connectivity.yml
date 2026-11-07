@@ -54,7 +54,7 @@ jobs:
             { expected: 'luckreadpro', secret: 'NEON_DATABASE_URL_LUCKREADPRO' },
             { expected: 'luckread_governance', secret: 'NEON_DATABASE_URL_GOVERNANCE' },
             { expected: 'luckread_finance', secret: 'NEON_DATABASE_URL_FINANCE' },
-            { expected: 'allLuck', secret: 'NEON_DATABASE_URL_ALLLUCK' },
+            { expected: 'allluck', secret: 'NEON_DATABASE_URL_ALLLUCK' },
           ]
 
           async function main() {
@@ -135,16 +135,16 @@ jobs:
                 const query = await client.query(`
                   SELECT
                     current_database() AS database_name,
-                    current_setting('server_version') AS server_version,
-                    COALESCE(
-                      (SELECT ssl FROM pg_stat_ssl WHERE pid = pg_backend_pid()),
-                      FALSE
-                    ) AS ssl_enabled
+                    current_setting('server_version') AS server_version
                 `)
 
                 const row = query.rows[0]
                 const actualDatabase = row.database_name
-                const sslEnabled = row.ssl_enabled === true
+                // Neon terminates client TLS at its proxy/pooler. pg_stat_ssl describes
+                // the proxy-to-Postgres leg, not this GitHub Runner-to-Neon connection.
+                const tlsSocket = client.connection?.stream
+                const tlsEnabled = tlsSocket?.encrypted === true
+                const certificateAuthorized = tlsSocket?.authorized === true
 
                 if (actualDatabase !== database.expected) {
                   results.push({
@@ -153,18 +153,18 @@ jobs:
                     detail: 'Connected, but database name did not match. Actual: ' + actualDatabase,
                   })
                   failed = true
-                } else if (!sslEnabled) {
+                } else if (!tlsEnabled || !certificateAuthorized) {
                   results.push({
                     name: database.expected,
                     status: 'FAIL',
-                    detail: 'Connected, but PostgreSQL did not report an SSL connection.',
+                    detail: 'Connected, but the client TLS socket or certificate authorization check failed.',
                   })
                   failed = true
                 } else {
                   results.push({
                     name: database.expected,
                     status: 'PASS',
-                    detail: 'Connected; database name matched; TLS/SSL active; PostgreSQL ' + row.server_version,
+                    detail: 'Connected; database name matched; client TLS active and certificate authorized; PostgreSQL ' + row.server_version,
                   })
                 }
               } catch (error) {
@@ -197,6 +197,10 @@ jobs:
               ),
               '',
               'This workflow performs read-only SELECT queries. It does not create tables, alter schemas, write rows, run migrations, or change production routing.',
+              '',
+              'TLS is verified on the client-to-Neon socket because Neon terminates TLS at its proxy; pg_stat_ssl reports the separate proxy-to-Postgres connection.',
+              '',
+              'The PostgreSQL database created from the label allLuck is reported by the server as allluck because unquoted PostgreSQL identifiers are folded to lowercase.',
               '',
               'Connection strings and passwords are never printed by this workflow.',
             ]
