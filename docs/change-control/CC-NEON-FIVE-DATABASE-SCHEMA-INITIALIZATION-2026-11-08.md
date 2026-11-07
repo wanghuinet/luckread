@@ -66,7 +66,9 @@ A PostgreSQL migration ledger is schema provenance, not an import of business da
 
 ## 5. Required implementation properties
 
-- **Official adapters:** use Payload's supported PostgreSQL adapter and Better Auth's supported PostgreSQL-compatible persistence path. Do not emulate SQLite/D1 with a connection-string substitution.
+- **Official adapters:** use Payload's supported PostgreSQL adapter and Better Auth's supported PostgreSQL persistence path. Do not emulate SQLite/D1 with a connection-string substitution.
+- **W02 application SQL:** Better Auth's built-in PostgreSQL adapter does not port W02's own D1 code. W02 currently uses `D1Database.prepare/bind/first/run/batch` across identity, session, authorization, lifecycle and outbox paths. Each owning module must receive a PostgreSQL query/transaction implementation and tests; do not put a fake D1 shim in front of PostgreSQL or alter business semantics to make SQL appear portable.
+- **Payload migrations:** current W01 migration files import `@payloadcms/db-d1-sqlite`; they are not PostgreSQL migration files. Generate a PostgreSQL-native migration baseline from the W01 Payload config using the official `@payloadcms/db-postgres` adapter and reconcile it against the existing W01 schema/contracts. Do not invoke the D1 migration runner against Neon.
 - **Domain ownership:** preserve W01/W02/W03/W05/W06/W07/W08/W09/W11 responsibility as mapped above.
 - **Schema determinism:** version every migration; record checksum; reject changed content for an already-applied version; serialize migrations per database; use PostgreSQL transactions where supported.
 - **Fail closed:** reject wrong database names, wrong target domain, unknown pre-existing objects, checksum drift, missing prerequisites or unsupported SQL semantics.
