@@ -16,11 +16,21 @@ import { createPublicMediaUrl } from './media/public-media-url.js'
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
 
-// Schema generation only: no Cloudflare binding or R2 bucket is used.
-const schemaOnlyR2Bucket = Object.freeze({}) as never
-const databaseUrl =
-  process.env.PAYLOAD_SCHEMA_DATABASE_URL ??
-  'postgresql://postgres:postgres@127.0.0.1:5432/luckread_schema'
+// Schema generation only: refuse every non-disposable target before Payload
+// initializes its PostgreSQL adapter. CI supplies a local PostgreSQL 18 service.
+const databaseUrl = process.env.PAYLOAD_SCHEMA_DATABASE_URL
+if (!databaseUrl) throw new Error('PAYLOAD_SCHEMA_DATABASE_URL is required')
+const parsedDatabaseUrl = new URL(databaseUrl)
+if (
+  !new Set(['127.0.0.1', 'localhost', 'postgres']).has(parsedDatabaseUrl.hostname) ||
+  parsedDatabaseUrl.port !== '5432' ||
+  parsedDatabaseUrl.pathname !== '/luckread_schema'
+) {
+  throw new Error('Refusing to initialize Payload schema against a non-disposable database')
+}
+
+// R2's adapter is configured only so Payload can derive its real media schema
+// fields. The CLI uses disableOnInit, and no upload/static handler is invoked.
 
 export default buildConfig({
   admin: {
@@ -117,8 +127,7 @@ export default buildConfig({
     // It adds prefix and _objectKey without enabling upload/storage handlers.
     r2Storage({
       enabled: false,
-      alwaysInsertFields: true,
-      bucket: schemaOnlyR2Bucket,
+      bucket: Object.freeze({}) as never,
       collections: {
         media: { prefix: 'media', generateFileURL: createPublicMediaUrl },
       },
