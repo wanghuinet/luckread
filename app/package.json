@@ -74,7 +74,6 @@
     "react-native-screens": "~4.30.1",
     "react-native-sortables": "^1.5.2",
     "react-native-svg": "15.16.0",
-    "react-native-floating-glass-tabbar": "0.1.0",
     "react-native-svg-transformer": "^1.5.0",
     "react-native-swipe-list-view": "^3.2.9",
     "react-native-tab-view": "^4.0.10",
