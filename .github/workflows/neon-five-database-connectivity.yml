@@ -1,6 +1,10 @@
 name: Neon Five Database Connectivity and Empty Schema Preflight
 
 on:
+  push:
+    branches: [neon-empty-schema-preflight-20261108]
+    paths:
+      - '.github/workflows/neon-five-database-connectivity.yml'
   workflow_dispatch:
 
 permissions:
@@ -163,6 +167,9 @@ jobs:
                   "AND nspname NOT LIKE 'pg_toast%' AND nspname NOT LIKE 'pg_temp_%' " +
                   'ORDER BY nspname'
                 )
+                const publicSchemaExists = schemas.rows.some(
+                  (row) => row.schema_name === 'public',
+                )
                 const extraSchemas = schemas.rows
                   .map((row) => row.schema_name)
                   .filter((name) => name !== 'public')
@@ -236,6 +243,18 @@ jobs:
                   "SELECT extname FROM pg_extension WHERE extname <> 'plpgsql' ORDER BY extname"
                 )
 
+                const globalObjects = await client.query(
+                  'SELECT evtname AS object_name, \'event_trigger\' AS object_kind ' +
+                  'FROM pg_event_trigger ' +
+                  'UNION ALL ' +
+                  'SELECT pubname, \'publication\' FROM pg_publication ' +
+                  'UNION ALL ' +
+                  'SELECT fdwname, \'foreign_data_wrapper\' FROM pg_foreign_data_wrapper ' +
+                  'UNION ALL ' +
+                  'SELECT srvname, \'foreign_server\' FROM pg_foreign_server ' +
+                  'ORDER BY 1 LIMIT 51'
+                )
+
                 const relationNames = relations.rows.map(
                   (row) => row.schema_name + '.' + row.object_name,
                 )
@@ -249,13 +268,18 @@ jobs:
                   (row) => row.schema_name + '.' + row.object_name,
                 )
                 const extensionNames = extensions.rows.map((row) => row.extname)
+                const globalObjectNames = globalObjects.rows.map(
+                  (row) => row.object_kind + ':' + row.object_name,
+                )
                 const clean =
+                  publicSchemaExists &&
                   extraSchemas.length === 0 &&
                   relations.rows.length === 0 &&
                   customTypes.rows.length === 0 &&
                   routines.rows.length === 0 &&
                   otherObjects.rows.length === 0 &&
-                  extensionNames.length === 0
+                  extensionNames.length === 0 &&
+                  globalObjects.rows.length === 0
 
                 await client.query('ROLLBACK')
                 transactionOpen = false
@@ -267,12 +291,14 @@ jobs:
                     status: 'BLOCKED_NOT_EMPTY',
                     detail:
                       'Existing non-system objects found; inspect before initialization. ' +
-                      'Extra schemas=' + JSON.stringify(extraSchemas) +
+                      'Default public schema exists=' + publicSchemaExists +
+                      '; extra schemas=' + JSON.stringify(extraSchemas) +
                       '; relations=' + JSON.stringify(relationNames) +
                       '; custom types=' + JSON.stringify(customTypeNames) +
                       '; routines=' + JSON.stringify(routineNames) +
                       '; other schema objects=' + JSON.stringify(otherObjectNames) +
-                      '; non-default extensions=' + JSON.stringify(extensionNames),
+                      '; non-default extensions=' + JSON.stringify(extensionNames) +
+                      '; global objects=' + JSON.stringify(globalObjectNames),
                   })
                   failed = true
                 } else {
@@ -282,7 +308,7 @@ jobs:
                     status: 'PASS_EMPTY',
                     detail:
                       'Verified TLS; PostgreSQL ' + identity.rows[0].server_version +
-                      '; only the default public schema exists; no user relations, user-defined types, routines, operators, collations, conversions, text-search objects, or non-default extensions.',
+                      '; default public schema exists; no user relations, user-defined types, routines, operators, collations, conversions, text-search objects, non-default extensions, or global database objects.',
                   })
                 }
               } catch (error) {
@@ -325,7 +351,7 @@ jobs:
               '',
               'This workflow is read-only. It opens a READ ONLY transaction and rolls it back. It does not create schemas, tables, extensions, migration ledgers, or rows.',
               '',
-              'PASS_EMPTY confirms there are no non-system schemas beyond public, user relations, user-defined types, routines, operators, collations, conversions, text-search objects, or non-default extensions. A non-empty target is blocked for manual review and is never overwritten.',
+              'PASS_EMPTY confirms the default public schema exists and there are no extra non-system schemas, user relations, user-defined types, routines, operators, collations, conversions, text-search objects, non-default extensions, or global database objects. A non-empty target is blocked for manual review and is never overwritten.',
               '',
               'This is a target-readiness check only. It does not authorize D1 replacement, Worker/Hyperdrive binding changes, Payload adapter changes, schema application, or production traffic cutover.',
               '',
