@@ -6,8 +6,8 @@ type ExpoRouterTabRoute = {
 };
 
 type ExpoRouterTabEmitter = {
-  emit: (event: Parameters<TabBarNavigation['emit']>[0]) => ReturnType<TabBarNavigation['emit']>;
-};
+  emit?: (event: Parameters<TabBarNavigation['emit']>[0]) => ReturnType<TabBarNavigation['emit']>;
+} | null | undefined;
 
 export function createExpoRouterTabBarNavigation({
   routes,
@@ -15,11 +15,13 @@ export function createExpoRouterTabBarNavigation({
   navigateToTab,
 }: {
   routes: readonly ExpoRouterTabRoute[];
-  emitter: ExpoRouterTabEmitter;
+  emitter?: ExpoRouterTabEmitter;
   navigateToTab: (routeKey: string) => void;
 }): TabBarNavigation {
   return {
-    emit: (event) => emitter.emit(event),
+    emit: (event) => typeof emitter?.emit === 'function'
+      ? emitter.emit(event)
+      : { type: event.type, defaultPrevented: false },
     navigate: (routeName) => {
       const route = routes.find((candidate) => candidate.name === routeName);
       if (route) {
