@@ -6,7 +6,7 @@ on:
     paths:
       - '.github/workflows/neon-five-database-connectivity.yml'
   push:
-    branches: [neon-empty-schema-preflight-20261108]
+    branches: [main, neon-empty-schema-preflight-20261108]
     paths:
       - '.github/workflows/neon-five-database-connectivity.yml'
   workflow_dispatch:
