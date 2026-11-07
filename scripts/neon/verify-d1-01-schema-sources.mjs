@@ -186,9 +186,9 @@ for (const file of [
 }
 
 for (const owner of contract.owners.slice(1)) {
-  const content = read(owner.config)
-  if (content !== null) {
-    if (owner.worker === 'W02') {
+  if (owner.config) {
+    const content = read(owner.config)
+    if (content !== null && owner.worker === 'W02') {
       if (!content.includes('database: env.D1_01')) failures.push('W02 Better Auth no longer binds the expected D1-01 source database')
       addSource('W02', 'better-auth-config', owner.config, content)
     }
