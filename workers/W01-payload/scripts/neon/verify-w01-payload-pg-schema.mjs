@@ -58,6 +58,24 @@ const expectedForeignKeys = Object.values(snapshot.tables)
   }))
   .sort((a, b) => a.constraintName.localeCompare(b.constraintName))
 
+function normalizePostgresTextArray(value) {
+  if (Array.isArray(value)) return value
+  if (typeof value !== 'string' || !value.startsWith('{') || !value.endsWith('}')) {
+    throw new Error('Unexpected PostgreSQL text[] representation in foreign-key catalog')
+  }
+  const body = value.slice(1, -1)
+  if (body.length === 0) return []
+  // The source snapshot's FK column identifiers contain only ordinary
+  // unquoted PostgreSQL identifier characters; still handle quoted elements
+  // and escaped quotes defensively.
+  return body.split(',').map((item) => {
+    const unquoted = item.startsWith('"') && item.endsWith('"')
+      ? item.slice(1, -1).replace(/\\\\/g, '\\\\').replace(/\\"/g, '"')
+      : item
+    return unquoted
+  })
+}
+
 const requiredColumns = {
   users: ['username', 'display_name', 'identity_id', 'reset_password_requested_at'],
   media: ['alt', 'owner_user_id', 'upload_idempotency_key', 'upload_fingerprint', 'prefix', '_objectkey'],
@@ -218,8 +236,8 @@ try {
     constraintName: row.constraint_name,
     tableName: row.table_name,
     referencedTable: row.referenced_table,
-    columnsFrom: row.columns_from,
-    columnsTo: row.columns_to,
+    columnsFrom: normalizePostgresTextArray(row.columns_from),
+    columnsTo: normalizePostgresTextArray(row.columns_to),
     onDelete: row.on_delete,
     onUpdate: row.on_update,
   }))
