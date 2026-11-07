@@ -490,6 +490,7 @@ export default function BillingScreen() {
         setRefunds([]);
         setCursors({ payments: null, documents: null, refunds: null });
         setMore({ payments: false, documents: false, refunds: false });
+        setLoadingMore(false);
         return;
       }
       if (!result.response.ok) {
