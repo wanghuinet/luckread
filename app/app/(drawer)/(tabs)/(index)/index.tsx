@@ -4,6 +4,7 @@ import {
   Animated,
   Image,
   Pressable,
+  Platform,
   StyleSheet,
   Text,
   View,
@@ -28,6 +29,27 @@ import { readSessionToken } from '~/lib/secure-session';
 type FeedKind = NativeFeedKind;
 
 const APP_PRIMARY_COLOR = '#1769aa';
+
+function HomeScreenSurface({ children, isDark }: { children: React.ReactNode; isDark: boolean }) {
+  const style = [styles.container, { backgroundColor: isDark ? '#000000' : '#ffffff' }];
+
+  // Android's nested collapsible PagerView/FlatList tree should not be mounted
+  // inside a native BlurView. Keep the existing visual treatment on iOS.
+  if (Platform.OS === 'android') {
+    return <View style={style} className="flex-1">{children}</View>;
+  }
+
+  return (
+    <BlurView
+      style={style}
+      className="flex-1"
+      intensity={80}
+      tint={isDark ? 'dark' : 'light'}
+    >
+      {children}
+    </BlurView>
+  );
+}
 
 const Header = () => {
   const insets = useSafeAreaInsets();
@@ -429,7 +451,7 @@ export default function HomeScreen() {
   );
 
   return (
-    <BlurView style={[styles.container, { backgroundColor: isDark ? '#000000' : '#ffffff' }]} className="flex-1" intensity={80} tint={isDark ? 'dark' : 'light'}>
+    <HomeScreenSurface isDark={isDark}>
       <Tabs.Container
         renderHeader={Header}
         renderTabBar={renderTabBar}
@@ -468,7 +490,7 @@ export default function HomeScreen() {
           <Feather name="plus" size={28} color="#ffffff" />
         </Pressable>
       </Animated.View>
-    </BlurView>
+    </HomeScreenSurface>
   );
 }
 
