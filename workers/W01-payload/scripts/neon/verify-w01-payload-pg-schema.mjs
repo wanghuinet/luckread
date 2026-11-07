@@ -45,6 +45,18 @@ const expectedColumnsByTable = Object.fromEntries(
 const expectedIndexNames = Object.values(snapshot.tables)
   .flatMap((definition) => Object.keys(definition.indexes ?? {}))
   .sort()
+const expectedForeignKeys = Object.values(snapshot.tables)
+  .flatMap((definition) => Object.values(definition.foreignKeys ?? {}))
+  .map((foreignKey) => ({
+    constraintName: foreignKey.name,
+    tableName: foreignKey.tableFrom,
+    referencedTable: foreignKey.tableTo,
+    columnsFrom: foreignKey.columnsFrom,
+    columnsTo: foreignKey.columnsTo,
+    onDelete: foreignKey.onDelete,
+    onUpdate: foreignKey.onUpdate,
+  }))
+  .sort((a, b) => a.constraintName.localeCompare(b.constraintName))
 
 const requiredColumns = {
   users: ['username', 'display_name', 'identity_id', 'reset_password_requested_at'],
@@ -165,13 +177,60 @@ try {
   if (missingIndexes.length) failures.push({ kind: 'source-index-missing', missingIndexes })
 
   const fkResult = await pool.query(
-    `SELECT conrelid::regclass::text AS table_name, conname AS constraint_name,
-            confrelid::regclass::text AS referenced_table
-       FROM pg_catalog.pg_constraint
-      WHERE contype = 'f'
-      ORDER BY table_name, constraint_name`,
+    `SELECT source_table.relname AS table_name,
+            constraint_row.conname AS constraint_name,
+            target_table.relname AS referenced_table,
+            ARRAY(
+              SELECT source_column.attname
+                FROM unnest(constraint_row.conkey) WITH ORDINALITY AS key_column(attnum, ordinal)
+                JOIN pg_catalog.pg_attribute source_column
+                  ON source_column.attrelid = constraint_row.conrelid
+                 AND source_column.attnum = key_column.attnum
+               ORDER BY key_column.ordinal
+            ) AS columns_from,
+            ARRAY(
+              SELECT target_column.attname
+                FROM unnest(constraint_row.confkey) WITH ORDINALITY AS key_column(attnum, ordinal)
+                JOIN pg_catalog.pg_attribute target_column
+                  ON target_column.attrelid = constraint_row.confrelid
+                 AND target_column.attnum = key_column.attnum
+               ORDER BY key_column.ordinal
+            ) AS columns_to,
+            CASE constraint_row.confdeltype
+              WHEN 'a' THEN 'no action' WHEN 'r' THEN 'restrict'
+              WHEN 'c' THEN 'cascade' WHEN 'n' THEN 'set null'
+              WHEN 'd' THEN 'set default'
+            END AS on_delete,
+            CASE constraint_row.confupdtype
+              WHEN 'a' THEN 'no action' WHEN 'r' THEN 'restrict'
+              WHEN 'c' THEN 'cascade' WHEN 'n' THEN 'set null'
+              WHEN 'd' THEN 'set default'
+            END AS on_update
+       FROM pg_catalog.pg_constraint constraint_row
+       JOIN pg_catalog.pg_class source_table ON source_table.oid = constraint_row.conrelid
+       JOIN pg_catalog.pg_namespace source_namespace ON source_namespace.oid = source_table.relnamespace
+       JOIN pg_catalog.pg_class target_table ON target_table.oid = constraint_row.confrelid
+      WHERE constraint_row.contype = 'f'
+        AND source_namespace.nspname = 'public'
+      ORDER BY constraint_row.conname`,
   )
-  report.foreignKeys = fkResult.rows
+  const actualForeignKeys = fkResult.rows.map((row) => ({
+    constraintName: row.constraint_name,
+    tableName: row.table_name,
+    referencedTable: row.referenced_table,
+    columnsFrom: row.columns_from,
+    columnsTo: row.columns_to,
+    onDelete: row.on_delete,
+    onUpdate: row.on_update,
+  }))
+  report.foreignKeys = actualForeignKeys
+  if (JSON.stringify(actualForeignKeys) !== JSON.stringify(expectedForeignKeys)) {
+    failures.push({
+      kind: 'foreign-key-catalog-drift',
+      expected: expectedForeignKeys,
+      actual: actualForeignKeys,
+    })
+  }
 
   const businessTables = expectedTables.filter((table) => table !== 'payload_migrations')
   const rowCounts = {}
