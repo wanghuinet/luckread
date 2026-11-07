@@ -7,13 +7,13 @@ import {
   StyleSheet,
   Text,
   View,
-  type ViewToken,
 } from 'react-native';
 import { type ErrorBoundaryProps, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { DrawerActions } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Tabs, MaterialTabBar, useCurrentTabScrollY } from 'react-native-collapsible-tab-view';
+import { type ViewToken } from '@shopify/flash-list';
 import { useInfiniteQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import { useTabBarScrollState, useTabBarVisibilityOnAnimatedScroll } from '~/components/TabBarScroll';
 import { BlurView } from 'expo-blur';
