@@ -122,7 +122,7 @@ for (const file of expected.w02BuiltIn) {
   const relativePath = `${w02Directory}/${file}`
   const content = read(relativePath)
   if (content !== null) {
-    const tableNames = [...content.matchAll(/CREATE TABLE(?: IF NOT EXISTS)?\\s+["`]?([A-Za-z0-9_]+)/gi)]
+    const tableNames = [...content.matchAll(/CREATE TABLE(?: IF NOT EXISTS)?\s+["`]?([A-Za-z0-9_]+)/gi)]
       .map((match) => match[1])
     addSource('W02', 'better-auth-schema-reference-only', relativePath, content, {
       tableNames,
