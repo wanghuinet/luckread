@@ -167,7 +167,7 @@ jobs:
           chmod +x android/gradlew
           cd android
           echo "Starting Hyperswitch React Native Codegen (30-minute hard limit)."
-          timeout --foreground --signal=TERM --kill-after=60s 30m \
+          timeout --signal=TERM --kill-after=60s 30m \
             ./gradlew generateCodegenArtifactsFromSchema --no-daemon --console=plain --stacktrace --info
           cd ..
           SPEC_ROOT="node_modules/@juspay-tech/react-native-hyperswitch/android/build/generated/source/codegen"
