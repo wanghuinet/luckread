@@ -6,6 +6,7 @@ const diagnostics = readFileSync(new URL('../lib/posthog.tsx', import.meta.url),
 const rootLayout = readFileSync(new URL('../app/_layout.tsx', import.meta.url), 'utf8');
 const envExample = readFileSync(new URL('../.env.example', import.meta.url), 'utf8');
 const appConfigSource = readFileSync(new URL('../app.config.js', import.meta.url), 'utf8');
+const metroConfigSource = readFileSync(new URL('../metro.config.js', import.meta.url), 'utf8');
 const androidBetaWorkflow = readFileSync(
   new URL('../../.github/workflows/app-android-beta-release.yml', import.meta.url),
   'utf8',
@@ -29,6 +30,13 @@ test('initializes diagnostics only when a valid public project key and supported
   expect(diagnostics).toContain("return <>{children}</>");
   expect(diagnostics).toContain('https://us.i.posthog.com');
   expect(diagnostics).toContain('https://eu.i.posthog.com');
+});
+
+test('injects PostHog debug IDs while preserving LuckRead Metro transformers', () => {
+  expect(metroConfigSource).toContain("require('posthog-react-native/metro')");
+  expect(metroConfigSource).toContain('getPostHogExpoConfig(__dirname)');
+  expect(metroConfigSource).toContain("react-native-svg-transformer/expo");
+  expect(metroConfigSource).toContain("withNativeWind(config, { input: './global.css' })");
 });
 
 test('captures exceptions only and disables product analytics, session replay and push telemetry', () => {
