@@ -54,7 +54,7 @@ jobs:
             { expected: 'luckreadpro', secret: 'NEON_DATABASE_URL_LUCKREADPRO' },
             { expected: 'luckread_governance', secret: 'NEON_DATABASE_URL_GOVERNANCE' },
             { expected: 'luckread_finance', secret: 'NEON_DATABASE_URL_FINANCE' },
-            { expected: 'allLuck', secret: 'NEON_DATABASE_URL_ALLLUCK' },
+            { expected: 'allluck', secret: 'NEON_DATABASE_URL_ALLLUCK' },
           ]
 
           async function main() {
@@ -198,7 +198,11 @@ jobs:
               '',
               'This workflow performs read-only SELECT queries. It does not create tables, alter schemas, write rows, run migrations, or change production routing.',
               '',
-              'Connection strings and passwords are never printed by this workflow.',
+              'TLS is verified on the client-to-Neon socket because Neon terminates TLS at its proxy; pg_stat_ssl reports the separate proxy-to-Postgres connection.',
+            '',
+            'The PostgreSQL database created from the label allLuck is reported by the server as allluck because unquoted PostgreSQL identifiers are folded to lowercase.',
+            '',
+            'Connection strings and passwords are never printed by this workflow.',
             ]
 
             const summary = lines.join('\n') + '\n'
