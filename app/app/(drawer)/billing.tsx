@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import {
   ActivityIndicator,
@@ -261,6 +261,7 @@ export default function BillingScreen() {
   const isDark = colorScheme === 'dark';
   const router = useRouter();
   const authStatus = useAuthStore((state) => state.status);
+  const viewerId = useAuthStore((state) => state.user?.id ?? null);
   const [activeTab, setActiveTab] = useState<BillingTab>('payments');
   const [documents, setDocuments] = useState<BillingDocument[]>([]);
   const [payments, setPayments] = useState<PaymentHistoryItem[]>([]);
@@ -280,32 +281,96 @@ export default function BillingScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [authRequired, setAuthRequired] = useState(false);
   const [error, setError] = useState('');
-  const [refundBusyId, setRefundBusyId] = useState<string | null>(null);
+  const [billingDataViewerId, setBillingDataViewerId] = useState<string | null>(null);
+  const [refundBusyKey, setRefundBusyKey] = useState<string | null>(null);
   const refundIdempotencyKeys = useRef(new Map<string, string>());
   const requestRef = useRef<AbortController | null>(null);
+  const paginationRequestRef = useRef<AbortController | null>(null);
+  const viewerIdRef = useRef<string | null>(viewerId);
+  const authStatusRef = useRef(authStatus);
+  const billingDataViewerIdRef = useRef<string | null>(null);
+  const previousViewerIdRef = useRef<string | null>(viewerId);
+  const previousAuthStatusRef = useRef(authStatus);
+
+  useLayoutEffect(() => {
+    viewerIdRef.current = viewerId;
+    authStatusRef.current = authStatus;
+
+    const identityChanged = previousViewerIdRef.current !== viewerId ||
+      previousAuthStatusRef.current !== authStatus;
+    if (!identityChanged) return;
+
+    previousViewerIdRef.current = viewerId;
+    previousAuthStatusRef.current = authStatus;
+    requestRef.current?.abort();
+    requestRef.current = null;
+    paginationRequestRef.current?.abort();
+    paginationRequestRef.current = null;
+
+    billingDataViewerIdRef.current = null;
+    setBillingDataViewerId(null);
+    setDocuments([]);
+    setPayments([]);
+    setRefunds([]);
+    setCursors({ payments: null, documents: null, refunds: null });
+    setMore({ payments: false, documents: false, refunds: false });
+    setLoading(authStatus === 'authenticated' && Boolean(viewerId));
+    setRefreshing(false);
+    setLoadingMore(false);
+    setAuthRequired(authStatus !== 'authenticated' || !viewerId);
+    setError('');
+    setRefundBusyKey(null);
+  }, [authStatus, viewerId]);
+
+  const isCurrentViewerData = Boolean(viewerId) && billingDataViewerId === viewerId;
+  const visibleDocuments = isCurrentViewerData ? documents : [];
+  const visiblePayments = isCurrentViewerData ? payments : [];
+  const visibleRefunds = isCurrentViewerData ? refunds : [];
 
   const pendingRefundPaymentIds = useMemo(() => new Set(
-    refunds
+    visibleRefunds
       .filter((item) => REFUND_PENDING_STATUSES.has(item.status))
       .map((item) => item.paymentId),
-  ), [refunds]);
+  ), [visibleRefunds]);
 
   const openLogin = useCallback(() => {
     router.push(('/login?returnTo=' + encodeURIComponent('/billing')) as never);
   }, [router]);
 
   const loadAll = useCallback(async (pullRefresh = false) => {
+    const requestViewerId = viewerId;
     if (authStatus === 'loading') return;
-    if (authStatus !== 'authenticated') {
+    if (authStatus !== 'authenticated' || !requestViewerId) {
+      requestRef.current?.abort();
+      requestRef.current = null;
+      paginationRequestRef.current?.abort();
+      paginationRequestRef.current = null;
+      billingDataViewerIdRef.current = null;
+      setBillingDataViewerId(null);
+      setDocuments([]);
+      setPayments([]);
+      setRefunds([]);
       setAuthRequired(true);
       setLoading(false);
       setRefreshing(false);
+      setLoadingMore(false);
       return;
     }
 
     requestRef.current?.abort();
+    paginationRequestRef.current?.abort();
+    paginationRequestRef.current = null;
+    setLoadingMore(false);
     const controller = new AbortController();
     requestRef.current = controller;
+    const isCurrentRequest = () => (
+      !controller.signal.aborted &&
+      viewerIdRef.current === requestViewerId &&
+      authStatusRef.current === 'authenticated'
+    );
+
+    billingDataViewerIdRef.current = requestViewerId;
+    setBillingDataViewerId(requestViewerId);
     setError('');
     if (pullRefresh) setRefreshing(true);
     else setLoading(true);
@@ -316,17 +381,21 @@ export default function BillingScreen() {
         fetchPaymentHistoryPage({ limit: PAGE_SIZE, signal: controller.signal }),
         fetchRefundHistoryPage({ limit: PAGE_SIZE, signal: controller.signal }),
       ]);
-      if (controller.signal.aborted) return;
+      if (!isCurrentRequest()) return;
 
       const failed = [documentResult, paymentResult, refundResult].find((result) =>
         result.response.status === 401 || !result.response.ok,
       );
       if (failed) {
         if (failed.response.status === 401) {
+          billingDataViewerIdRef.current = null;
+          setBillingDataViewerId(null);
           setAuthRequired(true);
           setDocuments([]);
           setPayments([]);
           setRefunds([]);
+          setCursors({ payments: null, documents: null, refunds: null });
+          setMore({ payments: false, documents: false, refunds: false });
           return;
         }
         throw new Error(failed.error?.message || getApiErrorMessage(
@@ -341,6 +410,7 @@ export default function BillingScreen() {
         throw new Error('账单服务返回的数据格式无效，请稍后重试。');
       }
 
+      if (!isCurrentRequest()) return;
       setDocuments(documentPage.items);
       setPayments(paymentPage.items);
       setRefunds(refundPage.items);
@@ -356,37 +426,70 @@ export default function BillingScreen() {
       });
       setAuthRequired(false);
     } catch (cause) {
-      if (!controller.signal.aborted) {
+      if (isCurrentRequest()) {
         setError(cause instanceof Error ? cause.message : '账单数据加载失败，请稍后重试。');
       }
     } finally {
-      if (!controller.signal.aborted) {
+      if (isCurrentRequest()) {
         setLoading(false);
         setRefreshing(false);
       }
     }
-  }, [authStatus]);
+  }, [authStatus, viewerId]);
 
   useEffect(() => {
     void loadAll();
-    return () => requestRef.current?.abort();
   }, [loadAll]);
 
+  useEffect(() => () => {
+    requestRef.current?.abort();
+    paginationRequestRef.current?.abort();
+  }, []);
+
   const loadMore = useCallback(async () => {
-    if (!more[activeTab] || loadingMore || loading || authStatus !== 'authenticated') return;
-    const cursor = cursors[activeTab];
-    if (!cursor) return;
+    const requestViewerId = viewerId;
+    const requestTab = activeTab;
+    if (
+      !requestViewerId ||
+      !more[requestTab] ||
+      loadingMore ||
+      loading ||
+      authStatus !== 'authenticated' ||
+      viewerIdRef.current !== requestViewerId ||
+      billingDataViewerIdRef.current !== requestViewerId
+    ) return;
+    const cursor = cursors[requestTab];
+    if (!cursor || paginationRequestRef.current) return;
+
+    const controller = new AbortController();
+    paginationRequestRef.current = controller;
+    const isCurrentRequest = () => (
+      !controller.signal.aborted &&
+      viewerIdRef.current === requestViewerId &&
+      authStatusRef.current === 'authenticated' &&
+      billingDataViewerIdRef.current === requestViewerId
+    );
+
     setLoadingMore(true);
     setError('');
     try {
-      const options = { limit: PAGE_SIZE, cursor };
-      const result = activeTab === 'documents'
+      const options = { limit: PAGE_SIZE, cursor, signal: controller.signal };
+      const result = requestTab === 'documents'
         ? await fetchBillingDocumentsPage(options)
-        : activeTab === 'payments'
+        : requestTab === 'payments'
           ? await fetchPaymentHistoryPage(options)
           : await fetchRefundHistoryPage(options);
+      if (!isCurrentRequest()) return;
+
       if (result.response.status === 401) {
+        billingDataViewerIdRef.current = null;
+        setBillingDataViewerId(null);
         setAuthRequired(true);
+        setDocuments([]);
+        setPayments([]);
+        setRefunds([]);
+        setCursors({ payments: null, documents: null, refunds: null });
+        setMore({ payments: false, documents: false, refunds: false });
         return;
       }
       if (!result.response.ok) {
@@ -396,9 +499,11 @@ export default function BillingScreen() {
       }
       const page = unwrapPage<BillingItem>(result.data);
       if (!page) throw new Error('账单服务返回的数据格式无效。');
-      if (activeTab === 'documents') {
+      if (!isCurrentRequest()) return;
+
+      if (requestTab === 'documents') {
         setDocuments((current) => [...current, ...(page.items as BillingDocument[])]);
-      } else if (activeTab === 'payments') {
+      } else if (requestTab === 'payments') {
         setPayments((current) => {
           const known = new Set(current.map((item) => item.paymentId));
           return [...current, ...(page.items as PaymentHistoryItem[]).filter((item) => !known.has(item.paymentId))];
@@ -409,18 +514,36 @@ export default function BillingScreen() {
           return [...current, ...(page.items as RefundHistoryItem[]).filter((item) => !known.has(item.refundId))];
         });
       }
-      setCursors((current) => ({ ...current, [activeTab]: page.nextCursor }));
-      setMore((current) => ({ ...current, [activeTab]: page.hasMore }));
+      setCursors((current) => ({ ...current, [requestTab]: page.nextCursor }));
+      setMore((current) => ({ ...current, [requestTab]: page.hasMore }));
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : '加载更多记录失败，请重试。');
+      if (isCurrentRequest()) {
+        setError(cause instanceof Error ? cause.message : '加载更多记录失败，请重试。');
+      }
     } finally {
-      setLoadingMore(false);
+      if (isCurrentRequest()) setLoadingMore(false);
+      if (paginationRequestRef.current === controller) paginationRequestRef.current = null;
     }
-  }, [activeTab, authStatus, cursors, loading, loadingMore, more]);
+  }, [activeTab, authStatus, cursors, loading, loadingMore, more, viewerId]);
 
   const handleRefund = useCallback((item: PaymentHistoryItem) => {
+    const requestViewerId = viewerId;
     const amountMinor = refundBalance(item);
-    if (amountMinor <= 0) return;
+    if (
+      amountMinor <= 0 ||
+      !requestViewerId ||
+      viewerIdRef.current !== requestViewerId ||
+      authStatusRef.current !== 'authenticated' ||
+      billingDataViewerIdRef.current !== requestViewerId
+    ) return;
+
+    const refundIdempotencyScope = requestViewerId + ':' + item.paymentId;
+    const isCurrentViewer = () => (
+      viewerIdRef.current === requestViewerId &&
+      authStatusRef.current === 'authenticated' &&
+      billingDataViewerIdRef.current === requestViewerId
+    );
+
     Alert.alert(
       '确认申请退款',
       '将为该笔付款申请可退余额 ' + formatAmount(amountMinor, item.currency) +
@@ -431,20 +554,25 @@ export default function BillingScreen() {
           text: '确认申请',
           style: 'destructive',
           onPress: () => {
+            if (!isCurrentViewer()) return;
             void (async () => {
-              setRefundBusyId(item.paymentId);
+              if (!isCurrentViewer()) return;
+              setRefundBusyKey(refundIdempotencyScope);
               try {
-                const key = refundIdempotencyKeys.current.get(item.paymentId) ?? createIdempotencyKey();
-                refundIdempotencyKeys.current.set(item.paymentId, key);
+                const key = refundIdempotencyKeys.current.get(refundIdempotencyScope) ?? createIdempotencyKey();
+                refundIdempotencyKeys.current.set(refundIdempotencyScope, key);
                 const result = await requestPaymentRefund(
                   item.paymentId,
                   amountMinor,
                   item.currency,
                   key,
                 );
+                // Refund is a non-cancellable write once submitted. A switched account
+                // must never receive the previous viewer's result or trigger its reload.
+                if (!isCurrentViewer()) return;
                 if (!result.response.ok) {
                   if ([400, 401, 403, 404, 409, 422].includes(result.response.status)) {
-                    refundIdempotencyKeys.current.delete(item.paymentId);
+                    refundIdempotencyKeys.current.delete(refundIdempotencyScope);
                   }
                   throw new Error(result.error?.message || getApiErrorMessage(
                     result.data, '退款申请未能提交，请稍后重试。', result.response.status,
@@ -454,7 +582,7 @@ export default function BillingScreen() {
                   ? result.data.data
                   : null;
                 const status = typeof envelope?.status === 'string' ? envelope.status : 'PENDING';
-                if (status === 'FAILED') refundIdempotencyKeys.current.delete(item.paymentId);
+                if (status === 'FAILED') refundIdempotencyKeys.current.delete(refundIdempotencyScope);
                 Alert.alert(
                   '退款申请已提交',
                   status === 'SUCCEEDED'
@@ -463,20 +591,24 @@ export default function BillingScreen() {
                 );
                 await loadAll(true);
               } catch (cause) {
-                Alert.alert('退款申请失败', cause instanceof Error ? cause.message : '请稍后重试。');
+                if (isCurrentViewer()) {
+                  Alert.alert('退款申请失败', cause instanceof Error ? cause.message : '请稍后重试。');
+                }
               } finally {
-                setRefundBusyId(null);
+                if (isCurrentViewer()) {
+                  setRefundBusyKey((current) => current === refundIdempotencyScope ? null : current);
+                }
               }
             })();
           },
         },
       ],
     );
-  }, [loadAll]);
+  }, [loadAll, viewerId]);
 
   const visibleItems: BillingItem[] = activeTab === 'documents'
-    ? documents
-    : activeTab === 'payments' ? payments : refunds;
+    ? visibleDocuments
+    : activeTab === 'payments' ? visiblePayments : visibleRefunds;
 
   const renderItem = useCallback(({ item }: { item: BillingItem }) => {
     if (isBillingDocument(item)) {
@@ -492,13 +624,19 @@ export default function BillingScreen() {
         <PaymentRow
           item={item}
           pendingRefund={pendingRefundPaymentIds.has(item.paymentId)}
-          refundBusy={refundBusyId === item.paymentId}
+          refundBusy={Boolean(viewerId) && refundBusyKey === viewerId + ':' + item.paymentId}
           onRefund={() => handleRefund(item)}
         />
       );
     }
     return <RefundRow item={item} />;
-  }, [handleRefund, pendingRefundPaymentIds, refundBusyId]);
+  }, [handleRefund, pendingRefundPaymentIds, refundBusyKey, viewerId]);
+
+  const requiresAuthentication = authRequired || authStatus !== 'authenticated' || !viewerId;
+  const currentLoading = authStatus === 'loading' || (
+    authStatus === 'authenticated' && Boolean(viewerId) && !authRequired &&
+    (!isCurrentViewerData || loading)
+  );
 
   const keyExtractor = useCallback((item: BillingItem) => {
     if (isBillingDocument(item)) return item.documentId;
@@ -553,7 +691,12 @@ export default function BillingScreen() {
         })}
       </View>
 
-      {authRequired ? (
+      {currentLoading ? (
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator size="large" color="#1d9bf0" />
+          <Text className="mt-3 text-sm text-neutral-500">正在加载账单…</Text>
+        </View>
+      ) : requiresAuthentication ? (
         <View className="flex-1 items-center justify-center px-8">
           <Feather name="lock" size={34} color="#94a3b8" />
           <Text className="mt-4 text-base font-bold text-neutral-900 dark:text-white">请先登录</Text>
@@ -561,11 +704,6 @@ export default function BillingScreen() {
           <Pressable onPress={openLogin} className="mt-5 rounded-full bg-sky-500 px-6 py-3">
             <Text className="font-bold text-white">登录</Text>
           </Pressable>
-        </View>
-      ) : loading ? (
-        <View className="flex-1 items-center justify-center">
-          <ActivityIndicator size="large" color="#1d9bf0" />
-          <Text className="mt-3 text-sm text-neutral-500">正在加载账单…</Text>
         </View>
       ) : error && visibleItems.length === 0 ? (
         <View className="flex-1 items-center justify-center px-8">
