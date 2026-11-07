@@ -7,6 +7,7 @@ import Views from "~/assets/svg/views.svg";
 import LikeButton from './LikeButton';
 import ShareButton from './ShareButton';
 import { useReplyComposer } from './ReplyComposerProvider';
+import { getXDesignColors } from '~/constants/x-design-tokens';
 
 type EngagementData = {
     contentId?: string;
@@ -47,11 +48,12 @@ export const EngagementActions = ({ detailView, itemData, onCommentPress, replyD
             onSubmitted: () => onReplySubmitted?.(contentId),
         });
     };
-    const iconColor = colorScheme === 'dark' ? '#8b98a5' : '#536471';
-    const textColor = "text-sm text-neutral-600 dark:text-neutral-400";
+    const palette = getXDesignColors(colorScheme);
+    const iconColor = palette.muted;
+    const textColor = "text-[13px] leading-4 text-[#536471] dark:text-[#71767b]";
 
     return (
-        <View className="flex-row items-center justify-between mt-2">
+        <View className="flex-row items-center justify-between mt-3">
             <TouchableOpacity
                 accessibilityRole="button"
                 accessibilityLabel="Reply to post"
@@ -60,6 +62,8 @@ export const EngagementActions = ({ detailView, itemData, onCommentPress, replyD
                 disabled={replyDisabled || !itemData?.contentId?.trim()}
                 onPress={handleCommentPress}
                 className="flex-row items-center gap-1.5"
+                style={{ minHeight: 36, minWidth: 36 }}
+                hitSlop={8}
             >
                 <Comment width={18} height={18} fill={iconColor} />
                 <Text className={textColor}>{itemData?.reply_count}</Text>
