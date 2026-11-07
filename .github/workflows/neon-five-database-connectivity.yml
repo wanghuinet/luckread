@@ -1,0 +1,218 @@
+name: Neon Five Database Connectivity
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: neon-five-database-connectivity
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Verify all five Neon databases (read-only)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install pinned PostgreSQL client
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/neon-connectivity-probe"
+          npm install \
+            --prefix "$RUNNER_TEMP/neon-connectivity-probe" \
+            --no-save \
+            --no-audit \
+            --no-fund \
+            --ignore-scripts \
+            pg@8.16.3
+
+      - name: Test five Neon connections without writing data
+        shell: bash
+        env:
+          NEON_DATABASE_URL_LUCKREAD: ${{ secrets.NEON_DATABASE_URL_LUCKREAD }}
+          NEON_DATABASE_URL_LUCKREADPRO: ${{ secrets.NEON_DATABASE_URL_LUCKREADPRO }}
+          NEON_DATABASE_URL_GOVERNANCE: ${{ secrets.NEON_DATABASE_URL_GOVERNANCE }}
+          NEON_DATABASE_URL_FINANCE: ${{ secrets.NEON_DATABASE_URL_FINANCE }}
+          NEON_DATABASE_URL_ALLLUCK: ${{ secrets.NEON_DATABASE_URL_ALLLUCK }}
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/neon-connectivity-probe"
+          node <<'NODE'
+          const fs = require('node:fs')
+          const { Client } = require('pg')
+
+          const databases = [
+            { expected: 'luckread', secret: 'NEON_DATABASE_URL_LUCKREAD' },
+            { expected: 'luckreadpro', secret: 'NEON_DATABASE_URL_LUCKREADPRO' },
+            { expected: 'luckread_governance', secret: 'NEON_DATABASE_URL_GOVERNANCE' },
+            { expected: 'luckread_finance', secret: 'NEON_DATABASE_URL_FINANCE' },
+            { expected: 'allLuck', secret: 'NEON_DATABASE_URL_ALLLUCK' },
+          ]
+
+          const results = []
+          let failed = false
+
+          for (const database of databases) {
+            const connectionString = process.env[database.secret]
+
+            if (!connectionString) {
+              results.push({
+                name: database.expected,
+                status: 'FAIL',
+                detail: 'Missing GitHub Actions secret: ' + database.secret,
+              })
+              failed = true
+              continue
+            }
+
+            let parsed
+            try {
+              parsed = new URL(connectionString)
+            } catch {
+              results.push({
+                name: database.expected,
+                status: 'FAIL',
+                detail: 'Connection string is not a valid PostgreSQL URL.',
+              })
+              failed = true
+              continue
+            }
+
+            if (!['postgres:', 'postgresql:'].includes(parsed.protocol)) {
+              results.push({
+                name: database.expected,
+                status: 'FAIL',
+                detail: 'Connection string must use the PostgreSQL protocol.',
+              })
+              failed = true
+              continue
+            }
+
+            const sslmode = parsed.searchParams.get('sslmode')
+            const channelBinding = parsed.searchParams.get('channel_binding')
+
+            if (!['require', 'verify-ca', 'verify-full'].includes(sslmode)) {
+              results.push({
+                name: database.expected,
+                status: 'FAIL',
+                detail: 'SSL must be enabled with sslmode=require, verify-ca, or verify-full.',
+              })
+              failed = true
+              continue
+            }
+
+            if (channelBinding !== 'require') {
+              results.push({
+                name: database.expected,
+                status: 'FAIL',
+                detail: 'Connection string must include channel_binding=require.',
+              })
+              failed = true
+              continue
+            }
+
+            const client = new Client({
+              connectionString,
+              connectionTimeoutMillis: 15000,
+              query_timeout: 15000,
+              enableChannelBinding: true,
+            })
+
+            let connected = false
+            try {
+              await client.connect()
+              connected = true
+
+              const query = await client.query(`
+                SELECT
+                  current_database() AS database_name,
+                  current_setting('server_version') AS server_version,
+                  COALESCE(
+                    (SELECT ssl FROM pg_stat_ssl WHERE pid = pg_backend_pid()),
+                    FALSE
+                  ) AS ssl_enabled
+              `)
+
+              const row = query.rows[0]
+              const actualDatabase = row.database_name
+              const sslEnabled = row.ssl_enabled === true
+
+              if (actualDatabase !== database.expected) {
+                results.push({
+                  name: database.expected,
+                  status: 'FAIL',
+                  detail: 'Connected, but database name did not match. Actual: ' + actualDatabase,
+                })
+                failed = true
+              } else if (!sslEnabled) {
+                results.push({
+                  name: database.expected,
+                  status: 'FAIL',
+                  detail: 'Connected, but PostgreSQL did not report an SSL connection.',
+                })
+                failed = true
+              } else {
+                results.push({
+                  name: database.expected,
+                  status: 'PASS',
+                  detail: 'Connected; database name matched; TLS/SSL active; PostgreSQL ' + row.server_version,
+                })
+              }
+            } catch (error) {
+              const code = typeof error?.code === 'string' ? error.code : 'CONNECTION_ERROR'
+              results.push({
+                name: database.expected,
+                status: 'FAIL',
+                detail: 'Connection/query failed. Safe error code: ' + code,
+              })
+              failed = true
+            } finally {
+              if (connected) {
+                try {
+                  await client.end()
+                } catch {
+                  // Do not expose driver error details or connection settings in logs.
+                }
+              }
+            }
+          }
+
+          const lines = [
+            '# Neon five-database connectivity verification',
+            '',
+            '| Database | Result | Details |',
+            '|---|---|---|',
+            ...results.map((result) =>
+              '| ' + result.name + ' | **' + result.status + '** | ' +
+              result.detail.replaceAll('|', '\\|') + ' |'
+            ),
+            '',
+            'This workflow performs read-only SELECT queries. It does not create tables, alter schemas, write rows, run migrations, or change production routing.',
+            '',
+            'Connection strings and passwords are never printed by this workflow.',
+          ]
+
+          const summary = lines.join('\n') + '\n'
+          if (process.env.GITHUB_STEP_SUMMARY) {
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary)
+          }
+
+          for (const result of results) {
+            console.log(result.name + ': ' + result.status + ' — ' + result.detail)
+          }
+
+          if (failed) {
+            console.error('One or more Neon connectivity checks failed. See the step summary for details.')
+            process.exitCode = 1
+          } else {
+            console.log('All five Neon databases passed the read-only connectivity check.')
+          }
+          NODE
