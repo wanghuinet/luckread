@@ -222,6 +222,18 @@ test('uses canonical identity IDs for native profile content, ownership checks, 
   expect(profileScreenSource).not.toContain('pinnedRecord.ownerUserId === profile.id');
 });
 
+test('post detail content and member entitlement are isolated by authenticated viewer', () => {
+  expect(postDetailSource).toContain("const viewerId = useAuthStore((state) => state.user?.id ?? null);");
+  expect(postDetailSource).toContain('const viewerIdRef = useRef<string | null>(viewerId);');
+  expect(postDetailSource).toContain('const hasCurrentViewerData = dataViewerId === viewerId;');
+  expect(postDetailSource).toContain('viewerIdRef.current = viewerId;');
+  expect(postDetailSource).toContain('viewerIdRef.current === requestViewerId');
+  expect(postDetailSource).toContain('setDataViewerId(requestViewerId);');
+  expect(postDetailSource).toContain('if (!hasCurrentViewerData || loading)');
+  expect(postDetailSource).toContain('controller.abort();');
+  expect(postDetailSource).toContain('}, [postId, retryKey, viewerId]);');
+});
+
 test('wires public profile Replies and Media plus own-profile Likes to real channel endpoints', () => {
   expect(profileScreenSource).toContain("const profileTabs = isOwnProfile\n    ? ['Posts', 'Replies', 'Media', 'Likes']\n    : ['Posts', 'Replies', 'Media'];");
   expect(profileScreenSource).toContain("title: showingReplies ? 'Replies' : showingMedia ? 'Media' : showingLikes ? 'Likes' : 'Feed'");
