@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -116,7 +116,9 @@ export default function Notifications() {
   const requestedActorsRef = useRef(new Set<string>());
   const previousViewerIdRef = useRef<string | null>(viewerId);
   const viewerIdRef = useRef<string | null>(viewerId);
-  viewerIdRef.current = viewerId;
+  useLayoutEffect(() => {
+    viewerIdRef.current = viewerId;
+  }, [viewerId]);
   const [dataViewerId, setDataViewerId] = useState<string | null>(viewerId);
   const isCurrentViewerData = dataViewerId === viewerId;
   const currentItems = isCurrentViewerData ? items : EMPTY_NOTIFICATIONS;
