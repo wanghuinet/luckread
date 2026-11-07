@@ -114,9 +114,7 @@ jobs:
           PGPASSWORD: postgres
         run: |
           set -euo pipefail
-          psql "postgresql://postgres:postgres@127.0.0.1:5432/luckread_schema_rollback" \\
-            -v ON_ERROR_STOP=1 \\
-            -c "INSERT INTO public.payload_kv (key, data) VALUES ('neon-payload-rollback-guard-fixture', '{}'::jsonb);"
+          psql "postgresql://postgres:postgres@127.0.0.1:5432/luckread_schema_rollback" -v ON_ERROR_STOP=1 -c "INSERT INTO public.payload_kv (key, data) VALUES ('neon-payload-rollback-guard-fixture', '{}'::jsonb);"
 
       - name: Confirm Payload migrate:down refuses to drop a non-empty schema
         working-directory: workers/W01-payload
