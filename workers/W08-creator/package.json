@@ -13,6 +13,6 @@
   },
   "engines": { "node": ">=24" },
   "dependencies": {
-    "@casl/ability": "7.0.1"
+    "@casl/ability": "7.1.1"
   }
 }
