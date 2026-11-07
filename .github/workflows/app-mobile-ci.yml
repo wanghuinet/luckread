@@ -149,8 +149,10 @@ jobs:
           echo "Verified generated Hyperswitch specs:"
           echo "$MODULE_SPEC"
           echo "$HEADLESS_SPEC"
-      - name: TypeScript typecheck
+      - name: TypeScript 7 native compiler typecheck
         run: bun run typecheck
+      - name: TypeScript 6 compiler API compatibility typecheck
+        run: bun run typecheck:ts6
       - name: Test PostHog APP crash-diagnostics configuration
         run: bun test tests/posthog-diagnostics.test.mjs
       - name: Test unified native API client rules
