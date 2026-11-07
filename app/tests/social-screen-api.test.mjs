@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const bookmarkScreenSource = readFileSync(resolve(process.cwd(), 'app/(drawer)/bookmarks.tsx'), 'utf8');
+const bookmarkStateSource = readFileSync(resolve(process.cwd(), 'lib/content-bookmark-state.ts'), 'utf8');
 const feedItemSource = readFileSync(new URL('../components/FeedItem.tsx', import.meta.url), 'utf8');
 const postDetailSource = readFileSync(new URL('../app/(drawer)/(tabs)/(index,search,messages,grok,video,notifications)/post/[id].tsx', import.meta.url), 'utf8');
 const profileScreenSource = readFileSync(resolve(process.cwd(), 'app/(drawer)/(tabs)/(index,search,messages,grok,video,notifications)/profile/[id].tsx'), 'utf8');
@@ -13,11 +14,19 @@ const subscriptionsScreenSource = readFileSync(resolve(process.cwd(), 'app/(draw
 
 const calls = [];
 let keyCounter = 0;
+let activeViewerId = 'viewer-a';
+let apiResponder = null;
+const mockedAuthStore = Object.assign(
+  (selector) => selector({ status: 'authenticated', user: activeViewerId ? { id: activeViewerId } : null }),
+  { getState: () => ({ status: 'authenticated', user: activeViewerId ? { id: activeViewerId } : null }) },
+);
+mock.module('../store/auth-store.ts', () => ({ useAuthStore: mockedAuthStore }));
 mock.module('../lib/api-client.ts', () => ({
   createIdempotencyKey: () => 'test-key-' + ++keyCounter,
   apiRequest: async (path, options) => {
     const call = { path, options };
     calls.push(call);
+    if (apiResponder) return apiResponder(path, options);
     return { response: { ok: true, status: 200 }, data: { data: { items: [] } }, error: null };
   },
 }));
@@ -46,10 +55,16 @@ const {
   muteUser,
   unmuteUser,
 } = await import('../lib/social-screen-api.ts');
+const {
+  getContentBookmarkSnapshot,
+  refreshContentBookmarkStatus,
+} = await import('../lib/content-bookmark-state.ts');
 
 beforeEach(() => {
   calls.length = 0;
   keyCounter = 0;
+  activeViewerId = 'viewer-a';
+  apiResponder = null;
 });
 
 test('notification inbox data, actor cache, and pending reads are isolated when the authenticated account changes', () => {
@@ -173,11 +188,13 @@ test('marks all notifications as read using the existing endpoint', async () => 
   });
 });
 
-test('loads the real bookmark list with cursor pagination', async () => {
-  await fetchBookmarksPage({ cursor: 'bookmark cursor/1' });
+test('loads the real bookmark list with cursor pagination and forwards cancellation', async () => {
+  const controller = new AbortController();
+  await fetchBookmarksPage({ cursor: 'bookmark cursor/1', signal: controller.signal });
 
   expect(calls[0].path).toBe('/interactions/bookmarks?list=true&limit=20&cursor=bookmark+cursor%2F1');
   expect(calls[0].options.method).toBe('GET');
+  expect(calls[0].options.signal).toBe(controller.signal);
 });
 
 test('loads all content types for the native profile Media tab with creator filtering and pagination', async () => {
@@ -308,11 +325,67 @@ test('loads recent public discovery topics with the existing limit', async () =>
 });
 
 
+test('bookmark list and cached bookmark status are isolated by the authenticated viewer', () => {
+  expect(bookmarkScreenSource).toContain("const viewerId = useAuthStore((state) => state.user?.id ?? null);");
+  expect(bookmarkScreenSource).toContain('previousViewerIdRef.current !== viewerId');
+  expect(bookmarkScreenSource).toContain('const visibleItems = isCurrentViewerData ? items : [];');
+  expect(bookmarkScreenSource).toContain('viewerIdRef.current === requestViewerId');
+  expect(bookmarkScreenSource).toContain('signal: controller.signal');
+  expect(bookmarkScreenSource).toContain('dataViewerIdRef.current !== ownerViewerId');
+  expect(bookmarkStateSource).toContain('function snapshotKey(viewerId: string, contentId: string)');
+  expect(bookmarkStateSource).toContain('getContentBookmarkSnapshot(id, viewerId)');
+  expect(bookmarkStateSource).toContain('currentViewerId() !== viewerId');
+  expect(bookmarkStateSource).toContain('[authStatus, id, viewerId]');
+});
+
+test('the bookmark cache keeps the same content relationship separate for two accounts', async () => {
+  let favorited = true;
+  apiResponder = async () => ({
+    response: { ok: true, status: 200 },
+    data: { data: { favorited } },
+    error: null,
+  });
+
+  activeViewerId = 'viewer-a';
+  await refreshContentBookmarkStatus('content_shared_123');
+  expect(getContentBookmarkSnapshot('content_shared_123', 'viewer-a'))
+    .toMatchObject({ bookmarked: true, loaded: true, loading: false });
+
+  activeViewerId = 'viewer-b';
+  favorited = false;
+  await refreshContentBookmarkStatus('content_shared_123');
+  expect(getContentBookmarkSnapshot('content_shared_123', 'viewer-b'))
+    .toMatchObject({ bookmarked: false, loaded: true, loading: false });
+  expect(getContentBookmarkSnapshot('content_shared_123', 'viewer-a'))
+    .toMatchObject({ bookmarked: true, loaded: true, loading: false });
+});
+
+test('a late bookmark response for the previous viewer cannot hydrate the next viewer state', async () => {
+  let resolveResponse;
+  apiResponder = () => new Promise((resolve) => { resolveResponse = resolve; });
+
+  activeViewerId = 'viewer-a';
+  const pending = refreshContentBookmarkStatus('content_late_123');
+  expect(typeof resolveResponse).toBe('function');
+  activeViewerId = 'viewer-b';
+  resolveResponse({
+    response: { ok: true, status: 200 },
+    data: { data: { favorited: true } },
+    error: null,
+  });
+  await pending;
+
+  expect(getContentBookmarkSnapshot('content_late_123', 'viewer-a'))
+    .toMatchObject({ bookmarked: false, loaded: false, loading: false, pending: false });
+  expect(getContentBookmarkSnapshot('content_late_123', 'viewer-b'))
+    .toMatchObject({ bookmarked: false, loaded: false, loading: false, pending: false });
+});
+
 test('saved list removes an item only after shared bookmark status confirms it is no longer saved', () => {
   expect(bookmarkScreenSource).toContain("import { useContentBookmark } from '~/lib/content-bookmark-state';");
   expect(bookmarkScreenSource).toContain('function BookmarkFeedRow(');
   expect(bookmarkScreenSource).toContain('if (!contentId || !bookmark.loaded || bookmark.loading || bookmark.pending || bookmark.bookmarked) return;');
-  expect(bookmarkScreenSource).toContain('onRemoved(contentId);');
+  expect(bookmarkScreenSource).toContain('onRemoved(contentId, viewerId);');
   expect(bookmarkScreenSource).toContain('onRemoved={removeUnbookmarkedItem}');
 });
 

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import {
   ActivityIndicator,
@@ -31,23 +31,25 @@ const PRIMARY = '#1d9bf0';
 
 function BookmarkFeedRow({
   item,
+  viewerId,
   onOpen,
   onRemoved,
 }: {
   item: FeedContent;
+  viewerId: string;
   onOpen: (contentId: string) => void;
-  onRemoved: (contentId: string) => void;
+  onRemoved: (contentId: string, viewerId: string) => void;
 }) {
   const bookmark = useContentBookmark(item.contentId);
 
   useEffect(() => {
     const contentId = item.contentId;
-    // Only remove the row after the shared W05-backed bookmark status is known.
-    // A loading state or failed status read must not hide a still-saved item.
+    // Only remove the row after the W05-backed status for this exact viewer is known.
     if (!contentId || !bookmark.loaded || bookmark.loading || bookmark.pending || bookmark.bookmarked) return;
-    onRemoved(contentId);
+    onRemoved(contentId, viewerId);
   }, [
     item.contentId,
+    viewerId,
     bookmark.bookmarked,
     bookmark.loaded,
     bookmark.loading,
@@ -70,7 +72,9 @@ export default function Bookmarks() {
   const isDark = colorScheme === 'dark';
   const router = useRouter();
   const authStatus = useAuthStore((state) => state.status);
+  const viewerId = useAuthStore((state) => state.user?.id ?? null);
   const [items, setItems] = useState<FeedContent[]>([]);
+  const [dataViewerId, setDataViewerId] = useState<string | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -78,7 +82,48 @@ export default function Bookmarks() {
   const [error, setError] = useState('');
   const [authRequired, setAuthRequired] = useState(false);
 
-  const removeUnbookmarkedItem = useCallback((contentId: string) => {
+  const requestRef = useRef<AbortController | null>(null);
+  const viewerIdRef = useRef<string | null>(viewerId);
+  const authStatusRef = useRef(authStatus);
+  const dataViewerIdRef = useRef<string | null>(null);
+  const previousViewerIdRef = useRef<string | null>(viewerId);
+  const previousAuthStatusRef = useRef(authStatus);
+
+  useLayoutEffect(() => {
+    viewerIdRef.current = viewerId;
+    authStatusRef.current = authStatus;
+
+    const identityChanged = previousViewerIdRef.current !== viewerId ||
+      previousAuthStatusRef.current !== authStatus;
+    if (!identityChanged) return;
+
+    previousViewerIdRef.current = viewerId;
+    previousAuthStatusRef.current = authStatus;
+    requestRef.current?.abort();
+    requestRef.current = null;
+    dataViewerIdRef.current = null;
+    setDataViewerId(null);
+    setItems([]);
+    setCursor(null);
+    setHasMore(false);
+    setLoading(authStatus === 'authenticated' && Boolean(viewerId));
+    setLoadingMore(false);
+    setError('');
+    setAuthRequired(authStatus !== 'authenticated' || !viewerId);
+  }, [authStatus, viewerId]);
+
+  const isCurrentViewerData = Boolean(viewerId) && dataViewerId === viewerId;
+  const visibleItems = isCurrentViewerData ? items : [];
+  const visibleCursor = isCurrentViewerData ? cursor : null;
+  const visibleHasMore = isCurrentViewerData && hasMore;
+  const visibleLoadingMore = isCurrentViewerData && loadingMore;
+
+  const removeUnbookmarkedItem = useCallback((contentId: string, ownerViewerId: string) => {
+    if (
+      viewerIdRef.current !== ownerViewerId ||
+      authStatusRef.current !== 'authenticated' ||
+      dataViewerIdRef.current !== ownerViewerId
+    ) return;
     setItems((current) => current.filter((item) => item.contentId !== contentId));
   }, []);
 
@@ -87,21 +132,45 @@ export default function Bookmarks() {
   }, [router]);
 
   const loadPage = useCallback(async (nextCursor: string | null, append: boolean) => {
+    const requestViewerId = viewerId;
     if (authStatus === 'loading') return;
-    if (authStatus !== 'authenticated') {
-      setAuthRequired(true);
+    if (authStatus !== 'authenticated' || !requestViewerId) {
+      requestRef.current?.abort();
+      requestRef.current = null;
+      dataViewerIdRef.current = null;
+      setDataViewerId(null);
       setItems([]);
+      setCursor(null);
+      setHasMore(false);
+      setAuthRequired(true);
       setLoading(false);
       setLoadingMore(false);
       return;
     }
+    if (append && dataViewerIdRef.current !== requestViewerId) return;
+
+    requestRef.current?.abort();
+    const controller = new AbortController();
+    requestRef.current = controller;
+    const isCurrentRequest = () => (
+      !controller.signal.aborted &&
+      viewerIdRef.current === requestViewerId &&
+      authStatusRef.current === 'authenticated'
+    );
+
+    dataViewerIdRef.current = requestViewerId;
+    setDataViewerId(requestViewerId);
+    setError('');
     if (append) setLoadingMore(true);
     else setLoading(true);
-    setError('');
 
     try {
-      const result = await fetchBookmarksPage({ cursor: nextCursor });
+      const result = await fetchBookmarksPage({ cursor: nextCursor, signal: controller.signal });
+      if (!isCurrentRequest()) return;
+
       if (result.response.status === 401) {
+        dataViewerIdRef.current = null;
+        setDataViewerId(null);
         setAuthRequired(true);
         setItems([]);
         setCursor(null);
@@ -115,6 +184,7 @@ export default function Bookmarks() {
       if (!page || !Array.isArray(page.items)) throw new Error('收藏接口返回的数据格式无效。');
 
       const sessionToken = await readSessionToken().catch(() => null);
+      if (!isCurrentRequest()) return;
       const mapped = await Promise.all(page.items
         .filter((item): item is ApiContentRecord => Boolean(item && typeof item.id === 'string'))
         .map(async (item) => {
@@ -125,6 +195,8 @@ export default function Bookmarks() {
           ]);
           return mapContentToFeedContent(item, body, social, author, sessionToken);
         }));
+      if (!isCurrentRequest()) return;
+
       setItems((current) => {
         if (!append) return mapped;
         const seen = new Set(current.map((item) => item.contentId));
@@ -134,18 +206,40 @@ export default function Bookmarks() {
       setHasMore(page.hasMore === true);
       setAuthRequired(false);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : '无法加载收藏内容。');
+      if (isCurrentRequest()) setError(cause instanceof Error ? cause.message : '无法加载收藏内容。');
     } finally {
-      setLoading(false);
-      setLoadingMore(false);
+      if (isCurrentRequest()) {
+        setLoading(false);
+        setLoadingMore(false);
+      }
+      if (requestRef.current === controller) requestRef.current = null;
     }
-  }, [authStatus]);
+  }, [authStatus, viewerId]);
 
   useEffect(() => {
     if (authStatus !== 'loading') void loadPage(null, false);
-  }, [authStatus, loadPage]);
+  }, [authStatus, viewerId, loadPage]);
 
-  if (authRequired) {
+  useEffect(() => () => requestRef.current?.abort(), []);
+
+  const requiresAuthentication = authRequired || authStatus !== 'authenticated' || !viewerId;
+  const currentLoading = authStatus === 'loading' || (
+    authStatus === 'authenticated' && !viewerId
+  ) || (
+    authStatus === 'authenticated' && Boolean(viewerId) && !authRequired &&
+    (!isCurrentViewerData || loading)
+  );
+
+  if (currentLoading) {
+    return (
+      <View className="flex-1 items-center justify-center bg-white dark:bg-black">
+        <StatusBar style={isDark ? 'light' : 'dark'} />
+        <ActivityIndicator size="large" color={PRIMARY} />
+      </View>
+    );
+  }
+
+  if (requiresAuthentication) {
     return (
       <View className="flex-1 items-center justify-center bg-white px-6 dark:bg-black">
         <StatusBar style={isDark ? 'light' : 'dark'} />
@@ -164,7 +258,7 @@ export default function Bookmarks() {
       <StatusBar style={isDark ? 'light' : 'dark'} />
       <View className="flex-row items-center justify-between border-b border-neutral-100 px-4 py-3 dark:border-neutral-800">
         <Text className="text-xl font-bold text-neutral-900 dark:text-white">收藏</Text>
-        <Pressable accessibilityRole="button" onPress={() => void loadPage(null, false)} disabled={loading} className="p-2">
+        <Pressable accessibilityRole="button" onPress={() => void loadPage(null, false)} disabled={currentLoading} className="p-2">
           <Feather name="refresh-cw" size={19} color={PRIMARY} />
         </Pressable>
       </View>
@@ -175,11 +269,12 @@ export default function Bookmarks() {
         </View>
       ) : null}
       <FlatList
-        data={items}
+        data={visibleItems}
         keyExtractor={(item, index) => item.contentId || 'bookmark-' + index}
         renderItem={({ item }) => (
           <BookmarkFeedRow
             item={item}
+            viewerId={viewerId ?? ''}
             onOpen={openPost}
             onRemoved={removeUnbookmarkedItem}
           />
@@ -199,10 +294,10 @@ export default function Bookmarks() {
             )}
           </View>
         )}
-        ListFooterComponent={loadingMore ? (
+        ListFooterComponent={visibleLoadingMore ? (
           <ActivityIndicator className="py-5" color={PRIMARY} />
-        ) : hasMore ? (
-          <Pressable onPress={() => void loadPage(cursor, true)} className="items-center py-5">
+        ) : visibleHasMore ? (
+          <Pressable onPress={() => void loadPage(visibleCursor, true)} className="items-center py-5">
             <Text className="font-semibold text-sky-600">加载更多</Text>
           </Pressable>
         ) : <View className="h-6" />}
