@@ -181,8 +181,55 @@ jobs:
                   'FROM pg_type t JOIN pg_namespace n ON n.oid = t.typnamespace ' +
                   "WHERE n.nspname NOT IN ('pg_catalog', 'information_schema') " +
                   "AND n.nspname NOT LIKE 'pg_toast%' AND n.nspname NOT LIKE 'pg_temp_%' " +
-                  "AND t.typtype IN ('e', 'd', 'r') " +
                   'ORDER BY n.nspname, t.typname LIMIT 51'
+                )
+
+                const routines = await client.query(
+                  'SELECT n.nspname AS schema_name, p.proname AS object_name, ' +
+                  "'routine' AS object_kind FROM pg_proc p " +
+                  'JOIN pg_namespace n ON n.oid = p.pronamespace ' +
+                  "WHERE n.nspname NOT IN ('pg_catalog', 'information_schema') " +
+                  "AND n.nspname NOT LIKE 'pg_toast%' AND n.nspname NOT LIKE 'pg_temp_%' " +
+                  'ORDER BY n.nspname, p.proname LIMIT 51'
+                )
+
+                const otherObjects = await client.query(
+                  'SELECT n.nspname AS schema_name, o.oprname AS object_name, ' +
+                  "'operator' AS object_kind FROM pg_operator o " +
+                  'JOIN pg_namespace n ON n.oid = o.oprnamespace ' +
+                  "WHERE n.nspname NOT IN ('pg_catalog', 'information_schema') " +
+                  "AND n.nspname NOT LIKE 'pg_toast%' AND n.nspname NOT LIKE 'pg_temp_%' " +
+                  'UNION ALL ' +
+                  'SELECT n.nspname, c.collname, \'collation\' FROM pg_collation c ' +
+                  'JOIN pg_namespace n ON n.oid = c.collnamespace ' +
+                  "WHERE n.nspname NOT IN ('pg_catalog', 'information_schema') " +
+                  "AND n.nspname NOT LIKE 'pg_toast%' AND n.nspname NOT LIKE 'pg_temp_%' " +
+                  'UNION ALL ' +
+                  'SELECT n.nspname, c.conname, \'conversion\' FROM pg_conversion c ' +
+                  'JOIN pg_namespace n ON n.oid = c.connamespace ' +
+                  "WHERE n.nspname NOT IN ('pg_catalog', 'information_schema') " +
+                  "AND n.nspname NOT LIKE 'pg_toast%' AND n.nspname NOT LIKE 'pg_temp_%' " +
+                  'UNION ALL ' +
+                  'SELECT n.nspname, t.cfgname, \'text_search_config\' FROM pg_ts_config t ' +
+                  'JOIN pg_namespace n ON n.oid = t.cfgnamespace ' +
+                  "WHERE n.nspname NOT IN ('pg_catalog', 'information_schema') " +
+                  "AND n.nspname NOT LIKE 'pg_toast%' AND n.nspname NOT LIKE 'pg_temp_%' " +
+                  'UNION ALL ' +
+                  'SELECT n.nspname, t.dictname, \'text_search_dictionary\' FROM pg_ts_dict t ' +
+                  'JOIN pg_namespace n ON n.oid = t.dictnamespace ' +
+                  "WHERE n.nspname NOT IN ('pg_catalog', 'information_schema') " +
+                  "AND n.nspname NOT LIKE 'pg_toast%' AND n.nspname NOT LIKE 'pg_temp_%' " +
+                  'UNION ALL ' +
+                  'SELECT n.nspname, t.prsname, \'text_search_parser\' FROM pg_ts_parser t ' +
+                  'JOIN pg_namespace n ON n.oid = t.prsnamespace ' +
+                  "WHERE n.nspname NOT IN ('pg_catalog', 'information_schema') " +
+                  "AND n.nspname NOT LIKE 'pg_toast%' AND n.nspname NOT LIKE 'pg_temp_%' " +
+                  'UNION ALL ' +
+                  'SELECT n.nspname, t.tmplname, \'text_search_template\' FROM pg_ts_template t ' +
+                  'JOIN pg_namespace n ON n.oid = t.tmplnamespace ' +
+                  "WHERE n.nspname NOT IN ('pg_catalog', 'information_schema') " +
+                  "AND n.nspname NOT LIKE 'pg_toast%' AND n.nspname NOT LIKE 'pg_temp_%' " +
+                  'ORDER BY 1, 2 LIMIT 51'
                 )
 
                 const extensions = await client.query(
@@ -195,10 +242,20 @@ jobs:
                 const customTypeNames = customTypes.rows.map(
                   (row) => row.schema_name + '.' + row.type_name,
                 )
+                const routineNames = routines.rows.map(
+                  (row) => row.schema_name + '.' + row.object_name,
+                )
+                const otherObjectNames = otherObjects.rows.map(
+                  (row) => row.schema_name + '.' + row.object_name,
+                )
+                const extensionNames = extensions.rows.map((row) => row.extname)
                 const clean =
                   extraSchemas.length === 0 &&
                   relations.rows.length === 0 &&
-                  customTypes.rows.length === 0
+                  customTypes.rows.length === 0 &&
+                  routines.rows.length === 0 &&
+                  otherObjects.rows.length === 0 &&
+                  extensionNames.length === 0
 
                 await client.query('ROLLBACK')
                 transactionOpen = false
@@ -213,7 +270,9 @@ jobs:
                       'Extra schemas=' + JSON.stringify(extraSchemas) +
                       '; relations=' + JSON.stringify(relationNames) +
                       '; custom types=' + JSON.stringify(customTypeNames) +
-                      '; non-default extensions=' + JSON.stringify(extensions.rows.map((row) => row.extname)),
+                      '; routines=' + JSON.stringify(routineNames) +
+                      '; other schema objects=' + JSON.stringify(otherObjectNames) +
+                      '; non-default extensions=' + JSON.stringify(extensionNames),
                   })
                   failed = true
                 } else {
@@ -223,8 +282,7 @@ jobs:
                     status: 'PASS_EMPTY',
                     detail:
                       'Verified TLS; PostgreSQL ' + identity.rows[0].server_version +
-                      '; only the default public schema exists; no user relations or custom enum/domain/range types; non-default extensions=' +
-                      JSON.stringify(extensions.rows.map((row) => row.extname)),
+                      '; only the default public schema exists; no user relations, user-defined types, routines, operators, collations, conversions, text-search objects, or non-default extensions.',
                   })
                 }
               } catch (error) {
@@ -267,7 +325,7 @@ jobs:
               '',
               'This workflow is read-only. It opens a READ ONLY transaction and rolls it back. It does not create schemas, tables, extensions, migration ledgers, or rows.',
               '',
-              'PASS_EMPTY confirms there are no non-system schemas beyond public, no user tables/views/materialized views/sequences/foreign tables, and no user-defined enum/domain/range types. A non-empty target is blocked for manual review and is never overwritten.',
+              'PASS_EMPTY confirms there are no non-system schemas beyond public, user relations, user-defined types, routines, operators, collations, conversions, text-search objects, or non-default extensions. A non-empty target is blocked for manual review and is never overwritten.',
               '',
               'This is a target-readiness check only. It does not authorize D1 replacement, Worker/Hyperdrive binding changes, Payload adapter changes, schema application, or production traffic cutover.',
               '',
