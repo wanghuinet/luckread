@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useMemo, useCallback, useEffect, useLayoutEffect } from 'react';
 import { Alert, View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { useLocalSearchParams, Stack, useRouter } from 'expo-router';
 import { FeedItem, FeedContent } from '~/components/FeedItem';
@@ -180,6 +180,10 @@ export default function PostDetailScreen() {
     const tabBarScroll = useTabBarScroll();
     const rawId = params.id;
     const postId = Array.isArray(rawId) ? rawId[0] || '' : rawId || '';
+    const viewerId = useAuthStore((state) => state.user?.id ?? null);
+    const viewerIdRef = useRef<string | null>(viewerId);
+    const [dataViewerId, setDataViewerId] = useState<string | null>(viewerId);
+    const hasCurrentViewerData = dataViewerId === viewerId;
     const [selectedSort, setSelectedSort] = useState<SortType>('relevant');
     const [findPost, setFindPost] = useState<FeedContent | null>(null);
     const [membershipRequired, setMembershipRequired] = useState(false);
@@ -198,8 +202,14 @@ const handleSelectSort = useCallback((sortType: SortType) => {
         bottomSheetModalRef.current?.dismiss();
     }, []);
 
+    useLayoutEffect(() => {
+        viewerIdRef.current = viewerId;
+    }, [viewerId]);
+
     useEffect(() => {
+        const requestViewerId = viewerId;
         if (!postId) {
+            setDataViewerId(requestViewerId);
             setErrorMessage('The post ID is missing.');
             setLoading(false);
             return;
@@ -207,6 +217,11 @@ const handleSelectSort = useCallback((sortType: SortType) => {
 
         const controller = new AbortController();
         let active = true;
+        const isCurrent = () =>
+            active &&
+            !controller.signal.aborted &&
+            viewerIdRef.current === requestViewerId;
+
         setLoading(true);
         setErrorMessage('');
         setFindPost(null);
@@ -218,6 +233,7 @@ const handleSelectSort = useCallback((sortType: SortType) => {
                     '/contents/' + encodeURIComponent(postId),
                     { method: 'GET', signal: controller.signal },
                 );
+                if (!isCurrent()) return;
                 const record = unwrapApiData<ApiContentRecord>(data);
                 if (!response.ok || !record || typeof record.id !== 'string') {
                     throw new Error(getApiErrorMessage(data, 'Could not load this post. Please retry.'));
@@ -243,7 +259,7 @@ const handleSelectSort = useCallback((sortType: SortType) => {
                 }
 
                 const [socialResult, authorResult] = await Promise.all(tasks);
-                if (!active || controller.signal.aborted) return;
+                if (!isCurrent()) return;
 
                 const socialResponse = socialResult as { response?: Response; data?: unknown } | null;
                 const social = socialResponse?.response?.ok
@@ -261,18 +277,21 @@ const handleSelectSort = useCallback((sortType: SortType) => {
                 }
 
                 const sessionToken = await readSessionToken().catch(() => null);
-                if (!active || controller.signal.aborted) return;
+                if (!isCurrent()) return;
                 const accessRequired = hydratedRecord.accessMode === 'MEMBERS_ONLY' &&
                     hydratedRecord.accessGranted !== true;
                 const body = await readContentBody(hydratedRecord, controller.signal, sessionToken);
-                if (!active || controller.signal.aborted) return;
+                if (!isCurrent()) return;
+                const mappedPost = mapContentToFeedContent(hydratedRecord, body, social, null, sessionToken);
                 setMembershipRequired(accessRequired);
-                setFindPost(mapContentToFeedContent(hydratedRecord, body, social, null, sessionToken));
+                setFindPost(mappedPost);
+                setDataViewerId(requestViewerId);
             } catch (error) {
-                if (!active || controller.signal.aborted) return;
+                if (!isCurrent()) return;
+                setDataViewerId(requestViewerId);
                 setErrorMessage(error instanceof Error ? error.message : 'Could not load this post. Please retry.');
             } finally {
-                if (active) setLoading(false);
+                if (isCurrent()) setLoading(false);
             }
         })();
 
@@ -280,7 +299,7 @@ const handleSelectSort = useCallback((sortType: SortType) => {
             active = false;
             controller.abort();
         };
-    }, [postId, retryKey]);
+    }, [postId, retryKey, viewerId]);
 
     const authorHandle = findPost?.authorHandle || findPost?.poster_id || undefined;
     const membershipCreatorId = findPost?.creatorId;
@@ -296,7 +315,7 @@ const handleSelectSort = useCallback((sortType: SortType) => {
         router.push(('/membership-plans?' + query.toString()) as never);
     }, [findPost?.creatorId, postId, router]);
 
-    if (loading) {
+    if (!hasCurrentViewerData || loading) {
         return (
             <View className="flex-1 justify-center items-center bg-white dark:bg-black" style={{ paddingTop: insets.top }}>
                 <Text className="text-neutral-500 dark:text-neutral-400">Loading post…</Text>
