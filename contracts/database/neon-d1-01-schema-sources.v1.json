@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/database/neon-d1-01-schema-sources.v1.json",
+  "title": "LuckRead D1-01 to Neon PostgreSQL Schema Source Inventory Contract",
+  "version": "1.0.0",
+  "status": "SOURCE_INVENTORY_BASELINE",
+  "target": {
+    "domainId": "D1-01",
+    "databaseName": "luckread",
+    "postgresMajor": 18,
+    "existingProductionAuthority": "Cloudflare D1",
+    "stagedSchemaTarget": "Neon PostgreSQL",
+    "businessDataImport": false
+  },
+  "owners": [
+    {
+      "worker": "W01",
+      "role": "Payload/CMS schema authority and API boundary",
+      "schemaMode": "Generate a fresh PostgreSQL baseline using the official Payload PostgreSQL adapter; do not translate or execute D1 adapter migrations on PostgreSQL.",
+      "currentAdapter": "@payloadcms/db-d1-sqlite@3.90.2",
+      "targetAdapter": "@payloadcms/db-postgres@3.90.2",
+      "config": "workers/W01-payload/src/payload.config.ts",
+      "wrangler": "workers/W01-payload/wrangler.jsonc",
+      "collections": [
+        "workers/W01-payload/src/collections/Users.ts",
+        "workers/W01-payload/src/collections/Media.ts"
+      ],
+      "migrationIndex": "workers/W01-payload/src/migrations/index.ts",
+      "migrationModules": [
+        "20250929_111647.ts",
+        "20260921_003203_MIG_AUTH_002_SESSION_V1.ts",
+        "20260925_111503_MIG_ENT_USER_PROFILE_V1.ts",
+        "20260928_020000_MIG_AUTH_001_REGISTRATION_BATCH_V1.ts",
+        "20260928_104842_MIG_PAYLOAD_3902_NATIVE_SCHEMA_V1.ts",
+        "20261002_120000_media_owner.ts",
+        "20261006_202000_MIG_BETTER_AUTH_PROFILE_PROJECTION_V1.ts",
+        "20261022_120000_MIG_MEDIA_UPLOAD_IDEMPOTENCY_V1.ts",
+        "20261101_163928_username_redirects.ts"
+      ],
+      "sqliteSchemaSnapshots": [
+        "workers/W01-payload/src/migrations/20250929_111647.json",
+        "workers/W01-payload/src/migrations/20260928_104842_MIG_PAYLOAD_3902_NATIVE_SCHEMA_V1.json",
+        "workers/W01-payload/src/migrations/20261101_163928_username_redirects.json"
+      ],
+      "latestSqliteSnapshot": "workers/W01-payload/src/migrations/20261101_163928_username_redirects.json",
+      "expectedCurrentCollectionTables": 11
+    },
+    {
+      "worker": "W02",
+      "role": "Better Auth identity/session core and identity/account domain state",
+      "schemaMode": "Generate Better Auth core/plugin tables from the pinned Better Auth configuration/CLI; port W02-owned custom D1 SQL and all direct D1 query/transaction code separately.",
+      "betterAuthVersion": "1.7.8",
+      "config": "workers/W02-identity/src/auth/better-auth.ts",
+      "wrangler": "workers/W02-identity/wrangler.jsonc",
+      "builtInSchemaMigrations": [
+        "0005_better_auth_identity_core.sql",
+        "0006_better_auth_two_factor.sql"
+      ],
+      "customSqlMigrations": [
+        "0001_role_assignments.sql",
+        "0002_auth_013_account_state.sql",
+        "0003_auth_013_publication_journal.sql",
+        "0003_role_authorization_versions.sql",
+        "0004_auth_003_credentials.sql",
+        "0007_l8_genesis_bootstrap_audit.sql",
+        "0008_auth_007_mfa_publication_journal.sql",
+        "0009_auth_007_mfa_operation_receipts.sql",
+        "0010_auth_username_change_state.sql",
+        "0011_auth_015_lifecycle_windows.sql",
+        "0012_auth_010_session_revocation_journal.sql"
+      ]
+    },
+    {
+      "worker": "W07",
+      "role": "D1-01 subscription plan, subscription state and entitlement references only",
+      "schemaMode": "Port the D1-01 migration set to PostgreSQL; payment/order/financial facts remain in D1-04 and are not part of this domain bootstrap.",
+      "wrangler": "workers/W07-subscription-commerce/wrangler.jsonc",
+      "sqlMigrations": [
+        "0001_membership_subscriptions.sql",
+        "0002_subscription_version_cas.sql",
+        "0003_membership_plans.sql",
+        "0004_revenuecat_membership_product_bindings.sql",
+        "0005_membership_subscription_plan_change_attempts.sql",
+        "0006_membership_subscription_scheduled_plan_changes.sql",
+        "0007_scheduled_plan_change_type.sql",
+        "0008_subscription_trial_lifecycle.sql"
+      ],
+      "excludedMigrationDirectory": "workers/W07-subscription-commerce/migrations-d1-04"
+    },
+    {
+      "worker": "W08",
+      "role": "Creator application and creator identity facts; RoleAssignment remains W02-owned",
+      "schemaMode": "Port the D1-01 creator authorization migration to PostgreSQL; preserve W02 role authority.",
+      "wrangler": "workers/W08-creator/wrangler.jsonc",
+      "sqlMigrations": [
+        "0001_creator_authorization.sql"
+      ]
+    }
+  ],
+  "sharedInvariants": [
+    "Do not import existing business rows.",
+    "Do not change production D1 bindings or production runtime adapters in this source-inventory stage.",
+    "Do not execute SQLite/D1 migration files on PostgreSQL.",
+    "Do not modify Payload Core or Better Auth upstream source.",
+    "Keep W01/W02/W07/W08 ownership boundaries explicit within the shared D1-01 physical database.",
+    "Keep all cross-domain references as opaque identifiers; do not add cross-database foreign keys.",
+    "Treat migration provenance rows as schema bookkeeping, not business data."
+  ],
+  "knownPortabilityReviewAreas": [
+    "SQLite strftime/julianday timestamp defaults",
+    "SQLite typeof/GLOB checks and JSON functions",
+    "SQLite RAISE(ABORT) trigger bodies and trigger syntax",
+    "Payload D1 migration modules importing @payloadcms/db-d1-sqlite",
+    "Better Auth direct D1 binding and W02 custom D1Database prepare/batch transactions",
+    "PostgreSQL boolean, JSON/JSONB, text timestamp and partial-index semantics"
+  ],
+  "executionOrder": [
+    "Verify source inventory and current Worker-to-D1-01 mapping",
+    "Generate Payload PostgreSQL base migration using @payloadcms/db-postgres",
+    "Generate Better Auth 1.7.8 PostgreSQL schema from the canonical auth configuration",
+    "Port W02 custom identity SQL and transaction code with PostgreSQL tests",
+    "Port W07 D1-01 subscription/entitlement schema and tests",
+    "Port W08 creator schema and tests",
+    "Run one clean PostgreSQL 18 bootstrap and schema catalog comparison",
+    "Apply reviewed schema-only migration to Neon D1-01 and run read-only postflight"
+  ],
+  "cutover": {
+    "authorized": false,
+    "requiresSeparateChangeControl": true
+  }
+}
