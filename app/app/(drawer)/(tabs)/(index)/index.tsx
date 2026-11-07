@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Text,
   View,
+  type ViewToken,
 } from 'react-native';
 import { type ErrorBoundaryProps, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -22,6 +23,7 @@ import { FeedContent, FeedItem } from '~/components/FeedItem';
 import X from '~/assets/svg/aside/x.svg';
 import { mapContentToFeedContent, readContentBody, readContentSocial, readContentAuthor, type ApiContentRecord } from '~/lib/content-adapter';
 import { fetchNativeFeedPage, incrementNativeFeedReplyCount, nativeFeedQueryKey, type NativeFeedKind, type NativeFeedPage } from '~/lib/feed-query';
+import { selectVisibleFeedHydrationRecords } from '~/lib/feed-hydration';
 import { useAuthStore } from '~/store/auth-store';
 import { readSessionToken } from '~/lib/secure-session';
 import { getXDesignColors, X_DESIGN_TOKENS } from '~/constants/x-design-tokens';
@@ -142,6 +144,10 @@ function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSig
     scope: string;
     byId: Record<string, FeedContent>;
   }>({ scope: hydrationScope, byId: {} });
+  const [hydrationTargets, setHydrationTargets] = useState<{
+    scope: string;
+    ids: string[];
+  }>({ scope: hydrationScope, ids: [] });
   // For You list pages remain public/shared, but hydrated social.viewer state is viewer-specific.
   // The scope guard prevents even a one-frame flash from a previous account during switches.
   const hydratedById = hydratedState.scope === hydrationScope ? hydratedState.byId : {};
@@ -149,6 +155,23 @@ function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSig
   const hydrationScopeRef = useRef(hydrationScope);
   const hydrationGenerationRef = useRef(0);
   const mountedRef = useRef(false);
+  const onViewableItemsChanged = useRef(
+    ({ viewableItems }: { viewableItems: Array<ViewToken<FeedContent>> }) => {
+      const visibleIds = viewableItems.flatMap(({ isViewable, item }) =>
+        isViewable && item?.contentId ? [item.contentId] : [],
+      );
+      if (visibleIds.length === 0) return;
+
+      const scope = hydrationScopeRef.current;
+      setHydrationTargets((current) => {
+        const currentIds = current.scope === scope ? current.ids : [];
+        const nextIds = [...new Set([...currentIds, ...visibleIds])];
+        if (current.scope === scope && nextIds.length === current.ids.length) return current;
+        return { scope, ids: nextIds };
+      });
+    },
+  ).current;
+  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 35 }).current;
   const previousRefreshSignal = useRef(refreshSignal);
 
   useEffect(() => {
@@ -165,10 +188,16 @@ function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSig
     hydrationGenerationRef.current += 1;
     hydratedIdsRef.current.clear();
     setHydratedState({ scope: hydrationScope, byId: {} });
+    setHydrationTargets({ scope: hydrationScope, ids: [] });
   }, [hydrationScope]);
 
   useEffect(() => {
-    const pendingRecords = records.filter((item) => !hydratedIdsRef.current.has(item.id));
+    const visibleContentIds = hydrationTargets.scope === hydrationScope ? hydrationTargets.ids : [];
+    const pendingRecords = selectVisibleFeedHydrationRecords(
+      records,
+      visibleContentIds,
+      hydratedIdsRef.current,
+    );
     if (pendingRecords.length === 0) return;
 
     for (const item of pendingRecords) hydratedIdsRef.current.add(item.id);
@@ -216,7 +245,7 @@ function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSig
         }));
       }
     })();
-  }, [records, hydrationScope]);
+  }, [records, hydrationScope, hydrationTargets]);
 
   useEffect(() => {
     if (previousRefreshSignal.current !== refreshSignal && refreshSignal) {
@@ -394,6 +423,8 @@ function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSig
       refreshing={feedQuery.isRefetching}
       onEndReached={loadMore}
       onEndReachedThreshold={0.5}
+      onViewableItemsChanged={onViewableItemsChanged}
+      viewabilityConfig={viewabilityConfig}
     />
   );
 }
