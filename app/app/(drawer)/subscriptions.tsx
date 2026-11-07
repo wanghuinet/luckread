@@ -150,6 +150,20 @@ export default function MySubscriptionsScreen() {
   const [subscriptionDataViewerId, setSubscriptionDataViewerId] = useState<string | null>(viewerId);
   const [paymentMethodsViewerId, setPaymentMethodsViewerId] = useState<string | null>(viewerId);
   const [errorViewerId, setErrorViewerId] = useState<string | null>(null);
+  const [items, setItems] = useState<MySubscription[]>([]);
+  const [pageNumber, setPageNumber] = useState(1);
+  const [hasNextPage, setHasNextPage] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [authRequired, setAuthRequired] = useState(false);
+  const [error, setError] = useState('');
+  const [paymentMethods, setPaymentMethods] = useState<SavedPaymentMethod[]>([]);
+  const [paymentMethodsLoading, setPaymentMethodsLoading] = useState(true);
+  const [revokingPaymentMethodId, setRevokingPaymentMethodId] = useState<string | null>(null);
+  const paymentMethodRequestRef = useRef<AbortController | null>(null);
+  const paymentMethodIdempotencyKeys = useRef(new Map<string, string>());
+
   const isCurrentSubscriptionData = subscriptionDataViewerId === viewerId;
   const isCurrentPaymentMethodData = paymentMethodsViewerId === viewerId;
   const currentItems = isCurrentSubscriptionData ? items : EMPTY_SUBSCRIPTIONS;
@@ -167,19 +181,6 @@ export default function MySubscriptionsScreen() {
     (!isCurrentPaymentMethodData || paymentMethodsLoading)
   );
   const currentError = errorViewerId === viewerId ? error : '';
-  const [items, setItems] = useState<MySubscription[]>([]);
-  const [pageNumber, setPageNumber] = useState(1);
-  const [hasNextPage, setHasNextPage] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-  const [authRequired, setAuthRequired] = useState(false);
-  const [error, setError] = useState('');
-  const [paymentMethods, setPaymentMethods] = useState<SavedPaymentMethod[]>([]);
-  const [paymentMethodsLoading, setPaymentMethodsLoading] = useState(true);
-  const [revokingPaymentMethodId, setRevokingPaymentMethodId] = useState<string | null>(null);
-  const paymentMethodRequestRef = useRef<AbortController | null>(null);
-  const paymentMethodIdempotencyKeys = useRef(new Map<string, string>());
 
   const requestRef = useRef<AbortController | null>(null);
 
@@ -365,6 +366,7 @@ export default function MySubscriptionsScreen() {
                   ));
                 }
                 await loadPaymentMethods();
+                if (viewerIdRef.current !== requestViewerId) return;
                 if (result.response.status === 202) {
                   Alert.alert('撤销处理中', '新的自动续费扣款已暂缓。收到 Hyperswitch 的签名确认事件后，请返回此页点击“重试移除”，完成支付渠道中的付款方式删除。');
                 } else {
@@ -459,8 +461,8 @@ export default function MySubscriptionsScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="刷新订阅"
-          accessibilityState={{ disabled: loading || loadingMore }}
-          disabled={loading || loadingMore}
+          accessibilityState={{ disabled: currentLoading || currentLoadingMore }}
+          disabled={currentLoading || currentLoadingMore}
           onPress={() => void loadPage(1, false)}
           className="rounded-full p-2"
         >
