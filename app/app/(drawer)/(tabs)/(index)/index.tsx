@@ -4,7 +4,6 @@ import {
   Animated,
   Image,
   Pressable,
-  Platform,
   StyleSheet,
   Text,
   View,
@@ -33,21 +32,18 @@ const APP_PRIMARY_COLOR = '#1769aa';
 function HomeScreenSurface({ children, isDark }: { children: React.ReactNode; isDark: boolean }) {
   const style = [styles.container, { backgroundColor: isDark ? '#000000' : '#ffffff' }];
 
-  // Android's nested collapsible PagerView/FlatList tree should not be mounted
-  // inside a native BlurView. Keep the existing visual treatment on iOS.
-  if (Platform.OS === 'android') {
-    return <View style={style} className="flex-1">{children}</View>;
-  }
-
+  // Keep the native BlurView as a separate background sibling. The nested
+  // PagerView/FlatList tree stays outside its native view hierarchy on Android.
   return (
-    <BlurView
-      style={style}
-      className="flex-1"
-      intensity={80}
-      tint={isDark ? 'dark' : 'light'}
-    >
+    <View style={style} className="flex-1">
+      <BlurView
+        pointerEvents="none"
+        style={StyleSheet.absoluteFill}
+        intensity={80}
+        tint={isDark ? 'dark' : 'light'}
+      />
       {children}
-    </BlurView>
+    </View>
   );
 }
 
