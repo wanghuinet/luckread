@@ -49,6 +49,26 @@ beforeEach(() => {
   keyCounter = 0;
 });
 
+test('notification inbox data, actor cache, and pending reads are isolated when the authenticated account changes', () => {
+  expect(notificationsScreenSource).toContain("const viewerId = useAuthStore((state) => state.user?.id ?? null);");
+  expect(notificationsScreenSource).toContain('const currentItems = isCurrentViewerData ? items : EMPTY_NOTIFICATIONS;');
+  expect(notificationsScreenSource).toContain('const currentActorProfiles = isCurrentViewerData ? actorProfiles : EMPTY_PUBLIC_PROFILES;');
+  expect(notificationsScreenSource).toContain('useLayoutEffect(() => {\n    viewerIdRef.current = viewerId;\n  }, [viewerId]);');
+  expect(notificationsScreenSource).toContain('previousViewerIdRef.current = viewerId;');
+  expect(notificationsScreenSource).toContain('requestedActorsRef.current.clear();');
+  expect(notificationsScreenSource).toContain('handledDeepLinkIdRef.current = null;');
+  expect(notificationsScreenSource).toContain('setItems([]);');
+  expect(notificationsScreenSource).toContain('setActorProfiles({});');
+  expect(notificationsScreenSource).toContain('viewerIdRef.current !== requestViewerId');
+  expect(notificationsScreenSource).toContain('if (viewerIdRef.current !== requestViewerId) return;');
+  expect(notificationsScreenSource).toContain('}, [authStatus, filter, loadActorProfiles, viewerId]);');
+  expect(notificationsScreenSource).toContain('}, [authStatus, viewerId]);');
+  expect(notificationsScreenSource).toContain('if (!viewerId || viewerIdRef.current !== viewerId) return;');
+  expect(notificationsScreenSource).toContain('const currentHasMore = isCurrentViewerData && hasMore;');
+  expect(notificationsScreenSource).toContain('const currentReadAllBusy = isCurrentViewerData && readAllBusy;');
+});
+
+
 test('loads the first notification page through the shared client', async () => {
   await fetchNotificationsPage();
 

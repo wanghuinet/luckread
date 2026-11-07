@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -48,6 +48,8 @@ type PublicUser = {
 };
 
 const PRIMARY = '#1d9bf0';
+const EMPTY_NOTIFICATIONS: SocialNotification[] = [];
+const EMPTY_PUBLIC_PROFILES: Record<string, PublicUser> = {};
 
 function messageFor(item: SocialNotification): string {
   switch (item.type) {
@@ -94,6 +96,7 @@ export default function Notifications() {
     : null;
   const handledDeepLinkIdRef = useRef<string | null>(null);
   const authStatus = useAuthStore((state) => state.status);
+  const viewerId = useAuthStore((state) => state.user?.id ?? null);
   const [items, setItems] = useState<SocialNotification[]>([]);
   const [actorProfiles, setActorProfiles] = useState<Record<string, PublicUser>>({});
   const [filter, setFilter] = useState<NotificationFilter>('all');
@@ -111,8 +114,31 @@ export default function Notifications() {
   const requestIdRef = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
   const requestedActorsRef = useRef(new Set<string>());
+  const previousViewerIdRef = useRef<string | null>(viewerId);
+  const viewerIdRef = useRef<string | null>(viewerId);
+  useLayoutEffect(() => {
+    viewerIdRef.current = viewerId;
+  }, [viewerId]);
+  const [dataViewerId, setDataViewerId] = useState<string | null>(viewerId);
+  const isCurrentViewerData = dataViewerId === viewerId;
+  const currentItems = isCurrentViewerData ? items : EMPTY_NOTIFICATIONS;
+  const currentActorProfiles = isCurrentViewerData ? actorProfiles : EMPTY_PUBLIC_PROFILES;
+  const currentUnreadCount = isCurrentViewerData ? unreadCount : 0;
+  const currentReadAllBusy = isCurrentViewerData && readAllBusy;
+  const currentHasMore = isCurrentViewerData && hasMore;
+  const currentCursor = isCurrentViewerData ? cursor : null;
+  const currentLoading = authStatus === 'loading'
+    ? true
+    : isCurrentViewerData ? loading : authStatus === 'authenticated' && Boolean(viewerId);
+  const currentLoadingMore = isCurrentViewerData && loadingMore;
+  const currentRefreshing = isCurrentViewerData && refreshing;
+  const currentError = isCurrentViewerData ? error : '';
+  const currentAuthRequired = authStatus === 'anonymous' ||
+    (authStatus === 'authenticated' && !viewerId) ||
+    (isCurrentViewerData && authRequired);
 
   const loadActorProfiles = useCallback(async (notifications: SocialNotification[], signal: AbortSignal) => {
+    const requestViewerId = viewerId;
     const actorIds = Array.from(new Set(notifications.map((item) => item.actorUserId)))
       .filter((id) => id && !requestedActorsRef.current.has(id));
     actorIds.forEach((id) => requestedActorsRef.current.add(id));
@@ -120,7 +146,7 @@ export default function Notifications() {
       id,
       profile: await resolvePublicProfileById(id, signal),
     })));
-    if (signal.aborted) {
+    if (signal.aborted || viewerIdRef.current !== requestViewerId) {
       actorIds.forEach((id) => requestedActorsRef.current.delete(id));
       return;
     }
@@ -136,13 +162,15 @@ export default function Notifications() {
     results.forEach((result) => {
       if (!result.profile) requestedActorsRef.current.delete(result.id);
     });
-  }, []);
+  }, [viewerId]);
 
   const loadPage = useCallback(async (nextCursor: string | null, append: boolean) => {
     if (authStatus === 'loading') return;
-    if (authStatus !== 'authenticated') {
+    if (authStatus !== 'authenticated' || !viewerId) {
+      setDataViewerId(viewerId);
       setAuthRequired(true);
       setItems([]);
+      setActorProfiles({});
       setCursor(null);
       setHasMore(false);
       setUnreadCount(0);
@@ -152,6 +180,7 @@ export default function Notifications() {
       return;
     }
 
+    const requestViewerId = viewerId;
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
@@ -166,9 +195,10 @@ export default function Notifications() {
         filter,
         signal: controller.signal,
       });
-      if (requestId !== requestIdRef.current || controller.signal.aborted) return;
+      if (requestId !== requestIdRef.current || controller.signal.aborted || viewerIdRef.current !== requestViewerId) return;
 
       if (result.response.status === 401) {
+        setDataViewerId(requestViewerId);
         setAuthRequired(true);
         setItems([]);
         setUnreadCount(0);
@@ -182,6 +212,7 @@ export default function Notifications() {
         throw new Error(getApiErrorMessage(result.data, '无法加载通知，请重试。', result.response.status));
       }
 
+      setDataViewerId(requestViewerId);
       setAuthRequired(false);
       setItems((current) => {
         if (!append) return page.items;
@@ -193,17 +224,41 @@ export default function Notifications() {
       setHasMore(page.hasMore === true);
       void loadActorProfiles(page.items, controller.signal);
     } catch (cause) {
-      if (requestId !== requestIdRef.current || controller.signal.aborted) return;
+      if (requestId !== requestIdRef.current || controller.signal.aborted || viewerIdRef.current !== requestViewerId) return;
       setError(cause instanceof Error ? cause.message : '无法加载通知，请重试。');
     } finally {
-      if (requestId === requestIdRef.current && !controller.signal.aborted) {
+      if (requestId === requestIdRef.current && !controller.signal.aborted && viewerIdRef.current === requestViewerId) {
         setLoading(false);
         setLoadingMore(false);
         setRefreshing(false);
         if (abortRef.current === controller) abortRef.current = null;
       }
     }
-  }, [authStatus, filter, loadActorProfiles]);
+  }, [authStatus, filter, loadActorProfiles, viewerId]);
+
+  useEffect(() => {
+    if (previousViewerIdRef.current === viewerId) return;
+    previousViewerIdRef.current = viewerId;
+    requestIdRef.current += 1;
+    abortRef.current?.abort();
+    abortRef.current = null;
+    requestedActorsRef.current.clear();
+    handledDeepLinkIdRef.current = null;
+    setDataViewerId(viewerId);
+    setItems([]);
+    setActorProfiles({});
+    setCursor(null);
+    setHasMore(false);
+    setUnreadCount(0);
+    setLoading(authStatus === 'authenticated' && Boolean(viewerId));
+    setLoadingMore(false);
+    setRefreshing(false);
+    setReadAllBusy(false);
+    setBusyIds(new Set());
+    setError('');
+    setAuthRequired(authStatus !== 'authenticated' || !viewerId);
+    setDeepLinkRetryNonce(0);
+  }, [authStatus, viewerId]);
 
   useEffect(() => {
     if (authStatus !== 'loading') void loadPage(null, false);
@@ -213,7 +268,8 @@ export default function Notifications() {
   }, [authStatus, filter, loadPage]);
 
   const markRead = useCallback(async (item: SocialNotification) => {
-    if (item.readAt || busyIds.has(item.id)) return;
+    const requestViewerId = viewerId;
+    if (!requestViewerId || viewerIdRef.current !== requestViewerId || item.readAt || busyIds.has(item.id)) return;
     setBusyIds((current) => new Set(current).add(item.id));
     setError('');
     try {
@@ -221,6 +277,7 @@ export default function Notifications() {
       if (!result.response.ok) {
         throw new Error(getApiErrorMessage(result.data, '无法标记通知为已读。', result.response.status));
       }
+      if (viewerIdRef.current !== requestViewerId) return;
       const readAt = new Date().toISOString();
       setItems((current) => current.map((candidate) =>
         candidate.id === item.id && !candidate.readAt ? { ...candidate, readAt } : candidate,
@@ -229,16 +286,19 @@ export default function Notifications() {
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '无法标记通知为已读。');
     } finally {
-      setBusyIds((current) => {
-        const next = new Set(current);
-        next.delete(item.id);
-        return next;
-      });
+      if (viewerIdRef.current === requestViewerId) {
+        setBusyIds((current) => {
+          const next = new Set(current);
+          next.delete(item.id);
+          return next;
+        });
+      }
     }
-  }, [busyIds]);
+  }, [busyIds, viewerId]);
 
   const markAllRead = useCallback(async () => {
-    if (unreadCount <= 0 || readAllBusy) return;
+    const requestViewerId = viewerId;
+    if (!requestViewerId || viewerIdRef.current !== requestViewerId || !isCurrentViewerData || unreadCount <= 0 || readAllBusy) return;
     setReadAllBusy(true);
     setError('');
     try {
@@ -246,54 +306,58 @@ export default function Notifications() {
       if (!result.response.ok) {
         throw new Error(getApiErrorMessage(result.data, '无法将通知全部标记为已读。', result.response.status));
       }
+      if (viewerIdRef.current !== requestViewerId) return;
       const readAt = new Date().toISOString();
       setItems((current) => current.map((item) => item.readAt ? item : { ...item, readAt }));
       setUnreadCount(0);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '无法将通知全部标记为已读。');
     } finally {
-      setReadAllBusy(false);
+      if (viewerIdRef.current === requestViewerId) setReadAllBusy(false);
     }
-  }, [readAllBusy, unreadCount]);
+  }, [isCurrentViewerData, readAllBusy, unreadCount, viewerId]);
 
   const filteredItems = useMemo(
-    () => filter === 'mentions' ? items.filter((item) => item.type === 'MENTION') : items,
-    [filter, items],
+    () => filter === 'mentions' ? currentItems.filter((item) => item.type === 'MENTION') : currentItems,
+    [currentItems, filter],
   );
 
   const openNotification = useCallback((item: SocialNotification) => {
+    if (!viewerId || viewerIdRef.current !== viewerId) return;
     void markRead(item);
     const contentId = resolveContentId(item);
     if (contentId) {
       router.push(('/post/' + encodeURIComponent(contentId)) as never);
       return;
     }
-    const actor = actorProfiles[item.actorUserId];
+    const actor = currentActorProfiles[item.actorUserId];
     const actorRoute = actor?.username || actor?.id || item.actorUserId;
     if (actorRoute) {
       router.push(('/profile/' + encodeURIComponent(actorRoute)) as never);
     }
-  }, [actorProfiles, markRead, router]);
+  }, [currentActorProfiles, markRead, router, viewerId]);
 
   useEffect(() => {
     const notificationId = deepLinkedNotificationId;
-    if (authStatus !== 'authenticated' || !notificationId ||
+    if (authStatus !== 'authenticated' || !viewerId || !notificationId ||
         handledDeepLinkIdRef.current === notificationId) return;
 
     handledDeepLinkIdRef.current = notificationId;
+    const requestViewerId = viewerId;
     const controller = new AbortController();
     let active = true;
     setError('');
 
     void (async () => {
       const result = await fetchNotificationById(notificationId, controller.signal);
-      if (!active || controller.signal.aborted) return;
+      if (!active || controller.signal.aborted || viewerIdRef.current !== requestViewerId) return;
       const page = result.response.ok ? unwrapApiData<NotificationPage>(result.data) : null;
       const item = page?.items?.find((candidate) => candidate.id === notificationId);
       if (!item) {
         throw new Error('这条通知暂时无法打开，请从通知列表查看。');
       }
 
+      setDataViewerId(requestViewerId);
       setItems((current) => current.some((candidate) => candidate.id === item.id)
         ? current.map((candidate) => candidate.id === item.id ? item : candidate)
         : [item, ...current]);
@@ -310,7 +374,7 @@ export default function Notifications() {
       active = false;
       controller.abort();
     };
-  }, [authStatus, deepLinkRetryNonce, deepLinkedNotificationId, loadActorProfiles, openNotification]);
+  }, [authStatus, deepLinkRetryNonce, deepLinkedNotificationId, loadActorProfiles, openNotification, viewerId]);
 
   const retryNotificationLoad = useCallback(() => {
     setError('');
@@ -323,7 +387,7 @@ export default function Notifications() {
   }, [deepLinkedNotificationId, loadPage]);
 
   const renderItem = useCallback(({ item }: { item: SocialNotification }) => {
-    const profile = actorProfiles[item.actorUserId];
+    const profile = currentActorProfiles[item.actorUserId];
     const displayName = profile?.displayName?.trim() || (profile?.username ? '@' + profile.username : '') ||
       (typeof item.payload?.handle === 'string' ? '@' + item.payload.handle.replace(/^@/, '') : '') ||
       'LuckRead 用户';
@@ -382,7 +446,7 @@ export default function Notifications() {
         </View>
       </Pressable>
     );
-  }, [actorProfiles, busyIds, markRead, openNotification]);
+  }, [busyIds, currentActorProfiles, markRead, openNotification]);
 
   const header = (
     <View className="bg-white dark:bg-black">
@@ -390,12 +454,12 @@ export default function Notifications() {
         <Text className="text-xl font-bold text-neutral-900 dark:text-white">通知</Text>
         <Pressable
           accessibilityRole="button"
-          disabled={unreadCount === 0 || readAllBusy}
+          disabled={currentUnreadCount === 0 || currentReadAllBusy}
           onPress={() => void markAllRead()}
           className="rounded-full px-3 py-2"
         >
-          <Text className={'text-sm font-semibold ' + (unreadCount === 0 ? 'text-neutral-400' : 'text-sky-600')}>
-            {readAllBusy ? '处理中…' : unreadCount > 0 ? '全部标记已读' : '全部已读'}
+          <Text className={'text-sm font-semibold ' + (currentUnreadCount === 0 ? 'text-neutral-400' : 'text-sky-600')}>
+            {currentReadAllBusy ? '处理中…' : currentUnreadCount > 0 ? '全部标记已读' : '全部已读'}
           </Text>
         </Pressable>
       </View>
@@ -415,9 +479,9 @@ export default function Notifications() {
           </Pressable>
         ))}
       </View>
-      {error ? (
+      {currentError ? (
         <View className="flex-row items-center justify-between px-4 py-3">
-          <Text className="mr-3 flex-1 text-sm text-red-600">{error}</Text>
+          <Text className="mr-3 flex-1 text-sm text-red-600">{currentError}</Text>
           <Pressable onPress={retryNotificationLoad}>
             <Text className="font-semibold text-sky-600">重试</Text>
           </Pressable>
@@ -426,7 +490,7 @@ export default function Notifications() {
     </View>
   );
 
-  if (authRequired) {
+  if (currentAuthRequired) {
     return (
       <View className="flex-1 items-center justify-center bg-white px-6 dark:bg-black">
         <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
@@ -452,28 +516,28 @@ export default function Notifications() {
         ListHeaderComponent={header}
         ListEmptyComponent={(
           <View className="items-center px-6 py-14">
-            {loading ? <ActivityIndicator color={PRIMARY} /> : (
+            {currentLoading ? <ActivityIndicator color={PRIMARY} /> : (
               <>
                 <Feather name="bell" size={34} color="#9ca3af" />
                 <Text className="mt-4 text-base font-semibold text-neutral-800 dark:text-neutral-100">
-                  {error ? '暂时无法显示通知' : filter === 'mentions' ? '暂无提及通知' : '暂无通知'}
+                  {currentError ? '暂时无法显示通知' : filter === 'mentions' ? '暂无提及通知' : '暂无通知'}
                 </Text>
                 <Text className="mt-2 text-center text-sm text-neutral-500">
-                  {error ? '请检查网络后重试。' : '当有人关注、点赞、评论或提及你时，会显示在这里。'}
+                  {currentError ? '请检查网络后重试。' : '当有人关注、点赞、评论或提及你时，会显示在这里。'}
                 </Text>
-                {error ? <Pressable onPress={retryNotificationLoad} className="mt-4 rounded-full border border-neutral-300 px-4 py-2"><Text className="font-semibold text-neutral-800 dark:text-neutral-100">重试</Text></Pressable> : null}
+                {currentError ? <Pressable onPress={retryNotificationLoad} className="mt-4 rounded-full border border-neutral-300 px-4 py-2"><Text className="font-semibold text-neutral-800 dark:text-neutral-100">重试</Text></Pressable> : null}
               </>
             )}
           </View>
         )}
-        ListFooterComponent={loadingMore ? (
+        ListFooterComponent={currentLoadingMore ? (
           <ActivityIndicator className="py-5" color={PRIMARY} />
-        ) : hasMore ? (
-          <Pressable onPress={() => void loadPage(cursor, true)} className="items-center py-5">
+        ) : currentHasMore ? (
+          <Pressable onPress={() => void loadPage(currentCursor, true)} className="items-center py-5">
             <Text className="font-semibold text-sky-600">加载更多</Text>
           </Pressable>
         ) : <View className="h-6" />}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => {
+        refreshControl={<RefreshControl refreshing={currentRefreshing} onRefresh={() => {
           setRefreshing(true);
           void loadPage(null, false);
         }} tintColor={PRIMARY} />}
