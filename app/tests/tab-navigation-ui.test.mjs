@@ -53,6 +53,14 @@ test('uses a flat X-style bottom navigation without the floating glass dependenc
   expect(bottomTabBarSource).toContain("state.routes[state.index]?.name === '(video)'");
 });
 
+test('extends the flat X navigation background through device safe areas', () => {
+  expect(bottomTabBarSource).toContain('bottom: 0');
+  expect(bottomTabBarSource).toContain('paddingBottom: insets.bottom');
+  expect(bottomTabBarSource).toContain('borderTopWidth: StyleSheet.hairlineWidth');
+  expect(bottomTabBarSource).toContain('height: 56');
+  expect(bottomTabBarSource).toContain('minHeight: 48');
+});
+
 test('keeps Expo Router tab scenes inside their native navigation context', () => {
   // Keep scene ownership with Expo Router and bridge only the tabPress events
   // needed by the custom native tab surface.
