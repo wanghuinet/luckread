@@ -157,17 +157,16 @@ function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSig
   const mountedRef = useRef(false);
   const onViewableItemsChanged = useRef(
     ({ viewableItems }: { viewableItems: Array<ViewToken<FeedContent>> }) => {
-      const visibleIds = viewableItems.flatMap(({ isViewable, item }) =>
+      const visibleIds = [...new Set(viewableItems.flatMap(({ isViewable, item }) =>
         isViewable && item?.contentId ? [item.contentId] : [],
-      );
-      if (visibleIds.length === 0) return;
-
+      ))];
       const scope = hydrationScopeRef.current;
+
       setHydrationTargets((current) => {
-        const currentIds = current.scope === scope ? current.ids : [];
-        const nextIds = [...new Set([...currentIds, ...visibleIds])];
-        if (current.scope === scope && nextIds.length === current.ids.length) return current;
-        return { scope, ids: nextIds };
+        const unchanged = current.scope === scope &&
+          current.ids.length === visibleIds.length &&
+          current.ids.every((id, index) => id === visibleIds[index]);
+        return unchanged ? current : { scope, ids: visibleIds };
       });
     },
   ).current;
@@ -188,7 +187,9 @@ function FeedTimeline({ kind, refreshSignal = '' }: { kind: FeedKind; refreshSig
     hydrationGenerationRef.current += 1;
     hydratedIdsRef.current.clear();
     setHydratedState({ scope: hydrationScope, byId: {} });
-    setHydrationTargets({ scope: hydrationScope, ids: [] });
+    // Re-hydrate the currently visible cards for the new viewer without
+    // carrying forward any previously hydrated viewer-specific state.
+    setHydrationTargets((current) => ({ scope: hydrationScope, ids: current.ids }));
   }, [hydrationScope]);
 
   useEffect(() => {
