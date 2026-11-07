@@ -110,6 +110,15 @@ jobs:
         with:
           node-version: "22.13.1"
 
+      # The PostHog Expo plugin invokes posthog-cli from the Gradle bundle task.
+      # Pin a CLI that supports event-mode Hermes uploads (>= 0.16.0).
+      - name: Install and verify PostHog CLI
+        run: |
+          npm install --global @posthog/cli@0.19.0
+          POSTHOG_CLI_BIN="$(command -v posthog-cli)"
+          test -n "$POSTHOG_CLI_BIN"
+          "$POSTHOG_CLI_BIN" --version
+
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
         with:
@@ -224,7 +233,23 @@ jobs:
           console.log(JSON.stringify({ expectedTag, versionCode, previousHighestVersionCode: highestCode }));
           NODE
 
+      - name: Verify PostHog project ingestion key is available
+        env:
+          EXPO_PUBLIC_POSTHOG_API_KEY: ${{ secrets.EXPO_PUBLIC_POSTHOG_API_KEY }}
+        run: |
+          if [ -z "$EXPO_PUBLIC_POSTHOG_API_KEY" ]; then
+            echo "::error::EXPO_PUBLIC_POSTHOG_API_KEY is missing from GitHub Actions Secrets; refusing to build an APK without crash diagnostics."
+            exit 1
+          fi
+          echo "Verified PostHog project ingestion key is available."
+
       - name: Generate Android native project
+        env:
+          EXPO_PUBLIC_POSTHOG_API_KEY: ${{ secrets.EXPO_PUBLIC_POSTHOG_API_KEY }}
+          EXPO_PUBLIC_POSTHOG_HOST: "https://us.i.posthog.com"
+          POSTHOG_CLI_API_KEY: ${{ secrets.POSTHOG_CLI_API_KEY }}
+          POSTHOG_CLI_PROJECT_ID: "715723"
+          POSTHOG_CLI_HOST: "https://us.posthog.com"
         run: bunx expo prebuild --platform android --clean --no-install
 
       - name: Generate and verify Hyperswitch React Native Codegen specs
@@ -246,6 +271,12 @@ jobs:
       - name: Compile signed Release APK with embedded JavaScript bundle
         # Keep the values selected by the preceding step (stable or temporary key).
         # Re-declaring these from repository secrets would blank them in test-key mode.
+        env:
+          EXPO_PUBLIC_POSTHOG_API_KEY: ${{ secrets.EXPO_PUBLIC_POSTHOG_API_KEY }}
+          EXPO_PUBLIC_POSTHOG_HOST: "https://us.i.posthog.com"
+          POSTHOG_CLI_API_KEY: ${{ secrets.POSTHOG_CLI_API_KEY }}
+          POSTHOG_CLI_PROJECT_ID: "715723"
+          POSTHOG_CLI_HOST: "https://us.posthog.com"
         run: |
           chmod +x android/gradlew
           cd android

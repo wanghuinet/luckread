@@ -151,6 +151,8 @@ jobs:
           echo "$HEADLESS_SPEC"
       - name: TypeScript typecheck
         run: bun run typecheck
+      - name: Test PostHog APP crash-diagnostics configuration
+        run: bun test tests/posthog-diagnostics.test.mjs
       - name: Test unified native API client rules
         run: bun run test:api-client
       - name: Test native media reference host and credential boundaries
