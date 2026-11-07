@@ -1,6 +1,8 @@
 import React, { useCallback, useMemo, useState, useReducer, Reducer, useRef, useEffect } from 'react';
 import {
+  Alert,
   Linking,
+  Share as NativeShare,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -45,7 +47,6 @@ import Save from "~/assets/svg/save.svg"
 import Share from "~/assets/svg/share.svg"
 import Views from "~/assets/svg/views.svg"
 import Category from "~/assets/svg/category.svg"
-import Grok from "~/assets/svg/tabs/grok.svg";
 import { useTabBarVisibilityOnAnimatedScroll } from '~/components/TabBarScroll';
 
 import { FeedItem, FeedContent, ProfileImage, PROFILE_IMAGE_SIZE_MAP } from '~/components/FeedItem';
@@ -53,6 +54,7 @@ import FollowButton from '~/components/FollowButton';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { apiRequest, getApiErrorMessage } from '~/lib/api-client';
 import { mapContentToFeedContent, readContentBody, readContentSocial, readContentAuthor, resolveNativeMediaSource, resolvePublicProfileById, unwrapApiData, type ApiContentPage, type ApiContentRecord } from '~/lib/content-adapter';
+import { buildPublicProfileUrl } from '~/lib/public-profile-url';
 import { useAuthStore } from '~/store/auth-store';
 import { readSessionToken } from '~/lib/secure-session';
 import { fetchUserLikedContentsPage, fetchUserProfileContentPage, fetchUserRepliesPage } from '~/lib/social-screen-api';
@@ -102,6 +104,7 @@ type ProfileReplyDisplay = FeedContent & {
 
 interface User {
   id: string;
+  public_profile_id: string;
   name: string;
   handle: string;
   bio: string;
@@ -131,6 +134,22 @@ const ProfileHeader = ({ navBarVisibility, scrollOffset, refreshing, user, curre
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
   const navigation = useNavigation();
+  const router = useRouter();
+  const handleShareProfile = useCallback(async () => {
+    const url = buildPublicProfileUrl(user.public_profile_id);
+    if (!url) {
+      Alert.alert('Profile link unavailable', 'LuckRead could not create a public link for this profile.');
+      return;
+    }
+    try {
+      await NativeShare.share({ message: url, title: `${user.name} on LuckRead` });
+    } catch (cause) {
+      Alert.alert(
+        'Could not share profile',
+        cause instanceof Error ? cause.message : 'Please try again.',
+      );
+    }
+  }, [user.name, user.public_profile_id]);
   const { left: leftInset, right: rightInset, top: safeAreaTop } = useSafeAreaInsets();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const bannerTotalHeight = useSharedValue(110 + BANNER_BOTTOM_MARGIN);
@@ -385,22 +404,22 @@ const ProfileHeader = ({ navBarVisibility, scrollOffset, refreshing, user, curre
         navBarVisibility={navBarVisibility}
         rightContent={
           <View className="flex-row gap-1.5">
-
-
-            <TouchableOpacity className="bg-black/50 dark:bg-white/20 rounded-full p-2">
-              <Grok width={20} height={17} fill="white" />
-            </TouchableOpacity>
-
-
-            <TouchableOpacity className="bg-black/50 dark:bg-white/20 rounded-full p-2">
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Search LuckRead"
+              onPress={() => router.push('/search' as never)}
+              className="bg-black/50 dark:bg-white/20 rounded-full p-2"
+            >
               <Feather color="white" name="search" size={20} />
             </TouchableOpacity>
-
-            <TouchableOpacity className="bg-black/50 dark:bg-white/20 rounded-full p-2">
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Share profile"
+              onPress={() => void handleShareProfile()}
+              className="bg-black/50 dark:bg-white/20 rounded-full p-2"
+            >
               <Share width={20} height={20} fill="white" />
             </TouchableOpacity>
-
-
           </View>
         }
         leftContent={
@@ -744,6 +763,7 @@ export default function UserProfileScreen() {
 
       setUser({
         id: canonicalProfileId,
+        public_profile_id: profile.id,
         name: profile.displayName?.trim() || profile.username || 'LuckRead member',
         handle: profile.username || userHandle || canonicalProfileId,
         bio: profile.bio || '',
@@ -1397,6 +1417,10 @@ export default function UserProfileScreen() {
               {profileTabs.map((tabName, index) => (
                 <TouchableOpacity
                   key={`tab-${index}`}
+                  accessibilityRole="tab"
+                  accessibilityLabel={tabName}
+                  accessibilityState={{ selected: selectedTabIndex === index }}
+                  testID={`profile-tab-${tabName.toLowerCase()}`}
                   className="px-4 justify-center items-center h-[46px] relative"
                   onPress={() => setSelectedTabIndex(index)}
                 >
