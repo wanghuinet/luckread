@@ -111,5 +111,7 @@ test('documents and wires the separate private PostHog CLI credentials for nativ
   expect(androidBetaWorkflow).toContain('POSTHOG_CLI_PROJECT_ID: "715723"');
   expect(androidBetaWorkflow).toContain('POSTHOG_CLI_HOST: "https://us.posthog.com"');
   expect(androidBetaWorkflow).toContain('EXPO_PUBLIC_POSTHOG_HOST: "https://us.i.posthog.com"');
+  expect(androidBetaWorkflow).toContain('npm install --global @posthog/cli@0.19.0');
+  expect(androidBetaWorkflow).toContain('command -v posthog-cli');
   expect(envExample).not.toContain('POSTHOG_CLI_API_KEY=phx_');
 });
