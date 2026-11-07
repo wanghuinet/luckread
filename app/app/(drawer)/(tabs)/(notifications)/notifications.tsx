@@ -122,6 +122,9 @@ export default function Notifications() {
   const currentItems = isCurrentViewerData ? items : EMPTY_NOTIFICATIONS;
   const currentActorProfiles = isCurrentViewerData ? actorProfiles : EMPTY_PUBLIC_PROFILES;
   const currentUnreadCount = isCurrentViewerData ? unreadCount : 0;
+  const currentReadAllBusy = isCurrentViewerData && readAllBusy;
+  const currentHasMore = isCurrentViewerData && hasMore;
+  const currentCursor = isCurrentViewerData ? cursor : null;
   const currentLoading = authStatus === 'loading'
     ? true
     : isCurrentViewerData ? loading : authStatus === 'authenticated' && Boolean(viewerId);
@@ -264,7 +267,7 @@ export default function Notifications() {
 
   const markRead = useCallback(async (item: SocialNotification) => {
     const requestViewerId = viewerId;
-    if (!requestViewerId || !isCurrentViewerData || item.readAt || busyIds.has(item.id)) return;
+    if (!requestViewerId || viewerIdRef.current !== requestViewerId || item.readAt || busyIds.has(item.id)) return;
     setBusyIds((current) => new Set(current).add(item.id));
     setError('');
     try {
@@ -289,11 +292,11 @@ export default function Notifications() {
         });
       }
     }
-  }, [busyIds, isCurrentViewerData, viewerId]);
+  }, [busyIds, viewerId]);
 
   const markAllRead = useCallback(async () => {
     const requestViewerId = viewerId;
-    if (!requestViewerId || !isCurrentViewerData || unreadCount <= 0 || readAllBusy) return;
+    if (!requestViewerId || viewerIdRef.current !== requestViewerId || !isCurrentViewerData || unreadCount <= 0 || readAllBusy) return;
     setReadAllBusy(true);
     setError('');
     try {
@@ -318,7 +321,7 @@ export default function Notifications() {
   );
 
   const openNotification = useCallback((item: SocialNotification) => {
-    if (!viewerId || !isCurrentViewerData) return;
+    if (!viewerId || viewerIdRef.current !== viewerId) return;
     void markRead(item);
     const contentId = resolveContentId(item);
     if (contentId) {
@@ -330,7 +333,7 @@ export default function Notifications() {
     if (actorRoute) {
       router.push(('/profile/' + encodeURIComponent(actorRoute)) as never);
     }
-  }, [currentActorProfiles, isCurrentViewerData, markRead, router, viewerId]);
+  }, [currentActorProfiles, markRead, router, viewerId]);
 
   useEffect(() => {
     const notificationId = deepLinkedNotificationId;
@@ -449,12 +452,12 @@ export default function Notifications() {
         <Text className="text-xl font-bold text-neutral-900 dark:text-white">通知</Text>
         <Pressable
           accessibilityRole="button"
-          disabled={currentUnreadCount === 0 || readAllBusy}
+          disabled={currentUnreadCount === 0 || currentReadAllBusy}
           onPress={() => void markAllRead()}
           className="rounded-full px-3 py-2"
         >
           <Text className={'text-sm font-semibold ' + (currentUnreadCount === 0 ? 'text-neutral-400' : 'text-sky-600')}>
-            {readAllBusy ? '处理中…' : currentUnreadCount > 0 ? '全部标记已读' : '全部已读'}
+            {currentReadAllBusy ? '处理中…' : currentUnreadCount > 0 ? '全部标记已读' : '全部已读'}
           </Text>
         </Pressable>
       </View>
@@ -527,8 +530,8 @@ export default function Notifications() {
         )}
         ListFooterComponent={currentLoadingMore ? (
           <ActivityIndicator className="py-5" color={PRIMARY} />
-        ) : hasMore ? (
-          <Pressable onPress={() => void loadPage(cursor, true)} className="items-center py-5">
+        ) : currentHasMore ? (
+          <Pressable onPress={() => void loadPage(currentCursor, true)} className="items-center py-5">
             <Text className="font-semibold text-sky-600">加载更多</Text>
           </Pressable>
         ) : <View className="h-6" />}
