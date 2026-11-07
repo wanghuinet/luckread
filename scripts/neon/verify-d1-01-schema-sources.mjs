@@ -115,8 +115,24 @@ if (migrationIndex !== null) {
   addSource('W01', 'payload-migration-index', contract.owners[0].migrationIndex, migrationIndex)
 }
 
+const w02Directory = 'workers/W02-identity/migrations'
+const w02Actual = listFiles(w02Directory, '.sql')
+compareSets('W02 D1-01 SQL migrations', w02Actual, [...expected.w02BuiltIn, ...expected.w02Custom])
+for (const file of expected.w02BuiltIn) {
+  const relativePath = `${w02Directory}/${file}`
+  const content = read(relativePath)
+  if (content !== null) {
+    const tableNames = [...content.matchAll(/CREATE TABLE(?: IF NOT EXISTS)?\\s+["`]?([A-Za-z0-9_]+)/gi)]
+      .map((match) => match[1])
+    addSource('W02', 'better-auth-schema-reference-only', relativePath, content, {
+      tableNames,
+      executionPolicy: 'Do not execute this SQLite migration on PostgreSQL; generate Better Auth schema from the pinned config/CLI.',
+    })
+  }
+}
+for (const file of expected.w02Custom) scanSql(`${w02Directory}/${file}`, 'W02')
+
 for (const [owner, dir, expectedFiles] of [
-  ['W02', 'workers/W02-identity/migrations', [...expected.w02BuiltIn, ...expected.w02Custom]],
   ['W07', 'workers/W07-subscription-commerce/migrations', expected.w07],
   ['W08', 'workers/W08-creator/migrations', expected.w08],
 ]) {
@@ -126,6 +142,14 @@ for (const [owner, dir, expectedFiles] of [
 }
 
 const payload = contract.owners[0]
+for (const module of expected.w01PayloadModules) {
+  const relativePath = `${payloadTsDir}/${module}`
+  const content = read(relativePath)
+  addSource('W01', 'payload-d1-migration-reference-only', relativePath, content, {
+    executionPolicy: 'Do not execute D1 adapter migration modules on PostgreSQL; regenerate a PostgreSQL-native baseline from the official Payload Postgres adapter.',
+  })
+}
+
 for (const file of [
   payload.config,
   payload.wrangler,
@@ -228,10 +252,11 @@ const report = {
   packageState,
   sourceCounts: {
     w01PayloadMigrationModules: payloadModules.length,
-    w02SqlMigrations: expected.w02BuiltIn.length + expected.w02Custom.length,
+    w02SqlMigrationReferences: expected.w02BuiltIn.length + expected.w02Custom.length,
+    w02CustomSqlMigrationsToPort: expected.w02Custom.length,
     w07D101SqlMigrations: expected.w07.length,
     w08SqlMigrations: expected.w08.length,
-    totalSqlMigrationFiles: sourceRows.filter((row) => row.kind === 'sql-migration').length,
+    totalCustomSqlMigrationFilesToPort: sourceRows.filter((row) => row.kind === 'sql-migration').length,
     directD1RuntimeFiles: Object.fromEntries(Object.entries(directD1Code).map(([key, values]) => [key, values.length])),
     totalFingerprintedFiles: sourceRows.length,
   },
