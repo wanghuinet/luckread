@@ -1,13 +1,20 @@
-import type { TabBarNavigation } from 'react-native-floating-glass-tabbar';
-
-type ExpoRouterTabRoute = {
+export type ExpoRouterTabRoute = {
   key: string;
   name: string;
 };
 
+export type ExpoRouterTabEvent =
+  | { type: 'tabPress'; target: string; canPreventDefault: true }
+  | { type: 'tabLongPress'; target: string };
+
 type ExpoRouterTabEmitter = {
-  emit?: (event: Parameters<TabBarNavigation['emit']>[0]) => ReturnType<TabBarNavigation['emit']>;
-} | null | undefined;
+  emit?: (event: ExpoRouterTabEvent) => { type: string; defaultPrevented?: boolean } | undefined;
+};
+
+export type ExpoRouterTabBarNavigation = {
+  emit: (event: ExpoRouterTabEvent) => { type: string; defaultPrevented: boolean };
+  navigate: (routeName: string) => void;
+};
 
 export function createExpoRouterTabBarNavigation({
   routes,
@@ -17,16 +24,15 @@ export function createExpoRouterTabBarNavigation({
   routes: readonly ExpoRouterTabRoute[];
   emitter?: ExpoRouterTabEmitter;
   navigateToTab: (routeKey: string) => void;
-}): TabBarNavigation {
+}): ExpoRouterTabBarNavigation {
   return {
-    emit: (event) => typeof emitter?.emit === 'function'
-      ? emitter.emit(event)
-      : { type: event.type, defaultPrevented: false },
+    emit: (event) => {
+      const result = typeof emitter?.emit === 'function' ? emitter.emit(event) : undefined;
+      return { type: event.type, defaultPrevented: result?.defaultPrevented === true };
+    },
     navigate: (routeName) => {
       const route = routes.find((candidate) => candidate.name === routeName);
-      if (route) {
-        navigateToTab(route.key);
-      }
+      if (route) navigateToTab(route.key);
     },
   };
 }
