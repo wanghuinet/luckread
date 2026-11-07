@@ -63,7 +63,9 @@ test('notification inbox data, actor cache, and pending reads are isolated when 
   expect(notificationsScreenSource).toContain('if (viewerIdRef.current !== requestViewerId) return;');
   expect(notificationsScreenSource).toContain('}, [authStatus, filter, loadActorProfiles, viewerId]);');
   expect(notificationsScreenSource).toContain('}, [authStatus, viewerId]);');
-  expect(notificationsScreenSource).toContain('if (!viewerId || !isCurrentViewerData) return;');
+  expect(notificationsScreenSource).toContain('if (!viewerId || viewerIdRef.current !== viewerId) return;');
+  expect(notificationsScreenSource).toContain('const currentHasMore = isCurrentViewerData && hasMore;');
+  expect(notificationsScreenSource).toContain('const currentReadAllBusy = isCurrentViewerData && readAllBusy;');
 });
 
 
