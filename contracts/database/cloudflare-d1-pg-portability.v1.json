@@ -4,7 +4,7 @@
   "title": "Luckread Cloudflare D1 to PostgreSQL Portability Contract",
   "version": "1.0.0",
   "status": "FROZEN_CONTRACT",
-  "purpose": "Keep the Luckread application data model Cloudflare D1-native today while preserving a low-cost, deterministic migration path to PostgreSQL providers such as GCP Cloud SQL for PostgreSQL or other PostgreSQL-compatible services later.",
+  "purpose": "Keep the LuckRead logical domain model provider-neutral. Cloudflare D1 remains the live production authority during migration; Neon PostgreSQL is the approved staged schema target under the schema-only change control, with production cutover requiring separate authorization.",
   "authority": {
     "sourceOfTruth": "This contract is subordinate to the official Payload adapter contracts and is authoritative for Luckread-owned application data design.",
     "officialPayloadCompatibility": [
@@ -15,8 +15,11 @@
   },
   "architecture": {
     "canonicalLayer": "Luckread logical application data contract",
-    "currentPhysicalTarget": "Cloudflare D1",
+    "currentPhysicalTarget": "Cloudflare D1 (existing production authority during staged migration)",
+    "approvedStagedSchemaTarget": "Neon PostgreSQL (empty-schema initialization only; no production traffic or business-data import)",
+    "productionAuthorityDuringSchemaBootstrap": "Cloudflare D1",
     "futurePhysicalTargets": [
+      "Neon PostgreSQL",
       "PostgreSQL on Google Cloud",
       "PostgreSQL-compatible managed services",
       "Other standards-compliant PostgreSQL providers"
@@ -71,6 +74,15 @@
       "Cloudflare-specific object URLs",
       "Cloudflare-specific KV keys as relational identifiers"
     ]
+  },
+  "neonSchemaBootstrap": {
+    "contract": "contracts/database/neon-five-domain-schema-bootstrap.v1.json",
+    "changeControl": "docs/change-control/CC-NEON-FIVE-DATABASE-SCHEMA-INITIALIZATION-2026-11-08.md",
+    "scope": "Schema-only bootstrap from empty targets; business rows are not imported.",
+    "domainOrder": ["D1-01", "D1-02", "D1-03", "D1-04", "D1-05"],
+    "runtimeSwitchAuthorized": false,
+    "productionCutoverRequiresSeparateChangeControl": true,
+    "migrationLedgerRowsAllowed": true
   },
   "postgresMigrationRules": {
     "targetAdapter": "@payloadcms/db-postgres",
@@ -136,5 +148,5 @@
     "A D1-only implementation leaks binding names or SQLite semantics into domain APIs",
     "A PostgreSQL migration requires rewriting Payload/Luckread API contracts merely to preserve database compatibility"
   ],
-  "designDirective": "Design for D1 now, but treat PostgreSQL as a first-class future physical target. Cloudflare optimization must reduce cost and improve runtime fit without creating irreversible domain-model or API coupling."
+  "designDirective": "Keep the logical domain and API contracts stable. D1 remains production authority during the approved Neon schema-only bootstrap; PostgreSQL schema creation does not authorize Worker runtime switching or production cutover."
 }
