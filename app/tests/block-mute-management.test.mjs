@@ -91,3 +91,10 @@ test('prevents duplicate pagination requests and keeps the list server-authorita
   expect(screenSource).toContain("setCursor(page.nextCursor || null)");
   expect(screenSource).toContain("setHasMore(page.hasMore)");
 });
+
+
+test('shows a recoverable empty state instead of a spinner when the initial list request fails', () => {
+  expect(screenSource).toContain('{loading || (!accountDataReady && !error) ? <ActivityIndicator color={PRIMARY} /> : (');
+  expect(screenSource).toContain("{error ? '暂时无法显示列表' : kind === 'blocks' ? '没有已屏蔽的账号' : '没有已静音的账号'}");
+  expect(screenSource).toContain('onPress={() => void loadPage(null, false)}');
+});
