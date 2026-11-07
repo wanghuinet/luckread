@@ -271,7 +271,7 @@ test('centralizes X-inspired light/dark social surface tokens and type scale', (
 
 test('home feed cards use the shared compact X-style author, body and metadata scale', () => {
   const start = feedItemUiSource.indexOf('const feedCard = (');
-  const end = feedItemUiSource.indexOf('\\n    return (\\n        <>', start);
+  const end = feedItemUiSource.indexOf('\n    return (\n        <>', start);
   expect(start).toBeGreaterThanOrEqual(0);
   expect(end).toBeGreaterThan(start);
   const card = feedItemUiSource.slice(start, end);
