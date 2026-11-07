@@ -33,6 +33,8 @@ env:
 jobs:
   dependency-compatibility:
     name: Expo install, doctor and typecheck
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     env:
       EXPO_PROJECT_ID: "00000000-0000-4000-8000-000000000001"
@@ -62,6 +64,30 @@ jobs:
           path: app/bun.lockb
           if-no-files-found: error
           retention-days: 1
+
+      - name: Commit generated Bun lockfile to same-repository PR branch
+        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+        env:
+          PR_BRANCH: ${{ github.event.pull_request.head.ref }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          LOCKFILE_COPY="${RUNNER_TEMP}/luckread-generated-bun.lockb"
+          cp bun.lockb "$LOCKFILE_COPY"
+          cd ..
+          test -n "$PR_BRANCH"
+          test -n "$PR_HEAD_SHA"
+          git fetch origin "$PR_HEAD_SHA"
+          git checkout --detach "$PR_HEAD_SHA"
+          install -D -m 0644 "$LOCKFILE_COPY" app/bun.lockb
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/bun.lockb
+          if git diff --cached --quiet; then
+            echo "Generated Bun lockfile already matches the PR branch."
+            exit 0
+          fi
+          git commit -m "chore(app): update generated Bun lockfile"
+          git push origin "HEAD:refs/heads/$PR_BRANCH"
       - name: Apply and verify Hyperswitch React Native 0.88 compatibility
         run: |
           node scripts/apply-hyperswitch-rn88-compat.mjs
