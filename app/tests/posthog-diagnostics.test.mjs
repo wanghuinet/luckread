@@ -106,7 +106,8 @@ test('documents and wires the separate private PostHog CLI credentials for nativ
   expect(envExample).toContain('POSTHOG_CLI_PROJECT_ID=715723');
   expect(envExample).toContain('POSTHOG_CLI_HOST=https://us.posthog.com');
   expect(envExample).toContain('Configure POSTHOG_CLI_API_KEY as a GitHub Actions repository secret');
-  expect(androidBetaWorkflow).toContain('EXPO_PUBLIC_POSTHOG_API_KEY: ${{ vars.EXPO_PUBLIC_POSTHOG_API_KEY }}');
+  expect(androidBetaWorkflow).toContain('EXPO_PUBLIC_POSTHOG_API_KEY: ${{ secrets.EXPO_PUBLIC_POSTHOG_API_KEY }}');
+  expect(androidBetaWorkflow).toContain('Verify PostHog project ingestion key is available');
   expect(androidBetaWorkflow).toContain('POSTHOG_CLI_API_KEY: ${{ secrets.POSTHOG_CLI_API_KEY }}');
   expect(androidBetaWorkflow).toContain('POSTHOG_CLI_PROJECT_ID: "715723"');
   expect(androidBetaWorkflow).toContain('POSTHOG_CLI_HOST: "https://us.posthog.com"');
