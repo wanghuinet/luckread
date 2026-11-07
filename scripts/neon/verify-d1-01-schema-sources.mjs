@@ -182,6 +182,9 @@ for (const file of [
     if (!content.includes('@payloadcms/db-d1-sqlite')) failures.push('W01 current Payload adapter no longer matches the source contract')
     if (!/push\s*:\s*false/.test(content)) failures.push('W01 Payload push:false was not found; do not admit automatic production DDL')
   }
+  if (file === payload.wrangler && (!content.includes('"database_name": "luckread"') || !content.includes('"database_id": "2f80471e-3756-49f9-8db1-7707a433ad64"'))) {
+    failures.push('W01 Payload Wrangler binding no longer points to the admitted D1-01 source database')
+  }
   addSource('W01', file.endsWith('.json') ? 'sqlite-schema-snapshot' : file.includes('/collections/') ? 'payload-collection' : 'payload-config-or-wrangler', file, content, extra)
 }
 
@@ -234,6 +237,14 @@ const packageState = {
   betterAuthPgDriverInstalled: Boolean(w02Package.dependencies?.pg),
 }
 
+const directD1CodeBreakdown = Object.fromEntries(
+  Object.entries(directD1Code).map(([owner, files]) => {
+    const tests = files.filter((file) => file.endsWith('.test.ts'))
+    const production = files.filter((file) => !file.endsWith('.test.ts'))
+    return [owner, { productionSourceFiles: production.length, testFiles: tests.length, total: files.length }]
+  }),
+)
+
 const sqliteFindings = sourceRows
   .filter((row) => row.kind === 'sql-migration' && (row.sqliteSpecificConstructs?.length || row.triggerDefinitions))
   .map((row) => ({
@@ -261,10 +272,11 @@ const report = {
     w07D101SqlMigrations: expected.w07.length,
     w08SqlMigrations: expected.w08.length,
     totalCustomSqlMigrationFilesToPort: sourceRows.filter((row) => row.kind === 'sql-migration').length,
-    directD1RuntimeFiles: Object.fromEntries(Object.entries(directD1Code).map(([key, values]) => [key, values.length])),
+    directD1RuntimeFiles: directD1CodeBreakdown,
     totalFingerprintedFiles: sourceRows.length,
   },
   directD1RuntimeFiles: directD1Code,
+  directD1RuntimeFileBreakdown: directD1CodeBreakdown,
   sqlitePortabilityFindings: sqliteFindings,
   sources: sourceRows.sort((a, b) => a.path.localeCompare(b.path)),
   failures,
