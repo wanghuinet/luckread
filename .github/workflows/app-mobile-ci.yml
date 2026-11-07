@@ -23,7 +23,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: app-mobile-ci-${{ github.ref }}
+  group: app-mobile-ci-v2-${{ github.ref }}
   cancel-in-progress: true
 
 env:
