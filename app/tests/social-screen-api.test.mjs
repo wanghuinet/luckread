@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const bookmarkScreenSource = readFileSync(resolve(process.cwd(), 'app/(drawer)/bookmarks.tsx'), 'utf8');
-const bookmarkStateSource = readFileSync(resolve(process.cwd(), 'app/lib/content-bookmark-state.ts'), 'utf8');
+const bookmarkStateSource = readFileSync(resolve(process.cwd(), 'lib/content-bookmark-state.ts'), 'utf8');
 const feedItemSource = readFileSync(new URL('../components/FeedItem.tsx', import.meta.url), 'utf8');
 const postDetailSource = readFileSync(new URL('../app/(drawer)/(tabs)/(index,search,messages,grok,video,notifications)/post/[id].tsx', import.meta.url), 'utf8');
 const profileScreenSource = readFileSync(resolve(process.cwd(), 'app/(drawer)/(tabs)/(index,search,messages,grok,video,notifications)/profile/[id].tsx'), 'utf8');
@@ -385,7 +385,7 @@ test('saved list removes an item only after shared bookmark status confirms it i
   expect(bookmarkScreenSource).toContain("import { useContentBookmark } from '~/lib/content-bookmark-state';");
   expect(bookmarkScreenSource).toContain('function BookmarkFeedRow(');
   expect(bookmarkScreenSource).toContain('if (!contentId || !bookmark.loaded || bookmark.loading || bookmark.pending || bookmark.bookmarked) return;');
-  expect(bookmarkScreenSource).toContain('onRemoved(contentId);');
+  expect(bookmarkScreenSource).toContain('onRemoved(contentId, viewerId);');
   expect(bookmarkScreenSource).toContain('onRemoved={removeUnbookmarkedItem}');
 });
 
