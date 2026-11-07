@@ -10,6 +10,7 @@ import {
     Modal,
     StatusBar,
     useWindowDimensions,
+    StyleSheet,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -38,6 +39,7 @@ import { blockUser, muteUser } from '~/lib/social-screen-api';
 import { setProfilePin, useProfilePinSnapshot } from '~/lib/profile-pin-state';
 import ReportPostDialog from './ReportPostDialog';
 import SocialPoll from './SocialPoll';
+import { getXDesignColors, X_DESIGN_TOKENS } from '~/constants/x-design-tokens';
 
 
 dayjs.extend(relativeTime);
@@ -243,8 +245,8 @@ const FeedMediaGallery = ({
                     <View
                         key={media.src + '-' + index}
                         className={items.length === 1
-                            ? "w-full overflow-hidden rounded-lg bg-neutral-100 dark:bg-neutral-900"
-                            : "w-[48%] overflow-hidden rounded-lg bg-neutral-100 dark:bg-neutral-900"}
+                            ? "w-full overflow-hidden rounded-xl bg-neutral-100 dark:bg-neutral-900"
+                            : "w-[48%] overflow-hidden rounded-xl bg-neutral-100 dark:bg-neutral-900"}
                     >
                         {media.kind === 'video' ? (
                             <FeedVideoAttachment uri={media.src} headers={media.headers} />
@@ -408,6 +410,7 @@ interface FeedItemProps {
 
 export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailView, onDeleted, onCommentPress, replyDisabled, onReplySubmitted }) => {
     const { colorScheme } = useColorScheme();
+    const palette = getXDesignColors(colorScheme);
     const effectiveReplyDisabled = replyDisabled ?? (
         itemData.accessMode === 'MEMBERS_ONLY' && itemData.accessGranted !== true
     );
@@ -691,7 +694,12 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
     const feedCard = (
         <TouchableOpacity
             onPress={onPress}
-            className="p-1 py-2 pr-4 border-b border-neutral-200 dark:border-neutral-800"
+            style={{
+                paddingHorizontal: X_DESIGN_TOKENS.spacing.feedHorizontal,
+                paddingVertical: X_DESIGN_TOKENS.spacing.feedVertical,
+                borderBottomWidth: StyleSheet.hairlineWidth,
+                borderBottomColor: palette.border,
+            }}
         >
             {isProfilePinned ? (
                 <View className="ml-11 mb-1 flex-row items-center gap-1">
@@ -702,10 +710,13 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
             <View className="flex-row">
                 <ProfileImage source={{ uri: authorImageUrl, headers: authorImageHeaders }} displaySize="s" is_organization={isOrganization} />
                 <View className="ml-2 flex-1">
-                    <View className="flex-row items-center justify-between">
-                        <TouchableOpacity onPress={() => router.push('/profile/' + encodeURIComponent(profileIdentifier))}>
-                            <View className="flex-row items-center">
-                                <Text className="text-lg font-bold text-black dark:text-white mr-1">{authorName}</Text>
+                    <View className="flex-row items-start justify-between">
+                        <TouchableOpacity
+                            style={{ flex: 1, marginRight: 8 }}
+                            onPress={() => router.push('/profile/' + encodeURIComponent(profileIdentifier))}
+                        >
+                            <View className="flex-row flex-wrap items-center">
+                                <Text style={{ fontSize: X_DESIGN_TOKENS.typography.author, fontWeight: '700', color: palette.text, marginRight: 4 }}>{authorName}</Text>
                                 {verified_badge && (
                                     <Image
                                         source={{ uri: verified_badge }}
@@ -713,8 +724,8 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
                                         onError={(e) => console.log('Failed to load verified badge:', e.error)}
                                     />
                                 )}
-                                <Text className="text-lg text-neutral-500 dark:text-neutral-400 mr-1 ml-1">@{authorHandle}</Text>
-                                <Text className="text-lg text-neutral-500 dark:text-neutral-400"> · {formatTime(itemData.posted_time, false)}</Text>
+                                <Text style={{ fontSize: X_DESIGN_TOKENS.typography.metadata, color: palette.muted, marginRight: 4, marginLeft: 2 }}>@{authorHandle}</Text>
+                                <Text style={{ fontSize: X_DESIGN_TOKENS.typography.metadata, color: palette.muted }}>· {formatTime(itemData.posted_time, false)}</Text>
                             </View>
                         </TouchableOpacity>
                         {!detailView && (
@@ -736,7 +747,12 @@ export const FeedItem: React.FC<FeedItemProps> = ({ itemData, onPress, detailVie
                             <Text className="text-xs font-semibold text-amber-800 dark:text-amber-300">会员专享</Text>
                         </View>
                     ) : null}
-                    <Text className="text-black dark:text-white mt-1 text-lg leading-6">{itemData.message}</Text>
+                    <Text style={{
+                        marginTop: X_DESIGN_TOKENS.spacing.bodyTop,
+                        fontSize: X_DESIGN_TOKENS.typography.body,
+                        lineHeight: X_DESIGN_TOKENS.typography.bodyLineHeight,
+                        color: palette.text,
+                    }}>{itemData.message}</Text>
                     <FeedMediaGallery items={mediaItems} contentId={itemData.contentId} mediaWarning={itemData.accessGranted === false ? null : itemData.mediaWarning} />
                     {detailView && itemData.contentType === 'post' && itemData.contentId ? (
                         <SocialPoll contentId={itemData.contentId} />
