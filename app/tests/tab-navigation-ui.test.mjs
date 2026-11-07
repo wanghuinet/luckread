@@ -15,6 +15,10 @@ const tabBarScrollSource = readFileSync(
   new URL('../components/TabBarScroll.tsx', import.meta.url),
   'utf8',
 );
+const bottomTabBarSource = readFileSync(
+  new URL('../components/XBottomTabBar.tsx', import.meta.url),
+  'utf8',
+);
 const publishScreenSource = readFileSync(new URL('../app/publish.tsx', import.meta.url), 'utf8');
 const profileScreenSource = readFileSync(
   new URL('../app/(drawer)/(tabs)/(index,search,messages,grok,video,notifications)/profile/[id].tsx', import.meta.url),
@@ -25,40 +29,48 @@ const appPackage = JSON.parse(
   readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
 );
 
-test('uses the pinned upstream floating glass tab bar without replacing LuckRead routes', () => {
-  expect(appPackage.dependencies['react-native-floating-glass-tabbar']).toBe('0.1.0');
-  expect(tabLayoutSource).toContain("from 'react-native-floating-glass-tabbar'");
-  expect(tabLayoutSource).toContain('<FloatingGlassTabBar');
-  expect(tabLayoutSource).toContain('tabs={LuckReadTabs}');
-  expect(tabLayoutSource).toContain('labelMode="none"');
-  expect(tabLayoutSource).toContain('floatGap={10}');
-  expect(tabLayoutSource).toContain('glassTint:');
-  expect(tabLayoutSource).toContain('blurTint:');
-  expect(tabLayoutSource).toContain('style={tabBarAnimationStyle}');
+test('uses a flat X-style bottom navigation without the floating glass dependency', () => {
+  expect(appPackage.dependencies['react-native-floating-glass-tabbar']).toBeUndefined();
+  expect(tabLayoutSource).toContain("import XBottomTabBar from '~/components/XBottomTabBar';");
+  expect(tabLayoutSource).toContain('tabBar={(props) => <XBottomTabBar {...props} />}');
+  expect(bottomTabBarSource).toContain("backgroundColor: palette.background");
+  expect(bottomTabBarSource).toContain('borderTopColor: palette.border');
+  expect(bottomTabBarSource).toContain('position: \'absolute\'');
+  expect(bottomTabBarSource).toContain('height: 56');
+  expect(bottomTabBarSource).toContain('minWidth: 48');
+  expect(bottomTabBarSource).toContain('accessibilityRole="tab"');
+  expect(bottomTabBarSource).toContain('accessibilityState={{ selected: isFocused }}');
+  expect(bottomTabBarSource).not.toContain('BlurView');
+  expect(bottomTabBarSource).not.toContain('glassTint');
+  expect(bottomTabBarSource).not.toContain('borderRadius');
 
   for (const routeName of ['(index)', '(search)', '(video)', '(notifications)', '(messages)']) {
-    expect(tabLayoutSource).toContain(`'${routeName}':`);
     expect(tabLayoutSource).toContain(`name="${routeName}"`);
+    expect(bottomTabBarSource).toContain(`routeName: '${routeName}'`);
   }
 
-  // The immersive video route stays full-screen; all other registered routes share the glass bar.
-  expect(tabLayoutSource).toContain("if (props.state.routes[props.state.index]?.name === '(video)') return null;");
+  // The immersive video route remains full-screen.
+  expect(bottomTabBarSource).toContain("state.routes[state.index]?.name === '(video)'");
+});
+
+test('extends the flat X navigation background through device safe areas', () => {
+  expect(bottomTabBarSource).toContain('bottom: 0');
+  expect(bottomTabBarSource).toContain('paddingBottom: insets.bottom');
+  expect(bottomTabBarSource).toContain('borderTopWidth: StyleSheet.hairlineWidth');
+  expect(bottomTabBarSource).toContain('height: 56');
+  expect(bottomTabBarSource).toContain('minHeight: 48');
 });
 
 test('keeps Expo Router tab scenes inside their native navigation context', () => {
-  // Use Expo Router's route-tree-aware focus hook so shared tab screens attach
-  // focus effects to the same navigation context that owns the route scenes.
-  // Keep scene ownership with the navigator; do not add a custom screenLayout.
-  expect(tabLayoutSource).toContain('tabBar={(props) => {');
-  expect(tabLayoutSource).toContain('createExpoRouterTabBarNavigation({');
-  expect(tabLayoutSource).toContain('emitter: props.emitter');
-  expect(tabLayoutSource).toContain('navigateToTab: props.navigateToTab');
-  expect(tabLayoutSource).toContain('<FloatingGlassTabBar');
-  expect(tabLayoutSource).toContain('{...props}');
-  expect(tabLayoutSource).toContain('navigation={navigation}');
+  // Keep scene ownership with Expo Router and bridge only the tabPress events
+  // needed by the custom native tab surface.
+  expect(tabLayoutSource).toContain('tabBar={(props) => <XBottomTabBar {...props} />}');
+  expect(bottomTabBarSource).toContain('createExpoRouterTabBarNavigation({');
+  expect(bottomTabBarSource).toContain('state, emitter, navigateToTab');
+  expect(bottomTabBarSource).toContain("type: 'tabPress'");
+  expect(bottomTabBarSource).toContain("type: 'tabLongPress'");
+  expect(bottomTabBarSource).toContain('navigation.navigate(tab.routeName)');
   expect(tabLayoutSource).not.toContain('screenLayout=');
-  expect(tabLayoutSource).not.toContain('BlurTargetView');
-  expect(tabLayoutSource).not.toContain('blurProps=');
   expect(tabLayoutSource).not.toContain('Platform.OS');
   expect(tabBarScrollSource).toContain("import { useFocusEffect } from 'expo-router';");
   expect(tabBarScrollSource).not.toContain("import { useFocusEffect } from '@react-navigation/native';");
@@ -84,7 +96,7 @@ test('does not crash tab presses when the Expo Router emitter is absent', () => 
   });
 });
 
-test('adapts Expo Router 58 tab events to the glass tab bar emitter contract', () => {
+test('adapts Expo Router 58 tab events to the native X-style tab bar contract', () => {
   const events = [];
   const routes = [
     { key: 'home-key', name: '(index)' },
@@ -108,7 +120,7 @@ test('adapts Expo Router 58 tab events to the glass tab bar emitter contract', (
   expect(result).toEqual({ type: 'tabPress', defaultPrevented: true });
 });
 
-test('maps glass tab route-name navigation to Expo Router route-key navigation', () => {
+test('maps X-style tab route-name navigation to Expo Router route-key navigation', () => {
   const navigatedRouteKeys = [];
   const navigation = createExpoRouterTabBarNavigation({
     routes: [
@@ -206,14 +218,14 @@ test('root route boundary catches render failures across all native app pages', 
 });
 
 
-test('hides the same floating bottom navigation and publish action on downward scroll, then restores them on upward scroll', () => {
+test('hides and restores the X-style bottom navigation and publish action during scrolling', () => {
   const homeScreen = readFileSync(
     new URL('../app/(drawer)/(tabs)/(index)/index.tsx', import.meta.url),
     'utf8',
   );
 
   expect(tabLayoutSource).toContain('TabBarScrollProvider');
-  expect(tabLayoutSource).toContain('transform: [{ translateY: tabBarTranslateY }]');
+  expect(bottomTabBarSource).toContain('transform: [{ translateY: tabBarTranslateY }]');
   expect(homeScreen).toContain('transform: [{ translateY: tabBarTranslateY }]');
   expect(tabBarScrollSource).toContain('HIDE_SCROLL_THRESHOLD');
   expect(tabBarScrollSource).toContain('SHOW_SCROLL_THRESHOLD');
