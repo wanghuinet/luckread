@@ -3,7 +3,7 @@
   "$id": "https://luckread.com/contracts/database/neon-d1-04-w07-order-payment-schema.v1.json",
   "title": "LuckRead D1-04 W07 Cumulative Finance PostgreSQL Schema",
   "version": "1.0.0",
-  "status": "W07_D1_04_REFUNDS_BILLING_LOCAL_POSTGRES18_PASSED_PAYMENT_METHOD_REVOCATION_PENDING",
+  "status": "W07_D1_04_PAYMENT_METHOD_REVOCATION_PENDING_LOCAL_POSTGRES18_REHEARSAL",
   "target": {
     "domainId": "D1-04",
     "databaseName": "luckread_finance",
@@ -38,7 +38,8 @@
       "workers/W07-subscription-commerce/migrations-d1-04/0003_saved_payment_methods_mandates.sql",
       "workers/W07-subscription-commerce/migrations-d1-04/0004_subscription_renewal_cycles.sql",
       "workers/W07-subscription-commerce/migrations-d1-04/0005_revenuecat_webhook_inbox.sql",
-      "workers/W07-subscription-commerce/migrations-d1-04/0006_refunds_billing_documents.sql"
+      "workers/W07-subscription-commerce/migrations-d1-04/0006_refunds_billing_documents.sql",
+      "workers/W07-subscription-commerce/migrations-d1-04/0007_payment_method_revocation_requests.sql"
     ],
     "includedTables": [
       "orders",
@@ -54,12 +55,10 @@
       "revenuecat_webhook_events",
       "revenuecat_webhook_event_conflicts",
       "refunds",
-      "billing_documents"
-    ],
-    "deferredTables": [
+      "billing_documents",
       "payment_method_revocation_requests"
     ],
-    "deferredScopeNote": "Only payment_method_revocation_requests from source migration 0007 remain deferred as a separate PostgreSQL-native PAY-007 slice with its own local rehearsal.",
+    "deferredTables": [],
     "excludedTables": [
       "entitlements",
       "ledger_entries",
@@ -67,7 +66,7 @@
       "users",
       "media"
     ],
-    "tableCount": 14
+    "tableCount": 15
   },
   "schema": {
     "tables": {
@@ -327,6 +326,45 @@
         "snapshot": "Bounded valid JSON text, immutable after issue.",
         "sourceGuard": "Every document matches authoritative Order customer/currency/total; RECEIPT additionally matches a succeeded Payment for the same Order/customer/currency/amount.",
         "retention": "Issued billing documents are immutable and retained."
+      },
+      "payment_method_revocation_requests": {
+        "source": "0007_payment_method_revocation_requests.sql",
+        "primaryKey": "revocation_request_id",
+        "uniqueKeys": [
+          [
+            "saved_payment_method_id"
+          ],
+          [
+            "customer_id",
+            "idempotency_key"
+          ]
+        ],
+        "indexes": [
+          "ix_payment_method_revocation_status",
+          "ux_payment_method_revocation_customer_idempotency"
+        ],
+        "triggerCount": 7,
+        "provider": "hyperswitch",
+        "lifecycleStates": [
+          "REQUESTED",
+          "PENDING_PROVIDER",
+          "RECONCILIATION_REQUIRED",
+          "COMPLETED"
+        ],
+        "immutableFields": [
+          "revocation request identity",
+          "saved payment method identity",
+          "opaque provider payment method reference",
+          "provider",
+          "merchant",
+          "customer",
+          "customer idempotency key",
+          "created_at"
+        ],
+        "providerDeleteTimestamp": "Once provider_method_deleted_at is set it cannot be changed; it is not proof that mandate webhooks have all been applied.",
+        "completionRule": "COMPLETED requires provider_method_deleted_at and every mandate attached to the saved method to be REVOKED, FAILED or EXPIRED.",
+        "ownerRule": "Insert requires exact provider/merchant/customer/payment_method_id match with one existing saved_payment_methods row.",
+        "relationship": "PostgreSQL keeps D1-04 without foreign keys and preserves the saved-method reference using an owner-binding trigger."
       }
     },
     "explicitIndexNames": [
@@ -358,7 +396,9 @@
       "ix_refunds_customer_created",
       "ix_refunds_payment_created",
       "ix_refunds_status_updated",
-      "ix_billing_documents_customer_issued"
+      "ix_billing_documents_customer_issued",
+      "ix_payment_method_revocation_status",
+      "ux_payment_method_revocation_customer_idempotency"
     ],
     "triggerNames": [
       "orders_commercial_snapshot_immutable",
@@ -425,13 +465,20 @@
       "refunds_retained",
       "billing_documents_source_guard",
       "billing_documents_identity_immutable",
-      "billing_documents_retained"
+      "billing_documents_retained",
+      "payment_method_revocation_request_requires_saved_method",
+      "payment_method_revocation_request_identity_immutable",
+      "payment_method_revocation_request_version_guard",
+      "payment_method_revocation_request_transition_guard",
+      "payment_method_revocation_request_provider_deleted_immutable",
+      "payment_method_revocation_request_retained",
+      "payment_method_revocation_request_completion_guard"
     ],
     "totals": {
-      "tables": 14,
-      "explicitIndexes": 29,
-      "triggers": 65,
-      "triggerFunctions": 5,
+      "tables": 15,
+      "explicitIndexes": 31,
+      "triggers": 72,
+      "triggerFunctions": 6,
       "foreignKeys": 0
     },
     "cumulativeSlices": [
@@ -478,6 +525,17 @@
         "triggers": 9,
         "triggerFunctions": 1,
         "foreignKeys": 0
+      },
+      {
+        "migrationId": "0006_w07_d1_04_payment_method_revocation",
+        "source": "workers/W07-subscription-commerce/migrations-d1-04/0007_payment_method_revocation_requests.sql",
+        "contract": "contracts/database/neon-d1-04-w07-payment-method-revocation-schema.v1.json",
+        "status": "PENDING_LOCAL_POSTGRES18_REHEARSAL",
+        "tables": 1,
+        "explicitIndexes": 2,
+        "triggers": 7,
+        "triggerFunctions": 1,
+        "foreignKeys": 0
       }
     ],
     "sliceTotals": {
@@ -515,6 +573,13 @@
         "triggers": 9,
         "triggerFunctions": 1,
         "foreignKeys": 0
+      },
+      "paymentMethodRevocationRequests": {
+        "tables": 1,
+        "explicitIndexes": 2,
+        "triggers": 7,
+        "triggerFunctions": 1,
+        "foreignKeys": 0
       }
     }
   },
@@ -528,7 +593,10 @@
     "renewalCycles": "Preserve immutable billing-cycle identity and resolved pricing snapshots, the W07-owned cycle state machine, CAS leases, exact Order/Payment binding, active MIT mandate check, terminal provider-outcome synchronization and one scheduler control-metadata singleton. W10 orchestrates but never reads or writes D1-04; subscription entitlements remain D1-01 authority.",
     "revenuecatWebhook": "Keep RevenueCat app_id/event_id first receipt unique and immutable, store bounded event_data_json as an object without raw webhook bytes or subscriber_attributes, record distinct conflicting payload hashes separately against the first receipt, and advance each conflict occurrence by one with monotonic time. Keep this provider inbox separate from Hyperswitch payment_provider_events.",
     "refunds": "HyperSwitch-only refund facts; keep money in BIGINT minor units, serialize refundable-balance reservations by locking the matching Payment row, enforce customer-scoped idempotency, CAS version/state transitions and monotonic provider timestamps.",
-    "billingDocuments": "Immutable invoice/receipt snapshots bound to matching Order commercial facts; RECEIPT additionally requires its matching succeeded Payment. Keep bounded JSON text and no foreign keys."
+    "billingDocuments": "Immutable invoice/receipt snapshots bound to matching Order commercial facts; RECEIPT additionally requires its matching succeeded Payment. Keep bounded JSON text and no foreign keys.",
+    "paymentMethodRevocationRequests": "Persist the one-way local revocation request with exact saved-method owner binding, customer-scoped idempotency, immutable identity, one-step CAS, monotonic timestamps and a completion gate requiring provider deletion plus all associated mandates terminal. Keep zero foreign keys.",
+    "mandateWebhookReplay": "Replace payment_provider_events_terminal_immutable so only a mandate_active/mandate_revoked receipt in RECONCILIATION_REQUIRED can reset to RECEIVED with processed_at/outcome_code cleared; original identity and payload SHA-256 remain immutable; APPLIED and REJECTED remain terminal.",
+    "renewalRevocationGate": "Keep existing W07 renewal-runtime readActiveMandate and isExactMandateActive NOT EXISTS lookups against payment_method_revocation_requests; a matching non-COMPLETED request blocks any new MIT submission."
   },
   "sourceInventory": [
     {
@@ -580,19 +648,23 @@
       "path": "workers/W07-subscription-commerce/migrations-d1-04/0006_refunds_billing_documents.sql",
       "role": "W07-owned refund facts and immutable customer invoice/receipt snapshots.",
       "execution": "Fingerprint and translate to PostgreSQL 18 only; HyperSwitch provider events remain the only provider-confirmation source. No remote DDL or business-data import."
+    },
+    {
+      "path": "workers/W07-subscription-commerce/migrations-d1-04/0007_payment_method_revocation_requests.sql",
+      "role": "W07-owned saved-method revocation request lifecycle and exact mandate webhook reconciliation replay policy.",
+      "execution": "Fingerprint and translate to PostgreSQL 18 only. Preserve existing runtime renewal lookup guard; replace only the provider event terminal trigger branch; preserve saved-method owner binding without adding a foreign key."
     }
   ],
   "verification": {
     "sourceRegression": "workers/W07-subscription-commerce/scripts/test_order_d1_04_migration.py",
     "postgresImage": "postgres:18.6",
-    "tables": 14,
-    "explicitIndexes": 29,
-    "triggers": 65,
-    "triggerFunctions": 5,
+    "tables": 15,
+    "explicitIndexes": 31,
+    "triggers": 72,
+    "triggerFunctions": 6,
     "foreignKeys": 0,
     "fixtureRowsAfterRollback": 0,
     "mustNotExist": [
-      "payment_method_revocation_requests",
       "entitlements",
       "ledger_entries",
       "payment_intents",
@@ -600,6 +672,29 @@
       "media"
     ],
     "localRehearsalEvidence": {
+      "status": "NOT_RUN"
+    },
+    "predecessorLocalRehearsalEvidence": {
+      "workflowRunId": 42489584748,
+      "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42489584748",
+      "verifiedHeadSha": "6d416296e83d6b0389505f7b224976aae7634345",
+      "postgresVersion": "18.6",
+      "database": "luckread_finance_schema",
+      "tables": 6,
+      "explicitIndexes": 14,
+      "triggers": 24,
+      "triggerFunctions": 1,
+      "foreignKeys": 0,
+      "rowsAfterRollback": 0,
+      "offlineD104SourceRegressionTests": 24,
+      "laterFinanceTablesIncluded": false,
+      "remoteNeonTouched": false,
+      "cloudflareD1Touched": false,
+      "businessDataImported": false,
+      "productionCutoverAuthorized": false,
+      "evidenceArtifactId": 13621195000
+    },
+    "previousSliceLocalRehearsalEvidence": {
       "status": "LOCAL_POSTGRES18_REHEARSAL_PASSED",
       "workflowRunId": 42496761021,
       "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42496761021",
@@ -625,50 +720,7 @@
       "businessDataImported": false,
       "productionCutoverAuthorized": false
     },
-    "predecessorLocalRehearsalEvidence": {
-      "workflowRunId": 42489584748,
-      "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42489584748",
-      "verifiedHeadSha": "6d416296e83d6b0389505f7b224976aae7634345",
-      "postgresVersion": "18.6",
-      "database": "luckread_finance_schema",
-      "tables": 6,
-      "explicitIndexes": 14,
-      "triggers": 24,
-      "triggerFunctions": 1,
-      "foreignKeys": 0,
-      "rowsAfterRollback": 0,
-      "offlineD104SourceRegressionTests": 24,
-      "laterFinanceTablesIncluded": false,
-      "remoteNeonTouched": false,
-      "cloudflareD1Touched": false,
-      "businessDataImported": false,
-      "productionCutoverAuthorized": false,
-      "evidenceArtifactId": 13621195000
-    },
-    "previousSliceLocalRehearsalEvidence": {
-      "workflowRunId": 42493925572,
-      "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42493925572",
-      "verifiedHeadSha": "d675381cd5df4ef673b0cf256df74ee5809a29c5",
-      "postgresVersion": "18.6",
-      "database": "luckread_finance_schema",
-      "sourceRegressionTests": 24,
-      "newSliceTables": 2,
-      "newSliceExplicitIndexes": 3,
-      "newSliceTriggers": 7,
-      "newSliceTriggerFunctions": 1,
-      "cumulativeTables": 12,
-      "cumulativeExplicitIndexes": 25,
-      "cumulativeTriggers": 56,
-      "cumulativeTriggerFunctions": 4,
-      "foreignKeys": 0,
-      "fixtureRowsAfterRollback": 0,
-      "schedulerControlRowsAfterRollback": 1,
-      "remoteNeonTouched": false,
-      "cloudflareD1Touched": false,
-      "businessDataImported": false,
-      "productionCutoverAuthorized": false
-    },
-    "nextGate": "PAY-007 payment-method revocation remains the only W07 D1-04 source schema slice pending local PostgreSQL 18.6 rehearsal. Shared-ledger remote runner and Neon cutover remain separate, unauthorized gates."
+    "nextGate": "PAY-007 local PostgreSQL 18.6 rehearsal. After this slice, all seven W07 D1-04 source migrations have PostgreSQL translations; shared-ledger D1-04 remote runner and Neon cutover remain separate, unauthorized gates."
   },
   "safety": {
     "remoteConnectionAttempted": false,
@@ -678,6 +730,6 @@
     "businessDataImported": false,
     "productionCutoverAuthorized": false
   },
-  "nextGate": "PAY-007 payment-method revocation remains the only W07 D1-04 source schema slice pending local PostgreSQL 18.6 rehearsal. Shared-ledger remote runner and Neon cutover remain separate, unauthorized gates.",
-  "next": "PAY-007 payment-method revocation remains the only W07 D1-04 source schema slice pending local PostgreSQL 18.6 rehearsal. Shared-ledger remote runner and Neon cutover remain separate, unauthorized gates."
+  "nextGate": "PAY-007 local PostgreSQL 18.6 rehearsal. After this slice, all seven W07 D1-04 source migrations have PostgreSQL translations; shared-ledger D1-04 remote runner and Neon cutover remain separate, unauthorized gates.",
+  "next": "PAY-007 local PostgreSQL 18.6 rehearsal. After this slice, all seven W07 D1-04 source migrations have PostgreSQL translations; shared-ledger D1-04 remote runner and Neon cutover remain separate, unauthorized gates."
 }
