@@ -53,15 +53,22 @@ export function validateRemoteNeonTarget(connectionString) {
     return { valid: false, reason: 'remote runner accepts only the approved Neon PostgreSQL 18 database luckread' }
   }
   if (parsed.searchParams.getAll('sslmode').length !== 1 ||
-      parsed.searchParams.get('sslmode') !== 'verify-full' ||
+      !['require', 'verify-full'].includes(parsed.searchParams.get('sslmode')) ||
       parsed.searchParams.getAll('channel_binding').length !== 1 ||
       parsed.searchParams.get('channel_binding') !== 'require') {
-    return { valid: false, reason: 'Neon connection must require sslmode=verify-full and channel_binding=require' }
+    return { valid: false, reason: 'Neon connection must use sslmode=require or verify-full with channel_binding=require' }
   }
   if (!parsed.username || !parsed.password) {
     return { valid: false, reason: 'Neon database credentials are required' }
   }
   return { valid: true, parsed }
+}
+
+export function enforceVerifiedNeonConnectionString(connectionString) {
+  const parsed = new URL(connectionString)
+  parsed.searchParams.set('sslmode', 'verify-full')
+  parsed.searchParams.set('channel_binding', 'require')
+  return parsed.toString()
 }
 
 export function verifyRemoteTlsConnection(client, hostname) {
@@ -393,6 +400,7 @@ async function run() {
     sourceCommitSha = process.env.GITHUB_SHA
   }
   if (!target.valid) fail(target.reason)
+  if (remoteNeon) connectionString = enforceVerifiedNeonConnectionString(connectionString)
   if (!/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(sourceCommitSha || '')) {
     fail('an exact source commit SHA is required for migration provenance')
   }
