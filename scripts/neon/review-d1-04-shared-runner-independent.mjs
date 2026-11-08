@@ -253,7 +253,8 @@ export function verifyD104SharedRunnerReview({ readSource = readText } = {}) {
     const entry = entries[index]
     const contract = contracts[index]
     const expectedArtifact = artifactPaths[index]
-    if (entry.order !== (index + 1) * 100 ||
+    if (entry.migrationId !== expectedIds[index] ||
+        entry.order !== (index + 1) * 100 ||
         entry.ownerWorker !== 'W07' ||
         entry.logicalOwnerWorker !== 'W07' ||
         entry.kind !== 'POSTGRESQL_SQL' ||
@@ -283,15 +284,17 @@ export function verifyD104SharedRunnerReview({ readSource = readText } = {}) {
       fail('W07 slice source migration does not match its schema contract: ' + contractPaths[index])
     }
     allSourcePaths.push(...entrySources)
-    if (contract.localRehearsalEvidence?.remoteNeonTouched === true ||
+    if (contract.localRehearsalEvidence?.postgresVersion !== '18.6' ||
+        !Number.isSafeInteger(contract.localRehearsalEvidence?.workflowRunId) ||
+        contract.localRehearsalEvidence?.remoteNeonTouched === true ||
         contract.localRehearsalEvidence?.cloudflareD1Touched === true ||
         contract.localRehearsalEvidence?.businessDataImported === true ||
         contract.localRehearsalEvidence?.productionCutoverAuthorized === true) {
       fail('W07 slice evidence must remain local-only and empty-data: ' + contractPaths[index])
     }
   }
-  if (!sameSet(allSourcePaths,sourcePaths)) {
-    fail('the seven admitted W07 D1 source migrations do not map exactly once to the six PostgreSQL artifacts')
+  if (JSON.stringify(allSourcePaths) !== JSON.stringify(sourcePaths)) {
+    fail('the seven admitted W07 D1 source migrations do not map exactly once in canonical order to the six PostgreSQL artifacts')
   }
 
   const renewalContract = contracts[2]
@@ -381,6 +384,7 @@ export function verifyD104SharedRunnerReview({ readSource = readText } = {}) {
       new Set(allIndexes).size !== 31 ||
       finalTriggers.size !== 72 ||
       allFunctions.length !== 6 ||
+      new Set(allFunctions).size !== 6 ||
       allReferences.length !== 0) {
     fail('D1-04 final SQL catalog differs from 15 tables / 31 indexes / 72 final triggers / 6 functions / zero FKs')
   }
