@@ -44,12 +44,26 @@ The PostgreSQL 18 migration is generated from the source contract and admitted s
 
 ## 5. Acceptance
 
-- [ ] Six W10 tables match the owner map and source contracts.
-- [ ] D1 source contains six W10-owned tables, seven explicit indexes and two same-owner foreign keys.
-- [ ] PostgreSQL 18.6 catalog matches six tables, seven explicit indexes and two same-owner foreign keys.
-- [ ] Uniqueness, state checks, DLQ metadata and same-owner references are verified.
-- [ ] Synthetic fixtures are rolled back and every business/execution table returns to zero rows.
-- [ ] No W10 runtime D1 binding, Queue binding, Worker, D1, Queue, Service Binding or production configuration is added.
-- [ ] Remote DDL, business-data import and production cutover remain false.
+- [x] Six W10 tables match the owner map and source contracts.
+- [x] D1 source contains six W10-owned tables, seven explicit indexes and two same-owner foreign keys.
+- [x] PostgreSQL 18.6 catalog matches six tables, seven explicit indexes and two same-owner foreign keys.
+- [x] Uniqueness, state checks, DLQ metadata and same-owner references are verified.
+- [x] Synthetic fixtures are rolled back and every business/execution table returns to zero rows.
+- [x] No W10 runtime D1 binding, Queue binding, Worker, D1, Queue, Service Binding or production configuration is added.
+- [x] Remote DDL, business-data import and production cutover remain false.
 
 Passing this slice admits W10 schema sources only. JOB-001..008 runtime implementation and global Mapping/Contract GREEN status are not promoted by this change.
+
+
+## 6. PostgreSQL 18.6 rehearsal evidence
+
+The dedicated local workflow completed successfully:
+- Run: [42502495149](https://github.com/wanghuinet/luckread/actions/runs/42502495149)
+- Verified head: `93fdce0b5963501ca55d8093c5514828d302a6a4`
+- Target: disposable `luckread_d1_03_w10_rehearsal`, PostgreSQL 18.6
+- Catalog: 6 tables, 7 explicit indexes, 2 same-owner foreign keys, 0 triggers, 0 trigger functions
+- Generator/admission tests, schema apply, catalog validation, idempotency uniqueness check and transaction rollback: PASS
+- Synthetic fixture rows after rollback: 0
+- Evidence artifact: `13626345587` (`sha256:209f474ce742eb7f647f362b51fb468f3eb0d3a3ba30ac1f2ddc650525d6a7ad`)
+
+This is local disposable-database evidence only. It does not authorize remote Neon DDL, runtime binding/deployment, business-data import or production cutover.
