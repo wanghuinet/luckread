@@ -158,6 +158,14 @@ export function buildD105W11Migration({
 
   const tableNames = namesIn(template, /^CREATE\s+TABLE\s+([A-Za-z0-9_]+)/gim)
   const indexNames = namesIn(template, /^CREATE\s+INDEX\s+([A-Za-z0-9_]+)/gim)
+  const collatedTimeColumns = namesIn(template, /^\s*([a-z_]+) TEXT COLLATE "C"/gim)
+  if (collatedTimeColumns.length !== 15 ||
+      !['occurred_at', 'received_at', 'hour_start', 'ingested_at', 'last_event_at',
+        'updated_at', 'window_from', 'window_to', 'created_at', 'started_at', 'completed_at']
+        .every((name) => collatedTimeColumns.includes(name))) {
+    fail('W11 PostgreSQL time keys must preserve all 15 SQLite BINARY collation columns')
+  }
+
   if (!sameSet(tableNames, expectedTables) ||
       !sameSet(indexNames, expectedIndexes) ||
       tableNames.length !== 6 ||
