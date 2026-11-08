@@ -52,13 +52,24 @@ const releaseBlocked =
   ledgerContract.remoteApplyReady === false &&
   ledgerContract.execution?.remoteApplyReady === false &&
   ledgerContract.execution?.runnerStatus === 'NOT_IMPLEMENTED'
+const domainReadiness = ledgerContract.execution?.domainReadiness ?? {}
+const expectedDomains = ['D1-01', 'D1-02', 'D1-03', 'D1-04', 'D1-05']
+const d1Readiness = domainReadiness['D1-01']
+const otherDomainsBlocked = expectedDomains
+  .filter((domain) => domain !== 'D1-01')
+  .every((domain) => domainReadiness[domain]?.runnerStatus === 'NOT_IMPLEMENTED' &&
+    domainReadiness[domain]?.remoteApplyReady === false)
 const releaseReady =
   manifest.remoteApplyReady === true &&
   manifest.execution?.remoteApplyReady === true &&
   manifest.execution?.runnerStatus === 'IMPLEMENTED_AND_REVIEWED' &&
-  ledgerContract.remoteApplyReady === true &&
-  ledgerContract.execution?.remoteApplyReady === true &&
-  ledgerContract.execution?.runnerStatus === 'IMPLEMENTED_AND_REVIEWED'
+  ledgerContract.remoteApplyReady === false &&
+  ledgerContract.execution?.remoteApplyReady === false &&
+  ledgerContract.execution?.runnerStatus === 'IMPLEMENTED_FOR_D1_01_ONLY' &&
+  JSON.stringify(Object.keys(domainReadiness).sort()) === JSON.stringify(expectedDomains) &&
+  d1Readiness?.runnerStatus === 'IMPLEMENTED_AND_REVIEWED' &&
+  d1Readiness?.remoteApplyReady === true &&
+  otherDomainsBlocked
 if (manifest.domainId !== 'D1-01' || manifest.databaseName !== 'luckread' ||
     manifest.postgresMajor !== 18 || manifest.businessDataImport !== false ||
     manifest.productionCutoverAuthorized !== false || (!releaseBlocked && !releaseReady)) {
@@ -67,8 +78,8 @@ if (manifest.domainId !== 'D1-01' || manifest.databaseName !== 'luckread' ||
 if (releaseReady) {
   const reviewRef = 'contracts/database/neon-d1-01-remote-runner-review.v1.json'
   if (manifest.execution?.reviewEvidenceRef !== reviewRef ||
-      ledgerContract.execution?.reviewEvidenceRef !== reviewRef) {
-    fail('both release contracts must reference the same reviewed remote runner evidence')
+      d1Readiness?.reviewEvidenceRef !== reviewRef) {
+    fail('D1-01 manifest and D1-01 domain readiness must reference the same reviewed evidence')
   }
   const review = validateRemoteRunnerReview({ root: repositoryRoot })
   if (!review.valid) fail('remote runner review evidence is invalid: ' + review.errors.join('; '))
