@@ -224,8 +224,14 @@ export function verifyD103SharedRunnerReview({ readSource = readText } = {}) {
         'resolveActiveRecipientPushEndpoints',
         'clearProviderInvalidExpoToken',
       ]) ||
-      notifyPersistence?.primaryWorker !== 'W09' ||
-      notifyDelivery?.owner?.worker && notifyDelivery.owner.worker !== 'W09') {
+      notifyPersistence?.authority?.primaryWorker !== 'W09' ||
+      notifyPersistence?.authority?.scopedWriter?.worker !== 'W05' ||
+      notifyDelivery?.primaryOwner?.worker !== 'W09' ||
+      notifyDelivery?.delegatedRuntime?.worker !== 'W05' ||
+      !sameSet((notifyDelivery?.operations ?? []).map((item) => item.id), [
+        'resolveActiveRecipientPushEndpoints',
+        'clearProviderInvalidExpoToken',
+      ])) {
     fail('W05 NotificationPushEndpoint delegation must remain narrow and W09-owned')
   }
 
