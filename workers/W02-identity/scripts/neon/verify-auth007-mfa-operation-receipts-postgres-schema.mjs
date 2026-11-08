@@ -316,6 +316,13 @@ try {
   }
   await client.query('ROLLBACK')
   transactionOpen = false
+  const afterRollback = await client.query(
+    'SELECT COUNT(*)::int AS count FROM auth_007_mfa_operation_receipts',
+  )
+  assert(Number(afterRollback.rows[0].count) === 0,
+    'all synthetic operation receipts must be rolled back and the table must remain empty')
+  report.checks.allSyntheticRowsRolledBackAndTableEmpty = true
+  report.tableRows.auth_007_mfa_operation_receipts = Number(afterRollback.rows[0].count)
 } catch (error) {
   primaryError = error
 } finally {
