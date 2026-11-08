@@ -7,8 +7,8 @@ DECLARE
   expected_columns TEXT[];
   actual_count INTEGER;
   expected_tables TEXT[] := ARRAY[
-    'membership_plans',
     'membership_plan_versions',
+    'membership_plans',
     'membership_revenuecat_product_bindings',
     'membership_subscription_plan_change_attempts',
     'membership_subscription_scheduled_plan_changes',
