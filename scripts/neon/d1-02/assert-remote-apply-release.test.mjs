@@ -20,7 +20,6 @@ const ledgerContract={
     'D1-05':{runnerStatus:'NOT_IMPLEMENTED',remoteApplyReady:false}
   }}
 }
-}
 
 test('releases only D1-02 in the exact reviewed schema-only shared-ledger state', () => {
   assert.equal(validateD1_02ReleaseState({manifest,ledgerContract,reviewValid:true}),true)
