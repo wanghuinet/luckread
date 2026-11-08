@@ -467,8 +467,11 @@ export function verifyD104SharedRunnerReview({ readSource = readText } = {}) {
       businessRows:0,
     },
     triggerReplacement:{
+      initiallyCreated:createdTriggers.filter((item) =>
+        item.name === 'payment_provider_events_terminal_immutable' && item.migration === 1),
       dropped:droppedTriggers,
-      recreated:createdTriggers.filter((item) => item.name === 'payment_provider_events_terminal_immutable'),
+      recreated:createdTriggers.filter((item) =>
+        item.name === 'payment_provider_events_terminal_immutable' && item.migration === 6),
     },
     perArtifact,
     safety:{
