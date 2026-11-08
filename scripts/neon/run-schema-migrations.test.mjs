@@ -60,21 +60,61 @@ test('accepts only the exact D1-01 Neon target with required channel binding', (
   assert.equal(effective.searchParams.get('channel_binding'), 'require')
 })
 
-test('keeps remote Neon execution disabled until both reviewed contracts enable it', () => {
-  const manifest = { remoteApplyReady: false, execution: { runnerStatus: 'NOT_IMPLEMENTED' } }
-  const ledger = { remoteApplyReady: false, execution: { runnerStatus: 'NOT_IMPLEMENTED' } }
-  assert.equal(isRemoteApplyReleased(manifest, ledger), false)
-  assert.equal(isRemoteApplyReleased({ ...manifest, remoteApplyReady: true }, ledger), false)
-  assert.equal(isRemoteApplyReleased(
-    { remoteApplyReady: true, execution: { runnerStatus: 'IMPLEMENTED_AND_REVIEWED' } },
-    { remoteApplyReady: true, execution: { runnerStatus: 'IMPLEMENTED_AND_REVIEWED' } },
-  ), true)
-  assert.equal(isRemoteApplyReleased(
-    { remoteApplyReady: true, execution: { runnerStatus: 'NOT_IMPLEMENTED' } },
-    { remoteApplyReady: true, execution: { runnerStatus: 'IMPLEMENTED_AND_REVIEWED' } },
-  ), false)
-})
+test('releases only D1-01 when its review is valid and keeps the other four domains blocked', () => {
+  const reviewEvidenceRef = 'contracts/database/neon-d1-01-remote-runner-review.v1.json'
+  const blockedManifest = {
+    remoteApplyReady: false,
+    execution: { runnerStatus: 'NOT_IMPLEMENTED', remoteApplyReady: false },
+  }
+  const blockedLedger = {
+    remoteApplyReady: false,
+    execution: { runnerStatus: 'NOT_IMPLEMENTED', remoteApplyReady: false },
+  }
+  assert.equal(isRemoteApplyReleased(blockedManifest, blockedLedger), false)
 
+  const manifest = {
+    remoteApplyReady: true,
+    execution: {
+      runnerStatus: 'IMPLEMENTED_AND_REVIEWED',
+      remoteApplyReady: true,
+      reviewEvidenceRef,
+    },
+  }
+  const ledger = {
+    remoteApplyReady: false,
+    execution: {
+      runnerStatus: 'IMPLEMENTED_FOR_D1_01_ONLY',
+      remoteApplyReady: false,
+      domainReadiness: {
+        'D1-01': {
+          runnerStatus: 'IMPLEMENTED_AND_REVIEWED',
+          remoteApplyReady: true,
+          reviewEvidenceRef,
+        },
+        'D1-02': { runnerStatus: 'NOT_IMPLEMENTED', remoteApplyReady: false },
+        'D1-03': { runnerStatus: 'NOT_IMPLEMENTED', remoteApplyReady: false },
+        'D1-04': { runnerStatus: 'NOT_IMPLEMENTED', remoteApplyReady: false },
+        'D1-05': { runnerStatus: 'NOT_IMPLEMENTED', remoteApplyReady: false },
+      },
+    },
+  }
+  assert.equal(isRemoteApplyReleased(manifest, ledger), true)
+
+  const unsafe = structuredClone(ledger)
+  unsafe.execution.domainReadiness['D1-02'] = {
+    runnerStatus: 'IMPLEMENTED_AND_REVIEWED',
+    remoteApplyReady: true,
+  }
+  assert.equal(isRemoteApplyReleased(manifest, unsafe), false)
+
+  const globallyEnabled = structuredClone(ledger)
+  globallyEnabled.remoteApplyReady = true
+  assert.equal(isRemoteApplyReleased(manifest, globallyEnabled), false)
+
+  const wrongReview = structuredClone(manifest)
+  wrongReview.execution.reviewEvidenceRef = 'contracts/other-review.json'
+  assert.equal(isRemoteApplyReleased(wrongReview, ledger), false)
+})
 test('strips only an exact outer BEGIN/COMMIT wrapper', () => {
   const sql = '-- generated schema\n\nBEGIN;\nCREATE TABLE demo (id TEXT);\nCOMMIT;\n'
   assert.equal(stripOuterTransaction(sql, 'demo'), '-- generated schema\n\n\nCREATE TABLE demo (id TEXT);')
