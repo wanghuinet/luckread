@@ -105,7 +105,7 @@ test('local connection URLs are pinned to loopback, port 5432 and the matching d
 test('transaction stripping accepts plain SQL or exact outer BEGIN/COMMIT and rejects partial wrappers', () => {
   assert.equal(stripOuterTransaction('-- only a comment\nSELECT 1;', 'plain'), '-- only a comment\nSELECT 1;')
   assert.equal(stripOuterTransaction('-- header\nBEGIN;\nCREATE TABLE x(id int);\nCOMMIT;\n', 'wrapped'),
-    'CREATE TABLE x(id int);')
+    '-- header\n\nCREATE TABLE x(id int);')
   assert.throws(() => stripOuterTransaction('BEGIN;\nCREATE TABLE x(id int);', 'partial'),
     /incomplete outer transaction wrapper/)
 })
