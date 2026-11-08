@@ -44,7 +44,7 @@
       },
       {
         "path": "scripts/neon/d1-02/assert-remote-apply-release.test.mjs",
-        "gitBlobSha1": "5ceef713d5425e5b9c18b2a5464896533e56578d"
+        "gitBlobSha1": "07c5ca81221f44397714b4b2e4cb90928de03b79"
       },
       {
         "path": "scripts/neon/d1-02/remote-runner-review.mjs",
@@ -84,7 +84,7 @@
       },
       {
         "path": "scripts/neon/run-schema-migrations.mjs",
-        "gitBlobSha1": "9199e3d9ced1553e8745d4051a1b6aad4144e74a"
+        "gitBlobSha1": "56bb4961adf6cdaced056df7d6a933a7e390b215"
       },
       {
         "path": "scripts/neon/run-schema-migrations.test.mjs",
