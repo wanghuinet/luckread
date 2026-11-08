@@ -76,7 +76,7 @@
         "workers/W02-identity/src/neon-postgres-migrations/0001_role_assignments.sql"
       ],
       "sourcePaths": [
-        "workers/W02-identity/scripts/neon/",
+        "workers/W02-identity/scripts/neon/generate-role-assignment-postgres-migrations.mjs",
         "workers/W02-identity/package.json"
       ],
       "dependsOn": [
@@ -99,7 +99,7 @@
         "workers/W02-identity/src/neon-postgres-migrations/0002_role_authorization_versions.sql"
       ],
       "sourcePaths": [
-        "workers/W02-identity/scripts/neon/",
+        "workers/W02-identity/scripts/neon/generate-role-assignment-postgres-migrations.mjs",
         "workers/W02-identity/package.json"
       ],
       "dependsOn": [
@@ -122,7 +122,7 @@
         "workers/W02-identity/src/neon-postgres-migrations/0003_auth_003_credentials.sql"
       ],
       "sourcePaths": [
-        "workers/W02-identity/scripts/neon/",
+        "workers/W02-identity/scripts/neon/generate-auth003-credentials-postgres-migration.mjs",
         "workers/W02-identity/package.json"
       ],
       "dependsOn": [
@@ -145,7 +145,7 @@
         "workers/W02-identity/src/neon-postgres-migrations/0004_auth_013_publication_journal.sql"
       ],
       "sourcePaths": [
-        "workers/W02-identity/scripts/neon/",
+        "workers/W02-identity/scripts/neon/generate-auth013-publication-journal-postgres-migration.mjs",
         "workers/W02-identity/package.json"
       ],
       "dependsOn": [
@@ -168,7 +168,7 @@
         "workers/W02-identity/src/neon-postgres-migrations/0005_auth_015_lifecycle_windows.sql"
       ],
       "sourcePaths": [
-        "workers/W02-identity/scripts/neon/",
+        "workers/W02-identity/scripts/neon/generate-auth015-lifecycle-windows-postgres-migration.mjs",
         "workers/W02-identity/package.json"
       ],
       "dependsOn": [
@@ -191,7 +191,7 @@
         "workers/W02-identity/src/neon-postgres-migrations/0006_auth_010_session_revocation_journal.sql"
       ],
       "sourcePaths": [
-        "workers/W02-identity/scripts/neon/",
+        "workers/W02-identity/scripts/neon/generate-auth010-session-revocation-postgres-migration.mjs",
         "workers/W02-identity/package.json"
       ],
       "dependsOn": [
@@ -214,7 +214,7 @@
         "workers/W02-identity/src/neon-postgres-migrations/0007_auth_007_mfa_lifecycle.sql"
       ],
       "sourcePaths": [
-        "workers/W02-identity/scripts/neon/",
+        "workers/W02-identity/scripts/neon/generate-auth007-mfa-lifecycle-postgres-migration.mjs",
         "workers/W02-identity/package.json"
       ],
       "dependsOn": [
@@ -237,7 +237,7 @@
         "workers/W02-identity/src/neon-postgres-migrations/0008_auth_username_change_state.sql"
       ],
       "sourcePaths": [
-        "workers/W02-identity/scripts/neon/",
+        "workers/W02-identity/scripts/neon/generate-username-change-state-postgres-migration.mjs",
         "workers/W02-identity/package.json"
       ],
       "dependsOn": [
@@ -260,7 +260,7 @@
         "workers/W02-identity/src/neon-postgres-migrations/0009_auth_007_mfa_publication_journal.sql"
       ],
       "sourcePaths": [
-        "workers/W02-identity/scripts/neon/",
+        "workers/W02-identity/scripts/neon/generate-auth007-mfa-publication-journal-postgres-migration.mjs",
         "workers/W02-identity/package.json"
       ],
       "dependsOn": [
@@ -283,7 +283,7 @@
         "workers/W02-identity/src/neon-postgres-migrations/0010_auth_007_mfa_operation_receipts.sql"
       ],
       "sourcePaths": [
-        "workers/W02-identity/scripts/neon/",
+        "workers/W02-identity/scripts/neon/generate-auth007-mfa-operation-receipts-postgres-migration.mjs",
         "workers/W02-identity/package.json"
       ],
       "dependsOn": [
