@@ -3,7 +3,7 @@
   "$id": "https://luckread.com/contracts/database/neon-d1-04-w07-order-payment-schema.v1.json",
   "title": "LuckRead D1-04 W07 Order and Payment PostgreSQL Schema Slice",
   "version": "1.0.0",
-  "status": "W07_D1_04_ORDER_PAYMENT_LOCAL_POSTGRES18_REHEARSAL_PASSED_LATER_MODULES_PENDING",
+  "status": "W07_D1_04_ORDER_PAYMENT_AND_SAVED_METHODS_MANDATES_LOCAL_POSTGRES18_REHEARSAL_PASSED_REMAINING_FINANCE_MODULES_PENDING",
   "target": {
     "domainId": "D1-04",
     "databaseName": "luckread_finance",
@@ -34,7 +34,8 @@
   "scope": {
     "includedSourceMigrations": [
       "workers/W07-subscription-commerce/migrations-d1-04/0001_order_commerce.sql",
-      "workers/W07-subscription-commerce/migrations-d1-04/0002_payment_provider_events.sql"
+      "workers/W07-subscription-commerce/migrations-d1-04/0002_payment_provider_events.sql",
+      "workers/W07-subscription-commerce/migrations-d1-04/0003_saved_payment_methods_mandates.sql"
     ],
     "includedTables": [
       "orders",
@@ -42,11 +43,11 @@
       "order_create_idempotency",
       "payments",
       "payment_provider_events",
-      "payment_provider_event_conflicts"
+      "payment_provider_event_conflicts",
+      "saved_payment_methods",
+      "payment_mandates"
     ],
     "deferredTables": [
-      "saved_payment_methods",
-      "payment_mandates",
       "subscription_renewal_cycles",
       "subscription_renewal_scheduler_state",
       "revenuecat_webhook_events",
@@ -55,7 +56,7 @@
       "billing_documents",
       "payment_method_revocation_requests"
     ],
-    "deferredScopeNote": "These nine tables are admitted by later W07 D1-04 migrations 0003 through 0007. They are intentionally excluded from this first bounded schema slice and must be added in separate PostgreSQL-native slices after their own local rehearsal.",
+    "deferredScopeNote": "These seven tables are admitted by later W07 D1-04 migrations 0004 through 0007. They remain separate PostgreSQL-native slices with their own local rehearsals.",
     "excludedTables": [
       "entitlements",
       "ledger_entries",
@@ -63,7 +64,7 @@
       "users",
       "media"
     ],
-    "tableCount": 6
+    "tableCount": 8
   },
   "schema": {
     "tables": {
@@ -122,6 +123,40 @@
         ],
         "triggerCount": 5,
         "primaryKey": "conflict_id"
+      },
+      "saved_payment_methods": {
+        "primaryKey": "saved_payment_method_id",
+        "indexes": [
+          "ix_saved_payment_methods_customer_created"
+        ],
+        "triggerCount": 4,
+        "source": "0003_saved_payment_methods_mandates.sql",
+        "sensitiveFields": [
+          "payment_method_id"
+        ],
+        "privacy": "Only the provider opaque payment-method reference is persisted; no PAN/CVC, API key, browser client secret or raw webhook body."
+      },
+      "payment_mandates": {
+        "primaryKey": "mandate_record_id",
+        "indexes": [
+          "ux_payment_mandates_provider_mandate_id",
+          "ix_payment_mandates_customer_status_created",
+          "ix_payment_mandates_method_status"
+        ],
+        "triggerCount": 8,
+        "source": "0003_saved_payment_methods_mandates.sql",
+        "consentEvidenceFields": [
+          "consent_accepted_at",
+          "consent_acceptance_type",
+          "consent_scope",
+          "consent_terms_version"
+        ],
+        "initialStatus": "PENDING_PROVIDER_CONFIRMATION",
+        "terminalStates": [
+          "REVOKED",
+          "FAILED",
+          "EXPIRED"
+        ]
       }
     },
     "explicitIndexNames": [
@@ -138,7 +173,11 @@
       "ix_payment_provider_events_state_received",
       "ix_payment_provider_events_payment_received",
       "ix_payment_provider_event_conflicts_state_last_seen",
-      "ix_payment_provider_event_conflicts_identity"
+      "ix_payment_provider_event_conflicts_identity",
+      "ix_saved_payment_methods_customer_created",
+      "ux_payment_mandates_provider_mandate_id",
+      "ix_payment_mandates_customer_status_created",
+      "ix_payment_mandates_method_status"
     ],
     "triggerNames": [
       "orders_commercial_snapshot_immutable",
@@ -164,14 +203,55 @@
       "payment_provider_event_conflicts_identity_immutable",
       "payment_provider_event_conflicts_version_guard",
       "payment_provider_event_conflicts_resolved_immutable",
-      "payment_provider_event_conflicts_retained"
+      "payment_provider_event_conflicts_retained",
+      "saved_payment_methods_require_succeeded_payment",
+      "saved_payment_methods_customer_binding_guard",
+      "saved_payment_methods_identity_immutable",
+      "saved_payment_methods_retained",
+      "payment_mandates_require_saved_method",
+      "payment_mandates_start_pending",
+      "payment_mandates_identity_immutable",
+      "payment_mandates_version_guard",
+      "payment_mandates_transition_guard",
+      "payment_mandates_provider_id_immutable",
+      "payment_mandates_provider_timestamp_monotonic",
+      "payment_mandates_retained"
     ],
     "totals": {
-      "tables": 6,
-      "explicitIndexes": 14,
-      "triggers": 24,
-      "triggerFunctions": 1,
+      "tables": 8,
+      "explicitIndexes": 18,
+      "triggers": 36,
+      "triggerFunctions": 2,
       "foreignKeys": 0
+    },
+    "cumulativeSlices": [
+      {
+        "migrationId": "0002_w07_d1_04_saved_methods_mandates",
+        "source": "workers/W07-subscription-commerce/migrations-d1-04/0003_saved_payment_methods_mandates.sql",
+        "contract": "contracts/database/neon-d1-04-w07-saved-methods-mandates-schema.v1.json",
+        "status": "LOCAL_POSTGRES18_REHEARSAL_PASSED",
+        "tables": 2,
+        "explicitIndexes": 4,
+        "triggers": 12,
+        "triggerFunctions": 1,
+        "foreignKeys": 0
+      }
+    ],
+    "sliceTotals": {
+      "orderPayment": {
+        "tables": 6,
+        "explicitIndexes": 14,
+        "triggers": 24,
+        "triggerFunctions": 1,
+        "foreignKeys": 0
+      },
+      "savedMethodsMandates": {
+        "tables": 2,
+        "explicitIndexes": 4,
+        "triggers": 12,
+        "triggerFunctions": 1,
+        "foreignKeys": 0
+      }
     }
   },
   "postgresMappings": {
@@ -222,17 +302,17 @@
   "verification": {
     "sourceRegression": "workers/W07-subscription-commerce/scripts/test_order_d1_04_migration.py",
     "postgresImage": "postgres:18.6",
-    "tables": 6,
-    "explicitIndexes": 14,
-    "triggers": 24,
-    "triggerFunctions": 1,
+    "tables": 8,
+    "explicitIndexes": 18,
+    "triggers": 36,
+    "triggerFunctions": 2,
     "foreignKeys": 0,
     "fixtureRowsAfterRollback": 0,
     "mustNotExist": [
-      "saved_payment_methods",
-      "payment_mandates",
       "subscription_renewal_cycles",
+      "subscription_renewal_scheduler_state",
       "revenuecat_webhook_events",
+      "revenuecat_webhook_event_conflicts",
       "refunds",
       "billing_documents",
       "payment_method_revocation_requests",
@@ -243,9 +323,37 @@
       "media"
     ],
     "localRehearsalEvidence": {
-      "workflowRunId": 42486816324,
-      "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42486816324",
-      "verifiedHeadSha": "da58f8c1ac7baeb3d7490bbf504cd1b64f87e102",
+      "workflowRunId": 42489584839,
+      "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42489584839",
+      "verifiedHeadSha": "6d416296e83d6b0389505f7b224976aae7634345",
+      "postgresVersion": "18.6",
+      "database": "luckread_finance_schema",
+      "predecessorWorkflowRunId": 42489584748,
+      "sourceRegressionTests": 24,
+      "newSliceTables": 2,
+      "newSliceExplicitIndexes": 4,
+      "newSliceTriggers": 12,
+      "newSliceTriggerFunctions": 1,
+      "cumulativeTables": 8,
+      "cumulativeExplicitIndexes": 18,
+      "cumulativeTriggers": 36,
+      "cumulativeTriggerFunctions": 2,
+      "foreignKeys": 0,
+      "sensitiveCardOrSecretColumns": 0,
+      "rowsAfterRollback": 0,
+      "laterFinanceTablesIncluded": false,
+      "remoteNeonTouched": false,
+      "cloudflareD1Touched": false,
+      "businessDataImported": false,
+      "productionCutoverAuthorized": false,
+      "evidenceArtifactId": 13621196833,
+      "evidenceArtifactName": "neon-d1-04-w07-saved-methods-mandates-postgres18-f56291b077837b94e9aaea64e57e040176cc83b2",
+      "evidenceArtifactSha256": "sha256:1f43b7545e715da4aebd07757162485dc097226b68ca714df018d1411647b634"
+    },
+    "predecessorLocalRehearsalEvidence": {
+      "workflowRunId": 42489584748,
+      "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42489584748",
+      "verifiedHeadSha": "6d416296e83d6b0389505f7b224976aae7634345",
       "postgresVersion": "18.6",
       "database": "luckread_finance_schema",
       "tables": 6,
@@ -260,9 +368,7 @@
       "cloudflareD1Touched": false,
       "businessDataImported": false,
       "productionCutoverAuthorized": false,
-      "evidenceArtifactId": 13619178793,
-      "evidenceArtifactName": "neon-d1-04-w07-order-payment-postgres18-516cd20c00f87a769bbc424473aafef186026081",
-      "evidenceArtifactSha256": "sha256:f027c9a7db2915303fd0a566573229e8aed13478d17c6d0190dfde1a487990fb"
+      "evidenceArtifactId": 13621195000
     }
   },
   "safety": {

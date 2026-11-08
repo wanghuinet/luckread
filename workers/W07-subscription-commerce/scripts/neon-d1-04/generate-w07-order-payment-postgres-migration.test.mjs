@@ -13,11 +13,14 @@ test('W07 D1-04 order/payment migration is deterministic and matches its committ
   const second = buildW07D104OrderPaymentMigration()
   assert.equal(first.migration, second.migration)
   assert.equal(first.migration, readFileSync(artifactPath, 'utf8'))
-  assert.equal(first.contract.schema.totals.tables, 6)
-  assert.equal(first.contract.schema.totals.explicitIndexes, 14)
-  assert.equal(first.contract.schema.totals.triggers, 24)
-  assert.equal(first.contract.schema.totals.triggerFunctions, 1)
-  assert.equal(first.contract.schema.totals.foreignKeys, 0)
+  assert.equal(first.sliceTotals.tables, 6)
+  assert.equal(first.sliceTotals.explicitIndexes, 14)
+  assert.equal(first.sliceTotals.triggers, 24)
+  assert.equal(first.sliceTotals.triggerFunctions, 1)
+  assert.equal(first.sliceTotals.foreignKeys, 0)
+  assert.deepEqual(first.contract.schema.totals, {
+    tables: 8, explicitIndexes: 18, triggers: 36, triggerFunctions: 2, foreignKeys: 0,
+  })
   for (const value of Object.values(first.hashes)) assert.match(value, /^[a-f0-9]{64}$/)
 })
 
