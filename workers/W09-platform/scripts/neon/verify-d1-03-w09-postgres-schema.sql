@@ -17,6 +17,7 @@ DECLARE
   explicit_index_count INTEGER;
   trigger_names TEXT[];
   foreign_key_count INTEGER;
+  trigger_function_count INTEGER;
 BEGIN
   IF current_setting('server_version_num')::INTEGER / 10000 <> 18 THEN
     RAISE EXCEPTION 'Expected PostgreSQL 18, got %', current_setting('server_version');
@@ -73,6 +74,15 @@ BEGIN
     'trg_neon_w09_audit_events_immutable_update_delete'
   ] THEN
     RAISE EXCEPTION 'Unexpected W09 trigger set: %', trigger_names;
+  END IF;
+
+  SELECT count(*) INTO trigger_function_count
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+   WHERE n.nspname = 'public'
+     AND p.proname = 'neon_w09_d1_03_reject_audit_event_mutation';
+  IF trigger_function_count <> 1 THEN
+    RAISE EXCEPTION 'Expected one W09 AuditEvent mutation trigger function, got %', trigger_function_count;
   END IF;
 
   SELECT count(*) INTO foreign_key_count
