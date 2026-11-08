@@ -13,14 +13,21 @@ const createdAt = new Date('2026-01-01T00:00:00.000Z')
 const assert = (condition, message) => {
   if (!condition) throw new Error('W02_AUTH007_MFA_PG_ASSERTION_FAILED: ' + message)
 }
+let negativeProbeSequence = 0
 const expectPgCode = async (label, operation, expectedCode) => {
+  const savepoint = 'mfa_negative_probe_' + (++negativeProbeSequence)
+  await client.query('SAVEPOINT ' + savepoint)
   try {
     await operation()
   } catch (error) {
+    await client.query('ROLLBACK TO SAVEPOINT ' + savepoint)
+    await client.query('RELEASE SAVEPOINT ' + savepoint)
     assert(error && error.code === expectedCode,
       label + ' expected SQLSTATE ' + expectedCode + ', got ' + String(error?.code ?? 'unknown'))
     return
   }
+  await client.query('ROLLBACK TO SAVEPOINT ' + savepoint)
+  await client.query('RELEASE SAVEPOINT ' + savepoint)
   throw new Error('W02_AUTH007_MFA_PG_ASSERTION_FAILED: ' + label + ' unexpectedly succeeded')
 }
 
@@ -73,6 +80,19 @@ try {
       "WHERE table_schema = 'public' AND table_name = 'twoFactor'",
   )
   const factorMap = new Map(factorColumns.rows.map((row) => [row.column_name, row]))
+  const expectedFactorColumns = [
+    'id', 'secret', 'backupCodes', 'userId', 'verified',
+    'failedVerificationCount', 'lockedUntil', 'lastAcceptedTotpTimeStep',
+  ].sort()
+  assert(JSON.stringify([...factorMap.keys()].sort()) === JSON.stringify(expectedFactorColumns),
+    'twoFactor must reuse the official Better Auth table and exact eight-column shape')
+  for (const name of ['id', 'secret', 'backupCodes', 'userId']) {
+    assert(factorMap.get(name)?.data_type === 'text' && factorMap.get(name)?.is_nullable === 'NO',
+      name + ' must remain TEXT NOT NULL')
+  }
+  assert(factorMap.get('lockedUntil')?.data_type === 'timestamp with time zone' &&
+    factorMap.get('lockedUntil')?.is_nullable === 'YES',
+  'lockedUntil must use nullable TIMESTAMPTZ')
   assert(factorMap.get('lastAcceptedTotpTimeStep')?.data_type === 'integer',
     'lastAcceptedTotpTimeStep must be INTEGER')
   assert(factorMap.get('lastAcceptedTotpTimeStep')?.is_nullable === 'YES',
@@ -103,7 +123,8 @@ try {
     'twoFactor must cascade with its authoritative Better Auth user')
 
   const triggers = await client.query(
-    "SELECT tg.tgname AS name, pg_get_functiondef(tg.tgfoid) AS function_definition " +
+    "SELECT tg.tgname AS name, pg_get_functiondef(tg.tgfoid) AS function_definition, " +
+      "pg_get_triggerdef(tg.oid) AS trigger_definition " +
       "FROM pg_trigger tg JOIN pg_class c ON c.oid = tg.tgrelid " +
       "JOIN pg_namespace n ON n.oid = c.relnamespace " +
       "WHERE n.nspname = 'public' AND c.relname = 'user' AND NOT tg.tgisinternal",
@@ -111,6 +132,15 @@ try {
   const triggerMap = new Map(triggers.rows.map((row) => [row.name, row.function_definition]))
   assert(triggerMap.has('user_mfa_enable_revoke_sessions'), 'MFA enable session-revocation trigger missing')
   assert(triggerMap.has('user_mfa_disable_clear_enrollment'), 'MFA disable cleanup/session-revocation trigger missing')
+  const triggerDefinitions = new Map(triggers.rows.map((row) => [row.name, row.trigger_definition]))
+  assert(/UPDATE OF two_factor_enabled ON user/i.test(triggerDefinitions.get('user_mfa_enable_revoke_sessions') ?? '') &&
+    /OLD\.two_factor_enabled IS FALSE AND NEW\.two_factor_enabled IS TRUE/i.test(
+      triggerDefinitions.get('user_mfa_enable_revoke_sessions') ?? ''),
+  'MFA enable trigger must run only on the false-to-true transition')
+  assert(/UPDATE OF two_factor_enabled ON user/i.test(triggerDefinitions.get('user_mfa_disable_clear_enrollment') ?? '') &&
+    /OLD\.two_factor_enabled IS TRUE AND NEW\.two_factor_enabled IS FALSE/i.test(
+      triggerDefinitions.get('user_mfa_disable_clear_enrollment') ?? ''),
+  'MFA disable trigger must run only on the true-to-false transition')
   assert(triggerMap.get('user_mfa_enable_revoke_sessions')?.includes('mfa_enrolled_at = statement_timestamp()'),
     'MFA enable trigger must set authoritative enrollment time')
   assert(triggerMap.get('user_mfa_enable_revoke_sessions')?.includes('DELETE FROM "session" WHERE user_id = NEW.id'),
