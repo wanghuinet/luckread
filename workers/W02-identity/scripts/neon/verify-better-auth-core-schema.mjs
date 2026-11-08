@@ -50,10 +50,13 @@ try {
   const actualTables = tableResult.rows.map((row) => row.table_name).sort()
   const expectedTables = Object.keys(expectedColumns).sort()
   const missingTables = expectedTables.filter((table) => !actualTables.includes(table))
-  const unexpectedTables = actualTables.filter((table) => !expectedTables.includes(table))
-  if (missingTables.length || unexpectedTables.length) {
-    throw new Error('Better Auth table catalog mismatch: ' + JSON.stringify({ missingTables, unexpectedTables }))
+  if (missingTables.length) {
+    throw new Error('Required Better Auth core tables missing: ' + missingTables.join(', '))
   }
+  // W02's canonical Better Auth schema is a required subset of the W02
+  // PostgreSQL baseline. Domain-owned custom tables are applied after it and
+  // must not be misclassified as unexpected Better Auth plugin tables.
+  const additionalTables = actualTables.filter((table) => !expectedTables.includes(table))
 
   const actualColumns = {}
   for (const table of expectedTables) {
@@ -77,7 +80,9 @@ try {
     status: 'W02_BETTER_AUTH_POSTGRES_SCHEMA_PASS',
     database: identity.rows[0].database_name,
     postgresMajor: versionMajor,
-    generatedTables: actualTables,
+    generatedTables: expectedTables,
+    additionalTables,
+    catalogTables: actualTables,
     requiredColumns: expectedColumns,
     actualColumns,
     businessRowsImported: false,
