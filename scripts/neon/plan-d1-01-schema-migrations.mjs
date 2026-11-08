@@ -51,8 +51,8 @@ export function buildReadOnlyMigrationPlan({ manifest, ledgerContract, checksums
       ledgerContract.execution?.runnerStatus !== 'NOT_IMPLEMENTED') {
     fail('remote execution must remain disabled in this planning slice')
   }
-  if (!Array.isArray(manifest.entries) || manifest.entries.length !== 14) {
-    fail('expected exactly fourteen ordered D1-01 migration entries')
+  if (!Array.isArray(manifest.entries) || manifest.entries.length === 0) {
+    fail('manifest must contain at least one ordered migration entry')
   }
   if (ledgerContract.table?.name !== 'neon_schema_migration_ledger' ||
       ledgerContract.table?.appendOnly !== true) {
