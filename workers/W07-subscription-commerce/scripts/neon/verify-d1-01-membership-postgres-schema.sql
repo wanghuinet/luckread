@@ -6,6 +6,41 @@ DECLARE
   actual_columns TEXT[];
   expected_columns TEXT[];
   actual_count INTEGER;
+  -- The verifier still checks W07's exact six-table owner slice, while allowing
+  -- only the previously applied W01/W02 tables in the integrated D1-01 rehearsal.
+  known_d1_01_tables TEXT[] := ARRAY[
+    'users_sessions',
+    'users',
+    'media',
+    'redirects',
+    'redirects_rels',
+    'payload_kv',
+    'payload_locked_documents',
+    'payload_locked_documents_rels',
+    'payload_preferences',
+    'payload_preferences_rels',
+    'payload_migrations',
+    'user',
+    'session',
+    'account',
+    'verification',
+    'twoFactor',
+    'role_assignments',
+    'role_authorization_versions',
+    'auth_identities',
+    'auth_credentials',
+    'auth_013_publication_journal',
+    'auth_010_session_revocation_journal',
+    'auth_username_change_state',
+    'auth_007_mfa_publication_journal',
+    'auth_007_mfa_operation_receipts',
+    'membership_plan_versions',
+    'membership_plans',
+    'membership_revenuecat_product_bindings',
+    'membership_subscription_plan_change_attempts',
+    'membership_subscription_scheduled_plan_changes',
+    'membership_subscriptions'
+  ];
   expected_tables TEXT[] := ARRAY[
     'membership_plan_versions',
     'membership_plans',
@@ -35,14 +70,9 @@ BEGIN
     FROM information_schema.tables
     WHERE table_schema = 'public'
       AND table_type = 'BASE TABLE'
-      AND table_name NOT IN ('membership_plans',
-        'membership_plan_versions',
-        'membership_revenuecat_product_bindings',
-        'membership_subscription_plan_change_attempts',
-        'membership_subscription_scheduled_plan_changes',
-        'membership_subscriptions');
+      AND NOT (table_name = ANY(known_d1_01_tables));
   IF actual_count <> 0 THEN
-    RAISE EXCEPTION 'Unexpected business tables exist in isolated W07 schema';
+    RAISE EXCEPTION 'Unexpected table outside the registered D1-01 W01/W02/W07 owner set: %', actual_count;
   END IF;
 
   expected_columns := ARRAY[
