@@ -24,6 +24,8 @@ BEGIN
 END;
 $username_preflight$;
 
+-- The Better Auth generator exposes username but does not make it UNIQUE in PostgreSQL.
+-- D1 core migration 0005 declares username UNIQUE; preserve that base invariant.
 ALTER TABLE "user"
   ADD CONSTRAINT user_username_uq UNIQUE (username);
 
