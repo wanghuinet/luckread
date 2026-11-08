@@ -8,7 +8,10 @@ CREATE TABLE IF NOT EXISTS jobs (
   job_id TEXT PRIMARY KEY NOT NULL,
   operation_id TEXT NOT NULL UNIQUE,
   operation_type TEXT NOT NULL,
-  owner_worker TEXT NOT NULL,
+  owner_worker TEXT NOT NULL CHECK (owner_worker IN (
+    'W01', 'W02', 'W03', 'W04', 'W05', 'W06',
+    'W07', 'W08', 'W09', 'W10', 'W11', 'W12'
+  )),
   owner_task_id TEXT,
   resource_type TEXT NOT NULL,
   resource_id TEXT NOT NULL,
@@ -161,7 +164,10 @@ CREATE INDEX IF NOT EXISTS idx_execution_outbox_delivery
 
 CREATE TABLE IF NOT EXISTS operational_idempotency (
   idempotency_id TEXT PRIMARY KEY NOT NULL,
-  owner_worker TEXT NOT NULL,
+  owner_worker TEXT NOT NULL CHECK (owner_worker IN (
+    'W01', 'W02', 'W03', 'W04', 'W05', 'W06',
+    'W07', 'W08', 'W09', 'W10', 'W11', 'W12'
+  )),
   operation_type TEXT NOT NULL,
   scope TEXT NOT NULL,
   idempotency_key TEXT NOT NULL,
