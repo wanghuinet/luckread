@@ -47,6 +47,7 @@ ALTER TABLE "twoFactor"
   ADD CONSTRAINT "twoFactor_lastAcceptedTotpTimeStep_check"
     CHECK ("lastAcceptedTotpTimeStep" IS NULL OR "lastAcceptedTotpTimeStep" >= 0);
 
+-- Enable is an edge-triggered transition. The internal metadata UPDATE does not update two_factor_enabled.
 CREATE OR REPLACE FUNCTION w02_user_mfa_enable_revoke_sessions_fn()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -64,6 +65,7 @@ FOR EACH ROW
 WHEN (OLD.two_factor_enabled IS FALSE AND NEW.two_factor_enabled IS TRUE)
 EXECUTE FUNCTION w02_user_mfa_enable_revoke_sessions_fn();
 
+-- Disable clears all W02 enrollment/idempotency metadata and invalidates every existing session.
 CREATE OR REPLACE FUNCTION w02_user_mfa_disable_clear_enrollment_fn()
 RETURNS trigger
 LANGUAGE plpgsql
