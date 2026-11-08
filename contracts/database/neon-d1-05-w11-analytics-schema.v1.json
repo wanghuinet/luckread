@@ -221,9 +221,9 @@
   "nextGate": "Admit explicit retention, deletion and consent/purpose policies; separately close W11 analytics operation security E2E. Only then may the D1-05 schema be admitted into a reviewed shared migration manifest. Remote Neon apply remains a later manually dispatched gate.",
   "localRehearsalEvidence": {
     "status": "PASS",
-    "workflowRunId": 42507767798,
-    "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42507767798",
-    "sourceCommitSha": "7a3bfc23e794ba0edbb865cd1d24e922be10f38a",
+    "workflowRunId": 42507930767,
+    "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42507930767",
+    "sourceCommitSha": "7d67adbb266c503a0ad561a56362968bcf8bd824",
     "postgresImage": "postgres:18.6",
     "results": {
       "tables": 6,
@@ -234,7 +234,8 @@
       "syntheticRowsAfterRollback": 0,
       "eventOwnerAndProjectionConstraints": "PASS",
       "sourceMigrationBlobPins": "PASS",
-      "generatedArtifactDeterminism": "PASS"
+      "generatedArtifactDeterminism": "PASS",
+      "isolatedD105MigrationDirectory": "PASS"
     },
     "safety": {
       "remoteNeonTouched": false,
