@@ -150,13 +150,24 @@ function readManifestChecksums() {
   }
 }
 
+export function isRemoteApplyReleased(manifestContract, ledgerContractValue) {
+  return manifestContract?.remoteApplyReady === true &&
+    ledgerContractValue?.remoteApplyReady === true &&
+    manifestContract?.execution?.runnerStatus === 'IMPLEMENTED_AND_REVIEWED' &&
+    ledgerContractValue?.execution?.runnerStatus === 'IMPLEMENTED_AND_REVIEWED'
+}
+
 function validateManifest(checksums) {
+  const releaseBlocked = manifest.remoteApplyReady === false &&
+    ledgerContract.remoteApplyReady === false &&
+    manifest.execution?.runnerStatus === 'NOT_IMPLEMENTED' &&
+    ledgerContract.execution?.runnerStatus === 'NOT_IMPLEMENTED'
+  const releaseEnabled = isRemoteApplyReleased(manifest, ledgerContract)
   if (manifest.domainId !== 'D1-01' || manifest.databaseName !== 'luckread' ||
       manifest.postgresMajor !== 18 || manifest.entries?.length !== 14 ||
       manifest.businessDataImport !== false || manifest.productionCutoverAuthorized !== false ||
-      manifest.remoteApplyReady !== false || manifest.execution?.runnerStatus !== 'NOT_IMPLEMENTED' ||
-      ledgerContract.remoteApplyReady !== false) {
-    fail('D1-01 manifest must remain the reviewed 14-entry schema-only contract with remote apply disabled')
+      (!releaseBlocked && !releaseEnabled)) {
+    fail('D1-01 manifest must remain the reviewed 14-entry schema-only contract with a consistent remote release gate')
   }
   if (!Array.isArray(checksums) || checksums.length !== manifest.entries.length) {
     fail('canonical checksums must cover every manifest entry')
@@ -373,10 +384,7 @@ async function run() {
         !/^\d+$/.test(process.env.GITHUB_RUN_ATTEMPT || '')) {
       fail('remote execution requires the protected main-only manual workflow and exact D1-01 confirmation')
     }
-    if (manifest.remoteApplyReady !== true ||
-        ledgerContract.remoteApplyReady !== true ||
-        manifest.execution?.runnerStatus !== 'IMPLEMENTED_AND_REVIEWED' ||
-        ledgerContract.execution?.runnerStatus !== 'IMPLEMENTED_AND_REVIEWED') {
+    if (!isRemoteApplyReleased(manifest, ledgerContract)) {
       fail('remote Neon execution remains disabled until the reviewed release gate is enabled')
     }
     connectionString = process.env.NEON_DATABASE_URL_LUCKREAD
