@@ -1,0 +1,102 @@
+name: Neon W03 D1-02 PostgreSQL 18 Local Schema Rehearsal
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/neon-w03-d1-02-postgres-schema.yml'
+      - 'contracts/database/neon-d1-02-schema-sources.v1.json'
+      - 'contracts/persistence/CONTENT-ARTICLE-d1-02-persistence.v1.json'
+      - 'workers/W03-content/migrations/**'
+      - 'workers/W03-content/scripts/neon/**'
+      - 'workers/W03-content/src/neon-postgres-migrations/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: neon-w03-d1-02-postgres-schema-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  local-postgres18:
+    name: Rehearse W03 D1-02 schema on disposable PostgreSQL 18
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:18.6
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres_local_only
+          POSTGRES_DB: luckread_d1_02_schema
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d luckread_d1_02_schema"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Run generator and source/contract unit tests
+        run: |
+          set -euo pipefail
+          node --test workers/W03-content/scripts/neon/generate-d1-02-postgres-migration.test.mjs
+          node workers/W03-content/scripts/neon/generate-d1-02-postgres-migration.mjs --report artifacts/neon/w03-d1-02-source-hashes.json
+          git diff --exit-code -- workers/W03-content/src/neon-postgres-migrations/0001_w03_d1_02_content_schema.sql
+      - name: Apply only the PostgreSQL-native W03 artifact to disposable PostgreSQL 18
+        run: |
+          set -euo pipefail
+          psql "postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_d1_02_schema" \
+            --set ON_ERROR_STOP=1 --no-psqlrc \
+            --file workers/W03-content/src/neon-postgres-migrations/0001_w03_d1_02_content_schema.sql
+      - name: Verify schema, event semantics and rollback of synthetic rows
+        run: |
+          set -euo pipefail
+          psql "postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_d1_02_schema" \
+            --set ON_ERROR_STOP=1 --no-psqlrc \
+            --file workers/W03-content/scripts/neon/verify-d1-02-content-postgres-schema.sql
+          node --input-type=module <<'NODE'
+          import { execFileSync } from 'node:child_process'
+          import { mkdir, writeFile } from 'node:fs/promises'
+          const url = 'postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_d1_02_schema'
+          const sql = `
+            SELECT json_build_object(
+              'database', current_database(),
+              'postgresMajor', current_setting('server_version_num')::int / 10000,
+              'tables', (SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE'),
+              'triggers', (SELECT count(*) FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND NOT t.tgisinternal),
+              'businessRows', (SELECT (SELECT count(*) FROM contents) + (SELECT count(*) FROM content_mutation_idempotency) + (SELECT count(*) FROM content_outbox_events) + (SELECT count(*) FROM content_txn_guard) + (SELECT count(*) FROM content_revisions) + (SELECT count(*) FROM content_relationships) + (SELECT count(*) FROM content_series) + (SELECT count(*) FROM content_collections)),
+              'snowflakeAllocatorRows', (SELECT count(*) FROM content_id_snowflake_state),
+              'remoteNeonTouched', false,
+              'cloudflareD1Touched', false,
+              'businessDataImported', false
+            )::text;
+          `
+          const report = JSON.parse(execFileSync('psql', [url, '-A', '-t', '-q', '-c', sql], { encoding:'utf8' }).trim())
+          if (report.database !== 'luckread_d1_02_schema' || report.postgresMajor !== 18 ||
+              report.tables !== 9 || report.triggers !== 8 || report.businessRows !== 0 ||
+              report.snowflakeAllocatorRows !== 1 || report.remoteNeonTouched ||
+              report.cloudflareD1Touched || report.businessDataImported) {
+            throw new Error('W03 local PostgreSQL 18 postflight mismatch: ' + JSON.stringify(report))
+          }
+          await mkdir('artifacts/neon', { recursive:true })
+          await writeFile('artifacts/neon/w03-d1-02-postgres-schema-postflight.json', JSON.stringify(report,null,2)+'\\n')
+          console.log('W03_D1_02_POSTGRES18_REHEARSAL_PASS ' + JSON.stringify(report))
+          NODE
+      - name: Upload W03 D1-02 PostgreSQL 18 evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: neon-w03-d1-02-postgres18-${{ github.sha }}
+          path: |
+            workers/W03-content/src/neon-postgres-migrations/0001_w03_d1_02_content_schema.sql
+            artifacts/neon/w03-d1-02-source-hashes.json
+            artifacts/neon/w03-d1-02-postgres-schema-postflight.json
+          if-no-files-found: error
+          retention-days: 90
