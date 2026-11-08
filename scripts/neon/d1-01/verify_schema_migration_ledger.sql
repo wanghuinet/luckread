@@ -80,7 +80,7 @@ BEGIN
       (domain_id,database_name,owner_worker,migration_id,migration_order,migration_kind,
        artifact_sha256,manifest_entry_sha256,source_commit_sha,runner_version,execution_id)
     VALUES
-      ('D1-01','luckread','W01','W01-FIXTURE-DUPLICATE-ID',101,'PAYLOAD_NATIVE',
+      ('D1-01','luckread','W01','W01-FIXTURE-BASELINE',101,'PAYLOAD_NATIVE',
        repeat('a',64),repeat('b',64),repeat('c',40),'ledger-ci/1','duplicate-id');
     RAISE EXCEPTION 'expected duplicate owner/migration key to fail';
   EXCEPTION WHEN unique_violation THEN NULL;
