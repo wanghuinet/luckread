@@ -103,15 +103,46 @@
       },
       "D1-03": {
         "runnerStatus": "NOT_IMPLEMENTED",
-        "remoteApplyReady": false
+        "remoteApplyReady": false,
+        "runnerScope": "REMOTE_NEON_APPLY_ONLY",
+        "localSharedRunnerStatus": "IMPLEMENTED_AND_INDEPENDENTLY_REVIEWED",
+        "localReviewStatus": "LOCAL_SHARED_SCHEMA_REVIEW_PASSED_REMOTE_APPLY_BLOCKED",
+        "localReviewEvidenceRef": "contracts/database/neon-d1-03-shared-runner-independent-review.v1.json",
+        "localSchemaRehearsalRunId": 42509822425,
+        "remoteApplyBlockers": [
+          "W06 Appeal has no admitted persistence contract or source migration.",
+          "W11 Campaign and GrowthOperation remain logical-only in D1-03; no physical schema or runtime binding is admitted.",
+          "A separate reviewed remote-apply runner release record and domain-specific approval are required."
+        ]
       },
       "D1-04": {
         "runnerStatus": "NOT_IMPLEMENTED",
-        "remoteApplyReady": false
+        "remoteApplyReady": false,
+        "runnerScope": "REMOTE_NEON_APPLY_ONLY",
+        "localSharedRunnerStatus": "IMPLEMENTED_AND_INDEPENDENTLY_REVIEWED",
+        "localReviewStatus": "LOCAL_SHARED_SCHEMA_REVIEW_PASSED_REMOTE_APPLY_BLOCKED",
+        "localReviewEvidenceRef": "contracts/database/neon-d1-04-shared-runner-independent-review.v1.json",
+        "localSchemaRehearsalRunId": 42509822425,
+        "remoteApplyBlockers": [
+          "The D1-04 shared runner has only been exercised against an isolated local PostgreSQL 18.6 database; a separate reviewed remote runner release record is still required.",
+          "Remote Neon schema apply, business data import and production cutover remain unauthorized."
+        ]
       },
       "D1-05": {
         "runnerStatus": "NOT_IMPLEMENTED",
-        "remoteApplyReady": false
+        "remoteApplyReady": false,
+        "runnerScope": "REMOTE_NEON_APPLY_ONLY",
+        "localSharedRunnerStatus": "IMPLEMENTED_AND_INDEPENDENTLY_REVIEWED",
+        "localReviewStatus": "LOCAL_SHARED_SCHEMA_REVIEW_PASSED_ADMISSION_BLOCKED",
+        "localReviewEvidenceRef": "contracts/database/neon-d1-05-shared-runner-independent-review.v1.json",
+        "localSchemaRehearsalRunId": 42509822425,
+        "localStandaloneRehearsalRunId": 42508098818,
+        "remoteApplyBlockers": [
+          "Retention policy for event and aggregate classes, including bounded late-event replay horizon, is missing.",
+          "Deletion/privacy-request behavior for actor-linked and creator-linked analytics projections is missing.",
+          "Consent, lawful purpose and collection eligibility rules for anonymous and authenticated telemetry are missing.",
+          "A separate reviewed remote runner release record and domain-specific remote schema approval are required."
+        ]
       }
     },
     "lock": {
@@ -127,7 +158,29 @@
     "recovery": "Interrupted/non-atomic Payload application requires read-only catalog and Payload migration-ledger reconciliation before retry; no blind replay.",
     "targetGuard": "Validate TLS, current_database(), D1 domain/database mapping, PostgreSQL major version, schema emptiness/expected prior ledger state and exact manifest before any DDL.",
     "businessDataImport": false,
-    "productionCutoverAuthorized": false
+    "productionCutoverAuthorized": false,
+    "runnerScope": "REMOTE_NEON_APPLY_ONLY",
+    "localSharedRunner": {
+      "status": "IMPLEMENTED_AND_INDEPENDENTLY_REVIEWED",
+      "entryPoint": "scripts/neon/shared-domain-schema-runner.mjs",
+      "supportedDomains": [
+        "D1-03",
+        "D1-04",
+        "D1-05"
+      ],
+      "postgresMajor": 18,
+      "executionMode": "LOCAL_ONLY",
+      "remoteNeonExecutionSupported": false,
+      "businessDataImport": false,
+      "productionCutoverAuthorized": false,
+      "workflow": ".github/workflows/neon-shared-d1-03-05-schema-rehearsal.yml",
+      "successfulPostflightRunId": 42509822425,
+      "independentReviewEvidence": {
+        "D1-03": "contracts/database/neon-d1-03-shared-runner-independent-review.v1.json",
+        "D1-04": "contracts/database/neon-d1-04-shared-runner-independent-review.v1.json",
+        "D1-05": "contracts/database/neon-d1-05-shared-runner-independent-review.v1.json"
+      }
+    }
   },
   "remoteApplyReady": false
 }
