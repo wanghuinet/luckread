@@ -32,6 +32,8 @@
     "neon:auth007-mfa:generate": "node scripts/neon/generate-auth007-mfa-lifecycle-postgres-migration.mjs",
     "neon:auth007-mfa:verify": "node scripts/neon/verify-auth007-mfa-lifecycle-postgres-schema.mjs",
     "neon:username-change:generate": "node scripts/neon/generate-username-change-state-postgres-migration.mjs",
-    "neon:username-change:verify": "node scripts/neon/verify-username-change-state-postgres-schema.mjs"
+    "neon:username-change:verify": "node scripts/neon/verify-username-change-state-postgres-schema.mjs",
+    "neon:auth007-mfa-journal:generate": "node scripts/neon/generate-auth007-mfa-publication-journal-postgres-migration.mjs",
+    "neon:auth007-mfa-journal:verify": "node scripts/neon/verify-auth007-mfa-publication-journal-postgres-schema.mjs"
   }
 }
