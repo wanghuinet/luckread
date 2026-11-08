@@ -35,7 +35,8 @@ export function validateTargetConnectionString(connectionString, expectedDatabas
   if (!['postgres:', 'postgresql:'].includes(parsed.protocol)) {
     return { valid: false, code: 'INVALID_POSTGRES_PROTOCOL' }
   }
-  if (!parsed.hostname.toLowerCase().endsWith('.neon.tech')) {
+  if (!parsed.hostname.toLowerCase().startsWith('ep-') ||
+      !parsed.hostname.toLowerCase().endsWith('.neon.tech')) {
     return { valid: false, code: 'UNAPPROVED_DATABASE_HOST' }
   }
   let pathDatabase
@@ -210,11 +211,15 @@ async function inspectTarget({ target, connectionString, Client }) {
     if (actualDatabase !== target.database) {
       throw Object.assign(new Error('Connected database name did not match the approved target.'), {
         code: 'DATABASE_NAME_MISMATCH',
+        serverVersion,
+        postgresMajor: Math.floor(serverVersionNum / 10_000),
       })
     }
     if (Math.floor(serverVersionNum / 10_000) !== 18) {
       throw Object.assign(new Error('Target database is not running PostgreSQL 18.'), {
         code: 'POSTGRESQL_18_REQUIRED',
+        serverVersion,
+        postgresMajor: Math.floor(serverVersionNum / 10_000),
       })
     }
 
@@ -354,6 +359,10 @@ async function inspectTarget({ target, connectionString, Client }) {
       authority: target.authority,
       status: 'FAIL',
       errorCode: safeErrorCode(error),
+      ...(typeof error?.serverVersion === 'string' ? {
+        serverVersion: error.serverVersion,
+        postgresMajor: error.postgresMajor ?? null,
+      } : {}),
       ddlExecuted: false,
       businessDataImported: false,
       productionD1Touched: false,
