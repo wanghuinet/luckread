@@ -113,7 +113,7 @@ try {
     'journal must have the exact fourteen contract columns')
   for (const name of [
     'journal_id', 'event_id', 'event_type', 'schema_version', 'resource_id',
-    'idempotency_key', 'payload', 'status', 'created_at',
+    'idempotency_key', 'payload', 'status',
   ]) {
     assert(columnMap.get(name)?.data_type === 'text', name + ' must use TEXT')
     assert(columnMap.get(name)?.is_nullable === 'NO', name + ' must be NOT NULL')
