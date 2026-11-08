@@ -236,7 +236,23 @@
         "triggerFunctions": 1,
         "foreignKeys": 0
       }
-    ]
+    ],
+    "sliceTotals": {
+      "orderPayment": {
+        "tables": 6,
+        "explicitIndexes": 14,
+        "triggers": 24,
+        "triggerFunctions": 1,
+        "foreignKeys": 0
+      },
+      "savedMethodsMandates": {
+        "tables": 2,
+        "explicitIndexes": 4,
+        "triggers": 12,
+        "triggerFunctions": 1,
+        "foreignKeys": 0
+      }
+    }
   },
   "postgresMappings": {
     "integer": "Use BIGINT for D1/SQLite INTEGER fields to preserve the signed 64-bit source range; retain safe-integer checks for money and version counters.",
