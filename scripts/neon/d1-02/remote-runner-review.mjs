@@ -48,7 +48,7 @@ export function validateD1_02RemoteRunnerReview({
   const info = record.review ?? {}
   if (info.reviewer !== 'GPT-6' ||
       info.reviewType !== 'GPT-6 code-path audit plus current-main SHA and CI evidence reconciliation' ||
-      !/^2026-11-\\d{2}$/.test(info.reviewedAt ?? '') ||
+      !/^2026-11-\d{2}$/.test(info.reviewedAt ?? '') ||
       info.reviewedMainSha !== IMPLEMENTATION_MERGE_SHA ||
       info.implementationMergeSha !== IMPLEMENTATION_MERGE_SHA ||
       info.result !== 'NO_BLOCKING_FINDINGS' ||
@@ -77,7 +77,7 @@ export function validateD1_02RemoteRunnerReview({
     for (const item of info.reviewedFiles) {
       const relativePath = item?.path
       if (typeof relativePath !== 'string' || isAbsolute(relativePath) ||
-          relativePath.split(/[\\\\/]/).includes('..') ||
+          relativePath.split(/[\\/]/).includes('..') ||
           !BLOB_SHA1.test(item?.gitBlobSha1 ?? '')) {
         fail(errors, 'reviewed file record contains an unsafe path or invalid Git blob SHA')
         continue
