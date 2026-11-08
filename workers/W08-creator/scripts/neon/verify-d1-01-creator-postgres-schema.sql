@@ -51,8 +51,8 @@ DECLARE
   ];
   unexpected_table_count INTEGER;
 BEGIN
-  IF current_database() <> 'luckread_schema' THEN
-    RAISE EXCEPTION 'W08 schema verifier must run only against luckread_schema';
+  IF current_database() NOT IN ('luckread_schema', 'luckread') THEN
+    RAISE EXCEPTION 'W08 schema verifier must run only against the approved D1-01 databases luckread_schema or luckread';
   END IF;
   IF current_setting('server_version_num')::INTEGER / 10000 <> 18 THEN
     RAISE EXCEPTION 'W08 schema verifier requires PostgreSQL 18';

@@ -1,8 +1,10 @@
 import { randomUUID } from 'node:crypto'
 import { Pool } from 'pg'
+import { resolveExpectedSchemaDatabase } from './verify-schema-database-target.mjs'
 
 const connectionString = process.env.W02_SCHEMA_DATABASE_URL
 if (!connectionString) throw new Error('W02_SCHEMA_DATABASE_URL is required')
+const expectedDatabase = resolveExpectedSchemaDatabase()
 
 const pool = new Pool({ connectionString, max: 8, connectionTimeoutMillis: 5000 })
 const suffix = randomUUID().replaceAll('-', '').slice(0, 18)
@@ -52,10 +54,11 @@ let completedAssertions = 0
 let primaryError
 try {
   const server = await pool.query(
-    "SELECT current_setting('server_version_num')::integer AS version_num",
+    "SELECT current_setting('server_version_num')::integer AS version_num, current_database() AS database_name",
   )
   const postgresMajor = Math.floor(Number(server.rows[0].version_num) / 10000)
   assert(postgresMajor >= 18, 'PostgreSQL 18 or newer is required')
+  assert(server.rows[0].database_name === expectedDatabase, 'unexpected database target')
   completedAssertions += 1
 
   const extension = await pool.query(

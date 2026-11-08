@@ -1,7 +1,9 @@
 import { Pool } from 'pg'
+import { resolveExpectedSchemaDatabase } from './verify-schema-database-target.mjs'
 
 const connectionString = process.env.W02_SCHEMA_DATABASE_URL
 if (!connectionString) throw new Error('W02_SCHEMA_DATABASE_URL is required')
+const expectedDatabase = resolveExpectedSchemaDatabase()
 
 const pool = new Pool({
   connectionString,
@@ -40,7 +42,7 @@ try {
   )
   const versionMajor = Math.floor(identity.rows[0].version_num / 10_000)
   if (versionMajor !== 18) throw new Error('Expected PostgreSQL 18, got ' + versionMajor)
-  if (identity.rows[0].database_name !== 'luckread_schema') {
+  if (identity.rows[0].database_name !== expectedDatabase) {
     throw new Error('Refusing to verify an unexpected database target')
   }
 
