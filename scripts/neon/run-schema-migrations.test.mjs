@@ -52,7 +52,7 @@ test('accepts only the exact D1-01 Neon target with required channel binding', (
   assert.equal(validateRemoteNeonTarget(requireMode.replace('/luckread?', '/luckreadpro?')).valid, false)
   assert.equal(validateRemoteNeonTarget(requireMode.replace(host, 'db.example.com')).valid, false)
   assert.equal(validateRemoteNeonTarget(requireMode.replace('sslmode=require', 'sslmode=disable')).valid, false)
-  assert.equal(validateRemoteNeonTarget(requireMode.replace('&channel_binding=require', '')).valid, false)
+  assert.equal(validateRemoteNeonTarget(requireMode.replace('channel_binding=require&', '')).valid, false)
   assert.equal(validateRemoteNeonTarget(requireMode.replace('@' + host, '@' + host + ':6432')).valid, false)
   assert.equal(validateRemoteNeonTarget(requireMode.replace('channel_binding=require', 'channel_binding=prefer')).valid, false)
   const effective = new URL(enforceVerifiedNeonConnectionString(requireMode))
