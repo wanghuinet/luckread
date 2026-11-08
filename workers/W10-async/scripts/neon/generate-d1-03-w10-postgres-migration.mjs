@@ -40,11 +40,23 @@ function digest(value) {
 }
 
 function extractCreateTable(sql, tableName) {
-  const pattern = new RegExp(
-    String.raw`CREATE TABLE (?:IF NOT EXISTS )?${tableName}\\s*\\(([\\s\\S]*?)\\n\\);`,
-    'i',
-  )
-  return pattern.exec(sql)?.[1] ?? null
+  const markers = [
+    'CREATE TABLE IF NOT EXISTS ' + tableName + ' (',
+    'CREATE TABLE ' + tableName + ' (',
+  ]
+  let start = -1
+  let marker = ''
+  for (const candidate of markers) {
+    start = sql.indexOf(candidate)
+    if (start >= 0) {
+      marker = candidate
+      break
+    }
+  }
+  if (start < 0) return null
+  const bodyStart = start + marker.length
+  const end = sql.indexOf('\n);', bodyStart)
+  return end < 0 ? null : sql.slice(bodyStart, end)
 }
 
 export function buildD103W10Migration({
@@ -121,8 +133,8 @@ export function buildD103W10Migration({
   const postgresDlq = extractCreateTable(template, 'execution_dead_letters')
   if (!d1Dlq || !postgresDlq) throw new Error('W10 DLQ source and PostgreSQL translation must both exist')
   for (const column of dlqMetadataColumns) {
-    const columnPattern = new RegExp('^\\\\s*' + column + '\\\\s+', 'm')
-    if (!columnPattern.test(d1Dlq) || !columnPattern.test(postgresDlq)) {
+    const columnPresent = (body) => body.split('\n').some((line) => line.trimStart().startsWith(column + ' '))
+    if (!columnPresent(d1Dlq) || !columnPresent(postgresDlq)) {
       throw new Error('W10 DLQ allowlisted event metadata column is missing: ' + column)
     }
   }
