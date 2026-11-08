@@ -1,0 +1,67 @@
+name: Neon D1-03 W11 Campaign and Growth Owner Reconciliation
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/neon-d1-03-w11-owner-reconciliation.yml'
+      - 'contracts/database/neon-d1-03-w11-owner-reconciliation.v1.json'
+      - 'contracts/database/neon-d1-03-w09-platform-schema.v1.json'
+      - 'contracts/database/neon-five-domain-schema-bootstrap.v1.json'
+      - 'contracts/transport/d1-03-entity-owner-boundary.v1.json'
+      - 'contracts/transport/d1-05-analytics-owner-boundary.v1.json'
+      - 'docs/02-FINAL-MAPPING-v1.0.md'
+      - 'docs/09-D1-DOMAIN-MASTER-v1.0.md'
+      - 'workers/W11-growth-campaign-analytics-operations/README.md'
+      - 'workers/W11-growth-campaign-analytics-operations/wrangler.jsonc'
+      - 'workers/W11-growth-campaign-analytics-operations/src/worker.ts'
+      - 'workers/W11-growth-campaign-analytics-operations/migrations/**'
+      - 'workers/W11-growth-campaign-analytics-operations/scripts/neon/**'
+      - 'scripts/verify-d1-03-entity-owner-boundary.mjs'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/neon-d1-03-w11-owner-reconciliation.yml'
+      - 'contracts/database/neon-d1-03-w11-owner-reconciliation.v1.json'
+      - 'contracts/database/neon-d1-03-w09-platform-schema.v1.json'
+      - 'contracts/database/neon-five-domain-schema-bootstrap.v1.json'
+      - 'contracts/transport/d1-03-entity-owner-boundary.v1.json'
+      - 'contracts/transport/d1-05-analytics-owner-boundary.v1.json'
+      - 'docs/02-FINAL-MAPPING-v1.0.md'
+      - 'docs/09-D1-DOMAIN-MASTER-v1.0.md'
+      - 'workers/W11-growth-campaign-analytics-operations/README.md'
+      - 'workers/W11-growth-campaign-analytics-operations/wrangler.jsonc'
+      - 'workers/W11-growth-campaign-analytics-operations/src/worker.ts'
+      - 'workers/W11-growth-campaign-analytics-operations/migrations/**'
+      - 'workers/W11-growth-campaign-analytics-operations/scripts/neon/**'
+      - 'scripts/verify-d1-03-entity-owner-boundary.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: neon-d1-03-w11-owner-reconciliation-\${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  w11-d1-03-owner-reconciliation:
+    name: Verify T22 ownership and T23 analytics separation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout reviewed source
+        uses: actions/checkout@v4
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Run W11 D1-03 ownership and D1-05 separation regressions
+        run: |
+          set -euo pipefail
+          node --check workers/W11-growth-campaign-analytics-operations/scripts/neon/verify-d1-03-w11-owner-reconciliation.mjs
+          node --test workers/W11-growth-campaign-analytics-operations/scripts/neon/verify-d1-03-w11-owner-reconciliation.test.mjs
+          node workers/W11-growth-campaign-analytics-operations/scripts/neon/verify-d1-03-w11-owner-reconciliation.mjs
+          node scripts/verify-d1-03-entity-owner-boundary.mjs
