@@ -151,7 +151,7 @@ for (const eventName of expectedEvents) {
   if (!migration.includes("'" + eventName + "'")) fail('D1 source migration missing event type ' + eventName)
 }
 
-const eventList = expectedEvents.map((value) => "'" + value + "'").join(',\n    ')
+const eventList = expectedEvents.map((value) => "    '" + value + "'").join(',\n')
 const sql = [
   '-- GENERATED FILE',
   '-- Source authority: workers/W02-identity/migrations/0008_auth_007_mfa_publication_journal.sql',
@@ -171,7 +171,7 @@ const sql = [
   '  journal_id TEXT NOT NULL CONSTRAINT auth_007_mfa_publication_journal_pkey PRIMARY KEY,',
   '  event_id TEXT NOT NULL CONSTRAINT auth_007_mfa_publication_journal_event_id_uq UNIQUE,',
   '  event_type TEXT NOT NULL CHECK (event_type IN (',
-  '    ' + eventList.split('\n').join('\n    '),
+  eventList,
   '  )),',
   "  schema_version TEXT NOT NULL CHECK (schema_version = '1.0'),",
   '  resource_id TEXT NOT NULL,',
