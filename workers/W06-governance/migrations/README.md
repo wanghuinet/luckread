@@ -1,6 +1,6 @@
 # W06 D1-03 schema sources
 
-This directory contains the existing Cloudflare D1/SQLite migration sources. They remain the current runtime compatibility source while Neon schema bootstrap is staged.
+The files in this directory are legacy Cloudflare D1 migrations and SQLite schema sources. They remain the current runtime compatibility source while Neon schema bootstrap is staged.
 
 ## Existing schema ownership
 
@@ -24,4 +24,4 @@ The admitted slice contains 7 tables, 11 explicit indexes, 0 triggers and 0 fore
 
 Appeal is intentionally excluded. The Report/Appeal API contract describes appeal behavior, but docs/63-MODERATION-APPEALS-SYSTEM-CONTRACT-v1.0.md currently marks implementation pending and the admitted migrations contain no Appeal persistence table. Do not invent one until a dedicated persistence contract and source migration are admitted.
 
-Do not execute the D1/SQLite migrations against Neon PostgreSQL. The local rehearsal uses a disposable PostgreSQL 18.6 service only. No remote Neon connection, Cloudflare D1 mutation, business-data import, Worker runtime/binding change, or production cutover is authorized by this schema source.
+Do not execute this SQLite/D1 migration against Neon PostgreSQL. The legacy Cloudflare D1 migrations remain source-only for Neon generation. The local rehearsal uses a disposable PostgreSQL 18.6 service only. No remote Neon connection, Cloudflare D1 mutation, business-data import, Worker runtime/binding change, or production cutover is authorized by this schema source.
