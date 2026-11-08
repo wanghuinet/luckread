@@ -207,9 +207,9 @@
           "productionCutoverAuthorized": false,
           "localPostgres18Evidence": {
             "status": "LOCAL_POSTGRES18_REHEARSAL_PASSED",
-            "workflowRunId": 42502495149,
-            "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42502495149",
-            "verifiedHeadSha": "93fdce0b5963501ca55d8093c5514828d302a6a4",
+            "workflowRunId": 42502891564,
+            "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42502891564",
+            "verifiedHeadSha": "b6dca4fc21b52eb6169d1b4a7a64577fd038d590",
             "postgresVersion": "18.6",
             "database": "luckread_d1_03_w10_rehearsal",
             "tables": 6,
@@ -219,14 +219,17 @@
             "triggerFunctionCount": 0,
             "businessFixtureRowsAfterRollback": 0,
             "generatorAndAdmissionTests": "PASSED",
+            "dlqAllowlistedMetadataVerification": "PASSED",
             "catalogAndRollbackVerification": "PASSED",
+            "d1MigrationSha256": "4e2aadf03989417379a27ae8dc1e7260bdf9cc5ed771ef22ed304e145d477b41",
+            "ownerBoundarySha256": "5c911b56d31b3b078941f01f5bc7800c7082c1c5e02191d933b78054f0befe52",
             "remoteNeonTouched": false,
             "cloudflareD1Touched": false,
             "w10RuntimeBindingAdded": false,
             "businessDataImported": false,
             "productionCutoverAuthorized": false,
-            "evidenceArtifactId": 13626345587,
-            "evidenceArtifactSha256": "sha256:209f474ce742eb7f647f362b51fb468f3eb0d3a3ba30ac1f2ddc650525d6a7ad"
+            "evidenceArtifactId": 13625774522,
+            "evidenceArtifactSha256": "sha256:e24a8c63b3d0c295e35c156baa423b20e123c217f8f3fa308276780e73d8be72"
           },
           "runtimeBindingAdded": false
         },
