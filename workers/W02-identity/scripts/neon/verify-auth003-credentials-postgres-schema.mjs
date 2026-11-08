@@ -84,7 +84,12 @@ try {
     "SELECT column_name, data_type, is_nullable FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'auth_identities'",
   )
   const identityColumnMap = new Map(identityColumns.rows.map((row) => [row.column_name, row]))
-  assert(identityColumnMap.size === 9, 'identity table has an unexpected column count')
+  const expectedIdentityColumns = [
+    'id', 'user_id', 'username', 'username_normalized', 'email',
+    'email_normalized', 'phone', 'phone_normalized', 'normalization_version',
+  ].sort()
+  assert(JSON.stringify([...identityColumnMap.keys()].sort()) === JSON.stringify(expectedIdentityColumns),
+    'identity table columns must exactly match the admitted field contract')
   assert(identityColumnMap.get('normalization_version')?.is_nullable === 'NO', 'normalization version must be required')
   assertionsPassed++
 
@@ -92,7 +97,12 @@ try {
     "SELECT column_name, data_type, is_nullable, column_default FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'auth_credentials'",
   )
   const credentialColumnMap = new Map(credentialColumns.rows.map((row) => [row.column_name, row]))
-  assert(credentialColumnMap.size === 9, 'credential table has an unexpected column count')
+  const expectedCredentialColumns = [
+    'id', 'identity_id', 'kind', 'value_hash', 'normalized_value',
+    'verified_at', 'active', 'created_at', 'updated_at',
+  ].sort()
+  assert(JSON.stringify([...credentialColumnMap.keys()].sort()) === JSON.stringify(expectedCredentialColumns),
+    'credential table columns must exactly match the admitted field contract')
   assert(credentialColumnMap.get('active')?.data_type === 'boolean', 'active must be native PostgreSQL boolean')
   assert(credentialColumnMap.get('active')?.column_default === 'true', 'active must default to true')
   assert(credentialColumnMap.get('created_at')?.data_type === 'timestamp with time zone', 'created_at must be timestamptz')
