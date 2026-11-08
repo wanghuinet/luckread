@@ -46,7 +46,8 @@ DECLARE
     'membership_subscriptions',
     'creator_applications',
     'creator_authorization_audit',
-    'creators'
+    'creators',
+    'neon_schema_migration_ledger'
   ];
   unexpected_table_count INTEGER;
 BEGIN
@@ -73,7 +74,7 @@ BEGIN
       AND table_type = 'BASE TABLE'
       AND NOT (table_name = ANY(known_d1_01_tables));
   IF unexpected_table_count <> 0 THEN
-    RAISE EXCEPTION 'Unexpected table outside the registered D1-01 W01/W02/W07/W08 owner set: %',
+    RAISE EXCEPTION 'Unexpected table outside the registered D1-01 W01/W02/W07/W08 owners and shared migration ledger: %',
       unexpected_table_count;
   END IF;
 
