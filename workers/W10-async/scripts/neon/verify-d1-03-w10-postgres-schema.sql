@@ -77,12 +77,15 @@ INSERT INTO job_retries (
 );
 
 INSERT INTO execution_dead_letters (
-  dlq_id, event_id, consumer_name, original_event_metadata_json,
-  payload_sha256, attempt_count, last_error_class, last_error_summary,
-  first_seen_at, last_seen_at
+  dlq_id, event_id, consumer_name, event_type, schema_version, producer,
+  resource_type, resource_id, occurred_at, published_at, idempotency_key,
+  source_version, correlation_id, causation_id, payload_sha256, attempt_count,
+  last_error_class, last_error_summary, first_seen_at, last_seen_at
 ) VALUES (
   'dlq-w10-rehearsal', 'event-w10-rehearsal', 'w06-moderation-consumer',
-  '{"eventId":"event-w10-rehearsal","producer":"W06","schemaVersion":"1.0"}',
+  'moderation.case.queued', '1.0', 'W06', 'ModerationCase', 'case-rehearsal',
+  TIMESTAMPTZ '2026-11-09T00:00:02Z', TIMESTAMPTZ '2026-11-09T00:00:02Z',
+  'idem-w10-dlq-0001', 1, 'corr-w10-rehearsal', 'cause-w10-rehearsal',
   repeat('a', 64), 3, 'poison', 'Sanitized invalid event metadata',
   TIMESTAMPTZ '2026-11-09T00:00:02Z', TIMESTAMPTZ '2026-11-09T00:00:03Z'
 );
