@@ -46,7 +46,8 @@ const isSafeRepositoryPath = (path) => typeof path === 'string' &&
 
 if (manifest.domainId !== 'D1-01' || manifest.databaseName !== 'luckread' ||
     manifest.postgresMajor !== 18 || manifest.businessDataImport !== false ||
-    manifest.productionCutoverAuthorized !== false || manifest.remoteApplyReady !== false) {
+    manifest.productionCutoverAuthorized !== false || manifest.remoteApplyReady !== false ||
+    manifest.execution?.runnerStatus !== 'NOT_IMPLEMENTED' || manifest.execution?.remoteApplyReady !== false) {
   fail('manifest target or schema-only authorization drift')
 }
 const inventory = JSON.parse(readFileSync(
