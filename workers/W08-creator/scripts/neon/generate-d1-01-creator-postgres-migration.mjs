@@ -114,6 +114,7 @@ for (const indexName of sourceIndexNames) {
     fail('W08 source-defined index missing from PostgreSQL DDL: ' + indexName)
   }
 }
+const normalizeSql = (value) => value.replace(/\\s+/g, '')
 for (const token of [
   "('PERSONAL','WRITER','VIDEO_CREATOR','DEVELOPER','ARTIST','OTHER')",
   "('PENDING','APPROVED','REJECTED')",
@@ -127,8 +128,9 @@ for (const token of [
   "'creator'",
   "'role_assignment'",
 ]) {
-  if (!source.includes(token.replaceAll(',', ', ')) && !source.includes(token)) {
-    fail('canonical source enum/event/resource vocabulary drift: ' + token)
+  if (!normalizeSql(source).includes(normalizeSql(token)) ||
+      !normalizeSql(sql).includes(normalizeSql(token))) {
+    fail('PostgreSQL enum/event/resource vocabulary differs from the canonical source: ' + token)
   }
 }
 for (const token of [
