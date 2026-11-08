@@ -106,7 +106,35 @@
         "workers/W03-content/migrations",
         "workers/W05-social/migrations"
       ],
-      "status": "PENDING"
+      "status": "LOCAL_POSTGRES18_REHEARSAL_PASSED_REMOTE_APPLY_PENDING",
+      "completedSchemaOwners": [
+        "W03",
+        "W05"
+      ],
+      "pendingSchemaOwners": [],
+      "remoteSchemaApplied": false,
+      "schemaContract": "contracts/database/neon-d1-02-combined-schema.v1.json",
+      "migrationManifest": "contracts/database/neon-d1-02-migration-manifest.v1.json",
+      "schemaVerificationEvidence": {
+        "workflowRunId": 42481970245,
+        "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42481970245",
+        "postgresVersion": "18.6",
+        "tables": 28,
+        "explicitIndexes": 63,
+        "triggers": 9,
+        "triggerFunctions": 10,
+        "businessRows": 0,
+        "snowflakeAllocatorRows": 1,
+        "migrationLedgerRows": 2,
+        "foreignKeys": 0,
+        "d1_03EndpointTablePresent": false,
+        "remoteNeonTouched": false,
+        "cloudflareD1Touched": false,
+        "businessDataImported": false,
+        "productionCutoverAuthorized": false,
+        "evidenceArtifactId": 13617648427,
+        "evidenceArtifactSha256": "6dc320b5fff134d6420fd879df58a10ad510c21d03d3d1e0f10a9693170bfc49"
+      }
     },
     {
       "domainId": "D1-03",

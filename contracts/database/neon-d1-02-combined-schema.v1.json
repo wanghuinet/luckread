@@ -3,7 +3,7 @@
   "$id": "https://luckread.com/contracts/database/neon-d1-02-combined-schema.v1.json",
   "title": "LuckRead D1-02 Combined W03 and W05 PostgreSQL 18 Schema Contract",
   "version": "1.0.0",
-  "status": "COMBINED_LOCAL_REHEARSAL_CONTRACT",
+  "status": "COMBINED_LOCAL_POSTGRES18_REHEARSAL_PASSED_REMOTE_APPLY_PENDING",
   "target": {
     "domainId": "D1-02",
     "databaseName": "luckreadpro",
@@ -21,7 +21,12 @@
       "migrationDirectory": "workers/W03-content/migrations",
       "migrationCount": 15,
       "artifactPath": "workers/W03-content/src/neon-postgres-migrations/0001_w03_d1_02_content_schema.sql",
-      "expected": { "tables": 9, "explicitIndexes": 28, "triggers": 8, "triggerFunctions": 9 }
+      "expected": {
+        "tables": 9,
+        "explicitIndexes": 28,
+        "triggers": 8,
+        "triggerFunctions": 9
+      }
     },
     {
       "worker": "W05",
@@ -29,10 +34,22 @@
       "migrationDirectory": "workers/W05-social/migrations",
       "migrationCount": 15,
       "artifactPath": "workers/W05-social/src/neon-postgres-migrations/0001_w05_d1_02_social_schema.sql",
-      "expected": { "tables": 19, "explicitIndexes": 35, "triggers": 1, "triggerFunctions": 1 }
+      "expected": {
+        "tables": 19,
+        "explicitIndexes": 35,
+        "triggers": 1,
+        "triggerFunctions": 1
+      }
     }
   ],
-  "combined": { "owners": 2, "migrationSources": 30, "tables": 28, "explicitIndexes": 63, "triggers": 9, "triggerFunctions": 10 },
+  "combined": {
+    "owners": 2,
+    "migrationSources": 30,
+    "tables": 28,
+    "explicitIndexes": 63,
+    "triggers": 9,
+    "triggerFunctions": 10
+  },
   "excludedBindings": [
     {
       "worker": "W05",
@@ -51,5 +68,31 @@
     "Do not import business rows; only the required W03 Snowflake allocator singleton row remains after bootstrap.",
     "Do not create W09 notification_push_endpoints or include W05 D1-03 schema.",
     "Do not add cross-domain foreign keys; content, user and endpoint identifiers remain opaque references."
-  ]
+  ],
+  "localRehearsalEvidence": {
+    "workflowRunId": 42481970245,
+    "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42481970245",
+    "reviewedPr": 1644,
+    "reviewedPrMergeCommit": "b1d58fb7cb481966cae020b05789707df086c459",
+    "postgresVersion": "18.6",
+    "database": "luckread_d1_02_schema",
+    "owners": 2,
+    "migrationSources": 30,
+    "tables": 28,
+    "explicitIndexes": 63,
+    "triggers": 9,
+    "triggerFunctions": 10,
+    "businessRows": 0,
+    "snowflakeAllocatorRows": 1,
+    "migrationLedgerRows": 2,
+    "foreignKeys": 0,
+    "d1_03EndpointTablePresent": false,
+    "remoteNeonTouched": false,
+    "cloudflareD1Touched": false,
+    "businessDataImported": false,
+    "productionCutoverAuthorized": false,
+    "evidenceArtifactId": 13617648427,
+    "evidenceArtifactName": "neon-d1-02-combined-postgres18-9b42ab42bb7e6d2ba188c28c7d2c6530b56c471e",
+    "evidenceArtifactSha256": "6dc320b5fff134d6420fd879df58a10ad510c21d03d3d1e0f10a9693170bfc49"
+  }
 }
