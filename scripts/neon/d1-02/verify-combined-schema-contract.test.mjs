@@ -24,7 +24,7 @@ test('combined W03 and W05 schema exactly matches D1-02 object totals', () => {
 test('combined contract rejects W05 D1-03 marked included in source inventory', () => {
   const invalid = clone(inventory)
   invalid.owners.find((item) => item.worker === 'W05').physicalBindings.find((item) => item.binding === 'D1_03').included = true
-  assert.throws(() => verifyCombinedSchemaContract({ contract, inventory:invalid, loadArtifact }), /W05 DB only; W05 D1_03/)
+  assert.throws(() => verifyCombinedSchemaContract({ contract, inventory:invalid, loadArtifact }), /W05 binding must resolve only to D1-02|W05 DB only; W05 D1_03/)
 })
 
 test('combined contract rejects foreign keys, endpoint table and SQLite syntax', () => {
