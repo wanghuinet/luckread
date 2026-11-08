@@ -17,7 +17,6 @@ The first slice is deliberately not a general finance database. It does not crea
 
 The following remaining source migrations are deferred to separate bounded PostgreSQL schema slices:
 
-- `0006_refunds_billing_documents.sql`
 - `0007_payment_method_revocation_requests.sql`
 
 Do not hand-copy these tables into this first artifact. Each needs a separate owner/source-boundary check and PG18 local rehearsal before it is admitted.
@@ -94,7 +93,7 @@ The candidate PostgreSQL migration \`0004_w07_d1_04_revenuecat_webhook_inbox.sql
 - \`revenuecat_webhook_events\`: one immutable first receipt per \`app_id + event_id\`, with bounded object-only \`event_data_json\`, payload SHA-256, lifecycle state and processing timestamp.
 - \`revenuecat_webhook_event_conflicts\`: a separate record for each distinct conflicting incoming payload hash, tied to the first receipt and retaining occurrence count and first/last-seen timestamps.
 
-This slice adds **2 tables, 3 explicit indexes, 7 source-semantic triggers, one trigger function and zero foreign keys**. Cumulative D1-04 schema target after slices 0001–0004 is **12 tables, 25 explicit indexes, 56 triggers, four trigger functions and zero foreign keys**. The PAY-005 status remains pending until the local PostgreSQL 18.6 rehearsal succeeds.
+This slice adds **2 tables, 3 explicit indexes, 7 source-semantic triggers, one trigger function and zero foreign keys**. Cumulative D1-04 schema target after slices 0001–0004 is **12 tables, 25 explicit indexes, 56 triggers, four trigger functions and zero foreign keys**. The PAY-005 local PostgreSQL 18.6 rehearsal passed; its evidence is recorded in the cumulative schema contract.
 
 Important invariants:
 
@@ -110,3 +109,27 @@ Important invariants:
 The PostgreSQL 18.6 rehearsal applies slices 0001–0004 in order, runs the complete offline D1-04 source regression suite, verifies the cumulative catalog, exercises valid and invalid first-receipt/conflict cases in a rollback-only transaction, and confirms zero business fixture rows remain.
 
 The remaining source slices are \`0006_refunds_billing_documents.sql\` and \`0007_payment_method_revocation_requests.sql\`. No remote Neon DDL, Cloudflare D1 write, business data import, runtime binding change or production cutover is authorized.
+
+
+## PAY-006 refunds and billing documents — fifth D1-04 slice
+
+The PostgreSQL migration `0005_w07_d1_04_refunds_billing_documents.sql` translates only source migration `0006_refunds_billing_documents.sql` and adds:
+
+- `refunds`: HyperSwitch-only refund facts with customer-scoped idempotency, immutable commercial identity, CAS versions, an explicit lifecycle guard and monotonic provider timestamps.
+- `billing_documents`: immutable customer invoices and receipts, bound to the exact order snapshot; receipts additionally require the matching succeeded payment.
+
+This slice adds **2 tables, 4 explicit indexes, 9 source-semantic triggers, one trigger function and zero foreign keys**. Cumulative D1-04 schema after slices 0001–0005 is **14 tables, 29 explicit indexes, 65 triggers, five trigger functions and zero foreign keys**.
+
+Important invariants:
+
+- A refund must match a succeeded or partially captured HyperSwitch payment and the same merchant, customer, order and currency.
+- Refunds reserve against the captured amount. The PostgreSQL insert guard locks the matched payment row before calculating the sum of non-FAILED refunds to serialize concurrent reservations.
+- Customer-scoped idempotency keys are unique. Amount, provider, customer/order/payment identity, reason and request hash are immutable.
+- Refund state changes use the source lifecycle transitions, exact one-step version CAS and monotonic provider timestamps. Provider network calls remain outside database transactions.
+- INVOICE documents have no payment reference; RECEIPT documents must match a succeeded payment for the exact order/customer/currency/amount.
+- Issued document snapshots are immutable and both refund facts and issued billing documents are retained.
+- No PAN/CVC, API credentials, raw webhook body, entitlement, ledger, user or media data is added. D1-01 continues to own subscription entitlements.
+
+The PAY-006 workflow applies predecessor slices 0001–0004 in order, runs the full offline D1-04 source regression suite, verifies deterministic generators through PAY-006, applies the new PostgreSQL 18.6 slice, tests valid and invalid refund/document cases, and confirms all business fixtures roll back while the single scheduler control row remains.
+
+Only `0007_payment_method_revocation_requests.sql` remains to be translated. No remote Neon DDL, Cloudflare D1 write, business-data import, runtime binding change or production cutover is authorized.
