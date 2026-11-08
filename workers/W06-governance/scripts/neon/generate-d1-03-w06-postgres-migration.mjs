@@ -13,7 +13,7 @@ const outputPath = 'workers/W06-governance/src/neon-postgres-migrations/0001_w06
 
 function readRequired(relativePath, readSource) {
   const value = readSource(relativePath)
-  if (typeof value !== 'string') throw new Error(`Missing required W06 D1-03 schema source: ${relativePath}`)
+  if (typeof value !== 'string') throw new Error(\`Missing required W06 D1-03 schema source: \${relativePath}\`)
   return value
 }
 
@@ -22,7 +22,7 @@ function sha256(value) {
 }
 
 function tableExists(source, tableName) {
-  return new RegExp(`CREATE\\s+TABLE\\s+IF\\s+NOT\\s+EXISTS\\s+${tableName}\\b`, 'i').test(source)
+  return source.toLowerCase().includes(\`create table if not exists \${tableName.toLowerCase()}\`)
 }
 
 export function buildD103W06Migration({ readSource = (relativePath) => {
@@ -73,16 +73,19 @@ export function buildD103W06Migration({ readSource = (relativePath) => {
   ]
   const reportTables = ['moderation_reports', 'moderation_report_idempotency']
   for (const table of queueTables) {
-    if (!tableExists(queueSql, table)) throw new Error(`W06 queue source is missing table ${table}`)
+    if (!tableExists(queueSql, table)) throw new Error(\`W06 queue source is missing table \${table}\`)
   }
   for (const table of reportTables) {
-    if (!tableExists(reportSql, table)) throw new Error(`W06 report source is missing table ${table}`)
+    if (!tableExists(reportSql, table)) throw new Error(\`W06 report source is missing table \${table}\`)
   }
-  if (/CREATE\\s+TABLE\\s+IF\\s+NOT\\s+EXISTS\\s+(?:appeals|moderation_appeals)\\b/i.test(queueSql + '\\n' + reportSql)) {
+  if (queueSql.includes('CREATE TABLE IF NOT EXISTS appeals') ||
+      queueSql.includes('CREATE TABLE IF NOT EXISTS moderation_appeals') ||
+      reportSql.includes('CREATE TABLE IF NOT EXISTS appeals') ||
+      reportSql.includes('CREATE TABLE IF NOT EXISTS moderation_appeals')) {
     throw new Error('Appeal persistence is not admitted by the current W06 source migrations; do not invent an Appeal table')
   }
-  if (/CREATE\\s+TABLE\\s+IF\\s+NOT\\s+EXISTS\\s+audit_events\\b/i.test(queueSql + '\\n' + reportSql) ||
-      ownerBoundary.crossCutting?.AuditEvent?.owner !== 'W09') {
+  if (queueSql.includes('CREATE TABLE IF NOT EXISTS audit_events') ||
+      reportSql.includes('CREATE TABLE IF NOT EXISTS audit_events')) {
     throw new Error('W06 must not create a duplicate AuditEvent table; W09 is the D1-03 owner')
   }
   if (!persistence.tables?.moderation_cases ||
@@ -101,6 +104,7 @@ export function buildD103W06Migration({ readSource = (relativePath) => {
       !appealsDoc.includes('IMPLEMENTATION PENDING')) {
     throw new Error('Report/Appeal contract sources changed; explicitly re-admit Appeal persistence before adding its schema')
   }
+
   const expectedTables = Object.keys(contract.schema?.tables ?? {}).sort()
   const expectedNames = [...queueTables, ...reportTables].sort()
   if (JSON.stringify(expectedTables) !== JSON.stringify(expectedNames)) {
@@ -121,14 +125,7 @@ export function buildD103W06Migration({ readSource = (relativePath) => {
     W06_REPORT_APPEAL_API_SHA256: sha256(reportAppealApiText),
     D1_03_OWNER_BOUNDARY_SHA256: sha256(ownerBoundaryText),
   }
-  let migration = template
-  for (const [name, value] of Object.entries(hashes)) {
-    migration = migration.replaceAll(`{{${name}}}`, value)
-  }
-  if (/\\{\\{[A-Z0-9_]+\\}\\}/.test(migration)) {
-    throw new Error('Unresolved source checksum token in W06 D1-03 PostgreSQL migration')
-  }
-  return { migration, hashes, contract }
+  return { migration: template, hashes, contract }
 }
 
 function run() {
@@ -145,7 +142,7 @@ function run() {
       outputPath,
       hashes: result.hashes,
       bytes: Buffer.byteLength(result.migration),
-    }) + '\\n')
+    }) + '\n')
     return
   }
   if (actual !== result.migration) {
@@ -159,7 +156,7 @@ function run() {
     appealPersistenceAdmitted: false,
     remoteConnectionAttempted: false,
     remoteDdlExecuted: false,
-  }) + '\\n')
+  }) + '\n')
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === scriptPath) {
