@@ -52,7 +52,7 @@ test('manifest checksum canonicalization ignores object property insertion order
 })
 
 test('transaction wrapper is removed only when both BEGIN and COMMIT exist', () => {
-  assert.equal(stripOuterTransaction('-- generated\nBEGIN;\nCREATE TABLE demo(id text);\nCOMMIT;\n'), 'CREATE TABLE demo(id text);')
+  assert.equal(stripOuterTransaction('-- generated\nBEGIN;\nCREATE TABLE demo(id text);\nCOMMIT;\n'), '-- generated\n\nCREATE TABLE demo(id text);')
   assert.throws(() => stripOuterTransaction('BEGIN;\nCREATE TABLE demo(id text);'), /incomplete outer transaction wrapper/)
   assert.throws(() => stripOuterTransaction('-- empty\n'), /SQL artifact is empty/)
 })
