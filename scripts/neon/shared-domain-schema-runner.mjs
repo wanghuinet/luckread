@@ -683,6 +683,7 @@ async function verifyFinalCatalog(client, manifest, plan) {
     triggers:plan.triggers.length,
     triggerFunctions:plan.functions.length,
     foreignKeys:Number(foreignKeys.rows[0].count),
+    controlSeedRows:manifest.expected.controlSeedRows,
     businessRows:0,
   }
 }
