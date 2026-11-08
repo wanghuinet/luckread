@@ -26,6 +26,31 @@ on:
       - 'workers/W07-subscription-commerce/scripts/neon/**'
       - 'workers/W08-creator/src/neon-postgres-migrations/**'
       - 'workers/W08-creator/scripts/neon/**'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/neon-d1-01-reviewed-remote-schema-apply.yml'
+      - 'scripts/neon/run-schema-migrations.mjs'
+      - 'scripts/neon/remote-runner-review.mjs'
+      - 'scripts/neon/remote-runner-review.test.mjs'
+      - 'contracts/database/neon-d1-01-remote-runner-review.v1.json'
+      - 'scripts/neon/plan-d1-01-schema-migrations.mjs'
+      - 'scripts/neon/plan-d1-01-schema-migrations.test.mjs'
+      - 'scripts/neon/d1-01/verify-combined-local-rehearsal.mjs'
+      - '.github/workflows/neon-d1-01-migration-ledger.yml'
+      - 'scripts/neon/run-schema-migrations.test.mjs'
+      - 'scripts/neon/assert-d1-01-migration-ledger-ready.mjs'
+      - 'scripts/neon/d1-01-migration-manifest.mjs'
+      - 'contracts/database/neon-d1-01-migration-manifest.v1.json'
+      - 'contracts/database/neon-schema-migration-ledger.v1.json'
+      - 'workers/W01-payload/scripts/neon/**'
+      - 'workers/W01-payload/src/neon-postgres-migrations/**'
+      - 'workers/W02-identity/src/neon-postgres-migrations/**'
+      - 'workers/W02-identity/scripts/neon/**'
+      - 'workers/W07-subscription-commerce/src/neon-postgres-migrations/**'
+      - 'workers/W07-subscription-commerce/scripts/neon/**'
+      - 'workers/W08-creator/src/neon-postgres-migrations/**'
+      - 'workers/W08-creator/scripts/neon/**'
   workflow_dispatch:
     inputs:
       confirm_target:
@@ -44,7 +69,7 @@ concurrency:
 
 jobs:
   validate:
-    if: ${{ github.event_name == 'pull_request' }}
+    if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
     name: Validate remote runner guards without Neon credentials
     runs-on: ubuntu-latest
     steps:
