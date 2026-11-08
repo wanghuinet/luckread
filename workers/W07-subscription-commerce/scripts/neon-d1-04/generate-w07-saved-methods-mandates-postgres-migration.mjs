@@ -112,7 +112,14 @@ export function buildW07D104SavedMethodsMandatesMigration({ readSource = (relati
     explicitIndexNames: baseContract.schema?.explicitIndexNames?.slice(0, 14),
     triggerNames: baseContract.schema?.triggerNames?.slice(0, 24),
     sliceTotals: baseContract.schema?.sliceTotals?.orderPayment,
-    postgresMappings: baseContract.postgresMappings,
+    postgresMappings: {
+      integer: baseContract.postgresMappings?.integer,
+      time: baseContract.postgresMappings?.time,
+      json: baseContract.postgresMappings?.json,
+      partialUnique: baseContract.postgresMappings?.partialUnique,
+      relationships: baseContract.postgresMappings?.relationships,
+      triggerSemantics: baseContract.postgresMappings?.triggerSemantics,
+    },
   }
   const hashes = {
     W07_SAVED_METHODS_SOURCE_SHA256: sha256(sourceSql),

@@ -18,8 +18,8 @@ test('W07 D1-04 order/payment migration is deterministic and matches its committ
   assert.equal(first.sliceTotals.triggers, 24)
   assert.equal(first.sliceTotals.triggerFunctions, 1)
   assert.equal(first.sliceTotals.foreignKeys, 0)
-  assert.deepEqual(first.contract.schema.totals, {
-    tables: 8, explicitIndexes: 18, triggers: 36, triggerFunctions: 2, foreignKeys: 0,
+  assert.deepEqual(first.contract.schema.sliceTotals.orderPayment, {
+    tables: 6, explicitIndexes: 14, triggers: 24, triggerFunctions: 1, foreignKeys: 0,
   })
   for (const value of Object.values(first.hashes)) assert.match(value, /^[a-f0-9]{64}$/)
 })
