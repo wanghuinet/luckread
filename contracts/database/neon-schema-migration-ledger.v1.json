@@ -3,7 +3,7 @@
   "$id": "https://luckread.com/contracts/database/neon-schema-migration-ledger.v1.json",
   "title": "LuckRead Neon Schema Migration Ledger Contract",
   "version": "1.0.0",
-  "status": "LEDGER_SCHEMA_REVIEWED_SHARED_RUNNER_REMOTE_READY",
+  "status": "LEDGER_SCHEMA_D1_01_READY_OTHER_DOMAINS_BLOCKED",
   "scope": "Shared append-only schema migration provenance ledger installed independently inside each approved Neon database.",
   "businessData": false,
   "table": {
@@ -87,10 +87,33 @@
     "sourceCommit": "Record the exact 40-character Git commit SHA whose migration artifacts were executed."
   },
   "execution": {
-    "runnerStatus": "IMPLEMENTED_AND_REVIEWED",
-    "remoteApplyReady": true,
+    "runnerStatus": "IMPLEMENTED_FOR_D1_01_ONLY",
+    "remoteApplyReady": false,
     "runnerEntryPoint": "scripts/neon/run-schema-migrations.mjs",
     "reviewEvidenceRef": "contracts/database/neon-d1-01-remote-runner-review.v1.json",
+    "domainReadiness": {
+      "D1-01": {
+        "runnerStatus": "IMPLEMENTED_AND_REVIEWED",
+        "remoteApplyReady": true,
+        "reviewEvidenceRef": "contracts/database/neon-d1-01-remote-runner-review.v1.json"
+      },
+      "D1-02": {
+        "runnerStatus": "NOT_IMPLEMENTED",
+        "remoteApplyReady": false
+      },
+      "D1-03": {
+        "runnerStatus": "NOT_IMPLEMENTED",
+        "remoteApplyReady": false
+      },
+      "D1-04": {
+        "runnerStatus": "NOT_IMPLEMENTED",
+        "remoteApplyReady": false
+      },
+      "D1-05": {
+        "runnerStatus": "NOT_IMPLEMENTED",
+        "remoteApplyReady": false
+      }
+    },
     "lock": {
       "type": "PostgreSQL transaction-scoped advisory lock",
       "keyExpression": "hashtextextended('luckread:neon-schema-migration:' || current_database(), 0)",
@@ -106,5 +129,5 @@
     "businessDataImport": false,
     "productionCutoverAuthorized": false
   },
-  "remoteApplyReady": true
+  "remoteApplyReady": false
 }
