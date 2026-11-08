@@ -117,3 +117,12 @@ Record the gap and keep the remaining databases untouched.
 ## 9. Completion criteria for this change control
 
 This change control is complete when the repository has an agreed five-domain schema map and a reviewed, deterministic schema-bootstrap implementation contract. It does not claim that any Neon database has yet received application tables, that any Worker has been switched, or that production migration/cutover is complete.
+
+
+## 10. Implementation progress — 2026-11-08
+
+- PR #1619 added the W02 MFA PostgreSQL schema source. PR #1620 added the W07 D1-01 membership/entitlement schema source. PR #1621 added the W08 Creator schema source. These schema slices were verified on disposable PostgreSQL 18 CI and merged to main.
+- PR #1622 added the append-only shared schema migration ledger contract/DDL and the ordered 14-entry D1-01 migration manifest. Its PostgreSQL 18 ledger CI, Mapping 0 and Contract Admission checks passed before merge.
+- The owner-specific W01 remote apply path is permanently denied. Only a future reviewed shared runner may become an eligible remote apply path.
+- Current implementation slice: read-only D1-01 migration planner. It validates the committed manifest/checksums and emits the 14-entry ordered plan; it does not read database credentials, connect to Neon, inspect a database, execute DDL, import business data or authorize cutover.
+- Next slices are intentionally separate: (1) generated-artifact preparation and checksum refresh; (2) local PostgreSQL rehearsal using only disposable containers; (3) read-only remote target preflight; (4) shared runner transaction/ledger implementation; (5) Payload native migration reconciliation. Remote apply remains disabled until those slices are reviewed and proven.
