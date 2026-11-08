@@ -139,7 +139,12 @@ async function finalizeKnownMfaRejection(
   }
 }
 
-const buildLuckReadAuth = (env: BetterAuthEnv) => {
+type BetterAuthDatabase = NonNullable<Parameters<typeof betterAuth>[0]['database']>
+
+export const buildLuckReadAuth = (
+  env: BetterAuthEnv,
+  database: BetterAuthDatabase = env.D1_01 as BetterAuthDatabase,
+) => {
   // Keep local origins available only to the local evidence/runtime profile.
   // Production must never inherit localhost trust from a shared config.
   const trustedOrigins = [
@@ -442,7 +447,7 @@ const buildLuckReadAuth = (env: BetterAuthEnv) => {
     },
     // W02 is the platform identity authority. Better Auth uses native D1
     // persistence here; Payload is not an authentication/database adapter.
-    database: env.D1_01,
+    database,
     baseURL: 'https://luckread.com',
     basePath: '/api/auth',
     trustedOrigins,
