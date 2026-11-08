@@ -16,7 +16,7 @@ CREATE TABLE auth_identities (
   email_normalized TEXT CONSTRAINT auth_identities_email_normalized_uq UNIQUE,
   phone TEXT,
   phone_normalized TEXT CONSTRAINT auth_identities_phone_normalized_uq UNIQUE,
-  normalization_version TEXT NOT NULL CHECK (length(normalization_version) > 0)
+  normalization_version TEXT NOT NULL
 );
 
 CREATE TABLE auth_credentials (
