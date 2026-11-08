@@ -32,6 +32,7 @@ test('D1-03 manifest combines only admitted W06, W09 and W10 owner schemas', () 
   assert.equal(plan.triggers.length, 2)
   assert.equal(plan.functions.length, 1)
   assert.equal(plan.references.length, 2)
+  assert.equal(plan.controlSeedRows, 0)
   const w10 = manifest.entries.find((entry) => entry.logicalOwnerWorker === 'W10')
   assert.equal(w10.ownerWorker, 'W09')
   assert.equal(w10.migrationConfigOwner, 'W09')
@@ -53,6 +54,14 @@ test('D1-04 combines all seven admitted source migrations in six ordered Postgre
   assert.equal(plan.triggers.length, 72)
   assert.equal(plan.functions.length, 6)
   assert.equal(plan.references.length, 0)
+  assert.equal(plan.controlSeedRows, 1)
+  assert.deepEqual(plan.seedRowsByTable.get('subscription_renewal_scheduler_state'), [{
+    state_id: 'subscription-renewals',
+    cursor_period_end: null,
+    cursor_subscription_id: null,
+    version: 1,
+    updated_at: '1970-01-01T00:00:00.000Z',
+  }])
   assert.ok(plan.entries[5].effects.triggerOperations.some((item) =>
     item.operation === 'DROP' && item.name === 'payment_provider_events_terminal_immutable'))
 })
@@ -66,6 +75,7 @@ test('D1-05 remains local-rehearsal eligible but remote-admission blocked', () =
   assert.equal(plan.indexes.length, 8)
   assert.equal(plan.triggers.length, 0)
   assert.equal(plan.functions.length, 0)
+  assert.equal(plan.controlSeedRows, 0)
   assert.equal(manifest.remoteApplyReady, false)
   assert.ok(manifest.remoteApplyBlockers.some((item) => /retention/i.test(item)))
   assert.ok(manifest.remoteApplyBlockers.some((item) => /deletion/i.test(item)))
