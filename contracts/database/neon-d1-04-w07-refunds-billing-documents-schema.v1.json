@@ -1,0 +1,230 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/database/neon-d1-04-w07-refunds-billing-documents-schema.v1.json",
+  "title": "LuckRead D1-04 W07 Refunds and Billing Documents PostgreSQL Schema Slice",
+  "version": "1.0.0",
+  "status": "W07_D1_04_REFUNDS_BILLING_DOCUMENTS_PENDING_LOCAL_POSTGRES18_REHEARSAL",
+  "target": {
+    "domainId": "D1-04",
+    "databaseName": "luckread_finance",
+    "cloudflareD1DatabaseUuid": "9bfb89a5-fbb5-45b1-a2ee-eab674b0d736",
+    "binding": "D1_04",
+    "postgresMajor": 18,
+    "existingProductionAuthority": "Cloudflare D1",
+    "stagedSchemaTarget": "Neon PostgreSQL",
+    "businessDataImport": false,
+    "productionCutoverAuthorized": false,
+    "remoteSchemaApplied": false
+  },
+  "primaryOwner": {
+    "worker": "W07",
+    "feature": "PAY-006",
+    "entities": [
+      "Refund",
+      "BillingDocument"
+    ],
+    "migrationArtifact": "workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0005_w07_d1_04_refunds_billing_documents.sql",
+    "template": "workers/W07-subscription-commerce/scripts/neon-d1-04/templates/w07-refunds-billing-documents-postgres.sql",
+    "generator": "workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-refunds-billing-documents-postgres-migration.mjs"
+  },
+  "dependencies": {
+    "previousMigrationId": "0004_w07_d1_04_revenuecat_webhook_inbox",
+    "previousSchemaTotals": {
+      "tables": 12,
+      "explicitIndexes": 25,
+      "triggers": 56,
+      "triggerFunctions": 4,
+      "foreignKeys": 0
+    },
+    "requiredPreviousTables": [
+      "orders",
+      "order_lines",
+      "order_create_idempotency",
+      "payments",
+      "payment_provider_events",
+      "payment_provider_event_conflicts",
+      "saved_payment_methods",
+      "payment_mandates",
+      "subscription_renewal_cycles",
+      "subscription_renewal_scheduler_state",
+      "revenuecat_webhook_events",
+      "revenuecat_webhook_event_conflicts"
+    ],
+    "requiredPreviousFunctions": [
+      "w07_d104_order_payment_source_guard",
+      "w07_d104_saved_mandate_source_guard",
+      "w07_d104_renewal_cycles_source_guard",
+      "w07_d104_revenuecat_inbox_source_guard"
+    ],
+    "sourceBoundary": "Refunds are Hyperswitch-only and must not alter the RevenueCat inbox or payment_provider_events provider constraint. Billing documents are immutable W07 snapshots bound to their authoritative Order and, for receipts, a succeeded Payment."
+  },
+  "scope": {
+    "includedSourceMigration": "workers/W07-subscription-commerce/migrations-d1-04/0006_refunds_billing_documents.sql",
+    "includedTables": [
+      "refunds",
+      "billing_documents"
+    ],
+    "deferredTables": [
+      "payment_method_revocation_requests"
+    ],
+    "excludedTables": [
+      "entitlements",
+      "ledger_entries",
+      "payment_intents",
+      "users",
+      "media"
+    ],
+    "tableCount": 2
+  },
+  "schema": {
+    "tables": {
+      "refunds": {
+        "source": "0006_refunds_billing_documents.sql",
+        "primaryKey": "refund_id",
+        "indexes": [
+          "ix_refunds_customer_created",
+          "ix_refunds_payment_created",
+          "ix_refunds_status_updated"
+        ],
+        "triggerCount": 6,
+        "provider": "hyperswitch",
+        "idempotencyKey": [
+          "customer_id",
+          "idempotency_key"
+        ],
+        "moneyMinorUnit": "BIGINT",
+        "lifecycleStates": [
+          "REQUESTED",
+          "PENDING",
+          "SUCCEEDED",
+          "FAILED",
+          "REVIEW",
+          "RECONCILIATION_REQUIRED"
+        ],
+        "remainingRefundRule": "Sum every existing refund for the same payment except FAILED; reject a new amount above captured amount minus that sum.",
+        "immutableFields": [
+          "refund identity",
+          "provider",
+          "merchant and customer ownership",
+          "order and payment identity",
+          "amount and captured amount",
+          "currency",
+          "reason",
+          "idempotency key",
+          "request hash",
+          "created_at"
+        ],
+        "retention": "Refund financial facts are retained."
+      },
+      "billing_documents": {
+        "source": "0006_refunds_billing_documents.sql",
+        "primaryKey": "document_id",
+        "indexes": [
+          "ix_billing_documents_customer_issued"
+        ],
+        "triggerCount": 3,
+        "documentTypes": [
+          "INVOICE",
+          "RECEIPT"
+        ],
+        "uniqueKeys": [
+          [
+            "document_type",
+            "order_id"
+          ],
+          [
+            "document_number"
+          ]
+        ],
+        "snapshot": "Bounded valid JSON text, immutable after issue.",
+        "sourceGuard": "Every document matches authoritative Order customer/currency/total; RECEIPT additionally matches a succeeded Payment for the same Order/customer/currency/amount.",
+        "retention": "Issued billing documents are immutable and retained."
+      }
+    },
+    "explicitIndexNames": [
+      "ix_refunds_customer_created",
+      "ix_refunds_payment_created",
+      "ix_refunds_status_updated",
+      "ix_billing_documents_customer_issued"
+    ],
+    "triggerNames": [
+      "refunds_require_captured_payment",
+      "refunds_identity_immutable",
+      "refunds_version_guard",
+      "refunds_state_transition_guard",
+      "refunds_provider_timestamp_monotonic",
+      "refunds_retained",
+      "billing_documents_source_guard",
+      "billing_documents_identity_immutable",
+      "billing_documents_retained"
+    ],
+    "totals": {
+      "tables": 2,
+      "explicitIndexes": 4,
+      "triggers": 9,
+      "triggerFunctions": 1,
+      "foreignKeys": 0
+    },
+    "cumulativeAfterThisSlice": {
+      "tables": 14,
+      "explicitIndexes": 29,
+      "triggers": 65,
+      "triggerFunctions": 5,
+      "foreignKeys": 0
+    }
+  },
+  "postgresMappings": {
+    "integer": "Map D1/SQLite integer identifiers, versions and money-minor values to BIGINT; preserve source safe-integer bounds for amounts.",
+    "time": "Map ISO-8601 TEXT instants to TIMESTAMPTZ and compare provider update timestamps as instants.",
+    "json": "Keep snapshot_json as TEXT with a PostgreSQL JSONB parse check and the source 65,536-character maximum; preserve all valid JSON value types.",
+    "relationships": "Use source-semantic trigger checks against existing orders/payments; add zero foreign keys and no new ownership domain.",
+    "refundProvider": "Refund records remain HyperSwitch-only; external provider calls remain outside database transactions and only verified provider events may advance provider-confirmed state.",
+    "refundConcurrency": "Lock the matched payment row before calculating remaining refundable amount so concurrent refund inserts for one payment serialize.",
+    "billing": "INVOICE has no payment_id; RECEIPT requires the same succeeded payment and exact amount/currency/order/customer snapshot.",
+    "authority": "W07 remains sole D1-04 finance authority; D1-01 continues to own subscription entitlements."
+  },
+  "verification": {
+    "postgresImage": "postgres:18.6",
+    "sourceRegression": "workers/W07-subscription-commerce/scripts/test_order_d1_04_migration.py",
+    "tables": 2,
+    "explicitIndexes": 4,
+    "triggers": 9,
+    "triggerFunctions": 1,
+    "foreignKeys": 0,
+    "cumulativeTables": 14,
+    "cumulativeExplicitIndexes": 29,
+    "cumulativeTriggers": 65,
+    "cumulativeTriggerFunctions": 5,
+    "fixtureRowsAfterRollback": 0,
+    "schedulerControlRowsAfterRollback": 1,
+    "requiredPositiveCases": [
+      "refund insert matches a succeeded/partially-captured HyperSwitch payment and available captured amount",
+      "remaining refundable amount decreases by every non-FAILED refund",
+      "refund lifecycle follows allowed monotonic transitions and version CAS",
+      "provider refund timestamp advances monotonically",
+      "invoice matches order and has no payment_id",
+      "receipt matches the same succeeded payment/order/customer/currency/amount",
+      "billing document snapshot remains immutable"
+    ],
+    "requiredNegativeCases": [
+      "refund for another customer/order/merchant/provider/payment is rejected",
+      "captured amount greater than payment amount is rejected",
+      "refund amount greater than remaining captured amount is rejected",
+      "customer-scoped idempotency key reuse is rejected",
+      "illegal refund state transition is rejected",
+      "version must advance exactly one and updated_at must increase",
+      "provider timestamp cannot move backwards",
+      "billing document for unknown or mismatched order is rejected",
+      "receipt without a matching succeeded payment is rejected",
+      "issued billing documents cannot be updated or deleted",
+      "refund financial facts cannot be deleted"
+    ],
+    "noRemoteOperations": [
+      "no remote Neon DDL",
+      "no Cloudflare D1 writes",
+      "no business data import",
+      "no Worker deployment or binding change",
+      "no production cutover"
+    ]
+  }
+}
