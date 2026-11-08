@@ -146,5 +146,13 @@ if (/PRAGMA|AUTOINCREMENT|strftime|julianday|RAISE\s*\(\s*ABORT|GLOB/i.test(sql)
 }
 
 mkdirSync(dirname(outputPath), { recursive: true })
-writeFileSync(outputPath, sql)
+const generatedHeader = [
+  '-- GENERATED FILE. Do not hand-edit.',
+  '-- Regenerate with scripts/neon/generate-d1-01-membership-postgres-migration.mjs.',
+  '-- See scripts/neon/templates/d1-01-membership-postgres.sql for the checked schema template.',
+  '-- Source of truth remains migrations/0001..0008 and the W07 Subscription contracts.',
+  '-- This file is schema-only; runtime remains on Cloudflare D1 pending a separate cutover gate.',
+  '',
+].join('\n')
+writeFileSync(outputPath, generatedHeader + sql)
 console.log('W07_D1_01_MEMBERSHIP_POSTGRES_MIGRATION_GENERATION_PASS')
