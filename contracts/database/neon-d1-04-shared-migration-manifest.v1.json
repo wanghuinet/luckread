@@ -1,0 +1,159 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/database/neon-d1-04-shared-migration-manifest.v1.json",
+  "title": "LuckRead D1-04 Shared PostgreSQL 18 Schema Migration Manifest",
+  "version": "1.0.0",
+  "status": "LOCAL_EXECUTOR_MANIFEST_READY_REMOTE_REVIEW_PENDING",
+  "domainId": "D1-04",
+  "databaseName": "luckread_finance",
+  "cloudflareD1DatabaseUuid": "9bfb89a5-fbb5-45b1-a2ee-eab674b0d736",
+  "postgresMajor": 18,
+  "ledger": {
+    "table": "neon_schema_migration_ledger",
+    "ddlPath": "scripts/neon/d1-01/0001_schema_migration_ledger.sql",
+    "domainId": "D1-04",
+    "databaseName": "luckread_finance"
+  },
+  "localRehearsal": {
+    "allowed": true,
+    "databaseName": "luckread_d1_04_shared",
+    "postgresMajor": 18,
+    "environmentVariable": "D1_SHARED_LOCAL_DATABASE_URL"
+  },
+  "remoteApplyReady": false,
+  "businessDataImport": false,
+  "productionCutoverAuthorized": false,
+  "entries": [
+    {
+      "migrationId": "d1-04-w07-order-payment-schema-v1",
+      "order": 100,
+      "ownerWorker": "W07",
+      "logicalOwnerWorker": "W07",
+      "kind": "POSTGRESQL_SQL",
+      "artifactPaths": [
+        "workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0001_w07_d1_04_order_payment_schema.sql"
+      ],
+      "dependsOn": [],
+      "schemaContract": "contracts/database/neon-d1-04-w07-order-payment-schema.v1.json",
+      "sourceMigrations": [
+        "workers/W07-subscription-commerce/migrations-d1-04/0001_order_commerce.sql",
+        "workers/W07-subscription-commerce/migrations-d1-04/0002_payment_provider_events.sql"
+      ],
+      "scope": "Order, order-line, idempotency and payment-provider persistence."
+    },
+    {
+      "migrationId": "d1-04-w07-saved-methods-mandates-v1",
+      "order": 200,
+      "ownerWorker": "W07",
+      "logicalOwnerWorker": "W07",
+      "kind": "POSTGRESQL_SQL",
+      "artifactPaths": [
+        "workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0002_w07_d1_04_saved_methods_mandates.sql"
+      ],
+      "dependsOn": [
+        "d1-04-w07-order-payment-schema-v1"
+      ],
+      "schemaContract": "contracts/database/neon-d1-04-w07-saved-methods-mandates-schema.v1.json",
+      "sourceMigrations": [
+        "workers/W07-subscription-commerce/migrations-d1-04/0003_saved_payment_methods_mandates.sql"
+      ],
+      "scope": "Saved payment methods and MIT mandates."
+    },
+    {
+      "migrationId": "d1-04-w07-renewal-cycles-v1",
+      "order": 300,
+      "ownerWorker": "W07",
+      "logicalOwnerWorker": "W07",
+      "kind": "POSTGRESQL_SQL",
+      "artifactPaths": [
+        "workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0003_w07_d1_04_renewal_cycles.sql"
+      ],
+      "dependsOn": [
+        "d1-04-w07-saved-methods-mandates-v1"
+      ],
+      "schemaContract": "contracts/database/neon-d1-04-w07-renewal-cycles-schema.v1.json",
+      "sourceMigrations": [
+        "workers/W07-subscription-commerce/migrations-d1-04/0004_subscription_renewal_cycles.sql"
+      ],
+      "scope": "Subscription renewal cycles and scheduler singleton."
+    },
+    {
+      "migrationId": "d1-04-w07-revenuecat-webhook-inbox-v1",
+      "order": 400,
+      "ownerWorker": "W07",
+      "logicalOwnerWorker": "W07",
+      "kind": "POSTGRESQL_SQL",
+      "artifactPaths": [
+        "workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0004_w07_d1_04_revenuecat_webhook_inbox.sql"
+      ],
+      "dependsOn": [
+        "d1-04-w07-renewal-cycles-v1"
+      ],
+      "schemaContract": "contracts/database/neon-d1-04-w07-revenuecat-webhook-schema.v1.json",
+      "sourceMigrations": [
+        "workers/W07-subscription-commerce/migrations-d1-04/0005_revenuecat_webhook_inbox.sql"
+      ],
+      "scope": "RevenueCat webhook first-receipt inbox and conflict occurrences."
+    },
+    {
+      "migrationId": "d1-04-w07-refunds-billing-documents-v1",
+      "order": 500,
+      "ownerWorker": "W07",
+      "logicalOwnerWorker": "W07",
+      "kind": "POSTGRESQL_SQL",
+      "artifactPaths": [
+        "workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0005_w07_d1_04_refunds_billing_documents.sql"
+      ],
+      "dependsOn": [
+        "d1-04-w07-revenuecat-webhook-inbox-v1"
+      ],
+      "schemaContract": "contracts/database/neon-d1-04-w07-refunds-billing-documents-schema.v1.json",
+      "sourceMigrations": [
+        "workers/W07-subscription-commerce/migrations-d1-04/0006_refunds_billing_documents.sql"
+      ],
+      "scope": "Refunds and billing-document records."
+    },
+    {
+      "migrationId": "d1-04-w07-payment-method-revocation-v1",
+      "order": 600,
+      "ownerWorker": "W07",
+      "logicalOwnerWorker": "W07",
+      "kind": "POSTGRESQL_SQL",
+      "artifactPaths": [
+        "workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0006_w07_d1_04_payment_method_revocation.sql"
+      ],
+      "dependsOn": [
+        "d1-04-w07-refunds-billing-documents-v1"
+      ],
+      "schemaContract": "contracts/database/neon-d1-04-w07-payment-method-revocation-schema.v1.json",
+      "sourceMigrations": [
+        "workers/W07-subscription-commerce/migrations-d1-04/0007_payment_method_revocation_requests.sql"
+      ],
+      "scope": "Payment-method revocation request lifecycle."
+    }
+  ],
+  "sourceMigrationCount": 7,
+  "expected": {
+    "tables": 15,
+    "explicitIndexes": 31,
+    "triggers": 72,
+    "triggerFunctions": 6,
+    "foreignKeys": 0,
+    "businessRows": 0
+  },
+  "remoteApplyBlockers": [
+    "The seven W07 D1-04 source migrations have local PostgreSQL 18.6 rehearsals, but the combined shared-ledger execution path requires a separate independent review.",
+    "Remote Neon schema apply and production cutover remain disabled pending a reviewed runner release record."
+  ],
+  "safety": {
+    "newWorkers": 0,
+    "newD1Databases": 0,
+    "newQueues": 0,
+    "newServiceBindings": 0,
+    "runtimeBindingsChanged": false,
+    "remoteNeonDdlExecuted": false,
+    "cloudflareD1Touched": false,
+    "businessDataImported": false,
+    "productionCutoverAuthorized": false
+  }
+}
