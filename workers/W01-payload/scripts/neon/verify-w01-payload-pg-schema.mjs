@@ -182,7 +182,7 @@ try {
     `SELECT table_name, column_name, data_type, is_nullable, column_default
        FROM information_schema.columns
       WHERE table_schema = 'public'
-        AND table_name = ANY($1::text[])
+        AND table_name::text = ANY($1::text[])
       ORDER BY table_name, ordinal_position`,
     [expectedTables],
   )
@@ -217,7 +217,7 @@ try {
     `SELECT tablename AS table_name, indexname AS index_name, indexdef
        FROM pg_catalog.pg_indexes
       WHERE schemaname = 'public'
-        AND tablename = ANY($1::text[])
+        AND tablename::text = ANY($1::text[])
       ORDER BY tablename, indexname`,
     [expectedTables],
   )
@@ -262,7 +262,7 @@ try {
        JOIN pg_catalog.pg_class target_table ON target_table.oid = constraint_row.confrelid
       WHERE constraint_row.contype = 'f'
         AND source_namespace.nspname = 'public'
-        AND source_table.relname = ANY($1::text[])
+        AND source_table.relname::text = ANY($1::text[])
       ORDER BY constraint_row.conname`,
     [expectedTables],
   )
