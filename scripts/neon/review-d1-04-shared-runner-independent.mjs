@@ -285,12 +285,20 @@ export function verifyD104SharedRunnerReview({ readSource = readText } = {}) {
     }
     allSourcePaths.push(...entrySources)
     const sliceEvidence = contract.verification?.localRehearsalEvidence
+    const safety = contract.safety
+    const noRemoteOperations = contract.verification?.noRemoteOperations ?? []
+    const safetyDeclared = safety
+      ? safety.remoteNeonDdlExecuted === false &&
+        safety.cloudflareD1Touched === false &&
+        safety.businessDataImported === false &&
+        safety.productionCutoverAuthorized === false
+      : noRemoteOperations.includes('no remote Neon DDL') &&
+        noRemoteOperations.includes('no Cloudflare D1 writes') &&
+        noRemoteOperations.includes('no business data import') &&
+        noRemoteOperations.includes('no production cutover')
     if (sliceEvidence?.postgresVersion !== '18.6' ||
         !Number.isSafeInteger(sliceEvidence?.workflowRunId) ||
-        contract.safety?.remoteNeonDdlExecuted !== false ||
-        contract.safety?.cloudflareD1Touched !== false ||
-        contract.safety?.businessDataImported !== false ||
-        contract.safety?.productionCutoverAuthorized !== false ||
+        !safetyDeclared ||
         sliceEvidence?.remoteNeonTouched === true ||
         sliceEvidence?.cloudflareD1Touched === true ||
         sliceEvidence?.businessDataImported === true ||
