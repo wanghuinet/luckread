@@ -1,0 +1,184 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/database/neon-d1-03-w09-platform-schema.v1.json",
+  "title": "LuckRead D1-03 W09 Platform PostgreSQL Schema Slice",
+  "version": "1.0.0",
+  "status": "W09_SOURCE_BASELINE_READY_LOCAL_REHEARSAL_PENDING",
+  "target": {
+    "domainId": "D1-03",
+    "databaseName": "luckread_governance",
+    "cloudflareD1DatabaseName": "secondary",
+    "cloudflareD1DatabaseUuid": "bda1d247-a371-4244-91ae-aef96034db7f",
+    "postgresMajor":  18,
+    "existingProductionAuthority": "Cloudflare D1",
+    "stagedSchemaTarget": "Neon PostgreSQL",
+    "businessDataImport": false,
+    "productionCutoverAuthorized": false
+  },
+  "primaryOwner": {
+    "worker": "W09",
+    "entities": [
+      "AuditEvent",
+      "NotificationPushEndpoint"
+    ],
+    "migrationArtifact": "workers/W09-platform/src/neon-postgres-migrations/0001_w09_d1_03_platform_schema.sql",
+    "template": "workers/W09-platform/scripts/neon/templates/d1-03-w09-platform-postgres.sql",
+    "generator": "workers/W09-platform/scripts/neon/generate-d1-03-w09-postgres-migration.mjs"
+  },
+  "schema": {
+    "tables": {
+      "audit_events": {
+        "entity": "AuditEvent",
+        "columns": [
+          "event_id",
+          "request_id",
+          "trace_id",
+          "actor_json",
+          "action",
+          "target_type",
+          "target_id",
+          "before_json",
+          "after_json",
+          "reason",
+          "ip",
+          "user_agent",
+          "occurred_at"
+        ],
+        "explicitIndexes": [
+          "idx_audit_events_action_occurred_at",
+          "idx_audit_events_target_occurred_at"
+        ],
+        "triggers": [
+          "trg_neon_w09_audit_events_immutable_update_delete",
+          "trg_neon_w09_audit_events_immutable_truncate"
+        ],
+        "triggerFunctions": [
+          "neon_w09_d1_03_reject_audit_event_mutation"
+        ],
+        "immutability": "UPDATE, DELETE and TRUNCATE fail with SQLSTATE 55000."
+      },
+      "notification_push_endpoints": {
+        "entity": "NotificationPushEndpoint",
+        "columns": [
+          "endpoint_id",
+          "installation_id",
+          "owner_user_id",
+          "provider",
+          "platform",
+          "push_token",
+          "permission_status",
+          "app_version",
+          "created_at",
+          "updated_at",
+          "last_seen_at"
+        ],
+        "explicitIndexes": [
+          "uq_notification_push_endpoints_provider_token",
+          "ix_notification_push_endpoints_owner_status"
+        ],
+        "constraints": [
+          "installation_id is unique.",
+          "provider is fixed to expo.",
+          "provider + push_token is unique when push_token is present.",
+          "granted requires a token; denied/undetermined requires a null token.",
+          "owner_user_id is a reference only; no cross-domain foreign key is created."
+        ]
+      }
+    },
+    "totals": {
+      "tables": 2,
+      "explicitIndexes": 4,
+      "triggers": 2,
+      "triggerFunctions": 1,
+      "foreignKeys": 0
+    }
+  },
+  "sourceInventory": [
+    {
+      "path": "contracts/schemas/common/audit-event.json",
+      "role": "Canonical AuditEvent field contract",
+      "execution": "Contract source; not SQL."
+    },
+    {
+      "path": "workers/W06-governance/migrations/0001_audit_event.sql",
+      "role": "Legacy Cloudflare D1 compatibility source for the existing W06 runtime path",
+      "execution": "Fingerprint and reconcile semantics only; never execute this SQLite/D1 SQL on Neon."
+    },
+    {
+      "path": "workers/W09-platform/migrations-d1-03/0001_notification_push_endpoints.sql",
+      "role": "W09-owned Cloudflare D1 source schema for NotificationPushEndpoint",
+      "execution": "Fingerprint and reconcile semantics only; never execute this SQLite/D1 SQL on Neon."
+    },
+    {
+      "path": "contracts/persistence/NOTIFY-002-W05-D1-03-PUSH-ENDPOINT-PERSISTENCE.v1.json",
+      "role": "NotificationPushEndpoint owner and W05 scoped access contract",
+      "execution": "Contract source; not SQL."
+    },
+    {
+      "path": "contracts/transport/d1-03-entity-owner-boundary.v1.json",
+      "role": "Frozen D1-03 primary ownership and W05 delegation contract",
+      "execution": "Must identify W09 as AuditEvent and NotificationPushEndpoint primary owner."
+    },
+    {
+      "path": "docs/09-D1-DOMAIN-MASTER-v1.0.md",
+      "role": "Canonical D1 domain owner matrix",
+      "execution": "Must identify W09 as AuditEvent and NotificationPushEndpoint primary owner."
+    }
+  ],
+  "delegation": {
+    "W05": {
+      "primarySchemaOwner": false,
+      "allowedOperations": [
+        "Authenticated self-service endpoint PUT/DELETE",
+        "Owner-scoped active endpoint read",
+        "Conditional invalid-token clearing by exact token hash"
+      ],
+      "contractRefs": [
+        "contracts/persistence/NOTIFY-002-W05-D1-03-PUSH-ENDPOINT-PERSISTENCE.v1.json",
+        "contracts/transport/W05-W09-notification-push-delivery.v1.json"
+      ]
+    }
+  },
+  "deferredOwners": {
+    "W06": {
+      "entities": [
+        "ModerationCase",
+        "ModerationDecision",
+        "Report",
+        "Appeal"
+      ],
+      "status": "NEXT_SCHEMA_SLICE",
+      "sourceDirectory": "workers/W06-governance/migrations",
+      "note": "W06 remains the moderation entity owner; its SQLite/D1 migrations require a separate PostgreSQL-native port."
+    },
+    "W10": {
+      "entities": [
+        "Job",
+        "Retry",
+        "DLQ",
+        "ExecutionInbox",
+        "ExecutionOutbox",
+        "OperationalIdempotency"
+      ],
+      "status": "SOURCE_AND_BINDING_NOT_ADMITTED",
+      "note": "The current W10 Wrangler config has no D1-03 binding or D1-03 migration directory. No W10 tables are invented in this slice."
+    },
+    "W11": {
+      "entities": [
+        "Campaign",
+        "GrowthOperation"
+      ],
+      "status": "SOURCE_AND_BINDING_NOT_ADMITTED",
+      "note": "The current W11 Wrangler config binds only D1-05. Analytics migrations stay in D1-05; no W11 tables are copied into D1-03."
+    }
+  },
+  "safety": {
+    "remoteConnectionAttempted": false,
+    "remoteNeonDdlExecuted": false,
+    "cloudflareD1Touched": false,
+    "workerRuntimeOrBindingsChanged": false,
+    "businessDataImported": false,
+    "productionCutoverAuthorized": false
+  },
+  "nextGate": "A separate reviewed D1-03 schema-source manifest and shared ledger-backed runner must include the W06 owner slice before D1-03 remote apply is eligible."
+}
