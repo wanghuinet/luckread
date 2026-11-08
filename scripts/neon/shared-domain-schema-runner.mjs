@@ -183,12 +183,48 @@ export function validateManifestShape(manifest) {
   }
 
   const expected = manifest.expected ?? {}
-  for (const key of ['tables', 'explicitIndexes', 'triggers', 'triggerFunctions', 'foreignKeys', 'businessRows']) {
+  for (const key of ['tables', 'explicitIndexes', 'triggers', 'triggerFunctions', 'foreignKeys', 'businessRows', 'controlSeedRows']) {
     if (!Number.isSafeInteger(expected[key]) || expected[key] < 0) {
       errors.push('manifest.expected.' + key + ' must be a non-negative integer')
     }
   }
   if (expected.businessRows !== 0) errors.push('schema-only local rehearsal requires zero business rows')
+  const seedRows = manifest.seedRows ?? []
+  if (!Array.isArray(seedRows)) {
+    errors.push('manifest.seedRows must be an explicit array; no implicit seed rows are allowed')
+  } else {
+    const seedTables = new Set()
+    let controlSeedRowCount = 0
+    for (const seed of seedRows) {
+      if (!seed || typeof seed.table !== 'string' ||
+          !/^[A-Za-z_][A-Za-z0-9_$]*$/.test(seed.table) ||
+          seedTables.has(seed.table)) {
+        errors.push('control seed table names must be unique safe SQL identifiers')
+      }
+      if (seed?.kind !== 'SCHEMA_CONTROL_METADATA_NOT_BUSINESS_DATA' ||
+          !allowedOwners.has(seed?.ownerWorker) ||
+          !isSafeRepositoryPath(seed?.sourceContract) ||
+          !Array.isArray(seed?.rows) || seed.rows.length !== 1) {
+        errors.push('each control seed must name one exact admitted schema-control row and its owner contract')
+      }
+      for (const row of seed?.rows ?? []) {
+        if (!row || typeof row !== 'object' || Array.isArray(row) ||
+            Object.keys(row).length === 0 ||
+            Object.entries(row).some(([column, value]) =>
+              !/^[A-Za-z_][A-Za-z0-9_$]*$/.test(column) ||
+              !(value === null || typeof value === 'string' ||
+                typeof value === 'boolean' ||
+                (typeof value === 'number' && Number.isFinite(value))))) {
+          errors.push('control seed rows must contain only safe column identifiers and JSON scalar values')
+        }
+        controlSeedRowCount++
+      }
+      if (typeof seed?.table === 'string') seedTables.add(seed.table)
+    }
+    if (expected.controlSeedRows !== controlSeedRowCount) {
+      errors.push('manifest.expected.controlSeedRows must exactly match the explicit schema-control seed rows')
+    }
+  }
   const sourceMigrationCount = entries.reduce((sum, entry) =>
     sum + (Array.isArray(entry.sourceMigrations) ? entry.sourceMigrations.length : 0), 0)
   if (manifest.sourceMigrationCount !== undefined &&
@@ -343,6 +379,32 @@ export function buildDomainPlan(manifest, {
       fail('cross-domain or unadmitted foreign-key reference is forbidden: ' + reference)
     }
   }
+  const seedRowsByTable = new Map()
+  let controlSeedRows = 0
+  for (const seed of manifest.seedRows ?? []) {
+    if (!allTables.has(seed.table)) fail('control seed names a table outside the domain manifest: ' + seed.table)
+    if (seed.ownerWorker !== sourceOwnerByTable.get(seed.table)) {
+      fail('control seed owner does not match the schema artifact owner: ' + seed.table)
+    }
+    const seedContract = JSON.parse(readText(seed.sourceContract))
+    if (seedContract.target?.domainId !== manifest.domainId ||
+        seedContract.target?.databaseName !== manifest.databaseName ||
+        seedContract.target?.postgresMajor !== 18 ||
+        seedContract.primaryOwner?.worker !== seed.ownerWorker) {
+      fail('control seed source contract target or owner does not match the domain manifest: ' + seed.sourceContract)
+    }
+    const tableContract = seedContract.schema?.tables?.[seed.table]
+    if (tableContract?.seedRowKind !== seed.kind ||
+        canonicalJson(tableContract?.seededControlRow) !== canonicalJson(seed.rows[0])) {
+      fail('control seed does not exactly match the admitted schema-control row: ' + seed.table)
+    }
+    seedRowsByTable.set(seed.table, seed.rows)
+    controlSeedRows += seed.rows.length
+  }
+  if (controlSeedRows !== manifest.expected.controlSeedRows) {
+    fail('control seed row total does not match the reviewed domain manifest')
+  }
+
   const expected = manifest.expected
   if (allTables.size !== expected.tables ||
       allIndexes.size !== expected.explicitIndexes ||
@@ -363,6 +425,8 @@ export function buildDomainPlan(manifest, {
     functions:[...functionNames].sort(),
     references:[...allReferences].sort(),
     sourceOwnerByTable,
+    seedRowsByTable,
+    controlSeedRows,
   }
 }
 
@@ -544,14 +608,258 @@ async function verifyOwnerSchemaState(client, manifest, plan, appliedCount) {
   await verifyPublicSchema(client)
 
   const rowCounts = {}
+  let controlSeedRows = 0
   for (const table of expectedTables) {
     const result = await client.query('SELECT COUNT(*)::bigint AS count FROM public."' +
       table.replace(/"/g,'""') + '"')
     const count = Number(result.rows[0].count)
+    const expectedSeedRows = plan.seedRowsByTable.get(table) ?? []
     rowCounts[table] = count
-    if (count !== 0) fail('business table must remain empty: ' + table)
+    if (count !== expectedSeedRows.length) {
+      if (expectedSeedRows.length === 0) {
+        fail('business table must remain empty: ' + table)
+      }
+      fail('schema-control seed row count differs from its exact manifest: ' + table)
+    }
+    for (const seedRow of expectedSeedRows) {
+      const columns = Object.keys(seedRow)
+      if (columns.length === 0 || columns.some((column) =>
+        !/^[A-Za-z_][A-Za-z0-9_$]*$/.test(column))) {
+        fail('schema-control seed contains an unsafe column identifier: ' + table)
+      }
+      const predicate = columns.map((column, index) =>
+        '"' + column + '" IS NOT DISTINCT FROM 
+
+async function verifyFinalCatalog(client, manifest, plan) {
+  const expectedTables = plan.tables
+  const actualTables = (await actualPublicTables(client)).filter((name) => name !== ledgerTable)
+  if (JSON.stringify(actualTables) !== JSON.stringify(expectedTables)) {
+    fail('final public table set does not match the shared domain manifest')
   }
-  return {tableCount:expectedTables.length,businessTableRowCounts:rowCounts}
+  const indexRows = await client.query(
+    "SELECT indexname FROM pg_catalog.pg_indexes WHERE schemaname='public' ORDER BY indexname",
+  )
+  const actualIndexNames = new Set(indexRows.rows.map((row) => row.indexname))
+  const missingIndexes = plan.indexes.filter((name) => !actualIndexNames.has(name))
+  if (missingIndexes.length) fail('expected explicit indexes are missing: ' + missingIndexes.join(','))
+  if (plan.indexes.length !== manifest.expected.explicitIndexes) {
+    fail('explicit index count differs from the reviewed manifest')
+  }
+
+  const triggerRows = await client.query(
+    "SELECT t.tgname FROM pg_catalog.pg_trigger t JOIN pg_catalog.pg_class c ON c.oid=t.tgrelid JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relname <> $1 AND NOT t.tgisinternal ORDER BY t.tgname",
+    [ledgerTable],
+  )
+  const actualTriggers = triggerRows.rows.map((row) => row.tgname)
+  if (JSON.stringify(actualTriggers) !== JSON.stringify(plan.triggers)) {
+    fail('actual trigger set does not match the ordered migration effects')
+  }
+
+  const functionRows = await client.query(
+    "SELECT p.proname FROM pg_catalog.pg_proc p JOIN pg_catalog.pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public' AND p.prokind='f' AND p.proname <> $1 ORDER BY p.proname",
+    [ledgerFunction],
+  )
+  const actualFunctions = functionRows.rows.map((row) => row.proname)
+  if (JSON.stringify(actualFunctions) !== JSON.stringify(plan.functions)) {
+    fail('actual trigger/function set does not match the ordered migration effects')
+  }
+
+  const foreignKeys = await client.query(
+    "SELECT COUNT(*)::integer AS count FROM pg_catalog.pg_constraint c JOIN pg_catalog.pg_namespace n ON n.oid=c.connamespace WHERE n.nspname='public' AND c.contype='f' AND c.conrelid <> $1::regclass",
+    ['public.' + ledgerTable],
+  )
+  if (Number(foreignKeys.rows[0].count) !== manifest.expected.foreignKeys) {
+    fail('actual same-domain foreign-key count does not match the shared domain manifest')
+  }
+  const indexCount = plan.indexes.length
+  if (indexCount !== manifest.expected.explicitIndexes ||
+      plan.triggers.length !== manifest.expected.triggers ||
+      plan.functions.length !== manifest.expected.triggerFunctions) {
+    fail('final PostgreSQL object counts do not match the reviewed manifest')
+  }
+  return {
+    tables:expectedTables.length,
+    explicitIndexes:indexCount,
+    triggers:plan.triggers.length,
+    triggerFunctions:plan.functions.length,
+    foreignKeys:Number(foreignKeys.rows[0].count),
+    businessRows:0,
+  }
+}
+
+export function parseCommandLine(argv) {
+  if (argv.includes('--remote-neon')) {
+    return {valid:false,reason:'remote Neon execution is deliberately unavailable until the domain-specific independent review and release gate are merged'}
+  }
+  if (argv.length !== 3 || argv[0] !== '--domain' ||
+      !Object.hasOwn(DOMAIN_MANIFESTS,argv[1]) || argv[2] !== '--local-only') {
+    return {valid:false,reason:'select exactly: --domain D1-03|D1-04|D1-05 --local-only'}
+  }
+  return {valid:true,domainId:argv[1]}
+}
+
+async function runDomain(domainId) {
+  const manifest = readJson(DOMAIN_MANIFESTS[domainId])
+  const plan = buildDomainPlan(manifest)
+  const target = validateLocalTarget(process.env.D1_SHARED_LOCAL_DATABASE_URL,manifest)
+  if (!target.valid) fail(target.reason)
+
+  const sourceCommitSha = process.env.GITHUB_SHA || process.env.REHEARSAL_SOURCE_COMMIT_SHA
+  if (!SHA.test(sourceCommitSha || '')) fail('an exact source commit SHA is required for migration provenance')
+  const executionId = 'local-' + (process.env.GITHUB_RUN_ID || 'manual') + '-' +
+    (process.env.GITHUB_RUN_ATTEMPT || '1') + '-' + process.pid
+
+  const { Pool } = requireFromW02('pg')
+  const pool = new Pool({
+    connectionString:process.env.D1_SHARED_LOCAL_DATABASE_URL,
+    max:2,
+    connectionTimeoutMillis:15000,
+    idleTimeoutMillis:1000,
+  })
+  let lockClient
+  let client
+  let lockOpen = false
+  try {
+    lockClient = await pool.connect()
+    await lockClient.query('BEGIN')
+    lockOpen = true
+    const identity = await lockClient.query(
+      "SELECT current_database() AS database_name,current_setting('server_version_num')::integer AS version_num",
+    )
+    const major = Math.floor(Number(identity.rows[0]?.version_num) / 10000)
+    if (identity.rows[0]?.database_name !== manifest.localRehearsal.databaseName || major !== 18) {
+      fail('connected database must be the exact disposable PostgreSQL 18 target')
+    }
+    await lockClient.query(
+      "SELECT pg_advisory_xact_lock(hashtextextended('luckread:neon-schema-migration:' || current_database(),0))",
+    )
+
+    client = await pool.connect()
+    await ensureLedger(client)
+    let ledgerRows = await readLedgerRows(client)
+    let appliedEntries = assertLedgerPrefixRows(manifest,plan,ledgerRows)
+    await verifyOwnerSchemaState(client,manifest,plan,appliedEntries.length)
+
+    for (const item of plan.entries.slice(appliedEntries.length)) {
+      for (const dependency of item.entry.dependsOn ?? []) {
+        if (!appliedEntries.some((entry) => entry.migrationId === dependency)) {
+          fail('migration dependency has not been committed: ' + dependency)
+        }
+      }
+      await client.query('BEGIN')
+      try {
+        await client.query(item.body)
+        await insertLedgerRow(client,manifest,item,sourceCommitSha,executionId)
+        await client.query('COMMIT')
+      } catch (error) {
+        try { await client.query('ROLLBACK') } catch {}
+        throw error
+      }
+      appliedEntries = [...appliedEntries,item.entry]
+      ledgerRows = await readLedgerRows(client)
+      assertLedgerPrefixRows(manifest,plan,ledgerRows)
+      await verifyOwnerSchemaState(client,manifest,plan,appliedEntries.length)
+    }
+
+    const finalRows = await readLedgerRows(client)
+    assertLedgerPrefixRows(manifest,plan,finalRows)
+    if (finalRows.length !== plan.entries.length) fail('shared schema executor did not commit every migration')
+    const catalog = await verifyFinalCatalog(client,manifest,plan)
+    const report = {
+      reportType:'NEON_SHARED_DOMAIN_SCHEMA_LOCAL_POSTFLIGHT',
+      status:'LOCAL_SCHEMA_ONLY_APPLY_PASS',
+      domainId:manifest.domainId,
+      databaseName:manifest.databaseName,
+      localDatabaseName:manifest.localRehearsal.databaseName,
+      postgresMajor:18,
+      sourceCommitSha,
+      runnerVersion,
+      appliedMigrations:finalRows.map((row) => ({
+        ownerWorker:row.owner_worker,
+        migrationId:row.migration_id,
+        migrationOrder:Number(row.migration_order),
+        migrationKind:row.migration_kind,
+        artifactSha256:row.artifact_sha256,
+        manifestEntrySha256:row.manifest_entry_sha256,
+        sourceCommitSha:row.source_commit_sha,
+      })),
+      catalog,
+      safety:{
+        remoteNeonTouched:false,
+        cloudflareD1Touched:false,
+        businessDataImported:false,
+        runtimeBindingsChanged:false,
+        productionCutoverAuthorized:false,
+      },
+      remoteApplyReady:false,
+      remoteApplyBlockers:manifest.remoteApplyBlockers,
+    }
+    const output = process.env.D1_SHARED_SCHEMA_APPLY_REPORT ||
+      'artifacts/neon/' + manifest.domainId.toLowerCase() + '-shared-runner-postflight.json'
+    if (!isSafeRepositoryPath(output)) fail('postflight report path must remain inside the repository')
+    mkdirSync(dirname(resolve(repositoryRoot,output)),{recursive:true})
+    writeFileSync(resolve(repositoryRoot,output),JSON.stringify(report,null,2)+'\n')
+    process.stdout.write('NEON_SHARED_DOMAIN_SCHEMA_LOCAL_PASS ' + JSON.stringify({
+      domainId:manifest.domainId,
+      databaseName:manifest.databaseName,
+      postgresMajor:18,
+      migrations:finalRows.length,
+      tables:catalog.tables,
+      explicitIndexes:catalog.explicitIndexes,
+      triggers:catalog.triggers,
+      triggerFunctions:catalog.triggerFunctions,
+      foreignKeys:catalog.foreignKeys,
+      businessRows:catalog.businessRows,
+      remoteNeonTouched:false,
+      cloudflareD1Touched:false,
+      remoteApplyReady:false,
+    })+'\n')
+  } finally {
+    if (client) client.release()
+    if (lockClient) {
+      if (lockOpen) {
+        try { await lockClient.query('ROLLBACK') } catch {}
+      }
+      lockClient.release()
+    }
+    await pool.end()
+  }
+}
+
+async function run() {
+  const selection = parseCommandLine(process.argv.slice(2))
+  if (!selection.valid) fail(selection.reason)
+  await runDomain(selection.domainId)
+}
+
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  run().catch((error) => {
+    process.stderr.write((error instanceof Error ? error.message : String(error)) + '\n')
+    process.exitCode = 1
+  })
+}
+ + (index + 1),
+      ).join(' AND ')
+      const matched = await client.query(
+        'SELECT COUNT(*)::bigint AS count FROM public."' +
+          table.replace(/"/g,'""') + '" WHERE ' + predicate,
+        columns.map((column) => seedRow[column]),
+      )
+      if (Number(matched.rows[0].count) !== 1) {
+        fail('schema-control seed row does not match the exact admitted values: ' + table)
+      }
+      controlSeedRows++
+    }
+  }
+  if (controlSeedRows !== manifest.expected.controlSeedRows) {
+    fail('actual schema-control seed row count does not match the reviewed manifest')
+  }
+  return {
+    tableCount:expectedTables.length,
+    tableRowCounts:rowCounts,
+    controlSeedRows,
+    businessRows:0,
+  }
 }
 
 async function verifyFinalCatalog(client, manifest, plan) {
