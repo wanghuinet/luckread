@@ -17,7 +17,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: neon-d1-01-w07-membership-schema-\${{ github.event.pull_request.number }}
+  group: neon-d1-01-w07-membership-schema-${{ github.event.pull_request.number }}
   cancel-in-progress: false
 
 jobs:
@@ -88,7 +88,7 @@ jobs:
       - name: Upload W07 PostgreSQL schema evidence
         uses: actions/upload-artifact@v4
         with:
-          name: neon-d1-01-w07-membership-postgres-schema-\${{ github.sha }}
+          name: neon-d1-01-w07-membership-postgres-schema-${{ github.sha }}
           path: workers/W07-subscription-commerce/artifacts/neon/w07-d1-01-membership-postgres-schema-postflight.json
           if-no-files-found: error
           retention-days: 90
