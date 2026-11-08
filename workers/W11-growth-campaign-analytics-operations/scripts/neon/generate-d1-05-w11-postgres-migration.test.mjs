@@ -22,6 +22,8 @@ test('generates the exact W11 D1-05 six-table PostgreSQL 18 baseline', () => {
   )
   assert.match(result.sql, /CREATE TABLE analytics_event_dedupe/)
   assert.match(result.sql, /CREATE TABLE analytics_projection_rebuild_state/)
+  assert.match(result.sql, /hour_start TEXT COLLATE "C"/)
+  assert.match(result.sql, /window_from TEXT COLLATE "C"/)
   assert.doesNotMatch(result.sql, /CREATE TABLE (?:campaigns|growth_operations)/i)
   assert.doesNotMatch(result.sql, /\b(?:actor_id|visitor_id|session_id)\b/i)
 })
