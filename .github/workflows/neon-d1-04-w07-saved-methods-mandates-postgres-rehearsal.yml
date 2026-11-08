@@ -66,6 +66,9 @@ jobs:
         with:
           node-version: 24
 
+      - name: Prepare rehearsal evidence directory
+        run: mkdir -p artifacts/neon
+
       - name: Run existing offline D1-04 source regression suite
         run: python3 workers/W07-subscription-commerce/scripts/test_order_d1_04_migration.py
 
