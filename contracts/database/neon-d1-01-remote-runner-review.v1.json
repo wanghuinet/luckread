@@ -39,7 +39,7 @@
       },
       {
         "path": "scripts/neon/remote-runner-review.mjs",
-        "gitBlobSha1": "e9fde653734cfbd15c2f1ad7c0521e3f9013b72b"
+        "gitBlobSha1": "149fc4b626d89b553c451513f1a7892ed84ca045"
       },
       {
         "path": "scripts/neon/remote-runner-review.test.mjs",
