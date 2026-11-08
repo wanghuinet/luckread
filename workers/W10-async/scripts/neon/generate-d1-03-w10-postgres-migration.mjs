@@ -39,6 +39,14 @@ function digest(value) {
   return createHash('sha256').update(value, 'utf8').digest('hex')
 }
 
+function extractCreateTable(sql, tableName) {
+  const pattern = new RegExp(
+    String.raw`CREATE TABLE (?:IF NOT EXISTS )?${tableName}\\s*\\(([\\s\\S]*?)\\n\\);`,
+    'i',
+  )
+  return pattern.exec(sql)?.[1] ?? null
+}
+
 export function buildD103W10Migration({
   readSource = (relativePath) => {
     try {
@@ -104,7 +112,25 @@ export function buildD103W10Migration({
   if (/CREATE TABLE IF NOT EXISTS (audit_events|notification_push_endpoints|moderation_cases|moderation_reports)\b/i.test(d1Migration)) {
     throw new Error('W10 source must not create W06/W09-owned D1-03 entities')
   }
-  if (/\b(payload_json|raw_payload|private_message|payment_credential|access_token)\b/i.test(d1Migration)) {
+  const dlqMetadataColumns = [
+    'event_type', 'schema_version', 'producer', 'resource_type', 'resource_id',
+    'occurred_at', 'published_at', 'idempotency_key', 'source_version',
+    'correlation_id', 'causation_id',
+  ]
+  const d1Dlq = extractCreateTable(d1Migration, 'execution_dead_letters')
+  const postgresDlq = extractCreateTable(template, 'execution_dead_letters')
+  if (!d1Dlq || !postgresDlq) throw new Error('W10 DLQ source and PostgreSQL translation must both exist')
+  for (const column of dlqMetadataColumns) {
+    const columnPattern = new RegExp('^\\\\s*' + column + '\\\\s+', 'm')
+    if (!columnPattern.test(d1Dlq) || !columnPattern.test(postgresDlq)) {
+      throw new Error('W10 DLQ allowlisted event metadata column is missing: ' + column)
+    }
+  }
+  if (/original_event_metadata_json|metadata_json/i.test(d1Dlq) ||
+      /original_event_metadata_json|metadata_json/i.test(postgresDlq)) {
+    throw new Error('W10 DLQ must not persist arbitrary JSON event metadata')
+  }
+  if (/\\b(payload_json|raw_payload|private_message|payment_credential|access_token)\\b/i.test(d1Migration)) {
     throw new Error('W10 execution metadata must not persist raw/sensitive payload columns')
   }
   for (const sourcePath of sourcePaths) {
