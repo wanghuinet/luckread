@@ -284,12 +284,17 @@ export function verifyD104SharedRunnerReview({ readSource = readText } = {}) {
       fail('W07 slice source migration does not match its schema contract: ' + contractPaths[index])
     }
     allSourcePaths.push(...entrySources)
-    if (contract.localRehearsalEvidence?.postgresVersion !== '18.6' ||
-        !Number.isSafeInteger(contract.localRehearsalEvidence?.workflowRunId) ||
-        contract.localRehearsalEvidence?.remoteNeonTouched === true ||
-        contract.localRehearsalEvidence?.cloudflareD1Touched === true ||
-        contract.localRehearsalEvidence?.businessDataImported === true ||
-        contract.localRehearsalEvidence?.productionCutoverAuthorized === true) {
+    const sliceEvidence = contract.verification?.localRehearsalEvidence
+    if (sliceEvidence?.postgresVersion !== '18.6' ||
+        !Number.isSafeInteger(sliceEvidence?.workflowRunId) ||
+        contract.safety?.remoteNeonDdlExecuted !== false ||
+        contract.safety?.cloudflareD1Touched !== false ||
+        contract.safety?.businessDataImported !== false ||
+        contract.safety?.productionCutoverAuthorized !== false ||
+        sliceEvidence?.remoteNeonTouched === true ||
+        sliceEvidence?.cloudflareD1Touched === true ||
+        sliceEvidence?.businessDataImported === true ||
+        sliceEvidence?.productionCutoverAuthorized === true) {
       fail('W07 slice evidence must remain local-only and empty-data: ' + contractPaths[index])
     }
   }
