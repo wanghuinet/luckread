@@ -70,38 +70,22 @@ const makeEntry = (sessionId, eventSuffix, overrides = {}) => {
 const insertEntry = (entry) => pool.query(
   'INSERT INTO auth_010_session_revocation_journal ' +
     '(journal_id, event_id, event_type, schema_version, resource_id, source_version, ' +
-    'idempotency_key, payload, created_at' +
-    (entry.status === undefined ? '' : ', status') +
-    (entry.attempt === undefined ? '' : ', attempt') +
-    (entry.nextAttemptAt === undefined ? '' : ', next_attempt_at') +
-    (entry.publishedAt === undefined ? '' : ', published_at') +
-    (entry.lastErrorCode === undefined ? '' : ', last_error_code') +
-    ') VALUES (' +
-    [
-      '$1', '$2', '$3', '$4', '$5', '$6', '$7', '$8', '$9',
-      ...(entry.status === undefined ? [] : ['$10']),
-      ...(entry.attempt === undefined ? [] : ['$' + (entry.status === undefined ? 10 : 11)]),
-      ...(entry.nextAttemptAt === undefined ? [] : ['$' + (9 +
-        (entry.status === undefined ? 0 : 1) +
-        (entry.attempt === undefined ? 0 : 1) + 1)]),
-      ...(entry.publishedAt === undefined ? [] : ['$' + (9 +
-        (entry.status === undefined ? 0 : 1) +
-        (entry.attempt === undefined ? 0 : 1) +
-        (entry.nextAttemptAt === undefined ? 0 : 1) + 1)]),
-      ...(entry.lastErrorCode === undefined ? [] : ['$' + (9 +
-        (entry.status === undefined ? 0 : 1) +
-        (entry.attempt === undefined ? 0 : 1) +
-        (entry.nextAttemptAt === undefined ? 0 : 1) +
-        (entry.publishedAt === undefined ? 0 : 1) + 1)]),
-    ].join(', ') + ')',
+    'idempotency_key, payload, status, attempt, next_attempt_at, created_at, published_at, last_error_code) ' +
+    'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)',
+  [
+    entry.journalId, entry.eventId, entry.eventType, entry.schemaVersion, entry.resourceId,
+    entry.sourceVersion, entry.idempotencyKey, entry.payload,
+    entry.status ?? 'PENDING', entry.attempt ?? 1, entry.nextAttemptAt ?? null,
+    entry.createdAt, entry.publishedAt ?? null, entry.lastErrorCode ?? null,
+  ],
+)
+const insertDefaultEntry = (entry) => pool.query(
+  'INSERT INTO auth_010_session_revocation_journal ' +
+    '(journal_id, event_id, event_type, schema_version, resource_id, source_version, ' +
+    'idempotency_key, payload, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
   [
     entry.journalId, entry.eventId, entry.eventType, entry.schemaVersion, entry.resourceId,
     entry.sourceVersion, entry.idempotencyKey, entry.payload, entry.createdAt,
-    ...(entry.status === undefined ? [] : [entry.status]),
-    ...(entry.attempt === undefined ? [] : [entry.attempt]),
-    ...(entry.nextAttemptAt === undefined ? [] : [entry.nextAttemptAt]),
-    ...(entry.publishedAt === undefined ? [] : [entry.publishedAt]),
-    ...(entry.lastErrorCode === undefined ? [] : [entry.lastErrorCode]),
   ],
 )
 
@@ -188,7 +172,7 @@ try {
     'session audit journal must not create a second Session table or foreign-key into session storage')
 
   const validA = makeEntry(sessionA, suffix)
-  const saved = await insertEntry(validA.entry)
+  const saved = await insertDefaultEntry(validA.entry)
   assert(saved.rowCount === 1, 'canonical session-revoked event insert must succeed')
 
   const defaultRow = await pool.query(
