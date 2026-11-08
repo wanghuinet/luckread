@@ -112,8 +112,8 @@ jobs:
           const target = validateRemoteNeonTarget(raw)
           if (!target.valid) throw new Error(target.reason)
           const verified = enforceVerifiedNeonConnectionString(raw)
-          process.stdout.write('::add-mask::' + verified + '\\n')
-          process.stdout.write('NEON_DATABASE_URL_LUCKREADPRO_VERIFIED=' + verified + '\\n')
+          process.stdout.write('::add-mask::' + verified + '\n')
+          process.stdout.write('NEON_DATABASE_URL_LUCKREADPRO_VERIFIED=' + verified + '\n')
           NODE
 
       - name: Apply W03 then W05 using the immutable D1-02 ledger runner
@@ -135,7 +135,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install --yes postgresql-client
           test -s /etc/ssl/certs/ca-certificates.crt
-          printf 'PGSSLROOTCERT=%s\\n' /etc/ssl/certs/ca-certificates.crt >> "$GITHUB_ENV"
+          printf 'PGSSLROOTCERT=%s\n' /etc/ssl/certs/ca-certificates.crt >> "$GITHUB_ENV"
           psql --version
 
       - name: Verify the full D1-02 PostgreSQL 18 catalog and rollback-only semantics
