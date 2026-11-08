@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import { readFileSync, statSync } from 'node:fs'
 import { dirname, isAbsolute, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { validateRemoteRunnerReview } from './remote-runner-review.mjs'
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 const manifestPath = resolve(repositoryRoot, 'contracts/database/neon-d1-01-migration-manifest.v1.json')
@@ -44,11 +45,33 @@ const validHex = (value, length) => typeof value === 'string' && new RegExp('^[0
 const isSafeRepositoryPath = (path) => typeof path === 'string' &&
   path.startsWith('workers/') && !isAbsolute(path) && !path.split(/[\\/]/).includes('..')
 
+const releaseBlocked =
+  manifest.remoteApplyReady === false &&
+  manifest.execution?.remoteApplyReady === false &&
+  manifest.execution?.runnerStatus === 'NOT_IMPLEMENTED' &&
+  ledgerContract.remoteApplyReady === false &&
+  ledgerContract.execution?.remoteApplyReady === false &&
+  ledgerContract.execution?.runnerStatus === 'NOT_IMPLEMENTED'
+const releaseReady =
+  manifest.remoteApplyReady === true &&
+  manifest.execution?.remoteApplyReady === true &&
+  manifest.execution?.runnerStatus === 'IMPLEMENTED_AND_REVIEWED' &&
+  ledgerContract.remoteApplyReady === true &&
+  ledgerContract.execution?.remoteApplyReady === true &&
+  ledgerContract.execution?.runnerStatus === 'IMPLEMENTED_AND_REVIEWED'
 if (manifest.domainId !== 'D1-01' || manifest.databaseName !== 'luckread' ||
     manifest.postgresMajor !== 18 || manifest.businessDataImport !== false ||
-    manifest.productionCutoverAuthorized !== false || manifest.remoteApplyReady !== false ||
-    manifest.execution?.runnerStatus !== 'NOT_IMPLEMENTED' || manifest.execution?.remoteApplyReady !== false) {
-  fail('manifest target or schema-only authorization drift')
+    manifest.productionCutoverAuthorized !== false || (!releaseBlocked && !releaseReady)) {
+  fail('manifest target, schema-only authorization or shared release-gate consistency drift')
+}
+if (releaseReady) {
+  const reviewRef = 'contracts/database/neon-d1-01-remote-runner-review.v1.json'
+  if (manifest.execution?.reviewEvidenceRef !== reviewRef ||
+      ledgerContract.execution?.reviewEvidenceRef !== reviewRef) {
+    fail('both release contracts must reference the same reviewed remote runner evidence')
+  }
+  const review = validateRemoteRunnerReview({ root: repositoryRoot })
+  if (!review.valid) fail('remote runner review evidence is invalid: ' + review.errors.join('; '))
 }
 const inventory = JSON.parse(readFileSync(
   resolve(repositoryRoot, 'contracts/database/neon-d1-01-schema-sources.v1.json'), 'utf8'
@@ -58,6 +81,7 @@ const bootstrap = JSON.parse(readFileSync(
 ))
 const w01Package = JSON.parse(readFileSync(resolve(repositoryRoot, 'workers/W01-payload/package.json'), 'utf8'))
 const w02Package = JSON.parse(readFileSync(resolve(repositoryRoot, 'workers/W02-identity/package.json'), 'utf8'))
+const ledgerContract = JSON.parse(readFileSync(resolve(repositoryRoot, 'contracts/database/neon-schema-migration-ledger.v1.json'), 'utf8'))
 const d1Domain = bootstrap.domains?.find((domain) => domain.domainId === 'D1-01')
 const inventoryOwners = inventory.owners?.map((owner) => owner.worker).filter((worker) =>
   ['W01', 'W02', 'W07', 'W08'].includes(worker)
