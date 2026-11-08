@@ -115,6 +115,35 @@ test('releases only D1-01 when its review is valid and keeps the other four doma
   wrongReview.execution.reviewEvidenceRef = 'contracts/other-review.json'
   assert.equal(isRemoteApplyReleased(wrongReview, ledger), false)
 })
+test('keeps D1-01 available when D1-02 is independently reviewed and released', () => {
+  const d1Review = 'contracts/database/neon-d1-01-remote-runner-review.v1.json'
+  const d2Review = 'contracts/database/neon-d1-02-remote-runner-review.v1.json'
+  const d1Manifest = {
+    remoteApplyReady: true,
+    execution: { runnerStatus: 'IMPLEMENTED_AND_REVIEWED', remoteApplyReady: true, reviewEvidenceRef: d1Review },
+  }
+  const ledger = {
+    remoteApplyReady: false,
+    execution: {
+      runnerStatus: 'IMPLEMENTED_FOR_D1_01_AND_D1_02_ONLY',
+      remoteApplyReady: false,
+      domainReadiness: {
+        'D1-01': { runnerStatus: 'IMPLEMENTED_AND_REVIEWED', remoteApplyReady: true, reviewEvidenceRef: d1Review },
+        'D1-02': { runnerStatus: 'IMPLEMENTED_AND_REVIEWED', remoteApplyReady: true, reviewEvidenceRef: d2Review },
+        'D1-03': { runnerStatus: 'NOT_IMPLEMENTED', remoteApplyReady: false },
+        'D1-04': { runnerStatus: 'NOT_IMPLEMENTED', remoteApplyReady: false },
+        'D1-05': { runnerStatus: 'NOT_IMPLEMENTED', remoteApplyReady: false },
+      },
+    },
+  }
+  assert.equal(isRemoteApplyReleased(d1Manifest, ledger), true)
+  const missingReview = structuredClone(ledger)
+  delete missingReview.execution.domainReadiness['D1-02'].reviewEvidenceRef
+  assert.equal(isRemoteApplyReleased(d1Manifest, missingReview), false)
+  const globalReady = structuredClone(ledger)
+  globalReady.remoteApplyReady = true
+  assert.equal(isRemoteApplyReleased(d1Manifest, globalReady), false)
+})
 test('strips only an exact outer BEGIN/COMMIT wrapper', () => {
   const sql = '-- generated schema\n\nBEGIN;\nCREATE TABLE demo (id TEXT);\nCOMMIT;\n'
   assert.equal(stripOuterTransaction(sql, 'demo'), '-- generated schema\n\n\nCREATE TABLE demo (id TEXT);')
