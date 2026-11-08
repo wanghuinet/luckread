@@ -439,7 +439,7 @@ async function run() {
     }
     const ledgerReportPath = resolve(repositoryRoot, 'artifacts/neon/d1-01-ledger-postflight.json')
     mkdirSync(dirname(ledgerReportPath), { recursive: true })
-    writeFileSync(ledgerReportPath, JSON.stringify(ledgerEvidence, null, 2) + '\\n')
+    writeFileSync(ledgerReportPath, JSON.stringify(ledgerEvidence, null, 2) + '\n')
     process.stdout.write(JSON.stringify({
       status: 'D1_01_SHARED_LOCAL_SCHEMA_RUNNER_PASS',
       target: { database: 'luckread_schema', postgresMajor: major },
