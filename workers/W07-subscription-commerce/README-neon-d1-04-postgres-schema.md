@@ -15,10 +15,8 @@ The first slice is deliberately not a general finance database. It does not crea
 
 ## Deferred D1-04 source migrations
 
-The following existing migrations are deferred to separate bounded PostgreSQL schema slices:
+The following remaining source migrations are deferred to separate bounded PostgreSQL schema slices:
 
-- `0003_saved_payment_methods_mandates.sql`
-- `0004_subscription_renewal_cycles.sql`
 - `0005_revenuecat_webhook_inbox.sql`
 - `0006_refunds_billing_documents.sql`
 - `0007_payment_method_revocation_requests.sql`
@@ -63,4 +61,28 @@ Important invariants preserved:
 
 The local PostgreSQL 18.6 workflow applies the already-admitted first slice, runs its predecessor postflight, applies PAY-003, exercises positive and negative lifecycle cases in rollback-only transactions, and confirms zero fixture rows remain.
 
-The remaining D1-04 slices (`0004` renewal cycles, `0005` RevenueCat inbox, `0006` refunds/billing, and `0007` payment-method revocation) remain deferred. This PR does not change the reviewed D1-04 remote runner or execute any remote database operation.
+The remaining D1-04 slices (`0005` RevenueCat inbox, `0006` refunds/billing, and `0007` payment-method revocation) remain deferred. This PR does not change the reviewed D1-04 remote runner or execute any remote database operation.
+
+
+## PAY-004 subscription renewal cycles — third D1-04 slice
+
+The additive PostgreSQL migration \`0003_w07_d1_04_renewal_cycles.sql\` translates only source migration \`0004_subscription_renewal_cycles.sql\` and adds:
+
+- \`subscription_renewal_cycles\`: immutable recurring-cycle identity, authoritative pricing snapshot, Order/Payment binding, MIT method/mandate reference, execution lease and provider-outcome synchronization state.
+- \`subscription_renewal_scheduler_state\`: one retained scheduler cursor singleton. Its seed row is schema control metadata, not imported user or business data.
+
+This slice adds **2 tables, 4 explicit indexes, 13 source-semantic triggers, one trigger function and zero foreign keys**. Cumulative D1-04 schema after slices 0001–0003 is **10 tables, 22 explicit indexes, 49 triggers, three trigger functions and zero foreign keys**.
+
+Important invariants preserved:
+
+- A cycle starts only in \`AWAITING_PRICING\`; the offer and resolved pricing snapshots become immutable.
+- A cycle cannot bind to an Order, OrderLine or Payment whose customer, plan, interval, currency, amount or cycle boundaries differ.
+- \`PAYMENT_READY\` and \`SUBMITTING\` require a provider-confirmed ACTIVE mandate joined to the same customer's saved payment method.
+- \`SUBMITTING\` requires a lease token and expiry; version CAS and strictly increasing update timestamps protect cycle and scheduler transitions.
+- Provider-confirmed terminal cycle outcomes precede subscription-outcome synchronization. D1-04 never grants entitlements; subscription authority remains D1-01.
+- W07 remains the D1-04 business authority. W10 is orchestration-only and does not read/write D1-01 or D1-04.
+- Cycle and scheduler audit/control records are retained; the scheduler seed is restored by rollback while all business fixture rows return to zero.
+
+The PostgreSQL 18.6 rehearsal applies the two already-admitted predecessor slices before PAY-004, runs the complete offline D1-04 source regression suite, checks the cumulative catalog, exercises positive and negative state-machine cases, and confirms rollback. Workflow evidence is recorded in the cumulative schema contract.
+
+The remaining D1-04 slices are \`0005_revenuecat_webhook_inbox.sql\`, \`0006_refunds_billing_documents.sql\` and \`0007_payment_method_revocation_requests.sql\`; each remains a separate, bounded local PostgreSQL 18 rehearsal. No remote Neon DDL, Cloudflare D1 write, business data import or production cutover is authorized.

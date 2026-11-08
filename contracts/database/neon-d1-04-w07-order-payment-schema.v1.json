@@ -1,9 +1,9 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://luckread.com/contracts/database/neon-d1-04-w07-order-payment-schema.v1.json",
-  "title": "LuckRead D1-04 W07 Order and Payment PostgreSQL Schema Slice",
+  "title": "LuckRead D1-04 W07 Cumulative Finance PostgreSQL Schema",
   "version": "1.0.0",
-  "status": "W07_D1_04_ORDER_PAYMENT_AND_SAVED_METHODS_MANDATES_LOCAL_POSTGRES18_REHEARSAL_PASSED_REMAINING_FINANCE_MODULES_PENDING",
+  "status": "W07_D1_04_ORDER_PAYMENT_SAVED_METHODS_MANDATES_AND_RENEWAL_CYCLES_LOCAL_POSTGRES18_REHEARSAL_PASSED_REMAINING_FINANCE_SLICES_PENDING",
   "target": {
     "domainId": "D1-04",
     "databaseName": "luckread_finance",
@@ -35,7 +35,8 @@
     "includedSourceMigrations": [
       "workers/W07-subscription-commerce/migrations-d1-04/0001_order_commerce.sql",
       "workers/W07-subscription-commerce/migrations-d1-04/0002_payment_provider_events.sql",
-      "workers/W07-subscription-commerce/migrations-d1-04/0003_saved_payment_methods_mandates.sql"
+      "workers/W07-subscription-commerce/migrations-d1-04/0003_saved_payment_methods_mandates.sql",
+      "workers/W07-subscription-commerce/migrations-d1-04/0004_subscription_renewal_cycles.sql"
     ],
     "includedTables": [
       "orders",
@@ -45,18 +46,18 @@
       "payment_provider_events",
       "payment_provider_event_conflicts",
       "saved_payment_methods",
-      "payment_mandates"
+      "payment_mandates",
+      "subscription_renewal_cycles",
+      "subscription_renewal_scheduler_state"
     ],
     "deferredTables": [
-      "subscription_renewal_cycles",
-      "subscription_renewal_scheduler_state",
       "revenuecat_webhook_events",
       "revenuecat_webhook_event_conflicts",
       "refunds",
       "billing_documents",
       "payment_method_revocation_requests"
     ],
-    "deferredScopeNote": "These seven tables are admitted by later W07 D1-04 migrations 0004 through 0007. They remain separate PostgreSQL-native slices with their own local rehearsals.",
+    "deferredScopeNote": "The five remaining finance tables are admitted by W07 D1-04 source migrations 0005 through 0007. They remain separate PostgreSQL-native slices with their own local rehearsals.",
     "excludedTables": [
       "entitlements",
       "ledger_entries",
@@ -64,7 +65,7 @@
       "users",
       "media"
     ],
-    "tableCount": 8
+    "tableCount": 10
   },
   "schema": {
     "tables": {
@@ -157,6 +158,56 @@
           "FAILED",
           "EXPIRED"
         ]
+      },
+      "subscription_renewal_cycles": {
+        "source": "0004_subscription_renewal_cycles.sql",
+        "primaryKey": "cycle_id",
+        "indexes": [
+          "ux_subscription_renewal_cycles_subscription_cycle",
+          "ux_subscription_renewal_cycles_payment",
+          "ix_subscription_renewal_cycles_state_updated",
+          "ix_subscription_renewal_cycles_subscriber_cycle"
+        ],
+        "triggerCount": 10,
+        "lifecycleStates": [
+          "AWAITING_PRICING",
+          "AWAITING_MANDATE",
+          "PREPARED",
+          "PAYMENT_READY",
+          "SUBMITTING",
+          "SUBMITTED",
+          "SUCCEEDED",
+          "FAILED",
+          "RECONCILIATION_REQUIRED"
+        ],
+        "immutableSnapshots": [
+          "cycle identity",
+          "offer_snapshot_json",
+          "resolved amount_minor",
+          "pricing_snapshot_json",
+          "payment_method_id",
+          "mandate_record_id"
+        ],
+        "requiresActiveMandateFor": [
+          "PAYMENT_READY",
+          "SUBMITTING"
+        ],
+        "subscriptionEntitlementAuthority": "D1-01"
+      },
+      "subscription_renewal_scheduler_state": {
+        "source": "0004_subscription_renewal_cycles.sql",
+        "primaryKey": "state_id",
+        "indexes": [],
+        "triggerCount": 3,
+        "singletonId": "subscription-renewals",
+        "seededControlRow": {
+          "state_id": "subscription-renewals",
+          "cursor_period_end": null,
+          "cursor_subscription_id": null,
+          "version": 1,
+          "updated_at": "1970-01-01T00:00:00.000Z"
+        },
+        "seedRowKind": "SCHEMA_CONTROL_METADATA_NOT_BUSINESS_DATA"
       }
     },
     "explicitIndexNames": [
@@ -177,7 +228,11 @@
       "ix_saved_payment_methods_customer_created",
       "ux_payment_mandates_provider_mandate_id",
       "ix_payment_mandates_customer_status_created",
-      "ix_payment_mandates_method_status"
+      "ix_payment_mandates_method_status",
+      "ux_subscription_renewal_cycles_subscription_cycle",
+      "ux_subscription_renewal_cycles_payment",
+      "ix_subscription_renewal_cycles_state_updated",
+      "ix_subscription_renewal_cycles_subscriber_cycle"
     ],
     "triggerNames": [
       "orders_commercial_snapshot_immutable",
@@ -215,13 +270,26 @@
       "payment_mandates_transition_guard",
       "payment_mandates_provider_id_immutable",
       "payment_mandates_provider_timestamp_monotonic",
-      "payment_mandates_retained"
+      "payment_mandates_retained",
+      "subscription_renewal_cycles_initial_state_guard",
+      "subscription_renewal_cycles_identity_immutable",
+      "subscription_renewal_cycles_resolved_snapshot_immutable",
+      "subscription_renewal_cycles_version_guard",
+      "subscription_renewal_cycles_state_transition_guard",
+      "subscription_renewal_cycles_sync_state_transition_guard",
+      "subscription_renewal_cycles_order_binding_guard",
+      "subscription_renewal_cycles_payment_binding_guard",
+      "subscription_renewal_cycles_requires_active_mandate",
+      "subscription_renewal_cycles_retained",
+      "subscription_renewal_scheduler_state_identity_immutable",
+      "subscription_renewal_scheduler_state_version_guard",
+      "subscription_renewal_scheduler_state_retained"
     ],
     "totals": {
-      "tables": 8,
-      "explicitIndexes": 18,
-      "triggers": 36,
-      "triggerFunctions": 2,
+      "tables": 10,
+      "explicitIndexes": 22,
+      "triggers": 49,
+      "triggerFunctions": 3,
       "foreignKeys": 0
     },
     "cumulativeSlices": [
@@ -233,6 +301,17 @@
         "tables": 2,
         "explicitIndexes": 4,
         "triggers": 12,
+        "triggerFunctions": 1,
+        "foreignKeys": 0
+      },
+      {
+        "migrationId": "0003_w07_d1_04_renewal_cycles",
+        "source": "workers/W07-subscription-commerce/migrations-d1-04/0004_subscription_renewal_cycles.sql",
+        "contract": "contracts/database/neon-d1-04-w07-renewal-cycles-schema.v1.json",
+        "status": "LOCAL_POSTGRES18_REHEARSAL_PASSED",
+        "tables": 2,
+        "explicitIndexes": 4,
+        "triggers": 13,
         "triggerFunctions": 1,
         "foreignKeys": 0
       }
@@ -251,6 +330,13 @@
         "triggers": 12,
         "triggerFunctions": 1,
         "foreignKeys": 0
+      },
+      "renewalCycles": {
+        "tables": 2,
+        "explicitIndexes": 4,
+        "triggers": 13,
+        "triggerFunctions": 1,
+        "foreignKeys": 0
       }
     }
   },
@@ -260,7 +346,8 @@
     "json": "Keep JSON text snapshots as TEXT with PostgreSQL JSONB type checks where the source requires JSON validity/object shape. Keep response_json as TEXT with validity check.",
     "partialUnique": "Preserve ux_payments_single_live_or_successful_per_order as a PostgreSQL partial unique index.",
     "relationships": "Preserve source trigger-enforced logical relations. Do not add foreign keys; the source regression suite explicitly requires zero FKs for D1-04 finance tables.",
-    "triggerSemantics": "Preserve source immutable snapshots, CAS/version guards, allowed order transitions, payable-order binding, idempotency pairing, webhook receipt immutability, conflict first-receipt binding and retention."
+    "triggerSemantics": "Preserve source immutable snapshots, CAS/version guards, allowed order transitions, payable-order binding, idempotency pairing, webhook receipt immutability, conflict first-receipt binding and retention.",
+    "renewalCycles": "Preserve immutable billing-cycle identity and resolved pricing snapshots, the W07-owned cycle state machine, CAS leases, exact Order/Payment binding, active MIT mandate check, terminal provider-outcome synchronization and one scheduler control-metadata singleton. W10 orchestrates but never reads or writes D1-04; subscription entitlements remain D1-01 authority."
   },
   "sourceInventory": [
     {
@@ -297,20 +384,23 @@
       "path": "contracts/database/neon-schema-migration-ledger.v1.json",
       "role": "D1-04 is registered to W07 in the shared per-database append-only schema ledger; D1-04 runner remains not implemented.",
       "execution": "Ownership source; this PR does not install the shared ledger or admit remote apply."
+    },
+    {
+      "path": "workers/W07-subscription-commerce/migrations-d1-04/0004_subscription_renewal_cycles.sql",
+      "role": "W07-owned D1-04 recurring billing-cycle records and the singleton scheduler cursor control row.",
+      "execution": "Fingerprint and translate to PostgreSQL 18 only; no D1/SQLite source SQL runs against Neon. The scheduler seed is schema control metadata, not business-data import."
     }
   ],
   "verification": {
     "sourceRegression": "workers/W07-subscription-commerce/scripts/test_order_d1_04_migration.py",
     "postgresImage": "postgres:18.6",
-    "tables": 8,
-    "explicitIndexes": 18,
-    "triggers": 36,
-    "triggerFunctions": 2,
+    "tables": 10,
+    "explicitIndexes": 22,
+    "triggers": 49,
+    "triggerFunctions": 3,
     "foreignKeys": 0,
     "fixtureRowsAfterRollback": 0,
     "mustNotExist": [
-      "subscription_renewal_cycles",
-      "subscription_renewal_scheduler_state",
       "revenuecat_webhook_events",
       "revenuecat_webhook_event_conflicts",
       "refunds",
@@ -323,6 +413,54 @@
       "media"
     ],
     "localRehearsalEvidence": {
+      "workflowRunId": 42491082583,
+      "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42491082583",
+      "verifiedHeadSha": "b9e0fa3d920153c11ee8b7a2bb96016948eb9b20",
+      "postgresVersion": "18.6",
+      "database": "luckread_finance_schema",
+      "sourceRegressionTests": 24,
+      "newSliceTables": 2,
+      "newSliceExplicitIndexes": 4,
+      "newSliceTriggers": 13,
+      "newSliceTriggerFunctions": 1,
+      "cumulativeTables": 10,
+      "cumulativeExplicitIndexes": 22,
+      "cumulativeTriggers": 49,
+      "cumulativeTriggerFunctions": 3,
+      "foreignKeys": 0,
+      "sensitiveCardOrSecretColumns": 0,
+      "rowsAfterRollback": 0,
+      "schedulerControlRowsAfterRollback": 1,
+      "laterFinanceTablesIncluded": false,
+      "remoteNeonTouched": false,
+      "cloudflareD1Touched": false,
+      "businessDataImported": false,
+      "productionCutoverAuthorized": false,
+      "evidenceArtifactId": 13620709002,
+      "evidenceArtifactName": "neon-d1-04-w07-renewal-cycles-postgres18-fdac22852c742c890146a810079522201bb0fcee",
+      "evidenceArtifactSha256": "sha256:b60a715ed28efdd8dabd32b0caa32607ddaa4d7ea9902eada26065ff5624f019"
+    },
+    "predecessorLocalRehearsalEvidence": {
+      "workflowRunId": 42489584748,
+      "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42489584748",
+      "verifiedHeadSha": "6d416296e83d6b0389505f7b224976aae7634345",
+      "postgresVersion": "18.6",
+      "database": "luckread_finance_schema",
+      "tables": 6,
+      "explicitIndexes": 14,
+      "triggers": 24,
+      "triggerFunctions": 1,
+      "foreignKeys": 0,
+      "rowsAfterRollback": 0,
+      "offlineD104SourceRegressionTests": 24,
+      "laterFinanceTablesIncluded": false,
+      "remoteNeonTouched": false,
+      "cloudflareD1Touched": false,
+      "businessDataImported": false,
+      "productionCutoverAuthorized": false,
+      "evidenceArtifactId": 13621195000
+    },
+    "previousSliceLocalRehearsalEvidence": {
       "workflowRunId": 42489584839,
       "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42489584839",
       "verifiedHeadSha": "6d416296e83d6b0389505f7b224976aae7634345",
@@ -350,26 +488,7 @@
       "evidenceArtifactName": "neon-d1-04-w07-saved-methods-mandates-postgres18-f56291b077837b94e9aaea64e57e040176cc83b2",
       "evidenceArtifactSha256": "sha256:1f43b7545e715da4aebd07757162485dc097226b68ca714df018d1411647b634"
     },
-    "predecessorLocalRehearsalEvidence": {
-      "workflowRunId": 42489584748,
-      "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42489584748",
-      "verifiedHeadSha": "6d416296e83d6b0389505f7b224976aae7634345",
-      "postgresVersion": "18.6",
-      "database": "luckread_finance_schema",
-      "tables": 6,
-      "explicitIndexes": 14,
-      "triggers": 24,
-      "triggerFunctions": 1,
-      "foreignKeys": 0,
-      "rowsAfterRollback": 0,
-      "offlineD104SourceRegressionTests": 24,
-      "laterFinanceTablesIncluded": false,
-      "remoteNeonTouched": false,
-      "cloudflareD1Touched": false,
-      "businessDataImported": false,
-      "productionCutoverAuthorized": false,
-      "evidenceArtifactId": 13621195000
-    }
+    "nextGate": "Add the remaining W07 D1-04 source migrations 0005 RevenueCat inbox, 0006 refunds/billing documents and 0007 payment-method revocation as isolated PostgreSQL-native slices. The shared-ledger remote runner and production cutover remain separate, unauthorized gates."
   },
   "safety": {
     "remoteConnectionAttempted": false,
@@ -379,5 +498,5 @@
     "businessDataImported": false,
     "productionCutoverAuthorized": false
   },
-  "nextGate": "Add the deferred W07 D1-04 source migrations 0003 through 0007 as separate PostgreSQL-native slices. A reviewed shared-ledger runner, target review and remote release change control are separate work and are not part of this local schema slice."
+  "nextGate": "Add the remaining W07 D1-04 source migrations 0005 RevenueCat inbox, 0006 refunds/billing documents and 0007 payment-method revocation as isolated PostgreSQL-native slices. The shared-ledger remote runner and production cutover remain separate, unauthorized gates."
 }

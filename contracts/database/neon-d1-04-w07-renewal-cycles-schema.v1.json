@@ -3,7 +3,7 @@
   "$id": "https://luckread.com/contracts/database/neon-d1-04-w07-renewal-cycles-schema.v1.json",
   "title": "LuckRead D1-04 W07 Subscription Renewal Cycles PostgreSQL Schema Slice",
   "version": "1.0.0",
-  "status": "W07_D1_04_RENEWAL_CYCLES_SCHEMA_PENDING_LOCAL_POSTGRES18_REHEARSAL",
+  "status": "W07_D1_04_RENEWAL_CYCLES_LOCAL_POSTGRES18_REHEARSAL_PASSED_REMAINING_FINANCE_SLICES_PENDING",
   "target": {
     "domainId": "D1-04",
     "databaseName": "luckread_finance",
@@ -206,7 +206,32 @@
       "renewal cycle and scheduler control audit rows cannot be deleted"
     ],
     "localRehearsalEvidence": {
-      "status": "NOT_RUN"
+      "workflowRunId": 42491082583,
+      "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42491082583",
+      "verifiedHeadSha": "b9e0fa3d920153c11ee8b7a2bb96016948eb9b20",
+      "postgresVersion": "18.6",
+      "database": "luckread_finance_schema",
+      "sourceRegressionTests": 24,
+      "newSliceTables": 2,
+      "newSliceExplicitIndexes": 4,
+      "newSliceTriggers": 13,
+      "newSliceTriggerFunctions": 1,
+      "cumulativeTables": 10,
+      "cumulativeExplicitIndexes": 22,
+      "cumulativeTriggers": 49,
+      "cumulativeTriggerFunctions": 3,
+      "foreignKeys": 0,
+      "sensitiveCardOrSecretColumns": 0,
+      "rowsAfterRollback": 0,
+      "schedulerControlRowsAfterRollback": 1,
+      "laterFinanceTablesIncluded": false,
+      "remoteNeonTouched": false,
+      "cloudflareD1Touched": false,
+      "businessDataImported": false,
+      "productionCutoverAuthorized": false,
+      "evidenceArtifactId": 13620709002,
+      "evidenceArtifactName": "neon-d1-04-w07-renewal-cycles-postgres18-fdac22852c742c890146a810079522201bb0fcee",
+      "evidenceArtifactSha256": "sha256:b60a715ed28efdd8dabd32b0caa32607ddaa4d7ea9902eada26065ff5624f019"
     }
   },
   "safety": {
