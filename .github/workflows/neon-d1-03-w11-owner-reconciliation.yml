@@ -41,7 +41,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: neon-d1-03-w11-owner-reconciliation-\${{ github.event.pull_request.number || github.ref }}
+  group: neon-d1-03-w11-owner-reconciliation-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: false
 
 jobs:
