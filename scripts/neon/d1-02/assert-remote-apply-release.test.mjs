@@ -18,7 +18,8 @@ const ledgerContract={
     'D1-03':{runnerStatus:'NOT_IMPLEMENTED',remoteApplyReady:false},
     'D1-04':{runnerStatus:'NOT_IMPLEMENTED',remoteApplyReady:false},
     'D1-05':{runnerStatus:'NOT_IMPLEMENTED',remoteApplyReady:false}
-  }}}
+  }}
+}
 }
 
 test('releases only D1-02 in the exact reviewed schema-only shared-ledger state', () => {
