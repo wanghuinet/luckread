@@ -8,6 +8,8 @@ on:
       - 'contracts/entity/AUTH-003-identity-field-contract.v1.json'
       - 'contracts/entity/AUTH-003-credential-field-contract.v1.json'
       - 'contracts/api/AUTH-003-credential-management-contract.v1.json'
+      - 'contracts/migration/AUTH-013-publication-journal.v1.json'
+      - 'contracts/events/identity-account-state-changed.v1.json'
       - 'contracts/authz/layers.json'
       - 'workers/W02-identity/package.json'
       - 'workers/W02-identity/src/auth/better-auth.ts'
@@ -84,16 +86,18 @@ jobs:
           mkdir -p artifacts/neon
           npm run neon:schema:generate
 
-      - name: Generate PostgreSQL RoleAssignment migrations from canonical contracts
+      - name: Generate W02 custom PostgreSQL migrations from canonical contracts
         working-directory: workers/W02-identity
         run: |
           set -euo pipefail
           npm run neon:role-assignment:generate
           npm run neon:auth003:generate
+          npm run neon:auth013-journal:generate
           git diff --exit-code -- \
             src/neon-postgres-migrations/0001_role_assignments.sql \
             src/neon-postgres-migrations/0002_role_authorization_versions.sql \
-            src/neon-postgres-migrations/0003_auth_003_credentials.sql
+            src/neon-postgres-migrations/0003_auth_003_credentials.sql \
+            src/neon-postgres-migrations/0004_auth_013_publication_journal.sql
 
       - name: Confirm all generated DDL is PostgreSQL-native
         working-directory: workers/W02-identity
@@ -104,6 +108,7 @@ jobs:
             src/neon-postgres-migrations/0001_role_assignments.sql
             src/neon-postgres-migrations/0002_role_authorization_versions.sql
             src/neon-postgres-migrations/0003_auth_003_credentials.sql
+            src/neon-postgres-migrations/0004_auth_013_publication_journal.sql
           )
           for file in "${files[@]}"; do
             test -s "$file"
@@ -154,6 +159,15 @@ jobs:
             --dbname luckread_schema --set ON_ERROR_STOP=1 \
             --file src/neon-postgres-migrations/0003_auth_003_credentials.sql
 
+      - name: Apply generated AUTH-013 durable publication journal PostgreSQL migration
+        working-directory: workers/W02-identity
+        env:
+          PGPASSWORD: schema_generator_local_only
+        run: |
+          psql --host 127.0.0.1 --port 5432 --username schema_generator \
+            --dbname luckread_schema --set ON_ERROR_STOP=1 \
+            --file src/neon-postgres-migrations/0004_auth_013_publication_journal.sql
+
       - name: Verify Better Auth core tables and empty business rows
         working-directory: workers/W02-identity
         env:
@@ -172,6 +186,12 @@ jobs:
           W02_SCHEMA_DATABASE_URL: postgresql://schema_generator:schema_generator_local_only@127.0.0.1:5432/luckread_schema
         run: npm run neon:auth003:verify > artifacts/neon/w02-auth003-postgres-schema-postflight.json
 
+      - name: Verify AUTH-013 journal contract, retry state, and uniqueness semantics
+        working-directory: workers/W02-identity
+        env:
+          W02_SCHEMA_DATABASE_URL: postgresql://schema_generator:schema_generator_local_only@127.0.0.1:5432/luckread_schema
+        run: npm run neon:auth013-journal:verify > artifacts/neon/w02-auth013-publication-journal-postgres-schema-postflight.json
+
       - name: Upload generated schema and postflight evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -184,6 +204,8 @@ jobs:
             workers/W02-identity/src/neon-postgres-migrations/0001_role_assignments.sql
             workers/W02-identity/src/neon-postgres-migrations/0002_role_authorization_versions.sql
             workers/W02-identity/src/neon-postgres-migrations/0003_auth_003_credentials.sql
+            workers/W02-identity/src/neon-postgres-migrations/0004_auth_013_publication_journal.sql
             workers/W02-identity/artifacts/neon/w02-auth003-postgres-schema-postflight.json
+            workers/W02-identity/artifacts/neon/w02-auth013-publication-journal-postgres-schema-postflight.json
           if-no-files-found: error
           retention-days: 30
