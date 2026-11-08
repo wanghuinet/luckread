@@ -1,0 +1,177 @@
+name: Neon D1-01 Reviewed Remote Schema Apply
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/neon-d1-01-reviewed-remote-schema-apply.yml'
+      - 'scripts/neon/run-schema-migrations.mjs'
+      - 'scripts/neon/run-schema-migrations.test.mjs'
+      - 'scripts/neon/assert-d1-01-migration-ledger-ready.mjs'
+      - 'scripts/neon/d1-01-migration-manifest.mjs'
+      - 'contracts/database/neon-d1-01-migration-manifest.v1.json'
+      - 'contracts/database/neon-schema-migration-ledger.v1.json'
+      - 'workers/W01-payload/scripts/neon/**'
+      - 'workers/W01-payload/src/neon-postgres-migrations/**'
+      - 'workers/W02-identity/src/neon-postgres-migrations/**'
+      - 'workers/W02-identity/scripts/neon/**'
+      - 'workers/W07-subscription-commerce/src/neon-postgres-migrations/**'
+      - 'workers/W07-subscription-commerce/scripts/neon/**'
+      - 'workers/W08-creator/src/neon-postgres-migrations/**'
+      - 'workers/W08-creator/scripts/neon/**'
+  workflow_dispatch:
+    inputs:
+      confirm_target:
+        description: Apply only the reviewed D1-01 schema to the existing Neon luckread database; no business data or production cutover.
+        required: true
+        type: choice
+        options:
+          - APPLY_REVIEWED_SCHEMA_D1_01_LUCKREAD
+
+permissions:
+  contents: read
+
+concurrency:
+  group: neon-d1-01-reviewed-remote-schema-apply
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    if: ${{ github.event_name == 'pull_request' }}
+    name: Validate remote runner guards without Neon credentials
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install pinned W02 PostgreSQL driver
+        working-directory: workers/W02-identity
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Test local-only and remote Neon target restrictions
+        run: |
+          set -euo pipefail
+          node --check scripts/neon/run-schema-migrations.mjs
+          node --test scripts/neon/run-schema-migrations.test.mjs
+          node scripts/neon/assert-d1-01-migration-ledger-ready.mjs --expect-blocked
+          if node scripts/neon/assert-d1-01-migration-ledger-ready.mjs --assert-runner-ready; then
+            echo "Remote apply must remain gated until the separate reviewed release enablement."
+            exit 1
+          fi
+
+  apply:
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.confirm_target == 'APPLY_REVIEWED_SCHEMA_D1_01_LUCKREAD' }}
+    name: Apply reviewed schema to Neon D1-01 luckread
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Guard exact main ref and target confirmation
+        shell: bash
+        env:
+          CONFIRM_TARGET: ${{ inputs.confirm_target }}
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REF}" = "refs/heads/main"
+          test "${CONFIRM_TARGET}" = "APPLY_REVIEWED_SCHEMA_D1_01_LUCKREAD"
+
+      - name: Checkout reviewed main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+          run_install: false
+
+      - name: Install exact W01 Payload dependency graph
+        working-directory: workers/W01-payload
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Install pinned W02 PostgreSQL toolchain
+        working-directory: workers/W02-identity
+        run: npm install --ignore-scripts --no-audit --no-fund
+
+      - name: Require the separately reviewed remote release gate
+        run: node scripts/neon/assert-d1-01-migration-ledger-ready.mjs --assert-runner-ready
+
+      - name: Reconcile the existing W01 Payload baseline on Neon (read-only)
+        working-directory: workers/W01-payload
+        env:
+          PAYLOAD_SCHEMA_NEON_VERIFY: 'true'
+          PAYLOAD_SCHEMA_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL_LUCKREAD }}
+          PAYLOAD_SCHEMA_REPORT: artifacts/neon/w01-payload-neon-preflight.json
+        run: pnpm run neon:schema:verify
+
+      - name: Apply the exact D1-01 manifest through the shared remote runner
+        env:
+          D1_01_REMOTE_APPLY_CONFIRMATION: ${{ inputs.confirm_target }}
+          NEON_DATABASE_URL_LUCKREAD: ${{ secrets.NEON_DATABASE_URL_LUCKREAD }}
+        run: node scripts/neon/run-schema-migrations.mjs --remote-neon
+
+      - name: Re-verify W01 Payload schema and empty business tables (read-only)
+        working-directory: workers/W01-payload
+        env:
+          PAYLOAD_SCHEMA_NEON_VERIFY: 'true'
+          PAYLOAD_SCHEMA_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL_LUCKREAD }}
+          PAYLOAD_SCHEMA_REPORT: artifacts/neon/w01-payload-neon-postflight.json
+        run: pnpm run neon:schema:verify
+
+      - name: Deeply verify W02 PostgreSQL identity schemas (read-only)
+        working-directory: workers/W02-identity
+        env:
+          W02_SCHEMA_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL_LUCKREAD }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/neon
+          node scripts/neon/verify-better-auth-core-schema.mjs > artifacts/neon/w02-better-auth-core-postflight.json
+          npm run neon:role-assignment:verify > artifacts/neon/w02-role-assignment-postflight.json
+          npm run neon:auth003:verify > artifacts/neon/w02-auth003-postflight.json
+          npm run neon:auth013-journal:verify > artifacts/neon/w02-auth013-journal-postflight.json
+          npm run neon:auth015:verify > artifacts/neon/w02-auth015-postflight.json
+          npm run neon:auth010:verify > artifacts/neon/w02-auth010-postflight.json
+          npm run neon:auth007-mfa:verify > artifacts/neon/w02-auth007-mfa-postflight.json
+          npm run neon:username-change:verify > artifacts/neon/w02-username-change-postflight.json
+          npm run neon:auth007-mfa-journal:verify > artifacts/neon/w02-auth007-mfa-journal-postflight.json
+          npm run neon:auth007-mfa-receipts:verify > artifacts/neon/w02-auth007-mfa-receipts-postflight.json
+
+      - name: Install PostgreSQL client for owner-specific postflight verifiers
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+
+      - name: Deeply verify W07 membership schema (read-only)
+        env:
+          NEON_DATABASE_URL_LUCKREAD: ${{ secrets.NEON_DATABASE_URL_LUCKREAD }}
+        run: |
+          set -euo pipefail
+          mkdir -p workers/W07-subscription-commerce/artifacts/neon
+          psql "${NEON_DATABASE_URL_LUCKREAD}" -A -t -q --set ON_ERROR_STOP=1 --no-psqlrc             --file workers/W07-subscription-commerce/scripts/neon/verify-d1-01-membership-postgres-schema.sql             > workers/W07-subscription-commerce/artifacts/neon/w07-d1-01-membership-postgres-schema-postflight.json
+
+      - name: Deeply verify W08 creator schema (read-only)
+        env:
+          NEON_DATABASE_URL_LUCKREAD: ${{ secrets.NEON_DATABASE_URL_LUCKREAD }}
+        run: |
+          set -euo pipefail
+          mkdir -p workers/W08-creator/artifacts/neon
+          psql "${NEON_DATABASE_URL_LUCKREAD}" -A -t -q --set ON_ERROR_STOP=1 --no-psqlrc             --file workers/W08-creator/scripts/neon/verify-d1-01-creator-postgres-schema.sql             > workers/W08-creator/artifacts/neon/w08-d1-01-creator-postgres-schema-postflight.json
+
+      - name: Upload sanitized D1-01 Neon migration evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: neon-d1-01-remote-schema-postflight-${{ github.run_id }}
+          path: |
+            artifacts/neon/d1-01-ledger-postflight.json
+            workers/W01-payload/artifacts/neon/w01-payload-neon-preflight.json
+            workers/W01-payload/artifacts/neon/w01-payload-neon-postflight.json
+            workers/W02-identity/artifacts/neon/
+            workers/W07-subscription-commerce/artifacts/neon/w07-d1-01-membership-postgres-schema-postflight.json
+            workers/W08-creator/artifacts/neon/w08-d1-01-creator-postgres-schema-postflight.json
+          if-no-files-found: error
+          retention-days: 90
