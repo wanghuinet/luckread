@@ -108,17 +108,41 @@ test('rejects missing or malformed checksums rather than planning an unverified 
   )
 })
 
-test('rejects any manifest or ledger contract that prematurely enables remote execution', () => {
+test('accepts only a fully reviewed shared release state while keeping the plan read-only', () => {
+  const releasedManifest = structuredClone(manifest)
+  releasedManifest.remoteApplyReady = true
+  releasedManifest.execution = {
+    runnerStatus: 'IMPLEMENTED_AND_REVIEWED',
+    remoteApplyReady: true,
+  }
+  const releasedLedger = structuredClone(ledgerContract)
+  releasedLedger.remoteApplyReady = true
+  releasedLedger.execution = {
+    runnerStatus: 'IMPLEMENTED_AND_REVIEWED',
+    remoteApplyReady: true,
+  }
+  const plan = buildReadOnlyMigrationPlan({
+    manifest: releasedManifest,
+    ledgerContract: releasedLedger,
+    checksums,
+  })
+  assert.equal(plan.safety.remoteApplyReady, true)
+  assert.equal(plan.safety.remoteConnectionAttempted, false)
+  assert.equal(plan.safety.ddlExecuted, false)
+  assert.equal(plan.readiness.sharedRunner, 'IMPLEMENTED_AND_REVIEWED')
+  assert.equal(plan.readiness.remoteReleaseGate, 'READY_FOR_MANUAL_DISPATCH')
+  assert.equal(plan.readiness.executable, false)
+})
+
+test('rejects a partially enabled manifest/ledger release gate', () => {
   const enabledManifest = structuredClone(manifest)
   enabledManifest.remoteApplyReady = true
+  enabledManifest.execution = {
+    runnerStatus: 'IMPLEMENTED_AND_REVIEWED',
+    remoteApplyReady: true,
+  }
   assert.throws(
     () => buildReadOnlyMigrationPlan({ manifest: enabledManifest, ledgerContract, checksums }),
-    /remote execution must remain disabled/
-  )
-  const enabledLedger = structuredClone(ledgerContract)
-  enabledLedger.remoteApplyReady = true
-  assert.throws(
-    () => buildReadOnlyMigrationPlan({ manifest, ledgerContract: enabledLedger, checksums }),
-    /remote execution must remain disabled/
+    /complete blocked or reviewed release state/
   )
 })
