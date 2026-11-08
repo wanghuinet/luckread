@@ -173,54 +173,27 @@ async function run() {
     }))
     assertSameOwnerForeignKeys(ownerByTable, foreignKeys)
 
-    const ledgerBefore = await pool.query(
-      'SELECT COUNT(*)::integer AS count FROM public.neon_schema_migration_ledger',
-    )
-    if (Number(ledgerBefore.rows[0].count) !== 0) {
-      fail('fresh local rehearsal ledger must be empty before provenance recording')
-    }
-
-    const client = await pool.connect()
-    try {
-      await client.query('BEGIN')
-      for (const entry of manifest.entries) {
-        const checksum = checksumById.get(entry.migrationId)
-        await client.query(
-          'INSERT INTO neon_schema_migration_ledger ' +
-          '(domain_id, database_name, owner_worker, migration_id, migration_order, migration_kind, ' +
-          'artifact_sha256, manifest_entry_sha256, source_commit_sha, runner_version, execution_id) ' +
-          'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)',
-          [
-            'D1-01', 'luckread', entry.ownerWorker, entry.migrationId, entry.order, entry.kind,
-            checksum.artifactSha256, checksum.manifestEntrySha256, sourceCommitSha, runnerVersion, executionId,
-          ],
-        )
-      }
-      await client.query('COMMIT')
-    } catch (error) {
-      try { await client.query('ROLLBACK') } catch {}
-      throw error
-    } finally {
-      client.release()
-    }
-
     const ledgerResult = await pool.query(
-      'SELECT owner_worker, migration_id, migration_order, artifact_sha256, manifest_entry_sha256, source_commit_sha ' +
+      'SELECT domain_id, database_name, owner_worker, migration_id, migration_order, migration_kind, ' +
+      'artifact_sha256, manifest_entry_sha256, source_commit_sha, runner_version, execution_id ' +
       'FROM neon_schema_migration_ledger WHERE domain_id = $1 ORDER BY migration_order',
       ['D1-01'],
     )
     if (ledgerResult.rows.length !== manifest.entries.length) {
-      fail('migration ledger must contain exactly fourteen D1-01 rehearsal rows')
+      fail('shared runner ledger must contain exactly fourteen D1-01 migration rows')
     }
     for (let i = 0; i < manifest.entries.length; i++) {
       const entry = manifest.entries[i]
       const checksum = checksumById.get(entry.migrationId)
       const row = ledgerResult.rows[i]
-      if (row.migration_id !== entry.migrationId || Number(row.migration_order) !== entry.order ||
-          row.owner_worker !== entry.ownerWorker || row.artifact_sha256 !== checksum.artifactSha256 ||
+      if (row.domain_id !== 'D1-01' || row.database_name !== 'luckread' ||
+          row.migration_id !== entry.migrationId || Number(row.migration_order) !== entry.order ||
+          row.owner_worker !== entry.ownerWorker || row.migration_kind !== entry.kind ||
+          row.artifact_sha256 !== checksum.artifactSha256 ||
           row.manifest_entry_sha256 !== checksum.manifestEntrySha256 ||
-          row.source_commit_sha !== sourceCommitSha) {
-        fail('ledger provenance row does not match manifest/checksums: ' + entry.migrationId)
+          row.source_commit_sha !== sourceCommitSha ||
+          row.runner_version !== 'd1-01-shared-runner/1.0.0') {
+        fail('shared runner ledger provenance row does not match manifest/checksums: ' + entry.migrationId)
       }
     }
 
