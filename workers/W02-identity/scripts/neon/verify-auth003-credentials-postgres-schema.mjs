@@ -107,7 +107,7 @@ try {
   assert(foreignKeys.rows[0].confdeltype === 'c', 'credential identity FK must cascade on delete')
   assertionsPassed++
 
-  await insertIdentity(identityId, 'auth003-user-' + suffix, 'normalized-user-' + suffix, 'normalized-email-' + suffix, null)
+  await insertIdentity(identityId, 'auth003-user-' + suffix, 'normalized-user-' + suffix, 'normalized-email-' + suffix, '+12025550100')
   await insertIdentity(otherIdentityId, 'auth003-user-b-' + suffix, null, null, null)
   assertionsPassed++
 
