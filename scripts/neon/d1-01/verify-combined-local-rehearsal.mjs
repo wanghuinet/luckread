@@ -124,10 +124,6 @@ async function run() {
   if (!/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(sourceCommitSha || '')) {
     fail('an exact Git source commit SHA is required for rehearsal ledger provenance')
   }
-  const executionId = 'github-' + (process.env.GITHUB_RUN_ID || 'local') +
-    '-' + (process.env.GITHUB_RUN_ATTEMPT || '1')
-  const runnerVersion = 'd1-01-local-rehearsal/1.0.0'
-
   const checksums = readManifestChecksums()
   assertManifestAndChecksums(checksums)
   const checksumById = new Map(checksums.map((item) => [item.migrationId, item]))
