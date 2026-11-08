@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto'
 import { createRequire } from 'node:module'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
@@ -17,13 +16,13 @@ const readJson = (path) => JSON.parse(readFileSync(path, 'utf8'))
 const manifestPath = resolve(repositoryRoot, 'contracts/database/neon-d1-01-migration-manifest.v1.json')
 const manifest = readJson(manifestPath)
 
-const relationPattern = String.raw`(?:(?:"public"|public)\\s*\\.\\s*)?"?([A-Za-z_][A-Za-z0-9_$]*)"?`
+const relationPattern = String.raw`(?:(?:"public"|public)\s*\.\s*)?"?([A-Za-z_][A-Za-z0-9_$]*)"?`
 
 export function extractTouchedTables(sql) {
   const names = new Set()
   const patterns = [
-    new RegExp(String.raw`\\bCREATE\\s+TABLE\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?${relationPattern}`, 'gi'),
-    new RegExp(String.raw`\\bALTER\\s+TABLE\\s+(?:ONLY\\s+)?(?:IF\\s+EXISTS\\s+)?${relationPattern}`, 'gi'),
+    new RegExp(String.raw`\bCREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?${relationPattern}`, 'gi'),
+    new RegExp(String.raw`\bALTER\s+TABLE\s+(?:ONLY\s+)?(?:IF\s+EXISTS\s+)?${relationPattern}`, 'gi'),
   ]
   for (const pattern of patterns) {
     for (const match of sql.matchAll(pattern)) names.add(match[1])
