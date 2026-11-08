@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/database/neon-d1-01-remote-runner-review.v1.json",
+  "version": "1.0.0",
+  "status": "AI_REVIEW_PASS_NO_BLOCKING_FINDINGS",
+  "repository": "wanghuinet/luckread",
+  "target": {
+    "domainId": "D1-01",
+    "databaseName": "luckread",
+    "postgresMajor": 18,
+    "scope": "schema-only",
+    "businessDataImport": false,
+    "productionCutoverAuthorized": false
+  },
+  "review": {
+    "reviewer": "GPT-6",
+    "reviewType": "independent code-path review plus current-SHA CI evidence reconciliation",
+    "reviewedAt": "2026-11-08",
+    "reviewedMainSha": "c57fe841bb861c9310c361266396f9ffe6a00de1",
+    "implementationMergeSha": "62e2a8264cc0c6c128a2290e281dba16a8257d6e",
+    "postflightTargetFixMergeSha": "c57fe841bb861c9310c361266396f9ffe6a00de1",
+    "result": "NO_BLOCKING_FINDINGS",
+    "reviewedFiles": [
+      {
+        "path": "scripts/neon/run-schema-migrations.mjs",
+        "gitBlobSha1": "131709ecfae728e72deea89ead39cf81af1ff0ef"
+      },
+      {
+        "path": "scripts/neon/run-schema-migrations.test.mjs",
+        "gitBlobSha1": "9669d43e83d35c3eb8c69ec9f459f4fa8a6333b9"
+      },
+      {
+        "path": "scripts/neon/d1-01/0001_schema_migration_ledger.sql",
+        "gitBlobSha1": "b8cdec415ee4106d0b0618197b12b61d8656a2c9"
+      }
+    ],
+    "controlsChecked": [
+      "remote target host/database/port allowlist and PostgreSQL 18 identity guard",
+      "TLS verify-full, certificate/hostname validation and channel binding requirement",
+      "main-only workflow_dispatch and exact D1-01 confirmation token",
+      "transaction-scoped advisory lock held for the complete migration run",
+      "W01 Payload baseline is reconciled and recorded; it is not replayed by the shared SQL executor",
+      "strict ordered manifest, artifact and manifest-entry checksums, and ordered ledger-prefix validation",
+      "one PostgreSQL transaction per SQL migration including its ledger insert",
+      "retry resumes only from an exact successful ledger prefix",
+      "append-only migration provenance ledger and owner/database constraints",
+      "postflight ownership, schema, extension and empty-business-table checks",
+      "no Cloudflare D1 mutation, business data import, or production cutover"
+    ],
+    "findings": [],
+    "limitations": [
+      "PR #1629 and PR #1630 have no submitted GitHub review records; this is an explicit GPT-6 code review record, not a human approval or GitHub APPROVE review.",
+      "Remote Neon DDL has not been executed. Remote apply remains a separate manually dispatched action and must produce fresh postflight evidence.",
+      "The remote runner has only been exercised against disposable PostgreSQL 18 in CI; no claim of remote Neon execution success is made."
+    ],
+    "formalGitHubReviewSubmissions": 0
+  },
+  "verificationEvidence": {
+    "fullD1_01LocalPostgres18Rehearsal": {
+      "runId": 42458291648,
+      "conclusion": "success",
+      "url": "https://github.com/wanghuinet/luckread/actions/runs/42458291648"
+    },
+    "w02BetterAuthPostgres18": {
+      "runId": 42458291621,
+      "conclusion": "success",
+      "url": "https://github.com/wanghuinet/luckread/actions/runs/42458291621"
+    },
+    "remoteRunnerGuardsNoCredentials": {
+      "runId": 42458291629,
+      "conclusion": "success",
+      "url": "https://github.com/wanghuinet/luckread/actions/runs/42458291629",
+      "remoteApplyJob": "skipped"
+    },
+    "contractAdmission": {
+      "runId": 42458291617,
+      "conclusion": "success",
+      "url": "https://github.com/wanghuinet/luckread/actions/runs/42458291617"
+    },
+    "mapping0StructuralGate": {
+      "runId": 42458291520,
+      "conclusion": "success",
+      "url": "https://github.com/wanghuinet/luckread/actions/runs/42458291520"
+    }
+  },
+  "safety": {
+    "remoteNeonDdlExecuted": false,
+    "productionD1Touched": false,
+    "businessDataImported": false,
+    "productionCutoverAuthorized": false,
+    "manualWorkflowDispatchRequired": true,
+    "exactConfirmationRequired": "APPLY_REVIEWED_SCHEMA_D1_01_LUCKREAD"
+  }
+}
