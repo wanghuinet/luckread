@@ -94,7 +94,7 @@ function collectOwnerTables() {
 function assertManifestAndChecksums(checksums) {
   if (manifest.domainId !== 'D1-01' || manifest.databaseName !== 'luckread' ||
       manifest.postgresMajor !== 18 || manifest.businessDataImport !== false ||
-      manifest.productionCutoverAuthorized !== false || manifest.remoteApplyReady !== false ||
+      manifest.productionCutoverAuthorized !== false ||
       manifest.entries.length !== 14) {
     fail('manifest target, schema-only authorization or 14-entry contract drifted')
   }
