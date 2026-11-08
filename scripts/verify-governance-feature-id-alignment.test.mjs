@@ -66,6 +66,20 @@ test('fails closed when the appeal schema reference points to another operation'
   }), /Canonical API schemaRef mismatch for createAppeal/)
 })
 
+test('fails closed when previously admitted notification operation metadata is dropped', () => {
+  const override = jsonOverride('contracts/alignment/api-inventory.v1.json', (value) => {
+    const record = value.records.find((entry) => entry.operationId === 'getNotificationPreferences')
+    record.status = 'DISCOVERED'
+    record.schemaRef = ''
+    record.sourceRefs = record.sourceRefs.slice(0, 2)
+  })
+  assert.throws(() => verifyGovernanceFeatureIdAlignment({
+    readSource: readWithOverrides({
+      'contracts/alignment/api-inventory.v1.json': override,
+    }),
+  }), /Generated API inventory did not preserve admitted metadata for getNotificationPreferences/)
+})
+
 test('fails closed when generated API alignment output is stale', () => {
   const override = jsonOverride('contracts/alignment/api-inventory.v1.json', (value) => {
     value.records.find((record) => record.operationId === 'createAppeal').featureIds = []
