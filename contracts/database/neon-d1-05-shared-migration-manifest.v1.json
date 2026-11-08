@@ -50,7 +50,8 @@
     "triggers": 0,
     "triggerFunctions": 0,
     "foreignKeys": 0,
-    "businessRows": 0
+    "businessRows": 0,
+    "controlSeedRows": 0
   },
   "remoteApplyBlockers": [
     "Retention policy for event and aggregate classes is missing.",
@@ -68,5 +69,6 @@
     "cloudflareD1Touched": false,
     "businessDataImported": false,
     "productionCutoverAuthorized": false
-  }
+  },
+  "seedRows": []
 }
