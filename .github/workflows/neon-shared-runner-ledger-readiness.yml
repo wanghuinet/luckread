@@ -1,0 +1,67 @@
+name: Neon Shared Runner Ledger Readiness Reconciliation
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/neon-shared-runner-ledger-readiness.yml'
+      - 'contracts/database/neon-shared-runner-local-readiness.v1.json'
+      - 'contracts/database/neon-schema-migration-ledger.v1.json'
+      - 'contracts/database/neon-d1-03-shared-runner-independent-review.v1.json'
+      - 'contracts/database/neon-d1-04-shared-runner-independent-review.v1.json'
+      - 'contracts/database/neon-d1-05-shared-runner-independent-review.v1.json'
+      - 'scripts/neon/shared-domain-schema-runner.mjs'
+      - 'scripts/neon/verify-shared-runner-ledger-readiness.mjs'
+      - 'scripts/neon/verify-shared-runner-ledger-readiness.test.mjs'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/neon-shared-runner-ledger-readiness.yml'
+      - 'contracts/database/neon-shared-runner-local-readiness.v1.json'
+      - 'contracts/database/neon-schema-migration-ledger.v1.json'
+      - 'contracts/database/neon-d1-03-shared-runner-independent-review.v1.json'
+      - 'contracts/database/neon-d1-04-shared-runner-independent-review.v1.json'
+      - 'contracts/database/neon-d1-05-shared-runner-independent-review.v1.json'
+      - 'scripts/neon/shared-domain-schema-runner.mjs'
+      - 'scripts/neon/verify-shared-runner-ledger-readiness.mjs'
+      - 'scripts/neon/verify-shared-runner-ledger-readiness.test.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: neon-shared-runner-ledger-readiness-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  reconcile-ledger:
+    name: Verify local shared runner evidence without releasing remote apply
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout reviewed source
+        uses: actions/checkout@v4
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Run ledger readiness regression tests
+        run: |
+          set -euo pipefail
+          node --check scripts/neon/verify-shared-runner-ledger-readiness.mjs
+          node --test \
+            scripts/neon/verify-shared-runner-ledger-readiness.test.mjs \
+            scripts/neon/shared-domain-schema-runner.test.mjs
+      - name: Emit five-domain readiness reconciliation
+        run: |
+          set -euo pipefail
+          node scripts/neon/verify-shared-runner-ledger-readiness.mjs
+      - name: Upload sanitized readiness evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: neon-shared-runner-ledger-readiness-${{ github.sha }}
+          path: artifacts/neon/shared-runner-ledger-readiness.json
+          if-no-files-found: error
+          retention-days: 90
