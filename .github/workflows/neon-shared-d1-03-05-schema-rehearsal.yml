@@ -39,10 +39,15 @@ on:
       - 'scripts/neon/shared-domain-schema-runner.mjs'
       - 'scripts/neon/shared-domain-schema-runner.test.mjs'
       - 'workers/W06-governance/src/neon-postgres-migrations/**'
+      - 'workers/W06-governance/migrations/**'
       - 'workers/W09-platform/src/neon-postgres-migrations/**'
+      - 'workers/W09-platform/migrations-d1-03/**'
       - 'workers/W10-async/src/neon-postgres-migrations/**'
+      - 'workers/W09-platform/migrations-d1-03/0002_w10_async_execution_state.sql'
       - 'workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/**'
+      - 'workers/W07-subscription-commerce/migrations-d1-04/**'
       - 'workers/W11-growth-campaign-analytics-operations/src/neon-postgres-migrations-d1-05/**'
+      - 'workers/W11-growth-campaign-analytics-operations/migrations/**'
   workflow_dispatch:
 
 permissions:
