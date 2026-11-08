@@ -35,8 +35,12 @@ const pushRuntimePath = resolve(root, 'workers/W05-social/src/push-endpoint-runt
 const deliveryRuntimePath = resolve(root, 'workers/W05-social/src/notification-push-delivery-runtime.ts')
 const deliveryContractPath = resolve(root, 'contracts/transport/W05-W09-notification-push-delivery.v1.json')
 const pushMigrationPath = resolve(root, 'workers/W09-platform/migrations-d1-03/0001_notification_push_endpoints.sql')
+const auditSchemaPath = resolve(root, 'contracts/schemas/common/audit-event.json')
+const w06MigrationReadmePath = resolve(root, 'workers/W06-governance/migrations/README.md')
+const w09NeonMigrationPath = resolve(root, 'workers/W09-platform/src/neon-postgres-migrations/0001_w09_d1_03_platform_schema.sql')
+const w09NeonSchemaContractPath = resolve(root, 'contracts/database/neon-d1-03-w09-platform-schema.v1.json')
 
-for (const path of [w05ConfigPath, w09MigrationConfigPath, w05SourcePath, pushRuntimePath, deliveryRuntimePath, deliveryContractPath, pushMigrationPath]) {
+for (const path of [w05ConfigPath, w09MigrationConfigPath, w05SourcePath, pushRuntimePath, deliveryRuntimePath, deliveryContractPath, pushMigrationPath, auditSchemaPath, w06MigrationReadmePath, w09NeonMigrationPath, w09NeonSchemaContractPath]) {
   if (!existsSync(path)) throw new Error(`Missing scoped NotificationPushEndpoint owner artifact: ${path}`)
 }
 
@@ -82,6 +86,29 @@ if (
   w09D1Bindings[0].migrations_dir !== 'migrations-d1-03'
 ) {
   throw new Error('W09 must be the sole D1-03 schema migration configuration owner')
+}
+
+
+const auditSchema = JSON.parse(readFileSync(auditSchemaPath, 'utf8'))
+const w06MigrationReadme = readFileSync(w06MigrationReadmePath, 'utf8')
+const w09NeonMigration = readFileSync(w09NeonMigrationPath, 'utf8')
+const w09NeonSchemaContract = JSON.parse(readFileSync(w09NeonSchemaContractPath, 'utf8'))
+if (
+  auditSchema['x-luckread']?.['authoritative-writer'] !== 'W09' ||
+  auditSchema['x-luckread']?.neonSchemaOwner !== 'W09' ||
+  auditSchema['x-luckread']?.legacyCloudflareD1CompatibilityWriter !== 'W06' ||
+  auditSchema['x-luckread']?.legacyCloudflareD1CompatibilityStatus !== 'RETAINED_UNTIL_SEPARATE_RUNTIME_ADAPTER_SLICE' ||
+  !w06MigrationReadme.includes('legacy Cloudflare D1 migrations') ||
+  !w06MigrationReadme.includes('Do not execute this SQLite/D1 migration against Neon PostgreSQL') ||
+  !w09NeonMigration.includes('CREATE TABLE audit_events') ||
+  !w09NeonMigration.includes('CREATE TABLE notification_push_endpoints') ||
+  !w09NeonMigration.includes('BEFORE TRUNCATE ON audit_events') ||
+  w09NeonSchemaContract.target?.domainId !== 'D1-03' ||
+  w09NeonSchemaContract.target?.databaseName !== 'luckread_governance' ||
+  w09NeonSchemaContract.primaryOwner?.worker !== 'W09' ||
+  w09NeonSchemaContract.schema?.totals?.tables !== 2
+) {
+  throw new Error('W09 D1-03 Neon schema source and legacy W06 D1 compatibility boundary are not aligned')
 }
 
 const pushRuntime = readFileSync(pushRuntimePath, 'utf8')

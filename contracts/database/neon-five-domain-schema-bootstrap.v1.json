@@ -91,16 +91,64 @@
       "domainId": "D1-03",
       "databaseName": "luckread_governance",
       "owners": [
-        "W05",
         "W06",
-        "W09"
+        "W09",
+        "W10",
+        "W11"
       ],
       "schemaSources": [
-        "workers/W05-social",
         "workers/W06-governance/migrations",
         "workers/W09-platform/migrations-d1-03"
       ],
-      "status": "PENDING"
+      "status": "PARTIAL_W09_SCHEMA_SOURCE_ADMITTED_W06_W10_W11_PENDING",
+      "schemaProgress": {
+        "W09": {
+          "entities": [
+            "AuditEvent",
+            "NotificationPushEndpoint"
+          ],
+          "status": "SOURCE_ADMITTED_LOCAL_POSTGRES18_REHEARSAL_PENDING",
+          "schemaContract": "contracts/database/neon-d1-03-w09-platform-schema.v1.json"
+        },
+        "W06": {
+          "entities": [
+            "ModerationCase",
+            "ModerationDecision",
+            "Report",
+            "Appeal"
+          ],
+          "status": "NEXT_SCHEMA_SLICE",
+          "note": "W06 SQLite/D1 sources require a separate PostgreSQL-native port; AuditEvent is W09-owned."
+        },
+        "W10": {
+          "entities": [
+            "Job",
+            "Retry",
+            "DLQ",
+            "ExecutionInbox",
+            "ExecutionOutbox",
+            "OperationalIdempotency"
+          ],
+          "status": "SOURCE_AND_BINDING_NOT_ADMITTED"
+        },
+        "W11": {
+          "entities": [
+            "Campaign",
+            "GrowthOperation"
+          ],
+          "status": "SOURCE_AND_BINDING_NOT_ADMITTED",
+          "note": "W11 analytics persistence remains D1-05; no W11 tables are included in D1-03."
+        }
+      },
+      "scopedDelegations": {
+        "W05": {
+          "entity": "NotificationPushEndpoint",
+          "primaryOwner": "W09",
+          "task": "T14",
+          "scope": "Only authenticated self-service endpoint registration/deletion and owner-scoped delivery operations admitted by NOTIFY-002 and W05-W09 notification-push-delivery contracts.",
+          "schemaOwnership": false
+        }
+      }
     },
     {
       "domainId": "D1-04",

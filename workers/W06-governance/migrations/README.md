@@ -1,13 +1,10 @@
-# W06 D1-03 migrations
+# W06 D1-03 legacy Cloudflare D1 migrations
 
-The canonical AuditEvent persistence migration is now admitted in source at:
+The files in this directory are Cloudflare D1/SQLite migration sources for the existing W06 runtime compatibility path.
 
-- `0001_audit_event.sql`
-- Canonical schema source: `contracts/schemas/common/audit-event.json`
-- Target: W06 / D1-03 / `secondary` / `bda1d247-a371-4244-91ae-aef96034db7f`
+- `0001_audit_event.sql` retains the historical D1 implementation used by the current W06 runtime.
+- Canonical field contract: `contracts/schemas/common/audit-event.json`.
+- Frozen D1-03 primary entity owner: **W09**, per `docs/09-D1-DOMAIN-MASTER-v1.0.md` and `contracts/transport/d1-03-entity-owner-boundary.v1.json`.
+- W09-owned Neon PostgreSQL schema artifact: `workers/W09-platform/src/neon-postgres-migrations/0001_w09_d1_03_platform_schema.sql`.
 
-Remote application is separately gated by:
-
-- `.github/workflows/w06-audit-event-migration.yml`
-
-The migration is fail-closed for an already-existing `audit_events` table and is intended for the controlled zero-row target only. This source admission does not itself mutate Cloudflare D1.
+Do not execute this SQLite/D1 migration against Neon PostgreSQL. The W06 runtime remains on Cloudflare D1 during the staged schema bootstrap; its future W09 runtime-adapter transition is a separate gate. This documentation change does not mutate Cloudflare D1 or change Worker bindings.

@@ -1,0 +1,115 @@
+name: Neon D1-03 W09 Platform PostgreSQL 18 Local Rehearsal
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/neon-d1-03-w09-platform-postgres-rehearsal.yml'
+      - '.github/workflows/d1-03-entity-owner-boundary-gate.yml'
+      - 'contracts/database/neon-d1-03-w09-platform-schema.v1.json'
+      - 'contracts/schemas/common/audit-event.json'
+      - 'contracts/persistence/NOTIFY-002-W05-D1-03-PUSH-ENDPOINT-PERSISTENCE.v1.json'
+      - 'contracts/transport/d1-03-entity-owner-boundary.v1.json'
+      - 'contracts/transport/W05-W09-notification-push-delivery.v1.json'
+      - 'docs/09-D1-DOMAIN-MASTER-v1.0.md'
+      - 'workers/W06-governance/README.md'
+      - 'workers/W06-governance/migrations/README.md'
+      - 'workers/W06-governance/migrations/0001_audit_event.sql'
+      - 'workers/W09-platform/README.md'
+      - 'workers/W09-platform/migrations-d1-03/**'
+      - 'workers/W09-platform/scripts/neon/**'
+      - 'workers/W09-platform/src/neon-postgres-migrations/**'
+      - 'scripts/verify-d1-03-entity-owner-boundary.mjs'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/neon-d1-03-w09-platform-postgres-rehearsal.yml'
+      - '.github/workflows/d1-03-entity-owner-boundary-gate.yml'
+      - 'contracts/database/neon-d1-03-w09-platform-schema.v1.json'
+      - 'contracts/schemas/common/audit-event.json'
+      - 'contracts/persistence/NOTIFY-002-W05-D1-03-PUSH-ENDPOINT-PERSISTENCE.v1.json'
+      - 'contracts/transport/d1-03-entity-owner-boundary.v1.json'
+      - 'contracts/transport/W05-W09-notification-push-delivery.v1.json'
+      - 'docs/09-D1-DOMAIN-MASTER-v1.0.md'
+      - 'workers/W06-governance/README.md'
+      - 'workers/W06-governance/migrations/README.md'
+      - 'workers/W06-governance/migrations/0001_audit_event.sql'
+      - 'workers/W09-platform/README.md'
+      - 'workers/W09-platform/migrations-d1-03/**'
+      - 'workers/W09-platform/scripts/neon/**'
+      - 'workers/W09-platform/src/neon-postgres-migrations/**'
+      - 'scripts/verify-d1-03-entity-owner-boundary.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: neon-d1-03-w09-platform-postgres-rehearsal-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  w09-platform-local-rehearsal:
+    name: Rehearse W09 D1-03 platform schema on disposable PostgreSQL 18
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:18.6
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres_local_only
+          POSTGRES_DB: luckread_d1_03_w09_rehearsal
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d luckread_d1_03_w09_rehearsal"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - name: Checkout reviewed source
+        uses: actions/checkout@v4
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Check deterministic PostgreSQL artifact and source-boundary tests
+        run: |
+          set -euo pipefail
+          node --check workers/W09-platform/scripts/neon/generate-d1-03-w09-postgres-migration.mjs
+          node --test workers/W09-platform/scripts/neon/generate-d1-03-w09-postgres-migration.test.mjs
+          node workers/W09-platform/scripts/neon/generate-d1-03-w09-postgres-migration.mjs
+          node scripts/verify-d1-03-entity-owner-boundary.mjs
+          git diff --exit-code -- workers/W09-platform/src/neon-postgres-migrations/0001_w09_d1_03_platform_schema.sql
+
+      - name: Apply W09 platform schema to disposable PostgreSQL 18
+        env:
+          D1_03_W09_LOCAL_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_d1_03_w09_rehearsal
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/neon
+          psql "$D1_03_W09_LOCAL_DATABASE_URL" \
+            --set ON_ERROR_STOP=1 --no-psqlrc --single-transaction \
+            --file workers/W09-platform/src/neon-postgres-migrations/0001_w09_d1_03_platform_schema.sql
+
+      - name: Verify catalog, constraints, immutability and rollback-only semantics
+        env:
+          D1_03_W09_LOCAL_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_d1_03_w09_rehearsal
+        run: |
+          set -euo pipefail
+          psql "$D1_03_W09_LOCAL_DATABASE_URL" \
+            --set ON_ERROR_STOP=1 --no-psqlrc \
+            --file workers/W09-platform/scripts/neon/verify-d1-03-w09-postgres-schema.sql \
+            | tee artifacts/neon/d1-03-w09-platform-postflight.txt
+
+      - name: Upload W09 D1-03 PostgreSQL 18 rehearsal evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: neon-d1-03-w09-platform-postgres18-${{ github.sha }}
+          path: artifacts/neon/d1-03-w09-platform-postflight.txt
+          if-no-files-found: error
+          retention-days: 90
