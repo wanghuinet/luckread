@@ -96,11 +96,29 @@ export function buildW07D104SavedMethodsMandatesMigration({ readSource = (relati
     throw new Error('PAY-003 schema contract totals drift')
   }
 
+  const baseOrderPaymentTables = ['orders','order_lines','order_create_idempotency','payments','payment_provider_events','payment_provider_event_conflicts']
+  const baseOrderPaymentContractSemanticProjection = {
+    contractId: baseContract.$id,
+    version: baseContract.version,
+    target: {
+      domainId: baseContract.target?.domainId,
+      databaseName: baseContract.target?.databaseName,
+      cloudflareD1DatabaseUuid: baseContract.target?.cloudflareD1DatabaseUuid,
+      postgresMajor: baseContract.target?.postgresMajor,
+    },
+    primaryOwner: baseContract.primaryOwner?.worker,
+    sourceMigrations: baseContract.scope?.includedSourceMigrations?.slice(0, 2),
+    tables: Object.fromEntries(baseOrderPaymentTables.map((name) => [name, baseContract.schema?.tables?.[name]])),
+    explicitIndexNames: baseContract.schema?.explicitIndexNames?.slice(0, 14),
+    triggerNames: baseContract.schema?.triggerNames?.slice(0, 24),
+    sliceTotals: baseContract.schema?.sliceTotals?.orderPayment,
+    postgresMappings: baseContract.postgresMappings,
+  }
   const hashes = {
     W07_SAVED_METHODS_SOURCE_SHA256: sha256(sourceSql),
     SAVED_METHOD_PERSISTENCE_CONTRACT_SHA256: sha256(persistenceText),
     BASE_ORDER_PAYMENT_SCHEMA_SHA256: sha256(baseSchemaText),
-    BASE_ORDER_PAYMENT_CONTRACT_SHA256: sha256(baseContractText),
+    BASE_ORDER_PAYMENT_CONTRACT_SEMANTIC_SHA256: sha256(JSON.stringify(baseOrderPaymentContractSemanticProjection)),
     D1_04_OWNER_LEDGER_CONTRACT_SHA256: sha256(ledgerText),
     D1_04_OWNER_BOUNDARY_CONTRACT_SHA256: sha256(ownerBoundaryText),
   }
