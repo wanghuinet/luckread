@@ -287,6 +287,7 @@ jobs:
           path: |
             artifacts/neon/d1-01-manifest-checksums.json
             artifacts/neon/d1-01-ledger-postflight.json
+            artifacts/neon/d1-01-full-local-rehearsal.json
             workers/W01-payload/artifacts/neon/w01-payload-postgres-schema.json
             workers/W02-identity/artifacts/neon/
             workers/W07-subscription-commerce/artifacts/neon/w07-d1-01-membership-postgres-schema-postflight.json
