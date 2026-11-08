@@ -143,7 +143,7 @@ records.sort((a, b) => `${a.method} ${a.path}`.localeCompare(`${b.method} ${b.pa
 const output = {
   version: '1.0.0',
   status: 'DISCOVERED',
-  sourceOfTruth: 'contracts/openapi/v1/openapi.yaml + contracts/api/api-inventory.v1.json',
+  sourceOfTruth: 'contracts/openapi/v1/openapi.yaml + contracts/api/api-inventory.v1.json + contracts/alignment/feature-inventory.v1.json',
   generatedBy: 'scripts/build-api-alignment-inventory.mjs',
   serverPrefix: serverUrl || null,
   records,
