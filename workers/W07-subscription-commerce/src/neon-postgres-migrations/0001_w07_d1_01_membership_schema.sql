@@ -15,6 +15,8 @@
 -- No speculative active-subscription uniqueness constraint is introduced.
 -- Runtime stays on Cloudflare D1; this schema is for disposable PostgreSQL CI only.
 
+BEGIN;
+
 CREATE TABLE membership_subscriptions (
   subscription_id TEXT PRIMARY KEY NOT NULL,
   subscriber_id TEXT NOT NULL,
@@ -350,3 +352,5 @@ $$;
 CREATE TRIGGER membership_subscriptions_trial_conversion_write_once
 BEFORE UPDATE OF trial_converted_at ON membership_subscriptions
 FOR EACH ROW EXECUTE FUNCTION w07_guard_subscription_trial_conversion();
+
+COMMIT;
