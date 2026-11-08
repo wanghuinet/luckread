@@ -175,9 +175,6 @@ export function validateManifestShape(manifest) {
 
 export function buildArtifactChecksums(manifest, readArtifact) {
   const shape = validateManifestShape(manifest)
-  if (remoteNeon && manifest.remoteApplyReady !== true) {
-    fail('D1-02 remote apply is intentionally blocked until its separate reviewed release contract is enabled')
-  }
   if (!shape.valid) fail(shape.errors.join('; '))
   return shape.entries.map((entry) => {
     const paths = [...entry.artifactPaths].sort((a, b) => Buffer.compare(Buffer.from(a), Buffer.from(b)))
@@ -414,6 +411,9 @@ async function run() {
     '-' + (process.env.GITHUB_RUN_ATTEMPT || '1')
   const manifest = readJson(manifestPath)
   const shape = validateManifestShape(manifest)
+  if (remoteNeon && manifest.remoteApplyReady !== true) {
+    fail('D1-02 remote apply is intentionally blocked until its separate reviewed release contract is enabled')
+  }
   if (!shape.valid) fail(shape.errors.join('; '))
   const checksums = buildArtifactChecksums(manifest, (file) =>
     readFileSync(resolve(repositoryRoot, file)),
