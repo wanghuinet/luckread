@@ -89,6 +89,14 @@ BEGIN
     RAISE EXCEPTION 'D1 ISO-8601 timestamp fields must map to PostgreSQL TIMESTAMPTZ';
   END IF;
 
+  IF (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'membership_plans') <> 9
+     OR (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'membership_plan_versions') <> 10
+     OR (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'membership_revenuecat_product_bindings') <> 8
+     OR (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'membership_subscription_plan_change_attempts') <> 19
+     OR (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'membership_subscription_scheduled_plan_changes') <> 17 THEN
+    RAISE EXCEPTION 'W07 plan, RevenueCat, upgrade-attempt or scheduled-change column counts drifted';
+  END IF;
+
   IF (SELECT data_type FROM information_schema.columns
       WHERE table_schema = 'public' AND table_name = 'membership_subscriptions'
         AND column_name = 'version') <> 'integer'
