@@ -1,0 +1,149 @@
+name: Neon D1-02 Reviewed Remote Schema Apply
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/neon-d1-02-reviewed-remote-schema-apply.yml'
+      - 'contracts/database/neon-d1-02-migration-manifest.v1.json'
+      - 'scripts/neon/d1-02/**'
+      - 'scripts/neon/d1-01/0001_schema_migration_ledger.sql'
+      - 'workers/W03-content/src/neon-postgres-migrations/**'
+      - 'workers/W05-social/src/neon-postgres-migrations/**'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/neon-d1-02-reviewed-remote-schema-apply.yml'
+      - 'contracts/database/neon-d1-02-migration-manifest.v1.json'
+      - 'scripts/neon/d1-02/**'
+      - 'scripts/neon/d1-01/0001_schema_migration_ledger.sql'
+      - 'workers/W03-content/src/neon-postgres-migrations/**'
+      - 'workers/W05-social/src/neon-postgres-migrations/**'
+  workflow_dispatch:
+    inputs:
+      confirm_target:
+        description: Apply only the reviewed empty D1-02 W03/W05 schema to the existing Neon luckreadpro database. No business data import or production cutover.
+        required: true
+        type: choice
+        options:
+          - APPLY_REVIEWED_SCHEMA_D1_02_LUCKREADPRO
+
+permissions:
+  contents: read
+
+concurrency:
+  group: neon-d1-02-reviewed-remote-schema-apply
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
+    name: Validate D1-02 remote target guards without Neon credentials
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Check remote runner syntax and target/dispatch guards
+        run: |
+          set -euo pipefail
+          node --check scripts/neon/d1-02/schema-only-runner.mjs
+          node --check scripts/neon/d1-02/assert-remote-apply-release.mjs
+          node --test scripts/neon/d1-02/schema-only-runner.test.mjs
+          node scripts/neon/d1-02/assert-remote-apply-release.mjs --assert-configured
+      - name: Prove the remote DDL job is not released by this implementation slice
+        run: node scripts/neon/d1-02/assert-remote-apply-release.mjs --assert-ready && exit 1 || test "$?" -ne 0
+
+  apply:
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.confirm_target == 'APPLY_REVIEWED_SCHEMA_D1_02_LUCKREADPRO' }}
+    name: Apply reviewed schema to Neon D1-02 luckreadpro
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Guard exact main ref and target confirmation
+        shell: bash
+        env:
+          CONFIRM_TARGET: ${{ inputs.confirm_target }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/heads/main"
+          test "$CONFIRM_TARGET" = "APPLY_REVIEWED_SCHEMA_D1_02_LUCKREADPRO"
+
+      - name: Checkout the exact dispatched main commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+
+      - name: Verify checkout provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+
+      - name: Require the separately reviewed D1-02 release flag before reading Neon credentials
+        run: node scripts/neon/d1-02/assert-remote-apply-release.mjs --assert-ready
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install the pinned PostgreSQL driver from W02
+        working-directory: workers/W02-identity
+        run: npm install --ignore-scripts --no-audit --no-fund
+
+      - name: Enforce the exact D1-02 Neon endpoint and full TLS verification
+        env:
+          NEON_DATABASE_URL_LUCKREADPRO: ${{ secrets.NEON_DATABASE_URL_LUCKREADPRO }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE' >> "$GITHUB_ENV"
+          const { validateRemoteNeonTarget, enforceVerifiedNeonConnectionString } = await import('./scripts/neon/d1-02/schema-only-runner.mjs')
+          const raw = process.env.NEON_DATABASE_URL_LUCKREADPRO
+          const target = validateRemoteNeonTarget(raw)
+          if (!target.valid) throw new Error(target.reason)
+          const verified = enforceVerifiedNeonConnectionString(raw)
+          process.stdout.write('::add-mask::' + verified + '\\n')
+          process.stdout.write('NEON_DATABASE_URL_LUCKREADPRO_VERIFIED=' + verified + '\\n')
+          NODE
+
+      - name: Apply W03 then W05 using the immutable D1-02 ledger runner
+        env:
+          GITHUB_ACTIONS: 'true'
+          GITHUB_REF: ${{ github.ref }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
+          D1_02_REMOTE_APPLY_CONFIRMATION: ${{ inputs.confirm_target }}
+          NEON_DATABASE_URL_LUCKREADPRO: ${{ env.NEON_DATABASE_URL_LUCKREADPRO_VERIFIED }}
+          D1_02_SCHEMA_APPLY_REPORT: artifacts/neon/d1-02-schema-runner-remote-postflight.json
+        run: |
+          mkdir -p artifacts/neon
+          node scripts/neon/d1-02/schema-only-runner.mjs --remote-neon
+
+      - name: Install PostgreSQL client and configure system CA bundle
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+          test -s /etc/ssl/certs/ca-certificates.crt
+          printf 'PGSSLROOTCERT=%s\\n' /etc/ssl/certs/ca-certificates.crt >> "$GITHUB_ENV"
+          psql --version
+
+      - name: Verify the full D1-02 PostgreSQL 18 catalog and rollback-only semantics
+        env:
+          NEON_DATABASE_URL_LUCKREADPRO_VERIFIED: ${{ env.NEON_DATABASE_URL_LUCKREADPRO_VERIFIED }}
+        run: |
+          set -euo pipefail
+          psql "$NEON_DATABASE_URL_LUCKREADPRO_VERIFIED" -A -t -q --set ON_ERROR_STOP=1 --no-psqlrc --set expected_database=luckreadpro --file scripts/neon/d1-02/verify-combined-postgres-schema.sql > artifacts/neon/d1-02-combined-remote-postflight.txt
+
+      - name: Upload sanitized D1-02 remote schema evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: neon-d1-02-remote-schema-postflight-${{ github.run_id }}
+          path: artifacts/neon/
+          if-no-files-found: warn
+          retention-days: 90
