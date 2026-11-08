@@ -14,19 +14,19 @@ const eventContract = JSON.parse(readFileSync(eventContractPath, 'utf8'))
 
 const fail = (message) => { throw new Error('AUTH-013 publication journal contract drift: ' + message) }
 const expectedColumns = [
-  ['journal_id', 'TEXT', false, true],
-  ['event_id', 'TEXT', false, false],
-  ['event_type', 'TEXT', false, false],
-  ['schema_version', 'TEXT', false, false],
-  ['resource_id', 'TEXT', false, false],
-  ['source_version', 'INTEGER', false, false],
-  ['payload', 'TEXT', false, false],
-  ['status', 'TEXT', false, false],
-  ['attempt', 'INTEGER', false, false],
-  ['next_attempt_at', 'TEXT', true, false],
-  ['created_at', 'TEXT', false, false],
-  ['published_at', 'TEXT', true, false],
-  ['last_error_code', 'TEXT', true, false],
+  { column: 'journal_id', dbType: 'TEXT', nullable: false, primaryKey: true },
+  { column: 'event_id', dbType: 'TEXT', nullable: false, unique: true },
+  { column: 'event_type', dbType: 'TEXT', nullable: false, constant: 'identity.account_state_changed' },
+  { column: 'schema_version', dbType: 'TEXT', nullable: false, constant: '1.0' },
+  { column: 'resource_id', dbType: 'TEXT', nullable: false },
+  { column: 'source_version', dbType: 'INTEGER', nullable: false, minimum: 1 },
+  { column: 'payload', dbType: 'TEXT', nullable: false, immutable: true },
+  { column: 'status', dbType: 'TEXT', nullable: false, enum: ['PENDING', 'PUBLISHED', 'FAILED'] },
+  { column: 'attempt', dbType: 'INTEGER', nullable: false, minimum: 1, default: 1 },
+  { column: 'next_attempt_at', dbType: 'TEXT', nullable: true },
+  { column: 'created_at', dbType: 'TEXT', nullable: false },
+  { column: 'published_at', dbType: 'TEXT', nullable: true },
+  { column: 'last_error_code', dbType: 'TEXT', nullable: true, maxLength: 128 },
 ]
 
 if (migrationContract.migrationId !== 'MIG-AUTH-013-PUBLICATION-JOURNAL-V1') fail('migration id')
@@ -63,10 +63,13 @@ if (JSON.stringify(migrationContract.indexes) !==
 
 const actualColumns = migrationContract.columns ?? []
 if (actualColumns.length !== expectedColumns.length) fail('column count must be exactly 13')
-for (const [name, dbType, nullable, primaryKey] of expectedColumns) {
-  const column = actualColumns.find((candidate) => candidate.column === name)
-  if (!column || column.dbType !== dbType || column.nullable !== nullable || (column.primaryKey === true) !== primaryKey) {
-    fail('column contract: ' + name)
+for (const expected of expectedColumns) {
+  const column = actualColumns.find((candidate) => candidate.column === expected.column)
+  if (!column) fail('column missing: ' + expected.column)
+  for (const [key, value] of Object.entries(expected)) {
+    if (JSON.stringify(column[key]) !== JSON.stringify(value)) {
+      fail('column contract: ' + expected.column + '.' + key)
+    }
   }
 }
 const eventType = eventContract.properties?.eventType?.const
