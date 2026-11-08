@@ -154,5 +154,5 @@ const generatedHeader = [
   '-- This file is schema-only; runtime remains on Cloudflare D1 pending a separate cutover gate.',
   '',
 ].join('\n')
-writeFileSync(outputPath, generatedHeader + sql)
+writeFileSync(outputPath, generatedHeader + '\n' + sql)
 console.log('W07_D1_01_MEMBERSHIP_POSTGRES_MIGRATION_GENERATION_PASS')
