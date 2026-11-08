@@ -1,0 +1,182 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/database/neon-d1-04-w07-saved-methods-mandates-schema.v1.json",
+  "title": "LuckRead D1-04 W07 Saved Payment Methods and Mandates PostgreSQL Schema Slice",
+  "version": "1.0.0",
+  "status": "W07_D1_04_SAVED_METHODS_MANDATES_SOURCE_READY_LOCAL_REHEARSAL_PENDING",
+  "target": {
+    "domainId": "D1-04",
+    "databaseName": "luckread_finance",
+    "cloudflareD1DatabaseUuid": "9bfb89a5-fbb5-45b1-a2ee-eab674b0d736",
+    "binding": "D1_04",
+    "postgresMajor": 18,
+    "existingProductionAuthority": "Cloudflare D1",
+    "stagedSchemaTarget": "Neon PostgreSQL",
+    "previousAdmittedSchema": "workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0001_w07_d1_04_order_payment_schema.sql",
+    "businessDataImport": false,
+    "productionCutoverAuthorized": false,
+    "remoteSchemaApplied": false
+  },
+  "primaryOwner": {
+    "worker": "W07",
+    "feature": "PAY-003",
+    "entities": [
+      "SavedPaymentMethod",
+      "PaymentMandate"
+    ],
+    "migrationArtifact": "workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0002_w07_d1_04_saved_methods_mandates.sql",
+    "template": "workers/W07-subscription-commerce/scripts/neon-d1-04/templates/w07-saved-methods-mandates-postgres.sql",
+    "generator": "workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-saved-methods-mandates-postgres-migration.mjs"
+  },
+  "dependencies": {
+    "previousMigrationId": "0001_w07_d1_04_order_payment_schema",
+    "previousSchemaTables": 6,
+    "requiredPreviousTables": [
+      "orders",
+      "payments",
+      "payment_provider_events",
+      "payment_provider_event_conflicts"
+    ],
+    "requiredPreviousFunction": "w07_d104_order_payment_source_guard",
+    "requiredPersistenceContract": "contracts/persistence/SAVED-PAYMENT-METHOD-D1-04-persistence.v1.json"
+  },
+  "scope": {
+    "includedSourceMigration": "workers/W07-subscription-commerce/migrations-d1-04/0003_saved_payment_methods_mandates.sql",
+    "includedTables": [
+      "saved_payment_methods",
+      "payment_mandates"
+    ],
+    "deferredTables": [
+      "subscription_renewal_cycles",
+      "subscription_renewal_scheduler_state",
+      "revenuecat_webhook_events",
+      "revenuecat_webhook_event_conflicts",
+      "refunds",
+      "billing_documents",
+      "payment_method_revocation_requests"
+    ],
+    "excludedTables": [
+      "ledger_entries",
+      "entitlements",
+      "payment_intents",
+      "users",
+      "media"
+    ],
+    "tableCount": 2
+  },
+  "schema": {
+    "tables": {
+      "saved_payment_methods": {
+        "primaryKey": "saved_payment_method_id",
+        "indexes": [
+          "ix_saved_payment_methods_customer_created"
+        ],
+        "triggerCount": 4,
+        "source": "0003_saved_payment_methods_mandates.sql",
+        "sensitiveFields": [
+          "payment_method_id"
+        ],
+        "privacy": "Only the provider opaque payment-method reference is persisted; no PAN/CVC, API key, browser client secret or raw webhook body."
+      },
+      "payment_mandates": {
+        "primaryKey": "mandate_record_id",
+        "indexes": [
+          "ux_payment_mandates_provider_mandate_id",
+          "ix_payment_mandates_customer_status_created",
+          "ix_payment_mandates_method_status"
+        ],
+        "triggerCount": 8,
+        "source": "0003_saved_payment_methods_mandates.sql",
+        "consentEvidenceFields": [
+          "consent_accepted_at",
+          "consent_acceptance_type",
+          "consent_scope",
+          "consent_terms_version"
+        ],
+        "initialStatus": "PENDING_PROVIDER_CONFIRMATION",
+        "terminalStates": [
+          "REVOKED",
+          "FAILED",
+          "EXPIRED"
+        ]
+      }
+    },
+    "explicitIndexNames": [
+      "ix_saved_payment_methods_customer_created",
+      "ux_payment_mandates_provider_mandate_id",
+      "ix_payment_mandates_customer_status_created",
+      "ix_payment_mandates_method_status"
+    ],
+    "triggerNames": [
+      "saved_payment_methods_require_succeeded_payment",
+      "saved_payment_methods_customer_binding_guard",
+      "saved_payment_methods_identity_immutable",
+      "saved_payment_methods_retained",
+      "payment_mandates_require_saved_method",
+      "payment_mandates_start_pending",
+      "payment_mandates_identity_immutable",
+      "payment_mandates_version_guard",
+      "payment_mandates_transition_guard",
+      "payment_mandates_provider_id_immutable",
+      "payment_mandates_provider_timestamp_monotonic",
+      "payment_mandates_retained"
+    ],
+    "totals": {
+      "tables": 2,
+      "explicitIndexes": 4,
+      "triggers": 12,
+      "triggerFunctions": 1,
+      "foreignKeys": 0
+    },
+    "cumulativeAfterThisSlice": {
+      "tables": 8,
+      "explicitIndexes": 18,
+      "triggers": 36,
+      "triggerFunctions": 2,
+      "foreignKeys": 0
+    }
+  },
+  "postgresMappings": {
+    "integer": "Use BIGINT for SQLite INTEGER version fields.",
+    "time": "Map ISO-8601 TEXT instant fields to TIMESTAMPTZ and compare timestamps as instants.",
+    "identifiers": "Preserve exact 30-character provider-scoped spm_/mnd_/pay_ ID formats.",
+    "opaqueToken": "payment_method_id is an opaque printable ASCII provider token, never PAN/CVC or a secret; do not expose it in API responses or logs.",
+    "partialUnique": "Preserve ux_payment_mandates_provider_mandate_id as a partial unique index WHERE provider_mandate_id IS NOT NULL.",
+    "relationships": "Preserve source trigger-enforced logical relations to payments, provider events and saved methods; zero foreign keys.",
+    "lifecycle": "New mandate rows must begin pending with version=1 and no provider timestamp; only a later verified provider reconciliation may activate."
+  },
+  "verification": {
+    "sourceRegression": "workers/W07-subscription-commerce/scripts/test_order_d1_04_migration.py",
+    "postgresImage": "postgres:18.6",
+    "tables": 2,
+    "explicitIndexes": 4,
+    "triggers": 12,
+    "triggerFunctions": 1,
+    "foreignKeys": 0,
+    "fixtureRowsAfterRollback": 0,
+    "requiredPositiveCases": [
+      "customer/merchant-bound successful payment + RECEIVED payment_succeeded receipt permits saved method",
+      "matching saved method/payment/receipt plus explicit online recurring consent permits a pending mandate",
+      "pending -> active -> revoked with increasing version and provider timestamps"
+    ],
+    "requiredNegativeCases": [
+      "saved method without a RECEIVED verified payment event is rejected",
+      "provider payment method token cannot be rebound across customers",
+      "mandate cannot be inserted ACTIVE",
+      "consent evidence and saved token identity cannot be updated",
+      "version must advance and updated_at must increase",
+      "provider mandate ID cannot change after set",
+      "terminal REVOKED mandate cannot be reactivated",
+      "saved method and mandate rows cannot be deleted"
+    ]
+  },
+  "safety": {
+    "remoteConnectionAttempted": false,
+    "remoteNeonDdlExecuted": false,
+    "cloudflareD1Touched": false,
+    "workerRuntimeOrBindingsChanged": false,
+    "businessDataImported": false,
+    "productionCutoverAuthorized": false
+  },
+  "nextGate": "This is only the PAY-003 saved-method/mandate source and disposable PG18 rehearsal slice. Renewal cycle, RevenueCat inbox, refunds/billing and revocation request migrations remain separate."
+}
