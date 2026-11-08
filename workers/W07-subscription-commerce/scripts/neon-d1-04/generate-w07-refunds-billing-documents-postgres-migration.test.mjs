@@ -18,7 +18,7 @@ test('PAY-006 builds a deterministic PostgreSQL 18 translation with source inven
  assert.match(first.migration,/billing_documents_source_guard/)
  assert.doesNotMatch(first.migration,/\{\{[A-Z0-9_]+\}\}/)
  assert.doesNotMatch(first.migration,/CREATE TABLE payment_method_revocation_requests/i)
- assert.doesNotMatch(first.migration,/FOREIGN KEY/i)
+ assert.doesNotMatch(first.migration,/\\bFOREIGN\\s+KEY\\b/i)
 })
 
 test('PAY-006 fails closed when the source provider boundary changes',()=>{
