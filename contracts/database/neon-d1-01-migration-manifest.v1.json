@@ -44,7 +44,7 @@
       "ownerWorker": "W02",
       "migrationId": "D1-01-W02-BETTER-AUTH-CORE-1.7.8",
       "kind": "GENERATED_POSTGRESQL_SQL",
-      "artifactState": "GENERATED_AT_EXECUTION",
+      "artifactState": "COMMITTED",
       "artifactPaths": [
         "workers/W02-identity/artifacts/neon/w02-better-auth-postgres-schema.sql"
       ],
