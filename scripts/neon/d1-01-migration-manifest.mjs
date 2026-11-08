@@ -17,7 +17,7 @@ const canonicalize = (value) => {
   }
   return value
 }
-const hashManifestEntry = (entry) =>
+export const hashManifestEntry = (entry) =>
   createHash('sha256').update(JSON.stringify(canonicalize(entry)), 'utf8').digest('hex')
 
 export function hashArtifactBundle(artifactPaths) {
@@ -82,10 +82,8 @@ for (const entry of manifest.entries) {
     fail('unsupported artifact state for ' + entry.migrationId)
   }
   for (const path of entry.sourcePaths) {
-    if (!path.startsWith('workers/') || path.endsWith('/') || !statSync(resolve(repositoryRoot, path)).isFile()) {
-      if (!(entry.ownerWorker === 'W02' && path === 'workers/W02-identity/scripts/neon/')) {
-        fail('source input missing or not a file: ' + path)
-      }
+    if (!path.startsWith('workers/') || !statSync(resolve(repositoryRoot, path)).isFile()) {
+      fail('source input missing or not a file: ' + path)
     }
   }
   for (const dependency of entry.dependsOn) {
