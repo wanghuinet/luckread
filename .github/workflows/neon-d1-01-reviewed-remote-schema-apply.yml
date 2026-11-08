@@ -100,34 +100,50 @@ jobs:
       - name: Require the separately reviewed remote release gate
         run: node scripts/neon/assert-d1-01-migration-ledger-ready.mjs --assert-runner-ready
 
+      - name: Enforce full TLS verification for every Neon connection
+        env:
+          NEON_DATABASE_URL_LUCKREAD: ${{ secrets.NEON_DATABASE_URL_LUCKREAD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE' >> "$GITHUB_ENV"
+          const url = new URL(process.env.NEON_DATABASE_URL_LUCKREAD)
+          if (!['postgres:', 'postgresql:'].includes(url.protocol) ||
+              !url.hostname.toLowerCase().endsWith('.neon.tech') ||
+              decodeURIComponent(url.pathname.replace(/^\\/+/, '')) !== 'luckread' ||
+              url.searchParams.get('channel_binding') !== 'require' ||
+              !['require', 'verify-full'].includes(url.searchParams.get('sslmode'))) {
+            throw new Error('Configured Neon URL is not an approved D1-01 luckread target')
+          }
+          url.searchParams.set('sslmode', 'verify-full')
+          url.searchParams.set('channel_binding', 'require')
+          process.stdout.write('NEON_DATABASE_URL_LUCKREAD_VERIFIED=' + url.toString() + '\\n')
+          NODE
+
       - name: Reconcile the existing W01 Payload baseline on Neon (read-only)
         working-directory: workers/W01-payload
         env:
           PAYLOAD_SCHEMA_NEON_VERIFY: 'true'
-          PAYLOAD_SCHEMA_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL_LUCKREAD }}
           PAYLOAD_SCHEMA_REPORT: artifacts/neon/w01-payload-neon-preflight.json
-        run: pnpm run neon:schema:verify
+        run: PAYLOAD_SCHEMA_DATABASE_URL="$NEON_DATABASE_URL_LUCKREAD_VERIFIED" pnpm run neon:schema:verify
 
       - name: Apply the exact D1-01 manifest through the shared remote runner
         env:
           D1_01_REMOTE_APPLY_CONFIRMATION: ${{ inputs.confirm_target }}
-          NEON_DATABASE_URL_LUCKREAD: ${{ secrets.NEON_DATABASE_URL_LUCKREAD }}
-        run: node scripts/neon/run-schema-migrations.mjs --remote-neon
+        run: NEON_DATABASE_URL_LUCKREAD="$NEON_DATABASE_URL_LUCKREAD_VERIFIED" node scripts/neon/run-schema-migrations.mjs --remote-neon
 
       - name: Re-verify W01 Payload schema and empty business tables (read-only)
         working-directory: workers/W01-payload
         env:
           PAYLOAD_SCHEMA_NEON_VERIFY: 'true'
-          PAYLOAD_SCHEMA_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL_LUCKREAD }}
           PAYLOAD_SCHEMA_REPORT: artifacts/neon/w01-payload-neon-postflight.json
-        run: pnpm run neon:schema:verify
+        run: PAYLOAD_SCHEMA_DATABASE_URL="$NEON_DATABASE_URL_LUCKREAD_VERIFIED" pnpm run neon:schema:verify
 
       - name: Deeply verify W02 PostgreSQL identity schemas (read-only)
         working-directory: workers/W02-identity
-        env:
-          W02_SCHEMA_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL_LUCKREAD }}
         run: |
           set -euo pipefail
+          export W02_SCHEMA_DATABASE_URL="$NEON_DATABASE_URL_LUCKREAD_VERIFIED"
           mkdir -p artifacts/neon
           node scripts/neon/verify-better-auth-core-schema.mjs > artifacts/neon/w02-better-auth-core-postflight.json
           npm run neon:role-assignment:verify > artifacts/neon/w02-role-assignment-postflight.json
@@ -146,20 +162,16 @@ jobs:
           sudo apt-get install --yes postgresql-client
 
       - name: Run W07 membership schema probes with transactional rollback
-        env:
-          NEON_DATABASE_URL_LUCKREAD: ${{ secrets.NEON_DATABASE_URL_LUCKREAD }}
         run: |
           set -euo pipefail
           mkdir -p workers/W07-subscription-commerce/artifacts/neon
-          psql "${NEON_DATABASE_URL_LUCKREAD}" -A -t -q --set ON_ERROR_STOP=1 --no-psqlrc             --file workers/W07-subscription-commerce/scripts/neon/verify-d1-01-membership-postgres-schema.sql             > workers/W07-subscription-commerce/artifacts/neon/w07-d1-01-membership-postgres-schema-postflight.json
+          psql "$NEON_DATABASE_URL_LUCKREAD_VERIFIED" -A -t -q --set ON_ERROR_STOP=1 --no-psqlrc             --file workers/W07-subscription-commerce/scripts/neon/verify-d1-01-membership-postgres-schema.sql             > workers/W07-subscription-commerce/artifacts/neon/w07-d1-01-membership-postgres-schema-postflight.json
 
       - name: Run W08 creator schema probes with transactional rollback
-        env:
-          NEON_DATABASE_URL_LUCKREAD: ${{ secrets.NEON_DATABASE_URL_LUCKREAD }}
         run: |
           set -euo pipefail
           mkdir -p workers/W08-creator/artifacts/neon
-          psql "${NEON_DATABASE_URL_LUCKREAD}" -A -t -q --set ON_ERROR_STOP=1 --no-psqlrc             --file workers/W08-creator/scripts/neon/verify-d1-01-creator-postgres-schema.sql             > workers/W08-creator/artifacts/neon/w08-d1-01-creator-postgres-schema-postflight.json
+          psql "$NEON_DATABASE_URL_LUCKREAD_VERIFIED" -A -t -q --set ON_ERROR_STOP=1 --no-psqlrc             --file workers/W08-creator/scripts/neon/verify-d1-01-creator-postgres-schema.sql             > workers/W08-creator/artifacts/neon/w08-d1-01-creator-postgres-schema-postflight.json
 
       - name: Upload sanitized D1-01 Neon migration evidence
         if: always()
