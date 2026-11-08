@@ -3,7 +3,7 @@
   "$id": "https://luckread.com/contracts/database/neon-d1-05-w11-analytics-schema.v1.json",
   "title": "LuckRead D1-05 W11 Analytics PostgreSQL Schema Slice",
   "version": "1.0.0",
-  "status": "SCHEMA_TRANSLATION_ONLY_LOCAL_PG18_REHEARSAL_REQUIRED",
+  "status": "LOCAL_POSTGRES18_REHEARSAL_PASSED_ADMISSION_BLOCKED",
   "target": {
     "domainId": "D1-05",
     "databaseName": "allluck",
@@ -218,5 +218,31 @@
     "verifier": "workers/W11-growth-campaign-analytics-operations/scripts/neon/verify-d1-05-w11-postgres-schema.sql",
     "workflow": ".github/workflows/neon-d1-05-w11-postgres-rehearsal.yml"
   },
-  "nextGate": "Admit explicit retention, deletion and consent/purpose policies; separately close W11 analytics operation security E2E. Only then may the D1-05 schema be admitted into a reviewed shared migration manifest. Remote Neon apply remains a later manually dispatched gate."
+  "nextGate": "Admit explicit retention, deletion and consent/purpose policies; separately close W11 analytics operation security E2E. Only then may the D1-05 schema be admitted into a reviewed shared migration manifest. Remote Neon apply remains a later manually dispatched gate.",
+  "localRehearsalEvidence": {
+    "status": "PASS",
+    "workflowRunId": 42507767798,
+    "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42507767798",
+    "sourceCommitSha": "7a3bfc23e794ba0edbb865cd1d24e922be10f38a",
+    "postgresImage": "postgres:18.6",
+    "results": {
+      "tables": 6,
+      "explicitIndexes": 8,
+      "foreignKeys": 0,
+      "triggers": 0,
+      "utcTimeTextColumnsWithBinaryCollation": 15,
+      "syntheticRowsAfterRollback": 0,
+      "eventOwnerAndProjectionConstraints": "PASS",
+      "sourceMigrationBlobPins": "PASS",
+      "generatedArtifactDeterminism": "PASS"
+    },
+    "safety": {
+      "remoteNeonTouched": false,
+      "cloudflareD1Touched": false,
+      "businessDataImported": false,
+      "runtimeBindingsChanged": false,
+      "productionCutoverAuthorized": false
+    },
+    "admissionStatus": "BLOCKED_MISSING_RETENTION_DELETION_AND_CONSENT_PURPOSE_POLICIES"
+  }
 }
