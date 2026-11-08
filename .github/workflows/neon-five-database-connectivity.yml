@@ -1,6 +1,12 @@
 name: Neon Five Database Read-only Target Preflight
 
 on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/neon-five-database-connectivity.yml'
+      - 'scripts/neon/five-database-readonly-preflight.mjs'
+      - 'scripts/neon/five-database-readonly-preflight.test.mjs'
   workflow_dispatch:
     inputs:
       confirm_target:
@@ -19,8 +25,26 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  validate-script:
+    if: ${{ github.event_name == 'pull_request' }}
+    name: Validate read-only preflight guards without database secrets
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR
+        uses: actions/checkout@v4
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Check syntax and run unit tests (no Neon credentials available)
+        run: |
+          set -euo pipefail
+          node --check scripts/neon/five-database-readonly-preflight.mjs
+          node --check scripts/neon/five-database-readonly-preflight.test.mjs
+          node --test scripts/neon/five-database-readonly-preflight.test.mjs
+
   preflight:
-    if: ${{ github.ref == 'refs/heads/main' && inputs.confirm_target == 'READ_ONLY_PREFLIGHT_FIVE_NEON_DATABASES' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.confirm_target == 'READ_ONLY_PREFLIGHT_FIVE_NEON_DATABASES' }}
     name: Verify all five Neon target identities and empty schema state (read-only)
     runs-on: ubuntu-latest
     timeout-minutes: 15
