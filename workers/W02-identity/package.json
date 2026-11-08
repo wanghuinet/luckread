@@ -20,6 +20,8 @@
     "neon:schema:generate": "auth generate --config src/auth/neon-postgres-schema.config.ts --output artifacts/neon/w02-better-auth-postgres-schema.sql --yes",
     "neon:schema:check": "auth check schema --config src/auth/neon-postgres-schema.config.ts",
     "neon:role-assignment:generate": "node scripts/neon/generate-role-assignment-postgres-migrations.mjs",
-    "neon:role-assignment:verify": "node scripts/neon/verify-role-assignment-postgres-schema.mjs"
+    "neon:role-assignment:verify": "node scripts/neon/verify-role-assignment-postgres-schema.mjs",
+    "neon:auth003:generate": "node scripts/neon/generate-auth003-credentials-postgres-migration.mjs",
+    "neon:auth003:verify": "node scripts/neon/verify-auth003-credentials-postgres-schema.mjs"
   }
 }
