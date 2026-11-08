@@ -3,7 +3,7 @@
   "$id": "https://luckread.com/contracts/database/neon-d1-04-w07-order-payment-schema.v1.json",
   "title": "LuckRead D1-04 W07 Order and Payment PostgreSQL Schema Slice",
   "version": "1.0.0",
-  "status": "W07_D1_04_ORDER_PAYMENT_SOURCE_BASELINE_READY_LOCAL_REHEARSAL_PENDING",
+  "status": "W07_D1_04_ORDER_PAYMENT_LOCAL_POSTGRES18_REHEARSAL_PASSED_LATER_MODULES_PENDING",
   "target": {
     "domainId": "D1-04",
     "databaseName": "luckread_finance",
@@ -241,7 +241,29 @@
       "payment_intents",
       "users",
       "media"
-    ]
+    ],
+    "localRehearsalEvidence": {
+      "workflowRunId": 42486816324,
+      "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42486816324",
+      "verifiedHeadSha": "da58f8c1ac7baeb3d7490bbf504cd1b64f87e102",
+      "postgresVersion": "18.6",
+      "database": "luckread_finance_schema",
+      "tables": 6,
+      "explicitIndexes": 14,
+      "triggers": 24,
+      "triggerFunctions": 1,
+      "foreignKeys": 0,
+      "rowsAfterRollback": 0,
+      "offlineD104SourceRegressionTests": 24,
+      "laterFinanceTablesIncluded": false,
+      "remoteNeonTouched": false,
+      "cloudflareD1Touched": false,
+      "businessDataImported": false,
+      "productionCutoverAuthorized": false,
+      "evidenceArtifactId": 13619178793,
+      "evidenceArtifactName": "neon-d1-04-w07-order-payment-postgres18-516cd20c00f87a769bbc424473aafef186026081",
+      "evidenceArtifactSha256": "sha256:f027c9a7db2915303fd0a566573229e8aed13478d17c6d0190dfde1a487990fb"
+    }
   },
   "safety": {
     "remoteConnectionAttempted": false,
