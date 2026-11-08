@@ -608,6 +608,8 @@ async function verifyOwnerSchemaState(client, manifest, plan, appliedCount) {
   await verifyPublicSchema(client)
 
   const rowCounts = {}
+  const expectedPrefixControlSeedRows = expectedTables.reduce((total, table) =>
+    total + (plan.seedRowsByTable.get(table)?.length ?? 0), 0)
   let controlSeedRows = 0
   for (const table of expectedTables) {
     const result = await client.query('SELECT COUNT(*)::bigint AS count FROM public."' +
@@ -641,8 +643,12 @@ async function verifyOwnerSchemaState(client, manifest, plan, appliedCount) {
       controlSeedRows++
     }
   }
-  if (controlSeedRows !== manifest.expected.controlSeedRows) {
-    fail('actual schema-control seed row count does not match the reviewed manifest')
+  if (controlSeedRows !== expectedPrefixControlSeedRows) {
+    fail('actual schema-control seed row count does not match the applied manifest prefix')
+  }
+  if (appliedCount === plan.entries.length &&
+      controlSeedRows !== manifest.expected.controlSeedRows) {
+    fail('final schema-control seed row count does not match the reviewed manifest')
   }
   return {
     tableCount:expectedTables.length,
