@@ -13,9 +13,10 @@ const outputPath = resolve(workerRoot, 'src/neon-postgres-migrations/0008_auth_u
 const migration = readFileSync(migrationPath, 'utf8')
 const changeControl = readFileSync(changeControlPath, 'utf8')
 const policy = JSON.parse(readFileSync(policyPath, 'utf8'))
+const normalizedChangeControl = changeControl.replaceAll('`', '')
 const fail = (message) => { throw new Error('W02 username change PostgreSQL schema contract drift: ' + message) }
 
-if (!changeControl.includes('Status: OWNER_POLICY_DECISIONS_CAPTURED / IMPLEMENTATION_CANDIDATE')) {
+if (!normalizedChangeControl.includes('Status: OWNER_POLICY_DECISIONS_CAPTURED / IMPLEMENTATION_CANDIDATE')) {
   fail('owner policy decision state')
 }
 for (const required of [
@@ -25,7 +26,7 @@ for (const required of [
   'W02 does not store a permanent username alias log',
   'No production migration, Worker deployment, PR merge, or W01 public API activation is authorized by this record.',
 ]) {
-  if (!changeControl.includes(required)) fail('change-control rule missing: ' + required)
+  if (!normalizedChangeControl.includes(required)) fail('change-control rule missing: ' + required)
 }
 if (
   policy.status !== 'OWNER_DELEGATED_POLICY' ||
