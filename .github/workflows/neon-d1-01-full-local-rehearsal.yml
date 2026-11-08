@@ -104,6 +104,7 @@ jobs:
           PGPASSWORD: postgres_local_only
         run: |
           set -euo pipefail
+          mkdir -p artifacts/neon
           node scripts/neon/d1-01-migration-manifest.mjs
           node scripts/neon/plan-d1-01-schema-migrations.mjs > /tmp/d1-01-plan.json
           node --input-type=module -e "import fs from 'node:fs'; const p=JSON.parse(fs.readFileSync('/tmp/d1-01-plan.json','utf8')); if (p.summary.migrationCount !== 14 || p.readiness.generatedArtifactCount !== 0 || p.readiness.executable !== false || p.safety.remoteConnectionAttempted !== false) throw new Error('D1-01 manifest plan guard failed'); console.log('D1_01_MANIFEST_READY entries=' + p.summary.migrationCount)"
