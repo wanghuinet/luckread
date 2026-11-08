@@ -29,11 +29,13 @@ test('W06 schema is limited to admitted moderation/report sources', () => {
     'moderation_enforcement_outbox',
     'moderation_reports',
     'moderation_report_idempotency',
-  ]) assert.match(result.migration, new RegExp('CREATE TABLE ' + name + '\\b'))
-  assert.doesNotMatch(result.migration, /CREATE TABLE (?:audit_events|appeals|moderation_appeals)\\b/i)
-  assert.match(result.migration, /evidence_refs_json JSONB[\\s\\S]+jsonb_typeof\\(evidence_refs_json\\) = 'array'/)
+  ]) assert.ok(result.migration.includes('CREATE TABLE ' + name + ' ('))
+  assert.ok(!result.migration.includes('CREATE TABLE audit_events'))
+  assert.ok(!result.migration.includes('CREATE TABLE appeals'))
+  assert.ok(result.migration.includes('evidence_refs_json JSONB'))
+  assert.ok(result.migration.includes("jsonb_typeof(evidence_refs_json) = 'array'"))
   assert.equal(result.contract.scope.excludedEntities.find((item) => item.entity === 'Appeal')?.entity, 'Appeal')
-  assert.equal(result.contract.scope.excludedEntities.find((item) => item.entity === 'AuditEvent')?.reason.includes('W09-owned'), true)
+  assert.ok(result.contract.scope.excludedEntities.find((item) => item.entity === 'AuditEvent')?.reason.includes('W09-owned'))
 })
 
 test('W06 generator fails closed when any admitted source is missing', () => {
