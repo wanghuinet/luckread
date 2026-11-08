@@ -133,13 +133,15 @@ try {
   assert(triggerMap.has('user_mfa_enable_revoke_sessions'), 'MFA enable session-revocation trigger missing')
   assert(triggerMap.has('user_mfa_disable_clear_enrollment'), 'MFA disable cleanup/session-revocation trigger missing')
   const triggerDefinitions = new Map(triggers.rows.map((row) => [row.name, row.trigger_definition]))
-  assert(/UPDATE OF two_factor_enabled ON user/i.test(triggerDefinitions.get('user_mfa_enable_revoke_sessions') ?? '') &&
-    /OLD\.two_factor_enabled IS FALSE AND NEW\.two_factor_enabled IS TRUE/i.test(
-      triggerDefinitions.get('user_mfa_enable_revoke_sessions') ?? ''),
+  const enableDefinition = (triggerDefinitions.get('user_mfa_enable_revoke_sessions') ?? '').toLowerCase()
+  const disableDefinition = (triggerDefinitions.get('user_mfa_disable_clear_enrollment') ?? '').toLowerCase()
+  assert(/update of two_factor_enabled on (?:public\.)?"user"/i.test(enableDefinition) &&
+    enableDefinition.includes('old.two_factor_enabled is false') &&
+    enableDefinition.includes('new.two_factor_enabled is true'),
   'MFA enable trigger must run only on the false-to-true transition')
-  assert(/UPDATE OF two_factor_enabled ON user/i.test(triggerDefinitions.get('user_mfa_disable_clear_enrollment') ?? '') &&
-    /OLD\.two_factor_enabled IS TRUE AND NEW\.two_factor_enabled IS FALSE/i.test(
-      triggerDefinitions.get('user_mfa_disable_clear_enrollment') ?? ''),
+  assert(/update of two_factor_enabled on (?:public\.)?"user"/i.test(disableDefinition) &&
+    disableDefinition.includes('old.two_factor_enabled is true') &&
+    disableDefinition.includes('new.two_factor_enabled is false'),
   'MFA disable trigger must run only on the true-to-false transition')
   assert(triggerMap.get('user_mfa_enable_revoke_sessions')?.includes('mfa_enrolled_at = statement_timestamp()'),
     'MFA enable trigger must set authoritative enrollment time')
