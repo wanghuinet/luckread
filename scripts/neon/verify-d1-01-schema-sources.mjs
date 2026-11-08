@@ -195,7 +195,7 @@ for (const owner of contract.owners.slice(1)) {
       const retainsProductionD1Default =
         content.includes('database: env.D1_01') ||
         (
-          /database\s*:\s*database\s*,/.test(content) &&
+          /(?:^|\n)\s*database\s*,/m.test(content) &&
           /database\s*:\s*BetterAuthDatabase\s*=\s*env\.D1_01(?:\s+as\s+BetterAuthDatabase)?/.test(content) &&
           /export\s+const\s+buildLuckReadAuth/.test(content)
         )
