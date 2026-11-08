@@ -154,3 +154,13 @@ This change control is complete when the repository has an agreed five-domain sc
 - The connectivity workflow is now manual-dispatch-only on `main` with an exact read-only confirmation. PRs run only local syntax/unit tests; the PR validation job receives no Neon secrets. This avoids exposing connection credentials to PR-controlled workflow code.
 - This slice does not authorize or perform schema application, migration-ledger installation, business-data import, Cloudflare D1 mutation, Worker runtime/binding changes or production cutover.
 - The earlier `PASS_EMPTY 5/5` record remains historical evidence from the original preflight run. The hardened preflight must be manually dispatched after this PR is merged to collect fresh five-target evidence under the stricter checks.
+
+
+## 13. D1-01 W01 Payload baseline reconciliation — safety follow-up
+
+- The hardened five-database read-only preflight on workflow run [42452559295](https://github.com/wanghuinet/luckread/actions/runs/42452559295) returned `PASS_EMPTY 4/5` and `D1-01 luckread = BLOCKED_NOT_EMPTY`.
+- D1-01's catalog names align with the committed W01 Payload baseline's 11 relations (10 business tables plus `payload_migrations`), their generated sequences and the three Redirects enum types. This is only a catalog-name match; it is not proof that all columns, indexes, constraints or rows are correct.
+- The generic five-database preflight did not read business rows. The current D1-01 business-table row counts and exact `payload_migrations.name` value therefore remain unverified.
+- The next allowed operation is the separate manual workflow `.github/workflows/neon-d1-01-w01-payload-baseline-reconciliation.yml`, with confirmation `RECONCILE_READ_ONLY_D1_01_W01_PAYLOAD_BASELINE`. It verifies the W01 schema snapshot, all ten business tables are empty, and exactly one `payload_migrations` row names the committed baseline migration, using one `BEGIN READ ONLY` transaction followed by `ROLLBACK`.
+- A successful reconciliation may be used as evidence that W01's baseline is already present; it does not authorize deleting/recreating W01 objects, installing the shared ledger, applying W02/W07/W08 schemas, changing production D1 or cutting traffic over.
+- Any mismatch or non-zero business-table count is a hard stop for manual review. No automatic cleanup is permitted.

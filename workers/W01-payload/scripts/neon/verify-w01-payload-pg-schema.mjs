@@ -2,6 +2,8 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import pg from 'pg'
+import tls from 'node:tls'
+import { evaluatePayloadMigrationLedgerRows } from './payload-baseline-reconciliation.mjs'
 
 const { Pool } = pg
 const scriptDir = path.dirname(fileURLToPath(import.meta.url))
@@ -20,7 +22,8 @@ const localMode =
 const approvedNeonMode =
   neonMode &&
   ['postgres:', 'postgresql:'].includes(parsedUrl.protocol) &&
-  parsedUrl.hostname.endsWith('.neon.tech') &&
+  parsedUrl.hostname.toLowerCase().startsWith('ep-') &&
+  parsedUrl.hostname.toLowerCase().endsWith('.neon.tech') &&
   parsedUrl.pathname === '/luckread' &&
   ['require', 'verify-ca', 'verify-full'].includes(parsedUrl.searchParams.get('sslmode')) &&
   parsedUrl.searchParams.get('channel_binding') === 'require'
@@ -93,13 +96,17 @@ const requiredColumns = {
 
 const pool = new Pool({
   connectionString: databaseUrl,
-  max: 2,
+  max: 1,
   connectionTimeoutMillis: 10_000,
   idleTimeoutMillis: 1_000,
   enableChannelBinding: true,
 })
+let client
+let transactionOpen = false
 const failures = []
 const report = {
+  readOnlyTransactionVerified: false,
+  readOnlyTransactionRolledBack: false,
   reportVersion: 1,
   scope: neonMode
     ? 'W01 Payload PostgreSQL schema postflight against the explicitly approved Neon D1-01 target; no business data import or production Worker switch.'
@@ -111,21 +118,35 @@ const report = {
 }
 
 try {
+  client = await pool.connect()
   if (neonMode) {
-    const tlsClient = await pool.connect()
-    try {
-      const tlsSocket = tlsClient.connection?.stream
-      if (tlsSocket?.encrypted !== true || tlsSocket?.authorized !== true) {
-        throw new Error('Neon client TLS verification failed')
-      }
-      await tlsClient.query('SELECT 1')
-    } finally {
-      tlsClient.release()
+    const tlsSocket = client.connection?.stream
+    const peerCertificate = tlsSocket?.getPeerCertificate?.()
+    const hostnameError = peerCertificate
+      ? tls.checkServerIdentity(parsedUrl.hostname, peerCertificate)
+      : new Error('Peer certificate unavailable')
+    if (
+      tlsSocket?.encrypted !== true ||
+      tlsSocket?.authorized !== true ||
+      hostnameError
+    ) {
+      throw new Error('Neon TLS chain or hostname verification failed')
     }
     report.tlsVerified = true
+    report.tlsHostnameVerified = true
   }
 
-  const server = await pool.query(
+  await client.query('BEGIN READ ONLY')
+  transactionOpen = true
+  const transactionState = await client.query(
+    "SELECT current_setting('transaction_read_only') AS read_only",
+  )
+  report.readOnlyTransactionVerified = transactionState.rows[0]?.read_only === 'on'
+  if (!report.readOnlyTransactionVerified) {
+    throw new Error('PostgreSQL read-only transaction could not be verified')
+  }
+
+  const server = await client.query(
     "SELECT current_database() AS database, current_setting('server_version') AS version",
   )
   report.server = server.rows[0]
@@ -133,7 +154,7 @@ try {
     throw new Error('Expected PostgreSQL 18 at the exact approved database name')
   }
 
-  const tableResult = await pool.query(
+  const tableResult = await client.query(
     `SELECT tablename
        FROM pg_catalog.pg_tables
       WHERE schemaname = 'public'
@@ -150,7 +171,7 @@ try {
     failures.push({ kind: 'table-catalog-drift', missingTables, unexpectedTables })
   }
 
-  const columnResult = await pool.query(
+  const columnResult = await client.query(
     `SELECT table_name, column_name, data_type, is_nullable, column_default
        FROM information_schema.columns
       WHERE table_schema = 'public'
@@ -183,7 +204,7 @@ try {
     if (missing.length) failures.push({ kind: 'required-column-missing', table, missing })
   }
 
-  const indexResult = await pool.query(
+  const indexResult = await client.query(
     `SELECT tablename AS table_name, indexname AS index_name, indexdef
        FROM pg_catalog.pg_indexes
       WHERE schemaname = 'public'
@@ -194,7 +215,7 @@ try {
   const missingIndexes = expectedIndexNames.filter((name) => !actualIndexNames.has(name))
   if (missingIndexes.length) failures.push({ kind: 'source-index-missing', missingIndexes })
 
-  const fkResult = await pool.query(
+  const fkResult = await client.query(
     `SELECT source_table.relname AS table_name,
             constraint_row.conname AS constraint_name,
             target_table.relname AS referenced_table,
@@ -253,7 +274,7 @@ try {
   const businessTables = expectedTables.filter((table) => table !== 'payload_migrations')
   const rowCounts = {}
   for (const table of businessTables) {
-    const result = await pool.query(`SELECT COUNT(*)::bigint AS count FROM public."${table}"`)
+    const result = await client.query(`SELECT COUNT(*)::bigint AS count FROM public."${table}"`)
     rowCounts[table] = Number(result.rows[0].count)
     if (rowCounts[table] !== 0) {
       failures.push({ kind: 'unexpected-business-data', table, count: rowCounts[table] })
@@ -261,11 +282,24 @@ try {
   }
   report.businessTableRowCounts = rowCounts
 
-  const ledger = await pool.query('SELECT COUNT(*)::bigint AS count FROM public.payload_migrations')
-  report.payloadMigrationLedgerRows = Number(ledger.rows[0].count)
-  if (report.payloadMigrationLedgerRows !== 1) {
-    failures.push({ kind: 'payload-migration-ledger-count', expected: 1, actual: report.payloadMigrationLedgerRows })
+  const ledger = await client.query(
+    'SELECT name FROM public.payload_migrations ORDER BY id',
+  )
+  const ledgerValidation = evaluatePayloadMigrationLedgerRows(ledger.rows)
+  report.payloadMigrationLedgerRows = ledger.rows.length
+  report.payloadMigrationNames = ledgerValidation.actualNames
+  if (!ledgerValidation.valid) {
+    failures.push({
+      kind: 'payload-migration-ledger-identity',
+      expected: ledgerValidation.expectedName,
+      actual: ledgerValidation.actualNames,
+      rowCount: ledgerValidation.rowCount,
+    })
   }
+
+  await client.query('ROLLBACK')
+  transactionOpen = false
+  report.readOnlyTransactionRolledBack = true
 
   report.failures = failures
   report.status = failures.length === 0
@@ -278,5 +312,9 @@ try {
   process.stdout.write(`${JSON.stringify(report, null, 2)}\n`)
   if (failures.length > 0) process.exitCode = 1
 } finally {
+  if (transactionOpen && client) {
+    try { await client.query('ROLLBACK') } catch { /* preserve the original verification error */ }
+  }
+  if (client) client.release()
   await pool.end()
 }
