@@ -86,7 +86,8 @@
     "triggers": 2,
     "triggerFunctions": 1,
     "foreignKeys": 2,
-    "businessRows": 0
+    "businessRows": 0,
+    "controlSeedRows": 0
   },
   "remoteApplyBlockers": [
     "W06 Appeal has no admitted persistence contract or source migration; no Appeal table is inferred.",
@@ -103,5 +104,6 @@
     "cloudflareD1Touched": false,
     "businessDataImported": false,
     "productionCutoverAuthorized": false
-  }
+  },
+  "seedRows": []
 }
