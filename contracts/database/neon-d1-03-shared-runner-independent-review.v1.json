@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/database/neon-d1-03-shared-runner-independent-review.v1.json",
+  "title": "LuckRead D1-03 Shared Schema Runner Independent Local Review",
+  "version": "1.0.0",
+  "status": "LOCAL_SHARED_SCHEMA_REVIEW_PASSED_REMOTE_APPLY_BLOCKED",
+  "review": {
+    "reviewKind": "AUTOMATED_INDEPENDENT_READ_ONLY_CODE_PATH_REVIEW",
+    "description": "A separate verifier reviews the D1-03 manifest, ownership/transport boundaries, source schema contracts, W06/W09/W10 artifacts, runtime bindings and shared-runner local-only restrictions. This is not a remote-apply approval or production release.",
+    "reviewedMainCommit": "4ed51dd2c105b38c15ca94fce496485facd83c58",
+    "sharedExecutorPullRequest": 1660,
+    "sharedExecutorHeadCommit": "5e8bfaf7bd26fe8669c08de1e062d998c4f4c6de",
+    "sharedPostgres18WorkflowRunId": 42509822425,
+    "sharedPostgres18WorkflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42509822425",
+    "d1Postflight": {
+      "domainId": "D1-03",
+      "databaseName": "luckread_governance",
+      "localDatabaseName": "luckread_d1_03_shared",
+      "postgresMajor": 18,
+      "migrations": 3,
+      "tables": 15,
+      "explicitIndexes": 22,
+      "triggers": 2,
+      "triggerFunctions": 1,
+      "foreignKeys": 2,
+      "businessRows": 0,
+      "remoteNeonTouched": false,
+      "cloudflareD1Touched": false,
+      "remoteApplyReady": false
+    },
+    "reviewedSourcePins": [
+      {
+        "path": "scripts/neon/shared-domain-schema-runner.mjs",
+        "gitBlobSha1": "53706e33929da41f331acf3892d223d341762817"
+      },
+      {
+        "path": "contracts/database/neon-d1-03-shared-migration-manifest.v1.json",
+        "gitBlobSha1": "4d5192c4baf140f2b9c3a76db401c894b8b45288"
+      },
+      {
+        "path": "contracts/transport/d1-03-entity-owner-boundary.v1.json",
+        "gitBlobSha1": "e271a1402d2f2600b88271c29f2e694be70f30c2"
+      },
+      {
+        "path": "contracts/transport/worker-d1-access-boundary.v1.json",
+        "gitBlobSha1": "fb269371ba3f3d6952f019b7b6c47ad1315e0c7d"
+      },
+      {
+        "path": "contracts/database/neon-d1-03-w06-moderation-schema.v1.json",
+        "gitBlobSha1": "2feac89859bfe5729d461e369a3bf33dcbe421bc"
+      },
+      {
+        "path": "contracts/database/neon-d1-03-w09-platform-schema.v1.json",
+        "gitBlobSha1": "50e980647710bdaae29e52fae60b1b231b9e2f3c"
+      },
+      {
+        "path": "contracts/database/neon-d1-03-w10-execution-schema.v1.json",
+        "gitBlobSha1": "e5e3bc9bebb4ee13a2d1ed51336bd380d3c7bc35"
+      },
+      {
+        "path": "contracts/database/neon-d1-03-w09-owner-reconciliation.v1.json",
+        "gitBlobSha1": "3bb0795dfb70ed875c83040aea796b34587a4b54"
+      },
+      {
+        "path": "contracts/database/neon-d1-03-w11-owner-reconciliation.v1.json",
+        "gitBlobSha1": "f8582c29b3a6095b51ed409ea0ea34b0f42be6e7"
+      },
+      {
+        "path": "contracts/persistence/NOTIFY-002-W05-D1-03-PUSH-ENDPOINT-PERSISTENCE.v1.json",
+        "gitBlobSha1": "be5eda5fa64ec4c39c92eeb3ca1fc8ed03b330c0"
+      },
+      {
+        "path": "contracts/transport/W05-W09-notification-push-delivery.v1.json",
+        "gitBlobSha1": "0e0f9f92b6f6aee11e693e7501892f7527e49feb"
+      },
+      {
+        "path": "workers/W06-governance/wrangler.jsonc",
+        "gitBlobSha1": "2c4120ded4078feba776cad1c265c401647e47db"
+      },
+      {
+        "path": "workers/W09-platform/wrangler.d1-03-migrations.jsonc",
+        "gitBlobSha1": "bf93e677e553a66083c1f5741294bab9c45d6206"
+      },
+      {
+        "path": "workers/W10-async/wrangler.jsonc",
+        "gitBlobSha1": "04d060a1040fa3b7ea5be24157feddf7b6668447"
+      },
+      {
+        "path": "workers/W11-growth-campaign-analytics-operations/wrangler.jsonc",
+        "gitBlobSha1": "7df80ec418aa46bb2ba09fa9252c88138d00ceaf"
+      },
+      {
+        "path": "workers/W06-governance/src/neon-postgres-migrations/0001_w06_d1_03_moderation_schema.sql",
+        "gitBlobSha1": "567dfb076d3cb7cfd774e794f45e0e0d41f19aa7"
+      },
+      {
+        "path": "workers/W09-platform/src/neon-postgres-migrations/0001_w09_d1_03_platform_schema.sql",
+        "gitBlobSha1": "914a88a1dbf02b937a701f500ab2c08c7db59b60"
+      },
+      {
+        "path": "workers/W10-async/src/neon-postgres-migrations/0001_w10_d1_03_async_execution.sql",
+        "gitBlobSha1": "77ea1bdbbddf17e77068108b7193a5956cd2fc40"
+      }
+    ]
+  },
+  "reviewChecks": [
+    "The D1-03 manifest has exactly three ordered migrations: W06 moderation, W09 platform, and W10 logical async execution.",
+    "The W10 migration is recorded in the shared ledger as W09 because W09 is the sole D1-03 Wrangler migration-config owner; the logical entity owner remains W10.",
+    "W06 owns the seven admitted moderation/report tables. Appeal and AuditEvent are excluded from the W06 physical artifact.",
+    "W09 owns audit_events and notification_push_endpoints. W05 retains only its exact scoped NotificationPushEndpoint delegation.",
+    "W10 owns six async-execution tables and has no D1-03 runtime binding in its Wrangler config; runtime admission remains separate.",
+    "W11 Campaign and GrowthOperation remain logical-only in D1-03; W11 has only its existing D1-05 runtime binding.",
+    "The shared runner accepts only the exact local PostgreSQL 18 target and explicitly rejects remote Neon execution.",
+    "The shared PG18 run verified 15 tables, 22 indexes, 2 triggers, 1 trigger function, 2 same-domain foreign keys, and zero business rows."
+  ],
+  "remoteApplyReady": false,
+  "businessDataImport": false,
+  "productionCutoverAuthorized": false,
+  "safety": {
+    "newWorkers": 0,
+    "newD1Databases": 0,
+    "newQueues": 0,
+    "newServiceBindings": 0,
+    "runtimeBindingsChanged": false,
+    "remoteNeonDdlExecuted": false,
+    "cloudflareD1Touched": false,
+    "businessDataImported": false,
+    "productionCutoverAuthorized": false
+  },
+  "remoteApplyBlockers": [
+    "W06 Appeal remains a logical capability without an admitted persistence contract and source migration.",
+    "W11 Campaign and GrowthOperation remain logical-only in D1-03; no physical schema or runtime binding is admitted.",
+    "The independent local review does not authorize remote DDL. A separate reviewed remote-apply release record and domain-specific approval are required."
+  ]
+}
