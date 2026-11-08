@@ -214,7 +214,7 @@
   "artifacts": {
     "template": "workers/W11-growth-campaign-analytics-operations/scripts/neon/templates/d1-05-w11-analytics-postgres.sql",
     "generator": "workers/W11-growth-campaign-analytics-operations/scripts/neon/generate-d1-05-w11-postgres-migration.mjs",
-    "migration": "workers/W11-growth-campaign-analytics-operations/src/neon-postgres-migrations/0001_w11_d1_05_analytics_schema.sql",
+    "migration": "workers/W11-growth-campaign-analytics-operations/src/neon-postgres-migrations-d1-05/0001_w11_d1_05_analytics_schema.sql",
     "verifier": "workers/W11-growth-campaign-analytics-operations/scripts/neon/verify-d1-05-w11-postgres-schema.sql",
     "workflow": ".github/workflows/neon-d1-05-w11-postgres-rehearsal.yml"
   },
