@@ -68,7 +68,7 @@ test('D1-02 remote target guard accepts only the pinned luckreadpro Neon endpoin
   assert.equal(validateRemoteNeonTarget(valid.replace(host, 'ep-other-pooler.c-3.ap-southeast-1.aws.neon.tech')).valid, false)
   assert.equal(validateRemoteNeonTarget(valid.replace('sslmode=require', 'sslmode=disable')).valid, false)
   assert.equal(validateRemoteNeonTarget(valid.replace('channel_binding=require', 'channel_binding=prefer')).valid, false)
-  assert.equal(validateRemoteNeonTarget(valid.replace('channel_binding=require&', '')).valid, false)
+  assert.equal(validateRemoteNeonTarget(valid.replace('&channel_binding=require', '')).valid, false)
   assert.equal(validateRemoteNeonTarget(valid.replace('owner:secret@', '')).valid, false)
   assert.equal(validateRemoteNeonTarget('https://example.com').valid, false)
   assert.equal(validateRemoteNeonTarget(undefined).valid, false)
