@@ -24,7 +24,11 @@
     "reviewedFiles": [
       {
         "path": ".github/workflows/neon-d1-02-reviewed-remote-schema-apply.yml",
-        "gitBlobSha1": "6d7236be624934393bdb941f8e320f2fd45091b9"
+        "gitBlobSha1": "19d18240f403a6b8b7fe7c23195adcba5d8f4134"
+      },
+      {
+        "path": ".github/workflows/neon-d1-01-reviewed-remote-schema-apply.yml",
+        "gitBlobSha1": "00d4acb8ac2bb26c3248caebcdfef550a5075a6a"
       },
       {
         "path": "contracts/database/neon-d1-02-migration-manifest.v1.json",
@@ -115,7 +119,8 @@
       "Postflight checks exact 28-table ownership, 63 indexes, 9 triggers, 10 trigger functions, zero business rows, only one Snowflake allocator row, zero foreign keys and no D1-03/W09 endpoint table.",
       "Disposable PostgreSQL 18 CI exercises the full schema and rollback-only cross-owner event/reference semantics.",
       "D1-01 shared migration readiness logic permits only the exact reviewed D1-02 state while retaining D1-03 through D1-05 blocked and the global remoteApplyReady flag false.",
-      "PR and push validation never read Neon credentials; remote apply remains a separate manual main-only workflow."
+      "PR and push validation never read Neon credentials; remote apply remains a separate manual main-only workflow.",
+      "D1-01 remote validation workflow also runs shared runner and D1-01 planning regression tests after the D1-02 domain release state changes."
     ],
     "findings": [],
     "limitations": [
