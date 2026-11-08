@@ -98,7 +98,7 @@ test('fails closed if W11 gains an unapproved D1-03 runtime binding', () => {
 test('fails closed if direct actor, visitor or session identifiers are added to analytics persistence', () => {
   const mutate = (text) => text.replace(
     '  actor_type TEXT NOT NULL',
-    '  actor_id TEXT,\\n  actor_type TEXT NOT NULL',
+    '  actor_id TEXT,\n  actor_type TEXT NOT NULL',
   )
   const source = overrideSources([[artifactPath,mutate],[templatePath,mutate]])
   assert.throws(
@@ -109,8 +109,8 @@ test('fails closed if direct actor, visitor or session identifiers are added to 
 
 test('fails closed if W11 D1-03 Campaign/GrowthOperation business tables are inferred into D1-05', () => {
   const mutate = (text) => text.replace(
-    '\\nCOMMIT;',
-    '\\nCREATE TABLE campaigns (campaign_id TEXT PRIMARY KEY NOT NULL);\\nCOMMIT;',
+    '\nCOMMIT;',
+    '\nCREATE TABLE campaigns (campaign_id TEXT PRIMARY KEY NOT NULL);\nCOMMIT;',
   )
   const source = overrideSources([[artifactPath,mutate],[templatePath,mutate]])
   assert.throws(
@@ -121,8 +121,8 @@ test('fails closed if W11 D1-03 Campaign/GrowthOperation business tables are inf
 
 test('fails closed if a cross-domain foreign key is introduced', () => {
   const mutate = (text) => text.replace(
-    '\\nCOMMIT;',
-    '\\nALTER TABLE analytics_event_dedupe ADD CONSTRAINT bad_owner_ref FOREIGN KEY (content_id) REFERENCES users(id);\\nCOMMIT;',
+    '\nCOMMIT;',
+    '\nALTER TABLE analytics_event_dedupe ADD CONSTRAINT bad_owner_ref FOREIGN KEY (content_id) REFERENCES users(id);\nCOMMIT;',
   )
   const source = overrideSources([[artifactPath,mutate],[templatePath,mutate]])
   assert.throws(
@@ -164,7 +164,7 @@ test('fails closed when a reviewed D1 source migration Git blob drifts', () => {
   const sourcePath = 'workers/W11-growth-campaign-analytics-operations/migrations/0001_analytics_projection.sql'
   const source = overrideSources([[
     sourcePath,
-    (text) => text + '\\n-- source drift\\n',
+    (text) => text + '\n-- source drift\n',
   ]],false)
   assert.throws(
     () => verifyD105SharedRunnerReview({readSource:source}),
