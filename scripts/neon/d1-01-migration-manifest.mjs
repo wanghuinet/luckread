@@ -94,7 +94,6 @@ const bootstrap = JSON.parse(readFileSync(
 ))
 const w01Package = JSON.parse(readFileSync(resolve(repositoryRoot, 'workers/W01-payload/package.json'), 'utf8'))
 const w02Package = JSON.parse(readFileSync(resolve(repositoryRoot, 'workers/W02-identity/package.json'), 'utf8'))
-const ledgerContract = JSON.parse(readFileSync(resolve(repositoryRoot, 'contracts/database/neon-schema-migration-ledger.v1.json'), 'utf8'))
 const d1Domain = bootstrap.domains?.find((domain) => domain.domainId === 'D1-01')
 const inventoryOwners = inventory.owners?.map((owner) => owner.worker).filter((worker) =>
   ['W01', 'W02', 'W07', 'W08'].includes(worker)
