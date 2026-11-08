@@ -33,7 +33,7 @@ export function verifyCombinedSchemaContract({ contract, inventory, loadArtifact
   }
 
   const totals = { owners: owners.length, migrationSources: 0, tables: 0, explicitIndexes: 0, triggers: 0, triggerFunctions: 0 }
-  const objectNames = { tables: [], indexes: [], triggers: [], functions: [] }
+  const objectNames = { tables: [], explicitIndexes: [], triggers: [], triggerFunctions: [] }
   const ownerArtifacts = []
   for (const owner of owners) {
     const source = inventory.owners?.find((item) => item.worker === owner.worker)
