@@ -1,0 +1,97 @@
+name: D1-04 Shared Runner Independent Local Review
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/neon-d1-04-shared-runner-independent-review.yml'
+      - 'contracts/database/neon-d1-04-shared-runner-independent-review.v1.json'
+      - 'contracts/database/neon-d1-04-shared-migration-manifest.v1.json'
+      - 'contracts/database/neon-d1-04-w07-*-schema.v1.json'
+      - 'contracts/transport/worker-d1-access-boundary.v1.json'
+      - 'scripts/neon/shared-domain-schema-runner.mjs'
+      - 'scripts/neon/shared-domain-schema-runner.test.mjs'
+      - 'scripts/neon/review-d1-04-shared-runner-independent.mjs'
+      - 'scripts/neon/review-d1-04-shared-runner-independent.test.mjs'
+      - 'workers/W07-subscription-commerce/wrangler.jsonc'
+      - 'workers/W07-subscription-commerce/migrations-d1-04/**'
+      - 'workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/**'
+      - 'workers/W07-subscription-commerce/scripts/neon-d1-04/**'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/neon-d1-04-shared-runner-independent-review.yml'
+      - 'contracts/database/neon-d1-04-shared-runner-independent-review.v1.json'
+      - 'contracts/database/neon-d1-04-shared-migration-manifest.v1.json'
+      - 'contracts/database/neon-d1-04-w07-*-schema.v1.json'
+      - 'contracts/transport/worker-d1-access-boundary.v1.json'
+      - 'scripts/neon/shared-domain-schema-runner.mjs'
+      - 'scripts/neon/shared-domain-schema-runner.test.mjs'
+      - 'scripts/neon/review-d1-04-shared-runner-independent.mjs'
+      - 'scripts/neon/review-d1-04-shared-runner-independent.test.mjs'
+      - 'workers/W07-subscription-commerce/wrangler.jsonc'
+      - 'workers/W07-subscription-commerce/migrations-d1-04/**'
+      - 'workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/**'
+      - 'workers/W07-subscription-commerce/scripts/neon-d1-04/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: neon-d1-04-shared-runner-independent-review-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  independent-review:
+    name: Independently review W07 D1-04 ownership, migration chain and exact control seed
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout reviewed source
+        uses: actions/checkout@v4
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Run shared-ledger and W07 independent review tests
+        run: |
+          set -euo pipefail
+          node --check scripts/neon/review-d1-04-shared-runner-independent.mjs
+          node --test \
+            scripts/neon/shared-domain-schema-runner.test.mjs \
+            scripts/neon/review-d1-04-shared-runner-independent.test.mjs \
+            workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-order-payment-postgres-migration.test.mjs \
+            workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-saved-methods-mandates-postgres-migration.test.mjs \
+            workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-renewal-cycles-postgres-migration.test.mjs \
+            workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-revenuecat-webhook-postgres-migration.test.mjs \
+            workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-refunds-billing-documents-postgres-migration.test.mjs \
+            workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-payment-method-revocation-postgres-migration.test.mjs
+      - name: Regenerate all six W07 PostgreSQL artifacts from their admitted contracts
+        run: |
+          set -euo pipefail
+          node workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-order-payment-postgres-migration.mjs
+          node workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-saved-methods-mandates-postgres-migration.mjs
+          node workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-renewal-cycles-postgres-migration.mjs
+          node workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-revenuecat-webhook-postgres-migration.mjs
+          node workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-refunds-billing-documents-postgres-migration.mjs
+          node workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-payment-method-revocation-postgres-migration.mjs
+          git diff --exit-code -- \
+            workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0001_w07_d1_04_order_payment_schema.sql \
+            workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0002_w07_d1_04_saved_methods_mandates.sql \
+            workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0003_w07_d1_04_renewal_cycles.sql \
+            workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0004_w07_d1_04_revenuecat_webhook_inbox.sql \
+            workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0005_w07_d1_04_refunds_billing_documents.sql \
+            workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0006_w07_d1_04_payment_method_revocation.sql
+      - name: Emit D1-04 independent local review evidence
+        run: |
+          set -euo pipefail
+          node scripts/neon/review-d1-04-shared-runner-independent.mjs
+      - name: Upload D1-04 independent review evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: neon-d1-04-shared-runner-independent-review-${{ github.sha }}
+          path: artifacts/neon/d1-04-shared-runner-independent-review.json
+          if-no-files-found: error
+          retention-days: 90
