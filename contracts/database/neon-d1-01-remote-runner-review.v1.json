@@ -68,6 +68,14 @@
       {
         "path": ".github/workflows/neon-d1-01-reviewed-remote-schema-apply.yml",
         "gitBlobSha1": "b81b3db57eb346108dae225d3809468d2d150987"
+      },
+      {
+        "path": "contracts/database/neon-d1-01-migration-manifest.v1.json",
+        "gitBlobSha1": "cfe408db4eda5f0e005ea75ce28128c054d87238"
+      },
+      {
+        "path": "contracts/database/neon-schema-migration-ledger.v1.json",
+        "gitBlobSha1": "6b22cf2f70cc51fd05fd70d4d5af43483c62b077"
       }
     ],
     "controlsChecked": [
