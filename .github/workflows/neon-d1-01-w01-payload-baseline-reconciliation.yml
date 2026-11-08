@@ -1,0 +1,96 @@
+name: Neon D1-01 W01 Payload Baseline Read-only Reconciliation
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/neon-d1-01-w01-payload-baseline-reconciliation.yml'
+      - 'workers/W01-payload/scripts/neon/verify-w01-payload-pg-schema.mjs'
+      - 'workers/W01-payload/scripts/neon/payload-baseline-reconciliation.mjs'
+      - 'workers/W01-payload/scripts/neon/payload-baseline-reconciliation.test.mjs'
+      - 'workers/W01-payload/src/migrations/20261101_163928_username_redirects.json'
+      - 'docs/change-control/CC-NEON-FIVE-DATABASE-SCHEMA-INITIALIZATION-2026-11-08.md'
+  workflow_dispatch:
+    inputs:
+      confirm_target:
+        description: Type the exact confirmation for a read-only W01 baseline reconciliation against Neon luckread.
+        required: true
+        type: choice
+        options:
+          - RECONCILE_READ_ONLY_D1_01_W01_PAYLOAD_BASELINE
+
+permissions:
+  contents: read
+
+concurrency:
+  group: neon-d1-01-w01-payload-baseline-reconciliation
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    if: ${{ github.event_name == 'pull_request' }}
+    name: Validate W01 baseline reconciliation guards without Neon secrets
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout PR source
+        uses: actions/checkout@v4
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Check W01 verifier syntax
+        run: node --check workers/W01-payload/scripts/neon/verify-w01-payload-pg-schema.mjs
+      - name: Test Payload migration ledger identity guard
+        run: node --test workers/W01-payload/scripts/neon/payload-baseline-reconciliation.test.mjs
+
+  reconcile:
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.confirm_target == 'RECONCILE_READ_ONLY_D1_01_W01_PAYLOAD_BASELINE' }}
+    name: Reconcile existing W01 Payload schema on Neon D1-01 (read-only)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Guard exact main ref and explicit read-only confirmation
+        shell: bash
+        env:
+          CONFIRM_TARGET: ${{ inputs.confirm_target }}
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REF}" = "refs/heads/main"
+          test "${CONFIRM_TARGET}" = "RECONCILE_READ_ONLY_D1_01_W01_PAYLOAD_BASELINE"
+
+      - name: Checkout reviewed main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Setup pnpm 11
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+          run_install: false
+
+      - name: Install exact W01 dependency graph
+        working-directory: workers/W01-payload
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Verify W01 Payload schema and empty business tables in a read-only transaction
+        working-directory: workers/W01-payload
+        env:
+          PAYLOAD_SCHEMA_NEON_VERIFY: 'true'
+          PAYLOAD_SCHEMA_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL_LUCKREAD }}
+          PAYLOAD_SCHEMA_REPORT: artifacts/neon/w01-payload-neon-schema-postflight.json
+        run: pnpm run neon:schema:verify
+
+      - name: Upload sanitized W01 baseline reconciliation evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: neon-d1-01-w01-payload-baseline-reconciliation-${{ github.run_id }}
+          path: workers/W01-payload/artifacts/neon/w01-payload-neon-schema-postflight.json
+          if-no-files-found: error
+          retention-days: 90
