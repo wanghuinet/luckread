@@ -180,5 +180,5 @@
     "businessDataImported": false,
     "productionCutoverAuthorized": false
   },
-  "nextGate": "A separate reviewed D1-03 schema-source manifest and shared ledger-backed runner must include the W06 owner slice before D1-03 remote apply is eligible."
+  "nextGate": "D1-03 remote apply remains blocked until the W06 and W11 owner gaps are resolved, W10 PG18 rehearsal evidence is accepted, and a separate reviewed D1-03 schema-source manifest plus shared ledger-backed runner/release review is admitted."
 }
