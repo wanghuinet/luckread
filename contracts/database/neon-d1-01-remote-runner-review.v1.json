@@ -14,7 +14,7 @@
   },
   "review": {
     "reviewer": "GPT-6",
-    "reviewType": "independent code-path review plus current-SHA CI evidence reconciliation",
+    "reviewType": "GPT-6 code-path audit plus current-SHA CI evidence reconciliation",
     "reviewedAt": "2026-11-08",
     "reviewedMainSha": "c57fe841bb861c9310c361266396f9ffe6a00de1",
     "implementationMergeSha": "62e2a8264cc0c6c128a2290e281dba16a8257d6e",
@@ -23,15 +23,51 @@
     "reviewedFiles": [
       {
         "path": "scripts/neon/run-schema-migrations.mjs",
-        "gitBlobSha1": "131709ecfae728e72deea89ead39cf81af1ff0ef"
+        "gitBlobSha1": "fcbb2bb49ed3611f0cea121663722ba4086d082b"
       },
       {
         "path": "scripts/neon/run-schema-migrations.test.mjs",
-        "gitBlobSha1": "9669d43e83d35c3eb8c69ec9f459f4fa8a6333b9"
+        "gitBlobSha1": "3f027f0996d1d212527dcf62219037a1b6748016"
+      },
+      {
+        "path": "scripts/neon/d1-01-migration-manifest.mjs",
+        "gitBlobSha1": "0ad8fda67ff3506abc69aefed335fae593355abf"
+      },
+      {
+        "path": "scripts/neon/assert-d1-01-migration-ledger-ready.mjs",
+        "gitBlobSha1": "c6b8e8a8913934bea7e8e8ee3d4f37b6a0da3a0d"
+      },
+      {
+        "path": "scripts/neon/remote-runner-review.mjs",
+        "gitBlobSha1": "e9fde653734cfbd15c2f1ad7c0521e3f9013b72b"
+      },
+      {
+        "path": "scripts/neon/remote-runner-review.test.mjs",
+        "gitBlobSha1": "62c319ba7ceba2942484274dda09f4ca74711c64"
+      },
+      {
+        "path": "scripts/neon/plan-d1-01-schema-migrations.mjs",
+        "gitBlobSha1": "4058ab0c04cedf725248046c455d5333fb0fabf4"
+      },
+      {
+        "path": "scripts/neon/plan-d1-01-schema-migrations.test.mjs",
+        "gitBlobSha1": "082882183498b2241d09220f0460ba1e0439ac4e"
       },
       {
         "path": "scripts/neon/d1-01/0001_schema_migration_ledger.sql",
         "gitBlobSha1": "b8cdec415ee4106d0b0618197b12b61d8656a2c9"
+      },
+      {
+        "path": "scripts/neon/d1-01/verify-combined-local-rehearsal.mjs",
+        "gitBlobSha1": "3c4f4646bbfa678a82068dfff597ff1293e46606"
+      },
+      {
+        "path": ".github/workflows/neon-d1-01-migration-ledger.yml",
+        "gitBlobSha1": "6577b74b91aa118396083b2b88485889ba50c913"
+      },
+      {
+        "path": ".github/workflows/neon-d1-01-reviewed-remote-schema-apply.yml",
+        "gitBlobSha1": "b81b3db57eb346108dae225d3809468d2d150987"
       }
     ],
     "controlsChecked": [
@@ -45,11 +81,13 @@
       "retry resumes only from an exact successful ledger prefix",
       "append-only migration provenance ledger and owner/database constraints",
       "postflight ownership, schema, extension and empty-business-table checks",
-      "no Cloudflare D1 mutation, business data import, or production cutover"
+      "no Cloudflare D1 mutation, business data import, or production cutover",
+      "the shared ledger contract remains globally remoteApplyReady=false; only D1-01 is eligible while D1-02 through D1-05 remain NOT_IMPLEMENTED and blocked"
     ],
     "findings": [],
     "limitations": [
-      "PR #1629 and PR #1630 have no submitted GitHub review records; this is an explicit GPT-6 code review record, not a human approval or GitHub APPROVE review.",
+      "PR #1629 and PR #1630 have no submitted GitHub review records; this is a GPT-6 code review record, not a human approval or GitHub APPROVE review.",
+      "The same GPT-6 agent authored the D1-01 release-gate patch and performed this review; this is not an independent third-party review.",
       "Remote Neon DDL has not been executed. Remote apply remains a separate manually dispatched action and must produce fresh postflight evidence.",
       "The remote runner has only been exercised against disposable PostgreSQL 18 in CI; no claim of remote Neon execution success is made."
     ],
