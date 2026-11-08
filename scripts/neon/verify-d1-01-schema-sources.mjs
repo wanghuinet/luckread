@@ -192,7 +192,16 @@ for (const owner of contract.owners.slice(1)) {
   if (owner.config) {
     const content = read(owner.config)
     if (content !== null && owner.worker === 'W02') {
-      if (!content.includes('database: env.D1_01')) failures.push('W02 Better Auth no longer binds the expected D1-01 source database')
+      const retainsProductionD1Default =
+        content.includes('database: env.D1_01') ||
+        (
+          /(?:^|\n)\s*database\s*,/m.test(content) &&
+          /database\s*:\s*BetterAuthDatabase\s*=\s*env\.D1_01(?:\s+as\s+BetterAuthDatabase)?/.test(content) &&
+          /export\s+const\s+buildLuckReadAuth/.test(content)
+        )
+      if (!retainsProductionD1Default) {
+        failures.push('W02 Better Auth must keep D1-01 as the runtime default; only isolated schema generation may inject another adapter')
+      }
       addSource('W02', 'better-auth-config', owner.config, content)
     }
   }
