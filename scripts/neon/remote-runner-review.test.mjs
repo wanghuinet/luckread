@@ -18,7 +18,7 @@ test('rejects any changed runner or ledger source after the review', () => {
   drifted.review.reviewedFiles[0].gitBlobSha1 = 'f'.repeat(40)
   const result = validateRemoteRunnerReview({ review: drifted })
   assert.equal(result.valid, false)
-  assert.ok(result.errors.some((message) => message.includes('review invalidates the review')))
+  assert.ok(result.errors.some((message) => message.includes('invalidates the review')))
 })
 
 test('rejects remote apply evidence that did not remain skipped during PR validation', () => {
