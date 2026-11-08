@@ -39,8 +39,8 @@ test('W10 DLQ persists only allowlisted event-envelope metadata, never arbitrary
     'correlation_id', 'causation_id',
   ]
   for (const column of requiredColumns) {
-    assert.match(d1, new RegExp('\\\\b' + column + '\\\\s+'))
-    assert.match(result.migration, new RegExp('\\\\b' + column + '\\\\s+'))
+    assert.ok(d1.includes(column + ' '), 'D1 source is missing ' + column)
+    assert.ok(result.migration.includes(column + ' '), 'PostgreSQL source is missing ' + column)
   }
   assert.doesNotMatch(d1, /original_event_metadata_json|metadata_json/i)
   assert.doesNotMatch(result.migration, /original_event_metadata_json|metadata_json/i)
@@ -50,7 +50,10 @@ test('W10 DLQ persists only allowlisted event-envelope metadata, never arbitrary
       readSource: (relativePath) => {
         const value = read(relativePath)
         if (relativePath === 'workers/W09-platform/migrations-d1-03/0002_w10_async_execution_state.sql') {
-          return value.replace('event_type TEXT NOT NULL,', 'original_event_metadata_json TEXT NOT NULL,')
+          return value.replace(
+            'consumer_name TEXT NOT NULL,',
+            'consumer_name TEXT NOT NULL,\\n  original_event_metadata_json TEXT NOT NULL,',
+          )
         }
         return value
       },
