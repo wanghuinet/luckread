@@ -132,5 +132,5 @@ test('still rejects an unexpected foreign key declared by a W01 source table', (
   )
 
   assert.equal(result.valid, false)
-  assert.deepEqual(result.actual, [expectedForeignKey, unexpectedW01ForeignKey])
+  assert.deepEqual(result.actual, [unexpectedW01ForeignKey, expectedForeignKey])
 })
