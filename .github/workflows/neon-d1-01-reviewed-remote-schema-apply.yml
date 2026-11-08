@@ -6,6 +6,13 @@ on:
     paths:
       - '.github/workflows/neon-d1-01-reviewed-remote-schema-apply.yml'
       - 'scripts/neon/run-schema-migrations.mjs'
+      - 'scripts/neon/remote-runner-review.mjs'
+      - 'scripts/neon/remote-runner-review.test.mjs'
+      - 'contracts/database/neon-d1-01-remote-runner-review.v1.json'
+      - 'scripts/neon/plan-d1-01-schema-migrations.mjs'
+      - 'scripts/neon/plan-d1-01-schema-migrations.test.mjs'
+      - 'scripts/neon/d1-01/verify-combined-local-rehearsal.mjs'
+      - '.github/workflows/neon-d1-01-migration-ledger.yml'
       - 'scripts/neon/run-schema-migrations.test.mjs'
       - 'scripts/neon/assert-d1-01-migration-ledger-ready.mjs'
       - 'scripts/neon/d1-01-migration-manifest.mjs'
@@ -52,12 +59,14 @@ jobs:
         run: |
           set -euo pipefail
           node --check scripts/neon/run-schema-migrations.mjs
-          node --test scripts/neon/run-schema-migrations.test.mjs workers/W02-identity/scripts/neon/verify-schema-database-target.test.mjs
-          node scripts/neon/assert-d1-01-migration-ledger-ready.mjs --expect-blocked
-          if node scripts/neon/assert-d1-01-migration-ledger-ready.mjs --assert-runner-ready; then
-            echo "Remote apply must remain gated until the separate reviewed release enablement."
+          node --check scripts/neon/remote-runner-review.mjs
+          node --test scripts/neon/run-schema-migrations.test.mjs scripts/neon/remote-runner-review.test.mjs workers/W02-identity/scripts/neon/verify-schema-database-target.test.mjs
+          node scripts/neon/assert-d1-01-migration-ledger-ready.mjs --assert-runner-ready
+          if node scripts/neon/assert-d1-01-migration-ledger-ready.mjs --expect-blocked > /tmp/runner-blocked.log 2>&1; then
+            echo "Released shared runner unexpectedly reported blocked."
             exit 1
           fi
+          grep -F "Shared runner readiness is now released" /tmp/runner-blocked.log
 
   apply:
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.confirm_target == 'APPLY_REVIEWED_SCHEMA_D1_01_LUCKREAD' }}

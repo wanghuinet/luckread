@@ -158,10 +158,24 @@ function readManifestChecksums() {
 }
 
 export function isRemoteApplyReleased(manifestContract, ledgerContractValue) {
+  const domains = ledgerContractValue?.execution?.domainReadiness ?? {}
+  const expectedDomains = ['D1-01', 'D1-02', 'D1-03', 'D1-04', 'D1-05']
+  const exactDomainSet = JSON.stringify(Object.keys(domains).sort()) === JSON.stringify(expectedDomains)
+  const d1Ready = domains['D1-01']?.runnerStatus === 'IMPLEMENTED_AND_REVIEWED' &&
+    domains['D1-01']?.remoteApplyReady === true &&
+    domains['D1-01']?.reviewEvidenceRef === 'contracts/database/neon-d1-01-remote-runner-review.v1.json'
+  const otherDomainsBlocked = expectedDomains
+    .filter((domain) => domain !== 'D1-01')
+    .every((domain) => domains[domain]?.runnerStatus === 'NOT_IMPLEMENTED' &&
+      domains[domain]?.remoteApplyReady === false)
   return manifestContract?.remoteApplyReady === true &&
-    ledgerContractValue?.remoteApplyReady === true &&
+    manifestContract?.execution?.remoteApplyReady === true &&
     manifestContract?.execution?.runnerStatus === 'IMPLEMENTED_AND_REVIEWED' &&
-    ledgerContractValue?.execution?.runnerStatus === 'IMPLEMENTED_AND_REVIEWED'
+    ledgerContractValue?.remoteApplyReady === false &&
+    ledgerContractValue?.execution?.remoteApplyReady === false &&
+    ledgerContractValue?.execution?.runnerStatus === 'IMPLEMENTED_FOR_D1_01_ONLY' &&
+    exactDomainSet && d1Ready && otherDomainsBlocked &&
+    manifestContract?.execution?.reviewEvidenceRef === domains['D1-01']?.reviewEvidenceRef
 }
 
 function validateManifest(checksums) {

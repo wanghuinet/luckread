@@ -1,0 +1,145 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/database/neon-d1-01-remote-runner-review.v1.json",
+  "version": "1.0.0",
+  "status": "AI_REVIEW_PASS_NO_BLOCKING_FINDINGS",
+  "repository": "wanghuinet/luckread",
+  "target": {
+    "domainId": "D1-01",
+    "databaseName": "luckread",
+    "postgresMajor": 18,
+    "scope": "schema-only",
+    "businessDataImport": false,
+    "productionCutoverAuthorized": false
+  },
+  "review": {
+    "reviewer": "GPT-6",
+    "reviewType": "GPT-6 code-path audit plus current-SHA CI evidence reconciliation",
+    "reviewedAt": "2026-11-08",
+    "reviewedMainSha": "c57fe841bb861c9310c361266396f9ffe6a00de1",
+    "implementationMergeSha": "62e2a8264cc0c6c128a2290e281dba16a8257d6e",
+    "postflightTargetFixMergeSha": "c57fe841bb861c9310c361266396f9ffe6a00de1",
+    "result": "NO_BLOCKING_FINDINGS",
+    "reviewedFiles": [
+      {
+        "path": "scripts/neon/run-schema-migrations.mjs",
+        "gitBlobSha1": "fcbb2bb49ed3611f0cea121663722ba4086d082b"
+      },
+      {
+        "path": "scripts/neon/run-schema-migrations.test.mjs",
+        "gitBlobSha1": "3f027f0996d1d212527dcf62219037a1b6748016"
+      },
+      {
+        "path": "scripts/neon/d1-01-migration-manifest.mjs",
+        "gitBlobSha1": "6e01bc8266aa6a1c07891e49f4c32f38a05dfa17"
+      },
+      {
+        "path": "scripts/neon/assert-d1-01-migration-ledger-ready.mjs",
+        "gitBlobSha1": "c6b8e8a8913934bea7e8e8ee3d4f37b6a0da3a0d"
+      },
+      {
+        "path": "scripts/neon/remote-runner-review.mjs",
+        "gitBlobSha1": "149fc4b626d89b553c451513f1a7892ed84ca045"
+      },
+      {
+        "path": "scripts/neon/remote-runner-review.test.mjs",
+        "gitBlobSha1": "2adc585ff515c961af10810c258955b0585be4a7"
+      },
+      {
+        "path": "scripts/neon/plan-d1-01-schema-migrations.mjs",
+        "gitBlobSha1": "4058ab0c04cedf725248046c455d5333fb0fabf4"
+      },
+      {
+        "path": "scripts/neon/plan-d1-01-schema-migrations.test.mjs",
+        "gitBlobSha1": "082882183498b2241d09220f0460ba1e0439ac4e"
+      },
+      {
+        "path": "scripts/neon/d1-01/0001_schema_migration_ledger.sql",
+        "gitBlobSha1": "b8cdec415ee4106d0b0618197b12b61d8656a2c9"
+      },
+      {
+        "path": "scripts/neon/d1-01/verify-combined-local-rehearsal.mjs",
+        "gitBlobSha1": "3c4f4646bbfa678a82068dfff597ff1293e46606"
+      },
+      {
+        "path": ".github/workflows/neon-d1-01-migration-ledger.yml",
+        "gitBlobSha1": "6577b74b91aa118396083b2b88485889ba50c913"
+      },
+      {
+        "path": ".github/workflows/neon-d1-01-reviewed-remote-schema-apply.yml",
+        "gitBlobSha1": "b81b3db57eb346108dae225d3809468d2d150987"
+      },
+      {
+        "path": "contracts/database/neon-d1-01-migration-manifest.v1.json",
+        "gitBlobSha1": "6a04861f12b379147aad406a39921e8f1ceedd2f"
+      },
+      {
+        "path": "contracts/database/neon-schema-migration-ledger.v1.json",
+        "gitBlobSha1": "6b22cf2f70cc51fd05fd70d4d5af43483c62b077"
+      }
+    ],
+    "controlsChecked": [
+      "remote target host/database/port allowlist and PostgreSQL 18 identity guard",
+      "TLS verify-full, certificate/hostname validation and channel binding requirement",
+      "main-only workflow_dispatch and exact D1-01 confirmation token",
+      "transaction-scoped advisory lock held for the complete migration run",
+      "W01 Payload baseline is reconciled and recorded; it is not replayed by the shared SQL executor",
+      "strict ordered manifest, artifact and manifest-entry checksums, and ordered ledger-prefix validation",
+      "one PostgreSQL transaction per SQL migration including its ledger insert",
+      "retry resumes only from an exact successful ledger prefix",
+      "append-only migration provenance ledger and owner/database constraints",
+      "postflight ownership, schema, extension and empty-business-table checks",
+      "no Cloudflare D1 mutation, business data import, or production cutover",
+      "the shared ledger contract remains globally remoteApplyReady=false; only D1-01 is eligible while D1-02 through D1-05 remain NOT_IMPLEMENTED and blocked"
+    ],
+    "findings": [],
+    "limitations": [
+      "PR #1629 and PR #1630 have no submitted GitHub review records; this is a GPT-6 code review record, not a human approval or GitHub APPROVE review.",
+      "The same GPT-6 agent authored the D1-01 release-gate patch and performed this review; this is not an independent third-party review.",
+      "Remote Neon DDL has not been executed. Remote apply remains a separate manually dispatched action and must produce fresh postflight evidence.",
+      "The remote runner has only been exercised against disposable PostgreSQL 18 in CI; no claim of remote Neon execution success is made."
+    ],
+    "formalGitHubReviewSubmissions": 0,
+    "followUpReview": {
+      "reviewedAt": "2026-11-08",
+      "scope": "Verified the duplicate ledger-contract declaration removal and aligned the D1-01 manifest nested remoteApplyReady flag with the reviewed runner and ledger domain state.",
+      "result": "NO_NEW_BLOCKING_FINDINGS"
+    }
+  },
+  "verificationEvidence": {
+    "fullD1_01LocalPostgres18Rehearsal": {
+      "runId": 42458291648,
+      "conclusion": "success",
+      "url": "https://github.com/wanghuinet/luckread/actions/runs/42458291648"
+    },
+    "w02BetterAuthPostgres18": {
+      "runId": 42458291621,
+      "conclusion": "success",
+      "url": "https://github.com/wanghuinet/luckread/actions/runs/42458291621"
+    },
+    "remoteRunnerGuardsNoCredentials": {
+      "runId": 42458291629,
+      "conclusion": "success",
+      "url": "https://github.com/wanghuinet/luckread/actions/runs/42458291629",
+      "remoteApplyJob": "skipped"
+    },
+    "contractAdmission": {
+      "runId": 42458291617,
+      "conclusion": "success",
+      "url": "https://github.com/wanghuinet/luckread/actions/runs/42458291617"
+    },
+    "mapping0StructuralGate": {
+      "runId": 42458291520,
+      "conclusion": "success",
+      "url": "https://github.com/wanghuinet/luckread/actions/runs/42458291520"
+    }
+  },
+  "safety": {
+    "remoteNeonDdlExecuted": false,
+    "productionD1Touched": false,
+    "businessDataImported": false,
+    "productionCutoverAuthorized": false,
+    "manualWorkflowDispatchRequired": true,
+    "exactConfirmationRequired": "APPLY_REVIEWED_SCHEMA_D1_01_LUCKREAD"
+  }
+}

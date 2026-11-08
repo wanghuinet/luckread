@@ -126,8 +126,7 @@ This change control is complete when the repository has an agreed five-domain sc
 - The owner-specific W01 remote apply path is permanently denied. Only a future reviewed shared runner may become an eligible remote apply path.
 - PR #1624 generates the Better Auth 1.7.8 PostgreSQL core schema twice through W02's official pinned CLI and requires byte-identical output. The generated artifact is committed at `workers/W02-identity/artifacts/neon/w02-better-auth-postgres-schema.sql`; SHA-256: `32705a1bb3aba85e0d831d65191f07d1aa08574a3d86d87e5b332de81d952593`. The workflow now fails if regenerated SQL differs from the committed artifact.
 - Disposable PostgreSQL 18 evidence: exactly five Better Auth core tables (`user`, `session`, `account`, `verification`, `twoFactor`) and five indexes; core business tables remained empty. The W02 custom schema migrations 0001..0010 and their targeted postflight checks passed in the same disposable run. No Neon target was contacted.
-- Current implementation slice: D1-01 migration planner plus committed W02 Better Auth schema artifact. The 14-entry manifest now has all committed artifacts/checksums; ledger schema remains uninstalled, shared runner remains unimplemented, and remote apply remains disabled.
-- Next slices are intentionally separate: (1) full local PostgreSQL 18 rehearsal of all D1-01 owners in manifest order, with W01 Payload's native migration path treated separately; (2) read-only remote target preflight; (3) shared runner transaction/ledger implementation; (4) Payload native migration reconciliation. No business data import or production cutover is included.
+- Historical snapshot: at this point the D1-01 migration planner and W02 artifacts were committed, while the full owner rehearsal and shared runner were still pending. Their later completion and review evidence are recorded in Sections 11 and 14 below.
 
 
 ## 11. D1-01 full local PostgreSQL 18 rehearsal — implementation slice
@@ -160,7 +159,20 @@ This change control is complete when the repository has an agreed five-domain sc
 
 - The hardened five-database read-only preflight on workflow run [42452559295](https://github.com/wanghuinet/luckread/actions/runs/42452559295) returned `PASS_EMPTY 4/5` and `D1-01 luckread = BLOCKED_NOT_EMPTY`.
 - D1-01's catalog names align with the committed W01 Payload baseline's 11 relations (10 business tables plus `payload_migrations`), their generated sequences and the three Redirects enum types. This is only a catalog-name match; it is not proof that all columns, indexes, constraints or rows are correct.
-- The generic five-database preflight did not read business rows. The current D1-01 business-table row counts and exact `payload_migrations.name` value therefore remain unverified.
-- The next allowed operation is the separate manual workflow `.github/workflows/neon-d1-01-w01-payload-baseline-reconciliation.yml`, with confirmation `RECONCILE_READ_ONLY_D1_01_W01_PAYLOAD_BASELINE`. It verifies the W01 schema snapshot, all ten business tables are empty, and exactly one `payload_migrations` row names the committed baseline migration, using one `BEGIN READ ONLY` transaction followed by `ROLLBACK`.
-- A successful reconciliation may be used as evidence that W01's baseline is already present; it does not authorize deleting/recreating W01 objects, installing the shared ledger, applying W02/W07/W08 schemas, changing production D1 or cutting traffic over.
-- Any mismatch or non-zero business-table count is a hard stop for manual review. No automatic cleanup is permitted.
+- The separate read-only workflow `.github/workflows/neon-d1-01-w01-payload-baseline-reconciliation.yml` completed successfully in [run 42453402142](https://github.com/wanghuinet/luckread/actions/runs/42453402142). It verified the W01 schema snapshot, all ten business tables empty, and exactly one `payload_migrations` row naming the committed baseline migration, inside `BEGIN READ ONLY` followed by `ROLLBACK`.
+- This successful reconciliation is evidence that the existing W01 baseline is already present and must be preserved. The shared runner records it in the common ledger but never replays the W01 Payload DDL.
+- The successful read-only reconciliation does not authorize deleting/recreating W01 objects, changing production D1, importing business data or cutting traffic over.
+- Any future mismatch or non-zero business-table count remains a hard stop for manual review. No automatic cleanup is permitted.
+
+
+
+## 14. D1-01 shared remote runner — code review and release-gate evidence
+
+- The shared runner implementation and main-target verifier correction are merged at `62e2a8264cc0c6c128a2290e281dba16a8257d6e` (PR #1629) and `c57fe841bb861c9310c361266396f9ffe6a00de1` (PR #1630).
+- The integrated disposable PostgreSQL 18 rehearsal passed all fourteen manifest entries and the four owner verifiers in [run 42458291648](https://github.com/wanghuinet/luckread/actions/runs/42458291648). W02 Better Auth and its ten custom migration checks passed in [run 42458291621](https://github.com/wanghuinet/luckread/actions/runs/42458291621).
+- Remote-target allowlist and guard validation passed without Neon credentials in [run 42458291629](https://github.com/wanghuinet/luckread/actions/runs/42458291629). The actual remote apply job was **skipped**, as required for pull-request validation. Contract Admission and Mapping 0 Structural Gate passed in [run 42458291617](https://github.com/wanghuinet/luckread/actions/runs/42458291617) and [run 42458291520](https://github.com/wanghuinet/luckread/actions/runs/42458291520).
+- A GPT-6 code review record is committed at `contracts/database/neon-d1-01-remote-runner-review.v1.json`. It pins the reviewed runner source, runner tests and ledger DDL by Git blob SHA, and records the exact successful CI run IDs. The review found no blocking issues in the reviewed paths.
+- Review limitation: PR #1629 and PR #1630 contain no submitted GitHub review records. The review record explicitly identifies this as GPT-6 code review, **not** a human approval or GitHub `APPROVE` review.
+- This release-gate change makes the shared runner eligible for a later manually dispatched D1-01 schema-only apply after the release PR is merged. It does not dispatch that workflow, contact Neon, or apply DDL automatically.
+- The only eligible remote path remains `.github/workflows/neon-d1-01-reviewed-remote-schema-apply.yml` on `main`, with `NEON_DATABASE_URL_LUCKREAD`, TLS `verify-full`, `channel_binding=require`, PostgreSQL 18 and the exact confirmation `APPLY_REVIEWED_SCHEMA_D1_01_LUCKREAD`.
+- The release does not authorize business data import, Cloudflare D1 changes, Worker runtime/binding changes, dual writes or production cutover. Cloudflare D1 remains authoritative for production.
