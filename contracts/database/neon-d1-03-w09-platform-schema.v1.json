@@ -161,7 +161,7 @@
         "OperationalIdempotency"
       ],
       "status": "SOURCE_ADMITTED_LOCAL_POSTGRES18_REHEARSAL_PASSED_RUNTIME_BINDING_NOT_ADMITTED",
-      "note": "The current W10 Wrangler config has no D1-03 binding or D1-03 migration directory. No W10 tables are invented in this slice.",
+      "note": "W10 still has no D1-03 runtime binding. Its six execution-record tables are admitted through the existing W09-owned D1-03 migration sequence; no W10 Wrangler migration configuration or runtime binding is added.",
       "schemaContract": "contracts/database/neon-d1-03-w10-execution-schema.v1.json",
       "migrationArtifact": "workers/W09-platform/migrations-d1-03/0002_w10_async_execution_state.sql",
       "localPostgres18Evidence": {
