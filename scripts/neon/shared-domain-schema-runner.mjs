@@ -386,7 +386,7 @@ export function buildDomainPlan(manifest, {
     if (seed.ownerWorker !== sourceOwnerByTable.get(seed.table)) {
       fail('control seed owner does not match the schema artifact owner: ' + seed.table)
     }
-    const seedContract = JSON.parse(readText(seed.sourceContract))
+    const seedContract = JSON.parse(readSource(seed.sourceContract))
     if (seedContract.target?.domainId !== manifest.domainId ||
         seedContract.target?.databaseName !== manifest.databaseName ||
         seedContract.target?.postgresMajor !== 18 ||
