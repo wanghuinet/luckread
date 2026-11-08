@@ -1,0 +1,125 @@
+name: Neon D1-01 W02 Better Auth PostgreSQL Schema
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/neon-d1-01-w02-better-auth-schema.yml'
+      - 'workers/W02-identity/package.json'
+      - 'workers/W02-identity/src/auth/better-auth.ts'
+      - 'workers/W02-identity/src/auth/neon-postgres-schema.config.ts'
+      - 'workers/W02-identity/scripts/neon/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  generate-and-verify:
+    name: Generate W02 Better Auth schema and verify on disposable PostgreSQL 18
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:18.6
+        env:
+          POSTGRES_USER: schema_generator
+          POSTGRES_PASSWORD: schema_generator_local_only
+          POSTGRES_DB: luckread_schema
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U schema_generator -d luckread_schema"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install pinned W02 toolchain
+        working-directory: workers/W02-identity
+        run: npm install --ignore-scripts --no-audit --no-fund
+
+      - name: Verify Better Auth and CLI versions are pinned together
+        working-directory: workers/W02-identity
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFile } from 'node:fs/promises'
+          const pkg = JSON.parse(await readFile('./package.json', 'utf8'))
+          const auth = JSON.parse(await readFile('./node_modules/better-auth/package.json', 'utf8'))
+          const cli = JSON.parse(await readFile('./node_modules/auth/package.json', 'utf8'))
+          if (pkg.dependencies['better-auth'] !== '1.7.8' || auth.version !== '1.7.8') {
+            throw new Error('W02 Better Auth runtime must remain pinned to 1.7.8')
+          }
+          if (pkg.devDependencies.auth !== '1.7.8' || cli.version !== '1.7.8') {
+            throw new Error('W02 Better Auth schema CLI must match runtime version 1.7.8')
+          }
+          if (pkg.devDependencies.pg !== '8.20.0') {
+            throw new Error('W02 schema-generation PostgreSQL driver pin drifted')
+          }
+          console.log('Better Auth runtime, schema CLI, and PostgreSQL driver pins: PASS')
+          NODE
+
+      - name: Generate PostgreSQL DDL from the canonical W02 Better Auth configuration
+        working-directory: workers/W02-identity
+        env:
+          W02_SCHEMA_PGHOST: 127.0.0.1
+          W02_SCHEMA_PGPORT: '5432'
+          W02_SCHEMA_PGUSER: schema_generator
+          W02_SCHEMA_PGPASSWORD: schema_generator_local_only
+          W02_SCHEMA_PGDATABASE: luckread_schema
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/neon
+          npm run neon:schema:generate
+
+      - name: Confirm generated DDL is PostgreSQL and contains no SQLite-only statements
+        working-directory: workers/W02-identity
+        run: |
+          set -euo pipefail
+          test -s artifacts/neon/w02-better-auth-postgres-schema.sql
+          if grep -Eiq '\\b(PRAGMA|AUTOINCREMENT|strftime|julianday|GLOB|RAISE[[:space:]]*\\([[:space:]]*ABORT)\\b' artifacts/neon/w02-better-auth-postgres-schema.sql; then
+            echo "Generated Better Auth schema contains SQLite-only SQL"
+            exit 1
+          fi
+
+      - name: Apply generated DDL to disposable PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          PGPASSWORD: schema_generator_local_only
+        run: |
+          psql --host 127.0.0.1 --port 5432 --username schema_generator \
+            --dbname luckread_schema --set ON_ERROR_STOP=1 \
+            --file artifacts/neon/w02-better-auth-postgres-schema.sql
+
+      - name: Run the official Better Auth schema check against disposable PostgreSQL
+        working-directory: workers/W02-identity
+        env:
+          W02_SCHEMA_PGHOST: 127.0.0.1
+          W02_SCHEMA_PGPORT: '5432'
+          W02_SCHEMA_PGUSER: schema_generator
+          W02_SCHEMA_PGPASSWORD: schema_generator_local_only
+          W02_SCHEMA_PGDATABASE: luckread_schema
+        run: npm run neon:schema:check
+
+      - name: Verify target tables, required columns, and empty business rows
+        working-directory: workers/W02-identity
+        env:
+          W02_SCHEMA_DATABASE_URL: postgresql://schema_generator:schema_generator_local_only@127.0.0.1:5432/luckread_schema
+        run: node scripts/neon/verify-better-auth-core-schema.mjs > artifacts/neon/w02-better-auth-postgres-schema-postflight.json
+
+      - name: Upload generated schema and postflight evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: w02-better-auth-postgres-schema-${{ github.run_id }}
+          path: |
+            workers/W02-identity/artifacts/neon/w02-better-auth-postgres-schema.sql
+            workers/W02-identity/artifacts/neon/w02-better-auth-postgres-schema-postflight.json
+          if-no-files-found: error
+          retention-days: 30
