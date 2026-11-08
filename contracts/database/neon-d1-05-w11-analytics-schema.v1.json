@@ -1,0 +1,249 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/database/neon-d1-05-w11-analytics-schema.v1.json",
+  "title": "LuckRead D1-05 W11 Analytics PostgreSQL Schema Slice",
+  "version": "1.0.0",
+  "status": "LOCAL_POSTGRES18_REHEARSAL_PASSED_ADMISSION_BLOCKED",
+  "target": {
+    "domainId": "D1-05",
+    "databaseName": "allluck",
+    "cloudflareD1DatabaseUuid": "77d82be2-d12e-4a17-b410-9aa7d376bc11",
+    "postgresMajor": 18,
+    "primaryWorker": "W11",
+    "existingProductionAuthority": "Cloudflare D1",
+    "stagedSchemaTarget": "Neon PostgreSQL",
+    "remoteSchemaApplied": false,
+    "businessDataImport": false,
+    "productionCutoverAuthorized": false
+  },
+  "scope": {
+    "migrationStrategy": "One fresh PostgreSQL-native schema baseline representing the final admitted state of W11 D1 migrations 0001 through 0004. The SQLite migrations themselves are never executed on PostgreSQL.",
+    "sourceMigrations": [
+      {
+        "path": "workers/W11-growth-campaign-analytics-operations/migrations/0001_analytics_projection.sql",
+        "gitBlobSha1": "e957128a506ec21a1fa30c92ea062cc15dc83c23"
+      },
+      {
+        "path": "workers/W11-growth-campaign-analytics-operations/migrations/0002_analytics_projection_rebuild_state.sql",
+        "gitBlobSha1": "b4935dd6927c4410bc950744f2f7126f3ed9c076"
+      },
+      {
+        "path": "workers/W11-growth-campaign-analytics-operations/migrations/0003_analytics_late_event_replay.sql",
+        "gitBlobSha1": "699f0f63cbef1a6a98e7163362e22d6fd9c6324d"
+      },
+      {
+        "path": "workers/W11-growth-campaign-analytics-operations/migrations/0004_analytics_w01_client_telemetry.sql",
+        "gitBlobSha1": "d265bbb7b3eb8e56c5b9fd3c5a947d17d7f53db3"
+      }
+    ],
+    "includedTables": [
+      "analytics_event_dedupe",
+      "analytics_content_hourly",
+      "analytics_creator_hourly",
+      "analytics_rollup_watermark",
+      "analytics_reconciliation_status",
+      "analytics_projection_rebuild_state"
+    ],
+    "excludedEntities": [
+      {
+        "entity": "Campaign",
+        "reason": "Campaign is a W11 logical D1-03/T22 owner entity. No physical persistence source has been admitted; it is not inferred from analytics migration files."
+      },
+      {
+        "entity": "GrowthOperation",
+        "reason": "GrowthOperation is a W11 logical D1-03/T22 owner entity. No physical persistence source has been admitted; it is not inferred from analytics migration files."
+      }
+    ]
+  },
+  "schema": {
+    "tables": {
+      "analytics_event_dedupe": {
+        "sourceMigrations": [
+          "0001",
+          "0003",
+          "0004"
+        ],
+        "purpose": "Deduplicated source event ledger and durable PENDING/APPLIED/LATE projection state.",
+        "columns": [
+          "event_id",
+          "dedupe_key",
+          "schema_version",
+          "event_name",
+          "source_worker",
+          "occurred_at",
+          "received_at",
+          "hour_start",
+          "actor_type",
+          "content_id",
+          "content_type",
+          "creator_id",
+          "duration_ms",
+          "position",
+          "metric_version",
+          "projection_status",
+          "ingested_at"
+        ],
+        "constraints": [
+          "event_id primary key",
+          "dedupe_key unique",
+          "schema_version and metric_version equal 1.0",
+          "event_name is restricted to the admitted W01/W03 content telemetry and W05 social event allowlists",
+          "W01/W03 may emit content telemetry; only W05 may emit authoritative social/follow events",
+          "follow events require creator_id and omit content_id/content_type; other events require content_id/content_type",
+          "read_dwell, dwell and video_watch require duration_ms between 1 and 86400000; other events require duration_ms null",
+          "social events require actor_type user",
+          "projection_status is PENDING, APPLIED or LATE"
+        ],
+        "explicitIndexes": [
+          "analytics_event_dedupe_ingested_at_idx",
+          "analytics_event_dedupe_occurred_at_idx",
+          "analytics_event_dedupe_hour_start_idx",
+          "analytics_event_dedupe_pending_idx"
+        ]
+      },
+      "analytics_content_hourly": {
+        "sourceMigrations": [
+          "0001"
+        ],
+        "purpose": "Hourly derived content and social-metric aggregates.",
+        "primaryKey": [
+          "hour_start",
+          "content_type",
+          "content_id",
+          "metric_version"
+        ],
+        "explicitIndexes": [
+          "analytics_content_hourly_content_time_idx",
+          "analytics_content_hourly_content_id_time_idx",
+          "analytics_content_hourly_time_idx"
+        ]
+      },
+      "analytics_creator_hourly": {
+        "sourceMigrations": [
+          "0001"
+        ],
+        "purpose": "Hourly creator follower gain/loss aggregates.",
+        "primaryKey": [
+          "hour_start",
+          "creator_id",
+          "metric_version"
+        ],
+        "explicitIndexes": [
+          "analytics_creator_hourly_creator_time_idx"
+        ]
+      },
+      "analytics_rollup_watermark": {
+        "sourceMigrations": [
+          "0001"
+        ],
+        "purpose": "Bounded consumer watermark state."
+      },
+      "analytics_reconciliation_status": {
+        "sourceMigrations": [
+          "0001"
+        ],
+        "purpose": "Bounded reconciliation-operation state with a PENDING/RUNNING/PASSED/FAILED lifecycle."
+      },
+      "analytics_projection_rebuild_state": {
+        "sourceMigrations": [
+          "0002"
+        ],
+        "purpose": "One singleton row for the latest hourly projection rebuild; no unbounded job history.",
+        "constraints": [
+          "singleton_id equals 1",
+          "RUNNING has no completion/error; SUCCEEDED has completion and bucket counts; FAILED has completion and an allow-listed error code"
+        ]
+      }
+    },
+    "totals": {
+      "tables": 6,
+      "explicitIndexes": 8,
+      "foreignKeys": 0,
+      "triggers": 0,
+      "triggerFunctions": 0
+    },
+    "postgresTypeMappings": {
+      "TEXT": "Keep source event timestamps, hour_start bucket keys, opaque IDs, details_json and status values as TEXT. Apply PostgreSQL COLLATE C to every UTC timestamp/bucket text column to preserve SQLite's default BINARY lexical comparison; do not introduce unapproved timestamp coercion or JSONB validation.",
+      "INTEGER": "PostgreSQL INTEGER with the source range and non-negative checks preserved where present.",
+      "REAL": "PostgreSQL DOUBLE PRECISION with the source 0..100 position constraint preserved.",
+      "ingested_at": "TEXT with a UTC ISO-8601 millisecond default, preserving the D1 adapter's stored representation."
+    }
+  },
+  "admission": {
+    "status": "BLOCKED_MISSING_RETENTION_DELETION_AND_CONSENT_PURPOSE_POLICIES",
+    "blockingRequirements": [
+      {
+        "requirement": "Retention policy for each event and derived aggregate class, including bounded late-event replay horizon",
+        "evidenceRef": null,
+        "status": "MISSING"
+      },
+      {
+        "requirement": "Deletion and privacy-request behavior for actor-linked and creator-linked analytics projections",
+        "evidenceRef": null,
+        "status": "MISSING"
+      },
+      {
+        "requirement": "Consent, lawful purpose and collection eligibility rules for anonymous and authenticated telemetry",
+        "evidenceRef": null,
+        "status": "MISSING"
+      }
+    ],
+    "rule": "A passing local PostgreSQL 18 schema rehearsal proves SQL compatibility only. It does not admit D1-05 source/runtime, authorize remote DDL, or waive the missing privacy/retention requirements. Do not invent retention durations."
+  },
+  "privacy": {
+    "directIdentityFieldsPersisted": false,
+    "sessionIdPersisted": false,
+    "actorIdPersisted": false,
+    "visitorIdPersisted": false,
+    "creatorIdPersisted": true,
+    "creatorIdPurpose": "Existing analytics aggregation dimension from the admitted D1 schema; remains subject to the missing consent/purpose/deletion policy.",
+    "noCrossDomainForeignKeys": true
+  },
+  "safety": {
+    "newWorkers": 0,
+    "newD1Databases": 0,
+    "newQueues": 0,
+    "newServiceBindings": 0,
+    "runtimeBindingsChanged": false,
+    "remoteNeonConnectionAttempted": false,
+    "remoteNeonDdlExecuted": false,
+    "cloudflareD1Touched": false,
+    "businessDataImported": false,
+    "productionCutoverAuthorized": false
+  },
+  "artifacts": {
+    "template": "workers/W11-growth-campaign-analytics-operations/scripts/neon/templates/d1-05-w11-analytics-postgres.sql",
+    "generator": "workers/W11-growth-campaign-analytics-operations/scripts/neon/generate-d1-05-w11-postgres-migration.mjs",
+    "migration": "workers/W11-growth-campaign-analytics-operations/src/neon-postgres-migrations-d1-05/0001_w11_d1_05_analytics_schema.sql",
+    "verifier": "workers/W11-growth-campaign-analytics-operations/scripts/neon/verify-d1-05-w11-postgres-schema.sql",
+    "workflow": ".github/workflows/neon-d1-05-w11-postgres-rehearsal.yml"
+  },
+  "nextGate": "Admit explicit retention, deletion and consent/purpose policies; separately close W11 analytics operation security E2E. Only then may the D1-05 schema be admitted into a reviewed shared migration manifest. Remote Neon apply remains a later manually dispatched gate.",
+  "localRehearsalEvidence": {
+    "status": "PASS",
+    "workflowRunId": 42507930767,
+    "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42507930767",
+    "sourceCommitSha": "7d67adbb266c503a0ad561a56362968bcf8bd824",
+    "postgresImage": "postgres:18.6",
+    "results": {
+      "tables": 6,
+      "explicitIndexes": 8,
+      "foreignKeys": 0,
+      "triggers": 0,
+      "utcTimeTextColumnsWithBinaryCollation": 15,
+      "syntheticRowsAfterRollback": 0,
+      "eventOwnerAndProjectionConstraints": "PASS",
+      "sourceMigrationBlobPins": "PASS",
+      "generatedArtifactDeterminism": "PASS",
+      "isolatedD105MigrationDirectory": "PASS"
+    },
+    "safety": {
+      "remoteNeonTouched": false,
+      "cloudflareD1Touched": false,
+      "businessDataImported": false,
+      "runtimeBindingsChanged": false,
+      "productionCutoverAuthorized": false
+    },
+    "admissionStatus": "BLOCKED_MISSING_RETENTION_DELETION_AND_CONSENT_PURPOSE_POLICIES"
+  }
+}
