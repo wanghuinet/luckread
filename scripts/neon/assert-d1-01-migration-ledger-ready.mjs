@@ -17,15 +17,26 @@ const manifestValidation = spawnSync(process.execPath, [
   encoding: 'utf8',
   stdio: ['ignore', 'pipe', 'pipe'],
 })
+const domainReadiness = ledger.execution?.domainReadiness ?? {}
+const expectedDomains = ['D1-01', 'D1-02', 'D1-03', 'D1-04', 'D1-05']
+const d1Readiness = domainReadiness['D1-01']
+const otherDomainsBlocked = expectedDomains
+  .filter((domain) => domain !== 'D1-01')
+  .every((domain) => domainReadiness[domain]?.runnerStatus === 'NOT_IMPLEMENTED' &&
+    domainReadiness[domain]?.remoteApplyReady === false)
 const ready = manifestValidation.status === 0 &&
   manifest.remoteApplyReady === true &&
-  ledger.remoteApplyReady === true &&
   manifest.execution?.remoteApplyReady === true &&
-  ledger.execution?.remoteApplyReady === true &&
   manifest.execution?.runnerStatus === 'IMPLEMENTED_AND_REVIEWED' &&
-  ledger.execution?.runnerStatus === 'IMPLEMENTED_AND_REVIEWED' &&
+  ledger.remoteApplyReady === false &&
+  ledger.execution?.remoteApplyReady === false &&
+  ledger.execution?.runnerStatus === 'IMPLEMENTED_FOR_D1_01_ONLY' &&
+  JSON.stringify(Object.keys(domainReadiness).sort()) === JSON.stringify(expectedDomains) &&
+  d1Readiness?.runnerStatus === 'IMPLEMENTED_AND_REVIEWED' &&
+  d1Readiness?.remoteApplyReady === true &&
   manifest.execution?.reviewEvidenceRef === reviewRef &&
-  ledger.execution?.reviewEvidenceRef === reviewRef &&
+  d1Readiness?.reviewEvidenceRef === reviewRef &&
+  otherDomainsBlocked &&
   existsSync(runnerPath) &&
   review.valid
 
