@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { createHash } from 'node:crypto'
-import { readFileSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -406,6 +406,7 @@ export function verifyD103SharedRunnerReview({ readSource = readText } = {}) {
 function run() {
   const result = verifyD103SharedRunnerReview()
   const output = 'artifacts/neon/d1-03-shared-runner-independent-review.json'
+  mkdirSync(resolve(repositoryRoot,'artifacts/neon'),{recursive:true})
   writeFileSync(resolve(repositoryRoot,output),JSON.stringify(result,null,2)+'\n')
   process.stdout.write('D1_03_SHARED_RUNNER_INDEPENDENT_REVIEW_PASS ' + JSON.stringify(result) + '\n')
 }
