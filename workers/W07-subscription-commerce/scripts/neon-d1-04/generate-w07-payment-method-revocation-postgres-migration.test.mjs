@@ -18,8 +18,8 @@ test('PAY-007 builds a deterministic PostgreSQL 18 translation with the full cum
  assert.match(first.migration,/OLD.event_type IN \('mandate_active','mandate_revoked'\)/)
  assert.match(first.migration,/NEW.processed_at IS NULL/)
  assert.match(first.migration,/payment_method_revocation_request_completion_guard/)
- assert.doesNotMatch(first.migration,/\\bFOREIGN\\s+KEY\\b/i)
- assert.doesNotMatch(first.migration,/\\{\\{[A-Z0-9_]+\\}\\}/)
+ assert.doesNotMatch(first.migration,/\bFOREIGN\s+KEY\b/i)
+ assert.doesNotMatch(first.migration,/\{\{[A-Z0-9_]+\}\}/)
 })
 
 test('PAY-007 fails closed if mandate receipt identity replay rules are weakened',()=>{
