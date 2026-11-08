@@ -3,6 +3,7 @@ import fs from 'node:fs';
 const root = process.cwd();
 const openapiPath = 'contracts/openapi/v1/openapi.yaml';
 const apiInventoryPath = 'contracts/api/api-inventory.v1.json';
+const featureInventoryPath = 'contracts/alignment/feature-inventory.v1.json';
 const outPath = 'contracts/alignment/api-inventory.v1.json';
 
 const fail = (message) => {
@@ -12,9 +13,13 @@ const fail = (message) => {
 
 if (!fs.existsSync(openapiPath)) fail(`missing ${openapiPath}`);
 if (!fs.existsSync(apiInventoryPath)) fail(`missing ${apiInventoryPath}`);
+if (!fs.existsSync(featureInventoryPath)) fail(`missing ${featureInventoryPath}; build the canonical feature inventory first`);
 
 const openapiRaw = fs.readFileSync(openapiPath, 'utf8');
 const inventory = JSON.parse(fs.readFileSync(apiInventoryPath, 'utf8'));
+const featureInventory = JSON.parse(fs.readFileSync(featureInventoryPath, 'utf8'));
+const knownFeatureIds = new Set((featureInventory.features ?? []).map((feature) => feature.featureId));
+const operationFeatureMap = inventory.operation_feature_map ?? {};
 
 // Lightweight OpenAPI path/operation extraction with no `yaml` runtime
 // dependency. Mirrors scripts/sync-rc-openapi.mjs, which already removed the
@@ -44,6 +49,26 @@ const operations = [];
     if (operationMatch) currentOperationId = operationMatch[2].trim();
   }
   flush();
+}
+
+const openapiOperationIds = new Set(operations.map((operation) => operation.operationId));
+for (const [operationId, mapping] of Object.entries(operationFeatureMap)) {
+  if (!openapiOperationIds.has(operationId)) fail(`operation_feature_map references unknown OpenAPI operationId '${operationId}'`);
+  if (!mapping || !Array.isArray(mapping.feature_ids) || mapping.feature_ids.length === 0) {
+    fail(`operation_feature_map '${operationId}' must declare a non-empty feature_ids array`);
+  }
+  if (new Set(mapping.feature_ids).size !== mapping.feature_ids.length) {
+    fail(`operation_feature_map '${operationId}' contains duplicate feature IDs`);
+  }
+  for (const featureId of mapping.feature_ids) {
+    if (!knownFeatureIds.has(featureId)) fail(`operation_feature_map '${operationId}' references unknown canonical feature '${featureId}'`);
+  }
+  const schemaRef = mapping.schema_ref ?? '';
+  if (typeof schemaRef !== 'string') fail(`operation_feature_map '${operationId}' schema_ref must be a string`);
+  if (schemaRef) {
+    const schemaPath = schemaRef.split('#', 1)[0];
+    if (!fs.existsSync(schemaPath)) fail(`operation_feature_map '${operationId}' references missing schema contract '${schemaPath}'`);
+  }
 }
 
 const versionPrefix = '/v1';
@@ -83,6 +108,7 @@ for (const op of operations) {
     missingFromInventory.push(key);
     continue;
   }
+  const featureMapping = operationFeatureMap[op.operationId] ?? {};
   records.push({
     operationId: op.operationId,
     method: upper,
@@ -90,10 +116,10 @@ for (const op of operations) {
     openapiPath: op.rawPath,
     domain: declaration.domain,
     status: 'DISCOVERED',
-    featureIds: [],
-    schemaRef: '',
+    featureIds: featureMapping.feature_ids ?? [],
+    schemaRef: featureMapping.schema_ref ?? '',
     openapiRef: `${openapiPath}#${op.method.toLowerCase()}:${op.rawPath}`,
-    sourceRefs: [openapiPath, apiInventoryPath],
+    sourceRefs: [openapiPath, apiInventoryPath, ...(featureMapping.feature_ids ? [featureInventoryPath] : [])],
   });
 }
 
