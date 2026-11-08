@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - '.github/workflows/neon-d1-01-w02-better-auth-schema.yml'
+      - 'contracts/database/neon-d1-01-w02-identity-schema.v1.json'
+      - 'workers/W02-identity/scripts/neon/verify-w02-identity-postgres-schema.sql'
       - 'contracts/entity/AUTHZ-role-assignment-authority.v1.json'
       - 'contracts/entity/AUTH-003-identity-field-contract.v1.json'
       - 'contracts/entity/AUTH-003-credential-field-contract.v1.json'
@@ -352,6 +354,16 @@ jobs:
         env:
           W02_SCHEMA_DATABASE_URL: postgresql://schema_generator:schema_generator_local_only@127.0.0.1:5432/luckread_schema
         run: npm run neon:auth007-mfa-receipts:verify > artifacts/neon/w02-auth007-mfa-operation-receipts-postgres-schema-postflight.json
+
+      - name: Verify combined W02 catalog ownership and zero-residual-row postflight
+        working-directory: workers/W02-identity
+        env:
+          W02_SCHEMA_DATABASE_URL: postgresql://schema_generator:schema_generator_local_only@127.0.0.1:5432/luckread_schema
+        run: |
+          psql "$W02_SCHEMA_DATABASE_URL" \
+            --set ON_ERROR_STOP=1 --no-psqlrc \
+            --file scripts/neon/verify-w02-identity-postgres-schema.sql \
+            | tee artifacts/neon/w02-identity-postflight.txt
 
       - name: Upload generated schema and postflight evidence
         if: always()
