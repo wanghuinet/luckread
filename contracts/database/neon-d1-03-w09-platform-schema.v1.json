@@ -160,8 +160,33 @@
         "ExecutionOutbox",
         "OperationalIdempotency"
       ],
-      "status": "SOURCE_AND_BINDING_NOT_ADMITTED",
-      "note": "The current W10 Wrangler config has no D1-03 binding or D1-03 migration directory. No W10 tables are invented in this slice."
+      "status": "SOURCE_ADMITTED_LOCAL_POSTGRES18_REHEARSAL_PASSED_RUNTIME_BINDING_NOT_ADMITTED",
+      "note": "The current W10 Wrangler config has no D1-03 binding or D1-03 migration directory. No W10 tables are invented in this slice.",
+      "schemaContract": "contracts/database/neon-d1-03-w10-execution-schema.v1.json",
+      "migrationArtifact": "workers/W09-platform/migrations-d1-03/0002_w10_async_execution_state.sql",
+      "localPostgres18Evidence": {
+        "status": "LOCAL_POSTGRES18_REHEARSAL_PASSED",
+        "workflowRunId": 42502495149,
+        "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42502495149",
+        "verifiedHeadSha": "93fdce0b5963501ca55d8093c5514828d302a6a4",
+        "postgresVersion": "18.6",
+        "database": "luckread_d1_03_w10_rehearsal",
+        "tables": 6,
+        "explicitIndexes": 7,
+        "foreignKeys": 2,
+        "triggerCount": 0,
+        "triggerFunctionCount": 0,
+        "businessFixtureRowsAfterRollback": 0,
+        "generatorAndAdmissionTests": "PASSED",
+        "catalogAndRollbackVerification": "PASSED",
+        "remoteNeonTouched": false,
+        "cloudflareD1Touched": false,
+        "w10RuntimeBindingAdded": false,
+        "businessDataImported": false,
+        "productionCutoverAuthorized": false,
+        "evidenceArtifactId": 13626345587,
+        "evidenceArtifactSha256": "sha256:209f474ce742eb7f647f362b51fb468f3eb0d3a3ba30ac1f2ddc650525d6a7ad"
+      }
     },
     "W11": {
       "entities": [
