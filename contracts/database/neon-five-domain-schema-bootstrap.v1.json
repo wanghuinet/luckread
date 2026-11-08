@@ -221,7 +221,7 @@
       "schemaSources": [
         "workers/W07-subscription-commerce/migrations-d1-04"
       ],
-      "status": "PARTIAL_W07_ORDER_PAYMENT_SAVED_METHODS_MANDATES_AND_RENEWAL_CYCLES_LOCAL_POSTGRES18_REHEARSAL_PASSED_REMAINING_FINANCE_MODULES_PENDING",
+      "status": "PARTIAL_W07_ORDER_PAYMENT_SAVED_METHODS_MANDATES_RENEWAL_CYCLES_AND_REVENUECAT_WEBHOOK_LOCAL_POSTGRES18_PENDING",
       "schemaContract": "contracts/database/neon-d1-04-w07-order-payment-schema.v1.json",
       "implementedSchemaSlices": [
         "W07_ORDER_PAYMENT_0001_0002",
@@ -241,38 +241,14 @@
         "payment_method_revocation_requests"
       ],
       "schemaVerificationEvidence": {
-        "workflowRunId": 42491082583,
-        "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42491082583",
-        "verifiedHeadSha": "b9e0fa3d920153c11ee8b7a2bb96016948eb9b20",
-        "postgresVersion": "18.6",
-        "database": "luckread_finance_schema",
-        "sourceRegressionTests": 24,
-        "newSliceTables": 2,
-        "newSliceExplicitIndexes": 4,
-        "newSliceTriggers": 13,
-        "newSliceTriggerFunctions": 1,
-        "cumulativeTables": 10,
-        "cumulativeExplicitIndexes": 22,
-        "cumulativeTriggers": 49,
-        "cumulativeTriggerFunctions": 3,
-        "foreignKeys": 0,
-        "sensitiveCardOrSecretColumns": 0,
-        "rowsAfterRollback": 0,
-        "schedulerControlRowsAfterRollback": 1,
-        "laterFinanceTablesIncluded": false,
-        "remoteNeonTouched": false,
-        "cloudflareD1Touched": false,
-        "businessDataImported": false,
-        "productionCutoverAuthorized": false,
-        "evidenceArtifactId": 13620709002,
-        "evidenceArtifactName": "neon-d1-04-w07-renewal-cycles-postgres18-fdac22852c742c890146a810079522201bb0fcee",
-        "evidenceArtifactSha256": "sha256:b60a715ed28efdd8dabd32b0caa32607ddaa4d7ea9902eada26065ff5624f019"
+        "status": "PENDING_LOCAL_POSTGRES18_REHEARSAL"
       },
       "remoteSchemaApplied": false,
       "schemaSliceContracts": [
         "contracts/database/neon-d1-04-w07-order-payment-schema.v1.json",
         "contracts/database/neon-d1-04-w07-saved-methods-mandates-schema.v1.json",
-        "contracts/database/neon-d1-04-w07-renewal-cycles-schema.v1.json"
+        "contracts/database/neon-d1-04-w07-renewal-cycles-schema.v1.json",
+        "contracts/database/neon-d1-04-w07-revenuecat-webhook-schema.v1.json"
       ],
       "previousSliceVerificationEvidence": {
         "workflowRunId": 42489584839,

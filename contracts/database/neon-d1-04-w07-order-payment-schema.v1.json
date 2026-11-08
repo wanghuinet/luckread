@@ -3,7 +3,7 @@
   "$id": "https://luckread.com/contracts/database/neon-d1-04-w07-order-payment-schema.v1.json",
   "title": "LuckRead D1-04 W07 Cumulative Finance PostgreSQL Schema",
   "version": "1.0.0",
-  "status": "W07_D1_04_ORDER_PAYMENT_SAVED_METHODS_MANDATES_AND_RENEWAL_CYCLES_LOCAL_POSTGRES18_REHEARSAL_PASSED_REMAINING_FINANCE_SLICES_PENDING",
+  "status": "W07_D1_04_REVENUECAT_WEBHOOK_LOCAL_POSTGRES18_PENDING_REMAINING_FINANCE_SLICES_PENDING",
   "target": {
     "domainId": "D1-04",
     "databaseName": "luckread_finance",
@@ -36,7 +36,8 @@
       "workers/W07-subscription-commerce/migrations-d1-04/0001_order_commerce.sql",
       "workers/W07-subscription-commerce/migrations-d1-04/0002_payment_provider_events.sql",
       "workers/W07-subscription-commerce/migrations-d1-04/0003_saved_payment_methods_mandates.sql",
-      "workers/W07-subscription-commerce/migrations-d1-04/0004_subscription_renewal_cycles.sql"
+      "workers/W07-subscription-commerce/migrations-d1-04/0004_subscription_renewal_cycles.sql",
+      "workers/W07-subscription-commerce/migrations-d1-04/0005_revenuecat_webhook_inbox.sql"
     ],
     "includedTables": [
       "orders",
@@ -48,16 +49,16 @@
       "saved_payment_methods",
       "payment_mandates",
       "subscription_renewal_cycles",
-      "subscription_renewal_scheduler_state"
+      "subscription_renewal_scheduler_state",
+      "revenuecat_webhook_events",
+      "revenuecat_webhook_event_conflicts"
     ],
     "deferredTables": [
-      "revenuecat_webhook_events",
-      "revenuecat_webhook_event_conflicts",
       "refunds",
       "billing_documents",
       "payment_method_revocation_requests"
     ],
-    "deferredScopeNote": "The five remaining finance tables are admitted by W07 D1-04 source migrations 0005 through 0007. They remain separate PostgreSQL-native slices with their own local rehearsals.",
+    "deferredScopeNote": "The three remaining finance tables are admitted by W07 D1-04 source migrations 0006 refunds/billing documents and 0007 payment-method revocation. They remain separate PostgreSQL-native slices with their own local rehearsals.",
     "excludedTables": [
       "entitlements",
       "ledger_entries",
@@ -65,7 +66,7 @@
       "users",
       "media"
     ],
-    "tableCount": 10
+    "tableCount": 12
   },
   "schema": {
     "tables": {
@@ -208,6 +209,62 @@
           "updated_at": "1970-01-01T00:00:00.000Z"
         },
         "seedRowKind": "SCHEMA_CONTROL_METADATA_NOT_BUSINESS_DATA"
+      },
+      "revenuecat_webhook_events": {
+        "source": "0005_revenuecat_webhook_inbox.sql",
+        "primaryKey": "event_row_id",
+        "uniqueKey": [
+          "app_id",
+          "event_id"
+        ],
+        "indexes": [
+          "ix_revenuecat_webhook_events_state_received",
+          "ix_revenuecat_webhook_events_user_received"
+        ],
+        "triggerCount": 3,
+        "lifecycleStates": [
+          "RECEIVED",
+          "APPLIED",
+          "RECONCILIATION_REQUIRED",
+          "IGNORED"
+        ],
+        "immutableFields": [
+          "event identity",
+          "event_timestamp_ms",
+          "api_version",
+          "app_user_id",
+          "product_id",
+          "store",
+          "environment",
+          "transaction_id",
+          "original_transaction_id",
+          "event_data_json",
+          "payload_sha256",
+          "received_at"
+        ],
+        "terminalRule": "Once state leaves RECEIVED the receipt is immutable.",
+        "payloadRule": "Store bounded object event_data_json; do not store raw_body or subscriber_attributes columns."
+      },
+      "revenuecat_webhook_event_conflicts": {
+        "source": "0005_revenuecat_webhook_inbox.sql",
+        "primaryKey": "conflict_id",
+        "uniqueKey": [
+          "app_id",
+          "event_id",
+          "incoming_payload_sha256"
+        ],
+        "indexes": [
+          "ix_revenuecat_webhook_conflicts_event"
+        ],
+        "triggerCount": 4,
+        "immutableFields": [
+          "conflict identity",
+          "existing_payload_sha256",
+          "incoming_payload_sha256",
+          "first_seen_at"
+        ],
+        "occurrenceRule": "Every update increments occurrence_count by exactly one and never moves last_seen_at backwards.",
+        "referenceRule": "A conflict references the matching app_id/event_id and immutable first receipt payload_sha256."
       }
     },
     "explicitIndexNames": [
@@ -232,7 +289,10 @@
       "ux_subscription_renewal_cycles_subscription_cycle",
       "ux_subscription_renewal_cycles_payment",
       "ix_subscription_renewal_cycles_state_updated",
-      "ix_subscription_renewal_cycles_subscriber_cycle"
+      "ix_subscription_renewal_cycles_subscriber_cycle",
+      "ix_revenuecat_webhook_events_state_received",
+      "ix_revenuecat_webhook_events_user_received",
+      "ix_revenuecat_webhook_conflicts_event"
     ],
     "triggerNames": [
       "orders_commercial_snapshot_immutable",
@@ -283,13 +343,20 @@
       "subscription_renewal_cycles_retained",
       "subscription_renewal_scheduler_state_identity_immutable",
       "subscription_renewal_scheduler_state_version_guard",
-      "subscription_renewal_scheduler_state_retained"
+      "subscription_renewal_scheduler_state_retained",
+      "revenuecat_webhook_events_identity_immutable",
+      "revenuecat_webhook_events_terminal_immutable",
+      "revenuecat_webhook_events_retained",
+      "revenuecat_webhook_conflicts_reference_first_receipt",
+      "revenuecat_webhook_conflicts_identity_immutable",
+      "revenuecat_webhook_conflicts_occurrence_guard",
+      "revenuecat_webhook_conflicts_retained"
     ],
     "totals": {
-      "tables": 10,
-      "explicitIndexes": 22,
-      "triggers": 49,
-      "triggerFunctions": 3,
+      "tables": 12,
+      "explicitIndexes": 25,
+      "triggers": 56,
+      "triggerFunctions": 4,
       "foreignKeys": 0
     },
     "cumulativeSlices": [
@@ -312,6 +379,17 @@
         "tables": 2,
         "explicitIndexes": 4,
         "triggers": 13,
+        "triggerFunctions": 1,
+        "foreignKeys": 0
+      },
+      {
+        "migrationId": "0004_w07_d1_04_revenuecat_webhook_inbox",
+        "source": "workers/W07-subscription-commerce/migrations-d1-04/0005_revenuecat_webhook_inbox.sql",
+        "contract": "contracts/database/neon-d1-04-w07-revenuecat-webhook-schema.v1.json",
+        "status": "PENDING_LOCAL_POSTGRES18_REHEARSAL",
+        "tables": 2,
+        "explicitIndexes": 3,
+        "triggers": 7,
         "triggerFunctions": 1,
         "foreignKeys": 0
       }
@@ -337,6 +415,13 @@
         "triggers": 13,
         "triggerFunctions": 1,
         "foreignKeys": 0
+      },
+      "revenuecatWebhookInbox": {
+        "tables": 2,
+        "explicitIndexes": 3,
+        "triggers": 7,
+        "triggerFunctions": 1,
+        "foreignKeys": 0
       }
     }
   },
@@ -347,7 +432,8 @@
     "partialUnique": "Preserve ux_payments_single_live_or_successful_per_order as a PostgreSQL partial unique index.",
     "relationships": "Preserve source trigger-enforced logical relations. Do not add foreign keys; the source regression suite explicitly requires zero FKs for D1-04 finance tables.",
     "triggerSemantics": "Preserve source immutable snapshots, CAS/version guards, allowed order transitions, payable-order binding, idempotency pairing, webhook receipt immutability, conflict first-receipt binding and retention.",
-    "renewalCycles": "Preserve immutable billing-cycle identity and resolved pricing snapshots, the W07-owned cycle state machine, CAS leases, exact Order/Payment binding, active MIT mandate check, terminal provider-outcome synchronization and one scheduler control-metadata singleton. W10 orchestrates but never reads or writes D1-04; subscription entitlements remain D1-01 authority."
+    "renewalCycles": "Preserve immutable billing-cycle identity and resolved pricing snapshots, the W07-owned cycle state machine, CAS leases, exact Order/Payment binding, active MIT mandate check, terminal provider-outcome synchronization and one scheduler control-metadata singleton. W10 orchestrates but never reads or writes D1-04; subscription entitlements remain D1-01 authority.",
+    "revenuecatWebhook": "Keep RevenueCat app_id/event_id first receipt unique and immutable, store bounded event_data_json as an object without raw webhook bytes or subscriber_attributes, record distinct conflicting payload hashes separately against the first receipt, and advance each conflict occurrence by one with monotonic time. Keep this provider inbox separate from Hyperswitch payment_provider_events."
   },
   "sourceInventory": [
     {
@@ -389,20 +475,23 @@
       "path": "workers/W07-subscription-commerce/migrations-d1-04/0004_subscription_renewal_cycles.sql",
       "role": "W07-owned D1-04 recurring billing-cycle records and the singleton scheduler cursor control row.",
       "execution": "Fingerprint and translate to PostgreSQL 18 only; no D1/SQLite source SQL runs against Neon. The scheduler seed is schema control metadata, not business-data import."
+    },
+    {
+      "path": "workers/W07-subscription-commerce/migrations-d1-04/0005_revenuecat_webhook_inbox.sql",
+      "role": "W07-owned RevenueCat event first-receipt inbox and distinct-payload conflict records; separate from Hyperswitch payment events.",
+      "execution": "Fingerprint and translate to PostgreSQL 18 only. No raw webhook bytes or subscriber_attributes are persisted; no remote DDL or business-data import."
     }
   ],
   "verification": {
     "sourceRegression": "workers/W07-subscription-commerce/scripts/test_order_d1_04_migration.py",
     "postgresImage": "postgres:18.6",
-    "tables": 10,
-    "explicitIndexes": 22,
-    "triggers": 49,
-    "triggerFunctions": 3,
+    "tables": 12,
+    "explicitIndexes": 25,
+    "triggers": 56,
+    "triggerFunctions": 4,
     "foreignKeys": 0,
     "fixtureRowsAfterRollback": 0,
     "mustNotExist": [
-      "revenuecat_webhook_events",
-      "revenuecat_webhook_event_conflicts",
       "refunds",
       "billing_documents",
       "payment_method_revocation_requests",
@@ -413,6 +502,29 @@
       "media"
     ],
     "localRehearsalEvidence": {
+      "status": "NOT_RUN"
+    },
+    "predecessorLocalRehearsalEvidence": {
+      "workflowRunId": 42489584748,
+      "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42489584748",
+      "verifiedHeadSha": "6d416296e83d6b0389505f7b224976aae7634345",
+      "postgresVersion": "18.6",
+      "database": "luckread_finance_schema",
+      "tables": 6,
+      "explicitIndexes": 14,
+      "triggers": 24,
+      "triggerFunctions": 1,
+      "foreignKeys": 0,
+      "rowsAfterRollback": 0,
+      "offlineD104SourceRegressionTests": 24,
+      "laterFinanceTablesIncluded": false,
+      "remoteNeonTouched": false,
+      "cloudflareD1Touched": false,
+      "businessDataImported": false,
+      "productionCutoverAuthorized": false,
+      "evidenceArtifactId": 13621195000
+    },
+    "previousSliceLocalRehearsalEvidence": {
       "workflowRunId": 42491082583,
       "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42491082583",
       "verifiedHeadSha": "b9e0fa3d920153c11ee8b7a2bb96016948eb9b20",
@@ -440,55 +552,7 @@
       "evidenceArtifactName": "neon-d1-04-w07-renewal-cycles-postgres18-fdac22852c742c890146a810079522201bb0fcee",
       "evidenceArtifactSha256": "sha256:b60a715ed28efdd8dabd32b0caa32607ddaa4d7ea9902eada26065ff5624f019"
     },
-    "predecessorLocalRehearsalEvidence": {
-      "workflowRunId": 42489584748,
-      "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42489584748",
-      "verifiedHeadSha": "6d416296e83d6b0389505f7b224976aae7634345",
-      "postgresVersion": "18.6",
-      "database": "luckread_finance_schema",
-      "tables": 6,
-      "explicitIndexes": 14,
-      "triggers": 24,
-      "triggerFunctions": 1,
-      "foreignKeys": 0,
-      "rowsAfterRollback": 0,
-      "offlineD104SourceRegressionTests": 24,
-      "laterFinanceTablesIncluded": false,
-      "remoteNeonTouched": false,
-      "cloudflareD1Touched": false,
-      "businessDataImported": false,
-      "productionCutoverAuthorized": false,
-      "evidenceArtifactId": 13621195000
-    },
-    "previousSliceLocalRehearsalEvidence": {
-      "workflowRunId": 42489584839,
-      "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42489584839",
-      "verifiedHeadSha": "6d416296e83d6b0389505f7b224976aae7634345",
-      "postgresVersion": "18.6",
-      "database": "luckread_finance_schema",
-      "predecessorWorkflowRunId": 42489584748,
-      "sourceRegressionTests": 24,
-      "newSliceTables": 2,
-      "newSliceExplicitIndexes": 4,
-      "newSliceTriggers": 12,
-      "newSliceTriggerFunctions": 1,
-      "cumulativeTables": 8,
-      "cumulativeExplicitIndexes": 18,
-      "cumulativeTriggers": 36,
-      "cumulativeTriggerFunctions": 2,
-      "foreignKeys": 0,
-      "sensitiveCardOrSecretColumns": 0,
-      "rowsAfterRollback": 0,
-      "laterFinanceTablesIncluded": false,
-      "remoteNeonTouched": false,
-      "cloudflareD1Touched": false,
-      "businessDataImported": false,
-      "productionCutoverAuthorized": false,
-      "evidenceArtifactId": 13621196833,
-      "evidenceArtifactName": "neon-d1-04-w07-saved-methods-mandates-postgres18-f56291b077837b94e9aaea64e57e040176cc83b2",
-      "evidenceArtifactSha256": "sha256:1f43b7545e715da4aebd07757162485dc097226b68ca714df018d1411647b634"
-    },
-    "nextGate": "Add the remaining W07 D1-04 source migrations 0005 RevenueCat inbox, 0006 refunds/billing documents and 0007 payment-method revocation as isolated PostgreSQL-native slices. The shared-ledger remote runner and production cutover remain separate, unauthorized gates."
+    "nextGate": "Add remaining W07 D1-04 source migrations 0006 refunds/billing documents and 0007 payment-method revocation as isolated PostgreSQL-native slices. Shared-ledger remote runner and production cutover remain separate, unauthorized gates."
   },
   "safety": {
     "remoteConnectionAttempted": false,
@@ -498,5 +562,6 @@
     "businessDataImported": false,
     "productionCutoverAuthorized": false
   },
-  "nextGate": "Add the remaining W07 D1-04 source migrations 0005 RevenueCat inbox, 0006 refunds/billing documents and 0007 payment-method revocation as isolated PostgreSQL-native slices. The shared-ledger remote runner and production cutover remain separate, unauthorized gates."
+  "nextGate": "Add the remaining W07 D1-04 source migrations 0005 RevenueCat inbox, 0006 refunds/billing documents and 0007 payment-method revocation as isolated PostgreSQL-native slices. The shared-ledger remote runner and production cutover remain separate, unauthorized gates.",
+  "next": "Add remaining W07 D1-04 source migrations 0006 refunds/billing documents and 0007 payment-method revocation as isolated PostgreSQL-native slices. Shared-ledger remote runner and production cutover remain separate, unauthorized gates."
 }
