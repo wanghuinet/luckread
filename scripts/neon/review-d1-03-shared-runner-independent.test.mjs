@@ -66,7 +66,7 @@ test('fails closed if W10 is promoted from logical owner to shared-ledger owner'
   })
   assert.throws(
     () => verifyD103SharedRunnerReview({ readSource: source }),
-    /ordered migration\\/ledger owner mapping drifted/,
+    /ordered migration\/ledger owner mapping drifted/,
   )
 })
 
@@ -117,7 +117,7 @@ test('fails closed if Campaign/GrowthOperation are promoted into D1-03 migration
   })
   assert.throws(
     () => verifyD103SharedRunnerReview({ readSource: source }),
-    /exactly the three admitted W06\\/W09\\/W10 schema entries/,
+    /exactly the three admitted W06\/W09\/W10 schema entries/,
   )
 })
 
