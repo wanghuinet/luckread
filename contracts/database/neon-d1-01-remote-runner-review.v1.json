@@ -63,7 +63,7 @@
       },
       {
         "path": ".github/workflows/neon-d1-01-migration-ledger.yml",
-        "gitBlobSha1": "6577b74b91aa118396083b2b88485889ba50c913"
+        "gitBlobSha1": "b171e0e5540bfeacadfc49c523c7b5ec9c2f21eb"
       },
       {
         "path": ".github/workflows/neon-d1-01-reviewed-remote-schema-apply.yml",
@@ -102,7 +102,7 @@
     "formalGitHubReviewSubmissions": 0,
     "followUpReview": {
       "reviewedAt": "2026-11-08",
-      "scope": "Verified the duplicate ledger-contract declaration removal and aligned the D1-01 manifest nested remoteApplyReady flag with the reviewed runner and ledger domain state.",
+      "scope": "Re-reviewed the shared ledger workflow after removing only the path-filter reference to the retired W01-only manual apply workflow. Confirmed the PostgreSQL 18 ledger job, D1-01 manifest validation, reviewed-runner readiness assertion and permanent owner-bypass denial are unchanged. No remote execution target, credential, DDL step, approval token or migration behavior changed.",
       "result": "NO_NEW_BLOCKING_FINDINGS"
     }
   },
