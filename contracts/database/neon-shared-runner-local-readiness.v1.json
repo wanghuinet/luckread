@@ -79,5 +79,6 @@
     "businessDataImported": false,
     "runtimeBindingsChanged": false,
     "productionCutoverAuthorized": false
-  }
+  },
+  "remoteApplyReady": false
 }
