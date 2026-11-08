@@ -117,7 +117,17 @@
           "dlq_id",
           "event_id",
           "consumer_name",
-          "original_event_metadata_json",
+          "event_type",
+          "schema_version",
+          "producer",
+          "resource_type",
+          "resource_id",
+          "occurred_at",
+          "published_at",
+          "idempotency_key",
+          "source_version",
+          "correlation_id",
+          "causation_id",
           "payload_sha256",
           "attempt_count",
           "last_error_class",
@@ -128,7 +138,7 @@
           "replay_id",
           "resolved_at"
         ],
-        "metadataRule": "Only non-sensitive event metadata and a payload hash are stored; raw event payload is excluded.",
+        "metadataRule": "Only allowlisted event-envelope metadata columns are stored with a payload SHA-256; no arbitrary JSON metadata or raw event payload is persisted.",
         "resolutionStates": [
           "OPEN",
           "REPLAYED",
@@ -267,7 +277,8 @@
     "newQueue": false,
     "newServiceBinding": false,
     "remoteNeonDdlExecuted": false,
-    "productionCutoverAuthorized": false
+    "productionCutoverAuthorized": false,
+    "dlqMetadata": "Column allowlist only: event identity/type/version/producer/resource, timestamps, idempotency/version/correlation/causation fields. No arbitrary JSON or payload content."
   },
   "verification": {
     "postgresImage": "postgres:18.6",
