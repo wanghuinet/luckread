@@ -106,14 +106,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          node --input-type=module <<'NODE' >> "$GITHUB_ENV"
+          node --input-type=module <<'NODE'
           const { validateRemoteNeonTarget, enforceVerifiedNeonConnectionString } = await import('./scripts/neon/d1-02/schema-only-runner.mjs')
           const raw = process.env.NEON_DATABASE_URL_LUCKREADPRO
           const target = validateRemoteNeonTarget(raw)
           if (!target.valid) throw new Error(target.reason)
           const verified = enforceVerifiedNeonConnectionString(raw)
           process.stdout.write('::add-mask::' + verified + '\n')
-          process.stdout.write('NEON_DATABASE_URL_LUCKREADPRO_VERIFIED=' + verified + '\n')
+          appendFileSync(process.env.GITHUB_ENV, 'NEON_DATABASE_URL_LUCKREADPRO_VERIFIED=' + verified + '\n')
+          import { appendFileSync } from 'node:fs'
           NODE
 
       - name: Apply W03 then W05 using the immutable D1-02 ledger runner
