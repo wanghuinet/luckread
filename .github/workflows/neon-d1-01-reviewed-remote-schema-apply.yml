@@ -110,14 +110,14 @@ jobs:
           const url = new URL(process.env.NEON_DATABASE_URL_LUCKREAD)
           if (!['postgres:', 'postgresql:'].includes(url.protocol) ||
               !url.hostname.toLowerCase().endsWith('.neon.tech') ||
-              decodeURIComponent(url.pathname.replace(/^\\/+/, '')) !== 'luckread' ||
+              decodeURIComponent(url.pathname.replace(/^\/+/, '')) !== 'luckread' ||
               url.searchParams.get('channel_binding') !== 'require' ||
               !['require', 'verify-full'].includes(url.searchParams.get('sslmode'))) {
             throw new Error('Configured Neon URL is not an approved D1-01 luckread target')
           }
           url.searchParams.set('sslmode', 'verify-full')
           url.searchParams.set('channel_binding', 'require')
-          process.stdout.write('NEON_DATABASE_URL_LUCKREAD_VERIFIED=' + url.toString() + '\\n')
+          process.stdout.write('NEON_DATABASE_URL_LUCKREAD_VERIFIED=' + url.toString() + '\n')
           NODE
 
       - name: Reconcile the existing W01 Payload baseline on Neon (read-only)
