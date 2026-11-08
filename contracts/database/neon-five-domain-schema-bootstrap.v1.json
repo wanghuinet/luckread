@@ -149,7 +149,7 @@
         "workers/W06-governance/migrations",
         "workers/W09-platform/migrations-d1-03"
       ],
-      "status": "PARTIAL_W06_W09_SCHEMA_SOURCE_ADMITTED_W10_W11_PENDING",
+      "status": "PARTIAL_W06_W09_W10_SCHEMA_SOURCE_ADMITTED_W11_PENDING",
       "schemaProgress": {
         "W09": {
           "entities": [
@@ -191,7 +191,47 @@
             "ExecutionOutbox",
             "OperationalIdempotency"
           ],
-          "status": "SOURCE_AND_BINDING_NOT_ADMITTED"
+          "status": "SOURCE_ADMITTED_LOCAL_POSTGRES18_REHEARSAL_PASSED_RUNTIME_BINDING_NOT_ADMITTED",
+          "schemaContract": "contracts/database/neon-d1-03-w10-execution-schema.v1.json",
+          "schemaArtifact": "workers/W09-platform/migrations-d1-03/0002_w10_async_execution_state.sql",
+          "includedTables": [
+            "jobs",
+            "job_retries",
+            "execution_dead_letters",
+            "execution_inbox",
+            "execution_outbox",
+            "operational_idempotency"
+          ],
+          "remoteSchemaApplied": false,
+          "businessDataImported": false,
+          "productionCutoverAuthorized": false,
+          "localPostgres18Evidence": {
+            "status": "LOCAL_POSTGRES18_REHEARSAL_PASSED",
+            "workflowRunId": 42502891564,
+            "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42502891564",
+            "verifiedHeadSha": "b6dca4fc21b52eb6169d1b4a7a64577fd038d590",
+            "postgresVersion": "18.6",
+            "database": "luckread_d1_03_w10_rehearsal",
+            "tables": 6,
+            "explicitIndexes": 7,
+            "foreignKeys": 2,
+            "triggerCount": 0,
+            "triggerFunctionCount": 0,
+            "businessFixtureRowsAfterRollback": 0,
+            "generatorAndAdmissionTests": "PASSED",
+            "dlqAllowlistedMetadataVerification": "PASSED",
+            "catalogAndRollbackVerification": "PASSED",
+            "d1MigrationSha256": "4e2aadf03989417379a27ae8dc1e7260bdf9cc5ed771ef22ed304e145d477b41",
+            "ownerBoundarySha256": "5c911b56d31b3b078941f01f5bc7800c7082c1c5e02191d933b78054f0befe52",
+            "remoteNeonTouched": false,
+            "cloudflareD1Touched": false,
+            "w10RuntimeBindingAdded": false,
+            "businessDataImported": false,
+            "productionCutoverAuthorized": false,
+            "evidenceArtifactId": 13625774522,
+            "evidenceArtifactSha256": "sha256:e24a8c63b3d0c295e35c156baa423b20e123c217f8f3fa308276780e73d8be72"
+          },
+          "runtimeBindingAdded": false
         },
         "W11": {
           "entities": [

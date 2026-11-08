@@ -34,3 +34,13 @@ The workflow transport is defined in `contracts/transport/W10-W07-membership-ren
 - W10 does not receive an artificial Primary Task.
 - W10 does not become a second owner of business state merely by executing a job.
 - External market/IP ownership is not inferred from a historical path name.
+
+## D1-03 execution schema source admission
+
+The six W10 execution-record entities (Job, Retry, DLQ, ExecutionInbox, ExecutionOutbox and OperationalIdempotency) now have a schema-only source contract and migration slice.
+
+- W10 remains the logical owner of those execution records; W09 remains the sole D1-03 Wrangler migration-configuration owner.
+- The D1 migration source is in the existing W09-owned D1-03 migration sequence. The PostgreSQL 18 translation and disposable local rehearsal are under the W10 schema tooling.
+- This source admission does not add a W10 D1_03 runtime binding or Queue binding. W10 does not yet read or write these tables at runtime.
+- Domain-local business outbox/inbox/idempotency and all business-state writes remain with their owning Workers. Raw event/job payloads and credentials are excluded.
+- W06 Appeal and W11 Campaign/GrowthOperation schema sources remain separate blockers. Generic JOB-001..008 runtime admission is not implied.

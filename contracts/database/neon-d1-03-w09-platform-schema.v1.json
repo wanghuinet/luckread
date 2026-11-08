@@ -160,8 +160,36 @@
         "ExecutionOutbox",
         "OperationalIdempotency"
       ],
-      "status": "SOURCE_AND_BINDING_NOT_ADMITTED",
-      "note": "The current W10 Wrangler config has no D1-03 binding or D1-03 migration directory. No W10 tables are invented in this slice."
+      "status": "SOURCE_ADMITTED_LOCAL_POSTGRES18_REHEARSAL_PASSED_RUNTIME_BINDING_NOT_ADMITTED",
+      "note": "W10 still has no D1-03 runtime binding. Its six execution-record tables are admitted through the existing W09-owned D1-03 migration sequence; no W10 Wrangler migration configuration or runtime binding is added.",
+      "schemaContract": "contracts/database/neon-d1-03-w10-execution-schema.v1.json",
+      "migrationArtifact": "workers/W09-platform/migrations-d1-03/0002_w10_async_execution_state.sql",
+      "localPostgres18Evidence": {
+        "status": "LOCAL_POSTGRES18_REHEARSAL_PASSED",
+        "workflowRunId": 42502891564,
+        "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42502891564",
+        "verifiedHeadSha": "b6dca4fc21b52eb6169d1b4a7a64577fd038d590",
+        "postgresVersion": "18.6",
+        "database": "luckread_d1_03_w10_rehearsal",
+        "tables": 6,
+        "explicitIndexes": 7,
+        "foreignKeys": 2,
+        "triggerCount": 0,
+        "triggerFunctionCount": 0,
+        "businessFixtureRowsAfterRollback": 0,
+        "generatorAndAdmissionTests": "PASSED",
+        "dlqAllowlistedMetadataVerification": "PASSED",
+        "catalogAndRollbackVerification": "PASSED",
+        "d1MigrationSha256": "4e2aadf03989417379a27ae8dc1e7260bdf9cc5ed771ef22ed304e145d477b41",
+        "ownerBoundarySha256": "5c911b56d31b3b078941f01f5bc7800c7082c1c5e02191d933b78054f0befe52",
+        "remoteNeonTouched": false,
+        "cloudflareD1Touched": false,
+        "w10RuntimeBindingAdded": false,
+        "businessDataImported": false,
+        "productionCutoverAuthorized": false,
+        "evidenceArtifactId": 13625774522,
+        "evidenceArtifactSha256": "sha256:e24a8c63b3d0c295e35c156baa423b20e123c217f8f3fa308276780e73d8be72"
+      }
     },
     "W11": {
       "entities": [
@@ -180,5 +208,5 @@
     "businessDataImported": false,
     "productionCutoverAuthorized": false
   },
-  "nextGate": "A separate reviewed D1-03 schema-source manifest and shared ledger-backed runner must include the W06 owner slice before D1-03 remote apply is eligible."
+  "nextGate": "D1-03 remote apply remains blocked until the W06 and W11 owner gaps are resolved, W10 PG18 rehearsal evidence is accepted, and a separate reviewed D1-03 schema-source manifest plus shared ledger-backed runner/release review is admitted."
 }
