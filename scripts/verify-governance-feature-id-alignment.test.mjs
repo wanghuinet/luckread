@@ -54,6 +54,18 @@ test('fails closed when createAppeal is mapped to a non-canonical feature', () =
   }), /Canonical API feature map mismatch for createAppeal/)
 })
 
+test('fails closed when the appeal schema reference points to another operation', () => {
+  const override = jsonOverride('contracts/api/api-inventory.v1.json', (value) => {
+    value.operation_feature_map.createAppeal.schema_ref =
+      'contracts/api/report-appeal.v1.json#/operations/0'
+  })
+  assert.throws(() => verifyGovernanceFeatureIdAlignment({
+    readSource: readWithOverrides({
+      'contracts/api/api-inventory.v1.json': override,
+    }),
+  }), /Canonical API schemaRef mismatch for createAppeal/)
+})
+
 test('fails closed when generated API alignment output is stale', () => {
   const override = jsonOverride('contracts/alignment/api-inventory.v1.json', (value) => {
     value.records.find((record) => record.operationId === 'createAppeal').featureIds = []
