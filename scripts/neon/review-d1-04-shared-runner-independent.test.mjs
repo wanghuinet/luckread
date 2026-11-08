@@ -132,7 +132,7 @@ test('fails closed if the payment-provider trigger replacement DROP is removed',
   )
   assert.throws(
     () => verifyD104SharedRunnerReview({ readSource: source }),
-    /\/trigger is recreated without a preceding DROP\//,
+    /trigger is recreated without a preceding DROP/,
   )
 })
 
