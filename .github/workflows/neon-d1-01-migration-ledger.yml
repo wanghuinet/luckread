@@ -1,0 +1,86 @@
+name: Neon Shared Schema Migration Ledger
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/neon-d1-01-migration-ledger.yml'
+      - '.github/workflows/neon-d1-01-w01-payload-schema-apply.yml'
+      - 'contracts/database/neon-schema-migration-ledger.v1.json'
+      - 'contracts/database/neon-d1-01-migration-manifest.v1.json'
+      - 'scripts/neon/d1-01/**'
+      - 'scripts/neon/d1-01-migration-manifest.mjs'
+      - 'scripts/neon/assert-d1-01-migration-ledger-ready.mjs'
+      - 'workers/W01-payload/src/neon-postgres-migrations/**'
+      - 'workers/W02-identity/src/neon-postgres-migrations/**'
+      - 'workers/W07-subscription-commerce/src/neon-postgres-migrations/**'
+      - 'workers/W08-creator/src/neon-postgres-migrations/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: neon-shared-schema-migration-ledger-\${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  verify-ledger:
+    name: Verify shared migration ledger and D1-01 manifest on PostgreSQL 18
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:18.6
+        env:
+          POSTGRES_USER: schema_generator
+          POSTGRES_PASSWORD: schema_generator_local_only
+          POSTGRES_DB: luckread_schema
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U schema_generator -d luckread_schema"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Validate deterministic D1-01 migration manifest and source files
+        run: |
+          set -euo pipefail
+          node scripts/neon/d1-01-migration-manifest.mjs
+          node scripts/neon/d1-01-migration-manifest.mjs --print-order
+          node scripts/neon/assert-d1-01-migration-ledger-ready.mjs --expect-blocked
+
+      - name: Apply append-only migration ledger only to disposable PostgreSQL 18
+        env:
+          PGPASSWORD: schema_generator_local_only
+        run: |
+          set -euo pipefail
+          psql --host 127.0.0.1 --port 5432 --username schema_generator \
+            --dbname luckread_schema --set ON_ERROR_STOP=1 \
+            --file scripts/neon/d1-01/0001_schema_migration_ledger.sql
+
+      - name: Verify checksum shape, owner mapping, migration ordering, append-only rules and advisory lock
+        env:
+          PGPASSWORD: schema_generator_local_only
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/neon
+          psql -A -t -q --host 127.0.0.1 --port 5432 --username schema_generator \
+            --dbname luckread_schema --set ON_ERROR_STOP=1 --no-psqlrc \
+            --file scripts/neon/d1-01/verify_schema_migration_ledger.sql \
+            > artifacts/neon/neon-schema-migration-ledger-postflight.json
+
+      - name: Upload migration ledger evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: neon-schema-migration-ledger-postflight-\${{ github.sha }}
+          path: artifacts/neon/neon-schema-migration-ledger-postflight.json
+          if-no-files-found: error
+          retention-days: 90
