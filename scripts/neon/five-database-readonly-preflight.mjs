@@ -69,6 +69,7 @@ export function summarizeTargetInspection({
   serverVersionNum,
   tlsChainVerified,
   tlsHostnameVerified,
+  readOnlyTransactionVerified,
   schemas,
   relations,
   customTypes,
@@ -97,6 +98,7 @@ export function summarizeTargetInspection({
   if (major !== 18) issues.push('POSTGRESQL_18_REQUIRED')
   if (!tlsChainVerified) issues.push('TLS_CERTIFICATE_CHAIN_NOT_VERIFIED')
   if (!tlsHostnameVerified) issues.push('TLS_HOSTNAME_NOT_VERIFIED')
+  if (!readOnlyTransactionVerified) issues.push('READ_ONLY_TRANSACTION_NOT_VERIFIED')
   if (!publicSchemaExists) issues.push('PUBLIC_SCHEMA_MISSING')
   if (extraSchemas.length) issues.push('UNEXPECTED_SCHEMAS')
   if (catalog.relations.length) issues.push('UNEXPECTED_RELATIONS')
@@ -109,7 +111,7 @@ export function summarizeTargetInspection({
 
   const connectionAndIdentityValid =
     actualDatabase === target.database && major === 18 &&
-    tlsChainVerified === true && tlsHostnameVerified === true
+    tlsChainVerified === true && tlsHostnameVerified === true && readOnlyTransactionVerified === true
   const clean = connectionAndIdentityValid && issues.length === 0 && ledgerPresent === false
 
   return {
@@ -121,6 +123,7 @@ export function summarizeTargetInspection({
     postgresMajor: Number.isFinite(major) ? major : null,
     tlsChainVerified,
     tlsHostnameVerified,
+    readOnlyTransactionVerified,
     channelBindingRequired: true,
     readOnlyTransactionRolledBack: true,
     migrationLedger: {
@@ -197,6 +200,12 @@ async function inspectTarget({ target, connectionString, Client }) {
     const actualDatabase = identity.rows[0]?.database_name
     const serverVersion = identity.rows[0]?.server_version
     const serverVersionNum = Number(identity.rows[0]?.server_version_num)
+    const readOnlyTransactionVerified = identity.rows[0]?.transaction_read_only === 'on'
+    if (!readOnlyTransactionVerified) {
+      throw Object.assign(new Error('PostgreSQL transaction is not read-only.'), {
+        code: 'READ_ONLY_TRANSACTION_NOT_VERIFIED',
+      })
+    }
     if (actualDatabase !== target.database) {
       throw Object.assign(new Error('Connected database name did not match the approved target.'), {
         code: 'DATABASE_NAME_MISMATCH',
@@ -320,6 +329,7 @@ async function inspectTarget({ target, connectionString, Client }) {
       serverVersionNum,
       tlsChainVerified,
       tlsHostnameVerified,
+      readOnlyTransactionVerified,
       schemas,
       relations,
       customTypes,
