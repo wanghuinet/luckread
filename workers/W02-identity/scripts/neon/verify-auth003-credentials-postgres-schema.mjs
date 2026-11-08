@@ -41,6 +41,7 @@ const insertCredential = (id, owner, kind, valueHash, normalizedValue, active) =
   )
 
 let assertionsPassed = 0
+let successReport
 let primaryError
 try {
   const identity = await pool.query(
@@ -191,11 +192,7 @@ try {
   assert(Number(cascaded.rows[0].count) === 0, 'deleting an identity must cascade its credentials')
   assertionsPassed++
 
-  const cleanup = {
-    productionDatabaseTouched: false,
-    businessRowsImported: false,
-  }
-  console.log(JSON.stringify({
+  successReport = {
     status: 'W02_AUTH003_CREDENTIAL_POSTGRES_SCHEMA_PASS',
     postgresMajor,
     assertionsPassed,
@@ -214,10 +211,10 @@ try {
       unknownKindRejected: true,
       missingIdentityRejected: true,
       optionalIdentityValuesMayRemainNull: true,
-      syntheticCredentialRowsCleaned: true,
     },
-    ...cleanup,
-  }, null, 2))
+    productionDatabaseTouched: false,
+    businessRowsImported: false,
+  }
 } catch (error) {
   primaryError = error
 } finally {
@@ -232,12 +229,26 @@ try {
   try {
     const remaining = await pool.query(
       "SELECT " +
-        "(SELECT COUNT(*) FROM auth_credentials WHERE identity_id = ANY($1::text[]) OR id LIKE $2) AS credentials, " +
-        "(SELECT COUNT(*) FROM auth_identities WHERE id = ANY($1::text[]) OR user_id = ANY($3::text[])) AS identities",
+        "(SELECT COUNT(*) FROM auth_credentials WHERE identity_id = ANY($1::text[]) OR id LIKE $2) AS synthetic_credentials, " +
+        "(SELECT COUNT(*) FROM auth_identities WHERE id = ANY($1::text[]) OR user_id = ANY($3::text[])) AS synthetic_identities, " +
+        "(SELECT COUNT(*) FROM auth_credentials) AS all_credentials, " +
+        "(SELECT COUNT(*) FROM auth_identities) AS all_identities",
       [identityIds, 'auth003-%-' + suffix, userIds],
     )
-    if (Number(remaining.rows[0].credentials) !== 0 || Number(remaining.rows[0].identities) !== 0) {
-      if (!primaryError) primaryError = new Error('W02_AUTH003_SYNTHETIC_CLEANUP_FAILED')
+    const counts = remaining.rows[0]
+    if (
+      Number(counts.synthetic_credentials) !== 0 ||
+      Number(counts.synthetic_identities) !== 0 ||
+      Number(counts.all_credentials) !== 0 ||
+      Number(counts.all_identities) !== 0
+    ) {
+      if (!primaryError) primaryError = new Error('W02_AUTH003_POSTFLIGHT_ROWS_NOT_EMPTY')
+    } else if (!primaryError && successReport) {
+      successReport.checks.syntheticCredentialRowsCleaned = true
+      successReport.businessTableRows = {
+        auth_identities: Number(counts.all_identities),
+        auth_credentials: Number(counts.all_credentials),
+      }
     }
   } catch (cleanupVerificationError) {
     if (!primaryError) primaryError = cleanupVerificationError
@@ -246,3 +257,7 @@ try {
 }
 
 if (primaryError) throw primaryError
+if (!successReport || successReport.checks.syntheticCredentialRowsCleaned !== true) {
+  throw new Error('W02_AUTH003_POSTFLIGHT_EVIDENCE_INCOMPLETE')
+}
+process.stdout.write(JSON.stringify(successReport, null, 2) + '\n')
