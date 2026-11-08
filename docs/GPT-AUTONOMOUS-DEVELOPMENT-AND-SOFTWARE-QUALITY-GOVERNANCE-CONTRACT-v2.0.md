@@ -391,7 +391,7 @@ Stop reason (if any):
 
 ## 17. 本文件与既有执行标准的关系
 
-本文件补充 `docs/DEVELOPMENT-EXECUTION-STANDARD-LUCKREAD-1.0-v1.0.md` 的 GPT 专用上下文恢复、用户指令语义、风险检查、门禁例外、状态报告和持续改进要求。
+本文件补充 `docs/DEVELOPMENT-EXECUTION-STANDARD-LUCKREAD-1.0-v1.0.md` 的 GPT 专用上下文恢复、用户指令语义、风险检查、门禁例外、状态报告和持续改进要求。GPT 开发还必须遵守 `docs/GPT-AUTONOMOUS-DEVELOPMENT-ANTI-LOOP-ADDENDUM-v1.0.md`，该补充条款约束单一活动 Slice、无进展止损、验收后冻结和交接记录。
 
 如本文件与现有 Feature Blueprint、Architecture Blueprint、领域 Contract、L5、L6、Evidence Registry、Change Control、CI 或 Admission 规则存在冲突，以现有权威规则为准，并停止执行冲突部分。本文件不得独立授权任何新的产品能力、架构资源、数据写入、权限、门禁跳过或 PR 合并。
 
