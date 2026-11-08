@@ -63,13 +63,14 @@ export function buildW07D104OrderPaymentMigration({ readSource = (relativePath) 
       paymentContract.primaryWorker !== 'W07' ||
       paymentContract.authoritativeDomain !== 'D1-04' ||
       !ledgerContract.domainOwners?.['D1-04']?.includes('W07') ||
-      !ownerBoundary.physicalD1Registry?.['D1-04']?.authorizedWorkers?.includes('W07')) {
+      ownerBoundary.physicalD1Registry?.['D1-04'] !== '9bfb89a5-fbb5-45b1-a2ee-eab674b0d736' ||
+      !ownerBoundary.workers?.W07?.allowedDomains?.includes('D1-04')) {
     throw new Error('W07 D1-04 owner boundary is not admitted by the canonical contracts')
   }
 
-  const tablePattern = /CREATE TABLE(?: IF NOT EXISTS)?\\s+([A-Za-z0-9_]+)/gi
-  const indexPattern = /CREATE (?:UNIQUE )?INDEX\\s+([A-Za-z0-9_]+)/gi
-  const triggerPattern = /CREATE TRIGGER\\s+([A-Za-z0-9_]+)/gi
+  const tablePattern = /CREATE TABLE(?: IF NOT EXISTS)?\s+([A-Za-z0-9_]+)/gi
+  const indexPattern = /CREATE (?:UNIQUE )?INDEX\s+([A-Za-z0-9_]+)/gi
+  const triggerPattern = /CREATE TRIGGER\s+([A-Za-z0-9_]+)/gi
   const orderTables = inventory(orderSql, tablePattern)
   const paymentTables = inventory(paymentSql, tablePattern)
   same(orderTables, ['orders','order_lines','order_create_idempotency'], 'PAY-002 table')
@@ -81,7 +82,7 @@ export function buildW07D104OrderPaymentMigration({ readSource = (relativePath) 
 
   if (orderSql.includes('CREATE TABLE ledger_entries') ||
       paymentSql.includes('CREATE TABLE ledger_entries') ||
-      /CREATE TABLE(?: IF NOT EXISTS)?\\s+(?:payment_intents|entitlements|saved_payment_methods|refunds|billing_documents)\\b/i.test(orderSql + paymentSql)) {
+      /CREATE TABLE(?: IF NOT EXISTS)?\s+(?:payment_intents|entitlements|saved_payment_methods|refunds|billing_documents)\b/i.test(orderSql + paymentSql)) {
     throw new Error('D1-04 order/payment slice must not create ledger, intent, entitlement or later-module tables')
   }
   if (orderSql.includes('CREATE TABLE users') || paymentSql.includes('CREATE TABLE users')) {
