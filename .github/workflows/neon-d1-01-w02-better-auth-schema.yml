@@ -10,6 +10,8 @@ on:
       - 'contracts/api/AUTH-003-credential-management-contract.v1.json'
       - 'contracts/migration/AUTH-013-publication-journal.v1.json'
       - 'contracts/events/identity-account-state-changed.v1.json'
+      - 'contracts/persistence/AUTH-015-account-lifecycle-window-persistence-contract.v1.json'
+      - 'docs/change-control/CC-AUTH-015-W02-LIFECYCLE-WINDOW-PERSISTENCE-2026-11-06.md'
       - 'contracts/authz/layers.json'
       - 'workers/W02-identity/package.json'
       - 'workers/W02-identity/src/auth/better-auth.ts'
@@ -93,11 +95,13 @@ jobs:
           npm run neon:role-assignment:generate
           npm run neon:auth003:generate
           npm run neon:auth013-journal:generate
+          npm run neon:auth015:generate
           git diff --exit-code -- \
             src/neon-postgres-migrations/0001_role_assignments.sql \
             src/neon-postgres-migrations/0002_role_authorization_versions.sql \
             src/neon-postgres-migrations/0003_auth_003_credentials.sql \
-            src/neon-postgres-migrations/0004_auth_013_publication_journal.sql
+            src/neon-postgres-migrations/0004_auth_013_publication_journal.sql \
+            src/neon-postgres-migrations/0005_auth_015_lifecycle_windows.sql
 
       - name: Confirm all generated DDL is PostgreSQL-native
         working-directory: workers/W02-identity
@@ -109,6 +113,7 @@ jobs:
             src/neon-postgres-migrations/0002_role_authorization_versions.sql
             src/neon-postgres-migrations/0003_auth_003_credentials.sql
             src/neon-postgres-migrations/0004_auth_013_publication_journal.sql
+            src/neon-postgres-migrations/0005_auth_015_lifecycle_windows.sql
           )
           for file in "${files[@]}"; do
             test -s "$file"
@@ -168,6 +173,15 @@ jobs:
             --dbname luckread_schema --set ON_ERROR_STOP=1 \
             --file src/neon-postgres-migrations/0004_auth_013_publication_journal.sql
 
+      - name: Apply generated AUTH-015 lifecycle window PostgreSQL migration
+        working-directory: workers/W02-identity
+        env:
+          PGPASSWORD: schema_generator_local_only
+        run: |
+          psql --host 127.0.0.1 --port 5432 --username schema_generator \
+            --dbname luckread_schema --set ON_ERROR_STOP=1 \
+            --file src/neon-postgres-migrations/0005_auth_015_lifecycle_windows.sql
+
       - name: Verify Better Auth core tables and empty business rows
         working-directory: workers/W02-identity
         env:
@@ -192,6 +206,12 @@ jobs:
           W02_SCHEMA_DATABASE_URL: postgresql://schema_generator:schema_generator_local_only@127.0.0.1:5432/luckread_schema
         run: npm run neon:auth013-journal:verify > artifacts/neon/w02-auth013-publication-journal-postgres-schema-postflight.json
 
+      - name: Verify AUTH-015 nullable lifecycle timestamps and empty user table
+        working-directory: workers/W02-identity
+        env:
+          W02_SCHEMA_DATABASE_URL: postgresql://schema_generator:schema_generator_local_only@127.0.0.1:5432/luckread_schema
+        run: npm run neon:auth015:verify > artifacts/neon/w02-auth015-lifecycle-windows-postgres-schema-postflight.json
+
       - name: Upload generated schema and postflight evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -205,7 +225,9 @@ jobs:
             workers/W02-identity/src/neon-postgres-migrations/0002_role_authorization_versions.sql
             workers/W02-identity/src/neon-postgres-migrations/0003_auth_003_credentials.sql
             workers/W02-identity/src/neon-postgres-migrations/0004_auth_013_publication_journal.sql
+            workers/W02-identity/src/neon-postgres-migrations/0005_auth_015_lifecycle_windows.sql
             workers/W02-identity/artifacts/neon/w02-auth003-postgres-schema-postflight.json
             workers/W02-identity/artifacts/neon/w02-auth013-publication-journal-postgres-schema-postflight.json
+            workers/W02-identity/artifacts/neon/w02-auth015-lifecycle-windows-postgres-schema-postflight.json
           if-no-files-found: error
           retention-days: 30
