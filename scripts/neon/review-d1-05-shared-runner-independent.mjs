@@ -222,8 +222,14 @@ export function verifyD105SharedRunnerReview({ readSource = readText } = {}) {
       schema.localRehearsalEvidence?.results?.explicitIndexes !== 8 ||
       schema.localRehearsalEvidence?.results?.foreignKeys !== 0 ||
       schema.localRehearsalEvidence?.results?.triggers !== 0 ||
-      schema.localRehearsalEvidence?.results?.utcTimeTextColumnsWithBinaryCollation !== 15) {
-    fail('W11 schema contract table inventory or standalone PG18 catalog evidence changed')
+      schema.localRehearsalEvidence?.results?.utcTimeTextColumnsWithBinaryCollation !== 15 ||
+      schema.localRehearsalEvidence?.results?.syntheticRowsAfterRollback !== 0 ||
+      schema.localRehearsalEvidence?.safety?.remoteNeonTouched !== false ||
+      schema.localRehearsalEvidence?.safety?.cloudflareD1Touched !== false ||
+      schema.localRehearsalEvidence?.safety?.businessDataImported !== false ||
+      schema.localRehearsalEvidence?.safety?.runtimeBindingsChanged !== false ||
+      schema.localRehearsalEvidence?.safety?.productionCutoverAuthorized !== false) {
+    fail('W11 schema contract table inventory, zero-row rollback or no-remote PG18 evidence changed')
   }
   if (schema.admission?.status !== 'BLOCKED_MISSING_RETENTION_DELETION_AND_CONSENT_PURPOSE_POLICIES' ||
       !sameSet((schema.admission?.blockingRequirements ?? []).map((item) => item.status),['MISSING','MISSING','MISSING'])) {
