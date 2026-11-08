@@ -201,8 +201,17 @@ jobs:
 
       - name: Install PostgreSQL client for owner-specific postflight verifiers
         run: |
+          set -euo pipefail
           sudo apt-get update
           sudo apt-get install --yes postgresql-client
+
+      - name: Configure libpq system CA bundle for verify-full
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s /etc/ssl/certs/ca-certificates.crt
+          printf 'PGSSLROOTCERT=%s\\n' /etc/ssl/certs/ca-certificates.crt >> "$GITHUB_ENV"
+          psql --version
 
       - name: Run W07 membership schema probes with transactional rollback
         run: |
