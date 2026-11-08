@@ -67,7 +67,7 @@
       },
       {
         "path": ".github/workflows/neon-d1-01-reviewed-remote-schema-apply.yml",
-        "gitBlobSha1": "b81b3db57eb346108dae225d3809468d2d150987"
+        "gitBlobSha1": "055a5ad906b2508f4a719b88f484defca1000e2e"
       },
       {
         "path": "contracts/database/neon-d1-01-migration-manifest.v1.json",
@@ -102,7 +102,7 @@
     "formalGitHubReviewSubmissions": 0,
     "followUpReview": {
       "reviewedAt": "2026-11-08",
-      "scope": "Re-reviewed the shared ledger workflow after removing only the path-filter reference to the retired W01-only manual apply workflow. Confirmed the PostgreSQL 18 ledger job, D1-01 manifest validation, reviewed-runner readiness assertion and permanent owner-bypass denial are unchanged. No remote execution target, credential, DDL step, approval token or migration behavior changed.",
+      "scope": "Reviewed the D1-01 remote apply workflow change that adds a main-only push trigger for the existing no-credential validation job. Confirmed the apply job remains restricted to workflow_dispatch on refs/heads/main with exact confirmation APPLY_REVIEWED_SCHEMA_D1_01_LUCKREAD; push/PR validation receives no Neon secrets and performs no remote connection or DDL. Updated the reviewed workflow Git blob SHA to the exact branch blob.",
       "result": "NO_NEW_BLOCKING_FINDINGS"
     }
   },
