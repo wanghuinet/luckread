@@ -8,6 +8,8 @@ on:
       - 'contracts/entity/AUTH-003-identity-field-contract.v1.json'
       - 'contracts/entity/AUTH-003-credential-field-contract.v1.json'
       - 'contracts/api/AUTH-003-credential-management-contract.v1.json'
+      - 'contracts/database/neon-d1-01-migration-manifest.v1.json'
+      - 'workers/W02-identity/artifacts/neon/w02-better-auth-postgres-schema.sql'
       - 'contracts/migration/AUTH-013-publication-journal.v1.json'
       - 'contracts/events/identity-account-state-changed.v1.json'
       - 'contracts/migration/AUTH-010-session-revocation-journal.v1.json'
@@ -113,6 +115,7 @@ jobs:
           cmp --silent "$first_copy" "$artifact"
           second_sha256="$(sha256sum "$artifact" | cut -d ' ' -f 1)"
           test "$first_sha256" = "$second_sha256"
+          git diff --exit-code -- "$artifact"
           cat > artifacts/neon/w02-better-auth-postgres-schema-generation-provenance.txt <<EOF
           generatorCommand=npm run neon:schema:generate
           betterAuth=1.7.8
