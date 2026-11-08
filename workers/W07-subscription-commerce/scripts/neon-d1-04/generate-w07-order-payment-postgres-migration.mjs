@@ -95,11 +95,12 @@ export function buildW07D104OrderPaymentMigration({ readSource = (relativePath) 
   if (!orderStateText.includes('"entity": "Order"') || !paymentStateText.includes('"entity": "Payment"')) {
     throw new Error('Order/Payment lifecycle state-machine contracts are missing their entity identities')
   }
-  if (contract.schema?.totals?.tables !== 6 ||
-      contract.schema?.totals?.explicitIndexes !== 14 ||
-      contract.schema?.totals?.triggers !== 24 ||
-      contract.schema?.totals?.triggerFunctions !== 1 ||
-      contract.schema?.totals?.foreignKeys !== 0) {
+  const sliceTotals = contract.schema?.sliceTotals?.orderPayment
+  if (sliceTotals?.tables !== 6 ||
+      sliceTotals?.explicitIndexes !== 14 ||
+      sliceTotals?.triggers !== 24 ||
+      sliceTotals?.triggerFunctions !== 1 ||
+      sliceTotals?.foreignKeys !== 0) {
     throw new Error('D1-04 order/payment schema contract totals drift')
   }
 
@@ -115,7 +116,7 @@ export function buildW07D104OrderPaymentMigration({ readSource = (relativePath) 
   let migration = template
   for (const [name, value] of Object.entries(hashes)) migration = migration.replaceAll('{{' + name + '}}', value)
   if (/\\{\\{[A-Z0-9_]+\\}\\}/.test(migration)) throw new Error('Unresolved W07 D1-04 migration checksum placeholder')
-  return { migration, hashes, contract }
+  return { migration, hashes, contract, sliceTotals }
 }
 
 function run() {
@@ -133,7 +134,7 @@ function run() {
   if (actual !== result.migration) throw new Error('Committed W07 D1-04 PostgreSQL migration drift; run generator with --write and review the diff')
   process.stdout.write('NEON_D1_04_W07_ORDER_PAYMENT_MIGRATION_CURRENT ' + JSON.stringify({
     outputPath,hashes:result.hashes,bytes:Buffer.byteLength(result.migration),
-    totals:result.contract.schema.totals,remoteConnectionAttempted:false,remoteDdlExecuted:false
+    totals:result.sliceTotals,remoteConnectionAttempted:false,remoteDdlExecuted:false
   }) + '\\n')
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === scriptPath) {
