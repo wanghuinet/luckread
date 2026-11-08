@@ -7,7 +7,7 @@ DECLARE
   expected_columns TEXT[];
   actual_count INTEGER;
   -- The verifier still checks W07's exact six-table owner slice, while allowing
-  -- only the previously applied W01/W02 tables in the integrated D1-01 rehearsal.
+  -- only the registered W01/W02/W07/W08 owner tables in the integrated D1-01 rehearsal.
   known_d1_01_tables TEXT[] := ARRAY[
     'users_sessions',
     'users',
@@ -39,7 +39,10 @@ DECLARE
     'membership_revenuecat_product_bindings',
     'membership_subscription_plan_change_attempts',
     'membership_subscription_scheduled_plan_changes',
-    'membership_subscriptions'
+    'membership_subscriptions',
+    'creator_applications',
+    'creators',
+    'creator_authorization_audit'
   ];
   expected_tables TEXT[] := ARRAY[
     'membership_plan_versions',
@@ -72,7 +75,7 @@ BEGIN
       AND table_type = 'BASE TABLE'
       AND NOT (table_name = ANY(known_d1_01_tables));
   IF actual_count <> 0 THEN
-    RAISE EXCEPTION 'Unexpected table outside the registered D1-01 W01/W02/W07 owner set: %', actual_count;
+    RAISE EXCEPTION 'Unexpected table outside the registered D1-01 W01/W02/W07/W08 owner set: %', actual_count;
   END IF;
 
   expected_columns := ARRAY[
