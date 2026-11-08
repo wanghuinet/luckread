@@ -38,7 +38,12 @@ export function validateTargetConnectionString(connectionString, expectedDatabas
   if (!parsed.hostname.toLowerCase().endsWith('.neon.tech')) {
     return { valid: false, code: 'UNAPPROVED_DATABASE_HOST' }
   }
-  const pathDatabase = decodeURIComponent(parsed.pathname.replace(/^\/+/, ''))
+  let pathDatabase
+  try {
+    pathDatabase = decodeURIComponent(parsed.pathname.replace(/^\/+/, ''))
+  } catch {
+    return { valid: false, code: 'INVALID_DATABASE_PATH' }
+  }
   if (pathDatabase !== expectedDatabase) {
     return { valid: false, code: 'DATABASE_URL_TARGET_MISMATCH' }
   }
@@ -192,6 +197,16 @@ async function inspectTarget({ target, connectionString, Client }) {
     const actualDatabase = identity.rows[0]?.database_name
     const serverVersion = identity.rows[0]?.server_version
     const serverVersionNum = Number(identity.rows[0]?.server_version_num)
+    if (actualDatabase !== target.database) {
+      throw Object.assign(new Error('Connected database name did not match the approved target.'), {
+        code: 'DATABASE_NAME_MISMATCH',
+      })
+    }
+    if (Math.floor(serverVersionNum / 10_000) !== 18) {
+      throw Object.assign(new Error('Target database is not running PostgreSQL 18.'), {
+        code: 'POSTGRESQL_18_REQUIRED',
+      })
+    }
 
     const schemaResult = await client.query(
       'SELECT nspname AS schema_name FROM pg_namespace ' +
