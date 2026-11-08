@@ -11,7 +11,7 @@ on:
       - 'workers/W11-growth-campaign-analytics-operations/wrangler.jsonc'
       - 'workers/W11-growth-campaign-analytics-operations/migrations/**'
       - 'workers/W11-growth-campaign-analytics-operations/scripts/neon/**'
-      - 'workers/W11-growth-campaign-analytics-operations/src/neon-postgres-migrations/**'
+      - 'workers/W11-growth-campaign-analytics-operations/src/neon-postgres-migrations-d1-05/**'
   push:
     branches: [main]
     paths:
@@ -22,7 +22,7 @@ on:
       - 'workers/W11-growth-campaign-analytics-operations/wrangler.jsonc'
       - 'workers/W11-growth-campaign-analytics-operations/migrations/**'
       - 'workers/W11-growth-campaign-analytics-operations/scripts/neon/**'
-      - 'workers/W11-growth-campaign-analytics-operations/src/neon-postgres-migrations/**'
+      - 'workers/W11-growth-campaign-analytics-operations/src/neon-postgres-migrations-d1-05/**'
   workflow_dispatch:
 
 permissions:
@@ -66,7 +66,7 @@ jobs:
           node --check workers/W11-growth-campaign-analytics-operations/scripts/neon/generate-d1-05-w11-postgres-migration.mjs
           node --test workers/W11-growth-campaign-analytics-operations/scripts/neon/generate-d1-05-w11-postgres-migration.test.mjs
           node workers/W11-growth-campaign-analytics-operations/scripts/neon/generate-d1-05-w11-postgres-migration.mjs
-          git diff --exit-code -- workers/W11-growth-campaign-analytics-operations/src/neon-postgres-migrations/0001_w11_d1_05_analytics_schema.sql
+          git diff --exit-code -- workers/W11-growth-campaign-analytics-operations/src/neon-postgres-migrations-d1-05/0001_w11_d1_05_analytics_schema.sql
 
       - name: Apply schema to disposable PostgreSQL 18
         env:
@@ -76,7 +76,7 @@ jobs:
           mkdir -p artifacts/neon
           psql "$D1_05_W11_LOCAL_DATABASE_URL" \
             --set ON_ERROR_STOP=1 --no-psqlrc \
-            --file workers/W11-growth-campaign-analytics-operations/src/neon-postgres-migrations/0001_w11_d1_05_analytics_schema.sql
+            --file workers/W11-growth-campaign-analytics-operations/src/neon-postgres-migrations-d1-05/0001_w11_d1_05_analytics_schema.sql
 
       - name: Verify exact catalog, ownership constraints, privacy boundary and rollback
         env:
