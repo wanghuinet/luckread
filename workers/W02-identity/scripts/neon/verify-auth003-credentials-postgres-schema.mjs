@@ -131,6 +131,9 @@ try {
   await expectPgCode('duplicate normalized username identity', () => insertIdentity(
     'auth003-identity-dup-name-' + suffix, 'auth003-user-c-' + suffix, 'normalized-user-' + suffix, null, null,
   ), '23505')
+  await expectPgCode('duplicate normalized email identity', () => insertIdentity(
+    'auth003-identity-dup-email-' + suffix, 'auth003-user-d-' + suffix, null, 'normalized-email-' + suffix, null,
+  ), '23505')
   await expectPgCode('duplicate identity user binding', () => insertIdentity(
     'auth003-identity-dup-user-' + suffix, 'auth003-user-' + suffix, null, null, null,
   ), '23505')
@@ -148,6 +151,14 @@ try {
   assert(defaults.rows[0].active === true, 'active default must be true')
   assert(defaults.rows[0].created_at instanceof Date && defaults.rows[0].updated_at instanceof Date,
     'timestamp defaults must be PostgreSQL timestamps')
+  assertionsPassed++
+
+  await insertCredential('auth003-cascade-' + suffix, otherIdentityId, 'username',
+    'hash-cascade-' + suffix, 'cascade-normalized-' + suffix, true)
+  await pool.query('DELETE FROM auth_identities WHERE id = $1', [otherIdentityId])
+  const cascaded = await pool.query('SELECT COUNT(*)::int AS count FROM auth_credentials WHERE id = $1',
+    ['auth003-cascade-' + suffix])
+  assert(Number(cascaded.rows[0].count) === 0, 'deleting an identity must cascade its credentials')
   assertionsPassed++
 
   const cleanup = {
@@ -168,6 +179,7 @@ try {
       differentKindsMayShareNormalizedValue: true,
       duplicateSameKindValueRejected: true,
       duplicateHashRejected: true,
+      identityDeleteCascadesCredentials: true,
       unknownKindRejected: true,
       missingIdentityRejected: true,
       optionalIdentityValuesMayRemainNull: true,
