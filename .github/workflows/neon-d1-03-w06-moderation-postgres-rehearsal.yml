@@ -1,0 +1,110 @@
+name: Neon D1-03 W06 Moderation PostgreSQL 18 Local Rehearsal
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/neon-d1-03-w06-moderation-postgres-rehearsal.yml'
+      - '.github/workflows/d1-03-entity-owner-boundary-gate.yml'
+      - 'contracts/database/neon-d1-03-w06-moderation-schema.v1.json'
+      - 'contracts/database/neon-five-domain-schema-bootstrap.v1.json'
+      - 'contracts/transport/d1-03-entity-owner-boundary.v1.json'
+      - 'contracts/persistence/MODERATION-QUEUE-FOUNDATION-persistence.v1.json'
+      - 'contracts/entity/MODERATION-CASE-CONTRACT.v1.json'
+      - 'contracts/entity/MODERATION-DECISION-CONTRACT.v1.json'
+      - 'contracts/api/report-appeal.v1.json'
+      - 'docs/63-MODERATION-APPEALS-SYSTEM-CONTRACT-v1.0.md'
+      - 'workers/W06-governance/README.md'
+      - 'workers/W06-governance/migrations/**'
+      - 'workers/W06-governance/scripts/neon/**'
+      - 'workers/W06-governance/src/neon-postgres-migrations/**'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/neon-d1-03-w06-moderation-postgres-rehearsal.yml'
+      - '.github/workflows/d1-03-entity-owner-boundary-gate.yml'
+      - 'contracts/database/neon-d1-03-w06-moderation-schema.v1.json'
+      - 'contracts/database/neon-five-domain-schema-bootstrap.v1.json'
+      - 'contracts/transport/d1-03-entity-owner-boundary.v1.json'
+      - 'contracts/persistence/MODERATION-QUEUE-FOUNDATION-persistence.v1.json'
+      - 'contracts/entity/MODERATION-CASE-CONTRACT.v1.json'
+      - 'contracts/entity/MODERATION-DECISION-CONTRACT.v1.json'
+      - 'contracts/api/report-appeal.v1.json'
+      - 'docs/63-MODERATION-APPEALS-SYSTEM-CONTRACT-v1.0.md'
+      - 'workers/W06-governance/README.md'
+      - 'workers/W06-governance/migrations/**'
+      - 'workers/W06-governance/scripts/neon/**'
+      - 'workers/W06-governance/src/neon-postgres-migrations/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: neon-d1-03-w06-moderation-postgres-rehearsal-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  w06-moderation-local-rehearsal:
+    name: Rehearse W06 moderation schema on disposable PostgreSQL 18
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:18.6
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres_local_only
+          POSTGRES_DB: luckread_d1_03_w06_rehearsal
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d luckread_d1_03_w06_rehearsal"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - name: Checkout reviewed source
+        uses: actions/checkout@v4
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Check deterministic PostgreSQL artifact and source-boundary tests
+        run: |
+          set -euo pipefail
+          node --check workers/W06-governance/scripts/neon/generate-d1-03-w06-postgres-migration.mjs
+          node --test workers/W06-governance/scripts/neon/generate-d1-03-w06-postgres-migration.test.mjs
+          node workers/W06-governance/scripts/neon/generate-d1-03-w06-postgres-migration.mjs
+          git diff --exit-code -- workers/W06-governance/src/neon-postgres-migrations/0001_w06_d1_03_moderation_schema.sql
+
+      - name: Apply W06 moderation schema to disposable PostgreSQL 18
+        env:
+          D1_03_W06_LOCAL_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_d1_03_w06_rehearsal
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/neon
+          psql "$D1_03_W06_LOCAL_DATABASE_URL" \
+            --set ON_ERROR_STOP=1 --no-psqlrc --single-transaction \
+            --file workers/W06-governance/src/neon-postgres-migrations/0001_w06_d1_03_moderation_schema.sql
+
+      - name: Verify catalog, constraints and rollback-only fixture semantics
+        env:
+          D1_03_W06_LOCAL_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_d1_03_w06_rehearsal
+        run: |
+          set -euo pipefail
+          psql "$D1_03_W06_LOCAL_DATABASE_URL" \
+            --set ON_ERROR_STOP=1 --no-psqlrc \
+            --file workers/W06-governance/scripts/neon/verify-d1-03-w06-postgres-schema.sql \
+            | tee artifacts/neon/d1-03-w06-moderation-postflight.txt
+
+      - name: Upload W06 D1-03 PostgreSQL 18 rehearsal evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: neon-d1-03-w06-moderation-postgres18-${{ github.sha }}
+          path: artifacts/neon/d1-03-w06-moderation-postflight.txt
+          if-no-files-found: error
+          retention-days: 90

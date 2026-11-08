@@ -100,14 +100,14 @@
         "workers/W06-governance/migrations",
         "workers/W09-platform/migrations-d1-03"
       ],
-      "status": "PARTIAL_W09_SCHEMA_SOURCE_ADMITTED_W06_W10_W11_PENDING",
+      "status": "PARTIAL_W06_W09_SCHEMA_SOURCE_ADMITTED_W10_W11_PENDING",
       "schemaProgress": {
         "W09": {
           "entities": [
             "AuditEvent",
             "NotificationPushEndpoint"
           ],
-          "status": "SOURCE_ADMITTED_LOCAL_POSTGRES18_REHEARSAL_PENDING",
+          "status": "SOURCE_ADMITTED_LOCAL_POSTGRES18_REHEARSAL_PASSED",
           "schemaContract": "contracts/database/neon-d1-03-w09-platform-schema.v1.json"
         },
         "W06": {
@@ -117,8 +117,21 @@
             "Report",
             "Appeal"
           ],
-          "status": "NEXT_SCHEMA_SLICE",
-          "note": "W06 SQLite/D1 sources require a separate PostgreSQL-native port; AuditEvent is W09-owned."
+          "status": "SOURCE_ADMITTED_PARTIAL_APPEAL_PERSISTENCE_GAP_LOCAL_POSTGRES18_REHEARSAL_PASSED",
+          "note": "W06 PostgreSQL schema covers only the seven physical tables admitted by migrations 0002 and 0003. Appeal remains a logical owner responsibility but has no admitted persistence schema; docs/63 marks implementation pending. AuditEvent is W09-owned.",
+          "schemaContract": "contracts/database/neon-d1-03-w06-moderation-schema.v1.json",
+          "implementedTables": [
+            "moderation_cases",
+            "moderation_decisions",
+            "moderation_decision_idempotency",
+            "moderation_txn_guard",
+            "moderation_enforcement_outbox",
+            "moderation_reports",
+            "moderation_report_idempotency"
+          ],
+          "pendingEntities": [
+            "Appeal"
+          ]
         },
         "W10": {
           "entities": [
