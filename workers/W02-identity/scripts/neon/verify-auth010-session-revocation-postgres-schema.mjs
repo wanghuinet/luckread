@@ -273,7 +273,6 @@ try {
   successReport = {
     status: 'W02_AUTH010_SESSION_REVOCATION_POSTGRES_SCHEMA_PASS',
     postgresMajor,
-    assertionsPassed: 13,
     checks: {
       exactFourteenColumnContract: true,
       nativePostgresTemporalColumns: true,
@@ -319,6 +318,7 @@ try {
       if (!primaryError) primaryError = new Error('W02_AUTH010_JOURNAL_POSTFLIGHT_ROWS_NOT_EMPTY')
     } else if (!primaryError && successReport) {
       successReport.checks.syntheticJournalRowsCleaned = true
+      successReport.verifiedCheckCount = Object.keys(successReport.checks).length
       successReport.businessTableRows = { auth_010_session_revocation_journal: Number(counts.rows[0].all_rows) }
     }
   } catch (cleanupVerificationError) {
