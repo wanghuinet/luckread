@@ -162,8 +162,15 @@ if (/\bFOREIGN\s+KEY\b|\bREFERENCES\b/i.test(sql)) {
 if (/CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:public\.)?(?:role_assignments?|users?|membership_subscriptions|orders?|payments?|refunds?)\b/i.test(sql)) {
   fail('W08 DDL must not copy W02 identity/RoleAssignment, W07 subscription or D1-04 financial tables')
 }
-if (/CREATE\s+TABLE\s+[^;]*(?:role_assignments?|users?|membership_|order|payment|refund|ledger|wallet)/i.test(sql)) {
-  fail('W08 schema contains a table outside the Creator owner boundary')
+const createdTableNames = [...sql.matchAll(/^CREATE TABLE\s+([a-z_][a-z0-9_]*)/gim)]
+  .map((match) => match[1])
+  .sort()
+if (JSON.stringify(createdTableNames) !== JSON.stringify([
+  'creator_applications',
+  'creator_authorization_audit',
+  'creators',
+].sort())) {
+  fail('W08 schema must contain exactly the three Creator-owned D1-01 tables')
 }
 if (/PRAGMA|AUTOINCREMENT|strftime|julianday|GLOB|typeof\s*\(|RAISE\s*\(\s*ABORT/i.test(sql)) {
   fail('PostgreSQL migration contains SQLite-only syntax')
