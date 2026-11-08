@@ -67,7 +67,7 @@
       },
       {
         "path": ".github/workflows/neon-d1-01-reviewed-remote-schema-apply.yml",
-        "gitBlobSha1": "055a5ad906b2508f4a719b88f484defca1000e2e"
+        "gitBlobSha1": "cc2f363dff4d987cede8fdbeb8328aa205072a94"
       },
       {
         "path": "contracts/database/neon-d1-01-migration-manifest.v1.json",
@@ -102,7 +102,7 @@
     "formalGitHubReviewSubmissions": 0,
     "followUpReview": {
       "reviewedAt": "2026-11-08",
-      "scope": "Reviewed the D1-01 remote apply workflow change that adds a main-only push trigger for the existing no-credential validation job. Confirmed the apply job remains restricted to workflow_dispatch on refs/heads/main with exact confirmation APPLY_REVIEWED_SCHEMA_D1_01_LUCKREAD; push/PR validation receives no Neon secrets and performs no remote connection or DDL. Updated the reviewed workflow Git blob SHA to the exact branch blob.",
+      "scope": "Re-reviewed the D1-01 remote apply workflow's libpq CA configuration. Confirmed W07/W08 psql probes use the Ubuntu system CA bundle through PGSSLROOTCERT while the approved Neon URL continues to enforce sslmode=verify-full and channel_binding=require. The change only supplies the verifier's trust bundle; it does not weaken TLS, change migration SQL, target, credentials, or remote apply gates. Updated the reviewed workflow Git blob SHA to the exact branch blob.",
       "result": "NO_NEW_BLOCKING_FINDINGS"
     }
   },
