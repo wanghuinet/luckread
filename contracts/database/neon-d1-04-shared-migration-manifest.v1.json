@@ -139,7 +139,8 @@
     "triggers": 72,
     "triggerFunctions": 6,
     "foreignKeys": 0,
-    "businessRows": 0
+    "businessRows": 0,
+    "controlSeedRows": 1
   },
   "remoteApplyBlockers": [
     "The seven W07 D1-04 source migrations have local PostgreSQL 18.6 rehearsals, but the combined shared-ledger execution path requires a separate independent review.",
@@ -155,5 +156,21 @@
     "cloudflareD1Touched": false,
     "businessDataImported": false,
     "productionCutoverAuthorized": false
-  }
+  },
+  "seedRows": [
+    {
+      "table": "subscription_renewal_scheduler_state",
+      "kind": "SCHEMA_CONTROL_METADATA_NOT_BUSINESS_DATA",
+      "sourceContract": "contracts/database/neon-d1-04-w07-renewal-cycles-schema.v1.json",
+      "rows": [
+        {
+          "state_id": "subscription-renewals",
+          "cursor_period_end": null,
+          "cursor_subscription_id": null,
+          "version": 1,
+          "updated_at": "1970-01-01T00:00:00.000Z"
+        }
+      ]
+    }
+  ]
 }
