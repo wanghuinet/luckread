@@ -54,9 +54,9 @@ function sqlReferenceTargets(sql) {
   const code = String(sql)
     .replace(/\/\*[\s\S]*?\*\//g, ' ')
     .replace(/^--.*$/gm, ' ')
-    .replace(/(\\$[A-Za-z_0-9]*\\$)[\\s\\S]*?\\1/g, ' ')
+    .replace(/(\$[A-Za-z_0-9]*$)[\s\S]*?\1/g, ' ')
     .replace(/'(?:''|[^'])*'/g, ' ')
-  return namesIn(code, /\\bREFERENCES\\s+(?:(?:public)\\s*\\.\\s*)?"?([A-Za-z_][A-Za-z0-9_$]*)"?/gim)
+  return namesIn(code, /\bREFERENCES\s+(?:(?:public)\s*\.\s*)?"?([A-Za-z_][A-Za-z0-9_$]*)"?/gim)
 }
 
 function assertD103Target(contract, label) {
@@ -301,10 +301,10 @@ export function verifyD103SharedRunnerReview({ readSource = readText } = {}) {
   }
 
   if (w09Reconciliation.status !== 'LOGICAL_OWNERS_RECONCILED_SCHEMA_ADMISSION_PARTIAL' ||
-      !w09Reconciliation.safety?.noRemoteDdl ||
+      w09Reconciliation.scope?.noRemoteDdl !== true ||
       w09Reconciliation.safety?.runtimeBindingsChanged !== false ||
       w11Reconciliation.status !== 'LOGICAL_OWNERS_RECONCILED_SCHEMA_ADMISSION_BLOCKED' ||
-      !w11Reconciliation.safety?.noRemoteDdl ||
+      w11Reconciliation.scope?.noRemoteDdl !== true ||
       w11Reconciliation.safety?.runtimeBindingsChanged !== false ||
       !sameSet(w11Reconciliation.logicalOwnerEntities ?? [], ['Campaign','GrowthOperation'])) {
     fail('W09/W11 logical-owner reconciliation status and no-runtime/no-remote declarations must remain intact')
@@ -322,10 +322,10 @@ export function verifyD103SharedRunnerReview({ readSource = readText } = {}) {
   const allReferences = []
   const ownerTableCounts = {}
   for (const item of sqlByOwner) {
-    const tables = namesIn(item.sql,/^CREATE\\s+TABLE(?:\\s+IF\\s+NOT\\s+EXISTS)?\\s+([A-Za-z_][A-Za-z0-9_$]*)/gim)
-    const indexes = namesIn(item.sql,/^CREATE\\s+(?:UNIQUE\\s+)?INDEX\\s+([A-Za-z_][A-Za-z0-9_$]*)/gim)
-    const triggers = namesIn(item.sql,/^CREATE\\s+(?:CONSTRAINT\\s+)?TRIGGER\\s+([A-Za-z_][A-Za-z0-9_$]*)/gim)
-    const functions = namesIn(item.sql,/^CREATE\\s+(?:OR\\s+REPLACE\\s+)?FUNCTION\\s+([A-Za-z_][A-Za-z0-9_$]*)/gim)
+    const tables = namesIn(item.sql,/^CREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+([A-Za-z_][A-Za-z0-9_$]*)/gim)
+    const indexes = namesIn(item.sql,/^CREATE\s+(?:UNIQUE\s+)?INDEX\s+([A-Za-z_][A-Za-z0-9_$]*)/gim)
+    const triggers = namesIn(item.sql,/^CREATE\s+(?:CONSTRAINT\s+)?TRIGGER\s+([A-Za-z_][A-Za-z0-9_$]*)/gim)
+    const functions = namesIn(item.sql,/^CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+([A-Za-z_][A-Za-z0-9_$]*)/gim)
     const refs = sqlReferenceTargets(item.sql)
     if (!sameSet(tables,item.tables)) fail(item.owner + ' PostgreSQL artifact tables do not match its schema contract')
     if (tables.some((name) => ['appeals','moderation_appeals','campaigns','growth_operations'].includes(name))) {
