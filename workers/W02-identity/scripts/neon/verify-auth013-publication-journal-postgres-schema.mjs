@@ -101,7 +101,7 @@ try {
   ].sort()
   assert(JSON.stringify([...columnMap.keys()].sort()) === JSON.stringify(expectedColumns),
     'journal columns must exactly match the 13-column contract')
-  for (const name of ['journal_id', 'event_id', 'event_type', 'schema_version', 'resource_id', 'payload', 'status', 'created_at']) {
+  for (const name of ['journal_id', 'event_id', 'event_type', 'schema_version', 'resource_id', 'payload', 'status']) {
     assert(columnMap.get(name)?.data_type === 'text', name + ' must use TEXT')
     assert(columnMap.get(name)?.is_nullable === 'NO', name + ' must be NOT NULL')
   }
@@ -111,7 +111,11 @@ try {
   assert(columnMap.get('attempt')?.is_nullable === 'NO', 'attempt must be NOT NULL')
   assert(columnMap.get('next_attempt_at')?.data_type === 'timestamp with time zone', 'next_attempt_at must be TIMESTAMPTZ')
   assert(columnMap.get('created_at')?.data_type === 'timestamp with time zone', 'created_at must be TIMESTAMPTZ')
+  assert(columnMap.get('created_at')?.is_nullable === 'NO', 'created_at must be NOT NULL')
+  assert(columnMap.get('next_attempt_at')?.is_nullable === 'YES', 'next_attempt_at must be nullable')
   assert(columnMap.get('published_at')?.data_type === 'timestamp with time zone', 'published_at must be TIMESTAMPTZ')
+  assert(columnMap.get('published_at')?.is_nullable === 'YES', 'published_at must be nullable')
+  assert(columnMap.get('last_error_code')?.data_type === 'text', 'last_error_code must use TEXT')
   assert(columnMap.get('last_error_code')?.is_nullable === 'YES', 'last_error_code must be nullable')
   assert(columnMap.get('status')?.column_default?.includes('PENDING'), 'status must default to PENDING')
   assert(columnMap.get('attempt')?.column_default === '1', 'attempt must default to 1')
