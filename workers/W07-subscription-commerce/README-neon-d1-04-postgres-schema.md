@@ -83,7 +83,7 @@ Important invariants preserved:
 
 The PostgreSQL 18.6 rehearsal applies the two already-admitted predecessor slices before PAY-004, runs the complete offline D1-04 source regression suite, checks the cumulative catalog, exercises positive and negative state-machine cases, and confirms rollback. Workflow evidence is recorded in the cumulative schema contract.
 
-The remaining D1-04 slices are \`0005_revenuecat_webhook_inbox.sql\`, \`0006_refunds_billing_documents.sql\` and \`0007_payment_method_revocation_requests.sql\`; each remains a separate, bounded local PostgreSQL 18 rehearsal. No remote Neon DDL, Cloudflare D1 write, business data import or production cutover is authorized.
+At the time PAY-004 was introduced, RevenueCat, refunds/billing and payment-method revocation were still separate pending source slices. Each was translated and rehearsed independently in later PAY-005, PAY-006 and PAY-007 sections below. No remote Neon DDL, Cloudflare D1 write, business data import or production cutover is authorized.
 
 
 ## PAY-005 RevenueCat Webhook inbox — fourth D1-04 slice
@@ -108,7 +108,7 @@ Important invariants:
 
 The PostgreSQL 18.6 rehearsal applies slices 0001–0004 in order, runs the complete offline D1-04 source regression suite, verifies the cumulative catalog, exercises valid and invalid first-receipt/conflict cases in a rollback-only transaction, and confirms zero business fixture rows remain.
 
-The remaining source slices are \`0006_refunds_billing_documents.sql\` and \`0007_payment_method_revocation_requests.sql\`. No remote Neon DDL, Cloudflare D1 write, business data import, runtime binding change or production cutover is authorized.
+At the time PAY-005 was introduced, refunds/billing and payment-method revocation were still pending independent slices. PAY-006 and PAY-007 are documented below. No remote Neon DDL, Cloudflare D1 write, business data import, runtime binding change or production cutover is authorized.
 
 
 ## PAY-006 refunds and billing documents — fifth D1-04 slice
@@ -132,4 +132,28 @@ Important invariants:
 
 The PAY-006 workflow applies predecessor slices 0001–0004 in order, runs the full offline D1-04 source regression suite, verifies deterministic generators through PAY-006, applies the new PostgreSQL 18.6 slice, tests valid and invalid refund/document cases, and confirms all business fixtures roll back while the single scheduler control row remains.
 
-Only `0007_payment_method_revocation_requests.sql` remains to be translated. No remote Neon DDL, Cloudflare D1 write, business-data import, runtime binding change or production cutover is authorized.
+PAY-007 now has a separate PostgreSQL translation and local rehearsal workflow; its validation evidence is recorded in the PAY-007 section below. No remote Neon DDL, Cloudflare D1 write, business-data import, runtime binding change or production cutover is authorized.
+
+
+## PAY-007 payment-method revocation — sixth D1-04 slice
+
+The PostgreSQL migration `0006_w07_d1_04_payment_method_revocation.sql` translates only source migration `0007_payment_method_revocation_requests.sql` and adds:
+
+- `payment_method_revocation_requests`: one durable, one-way request per saved payment method, with customer-scoped idempotency, immutable provider/customer/merchant/token identity, exact one-step version CAS, a guarded lifecycle and retained audit history.
+- A replacement for the existing `payment_provider_events_terminal_immutable` trigger, matching the source rule that only a `mandate_active` or `mandate_revoked` first receipt previously marked `RECONCILIATION_REQUIRED` can be replayed to `RECEIVED` with `processed_at` and `outcome_code` cleared. Its original event identity and payload hash remain immutable; `APPLIED`, `REJECTED`, payment events and other event types stay terminal.
+
+PAY-007 adds **1 table, 2 explicit indexes, 7 new source-semantic triggers, one trigger function and zero foreign keys**. It replaces one existing provider-event trigger without increasing its cumulative trigger count. Cumulative D1-04 after all seven source migrations is **15 tables, 31 explicit indexes, 72 triggers, six trigger functions and zero foreign keys**.
+
+Important invariants:
+
+- A revocation request must match the exact saved-method ID, provider, merchant, customer and opaque provider payment-method reference. PostgreSQL enforces this source relationship with a trigger rather than a foreign key, preserving the D1-04 zero-FK contract.
+- Only one request may exist per saved-method record; the idempotency key is unique within the customer.
+- Request identity cannot be rewritten. Every update must advance version by exactly one and use a strictly increasing timestamp.
+- `provider_method_deleted_at` is an immutable provider-delete acknowledgement. It does not, by itself, prove that recurring mandates have been revoked.
+- `COMPLETED` requires the provider deletion acknowledgement and every mandate attached to the saved method to be `REVOKED`, `FAILED` or `EXPIRED`. Revocation request facts are retained.
+- The existing W07 renewal runtime already excludes any active mandate linked to a revocation request whose status is not `COMPLETED`. The PostgreSQL generator fingerprints both `readActiveMandate` and `isExactMandateActive` so a later change cannot silently remove this new-charge block.
+- The local request never fabricates provider mandate truth. Only a verified mandate event/reconciliation can make the mandate terminal; D1-01 remains the entitlement authority.
+
+The dedicated PAY-007 PostgreSQL 18.6 rehearsal applies all six predecessor migrations in order, runs the full offline D1-04 source regression suite, checks deterministic generators through PAY-007, tests valid and invalid ownership, idempotency, request transitions, completion, immutable provider deletion time and exact mandate replay cases, then rolls back all business fixtures while preserving the one scheduler control row.
+
+All seven W07 D1-04 source migrations now have isolated PostgreSQL 18 translations. Completing local PAY-007 rehearsal still does **not** authorize remote Neon DDL, shared-ledger remote apply, business-data import, Worker deployment, runtime binding changes or production cutover; those remain separate gates.
