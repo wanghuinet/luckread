@@ -51,13 +51,24 @@ export function buildReadOnlyMigrationPlan({ manifest, ledgerContract, checksums
     ledgerContract.remoteApplyReady === false &&
     ledgerContract.execution?.remoteApplyReady === false &&
     ledgerContract.execution?.runnerStatus === 'NOT_IMPLEMENTED'
+  const domainReadiness = ledgerContract.execution?.domainReadiness ?? {}
+  const expectedDomains = ['D1-01', 'D1-02', 'D1-03', 'D1-04', 'D1-05']
+  const d1Readiness = domainReadiness['D1-01']
+  const otherDomainsBlocked = expectedDomains
+    .filter((domain) => domain !== 'D1-01')
+    .every((domain) => domainReadiness[domain]?.runnerStatus === 'NOT_IMPLEMENTED' &&
+      domainReadiness[domain]?.remoteApplyReady === false)
   const releaseReady =
     manifest.remoteApplyReady === true &&
     manifest.execution?.remoteApplyReady === true &&
     manifest.execution?.runnerStatus === 'IMPLEMENTED_AND_REVIEWED' &&
-    ledgerContract.remoteApplyReady === true &&
-    ledgerContract.execution?.remoteApplyReady === true &&
-    ledgerContract.execution?.runnerStatus === 'IMPLEMENTED_AND_REVIEWED'
+    ledgerContract.remoteApplyReady === false &&
+    ledgerContract.execution?.remoteApplyReady === false &&
+    ledgerContract.execution?.runnerStatus === 'IMPLEMENTED_FOR_D1_01_ONLY' &&
+    JSON.stringify(Object.keys(domainReadiness).sort()) === JSON.stringify(expectedDomains) &&
+    d1Readiness?.runnerStatus === 'IMPLEMENTED_AND_REVIEWED' &&
+    d1Readiness?.remoteApplyReady === true &&
+    manifest.execution?.reviewEvidenceRef === d1Readiness?.reviewEvidenceRef
   if (!releaseBlocked && !releaseReady) {
     fail('manifest and ledger must share one complete blocked or reviewed release state')
   }
