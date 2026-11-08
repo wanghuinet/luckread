@@ -77,8 +77,14 @@ jobs:
       - name: Checkout reviewed main
         uses: actions/checkout@v4
         with:
-          ref: main
+          ref: ${{ github.sha }}
           fetch-depth: 1
+
+      - name: Verify the checked-out commit matches the dispatched main commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
 
       - uses: actions/setup-node@v4
         with:
@@ -117,7 +123,9 @@ jobs:
           }
           url.searchParams.set('sslmode', 'verify-full')
           url.searchParams.set('channel_binding', 'require')
-          process.stdout.write('NEON_DATABASE_URL_LUCKREAD_VERIFIED=' + url.toString() + '\n')
+          const verified = url.toString()
+          process.stdout.write('::add-mask::' + verified + '\n')
+          process.stdout.write('NEON_DATABASE_URL_LUCKREAD_VERIFIED=' + verified + '\n')
           NODE
 
       - name: Reconcile the existing W01 Payload baseline on Neon (read-only)
