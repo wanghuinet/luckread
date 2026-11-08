@@ -176,3 +176,17 @@ This change control is complete when the repository has an agreed five-domain sc
 - This release-gate change makes the shared runner eligible for a later manually dispatched D1-01 schema-only apply after the release PR is merged. It does not dispatch that workflow, contact Neon, or apply DDL automatically.
 - The only eligible remote path remains `.github/workflows/neon-d1-01-reviewed-remote-schema-apply.yml` on `main`, with `NEON_DATABASE_URL_LUCKREAD`, TLS `verify-full`, `channel_binding=require`, PostgreSQL 18 and the exact confirmation `APPLY_REVIEWED_SCHEMA_D1_01_LUCKREAD`.
 - The release does not authorize business data import, Cloudflare D1 changes, Worker runtime/binding changes, dual writes or production cutover. Cloudflare D1 remains authoritative for production.
+
+
+## 15. W01 Payload schema owner closeout — 2026-11-08
+
+**W01 owner state: `ACCEPTED_SCHEMA_BASELINE_NEON_RECONCILED`.** This closes only W01's D1-01 Payload schema-owner slice; it does not close the overall D1-01 shared remote initialization or production runtime migration.
+
+- W01 standalone Payload schema and non-empty rollback protection passed on disposable PostgreSQL 18 in [run 42452902432](https://github.com/wanghuinet/luckread/actions/runs/42452902432).
+- The integrated fourteen-entry D1-01 rehearsal passed on disposable PostgreSQL 18 in [run 42460599618](https://github.com/wanghuinet/luckread/actions/runs/42460599618), including W01's official Payload-native migration first, all owner verifiers, same-owner foreign-key checks, and zero business rows.
+- The existing Neon W01 baseline was independently verified read-only in [run 42453402142](https://github.com/wanghuinet/luckread/actions/runs/42453402142): target `luckread`, PostgreSQL `18.6`, verified TLS chain/hostname, exact 11-table catalog/columns/indexes/foreign keys, ten business tables with zero rows, and exactly one expected `payload_migrations` baseline row. The verifier reports a verified read-only transaction followed by rollback and no failures.
+- The existing W01 baseline is therefore preserved as-is. The old owner-specific W01 Neon apply workflow has been removed. W01 remote checks and any schema execution must go through the reviewed shared D1-01 workflow; the shared runner records W01's existing Payload baseline in the common append-only ledger and must never replay W01 DDL.
+- The unified remote D1-01 workflow has not yet been manually dispatched. The common ledger provenance row for W01 is therefore still pending alongside the other D1-01 manifest entries. This is an overall D1-01 execution dependency, not a reason to reopen W01's accepted Payload schema.
+- Production W01 continues to use Cloudflare D1 and R2. No business data import, runtime adapter switch, dual write or production cutover is included.
+
+The W01 schema-owner slice is frozen. Reopen it only for a reproducible W01 schema mismatch/regression, source/contract drift, invalidated evidence, or explicit user authorization with a new scope.
