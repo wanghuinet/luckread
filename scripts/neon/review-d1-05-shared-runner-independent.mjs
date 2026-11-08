@@ -202,10 +202,10 @@ export function verifyD105SharedRunnerReview({ readSource = readText } = {}) {
 
   verifyD105Target(schema.target,'W11 analytics schema contract')
   if (schema.status !== 'LOCAL_POSTGRES18_REHEARSAL_PASSED_ADMISSION_BLOCKED' ||
-      schema.primaryOwner?.worker !== 'W11' ||
       schema.target?.primaryWorker !== 'W11' ||
-      !sameSet(schema.scope?.includedTables ?? [],expectedTables)) {
-    fail('W11 schema contract owner, final six-table inventory or admission status changed')
+      !sameSet(schema.scope?.includedTables ?? [],expectedTables) ||
+      !sameSet((schema.scope?.excludedEntities ?? []).map((item) => item.entity),['Campaign','GrowthOperation'])) {
+    fail('W11 schema contract owner, final six-table inventory or D1-03 entity exclusion changed')
   }
   if (!Array.isArray(schema.scope?.sourceMigrations) ||
       !sameSet(schema.scope.sourceMigrations.map((item) => item.path),sourceMigrationPaths)) {
