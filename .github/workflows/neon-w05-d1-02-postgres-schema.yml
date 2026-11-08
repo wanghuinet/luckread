@@ -1,0 +1,102 @@
+name: Neon W05 D1-02 PostgreSQL 18 Local Schema Rehearsal
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/neon-w05-d1-02-postgres-schema.yml'
+      - 'contracts/database/neon-d1-02-schema-sources.v1.json'
+      - 'contracts/persistence/SOCIAL-001-follow-relationship-persistence-contract.v1.json'
+      - 'contracts/persistence/SOCIAL-001-follow-relationship-migration-contract.v1.json'
+      - 'contracts/transport/W05-W09-notification-push-delivery.v1.json'
+      - 'workers/W05-social/migrations/**'
+      - 'workers/W05-social/scripts/neon/**'
+      - 'workers/W05-social/src/neon-postgres-migrations/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: neon-w05-d1-02-postgres-schema-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  local-postgres18:
+    name: Rehearse W05 D1-02 schema on disposable PostgreSQL 18
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:18.6
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres_local_only
+          POSTGRES_DB: luckread_w05_d1_02_schema
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d luckread_w05_d1_02_schema"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Run generator and source/contract unit tests
+        run: |
+          set -euo pipefail
+          node --test workers/W05-social/scripts/neon/generate-d1-02-postgres-migration.test.mjs
+          node workers/W05-social/scripts/neon/generate-d1-02-postgres-migration.mjs --report artifacts/neon/w05-d1-02-source-hashes.json
+          git diff --exit-code -- workers/W05-social/src/neon-postgres-migrations/0001_w05_d1_02_social_schema.sql
+      - name: Apply only the PostgreSQL-native W05 artifact to disposable PostgreSQL 18
+        run: |
+          set -euo pipefail
+          psql "postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_w05_d1_02_schema" \
+            --set ON_ERROR_STOP=1 --no-psqlrc \
+            --file workers/W05-social/src/neon-postgres-migrations/0001_w05_d1_02_social_schema.sql
+      - name: Verify schema, trigger semantics and rollback of synthetic rows
+        run: |
+          set -euo pipefail
+          psql "postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_w05_d1_02_schema" \
+            --set ON_ERROR_STOP=1 --no-psqlrc \
+            --file workers/W05-social/scripts/neon/verify-d1-02-social-postgres-schema.sql
+          node --input-type=module <<'NODE'
+          import { execFileSync } from 'node:child_process'
+          import { mkdir, writeFile } from 'node:fs/promises'
+          const url = 'postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_w05_d1_02_schema'
+          const sql = [
+            "SELECT json_build_object(",
+            "'database', current_database(),",
+            "'postgresMajor', current_setting('server_version_num')::int / 10000,",
+            "'tables', (SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE'),",
+            "'userTriggers', (SELECT count(*) FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND NOT t.tgisinternal),",
+            "'businessRows', (SELECT count(*) FROM social_follow_relationships) + (SELECT count(*) FROM interaction_likes) + (SELECT count(*) FROM social_comments) + (SELECT count(*) FROM interaction_favorites) + (SELECT count(*) FROM social_share_links) + (SELECT count(*) FROM social_user_interactions) + (SELECT count(*) FROM social_topics) + (SELECT count(*) FROM social_target_topics) + (SELECT count(*) FROM social_mentions) + (SELECT count(*) FROM social_notifications) + (SELECT count(*) FROM social_notification_preferences) + (SELECT count(*) FROM social_reposts) + (SELECT count(*) FROM social_profile_pins) + (SELECT count(*) FROM social_polls) + (SELECT count(*) FROM social_poll_options) + (SELECT count(*) FROM social_poll_votes) + (SELECT count(*) FROM social_content_reply_policies) + (SELECT count(*) FROM social_notification_push_outbox) + (SELECT count(*) FROM social_notification_push_deliveries),",
+            "'d1_03EndpointTablePresent', to_regclass('public.notification_push_endpoints') IS NOT NULL,",
+            "'remoteNeonTouched', false, 'cloudflareD1Touched', false, 'businessDataImported', false",
+            ")::text;"
+          ].join(' ')
+          const report = JSON.parse(execFileSync('psql', [url, '-A', '-t', '-q', '-c', sql], { encoding:'utf8' }).trim())
+          if (report.database !== 'luckread_w05_d1_02_schema' || report.postgresMajor !== 18 ||
+              report.tables !== 19 || report.userTriggers !== 1 || report.businessRows !== 0 ||
+              report.d1_03EndpointTablePresent || report.remoteNeonTouched ||
+              report.cloudflareD1Touched || report.businessDataImported) {
+            throw new Error('W05 local PostgreSQL 18 postflight mismatch: ' + JSON.stringify(report))
+          }
+          await mkdir('artifacts/neon', { recursive:true })
+          await writeFile('artifacts/neon/w05-d1-02-postgres-schema-postflight.json', JSON.stringify(report,null,2)+'\n')
+          console.log('W05_D1_02_POSTGRES18_REHEARSAL_PASS ' + JSON.stringify(report))
+          NODE
+      - name: Upload W05 D1-02 PostgreSQL 18 evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: neon-w05-d1-02-postgres18-${{ github.sha }}
+          path: |
+            workers/W05-social/src/neon-postgres-migrations/0001_w05_d1_02_social_schema.sql
+            artifacts/neon/w05-d1-02-source-hashes.json
+            artifacts/neon/w05-d1-02-postgres-schema-postflight.json
+          if-no-files-found: error
+          retention-days: 90
