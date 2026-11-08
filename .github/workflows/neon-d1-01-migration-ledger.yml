@@ -30,7 +30,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: neon-shared-schema-migration-ledger-\${{ github.event.pull_request.number }}
+  group: neon-shared-schema-migration-ledger-${{ github.event.pull_request.number }}
   cancel-in-progress: false
 
 jobs:
@@ -92,7 +92,7 @@ jobs:
       - name: Upload migration ledger evidence
         uses: actions/upload-artifact@v4
         with:
-          name: neon-schema-migration-ledger-postflight-\${{ github.sha }}
+          name: neon-schema-migration-ledger-postflight-${{ github.sha }}
           path: artifacts/neon/neon-schema-migration-ledger-postflight.json
           if-no-files-found: error
           retention-days: 90
