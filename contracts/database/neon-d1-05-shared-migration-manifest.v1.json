@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/database/neon-d1-05-shared-migration-manifest.v1.json",
+  "title": "LuckRead D1-05 Shared PostgreSQL 18 Schema Migration Manifest",
+  "version": "1.0.0",
+  "status": "LOCAL_SCHEMA_REHEARSAL_PASSED_REMOTE_ADMISSION_BLOCKED",
+  "domainId": "D1-05",
+  "databaseName": "allluck",
+  "cloudflareD1DatabaseUuid": "77d82be2-d12e-4a17-b410-9aa7d376bc11",
+  "postgresMajor": 18,
+  "ledger": {
+    "table": "neon_schema_migration_ledger",
+    "ddlPath": "scripts/neon/d1-01/0001_schema_migration_ledger.sql",
+    "domainId": "D1-05",
+    "databaseName": "allluck"
+  },
+  "localRehearsal": {
+    "allowed": true,
+    "databaseName": "alluck_d1_05_shared",
+    "postgresMajor": 18,
+    "environmentVariable": "D1_SHARED_LOCAL_DATABASE_URL"
+  },
+  "remoteApplyReady": false,
+  "businessDataImport": false,
+  "productionCutoverAuthorized": false,
+  "entries": [
+    {
+      "migrationId": "d1-05-w11-analytics-schema-v1",
+      "order": 100,
+      "ownerWorker": "W11",
+      "logicalOwnerWorker": "W11",
+      "kind": "GENERATED_POSTGRESQL_SQL",
+      "artifactPaths": [
+        "workers/W11-growth-campaign-analytics-operations/src/neon-postgres-migrations-d1-05/0001_w11_d1_05_analytics_schema.sql"
+      ],
+      "dependsOn": [],
+      "schemaContract": "contracts/database/neon-d1-05-w11-analytics-schema.v1.json",
+      "sourceMigrations": [
+        "workers/W11-growth-campaign-analytics-operations/migrations/0001_analytics_projection.sql",
+        "workers/W11-growth-campaign-analytics-operations/migrations/0002_analytics_projection_rebuild_state.sql",
+        "workers/W11-growth-campaign-analytics-operations/migrations/0003_analytics_late_event_replay.sql",
+        "workers/W11-growth-campaign-analytics-operations/migrations/0004_analytics_w01_client_telemetry.sql"
+      ],
+      "scope": "Six derived analytics tables only; no Campaign/GrowthOperation persistence is inferred."
+    }
+  ],
+  "expected": {
+    "tables": 6,
+    "explicitIndexes": 8,
+    "triggers": 0,
+    "triggerFunctions": 0,
+    "foreignKeys": 0,
+    "businessRows": 0
+  },
+  "remoteApplyBlockers": [
+    "Retention policy for event and aggregate classes is missing.",
+    "Deletion behavior for actor-linked and creator-linked analytics projections is missing.",
+    "Consent, lawful purpose and collection eligibility rules are missing.",
+    "The W11 schema contract explicitly blocks D1-05 source/runtime admission until these policies are admitted."
+  ],
+  "safety": {
+    "newWorkers": 0,
+    "newD1Databases": 0,
+    "newQueues": 0,
+    "newServiceBindings": 0,
+    "runtimeBindingsChanged": false,
+    "remoteNeonDdlExecuted": false,
+    "cloudflareD1Touched": false,
+    "businessDataImported": false,
+    "productionCutoverAuthorized": false
+  }
+}
