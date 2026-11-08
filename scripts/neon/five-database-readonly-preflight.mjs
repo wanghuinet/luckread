@@ -195,7 +195,8 @@ async function inspectTarget({ target, connectionString, Client }) {
 
     const identity = await client.query(
       'SELECT current_database() AS database_name, current_setting(\'server_version\') AS server_version, ' +
-      'current_setting(\'server_version_num\')::integer AS server_version_num',
+      'current_setting(\'server_version_num\')::integer AS server_version_num, ' +
+      'current_setting(\'transaction_read_only\') AS transaction_read_only',
     )
     const actualDatabase = identity.rows[0]?.database_name
     const serverVersion = identity.rows[0]?.server_version
