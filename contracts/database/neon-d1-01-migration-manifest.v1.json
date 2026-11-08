@@ -345,5 +345,11 @@
   },
   "noCrossDomainForeignKeys": true,
   "executionRequiresSharedLedger": true,
-  "sourceCommitRecordedAtExecution": true
+  "sourceCommitRecordedAtExecution": true,
+  "execution": {
+    "runnerStatus": "NOT_IMPLEMENTED",
+    "runnerEntryPoint": "scripts/neon/run-schema-migrations.mjs",
+    "lockExpression": "pg_advisory_xact_lock(hashtextextended('luckread:neon-schema-migration:' || current_database(), 0))",
+    "remoteApplyReady": false
+  }
 }
