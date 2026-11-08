@@ -21,7 +21,6 @@ on:
   push:
     branches:
       - main
-      - 'feat/neon-d1-02-schema-only-runner-*'
     paths:
       - '.github/workflows/neon-d1-02-full-local-rehearsal.yml'
       - 'contracts/database/neon-d1-02-migration-manifest.v1.json'
