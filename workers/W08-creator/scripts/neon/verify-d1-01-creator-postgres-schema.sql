@@ -10,6 +10,45 @@ DECLARE
     'creator_authorization_audit',
     'creators'
   ];
+  -- Exact allowlist for the ordered W01 -> W02 -> W07 -> W08 integration run.
+  -- Each owner-specific assertion below remains scoped to W08's own tables.
+  known_d1_01_tables TEXT[] := ARRAY[
+    'users_sessions',
+    'users',
+    'media',
+    'redirects',
+    'redirects_rels',
+    'payload_kv',
+    'payload_locked_documents',
+    'payload_locked_documents_rels',
+    'payload_preferences',
+    'payload_preferences_rels',
+    'payload_migrations',
+    'user',
+    'session',
+    'account',
+    'verification',
+    'twoFactor',
+    'role_assignments',
+    'role_authorization_versions',
+    'auth_identities',
+    'auth_credentials',
+    'auth_013_publication_journal',
+    'auth_010_session_revocation_journal',
+    'auth_username_change_state',
+    'auth_007_mfa_publication_journal',
+    'auth_007_mfa_operation_receipts',
+    'membership_plan_versions',
+    'membership_plans',
+    'membership_revenuecat_product_bindings',
+    'membership_subscription_plan_change_attempts',
+    'membership_subscription_scheduled_plan_changes',
+    'membership_subscriptions',
+    'creator_applications',
+    'creator_authorization_audit',
+    'creators'
+  ];
+  unexpected_table_count INTEGER;
 BEGIN
   IF current_database() <> 'luckread_schema' THEN
     RAISE EXCEPTION 'W08 schema verifier must run only against luckread_schema';
@@ -22,9 +61,20 @@ BEGIN
     INTO actual_names
     FROM information_schema.tables
     WHERE table_schema = 'public'
-      AND table_type = 'BASE TABLE';
+      AND table_type = 'BASE TABLE'
+      AND table_name = ANY(expected_tables);
   IF actual_names IS DISTINCT FROM expected_tables THEN
-    RAISE EXCEPTION 'W08 isolated database must contain exactly three creator tables; found %', actual_names;
+    RAISE EXCEPTION 'W08 expected exactly its three owner tables; found %', actual_names;
+  END IF;
+
+  SELECT COUNT(*)::INTEGER INTO unexpected_table_count
+    FROM information_schema.tables
+    WHERE table_schema = 'public'
+      AND table_type = 'BASE TABLE'
+      AND NOT (table_name = ANY(known_d1_01_tables));
+  IF unexpected_table_count <> 0 THEN
+    RAISE EXCEPTION 'Unexpected table outside the registered D1-01 W01/W02/W07/W08 owner set: %',
+      unexpected_table_count;
   END IF;
 
   IF (SELECT COUNT(*) FROM information_schema.columns

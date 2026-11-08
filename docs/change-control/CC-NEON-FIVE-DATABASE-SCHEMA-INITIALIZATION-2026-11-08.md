@@ -128,3 +128,12 @@ This change control is complete when the repository has an agreed five-domain sc
 - Disposable PostgreSQL 18 evidence: exactly five Better Auth core tables (`user`, `session`, `account`, `verification`, `twoFactor`) and five indexes; core business tables remained empty. The W02 custom schema migrations 0001..0010 and their targeted postflight checks passed in the same disposable run. No Neon target was contacted.
 - Current implementation slice: D1-01 migration planner plus committed W02 Better Auth schema artifact. The 14-entry manifest now has all committed artifacts/checksums; ledger schema remains uninstalled, shared runner remains unimplemented, and remote apply remains disabled.
 - Next slices are intentionally separate: (1) full local PostgreSQL 18 rehearsal of all D1-01 owners in manifest order, with W01 Payload's native migration path treated separately; (2) read-only remote target preflight; (3) shared runner transaction/ledger implementation; (4) Payload native migration reconciliation. No business data import or production cutover is included.
+
+
+## 11. D1-01 full local PostgreSQL 18 rehearsal — implementation slice
+
+- Build a single disposable PostgreSQL 18 rehearsal that applies the committed manifest in order: W01 Payload native migration; W02 Better Auth core plus W02 custom migrations 0001..0010; W07 membership; W08 creator.
+- Preserve each owner's existing deep verifier. The W07/W08 SQL verifiers now accept only the previously registered D1-01 owner table union while continuing to reject any table outside the declared W01/W02/W07/W08 set.
+- After owner migrations complete, install and verify the append-only shared ledger, then record exactly fourteen local rehearsal provenance rows using the manifest artifact and manifest-entry checksums.
+- The final combined verifier checks the exact table union, Worker ownership collisions, same-owner-only foreign keys, empty business tables, the single Payload schema migration record, and all fourteen ledger rows.
+- This is a CI-only disposable PostgreSQL test. It does not connect to Neon, execute remote DDL, import business rows, mutate Cloudflare D1, change Worker runtime bindings or authorize production cutover.
