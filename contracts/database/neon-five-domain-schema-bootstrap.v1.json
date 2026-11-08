@@ -221,7 +221,49 @@
       "schemaSources": [
         "workers/W07-subscription-commerce/migrations-d1-04"
       ],
-      "status": "PENDING"
+      "status": "PARTIAL_W07_ORDER_PAYMENT_SCHEMA_SOURCE_ADMITTED_LATER_FINANCE_MODULES_PENDING_LOCAL_POSTGRES18_REHEARSAL_PASSED",
+      "schemaContract": "contracts/database/neon-d1-04-w07-order-payment-schema.v1.json",
+      "implementedSchemaSlices": [
+        "W07_ORDER_PAYMENT_0001_0002"
+      ],
+      "pendingSchemaSlices": [
+        "W07_SAVED_METHODS_MANDATES_0003",
+        "W07_RENEWAL_CYCLES_0004",
+        "W07_REVENUECAT_WEBHOOK_0005",
+        "W07_REFUNDS_BILLING_DOCUMENTS_0006",
+        "W07_PAYMENT_METHOD_REVOCATION_0007"
+      ],
+      "pendingSchemaTables": [
+        "saved_payment_methods",
+        "payment_mandates",
+        "subscription_renewal_cycles",
+        "subscription_renewal_scheduler_state",
+        "revenuecat_webhook_events",
+        "revenuecat_webhook_event_conflicts",
+        "refunds",
+        "billing_documents",
+        "payment_method_revocation_requests"
+      ],
+      "schemaVerificationEvidence": {
+        "workflowRunId": 42486816324,
+        "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42486816324",
+        "postgresVersion": "18.6",
+        "tables": 6,
+        "explicitIndexes": 14,
+        "triggers": 24,
+        "triggerFunctions": 1,
+        "foreignKeys": 0,
+        "rowsAfterRollback": 0,
+        "offlineD104SourceRegressionTests": 24,
+        "laterFinanceTablesIncluded": false,
+        "remoteNeonTouched": false,
+        "cloudflareD1Touched": false,
+        "businessDataImported": false,
+        "productionCutoverAuthorized": false,
+        "evidenceArtifactId": 13619178793,
+        "evidenceArtifactSha256": "sha256:f027c9a7db2915303fd0a566573229e8aed13478d17c6d0190dfde1a487990fb"
+      },
+      "remoteSchemaApplied": false
     },
     {
       "domainId": "D1-05",

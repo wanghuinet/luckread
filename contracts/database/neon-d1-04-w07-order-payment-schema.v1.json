@@ -1,0 +1,277 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/database/neon-d1-04-w07-order-payment-schema.v1.json",
+  "title": "LuckRead D1-04 W07 Order and Payment PostgreSQL Schema Slice",
+  "version": "1.0.0",
+  "status": "W07_D1_04_ORDER_PAYMENT_LOCAL_POSTGRES18_REHEARSAL_PASSED_LATER_MODULES_PENDING",
+  "target": {
+    "domainId": "D1-04",
+    "databaseName": "luckread_finance",
+    "cloudflareD1DatabaseName": "unimportant",
+    "cloudflareD1DatabaseUuid": "9bfb89a5-fbb5-45b1-a2ee-eab674b0d736",
+    "binding": "D1_04",
+    "postgresMajor": 18,
+    "existingProductionAuthority": "Cloudflare D1",
+    "stagedSchemaTarget": "Neon PostgreSQL",
+    "businessDataImport": false,
+    "productionCutoverAuthorized": false,
+    "remoteSchemaApplied": false
+  },
+  "primaryOwner": {
+    "worker": "W07",
+    "entities": [
+      "Order",
+      "OrderLine",
+      "OrderCreateIdempotency",
+      "Payment",
+      "PaymentProviderEvent",
+      "PaymentProviderEventConflict"
+    ],
+    "migrationArtifact": "workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0001_w07_d1_04_order_payment_schema.sql",
+    "template": "workers/W07-subscription-commerce/scripts/neon-d1-04/templates/w07-order-payment-postgres.sql",
+    "generator": "workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-order-payment-postgres-migration.mjs"
+  },
+  "scope": {
+    "includedSourceMigrations": [
+      "workers/W07-subscription-commerce/migrations-d1-04/0001_order_commerce.sql",
+      "workers/W07-subscription-commerce/migrations-d1-04/0002_payment_provider_events.sql"
+    ],
+    "includedTables": [
+      "orders",
+      "order_lines",
+      "order_create_idempotency",
+      "payments",
+      "payment_provider_events",
+      "payment_provider_event_conflicts"
+    ],
+    "deferredTables": [
+      "saved_payment_methods",
+      "payment_mandates",
+      "subscription_renewal_cycles",
+      "subscription_renewal_scheduler_state",
+      "revenuecat_webhook_events",
+      "revenuecat_webhook_event_conflicts",
+      "refunds",
+      "billing_documents",
+      "payment_method_revocation_requests"
+    ],
+    "deferredScopeNote": "These nine tables are admitted by later W07 D1-04 migrations 0003 through 0007. They are intentionally excluded from this first bounded schema slice and must be added in separate PostgreSQL-native slices after their own local rehearsal.",
+    "excludedTables": [
+      "entitlements",
+      "ledger_entries",
+      "payment_intents",
+      "users",
+      "media"
+    ],
+    "tableCount": 6
+  },
+  "schema": {
+    "tables": {
+      "orders": {
+        "source": "0001_order_commerce.sql",
+        "indexes": [
+          "ix_orders_customer_created_order",
+          "ix_orders_status_created_order"
+        ],
+        "triggerCount": 5,
+        "primaryKey": "order_id"
+      },
+      "order_lines": {
+        "source": "0001_order_commerce.sql",
+        "indexes": [
+          "ix_order_lines_order_id",
+          "ix_order_lines_item_ref_version"
+        ],
+        "triggerCount": 3,
+        "primaryKey": "order_line_id"
+      },
+      "order_create_idempotency": {
+        "source": "0001_order_commerce.sql",
+        "indexes": [
+          "ix_order_create_idempotency_customer_created",
+          "ix_order_create_idempotency_expiration"
+        ],
+        "triggerCount": 2,
+        "primaryKey": "id"
+      },
+      "payments": {
+        "source": "0002_payment_provider_events.sql",
+        "indexes": [
+          "ix_payments_customer_created_payment",
+          "ix_payments_order_created_payment",
+          "ix_payments_status_updated_payment",
+          "ux_payments_single_live_or_successful_per_order"
+        ],
+        "triggerCount": 6,
+        "primaryKey": "payment_id"
+      },
+      "payment_provider_events": {
+        "source": "0002_payment_provider_events.sql",
+        "indexes": [
+          "ix_payment_provider_events_state_received",
+          "ix_payment_provider_events_payment_received"
+        ],
+        "triggerCount": 3,
+        "primaryKey": "event_row_id"
+      },
+      "payment_provider_event_conflicts": {
+        "source": "0002_payment_provider_events.sql",
+        "indexes": [
+          "ix_payment_provider_event_conflicts_state_last_seen",
+          "ix_payment_provider_event_conflicts_identity"
+        ],
+        "triggerCount": 5,
+        "primaryKey": "conflict_id"
+      }
+    },
+    "explicitIndexNames": [
+      "ix_orders_customer_created_order",
+      "ix_orders_status_created_order",
+      "ix_order_lines_order_id",
+      "ix_order_lines_item_ref_version",
+      "ix_order_create_idempotency_customer_created",
+      "ix_order_create_idempotency_expiration",
+      "ix_payments_customer_created_payment",
+      "ix_payments_order_created_payment",
+      "ix_payments_status_updated_payment",
+      "ux_payments_single_live_or_successful_per_order",
+      "ix_payment_provider_events_state_received",
+      "ix_payment_provider_events_payment_received",
+      "ix_payment_provider_event_conflicts_state_last_seen",
+      "ix_payment_provider_event_conflicts_identity"
+    ],
+    "triggerNames": [
+      "orders_commercial_snapshot_immutable",
+      "orders_version_must_advance",
+      "orders_status_transition_guard",
+      "orders_retained",
+      "order_lines_require_order",
+      "order_lines_immutable_update",
+      "order_lines_retained",
+      "orders_require_matching_completed_idempotency",
+      "order_create_idempotency_identity_immutable",
+      "order_create_idempotency_terminal_immutable",
+      "payments_require_payable_order",
+      "payments_snapshot_immutable",
+      "payments_version_must_advance",
+      "payments_terminal_status_guard",
+      "payments_provider_timestamp_monotonic",
+      "payments_retained",
+      "payment_provider_events_identity_immutable",
+      "payment_provider_events_terminal_immutable",
+      "payment_provider_events_retained",
+      "payment_provider_event_conflicts_reference_first_receipt",
+      "payment_provider_event_conflicts_identity_immutable",
+      "payment_provider_event_conflicts_version_guard",
+      "payment_provider_event_conflicts_resolved_immutable",
+      "payment_provider_event_conflicts_retained"
+    ],
+    "totals": {
+      "tables": 6,
+      "explicitIndexes": 14,
+      "triggers": 24,
+      "triggerFunctions": 1,
+      "foreignKeys": 0
+    }
+  },
+  "postgresMappings": {
+    "integer": "Use BIGINT for D1/SQLite INTEGER fields to preserve the signed 64-bit source range; retain safe-integer checks for money and version counters.",
+    "time": "Map ISO-8601 TEXT instant fields to TIMESTAMPTZ and compare as instants; no local timezone assumptions.",
+    "json": "Keep JSON text snapshots as TEXT with PostgreSQL JSONB type checks where the source requires JSON validity/object shape. Keep response_json as TEXT with validity check.",
+    "partialUnique": "Preserve ux_payments_single_live_or_successful_per_order as a PostgreSQL partial unique index.",
+    "relationships": "Preserve source trigger-enforced logical relations. Do not add foreign keys; the source regression suite explicitly requires zero FKs for D1-04 finance tables.",
+    "triggerSemantics": "Preserve source immutable snapshots, CAS/version guards, allowed order transitions, payable-order binding, idempotency pairing, webhook receipt immutability, conflict first-receipt binding and retention."
+  },
+  "sourceInventory": [
+    {
+      "path": "workers/W07-subscription-commerce/migrations-d1-04/0001_order_commerce.sql",
+      "role": "W07 source schema for orders, order lines and order-create idempotency.",
+      "execution": "Fingerprint and translate only; never run D1/SQLite SQL on Neon."
+    },
+    {
+      "path": "workers/W07-subscription-commerce/migrations-d1-04/0002_payment_provider_events.sql",
+      "role": "W07 source schema for provider payment facts, signed-provider event inbox and payload-hash conflict facts.",
+      "execution": "Fingerprint and translate only; never run D1/SQLite SQL on Neon."
+    },
+    {
+      "path": "contracts/persistence/ORDER-D1-04-persistence.v1.json",
+      "role": "Canonical Order/OrderLine/idempotency field and authority contract.",
+      "execution": "Contract source; not SQL."
+    },
+    {
+      "path": "contracts/persistence/PAYMENT-D1-04-persistence.v1.json",
+      "role": "Canonical Payment/provider event and conflict fact contract.",
+      "execution": "Contract source; not SQL."
+    },
+    {
+      "path": "contracts/state-machines/order.json",
+      "role": "Canonical Order lifecycle state machine candidate.",
+      "execution": "Contract source; not SQL."
+    },
+    {
+      "path": "contracts/state-machines/payment.json",
+      "role": "Canonical Payment lifecycle state machine candidate.",
+      "execution": "Contract source; not SQL."
+    },
+    {
+      "path": "contracts/database/neon-schema-migration-ledger.v1.json",
+      "role": "D1-04 is registered to W07 in the shared per-database append-only schema ledger; D1-04 runner remains not implemented.",
+      "execution": "Ownership source; this PR does not install the shared ledger or admit remote apply."
+    }
+  ],
+  "verification": {
+    "sourceRegression": "workers/W07-subscription-commerce/scripts/test_order_d1_04_migration.py",
+    "postgresImage": "postgres:18.6",
+    "tables": 6,
+    "explicitIndexes": 14,
+    "triggers": 24,
+    "triggerFunctions": 1,
+    "foreignKeys": 0,
+    "fixtureRowsAfterRollback": 0,
+    "mustNotExist": [
+      "saved_payment_methods",
+      "payment_mandates",
+      "subscription_renewal_cycles",
+      "revenuecat_webhook_events",
+      "refunds",
+      "billing_documents",
+      "payment_method_revocation_requests",
+      "entitlements",
+      "ledger_entries",
+      "payment_intents",
+      "users",
+      "media"
+    ],
+    "localRehearsalEvidence": {
+      "workflowRunId": 42486816324,
+      "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42486816324",
+      "verifiedHeadSha": "da58f8c1ac7baeb3d7490bbf504cd1b64f87e102",
+      "postgresVersion": "18.6",
+      "database": "luckread_finance_schema",
+      "tables": 6,
+      "explicitIndexes": 14,
+      "triggers": 24,
+      "triggerFunctions": 1,
+      "foreignKeys": 0,
+      "rowsAfterRollback": 0,
+      "offlineD104SourceRegressionTests": 24,
+      "laterFinanceTablesIncluded": false,
+      "remoteNeonTouched": false,
+      "cloudflareD1Touched": false,
+      "businessDataImported": false,
+      "productionCutoverAuthorized": false,
+      "evidenceArtifactId": 13619178793,
+      "evidenceArtifactName": "neon-d1-04-w07-order-payment-postgres18-516cd20c00f87a769bbc424473aafef186026081",
+      "evidenceArtifactSha256": "sha256:f027c9a7db2915303fd0a566573229e8aed13478d17c6d0190dfde1a487990fb"
+    }
+  },
+  "safety": {
+    "remoteConnectionAttempted": false,
+    "remoteNeonDdlExecuted": false,
+    "cloudflareD1Touched": false,
+    "workerRuntimeOrBindingsChanged": false,
+    "businessDataImported": false,
+    "productionCutoverAuthorized": false
+  },
+  "nextGate": "Add the deferred W07 D1-04 source migrations 0003 through 0007 as separate PostgreSQL-native slices. A reviewed shared-ledger runner, target review and remote release change control are separate work and are not part of this local schema slice."
+}
