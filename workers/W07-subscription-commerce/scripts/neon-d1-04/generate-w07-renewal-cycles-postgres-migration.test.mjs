@@ -18,7 +18,7 @@ test('PAY-004 is additive and preserves its single scheduler control seed',()=>{
  assert.match(sql,/CREATE TABLE subscription_renewal_cycles/)
  assert.match(sql,/CREATE TABLE subscription_renewal_scheduler_state/)
  assert.match(sql,/subscription-renewals/)
- assert.match(sql,/m\\.status='ACTIVE'/)
+ assert.match(sql,/m\.status='ACTIVE'/)
  for(const name of ['revenuecat_webhook_events','revenuecat_webhook_event_conflicts','refunds','billing_documents','payment_method_revocation_requests','ledger_entries','entitlements','payment_intents','users','media'])assert.ok(!sql.includes('CREATE TABLE '+name+' ('))
 })
 test('PAY-004 generator fails closed when any dependency is unavailable',()=>{
