@@ -98,8 +98,8 @@ export function verifyW11D103OwnerReconciliation({
   }
 
   if (
-    !/^\|\s*T22\s*\|\s*W11\s*\|\s*D1-03 campaign\/growth operations\s*\|\s*MAPPED\s*\|/m.test(taskMapping) ||
-    !/^\|\s*T23\s*\|\s*W11\s*\|\s*D1-05 analytics-only derived data\s*\|\s*MAPPED\s*\|/m.test(taskMapping)
+    !/^\|\s*T22\s*\|\s*W11\s*\|\s*D1-03 campaign\/growth operations\s*\|$/m.test(taskMapping) ||
+    !/^\|\s*T23\s*\|\s*W11\s*\|\s*D1-05 analytics-only derived data\s*\|$/m.test(taskMapping)
   ) {
     throw new Error('Canonical task mapping must keep T22 in D1-03 and T23 in D1-05')
   }
