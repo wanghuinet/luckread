@@ -48,11 +48,11 @@ export function buildW07D104RefundsBillingMigration({readSource=(file)=>{try{ret
  if(c.target?.domainId!=='D1-04'||c.target?.databaseName!=='luckread_finance'||c.target?.postgresMajor!==18||c.target?.cloudflareD1DatabaseUuid!=='9bfb89a5-fbb5-45b1-a2ee-eab674b0d736'||c.target?.remoteSchemaApplied!==false||c.target?.productionCutoverAuthorized!==false||c.dependencies?.previousMigrationId!=='0004_w07_d1_04_revenuecat_webhook_inbox')throw new Error('PAY-006 target/safety/predecessor contract drift')
  if(c.primaryOwner?.worker!=='W07'||c.primaryOwner?.feature!=='PAY-006'||b.primaryOwner?.worker!=='W07'||b.target?.databaseName!=='luckread_finance'||b.schema?.totals?.tables<12||b.schema?.totals?.explicitIndexes<25||b.schema?.totals?.triggers<56||b.schema?.totals?.triggerFunctions<4||b.schema?.totals?.foreignKeys!==0||c.dependencies?.previousSchemaTotals?.tables!==12||c.dependencies?.previousSchemaTotals?.explicitIndexes!==25||c.dependencies?.previousSchemaTotals?.triggers!==56||c.dependencies?.previousSchemaTotals?.triggerFunctions!==4||c.dependencies?.previousSchemaTotals?.foreignKeys!==0)throw new Error('PAY-006 cumulative schema or predecessor totals are not admitted')
  if(!b.scope?.includedSourceMigrations?.includes(c.scope?.includedSourceMigration)||!b.schema?.tables?.revenuecat_webhook_events||!b.schema?.tables?.revenuecat_webhook_event_conflicts||!b.schema?.cumulativeSlices?.some(x=>x.migrationId==='0004_w07_d1_04_revenuecat_webhook_inbox'&&x.status==='LOCAL_POSTGRES18_REHEARSAL_PASSED')||!b.schema?.sliceTotals?.revenuecatWebhookInbox||!ledger.domainOwners?.['D1-04']?.includes('W07')||boundary.physicalD1Registry?.['D1-04']!=='9bfb89a5-fbb5-45b1-a2ee-eab674b0d736'||!boundary.workers?.W07?.allowedDomains?.includes('D1-04'))throw new Error('PAY-006 cumulative PAY-005 evidence or W07 ownership is not admitted')
- same(inventory(source,/CREATE TABLE(?: IF NOT EXISTS)?\\s+([A-Za-z0-9_]+)/gi),tables,'PAY-006 table')
- same(inventory(source,/CREATE (?:UNIQUE )?INDEX\\s+([A-Za-z0-9_]+)/gi),indexes,'PAY-006 index')
- same(inventory(source,/CREATE TRIGGER\\s+([A-Za-z0-9_]+)/gi),triggers,'PAY-006 trigger')
+ same(inventory(source,/CREATE TABLE(?: IF NOT EXISTS)?\s+([A-Za-z0-9_]+)/gi),tables,'PAY-006 table')
+ same(inventory(source,/CREATE (?:UNIQUE )?INDEX\s+([A-Za-z0-9_]+)/gi),indexes,'PAY-006 index')
+ same(inventory(source,/CREATE TRIGGER\s+([A-Za-z0-9_]+)/gi),triggers,'PAY-006 trigger')
  if(!source.includes("provider = 'hyperswitch'")||!source.includes("status <> 'FAILED'")||!source.includes("NEW.captured_amount_minor")||!source.includes("NEW.document_type = 'RECEIPT'")||!source.includes("status = 'succeeded'")||!source.includes('refunds_identity_immutable')||!source.includes('billing_documents_identity_immutable'))throw new Error('PAY-006 source money, provider, lifecycle or billing guards are missing')
- if(/CREATE TABLE(?: IF NOT EXISTS)?\\s+(?:payment_method_revocation_requests|entitlements|ledger_entries|payment_intents|users|media)\\b/i.test(source)||/FOREIGN KEY/i.test(source))throw new Error('PAY-006 contains deferred, cross-domain or foreign-key scope')
+ if(/CREATE TABLE(?: IF NOT EXISTS)?\s+(?:payment_method_revocation_requests|entitlements|ledger_entries|payment_intents|users|media)\b/i.test(source)||/FOREIGN KEY/i.test(source))throw new Error('PAY-006 contains deferred, cross-domain or foreign-key scope')
  if(c.scope?.includedTables?.join(',')!==tables.join(',')||c.schema?.totals?.tables!==2||c.schema?.totals?.explicitIndexes!==4||c.schema?.totals?.triggers!==9||c.schema?.totals?.triggerFunctions!==1||c.schema?.totals?.foreignKeys!==0||c.schema?.cumulativeAfterThisSlice?.tables!==14||c.schema?.cumulativeAfterThisSlice?.explicitIndexes!==29||c.schema?.cumulativeAfterThisSlice?.triggers!==65||c.schema?.cumulativeAfterThisSlice?.triggerFunctions!==5||c.schema?.cumulativeAfterThisSlice?.foreignKeys!==0)throw new Error('PAY-006 slice inventory drift')
  const hashes={
   W07_REFUNDS_BILLING_SOURCE_SHA256:hash(source),
@@ -67,7 +67,7 @@ export function buildW07D104RefundsBillingMigration({readSource=(file)=>{try{ret
  }
  let sql=template
  for(const [key,value] of Object.entries(hashes))sql=sql.replaceAll('{{'+key+'}}',value)
- if(/\\{\\{[A-Z0-9_]+\\}\\}/.test(sql))throw new Error('Unresolved PAY-006 checksum placeholder')
+ if(/\{\{[A-Z0-9_]+\}\}/.test(sql))throw new Error('Unresolved PAY-006 checksum placeholder')
  return {migration:sql,hashes,contract:c}
 }
 function run(){
