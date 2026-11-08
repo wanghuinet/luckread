@@ -3,6 +3,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+import tls from 'node:tls'
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 const requireFromW02 = createRequire(resolve(repositoryRoot, 'workers/W02-identity/package.json'))
@@ -32,6 +33,52 @@ export function validateLocalTarget(connectionString) {
     return { valid: false, reason: 'local PostgreSQL credentials are required' }
   }
   return { valid: true, parsed }
+}
+
+export function validateRemoteNeonTarget(connectionString) {
+  if (typeof connectionString !== 'string' || connectionString.length === 0) {
+    return { valid: false, reason: 'NEON_DATABASE_URL_LUCKREAD is required' }
+  }
+  let parsed
+  try { parsed = new URL(connectionString) } catch {
+    return { valid: false, reason: 'Neon database URL is invalid' }
+  }
+  const hostname = parsed.hostname.toLowerCase()
+  const database = (() => {
+    try { return decodeURIComponent(parsed.pathname.replace(/^\/+/, '')) } catch { return '' }
+  })()
+  const approvedNeonHost = /^ep-[a-z0-9-]+(?:\.c-\d+)?(?:\.[a-z0-9-]+\.aws)?\.neon\.tech$/.test(hostname)
+  if (!['postgres:', 'postgresql:'].includes(parsed.protocol) ||
+      !approvedNeonHost || !['', '5432'].includes(parsed.port) || database !== 'luckread') {
+    return { valid: false, reason: 'remote runner accepts only the approved Neon PostgreSQL 18 database luckread' }
+  }
+  if (parsed.searchParams.getAll('sslmode').length !== 1 ||
+      !['require', 'verify-full'].includes(parsed.searchParams.get('sslmode')) ||
+      parsed.searchParams.getAll('channel_binding').length !== 1 ||
+      parsed.searchParams.get('channel_binding') !== 'require') {
+    return { valid: false, reason: 'Neon connection must use sslmode=require or verify-full with channel_binding=require' }
+  }
+  if (!parsed.username || !parsed.password) {
+    return { valid: false, reason: 'Neon database credentials are required' }
+  }
+  return { valid: true, parsed }
+}
+
+export function enforceVerifiedNeonConnectionString(connectionString) {
+  const parsed = new URL(connectionString)
+  parsed.searchParams.set('sslmode', 'verify-full')
+  parsed.searchParams.set('channel_binding', 'require')
+  return parsed.toString()
+}
+
+export function verifyRemoteTlsConnection(client, hostname) {
+  const socket = client?.connection?.stream
+  const certificate = socket?.getPeerCertificate?.()
+  const identityError = certificate ? tls.checkServerIdentity(hostname, certificate) : new Error('peer certificate unavailable')
+  if (socket?.encrypted !== true || socket?.authorized !== true || identityError) {
+    fail('Neon TLS certificate chain or hostname verification failed')
+  }
+  return true
 }
 
 export function stripOuterTransaction(sql, migrationId = 'unknown') {
@@ -110,13 +157,24 @@ function readManifestChecksums() {
   }
 }
 
+export function isRemoteApplyReleased(manifestContract, ledgerContractValue) {
+  return manifestContract?.remoteApplyReady === true &&
+    ledgerContractValue?.remoteApplyReady === true &&
+    manifestContract?.execution?.runnerStatus === 'IMPLEMENTED_AND_REVIEWED' &&
+    ledgerContractValue?.execution?.runnerStatus === 'IMPLEMENTED_AND_REVIEWED'
+}
+
 function validateManifest(checksums) {
+  const releaseBlocked = manifest.remoteApplyReady === false &&
+    ledgerContract.remoteApplyReady === false &&
+    manifest.execution?.runnerStatus === 'NOT_IMPLEMENTED' &&
+    ledgerContract.execution?.runnerStatus === 'NOT_IMPLEMENTED'
+  const releaseEnabled = isRemoteApplyReleased(manifest, ledgerContract)
   if (manifest.domainId !== 'D1-01' || manifest.databaseName !== 'luckread' ||
       manifest.postgresMajor !== 18 || manifest.entries?.length !== 14 ||
       manifest.businessDataImport !== false || manifest.productionCutoverAuthorized !== false ||
-      manifest.remoteApplyReady !== false || manifest.execution?.runnerStatus !== 'NOT_IMPLEMENTED' ||
-      ledgerContract.remoteApplyReady !== false) {
-    fail('D1-01 manifest must remain the reviewed 14-entry schema-only contract with remote apply disabled')
+      (!releaseBlocked && !releaseEnabled)) {
+    fail('D1-01 manifest must remain the reviewed 14-entry schema-only contract with a consistent remote release gate')
   }
   if (!Array.isArray(checksums) || checksums.length !== manifest.entries.length) {
     fail('canonical checksums must cover every manifest entry')
@@ -309,12 +367,40 @@ async function insertLedgerRow(client, entry, checksum, sourceCommitSha, executi
 }
 
 async function run() {
-  if (!process.argv.includes('--local-only')) {
-    fail('this release contains a local PostgreSQL rehearsal executor only; remote execution is not implemented')
+  const localOnly = process.argv.includes('--local-only')
+  const remoteNeon = process.argv.includes('--remote-neon')
+  if (localOnly === remoteNeon) {
+    fail('select exactly one execution mode: --local-only or --remote-neon')
   }
-  const target = validateLocalTarget(process.env.D1_01_LOCAL_DATABASE_URL)
+
+  let target
+  let connectionString
+  let targetDatabase
+  let sourceCommitSha
+  if (localOnly) {
+    connectionString = process.env.D1_01_LOCAL_DATABASE_URL
+    target = validateLocalTarget(connectionString)
+    targetDatabase = 'luckread_schema'
+    sourceCommitSha = process.env.REHEARSAL_SOURCE_COMMIT_SHA || process.env.GITHUB_SHA
+  } else {
+    if (process.env.GITHUB_ACTIONS !== 'true' ||
+        process.env.GITHUB_REF !== 'refs/heads/main' ||
+        process.env.GITHUB_EVENT_NAME !== 'workflow_dispatch' ||
+        process.env.D1_01_REMOTE_APPLY_CONFIRMATION !== 'APPLY_REVIEWED_SCHEMA_D1_01_LUCKREAD' ||
+        !/^\d+$/.test(process.env.GITHUB_RUN_ID || '') ||
+        !/^\d+$/.test(process.env.GITHUB_RUN_ATTEMPT || '')) {
+      fail('remote execution requires the protected main-only manual workflow and exact D1-01 confirmation')
+    }
+    if (!isRemoteApplyReleased(manifest, ledgerContract)) {
+      fail('remote Neon execution remains disabled until the reviewed release gate is enabled')
+    }
+    connectionString = process.env.NEON_DATABASE_URL_LUCKREAD
+    target = validateRemoteNeonTarget(connectionString)
+    targetDatabase = 'luckread'
+    sourceCommitSha = process.env.GITHUB_SHA
+  }
   if (!target.valid) fail(target.reason)
-  const sourceCommitSha = process.env.REHEARSAL_SOURCE_COMMIT_SHA || process.env.GITHUB_SHA
+  if (remoteNeon) connectionString = enforceVerifiedNeonConnectionString(connectionString)
   if (!/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(sourceCommitSha || '')) {
     fail('an exact source commit SHA is required for migration provenance')
   }
@@ -324,24 +410,26 @@ async function run() {
   validateManifest(checksums)
   const sqlById = loadSqlArtifacts(checksums)
   const pool = new Pool({
-    connectionString: process.env.D1_01_LOCAL_DATABASE_URL,
+    connectionString,
     max: 2,
-    connectionTimeoutMillis: 5_000,
+    connectionTimeoutMillis: 15_000,
     idleTimeoutMillis: 1_000,
+    enableChannelBinding: remoteNeon,
   })
   let lockClient
   let client
   let lockTransactionOpen = false
   try {
     lockClient = await pool.connect()
+    if (remoteNeon) verifyRemoteTlsConnection(lockClient, target.parsed.hostname)
     await lockClient.query('BEGIN')
     lockTransactionOpen = true
     const identity = await lockClient.query(
       "SELECT current_database() AS database_name, current_setting('server_version_num')::integer AS version_num",
     )
     const major = Math.floor(Number(identity.rows[0]?.version_num) / 10_000)
-    if (identity.rows[0]?.database_name !== 'luckread_schema' || major !== 18) {
-      fail('connected target is not the approved disposable PostgreSQL 18 luckread_schema')
+    if (identity.rows[0]?.database_name !== targetDatabase || major !== 18) {
+      fail('connected target does not match the approved D1-01 PostgreSQL 18 database identity')
     }
     await lockClient.query(
       "SELECT pg_advisory_xact_lock(hashtextextended('luckread:neon-schema-migration:' || current_database(), 0))",
@@ -413,7 +501,7 @@ async function run() {
     }
     const finalSchema = await verifyOwnerSchemaState(client, appliedEntries, sqlById)
     const ledgerEvidence = {
-      status: 'D1_01_SHARED_LEDGER_LOCAL_VERIFY_PASS',
+      status: remoteNeon ? 'D1_01_SHARED_LEDGER_REMOTE_VERIFY_PASS' : 'D1_01_SHARED_LEDGER_LOCAL_VERIFY_PASS',
       domainId: 'D1-01',
       databaseName: 'luckread',
       runnerVersion,
@@ -432,7 +520,8 @@ async function run() {
       sourceCommitSha,
       executionId,
       appendOnlyLedgerVerified: true,
-      remoteConnectionAttempted: false,
+      remoteConnectionAttempted: remoteNeon,
+      remoteNeonConnected: remoteNeon,
       productionD1Touched: false,
       businessDataImported: false,
       productionCutoverAuthorized: false,
@@ -441,8 +530,8 @@ async function run() {
     mkdirSync(dirname(ledgerReportPath), { recursive: true })
     writeFileSync(ledgerReportPath, JSON.stringify(ledgerEvidence, null, 2) + '\n')
     process.stdout.write(JSON.stringify({
-      status: 'D1_01_SHARED_LOCAL_SCHEMA_RUNNER_PASS',
-      target: { database: 'luckread_schema', postgresMajor: major },
+      status: remoteNeon ? 'D1_01_SHARED_REMOTE_SCHEMA_RUNNER_PASS' : 'D1_01_SHARED_LOCAL_SCHEMA_RUNNER_PASS',
+      target: { database: targetDatabase, postgresMajor: major },
       migrationCount: finalRows.length,
       ownerWorkers: ['W01','W02','W07','W08'],
       tableCount: finalSchema.tableCount,
@@ -450,7 +539,8 @@ async function run() {
       businessRows: finalSchema.businessTableRowCounts,
       sourceCommitSha,
       executionId,
-      remoteConnectionAttempted: false,
+      remoteConnectionAttempted: remoteNeon,
+      remoteNeonConnected: remoteNeon,
       productionD1Touched: false,
       businessDataImported: false,
       productionCutoverAuthorized: false,
