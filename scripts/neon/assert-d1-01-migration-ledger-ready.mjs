@@ -1,16 +1,24 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { validateRemoteRunnerReview } from './remote-runner-review.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 const manifest = JSON.parse(readFileSync(resolve(root, 'contracts/database/neon-d1-01-migration-manifest.v1.json'), 'utf8'))
 const ledger = JSON.parse(readFileSync(resolve(root, 'contracts/database/neon-schema-migration-ledger.v1.json'), 'utf8'))
 const runnerPath = resolve(root, 'scripts/neon/run-schema-migrations.mjs')
+const reviewRef = 'contracts/database/neon-d1-01-remote-runner-review.v1.json'
+const review = validateRemoteRunnerReview({ root })
 const ready = manifest.remoteApplyReady === true &&
   ledger.remoteApplyReady === true &&
+  manifest.execution?.remoteApplyReady === true &&
+  ledger.execution?.remoteApplyReady === true &&
   manifest.execution?.runnerStatus === 'IMPLEMENTED_AND_REVIEWED' &&
   ledger.execution?.runnerStatus === 'IMPLEMENTED_AND_REVIEWED' &&
-  existsSync(runnerPath)
+  manifest.execution?.reviewEvidenceRef === reviewRef &&
+  ledger.execution?.reviewEvidenceRef === reviewRef &&
+  existsSync(runnerPath) &&
+  review.valid
 
 if (process.argv.includes('--deny-owner-bypass')) {
   throw new Error(
@@ -19,7 +27,7 @@ if (process.argv.includes('--deny-owner-bypass')) {
   )
 }
 if (process.argv.includes('--expect-blocked')) {
-  if (ready) throw new Error('Shared runner readiness unexpectedly became true; update this blocked-state CI assertion in the executor release PR.')
+  if (ready) throw new Error('Shared runner readiness is now released; remove obsolete blocked-state assertions from downstream workflows.')
   console.log('D1_01_REMOTE_APPLY_BLOCKED_RUNNER_NOT_IMPLEMENTED')
   process.exit(0)
 }
