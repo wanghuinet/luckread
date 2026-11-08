@@ -1,0 +1,82 @@
+name: Neon D1-04 W07 RevenueCat Webhook PostgreSQL 18 Local Rehearsal
+
+on:
+  pull_request:
+    paths:
+      - 'contracts/database/neon-d1-04-w07-order-payment-schema.v1.json'
+      - 'contracts/database/neon-d1-04-w07-revenuecat-webhook-schema.v1.json'
+      - 'contracts/database/neon-schema-migration-ledger.v1.json'
+      - 'contracts/transport/worker-d1-access-boundary.v1.json'
+      - 'workers/W07-subscription-commerce/migrations-d1-04/0005_revenuecat_webhook_inbox.sql'
+      - 'workers/W07-subscription-commerce/scripts/neon-d1-04/**'
+      - 'workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/**'
+      - '.github/workflows/neon-d1-04-w07-revenuecat-webhook-postgres-rehearsal.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  local-postgres-18-rehearsal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:18.6
+        env:
+          POSTGRES_DB: luckread_finance_schema
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d luckread_finance_schema"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      PGURL: postgresql://postgres:postgres@127.0.0.1:5432/luckread_finance_schema
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Run complete offline D1-04 source migration regression suite
+        run: python3 workers/W07-subscription-commerce/scripts/test_order_d1_04_migration.py
+      - name: Verify deterministic PostgreSQL generators
+        run: |
+          node workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-order-payment-postgres-migration.mjs
+          node workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-saved-methods-mandates-postgres-migration.mjs
+          node workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-renewal-cycles-postgres-migration.mjs
+          node --check workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-revenuecat-webhook-postgres-migration.mjs
+          node --test workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-revenuecat-webhook-postgres-migration.test.mjs
+          node workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-revenuecat-webhook-postgres-migration.mjs
+      - name: Apply order/payment predecessor
+        run: psql "$PGURL" -v ON_ERROR_STOP=1 --single-transaction -f workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0001_w07_d1_04_order_payment_schema.sql
+      - name: Verify order/payment predecessor
+        run: psql "$PGURL" -v ON_ERROR_STOP=1 --no-psqlrc -f workers/W07-subscription-commerce/scripts/neon-d1-04/verify-w07-order-payment-postgres-schema.sql
+      - name: Apply saved-method and mandate predecessor
+        run: psql "$PGURL" -v ON_ERROR_STOP=1 --single-transaction -f workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0002_w07_d1_04_saved_methods_mandates.sql
+      - name: Verify saved-method and mandate predecessor
+        run: psql "$PGURL" -v ON_ERROR_STOP=1 --no-psqlrc -f workers/W07-subscription-commerce/scripts/neon-d1-04/verify-w07-saved-methods-mandates-postgres-schema.sql
+      - name: Apply renewal-cycle predecessor
+        run: psql "$PGURL" -v ON_ERROR_STOP=1 --single-transaction -f workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0003_w07_d1_04_renewal_cycles.sql
+      - name: Verify renewal-cycle predecessor
+        run: psql "$PGURL" -v ON_ERROR_STOP=1 --no-psqlrc -f workers/W07-subscription-commerce/scripts/neon-d1-04/verify-w07-renewal-cycles-postgres-schema.sql
+      - name: Apply PAY-005 RevenueCat inbox
+        run: psql "$PGURL" -v ON_ERROR_STOP=1 --single-transaction -f workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0004_w07_d1_04_revenuecat_webhook_inbox.sql
+      - name: Verify PAY-005 first-receipt, conflict, retention and rollback contracts
+        run: psql "$PGURL" -v ON_ERROR_STOP=1 --no-psqlrc -f workers/W07-subscription-commerce/scripts/neon-d1-04/verify-w07-revenuecat-webhook-postgres-schema.sql
+      - name: Upload exact local rehearsal sources
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: neon-d1-04-w07-revenuecat-webhook-postgres18-${{ github.sha }}
+          path: |
+            workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0004_w07_d1_04_revenuecat_webhook_inbox.sql
+            contracts/database/neon-d1-04-w07-revenuecat-webhook-schema.v1.json
+          if-no-files-found: error
+          retention-days: 30

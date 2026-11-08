@@ -1,0 +1,217 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/database/neon-d1-04-w07-revenuecat-webhook-schema.v1.json",
+  "title": "LuckRead D1-04 W07 RevenueCat Webhook Inbox PostgreSQL Schema Slice",
+  "version": "1.0.0",
+  "status": "W07_D1_04_REVENUECAT_WEBHOOK_SCHEMA_PENDING_LOCAL_POSTGRES18_REHEARSAL",
+  "target": {
+    "domainId": "D1-04",
+    "databaseName": "luckread_finance",
+    "cloudflareD1DatabaseUuid": "9bfb89a5-fbb5-45b1-a2ee-eab674b0d736",
+    "binding": "D1_04",
+    "postgresMajor": 18,
+    "existingProductionAuthority": "Cloudflare D1",
+    "stagedSchemaTarget": "Neon PostgreSQL",
+    "businessDataImport": false,
+    "productionCutoverAuthorized": false,
+    "remoteSchemaApplied": false
+  },
+  "primaryOwner": {
+    "worker": "W07",
+    "feature": "PAY-005",
+    "entities": [
+      "RevenueCatWebhookEvent",
+      "RevenueCatWebhookEventConflict"
+    ],
+    "migrationArtifact": "workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0004_w07_d1_04_revenuecat_webhook_inbox.sql",
+    "template": "workers/W07-subscription-commerce/scripts/neon-d1-04/templates/w07-revenuecat-webhook-postgres.sql",
+    "generator": "workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-revenuecat-webhook-postgres-migration.mjs"
+  },
+  "dependencies": {
+    "previousMigrationId": "0003_w07_d1_04_renewal_cycles",
+    "previousSchemaTotals": {
+      "tables": 10,
+      "explicitIndexes": 22,
+      "triggers": 49,
+      "triggerFunctions": 3,
+      "foreignKeys": 0
+    },
+    "requiredPreviousTables": [
+      "orders",
+      "order_lines",
+      "order_create_idempotency",
+      "payments",
+      "payment_provider_events",
+      "payment_provider_event_conflicts",
+      "saved_payment_methods",
+      "payment_mandates",
+      "subscription_renewal_cycles",
+      "subscription_renewal_scheduler_state"
+    ],
+    "requiredPreviousFunctions": [
+      "w07_d104_order_payment_source_guard",
+      "w07_d104_saved_mandate_source_guard",
+      "w07_d104_renewal_cycles_source_guard"
+    ],
+    "sourceBoundary": "RevenueCat is a separate provider inbox and must not change payment_provider_events.provider='hyperswitch'."
+  },
+  "scope": {
+    "includedSourceMigration": "workers/W07-subscription-commerce/migrations-d1-04/0005_revenuecat_webhook_inbox.sql",
+    "includedTables": [
+      "revenuecat_webhook_events",
+      "revenuecat_webhook_event_conflicts"
+    ],
+    "deferredTables": [
+      "refunds",
+      "billing_documents",
+      "payment_method_revocation_requests"
+    ],
+    "excludedTables": [
+      "entitlements",
+      "ledger_entries",
+      "payment_intents",
+      "users",
+      "media"
+    ],
+    "tableCount": 2
+  },
+  "schema": {
+    "tables": {
+      "revenuecat_webhook_events": {
+        "source": "0005_revenuecat_webhook_inbox.sql",
+        "primaryKey": "event_row_id",
+        "uniqueKey": [
+          "app_id",
+          "event_id"
+        ],
+        "indexes": [
+          "ix_revenuecat_webhook_events_state_received",
+          "ix_revenuecat_webhook_events_user_received"
+        ],
+        "triggerCount": 3,
+        "lifecycleStates": [
+          "RECEIVED",
+          "APPLIED",
+          "RECONCILIATION_REQUIRED",
+          "IGNORED"
+        ],
+        "immutableFields": [
+          "event identity",
+          "event_timestamp_ms",
+          "api_version",
+          "app_user_id",
+          "product_id",
+          "store",
+          "environment",
+          "transaction_id",
+          "original_transaction_id",
+          "event_data_json",
+          "payload_sha256",
+          "received_at"
+        ],
+        "terminalRule": "Once state leaves RECEIVED the receipt is immutable.",
+        "payloadRule": "Store bounded object event_data_json; do not store raw_body or subscriber_attributes columns."
+      },
+      "revenuecat_webhook_event_conflicts": {
+        "source": "0005_revenuecat_webhook_inbox.sql",
+        "primaryKey": "conflict_id",
+        "uniqueKey": [
+          "app_id",
+          "event_id",
+          "incoming_payload_sha256"
+        ],
+        "indexes": [
+          "ix_revenuecat_webhook_conflicts_event"
+        ],
+        "triggerCount": 4,
+        "immutableFields": [
+          "conflict identity",
+          "existing_payload_sha256",
+          "incoming_payload_sha256",
+          "first_seen_at"
+        ],
+        "occurrenceRule": "Every update increments occurrence_count by exactly one and never moves last_seen_at backwards.",
+        "referenceRule": "A conflict references the matching app_id/event_id and immutable first receipt payload_sha256."
+      }
+    },
+    "explicitIndexNames": [
+      "ix_revenuecat_webhook_events_state_received",
+      "ix_revenuecat_webhook_events_user_received",
+      "ix_revenuecat_webhook_conflicts_event"
+    ],
+    "triggerNames": [
+      "revenuecat_webhook_events_identity_immutable",
+      "revenuecat_webhook_events_terminal_immutable",
+      "revenuecat_webhook_events_retained",
+      "revenuecat_webhook_conflicts_reference_first_receipt",
+      "revenuecat_webhook_conflicts_identity_immutable",
+      "revenuecat_webhook_conflicts_occurrence_guard",
+      "revenuecat_webhook_conflicts_retained"
+    ],
+    "totals": {
+      "tables": 2,
+      "explicitIndexes": 3,
+      "triggers": 7,
+      "triggerFunctions": 1,
+      "foreignKeys": 0
+    },
+    "cumulativeAfterThisSlice": {
+      "tables": 12,
+      "explicitIndexes": 25,
+      "triggers": 56,
+      "triggerFunctions": 4,
+      "foreignKeys": 0
+    }
+  },
+  "postgresMappings": {
+    "integer": "Map event_timestamp_ms and occurrence_count to BIGINT; preserve the source safe-integer bound for event_timestamp_ms.",
+    "time": "Map ISO-8601 TEXT received_at, processed_at, first_seen_at and last_seen_at values to TIMESTAMPTZ and compare as instants.",
+    "json": "Keep event_data_json as TEXT with bounded length and PostgreSQL JSONB object-shape validation; never persist raw webhook bytes.",
+    "deduplication": "Preserve UNIQUE(app_id,event_id) for the first receipt and UNIQUE(app_id,event_id,incoming_payload_sha256) for each distinct conflicting payload.",
+    "conflict": "Conflict rows reference the immutable first receipt hash; occurrence_count advances exactly one per update and last_seen_at is monotonic.",
+    "immutability": "Receipt identity/payload is immutable; a receipt becomes fully immutable once state leaves RECEIVED. Event and conflict receipts are retained.",
+    "providerIsolation": "RevenueCat remains separate from the Hyperswitch payment_provider_events table and its provider CHECK constraint.",
+    "privacy": "Do not add raw_body, subscriber_attributes, PAN/CVC, API keys, browser client secrets or provider credentials.",
+    "authority": "W07 owns D1-04 webhook receipt and conflict facts. Applying RevenueCat events to D1-01 entitlement/subscription state is a separate runtime concern and is not implemented by this schema slice."
+  },
+  "verification": {
+    "postgresImage": "postgres:18.6",
+    "sourceRegression": "workers/W07-subscription-commerce/scripts/test_order_d1_04_migration.py",
+    "tables": 2,
+    "explicitIndexes": 3,
+    "triggers": 7,
+    "triggerFunctions": 1,
+    "foreignKeys": 0,
+    "fixtureRowsAfterRollback": 0,
+    "requiredPositiveCases": [
+      "first RevenueCat receipt is inserted with bounded object payload and SHA-256 digest",
+      "one distinct payload conflict references the immutable first receipt",
+      "repeated conflicting payload advances occurrence_count by exactly one and last_seen_at monotonically",
+      "a RECEIVED event can be marked APPLIED with processed_at and outcome_code",
+      "cumulative PostgreSQL catalog contains twelve tables, twenty-five explicit indexes, fifty-six source triggers, four trigger functions and zero foreign keys"
+    ],
+    "requiredNegativeCases": [
+      "duplicate app_id and event_id cannot replace the first receipt",
+      "event payload identity, provider metadata and received_at cannot be rewritten",
+      "processed RevenueCat receipts cannot be updated or deleted",
+      "a conflict cannot reference a missing or mismatched first receipt",
+      "existing and incoming payload hashes must be valid lowercase SHA-256 and must differ",
+      "duplicate app_id, event_id and incoming_payload_sha256 conflicts are rejected",
+      "conflict identity cannot be rewritten and occurrence_count cannot skip or move backwards",
+      "RevenueCat inbox tables contain no raw_body or subscriber_attributes fields",
+      "conflict audit records cannot be deleted"
+    ],
+    "localRehearsalEvidence": {
+      "status": "NOT_RUN"
+    }
+  },
+  "safety": {
+    "remoteConnectionAttempted": false,
+    "remoteNeonDdlExecuted": false,
+    "cloudflareD1Touched": false,
+    "workerRuntimeOrBindingsChanged": false,
+    "businessDataImported": false,
+    "productionCutoverAuthorized": false
+  },
+  "nextGate": "PAY-005 local PostgreSQL 18 rehearsal only. Refunds/billing and payment-method revocation remain separate slices; remote runner and Neon cutover remain unauthorized."
+}

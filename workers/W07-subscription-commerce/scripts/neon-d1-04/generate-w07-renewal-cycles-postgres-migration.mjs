@@ -26,7 +26,28 @@ function hash(value){return createHash('sha256').update(value,'utf8').digest('he
 function inventory(sql,re){return [...sql.matchAll(re)].map(x=>x[1]).sort()}
 function same(a,b,label){if(JSON.stringify(a)!==JSON.stringify([...b].sort()))throw new Error(label+' source inventory drift: '+JSON.stringify(a))}
 function schemaProjection(c){return {id:c.$id,version:c.version,target:{domainId:c.target?.domainId,databaseName:c.target?.databaseName,cloudflareD1DatabaseUuid:c.target?.cloudflareD1DatabaseUuid,postgresMajor:c.target?.postgresMajor},primaryOwner:c.primaryOwner,dependencies:c.dependencies,scope:c.scope,schema:{tables:c.schema?.tables,explicitIndexNames:c.schema?.explicitIndexNames,triggerNames:c.schema?.triggerNames,totals:c.schema?.totals,cumulativeAfterThisSlice:c.schema?.cumulativeAfterThisSlice},postgresMappings:c.postgresMappings}}
-function baseProjection(c){return {contractId:c.$id,version:c.version,target:{domainId:c.target?.domainId,databaseName:c.target?.databaseName,cloudflareD1DatabaseUuid:c.target?.cloudflareD1DatabaseUuid,postgresMajor:c.target?.postgresMajor},primaryOwner:c.primaryOwner?.worker,sourceMigrations:c.scope?.includedSourceMigrations,tables:c.schema?.tables,explicitIndexNames:c.schema?.explicitIndexNames,triggerNames:c.schema?.triggerNames,totals:c.schema?.totals,sliceTotals:c.schema?.sliceTotals}}
+function baseProjection(c){
+  // The PAY-004 fingerprint is frozen to the cumulative contract admitted
+  // when renewal cycles were introduced. Later D1-04 slices append to the
+  // contract but must not rewrite the already-verified 0003 SQL artifact.
+  return {
+    contractId: c.$id,
+    version: c.version,
+    target: {
+      domainId: c.target?.domainId,
+      databaseName: c.target?.databaseName,
+      cloudflareD1DatabaseUuid: c.target?.cloudflareD1DatabaseUuid,
+      postgresMajor: c.target?.postgresMajor,
+    },
+    primaryOwner: c.primaryOwner?.worker,
+    sourceMigrations: c.scope?.includedSourceMigrations?.slice(0, 4),
+    tables: Object.fromEntries(Object.entries(c.schema?.tables ?? {}).slice(0, 10)),
+    explicitIndexNames: c.schema?.explicitIndexNames?.slice(0, 22),
+    triggerNames: c.schema?.triggerNames?.slice(0, 49),
+    totals: { tables: 10, explicitIndexes: 22, triggers: 49, triggerFunctions: 3, foreignKeys: 0 },
+    sliceTotals: Object.fromEntries(Object.entries(c.schema?.sliceTotals ?? {}).slice(0, 3)),
+  }
+}
 export function buildW07D104RenewalCyclesMigration({readSource=(file)=>{try{return readFileSync(path.join(repo,file),'utf8')}catch{return null}}}={}){
  const ct=readRequired(p.contract,readSource),c=JSON.parse(ct)
  const bt=readRequired(p.base,readSource),b=JSON.parse(bt),source=readRequired(p.source,readSource)
@@ -34,7 +55,7 @@ export function buildW07D104RenewalCyclesMigration({readSource=(file)=>{try{retu
  const ledger=readRequired(p.ledger,readSource),boundary=readRequired(p.boundary,readSource),workflow=readRequired(p.workflow,readSource)
  const template=readRequired(p.template,readSource),l=JSON.parse(ledger),o=JSON.parse(boundary),w=JSON.parse(workflow)
  if(c.target?.domainId!=='D1-04'||c.target?.databaseName!=='luckread_finance'||c.target?.postgresMajor!==18||c.target?.cloudflareD1DatabaseUuid!=='9bfb89a5-fbb5-45b1-a2ee-eab674b0d736'||c.target?.remoteSchemaApplied!==false||c.target?.productionCutoverAuthorized!==false||c.dependencies?.previousMigrationId!=='0002_w07_d1_04_saved_methods_mandates')throw new Error('W07 D1-04 renewal-cycle target, safety or dependency contract drift')
- if(c.primaryOwner?.worker!=='W07'||c.primaryOwner?.feature!=='PAY-004'||b.primaryOwner?.worker!=='W07'||b.target?.databaseName!=='luckread_finance'||b.schema?.totals?.tables!==10||b.schema?.totals?.explicitIndexes!==22||b.schema?.totals?.triggers!==49||b.schema?.totals?.triggerFunctions!==3||b.schema?.totals?.foreignKeys!==0||c.dependencies?.previousSchemaTotals?.tables!==8||c.dependencies?.previousSchemaTotals?.explicitIndexes!==18||c.dependencies?.previousSchemaTotals?.triggers!==36||c.dependencies?.previousSchemaTotals?.triggerFunctions!==2||c.dependencies?.previousSchemaTotals?.foreignKeys!==0||!b.scope?.includedSourceMigrations?.includes(c.scope?.includedSourceMigration)||!b.schema?.tables?.subscription_renewal_cycles||!b.schema?.tables?.subscription_renewal_scheduler_state||!b.schema?.cumulativeSlices?.some((item)=>item.migrationId==='0003_w07_d1_04_renewal_cycles'&&item.status==='LOCAL_POSTGRES18_REHEARSAL_PASSED')||b.schema?.sliceTotals?.renewalCycles?.tables!==2||b.schema?.sliceTotals?.renewalCycles?.explicitIndexes!==4||b.schema?.sliceTotals?.renewalCycles?.triggers!==13||b.schema?.sliceTotals?.renewalCycles?.triggerFunctions!==1||!l.domainOwners?.['D1-04']?.includes('W07')||o.physicalD1Registry?.['D1-04']!=='9bfb89a5-fbb5-45b1-a2ee-eab674b0d736'||!o.workers?.W07?.allowedDomains?.includes('D1-04')||w.consumer?.businessAuthority!=='Membership, subscription, order, payment, MIT mandate and renewal-cycle state'||!w.authority?.W10?.includes('does not read/write D1-01 or D1-04')||!w.authority?.W07?.includes('Owns D1-04 renewal cycles'))throw new Error('W07 D1-04 renewal-cycle ownership or predecessor schema is not admitted')
+ if(c.primaryOwner?.worker!=='W07'||c.primaryOwner?.feature!=='PAY-004'||b.primaryOwner?.worker!=='W07'||b.target?.databaseName!=='luckread_finance'||b.schema?.totals?.tables<10||b.schema?.totals?.explicitIndexes<22||b.schema?.totals?.triggers<49||b.schema?.totals?.triggerFunctions<3||b.schema?.totals?.foreignKeys!==0||c.dependencies?.previousSchemaTotals?.tables!==8||c.dependencies?.previousSchemaTotals?.explicitIndexes!==18||c.dependencies?.previousSchemaTotals?.triggers!==36||c.dependencies?.previousSchemaTotals?.triggerFunctions!==2||c.dependencies?.previousSchemaTotals?.foreignKeys!==0||!b.scope?.includedSourceMigrations?.includes(c.scope?.includedSourceMigration)||!b.schema?.tables?.subscription_renewal_cycles||!b.schema?.tables?.subscription_renewal_scheduler_state||!b.schema?.cumulativeSlices?.some((item)=>item.migrationId==='0003_w07_d1_04_renewal_cycles'&&item.status==='LOCAL_POSTGRES18_REHEARSAL_PASSED')||b.schema?.sliceTotals?.renewalCycles?.tables!==2||b.schema?.sliceTotals?.renewalCycles?.explicitIndexes!==4||b.schema?.sliceTotals?.renewalCycles?.triggers!==13||b.schema?.sliceTotals?.renewalCycles?.triggerFunctions!==1||!l.domainOwners?.['D1-04']?.includes('W07')||o.physicalD1Registry?.['D1-04']!=='9bfb89a5-fbb5-45b1-a2ee-eab674b0d736'||!o.workers?.W07?.allowedDomains?.includes('D1-04')||w.consumer?.businessAuthority!=='Membership, subscription, order, payment, MIT mandate and renewal-cycle state'||!w.authority?.W10?.includes('does not read/write D1-01 or D1-04')||!w.authority?.W07?.includes('Owns D1-04 renewal cycles'))throw new Error('W07 D1-04 renewal-cycle ownership or predecessor schema is not admitted')
  same(inventory(source,/CREATE TABLE(?: IF NOT EXISTS)?\s+([A-Za-z0-9_]+)/gi),tables,'PAY-004 table')
  same(inventory(source,/CREATE (?:UNIQUE )?INDEX\s+([A-Za-z0-9_]+)/gi),indexes,'PAY-004 index')
  same(inventory(source,/CREATE TRIGGER\s+([A-Za-z0-9_]+)/gi),triggers,'PAY-004 trigger')
