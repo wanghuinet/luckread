@@ -4,7 +4,6 @@ on:
   pull_request:
     paths:
       - '.github/workflows/neon-d1-01-migration-ledger.yml'
-      - '.github/workflows/neon-d1-01-w01-payload-schema-apply.yml'
       - 'contracts/database/neon-schema-migration-ledger.v1.json'
       - 'contracts/database/neon-d1-01-migration-manifest.v1.json'
       - 'scripts/neon/d1-01/**'
