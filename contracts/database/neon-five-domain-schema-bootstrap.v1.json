@@ -72,7 +72,28 @@
         "W02-Better-Auth-and-custom-identity",
         "W07-D1-01-subscriptions",
         "W08-Creator"
-      ]
+      ],
+      "localSchemaRehearsalProgress": {
+        "W02": {
+          "schemaContract": "contracts/database/neon-d1-01-w02-identity-schema.v1.json",
+          "status": "LOCAL_POSTGRES18_REHEARSAL_PASSED",
+          "workflowRunId": 42485297923,
+          "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42485297923",
+          "postgresVersion": "18.6",
+          "betterAuthVersion": "1.7.8",
+          "coreTables": 5,
+          "customTables": 9,
+          "totalTables": 14,
+          "triggers": 7,
+          "triggerFunctions": 5,
+          "residualSyntheticRows": 0,
+          "l8GenesisTableIncluded": false,
+          "payloadUsersTableIncluded": false,
+          "remoteSchemaApplied": false,
+          "businessDataImported": false,
+          "productionCutoverAuthorized": false
+        }
+      }
     },
     {
       "domainId": "D1-02",

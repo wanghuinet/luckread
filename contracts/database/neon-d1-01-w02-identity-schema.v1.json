@@ -1,0 +1,164 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/database/neon-d1-01-w02-identity-schema.v1.json",
+  "title": "LuckRead D1-01 W02 Better Auth Identity PostgreSQL Schema Slice",
+  "version": "1.0.0",
+  "status": "W02_SOURCE_BASELINE_READY_LOCAL_REHEARSAL_PASSED",
+  "target": {
+    "domainId": "D1-01",
+    "databaseName": "luckread",
+    "cloudflareD1DatabaseName": "luckread",
+    "cloudflareD1DatabaseUuid": "2f80471e-3756-49f9-8db1-7707a433ad64",
+    "postgresMajor": 18,
+    "existingProductionAuthority": "Cloudflare D1",
+    "stagedSchemaTarget": "Neon PostgreSQL",
+    "businessDataImport": false,
+    "productionCutoverAuthorized": false
+  },
+  "primaryOwner": {
+    "worker": "W02",
+    "role": "Better Auth identity/session core and identity/account domain state",
+    "betterAuthVersion": "1.7.8",
+    "canonicalAuthConfig": "workers/W02-identity/src/auth/better-auth.ts",
+    "schemaOnlyConfig": "workers/W02-identity/src/auth/neon-postgres-schema.config.ts",
+    "schemaGenerator": "auth generate --config src/auth/neon-postgres-schema.config.ts --output artifacts/neon/w02-better-auth-postgres-schema.sql --yes",
+    "migrationArtifactDirectory": "workers/W02-identity/src/neon-postgres-migrations"
+  },
+  "scope": {
+    "betterAuthCoreTables": [
+      "user",
+      "session",
+      "account",
+      "verification",
+      "twoFactor"
+    ],
+    "customPhysicalTables": [
+      "role_assignments",
+      "role_authorization_versions",
+      "auth_identities",
+      "auth_credentials",
+      "auth_013_publication_journal",
+      "auth_010_session_revocation_journal",
+      "auth_username_change_state",
+      "auth_007_mfa_publication_journal",
+      "auth_007_mfa_operation_receipts"
+    ],
+    "expectedPhysicalTableCount": 14,
+    "generatedCustomMigrations": [
+      "0001_role_assignments.sql",
+      "0002_role_authorization_versions.sql",
+      "0003_auth_003_credentials.sql",
+      "0004_auth_013_publication_journal.sql",
+      "0005_auth_015_lifecycle_windows.sql",
+      "0006_auth_010_session_revocation_journal.sql",
+      "0007_auth_007_mfa_lifecycle.sql",
+      "0008_auth_username_change_state.sql",
+      "0009_auth_007_mfa_publication_journal.sql",
+      "0010_auth_007_mfa_operation_receipts.sql"
+    ],
+    "generatedByExistingPackageScripts": [
+      "neon:schema:generate",
+      "neon:role-assignment:generate",
+      "neon:auth003:generate",
+      "neon:auth013-journal:generate",
+      "neon:auth015:generate",
+      "neon:auth010:generate",
+      "neon:auth007-mfa:generate",
+      "neon:username-change:generate",
+      "neon:auth007-mfa-journal:generate",
+      "neon:auth007-mfa-receipts:generate"
+    ],
+    "deferredSources": [
+      {
+        "source": "workers/W02-identity/migrations/0007_l8_genesis_bootstrap_audit.sql",
+        "entity": "l8_genesis_bootstrap_audit",
+        "reason": "The referenced change-control docs/change-control/CC-L8-GENESIS-BOOTSTRAP-OUT-OF-BAND-APPROVAL-2026-10-24.md still states PR #1299 is proposed, unmerged and undeployed. Do not admit this schema until its authority is merged and its MFA readiness gate is satisfied."
+      },
+      {
+        "source": "workers/W02-identity/migrations/0002_auth_013_account_state.sql",
+        "entity": "Payload users account_state projection migration",
+        "reason": "This SQLite/D1 migration alters W01 Payload users, not the W02 Better Auth user table. W02 Better Auth account_state fields are generated from the canonical Better Auth configuration; the W01 Payload PostgreSQL baseline remains W01-owned."
+      }
+    ]
+  },
+  "ownership": {
+    "W02": {
+      "owns": [
+        "Better Auth user/session/account/verification/twoFactor",
+        "RoleAssignment",
+        "auth_identities",
+        "auth_credentials",
+        "identity publication and lifecycle journals",
+        "username change state"
+      ],
+      "writes": "D1-01 / Neon luckread staged schema only"
+    },
+    "W01": {
+      "owns": [
+        "Payload CMS users projection",
+        "Payload collections and related tables"
+      ],
+      "restriction": "W02 does not create or own Payload users or media tables."
+    },
+    "W06": {
+      "owns": [
+        "D1-03 AuditEvent canonical persistence"
+      ],
+      "restriction": "W02 outboxes/journals remain W02-owned in D1-01 and publish only through existing AUTH013_QUEUE."
+    }
+  },
+  "postgresMappings": {
+    "timeFields": "Native TIMESTAMPTZ for UTC instants.",
+    "booleanFields": "PostgreSQL BOOLEAN where the Better Auth schema/contract expects boolean; integer state fields remain only where existing W02 runtime contracts require integer 0/1.",
+    "jsonPayloadFields": "Payload/event plan remain TEXT with JSONB validation where the generated migration defines it; no payload data is imported.",
+    "roleAssignmentIntervals": "GiST exclusion constraint with btree_gist prevents overlapping active role assignments while allowing adjacent half-open intervals.",
+    "opaqueReferences": "Cross-domain IDs remain opaque values; no cross-database foreign keys are introduced."
+  },
+  "verification": {
+    "postgresImage": "postgres:18.6",
+    "existingVerifierScripts": [
+      "scripts/neon/verify-role-assignment-postgres-schema.mjs",
+      "scripts/neon/verify-auth003-credentials-postgres-schema.mjs",
+      "scripts/neon/verify-auth013-publication-journal-postgres-schema.mjs",
+      "scripts/neon/verify-auth015-lifecycle-windows-postgres-schema.mjs",
+      "scripts/neon/verify-auth010-session-revocation-postgres-schema.mjs",
+      "scripts/neon/verify-auth007-mfa-lifecycle-postgres-schema.mjs",
+      "scripts/neon/verify-username-change-state-postgres-schema.mjs",
+      "scripts/neon/verify-auth007-mfa-publication-journal-postgres-schema.mjs",
+      "scripts/neon/verify-auth007-mfa-operation-receipts-postgres-schema.mjs"
+    ],
+    "postflightAssertions": [
+      "Exactly the five Better Auth tables and nine admitted W02 custom tables exist.",
+      "No Payload users table is created by W02.",
+      "No unapproved l8_genesis_bootstrap_audit table is created.",
+      "All synthetic verifier rows are cleaned and all fourteen W02 schema tables are empty at the end."
+    ],
+    "localRehearsalEvidence": {
+      "workflowRunId": 42485297923,
+      "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42485297923",
+      "verifiedHeadSha": "bbb731dc33443c975253a4e98fca90c96b58ef2f",
+      "postgresVersion": "18.6",
+      "betterAuthVersion": "1.7.8",
+      "betterAuthCoreTables": 5,
+      "customW02Tables": 9,
+      "totalTables": 14,
+      "domainTriggers": 7,
+      "triggerFunctions": 5,
+      "syntheticRowsRemaining": 0,
+      "businessDataImported": false,
+      "remoteNeonTouched": false,
+      "cloudflareD1Touched": false,
+      "productionCutoverAuthorized": false
+    }
+  },
+  "safety": {
+    "remoteConnectionAttempted": false,
+    "remoteNeonDdlExecuted": false,
+    "cloudflareD1Touched": false,
+    "workerRuntimeOrBindingsChanged": false,
+    "businessDataImported": false,
+    "productionCutoverAuthorized": false,
+    "auth007GreenClaim": false
+  },
+  "nextGate": "Integrate this W02 local PostgreSQL 18 rehearsal with the already admitted W01/W07/W08 schema sources before any single clean D1-01 bootstrap or remote apply."
+}
