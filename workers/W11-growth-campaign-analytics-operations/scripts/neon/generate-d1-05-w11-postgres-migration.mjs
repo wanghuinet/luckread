@@ -14,7 +14,7 @@ const paths = {
   readme: 'workers/W11-growth-campaign-analytics-operations/README.md',
   wrangler: 'workers/W11-growth-campaign-analytics-operations/wrangler.jsonc',
   template: 'workers/W11-growth-campaign-analytics-operations/scripts/neon/templates/d1-05-w11-analytics-postgres.sql',
-  output: 'workers/W11-growth-campaign-analytics-operations/src/neon-postgres-migrations/0001_w11_d1_05_analytics_schema.sql',
+  output: 'workers/W11-growth-campaign-analytics-operations/src/neon-postgres-migrations-d1-05/0001_w11_d1_05_analytics_schema.sql',
 }
 
 const expectedTables = [
