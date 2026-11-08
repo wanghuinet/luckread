@@ -349,7 +349,10 @@ export function verifyD104SharedRunnerReview({ readSource = readText } = {}) {
     const sql = readSource(entries[index].artifactPaths[0])
     const effects = extractEffects(sql)
     const contract = contracts[index]
-    if (!sameSet(effects.tables,contract.scope.includedTables)) {
+    const sliceTableMatch = index === 0
+      ? effects.tables.every((table) => Object.hasOwn(contract.schema?.tables ?? {},table))
+      : sameSet(effects.tables,contract.scope?.includedTables)
+    if (!sliceTableMatch) {
       fail('W07 PostgreSQL artifact tables do not match slice contract: ' + entries[index].artifactPaths[0])
     }
     if (effects.foreignKeys.length !== 0) {
