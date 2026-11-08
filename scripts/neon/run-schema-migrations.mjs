@@ -129,15 +129,15 @@ function validateManifest(checksums) {
         !Number.isSafeInteger(entry.order) || entry.order <= previousOrder || orders.has(entry.order)) {
       fail('manifest ids and order must be unique and strictly increasing')
     }
+    for (const dependency of entry.dependsOn ?? []) {
+      if (!ids.has(dependency)) fail('manifest dependency must appear before its dependent migration')
+    }
     ids.add(entry.migrationId)
     orders.add(entry.order)
     previousOrder = entry.order
     if (entry.artifactState !== 'COMMITTED' || !Array.isArray(entry.artifactPaths) ||
         entry.artifactPaths.length === 0) {
       fail('all D1-01 artifacts must be committed before the shared runner can execute')
-    }
-    for (const dependency of entry.dependsOn ?? []) {
-      if (!ids.has(dependency)) fail('manifest dependency must appear before its dependent migration')
     }
   }
   const actualIds = new Set(checksums.map((item) => item.migrationId))
