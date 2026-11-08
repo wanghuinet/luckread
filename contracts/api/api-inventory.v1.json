@@ -30,7 +30,8 @@
     "INTEGRATED",
     "STABLE",
     "DEPRECATED",
-    "REMOVED"
+    "REMOVED",
+    "CONTRACTED_PARTIAL"
   ],
   "domains": {
     "auth_identity": {
@@ -388,6 +389,31 @@
         "GOV-005"
       ],
       "schema_ref": "contracts/api/report-appeal.v1.json#/operations/1"
+    }
+  },
+  "operation_overrides": {
+    "getNotificationPreferences": {
+      "status": "CONTRACTED_PARTIAL",
+      "schema_ref": "contracts/api/notification-preferences.v1.json",
+      "source_refs": [
+        "contracts/api/notification-preferences.v1.json",
+        "contracts/api/notification-operation-policy.v1.json",
+        "workers/W01-payload/src/app/api/v1/notification-preferences/route.ts",
+        "workers/W05-social/src/index.ts",
+        "workers/W05-social/src/social-closure-runtime.ts"
+      ]
+    },
+    "patchNotificationPreferences": {
+      "status": "CONTRACTED_PARTIAL",
+      "schema_ref": "contracts/api/notification-preferences.v1.json",
+      "source_refs": [
+        "contracts/api/notification-preferences.v1.json",
+        "contracts/api/notification-operation-policy.v1.json",
+        "workers/W01-payload/src/app/api/v1/notification-preferences/route.ts",
+        "workers/W05-social/src/index.ts",
+        "workers/W05-social/src/social-closure-runtime.ts",
+        "workers/W06-governance/src/index.ts"
+      ]
     }
   }
 }
