@@ -89,7 +89,7 @@ BEGIN
         AND column_name = 'details_json') <> 'text'
      OR (SELECT column_default FROM information_schema.columns
       WHERE table_schema = 'public' AND table_name = 'creator_authorization_audit'
-        AND column_name = 'details_json') <> '''{}''::text' THEN
+        AND column_name = 'details_json') IS DISTINCT FROM $'{}'::text$ THEN
     RAISE EXCEPTION 'details_json must remain TEXT with the source {} default';
   END IF;
 
@@ -101,7 +101,7 @@ BEGIN
         AND column_name = 'version') <> '1'
      OR (SELECT column_default FROM information_schema.columns
       WHERE table_schema = 'public' AND table_name = 'creator_applications'
-        AND column_name = 'statement') <> ''''::text' THEN
+        AND column_name = 'statement') IS DISTINCT FROM $''::text$ THEN
     RAISE EXCEPTION 'W08 source defaults for statement/version drifted';
   END IF;
 
