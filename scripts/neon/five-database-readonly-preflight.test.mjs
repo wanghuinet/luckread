@@ -18,6 +18,7 @@ const clean = (overrides = {}) => summarizeTargetInspection({
   serverVersionNum: 180006,
   tlsChainVerified: true,
   tlsHostnameVerified: true,
+  readOnlyTransactionVerified: true,
   schemas: ['public'],
   relations: [],
   customTypes: [],
@@ -80,6 +81,7 @@ test('rejects non-Neon hosts, non-PostgreSQL protocols and missing channel bindi
 test('passes only an empty PostgreSQL 18 catalog with absent migration ledger', () => {
   const result = clean()
   assert.equal(result.status, 'PASS_EMPTY')
+  assert.equal(result.readOnlyTransactionVerified, true)
   assert.deepEqual(result.issues, [])
   assert.deepEqual(result.migrationLedger, {
     present: false,
@@ -106,8 +108,9 @@ test('blocks any user relations, extra schema or non-default extension', () => {
   assert.ok(result.issues.includes('UNEXPECTED_EXTENSIONS'))
 })
 
-test('fails closed for a wrong PostgreSQL major or an unverified TLS endpoint', () => {
+test('fails closed for a wrong PostgreSQL major, unverified TLS or a writable transaction', () => {
   assert.equal(clean({ serverVersion: '17.9', serverVersionNum: 170009 }).status, 'FAIL')
   assert.equal(clean({ tlsHostnameVerified: false }).status, 'FAIL')
   assert.equal(clean({ tlsChainVerified: false }).status, 'FAIL')
+  assert.equal(clean({ readOnlyTransactionVerified: false }).status, 'FAIL')
 })
