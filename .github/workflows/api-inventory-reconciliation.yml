@@ -6,6 +6,14 @@ on:
     paths:
       - 'contracts/api/**'
       - 'contracts/openapi/**'
+      - 'contracts/alignment/feature-inventory.v1.json'
+      - 'contracts/alignment/api-inventory.v1.json'
+      - 'contracts/alignment/code-evidence-inventory.v1.json'
+      - 'contracts/capability/reconciliation-batches/V-governance-appeals.v1.json'
+      - 'scripts/build-feature-inventory.mjs'
+      - 'scripts/build-api-alignment-inventory.mjs'
+      - 'scripts/verify-governance-feature-id-alignment.mjs'
+      - 'scripts/verify-governance-feature-id-alignment.test.mjs'
       - 'scripts/api-inventory-reconciliation-check.mjs'
       - 'scripts/api-inventory-reconciliation-stage-test.mjs'
       - 'scripts/api-inventory-report-schema-check.mjs'
@@ -14,6 +22,14 @@ on:
     paths:
       - 'contracts/api/**'
       - 'contracts/openapi/**'
+      - 'contracts/alignment/feature-inventory.v1.json'
+      - 'contracts/alignment/api-inventory.v1.json'
+      - 'contracts/alignment/code-evidence-inventory.v1.json'
+      - 'contracts/capability/reconciliation-batches/V-governance-appeals.v1.json'
+      - 'scripts/build-feature-inventory.mjs'
+      - 'scripts/build-api-alignment-inventory.mjs'
+      - 'scripts/verify-governance-feature-id-alignment.mjs'
+      - 'scripts/verify-governance-feature-id-alignment.test.mjs'
       - 'scripts/api-inventory-reconciliation-check.mjs'
       - 'scripts/api-inventory-reconciliation-stage-test.mjs'
       - 'scripts/api-inventory-report-schema-check.mjs'
@@ -38,6 +54,14 @@ jobs:
 
       - name: Verify contract and production evidence stages stay separate
         run: node scripts/api-inventory-reconciliation-stage-test.mjs
+
+      - name: Rebuild and verify canonical governance Feature ID mappings
+        run: |
+          node scripts/build-feature-inventory.mjs
+          node scripts/build-api-alignment-inventory.mjs
+          node scripts/verify-governance-feature-id-alignment.mjs
+          node --test scripts/verify-governance-feature-id-alignment.test.mjs
+          git diff --exit-code -- contracts/alignment/feature-inventory.v1.json contracts/alignment/api-inventory.v1.json
 
       - name: Run reconciliation
         id: reconciliation
