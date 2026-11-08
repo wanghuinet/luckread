@@ -1,0 +1,294 @@
+name: Neon D1-01 Full Local PostgreSQL 18 Rehearsal
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/neon-d1-01-full-local-rehearsal.yml'
+      - 'contracts/database/neon-d1-01-migration-manifest.v1.json'
+      - 'contracts/database/neon-schema-migration-ledger.v1.json'
+      - 'scripts/neon/d1-01/**'
+      - 'scripts/neon/d1-01-migration-manifest.mjs'
+      - 'scripts/neon/plan-d1-01-schema-migrations.mjs'
+      - 'workers/W01-payload/package.json'
+      - 'workers/W01-payload/pnpm-lock.yaml'
+      - 'workers/W01-payload/src/neon-postgres-schema.config.ts'
+      - 'workers/W01-payload/src/neon-postgres-migrations/**'
+      - 'workers/W01-payload/scripts/neon/**'
+      - 'workers/W02-identity/package.json'
+      - 'workers/W02-identity/src/auth/better-auth.ts'
+      - 'workers/W02-identity/src/auth/neon-postgres-schema.config.ts'
+      - 'workers/W02-identity/artifacts/neon/**'
+      - 'workers/W02-identity/src/neon-postgres-migrations/**'
+      - 'workers/W02-identity/scripts/neon/**'
+      - 'workers/W07-subscription-commerce/src/neon-postgres-migrations/**'
+      - 'workers/W07-subscription-commerce/scripts/neon/**'
+      - 'workers/W07-subscription-commerce/migrations/**'
+      - 'workers/W08-creator/src/neon-postgres-migrations/**'
+      - 'workers/W08-creator/scripts/neon/**'
+      - 'workers/W08-creator/migrations/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: neon-d1-01-full-local-rehearsal-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  full-local-rehearsal:
+    name: Rehearse ordered W01-W02-W07-W08 schema on disposable PostgreSQL 18
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    services:
+      postgres:
+        image: postgres:18.6
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres_local_only
+          POSTGRES_DB: luckread_schema
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d luckread_schema"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - name: Checkout reviewed PR
+        uses: actions/checkout@v4
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Setup pnpm 11
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+          run_install: false
+
+      - name: Install exact W01 Payload dependency graph
+        working-directory: workers/W01-payload
+        run: |
+          set -euo pipefail
+          pnpm install --lockfile-only --ignore-scripts
+          pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Install pinned W02 Better Auth PostgreSQL toolchain
+        working-directory: workers/W02-identity
+        run: npm install --ignore-scripts --no-audit --no-fund
+
+      - name: Verify pinned W02 generator and unit-test the combined verifier
+        working-directory: workers/W02-identity
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { readFile } from 'node:fs/promises'
+          const pkg = JSON.parse(await readFile('./package.json', 'utf8'))
+          const runtime = JSON.parse(await readFile('./node_modules/better-auth/package.json', 'utf8'))
+          const cli = JSON.parse(await readFile('./node_modules/auth/package.json', 'utf8'))
+          if (pkg.dependencies['better-auth'] !== '1.7.8' || runtime.version !== '1.7.8') {
+            throw new Error('Better Auth runtime pin drifted')
+          }
+          if (pkg.devDependencies.auth !== '1.7.8' || cli.version !== '1.7.8' ||
+              pkg.devDependencies.pg !== '8.20.0') {
+            throw new Error('Better Auth CLI / pg pin drifted')
+          }
+          console.log('W02 schema toolchain pins: PASS')
+          NODE
+          node --test ../../scripts/neon/d1-01/verify-combined-local-rehearsal.test.mjs
+
+      - name: Validate the complete fourteen-entry D1-01 manifest before DDL
+        env:
+          PGPASSWORD: postgres_local_only
+        run: |
+          set -euo pipefail
+          node scripts/neon/d1-01-migration-manifest.mjs
+          node scripts/neon/plan-d1-01-schema-migrations.mjs > /tmp/d1-01-plan.json
+          node --input-type=module -e "import fs from 'node:fs'; const p=JSON.parse(fs.readFileSync('/tmp/d1-01-plan.json','utf8')); if (p.summary.migrationCount !== 14 || p.readiness.generatedArtifactCount !== 0 || p.readiness.executable !== false || p.safety.remoteConnectionAttempted !== false) throw new Error('D1-01 manifest plan guard failed'); console.log('D1_01_MANIFEST_READY entries=' + p.summary.migrationCount)"
+          node scripts/neon/d1-01-migration-manifest.mjs --print-checksums > artifacts/neon/d1-01-manifest-checksums.json
+
+      - name: Re-generate Better Auth core twice and compare with committed artifact
+        working-directory: workers/W02-identity
+        env:
+          W02_SCHEMA_PGHOST: 127.0.0.1
+          W02_SCHEMA_PGPORT: '5432'
+          W02_SCHEMA_PGUSER: postgres
+          W02_SCHEMA_PGPASSWORD: postgres_local_only
+          W02_SCHEMA_PGDATABASE: luckread_schema
+        run: |
+          set -euo pipefail
+          artifact=artifacts/neon/w02-better-auth-postgres-schema.sql
+          cp "$artifact" /tmp/w02-better-auth-postgres-schema.committed.sql
+          npm run neon:schema:generate
+          cp "$artifact" /tmp/w02-better-auth-postgres-schema.first.sql
+          npm run neon:schema:generate
+          cmp --silent /tmp/w02-better-auth-postgres-schema.first.sql "$artifact"
+          cmp --silent /tmp/w02-better-auth-postgres-schema.committed.sql "$artifact"
+          git diff --exit-code -- "$artifact"
+          echo "W02 Better Auth SQL is reproducible and matches the committed checksum source."
+
+      - name: Regenerate all W02 custom migrations and reject source drift
+        working-directory: workers/W02-identity
+        run: |
+          set -euo pipefail
+          npm run neon:role-assignment:generate
+          npm run neon:auth003:generate
+          npm run neon:auth013-journal:generate
+          npm run neon:auth015:generate
+          npm run neon:auth010:generate
+          npm run neon:auth007-mfa:generate
+          npm run neon:username-change:generate
+          npm run neon:auth007-mfa-journal:generate
+          npm run neon:auth007-mfa-receipts:generate
+          (cd ../.. && node scripts/auth-010-session-revocation-journal-static-audit.mjs)
+          (cd ../.. && node scripts/w02-username-change-migration-static-audit.mjs)
+          git diff --exit-code -- src/neon-postgres-migrations/
+
+      - name: Regenerate W07 and W08 owner SQL and reject source drift
+        run: |
+          set -euo pipefail
+          (
+            cd workers/W07-subscription-commerce
+            node scripts/neon/generate-d1-01-membership-postgres-migration.mjs
+            git diff --exit-code -- src/neon-postgres-migrations/0001_w07_d1_01_membership_schema.sql
+          )
+          (
+            cd workers/W08-creator
+            node scripts/neon/generate-d1-01-creator-postgres-migration.mjs
+            git diff --exit-code -- src/neon-postgres-migrations/0001_w08_d1_01_creator_authorization.sql
+          )
+
+      - name: Apply W01 Payload native migration first
+        working-directory: workers/W01-payload
+        env:
+          NODE_ENV: development
+          PAYLOAD_SECRET: schema-generation-only-not-a-runtime-secret
+          PAYLOAD_SCHEMA_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_schema
+          PAYLOAD_CONFIG_PATH: src/neon-postgres-schema.config.ts
+        run: pnpm run neon:schema:apply
+
+      - name: Run the original W01 strict schema and empty-business-table verifier
+        working-directory: workers/W01-payload
+        env:
+          PAYLOAD_SCHEMA_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_schema
+          PAYLOAD_SCHEMA_REPORT: artifacts/neon/w01-payload-postgres-schema.json
+        run: pnpm run neon:schema:verify
+
+      - name: Apply W02 Better Auth core and official schema check
+        working-directory: workers/W02-identity
+        env:
+          W02_SCHEMA_PGHOST: 127.0.0.1
+          W02_SCHEMA_PGPORT: '5432'
+          W02_SCHEMA_PGUSER: postgres
+          W02_SCHEMA_PGPASSWORD: postgres_local_only
+          W02_SCHEMA_PGDATABASE: luckread_schema
+          W02_SCHEMA_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_schema
+          PGPASSWORD: postgres_local_only
+        run: |
+          set -euo pipefail
+          psql --host 127.0.0.1 --port 5432 --username postgres --dbname luckread_schema --set ON_ERROR_STOP=1             --file artifacts/neon/w02-better-auth-postgres-schema.sql
+          npm run neon:schema:check
+
+      - name: Apply all ten W02 PostgreSQL migrations in manifest order
+        env:
+          PGPASSWORD: postgres_local_only
+        run: |
+          set -euo pipefail
+          for file in \
+            workers/W02-identity/src/neon-postgres-migrations/0001_role_assignments.sql \
+            workers/W02-identity/src/neon-postgres-migrations/0002_role_authorization_versions.sql \
+            workers/W02-identity/src/neon-postgres-migrations/0003_auth_003_credentials.sql \
+            workers/W02-identity/src/neon-postgres-migrations/0004_auth_013_publication_journal.sql \
+            workers/W02-identity/src/neon-postgres-migrations/0005_auth_015_lifecycle_windows.sql \
+            workers/W02-identity/src/neon-postgres-migrations/0006_auth_010_session_revocation_journal.sql \
+            workers/W02-identity/src/neon-postgres-migrations/0007_auth_007_mfa_lifecycle.sql \
+            workers/W02-identity/src/neon-postgres-migrations/0008_auth_username_change_state.sql \
+            workers/W02-identity/src/neon-postgres-migrations/0009_auth_007_mfa_publication_journal.sql \
+            workers/W02-identity/src/neon-postgres-migrations/0010_auth_007_mfa_operation_receipts.sql; do
+            psql --host 127.0.0.1 --port 5432 --username postgres --dbname luckread_schema \
+              --set ON_ERROR_STOP=1 --file "$file"
+          done
+
+      - name: Run all W02 PostgreSQL owner-specific deep verifiers
+        working-directory: workers/W02-identity
+        env:
+          W02_SCHEMA_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_schema
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/neon
+          node scripts/neon/verify-better-auth-core-schema.mjs > artifacts/neon/w02-better-auth-core-postflight.json
+          npm run neon:role-assignment:verify > artifacts/neon/w02-role-assignment-postflight.json
+          npm run neon:auth003:verify > artifacts/neon/w02-auth003-postflight.json
+          npm run neon:auth013-journal:verify > artifacts/neon/w02-auth013-journal-postflight.json
+          npm run neon:auth015:verify > artifacts/neon/w02-auth015-postflight.json
+          npm run neon:auth010:verify > artifacts/neon/w02-auth010-postflight.json
+          npm run neon:auth007-mfa:verify > artifacts/neon/w02-auth007-mfa-postflight.json
+          npm run neon:username-change:verify > artifacts/neon/w02-username-change-postflight.json
+          npm run neon:auth007-mfa-journal:verify > artifacts/neon/w02-auth007-mfa-journal-postflight.json
+          npm run neon:auth007-mfa-receipts:verify > artifacts/neon/w02-auth007-mfa-receipts-postflight.json
+
+      - name: Apply and deeply verify W07 membership schema in the combined database
+        env:
+          PGPASSWORD: postgres_local_only
+        run: |
+          set -euo pipefail
+          psql --host 127.0.0.1 --port 5432 --username postgres --dbname luckread_schema \
+            --set ON_ERROR_STOP=1 \
+            --file workers/W07-subscription-commerce/src/neon-postgres-migrations/0001_w07_d1_01_membership_schema.sql
+          mkdir -p workers/W07-subscription-commerce/artifacts/neon
+          psql -A -t -q --host 127.0.0.1 --port 5432 --username postgres --dbname luckread_schema \
+            --set ON_ERROR_STOP=1 --no-psqlrc \
+            --file workers/W07-subscription-commerce/scripts/neon/verify-d1-01-membership-postgres-schema.sql \
+            > workers/W07-subscription-commerce/artifacts/neon/w07-d1-01-membership-postgres-schema-postflight.json
+
+      - name: Apply and deeply verify W08 creator schema in the combined database
+        env:
+          PGPASSWORD: postgres_local_only
+        run: |
+          set -euo pipefail
+          psql --host 127.0.0.1 --port 5432 --username postgres --dbname luckread_schema \
+            --set ON_ERROR_STOP=1 \
+            --file workers/W08-creator/src/neon-postgres-migrations/0001_w08_d1_01_creator_authorization.sql
+          mkdir -p workers/W08-creator/artifacts/neon
+          psql -A -t -q --host 127.0.0.1 --port 5432 --username postgres --dbname luckread_schema \
+            --set ON_ERROR_STOP=1 --no-psqlrc \
+            --file workers/W08-creator/scripts/neon/verify-d1-01-creator-postgres-schema.sql \
+            > workers/W08-creator/artifacts/neon/w08-d1-01-creator-postgres-schema-postflight.json
+
+      - name: Install and verify the append-only D1-01 migration provenance ledger
+        env:
+          PGPASSWORD: postgres_local_only
+        run: |
+          set -euo pipefail
+          psql --host 127.0.0.1 --port 5432 --username postgres --dbname luckread_schema \
+            --set ON_ERROR_STOP=1 --file scripts/neon/d1-01/0001_schema_migration_ledger.sql
+          mkdir -p artifacts/neon
+          psql -A -t -q --host 127.0.0.1 --port 5432 --username postgres --dbname luckread_schema \
+            --set ON_ERROR_STOP=1 --no-psqlrc \
+            --file scripts/neon/d1-01/verify_schema_migration_ledger.sql \
+            > artifacts/neon/d1-01-ledger-postflight.json
+
+      - name: Verify combined table ownership, foreign-key boundaries, empty business data and all fourteen ledger entries
+        working-directory: workers/W02-identity
+        env:
+          W02_SCHEMA_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_schema
+          REHEARSAL_SOURCE_COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
+          D1_01_REHEARSAL_REPORT: artifacts/neon/d1-01-full-local-rehearsal.json
+        run: node ../../scripts/neon/d1-01/verify-combined-local-rehearsal.mjs
+
+      - name: Upload D1-01 full local rehearsal evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: neon-d1-01-full-local-rehearsal-${{ github.sha }}
+          path: |
+            artifacts/neon/d1-01-manifest-checksums.json
+            artifacts/neon/d1-01-ledger-postflight.json
+            workers/W01-payload/artifacts/neon/w01-payload-postgres-schema.json
+            workers/W02-identity/artifacts/neon/
+            workers/W07-subscription-commerce/artifacts/neon/w07-d1-01-membership-postgres-schema-postflight.json
+            workers/W08-creator/artifacts/neon/w08-d1-01-creator-postgres-schema-postflight.json
+          if-no-files-found: error
+          retention-days: 90
