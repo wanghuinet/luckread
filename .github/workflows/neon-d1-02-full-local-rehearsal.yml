@@ -18,6 +18,16 @@ on:
       - 'workers/W05-social/scripts/neon/**'
       - 'workers/W05-social/src/neon-postgres-migrations/**'
       - 'scripts/neon/d1-02/**'
+  push:
+    branches:
+      - main
+      - 'feat/neon-d1-02-schema-only-runner-*'
+    paths:
+      - '.github/workflows/neon-d1-02-full-local-rehearsal.yml'
+      - 'contracts/database/neon-d1-02-migration-manifest.v1.json'
+      - 'scripts/neon/d1-02/**'
+      - 'workers/W03-content/src/neon-postgres-migrations/**'
+      - 'workers/W05-social/src/neon-postgres-migrations/**'
   workflow_dispatch:
 
 permissions:
