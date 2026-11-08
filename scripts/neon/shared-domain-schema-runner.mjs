@@ -628,8 +628,29 @@ async function verifyOwnerSchemaState(client, manifest, plan, appliedCount) {
         fail('schema-control seed contains an unsafe column identifier: ' + table)
       }
       const predicate = columns.map((column, index) =>
-        '"' + column + '" IS NOT DISTINCT FROM 
-
+        '"' + column + '" IS NOT DISTINCT FROM $' + (index + 1),
+      ).join(' AND ')
+      const matched = await client.query(
+        'SELECT COUNT(*)::bigint AS count FROM public."' +
+          table.replace(/"/g,'""') + '" WHERE ' + predicate,
+        columns.map((column) => seedRow[column]),
+      )
+      if (Number(matched.rows[0].count) !== 1) {
+        fail('schema-control seed row does not match the exact admitted values: ' + table)
+      }
+      controlSeedRows++
+    }
+  }
+  if (controlSeedRows !== manifest.expected.controlSeedRows) {
+    fail('actual schema-control seed row count does not match the reviewed manifest')
+  }
+  return {
+    tableCount:expectedTables.length,
+    tableRowCounts:rowCounts,
+    controlSeedRows,
+    businessRows:0,
+  }
+}
 async function verifyFinalCatalog(client, manifest, plan) {
   const expectedTables = plan.tables
   const actualTables = (await actualPublicTables(client)).filter((name) => name !== ledgerTable)
