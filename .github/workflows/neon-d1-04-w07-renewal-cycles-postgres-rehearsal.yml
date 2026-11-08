@@ -70,7 +70,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: neon-d1-04-w07-renewal-cycles-postgres18-\${{ github.sha }}
+          name: neon-d1-04-w07-renewal-cycles-postgres18-${{ github.sha }}
           path: |
             workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0003_w07_d1_04_renewal_cycles.sql
             contracts/database/neon-d1-04-w07-renewal-cycles-schema.v1.json
