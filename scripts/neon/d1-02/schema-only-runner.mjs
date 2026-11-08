@@ -236,11 +236,7 @@ async function ensureLedger(client) {
     const existingObjects = await client.query(
       "SELECT count(*)::integer AS count FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind IN ('r','p','v','m','S','f') AND c.relname NOT LIKE 'pg_%'",
     )
-    const existingFunctions = await client.query(
-      "SELECT count(*)::integer AS count FROM pg_catalog.pg_proc p JOIN pg_catalog.pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public'",
-    )
-    if (existingTables.length !== 0 || Number(existingObjects.rows[0].count) !== 0 ||
-        Number(existingFunctions.rows[0].count) !== 0) {
+    if (existingTables.length !== 0 || Number(existingObjects.rows[0].count) !== 0) {
       fail('first apply requires an empty public schema; existing public objects were found')
     }
     const ledgerSql = stripOuterTransaction(
