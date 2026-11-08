@@ -31,7 +31,7 @@ export function hashArtifactBundle(artifactPaths) {
     }
     const absolutePath = resolve(repositoryRoot, relativePath)
     const file = readFileSync(absolutePath)
-    const pathBytes = Buffer.from(relativePath.replaceAll('\\\\', '/'), 'utf8')
+    const pathBytes = Buffer.from(relativePath.replaceAll(String.fromCharCode(92), '/'), 'utf8')
     const pathLength = Buffer.alloc(4)
     pathLength.writeUInt32BE(pathBytes.length)
     const fileLength = Buffer.alloc(8)
