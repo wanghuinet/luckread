@@ -64,6 +64,8 @@ jobs:
       - name: Validate deterministic D1-01 migration manifest and source files
         run: |
           set -euo pipefail
+          node --check scripts/neon/d1-01-migration-manifest.mjs
+          node --check scripts/neon/assert-d1-01-migration-ledger-ready.mjs
           node scripts/neon/d1-01-migration-manifest.mjs
           node scripts/neon/d1-01-migration-manifest.mjs --print-order
           node scripts/neon/d1-01-migration-manifest.mjs --print-checksums
