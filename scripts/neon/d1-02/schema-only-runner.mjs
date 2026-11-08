@@ -398,7 +398,7 @@ async function run() {
       confirmation: process.env.D1_02_REMOTE_APPLY_CONFIRMATION,
     })
     if (!context.valid) fail(context.errors.join('; '))
-    connectionString = process.env.NEON_DATABASE_URL_LUCKREADPRO
+    connectionString = process.env.NEON_DATABASE_URL_LUCKREADPRO_VERIFIED || process.env.NEON_DATABASE_URL_LUCKREADPRO
     target = validateRemoteNeonTarget(connectionString)
     if (!target.valid) fail(target.reason)
     connectionString = enforceVerifiedNeonConnectionString(connectionString)
