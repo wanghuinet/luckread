@@ -3,7 +3,7 @@
   "$id": "https://luckread.com/contracts/database/neon-d1-03-w06-moderation-schema.v1.json",
   "title": "LuckRead D1-03 W06 Moderation PostgreSQL Schema Slice",
   "version": "1.0.0",
-  "status": "W06_SOURCE_BASELINE_READY_LOCAL_REHEARSAL_PENDING",
+  "status": "W06_SOURCE_BASELINE_READY_LOCAL_REHEARSAL_PASSED",
   "target": {
     "domainId": "D1-03",
     "databaseName": "luckread_governance",
