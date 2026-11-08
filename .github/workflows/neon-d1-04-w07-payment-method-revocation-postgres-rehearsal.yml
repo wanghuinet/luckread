@@ -1,0 +1,103 @@
+name: Neon D1-04 W07 Payment Method Revocation PostgreSQL 18 Local Rehearsal
+
+on:
+  pull_request:
+    paths:
+      - 'contracts/database/neon-d1-04-w07-order-payment-schema.v1.json'
+      - 'contracts/database/neon-d1-04-w07-refunds-billing-documents-schema.v1.json'
+      - 'contracts/database/neon-d1-04-w07-payment-method-revocation-schema.v1.json'
+      - 'contracts/database/neon-five-domain-schema-bootstrap.v1.json'
+      - 'contracts/database/neon-schema-migration-ledger.v1.json'
+      - 'contracts/transport/worker-d1-access-boundary.v1.json'
+      - 'workers/W07-subscription-commerce/migrations-d1-04/0007_payment_method_revocation_requests.sql'
+      - 'workers/W07-subscription-commerce/src/renewal-runtime.ts'
+      - 'workers/W07-subscription-commerce/scripts/neon-d1-04/**'
+      - 'workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/**'
+      - 'workers/W07-subscription-commerce/README-neon-d1-04-postgres-schema.md'
+      - '.github/workflows/neon-d1-04-w07-payment-method-revocation-postgres-rehearsal.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  local-postgres-18-rehearsal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:18.6
+        env:
+          POSTGRES_DB: luckread_finance_schema
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d luckread_finance_schema"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      PGURL: postgresql://postgres:postgres@127.0.0.1:5432/luckread_finance_schema
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Run complete offline D1-04 source migration regression suite
+        run: python3 workers/W07-subscription-commerce/scripts/test_order_d1_04_migration.py
+      - name: Verify deterministic PostgreSQL generators through PAY-007
+        run: |
+          node workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-order-payment-postgres-migration.mjs
+          node workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-saved-methods-mandates-postgres-migration.mjs
+          node --check workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-renewal-cycles-postgres-migration.mjs
+          node --test workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-renewal-cycles-postgres-migration.test.mjs
+          node workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-renewal-cycles-postgres-migration.mjs
+          node --check workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-revenuecat-webhook-postgres-migration.mjs
+          node --test workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-revenuecat-webhook-postgres-migration.test.mjs
+          node workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-revenuecat-webhook-postgres-migration.mjs
+          node --check workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-refunds-billing-documents-postgres-migration.mjs
+          node --test workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-refunds-billing-documents-postgres-migration.test.mjs
+          node workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-refunds-billing-documents-postgres-migration.mjs
+          node --check workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-payment-method-revocation-postgres-migration.mjs
+          node --test workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-payment-method-revocation-postgres-migration.test.mjs
+          node workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-payment-method-revocation-postgres-migration.mjs
+      - name: Apply PAY-001 order/payment predecessor
+        run: psql "$PGURL" -v ON_ERROR_STOP=1 --single-transaction -f workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0001_w07_d1_04_order_payment_schema.sql
+      - name: Verify PAY-001 order/payment predecessor
+        run: psql "$PGURL" -v ON_ERROR_STOP=1 --no-psqlrc -f workers/W07-subscription-commerce/scripts/neon-d1-04/verify-w07-order-payment-postgres-schema.sql
+      - name: Apply PAY-003 saved-method and mandate predecessor
+        run: psql "$PGURL" -v ON_ERROR_STOP=1 --single-transaction -f workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0002_w07_d1_04_saved_methods_mandates.sql
+      - name: Verify PAY-003 saved-method and mandate predecessor
+        run: psql "$PGURL" -v ON_ERROR_STOP=1 --no-psqlrc -f workers/W07-subscription-commerce/scripts/neon-d1-04/verify-w07-saved-methods-mandates-postgres-schema.sql
+      - name: Apply PAY-004 renewal-cycle predecessor
+        run: psql "$PGURL" -v ON_ERROR_STOP=1 --single-transaction -f workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0003_w07_d1_04_renewal_cycles.sql
+      - name: Verify PAY-004 renewal-cycle predecessor
+        run: psql "$PGURL" -v ON_ERROR_STOP=1 --no-psqlrc -f workers/W07-subscription-commerce/scripts/neon-d1-04/verify-w07-renewal-cycles-postgres-schema.sql
+      - name: Apply PAY-005 RevenueCat inbox predecessor
+        run: psql "$PGURL" -v ON_ERROR_STOP=1 --single-transaction -f workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0004_w07_d1_04_revenuecat_webhook_inbox.sql
+      - name: Verify PAY-005 RevenueCat inbox predecessor
+        run: psql "$PGURL" -v ON_ERROR_STOP=1 --no-psqlrc -f workers/W07-subscription-commerce/scripts/neon-d1-04/verify-w07-revenuecat-webhook-postgres-schema.sql
+      - name: Apply PAY-006 refunds and billing predecessor
+        run: psql "$PGURL" -v ON_ERROR_STOP=1 --single-transaction -f workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0005_w07_d1_04_refunds_billing_documents.sql
+      - name: Verify PAY-006 refunds and billing predecessor
+        run: psql "$PGURL" -v ON_ERROR_STOP=1 --no-psqlrc -f workers/W07-subscription-commerce/scripts/neon-d1-04/verify-w07-refunds-billing-documents-postgres-schema.sql
+      - name: Apply PAY-007 payment-method revocation
+        run: psql "$PGURL" -v ON_ERROR_STOP=1 --single-transaction -f workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0006_w07_d1_04_payment_method_revocation.sql
+      - name: Verify PAY-007 mandate replay, revocation completion and full rollback
+        run: psql "$PGURL" -v ON_ERROR_STOP=1 --no-psqlrc -f workers/W07-subscription-commerce/scripts/neon-d1-04/verify-w07-payment-method-revocation-postgres-schema.sql
+      - name: Upload exact local rehearsal sources
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: neon-d1-04-w07-payment-method-revocation-postgres18-${{ github.sha }}
+          path: |
+            workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0006_w07_d1_04_payment_method_revocation.sql
+            contracts/database/neon-d1-04-w07-payment-method-revocation-schema.v1.json
+            workers/W07-subscription-commerce/scripts/neon-d1-04/verify-w07-payment-method-revocation-postgres-schema.sql
+          if-no-files-found: error
+          retention-days: 30

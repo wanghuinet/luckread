@@ -1,0 +1,256 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/database/neon-d1-04-w07-payment-method-revocation-schema.v1.json",
+  "title": "LuckRead D1-04 W07 Payment Method Revocation PostgreSQL Schema Slice",
+  "version": "1.0.0",
+  "status": "W07_D1_04_PAYMENT_METHOD_REVOCATION_LOCAL_POSTGRES18_REHEARSAL_PASSED",
+  "target": {
+    "domainId": "D1-04",
+    "databaseName": "luckread_finance",
+    "cloudflareD1DatabaseUuid": "9bfb89a5-fbb5-45b1-a2ee-eab674b0d736",
+    "binding": "D1_04",
+    "postgresMajor": 18,
+    "existingProductionAuthority": "Cloudflare D1",
+    "stagedSchemaTarget": "Neon PostgreSQL",
+    "businessDataImport": false,
+    "productionCutoverAuthorized": false,
+    "remoteSchemaApplied": false
+  },
+  "primaryOwner": {
+    "worker": "W07",
+    "feature": "PAY-007",
+    "entities": [
+      "PaymentMethodRevocationRequest"
+    ],
+    "migrationArtifact": "workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0006_w07_d1_04_payment_method_revocation.sql",
+    "template": "workers/W07-subscription-commerce/scripts/neon-d1-04/templates/w07-payment-method-revocation-postgres.sql",
+    "generator": "workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-payment-method-revocation-postgres-migration.mjs"
+  },
+  "dependencies": {
+    "previousMigrationId": "0005_w07_d1_04_refunds_billing_documents",
+    "previousSchemaTotals": {
+      "tables": 14,
+      "explicitIndexes": 29,
+      "triggers": 65,
+      "triggerFunctions": 5,
+      "foreignKeys": 0
+    },
+    "requiredPreviousTables": [
+      "orders",
+      "order_lines",
+      "order_create_idempotency",
+      "payments",
+      "payment_provider_events",
+      "payment_provider_event_conflicts",
+      "saved_payment_methods",
+      "payment_mandates",
+      "subscription_renewal_cycles",
+      "subscription_renewal_scheduler_state",
+      "revenuecat_webhook_events",
+      "revenuecat_webhook_event_conflicts",
+      "refunds",
+      "billing_documents"
+    ],
+    "requiredPreviousFunctions": [
+      "w07_d104_order_payment_source_guard",
+      "w07_d104_saved_mandate_source_guard",
+      "w07_d104_renewal_cycles_source_guard",
+      "w07_d104_revenuecat_inbox_source_guard",
+      "w07_d104_refunds_billing_source_guard"
+    ],
+    "modifiedExistingTrigger": {
+      "name": "payment_provider_events_terminal_immutable",
+      "table": "payment_provider_events",
+      "reason": "Permit only mandate_active/mandate_revoked events previously marked RECONCILIATION_REQUIRED to be reset to RECEIVED with processed_at/outcome_code cleared; existing event identity/payload trigger keeps original payload hash immutable."
+    },
+    "runtimeRevocationGate": {
+      "source": "workers/W07-subscription-commerce/src/renewal-runtime.ts",
+      "requiredQueries": [
+        "readActiveMandate",
+        "isExactMandateActive"
+      ],
+      "predicate": "NOT EXISTS payment_method_revocation_requests joined through the same saved_payment_methods identity with status <> COMPLETED"
+    }
+  },
+  "scope": {
+    "includedSourceMigration": "workers/W07-subscription-commerce/migrations-d1-04/0007_payment_method_revocation_requests.sql",
+    "includedTables": [
+      "payment_method_revocation_requests"
+    ],
+    "deferredTables": [],
+    "excludedTables": [
+      "entitlements",
+      "ledger_entries",
+      "payment_intents",
+      "users",
+      "media"
+    ],
+    "tableCount": 1
+  },
+  "schema": {
+    "tables": {
+      "payment_method_revocation_requests": {
+        "source": "0007_payment_method_revocation_requests.sql",
+        "primaryKey": "revocation_request_id",
+        "uniqueKeys": [
+          [
+            "saved_payment_method_id"
+          ],
+          [
+            "customer_id",
+            "idempotency_key"
+          ]
+        ],
+        "indexes": [
+          "ix_payment_method_revocation_status",
+          "ux_payment_method_revocation_customer_idempotency"
+        ],
+        "triggerCount": 7,
+        "provider": "hyperswitch",
+        "lifecycleStates": [
+          "REQUESTED",
+          "PENDING_PROVIDER",
+          "RECONCILIATION_REQUIRED",
+          "COMPLETED"
+        ],
+        "immutableFields": [
+          "revocation request identity",
+          "saved payment method identity",
+          "opaque provider payment method reference",
+          "provider",
+          "merchant",
+          "customer",
+          "customer idempotency key",
+          "created_at"
+        ],
+        "providerDeleteTimestamp": "Once provider_method_deleted_at is set it cannot be changed; it is not proof that mandate webhooks have all been applied.",
+        "completionRule": "COMPLETED requires provider_method_deleted_at and every mandate attached to the saved method to be REVOKED, FAILED or EXPIRED.",
+        "ownerRule": "Insert requires exact provider/merchant/customer/payment_method_id match with one existing saved_payment_methods row.",
+        "relationship": "The D1 source has a saved_payment_methods reference; PostgreSQL preserves the same owner binding using a source-semantic trigger and keeps D1-04 without foreign keys.",
+        "retention": "Revocation request audit records are retained."
+      }
+    },
+    "explicitIndexNames": [
+      "ix_payment_method_revocation_status",
+      "ux_payment_method_revocation_customer_idempotency"
+    ],
+    "triggerNames": [
+      "payment_method_revocation_request_requires_saved_method",
+      "payment_method_revocation_request_identity_immutable",
+      "payment_method_revocation_request_version_guard",
+      "payment_method_revocation_request_transition_guard",
+      "payment_method_revocation_request_provider_deleted_immutable",
+      "payment_method_revocation_request_retained",
+      "payment_method_revocation_request_completion_guard"
+    ],
+    "modifiedExistingTriggerNames": [
+      "payment_provider_events_terminal_immutable"
+    ],
+    "totals": {
+      "tables": 1,
+      "explicitIndexes": 2,
+      "triggers": 7,
+      "triggerFunctions": 1,
+      "foreignKeys": 0
+    },
+    "cumulativeAfterThisSlice": {
+      "tables": 15,
+      "explicitIndexes": 31,
+      "triggers": 72,
+      "triggerFunctions": 6,
+      "foreignKeys": 0
+    }
+  },
+  "postgresMappings": {
+    "integer": "Map source INTEGER version to BIGINT.",
+    "time": "Map ISO-8601 TEXT created_at/updated_at/provider_method_deleted_at to TIMESTAMPTZ and compare as instants.",
+    "idempotency": "Preserve customer-scoped unique (customer_id,idempotency_key) and one revocation request per saved_payment_method_id.",
+    "relationship": "The source saved-method reference is checked against provider, merchant, customer and opaque payment_method_id in a trigger; no PostgreSQL foreign key is added.",
+    "providerDelete": "provider_method_deleted_at is immutable after first set; provider API deletion and signed mandate webhook finality remain separate facts.",
+    "completion": "A request can complete only after provider deletion is recorded and every linked mandate is terminal (REVOKED/FAILED/EXPIRED).",
+    "eventReplay": "Only an immutable first-receipt mandate_active/mandate_revoked event in RECONCILIATION_REQUIRED may be reset to RECEIVED with processed_at/outcome_code NULL. APPLIED and REJECTED receipts stay terminal; the existing payload/identity trigger prevents changing its SHA-256 or event identity.",
+    "renewalGate": "Existing W07 renewal runtime queries continue to reject a matching active mandate while any linked revocation request status is not COMPLETED. No new Worker or D1 binding is required.",
+    "authority": "W07 remains the sole D1-04 finance authority; D1-01 remains subscription entitlement authority."
+  },
+  "verification": {
+    "postgresImage": "postgres:18.6",
+    "sourceRegression": "workers/W07-subscription-commerce/scripts/test_order_d1_04_migration.py",
+    "tables": 1,
+    "explicitIndexes": 2,
+    "triggers": 7,
+    "triggerFunctions": 1,
+    "foreignKeys": 0,
+    "cumulativeTables": 15,
+    "cumulativeExplicitIndexes": 31,
+    "cumulativeTriggers": 72,
+    "cumulativeTriggerFunctions": 6,
+    "businessFixtureRowsAfterRollback": 0,
+    "schedulerControlRowsAfterRollback": 1,
+    "requiredPositiveCases": [
+      "revocation request is inserted only for an exact matching saved method/merchant/customer/provider/token identity",
+      "one customer can create a single idempotent revocation request for one saved method",
+      "REQUESTED can advance to PENDING_PROVIDER or RECONCILIATION_REQUIRED under one-step version CAS",
+      "provider_method_deleted_at can be recorded once and remains immutable",
+      "a request completes only after provider deletion and all mandates for the saved method are terminal",
+      "a RECONCILIATION_REQUIRED mandate_active/mandate_revoked provider receipt can be reopened as RECEIVED with processed_at/outcome_code cleared while its payload hash remains unchanged",
+      "existing renewal queries exclude a saved method while a linked revocation request is not COMPLETED"
+    ],
+    "requiredNegativeCases": [
+      "unknown saved method and mismatched provider/merchant/customer/payment_method_id are rejected",
+      "duplicate saved_payment_method_id and customer-scoped idempotency key are rejected",
+      "revocation request commercial identity cannot be rewritten",
+      "version must advance exactly one and updated_at must increase",
+      "forbidden status transitions are rejected",
+      "provider deletion timestamp cannot be replaced or cleared after it is set",
+      "COMPLETED without provider deletion timestamp is rejected",
+      "COMPLETED while any linked mandate remains non-terminal is rejected",
+      "APPLIED and REJECTED provider receipts cannot be reopened",
+      "non-mandate or non-reconciliation provider receipts cannot be reopened",
+      "mandate receipt payload hash/identity remains immutable during exact replay",
+      "revocation requests cannot be deleted"
+    ],
+    "noRemoteOperations": [
+      "no remote Neon DDL",
+      "no Cloudflare D1 writes",
+      "no business data import",
+      "no Worker deployment or binding change",
+      "no production cutover"
+    ],
+    "localRehearsalEvidence": {
+      "status": "LOCAL_POSTGRES18_REHEARSAL_PASSED",
+      "workflowRunId": 42498095211,
+      "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42498095211",
+      "verifiedHeadSha": "4d855b2547a33507141a442eb9e191e8158b86f6",
+      "postgresVersion": "18.6",
+      "database": "luckread_finance_schema",
+      "sourceRegressionTests": 24,
+      "newSliceTables": 1,
+      "newSliceExplicitIndexes": 2,
+      "newSliceTriggers": 7,
+      "newSliceTriggerFunctions": 1,
+      "cumulativeTables": 15,
+      "cumulativeExplicitIndexes": 31,
+      "cumulativeTriggers": 72,
+      "cumulativeTriggerFunctions": 6,
+      "foreignKeys": 0,
+      "revocationRowsAfterRollback": 0,
+      "businessFixtureRowsAfterRollback": 0,
+      "schedulerControlRowsAfterRollback": 1,
+      "evidenceArtifactId": 13623839431,
+      "evidenceArtifactSha256": "sha256:7638bdea865aa07354b0b9bce0fa288a29259bd0ab500280c58e8fefe19edd86",
+      "remoteNeonTouched": false,
+      "cloudflareD1Touched": false,
+      "businessDataImported": false,
+      "productionCutoverAuthorized": false
+    }
+  },
+  "safety": {
+    "remoteConnectionAttempted": false,
+    "remoteNeonDdlExecuted": false,
+    "cloudflareD1Touched": false,
+    "workerRuntimeOrBindingsChanged": false,
+    "businessDataImported": false,
+    "productionCutoverAuthorized": false
+  },
+  "nextGate": "All seven W07 D1-04 source schema slices now have PostgreSQL 18.6 local rehearsal evidence. The D1-04 shared-ledger remote runner, remote Neon schema apply, business data import and production cutover remain separate, unauthorized gates."
+}
