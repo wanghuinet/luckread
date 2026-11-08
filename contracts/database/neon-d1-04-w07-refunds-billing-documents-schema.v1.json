@@ -3,7 +3,7 @@
   "$id": "https://luckread.com/contracts/database/neon-d1-04-w07-refunds-billing-documents-schema.v1.json",
   "title": "LuckRead D1-04 W07 Refunds and Billing Documents PostgreSQL Schema Slice",
   "version": "1.0.0",
-  "status": "W07_D1_04_REFUNDS_BILLING_DOCUMENTS_PENDING_LOCAL_POSTGRES18_REHEARSAL",
+  "status": "W07_D1_04_REFUNDS_BILLING_DOCUMENTS_LOCAL_POSTGRES18_REHEARSAL_PASSED_PAYMENT_METHOD_REVOCATION_PENDING",
   "target": {
     "domainId": "D1-04",
     "databaseName": "luckread_finance",
@@ -225,6 +225,33 @@
       "no business data import",
       "no Worker deployment or binding change",
       "no production cutover"
-    ]
-  }
+    ],
+    "localRehearsalEvidence": {
+      "status": "LOCAL_POSTGRES18_REHEARSAL_PASSED",
+      "workflowRunId": 42496761021,
+      "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42496761021",
+      "verifiedHeadSha": "4f297c4b72fb918427c93742a08edf72686bfb4c",
+      "postgresVersion": "18.6",
+      "database": "luckread_finance_schema",
+      "sourceRegressionTests": 24,
+      "newSliceTables": 2,
+      "newSliceExplicitIndexes": 4,
+      "newSliceTriggers": 9,
+      "newSliceTriggerFunctions": 1,
+      "cumulativeTables": 14,
+      "cumulativeExplicitIndexes": 29,
+      "cumulativeTriggers": 65,
+      "cumulativeTriggerFunctions": 5,
+      "foreignKeys": 0,
+      "businessFixtureRowsAfterRollback": 0,
+      "schedulerControlRowsAfterRollback": 1,
+      "evidenceArtifactId": 13624255504,
+      "evidenceArtifactSha256": "sha256:ba7c2486d3287d495b5bffcad7b2a17e4b895951b2931d25e32d7944cd0e0b81",
+      "remoteNeonTouched": false,
+      "cloudflareD1Touched": false,
+      "businessDataImported": false,
+      "productionCutoverAuthorized": false
+    }
+  },
+  "nextGate": "PAY-007 payment-method revocation PostgreSQL 18 local rehearsal only. Shared-ledger remote runner and Neon cutover remain unauthorized."
 }
