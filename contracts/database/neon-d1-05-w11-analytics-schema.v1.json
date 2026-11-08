@@ -58,13 +58,30 @@
   "schema": {
     "tables": {
       "analytics_event_dedupe": {
-        "sourceMigrations": ["0001", "0003", "0004"],
+        "sourceMigrations": [
+          "0001",
+          "0003",
+          "0004"
+        ],
         "purpose": "Deduplicated source event ledger and durable PENDING/APPLIED/LATE projection state.",
         "columns": [
-          "event_id", "dedupe_key", "schema_version", "event_name", "source_worker",
-          "occurred_at", "received_at", "hour_start", "actor_type", "content_id",
-          "content_type", "creator_id", "duration_ms", "position", "metric_version",
-          "projection_status", "ingested_at"
+          "event_id",
+          "dedupe_key",
+          "schema_version",
+          "event_name",
+          "source_worker",
+          "occurred_at",
+          "received_at",
+          "hour_start",
+          "actor_type",
+          "content_id",
+          "content_type",
+          "creator_id",
+          "duration_ms",
+          "position",
+          "metric_version",
+          "projection_status",
+          "ingested_at"
         ],
         "constraints": [
           "event_id primary key",
@@ -85,9 +102,16 @@
         ]
       },
       "analytics_content_hourly": {
-        "sourceMigrations": ["0001"],
+        "sourceMigrations": [
+          "0001"
+        ],
         "purpose": "Hourly derived content and social-metric aggregates.",
-        "primaryKey": ["hour_start", "content_type", "content_id", "metric_version"],
+        "primaryKey": [
+          "hour_start",
+          "content_type",
+          "content_id",
+          "metric_version"
+        ],
         "explicitIndexes": [
           "analytics_content_hourly_content_time_idx",
           "analytics_content_hourly_content_id_time_idx",
@@ -95,21 +119,35 @@
         ]
       },
       "analytics_creator_hourly": {
-        "sourceMigrations": ["0001"],
+        "sourceMigrations": [
+          "0001"
+        ],
         "purpose": "Hourly creator follower gain/loss aggregates.",
-        "primaryKey": ["hour_start", "creator_id", "metric_version"],
-        "explicitIndexes": ["analytics_creator_hourly_creator_time_idx"]
+        "primaryKey": [
+          "hour_start",
+          "creator_id",
+          "metric_version"
+        ],
+        "explicitIndexes": [
+          "analytics_creator_hourly_creator_time_idx"
+        ]
       },
       "analytics_rollup_watermark": {
-        "sourceMigrations": ["0001"],
+        "sourceMigrations": [
+          "0001"
+        ],
         "purpose": "Bounded consumer watermark state."
       },
       "analytics_reconciliation_status": {
-        "sourceMigrations": ["0001"],
+        "sourceMigrations": [
+          "0001"
+        ],
         "purpose": "Bounded reconciliation-operation state with a PENDING/RUNNING/PASSED/FAILED lifecycle."
       },
       "analytics_projection_rebuild_state": {
-        "sourceMigrations": ["0002"],
+        "sourceMigrations": [
+          "0002"
+        ],
         "purpose": "One singleton row for the latest hourly projection rebuild; no unbounded job history.",
         "constraints": [
           "singleton_id equals 1",
@@ -125,7 +163,7 @@
       "triggerFunctions": 0
     },
     "postgresTypeMappings": {
-      "TEXT": "Keep source event timestamps, hour_start bucket keys, opaque IDs, details_json and status values as TEXT. UTC ISO-8601 text and lexical bucket-boundary semantics are preserved; do not introduce unapproved timestamp coercion or JSONB validation.",
+      "TEXT": "Keep source event timestamps, hour_start bucket keys, opaque IDs, details_json and status values as TEXT. Apply PostgreSQL COLLATE C to every UTC timestamp/bucket text column to preserve SQLite's default BINARY lexical comparison; do not introduce unapproved timestamp coercion or JSONB validation.",
       "INTEGER": "PostgreSQL INTEGER with the source range and non-negative checks preserved where present.",
       "REAL": "PostgreSQL DOUBLE PRECISION with the source 0..100 position constraint preserved.",
       "ingested_at": "TEXT with a UTC ISO-8601 millisecond default, preserving the D1 adapter's stored representation."
