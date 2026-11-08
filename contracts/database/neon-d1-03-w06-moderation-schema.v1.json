@@ -1,0 +1,303 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/database/neon-d1-03-w06-moderation-schema.v1.json",
+  "title": "LuckRead D1-03 W06 Moderation PostgreSQL Schema Slice",
+  "version": "1.0.0",
+  "status": "W06_SOURCE_BASELINE_READY_LOCAL_REHEARSAL_PENDING",
+  "target": {
+    "domainId": "D1-03",
+    "databaseName": "luckread_governance",
+    "cloudflareD1DatabaseName": "secondary",
+    "cloudflareD1DatabaseUuid": "bda1d247-a371-4244-91ae-aef96034db7f",
+    "postgresMajor": 18,
+    "existingProductionAuthority": "Cloudflare D1",
+    "stagedSchemaTarget": "Neon PostgreSQL",
+    "businessDataImport": false,
+    "productionCutoverAuthorized": false
+  },
+  "primaryOwner": {
+    "worker": "W06",
+    "entities": [
+      "ModerationCase",
+      "ModerationDecision",
+      "Report"
+    ],
+    "deferredOwnedEntities": [
+      "Appeal"
+    ],
+    "migrationArtifact": "workers/W06-governance/src/neon-postgres-migrations/0001_w06_d1_03_moderation_schema.sql",
+    "template": "workers/W06-governance/scripts/neon/templates/d1-03-w06-moderation-postgres.sql",
+    "generator": "workers/W06-governance/scripts/neon/generate-d1-03-w06-postgres-migration.mjs"
+  },
+  "scope": {
+    "includedTables": [
+      "moderation_cases",
+      "moderation_decisions",
+      "moderation_decision_idempotency",
+      "moderation_txn_guard",
+      "moderation_enforcement_outbox",
+      "moderation_reports",
+      "moderation_report_idempotency"
+    ],
+    "excludedEntities": [
+      {
+        "entity": "Appeal",
+        "reason": "The API/domain contracts describe appeal submission, but docs/63 marks implementation pending and the admitted W06 D1 migrations contain no Appeal persistence table or idempotency source. Do not invent physical schema until a dedicated Appeal persistence contract and source migration are admitted."
+      },
+      {
+        "entity": "AuditEvent",
+        "reason": "AuditEvent is W09-owned in D1-03. W06 continues its existing Cloudflare D1 compatibility path until a separate runtime-adapter slice; this schema does not create a second audit table."
+      }
+    ]
+  },
+  "schema": {
+    "tables": {
+      "moderation_cases": {
+        "entity": "ModerationCase",
+        "source": "workers/W06-governance/migrations/0002_moderation_queue_foundation.sql",
+        "columns": [
+          "case_id",
+          "target_type",
+          "target_id",
+          "target_version",
+          "policy_version",
+          "state",
+          "priority",
+          "assigned_reviewer_id",
+          "current_decision_id",
+          "evidence_bundle_ref",
+          "version",
+          "created_at",
+          "updated_at"
+        ],
+        "explicitIndexes": [
+          "uq_moderation_cases_case_id",
+          "ix_moderation_cases_queue",
+          "ix_moderation_cases_reviewer_state"
+        ],
+        "constraints": [
+          "case_id is the primary key and is never reused.",
+          "Queue ordering is state, priority DESC, created_at ASC, case_id ASC.",
+          "Reviewer queue ordering is assigned_reviewer_id, state, priority DESC, created_at ASC.",
+          "No cross-domain foreign key is introduced."
+        ]
+      },
+      "moderation_decisions": {
+        "entity": "ModerationDecision",
+        "source": "workers/W06-governance/migrations/0002_moderation_queue_foundation.sql",
+        "columns": [
+          "decision_id",
+          "case_id",
+          "case_version",
+          "outcome",
+          "target_type",
+          "target_id",
+          "target_version",
+          "policy_version",
+          "reason_code",
+          "severity",
+          "scope",
+          "effective_at",
+          "expires_at",
+          "source_kind",
+          "reviewer_id",
+          "reviewer_layer",
+          "request_id",
+          "created_at"
+        ],
+        "explicitIndexes": [
+          "uq_moderation_decisions_case_version",
+          "ix_moderation_decisions_case_created",
+          "ix_moderation_decisions_policy"
+        ],
+        "constraints": [
+          "(case_id, case_version) is unique.",
+          "outcome values are APPROVED or REJECTED at the admitted contract/runtime boundary.",
+          "Decision rows are append-oriented; this schema adds no unsupported mutation trigger.",
+          "case_id and target_id remain opaque cross-domain identifiers."
+        ]
+      },
+      "moderation_decision_idempotency": {
+        "entity": "W06OperationalIdempotency",
+        "source": "workers/W06-governance/migrations/0002_moderation_queue_foundation.sql",
+        "columns": [
+          "id",
+          "reviewer_id",
+          "case_id",
+          "idempotency_key",
+          "request_hash",
+          "decision_id",
+          "response_status",
+          "response_json",
+          "created_at",
+          "expires_at"
+        ],
+        "explicitIndexes": [
+          "ix_moderation_idem_expiry"
+        ],
+        "constraints": [
+          "(reviewer_id, case_id, idempotency_key) is unique.",
+          "response_json remains TEXT because the admitted source does not declare a JSON shape check."
+        ]
+      },
+      "moderation_txn_guard": {
+        "entity": "W06TransactionGuard",
+        "source": "workers/W06-governance/migrations/0002_moderation_queue_foundation.sql",
+        "columns": [
+          "id",
+          "successful"
+        ],
+        "explicitIndexes": [],
+        "constraints": [
+          "id must equal 1.",
+          "successful must equal 1.",
+          "The guard table is schema-only in this slice; no seed row is inserted."
+        ]
+      },
+      "moderation_enforcement_outbox": {
+        "entity": "W06ModerationEnforcementOutbox",
+        "source": "workers/W06-governance/migrations/0002_moderation_queue_foundation.sql",
+        "columns": [
+          "outbox_id",
+          "decision_id",
+          "case_id",
+          "target_type",
+          "target_id",
+          "target_version",
+          "outcome",
+          "policy_version",
+          "idempotency_key",
+          "status",
+          "attempts",
+          "next_attempt_at",
+          "last_error",
+          "created_at",
+          "delivered_at"
+        ],
+        "explicitIndexes": [
+          "ix_moderation_enforcement_outbox_ready"
+        ],
+        "constraints": [
+          "decision_id is unique.",
+          "target_type is content.",
+          "target_version is at least 1.",
+          "outcome is APPROVED or REJECTED.",
+          "status is PENDING, DELIVERED or RETRY.",
+          "attempts is non-negative."
+        ]
+      },
+      "moderation_reports": {
+        "entity": "Report",
+        "source": "workers/W06-governance/migrations/0003_moderation_report_v1.sql",
+        "columns": [
+          "report_id",
+          "actor_user_id",
+          "target_type",
+          "target_id",
+          "reason_code",
+          "description",
+          "evidence_refs_json",
+          "policy_version",
+          "dedup_bucket",
+          "created_at"
+        ],
+        "explicitIndexes": [
+          "ix_moderation_reports_target_created",
+          "ix_moderation_reports_actor_created"
+        ],
+        "constraints": [
+          "target_type is content, comment, creator, media or profile.",
+          "(actor_user_id, target_type, target_id, reason_code, dedup_bucket) is unique.",
+          "evidence_refs_json must be a JSON array.",
+          "No account/content foreign key is introduced."
+        ]
+      },
+      "moderation_report_idempotency": {
+        "entity": "W06ReportIdempotency",
+        "source": "workers/W06-governance/migrations/0003_moderation_report_v1.sql",
+        "columns": [
+          "id",
+          "actor_user_id",
+          "idempotency_key",
+          "request_hash",
+          "report_id",
+          "response_status",
+          "response_json",
+          "created_at",
+          "expires_at"
+        ],
+        "explicitIndexes": [
+          "ix_moderation_report_idem_expiry"
+        ],
+        "constraints": [
+          "(actor_user_id, idempotency_key) is unique.",
+          "response_json remains TEXT because the admitted source does not declare a JSON shape check."
+        ]
+      }
+    },
+    "postgresTypeMappings": {
+      "created_at_updated_at_effective_at_expires_at_next_attempt_at_delivered_at": "PostgreSQL TIMESTAMPTZ; source values must be valid ISO/RFC3339 instants.",
+      "moderation_reports.evidence_refs_json": "PostgreSQL JSONB with an array type check, preserving the source JSON-array invariant.",
+      "response_json": "TEXT, preserving the admitted source contract without inventing a JSON validity constraint.",
+      "other_text_columns": "TEXT; opaque identifiers are not foreign keys."
+    },
+    "totals": {
+      "tables": 7,
+      "explicitIndexes": 11,
+      "triggers": 0,
+      "triggerFunctions": 0,
+      "foreignKeys": 0
+    }
+  },
+  "sourceInventory": [
+    {
+      "path": "workers/W06-governance/migrations/0002_moderation_queue_foundation.sql",
+      "role": "Admitted W06 D1/SQLite source for moderation case, decision, idempotency, transaction guard and enforcement outbox tables.",
+      "execution": "Fingerprint and translate semantics only; never execute SQLite/D1 SQL on Neon."
+    },
+    {
+      "path": "workers/W06-governance/migrations/0003_moderation_report_v1.sql",
+      "role": "Admitted W06 D1/SQLite source for reports and report idempotency.",
+      "execution": "Fingerprint and translate semantics only; never execute SQLite/D1 SQL on Neon."
+    },
+    {
+      "path": "contracts/persistence/MODERATION-QUEUE-FOUNDATION-persistence.v1.json",
+      "role": "Canonical D1-03 moderation persistence mapping and uniqueness/queue contracts.",
+      "execution": "Contract source; not SQL."
+    },
+    {
+      "path": "contracts/entity/MODERATION-CASE-CONTRACT.v1.json",
+      "role": "Canonical ModerationCase field and lifecycle contract.",
+      "execution": "Contract source; not SQL."
+    },
+    {
+      "path": "contracts/entity/MODERATION-DECISION-CONTRACT.v1.json",
+      "role": "Canonical ModerationDecision field and idempotency contract.",
+      "execution": "Contract source; not SQL."
+    },
+    {
+      "path": "contracts/api/report-appeal.v1.json",
+      "role": "Report/Appeal API contract used to identify the admitted Report entity and deferred Appeal requirement.",
+      "execution": "Contract source; not SQL."
+    },
+    {
+      "path": "docs/63-MODERATION-APPEALS-SYSTEM-CONTRACT-v1.0.md",
+      "role": "Appeal capability state; document currently records implementation pending.",
+      "execution": "Gap evidence only; no Appeal table is inferred from this document."
+    },
+    {
+      "path": "contracts/transport/d1-03-entity-owner-boundary.v1.json",
+      "role": "Frozen D1-03 Worker owner partition; W06 owns moderation and W09 owns AuditEvent.",
+      "execution": "Must retain W06 ownership and W09 AuditEvent boundary."
+    }
+  ],
+  "safety": {
+    "remoteConnectionAttempted": false,
+    "remoteNeonDdlExecuted": false,
+    "cloudflareD1Touched": false,
+    "workerRuntimeOrBindingsChanged": false,
+    "businessDataImported": false,
+    "productionCutoverAuthorized": false
+  },
+  "nextGate": "W06 Appeal persistence remains a separately blocked entity gap. D1-03 remote apply remains blocked until W10/W11 schema source admission and a shared ledger-backed runner/release review are complete."
+}
