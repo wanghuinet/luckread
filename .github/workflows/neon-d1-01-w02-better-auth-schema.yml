@@ -91,7 +91,7 @@ jobs:
           console.log('Better Auth runtime, schema CLI, and PostgreSQL driver pins: PASS')
           NODE
 
-      - name: Generate PostgreSQL DDL from the canonical W02 Better Auth configuration
+      - name: Generate PostgreSQL DDL twice and prove deterministic output
         working-directory: workers/W02-identity
         env:
           W02_SCHEMA_PGHOST: 127.0.0.1
@@ -102,7 +102,37 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p artifacts/neon
+          artifact=artifacts/neon/w02-better-auth-postgres-schema.sql
+          first_copy=/tmp/w02-better-auth-postgres-schema.first.sql
           npm run neon:schema:generate
+          test -s "$artifact"
+          first_sha256="$(sha256sum "$artifact" | cut -d ' ' -f 1)"
+          cp "$artifact" "$first_copy"
+          npm run neon:schema:generate
+          test -s "$artifact"
+          cmp --silent "$first_copy" "$artifact"
+          second_sha256="$(sha256sum "$artifact" | cut -d ' ' -f 1)"
+          test "$first_sha256" = "$second_sha256"
+          cat > artifacts/neon/w02-better-auth-postgres-schema-generation-provenance.txt <<EOF
+          generatorCommand=npm run neon:schema:generate
+          betterAuth=1.7.8
+          betterAuthCli=1.7.8
+          pg=8.20.0
+          firstGenerationSha256=$first_sha256
+          secondGenerationSha256=$second_sha256
+          deterministic=true
+          databaseTarget=disposable-postgresql-18-only
+          remoteNeonConnectionAttempted=false
+          EOF
+          {
+            echo "## W02 Better Auth PostgreSQL schema generation"
+            echo "- Generator: `npm run neon:schema:generate`"
+            echo "- Better Auth runtime / CLI: `1.7.8 / 1.7.8`"
+            echo "- pg: `8.20.0`"
+            echo "- Artifact SHA-256: `$second_sha256`"
+            echo "- Two consecutive generations: **byte-identical**"
+            echo "- Target: disposable PostgreSQL 18 only; no remote Neon connection"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Generate W02 custom PostgreSQL migrations from canonical contracts
         working-directory: workers/W02-identity
@@ -327,6 +357,7 @@ jobs:
           name: w02-better-auth-postgres-schema-${{ github.run_id }}
           path: |
             workers/W02-identity/artifacts/neon/w02-better-auth-postgres-schema.sql
+            workers/W02-identity/artifacts/neon/w02-better-auth-postgres-schema-generation-provenance.txt
             workers/W02-identity/artifacts/neon/w02-better-auth-postgres-schema-postflight.json
             workers/W02-identity/artifacts/neon/w02-role-assignment-postgres-schema-postflight.json
             workers/W02-identity/src/neon-postgres-migrations/0001_role_assignments.sql
