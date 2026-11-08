@@ -61,7 +61,7 @@ DECLARE
     'w03_content_collections_after_update_outbox','w05_enqueue_social_notification_push_outbox'
   ];
   actual TEXT[];
-  expected_sorted TEXT[];
+  missing_count INTEGER;
 BEGIN
   IF current_database() <> 'luckread_d1_02_schema' THEN
     RAISE EXCEPTION 'Combined D1-02 rehearsal must use disposable luckread_d1_02_schema';
@@ -72,26 +72,38 @@ BEGIN
 
   SELECT array_agg(table_name ORDER BY table_name) INTO actual
     FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE';
-  SELECT array_agg(x ORDER BY x) INTO expected_sorted FROM unnest(expected_tables) x;
-  IF actual IS DISTINCT FROM expected_sorted THEN RAISE EXCEPTION 'Combined D1-02 table set mismatch: %',actual; END IF;
+  SELECT count(*) INTO missing_count FROM unnest(expected_tables) AS expected(name)
+   WHERE NOT (expected.name = ANY(COALESCE(actual, ARRAY[]::TEXT[])));
+  IF COALESCE(array_length(actual,1),0) <> cardinality(expected_tables) OR missing_count <> 0 THEN
+    RAISE EXCEPTION 'Combined D1-02 table set mismatch: actual %, missing %',actual,missing_count;
+  END IF;
 
   SELECT array_agg(indexname ORDER BY indexname) INTO actual
     FROM pg_indexes WHERE schemaname='public' AND indexname=ANY(expected_indexes);
-  SELECT array_agg(x ORDER BY x) INTO expected_sorted FROM unnest(expected_indexes) x;
-  IF actual IS DISTINCT FROM expected_sorted THEN RAISE EXCEPTION 'Combined D1-02 explicit index set mismatch: %',actual; END IF;
+  SELECT count(*) INTO missing_count FROM unnest(expected_indexes) AS expected(name)
+   WHERE NOT (expected.name = ANY(COALESCE(actual, ARRAY[]::TEXT[])));
+  IF COALESCE(array_length(actual,1),0) <> cardinality(expected_indexes) OR missing_count <> 0 THEN
+    RAISE EXCEPTION 'Combined D1-02 explicit index set mismatch: actual %, missing %',actual,missing_count;
+  END IF;
 
   SELECT array_agg(tgname ORDER BY tgname) INTO actual
     FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid
     JOIN pg_namespace n ON n.oid=c.relnamespace
     WHERE n.nspname='public' AND NOT t.tgisinternal;
-  SELECT array_agg(x ORDER BY x) INTO expected_sorted FROM unnest(expected_triggers) x;
-  IF actual IS DISTINCT FROM expected_sorted THEN RAISE EXCEPTION 'Combined D1-02 trigger inventory mismatch: %',actual; END IF;
+  SELECT count(*) INTO missing_count FROM unnest(expected_triggers) AS expected(name)
+   WHERE NOT (expected.name = ANY(COALESCE(actual, ARRAY[]::TEXT[])));
+  IF COALESCE(array_length(actual,1),0) <> cardinality(expected_triggers) OR missing_count <> 0 THEN
+    RAISE EXCEPTION 'Combined D1-02 trigger inventory mismatch: actual %, missing %',actual,missing_count;
+  END IF;
 
   SELECT array_agg(proname ORDER BY proname) INTO actual
     FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
     WHERE n.nspname='public' AND proname=ANY(expected_functions);
-  SELECT array_agg(x ORDER BY x) INTO expected_sorted FROM unnest(expected_functions) x;
-  IF actual IS DISTINCT FROM expected_sorted THEN RAISE EXCEPTION 'Combined D1-02 trigger function inventory mismatch: %',actual; END IF;
+  SELECT count(*) INTO missing_count FROM unnest(expected_functions) AS expected(name)
+   WHERE NOT (expected.name = ANY(COALESCE(actual, ARRAY[]::TEXT[])));
+  IF COALESCE(array_length(actual,1),0) <> cardinality(expected_functions) OR missing_count <> 0 THEN
+    RAISE EXCEPTION 'Combined D1-02 trigger function inventory mismatch: actual %, missing %',actual,missing_count;
+  END IF;
 
   IF EXISTS (
     SELECT 1 FROM pg_constraint c JOIN pg_class t ON t.oid=c.conrelid
