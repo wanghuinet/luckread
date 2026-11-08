@@ -53,7 +53,14 @@ jobs:
           node --test scripts/neon/d1-02/schema-only-runner.test.mjs
           node scripts/neon/d1-02/assert-remote-apply-release.mjs --assert-configured
       - name: Prove the remote DDL job is not released by this implementation slice
-        run: node scripts/neon/d1-02/assert-remote-apply-release.mjs --assert-ready && exit 1 || test "$?" -ne 0
+        shell: bash
+        run: |
+          set -euo pipefail
+          if node scripts/neon/d1-02/assert-remote-apply-release.mjs --assert-ready > /tmp/d1-02-release-check.log 2>&1; then
+            echo "Remote DDL unexpectedly became enabled in the implementation PR."
+            exit 1
+          fi
+          grep -F "remoteApplyReady remains false" /tmp/d1-02-release-check.log
 
   apply:
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.confirm_target == 'APPLY_REVIEWED_SCHEMA_D1_02_LUCKREADPRO' }}
@@ -117,7 +124,6 @@ jobs:
           GITHUB_RUN_ID: ${{ github.run_id }}
           GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
           D1_02_REMOTE_APPLY_CONFIRMATION: ${{ inputs.confirm_target }}
-          NEON_DATABASE_URL_LUCKREADPRO: ${{ env.NEON_DATABASE_URL_LUCKREADPRO_VERIFIED }}
           D1_02_SCHEMA_APPLY_REPORT: artifacts/neon/d1-02-schema-runner-remote-postflight.json
         run: |
           mkdir -p artifacts/neon
@@ -133,8 +139,6 @@ jobs:
           psql --version
 
       - name: Verify the full D1-02 PostgreSQL 18 catalog and rollback-only semantics
-        env:
-          NEON_DATABASE_URL_LUCKREADPRO_VERIFIED: ${{ env.NEON_DATABASE_URL_LUCKREADPRO_VERIFIED }}
         run: |
           set -euo pipefail
           psql "$NEON_DATABASE_URL_LUCKREADPRO_VERIFIED" -A -t -q --set ON_ERROR_STOP=1 --no-psqlrc --set expected_database=luckreadpro --file scripts/neon/d1-02/verify-combined-postgres-schema.sql > artifacts/neon/d1-02-combined-remote-postflight.txt
