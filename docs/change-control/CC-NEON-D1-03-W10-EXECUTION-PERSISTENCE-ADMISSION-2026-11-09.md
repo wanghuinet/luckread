@@ -58,12 +58,12 @@ Passing this slice admits W10 schema sources only. JOB-001..008 runtime implemen
 ## 6. PostgreSQL 18.6 rehearsal evidence
 
 The dedicated local workflow completed successfully:
-- Run: [42502495149](https://github.com/wanghuinet/luckread/actions/runs/42502495149)
-- Verified head: `93fdce0b5963501ca55d8093c5514828d302a6a4`
+- Run: [42502891564](https://github.com/wanghuinet/luckread/actions/runs/42502891564)
+- Verified head: `b6dca4fc21b52eb6169d1b4a7a64577fd038d590`
 - Target: disposable `luckread_d1_03_w10_rehearsal`, PostgreSQL 18.6
 - Catalog: 6 tables, 7 explicit indexes, 2 same-owner foreign keys, 0 triggers, 0 trigger functions
 - Generator/admission tests, schema apply, catalog validation, idempotency uniqueness check and transaction rollback: PASS
 - Synthetic fixture rows after rollback: 0
-- Evidence artifact: `13626345587` (`sha256:209f474ce742eb7f647f362b51fb468f3eb0d3a3ba30ac1f2ddc650525d6a7ad`)
+- Evidence artifact: `13625774522` (`sha256:e24a8c63b3d0c295e35c156baa423b20e123c217f8f3fa308276780e73d8be72`)
 
 This is local disposable-database evidence only. It does not authorize remote Neon DDL, runtime binding/deployment, business-data import or production cutover.
