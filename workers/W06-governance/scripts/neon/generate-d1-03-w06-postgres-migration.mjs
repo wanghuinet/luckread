@@ -13,7 +13,7 @@ const outputPath = 'workers/W06-governance/src/neon-postgres-migrations/0001_w06
 
 function readRequired(relativePath, readSource) {
   const value = readSource(relativePath)
-  if (typeof value !== 'string') throw new Error(\`Missing required W06 D1-03 schema source: \${relativePath}\`)
+  if (typeof value !== 'string') throw new Error('Missing required W06 D1-03 schema source: ' + relativePath)
   return value
 }
 
@@ -22,7 +22,7 @@ function sha256(value) {
 }
 
 function tableExists(source, tableName) {
-  return source.toLowerCase().includes(\`create table if not exists \${tableName.toLowerCase()}\`)
+  return source.toLowerCase().includes('create table if not exists ' + tableName.toLowerCase())
 }
 
 export function buildD103W06Migration({ readSource = (relativePath) => {
@@ -73,10 +73,10 @@ export function buildD103W06Migration({ readSource = (relativePath) => {
   ]
   const reportTables = ['moderation_reports', 'moderation_report_idempotency']
   for (const table of queueTables) {
-    if (!tableExists(queueSql, table)) throw new Error(\`W06 queue source is missing table \${table}\`)
+    if (!tableExists(queueSql, table)) throw new Error('W06 queue source is missing table ' + table)
   }
   for (const table of reportTables) {
-    if (!tableExists(reportSql, table)) throw new Error(\`W06 report source is missing table \${table}\`)
+    if (!tableExists(reportSql, table)) throw new Error('W06 report source is missing table ' + table)
   }
   if (queueSql.includes('CREATE TABLE IF NOT EXISTS appeals') ||
       queueSql.includes('CREATE TABLE IF NOT EXISTS moderation_appeals') ||
