@@ -2,7 +2,6 @@
 -- Regenerate with workers/W05-social/scripts/neon/generate-d1-02-postgres-migration.mjs.
 -- Template: workers/W05-social/scripts/neon/templates/d1-02-social-postgres.sql.
 -- Source authority: W05 / D1-02; Cloudflare D1 remains the current runtime authority.
-
 -- W05 / D1-02 PostgreSQL 18 schema-only bootstrap.
 -- Source authority: W05 / D1-02 social graph, interactions and notification delivery state.
 -- Endpoint state remains owned by W09 / D1-03 and is intentionally not created here.
