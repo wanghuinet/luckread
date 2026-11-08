@@ -1,6 +1,6 @@
--- W06 / D1-03 canonical immutable AuditEvent persistence.
+-- Legacy W06 / D1-03 Cloudflare D1 compatibility persistence for the existing runtime.
 -- Source of truth: contracts/schemas/common/audit-event.json
--- Remote application is separately gated by w06-audit-event-migration.yml.
+-- Cloudflare D1 compatibility application remains separately gated by w06-audit-event-migration.yml; do not execute this SQLite SQL against Neon.
 
 CREATE TABLE IF NOT EXISTS audit_events (
   event_id TEXT PRIMARY KEY NOT NULL,
