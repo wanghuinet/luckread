@@ -1,4 +1,8 @@
 \set ON_ERROR_STOP on
+\if :{?expected_database}
+\else
+\set expected_database luckread_d1_02_schema
+\endif
 BEGIN;
 DO $d1_02_combined_catalog$
 DECLARE
@@ -63,7 +67,7 @@ DECLARE
   actual TEXT[];
   missing_count INTEGER;
 BEGIN
-  IF current_database() <> 'luckread_d1_02_schema' THEN
+  IF current_database() <> :'expected_database' THEN
     RAISE EXCEPTION 'Combined D1-02 rehearsal must use disposable luckread_d1_02_schema';
   END IF;
   IF current_setting('server_version_num')::INTEGER / 10000 <> 18 THEN
@@ -71,7 +75,7 @@ BEGIN
   END IF;
 
   SELECT array_agg(table_name ORDER BY table_name) INTO actual
-    FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE';
+    FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE' AND table_name <> 'neon_schema_migration_ledger';
   SELECT count(*) INTO missing_count FROM unnest(expected_tables) AS expected(name)
    WHERE NOT (expected.name = ANY(COALESCE(actual, ARRAY[]::TEXT[])));
   IF COALESCE(array_length(actual,1),0) <> cardinality(expected_tables) OR missing_count <> 0 THEN
@@ -89,7 +93,7 @@ BEGIN
   SELECT array_agg(tgname ORDER BY tgname) INTO actual
     FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid
     JOIN pg_namespace n ON n.oid=c.relnamespace
-    WHERE n.nspname='public' AND NOT t.tgisinternal;
+    WHERE n.nspname='public' AND c.relname <> 'neon_schema_migration_ledger' AND NOT t.tgisinternal;
   SELECT count(*) INTO missing_count FROM unnest(expected_triggers) AS expected(name)
    WHERE NOT (expected.name = ANY(COALESCE(actual, ARRAY[]::TEXT[])));
   IF COALESCE(array_length(actual,1),0) <> cardinality(expected_triggers) OR missing_count <> 0 THEN
