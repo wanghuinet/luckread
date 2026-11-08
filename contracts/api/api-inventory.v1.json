@@ -349,5 +349,44 @@
     "integration_e2e_ref": "required_for_integrated_or_stable",
     "security_e2e_ref": "required_for_sensitive_or_privileged",
     "notes": "optional"
+  },
+  "operation_feature_map": {
+    "listModerationCases": {
+      "feature_ids": [
+        "GOV-003"
+      ],
+      "schema_ref": ""
+    },
+    "listModerationQueue": {
+      "feature_ids": [
+        "GOV-003"
+      ],
+      "schema_ref": "contracts/api/moderation-operation-policy.v1.json#/operations/0"
+    },
+    "getModerationCase": {
+      "feature_ids": [
+        "GOV-004"
+      ],
+      "schema_ref": "contracts/api/moderation-operation-policy.v1.json#/operations/1"
+    },
+    "decideModerationCase": {
+      "feature_ids": [
+        "GOV-004"
+      ],
+      "schema_ref": "contracts/api/moderation-operation-policy.v1.json#/operations/2"
+    },
+    "createReport": {
+      "feature_ids": [
+        "GOV-001",
+        "GOV-002"
+      ],
+      "schema_ref": "contracts/api/report-appeal.v1.json#/operations/0"
+    },
+    "createAppeal": {
+      "feature_ids": [
+        "GOV-005"
+      ],
+      "schema_ref": "contracts/api/report-appeal.v1.json#/operations/1"
+    }
   }
 }
