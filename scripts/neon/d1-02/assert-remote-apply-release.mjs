@@ -49,9 +49,11 @@ export function assertD1_02RemoteApplyReady({ root: repositoryRoot = root, curre
   return { ready, evidence: evidence.valid, remoteNeonDdlExecuted: false }
 }
 
-if (process.argv[2] === '--assert-ready' || process.argv[2] === '--assert-configured') {
-  const result = assertD1_02RemoteApplyReady({ currentHead: process.env.GITHUB_SHA || undefined })
-  console.log('D1_02_REMOTE_SCHEMA_APPLY_RELEASED ' + JSON.stringify(result))
-} else {
-  fail('Select --assert-configured or --assert-ready')
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  if (process.argv[2] === '--assert-ready' || process.argv[2] === '--assert-configured') {
+    const result = assertD1_02RemoteApplyReady({ currentHead: process.env.GITHUB_SHA || undefined })
+    console.log('D1_02_REMOTE_SCHEMA_APPLY_RELEASED ' + JSON.stringify(result))
+  } else {
+    fail('Select --assert-configured or --assert-ready')
+  }
 }
