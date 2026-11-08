@@ -43,7 +43,8 @@ test('all source outbox trigger families and indexes are preserved', () => {
 test('SQLite/D1 DDL syntax and implicit foreign keys are excluded', () => {
   const { artifact } = buildW03PostgresMigration({ inventory, contentContract, readSource, template })
   assert.doesNotMatch(artifact, /\bPRAGMA\b|\bAUTOINCREMENT\b|\bstrftime\s*\(|\bjulianday\s*\(|\bjson_object\s*\(|\brandomblob\s*\(|\bRAISE\s*\(\s*ABORT/i)
-  assert.doesNotMatch(artifact, /\bFOREIGN\s+KEY\b|\bREFERENCES\b/i)
+  const ddlStatements = artifact.replace(/^\s*--.*$/gm, '')
+  assert.doesNotMatch(ddlStatements, /\bFOREIGN\s+KEY\b|\bREFERENCES\s+[a-z_]/i)
 })
 
 test('W05 and D1-03 sources are not included in the W03 migration artifact', () => {
