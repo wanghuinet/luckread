@@ -31,7 +31,7 @@
       },
       {
         "path": "scripts/neon/d1-01-migration-manifest.mjs",
-        "gitBlobSha1": "4e1c5d485084ab5204ae56f2d50a8316025c17a6"
+        "gitBlobSha1": "6e01bc8266aa6a1c07891e49f4c32f38a05dfa17"
       },
       {
         "path": "scripts/neon/assert-d1-01-migration-ledger-ready.mjs",
@@ -71,7 +71,7 @@
       },
       {
         "path": "contracts/database/neon-d1-01-migration-manifest.v1.json",
-        "gitBlobSha1": "cfe408db4eda5f0e005ea75ce28128c054d87238"
+        "gitBlobSha1": "6a04861f12b379147aad406a39921e8f1ceedd2f"
       },
       {
         "path": "contracts/database/neon-schema-migration-ledger.v1.json",
@@ -99,7 +99,12 @@
       "Remote Neon DDL has not been executed. Remote apply remains a separate manually dispatched action and must produce fresh postflight evidence.",
       "The remote runner has only been exercised against disposable PostgreSQL 18 in CI; no claim of remote Neon execution success is made."
     ],
-    "formalGitHubReviewSubmissions": 0
+    "formalGitHubReviewSubmissions": 0,
+    "followUpReview": {
+      "reviewedAt": "2026-11-08",
+      "scope": "Verified the duplicate ledger-contract declaration removal and aligned the D1-01 manifest nested remoteApplyReady flag with the reviewed runner and ledger domain state.",
+      "result": "NO_NEW_BLOCKING_FINDINGS"
+    }
   },
   "verificationEvidence": {
     "fullD1_01LocalPostgres18Rehearsal": {
