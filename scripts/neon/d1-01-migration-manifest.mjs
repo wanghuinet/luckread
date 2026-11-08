@@ -40,7 +40,10 @@ export function hashArtifactBundle(artifactPaths) {
   }
   return hash.digest('hex')
 }
-const validHex = (value, length) => typeof value === 'string' && new RegExp('^[0-9a-f]{' + length + '}
+const validHex = (value, length) => typeof value === 'string' && new RegExp('^[0-9a-f]{' + length + '}$').test(value)
+const isSafeRepositoryPath = (path) => typeof path === 'string' &&
+  path.startsWith('workers/') && !isAbsolute(path) && !path.split(/[\\/]/).includes('..')
+
 if (manifest.domainId !== 'D1-01' || manifest.databaseName !== 'luckread' ||
     manifest.postgresMajor !== 18 || manifest.businessDataImport !== false ||
     manifest.productionCutoverAuthorized !== false || manifest.remoteApplyReady !== false) {
@@ -152,7 +155,7 @@ for (const entry of manifest.entries) {
     fail('unsupported artifact state for ' + entry.migrationId)
   }
   for (const path of entry.sourcePaths) {
-    if (!path.startsWith('workers/') || !statSync(resolve(repositoryRoot, path)).isFile()) {
+    if (!isSafeRepositoryPath(path) || !statSync(resolve(repositoryRoot, path)).isFile()) {
       fail('source input missing or not a file: ' + path)
     }
   }
