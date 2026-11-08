@@ -86,8 +86,8 @@ function extractSqlEffects(sql) {
   const references = namesIn(code,/\bREFERENCES\s+(?:(?:public)\s*\.\s*)?"?([A-Za-z_][A-Za-z0-9_$]*)"?/gim)
   const inserts = namesIn(uncommented,/^\s*INSERT\s+INTO\s+([A-Za-z_][A-Za-z0-9_$]*)/gim)
   const collatedTimeColumns = namesIn(uncommented,/^\s*([A-Za-z_][A-Za-z0-9_$]*)\s+TEXT\s+COLLATE\s+"C"/gim)
-  const identityColumns = namesIn(uncommented,/^\s*([A-Za-z_][A-Za-z0-9_$]*)\s+(?:TEXT|INTEGER|BIGINT|UUID)\b/gim)
-    .filter((name) => ['actor_id','visitor_id','session_id'].includes(name.toLowerCase()))
+  const identityColumns = [...new Set(code.match(/\b(?:actor_id|visitor_id|session_id)\b/gi) ?? [])]
+    .map((name) => name.toLowerCase())
   return {tables,indexes,functions,triggers,references,inserts,collatedTimeColumns,identityColumns,uncommented,code}
 }
 
