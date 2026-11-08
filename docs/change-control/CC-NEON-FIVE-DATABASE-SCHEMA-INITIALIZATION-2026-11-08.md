@@ -137,3 +137,20 @@ This change control is complete when the repository has an agreed five-domain sc
 - After owner migrations complete, install and verify the append-only shared ledger, then record exactly fourteen local rehearsal provenance rows using the manifest artifact and manifest-entry checksums.
 - The final combined verifier checks the exact table union, Worker ownership collisions, same-owner-only foreign keys, empty business tables, the single Payload schema migration record, and all fourteen ledger rows.
 - This is a CI-only disposable PostgreSQL test. It does not connect to Neon, execute remote DDL, import business rows, mutate Cloudflare D1, change Worker runtime bindings or authorize production cutover.
+
+
+## 12. Five-database read-only target preflight — implementation slice
+
+- Reuse the existing five-database connectivity workflow and its five configured Actions secrets:
+  - D1-01 `luckread` / `NEON_DATABASE_URL_LUCKREAD`
+  - D1-02 `luckreadpro` / `NEON_DATABASE_URL_LUCKREADPRO`
+  - D1-03 `luckread_governance` / `NEON_DATABASE_URL_GOVERNANCE`
+  - D1-04 `luckread_finance` / `NEON_DATABASE_URL_FINANCE`
+  - D1-05 `allluck` / `NEON_DATABASE_URL_ALLLUCK`
+- The new inspection verifies the exact database name and Neon host, requires channel binding, verifies the TLS certificate chain and hostname, and requires PostgreSQL major version 18 before reading the catalog.
+- Catalog inspection is performed inside `BEGIN READ ONLY` and always rolled back. It records schema/relations/types/routines/extensions/global-object metadata, checks the shared migration ledger's presence and row count (only when the ledger exists), and does not read business row payloads.
+- `PASS_EMPTY` requires the default `public` schema only, no user-defined database objects or non-default extensions, and no migration ledger table. An existing empty ledger is still a blocker because the expected pre-bootstrap state is that the ledger is absent.
+- Any non-empty target is blocked for manual review. The workflow never drops, repairs, creates or changes database objects.
+- The connectivity workflow is now manual-dispatch-only on `main` with an exact read-only confirmation. PRs run only local syntax/unit tests; the PR validation job receives no Neon secrets. This avoids exposing connection credentials to PR-controlled workflow code.
+- This slice does not authorize or perform schema application, migration-ledger installation, business-data import, Cloudflare D1 mutation, Worker runtime/binding changes or production cutover.
+- The earlier `PASS_EMPTY 5/5` record remains historical evidence from the original preflight run. The hardened preflight must be manually dispatched after this PR is merged to collect fresh five-target evidence under the stricter checks.
