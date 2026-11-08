@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/database/neon-d1-02-combined-schema.v1.json",
+  "title": "LuckRead D1-02 Combined W03 and W05 PostgreSQL 18 Schema Contract",
+  "version": "1.0.0",
+  "status": "COMBINED_LOCAL_REHEARSAL_CONTRACT",
+  "target": {
+    "domainId": "D1-02",
+    "databaseName": "luckreadpro",
+    "databaseUuid": "6c342634-97f6-4248-9f4a-85772af4f22c",
+    "postgresMajor": 18,
+    "existingProductionAuthority": "Cloudflare D1",
+    "stagedSchemaTarget": "Neon PostgreSQL",
+    "businessDataImport": false,
+    "productionCutoverAuthorized": false
+  },
+  "owners": [
+    {
+      "worker": "W03",
+      "binding": "D1_02",
+      "migrationDirectory": "workers/W03-content/migrations",
+      "migrationCount": 15,
+      "artifactPath": "workers/W03-content/src/neon-postgres-migrations/0001_w03_d1_02_content_schema.sql",
+      "expected": { "tables": 9, "explicitIndexes": 28, "triggers": 8, "triggerFunctions": 9 }
+    },
+    {
+      "worker": "W05",
+      "binding": "DB",
+      "migrationDirectory": "workers/W05-social/migrations",
+      "migrationCount": 15,
+      "artifactPath": "workers/W05-social/src/neon-postgres-migrations/0001_w05_d1_02_social_schema.sql",
+      "expected": { "tables": 19, "explicitIndexes": 35, "triggers": 1, "triggerFunctions": 1 }
+    }
+  ],
+  "combined": { "owners": 2, "migrationSources": 30, "tables": 28, "explicitIndexes": 63, "triggers": 9, "triggerFunctions": 10 },
+  "excludedBindings": [
+    {
+      "worker": "W05",
+      "binding": "D1_03",
+      "logicalDomain": "D1-03",
+      "databaseName": "secondary",
+      "databaseUuid": "bda1d247-a371-4244-91ae-aef96034db7f",
+      "reason": "W09 owns the governance and notification endpoint schema. W05 D1-02 delivery rows may retain opaque endpoint IDs only."
+    }
+  ],
+  "safetyInvariants": [
+    "Apply the PostgreSQL-native W03 artifact before the W05 artifact to one disposable PostgreSQL 18 database.",
+    "Do not execute historical SQLite/D1 migration files against PostgreSQL.",
+    "Do not connect to Neon or execute remote DDL in this local rehearsal.",
+    "Do not mutate Cloudflare D1 or change Worker runtime bindings.",
+    "Do not import business rows; only the required W03 Snowflake allocator singleton row remains after bootstrap.",
+    "Do not create W09 notification_push_endpoints or include W05 D1-03 schema.",
+    "Do not add cross-domain foreign keys; content, user and endpoint identifiers remain opaque references."
+  ]
+}
