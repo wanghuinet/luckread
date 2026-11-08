@@ -99,6 +99,8 @@ if (
 if (
   eventContract.status !== 'CONTRACTED_NOT_VERIFIED' ||
   eventContract.featureId !== 'AUTH-007' ||
+  JSON.stringify(eventContract.events?.map((event) => event.name)) !== JSON.stringify(expectedEvents) ||
+  eventContract.events?.some((event) => event.targetType !== 'User') ||
   eventContract.authority?.factorAndIdentityAuthority?.worker !== 'W02' ||
   eventContract.authority?.factorAndIdentityAuthority?.database !== 'D1-01' ||
   eventContract.authority?.canonicalAuditEventAuthority?.worker !== 'W06' ||
@@ -117,11 +119,6 @@ const sourceEvents = expectedEvents.map((eventName) =>
   source.includes("'" + eventName + "'"),
 )
 if (sourceEvents.some((present) => !present)) fail('W02 source producer must register all ten event names')
-for (const forbidden of eventContract.payloadPolicy?.secretFieldsForbidden ?? []) {
-  if (!eventContract.payloadPolicy.secretFieldsForbidden.includes(forbidden)) {
-    fail('event secret field list malformed')
-  }
-}
 if (!Array.isArray(eventContract.payloadPolicy?.secretFieldsForbidden) ||
     !eventContract.payloadPolicy.secretFieldsForbidden.includes('secret') ||
     !eventContract.payloadPolicy.secretFieldsForbidden.includes('totpUri') ||
