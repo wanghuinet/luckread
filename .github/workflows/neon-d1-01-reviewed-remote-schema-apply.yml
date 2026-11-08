@@ -52,7 +52,7 @@ jobs:
         run: |
           set -euo pipefail
           node --check scripts/neon/run-schema-migrations.mjs
-          node --test scripts/neon/run-schema-migrations.test.mjs
+          node --test scripts/neon/run-schema-migrations.test.mjs workers/W02-identity/scripts/neon/verify-schema-database-target.test.mjs
           node scripts/neon/assert-d1-01-migration-ledger-ready.mjs --expect-blocked
           if node scripts/neon/assert-d1-01-migration-ledger-ready.mjs --assert-runner-ready; then
             echo "Remote apply must remain gated until the separate reviewed release enablement."
@@ -152,6 +152,7 @@ jobs:
         run: |
           set -euo pipefail
           export W02_SCHEMA_DATABASE_URL="$NEON_DATABASE_URL_LUCKREAD_VERIFIED"
+          export W02_SCHEMA_EXPECTED_DATABASE="luckread"
           mkdir -p artifacts/neon
           node scripts/neon/verify-better-auth-core-schema.mjs > artifacts/neon/w02-better-auth-core-postflight.json
           npm run neon:role-assignment:verify > artifacts/neon/w02-role-assignment-postflight.json
