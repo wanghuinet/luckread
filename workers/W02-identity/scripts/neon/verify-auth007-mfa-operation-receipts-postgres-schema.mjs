@@ -27,7 +27,7 @@ let transactionOpen = false
 let negativeProbeSequence = 0
 let primaryError
 let report
-const expectPgCode = async (operation, label, run, expectedCode) => {
+const expectPgCode = async (label, run, expectedCode) => {
   const savepoint = 'mfa_receipt_negative_' + (++negativeProbeSequence)
   await client.query('SAVEPOINT ' + savepoint)
   try {
@@ -36,12 +36,12 @@ const expectPgCode = async (operation, label, run, expectedCode) => {
     await client.query('ROLLBACK TO SAVEPOINT ' + savepoint)
     await client.query('RELEASE SAVEPOINT ' + savepoint)
     assert(error && error.code === expectedCode,
-      operation + ' expected SQLSTATE ' + expectedCode + ', got ' + String(error?.code ?? 'unknown'))
+      label + ' expected SQLSTATE ' + expectedCode + ', got ' + String(error?.code ?? 'unknown'))
     return
   }
   await client.query('ROLLBACK TO SAVEPOINT ' + savepoint)
   await client.query('RELEASE SAVEPOINT ' + savepoint)
-  throw new Error('W02_AUTH007_MFA_RECEIPT_PG_ASSERTION_FAILED: ' + operation + ' unexpectedly succeeded')
+  throw new Error('W02_AUTH007_MFA_RECEIPT_PG_ASSERTION_FAILED: ' + label + ' unexpectedly succeeded')
 }
 const insertReceipt = async (overrides = {}) => client.query(
   'INSERT INTO auth_007_mfa_operation_receipts (' +
@@ -92,9 +92,17 @@ try {
     'receipt_id', 'resource_id', 'operation_path', 'status', 'correlation_id',
     'causation_id', 'event_plan', 'last_error_code',
   ]) assert(columnMap.get(name)?.data_type === 'text', name + ' must use TEXT')
-  assert(columnMap.get('receipt_id')?.is_nullable === 'NO' &&
-    columnMap.get('resource_id')?.is_nullable === 'NO',
-  'receipt/resource IDs must be NOT NULL')
+  for (const name of [
+    'receipt_id', 'resource_id', 'operation_path', 'is_challenge', 'status',
+    'started_at', 'correlation_id', 'causation_id', 'attempt',
+  ]) assert(columnMap.get(name)?.is_nullable === 'NO', name + ' must be NOT NULL')
+  for (const name of ['completed_at', 'event_plan', 'next_attempt_at', 'last_error_code']) {
+    assert(columnMap.get(name)?.is_nullable === 'YES', name + ' must remain nullable')
+  }
+  assert(columnMap.get('is_challenge')?.column_default === null,
+    'is_challenge must have no default; W02 supplies it explicitly')
+  assert(columnMap.get('attempt')?.column_default === '0',
+    'attempt must default to zero')
   assert(columnMap.get('is_challenge')?.data_type === 'integer' &&
     columnMap.get('is_challenge')?.is_nullable === 'NO',
   'is_challenge must remain INTEGER NOT NULL')
@@ -109,9 +117,6 @@ try {
   for (const name of ['completed_at', 'next_attempt_at']) {
     assert(columnMap.get(name)?.data_type === 'timestamp with time zone' &&
       columnMap.get(name)?.is_nullable === 'YES', name + ' must use nullable TIMESTAMPTZ')
-  }
-  for (const name of ['event_plan', 'completed_at', 'next_attempt_at', 'last_error_code']) {
-    assert(columnMap.get(name)?.is_nullable === 'YES', name + ' must remain nullable')
   }
   assert(columnMap.get('status')?.column_default?.includes('STARTED'),
     'status must default to STARTED')
@@ -243,45 +248,45 @@ try {
     [completedAt, receiptPrefix + 'status-1'],
   )
   const terminal = await client.query(
-    'SELECT COUNT(*)::int AS count FROM auth_007_mfa_operation_receipts WHERE receipt_id IN ($1, $2) AND status IN (\\'UNKNOWN\\', \\'RESOLVED\\')',
+    "SELECT COUNT(*)::int AS count FROM auth_007_mfa_operation_receipts WHERE receipt_id IN ($1, $2) AND status IN ('UNKNOWN', 'RESOLVED')",
     [receiptPrefix + 'status-0', receiptPrefix + 'status-1'],
   )
   assert(Number(terminal.rows[0].count) === 2,
     'UNKNOWN and RESOLVED terminal receipt outcomes must be representable')
 
-  await expectPgCode(client, 'invalid operation path', () => insertReceipt({
+  await expectPgCode('invalid operation path', () => insertReceipt({
     receiptId: receiptPrefix + 'invalid-path',
     operationPath: '/two-factor/enroll',
   }), '23514')
-  await expectPgCode(client, 'invalid is_challenge flag', () => insertReceipt({
+  await expectPgCode('invalid is_challenge flag', () => insertReceipt({
     receiptId: receiptPrefix + 'invalid-challenge',
     isChallenge: 2,
   }), '23514')
-  await expectPgCode(client, 'invalid receipt status', () => insertReceipt({
+  await expectPgCode('invalid receipt status', () => insertReceipt({
     receiptId: receiptPrefix + 'invalid-status',
     status: 'RETRYING',
   }), '23514')
-  await expectPgCode(client, 'negative attempt', () => insertReceipt({
+  await expectPgCode('negative attempt', () => insertReceipt({
     receiptId: receiptPrefix + 'negative-attempt',
     attempt: -1,
   }), '23514')
-  await expectPgCode(client, 'overlong correlation ID', () => insertReceipt({
+  await expectPgCode('overlong correlation ID', () => insertReceipt({
     receiptId: receiptPrefix + 'long-correlation',
     correlationId: 'x'.repeat(129),
   }), '23514')
-  await expectPgCode(client, 'overlong causation ID', () => insertReceipt({
+  await expectPgCode('overlong causation ID', () => insertReceipt({
     receiptId: receiptPrefix + 'long-causation',
     causationId: 'x'.repeat(129),
   }), '23514')
-  await expectPgCode(client, 'overlong error code', () => insertReceipt({
+  await expectPgCode('overlong error code', () => insertReceipt({
     receiptId: receiptPrefix + 'long-error',
     lastErrorCode: 'x'.repeat(129),
   }), '23514')
-  await expectPgCode(client, 'malformed event plan JSON', () => insertReceipt({
+  await expectPgCode('malformed event plan JSON', () => insertReceipt({
     receiptId: receiptPrefix + 'bad-json',
     eventPlan: '{invalid-json',
   }), '22P02')
-  await expectPgCode(client, 'non-array event plan JSON', () => insertReceipt({
+  await expectPgCode('non-array event plan JSON', () => insertReceipt({
     receiptId: receiptPrefix + 'non-array',
     eventPlan: '{}',
   }), '23514')
