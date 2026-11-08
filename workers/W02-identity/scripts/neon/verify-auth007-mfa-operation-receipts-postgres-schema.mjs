@@ -1,8 +1,10 @@
 import { randomUUID } from 'node:crypto'
 import { Pool } from 'pg'
+import { resolveExpectedSchemaDatabase } from './verify-schema-database-target.mjs'
 
 const connectionString = process.env.W02_SCHEMA_DATABASE_URL
 if (!connectionString) throw new Error('W02_SCHEMA_DATABASE_URL is required')
+const expectedDatabase = resolveExpectedSchemaDatabase()
 
 const pool = new Pool({ connectionString, max: 6, connectionTimeoutMillis: 5000 })
 const suffix = randomUUID().replaceAll('-', '').slice(0, 18)
@@ -72,7 +74,7 @@ try {
   )
   const postgresMajor = Math.floor(Number(identity.rows[0].version_num) / 10000)
   assert(postgresMajor === 18, 'PostgreSQL 18 required')
-  assert(identity.rows[0].database_name === 'luckread_schema', 'unexpected database target')
+  assert(identity.rows[0].database_name === expectedDatabase, 'unexpected database target')
   const before = await client.query('SELECT COUNT(*)::int AS count FROM auth_007_mfa_operation_receipts')
   assert(Number(before.rows[0].count) === 0, 'MFA operation receipts must be empty before synthetic probe')
 
