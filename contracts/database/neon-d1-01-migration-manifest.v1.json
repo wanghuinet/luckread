@@ -3,13 +3,13 @@
   "$id": "https://luckread.com/contracts/database/neon-d1-01-migration-manifest.v1.json",
   "title": "LuckRead D1-01 Neon PostgreSQL Schema Migration Manifest",
   "version": "1.0.0",
-  "status": "MANIFEST_CANDIDATE_RUNNER_NOT_IMPLEMENTED",
+  "status": "MANIFEST_REVIEWED_SHARED_RUNNER_REMOTE_READY",
   "domainId": "D1-01",
   "databaseName": "luckread",
   "postgresMajor": 18,
   "businessDataImport": false,
   "productionCutoverAuthorized": false,
-  "remoteApplyReady": false,
+  "remoteApplyReady": true,
   "ordering": "Strictly ascending unique order values; no lexical filename ordering is inferred.",
   "entries": [
     {
@@ -347,8 +347,9 @@
   "executionRequiresSharedLedger": true,
   "sourceCommitRecordedAtExecution": true,
   "execution": {
-    "runnerStatus": "NOT_IMPLEMENTED",
+    "runnerStatus": "IMPLEMENTED_AND_REVIEWED",
     "runnerEntryPoint": "scripts/neon/run-schema-migrations.mjs",
+    "reviewEvidenceRef": "contracts/database/neon-d1-01-remote-runner-review.v1.json",
     "lockExpression": "pg_advisory_xact_lock(hashtextextended('luckread:neon-schema-migration:' || current_database(), 0))",
     "remoteApplyReady": false
   }
