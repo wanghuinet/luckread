@@ -23,19 +23,19 @@
     "reviewedFiles": [
       {
         "path": "scripts/neon/run-schema-migrations.mjs",
-        "gitBlobSha1": "fcbb2bb49ed3611f0cea121663722ba4086d082b"
+        "gitBlobSha1": "56bb4961adf6cdaced056df7d6a933a7e390b215"
       },
       {
         "path": "scripts/neon/run-schema-migrations.test.mjs",
-        "gitBlobSha1": "3f027f0996d1d212527dcf62219037a1b6748016"
+        "gitBlobSha1": "c5c91870d9d7f2f1dbc467014ef12d06eda8722d"
       },
       {
         "path": "scripts/neon/d1-01-migration-manifest.mjs",
-        "gitBlobSha1": "6e01bc8266aa6a1c07891e49f4c32f38a05dfa17"
+        "gitBlobSha1": "3e2a8781989f00d8216b551ef2ff9227f99722fa"
       },
       {
         "path": "scripts/neon/assert-d1-01-migration-ledger-ready.mjs",
-        "gitBlobSha1": "c6b8e8a8913934bea7e8e8ee3d4f37b6a0da3a0d"
+        "gitBlobSha1": "9079276205d81fe1e9224a7e04602908822c057c"
       },
       {
         "path": "scripts/neon/remote-runner-review.mjs",
@@ -47,11 +47,11 @@
       },
       {
         "path": "scripts/neon/plan-d1-01-schema-migrations.mjs",
-        "gitBlobSha1": "4058ab0c04cedf725248046c455d5333fb0fabf4"
+        "gitBlobSha1": "651e318e744d5b8ec513e9ad4e6f010273e94e07"
       },
       {
         "path": "scripts/neon/plan-d1-01-schema-migrations.test.mjs",
-        "gitBlobSha1": "082882183498b2241d09220f0460ba1e0439ac4e"
+        "gitBlobSha1": "45be1292046aa94f91c4fc6cef02b0e20a0c6718"
       },
       {
         "path": "scripts/neon/d1-01/0001_schema_migration_ledger.sql",
@@ -67,7 +67,7 @@
       },
       {
         "path": ".github/workflows/neon-d1-01-reviewed-remote-schema-apply.yml",
-        "gitBlobSha1": "cc2f363dff4d987cede8fdbeb8328aa205072a94"
+        "gitBlobSha1": "00d4acb8ac2bb26c3248caebcdfef550a5075a6a"
       },
       {
         "path": "contracts/database/neon-d1-01-migration-manifest.v1.json",
@@ -75,7 +75,11 @@
       },
       {
         "path": "contracts/database/neon-schema-migration-ledger.v1.json",
-        "gitBlobSha1": "6b22cf2f70cc51fd05fd70d4d5af43483c62b077"
+        "gitBlobSha1": "8e0ed38ab3d30fa9994a80cb0361f914bf51f5f0"
+      },
+      {
+        "path": "contracts/database/neon-d1-02-remote-runner-review.v1.json",
+        "gitBlobSha1": "ae02bb00722b9001da75c10b53410a48422e16bd"
       }
     ],
     "controlsChecked": [
@@ -90,7 +94,8 @@
       "append-only migration provenance ledger and owner/database constraints",
       "postflight ownership, schema, extension and empty-business-table checks",
       "no Cloudflare D1 mutation, business data import, or production cutover",
-      "the shared ledger contract remains globally remoteApplyReady=false; only D1-01 is eligible while D1-02 through D1-05 remain NOT_IMPLEMENTED and blocked"
+      "the shared ledger contract remains globally remoteApplyReady=false; D1-01 and D1-02 are independently reviewed and eligible, while D1-03 through D1-05 remain NOT_IMPLEMENTED and blocked",
+      "D1-02's separate review record, exact target, source blob pins and release state are reconciled; D1-01 remains valid after D1-02 is released."
     ],
     "findings": [],
     "limitations": [
@@ -102,8 +107,10 @@
     "formalGitHubReviewSubmissions": 0,
     "followUpReview": {
       "reviewedAt": "2026-11-08",
-      "scope": "Re-reviewed the D1-01 remote apply workflow's libpq CA configuration. Confirmed W07/W08 psql probes use the Ubuntu system CA bundle through PGSSLROOTCERT while the approved Neon URL continues to enforce sslmode=verify-full and channel_binding=require. The change only supplies the verifier's trust bundle; it does not weaken TLS, change migration SQL, target, credentials, or remote apply gates. Updated the reviewed workflow Git blob SHA to the exact branch blob.",
-      "result": "NO_NEW_BLOCKING_FINDINGS"
+      "scope": "Re-reviewed D1-01 shared-runner readiness after D1-02 release was added. Confirmed the shared ledger remains globally disabled, D1-01 and D1-02 are individually pinned as reviewed, D1-03 through D1-05 stay blocked, and D1-01 manifest/planner/readiness guards accept only the two documented per-domain states.",
+      "result": "NO_NEW_BLOCKING_FINDINGS",
+      "formalGitHubReviewSubmissions": 0,
+      "limitations": "GPT-6 code-path review; not a human GitHub approval. Remote Neon DDL remains unexecuted."
     }
   },
   "verificationEvidence": {
