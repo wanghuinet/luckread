@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/neon-shared-runner-ledger-readiness.yml'
+      - 'contracts/database/neon-shared-runner-local-readiness.v1.json'
       - 'contracts/database/neon-schema-migration-ledger.v1.json'
       - 'contracts/database/neon-d1-03-shared-runner-independent-review.v1.json'
       - 'contracts/database/neon-d1-04-shared-runner-independent-review.v1.json'
@@ -16,6 +17,7 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/neon-shared-runner-ledger-readiness.yml'
+      - 'contracts/database/neon-shared-runner-local-readiness.v1.json'
       - 'contracts/database/neon-schema-migration-ledger.v1.json'
       - 'contracts/database/neon-d1-03-shared-runner-independent-review.v1.json'
       - 'contracts/database/neon-d1-04-shared-runner-independent-review.v1.json'
