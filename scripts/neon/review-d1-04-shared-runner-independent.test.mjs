@@ -47,6 +47,10 @@ test('independently verifies W07 D1-04 owners, seven source migrations, six PG a
     name: 'payment_provider_events_terminal_immutable',
     migration: 6,
   }])
+  assert.deepEqual(result.triggerReplacement.initiallyCreated, [{
+    name: 'payment_provider_events_terminal_immutable',
+    migration: 1,
+  }])
   assert.deepEqual(result.triggerReplacement.recreated, [{
     name: 'payment_provider_events_terminal_immutable',
     migration: 6,
@@ -128,7 +132,7 @@ test('fails closed if the payment-provider trigger replacement DROP is removed',
   )
   assert.throws(
     () => verifyD104SharedRunnerReview({ readSource: source }),
-    /final SQL catalog differs/,
+    /\/trigger is recreated without a preceding DROP\//,
   )
 })
 
