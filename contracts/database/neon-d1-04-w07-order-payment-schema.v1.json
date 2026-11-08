@@ -323,12 +323,12 @@
       "media"
     ],
     "localRehearsalEvidence": {
-      "workflowRunId": 42488467322,
-      "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42488467322",
-      "verifiedHeadSha": "d1620036a84c24b1a59f3fe7ab16ed00d7f8498d",
+      "workflowRunId": 42489584839,
+      "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42489584839",
+      "verifiedHeadSha": "6d416296e83d6b0389505f7b224976aae7634345",
       "postgresVersion": "18.6",
       "database": "luckread_finance_schema",
-      "predecessorWorkflowRunId": 42486816324,
+      "predecessorWorkflowRunId": 42489584748,
       "sourceRegressionTests": 24,
       "newSliceTables": 2,
       "newSliceExplicitIndexes": 4,
@@ -346,14 +346,14 @@
       "cloudflareD1Touched": false,
       "businessDataImported": false,
       "productionCutoverAuthorized": false,
-      "evidenceArtifactId": 13620461415,
-      "evidenceArtifactName": "neon-d1-04-w07-saved-methods-mandates-postgres18-bafb0d6b2ce4d2736199ce348b0b3967ea0ac3dd",
-      "evidenceArtifactSha256": "sha256:2ab11361a81fdbf07f0c93325d4ade3197c17b26bbb610eb6ae1578ad6d15837"
+      "evidenceArtifactId": 13621196833,
+      "evidenceArtifactName": "neon-d1-04-w07-saved-methods-mandates-postgres18-f56291b077837b94e9aaea64e57e040176cc83b2",
+      "evidenceArtifactSha256": "sha256:1f43b7545e715da4aebd07757162485dc097226b68ca714df018d1411647b634"
     },
     "predecessorLocalRehearsalEvidence": {
-      "workflowRunId": 42486816324,
-      "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42486816324",
-      "verifiedHeadSha": "da58f8c1ac7baeb3d7490bbf504cd1b64f87e102",
+      "workflowRunId": 42489584748,
+      "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42489584748",
+      "verifiedHeadSha": "6d416296e83d6b0389505f7b224976aae7634345",
       "postgresVersion": "18.6",
       "database": "luckread_finance_schema",
       "tables": 6,
@@ -368,9 +368,7 @@
       "cloudflareD1Touched": false,
       "businessDataImported": false,
       "productionCutoverAuthorized": false,
-      "evidenceArtifactId": 13619178793,
-      "evidenceArtifactName": "neon-d1-04-w07-order-payment-postgres18-516cd20c00f87a769bbc424473aafef186026081",
-      "evidenceArtifactSha256": "sha256:f027c9a7db2915303fd0a566573229e8aed13478d17c6d0190dfde1a487990fb"
+      "evidenceArtifactId": 13621195000
     }
   },
   "safety": {
