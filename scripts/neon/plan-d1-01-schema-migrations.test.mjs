@@ -42,7 +42,7 @@ const manifest = {
 }
 const ledgerContract = {
   remoteApplyReady: false,
-  execution: { runnerStatus: 'NOT_IMPLEMENTED' },
+  execution: { runnerStatus: 'NOT_IMPLEMENTED', remoteApplyReady: false },
   table: { name: 'neon_schema_migration_ledger', appendOnly: true },
 }
 const checksums = [
