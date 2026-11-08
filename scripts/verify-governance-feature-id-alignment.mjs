@@ -106,6 +106,15 @@ export function verifyGovernanceFeatureIdAlignment({
     }
   }
 
+  const expectedApiSources = [
+    'contracts/openapi/v1/openapi.yaml',
+    'contracts/api/api-inventory.v1.json',
+    paths.featureInventory,
+  ]
+  if (generatedApiInventory.sourceOfTruth !== expectedApiSources.join(' + ')) {
+    fail('Generated API inventory sourceOfTruth must include OpenAPI, API inventory, and canonical feature inventory')
+  }
+
   const generatedByOperation = new Map(
     (generatedApiInventory.records ?? []).map((record) => [record.operationId, record]),
   )
