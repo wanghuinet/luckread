@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { validateRemoteRunnerReview } from './remote-runner-review.mjs'
@@ -9,7 +10,15 @@ const ledger = JSON.parse(readFileSync(resolve(root, 'contracts/database/neon-sc
 const runnerPath = resolve(root, 'scripts/neon/run-schema-migrations.mjs')
 const reviewRef = 'contracts/database/neon-d1-01-remote-runner-review.v1.json'
 const review = validateRemoteRunnerReview({ root })
-const ready = manifest.remoteApplyReady === true &&
+const manifestValidation = spawnSync(process.execPath, [
+  resolve(root, 'scripts/neon/d1-01-migration-manifest.mjs'),
+], {
+  cwd: root,
+  encoding: 'utf8',
+  stdio: ['ignore', 'pipe', 'pipe'],
+})
+const ready = manifestValidation.status === 0 &&
+  manifest.remoteApplyReady === true &&
   ledger.remoteApplyReady === true &&
   manifest.execution?.remoteApplyReady === true &&
   ledger.execution?.remoteApplyReady === true &&
