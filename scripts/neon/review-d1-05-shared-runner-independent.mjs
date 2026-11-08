@@ -217,10 +217,17 @@ export function verifyD105SharedRunnerReview({ readSource = readText } = {}) {
     }
   }
   if (!sameSet(Object.keys(schema.schema?.tables ?? {}),expectedTables) ||
-      schema.totals?.tables !== 6 ||
-      schema.totals?.explicitIndexes !== 8 ||
-      schema.totals?.foreignKeys !== 0) {
-    fail('W11 schema contract table inventory or catalog totals changed')
+      schema.localRehearsalEvidence?.status !== 'PASS' ||
+      schema.localRehearsalEvidence?.results?.tables !== 6 ||
+      schema.localRehearsalEvidence?.results?.explicitIndexes !== 8 ||
+      schema.localRehearsalEvidence?.results?.foreignKeys !== 0 ||
+      schema.localRehearsalEvidence?.results?.triggers !== 0 ||
+      schema.localRehearsalEvidence?.results?.utcTimeTextColumnsWithBinaryCollation !== 15) {
+    fail('W11 schema contract table inventory or standalone PG18 catalog evidence changed')
+  }
+  if (schema.admission?.status !== 'BLOCKED_MISSING_RETENTION_DELETION_AND_CONSENT_PURPOSE_POLICIES' ||
+      !sameSet((schema.admission?.blockingRequirements ?? []).map((item) => item.status),['MISSING','MISSING','MISSING'])) {
+    fail('W11 schema admission must remain blocked on all three missing privacy-policy requirements')
   }
   if (schema.privacy?.directIdentityFieldsPersisted !== false ||
       schema.privacy?.actorIdPersisted !== false ||
