@@ -11,9 +11,20 @@ on:
       - 'scripts/neon/d1-01-migration-manifest.mjs'
       - 'scripts/neon/assert-d1-01-migration-ledger-ready.mjs'
       - 'workers/W01-payload/src/neon-postgres-migrations/**'
+      - 'workers/W01-payload/src/neon-postgres-schema.config.ts'
+      - 'workers/W01-payload/src/collections/**'
+      - 'workers/W01-payload/package.json'
       - 'workers/W02-identity/src/neon-postgres-migrations/**'
+      - 'workers/W02-identity/src/auth/better-auth.ts'
+      - 'workers/W02-identity/src/auth/neon-postgres-schema.config.ts'
+      - 'workers/W02-identity/scripts/neon/**'
+      - 'workers/W02-identity/package.json'
       - 'workers/W07-subscription-commerce/src/neon-postgres-migrations/**'
+      - 'workers/W07-subscription-commerce/scripts/neon/**'
+      - 'workers/W07-subscription-commerce/migrations/**'
       - 'workers/W08-creator/src/neon-postgres-migrations/**'
+      - 'workers/W08-creator/scripts/neon/**'
+      - 'workers/W08-creator/migrations/**'
 
 permissions:
   contents: read
@@ -55,6 +66,7 @@ jobs:
           set -euo pipefail
           node scripts/neon/d1-01-migration-manifest.mjs
           node scripts/neon/d1-01-migration-manifest.mjs --print-order
+          node scripts/neon/d1-01-migration-manifest.mjs --print-checksums
           node scripts/neon/assert-d1-01-migration-ledger-ready.mjs --expect-blocked
 
       - name: Apply append-only migration ledger only to disposable PostgreSQL 18
