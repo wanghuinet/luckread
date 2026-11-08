@@ -42,7 +42,8 @@ DECLARE
     'membership_subscriptions',
     'creator_applications',
     'creators',
-    'creator_authorization_audit'
+    'creator_authorization_audit',
+    'neon_schema_migration_ledger'
   ];
   expected_tables TEXT[] := ARRAY[
     'membership_plan_versions',
@@ -75,7 +76,7 @@ BEGIN
       AND table_type = 'BASE TABLE'
       AND NOT (table_name = ANY(known_d1_01_tables));
   IF actual_count <> 0 THEN
-    RAISE EXCEPTION 'Unexpected table outside the registered D1-01 W01/W02/W07/W08 owner set: %', actual_count;
+    RAISE EXCEPTION 'Unexpected table outside the registered D1-01 W01/W02/W07/W08 owners and shared migration ledger: %', actual_count;
   END IF;
 
   expected_columns := ARRAY[
