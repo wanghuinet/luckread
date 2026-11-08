@@ -15,6 +15,11 @@ on:
       - 'contracts/entity/AUTH-007-mfa-factor-field-contract.v1.json'
       - 'contracts/state-machines/AUTH-007-mfa-lifecycle.v1.json'
       - 'workers/W02-identity/migrations/0006_better_auth_two_factor.sql'
+      - 'workers/W02-identity/migrations/0010_auth_username_change_state.sql'
+      - 'docs/change-control/CC-W02-USERNAME-CHANGE-AUTHORITY-2026-11-02.md'
+      - 'contracts/security/username-reservation-policy.v1.json'
+      - 'scripts/w02-username-change-migration-static-audit.mjs'
+      - 'workers/W02-identity/src/auth/username-change.ts'
       - 'contracts/persistence/AUTH-015-account-lifecycle-window-persistence-contract.v1.json'
       - 'docs/change-control/CC-AUTH-015-W02-LIFECYCLE-WINDOW-PERSISTENCE-2026-11-06.md'
       - 'contracts/authz/layers.json'
@@ -103,7 +108,9 @@ jobs:
           npm run neon:auth015:generate
           npm run neon:auth010:generate
           npm run neon:auth007-mfa:generate
+          npm run neon:username-change:generate
           (cd ../.. && node scripts/auth-010-session-revocation-journal-static-audit.mjs)
+          (cd ../.. && node scripts/w02-username-change-migration-static-audit.mjs)
           git diff --exit-code -- \
             src/neon-postgres-migrations/0001_role_assignments.sql \
             src/neon-postgres-migrations/0002_role_authorization_versions.sql \
@@ -111,7 +118,8 @@ jobs:
             src/neon-postgres-migrations/0004_auth_013_publication_journal.sql \
             src/neon-postgres-migrations/0005_auth_015_lifecycle_windows.sql \
             src/neon-postgres-migrations/0006_auth_010_session_revocation_journal.sql \
-            src/neon-postgres-migrations/0007_auth_007_mfa_lifecycle.sql
+            src/neon-postgres-migrations/0007_auth_007_mfa_lifecycle.sql \
+            src/neon-postgres-migrations/0008_auth_username_change_state.sql
 
       - name: Confirm all generated DDL is PostgreSQL-native
         working-directory: workers/W02-identity
@@ -126,6 +134,7 @@ jobs:
             src/neon-postgres-migrations/0005_auth_015_lifecycle_windows.sql
             src/neon-postgres-migrations/0006_auth_010_session_revocation_journal.sql
             src/neon-postgres-migrations/0007_auth_007_mfa_lifecycle.sql
+            src/neon-postgres-migrations/0008_auth_username_change_state.sql
           )
           for file in "${files[@]}"; do
             test -s "$file"
@@ -212,6 +221,15 @@ jobs:
             --dbname luckread_schema --set ON_ERROR_STOP=1 \
             --file src/neon-postgres-migrations/0007_auth_007_mfa_lifecycle.sql
 
+      - name: Apply generated W02 username change state PostgreSQL migration
+        working-directory: workers/W02-identity
+        env:
+          PGPASSWORD: schema_generator_local_only
+        run: |
+          psql --host 127.0.0.1 --port 5432 --username schema_generator \
+            --dbname luckread_schema --set ON_ERROR_STOP=1 \
+            --file src/neon-postgres-migrations/0008_auth_username_change_state.sql
+
       - name: Verify Better Auth core tables and empty business rows
         working-directory: workers/W02-identity
         env:
@@ -254,6 +272,12 @@ jobs:
           W02_SCHEMA_DATABASE_URL: postgresql://schema_generator:schema_generator_local_only@127.0.0.1:5432/luckread_schema
         run: npm run neon:auth007-mfa:verify > artifacts/neon/w02-auth007-mfa-lifecycle-postgres-schema-postflight.json
 
+      - name: Verify W02 username lease, identity projection, and expired-handle reuse
+        working-directory: workers/W02-identity
+        env:
+          W02_SCHEMA_DATABASE_URL: postgresql://schema_generator:schema_generator_local_only@127.0.0.1:5432/luckread_schema
+        run: npm run neon:username-change:verify > artifacts/neon/w02-username-change-state-postgres-schema-postflight.json
+
       - name: Upload generated schema and postflight evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -270,6 +294,8 @@ jobs:
             workers/W02-identity/src/neon-postgres-migrations/0005_auth_015_lifecycle_windows.sql
             workers/W02-identity/src/neon-postgres-migrations/0006_auth_010_session_revocation_journal.sql
             workers/W02-identity/src/neon-postgres-migrations/0007_auth_007_mfa_lifecycle.sql
+            workers/W02-identity/src/neon-postgres-migrations/0008_auth_username_change_state.sql
+            workers/W02-identity/artifacts/neon/w02-username-change-state-postgres-schema-postflight.json
             workers/W02-identity/artifacts/neon/w02-auth007-mfa-lifecycle-postgres-schema-postflight.json
             workers/W02-identity/artifacts/neon/w02-auth010-session-revocation-postgres-schema-postflight.json
             workers/W02-identity/artifacts/neon/w02-auth003-postgres-schema-postflight.json

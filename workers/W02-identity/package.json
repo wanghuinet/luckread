@@ -30,6 +30,8 @@
     "neon:auth010:generate": "node scripts/neon/generate-auth010-session-revocation-postgres-migration.mjs",
     "neon:auth010:verify": "node scripts/neon/verify-auth010-session-revocation-postgres-schema.mjs",
     "neon:auth007-mfa:generate": "node scripts/neon/generate-auth007-mfa-lifecycle-postgres-migration.mjs",
-    "neon:auth007-mfa:verify": "node scripts/neon/verify-auth007-mfa-lifecycle-postgres-schema.mjs"
+    "neon:auth007-mfa:verify": "node scripts/neon/verify-auth007-mfa-lifecycle-postgres-schema.mjs",
+    "neon:username-change:generate": "node scripts/neon/generate-username-change-state-postgres-migration.mjs",
+    "neon:username-change:verify": "node scripts/neon/verify-username-change-state-postgres-schema.mjs"
   }
 }
