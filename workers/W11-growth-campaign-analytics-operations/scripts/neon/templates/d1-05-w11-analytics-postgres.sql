@@ -28,9 +28,9 @@ CREATE TABLE analytics_event_dedupe (
     'follow_created', 'follow_removed'
   )),
   source_worker TEXT NOT NULL CHECK (source_worker IN ('W01', 'W03', 'W05')),
-  occurred_at TEXT NOT NULL,
-  received_at TEXT NOT NULL,
-  hour_start TEXT NOT NULL,
+  occurred_at TEXT COLLATE "C" NOT NULL,
+  received_at TEXT COLLATE "C" NOT NULL,
+  hour_start TEXT COLLATE "C" NOT NULL,
   actor_type TEXT NOT NULL CHECK (actor_type IN ('user', 'visitor')),
   content_id TEXT,
   content_type TEXT CHECK (content_type IS NULL OR content_type IN ('article', 'post', 'video')),
@@ -40,7 +40,7 @@ CREATE TABLE analytics_event_dedupe (
   metric_version TEXT NOT NULL CHECK (metric_version = '1.0'),
   projection_status TEXT NOT NULL DEFAULT 'PENDING'
     CHECK (projection_status IN ('PENDING', 'APPLIED', 'LATE')),
-  ingested_at TEXT NOT NULL DEFAULT (
+  ingested_at TEXT COLLATE "C" NOT NULL DEFAULT (
     to_char(clock_timestamp() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
   ),
   CHECK (
@@ -84,7 +84,7 @@ CREATE INDEX analytics_event_dedupe_pending_idx
   ON analytics_event_dedupe (projection_status, hour_start);
 
 CREATE TABLE analytics_content_hourly (
-  hour_start TEXT NOT NULL,
+  hour_start TEXT COLLATE "C" NOT NULL,
   content_id TEXT NOT NULL,
   content_type TEXT NOT NULL CHECK (content_type IN ('article', 'post', 'video')),
   metric_version TEXT NOT NULL,
@@ -126,7 +126,7 @@ CREATE INDEX analytics_content_hourly_time_idx
   ON analytics_content_hourly (hour_start);
 
 CREATE TABLE analytics_creator_hourly (
-  hour_start TEXT NOT NULL,
+  hour_start TEXT COLLATE "C" NOT NULL,
   creator_id TEXT NOT NULL,
   metric_version TEXT NOT NULL,
   followers_gained INTEGER NOT NULL DEFAULT 0,
@@ -139,9 +139,9 @@ CREATE INDEX analytics_creator_hourly_creator_time_idx
 
 CREATE TABLE analytics_rollup_watermark (
   consumer_name TEXT PRIMARY KEY NOT NULL,
-  last_event_at TEXT,
+  last_event_at TEXT COLLATE "C",
   last_event_id TEXT,
-  updated_at TEXT NOT NULL DEFAULT (
+  updated_at TEXT COLLATE "C" NOT NULL DEFAULT (
     to_char(clock_timestamp() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
   )
 );
@@ -149,14 +149,14 @@ CREATE TABLE analytics_rollup_watermark (
 CREATE TABLE analytics_reconciliation_status (
   reconciliation_id TEXT PRIMARY KEY NOT NULL,
   source_worker TEXT NOT NULL CHECK (source_worker IN ('W03', 'W05', 'W07')),
-  window_from TEXT NOT NULL,
-  window_to TEXT NOT NULL,
+  window_from TEXT COLLATE "C" NOT NULL,
+  window_to TEXT COLLATE "C" NOT NULL,
   status TEXT NOT NULL CHECK (status IN ('PENDING', 'RUNNING', 'PASSED', 'FAILED')),
   details_json TEXT,
-  created_at TEXT NOT NULL DEFAULT (
+  created_at TEXT COLLATE "C" NOT NULL DEFAULT (
     to_char(clock_timestamp() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
   ),
-  updated_at TEXT NOT NULL DEFAULT (
+  updated_at TEXT COLLATE "C" NOT NULL DEFAULT (
     to_char(clock_timestamp() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
   ),
   CHECK (window_to >= window_from)
@@ -165,10 +165,10 @@ CREATE TABLE analytics_reconciliation_status (
 CREATE TABLE analytics_projection_rebuild_state (
   singleton_id INTEGER PRIMARY KEY NOT NULL CHECK (singleton_id = 1),
   run_id TEXT NOT NULL,
-  hour_start TEXT NOT NULL,
+  hour_start TEXT COLLATE "C" NOT NULL,
   status TEXT NOT NULL CHECK (status IN ('RUNNING', 'SUCCEEDED', 'FAILED')),
-  started_at TEXT NOT NULL,
-  completed_at TEXT,
+  started_at TEXT COLLATE "C" NOT NULL,
+  completed_at TEXT COLLATE "C",
   content_buckets_rebuilt INTEGER CHECK (
     content_buckets_rebuilt IS NULL OR content_buckets_rebuilt >= 0
   ),
