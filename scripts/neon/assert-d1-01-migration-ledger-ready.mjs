@@ -12,15 +12,24 @@ const ready = manifest.remoteApplyReady === true &&
   ledger.execution?.runnerStatus === 'IMPLEMENTED_AND_REVIEWED' &&
   existsSync(runnerPath)
 
+if (process.argv.includes('--deny-owner-bypass')) {
+  throw new Error(
+    'Owner-specific Neon schema apply is permanently disabled. ' +
+    'Use the reviewed shared schema migration runner workflow; never invoke an owner-only remote apply workflow.'
+  )
+}
 if (process.argv.includes('--expect-blocked')) {
-  if (ready) throw new Error('D1-01 remote apply is unexpectedly enabled before explicit release review')
+  if (ready) throw new Error('Shared runner readiness unexpectedly became true; update this blocked-state CI assertion in the executor release PR.')
   console.log('D1_01_REMOTE_APPLY_BLOCKED_RUNNER_NOT_IMPLEMENTED')
   process.exit(0)
 }
-if (!ready) {
-  throw new Error(
-    'D1-01 remote Neon apply is blocked: the shared migration runner is not implemented, reviewed and enabled. ' +
-    'Do not invoke an owner-specific remote schema workflow.'
-  )
+if (process.argv.includes('--assert-runner-ready')) {
+  if (!ready) {
+    throw new Error(
+      'D1-01 remote Neon apply is blocked: shared runner implementation, review and explicit release enablement are incomplete.'
+    )
+  }
+  console.log('D1_01_SHARED_MIGRATION_RUNNER_READY')
+  process.exit(0)
 }
-console.log('D1_01_SHARED_MIGRATION_RUNNER_READY')
+throw new Error('Select an explicit guard mode: --deny-owner-bypass, --expect-blocked or --assert-runner-ready.')
