@@ -191,7 +191,20 @@
             "ExecutionOutbox",
             "OperationalIdempotency"
           ],
-          "status": "SOURCE_AND_BINDING_NOT_ADMITTED"
+          "status": "SOURCE_ADMITTED_LOCAL_POSTGRES18_REHEARSAL_PENDING_RUNTIME_BINDING_NOT_ADMITTED",
+          "schemaContract": "contracts/database/neon-d1-03-w10-execution-schema.v1.json",
+          "schemaArtifact": "workers/W09-platform/migrations-d1-03/0002_w10_async_execution_state.sql",
+          "includedTables": [
+            "jobs",
+            "job_retries",
+            "execution_dead_letters",
+            "execution_inbox",
+            "execution_outbox",
+            "operational_idempotency"
+          ],
+          "remoteSchemaApplied": false,
+          "businessDataImported": false,
+          "productionCutoverAuthorized": false
         },
         "W11": {
           "entities": [
