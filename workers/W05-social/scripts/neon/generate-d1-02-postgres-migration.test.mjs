@@ -66,7 +66,7 @@ test('generator rejects foreign keys, SQLite syntax and source inventory drift',
   assert.throws(
     () => buildW05PostgresMigration({
       inventory, socialContract, readSource,
-      template: template.replace('BEGIN;', 'BEGIN;\nCREATE TABLE invalid_fk (id TEXT REFERENCES users(id));')
+      template: template.replace('relationship_id TEXT PRIMARY KEY NOT NULL,', 'relationship_id TEXT PRIMARY KEY NOT NULL REFERENCES users(id),')
     }),
     /no cross-domain or implicit foreign keys/
   )
