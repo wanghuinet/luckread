@@ -1,405 +1,87 @@
-name: Neon Five Database Connectivity and Empty Schema Preflight
+name: Neon Five Database Read-only Target Preflight
 
 on:
-  pull_request:
-    branches: [main]
-    paths:
-      - '.github/workflows/neon-five-database-connectivity.yml'
-  push:
-    branches: [main, neon-empty-schema-preflight-20261108, neon-preflight-status-report-20261108]
-    paths:
-      - '.github/workflows/neon-five-database-connectivity.yml'
   workflow_dispatch:
+    inputs:
+      confirm_target:
+        description: Confirm a read-only catalog check of all five configured Neon databases.
+        required: true
+        type: choice
+        options:
+          - READ_ONLY_PREFLIGHT_FIVE_NEON_DATABASES
 
 permissions:
   contents: read
   statuses: write
 
 concurrency:
-  group: neon-five-database-empty-schema-preflight
+  group: neon-five-database-readonly-target-preflight
   cancel-in-progress: false
 
 jobs:
   preflight:
-    name: Verify connections and empty PostgreSQL targets (read-only)
+    if: ${{ github.ref == 'refs/heads/main' && inputs.confirm_target == 'READ_ONLY_PREFLIGHT_FIVE_NEON_DATABASES' }}
+    name: Verify all five Neon target identities and empty schema state (read-only)
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
-      - name: Set up Node.js 24
+      - name: Guard exact main ref and explicit read-only confirmation
+        shell: bash
+        env:
+          CONFIRM_TARGET: ${{ inputs.confirm_target }}
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REF}" = "refs/heads/main"
+          test "${CONFIRM_TARGET}" = "READ_ONLY_PREFLIGHT_FIVE_NEON_DATABASES"
+
+      - name: Checkout reviewed main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+
+      - name: Setup Node.js 24
         uses: actions/setup-node@v4
         with:
           node-version: 24
 
-      - name: Install pinned PostgreSQL client
+      - name: Install pinned PostgreSQL driver
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/neon-preflight"
+          mkdir -p "$RUNNER_TEMP/neon-five-db-preflight"
           npm install \
-            --prefix "$RUNNER_TEMP/neon-preflight" \
+            --prefix "$RUNNER_TEMP/neon-five-db-preflight" \
             --no-save \
             --no-audit \
             --no-fund \
             --ignore-scripts \
-            pg@8.16.3
+            pg@8.20.0
 
-      - name: Inspect all five Neon targets without changing schemas or data
+      - name: Inspect all five Neon targets in read-only transactions
         id: inspect
         shell: bash
         env:
+          NEON_PG_MODULE_ROOT: ${{ runner.temp }}/neon-five-db-preflight/node_modules
+          NEON_PREFLIGHT_REPORT: ${{ runner.temp }}/neon-five-db-preflight/report.json
           NEON_DATABASE_URL_LUCKREAD: ${{ secrets.NEON_DATABASE_URL_LUCKREAD }}
           NEON_DATABASE_URL_LUCKREADPRO: ${{ secrets.NEON_DATABASE_URL_LUCKREADPRO }}
           NEON_DATABASE_URL_GOVERNANCE: ${{ secrets.NEON_DATABASE_URL_GOVERNANCE }}
           NEON_DATABASE_URL_FINANCE: ${{ secrets.NEON_DATABASE_URL_FINANCE }}
           NEON_DATABASE_URL_ALLLUCK: ${{ secrets.NEON_DATABASE_URL_ALLLUCK }}
-        run: |
-          set -euo pipefail
-          cd "$RUNNER_TEMP/neon-preflight"
-          node <<'NODE'
-          const fs = require('node:fs')
-          const { Client } = require('pg')
+        run: node scripts/neon/five-database-readonly-preflight.mjs
 
-          const databases = [
-            { expected: 'luckread', secret: 'NEON_DATABASE_URL_LUCKREAD', domain: 'D1-01 Identity / Account / Access' },
-            { expected: 'luckreadpro', secret: 'NEON_DATABASE_URL_LUCKREADPRO', domain: 'D1-02 Content / Community' },
-            { expected: 'luckread_governance', secret: 'NEON_DATABASE_URL_GOVERNANCE', domain: 'D1-03 Governance / Platform Runtime' },
-            { expected: 'luckread_finance', secret: 'NEON_DATABASE_URL_FINANCE', domain: 'D1-04 Commerce / Financial Authority' },
-            { expected: 'allluck', secret: 'NEON_DATABASE_URL_ALLLUCK', domain: 'D1-05 Analytics-only / W11' },
-          ]
-
-          async function main() {
-            const results = []
-            let failed = false
-
-            for (const database of databases) {
-              const connectionString = process.env[database.secret]
-
-              if (!connectionString) {
-                results.push({
-                  name: database.expected,
-                  domain: database.domain,
-                  status: 'FAIL',
-                  detail: 'Missing required Actions secret: ' + database.secret,
-                })
-                failed = true
-                continue
-              }
-
-              let parsed
-              try {
-                parsed = new URL(connectionString)
-              } catch {
-                results.push({
-                  name: database.expected,
-                  domain: database.domain,
-                  status: 'FAIL',
-                  detail: 'Connection string is not a valid PostgreSQL URL.',
-                })
-                failed = true
-                continue
-              }
-
-              if (!['postgres:', 'postgresql:'].includes(parsed.protocol)) {
-                results.push({
-                  name: database.expected,
-                  domain: database.domain,
-                  status: 'FAIL',
-                  detail: 'Connection string must use the PostgreSQL protocol.',
-                })
-                failed = true
-                continue
-              }
-
-              const sslmode = parsed.searchParams.get('sslmode')
-              const channelBinding = parsed.searchParams.get('channel_binding')
-              if (!['require', 'verify-ca', 'verify-full'].includes(sslmode)) {
-                results.push({
-                  name: database.expected,
-                  domain: database.domain,
-                  status: 'FAIL',
-                  detail: 'TLS must be required by the connection string.',
-                })
-                failed = true
-                continue
-              }
-              if (channelBinding !== 'require') {
-                results.push({
-                  name: database.expected,
-                  domain: database.domain,
-                  status: 'FAIL',
-                  detail: 'Connection string must require channel binding.',
-                })
-                failed = true
-                continue
-              }
-
-              const client = new Client({
-                connectionString,
-                connectionTimeoutMillis: 15000,
-                query_timeout: 15000,
-                enableChannelBinding: true,
-              })
-
-              let connected = false
-              let transactionOpen = false
-              try {
-                await client.connect()
-                connected = true
-
-                const tlsSocket = client.connection?.stream
-                if (tlsSocket?.encrypted !== true || tlsSocket?.authorized !== true) {
-                  throw Object.assign(new Error('Client TLS verification failed.'), {
-                    code: 'TLS_VERIFICATION_FAILED',
-                  })
-                }
-
-                await client.query('BEGIN READ ONLY')
-                transactionOpen = true
-
-                const identity = await client.query(
-                  'SELECT current_database() AS database_name, ' +
-                  "current_setting('server_version') AS server_version"
-                )
-                const actualDatabase = identity.rows[0]?.database_name
-                if (actualDatabase !== database.expected) {
-                  throw Object.assign(new Error('Connected database name did not match.'), {
-                    code: 'DATABASE_NAME_MISMATCH',
-                  })
-                }
-
-                const schemas = await client.query(
-                  'SELECT nspname AS schema_name FROM pg_namespace ' +
-                  "WHERE nspname NOT IN ('pg_catalog', 'information_schema') " +
-                  "AND nspname NOT LIKE 'pg_toast%' AND nspname NOT LIKE 'pg_temp_%' " +
-                  'ORDER BY nspname'
-                )
-                const publicSchemaExists = schemas.rows.some(
-                  (row) => row.schema_name === 'public',
-                )
-                const extraSchemas = schemas.rows
-                  .map((row) => row.schema_name)
-                  .filter((name) => name !== 'public')
-
-                const relations = await client.query(
-                  'SELECT n.nspname AS schema_name, c.relname AS object_name, c.relkind AS object_kind ' +
-                  'FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace ' +
-                  "WHERE n.nspname NOT IN ('pg_catalog', 'information_schema') " +
-                  "AND n.nspname NOT LIKE 'pg_toast%' AND n.nspname NOT LIKE 'pg_temp_%' " +
-                  "AND c.relkind IN ('r', 'p', 'v', 'm', 'S', 'f') " +
-                  'ORDER BY n.nspname, c.relname LIMIT 51'
-                )
-
-                const customTypes = await client.query(
-                  'SELECT n.nspname AS schema_name, t.typname AS type_name ' +
-                  'FROM pg_type t JOIN pg_namespace n ON n.oid = t.typnamespace ' +
-                  "WHERE n.nspname NOT IN ('pg_catalog', 'information_schema') " +
-                  "AND n.nspname NOT LIKE 'pg_toast%' AND n.nspname NOT LIKE 'pg_temp_%' " +
-                  'ORDER BY n.nspname, t.typname LIMIT 51'
-                )
-
-                const routines = await client.query(
-                  'SELECT n.nspname AS schema_name, p.proname AS object_name, ' +
-                  "'routine' AS object_kind FROM pg_proc p " +
-                  'JOIN pg_namespace n ON n.oid = p.pronamespace ' +
-                  "WHERE n.nspname NOT IN ('pg_catalog', 'information_schema') " +
-                  "AND n.nspname NOT LIKE 'pg_toast%' AND n.nspname NOT LIKE 'pg_temp_%' " +
-                  'ORDER BY n.nspname, p.proname LIMIT 51'
-                )
-
-                const otherObjects = await client.query(
-                  'SELECT n.nspname AS schema_name, o.oprname AS object_name, ' +
-                  "'operator' AS object_kind FROM pg_operator o " +
-                  'JOIN pg_namespace n ON n.oid = o.oprnamespace ' +
-                  "WHERE n.nspname NOT IN ('pg_catalog', 'information_schema') " +
-                  "AND n.nspname NOT LIKE 'pg_toast%' AND n.nspname NOT LIKE 'pg_temp_%' " +
-                  'UNION ALL ' +
-                  'SELECT n.nspname, c.collname, \'collation\' FROM pg_collation c ' +
-                  'JOIN pg_namespace n ON n.oid = c.collnamespace ' +
-                  "WHERE n.nspname NOT IN ('pg_catalog', 'information_schema') " +
-                  "AND n.nspname NOT LIKE 'pg_toast%' AND n.nspname NOT LIKE 'pg_temp_%' " +
-                  'UNION ALL ' +
-                  'SELECT n.nspname, c.conname, \'conversion\' FROM pg_conversion c ' +
-                  'JOIN pg_namespace n ON n.oid = c.connamespace ' +
-                  "WHERE n.nspname NOT IN ('pg_catalog', 'information_schema') " +
-                  "AND n.nspname NOT LIKE 'pg_toast%' AND n.nspname NOT LIKE 'pg_temp_%' " +
-                  'UNION ALL ' +
-                  'SELECT n.nspname, t.cfgname, \'text_search_config\' FROM pg_ts_config t ' +
-                  'JOIN pg_namespace n ON n.oid = t.cfgnamespace ' +
-                  "WHERE n.nspname NOT IN ('pg_catalog', 'information_schema') " +
-                  "AND n.nspname NOT LIKE 'pg_toast%' AND n.nspname NOT LIKE 'pg_temp_%' " +
-                  'UNION ALL ' +
-                  'SELECT n.nspname, t.dictname, \'text_search_dictionary\' FROM pg_ts_dict t ' +
-                  'JOIN pg_namespace n ON n.oid = t.dictnamespace ' +
-                  "WHERE n.nspname NOT IN ('pg_catalog', 'information_schema') " +
-                  "AND n.nspname NOT LIKE 'pg_toast%' AND n.nspname NOT LIKE 'pg_temp_%' " +
-                  'UNION ALL ' +
-                  'SELECT n.nspname, t.prsname, \'text_search_parser\' FROM pg_ts_parser t ' +
-                  'JOIN pg_namespace n ON n.oid = t.prsnamespace ' +
-                  "WHERE n.nspname NOT IN ('pg_catalog', 'information_schema') " +
-                  "AND n.nspname NOT LIKE 'pg_toast%' AND n.nspname NOT LIKE 'pg_temp_%' " +
-                  'UNION ALL ' +
-                  'SELECT n.nspname, t.tmplname, \'text_search_template\' FROM pg_ts_template t ' +
-                  'JOIN pg_namespace n ON n.oid = t.tmplnamespace ' +
-                  "WHERE n.nspname NOT IN ('pg_catalog', 'information_schema') " +
-                  "AND n.nspname NOT LIKE 'pg_toast%' AND n.nspname NOT LIKE 'pg_temp_%' " +
-                  'ORDER BY 1, 2 LIMIT 51'
-                )
-
-                const extensions = await client.query(
-                  "SELECT extname FROM pg_extension WHERE extname <> 'plpgsql' ORDER BY extname"
-                )
-
-                const globalObjects = await client.query(
-                  'SELECT evtname AS object_name, \'event_trigger\' AS object_kind ' +
-                  'FROM pg_event_trigger ' +
-                  'UNION ALL ' +
-                  'SELECT pubname, \'publication\' FROM pg_publication ' +
-                  'UNION ALL ' +
-                  'SELECT fdwname, \'foreign_data_wrapper\' FROM pg_foreign_data_wrapper ' +
-                  'UNION ALL ' +
-                  'SELECT srvname, \'foreign_server\' FROM pg_foreign_server ' +
-                  'ORDER BY 1 LIMIT 51'
-                )
-
-                const relationNames = relations.rows.map(
-                  (row) => row.schema_name + '.' + row.object_name,
-                )
-                const customTypeNames = customTypes.rows.map(
-                  (row) => row.schema_name + '.' + row.type_name,
-                )
-                const routineNames = routines.rows.map(
-                  (row) => row.schema_name + '.' + row.object_name,
-                )
-                const otherObjectNames = otherObjects.rows.map(
-                  (row) => row.schema_name + '.' + row.object_name,
-                )
-                const extensionNames = extensions.rows.map((row) => row.extname)
-                const globalObjectNames = globalObjects.rows.map(
-                  (row) => row.object_kind + ':' + row.object_name,
-                )
-                const clean =
-                  publicSchemaExists &&
-                  extraSchemas.length === 0 &&
-                  relations.rows.length === 0 &&
-                  customTypes.rows.length === 0 &&
-                  routines.rows.length === 0 &&
-                  otherObjects.rows.length === 0 &&
-                  extensionNames.length === 0 &&
-                  globalObjects.rows.length === 0
-
-                await client.query('ROLLBACK')
-                transactionOpen = false
-
-                if (!clean) {
-                  results.push({
-                    name: database.expected,
-                    domain: database.domain,
-                    status: 'BLOCKED_NOT_EMPTY',
-                    detail:
-                      'Existing non-system objects found; inspect before initialization. ' +
-                      'Default public schema exists=' + publicSchemaExists +
-                      '; extra schemas=' + JSON.stringify(extraSchemas) +
-                      '; relations=' + JSON.stringify(relationNames) +
-                      '; custom types=' + JSON.stringify(customTypeNames) +
-                      '; routines=' + JSON.stringify(routineNames) +
-                      '; other schema objects=' + JSON.stringify(otherObjectNames) +
-                      '; non-default extensions=' + JSON.stringify(extensionNames) +
-                      '; global objects=' + JSON.stringify(globalObjectNames),
-                  })
-                  failed = true
-                } else {
-                  results.push({
-                    name: database.expected,
-                    domain: database.domain,
-                    status: 'PASS_EMPTY',
-                    detail:
-                      'Verified TLS; PostgreSQL ' + identity.rows[0].server_version +
-                      '; default public schema exists; no user relations, user-defined types, routines, operators, collations, conversions, text-search objects, non-default extensions, or global database objects.',
-                  })
-                }
-              } catch (error) {
-                const code =
-                  typeof error?.code === 'string' ? error.code : 'PREFLIGHT_ERROR'
-                results.push({
-                  name: database.expected,
-                  domain: database.domain,
-                  status: 'FAIL',
-                  detail: 'Read-only preflight failed. Safe error code: ' + code,
-                })
-                failed = true
-                if (transactionOpen) {
-                  try {
-                    await client.query('ROLLBACK')
-                  } catch {
-                    // Never emit raw driver or connection details.
-                  }
-                }
-              } finally {
-                if (connected) {
-                  try {
-                    await client.end()
-                  } catch {
-                    // Never emit raw driver or connection details.
-                  }
-                }
-              }
-            }
-
-            const lines = [
-              '# Neon five-database empty-schema preflight',
-              '',
-              '| Database | Domain | Result | Details |',
-              '|---|---|---|---|',
-              ...results.map((result) =>
-                '| ' + result.name + ' | ' + result.domain + ' | **' +
-                result.status + '** | ' + result.detail.replaceAll('|', '\\|') + ' |'
-              ),
-              '',
-              'This workflow is read-only. It opens a READ ONLY transaction and rolls it back. It does not create schemas, tables, extensions, migration ledgers, or rows.',
-              '',
-              'PASS_EMPTY confirms the default public schema exists and there are no extra non-system schemas, user relations, user-defined types, routines, operators, collations, conversions, text-search objects, non-default extensions, or global database objects. A non-empty target is blocked for manual review and is never overwritten.',
-              '',
-              'This is a target-readiness check only. It does not authorize D1 replacement, Worker/Hyperdrive binding changes, Payload adapter changes, schema application, or production traffic cutover.',
-              '',
-              'Connection strings, usernames, passwords, and query result data are never printed.',
-            ]
-
-            const summary = lines.join('\n') + '\n'
-            if (process.env.GITHUB_STEP_SUMMARY) {
-              fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary)
-            }
-
-            if (process.env.GITHUB_OUTPUT) {
-              fs.appendFileSync(
-                process.env.GITHUB_OUTPUT,
-                'pass_empty_count=' + results.filter((result) => result.status === 'PASS_EMPTY').length + '\n' +
-                'blocked_count=' + results.filter((result) => result.status === 'BLOCKED_NOT_EMPTY').length + '\n' +
-                'failed_count=' + results.filter((result) => result.status === 'FAIL').length + '\n',
-              )
-            }
-
-            for (const result of results) {
-              console.log(result.name + ': ' + result.status + ' — ' + result.detail)
-            }
-
-            if (failed) {
-              console.error('One or more Neon targets are not ready for empty initialization.')
-              process.exitCode = 1
-            } else {
-              console.log('All five Neon targets passed empty-schema preflight.')
-            }
-          }
-
-          main().catch((error) => {
-            const code =
-              typeof error?.code === 'string' ? error.code : 'PREFLIGHT_ERROR'
-            console.error('Preflight stopped. Safe error code: ' + code)
-            process.exitCode = 1
-          })
-          NODE
-
-      - name: Publish preflight result as a commit status
+      - name: Upload sanitized catalog evidence
         if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: neon-five-database-readonly-preflight-${{ github.run_id }}
+          path: ${{ runner.temp }}/neon-five-db-preflight/report.json
+          if-no-files-found: warn
+          retention-days: 90
+
+      - name: Publish read-only preflight commit status
+        if: always() && github.ref == 'refs/heads/main' && inputs.confirm_target == 'READ_ONLY_PREFLIGHT_FIVE_NEON_DATABASES'
         uses: actions/github-script@v7
         env:
           PREFLIGHT_OUTCOME: ${{ steps.inspect.outcome }}
@@ -412,24 +94,17 @@ jobs:
             const passed = Number(process.env.PASS_EMPTY_COUNT || 0)
             const blocked = Number(process.env.BLOCKED_COUNT || 0)
             const failed = Number(process.env.FAILED_COUNT || 0)
-            const success =
-              process.env.PREFLIGHT_OUTCOME === 'success' && passed === 5
+            const success = process.env.PREFLIGHT_OUTCOME === 'success' && passed === 5
             const description = success
-              ? 'PASS_EMPTY ' + passed + '/5'
-              : 'PASS_EMPTY ' + passed + '/5; blocked ' + blocked +
-                '; failed ' + failed + '; inspect workflow run'
-
-            const owner = context.repo.owner
-            const repo = context.repo.repo
+              ? 'PASS_EMPTY 5/5; PG18, TLS, channel binding and absent ledgers verified'
+              : 'PASS_EMPTY ' + passed + '/5; blocked ' + blocked + '; failed ' + failed
             await github.rest.repos.createCommitStatus({
-              owner,
-              repo,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
               sha: context.sha,
               state: success ? 'success' : 'failure',
-              context: 'Neon Empty Schema Preflight',
+              context: 'Neon Five DB Read-only Target Preflight',
               description: description.slice(0, 140),
-              target_url:
-                context.serverUrl + '/' + owner + '/' + repo +
-                '/actions/runs/' + context.runId,
+              target_url: context.serverUrl + '/' + context.repo.owner + '/' +
+                context.repo.repo + '/actions/runs/' + context.runId,
             })
-            core.info('Published Neon Empty Schema Preflight commit status: ' + description)
