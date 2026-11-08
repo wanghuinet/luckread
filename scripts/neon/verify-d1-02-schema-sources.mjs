@@ -7,23 +7,23 @@ const repositoryRoot = process.cwd()
 const contractPath = 'contracts/database/neon-d1-02-schema-sources.v1.json'
 
 const sqliteRules = [
-  ['strftime', /\\bstrftime\\s*\\(/gi],
-  ['julianday', /\\bjulianday\\s*\\(/gi],
-  ['json1_function', /\\bjson_(?:object|array|extract|valid|type|set|insert|replace|remove)\\s*\\(/gi],
-  ['typeof', /\\btypeof\\s*\\(/gi],
-  ['glob', /\\bGLOB\\b/gi],
-  ['raise', /\\bRAISE\\s*\\(/gi],
-  ['pragma', /\\bPRAGMA\\b/gi],
-  ['autoincrement', /\\bAUTOINCREMENT\\b/gi],
-  ['randomblob', /\\brandomblob\\s*\\(/gi],
-  ['datetime', /\\bdatetime\\s*\\(/gi],
-  ['unixepoch', /\\bunixepoch\\s*\\(/gi],
-  ['insert_or_ignore', /\\bINSERT\\s+OR\\s+IGNORE\\b/gi],
-  ['insert_or_replace', /\\bINSERT\\s+OR\\s+REPLACE\\b/gi],
-  ['replace_into', /\\bREPLACE\\s+INTO\\b/gi],
-  ['changes_function', /\\bchanges\\s*\\(/gi],
-  ['last_insert_rowid', /\\blast_insert_rowid\\s*\\(/gi],
-  ['without_rowid', /\\bWITHOUT\\s+ROWID\\b/gi],
+  ['strftime', /\bstrftime\s*\(/gi],
+  ['julianday', /\bjulianday\s*\(/gi],
+  ['json1_function', /\bjson_(?:object|array|extract|valid|type|set|insert|replace|remove)\s*\(/gi],
+  ['typeof', /\btypeof\s*\(/gi],
+  ['glob', /\bGLOB\b/gi],
+  ['raise', /\bRAISE\s*\(/gi],
+  ['pragma', /\bPRAGMA\b/gi],
+  ['autoincrement', /\bAUTOINCREMENT\b/gi],
+  ['randomblob', /\brandomblob\s*\(/gi],
+  ['datetime', /\bdatetime\s*\(/gi],
+  ['unixepoch', /\bunixepoch\s*\(/gi],
+  ['insert_or_ignore', /\bINSERT\s+OR\s+IGNORE\b/gi],
+  ['insert_or_replace', /\bINSERT\s+OR\s+REPLACE\b/gi],
+  ['replace_into', /\bREPLACE\s+INTO\b/gi],
+  ['changes_function', /\bchanges\s*\(/gi],
+  ['last_insert_rowid', /\blast_insert_rowid\s*\(/gi],
+  ['without_rowid', /\bWITHOUT\s+ROWID\b/gi],
 ]
 
 function countMatches(content, expression) {
@@ -46,27 +46,27 @@ export function scanSqlPortability(content) {
 
   const triggerDefinitions = countMatches(
     content,
-    /\\bCREATE\\s+(?:TEMP(?:ORARY)?\\s+)?TRIGGER\\b/gi,
+    /\bCREATE\s+(?:TEMP(?:ORARY)?\s+)?TRIGGER\b/gi,
   )
-  const dropTableStatements = countMatches(content, /\\bDROP\\s+TABLE\\b/gi)
-  const renameTableStatements = countMatches(content, /\\bALTER\\s+TABLE\\b[^;]*\\bRENAME\\s+TO\\b/gi)
+  const dropTableStatements = countMatches(content, /\bDROP\s+TABLE\b/gi)
+  const renameTableStatements = countMatches(content, /\bALTER\s+TABLE\b[^;]*\bRENAME\s+TO\b/gi)
   const tableRebuildSequence = dropTableStatements > 0 && renameTableStatements > 0
 
   if (triggerDefinitions > 0) features.push({ name: 'trigger_definition', count: triggerDefinitions })
   if (tableRebuildSequence) features.push({ name: 'table_rebuild_sequence', count: 1 })
 
   const tablesCreated = [...content.matchAll(
-    /\\bCREATE\\s+TABLE(?:\\s+IF\\s+NOT\\s+EXISTS)?\\s+["`]?([A-Za-z0-9_]+)/gi,
+    /\bCREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+["`]?([A-Za-z0-9_]+)/gi,
   )].map((match) => match[1])
   const indexesCreated = [...content.matchAll(
-    /\\bCREATE\\s+(?:UNIQUE\\s+)?INDEX(?:\\s+IF\\s+NOT\\s+EXISTS)?\\s+["`]?([A-Za-z0-9_]+)/gi,
+    /\bCREATE\s+(?:UNIQUE\s+)?INDEX(?:\s+IF\s+NOT\s+EXISTS)?\s+["`]?([A-Za-z0-9_]+)/gi,
   )].map((match) => match[1])
 
   return {
     tablesCreated,
     indexesCreated,
     triggerDefinitions,
-    alterTableStatements: countMatches(content, /\\bALTER\\s+TABLE\\b/gi),
+    alterTableStatements: countMatches(content, /\bALTER\s+TABLE\b/gi),
     dropTableStatements,
     renameTableStatements,
     sqliteSpecificFeatures: features,
