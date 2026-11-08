@@ -45,6 +45,32 @@ const expectedOperationSchemaRefs = {
   createAppeal: 'contracts/api/report-appeal.v1.json#/operations/1',
 }
 
+const expectedOperationOverrides = {
+  getNotificationPreferences: {
+    status: 'CONTRACTED_PARTIAL',
+    schema_ref: 'contracts/api/notification-preferences.v1.json',
+    source_refs: [
+      'contracts/api/notification-preferences.v1.json',
+      'contracts/api/notification-operation-policy.v1.json',
+      'workers/W01-payload/src/app/api/v1/notification-preferences/route.ts',
+      'workers/W05-social/src/index.ts',
+      'workers/W05-social/src/social-closure-runtime.ts',
+    ],
+  },
+  patchNotificationPreferences: {
+    status: 'CONTRACTED_PARTIAL',
+    schema_ref: 'contracts/api/notification-preferences.v1.json',
+    source_refs: [
+      'contracts/api/notification-preferences.v1.json',
+      'contracts/api/notification-operation-policy.v1.json',
+      'workers/W01-payload/src/app/api/v1/notification-preferences/route.ts',
+      'workers/W05-social/src/index.ts',
+      'workers/W05-social/src/social-closure-runtime.ts',
+      'workers/W06-governance/src/index.ts',
+    ],
+  },
+}
+
 const fail = (message) => {
   throw new Error(message)
 }
@@ -118,6 +144,17 @@ export function verifyGovernanceFeatureIdAlignment({
     }
   }
 
+  const sourceOverrides = sourceApiInventory.operation_overrides ?? {}
+  for (const [operationId, expectedOverride] of Object.entries(expectedOperationOverrides)) {
+    const actual = sourceOverrides[operationId]
+    if (!actual ||
+        actual.status !== expectedOverride.status ||
+        actual.schema_ref !== expectedOverride.schema_ref ||
+        !sameArray(actual.source_refs, expectedOverride.source_refs)) {
+      fail(`Canonical API operation override mismatch for ${operationId}`)
+    }
+  }
+
   const expectedApiSources = [
     'contracts/openapi/v1/openapi.yaml',
     'contracts/api/api-inventory.v1.json',
@@ -142,6 +179,16 @@ export function verifyGovernanceFeatureIdAlignment({
     }
     if (!generated.sourceRefs?.includes(paths.featureInventory)) {
       fail(`Generated API inventory for ${operationId} must retain the canonical feature inventory source reference`)
+    }
+  }
+
+  for (const [operationId, expectedOverride] of Object.entries(expectedOperationOverrides)) {
+    const generated = generatedByOperation.get(operationId)
+    if (!generated ||
+        generated.status !== expectedOverride.status ||
+        generated.schemaRef !== expectedOverride.schema_ref ||
+        !expectedOverride.source_refs.every((sourceRef) => generated.sourceRefs?.includes(sourceRef))) {
+      fail(`Generated API inventory did not preserve admitted metadata for ${operationId}`)
     }
   }
 
