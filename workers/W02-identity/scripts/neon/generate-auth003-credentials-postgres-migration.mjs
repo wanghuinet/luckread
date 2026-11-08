@@ -33,22 +33,30 @@ if (credentialContract.entityAuthority?.identityEntityId !== 'ENT-IDENTITY' ||
 }
 
 const identityFields = identityContract.fields ?? []
-assertField(identityFields, 'ENT-IDENTITY-F-ID', { name: 'id', type: 'text', nullable: false, unique: true })
-assertField(identityFields, 'ENT-IDENTITY-F-USER-ID', { name: 'userId', type: 'text', nullable: false, unique: true })
-assertField(identityFields, 'ENT-IDENTITY-F-USERNAME-NORMALIZED', { name: 'usernameNormalized', nullable: true, unique: true })
-assertField(identityFields, 'ENT-IDENTITY-F-EMAIL-NORMALIZED', { name: 'emailNormalized', nullable: true, unique: true })
-assertField(identityFields, 'ENT-IDENTITY-F-PHONE-NORMALIZED', { name: 'phoneNormalized', nullable: true, unique: true })
-assertField(identityFields, 'ENT-IDENTITY-F-NORMALIZATION-VERSION', { name: 'normalizationVersion', type: 'text', nullable: false })
+for (const [fieldId, expected] of [
+  ['ENT-IDENTITY-F-ID', { name: 'id', type: 'text', nullable: false, unique: true, indexed: true }],
+  ['ENT-IDENTITY-F-USER-ID', { name: 'userId', type: 'text', nullable: false, unique: true, indexed: true }],
+  ['ENT-IDENTITY-F-USERNAME', { name: 'username', type: 'text', nullable: true, unique: false, indexed: false }],
+  ['ENT-IDENTITY-F-USERNAME-NORMALIZED', { name: 'usernameNormalized', type: 'text', nullable: true, unique: true, indexed: true }],
+  ['ENT-IDENTITY-F-EMAIL', { name: 'email', type: 'text', nullable: true, unique: false, indexed: false }],
+  ['ENT-IDENTITY-F-EMAIL-NORMALIZED', { name: 'emailNormalized', type: 'text', nullable: true, unique: true, indexed: true }],
+  ['ENT-IDENTITY-F-PHONE', { name: 'phone', type: 'text', nullable: true, unique: false, indexed: false }],
+  ['ENT-IDENTITY-F-PHONE-NORMALIZED', { name: 'phoneNormalized', type: 'text', nullable: true, unique: true, indexed: true }],
+  ['ENT-IDENTITY-F-NORMALIZATION-VERSION', { name: 'normalizationVersion', type: 'text', nullable: false, unique: false, indexed: false }],
+]) assertField(identityFields, fieldId, expected)
 
 const credentialFields = credentialContract.fieldAuthority ?? []
-assertField(credentialFields, 'ENT-CREDENTIAL-F-ID', { name: 'id', type: 'text', nullable: false, unique: true })
-assertField(credentialFields, 'ENT-CREDENTIAL-F-IDENTITY-ID', { name: 'identityId', type: 'text', nullable: false, unique: false })
-assertField(credentialFields, 'ENT-CREDENTIAL-F-KIND', {
-  name: 'kind', type: 'enum', nullable: false, allowedValues: ['username', 'email', 'phone'],
-})
-assertField(credentialFields, 'ENT-CREDENTIAL-F-VALUE-HASH', { name: 'valueHash', type: 'text', nullable: false, unique: true })
-assertField(credentialFields, 'ENT-CREDENTIAL-F-NORMALIZED-VALUE', { name: 'normalizedValue', nullable: false, unique: false })
-assertField(credentialFields, 'ENT-CREDENTIAL-F-ACTIVE', { name: 'active', type: 'boolean', nullable: false, defaultValue: true })
+for (const [fieldId, expected] of [
+  ['ENT-CREDENTIAL-F-ID', { name: 'id', type: 'text', nullable: false, unique: true, indexed: true }],
+  ['ENT-CREDENTIAL-F-IDENTITY-ID', { name: 'identityId', type: 'text', nullable: false, unique: false, indexed: true }],
+  ['ENT-CREDENTIAL-F-KIND', { name: 'kind', type: 'enum', nullable: false, unique: false, indexed: true, allowedValues: ['username', 'email', 'phone'] }],
+  ['ENT-CREDENTIAL-F-VALUE-HASH', { name: 'valueHash', type: 'text', nullable: false, unique: true, indexed: true }],
+  ['ENT-CREDENTIAL-F-NORMALIZED-VALUE', { name: 'normalizedValue', type: 'text', nullable: false, unique: false, indexed: true }],
+  ['ENT-CREDENTIAL-F-VERIFIED-AT', { name: 'verifiedAt', type: 'datetime', nullable: true, unique: false, indexed: true }],
+  ['ENT-CREDENTIAL-F-ACTIVE', { name: 'active', type: 'boolean', nullable: false, unique: false, indexed: true, defaultValue: true }],
+  ['ENT-CREDENTIAL-F-CREATED-AT', { name: 'createdAt', type: 'datetime', nullable: false, unique: false, indexed: true }],
+  ['ENT-CREDENTIAL-F-UPDATED-AT', { name: 'updatedAt', type: 'datetime', nullable: false, unique: false, indexed: true }],
+]) assertField(credentialFields, fieldId, expected)
 
 const uniqueness = apiContract.uniqueness
 if (
