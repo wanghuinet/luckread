@@ -105,6 +105,10 @@
       {
         "path": "scripts/neon/assert-d1-01-migration-ledger-ready.mjs",
         "gitBlobSha1": "9079276205d81fe1e9224a7e04602908822c057c"
+      },
+      {
+        "path": "contracts/database/neon-d1-01-remote-runner-review.v1.json",
+        "gitBlobSha1": "5d69101e791013c6b4c0b8d18bc0f6b3ea2fb32e"
       }
     ],
     "controlsChecked": [
@@ -120,7 +124,8 @@
       "Disposable PostgreSQL 18 CI exercises the full schema and rollback-only cross-owner event/reference semantics.",
       "D1-01 shared migration readiness logic permits only the exact reviewed D1-02 state while retaining D1-03 through D1-05 blocked and the global remoteApplyReady flag false.",
       "PR and push validation never read Neon credentials; remote apply remains a separate manual main-only workflow.",
-      "D1-01 remote validation workflow also runs shared runner and D1-01 planning regression tests after the D1-02 domain release state changes."
+      "D1-01 remote validation workflow also runs shared runner and D1-01 planning regression tests after the D1-02 domain release state changes.",
+      "The refreshed D1-01 remote-runner review record was re-hashed and validated after adding the D1-02 per-domain release state; no circular review references are used."
     ],
     "findings": [],
     "limitations": [
