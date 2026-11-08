@@ -330,7 +330,7 @@
     "path": "/v1/...",
     "domain": "required",
     "status": "required",
-    "schema_ref": "required",
+    "schema_ref": "required_after_schema_contract_mapping",
     "openapi_operation_id": "required",
     "permission_ref": "required",
     "scope_ref": "required",
@@ -348,7 +348,8 @@
     "example_refs": "required",
     "integration_e2e_ref": "required_for_integrated_or_stable",
     "security_e2e_ref": "required_for_sensitive_or_privileged",
-    "notes": "optional"
+    "notes": "optional",
+    "feature_ids": "required_after_feature_id_mapping"
   },
   "operation_feature_map": {
     "listModerationCases": {
