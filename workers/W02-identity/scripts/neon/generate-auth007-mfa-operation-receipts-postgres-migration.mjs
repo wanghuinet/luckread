@@ -134,7 +134,7 @@ if (!source.includes('function parsePlan(value: string | null)') ||
     !source.includes('Array.isArray(parsed)') ||
     !source.includes('JSON.stringify(plan)') ||
     !source.includes("const nextStatus = plan.length > 0 ? 'READY' : 'RESOLVED'") ||
-    !source.includes("SET status = ?, attempt = attempt + 1, next_attempt_at = ?") ||
+    !source.includes("SET attempt = attempt + 1, next_attempt_at = ?") ||
     !source.includes("SET status = ?, last_error_code = ?, next_attempt_at = NULL")) {
   fail('runtime receipt event-plan, retry or stale-UNKNOWN lifecycle source drift')
 }
