@@ -210,7 +210,7 @@ jobs:
         run: |
           set -euo pipefail
           test -s /etc/ssl/certs/ca-certificates.crt
-          printf 'PGSSLROOTCERT=%s\\n' /etc/ssl/certs/ca-certificates.crt >> "$GITHUB_ENV"
+          printf 'PGSSLROOTCERT=%s\n' /etc/ssl/certs/ca-certificates.crt >> "$GITHUB_ENV"
           psql --version
 
       - name: Run W07 membership schema probes with transactional rollback
