@@ -4,9 +4,12 @@ on:
   pull_request:
     paths:
       - '.github/workflows/neon-d1-01-w02-better-auth-schema.yml'
+      - 'contracts/entity/AUTHZ-role-assignment-authority.v1.json'
+      - 'contracts/authz/layers.json'
       - 'workers/W02-identity/package.json'
       - 'workers/W02-identity/src/auth/better-auth.ts'
       - 'workers/W02-identity/src/auth/neon-postgres-schema.config.ts'
+      - 'workers/W02-identity/src/neon-postgres-migrations/**'
       - 'workers/W02-identity/scripts/neon/**'
   workflow_dispatch:
 
@@ -15,7 +18,7 @@ permissions:
 
 jobs:
   generate-and-verify:
-    name: Generate W02 Better Auth schema and verify on disposable PostgreSQL 18
+    name: Generate W02 identity schema and verify on disposable PostgreSQL 18
     runs-on: ubuntu-latest
     timeout-minutes: 15
     services:
@@ -78,17 +81,31 @@ jobs:
           mkdir -p artifacts/neon
           npm run neon:schema:generate
 
-      - name: Confirm generated DDL is PostgreSQL and contains no SQLite-only statements
+      - name: Generate PostgreSQL RoleAssignment migrations from canonical contracts
         working-directory: workers/W02-identity
         run: |
           set -euo pipefail
-          test -s artifacts/neon/w02-better-auth-postgres-schema.sql
-          if grep -Eiq '\\b(PRAGMA|AUTOINCREMENT|strftime|julianday|GLOB|RAISE[[:space:]]*\\([[:space:]]*ABORT)\\b' artifacts/neon/w02-better-auth-postgres-schema.sql; then
-            echo "Generated Better Auth schema contains SQLite-only SQL"
-            exit 1
-          fi
+          npm run neon:role-assignment:generate
+          git diff --exit-code -- src/neon-postgres-migrations/0001_role_assignments.sql src/neon-postgres-migrations/0002_role_authorization_versions.sql
 
-      - name: Apply generated DDL to disposable PostgreSQL 18
+      - name: Confirm all generated DDL is PostgreSQL-native
+        working-directory: workers/W02-identity
+        run: |
+          set -euo pipefail
+          files=(
+            artifacts/neon/w02-better-auth-postgres-schema.sql
+            src/neon-postgres-migrations/0001_role_assignments.sql
+            src/neon-postgres-migrations/0002_role_authorization_versions.sql
+          )
+          for file in "${files[@]}"; do
+            test -s "$file"
+            if grep -Eiq '(^|[^[:alnum:]_])(PRAGMA|AUTOINCREMENT|strftime|julianday|GLOB|RAISE[[:space:]]*\([[:space:]]*ABORT)([^[:alnum:]_]|$)' "$file"; then
+              echo "Generated PostgreSQL schema contains SQLite-only SQL: $file"
+              exit 1
+            fi
+          done
+
+      - name: Apply generated Better Auth DDL to disposable PostgreSQL 18
         working-directory: workers/W02-identity
         env:
           PGPASSWORD: schema_generator_local_only
@@ -107,11 +124,30 @@ jobs:
           W02_SCHEMA_PGDATABASE: luckread_schema
         run: npm run neon:schema:check
 
-      - name: Verify target tables, required columns, and empty business rows
+      - name: Apply generated RoleAssignment PostgreSQL migrations
+        working-directory: workers/W02-identity
+        env:
+          PGPASSWORD: schema_generator_local_only
+        run: |
+          set -euo pipefail
+          for file in \
+            src/neon-postgres-migrations/0001_role_assignments.sql \
+            src/neon-postgres-migrations/0002_role_authorization_versions.sql; do
+            psql --host 127.0.0.1 --port 5432 --username schema_generator \
+              --dbname luckread_schema --set ON_ERROR_STOP=1 --file "$file"
+          done
+
+      - name: Verify Better Auth core tables and empty business rows
         working-directory: workers/W02-identity
         env:
           W02_SCHEMA_DATABASE_URL: postgresql://schema_generator:schema_generator_local_only@127.0.0.1:5432/luckread_schema
         run: node scripts/neon/verify-better-auth-core-schema.mjs > artifacts/neon/w02-better-auth-postgres-schema-postflight.json
+
+      - name: Verify RoleAssignment constraints, temporal overlap, concurrency, and versioning
+        working-directory: workers/W02-identity
+        env:
+          W02_SCHEMA_DATABASE_URL: postgresql://schema_generator:schema_generator_local_only@127.0.0.1:5432/luckread_schema
+        run: npm run neon:role-assignment:verify > artifacts/neon/w02-role-assignment-postgres-schema-postflight.json
 
       - name: Upload generated schema and postflight evidence
         if: always()
@@ -121,5 +157,8 @@ jobs:
           path: |
             workers/W02-identity/artifacts/neon/w02-better-auth-postgres-schema.sql
             workers/W02-identity/artifacts/neon/w02-better-auth-postgres-schema-postflight.json
+            workers/W02-identity/artifacts/neon/w02-role-assignment-postgres-schema-postflight.json
+            workers/W02-identity/src/neon-postgres-migrations/0001_role_assignments.sql
+            workers/W02-identity/src/neon-postgres-migrations/0002_role_authorization_versions.sql
           if-no-files-found: error
           retention-days: 30
