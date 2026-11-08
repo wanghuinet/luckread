@@ -76,10 +76,6 @@
       {
         "path": "contracts/database/neon-schema-migration-ledger.v1.json",
         "gitBlobSha1": "8e0ed38ab3d30fa9994a80cb0361f914bf51f5f0"
-      },
-      {
-        "path": "contracts/database/neon-d1-02-remote-runner-review.v1.json",
-        "gitBlobSha1": "ae02bb00722b9001da75c10b53410a48422e16bd"
       }
     ],
     "controlsChecked": [
