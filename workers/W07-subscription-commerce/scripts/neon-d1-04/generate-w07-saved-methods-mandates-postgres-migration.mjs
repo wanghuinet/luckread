@@ -61,7 +61,7 @@ export function buildW07D104SavedMethodsMandatesMigration({ readSource = (relati
       persistence.authoritativeDomain !== 'D1-04' ||
       baseContract.primaryOwner?.worker !== 'W07' ||
       baseContract.target?.databaseName !== 'luckread_finance' ||
-      baseContract.schema?.totals?.tables !== 6 ||
+      baseContract.schema?.sliceTotals?.orderPayment?.tables !== 6 ||
       !ledger.domainOwners?.['D1-04']?.includes('W07') ||
       ownerBoundary.physicalD1Registry?.['D1-04'] !== '9bfb89a5-fbb5-45b1-a2ee-eab674b0d736' ||
       !ownerBoundary.workers?.W07?.allowedDomains?.includes('D1-04')) {
