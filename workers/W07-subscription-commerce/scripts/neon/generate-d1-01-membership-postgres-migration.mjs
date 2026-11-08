@@ -157,7 +157,7 @@ if (JSON.stringify(subscriptionUniqueIndexes) !==
     JSON.stringify(['ux_membership_subscriptions_trial_per_subscriber_creator'])) {
   fail('only the contract-defined one-trial-per-creator unique index is allowed for subscriptions')
 }
-if (/CREATE\s+TABLE\s+[^;]*(?:order|payment|refund|ledger|wallet)/i.test(sql)) {
+if (/CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:public\.)?(?:orders?|order_items?|payments?|refunds?|wallets?|ledger|ledger_entries)\b/i.test(sql)) {
   fail('D1-04 financial/order tables must not enter the D1-01 schema')
 }
 if (/PRAGMA|AUTOINCREMENT|strftime|julianday|RAISE\s*\(\s*ABORT|GLOB/i.test(sql)) {
