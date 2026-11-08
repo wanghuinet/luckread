@@ -40,8 +40,9 @@ const trusted = contract.trustedEvaluation ?? {}
 if (
   contract.lifecycleWindows?.coolingOff?.durationDays !== 15 ||
   contract.lifecycleWindows?.reactivation?.durationDays !== 30 ||
-  trusted.authority !== 'W02' ||
+  trusted.authority !== 'W02 only' ||
   trusted.clock !== 'W02 server clock; UTC ISO-8601 timestamps' ||
+  trusted.timestampValidation !== 'timestamp must parse and round-trip exactly as canonical UTC ISO-8601; future, missing, malformed or non-canonical values fail closed' ||
   trusted.callerSuppliedPreconditionBooleanAccepted !== false ||
   trusted.accountStateVersionCompareAndSetRequired !== true ||
   trusted.timestampAndStateMutationSameSqlUpdate !== true ||
