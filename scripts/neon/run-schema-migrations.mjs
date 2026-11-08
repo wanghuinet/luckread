@@ -1,5 +1,5 @@
 import { createRequire } from 'node:module'
-import { readFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
@@ -412,6 +412,34 @@ async function run() {
       fail('shared D1-01 schema runner did not apply the full fourteen-entry manifest')
     }
     const finalSchema = await verifyOwnerSchemaState(client, appliedEntries, sqlById)
+    const ledgerEvidence = {
+      status: 'D1_01_SHARED_LEDGER_LOCAL_VERIFY_PASS',
+      domainId: 'D1-01',
+      databaseName: 'luckread',
+      runnerVersion,
+      migrationCount: finalRows.length,
+      migrations: finalRows.map((row) => ({
+        ownerWorker: row.owner_worker,
+        migrationId: row.migration_id,
+        order: Number(row.migration_order),
+        kind: row.migration_kind,
+        artifactSha256: row.artifact_sha256,
+        manifestEntrySha256: row.manifest_entry_sha256,
+        sourceCommitSha: row.source_commit_sha,
+        runnerVersion: row.runner_version,
+        executionId: row.execution_id,
+      })),
+      sourceCommitSha,
+      executionId,
+      appendOnlyLedgerVerified: true,
+      remoteConnectionAttempted: false,
+      productionD1Touched: false,
+      businessDataImported: false,
+      productionCutoverAuthorized: false,
+    }
+    const ledgerReportPath = resolve(repositoryRoot, 'artifacts/neon/d1-01-ledger-postflight.json')
+    mkdirSync(dirname(ledgerReportPath), { recursive: true })
+    writeFileSync(ledgerReportPath, JSON.stringify(ledgerEvidence, null, 2) + '\\n')
     process.stdout.write(JSON.stringify({
       status: 'D1_01_SHARED_LOCAL_SCHEMA_RUNNER_PASS',
       target: { database: 'luckread_schema', postgresMajor: major },
