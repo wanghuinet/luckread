@@ -117,7 +117,7 @@
             "Report",
             "Appeal"
           ],
-          "status": "SOURCE_ADMITTED_PARTIAL_APPEAL_PERSISTENCE_GAP_LOCAL_POSTGRES18_REHEARSAL_PENDING",
+          "status": "SOURCE_ADMITTED_PARTIAL_APPEAL_PERSISTENCE_GAP_LOCAL_POSTGRES18_REHEARSAL_PASSED",
           "note": "W06 PostgreSQL schema covers only the seven physical tables admitted by migrations 0002 and 0003. Appeal remains a logical owner responsibility but has no admitted persistence schema; docs/63 marks implementation pending. AuditEvent is W09-owned.",
           "schemaContract": "contracts/database/neon-d1-03-w06-moderation-schema.v1.json",
           "implementedTables": [
