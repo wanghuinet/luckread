@@ -1,0 +1,250 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/database/neon-d1-04-shared-runner-independent-review.v1.json",
+  "title": "LuckRead D1-04 Shared Schema Runner Independent Review",
+  "version": "1.0.0",
+  "status": "LOCAL_SHARED_SCHEMA_REVIEW_PASSED_REMOTE_APPLY_BLOCKED",
+  "review": {
+    "reviewKind": "AUTOMATED_INDEPENDENT_READ_ONLY_CODE_PATH_REVIEW",
+    "description": "Independent read-only review of W07 D1-04 ownership, source-to-PG18 translation, final trigger catalog, scheduler control metadata and shared-ledger local-only execution. This is not remote apply approval.",
+    "reviewedMainCommit": "3d08f094ad263fe03ff6e122a9bfef2ffe62ad09",
+    "sharedExecutorPullRequest": 1660,
+    "sharedExecutorHeadCommit": "5e8bfaf7bd26fe8669c08de1e062d998c4f4c6de",
+    "sharedPostgres18WorkflowRunId": 42509822425,
+    "sharedPostgres18WorkflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42509822425",
+    "d1Postflight": {
+      "domainId": "D1-04",
+      "databaseName": "luckread_finance",
+      "localDatabaseName": "luckread_d1_04_shared",
+      "postgresMajor": 18,
+      "migrations": 6,
+      "sourceMigrations": 7,
+      "tables": 15,
+      "explicitIndexes": 31,
+      "triggers": 72,
+      "triggerFunctions": 6,
+      "foreignKeys": 0,
+      "controlSeedRows": 1,
+      "businessRows": 0,
+      "remoteNeonTouched": false,
+      "cloudflareD1Touched": false,
+      "remoteApplyReady": false
+    },
+    "wranglerD1Config": {
+      "worker": "W07",
+      "binding": "D1_04",
+      "databaseName": "unimportant",
+      "databaseUuid": "9bfb89a5-fbb5-45b1-a2ee-eab674b0d736",
+      "migrationsDir": "migrations-d1-04",
+      "note": "Preserve the current Wrangler value unmodified; Neon target database is luckread_finance and is keyed independently by the same canonical D1 UUID."
+    },
+    "schedulerControlSeed": {
+      "table": "subscription_renewal_scheduler_state",
+      "kind": "SCHEMA_CONTROL_METADATA_NOT_BUSINESS_DATA",
+      "ownerWorker": "W07",
+      "sourceContract": "contracts/database/neon-d1-04-w07-renewal-cycles-schema.v1.json",
+      "row": {
+        "state_id": "subscription-renewals",
+        "cursor_period_end": null,
+        "cursor_subscription_id": null,
+        "version": 1,
+        "updated_at": "1970-01-01T00:00:00.000Z"
+      },
+      "businessRows": 0
+    },
+    "reviewedSourcePins": [
+      {
+        "path": "scripts/neon/shared-domain-schema-runner.mjs",
+        "gitBlobSha1": "53706e33929da41f331acf3892d223d341762817"
+      },
+      {
+        "path": "contracts/database/neon-d1-04-shared-migration-manifest.v1.json",
+        "gitBlobSha1": "3d0f609805db8f928921a386b91dae998ae74af8"
+      },
+      {
+        "path": "contracts/transport/worker-d1-access-boundary.v1.json",
+        "gitBlobSha1": "fb269371ba3f3d6952f019b7b6c47ad1315e0c7d"
+      },
+      {
+        "path": "workers/W07-subscription-commerce/wrangler.jsonc",
+        "gitBlobSha1": "189e2afedfa9a8cf8d53141c12f2469bfa765ab0"
+      },
+      {
+        "path": "contracts/database/neon-d1-04-w07-order-payment-schema.v1.json",
+        "gitBlobSha1": "b74244b6bbb6bfa92c27f560d1cb248667ba387b"
+      },
+      {
+        "path": "contracts/database/neon-d1-04-w07-saved-methods-mandates-schema.v1.json",
+        "gitBlobSha1": "61608c5f73c8b8a6530c3aed977766d8c03a7c88"
+      },
+      {
+        "path": "contracts/database/neon-d1-04-w07-renewal-cycles-schema.v1.json",
+        "gitBlobSha1": "593d536e0578956c85031f37b63de7a4b6dd37ea"
+      },
+      {
+        "path": "contracts/database/neon-d1-04-w07-revenuecat-webhook-schema.v1.json",
+        "gitBlobSha1": "d425dfe71068110072edcf0922a847fa54422190"
+      },
+      {
+        "path": "contracts/database/neon-d1-04-w07-refunds-billing-documents-schema.v1.json",
+        "gitBlobSha1": "07038c1ffb505af57b7b3518975cf51b6eb6c3e1"
+      },
+      {
+        "path": "contracts/database/neon-d1-04-w07-payment-method-revocation-schema.v1.json",
+        "gitBlobSha1": "4169c04075c40a41a7376dc6d5c1342b023a869e"
+      },
+      {
+        "path": "workers/W07-subscription-commerce/migrations-d1-04/0001_order_commerce.sql",
+        "gitBlobSha1": "00cd8afc25cae45452b3b072114ab4170599b13d"
+      },
+      {
+        "path": "workers/W07-subscription-commerce/migrations-d1-04/0002_payment_provider_events.sql",
+        "gitBlobSha1": "dba44d021808c763db6797ffdf09aef65cd08f95"
+      },
+      {
+        "path": "workers/W07-subscription-commerce/migrations-d1-04/0003_saved_payment_methods_mandates.sql",
+        "gitBlobSha1": "1823b182550fb7e54d555ef499f3056cd4375945"
+      },
+      {
+        "path": "workers/W07-subscription-commerce/migrations-d1-04/0004_subscription_renewal_cycles.sql",
+        "gitBlobSha1": "ccb5568a223ba391e8921aa47d5e0e55bc5f8d86"
+      },
+      {
+        "path": "workers/W07-subscription-commerce/migrations-d1-04/0005_revenuecat_webhook_inbox.sql",
+        "gitBlobSha1": "3e9fb4ca8578186e73beb6c2938b150e001c526a"
+      },
+      {
+        "path": "workers/W07-subscription-commerce/migrations-d1-04/0006_refunds_billing_documents.sql",
+        "gitBlobSha1": "a263636ef3ec08448146a25c9de1f433df9a7dc8"
+      },
+      {
+        "path": "workers/W07-subscription-commerce/migrations-d1-04/0007_payment_method_revocation_requests.sql",
+        "gitBlobSha1": "3593b1f624fbbdcca593e9cfea1d2049d0db937e"
+      },
+      {
+        "path": "workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0001_w07_d1_04_order_payment_schema.sql",
+        "gitBlobSha1": "27020aef0c4cd911b290b159553d3c41f9705c0c"
+      },
+      {
+        "path": "workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0002_w07_d1_04_saved_methods_mandates.sql",
+        "gitBlobSha1": "a7be466ba09a5f56c2e0bbe7edb76446c5bfd1ff"
+      },
+      {
+        "path": "workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0003_w07_d1_04_renewal_cycles.sql",
+        "gitBlobSha1": "c920c6152cce3b8da61170da1ba089e03effcbe6"
+      },
+      {
+        "path": "workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0004_w07_d1_04_revenuecat_webhook_inbox.sql",
+        "gitBlobSha1": "3299b84c9274e703f18f45dadee725958ee52431"
+      },
+      {
+        "path": "workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0005_w07_d1_04_refunds_billing_documents.sql",
+        "gitBlobSha1": "b19f4f7dc1ecb0fe5a661f2b0e7cc50ee68387eb"
+      },
+      {
+        "path": "workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0006_w07_d1_04_payment_method_revocation.sql",
+        "gitBlobSha1": "e7f7a42d957cf02c1a243a0fdd973b61c7b25721"
+      },
+      {
+        "path": "workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-order-payment-postgres-migration.mjs",
+        "gitBlobSha1": "b12d4da5aa1175de7618b1d42cdf538309c480e4"
+      },
+      {
+        "path": "workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-order-payment-postgres-migration.test.mjs",
+        "gitBlobSha1": "5729b3d573b5460269e46c834840ab0d7bafb6f5"
+      },
+      {
+        "path": "workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-saved-methods-mandates-postgres-migration.mjs",
+        "gitBlobSha1": "10b3438018df1f678051a90c14eb6c81dc13378e"
+      },
+      {
+        "path": "workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-saved-methods-mandates-postgres-migration.test.mjs",
+        "gitBlobSha1": "b9bcbc241fc1fc70ea571a479ed8620e7067fbe7"
+      },
+      {
+        "path": "workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-renewal-cycles-postgres-migration.mjs",
+        "gitBlobSha1": "7ec5b3626cec3c2d7ed09b68b2caa959caa23e6b"
+      },
+      {
+        "path": "workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-renewal-cycles-postgres-migration.test.mjs",
+        "gitBlobSha1": "4eae9ddc26c8d2180f0fdb85a9f1b0678cb0ef5a"
+      },
+      {
+        "path": "workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-revenuecat-webhook-postgres-migration.mjs",
+        "gitBlobSha1": "638a44c307f8b4b0cf8c9d424c5d8940d3cad20c"
+      },
+      {
+        "path": "workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-revenuecat-webhook-postgres-migration.test.mjs",
+        "gitBlobSha1": "ab4f380c69de93d2fd9f077e588e48ce367402db"
+      },
+      {
+        "path": "workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-refunds-billing-documents-postgres-migration.mjs",
+        "gitBlobSha1": "84cbf72d8366639e71de01b8d3d81b56fb09a0e0"
+      },
+      {
+        "path": "workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-refunds-billing-documents-postgres-migration.test.mjs",
+        "gitBlobSha1": "60e1aece63337bb4c134f009a100b0b23e8a59f0"
+      },
+      {
+        "path": "workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-payment-method-revocation-postgres-migration.mjs",
+        "gitBlobSha1": "0d283a61ef35fdfd2e8a0222d063c67221abb487"
+      },
+      {
+        "path": "workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-payment-method-revocation-postgres-migration.test.mjs",
+        "gitBlobSha1": "09463d5822cd344c272869f38d78f9634be009dd"
+      },
+      {
+        "path": "workers/W07-subscription-commerce/scripts/neon-d1-04/templates/w07-order-payment-postgres.sql",
+        "gitBlobSha1": "c408514ec113c35982499eba182a480c8258a49c"
+      },
+      {
+        "path": "workers/W07-subscription-commerce/scripts/neon-d1-04/templates/w07-saved-methods-mandates-postgres.sql",
+        "gitBlobSha1": "0b9edf5d1cabd6b84e065f30c98b6fcb17a94949"
+      },
+      {
+        "path": "workers/W07-subscription-commerce/scripts/neon-d1-04/templates/w07-renewal-cycles-postgres.sql",
+        "gitBlobSha1": "ccf3d9a691f799d2f832034b2dd85b0321d3411d"
+      },
+      {
+        "path": "workers/W07-subscription-commerce/scripts/neon-d1-04/templates/w07-revenuecat-webhook-postgres.sql",
+        "gitBlobSha1": "357e03a2975450f26de04d1c3aa2afd393219ecb"
+      },
+      {
+        "path": "workers/W07-subscription-commerce/scripts/neon-d1-04/templates/w07-refunds-billing-documents-postgres.sql",
+        "gitBlobSha1": "b6755bf92756b70577526b6f3ebfa5e50ccf0f64"
+      },
+      {
+        "path": "workers/W07-subscription-commerce/scripts/neon-d1-04/templates/w07-payment-method-revocation-postgres.sql",
+        "gitBlobSha1": "136f24d37686ea7988ba854f6d11a9b6cfb38f5d"
+      }
+    ]
+  },
+  "reviewChecks": [
+    "D1-04 is W07-only under the canonical Worker-to-D1 access boundary and retains the exact physical UUID.",
+    "W07 existing Wrangler D1_04 binding remains database_name unimportant, UUID 9bfb89a5-fbb5-45b1-a2ee-eab674b0d736, migrations_dir migrations-d1-04; this review makes no runtime binding change.",
+    "The shared manifest contains exactly six ordered W07 PostgreSQL artifacts representing all seven admitted D1 source migrations.",
+    "All six schema contracts target luckread_finance PostgreSQL 18 and remain sourced from existing Cloudflare D1 migrations; each has local PG18 rehearsal evidence.",
+    "The final catalog contains exactly 15 tables, 31 indexes, 72 final triggers, 6 functions and zero foreign keys.",
+    "The final W07 artifact drops and recreates exactly the existing payment_provider_events_terminal_immutable trigger; the final trigger count is calculated in manifest order.",
+    "Only the PAY-004 scheduler singleton is inserted. It is an exact schema-control metadata row, not business data; all fixture rows are rolled back and all other business tables remain empty.",
+    "The shared runner remains local-only and refuses remote Neon execution."
+  ],
+  "remoteApplyReady": false,
+  "businessDataImport": false,
+  "productionCutoverAuthorized": false,
+  "safety": {
+    "newWorkers": 0,
+    "newD1Databases": 0,
+    "newQueues": 0,
+    "newServiceBindings": 0,
+    "runtimeBindingsChanged": false,
+    "remoteNeonDdlExecuted": false,
+    "cloudflareD1Touched": false,
+    "businessDataImported": false,
+    "productionCutoverAuthorized": false
+  },
+  "remoteApplyBlockers": [
+    "The D1-04 shared runner has only been exercised against an isolated local PostgreSQL 18.6 database; a separate reviewed remote runner release record is still required.",
+    "Remote Neon schema apply, business data import and production cutover remain unauthorized."
+  ]
+}
