@@ -447,12 +447,15 @@
       "openapiPath": "/admin/moderation",
       "domain": "audit_compliance",
       "status": "DISCOVERED",
-      "featureIds": [],
+      "featureIds": [
+        "GOV-003"
+      ],
       "schemaRef": "",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/admin/moderation",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
+        "contracts/api/api-inventory.v1.json",
+        "contracts/alignment/feature-inventory.v1.json"
       ]
     },
     {
@@ -462,12 +465,15 @@
       "openapiPath": "/admin/moderation/cases/{caseId}",
       "domain": "audit_compliance",
       "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
+      "featureIds": [
+        "GOV-004"
+      ],
+      "schemaRef": "contracts/api/moderation-operation-policy.v1.json#/operations/1",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/admin/moderation/cases/{caseId}",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
+        "contracts/api/api-inventory.v1.json",
+        "contracts/alignment/feature-inventory.v1.json"
       ]
     },
     {
@@ -477,12 +483,15 @@
       "openapiPath": "/admin/moderation/queue",
       "domain": "audit_compliance",
       "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
+      "featureIds": [
+        "GOV-003"
+      ],
+      "schemaRef": "contracts/api/moderation-operation-policy.v1.json#/operations/0",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/admin/moderation/queue",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
+        "contracts/api/api-inventory.v1.json",
+        "contracts/alignment/feature-inventory.v1.json"
       ]
     },
     {
@@ -1808,12 +1817,15 @@
       "openapiPath": "/admin/moderation/cases/{caseId}/decision",
       "domain": "audit_compliance",
       "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
+      "featureIds": [
+        "GOV-004"
+      ],
+      "schemaRef": "contracts/api/moderation-operation-policy.v1.json#/operations/2",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/admin/moderation/cases/{caseId}/decision",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
+        "contracts/api/api-inventory.v1.json",
+        "contracts/alignment/feature-inventory.v1.json"
       ]
     },
     {
@@ -1853,12 +1865,15 @@
       "openapiPath": "/appeals",
       "domain": "audit_compliance",
       "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
+      "featureIds": [
+        "GOV-005"
+      ],
+      "schemaRef": "contracts/api/report-appeal.v1.json#/operations/1",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/appeals",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
+        "contracts/api/api-inventory.v1.json",
+        "contracts/alignment/feature-inventory.v1.json"
       ]
     },
     {
@@ -2817,12 +2832,16 @@
       "openapiPath": "/reports",
       "domain": "audit_compliance",
       "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
+      "featureIds": [
+        "GOV-001",
+        "GOV-002"
+      ],
+      "schemaRef": "contracts/api/report-appeal.v1.json#/operations/0",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/reports",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
+        "contracts/api/api-inventory.v1.json",
+        "contracts/alignment/feature-inventory.v1.json"
       ]
     },
     {
