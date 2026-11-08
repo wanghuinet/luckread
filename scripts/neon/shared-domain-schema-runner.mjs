@@ -215,8 +215,9 @@ function validateEntryContract(manifest, entry, readSource = readText) {
       contract.target?.postgresMajor !== 18) {
     fail('schema contract target does not match migration manifest: ' + entry.schemaContract)
   }
-  if (contract.primaryOwner?.worker !== entry.logicalOwnerWorker &&
-      contract.primaryOwner?.worker !== entry.ownerWorker) {
+  const contractLogicalOwner = contract.primaryOwner?.worker ?? contract.target?.primaryWorker
+  if (contractLogicalOwner !== entry.logicalOwnerWorker &&
+      contractLogicalOwner !== entry.ownerWorker) {
     fail('schema contract logical owner does not match the manifest: ' + entry.schemaContract)
   }
   if (entry.migrationConfigOwner &&
