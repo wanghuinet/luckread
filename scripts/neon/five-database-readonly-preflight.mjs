@@ -1,6 +1,7 @@
 import { createRequire } from 'node:module'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import tls from 'node:tls'
 
 export const DATABASE_TARGETS = Object.freeze([
@@ -475,7 +476,7 @@ export async function runPreflight({
   return report
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === new URL(import.meta.url).pathname) {
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   runPreflight().catch((error) => {
     console.error('Preflight stopped: ' + safeErrorCode(error))
     process.exitCode = 1
