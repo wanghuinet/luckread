@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/database/neon-d1-02-migration-manifest.v1.json",
+  "title": "LuckRead D1-02 W03 and W05 PostgreSQL Schema-Only Migration Manifest",
+  "version": "1.0.0",
+  "status": "LOCAL_RUNNER_IMPLEMENTATION_ONLY",
+  "domainId": "D1-02",
+  "databaseName": "luckreadpro",
+  "databaseUuid": "6c342634-97f6-4248-9f4a-85772af4f22c",
+  "postgresMajor": 18,
+  "businessDataImport": false,
+  "productionCutoverAuthorized": false,
+  "remoteApplyReady": false,
+  "ledger": {
+    "table": "neon_schema_migration_ledger",
+    "ddlPath": "scripts/neon/d1-01/0001_schema_migration_ledger.sql",
+    "domainId": "D1-02",
+    "databaseName": "luckreadpro"
+  },
+  "entries": [
+    {
+      "migrationId": "d1-02-w03-content-schema-v1",
+      "order": 1,
+      "ownerWorker": "W03",
+      "kind": "GENERATED_POSTGRESQL_SQL",
+      "artifactPaths": [
+        "workers/W03-content/src/neon-postgres-migrations/0001_w03_d1_02_content_schema.sql"
+      ],
+      "dependsOn": []
+    },
+    {
+      "migrationId": "d1-02-w05-social-schema-v1",
+      "order": 2,
+      "ownerWorker": "W05",
+      "kind": "GENERATED_POSTGRESQL_SQL",
+      "artifactPaths": [
+        "workers/W05-social/src/neon-postgres-migrations/0001_w05_d1_02_social_schema.sql"
+      ],
+      "dependsOn": [
+        "d1-02-w03-content-schema-v1"
+      ]
+    }
+  ],
+  "expected": {
+    "tables": 28,
+    "explicitIndexes": 63,
+    "triggers": 9,
+    "triggerFunctions": 10,
+    "businessRows": 0,
+    "snowflakeAllocatorRows": 1,
+    "foreignKeys": 0,
+    "d1_03EndpointTable": false
+  },
+  "safetyInvariants": [
+    "Apply only the committed PostgreSQL-native W03 artifact followed by the committed PostgreSQL-native W05 artifact.",
+    "Never execute historical SQLite or Cloudflare D1 migrations against PostgreSQL.",
+    "Use the append-only shared migration ledger and one transaction per owner artifact and its ledger row.",
+    "Do not import accounts, content, media, social relationships, notifications, or other business rows.",
+    "The W03 Snowflake allocator singleton is the only permitted initial row.",
+    "Exclude W05 D1_03 and W09 notification_push_endpoints; retain only opaque endpoint references.",
+    "Do not mutate Cloudflare D1, change Worker bindings, or authorize production cutover.",
+    "Remote Neon execution remains disabled until a separate exact-target review and manual release gate is merged."
+  ]
+}
