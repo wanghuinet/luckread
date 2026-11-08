@@ -182,6 +182,7 @@ export function isRemoteApplyReleased(manifestContract, ledgerContractValue) {
     ledgerContractValue?.execution?.runnerStatus === expectedRunnerStatus &&
     exactDomainSet && d1Ready && (d1_02Released || d1_02Blocked) && laterDomainsBlocked &&
     manifestContract?.execution?.reviewEvidenceRef === domains['D1-01']?.reviewEvidenceRef
+}
 
 function validateManifest(checksums) {
   const releaseBlocked = manifest.remoteApplyReady === false &&
