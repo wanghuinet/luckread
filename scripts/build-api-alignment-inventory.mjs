@@ -3,6 +3,7 @@ import fs from 'node:fs';
 const root = process.cwd();
 const openapiPath = 'contracts/openapi/v1/openapi.yaml';
 const apiInventoryPath = 'contracts/api/api-inventory.v1.json';
+const featureInventoryPath = 'contracts/alignment/feature-inventory.v1.json';
 const outPath = 'contracts/alignment/api-inventory.v1.json';
 
 const fail = (message) => {
@@ -12,9 +13,14 @@ const fail = (message) => {
 
 if (!fs.existsSync(openapiPath)) fail(`missing ${openapiPath}`);
 if (!fs.existsSync(apiInventoryPath)) fail(`missing ${apiInventoryPath}`);
+if (!fs.existsSync(featureInventoryPath)) fail(`missing ${featureInventoryPath}; build the canonical feature inventory first`);
 
 const openapiRaw = fs.readFileSync(openapiPath, 'utf8');
 const inventory = JSON.parse(fs.readFileSync(apiInventoryPath, 'utf8'));
+const featureInventory = JSON.parse(fs.readFileSync(featureInventoryPath, 'utf8'));
+const knownFeatureIds = new Set((featureInventory.features ?? []).map((feature) => feature.featureId));
+const operationFeatureMap = inventory.operation_feature_map ?? {};
+const operationOverrides = inventory.operation_overrides ?? {};
 
 // Lightweight OpenAPI path/operation extraction with no `yaml` runtime
 // dependency. Mirrors scripts/sync-rc-openapi.mjs, which already removed the
@@ -44,6 +50,53 @@ const operations = [];
     if (operationMatch) currentOperationId = operationMatch[2].trim();
   }
   flush();
+}
+
+const openapiOperationIds = new Set(operations.map((operation) => operation.operationId));
+for (const [operationId, mapping] of Object.entries(operationFeatureMap)) {
+  if (!openapiOperationIds.has(operationId)) fail(`operation_feature_map references unknown OpenAPI operationId '${operationId}'`);
+  if (!mapping || !Array.isArray(mapping.feature_ids) || mapping.feature_ids.length === 0) {
+    fail(`operation_feature_map '${operationId}' must declare a non-empty feature_ids array`);
+  }
+  if (new Set(mapping.feature_ids).size !== mapping.feature_ids.length) {
+    fail(`operation_feature_map '${operationId}' contains duplicate feature IDs`);
+  }
+  for (const featureId of mapping.feature_ids) {
+    if (!knownFeatureIds.has(featureId)) fail(`operation_feature_map '${operationId}' references unknown canonical feature '${featureId}'`);
+  }
+  const schemaRef = mapping.schema_ref ?? '';
+  if (typeof schemaRef !== 'string') fail(`operation_feature_map '${operationId}' schema_ref must be a string`);
+  if (schemaRef) {
+    const schemaPath = schemaRef.split('#', 1)[0];
+    if (!fs.existsSync(schemaPath)) fail(`operation_feature_map '${operationId}' references missing schema contract '${schemaPath}'`);
+  }
+}
+
+for (const [operationId, override] of Object.entries(operationOverrides)) {
+  if (!openapiOperationIds.has(operationId)) fail(`operation_overrides references unknown OpenAPI operationId '${operationId}'`);
+  if (!override || typeof override !== 'object') fail(`operation_overrides '${operationId}' must be an object`);
+  if (override.status !== undefined && !(inventory.endpoint_status ?? []).includes(override.status)) {
+    fail(`operation_overrides '${operationId}' uses unknown endpoint status '${override.status}'`);
+  }
+  if (override.schema_ref !== undefined && typeof override.schema_ref !== 'string') {
+    fail(`operation_overrides '${operationId}' schema_ref must be a string`);
+  }
+  if (override.schema_ref) {
+    const schemaPath = override.schema_ref.split('#', 1)[0];
+    if (!fs.existsSync(schemaPath)) fail(`operation_overrides '${operationId}' references missing schema contract '${schemaPath}'`);
+  }
+  if (override.source_refs !== undefined && !Array.isArray(override.source_refs)) {
+    fail(`operation_overrides '${operationId}' source_refs must be an array`);
+  }
+  for (const sourceRef of override.source_refs ?? []) {
+    if (typeof sourceRef !== 'string' || !sourceRef.trim() || !fs.existsSync(sourceRef)) {
+      fail(`operation_overrides '${operationId}' references missing source '${String(sourceRef)}'`);
+    }
+  }
+  const mapping = operationFeatureMap[operationId];
+  if (mapping?.schema_ref && override.schema_ref && mapping.schema_ref !== override.schema_ref) {
+    fail(`operation_feature_map and operation_overrides declare conflicting schema_ref values for '${operationId}'`);
+  }
 }
 
 const versionPrefix = '/v1';
@@ -83,17 +136,24 @@ for (const op of operations) {
     missingFromInventory.push(key);
     continue;
   }
+  const featureMapping = operationFeatureMap[op.operationId] ?? {};
+  const operationOverride = operationOverrides[op.operationId] ?? {};
   records.push({
     operationId: op.operationId,
     method: upper,
     path: canonicalPath,
     openapiPath: op.rawPath,
     domain: declaration.domain,
-    status: 'DISCOVERED',
-    featureIds: [],
-    schemaRef: '',
+    status: operationOverride.status ?? 'DISCOVERED',
+    featureIds: featureMapping.feature_ids ?? [],
+    schemaRef: featureMapping.schema_ref ?? operationOverride.schema_ref ?? '',
     openapiRef: `${openapiPath}#${op.method.toLowerCase()}:${op.rawPath}`,
-    sourceRefs: [openapiPath, apiInventoryPath],
+    sourceRefs: [...new Set([
+      openapiPath,
+      apiInventoryPath,
+      ...(featureMapping.feature_ids ? [featureInventoryPath] : []),
+      ...(operationOverride.source_refs ?? []),
+    ])],
   });
 }
 
@@ -117,7 +177,7 @@ records.sort((a, b) => `${a.method} ${a.path}`.localeCompare(`${b.method} ${b.pa
 const output = {
   version: '1.0.0',
   status: 'DISCOVERED',
-  sourceOfTruth: 'contracts/openapi/v1/openapi.yaml + contracts/api/api-inventory.v1.json',
+  sourceOfTruth: 'contracts/openapi/v1/openapi.yaml + contracts/api/api-inventory.v1.json + contracts/alignment/feature-inventory.v1.json',
   generatedBy: 'scripts/build-api-alignment-inventory.mjs',
   serverPrefix: serverUrl || null,
   records,

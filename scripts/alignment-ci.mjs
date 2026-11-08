@@ -2,8 +2,8 @@ import fs from 'node:fs';
 import { spawnSync } from 'node:child_process';
 
 const root = process.cwd();
-const run = (script) => {
-  const result = spawnSync(process.execPath, [script], { cwd: root, stdio: 'inherit' });
+const run = (script, nodeArgs = []) => {
+  const result = spawnSync(process.execPath, [...nodeArgs, script], { cwd: root, stdio: 'inherit' });
   if (result.status !== 0) process.exit(result.status ?? 1);
 };
 const required = [
@@ -25,6 +25,8 @@ for (const [, script] of required) {
 // inputs to the five-way graph. CI must fail closed instead of manufacturing
 // mappings when either source is absent.
 const authoritativeInputs = [
+  'scripts/verify-governance-feature-id-alignment.mjs',
+  'scripts/verify-governance-feature-id-alignment.test.mjs',
   'contracts/alignment/database-entity-persistence-inventory.v1.json',
   'contracts/alignment/cross-system-mapping.v1.json',
 ];
@@ -38,6 +40,8 @@ for (const p of authoritativeInputs) {
 // Regenerate all derived inventories before reconciliation so stale committed
 // outputs cannot be accepted by the admission gate.
 for (const [, script] of required.slice(0, 4)) run(script);
+run('scripts/verify-governance-feature-id-alignment.mjs');
+run('scripts/verify-governance-feature-id-alignment.test.mjs', ['--test']);
 run('scripts/build-five-way-reconciliation.mjs');
 run('scripts/build-change-impact.mjs');
 

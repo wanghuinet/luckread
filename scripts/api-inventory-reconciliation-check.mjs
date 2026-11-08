@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
 import path from 'node:path';
+import { verifyGovernanceFeatureIdAlignment } from './verify-governance-feature-id-alignment.mjs';
 
 const root = process.cwd();
 const inventoryBaseline = path.join(root, 'contracts', 'api', 'api-inventory.v1.json');
@@ -408,6 +409,7 @@ const conflictCodes = new Set([
   'PATH_CONFLICT',
   'POLICY_SOURCE_NORMALIZATION_CONFLICT',
   'INVALID_DEPRECATED_POLICY_OPERATION',
+  'GOVERNANCE_FEATURE_ID_ALIGNMENT_CONFLICT',
 ]);
 const incompleteCodes = new Set([
   'MISSING_API_INVENTORY_DIRECTORY',
@@ -436,6 +438,16 @@ if (!['contract', 'production'].includes(requestedStage)) {
   process.exit(2);
 }
 const stage = requestedStage === 'contract' ? 'CONTRACT' : 'PRODUCTION';
+try {
+  verifyGovernanceFeatureIdAlignment();
+  console.log('GOVERNANCE_FEATURE_ID_ALIGNMENT_PASS');
+} catch (error) {
+  failures.push({
+    code: 'GOVERNANCE_FEATURE_ID_ALIGNMENT_CONFLICT',
+    source: 'contracts/api/api-inventory.v1.json + GOV capability registry',
+    message: error instanceof Error ? error.message : String(error),
+  });
+}
 const isEvidenceFinding = (item) => ['EVIDENCE_MISSING', 'EVIDENCE_INCOMPLETE', 'EVIDENCE_INVALID'].includes(item.code);
 const informationalFindings = findings.filter((item) => item.code === 'DEPRECATED_POLICY_OPERATION');
 const productionEvidenceFindings = findings.filter(isEvidenceFinding);

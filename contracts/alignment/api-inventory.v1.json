@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
   "status": "DISCOVERED",
-  "sourceOfTruth": "contracts/openapi/v1/openapi.yaml + contracts/api/api-inventory.v1.json",
+  "sourceOfTruth": "contracts/openapi/v1/openapi.yaml + contracts/api/api-inventory.v1.json + contracts/alignment/feature-inventory.v1.json",
   "generatedBy": "scripts/build-api-alignment-inventory.mjs",
   "serverPrefix": "https://api.luckread.com/v1",
   "records": [
@@ -321,6 +321,21 @@
       ]
     },
     {
+      "operationId": "deletePaymentMethodsSavedPaymentMethodId",
+      "method": "DELETE",
+      "path": "/v1/payment-methods/{savedPaymentMethodId}",
+      "openapiPath": "/payment-methods/{savedPaymentMethodId}",
+      "domain": "subscription_entitlement_payment",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#delete:/payment-methods/{savedPaymentMethodId}",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
       "operationId": "deletePushEndpoint",
       "method": "DELETE",
       "path": "/v1/push/endpoints/{installationId}",
@@ -447,12 +462,15 @@
       "openapiPath": "/admin/moderation",
       "domain": "audit_compliance",
       "status": "DISCOVERED",
-      "featureIds": [],
+      "featureIds": [
+        "GOV-003"
+      ],
       "schemaRef": "",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/admin/moderation",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
+        "contracts/api/api-inventory.v1.json",
+        "contracts/alignment/feature-inventory.v1.json"
       ]
     },
     {
@@ -462,12 +480,15 @@
       "openapiPath": "/admin/moderation/cases/{caseId}",
       "domain": "audit_compliance",
       "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
+      "featureIds": [
+        "GOV-004"
+      ],
+      "schemaRef": "contracts/api/moderation-operation-policy.v1.json#/operations/1",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/admin/moderation/cases/{caseId}",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
+        "contracts/api/api-inventory.v1.json",
+        "contracts/alignment/feature-inventory.v1.json"
       ]
     },
     {
@@ -477,12 +498,15 @@
       "openapiPath": "/admin/moderation/queue",
       "domain": "audit_compliance",
       "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
+      "featureIds": [
+        "GOV-003"
+      ],
+      "schemaRef": "contracts/api/moderation-operation-policy.v1.json#/operations/0",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/admin/moderation/queue",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
+        "contracts/api/api-inventory.v1.json",
+        "contracts/alignment/feature-inventory.v1.json"
       ]
     },
     {
@@ -531,6 +555,21 @@
       ]
     },
     {
+      "operationId": "authMfaStatus",
+      "method": "GET",
+      "path": "/v1/auth/mfa",
+      "openapiPath": "/auth/mfa",
+      "domain": "auth_identity",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/auth/mfa",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
       "operationId": "authPrincipalGet",
       "method": "GET",
       "path": "/v1/auth/principal",
@@ -570,6 +609,36 @@
       "featureIds": [],
       "schemaRef": "",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/auth/sessions",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "getBillingDocuments",
+      "method": "GET",
+      "path": "/v1/billing/documents",
+      "openapiPath": "/billing/documents",
+      "domain": "subscription_entitlement_payment",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/billing/documents",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "getCommerceOrder",
+      "method": "GET",
+      "path": "/v1/commerce/orders/{orderId}",
+      "openapiPath": "/commerce/orders/{orderId}",
+      "domain": "subscription_entitlement_payment",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/commerce/orders/{orderId}",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
         "contracts/api/api-inventory.v1.json"
@@ -705,6 +774,21 @@
       "featureIds": [],
       "schemaRef": "",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/contents/{contentId}/revisions/{revisionId}",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "listPostThread",
+      "method": "GET",
+      "path": "/v1/contents/{contentId}/thread",
+      "openapiPath": "/contents/{contentId}/thread",
+      "domain": "interaction",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/contents/{contentId}/thread",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
         "contracts/api/api-inventory.v1.json"
@@ -1056,6 +1140,21 @@
       ]
     },
     {
+      "operationId": "listOwnMedia",
+      "method": "GET",
+      "path": "/v1/media",
+      "openapiPath": "/media",
+      "domain": "media",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/media",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
       "operationId": "getMedia",
       "method": "GET",
       "path": "/v1/media/{mediaId}",
@@ -1110,6 +1209,36 @@
       "featureIds": [],
       "schemaRef": "",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/media/{mediaId}/variants",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "getPublishedMediaMetadata",
+      "method": "GET",
+      "path": "/v1/media/metadata",
+      "openapiPath": "/media/metadata",
+      "domain": "media",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/media/metadata",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "listOwnMembershipPlans",
+      "method": "GET",
+      "path": "/v1/membership/plans",
+      "openapiPath": "/membership/plans",
+      "domain": "subscription_entitlement_payment",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/membership/plans",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
         "contracts/api/api-inventory.v1.json"
@@ -1211,6 +1340,21 @@
       ]
     },
     {
+      "operationId": "getPaymentMethods",
+      "method": "GET",
+      "path": "/v1/payment-methods",
+      "openapiPath": "/payment-methods",
+      "domain": "subscription_entitlement_payment",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/payment-methods",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
       "operationId": "getPaymentsPaymentId",
       "method": "GET",
       "path": "/v1/payments/{paymentId}",
@@ -1220,6 +1364,36 @@
       "featureIds": [],
       "schemaRef": "",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/payments/{paymentId}",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "getPaymentsHistory",
+      "method": "GET",
+      "path": "/v1/payments/history",
+      "openapiPath": "/payments/history",
+      "domain": "subscription_entitlement_payment",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/payments/history",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "getPaymentsRefunds",
+      "method": "GET",
+      "path": "/v1/payments/refunds",
+      "openapiPath": "/payments/refunds",
+      "domain": "subscription_entitlement_payment",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/payments/refunds",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
         "contracts/api/api-inventory.v1.json"
@@ -1481,6 +1655,21 @@
       ]
     },
     {
+      "operationId": "getMyUsername",
+      "method": "GET",
+      "path": "/v1/users/me/username",
+      "openapiPath": "/users/me/username",
+      "domain": "users_accounts",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#get:/users/me/username",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
       "operationId": "patchAccountsAccountId",
       "method": "PATCH",
       "path": "/v1/accounts/{accountId}",
@@ -1616,6 +1805,21 @@
       ]
     },
     {
+      "operationId": "updateOwnMedia",
+      "method": "PATCH",
+      "path": "/v1/media/{mediaId}",
+      "openapiPath": "/media/{mediaId}",
+      "domain": "media",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#patch:/media/{mediaId}",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
       "operationId": "patchNotificationPreferences",
       "method": "PATCH",
       "path": "/v1/notification-preferences",
@@ -1691,6 +1895,21 @@
       "featureIds": [],
       "schemaRef": "",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#patch:/users/me",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "updateUsername",
+      "method": "PATCH",
+      "path": "/v1/users/me/username",
+      "openapiPath": "/users/me/username",
+      "domain": "users_accounts",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#patch:/users/me/username",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
         "contracts/api/api-inventory.v1.json"
@@ -1808,12 +2027,15 @@
       "openapiPath": "/admin/moderation/cases/{caseId}/decision",
       "domain": "audit_compliance",
       "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
+      "featureIds": [
+        "GOV-004"
+      ],
+      "schemaRef": "contracts/api/moderation-operation-policy.v1.json#/operations/2",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/admin/moderation/cases/{caseId}/decision",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
+        "contracts/api/api-inventory.v1.json",
+        "contracts/alignment/feature-inventory.v1.json"
       ]
     },
     {
@@ -1853,12 +2075,15 @@
       "openapiPath": "/appeals",
       "domain": "audit_compliance",
       "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
+      "featureIds": [
+        "GOV-005"
+      ],
+      "schemaRef": "contracts/api/report-appeal.v1.json#/operations/1",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/appeals",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
+        "contracts/api/api-inventory.v1.json",
+        "contracts/alignment/feature-inventory.v1.json"
       ]
     },
     {
@@ -1916,6 +2141,81 @@
       "featureIds": [],
       "schemaRef": "",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/auth/logout",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "authMfaChallengeVerify",
+      "method": "POST",
+      "path": "/v1/auth/mfa/challenge/verify",
+      "openapiPath": "/auth/mfa/challenge/verify",
+      "domain": "auth_identity",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/auth/mfa/challenge/verify",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "authMfaDisable",
+      "method": "POST",
+      "path": "/v1/auth/mfa/disable",
+      "openapiPath": "/auth/mfa/disable",
+      "domain": "auth_identity",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/auth/mfa/disable",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "authMfaEnrollmentStart",
+      "method": "POST",
+      "path": "/v1/auth/mfa/enrollment",
+      "openapiPath": "/auth/mfa/enrollment",
+      "domain": "auth_identity",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/auth/mfa/enrollment",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "authMfaEnrollmentConfirm",
+      "method": "POST",
+      "path": "/v1/auth/mfa/enrollment/confirm",
+      "openapiPath": "/auth/mfa/enrollment/confirm",
+      "domain": "auth_identity",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/auth/mfa/enrollment/confirm",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "authMfaRecoveryCodesRotate",
+      "method": "POST",
+      "path": "/v1/auth/mfa/recovery-codes/rotate",
+      "openapiPath": "/auth/mfa/recovery-codes/rotate",
+      "domain": "auth_identity",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/auth/mfa/recovery-codes/rotate",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
         "contracts/api/api-inventory.v1.json"
@@ -2021,6 +2321,21 @@
       "featureIds": [],
       "schemaRef": "",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/comments/{commentId}/likes",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "createCommerceOrder",
+      "method": "POST",
+      "path": "/v1/commerce/orders",
+      "openapiPath": "/commerce/orders",
+      "domain": "subscription_entitlement_payment",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/commerce/orders",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
         "contracts/api/api-inventory.v1.json"
@@ -2246,6 +2561,21 @@
       "featureIds": [],
       "schemaRef": "",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/contents/{contentId}/state",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "appendPostThreadNext",
+      "method": "POST",
+      "path": "/v1/contents/{contentId}/thread",
+      "openapiPath": "/contents/{contentId}/thread",
+      "domain": "interaction",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/contents/{contentId}/thread",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
         "contracts/api/api-inventory.v1.json"
@@ -2537,6 +2867,51 @@
       ]
     },
     {
+      "operationId": "createOwnMembershipPlanDraft",
+      "method": "POST",
+      "path": "/v1/membership/plans",
+      "openapiPath": "/membership/plans",
+      "domain": "subscription_entitlement_payment",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/membership/plans",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "transitionOwnMembershipPlanLifecycle",
+      "method": "POST",
+      "path": "/v1/membership/plans/{planId}/lifecycle",
+      "openapiPath": "/membership/plans/{planId}/lifecycle",
+      "domain": "subscription_entitlement_payment",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/membership/plans/{planId}/lifecycle",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "publishOwnMembershipPlan",
+      "method": "POST",
+      "path": "/v1/membership/plans/{planId}/publish",
+      "openapiPath": "/membership/plans/{planId}/publish",
+      "domain": "subscription_entitlement_payment",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/membership/plans/{planId}/publish",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
       "operationId": "createSubscription",
       "method": "POST",
       "path": "/v1/memberships/subscriptions",
@@ -2593,8 +2968,7 @@
       "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/memberships/subscriptions/{subscriptionId}/change-plan/checkout",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json",
-        "contracts/api/commerce-operation-policy.v1.json"
+        "contracts/api/api-inventory.v1.json"
       ]
     },
     {
@@ -2609,8 +2983,7 @@
       "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/memberships/subscriptions/{subscriptionId}/change-plan/interval-schedule",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json",
-        "contracts/api/commerce-operation-policy.v1.json"
+        "contracts/api/api-inventory.v1.json"
       ]
     },
     {
@@ -2625,8 +2998,7 @@
       "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/memberships/subscriptions/{subscriptionId}/change-plan/schedule",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json",
-        "contracts/api/commerce-operation-policy.v1.json"
+        "contracts/api/api-inventory.v1.json"
       ]
     },
     {
@@ -2671,8 +3043,7 @@
       "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/memberships/subscriptions/trial",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json",
-        "contracts/api/commerce-operation-policy.v1.json"
+        "contracts/api/api-inventory.v1.json"
       ]
     },
     {
@@ -2766,6 +3137,21 @@
       ]
     },
     {
+      "operationId": "postPaymentsRefunds",
+      "method": "POST",
+      "path": "/v1/payments/refunds",
+      "openapiPath": "/payments/refunds",
+      "domain": "subscription_entitlement_payment",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/payments/refunds",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
       "operationId": "postPosts",
       "method": "POST",
       "path": "/v1/posts",
@@ -2817,12 +3203,16 @@
       "openapiPath": "/reports",
       "domain": "audit_compliance",
       "status": "DISCOVERED",
-      "featureIds": [],
-      "schemaRef": "",
+      "featureIds": [
+        "GOV-001",
+        "GOV-002"
+      ],
+      "schemaRef": "contracts/api/report-appeal.v1.json#/operations/0",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/reports",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
-        "contracts/api/api-inventory.v1.json"
+        "contracts/api/api-inventory.v1.json",
+        "contracts/alignment/feature-inventory.v1.json"
       ]
     },
     {
@@ -2886,6 +3276,36 @@
       ]
     },
     {
+      "operationId": "receiveHyperswitchPaymentWebhook",
+      "method": "POST",
+      "path": "/v1/webhooks/hyperswitch",
+      "openapiPath": "/webhooks/hyperswitch",
+      "domain": "subscription_entitlement_payment",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/webhooks/hyperswitch",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "receiveRevenueCatWebhook",
+      "method": "POST",
+      "path": "/v1/webhooks/revenuecat",
+      "openapiPath": "/webhooks/revenuecat",
+      "domain": "subscription_entitlement_payment",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#post:/webhooks/revenuecat",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
       "operationId": "authCredentialReplace",
       "method": "PUT",
       "path": "/v1/auth/credentials/{credentialId}",
@@ -2895,6 +3315,21 @@
       "featureIds": [],
       "schemaRef": "",
       "openapiRef": "contracts/openapi/v1/openapi.yaml#put:/auth/credentials/{credentialId}",
+      "sourceRefs": [
+        "contracts/openapi/v1/openapi.yaml",
+        "contracts/api/api-inventory.v1.json"
+      ]
+    },
+    {
+      "operationId": "updateOwnMembershipPlan",
+      "method": "PUT",
+      "path": "/v1/membership/plans/{planId}",
+      "openapiPath": "/membership/plans/{planId}",
+      "domain": "subscription_entitlement_payment",
+      "status": "DISCOVERED",
+      "featureIds": [],
+      "schemaRef": "",
+      "openapiRef": "contracts/openapi/v1/openapi.yaml#put:/membership/plans/{planId}",
       "sourceRefs": [
         "contracts/openapi/v1/openapi.yaml",
         "contracts/api/api-inventory.v1.json"
