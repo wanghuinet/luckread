@@ -121,7 +121,8 @@ export function buildW03PostgresMigration({ inventory, contentContract, readSour
   if (/\b(?:PRAGMA|AUTOINCREMENT|strftime|julianday|GLOB)\b|\bjson_object\s*\(|\brandomblob\s*\(|\bRAISE\s*\(\s*ABORT/i.test(sql)) {
     fail('PostgreSQL template contains SQLite-only syntax')
   }
-  if (/\bFOREIGN\s+KEY\b|\bREFERENCES\b/i.test(sql)) {
+  const ddlStatements = sql.replace(/^\s*--.*$/gm, '')
+  if (/\bFOREIGN\s+KEY\b|\bREFERENCES\s+[a-z_]/i.test(ddlStatements)) {
     fail('W03 domain references must remain opaque; no foreign keys are admitted')
   }
   if (!/payload_json TEXT NOT NULL/.test(sql) ||
