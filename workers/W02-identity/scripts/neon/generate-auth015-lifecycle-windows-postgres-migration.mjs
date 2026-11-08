@@ -36,6 +36,21 @@ if (contract.migration?.preflight?.noTimestampBackfill !== true ||
   fail('no-backfill / authority invariants')
 }
 
+const trusted = contract.trustedEvaluation ?? {}
+if (
+  contract.lifecycleWindows?.coolingOff?.durationDays !== 15 ||
+  contract.lifecycleWindows?.reactivation?.durationDays !== 30 ||
+  trusted.authority !== 'W02' ||
+  trusted.clock !== 'W02 server clock; UTC ISO-8601 timestamps' ||
+  trusted.callerSuppliedPreconditionBooleanAccepted !== false ||
+  trusted.accountStateVersionCompareAndSetRequired !== true ||
+  trusted.timestampAndStateMutationSameSqlUpdate !== true ||
+  trusted.eventJournalSameD1Batch !== true ||
+  trusted.publicationJournalIsNotLifecycleTimestampAuthority !== true
+) {
+  fail('trusted lifecycle-window semantics')
+}
+
 const expected = [
   {
     fieldId: 'ENT-USER-F-DELETION-REQUESTED-AT',
