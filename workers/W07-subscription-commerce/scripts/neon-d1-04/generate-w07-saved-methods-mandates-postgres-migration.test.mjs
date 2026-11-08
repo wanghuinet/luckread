@@ -37,6 +37,6 @@ test('PAY-003 slice is additive and excludes deferred finance modules', () => {
 test('W07 PAY-003 generator fails closed when an admitted source is missing', () => {
   assert.throws(
     () => buildW07D104SavedMethodsMandatesMigration({ readSource: () => null }),
-    /Missing required W07 D1-04 saved-payment-method\/mandate source/,
+    /Missing required W07 D1-04 saved-method\/mandate source/,
   )
 })
