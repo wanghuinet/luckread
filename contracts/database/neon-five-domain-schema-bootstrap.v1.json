@@ -221,7 +221,7 @@
       "schemaSources": [
         "workers/W07-subscription-commerce/migrations-d1-04"
       ],
-      "status": "PARTIAL_W07_ORDER_PAYMENT_SAVED_METHODS_MANDATES_RENEWAL_CYCLES_REVENUECAT_REFUNDS_BILLING_LOCAL_POSTGRES18_PENDING_PAYMENT_METHOD_REVOCATION",
+      "status": "PARTIAL_W07_D1_04_PAY006_LOCAL_POSTGRES18_PASSED_PAYMENT_METHOD_REVOCATION_PENDING",
       "schemaContract": "contracts/database/neon-d1-04-w07-order-payment-schema.v1.json",
       "implementedSchemaSlices": [
         "W07_ORDER_PAYMENT_0001_0002",
@@ -237,7 +237,30 @@
         "payment_method_revocation_requests"
       ],
       "schemaVerificationEvidence": {
-        "status": "PENDING_LOCAL_POSTGRES18_REHEARSAL"
+        "status": "LOCAL_POSTGRES18_REHEARSAL_PASSED",
+        "workflowRunId": 42496761021,
+        "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42496761021",
+        "verifiedHeadSha": "4f297c4b72fb918427c93742a08edf72686bfb4c",
+        "postgresVersion": "18.6",
+        "database": "luckread_finance_schema",
+        "sourceRegressionTests": 24,
+        "newSliceTables": 2,
+        "newSliceExplicitIndexes": 4,
+        "newSliceTriggers": 9,
+        "newSliceTriggerFunctions": 1,
+        "cumulativeTables": 14,
+        "cumulativeExplicitIndexes": 29,
+        "cumulativeTriggers": 65,
+        "cumulativeTriggerFunctions": 5,
+        "foreignKeys": 0,
+        "businessFixtureRowsAfterRollback": 0,
+        "schedulerControlRowsAfterRollback": 1,
+        "evidenceArtifactId": 13624255504,
+        "evidenceArtifactSha256": "sha256:ba7c2486d3287d495b5bffcad7b2a17e4b895951b2931d25e32d7944cd0e0b81",
+        "remoteNeonTouched": false,
+        "cloudflareD1Touched": false,
+        "businessDataImported": false,
+        "productionCutoverAuthorized": false
       },
       "remoteSchemaApplied": false,
       "schemaSliceContracts": [
@@ -289,6 +312,32 @@
         "businessDataImported": false,
         "productionCutoverAuthorized": false,
         "evidenceArtifactId": 13621195000
+      },
+      "latestSliceVerificationEvidence": {
+        "status": "LOCAL_POSTGRES18_REHEARSAL_PASSED",
+        "workflowRunId": 42496761021,
+        "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42496761021",
+        "verifiedHeadSha": "4f297c4b72fb918427c93742a08edf72686bfb4c",
+        "postgresVersion": "18.6",
+        "database": "luckread_finance_schema",
+        "sourceRegressionTests": 24,
+        "newSliceTables": 2,
+        "newSliceExplicitIndexes": 4,
+        "newSliceTriggers": 9,
+        "newSliceTriggerFunctions": 1,
+        "cumulativeTables": 14,
+        "cumulativeExplicitIndexes": 29,
+        "cumulativeTriggers": 65,
+        "cumulativeTriggerFunctions": 5,
+        "foreignKeys": 0,
+        "businessFixtureRowsAfterRollback": 0,
+        "schedulerControlRowsAfterRollback": 1,
+        "evidenceArtifactId": 13624255504,
+        "evidenceArtifactSha256": "sha256:ba7c2486d3287d495b5bffcad7b2a17e4b895951b2931d25e32d7944cd0e0b81",
+        "remoteNeonTouched": false,
+        "cloudflareD1Touched": false,
+        "businessDataImported": false,
+        "productionCutoverAuthorized": false
       }
     },
     {
