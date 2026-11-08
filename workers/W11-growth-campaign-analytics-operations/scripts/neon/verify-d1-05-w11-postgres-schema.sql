@@ -7,6 +7,7 @@ DECLARE
   foreign_key_count INTEGER;
   trigger_count INTEGER;
   identity_column_count INTEGER;
+  collated_time_column_count INTEGER;
   actual_tables TEXT[];
 BEGIN
   IF current_setting('server_version_num')::INTEGER / 10000 <> 18 THEN
@@ -79,6 +80,28 @@ BEGIN
     AND column_name = ANY (ARRAY['actor_id', 'visitor_id', 'session_id']);
   IF identity_column_count <> 0 THEN
     RAISE EXCEPTION 'DIRECT_ACTOR_VISITOR_OR_SESSION_IDENTIFIERS_MUST_NOT_BE_PERSISTED';
+  END IF;
+
+  SELECT count(*) INTO collated_time_column_count
+  FROM information_schema.columns
+  WHERE table_schema = current_schema()
+    AND table_name = ANY (ARRAY[
+      'analytics_event_dedupe',
+      'analytics_content_hourly',
+      'analytics_creator_hourly',
+      'analytics_rollup_watermark',
+      'analytics_reconciliation_status',
+      'analytics_projection_rebuild_state'
+    ])
+    AND column_name = ANY (ARRAY[
+      'occurred_at', 'received_at', 'hour_start', 'ingested_at',
+      'last_event_at', 'updated_at', 'window_from', 'window_to',
+      'created_at', 'started_at', 'completed_at'
+    ])
+    AND data_type = 'text'
+    AND collation_name = 'C';
+  IF collated_time_column_count <> 15 THEN
+    RAISE EXCEPTION 'EXPECTED_15_BINARY_COLLATION_TIME_COLUMNS_GOT_%', collated_time_column_count;
   END IF;
 
   IF to_regclass(format('%I.%I', current_schema(), 'campaigns')) IS NOT NULL
