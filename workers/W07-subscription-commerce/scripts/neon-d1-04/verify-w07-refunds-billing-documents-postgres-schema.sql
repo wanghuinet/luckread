@@ -1,4 +1,4 @@
-\\set ON_ERROR_STOP on
+\set ON_ERROR_STOP on
 
 -- PAY-006 D1-04 W07 refunds/billing PostgreSQL 18 cumulative local postflight.
 -- Disposable local database only; no Neon or Cloudflare D1 connection.
