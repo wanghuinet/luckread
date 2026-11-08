@@ -114,7 +114,7 @@ for (const indexName of sourceIndexNames) {
     fail('W08 source-defined index missing from PostgreSQL DDL: ' + indexName)
   }
 }
-const normalizeSql = (value) => value.replace(/\\s+/g, '')
+const normalizeSql = (value) => value.replace(/\s+/g, '')
 for (const token of [
   "('PERSONAL','WRITER','VIDEO_CREATOR','DEVELOPER','ARTIST','OTHER')",
   "('PENDING','APPROVED','REJECTED')",
@@ -158,7 +158,8 @@ if ((sql.match(/CREATE TABLE\s+/gi) ?? []).length !== 3) {
 if ((sql.match(/CREATE (?:UNIQUE )?INDEX\s+/gi) ?? []).length !== 5) {
   fail('W08 PostgreSQL migration must preserve exactly five explicit source indexes')
 }
-if (/\bFOREIGN\s+KEY\b|\bREFERENCES\b/i.test(sql)) {
+const ddlStatements = sql.replace(/^\s*--.*$/gm, '')
+if (/\bFOREIGN\s+KEY\b|\bREFERENCES\b/i.test(ddlStatements)) {
   fail('W08 must not introduce cross-domain or undocumented foreign keys')
 }
 if (/CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:public\.)?(?:role_assignments?|users?|membership_subscriptions|orders?|payments?|refunds?)\b/i.test(sql)) {
