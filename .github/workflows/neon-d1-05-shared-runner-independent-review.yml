@@ -1,0 +1,90 @@
+name: D1-05 Shared Runner Independent Local Review
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/neon-d1-05-shared-runner-independent-review.yml'
+      - 'contracts/database/neon-d1-05-shared-runner-independent-review.v1.json'
+      - 'contracts/database/neon-d1-05-shared-migration-manifest.v1.json'
+      - 'contracts/database/neon-d1-05-w11-analytics-schema.v1.json'
+      - 'contracts/transport/d1-05-analytics-owner-boundary.v1.json'
+      - 'contracts/transport/d1-03-entity-owner-boundary.v1.json'
+      - 'contracts/transport/worker-d1-access-boundary.v1.json'
+      - 'scripts/neon/shared-domain-schema-runner.mjs'
+      - 'scripts/neon/shared-domain-schema-runner.test.mjs'
+      - 'scripts/neon/review-d1-05-shared-runner-independent.mjs'
+      - 'scripts/neon/review-d1-05-shared-runner-independent.test.mjs'
+      - 'workers/W11-growth-campaign-analytics-operations/wrangler.jsonc'
+      - 'workers/W11-growth-campaign-analytics-operations/migrations/**'
+      - 'workers/W11-growth-campaign-analytics-operations/src/neon-postgres-migrations-d1-05/**'
+      - 'workers/W11-growth-campaign-analytics-operations/scripts/neon/**'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/neon-d1-05-shared-runner-independent-review.yml'
+      - 'contracts/database/neon-d1-05-shared-runner-independent-review.v1.json'
+      - 'contracts/database/neon-d1-05-shared-migration-manifest.v1.json'
+      - 'contracts/database/neon-d1-05-w11-analytics-schema.v1.json'
+      - 'contracts/transport/d1-05-analytics-owner-boundary.v1.json'
+      - 'contracts/transport/d1-03-entity-owner-boundary.v1.json'
+      - 'contracts/transport/worker-d1-access-boundary.v1.json'
+      - 'scripts/neon/shared-domain-schema-runner.mjs'
+      - 'scripts/neon/shared-domain-schema-runner.test.mjs'
+      - 'scripts/neon/review-d1-05-shared-runner-independent.mjs'
+      - 'scripts/neon/review-d1-05-shared-runner-independent.test.mjs'
+      - 'workers/W11-growth-campaign-analytics-operations/wrangler.jsonc'
+      - 'workers/W11-growth-campaign-analytics-operations/migrations/**'
+      - 'workers/W11-growth-campaign-analytics-operations/scripts/neon/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: neon-d1-05-shared-runner-independent-review-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  independent-review:
+    name: Independently review W11 D1-05 ownership, privacy boundaries and local-only runner
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout reviewed source
+        uses: actions/checkout@v4
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Run D1-05 independent review, shared runner and source generator tests
+        run: |
+          set -euo pipefail
+          node --check scripts/neon/review-d1-05-shared-runner-independent.mjs
+          node --test \
+            scripts/neon/shared-domain-schema-runner.test.mjs \
+            scripts/neon/review-d1-05-shared-runner-independent.test.mjs \
+            workers/W11-growth-campaign-analytics-operations/scripts/neon/generate-d1-05-w11-postgres-migration.test.mjs \
+            workers/W11-growth-campaign-analytics-operations/scripts/neon/verify-d1-03-w11-owner-reconciliation.test.mjs
+      - name: Regenerate the W11 PostgreSQL 18 artifact from four admitted D1 sources
+        run: |
+          set -euo pipefail
+          node workers/W11-growth-campaign-analytics-operations/scripts/neon/generate-d1-05-w11-postgres-migration.mjs
+          git diff --exit-code -- \
+            workers/W11-growth-campaign-analytics-operations/src/neon-postgres-migrations-d1-05/0001_w11_d1_05_analytics_schema.sql
+      - name: Re-run the existing W11 D1-03 logical owner reconciliation
+        run: |
+          set -euo pipefail
+          node workers/W11-growth-campaign-analytics-operations/scripts/neon/verify-d1-03-w11-owner-reconciliation.mjs
+      - name: Emit independent D1-05 local review evidence
+        run: |
+          set -euo pipefail
+          node scripts/neon/review-d1-05-shared-runner-independent.mjs
+      - name: Upload D1-05 independent review evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: neon-d1-05-shared-runner-independent-review-${{ github.sha }}
+          path: artifacts/neon/d1-05-shared-runner-independent-review.json
+          if-no-files-found: error
+          retention-days: 90

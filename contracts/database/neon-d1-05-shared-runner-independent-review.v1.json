@@ -1,0 +1,138 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/database/neon-d1-05-shared-runner-independent-review.v1.json",
+  "title": "LuckRead D1-05 Shared Schema Runner Independent Review",
+  "version": "1.0.0",
+  "status": "LOCAL_SHARED_SCHEMA_REVIEW_PASSED_ADMISSION_BLOCKED",
+  "review": {
+    "reviewKind": "AUTOMATED_INDEPENDENT_READ_ONLY_CODE_PATH_REVIEW",
+    "description": "Independent read-only review of W11-only D1-05 analytics ownership, four D1 source migrations, the PostgreSQL 18 schema baseline, privacy minimization, source-generator determinism and the shared runner's local-only restriction. This review is not remote DDL admission.",
+    "reviewedMainCommit": "920fef62b93e1798257a51bc9a42633fe24e4ec3",
+    "sharedExecutorPullRequest": 1660,
+    "sharedExecutorHeadCommit": "5e8bfaf7bd26fe8669c08de1e062d998c4f4c6de",
+    "sharedPostgres18WorkflowRunId": 42509822425,
+    "sharedPostgres18WorkflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42509822425",
+    "d105StandalonePostgres18WorkflowRunId": 42508098818,
+    "d105StandalonePostgres18WorkflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42508098818",
+    "d1Postflight": {
+      "domainId": "D1-05",
+      "databaseName": "allluck",
+      "localDatabaseName": "alluck_d1_05_shared",
+      "postgresMajor": 18,
+      "migrations": 1,
+      "sourceMigrations": 4,
+      "tables": 6,
+      "explicitIndexes": 8,
+      "triggers": 0,
+      "triggerFunctions": 0,
+      "foreignKeys": 0,
+      "controlSeedRows": 0,
+      "businessRows": 0,
+      "utcTimeTextColumnsWithBinaryCollation": 15,
+      "remoteNeonTouched": false,
+      "cloudflareD1Touched": false,
+      "remoteApplyReady": false
+    },
+    "privacyBoundary": {
+      "actorIdPersisted": false,
+      "visitorIdPersisted": false,
+      "sessionIdPersisted": false,
+      "creatorIdPersisted": true,
+      "creatorIdPurpose": "Existing analytics dimension admitted by the D1 schema; retention, deletion and consent/purpose rules remain missing and block remote admission."
+    },
+    "reviewedSourcePins": [
+      {
+        "path": "scripts/neon/shared-domain-schema-runner.mjs",
+        "gitBlobSha1": "53706e33929da41f331acf3892d223d341762817"
+      },
+      {
+        "path": "contracts/database/neon-d1-05-shared-migration-manifest.v1.json",
+        "gitBlobSha1": "8c4759f1d2f3f06228c0baebcad410514d02b75b"
+      },
+      {
+        "path": "contracts/database/neon-d1-05-w11-analytics-schema.v1.json",
+        "gitBlobSha1": "949a5c80a3ed56a73b66bebcc0849d6875c065a6"
+      },
+      {
+        "path": "contracts/transport/d1-05-analytics-owner-boundary.v1.json",
+        "gitBlobSha1": "ec4e6ced8adc76b1a11b6d92b9c72fe1dc3c1e40"
+      },
+      {
+        "path": "contracts/transport/worker-d1-access-boundary.v1.json",
+        "gitBlobSha1": "fb269371ba3f3d6952f019b7b6c47ad1315e0c7d"
+      },
+      {
+        "path": "contracts/transport/d1-03-entity-owner-boundary.v1.json",
+        "gitBlobSha1": "e271a1402d2f2600b88271c29f2e694be70f30c2"
+      },
+      {
+        "path": "workers/W11-growth-campaign-analytics-operations/wrangler.jsonc",
+        "gitBlobSha1": "7df80ec418aa46bb2ba09fa9252c88138d00ceaf"
+      },
+      {
+        "path": "workers/W11-growth-campaign-analytics-operations/migrations/0001_analytics_projection.sql",
+        "gitBlobSha1": "e957128a506ec21a1fa30c92ea062cc15dc83c23"
+      },
+      {
+        "path": "workers/W11-growth-campaign-analytics-operations/migrations/0002_analytics_projection_rebuild_state.sql",
+        "gitBlobSha1": "b4935dd6927c4410bc950744f2f7126f3ed9c076"
+      },
+      {
+        "path": "workers/W11-growth-campaign-analytics-operations/migrations/0003_analytics_late_event_replay.sql",
+        "gitBlobSha1": "699f0f63cbef1a6a98e7163362e22d6fd9c6324d"
+      },
+      {
+        "path": "workers/W11-growth-campaign-analytics-operations/migrations/0004_analytics_w01_client_telemetry.sql",
+        "gitBlobSha1": "d265bbb7b3eb8e56c5b9fd3c5a947d17d7f53db3"
+      },
+      {
+        "path": "workers/W11-growth-campaign-analytics-operations/src/neon-postgres-migrations-d1-05/0001_w11_d1_05_analytics_schema.sql",
+        "gitBlobSha1": "020f05b82b13ad9541825b19ede2e24e16537384"
+      },
+      {
+        "path": "workers/W11-growth-campaign-analytics-operations/scripts/neon/generate-d1-05-w11-postgres-migration.mjs",
+        "gitBlobSha1": "0254a4396adf3dcbfa66ba4f7fefbc954935f26f"
+      },
+      {
+        "path": "workers/W11-growth-campaign-analytics-operations/scripts/neon/generate-d1-05-w11-postgres-migration.test.mjs",
+        "gitBlobSha1": "839d0cba87252598b668e32dc24b11153da0289e"
+      },
+      {
+        "path": "workers/W11-growth-campaign-analytics-operations/scripts/neon/templates/d1-05-w11-analytics-postgres.sql",
+        "gitBlobSha1": "020f05b82b13ad9541825b19ede2e24e16537384"
+      }
+    ]
+  },
+  "reviewChecks": [
+    "D1-05 is the canonical W11-exclusive analytics-only domain and retains the existing physical UUID.",
+    "W11 Wrangler retains exactly its pre-existing D1_05 binding to allluck and does not acquire a D1_03 binding.",
+    "The D1-05 shared manifest contains exactly one W11 PostgreSQL baseline migration and maps all four existing W11 D1 source migrations to that baseline.",
+    "The final PostgreSQL schema contains exactly six analytics tables, eight explicit indexes, zero foreign keys, zero triggers, zero trigger functions and zero control seed rows.",
+    "The SQL artifact does not create Campaign or GrowthOperation tables; those remain W11 logical D1-03 owners only.",
+    "No actor_id, visitor_id or session_id is persisted; actor_type and creator_id remain constrained by the current schema contract.",
+    "All 15 timestamp/hour text columns use PostgreSQL COLLATE C to preserve source SQLite BINARY ordering.",
+    "W01/W03 content telemetry and W05 authoritative social-event source ownership remain enforced by the source schema constraints.",
+    "The generator pins all four D1 migration Git blob SHA-1 values and the committed PostgreSQL artifact is deterministic.",
+    "The shared runner continues to reject remote Neon execution and accepts only an exact local PostgreSQL 18 database."
+  ],
+  "remoteApplyReady": false,
+  "businessDataImport": false,
+  "productionCutoverAuthorized": false,
+  "safety": {
+    "newWorkers": 0,
+    "newD1Databases": 0,
+    "newQueues": 0,
+    "newServiceBindings": 0,
+    "runtimeBindingsChanged": false,
+    "remoteNeonDdlExecuted": false,
+    "cloudflareD1Touched": false,
+    "businessDataImported": false,
+    "productionCutoverAuthorized": false
+  },
+  "remoteApplyBlockers": [
+    "Retention policy for each analytics event and derived aggregate class, including bounded late-event replay horizon, is missing.",
+    "Deletion/privacy-request behavior for actor-linked and creator-linked analytics projections is missing.",
+    "Consent, lawful purpose and collection eligibility rules for anonymous and authenticated telemetry are missing.",
+    "A separate reviewed remote runner release record and domain-specific remote schema approval are still required."
+  ]
+}
