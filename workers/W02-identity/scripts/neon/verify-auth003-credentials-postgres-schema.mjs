@@ -141,6 +141,20 @@ try {
   ), '23503')
   assertionsPassed++
 
+  const concurrentClaims = await Promise.allSettled([
+    insertCredential('auth003-concurrent-a-' + suffix, identityId, 'phone',
+      'hash-concurrent-a-' + suffix, 'concurrent-phone-' + suffix, true),
+    insertCredential('auth003-concurrent-b-' + suffix, otherIdentityId, 'phone',
+      'hash-concurrent-b-' + suffix, 'concurrent-phone-' + suffix, true),
+  ])
+  const concurrentWinners = concurrentClaims.filter((result) => result.status === 'fulfilled').length
+  const concurrentConflicts = concurrentClaims.filter((result) =>
+    result.status === 'rejected' && result.reason?.code === '23505',
+  ).length
+  assert(concurrentWinners === 1 && concurrentConflicts === 1,
+    'concurrent same-kind credential claims must have exactly one authoritative winner')
+  assertionsPassed++
+
   await expectPgCode('duplicate normalized username identity', () => insertIdentity(
     'auth003-identity-dup-name-' + suffix, 'auth003-user-c-' + suffix, 'normalized-user-' + suffix, null, null,
   ), '23505')
@@ -194,6 +208,7 @@ try {
       uniquenessIsScopedToKindAndNormalizedValue: true,
       differentKindsMayShareNormalizedValue: true,
       duplicateSameKindValueRejected: true,
+      concurrentSameKindClaimHasSingleWinner: true,
       duplicateHashRejected: true,
       identityDeleteCascadesCredentials: true,
       unknownKindRejected: true,
