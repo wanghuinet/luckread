@@ -1,0 +1,185 @@
+name: Neon D1-01 W02 Identity PostgreSQL 18 Local Rehearsal
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/neon-d1-01-w02-identity-postgres-rehearsal.yml'
+      - 'contracts/database/neon-d1-01-w02-identity-schema.v1.json'
+      - 'contracts/database/neon-d1-01-schema-sources.v1.json'
+      - 'contracts/database/neon-five-domain-schema-bootstrap.v1.json'
+      - 'contracts/entity/AUTHZ-role-assignment-authority.v1.json'
+      - 'contracts/entity/AUTH-003-identity-field-contract.v1.json'
+      - 'contracts/entity/AUTH-003-credential-field-contract.v1.json'
+      - 'contracts/entity/AUTH-007-mfa-factor-field-contract.v1.json'
+      - 'contracts/state-machines/AUTH-007-mfa-lifecycle.v1.json'
+      - 'contracts/migration/AUTH-013-publication-journal.v1.json'
+      - 'contracts/migration/AUTH-010-session-revocation-journal.v1.json'
+      - 'contracts/migration/AUTH-007-mfa-publication-journal.v1.json'
+      - 'contracts/migration/AUTH-007-mfa-operation-receipt.v1.json'
+      - 'contracts/persistence/AUTH-015-account-lifecycle-window-persistence-contract.v1.json'
+      - 'contracts/security/username-reservation-policy.v1.json'
+      - 'contracts/events/identity-account-state-changed.v1.json'
+      - 'contracts/events/AUTH-010-session-revoked-binding.v1.json'
+      - 'contracts/events/AUTH-007-mfa-audit-binding.v1.json'
+      - 'docs/change-control/CC-W02-USERNAME-CHANGE-AUTHORITY-2026-11-02.md'
+      - 'workers/W02-identity/package.json'
+      - 'workers/W02-identity/src/auth/better-auth.ts'
+      - 'workers/W02-identity/src/auth/neon-postgres-schema.config.ts'
+      - 'workers/W02-identity/migrations/**'
+      - 'workers/W02-identity/scripts/neon/**'
+      - 'workers/W02-identity/src/neon-postgres-migrations/**'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/neon-d1-01-w02-identity-postgres-rehearsal.yml'
+      - 'contracts/database/neon-d1-01-w02-identity-schema.v1.json'
+      - 'contracts/database/neon-d1-01-schema-sources.v1.json'
+      - 'contracts/database/neon-five-domain-schema-bootstrap.v1.json'
+      - 'contracts/entity/AUTHZ-role-assignment-authority.v1.json'
+      - 'contracts/entity/AUTH-003-identity-field-contract.v1.json'
+      - 'contracts/entity/AUTH-003-credential-field-contract.v1.json'
+      - 'contracts/entity/AUTH-007-mfa-factor-field-contract.v1.json'
+      - 'contracts/state-machines/AUTH-007-mfa-lifecycle.v1.json'
+      - 'contracts/migration/AUTH-013-publication-journal.v1.json'
+      - 'contracts/migration/AUTH-010-session-revocation-journal.v1.json'
+      - 'contracts/migration/AUTH-007-mfa-publication-journal.v1.json'
+      - 'contracts/migration/AUTH-007-mfa-operation-receipt.v1.json'
+      - 'contracts/persistence/AUTH-015-account-lifecycle-window-persistence-contract.v1.json'
+      - 'contracts/security/username-reservation-policy.v1.json'
+      - 'contracts/events/identity-account-state-changed.v1.json'
+      - 'contracts/events/AUTH-010-session-revoked-binding.v1.json'
+      - 'contracts/events/AUTH-007-mfa-audit-binding.v1.json'
+      - 'docs/change-control/CC-W02-USERNAME-CHANGE-AUTHORITY-2026-11-02.md'
+      - 'workers/W02-identity/package.json'
+      - 'workers/W02-identity/src/auth/better-auth.ts'
+      - 'workers/W02-identity/src/auth/neon-postgres-schema.config.ts'
+      - 'workers/W02-identity/migrations/**'
+      - 'workers/W02-identity/scripts/neon/**'
+      - 'workers/W02-identity/src/neon-postgres-migrations/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: neon-d1-01-w02-identity-postgres-rehearsal-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  w02-identity-local-rehearsal:
+    name: Rehearse W02 Better Auth identity schema on disposable PostgreSQL 18
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:18.6
+        env:
+          POSTGRES_USER: schema_generator
+          POSTGRES_PASSWORD: schema_local_only
+          POSTGRES_DB: luckread_schema
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U schema_generator -d luckread_schema"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - name: Checkout reviewed source
+        uses: actions/checkout@v4
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install pinned W02 schema tooling
+        working-directory: workers/W02-identity
+        run: npm install --no-package-lock --no-audit --no-fund
+
+      - name: Generate Better Auth 1.7.8 core schema and reconcile committed W02 PostgreSQL artifacts
+        working-directory: workers/W02-identity
+        env:
+          W02_SCHEMA_PGHOST: 127.0.0.1
+          W02_SCHEMA_PGPORT: 5432
+          W02_SCHEMA_PGUSER: schema_generator
+          W02_SCHEMA_PGPASSWORD: schema_local_only
+          W02_SCHEMA_PGDATABASE: luckread_schema
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/neon
+          npm run neon:schema:generate
+          npm run neon:role-assignment:generate
+          npm run neon:auth003:generate
+          npm run neon:auth013-journal:generate
+          npm run neon:auth015:generate
+          npm run neon:auth010:generate
+          npm run neon:auth007-mfa:generate
+          npm run neon:username-change:generate
+          npm run neon:auth007-mfa-journal:generate
+          npm run neon:auth007-mfa-receipts:generate
+          git diff --exit-code -- src/neon-postgres-migrations
+          sha256sum artifacts/neon/w02-better-auth-postgres-schema.sql \
+            > artifacts/neon/w02-better-auth-core-schema.sha256
+
+      - name: Apply W02 schema to disposable PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          W02_SCHEMA_DATABASE_URL: postgresql://schema_generator:schema_local_only@127.0.0.1:5432/luckread_schema
+        run: |
+          set -euo pipefail
+          psql "$W02_SCHEMA_DATABASE_URL" \
+            --set ON_ERROR_STOP=1 --no-psqlrc --single-transaction \
+            --file artifacts/neon/w02-better-auth-postgres-schema.sql \
+            --file src/neon-postgres-migrations/0001_role_assignments.sql \
+            --file src/neon-postgres-migrations/0002_role_authorization_versions.sql \
+            --file src/neon-postgres-migrations/0003_auth_003_credentials.sql \
+            --file src/neon-postgres-migrations/0004_auth_013_publication_journal.sql \
+            --file src/neon-postgres-migrations/0005_auth_015_lifecycle_windows.sql \
+            --file src/neon-postgres-migrations/0006_auth_010_session_revocation_journal.sql \
+            --file src/neon-postgres-migrations/0007_auth_007_mfa_lifecycle.sql \
+            --file src/neon-postgres-migrations/0008_auth_username_change_state.sql \
+            --file src/neon-postgres-migrations/0009_auth_007_mfa_publication_journal.sql \
+            --file src/neon-postgres-migrations/0010_auth_007_mfa_operation_receipts.sql \
+            | tee artifacts/neon/w02-schema-apply.txt
+
+      - name: Verify Better Auth core schema and all W02 PostgreSQL contracts
+        working-directory: workers/W02-identity
+        env:
+          W02_SCHEMA_DATABASE_URL: postgresql://schema_generator:schema_local_only@127.0.0.1:5432/luckread_schema
+          W02_SCHEMA_EXPECTED_DATABASE: luckread_schema
+          W02_SCHEMA_PGHOST: 127.0.0.1
+          W02_SCHEMA_PGPORT: 5432
+          W02_SCHEMA_PGUSER: schema_generator
+          W02_SCHEMA_PGPASSWORD: schema_local_only
+          W02_SCHEMA_PGDATABASE: luckread_schema
+        run: |
+          set -euo pipefail
+          npm run neon:schema:check
+          npm run neon:role-assignment:verify
+          npm run neon:auth003:verify
+          npm run neon:auth013-journal:verify
+          npm run neon:auth015:verify
+          npm run neon:auth010:verify
+          npm run neon:auth007-mfa:verify
+          npm run neon:username-change:verify
+          npm run neon:auth007-mfa-journal:verify
+          npm run neon:auth007-mfa-receipts:verify
+          psql "$W02_SCHEMA_DATABASE_URL" --set ON_ERROR_STOP=1 --no-psqlrc \
+            --file scripts/neon/verify-w02-identity-postgres-schema.sql \
+            | tee artifacts/neon/w02-identity-postflight.txt
+
+      - name: Upload W02 D1-01 PostgreSQL 18 rehearsal evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: neon-d1-01-w02-identity-postgres18-${{ github.sha }}
+          path: workers/W02-identity/artifacts/neon/
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Remove local-only generated SQL and evidence directory
+        if: always()
+        working-directory: workers/W02-identity
+        run: rm -rf artifacts/neon
