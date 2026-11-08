@@ -54,7 +54,7 @@ function sqlReferenceTargets(sql) {
   const code = String(sql)
     .replace(/\/\*[\s\S]*?\*\//g, ' ')
     .replace(/^--.*$/gm, ' ')
-    .replace(/(\$[A-Za-z_0-9]*$)[\s\S]*?\1/g, ' ')
+    .replace(/(\$[A-Za-z_0-9]*\$)[\s\S]*?\1/g, ' ')
     .replace(/'(?:''|[^'])*'/g, ' ')
   return namesIn(code, /\bREFERENCES\s+(?:(?:public)\s*\.\s*)?"?([A-Za-z_][A-Za-z0-9_$]*)"?/gim)
 }
