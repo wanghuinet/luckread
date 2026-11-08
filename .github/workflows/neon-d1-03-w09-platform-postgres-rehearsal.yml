@@ -7,6 +7,9 @@ on:
       - '.github/workflows/neon-d1-03-w09-platform-postgres-rehearsal.yml'
       - '.github/workflows/d1-03-entity-owner-boundary-gate.yml'
       - 'contracts/database/neon-d1-03-w09-platform-schema.v1.json'
+      - 'contracts/database/neon-d1-03-w09-owner-reconciliation.v1.json'
+      - 'workers/W09-platform/scripts/neon/verify-d1-03-w09-owner-reconciliation.mjs'
+      - 'workers/W09-platform/scripts/neon/verify-d1-03-w09-owner-reconciliation.test.mjs'
       - 'contracts/schemas/common/audit-event.json'
       - 'contracts/persistence/NOTIFY-002-W05-D1-03-PUSH-ENDPOINT-PERSISTENCE.v1.json'
       - 'contracts/transport/d1-03-entity-owner-boundary.v1.json'
@@ -26,6 +29,9 @@ on:
       - '.github/workflows/neon-d1-03-w09-platform-postgres-rehearsal.yml'
       - '.github/workflows/d1-03-entity-owner-boundary-gate.yml'
       - 'contracts/database/neon-d1-03-w09-platform-schema.v1.json'
+      - 'contracts/database/neon-d1-03-w09-owner-reconciliation.v1.json'
+      - 'workers/W09-platform/scripts/neon/verify-d1-03-w09-owner-reconciliation.mjs'
+      - 'workers/W09-platform/scripts/neon/verify-d1-03-w09-owner-reconciliation.test.mjs'
       - 'contracts/schemas/common/audit-event.json'
       - 'contracts/persistence/NOTIFY-002-W05-D1-03-PUSH-ENDPOINT-PERSISTENCE.v1.json'
       - 'contracts/transport/d1-03-entity-owner-boundary.v1.json'
@@ -80,7 +86,9 @@ jobs:
         run: |
           set -euo pipefail
           node --check workers/W09-platform/scripts/neon/generate-d1-03-w09-postgres-migration.mjs
-          node --test workers/W09-platform/scripts/neon/generate-d1-03-w09-postgres-migration.test.mjs
+          node --check workers/W09-platform/scripts/neon/verify-d1-03-w09-owner-reconciliation.mjs
+          node --test workers/W09-platform/scripts/neon/generate-d1-03-w09-postgres-migration.test.mjs workers/W09-platform/scripts/neon/verify-d1-03-w09-owner-reconciliation.test.mjs
+          node workers/W09-platform/scripts/neon/verify-d1-03-w09-owner-reconciliation.mjs
           node workers/W09-platform/scripts/neon/generate-d1-03-w09-postgres-migration.mjs
           node scripts/verify-d1-03-entity-owner-boundary.mjs
           git diff --exit-code -- workers/W09-platform/src/neon-postgres-migrations/0001_w09_d1_03_platform_schema.sql
