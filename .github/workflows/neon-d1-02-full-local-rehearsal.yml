@@ -1,0 +1,141 @@
+name: Neon D1-02 Combined PostgreSQL 18 Full Local Rehearsal
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/neon-d1-02-full-local-rehearsal.yml'
+      - 'contracts/database/neon-d1-02-schema-sources.v1.json'
+      - 'contracts/database/neon-d1-02-combined-schema.v1.json'
+      - 'contracts/persistence/CONTENT-ARTICLE-d1-02-persistence.v1.json'
+      - 'contracts/persistence/SOCIAL-001-follow-relationship-persistence-contract.v1.json'
+      - 'contracts/persistence/SOCIAL-001-follow-relationship-migration-contract.v1.json'
+      - 'contracts/transport/W05-W09-notification-push-delivery.v1.json'
+      - 'workers/W03-content/migrations/**'
+      - 'workers/W03-content/scripts/neon/**'
+      - 'workers/W03-content/src/neon-postgres-migrations/**'
+      - 'workers/W05-social/migrations/**'
+      - 'workers/W05-social/scripts/neon/**'
+      - 'workers/W05-social/src/neon-postgres-migrations/**'
+      - 'scripts/neon/d1-02/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: neon-d1-02-full-local-rehearsal-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  combined-local-rehearsal:
+    name: Rehearse W03 and W05 together on disposable PostgreSQL 18
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:18.6
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres_local_only
+          POSTGRES_DB: luckread_d1_02_schema
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d luckread_d1_02_schema"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - name: Checkout reviewed change
+        uses: actions/checkout@v4
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Run both owner suites and combined static contract
+        run: |
+          set -euo pipefail
+          node --test workers/W03-content/scripts/neon/generate-d1-02-postgres-migration.test.mjs
+          node --test workers/W05-social/scripts/neon/generate-d1-02-postgres-migration.test.mjs
+          node --test scripts/neon/d1-02/verify-combined-schema-contract.test.mjs
+          mkdir -p artifacts/neon
+          node workers/W03-content/scripts/neon/generate-d1-02-postgres-migration.mjs --report artifacts/neon/w03-d1-02-source-hashes.json
+          node workers/W05-social/scripts/neon/generate-d1-02-postgres-migration.mjs --report artifacts/neon/w05-d1-02-source-hashes.json
+          node scripts/neon/d1-02/verify-combined-schema-contract.mjs --report artifacts/neon/d1-02-combined-schema-contract-report.json
+          git diff --exit-code -- \
+            workers/W03-content/src/neon-postgres-migrations/0001_w03_d1_02_content_schema.sql \
+            workers/W05-social/src/neon-postgres-migrations/0001_w05_d1_02_social_schema.sql
+
+      - name: Apply W03 PostgreSQL-native schema first
+        run: |
+          set -euo pipefail
+          psql "postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_d1_02_schema" \
+            --set ON_ERROR_STOP=1 --no-psqlrc \
+            --file workers/W03-content/src/neon-postgres-migrations/0001_w03_d1_02_content_schema.sql
+
+      - name: Apply W05 PostgreSQL-native schema into the same database
+        run: |
+          set -euo pipefail
+          psql "postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_d1_02_schema" \
+            --set ON_ERROR_STOP=1 --no-psqlrc \
+            --file workers/W05-social/src/neon-postgres-migrations/0001_w05_d1_02_social_schema.sql
+
+      - name: Verify combined catalog and W03-W05 event/reference semantics
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/neon
+          psql "postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_d1_02_schema" \
+            --set ON_ERROR_STOP=1 --no-psqlrc \
+            --file scripts/neon/d1-02/verify-combined-postgres-schema.sql
+          node --input-type=module <<'NODE'
+          import { execFileSync } from 'node:child_process'
+          import { readFile, writeFile } from 'node:fs/promises'
+          const url = 'postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_d1_02_schema'
+          const sql = [
+            "SELECT json_build_object(",
+            "'database',current_database(),",
+            "'postgresMajor',current_setting('server_version_num')::int/10000,",
+            "'tables',(SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE'),",
+            "'explicitIndexes',(SELECT count(*) FROM pg_indexes WHERE schemaname='public' AND (indexname ~ '_idx$' OR indexname ~ '^(uq_|ix_)')),",
+            "'triggers',(SELECT count(*) FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND NOT t.tgisinternal),",
+            "'triggerFunctions',(SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public' AND (p.proname LIKE 'w03_%' OR p.proname LIKE 'w05_%')),",
+            "'businessRows',(SELECT count(*) FROM contents)+(SELECT count(*) FROM content_mutation_idempotency)+(SELECT count(*) FROM content_outbox_events)+(SELECT count(*) FROM content_txn_guard)+(SELECT count(*) FROM content_revisions)+(SELECT count(*) FROM content_relationships)+(SELECT count(*) FROM content_series)+(SELECT count(*) FROM content_collections)+(SELECT count(*) FROM social_follow_relationships)+(SELECT count(*) FROM interaction_likes)+(SELECT count(*) FROM social_comments)+(SELECT count(*) FROM interaction_favorites)+(SELECT count(*) FROM social_share_links)+(SELECT count(*) FROM social_user_interactions)+(SELECT count(*) FROM social_topics)+(SELECT count(*) FROM social_target_topics)+(SELECT count(*) FROM social_mentions)+(SELECT count(*) FROM social_notifications)+(SELECT count(*) FROM social_notification_preferences)+(SELECT count(*) FROM social_reposts)+(SELECT count(*) FROM social_profile_pins)+(SELECT count(*) FROM social_polls)+(SELECT count(*) FROM social_poll_options)+(SELECT count(*) FROM social_poll_votes)+(SELECT count(*) FROM social_content_reply_policies)+(SELECT count(*) FROM social_notification_push_outbox)+(SELECT count(*) FROM social_notification_push_deliveries),",
+            "'snowflakeAllocatorRows',(SELECT count(*) FROM content_id_snowflake_state),",
+            "'d1_03EndpointTablePresent',to_regclass('public.notification_push_endpoints') IS NOT NULL,",
+            "'foreignKeyCount',(SELECT count(*) FROM pg_constraint c JOIN pg_class t ON t.oid=c.conrelid JOIN pg_namespace n ON n.oid=t.relnamespace WHERE n.nspname='public' AND c.contype='f'),",
+            "'remoteNeonTouched',false,'cloudflareD1Touched',false,'businessDataImported',false",
+            ")::text;"
+          ].join(' ')
+          const report = JSON.parse(execFileSync('psql',[url,'-A','-t','-q','-c',sql],{encoding:'utf8'}).trim())
+          if (report.database !== 'luckread_d1_02_schema' || report.postgresMajor !== 18 ||
+              report.tables !== 28 || report.explicitIndexes !== 63 || report.triggers !== 9 ||
+              report.triggerFunctions !== 10 || report.businessRows !== 0 ||
+              report.snowflakeAllocatorRows !== 1 || report.d1_03EndpointTablePresent ||
+              report.foreignKeyCount !== 0 || report.remoteNeonTouched ||
+              report.cloudflareD1Touched || report.businessDataImported) {
+            throw new Error('Combined D1-02 PostgreSQL 18 postflight mismatch: ' + JSON.stringify(report))
+          }
+          const staticReport = JSON.parse(await readFile('artifacts/neon/d1-02-combined-schema-contract-report.json','utf8'))
+          if (staticReport.totals.tables !== report.tables ||
+              staticReport.totals.explicitIndexes !== report.explicitIndexes ||
+              staticReport.totals.triggers !== report.triggers) {
+            throw new Error('Static combined contract and live PostgreSQL catalog disagree')
+          }
+          await writeFile('artifacts/neon/d1-02-combined-postflight.json',JSON.stringify(report,null,2)+'\n')
+          console.log('NEON_D1_02_COMBINED_POSTGRES18_REHEARSAL_PASS '+JSON.stringify(report))
+          NODE
+
+      - name: Upload combined D1-02 PostgreSQL 18 evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: neon-d1-02-combined-postgres18-${{ github.sha }}
+          path: |
+            artifacts/neon/w03-d1-02-source-hashes.json
+            artifacts/neon/w05-d1-02-source-hashes.json
+            artifacts/neon/d1-02-combined-schema-contract-report.json
+            artifacts/neon/d1-02-combined-postflight.json
+          if-no-files-found: error
+          retention-days: 90
