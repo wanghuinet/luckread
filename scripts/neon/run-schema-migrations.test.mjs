@@ -47,7 +47,7 @@ test('accepts only the exact D1-01 Neon target with verified TLS and channel bin
   assert.equal(validateRemoteNeonTarget(valid.replace('ep-example-pooler.c-3.ap-southeast-1.aws.neon.tech', 'db.example.com')).valid, false)
   assert.equal(validateRemoteNeonTarget(valid.replace('sslmode=verify-full', 'sslmode=require')).valid, false)
   assert.equal(validateRemoteNeonTarget(valid.replace('&channel_binding=require', '')).valid, false)
-  assert.equal(validateRemoteNeonTarget(valid.replace('5432/luckread', '6432/luckread')).valid, false)
+  assert.equal(validateRemoteNeonTarget(valid.replace('@ep-example-pooler.c-3.ap-southeast-1.aws.neon.tech', '@ep-example-pooler.c-3.ap-southeast-1.aws.neon.tech:6432')).valid, false)
   assert.equal(validateRemoteNeonTarget(valid.replace('channel_binding=require', 'channel_binding=prefer')).valid, false)
 })
 
