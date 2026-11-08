@@ -1,0 +1,221 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/database/neon-d1-04-w07-renewal-cycles-schema.v1.json",
+  "title": "LuckRead D1-04 W07 Subscription Renewal Cycles PostgreSQL Schema Slice",
+  "version": "1.0.0",
+  "status": "W07_D1_04_RENEWAL_CYCLES_SCHEMA_PENDING_LOCAL_POSTGRES18_REHEARSAL",
+  "target": {
+    "domainId": "D1-04",
+    "databaseName": "luckread_finance",
+    "cloudflareD1DatabaseUuid": "9bfb89a5-fbb5-45b1-a2ee-eab674b0d736",
+    "binding": "D1_04",
+    "postgresMajor": 18,
+    "existingProductionAuthority": "Cloudflare D1",
+    "stagedSchemaTarget": "Neon PostgreSQL",
+    "businessDataImport": false,
+    "productionCutoverAuthorized": false,
+    "remoteSchemaApplied": false
+  },
+  "primaryOwner": {
+    "worker": "W07",
+    "feature": "PAY-004",
+    "entities": [
+      "SubscriptionRenewalCycle",
+      "SubscriptionRenewalSchedulerState"
+    ],
+    "migrationArtifact": "workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0003_w07_d1_04_renewal_cycles.sql",
+    "template": "workers/W07-subscription-commerce/scripts/neon-d1-04/templates/w07-renewal-cycles-postgres.sql",
+    "generator": "workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-renewal-cycles-postgres-migration.mjs"
+  },
+  "dependencies": {
+    "previousMigrationId": "0002_w07_d1_04_saved_methods_mandates",
+    "previousSchemaTotals": {
+      "tables": 8,
+      "explicitIndexes": 18,
+      "triggers": 36,
+      "triggerFunctions": 2,
+      "foreignKeys": 0
+    },
+    "requiredPreviousTables": [
+      "orders",
+      "order_lines",
+      "payments",
+      "payment_provider_events",
+      "saved_payment_methods",
+      "payment_mandates"
+    ],
+    "requiredPreviousFunctions": [
+      "w07_d104_order_payment_source_guard",
+      "w07_d104_saved_mandate_source_guard"
+    ],
+    "requiredPersistenceAuthority": "contracts/transport/W10-W07-membership-renewal-workflow.v1.json"
+  },
+  "scope": {
+    "includedSourceMigration": "workers/W07-subscription-commerce/migrations-d1-04/0004_subscription_renewal_cycles.sql",
+    "includedTables": [
+      "subscription_renewal_cycles",
+      "subscription_renewal_scheduler_state"
+    ],
+    "deferredTables": [
+      "revenuecat_webhook_events",
+      "revenuecat_webhook_event_conflicts",
+      "refunds",
+      "billing_documents",
+      "payment_method_revocation_requests"
+    ],
+    "excludedTables": [
+      "entitlements",
+      "ledger_entries",
+      "payment_intents",
+      "users",
+      "media"
+    ],
+    "tableCount": 2
+  },
+  "schema": {
+    "tables": {
+      "subscription_renewal_cycles": {
+        "source": "0004_subscription_renewal_cycles.sql",
+        "primaryKey": "cycle_id",
+        "indexes": [
+          "ux_subscription_renewal_cycles_subscription_cycle",
+          "ux_subscription_renewal_cycles_payment",
+          "ix_subscription_renewal_cycles_state_updated",
+          "ix_subscription_renewal_cycles_subscriber_cycle"
+        ],
+        "triggerCount": 10,
+        "lifecycleStates": [
+          "AWAITING_PRICING",
+          "AWAITING_MANDATE",
+          "PREPARED",
+          "PAYMENT_READY",
+          "SUBMITTING",
+          "SUBMITTED",
+          "SUCCEEDED",
+          "FAILED",
+          "RECONCILIATION_REQUIRED"
+        ],
+        "immutableSnapshots": [
+          "cycle identity",
+          "offer_snapshot_json",
+          "resolved amount_minor",
+          "pricing_snapshot_json",
+          "payment_method_id",
+          "mandate_record_id"
+        ],
+        "requiresActiveMandateFor": [
+          "PAYMENT_READY",
+          "SUBMITTING"
+        ],
+        "subscriptionEntitlementAuthority": "D1-01"
+      },
+      "subscription_renewal_scheduler_state": {
+        "source": "0004_subscription_renewal_cycles.sql",
+        "primaryKey": "state_id",
+        "indexes": [],
+        "triggerCount": 3,
+        "singletonId": "subscription-renewals",
+        "seededControlRow": {
+          "state_id": "subscription-renewals",
+          "cursor_period_end": null,
+          "cursor_subscription_id": null,
+          "version": 1,
+          "updated_at": "1970-01-01T00:00:00.000Z"
+        },
+        "seedRowKind": "SCHEMA_CONTROL_METADATA_NOT_BUSINESS_DATA"
+      }
+    },
+    "explicitIndexNames": [
+      "ux_subscription_renewal_cycles_subscription_cycle",
+      "ux_subscription_renewal_cycles_payment",
+      "ix_subscription_renewal_cycles_state_updated",
+      "ix_subscription_renewal_cycles_subscriber_cycle"
+    ],
+    "triggerNames": [
+      "subscription_renewal_cycles_initial_state_guard",
+      "subscription_renewal_cycles_identity_immutable",
+      "subscription_renewal_cycles_resolved_snapshot_immutable",
+      "subscription_renewal_cycles_version_guard",
+      "subscription_renewal_cycles_state_transition_guard",
+      "subscription_renewal_cycles_sync_state_transition_guard",
+      "subscription_renewal_cycles_order_binding_guard",
+      "subscription_renewal_cycles_payment_binding_guard",
+      "subscription_renewal_cycles_requires_active_mandate",
+      "subscription_renewal_cycles_retained",
+      "subscription_renewal_scheduler_state_identity_immutable",
+      "subscription_renewal_scheduler_state_version_guard",
+      "subscription_renewal_scheduler_state_retained"
+    ],
+    "totals": {
+      "tables": 2,
+      "explicitIndexes": 4,
+      "triggers": 13,
+      "triggerFunctions": 1,
+      "foreignKeys": 0
+    },
+    "cumulativeAfterThisSlice": {
+      "tables": 10,
+      "explicitIndexes": 22,
+      "triggers": 49,
+      "triggerFunctions": 3,
+      "foreignKeys": 0
+    }
+  },
+  "postgresMappings": {
+    "integer": "Use BIGINT for D1/SQLite INTEGER version, attempt and money-minor fields; retain exact safe-integer bounds where source requires them.",
+    "time": "Map ISO-8601 TEXT instants to TIMESTAMPTZ and compare as instants.",
+    "json": "Keep offer_snapshot_json and pricing_snapshot_json as TEXT with PostgreSQL JSONB object-shape checks.",
+    "partialUnique": "Preserve ux_subscription_renewal_cycles_payment as a partial unique index WHERE payment_id IS NOT NULL.",
+    "relationships": "Preserve source trigger-enforced logical relations to Order, OrderLine, Payment, SavedPaymentMethod and PaymentMandate; zero foreign keys.",
+    "lease": "SUBMITTING requires both lease_token and lease_expires_at; every other state has neither.",
+    "mandate": "A currently active provider-verified mandate and its matching saved method are required before PAYMENT_READY or SUBMITTING.",
+    "outcome": "Provider webhook/reconciliation owns terminal payment outcome; subscription sync state is separately versioned and never grants entitlement in D1-04.",
+    "scheduler": "The single seeded cursor row is schema control metadata only, not imported business data.",
+    "authority": "W07 owns D1-04 renewal/payment state; W10 owns only durable scheduling and retry orchestration."
+  },
+  "verification": {
+    "postgresImage": "postgres:18.6",
+    "sourceRegression": "workers/W07-subscription-commerce/scripts/test_order_d1_04_migration.py",
+    "tables": 2,
+    "explicitIndexes": 4,
+    "triggers": 13,
+    "triggerFunctions": 1,
+    "foreignKeys": 0,
+    "fixtureRowsAfterRollback": 0,
+    "schedulerControlRowsAfterRollback": 1,
+    "requiredPositiveCases": [
+      "new cycle starts awaiting authoritative pricing and scheduler seed cursor is present",
+      "pricing resolves once and immutable price/offer snapshots are preserved",
+      "cycle Order and Payment bindings match the subscription and commercial snapshot",
+      "matching currently-active HyperSwitch mandate permits PAYMENT_READY and SUBMITTING",
+      "valid leased submission reaches SUBMITTED then provider-confirmed SUCCEEDED",
+      "terminal provider outcome can be synchronized without granting entitlement",
+      "scheduler cursor advances through one-step version CAS"
+    ],
+    "requiredNegativeCases": [
+      "cycles cannot be inserted beyond AWAITING_PRICING or before authoritative pricing",
+      "duplicate subscription and period identity is rejected",
+      "resolved amount/pricing/method/mandate snapshots cannot be rewritten",
+      "order, order line, payment, subscriber, currency and amount mismatches are rejected",
+      "missing, pending, revoked or cross-customer mandate cannot authorize a charge",
+      "PAYMENT_READY cannot be entered directly from PREPARED without the active mandate",
+      "SUBMITTING without a lease is rejected and illegal state transitions are blocked",
+      "version must advance one step and updated_at must strictly increase",
+      "subscription outcome sync cannot run before a final cycle outcome",
+      "scheduler identity, CAS and timestamp are guarded",
+      "renewal cycle and scheduler control audit rows cannot be deleted"
+    ],
+    "localRehearsalEvidence": {
+      "status": "NOT_RUN"
+    }
+  },
+  "safety": {
+    "remoteConnectionAttempted": false,
+    "remoteNeonDdlExecuted": false,
+    "cloudflareD1Touched": false,
+    "workerRuntimeOrBindingsChanged": false,
+    "businessDataImported": false,
+    "productionCutoverAuthorized": false
+  },
+  "nextGate": "PAY-004 local PostgreSQL 18 rehearsal only. RevenueCat inbox, refunds/billing and payment-method revocation remain separate slices. D1-04 remote runner and Neon cutover are not authorized."
+}

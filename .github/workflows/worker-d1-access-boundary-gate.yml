@@ -8,6 +8,7 @@ on:
       - 'contracts/transport/worker-d1-access-boundary.v1.json'
       - 'contracts/database/neon-d1-04-w07-order-payment-schema.v1.json'
       - 'contracts/database/neon-d1-04-w07-saved-methods-mandates-schema.v1.json'
+      - 'contracts/database/neon-d1-04-w07-renewal-cycles-schema.v1.json'
       - 'scripts/verify-worker-d1-access-boundary.mjs'
       - '.github/workflows/worker-d1-access-boundary-gate.yml'
   pull_request:
