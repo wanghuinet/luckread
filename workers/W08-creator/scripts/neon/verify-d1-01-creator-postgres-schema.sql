@@ -127,9 +127,14 @@ BEGIN
     RAISE EXCEPTION 'W08 explicit index set drifted: %', actual_names;
   END IF;
   IF (SELECT COUNT(*) FROM pg_indexes WHERE schemaname = 'public'
-      AND tablename IN ('creator_applications', 'creators', 'creator_authorization_audit')
-      AND indexdef ILIKE 'CREATE INDEX%') <> 5 THEN
-    RAISE EXCEPTION 'W08 must have exactly five explicitly declared non-unique indexes';
+      AND indexname IN (
+        'creator_applications_one_pending_per_user',
+        'creator_applications_status_created_idx',
+        'creators_status_idx',
+        'creator_authorization_audit_subject_time_idx',
+        'creator_authorization_audit_resource_time_idx'
+      )) <> 5 THEN
+    RAISE EXCEPTION 'W08 must have exactly five explicit source indexes, including the pending-app partial unique index';
   END IF;
 
   IF (SELECT COUNT(*) FROM pg_constraint
