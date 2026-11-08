@@ -1,0 +1,93 @@
+name: Neon D1-01 W08 Creator PostgreSQL Schema
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/neon-d1-01-w08-creator-schema.yml'
+      - 'contracts/database/neon-five-domain-schema-bootstrap.v1.json'
+      - 'contracts/database/neon-d1-01-schema-sources.v1.json'
+      - 'docs/change-control/CC-W02-W08-AUTHORIZATION-BOUNDARY-2026-10-12.md'
+      - 'workers/W08-creator/migrations/**'
+      - 'workers/W08-creator/scripts/neon/**'
+      - 'workers/W08-creator/src/neon-postgres-migrations/**'
+      - 'workers/W08-creator/README-neon-postgres-schema.md'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: neon-d1-01-w08-creator-schema-\${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  postgres-schema:
+    name: Generate and verify W08 D1-01 creator schema on PostgreSQL 18
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:18.6
+        env:
+          POSTGRES_USER: schema_generator
+          POSTGRES_PASSWORD: schema_generator_local_only
+          POSTGRES_DB: luckread_schema
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U schema_generator -d luckread_schema"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Generate PostgreSQL migration from canonical W08 migration and D1-01 contracts
+        working-directory: workers/W08-creator
+        run: |
+          set -euo pipefail
+          node scripts/neon/generate-d1-01-creator-postgres-migration.mjs
+          git diff --exit-code -- src/neon-postgres-migrations/0001_w08_d1_01_creator_authorization.sql
+
+      - name: Reject SQLite-only SQL constructs
+        working-directory: workers/W08-creator
+        run: |
+          set -euo pipefail
+          test -s src/neon-postgres-migrations/0001_w08_d1_01_creator_authorization.sql
+          if grep -Eiq '(^|[^[:alnum:]_])(PRAGMA|AUTOINCREMENT|strftime|julianday|GLOB|typeof|RAISE[[:space:]]*\([[:space:]]*ABORT)([^[:alnum:]_]|$)' src/neon-postgres-migrations/0001_w08_d1_01_creator_authorization.sql; then
+            echo "Generated W08 PostgreSQL migration contains SQLite-only SQL"
+            exit 1
+          fi
+
+      - name: Apply W08 schema only to disposable PostgreSQL 18
+        env:
+          PGPASSWORD: schema_generator_local_only
+        run: |
+          set -euo pipefail
+          psql --host 127.0.0.1 --port 5432 --username schema_generator \
+            --dbname luckread_schema --set ON_ERROR_STOP=1 \
+            --file workers/W08-creator/src/neon-postgres-migrations/0001_w08_d1_01_creator_authorization.sql
+
+      - name: Verify W08 constraints, indexes, authority boundaries, rollback and empty tables
+        env:
+          PGPASSWORD: schema_generator_local_only
+        run: |
+          set -euo pipefail
+          mkdir -p workers/W08-creator/artifacts/neon
+          psql -A -t -q --host 127.0.0.1 --port 5432 --username schema_generator \
+            --dbname luckread_schema --set ON_ERROR_STOP=1 --no-psqlrc \
+            --file workers/W08-creator/scripts/neon/verify-d1-01-creator-postgres-schema.sql \
+            > workers/W08-creator/artifacts/neon/w08-d1-01-creator-postgres-schema-postflight.json
+
+      - name: Upload W08 PostgreSQL schema evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: neon-d1-01-w08-creator-postgres-schema-\${{ github.sha }}
+          path: workers/W08-creator/artifacts/neon/w08-d1-01-creator-postgres-schema-postflight.json
+          if-no-files-found: error
+          retention-days: 90
