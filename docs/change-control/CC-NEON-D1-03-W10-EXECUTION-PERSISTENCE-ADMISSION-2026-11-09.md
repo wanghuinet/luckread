@@ -30,7 +30,7 @@ The six admitted entity mappings are:
 1. W10 never becomes the authority for the owner Worker's business state.
 2. Domain-local outbox, inbox and idempotency records stay in their source D1. The W10 OperationalIdempotency table is only for W10-owned async-operation submission.
 3. The W10 DLQ table is a queryable quarantine/evidence record. It does not replace Cloudflare Queue native retry limits or native DLQ configuration.
-4. Raw event/job payloads, passwords, access tokens, payment credentials, private messages and unnecessary personal data are not stored in these tables. Event metadata, payload hashes and opaque references are used.
+4. Raw event/job payloads, passwords, access tokens, payment credentials, private messages and unnecessary personal data are not stored in these tables. Only allowlisted event-envelope metadata columns, payload hashes and opaque references are stored; arbitrary JSON metadata and raw payloads are excluded.
 5. Retry and OperationalIdempotency references are same-owner references only. No cross-Worker or cross-D1 foreign key is introduced.
 6. D1-05 remains analytics-only. No W11 analytics table is included in D1-03.
 7. W06 Appeal persistence remains excluded until a dedicated Appeal persistence contract and source migration are admitted.
