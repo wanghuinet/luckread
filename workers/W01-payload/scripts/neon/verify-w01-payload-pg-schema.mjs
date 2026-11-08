@@ -3,7 +3,11 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import pg from 'pg'
 import tls from 'node:tls'
-import { evaluatePayloadMigrationLedgerRows } from './payload-baseline-reconciliation.mjs'
+import {
+  evaluatePayloadMigrationLedgerRows,
+  evaluateW01PayloadForeignKeyCatalog,
+  evaluateW01PayloadTableCatalog,
+} from './payload-baseline-reconciliation.mjs'
 
 const { Pool } = pg
 const scriptDir = path.dirname(fileURLToPath(import.meta.url))
@@ -162,20 +166,25 @@ try {
       ORDER BY tablename`,
   )
   const actualTables = tableResult.rows.map((row) => row.tablename).sort()
+  const tableCatalog = evaluateW01PayloadTableCatalog(expectedTables, actualTables)
   report.expectedTableNames = expectedTables
   report.actualTableNames = actualTables
+  report.tablesOutsideW01Snapshot = tableCatalog.tablesOutsideW01Snapshot
 
-  const missingTables = expectedTables.filter((table) => !actualTables.includes(table))
-  const unexpectedTables = actualTables.filter((table) => !expectedTables.includes(table))
-  if (missingTables.length || unexpectedTables.length) {
-    failures.push({ kind: 'table-catalog-drift', missingTables, unexpectedTables })
+  if (tableCatalog.missingTables.length) {
+    failures.push({
+      kind: 'missing-w01-payload-tables',
+      missingTables: tableCatalog.missingTables,
+    })
   }
 
   const columnResult = await client.query(
     `SELECT table_name, column_name, data_type, is_nullable, column_default
        FROM information_schema.columns
       WHERE table_schema = 'public'
+        AND table_name = ANY($1::text[])
       ORDER BY table_name, ordinal_position`,
+    [expectedTables],
   )
   const columnsByTable = {}
   for (const column of columnResult.rows) {
@@ -208,7 +217,9 @@ try {
     `SELECT tablename AS table_name, indexname AS index_name, indexdef
        FROM pg_catalog.pg_indexes
       WHERE schemaname = 'public'
+        AND tablename = ANY($1::text[])
       ORDER BY tablename, indexname`,
+    [expectedTables],
   )
   report.indexes = indexResult.rows
   const actualIndexNames = new Set(indexResult.rows.map((row) => row.index_name))
@@ -251,7 +262,9 @@ try {
        JOIN pg_catalog.pg_class target_table ON target_table.oid = constraint_row.confrelid
       WHERE constraint_row.contype = 'f'
         AND source_namespace.nspname = 'public'
+        AND source_table.relname = ANY($1::text[])
       ORDER BY constraint_row.conname`,
+    [expectedTables],
   )
   const actualForeignKeys = fkResult.rows.map((row) => ({
     constraintName: row.constraint_name,
@@ -262,12 +275,17 @@ try {
     onDelete: row.on_delete,
     onUpdate: row.on_update,
   }))
-  report.foreignKeys = actualForeignKeys
-  if (JSON.stringify(actualForeignKeys) !== JSON.stringify(expectedForeignKeys)) {
+  const foreignKeyCatalog = evaluateW01PayloadForeignKeyCatalog(
+    expectedForeignKeys,
+    actualForeignKeys,
+    expectedTables,
+  )
+  report.foreignKeys = foreignKeyCatalog.actual
+  if (!foreignKeyCatalog.valid) {
     failures.push({
       kind: 'foreign-key-catalog-drift',
-      expected: expectedForeignKeys,
-      actual: actualForeignKeys,
+      expected: foreignKeyCatalog.expected,
+      actual: foreignKeyCatalog.actual,
     })
   }
 
