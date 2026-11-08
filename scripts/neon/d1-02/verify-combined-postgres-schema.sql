@@ -3,6 +3,7 @@
 \else
 \set expected_database luckread_d1_02_schema
 \endif
+SELECT set_config('app.expected_database', :'expected_database', false);
 BEGIN;
 DO $d1_02_combined_catalog$
 DECLARE
@@ -67,7 +68,7 @@ DECLARE
   actual TEXT[];
   missing_count INTEGER;
 BEGIN
-  IF current_database() <> :'expected_database' THEN
+  IF current_database() <> current_setting('app.expected_database') THEN
     RAISE EXCEPTION 'Combined D1-02 rehearsal must use disposable luckread_d1_02_schema';
   END IF;
   IF current_setting('server_version_num')::INTEGER / 10000 <> 18 THEN
