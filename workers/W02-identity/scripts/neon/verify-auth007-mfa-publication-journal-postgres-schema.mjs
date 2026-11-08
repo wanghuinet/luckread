@@ -116,6 +116,7 @@ const insertWithDefaults = (client, entry) => client.query(
 )
 
 let client
+let transactionOpen = false
 let primaryError
 let report
 try {
@@ -204,6 +205,10 @@ try {
   ]) assert(constraintMap.has(name), 'required MFA journal constraint missing: ' + name)
   const foreignKeys = constraints.rows.filter((row) => row.contype === 'f')
   assert(foreignKeys.length === 0, 'MFA outbox must not create a factor or canonical AuditEvent foreign key')
+
+  // Use one rollback-only transaction for the synthetic event rows and SAVEPOINT-based negative probes.
+  await client.query('BEGIN')
+  transactionOpen = true
 
   // Every event type in the binding contract must be insertable with its permitted safe payload.
   const insertedEntries = []
@@ -340,8 +345,8 @@ try {
     "SELECT COUNT(*)::int AS count FROM auth_007_mfa_publication_journal " +
       "WHERE status = 'PENDING' AND next_attempt_at IS NOT NULL AND attempt > 1",
   )
-  assert(Number(retryRows.rows[0].count) === 0 || Number(retryRows.rows[0].count) >= 0,
-    'retry query predicate must be executable')
+  assert(Number(retryRows.rows[0].count) === 0,
+    'successful publication must leave no pending retry row for the acknowledged event')
 
   report = {
     status: 'W02_AUTH007_MFA_PUBLICATION_JOURNAL_POSTGRES_SCHEMA_PASS',
@@ -368,9 +373,19 @@ try {
     productionDatabaseTouched: false,
     secretsOrAuditEventsImported: false,
   }
+  await client.query('ROLLBACK')
+  transactionOpen = false
 } catch (error) {
   primaryError = error
 } finally {
+  if (client && transactionOpen) {
+    try {
+      await client.query('ROLLBACK')
+      transactionOpen = false
+    } catch (rollbackError) {
+      if (!primaryError) primaryError = rollbackError
+    }
+  }
   try {
     await pool.query(
       'DELETE FROM auth_007_mfa_publication_journal WHERE journal_id LIKE $1 OR idempotency_key LIKE $2 OR resource_id = $3',
