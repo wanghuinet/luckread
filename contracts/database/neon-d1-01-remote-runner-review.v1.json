@@ -31,7 +31,7 @@
       },
       {
         "path": "scripts/neon/d1-01-migration-manifest.mjs",
-        "gitBlobSha1": "0ad8fda67ff3506abc69aefed335fae593355abf"
+        "gitBlobSha1": "4e1c5d485084ab5204ae56f2d50a8316025c17a6"
       },
       {
         "path": "scripts/neon/assert-d1-01-migration-ledger-ready.mjs",
