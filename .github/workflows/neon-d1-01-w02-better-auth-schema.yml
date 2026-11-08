@@ -99,7 +99,7 @@ jobs:
           npm run neon:auth013-journal:generate
           npm run neon:auth015:generate
           npm run neon:auth010:generate
-          node ../../scripts/auth-010-session-revocation-journal-static-audit.mjs
+          (cd ../.. && node scripts/auth-010-session-revocation-journal-static-audit.mjs)
           git diff --exit-code -- \
             src/neon-postgres-migrations/0001_role_assignments.sql \
             src/neon-postgres-migrations/0002_role_authorization_versions.sql \
