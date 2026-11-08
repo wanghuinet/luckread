@@ -86,8 +86,8 @@ const sourceMigrations = [
 ]
 for (const [name, token] of sourceMigrations) {
   const sourcePath = resolve(workerRoot, 'migrations', name)
-  const source = readFileSync(sourcePath, 'utf8')
-  if (!source.includes(token)) fail('canonical source migration drift: ' + name)
+  const sourceText = readFileSync(sourcePath, 'utf8')
+  if (!sourceText.includes(token)) fail('canonical source migration drift: ' + name)
 }
 const sourcePlans = readFileSync(resolve(workerRoot, 'migrations/0003_membership_plans.sql'), 'utf8')
 for (const trigger of [
@@ -115,6 +115,8 @@ for (const trigger of [
 
 const sql = readFileSync(templatePath, 'utf8')
 const requiredSqlTokens = [
+  'BEGIN;',
+  'COMMIT;',
   'CREATE TABLE membership_subscriptions',
   'CREATE TABLE membership_plans',
   'CREATE TABLE membership_plan_versions',
@@ -135,8 +137,25 @@ const requiredSqlTokens = [
 for (const token of requiredSqlTokens) {
   if (!sql.includes(token)) fail('generated PostgreSQL template missing: ' + token)
 }
-if (/CREATE\s+UNIQUE\s+INDEX[^;]*(?:membership_subscriptions\s*\([^)]*status|membership_subscriptions\s*\([^)]*subscriber_id\s*,\s*creator_id\s*\)\s*;)/is.test(sql)) {
-  fail('speculative active-subscription uniqueness is forbidden')
+const contractFields = [
+  ...persistence.table.columns.map((column) => column.name),
+  ...persistence.additionalTables.flatMap((table) => table.columns.map((column) => column.name)),
+]
+for (const fieldName of contractFields) {
+  if (!sql.includes(fieldName)) fail('PostgreSQL DDL is missing contract field: ' + fieldName)
+}
+const contractIndexes = [
+  ...persistence.table.indexes.map((index) => index.name),
+  ...persistence.additionalTables.flatMap((table) => table.indexes.map((index) => index.name)),
+]
+for (const indexName of contractIndexes) {
+  if (!sql.includes(indexName)) fail('PostgreSQL DDL is missing contract index: ' + indexName)
+}
+const subscriptionUniqueIndexes = [...sql.matchAll(/CREATE\s+UNIQUE\s+INDEX\s+([a-z0-9_]+)\s+ON\s+membership_subscriptions\b/gi)]
+  .map((match) => match[1])
+if (JSON.stringify(subscriptionUniqueIndexes) !==
+    JSON.stringify(['ux_membership_subscriptions_trial_per_subscriber_creator'])) {
+  fail('only the contract-defined one-trial-per-creator unique index is allowed for subscriptions')
 }
 if (/CREATE\s+TABLE\s+[^;]*(?:order|payment|refund|ledger|wallet)/i.test(sql)) {
   fail('D1-04 financial/order tables must not enter the D1-01 schema')
