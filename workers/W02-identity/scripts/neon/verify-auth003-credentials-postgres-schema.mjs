@@ -8,6 +8,9 @@ const pool = new Pool({ connectionString, max: 6, connectionTimeoutMillis: 5000 
 const suffix = randomUUID().replaceAll('-', '').slice(0, 18)
 const identityId = 'auth003-identity-' + suffix
 const otherIdentityId = 'auth003-identity-b-' + suffix
+const nullIdentityId = 'auth003-identity-null-b-' + suffix
+const identityIds = [identityId, otherIdentityId, nullIdentityId]
+const userIds = ['auth003-user-' + suffix, 'auth003-user-b-' + suffix, 'auth003-user-null-b-' + suffix]
 const timestamp = new Date('2026-01-01T00:00:00.000Z')
 
 const assert = (condition, message) => {
@@ -134,13 +137,16 @@ try {
   await expectPgCode('duplicate normalized email identity', () => insertIdentity(
     'auth003-identity-dup-email-' + suffix, 'auth003-user-d-' + suffix, null, 'normalized-email-' + suffix, null,
   ), '23505')
+  await expectPgCode('duplicate normalized phone identity', () => insertIdentity(
+    'auth003-identity-dup-phone-' + suffix, 'auth003-user-e-' + suffix, null, null, '+12025550100',
+  ), '23505')
   await expectPgCode('duplicate identity user binding', () => insertIdentity(
     'auth003-identity-dup-user-' + suffix, 'auth003-user-' + suffix, null, null, null,
   ), '23505')
   assertionsPassed++
 
   // NULL normalized values remain compatible with nullable optional identity fields.
-  await insertIdentity('auth003-identity-null-b-' + suffix, 'auth003-user-null-b-' + suffix)
+  await insertIdentity(nullIdentityId, userIds[2])
   assertionsPassed++
 
   const defaults = await pool.query(
@@ -191,22 +197,19 @@ try {
   primaryError = error
 } finally {
   try {
-    await pool.query('DELETE FROM auth_credentials WHERE identity_id IN ($1, $2) OR id LIKE $3', [
-      identityId, otherIdentityId, 'auth003-%-' + suffix,
+    await pool.query('DELETE FROM auth_credentials WHERE identity_id = ANY($1::text[]) OR id LIKE $2', [
+      identityIds, 'auth003-%-' + suffix,
     ])
-    await pool.query('DELETE FROM auth_identities WHERE id LIKE $1 OR id LIKE $2', [
-      identityId, otherIdentityId,
-    ])
-    await pool.query('DELETE FROM auth_identities WHERE id LIKE $1', ['auth003-identity-null-b-' + suffix])
+    await pool.query('DELETE FROM auth_identities WHERE id = ANY($1::text[])', [identityIds])
   } catch (cleanupError) {
     if (!primaryError) primaryError = cleanupError
   }
   try {
     const remaining = await pool.query(
       "SELECT " +
-        "(SELECT COUNT(*) FROM auth_credentials WHERE value_hash LIKE $1) AS credentials, " +
-        "(SELECT COUNT(*) FROM auth_identities WHERE user_id LIKE $2) AS identities",
-      ['hash-%-' + suffix, 'auth003-user-%-' + suffix],
+        "(SELECT COUNT(*) FROM auth_credentials WHERE identity_id = ANY($1::text[]) OR id LIKE $2) AS credentials, " +
+        "(SELECT COUNT(*) FROM auth_identities WHERE id = ANY($1::text[]) OR user_id = ANY($3::text[])) AS identities",
+      [identityIds, 'auth003-%-' + suffix, userIds],
     )
     if (Number(remaining.rows[0].credentials) !== 0 || Number(remaining.rows[0].identities) !== 0) {
       if (!primaryError) primaryError = new Error('W02_AUTH003_SYNTHETIC_CLEANUP_FAILED')
