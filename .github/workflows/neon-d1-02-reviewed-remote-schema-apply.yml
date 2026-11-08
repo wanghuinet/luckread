@@ -1,4 +1,4 @@
-name: Neon D1-02 Reviewed Remote Schema Apply
+name: Neon D1-02 Remote Schema Apply Gate
 
 on:
   pull_request:
@@ -64,7 +64,7 @@ jobs:
 
   apply:
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.confirm_target == 'APPLY_REVIEWED_SCHEMA_D1_02_LUCKREADPRO' }}
-    name: Apply reviewed schema to Neon D1-02 luckreadpro
+    name: Apply released schema to Neon D1-02 luckreadpro
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
