@@ -30,6 +30,35 @@ test('W10 PostgreSQL migration is deterministic and bound to six owner entities'
   assert.equal(result.contract.schema.totals.foreignKeys, 2)
 })
 
+test('W10 DLQ persists only allowlisted event-envelope metadata, never arbitrary JSON', () => {
+  const result = buildD103W10Migration({ readSource: read })
+  const d1 = read('workers/W09-platform/migrations-d1-03/0002_w10_async_execution_state.sql')
+  const requiredColumns = [
+    'event_type', 'schema_version', 'producer', 'resource_type', 'resource_id',
+    'occurred_at', 'published_at', 'idempotency_key', 'source_version',
+    'correlation_id', 'causation_id',
+  ]
+  for (const column of requiredColumns) {
+    assert.match(d1, new RegExp('\\\\b' + column + '\\\\s+'))
+    assert.match(result.migration, new RegExp('\\\\b' + column + '\\\\s+'))
+  }
+  assert.doesNotMatch(d1, /original_event_metadata_json|metadata_json/i)
+  assert.doesNotMatch(result.migration, /original_event_metadata_json|metadata_json/i)
+
+  assert.throws(
+    () => buildD103W10Migration({
+      readSource: (relativePath) => {
+        const value = read(relativePath)
+        if (relativePath === 'workers/W09-platform/migrations-d1-03/0002_w10_async_execution_state.sql') {
+          return value.replace('event_type TEXT NOT NULL,', 'original_event_metadata_json TEXT NOT NULL,')
+        }
+        return value
+      },
+    }),
+    /must not persist arbitrary JSON event metadata/,
+  )
+})
+
 test('W10 source cannot proceed if an entity is removed from the frozen owner boundary', () => {
   assert.throws(
     () => buildD103W10Migration({
