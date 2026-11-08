@@ -36,6 +36,15 @@ const expectedOperationFeatureIds = {
   createAppeal: ['GOV-005'],
 }
 
+const expectedOperationSchemaRefs = {
+  listModerationCases: '',
+  listModerationQueue: 'contracts/api/moderation-operation-policy.v1.json#/operations/0',
+  getModerationCase: 'contracts/api/moderation-operation-policy.v1.json#/operations/1',
+  decideModerationCase: 'contracts/api/moderation-operation-policy.v1.json#/operations/2',
+  createReport: 'contracts/api/report-appeal.v1.json#/operations/0',
+  createAppeal: 'contracts/api/report-appeal.v1.json#/operations/1',
+}
+
 const fail = (message) => {
   throw new Error(message)
 }
@@ -103,6 +112,9 @@ export function verifyGovernanceFeatureIdAlignment({
     }
     if (typeof mapping.schema_ref !== 'string') {
       fail(`Canonical API feature map ${operationId} must declare schema_ref as a string`)
+    }
+    if (mapping.schema_ref !== expectedOperationSchemaRefs[operationId]) {
+      fail(`Canonical API schemaRef mismatch for ${operationId}: expected '${expectedOperationSchemaRefs[operationId]}'`)
     }
   }
 
