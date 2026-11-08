@@ -343,7 +343,7 @@ BEGIN
       (audit_id, event_key, actor_id, subject_id, event_type,
        resource_type, resource_id, occurred_at)
     VALUES
-      ('w08-fixture-audit-duplicate-id', 'w08-fixture-event-id', 'w08-fixture-admin',
+      ('w08-fixture-audit-1', 'w08-fixture-event-id', 'w08-fixture-admin',
        'w08-fixture-user', 'CREATOR_ROLE_GRANTED', 'creator',
        'w08-fixture-creator-1', '2026-01-07T00:00:00Z');
     RAISE EXCEPTION 'Expected invalid audit primary identifier replay to fail';
