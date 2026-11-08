@@ -38,7 +38,7 @@ export function validateRemoteRunnerReview({
 
   const reviewInfo = record.review ?? {}
   if (reviewInfo.reviewer !== 'GPT-6' ||
-      reviewInfo.reviewType !== 'independent code-path review plus current-SHA CI evidence reconciliation' ||
+      reviewInfo.reviewType !== 'GPT-6 code-path audit plus current-SHA CI evidence reconciliation' ||
       reviewInfo.result !== 'NO_BLOCKING_FINDINGS' ||
       !/^2026-11-\d{2}$/.test(reviewInfo.reviewedAt ?? '') ||
       !SHA40.test(reviewInfo.reviewedMainSha ?? '') ||
