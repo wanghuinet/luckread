@@ -7,6 +7,8 @@ import { validateRemoteRunnerReview } from './remote-runner-review.mjs'
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 const manifestPath = resolve(repositoryRoot, 'contracts/database/neon-d1-01-migration-manifest.v1.json')
 const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
+const ledgerContractPath = resolve(repositoryRoot, 'contracts/database/neon-schema-migration-ledger.v1.json')
+const ledgerContract = JSON.parse(readFileSync(ledgerContractPath, 'utf8'))
 
 const fail = (message) => {
   throw new Error('D1-01 migration manifest invalid: ' + message)
