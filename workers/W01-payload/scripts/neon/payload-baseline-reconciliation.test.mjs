@@ -3,6 +3,8 @@ import assert from 'node:assert/strict'
 import {
   EXPECTED_W01_PAYLOAD_MIGRATION_NAME,
   evaluatePayloadMigrationLedgerRows,
+  evaluateW01PayloadForeignKeyCatalog,
+  evaluateW01PayloadTableCatalog,
 } from './payload-baseline-reconciliation.mjs'
 
 test('accepts exactly the committed W01 Payload baseline migration row', () => {
@@ -46,8 +48,7 @@ test('treats malformed ledger rows as invalid without exposing row payloads', ()
 })
 
 
-test('ignores tables outside the W01 Payload snapshot but still requires every W01 table', async () => {
-  const { evaluateW01PayloadTableCatalog } = await import('./payload-baseline-reconciliation.mjs')
+test('ignores tables outside the W01 Payload snapshot but still requires every W01 table', () => {
   const result = evaluateW01PayloadTableCatalog(
     ['users', 'media', 'payload_migrations'],
     ['users', 'media', 'payload_migrations', 'user', 'session', 'membership_plans', 'neon_schema_migration_ledger'],
@@ -63,8 +64,7 @@ test('ignores tables outside the W01 Payload snapshot but still requires every W
   ])
 })
 
-test('fails when a W01-owned Payload table is missing', async () => {
-  const { evaluateW01PayloadTableCatalog } = await import('./payload-baseline-reconciliation.mjs')
+test('fails when a W01-owned Payload table is missing', () => {
   const result = evaluateW01PayloadTableCatalog(
     ['users', 'media', 'payload_migrations'],
     ['users', 'payload_migrations', 'user'],
@@ -74,8 +74,7 @@ test('fails when a W01-owned Payload table is missing', async () => {
   assert.deepEqual(result.missingTables, ['media'])
 })
 
-test('ignores foreign keys declared by non-W01 source tables', async () => {
-  const { evaluateW01PayloadForeignKeyCatalog } = await import('./payload-baseline-reconciliation.mjs')
+test('ignores foreign keys declared by non-W01 source tables', () => {
   const w01ForeignKey = {
     constraintName: 'payload_relationship_parent_fk',
     tableName: 'payload_relationships',
@@ -106,8 +105,7 @@ test('ignores foreign keys declared by non-W01 source tables', async () => {
   assert.equal(result.ignoredForeignKeyCount, 1)
 })
 
-test('still rejects an unexpected foreign key declared by a W01 source table', async () => {
-  const { evaluateW01PayloadForeignKeyCatalog } = await import('./payload-baseline-reconciliation.mjs')
+test('still rejects an unexpected foreign key declared by a W01 source table', () => {
   const expectedForeignKey = {
     constraintName: 'payload_relationship_parent_fk',
     tableName: 'payload_relationships',
