@@ -91,7 +91,7 @@ test('fails closed if W10 receives a D1-03 runtime binding before separate admis
 test('fails closed if Appeal is added to the admitted W06 physical artifact', () => {
   const artifactPath = 'workers/W06-governance/src/neon-postgres-migrations/0001_w06_d1_03_moderation_schema.sql'
   const source = overrideSource(artifactPath, (text) =>
-    text + '\\nCREATE TABLE appeals (appeal_id TEXT PRIMARY KEY NOT NULL);\\n')
+    text + '\nCREATE TABLE appeals (appeal_id TEXT PRIMARY KEY NOT NULL);\n')
   assert.throws(
     () => verifyD103SharedRunnerReview({ readSource: source }),
     /W06 PostgreSQL artifact tables do not match/,
@@ -139,7 +139,7 @@ test('fails closed if W05 NotificationPushEndpoint delegation is broadened', () 
 test('fails closed on a reviewed source blob mismatch', () => {
   const manifestPath = 'contracts/database/neon-d1-03-shared-migration-manifest.v1.json'
   const overrides = new Map([
-    [manifestPath, readSource(manifestPath) + '\\n'],
+    [manifestPath, readSource(manifestPath) + '\n'],
   ])
   const source = (relativePath) => overrides.has(relativePath)
     ? overrides.get(relativePath)
