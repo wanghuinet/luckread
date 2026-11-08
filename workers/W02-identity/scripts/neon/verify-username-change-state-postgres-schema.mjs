@@ -110,8 +110,9 @@ try {
     'last-changed index columns mismatch')
   assert(indexMap.get('auth_user_username_normalized_lookup_idx')?.includes('(lower(username))'),
     'username normalized lookup index mismatch')
-  assert(indexMap.get('user_username_uq')?.includes('UNIQUE (username)'),
-    'Better Auth username must retain the source D1 unique constraint')
+  assert(indexMap.get('user_username_uq')?.includes('CREATE UNIQUE INDEX') &&
+    indexMap.get('user_username_uq')?.includes('(username)'),
+  'Better Auth username must retain the source D1 unique constraint')
 
   const constraints = await client.query(
     "SELECT conname, contype, pg_get_constraintdef(oid) AS definition " +
