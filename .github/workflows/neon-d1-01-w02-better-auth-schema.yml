@@ -99,13 +99,14 @@ jobs:
           npm run neon:auth013-journal:generate
           npm run neon:auth015:generate
           npm run neon:auth010:generate
-          node scripts/auth-010-session-revocation-journal-static-audit.mjs
+          node ../../scripts/auth-010-session-revocation-journal-static-audit.mjs
           git diff --exit-code -- \
             src/neon-postgres-migrations/0001_role_assignments.sql \
             src/neon-postgres-migrations/0002_role_authorization_versions.sql \
             src/neon-postgres-migrations/0003_auth_003_credentials.sql \
             src/neon-postgres-migrations/0004_auth_013_publication_journal.sql \
-            src/neon-postgres-migrations/0005_auth_015_lifecycle_windows.sql
+            src/neon-postgres-migrations/0005_auth_015_lifecycle_windows.sql \
+            src/neon-postgres-migrations/0006_auth_010_session_revocation_journal.sql
 
       - name: Confirm all generated DDL is PostgreSQL-native
         working-directory: workers/W02-identity
