@@ -24,6 +24,8 @@
     "neon:auth003:generate": "node scripts/neon/generate-auth003-credentials-postgres-migration.mjs",
     "neon:auth003:verify": "node scripts/neon/verify-auth003-credentials-postgres-schema.mjs",
     "neon:auth013-journal:generate": "node scripts/neon/generate-auth013-publication-journal-postgres-migration.mjs",
-    "neon:auth013-journal:verify": "node scripts/neon/verify-auth013-publication-journal-postgres-schema.mjs"
+    "neon:auth013-journal:verify": "node scripts/neon/verify-auth013-publication-journal-postgres-schema.mjs",
+    "neon:auth015:generate": "node scripts/neon/generate-auth015-lifecycle-windows-postgres-migration.mjs",
+    "neon:auth015:verify": "node scripts/neon/verify-auth015-lifecycle-windows-postgres-schema.mjs"
   }
 }
