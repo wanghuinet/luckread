@@ -66,7 +66,7 @@ test('fails closed if the frozen D1-03 owner boundary changes without reconcilia
 
 test('fails closed if T22 or T23 is remapped across the D1-03 and D1-05 boundary', () => {
   const override = readSource('docs/02-FINAL-MAPPING-v1.0.md')
-    .replace('| T22 | W11 | D1-03 campaign/growth operations | MAPPED |',
+    .replace('| T22 | W11 | D1-03 campaign/growth operations |',
       '| T22 | W11 | D1-05 analytics-only derived data | MAPPED |')
   assert.throws(() => verifyW11D103OwnerReconciliation({
     readSource: readWithOverrides({
