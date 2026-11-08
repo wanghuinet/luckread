@@ -85,7 +85,8 @@ jobs:
           set -euo pipefail
           node --check scripts/neon/run-schema-migrations.mjs
           node --check scripts/neon/remote-runner-review.mjs
-          node --test scripts/neon/run-schema-migrations.test.mjs scripts/neon/remote-runner-review.test.mjs workers/W02-identity/scripts/neon/verify-schema-database-target.test.mjs
+          node --check scripts/neon/plan-d1-01-schema-migrations.mjs
+          node --test scripts/neon/run-schema-migrations.test.mjs scripts/neon/remote-runner-review.test.mjs scripts/neon/plan-d1-01-schema-migrations.test.mjs workers/W02-identity/scripts/neon/verify-schema-database-target.test.mjs
           node scripts/neon/assert-d1-01-migration-ledger-ready.mjs --assert-runner-ready
           if node scripts/neon/assert-d1-01-migration-ledger-ready.mjs --expect-blocked > /tmp/runner-blocked.log 2>&1; then
             echo "Released shared runner unexpectedly reported blocked."

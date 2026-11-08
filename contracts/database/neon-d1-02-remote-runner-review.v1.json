@@ -1,0 +1,180 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/database/neon-d1-02-remote-runner-review.v1.json",
+  "version": "1.0.0",
+  "status": "AI_REVIEW_PASS_NO_BLOCKING_FINDINGS",
+  "repository": "wanghuinet/luckread",
+  "target": {
+    "domainId": "D1-02",
+    "databaseName": "luckreadpro",
+    "databaseUuid": "6c342634-97f6-4248-9f4a-85772af4f22c",
+    "neonHost": "ep-icy-breeze-azdp8x8q-pooler.c-3.ap-southeast-1.aws.neon.tech",
+    "postgresMajor": 18,
+    "scope": "schema-only",
+    "businessDataImport": false,
+    "productionCutoverAuthorized": false
+  },
+  "review": {
+    "reviewer": "GPT-6",
+    "reviewType": "GPT-6 code-path audit plus current-main SHA and CI evidence reconciliation",
+    "reviewedAt": "2026-11-08",
+    "reviewedMainSha": "7f6b4848b86d041aba5cfca7ea4549dc50a9c7d3",
+    "implementationMergeSha": "7f6b4848b86d041aba5cfca7ea4549dc50a9c7d3",
+    "result": "NO_BLOCKING_FINDINGS",
+    "reviewedFiles": [
+      {
+        "path": ".github/workflows/neon-d1-02-reviewed-remote-schema-apply.yml",
+        "gitBlobSha1": "19d18240f403a6b8b7fe7c23195adcba5d8f4134"
+      },
+      {
+        "path": ".github/workflows/neon-d1-01-reviewed-remote-schema-apply.yml",
+        "gitBlobSha1": "00d4acb8ac2bb26c3248caebcdfef550a5075a6a"
+      },
+      {
+        "path": "contracts/database/neon-d1-02-migration-manifest.v1.json",
+        "gitBlobSha1": "056f61a53e7ef6c101ec194799829b48ab44e040"
+      },
+      {
+        "path": "contracts/database/neon-schema-migration-ledger.v1.json",
+        "gitBlobSha1": "8e0ed38ab3d30fa9994a80cb0361f914bf51f5f0"
+      },
+      {
+        "path": "scripts/neon/d1-02/assert-remote-apply-release.mjs",
+        "gitBlobSha1": "8a595fc1bed50d7018601049ca7c91fedc6ae34a"
+      },
+      {
+        "path": "scripts/neon/d1-02/assert-remote-apply-release.test.mjs",
+        "gitBlobSha1": "964128e147c5c919517a2114e190d08d63c76a03"
+      },
+      {
+        "path": "scripts/neon/d1-02/remote-runner-review.mjs",
+        "gitBlobSha1": "4c1563d2955c6546c26266b0c5f49b92bb140275"
+      },
+      {
+        "path": "scripts/neon/d1-02/remote-runner-review.test.mjs",
+        "gitBlobSha1": "3d3ea86cb9cd8b91cf0242ab1d3599a184ff9cb4"
+      },
+      {
+        "path": "scripts/neon/d1-02/schema-only-runner.mjs",
+        "gitBlobSha1": "718d920f6d5a364f0a9be11194ff9741ec934f18"
+      },
+      {
+        "path": "scripts/neon/d1-02/schema-only-runner.test.mjs",
+        "gitBlobSha1": "372e8e2325a98c1335b7fa5779c72bcea990b61c"
+      },
+      {
+        "path": "scripts/neon/d1-01/0001_schema_migration_ledger.sql",
+        "gitBlobSha1": "b8cdec415ee4106d0b0618197b12b61d8656a2c9"
+      },
+      {
+        "path": "workers/W03-content/src/neon-postgres-migrations/0001_w03_d1_02_content_schema.sql",
+        "gitBlobSha1": "d639d48dc38dd0df8015f9889747fd059d263660"
+      },
+      {
+        "path": "workers/W05-social/src/neon-postgres-migrations/0001_w05_d1_02_social_schema.sql",
+        "gitBlobSha1": "90d786ef9fa9ae34b823501728bd5da47d574a35"
+      },
+      {
+        "path": "scripts/neon/d1-02/verify-combined-postgres-schema.sql",
+        "gitBlobSha1": "02891d475a8b156a1841e7ae700751f080646228"
+      },
+      {
+        "path": "scripts/neon/d1-02/verify-combined-schema-contract.mjs",
+        "gitBlobSha1": "c186ba80ae88df2f423d6c05c7052e02deeb7254"
+      },
+      {
+        "path": "scripts/neon/run-schema-migrations.mjs",
+        "gitBlobSha1": "56bb4961adf6cdaced056df7d6a933a7e390b215"
+      },
+      {
+        "path": "scripts/neon/run-schema-migrations.test.mjs",
+        "gitBlobSha1": "c5c91870d9d7f2f1dbc467014ef12d06eda8722d"
+      },
+      {
+        "path": "scripts/neon/d1-01-migration-manifest.mjs",
+        "gitBlobSha1": "3e2a8781989f00d8216b551ef2ff9227f99722fa"
+      },
+      {
+        "path": "scripts/neon/plan-d1-01-schema-migrations.mjs",
+        "gitBlobSha1": "651e318e744d5b8ec513e9ad4e6f010273e94e07"
+      },
+      {
+        "path": "scripts/neon/plan-d1-01-schema-migrations.test.mjs",
+        "gitBlobSha1": "45be1292046aa94f91c4fc6cef02b0e20a0c6718"
+      },
+      {
+        "path": "scripts/neon/assert-d1-01-migration-ledger-ready.mjs",
+        "gitBlobSha1": "9079276205d81fe1e9224a7e04602908822c057c"
+      },
+      {
+        "path": "contracts/database/neon-d1-01-remote-runner-review.v1.json",
+        "gitBlobSha1": "5d69101e791013c6b4c0b8d18bc0f6b3ea2fb32e"
+      }
+    ],
+    "controlsChecked": [
+      "Exact D1-02 domain, luckreadpro database name, user-provided database UUID metadata, pinned Neon endpoint hostname and PostgreSQL major 18 guard.",
+      "TLS certificate-chain validation, hostname verification, sslmode=verify-full and channel_binding=require on remote connections.",
+      "GitHub Actions workflow_dispatch only from refs/heads/main with the exact D1-02 confirmation token.",
+      "Release gate validates this review record, exact reviewed Git blob SHAs and that the reviewed main commit is an ancestor of the dispatch commit.",
+      "Shared append-only ledger DDL constrains domain/database/owner mappings to the approved D1-02 W03/W05 domain.",
+      "Manifest pins W03 then W05 PostgreSQL artifacts, path-framed SHA-256 checksums, canonical manifest-entry checksums and ordered ledger-prefix idempotency.",
+      "One transaction per owner SQL migration and its ledger row, with a database-scoped transaction advisory lock held for the complete execution.",
+      "Preflight permits only a fresh public schema or an exact existing ledger prefix; retries reject drift and unexpected objects.",
+      "Postflight checks exact 28-table ownership, 63 indexes, 9 triggers, 10 trigger functions, zero business rows, only one Snowflake allocator row, zero foreign keys and no D1-03/W09 endpoint table.",
+      "Disposable PostgreSQL 18 CI exercises the full schema and rollback-only cross-owner event/reference semantics.",
+      "D1-01 shared migration readiness logic permits only the exact reviewed D1-02 state while retaining D1-03 through D1-05 blocked and the global remoteApplyReady flag false.",
+      "PR and push validation never read Neon credentials; remote apply remains a separate manual main-only workflow.",
+      "D1-01 remote validation workflow also runs shared runner and D1-01 planning regression tests after the D1-02 domain release state changes.",
+      "The refreshed D1-01 remote-runner review record was re-hashed and validated after adding the D1-02 per-domain release state; no circular review references are used."
+    ],
+    "findings": [],
+    "limitations": [
+      "PR #1643 had no submitted GitHub review records; this is a GPT-6 review record, not a human approval or GitHub APPROVE review.",
+      "Remote Neon DDL has not been executed. The CI database was a disposable PostgreSQL 18.6 service container.",
+      "GitHub repository secrets cannot be enumerated by this review tool; the workflow fails closed if NEON_DATABASE_URL_LUCKREADPRO is missing or does not match the pinned target.",
+      "The database UUID is pinned as user-provided Neon metadata; PostgreSQL does not expose this Neon control-plane UUID as a SQL identity field, so it is not independently verified by the connection."
+    ],
+    "formalGitHubReviewSubmissions": 0
+  },
+  "verificationEvidence": {
+    "fullD1_02LocalPostgres18Rehearsal": {
+      "runId": 42480684871,
+      "headSha": "7f6b4848b86d041aba5cfca7ea4549dc50a9c7d3",
+      "conclusion": "success",
+      "url": "https://github.com/wanghuinet/luckread/actions/runs/42480684871"
+    },
+    "remoteRunnerGuardsNoCredentials": {
+      "runId": 42480684866,
+      "headSha": "7f6b4848b86d041aba5cfca7ea4549dc50a9c7d3",
+      "conclusion": "success",
+      "url": "https://github.com/wanghuinet/luckread/actions/runs/42480684866",
+      "remoteApplyJob": "skipped"
+    },
+    "contractAdmission": {
+      "runId": 42480684886,
+      "headSha": "7f6b4848b86d041aba5cfca7ea4549dc50a9c7d3",
+      "conclusion": "success",
+      "url": "https://github.com/wanghuinet/luckread/actions/runs/42480684886"
+    },
+    "mapping0StructuralGate": {
+      "runId": 42480684852,
+      "headSha": "7f6b4848b86d041aba5cfca7ea4549dc50a9c7d3",
+      "conclusion": "success",
+      "url": "https://github.com/wanghuinet/luckread/actions/runs/42480684852"
+    },
+    "featureInventory": {
+      "runId": 42480684859,
+      "headSha": "7f6b4848b86d041aba5cfca7ea4549dc50a9c7d3",
+      "conclusion": "success",
+      "url": "https://github.com/wanghuinet/luckread/actions/runs/42480684859"
+    }
+  },
+  "safety": {
+    "remoteNeonDdlExecuted": false,
+    "cloudflareD1Touched": false,
+    "businessDataImported": false,
+    "productionCutoverAuthorized": false,
+    "manualWorkflowDispatchRequired": true,
+    "exactConfirmationRequired": "APPLY_REVIEWED_SCHEMA_D1_02_LUCKREADPRO"
+  }
+}

@@ -164,17 +164,23 @@ export function isRemoteApplyReleased(manifestContract, ledgerContractValue) {
   const d1Ready = domains['D1-01']?.runnerStatus === 'IMPLEMENTED_AND_REVIEWED' &&
     domains['D1-01']?.remoteApplyReady === true &&
     domains['D1-01']?.reviewEvidenceRef === 'contracts/database/neon-d1-01-remote-runner-review.v1.json'
-  const otherDomainsBlocked = expectedDomains
-    .filter((domain) => domain !== 'D1-01')
-    .every((domain) => domains[domain]?.runnerStatus === 'NOT_IMPLEMENTED' &&
-      domains[domain]?.remoteApplyReady === false)
+  const d1_02 = domains['D1-02']
+  const d1_02Ref = 'contracts/database/neon-d1-02-remote-runner-review.v1.json'
+  const d1_02Released = d1_02?.runnerStatus === 'IMPLEMENTED_AND_REVIEWED' &&
+    d1_02?.remoteApplyReady === true && d1_02?.reviewEvidenceRef === d1_02Ref
+  const d1_02Blocked = d1_02?.runnerStatus === 'NOT_IMPLEMENTED' && d1_02?.remoteApplyReady === false
+  const laterDomainsBlocked = ['D1-03', 'D1-04', 'D1-05'].every((domain) =>
+    domains[domain]?.runnerStatus === 'NOT_IMPLEMENTED' && domains[domain]?.remoteApplyReady === false)
+  const expectedRunnerStatus = d1_02Released
+    ? 'IMPLEMENTED_FOR_D1_01_AND_D1_02_ONLY'
+    : 'IMPLEMENTED_FOR_D1_01_ONLY'
   return manifestContract?.remoteApplyReady === true &&
     manifestContract?.execution?.remoteApplyReady === true &&
     manifestContract?.execution?.runnerStatus === 'IMPLEMENTED_AND_REVIEWED' &&
     ledgerContractValue?.remoteApplyReady === false &&
     ledgerContractValue?.execution?.remoteApplyReady === false &&
-    ledgerContractValue?.execution?.runnerStatus === 'IMPLEMENTED_FOR_D1_01_ONLY' &&
-    exactDomainSet && d1Ready && otherDomainsBlocked &&
+    ledgerContractValue?.execution?.runnerStatus === expectedRunnerStatus &&
+    exactDomainSet && d1Ready && (d1_02Released || d1_02Blocked) && laterDomainsBlocked &&
     manifestContract?.execution?.reviewEvidenceRef === domains['D1-01']?.reviewEvidenceRef
 }
 

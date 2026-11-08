@@ -160,3 +160,28 @@ test('rejects a partially enabled manifest/ledger release gate', () => {
     /complete blocked or reviewed release state/
   )
 })
+
+
+test('continues to plan D1-01 safely when D1-02 is independently reviewed and released', () => {
+  const releasedManifest = structuredClone(manifest)
+  releasedManifest.remoteApplyReady = true
+  const d1Review = 'contracts/database/neon-d1-01-remote-runner-review.v1.json'
+  const d2Review = 'contracts/database/neon-d1-02-remote-runner-review.v1.json'
+  releasedManifest.execution = { runnerStatus:'IMPLEMENTED_AND_REVIEWED', remoteApplyReady:true, reviewEvidenceRef:d1Review }
+  const releasedLedger = structuredClone(ledgerContract)
+  releasedLedger.execution = {
+    runnerStatus:'IMPLEMENTED_FOR_D1_01_AND_D1_02_ONLY', remoteApplyReady:false,
+    domainReadiness:{
+      'D1-01':{runnerStatus:'IMPLEMENTED_AND_REVIEWED',remoteApplyReady:true,reviewEvidenceRef:d1Review},
+      'D1-02':{runnerStatus:'IMPLEMENTED_AND_REVIEWED',remoteApplyReady:true,reviewEvidenceRef:d2Review},
+      'D1-03':{runnerStatus:'NOT_IMPLEMENTED',remoteApplyReady:false},
+      'D1-04':{runnerStatus:'NOT_IMPLEMENTED',remoteApplyReady:false},
+      'D1-05':{runnerStatus:'NOT_IMPLEMENTED',remoteApplyReady:false}
+    }
+  }
+  const plan = buildReadOnlyMigrationPlan({ manifest:releasedManifest, ledgerContract:releasedLedger, checksums })
+  assert.equal(plan.safety.remoteApplyReady,true)
+  assert.equal(plan.readiness.remoteReleaseGate,'READY_FOR_MANUAL_DISPATCH')
+  assert.equal(plan.readiness.executable,false)
+  assert.equal(plan.safety.remoteConnectionAttempted,false)
+})

@@ -20,17 +20,28 @@ const manifestValidation = spawnSync(process.execPath, [
 const domainReadiness = ledger.execution?.domainReadiness ?? {}
 const expectedDomains = ['D1-01', 'D1-02', 'D1-03', 'D1-04', 'D1-05']
 const d1Readiness = domainReadiness['D1-01']
-const otherDomainsBlocked = expectedDomains
-  .filter((domain) => domain !== 'D1-01')
-  .every((domain) => domainReadiness[domain]?.runnerStatus === 'NOT_IMPLEMENTED' &&
-    domainReadiness[domain]?.remoteApplyReady === false)
+const d1_02Readiness = domainReadiness['D1-02']
+const d1_02Released = d1_02Readiness?.runnerStatus === 'IMPLEMENTED_AND_REVIEWED' &&
+  d1_02Readiness?.remoteApplyReady === true &&
+  d1_02Readiness?.reviewEvidenceRef === 'contracts/database/neon-d1-02-remote-runner-review.v1.json'
+const d1_02Blocked = d1_02Readiness?.runnerStatus === 'NOT_IMPLEMENTED' &&
+  d1_02Readiness?.remoteApplyReady === false
+const laterDomainsBlocked = ['D1-03', 'D1-04', 'D1-05'].every((domain) =>
+  domainReadiness[domain]?.runnerStatus === 'NOT_IMPLEMENTED' &&
+  domainReadiness[domain]?.remoteApplyReady === false)
+const expectedSharedRunnerStatus = d1_02Released
+  ? 'IMPLEMENTED_FOR_D1_01_AND_D1_02_ONLY'
+  : 'IMPLEMENTED_FOR_D1_01_ONLY'
+const otherDomainsBlocked = (d1_02Released || d1_02Blocked) &&
+  laterDomainsBlocked &&
+  ledger.execution?.runnerStatus === expectedSharedRunnerStatus
 const ready = manifestValidation.status === 0 &&
   manifest.remoteApplyReady === true &&
   manifest.execution?.remoteApplyReady === true &&
   manifest.execution?.runnerStatus === 'IMPLEMENTED_AND_REVIEWED' &&
   ledger.remoteApplyReady === false &&
   ledger.execution?.remoteApplyReady === false &&
-  ledger.execution?.runnerStatus === 'IMPLEMENTED_FOR_D1_01_ONLY' &&
+  ledger.execution?.runnerStatus === expectedSharedRunnerStatus &&
   JSON.stringify(Object.keys(domainReadiness).sort()) === JSON.stringify(expectedDomains) &&
   d1Readiness?.runnerStatus === 'IMPLEMENTED_AND_REVIEWED' &&
   d1Readiness?.remoteApplyReady === true &&

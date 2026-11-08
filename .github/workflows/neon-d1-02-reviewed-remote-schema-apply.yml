@@ -42,6 +42,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -49,18 +51,10 @@ jobs:
         run: |
           set -euo pipefail
           node --check scripts/neon/d1-02/schema-only-runner.mjs
+          node --check scripts/neon/d1-02/remote-runner-review.mjs
           node --check scripts/neon/d1-02/assert-remote-apply-release.mjs
-          node --test scripts/neon/d1-02/schema-only-runner.test.mjs
-          node scripts/neon/d1-02/assert-remote-apply-release.mjs --assert-configured
-      - name: Prove the remote DDL job is not released by this implementation slice
-        shell: bash
-        run: |
-          set -euo pipefail
-          if node scripts/neon/d1-02/assert-remote-apply-release.mjs --assert-ready > /tmp/d1-02-release-check.log 2>&1; then
-            echo "Remote DDL unexpectedly became enabled in the implementation PR."
-            exit 1
-          fi
-          grep -F "remoteApplyReady remains false" /tmp/d1-02-release-check.log
+          node --test scripts/neon/d1-02/schema-only-runner.test.mjs scripts/neon/d1-02/remote-runner-review.test.mjs scripts/neon/d1-02/assert-remote-apply-release.test.mjs
+          node scripts/neon/d1-02/assert-remote-apply-release.mjs --assert-ready
 
   apply:
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.confirm_target == 'APPLY_REVIEWED_SCHEMA_D1_02_LUCKREADPRO' }}
@@ -81,7 +75,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
-          fetch-depth: 1
+          fetch-depth: 0
 
       - name: Verify checkout provenance
         shell: bash
