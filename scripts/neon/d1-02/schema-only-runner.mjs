@@ -175,6 +175,9 @@ export function validateManifestShape(manifest) {
 
 export function buildArtifactChecksums(manifest, readArtifact) {
   const shape = validateManifestShape(manifest)
+  if (remoteNeon && manifest.remoteApplyReady !== true) {
+    fail('D1-02 remote apply is intentionally blocked until its separate reviewed release contract is enabled')
+  }
   if (!shape.valid) fail(shape.errors.join('; '))
   return shape.entries.map((entry) => {
     const paths = [...entry.artifactPaths].sort((a, b) => Buffer.compare(Buffer.from(a), Buffer.from(b)))
@@ -381,15 +384,33 @@ async function insertLedgerRow(client, entry, checksum, sourceCommitSha, executi
 }
 
 async function run() {
-  if (process.argv.length !== 3 || process.argv[2] !== '--local-only') {
-    fail('this implementation supports --local-only only; remote Neon apply remains disabled')
+  if (process.argv.length !== 3 || !['--local-only', '--remote-neon'].includes(process.argv[2])) {
+    fail('select exactly one execution mode: --local-only or --remote-neon')
   }
-  const connectionString = process.env.D1_02_LOCAL_DATABASE_URL
-  const target = validateLocalTarget(connectionString)
-  if (!target.valid) fail(target.reason)
-  const sourceCommitSha = process.env.REHEARSAL_SOURCE_COMMIT_SHA || process.env.GITHUB_SHA
+  const remoteNeon = process.argv[2] === '--remote-neon'
+  let connectionString
+  let target
+  let sourceCommitSha
+  if (remoteNeon) {
+    const context = validateRemoteApplyContext({
+      githubActions: process.env.GITHUB_ACTIONS,
+      githubRef: process.env.GITHUB_REF,
+      confirmation: process.env.D1_02_REMOTE_APPLY_CONFIRMATION,
+    })
+    if (!context.valid) fail(context.errors.join('; '))
+    connectionString = process.env.NEON_DATABASE_URL_LUCKREADPRO
+    target = validateRemoteNeonTarget(connectionString)
+    if (!target.valid) fail(target.reason)
+    connectionString = enforceVerifiedNeonConnectionString(connectionString)
+    sourceCommitSha = process.env.GITHUB_SHA
+  } else {
+    connectionString = process.env.D1_02_LOCAL_DATABASE_URL
+    target = validateLocalTarget(connectionString)
+    if (!target.valid) fail(target.reason)
+    sourceCommitSha = process.env.REHEARSAL_SOURCE_COMMIT_SHA || process.env.GITHUB_SHA
+  }
   if (!SHA.test(sourceCommitSha || '')) fail('an exact source commit SHA is required for migration provenance')
-  const executionId = 'local-' + (process.env.GITHUB_RUN_ID || process.pid) +
+  const executionId = (remoteNeon ? 'github-' : 'local-') + (process.env.GITHUB_RUN_ID || process.pid) +
     '-' + (process.env.GITHUB_RUN_ATTEMPT || '1')
   const manifest = readJson(manifestPath)
   const shape = validateManifestShape(manifest)
@@ -408,6 +429,7 @@ async function run() {
   const pool = new Pool({
     connectionString,
     max: 2,
+    ...(remoteNeon ? { ssl: { rejectUnauthorized: true } } : {}),
     connectionTimeoutMillis: 15_000,
     idleTimeoutMillis: 1_000,
   })
@@ -418,18 +440,21 @@ async function run() {
     lockClient = await pool.connect()
     await lockClient.query('BEGIN')
     lockOpen = true
+    if (remoteNeon) verifyRemoteTlsConnection(lockClient, target.parsed.hostname)
     const identity = await lockClient.query(
       "SELECT current_database() AS database_name,current_setting('server_version_num')::integer AS version_num",
     )
     const major = Math.floor(Number(identity.rows[0]?.version_num) / 10_000)
-    if (identity.rows[0]?.database_name !== 'luckread_d1_02_schema' || major !== 18) {
-      fail('connected database must be the exact disposable D1-02 PostgreSQL 18 rehearsal target')
+    const expectedDatabase = remoteNeon ? 'luckreadpro' : 'luckread_d1_02_schema'
+    if (identity.rows[0]?.database_name !== expectedDatabase || major !== 18) {
+      fail('connected database must be the exact approved D1-02 PostgreSQL 18 target')
     }
     await lockClient.query(
       "SELECT pg_advisory_xact_lock(hashtextextended('luckread:neon-schema-migration:' || current_database(),0))",
     )
 
     client = await pool.connect()
+    if (remoteNeon) verifyRemoteTlsConnection(client, target.parsed.hostname)
     await ensureLedger(client)
     let appliedEntries = assertLedgerPrefix(shape.entries, checksums, await readD1_02LedgerRows(client))
     await verifyOwnerTableState(client, appliedEntries, checksums)
@@ -460,8 +485,8 @@ async function run() {
     if (rows.length !== shape.entries.length) fail('D1-02 runner did not complete both owner migrations')
     const schemaState = await verifyOwnerTableState(client, appliedEntries, checksums)
     const report = {
-      reportType: 'NEON_D1_02_SCHEMA_ONLY_RUNNER_LOCAL_POSTFLIGHT',
-      status: 'D1_02_LOCAL_SCHEMA_ONLY_APPLY_PASS',
+      reportType: remoteNeon ? 'NEON_D1_02_SCHEMA_ONLY_RUNNER_REMOTE_POSTFLIGHT' : 'NEON_D1_02_SCHEMA_ONLY_RUNNER_LOCAL_POSTFLIGHT',
+      status: remoteNeon ? 'D1_02_REMOTE_SCHEMA_ONLY_APPLY_PASS' : 'D1_02_LOCAL_SCHEMA_ONLY_APPLY_PASS',
       domainId: 'D1-02',
       databaseName: 'luckreadpro',
       databaseUuid: manifest.databaseUuid,
@@ -476,7 +501,7 @@ async function run() {
       })),
       schemaState,
       safety: {
-        remoteNeonTouched: false,
+        remoteNeonTouched: remoteNeon,
         cloudflareD1Touched: false,
         businessDataImported: false,
         productionCutoverAuthorized: false,
@@ -486,13 +511,13 @@ async function run() {
     const output = process.env.D1_02_SCHEMA_APPLY_REPORT || 'artifacts/neon/d1-02-schema-runner-postflight.json'
     mkdirSync(dirname(resolve(repositoryRoot, output)), { recursive: true })
     writeFileSync(resolve(repositoryRoot, output), JSON.stringify(report, null, 2) + '\n')
-    console.log('NEON_D1_02_SCHEMA_ONLY_RUNNER_PASS ' + JSON.stringify({
+    console.log((remoteNeon ? 'NEON_D1_02_REMOTE_SCHEMA_ONLY_RUNNER_PASS ' : 'NEON_D1_02_LOCAL_SCHEMA_ONLY_RUNNER_PASS ') + JSON.stringify({
       databaseName: report.databaseName,
       postgresMajor: report.postgresMajor,
       appliedMigrations: rows.length,
       tableCount: schemaState.tableCount,
       businessTableCount: schemaState.businessTableCount,
-      remoteNeonTouched: false,
+      remoteNeonTouched: remoteNeon,
       cloudflareD1Touched: false,
       businessDataImported: false,
     }))
