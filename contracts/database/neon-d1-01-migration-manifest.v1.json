@@ -1,0 +1,355 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/database/neon-d1-01-migration-manifest.v1.json",
+  "title": "LuckRead D1-01 Neon PostgreSQL Schema Migration Manifest",
+  "version": "1.0.0",
+  "status": "MANIFEST_CANDIDATE_RUNNER_NOT_IMPLEMENTED",
+  "domainId": "D1-01",
+  "databaseName": "luckread",
+  "postgresMajor": 18,
+  "businessDataImport": false,
+  "productionCutoverAuthorized": false,
+  "remoteApplyReady": false,
+  "ordering": "Strictly ascending unique order values; no lexical filename ordering is inferred.",
+  "entries": [
+    {
+      "order": 100,
+      "ownerWorker": "W01",
+      "migrationId": "D1-01-W01-PAYLOAD-BASELINE-20261107",
+      "kind": "PAYLOAD_NATIVE",
+      "artifactState": "COMMITTED",
+      "artifactPaths": [
+        "workers/W01-payload/src/neon-postgres-migrations/20261107_202531_neon_d1_01_payload_baseline.ts",
+        "workers/W01-payload/src/neon-postgres-migrations/20261107_202531_neon_d1_01_payload_baseline.json"
+      ],
+      "sourcePaths": [
+        "workers/W01-payload/src/neon-postgres-schema.config.ts",
+        "workers/W01-payload/src/collections/Users.ts",
+        "workers/W01-payload/src/collections/Media.ts",
+        "workers/W01-payload/src/neon-postgres-migrations/index.ts",
+        "workers/W01-payload/package.json"
+      ],
+      "dependsOn": [],
+      "execution": {
+        "executor": "PAYLOAD_NATIVE_MIGRATOR",
+        "packageDirectory": "workers/W01-payload",
+        "generatorCommand": "pnpm run neon:schema:generate",
+        "applyCommand": "pnpm run neon:schema:apply",
+        "transactionPolicy": "PAYLOAD_NATIVE_TRANSACTION_AND_LEDGER_RECONCILIATION",
+        "migrationName": "20261107_202531_neon_d1_01_payload_baseline"
+      }
+    },
+    {
+      "order": 200,
+      "ownerWorker": "W02",
+      "migrationId": "D1-01-W02-BETTER-AUTH-CORE-1.7.8",
+      "kind": "GENERATED_POSTGRESQL_SQL",
+      "artifactState": "GENERATED_AT_EXECUTION",
+      "artifactPaths": [
+        "workers/W02-identity/artifacts/neon/w02-better-auth-postgres-schema.sql"
+      ],
+      "sourcePaths": [
+        "workers/W02-identity/src/auth/neon-postgres-schema.config.ts",
+        "workers/W02-identity/src/auth/better-auth.ts",
+        "workers/W02-identity/package.json"
+      ],
+      "dependsOn": [],
+      "execution": {
+        "executor": "POSTGRESQL_SQL_EXECUTOR",
+        "packageDirectory": "workers/W02-identity",
+        "generatorCommand": "npm run neon:schema:generate",
+        "generatorVersions": {
+          "betterAuth": "1.7.8",
+          "betterAuthCli": "1.7.8",
+          "pg": "8.20.0"
+        },
+        "transactionPolicy": "RUNNER_OWNED_DDL_AND_LEDGER_TRANSACTION"
+      }
+    },
+    {
+      "order": 210,
+      "ownerWorker": "W02",
+      "migrationId": "D1-01-W02-0001_ROLE_ASSIGNMENTS",
+      "kind": "POSTGRESQL_SQL",
+      "artifactState": "COMMITTED",
+      "artifactPaths": [
+        "workers/W02-identity/src/neon-postgres-migrations/0001_role_assignments.sql"
+      ],
+      "sourcePaths": [
+        "workers/W02-identity/scripts/neon/generate-role-assignment-postgres-migrations.mjs",
+        "workers/W02-identity/package.json"
+      ],
+      "dependsOn": [
+        "D1-01-W02-BETTER-AUTH-CORE-1.7.8"
+      ],
+      "execution": {
+        "executor": "POSTGRESQL_SQL_EXECUTOR",
+        "packageDirectory": "workers/W02-identity",
+        "generatorFamily": "neon-role-assignment-generator",
+        "transactionPolicy": "RUNNER_OWNED_DDL_AND_LEDGER_TRANSACTION"
+      }
+    },
+    {
+      "order": 220,
+      "ownerWorker": "W02",
+      "migrationId": "D1-01-W02-0002_ROLE_AUTHORIZATION_VERSIONS",
+      "kind": "POSTGRESQL_SQL",
+      "artifactState": "COMMITTED",
+      "artifactPaths": [
+        "workers/W02-identity/src/neon-postgres-migrations/0002_role_authorization_versions.sql"
+      ],
+      "sourcePaths": [
+        "workers/W02-identity/scripts/neon/generate-role-assignment-postgres-migrations.mjs",
+        "workers/W02-identity/package.json"
+      ],
+      "dependsOn": [
+        "D1-01-W02-0001_ROLE_ASSIGNMENTS"
+      ],
+      "execution": {
+        "executor": "POSTGRESQL_SQL_EXECUTOR",
+        "packageDirectory": "workers/W02-identity",
+        "generatorFamily": "neon-role-assignment-generator",
+        "transactionPolicy": "RUNNER_OWNED_DDL_AND_LEDGER_TRANSACTION"
+      }
+    },
+    {
+      "order": 230,
+      "ownerWorker": "W02",
+      "migrationId": "D1-01-W02-0003_AUTH_003_CREDENTIALS",
+      "kind": "POSTGRESQL_SQL",
+      "artifactState": "COMMITTED",
+      "artifactPaths": [
+        "workers/W02-identity/src/neon-postgres-migrations/0003_auth_003_credentials.sql"
+      ],
+      "sourcePaths": [
+        "workers/W02-identity/scripts/neon/generate-auth003-credentials-postgres-migration.mjs",
+        "workers/W02-identity/package.json"
+      ],
+      "dependsOn": [
+        "D1-01-W02-0002_ROLE_AUTHORIZATION_VERSIONS"
+      ],
+      "execution": {
+        "executor": "POSTGRESQL_SQL_EXECUTOR",
+        "packageDirectory": "workers/W02-identity",
+        "generatorFamily": "neon-auth003-generator",
+        "transactionPolicy": "RUNNER_OWNED_DDL_AND_LEDGER_TRANSACTION"
+      }
+    },
+    {
+      "order": 240,
+      "ownerWorker": "W02",
+      "migrationId": "D1-01-W02-0004_AUTH_013_PUBLICATION_JOURNAL",
+      "kind": "POSTGRESQL_SQL",
+      "artifactState": "COMMITTED",
+      "artifactPaths": [
+        "workers/W02-identity/src/neon-postgres-migrations/0004_auth_013_publication_journal.sql"
+      ],
+      "sourcePaths": [
+        "workers/W02-identity/scripts/neon/generate-auth013-publication-journal-postgres-migration.mjs",
+        "workers/W02-identity/package.json"
+      ],
+      "dependsOn": [
+        "D1-01-W02-0003_AUTH_003_CREDENTIALS"
+      ],
+      "execution": {
+        "executor": "POSTGRESQL_SQL_EXECUTOR",
+        "packageDirectory": "workers/W02-identity",
+        "generatorFamily": "neon-auth013-generator",
+        "transactionPolicy": "RUNNER_OWNED_DDL_AND_LEDGER_TRANSACTION"
+      }
+    },
+    {
+      "order": 250,
+      "ownerWorker": "W02",
+      "migrationId": "D1-01-W02-0005_AUTH_015_LIFECYCLE_WINDOWS",
+      "kind": "POSTGRESQL_SQL",
+      "artifactState": "COMMITTED",
+      "artifactPaths": [
+        "workers/W02-identity/src/neon-postgres-migrations/0005_auth_015_lifecycle_windows.sql"
+      ],
+      "sourcePaths": [
+        "workers/W02-identity/scripts/neon/generate-auth015-lifecycle-windows-postgres-migration.mjs",
+        "workers/W02-identity/package.json"
+      ],
+      "dependsOn": [
+        "D1-01-W02-0004_AUTH_013_PUBLICATION_JOURNAL"
+      ],
+      "execution": {
+        "executor": "POSTGRESQL_SQL_EXECUTOR",
+        "packageDirectory": "workers/W02-identity",
+        "generatorFamily": "neon-auth015-generator",
+        "transactionPolicy": "RUNNER_OWNED_DDL_AND_LEDGER_TRANSACTION"
+      }
+    },
+    {
+      "order": 260,
+      "ownerWorker": "W02",
+      "migrationId": "D1-01-W02-0006_AUTH_010_SESSION_REVOCATION_JOURNAL",
+      "kind": "POSTGRESQL_SQL",
+      "artifactState": "COMMITTED",
+      "artifactPaths": [
+        "workers/W02-identity/src/neon-postgres-migrations/0006_auth_010_session_revocation_journal.sql"
+      ],
+      "sourcePaths": [
+        "workers/W02-identity/scripts/neon/generate-auth010-session-revocation-postgres-migration.mjs",
+        "workers/W02-identity/package.json"
+      ],
+      "dependsOn": [
+        "D1-01-W02-0005_AUTH_015_LIFECYCLE_WINDOWS"
+      ],
+      "execution": {
+        "executor": "POSTGRESQL_SQL_EXECUTOR",
+        "packageDirectory": "workers/W02-identity",
+        "generatorFamily": "neon-auth010-generator",
+        "transactionPolicy": "RUNNER_OWNED_DDL_AND_LEDGER_TRANSACTION"
+      }
+    },
+    {
+      "order": 270,
+      "ownerWorker": "W02",
+      "migrationId": "D1-01-W02-0007_AUTH_007_MFA_LIFECYCLE",
+      "kind": "POSTGRESQL_SQL",
+      "artifactState": "COMMITTED",
+      "artifactPaths": [
+        "workers/W02-identity/src/neon-postgres-migrations/0007_auth_007_mfa_lifecycle.sql"
+      ],
+      "sourcePaths": [
+        "workers/W02-identity/scripts/neon/generate-auth007-mfa-lifecycle-postgres-migration.mjs",
+        "workers/W02-identity/package.json"
+      ],
+      "dependsOn": [
+        "D1-01-W02-0006_AUTH_010_SESSION_REVOCATION_JOURNAL"
+      ],
+      "execution": {
+        "executor": "POSTGRESQL_SQL_EXECUTOR",
+        "packageDirectory": "workers/W02-identity",
+        "generatorFamily": "neon-auth007-mfa-generator",
+        "transactionPolicy": "RUNNER_OWNED_DDL_AND_LEDGER_TRANSACTION"
+      }
+    },
+    {
+      "order": 280,
+      "ownerWorker": "W02",
+      "migrationId": "D1-01-W02-0008_AUTH_USERNAME_CHANGE_STATE",
+      "kind": "POSTGRESQL_SQL",
+      "artifactState": "COMMITTED",
+      "artifactPaths": [
+        "workers/W02-identity/src/neon-postgres-migrations/0008_auth_username_change_state.sql"
+      ],
+      "sourcePaths": [
+        "workers/W02-identity/scripts/neon/generate-username-change-state-postgres-migration.mjs",
+        "workers/W02-identity/package.json"
+      ],
+      "dependsOn": [
+        "D1-01-W02-0007_AUTH_007_MFA_LIFECYCLE"
+      ],
+      "execution": {
+        "executor": "POSTGRESQL_SQL_EXECUTOR",
+        "packageDirectory": "workers/W02-identity",
+        "generatorFamily": "neon-username-change-generator",
+        "transactionPolicy": "RUNNER_OWNED_DDL_AND_LEDGER_TRANSACTION"
+      }
+    },
+    {
+      "order": 290,
+      "ownerWorker": "W02",
+      "migrationId": "D1-01-W02-0009_AUTH_007_MFA_PUBLICATION_JOURNAL",
+      "kind": "POSTGRESQL_SQL",
+      "artifactState": "COMMITTED",
+      "artifactPaths": [
+        "workers/W02-identity/src/neon-postgres-migrations/0009_auth_007_mfa_publication_journal.sql"
+      ],
+      "sourcePaths": [
+        "workers/W02-identity/scripts/neon/generate-auth007-mfa-publication-journal-postgres-migration.mjs",
+        "workers/W02-identity/package.json"
+      ],
+      "dependsOn": [
+        "D1-01-W02-0008_AUTH_USERNAME_CHANGE_STATE"
+      ],
+      "execution": {
+        "executor": "POSTGRESQL_SQL_EXECUTOR",
+        "packageDirectory": "workers/W02-identity",
+        "generatorFamily": "neon-auth007-mfa-journal-generator",
+        "transactionPolicy": "RUNNER_OWNED_DDL_AND_LEDGER_TRANSACTION"
+      }
+    },
+    {
+      "order": 300,
+      "ownerWorker": "W02",
+      "migrationId": "D1-01-W02-0010_AUTH_007_MFA_OPERATION_RECEIPTS",
+      "kind": "POSTGRESQL_SQL",
+      "artifactState": "COMMITTED",
+      "artifactPaths": [
+        "workers/W02-identity/src/neon-postgres-migrations/0010_auth_007_mfa_operation_receipts.sql"
+      ],
+      "sourcePaths": [
+        "workers/W02-identity/scripts/neon/generate-auth007-mfa-operation-receipts-postgres-migration.mjs",
+        "workers/W02-identity/package.json"
+      ],
+      "dependsOn": [
+        "D1-01-W02-0009_AUTH_007_MFA_PUBLICATION_JOURNAL"
+      ],
+      "execution": {
+        "executor": "POSTGRESQL_SQL_EXECUTOR",
+        "packageDirectory": "workers/W02-identity",
+        "generatorFamily": "neon-auth007-mfa-receipts-generator",
+        "transactionPolicy": "RUNNER_OWNED_DDL_AND_LEDGER_TRANSACTION"
+      }
+    },
+    {
+      "order": 500,
+      "ownerWorker": "W07",
+      "migrationId": "D1-01-W07-MEMBERSHIP-SCHEMA-0001",
+      "kind": "POSTGRESQL_SQL",
+      "artifactState": "COMMITTED",
+      "artifactPaths": [
+        "workers/W07-subscription-commerce/src/neon-postgres-migrations/0001_w07_d1_01_membership_schema.sql"
+      ],
+      "sourcePaths": [
+        "workers/W07-subscription-commerce/scripts/neon/generate-d1-01-membership-postgres-migration.mjs",
+        "workers/W07-subscription-commerce/scripts/neon/templates/d1-01-membership-postgres.sql",
+        "workers/W07-subscription-commerce/README-neon-postgres-schema.md"
+      ],
+      "dependsOn": [],
+      "execution": {
+        "executor": "POSTGRESQL_SQL_EXECUTOR",
+        "transactionPolicy": "RUNNER_MUST_STRIP_EXACT_OUTER_BEGIN_COMMIT_AND_OWN_TRANSACTION"
+      }
+    },
+    {
+      "order": 600,
+      "ownerWorker": "W08",
+      "migrationId": "D1-01-W08-CREATOR-AUTHORIZATION-0001",
+      "kind": "POSTGRESQL_SQL",
+      "artifactState": "COMMITTED",
+      "artifactPaths": [
+        "workers/W08-creator/src/neon-postgres-migrations/0001_w08_d1_01_creator_authorization.sql"
+      ],
+      "sourcePaths": [
+        "workers/W08-creator/scripts/neon/generate-d1-01-creator-postgres-migration.mjs",
+        "workers/W08-creator/scripts/neon/templates/d1-01-creator-postgres.sql",
+        "workers/W08-creator/README-neon-postgres-schema.md"
+      ],
+      "dependsOn": [],
+      "execution": {
+        "executor": "POSTGRESQL_SQL_EXECUTOR",
+        "transactionPolicy": "RUNNER_MUST_STRIP_EXACT_OUTER_BEGIN_COMMIT_AND_OWN_TRANSACTION"
+      }
+    }
+  ],
+  "ownerBoundaries": {
+    "W01": "Payload schema only; official Payload PostgreSQL native migrator. W01 users projection is not W02 Better Auth user identity.",
+    "W02": "Better Auth generated core followed by ten W02 PostgreSQL custom migrations; owns RoleAssignment and identity.",
+    "W07": "D1-01 membership/subscription and entitlement reference schema only. D1-04 orders/payments remain excluded.",
+    "W08": "Creator applications/creator/audit schema only. RoleAssignment is W02-owned; role_assignment in audit is opaque resource metadata."
+  },
+  "noCrossDomainForeignKeys": true,
+  "executionRequiresSharedLedger": true,
+  "sourceCommitRecordedAtExecution": true,
+  "execution": {
+    "runnerStatus": "NOT_IMPLEMENTED",
+    "runnerEntryPoint": "scripts/neon/run-schema-migrations.mjs",
+    "lockExpression": "pg_advisory_xact_lock(hashtextextended('luckread:neon-schema-migration:' || current_database(), 0))",
+    "remoteApplyReady": false
+  }
+}

@@ -44,6 +44,9 @@ jobs:
         with:
           node-version: 24
 
+      - name: Block owner-specific apply until the shared migration ledger runner is reviewed
+        run: node scripts/neon/assert-d1-01-migration-ledger-ready.mjs --deny-owner-bypass
+
       - name: Setup pnpm 11
         uses: pnpm/action-setup@v4
         with:

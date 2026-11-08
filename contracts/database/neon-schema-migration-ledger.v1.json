@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/database/neon-schema-migration-ledger.v1.json",
+  "title": "LuckRead Neon Schema Migration Ledger Contract",
+  "version": "1.0.0",
+  "status": "LEDGER_SCHEMA_CANDIDATE_RUNNER_NOT_IMPLEMENTED",
+  "scope": "Shared append-only schema migration provenance ledger installed independently inside each approved Neon database.",
+  "businessData": false,
+  "table": {
+    "name": "neon_schema_migration_ledger",
+    "columns": [
+      "domain_id",
+      "database_name",
+      "owner_worker",
+      "migration_id",
+      "migration_order",
+      "migration_kind",
+      "artifact_sha256",
+      "manifest_entry_sha256",
+      "source_commit_sha",
+      "runner_version",
+      "execution_id",
+      "applied_at"
+    ],
+    "primaryKey": [
+      "domain_id",
+      "owner_worker",
+      "migration_id"
+    ],
+    "unique": [
+      [
+        "domain_id",
+        "migration_order"
+      ]
+    ],
+    "appendOnly": true,
+    "secondaryIndexes": [
+      "neon_schema_migration_ledger_owner_applied_idx"
+    ],
+    "triggers": [
+      "neon_schema_migration_ledger_no_update_or_delete",
+      "neon_schema_migration_ledger_no_truncate"
+    ],
+    "foreignKeys": 0
+  },
+  "databaseMap": {
+    "D1-01": "luckread",
+    "D1-02": "luckreadpro",
+    "D1-03": "luckread_governance",
+    "D1-04": "luckread_finance",
+    "D1-05": "allluck"
+  },
+  "domainOwners": {
+    "D1-01": [
+      "W01",
+      "W02",
+      "W07",
+      "W08"
+    ],
+    "D1-02": [
+      "W03",
+      "W05"
+    ],
+    "D1-03": [
+      "W05",
+      "W06",
+      "W09"
+    ],
+    "D1-04": [
+      "W07"
+    ],
+    "D1-05": [
+      "W11"
+    ]
+  },
+  "migrationKinds": [
+    "PAYLOAD_NATIVE",
+    "GENERATED_POSTGRESQL_SQL",
+    "POSTGRESQL_SQL"
+  ],
+  "checksum": {
+    "algorithm": "SHA-256",
+    "artifactBundleEncoding": "UTF-8 path-framed binary stream: for artifact paths sorted by ordinal byte order, append uint32-be path-byte-length, UTF-8 relative path bytes, uint64-be content-byte-length, then raw file bytes.",
+    "manifestEntryEncoding": "SHA-256 over canonical JSON with recursively ordinal-sorted object keys and array order preserved.",
+    "lowercaseHex": true,
+    "artifactDrift": "Fail closed when an already-applied migration id has a different artifact checksum or manifest-entry checksum.",
+    "sourceCommit": "Record the exact 40-character Git commit SHA whose migration artifacts were executed."
+  },
+  "execution": {
+    "runnerStatus": "NOT_IMPLEMENTED",
+    "remoteApplyReady": false,
+    "runnerEntryPoint": "scripts/neon/run-schema-migrations.mjs",
+    "lock": {
+      "type": "PostgreSQL transaction-scoped advisory lock",
+      "keyExpression": "hashtextextended('luckread:neon-schema-migration:' || current_database(), 0)",
+      "scope": "One serial migration executor per database."
+    },
+    "existingRecord": "Skip only when migration id, owner, order, kind, artifact checksum and manifest-entry checksum all match exactly.",
+    "checksumMismatch": "Stop immediately; never overwrite, delete or repair ledger rows automatically.",
+    "sqlAtomicity": "Each PostgreSQL SQL migration and its ledger insert must share one transaction.",
+    "payloadAtomicity": "W01 must use the official Payload native migration runner; reconcile its payload_migrations record and resulting catalog before appending the shared ledger row after the Payload transaction commits.",
+    "failure": "A failed SQL migration rolls back its DDL and ledger insert together. Do not write a successful ledger row for failed work.",
+    "recovery": "Interrupted/non-atomic Payload application requires read-only catalog and Payload migration-ledger reconciliation before retry; no blind replay.",
+    "targetGuard": "Validate TLS, current_database(), D1 domain/database mapping, PostgreSQL major version, schema emptiness/expected prior ledger state and exact manifest before any DDL.",
+    "businessDataImport": false,
+    "productionCutoverAuthorized": false
+  },
+  "remoteApplyReady": false
+}
