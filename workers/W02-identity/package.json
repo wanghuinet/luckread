@@ -13,7 +13,8 @@
   "devDependencies": {
     "@types/node": "24.3.0",
     "auth": "1.7.8",
-    "pg": "8.20.0"
+    "pg": "8.20.0",
+    "@types/pg": "8.23.1"
   },
   "scripts": {
     "neon:schema:generate": "auth generate --config src/auth/neon-postgres-schema.config.ts --output artifacts/neon/w02-better-auth-postgres-schema.sql --yes",
