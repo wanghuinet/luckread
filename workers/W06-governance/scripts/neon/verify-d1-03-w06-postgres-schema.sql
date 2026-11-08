@@ -110,8 +110,6 @@ INSERT INTO moderation_decision_idempotency (
   'fixture-hash', 'fixture-decision', 200, '{}', now(), now() + interval '1 day'
 );
 
-INSERT INTO moderation_txn_guard (id, successful) VALUES (1, 1);
-
 INSERT INTO moderation_enforcement_outbox (
   outbox_id, decision_id, case_id, target_type, target_id, target_version,
   outcome, policy_version, idempotency_key, status, attempts, next_attempt_at,
