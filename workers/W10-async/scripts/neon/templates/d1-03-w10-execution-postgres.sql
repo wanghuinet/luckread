@@ -79,8 +79,20 @@ CREATE TABLE execution_dead_letters (
   dlq_id TEXT PRIMARY KEY NOT NULL,
   event_id TEXT NOT NULL,
   consumer_name TEXT NOT NULL,
-  original_event_metadata_json TEXT NOT NULL
-    CHECK (jsonb_typeof(original_event_metadata_json::jsonb) = 'object'),
+  event_type TEXT NOT NULL,
+  schema_version TEXT NOT NULL,
+  producer TEXT NOT NULL CHECK (producer IN (
+    'W01', 'W02', 'W03', 'W04', 'W05', 'W06',
+    'W07', 'W08', 'W09', 'W10', 'W11', 'W12'
+  )),
+  resource_type TEXT NOT NULL,
+  resource_id TEXT NOT NULL,
+  occurred_at TEXT NOT NULL,
+  published_at TEXT NOT NULL,
+  idempotency_key TEXT NOT NULL,
+  source_version INTEGER NOT NULL CHECK (source_version >= 1),
+  correlation_id TEXT NOT NULL,
+  causation_id TEXT NOT NULL,
   payload_sha256 TEXT NOT NULL CHECK (payload_sha256 ~ '^[0-9a-f]{64}$'),
   attempt_count INTEGER NOT NULL CHECK (attempt_count >= 1),
   last_error_class TEXT NOT NULL CHECK (last_error_class IN ('transient', 'permanent', 'poison')),
