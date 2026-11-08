@@ -105,7 +105,7 @@ jobs:
             src/neon-postgres-migrations/0002_role_authorization_versions.sql \
             src/neon-postgres-migrations/0003_auth_003_credentials.sql \
             src/neon-postgres-migrations/0004_auth_013_publication_journal.sql \
-            src/neon-postgres-migrations/0005_auth_015_lifecycle_windows.sql
+            src/neon-postgres-migrations/0005_auth_015_lifecycle_windows.sql \
             src/neon-postgres-migrations/0006_auth_010_session_revocation_journal.sql
 
       - name: Confirm all generated DDL is PostgreSQL-native
@@ -118,7 +118,7 @@ jobs:
             src/neon-postgres-migrations/0002_role_authorization_versions.sql
             src/neon-postgres-migrations/0003_auth_003_credentials.sql
             src/neon-postgres-migrations/0004_auth_013_publication_journal.sql
-            src/neon-postgres-migrations/0005_auth_015_lifecycle_windows.sql \
+            src/neon-postgres-migrations/0005_auth_015_lifecycle_windows.sql
             src/neon-postgres-migrations/0006_auth_010_session_revocation_journal.sql
           )
           for file in "${files[@]}"; do
