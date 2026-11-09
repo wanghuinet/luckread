@@ -306,7 +306,9 @@
             "NotificationPushEndpoint"
           ],
           "status": "SOURCE_ADMITTED_LOCAL_POSTGRES18_REHEARSAL_PASSED",
-          "schemaContract": "contracts/database/neon-d1-03-w09-platform-schema.v1.json"
+          "schemaContract": "contracts/database/neon-d1-03-w09-platform-schema.v1.json",
+          "admittedSliceRemoteApplied": true,
+          "remoteApplicationWorkflowRunId": 42563509520
         },
         "W06": {
           "entities": [
@@ -329,7 +331,9 @@
           ],
           "pendingEntities": [
             "Appeal"
-          ]
+          ],
+          "admittedSliceRemoteApplied": true,
+          "remoteApplicationWorkflowRunId": 42563509520
         },
         "W10": {
           "entities": [
@@ -351,7 +355,7 @@
             "execution_outbox",
             "operational_idempotency"
           ],
-          "remoteSchemaApplied": false,
+          "remoteSchemaApplied": true,
           "businessDataImported": false,
           "productionCutoverAuthorized": false,
           "localPostgres18Evidence": {
@@ -380,7 +384,8 @@
             "evidenceArtifactId": 13625774522,
             "evidenceArtifactSha256": "sha256:e24a8c63b3d0c295e35c156baa423b20e123c217f8f3fa308276780e73d8be72"
           },
-          "runtimeBindingAdded": false
+          "runtimeBindingAdded": false,
+          "remoteApplicationWorkflowRunId": 42563509520
         },
         "W11": {
           "entities": [
@@ -399,7 +404,71 @@
           "scope": "Only authenticated self-service endpoint registration/deletion and owner-scoped delivery operations admitted by NOTIFY-002 and W05-W09 notification-push-delivery contracts.",
           "schemaOwnership": false
         }
-      }
+      },
+      "partialRemoteSchemaApplied": true,
+      "fullDomainSchemaComplete": false,
+      "partialRemoteSchemaApplicationEvidence": {
+        "status": "D1_03_PARTIAL_SCHEMA_REMOTE_APPLY_PASS",
+        "workflowRunId": 42563509520,
+        "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42563509520",
+        "event": "workflow_dispatch",
+        "branch": "main",
+        "sourceCommitSha": "a35bdc5766fb4ee6f977055e7864858efd23bc6f",
+        "databaseName": "luckread_governance",
+        "scope": "ADMITTED_MANIFEST_ENTRIES_ONLY",
+        "postgresMajor": 18,
+        "migrationLedgerRows": 3,
+        "migrations": [
+          {
+            "ownerWorker": "W06",
+            "migrationId": "d1-03-w06-moderation-schema-v1",
+            "migrationOrder": 100,
+            "artifactSha256": "d80fce3a2989c62d4687b59f4aac942d9413f5b259ed99242694defa1e5bf4bd",
+            "manifestEntrySha256": "a24ccccd7f89d6892cebf2d9493e561bb33addc7a06b0e70e9528452ccc94260"
+          },
+          {
+            "ownerWorker": "W09",
+            "migrationId": "d1-03-w09-platform-schema-v1",
+            "migrationOrder": 200,
+            "artifactSha256": "2555ccd07d8866f602494a8b8b23f59695d04b111571820a9a80222071d666c1",
+            "manifestEntrySha256": "1cf32f0502d0880bd005356e610d71a67a2487592118bc9d268d67dff94a0f45"
+          },
+          {
+            "ownerWorker": "W09",
+            "logicalOwnerWorker": "W10",
+            "migrationId": "d1-03-w10-async-execution-schema-v1",
+            "migrationOrder": 300,
+            "artifactSha256": "b63233937b751406ba2eed315b9802b87f3ba323b57c6737986545f3888c49f4",
+            "manifestEntrySha256": "900b09cfbb17cdb8e2db751b58cc426ae4bd2bbb46b3b2867b3b942fda7ef2eb"
+          }
+        ],
+        "catalog": {
+          "tables": 15,
+          "explicitIndexes": 22,
+          "constraintIndexes": 27,
+          "triggers": 2,
+          "triggerFunctions": 1,
+          "foreignKeys": 2,
+          "controlSeedRows": 0,
+          "businessRows": 0
+        },
+        "artifact": {
+          "id": 13650895272,
+          "url": "https://github.com/wanghuinet/luckread/actions/runs/42563509520/artifacts/13650895272",
+          "sha256": "sha256:e9dc8f7d7739bfb023650361bad78a51ce9dc97b7fef8e9608e194f783ab345d"
+        },
+        "safety": {
+          "remoteNeonTouched": true,
+          "cloudflareD1Touched": false,
+          "businessDataImported": false,
+          "runtimeBindingsChanged": false,
+          "productionCutoverAuthorized": false
+        }
+      },
+      "remoteApplyBlockers": [
+        "W06 Appeal remains excluded because no dedicated Appeal persistence contract and source migration have been admitted.",
+        "W11 Campaign and GrowthOperation remain logical-only T22 entities; no D1-03 physical schema or runtime binding is admitted."
+      ]
     },
     {
       "domainId": "D1-04",
@@ -577,7 +646,58 @@
       "schemaSources": [
         "workers/W11-growth-campaign-analytics-operations/migrations"
       ],
-      "status": "PENDING"
+      "status": "SCHEMA_ONLY_REMOTE_APPLY_READY_PENDING_MANUAL_DISPATCH",
+      "schemaContract": "contracts/database/neon-d1-05-w11-analytics-schema.v1.json",
+      "migrationManifest": "contracts/database/neon-d1-05-shared-migration-manifest.v1.json",
+      "remoteReviewContract": "contracts/database/neon-d1-05-remote-runner-review.v1.json",
+      "schemaOnlyRemoteApplyReady": true,
+      "remoteSchemaApplied": false,
+      "runtimeDataIngestionEnabled": false,
+      "businessDataImported": false,
+      "productionCutoverAuthorized": false,
+      "localSchemaRehearsalEvidence": {
+        "status": "D1_05_SCHEMA_ONLY_LOCAL_POSTGRES18_PASS",
+        "workflowRunId": 42564810402,
+        "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42564810402",
+        "validationCommitSha": "673c606f35e3806a89fa51735742f9f3683adc7e",
+        "postgresVersion": "18.6",
+        "migrations": 1,
+        "tables": 6,
+        "explicitIndexes": 8,
+        "triggers": 0,
+        "triggerFunctions": 0,
+        "foreignKeys": 0,
+        "businessRows": 0,
+        "runtimeDataIngestionEnabled": false,
+        "remoteApplyJob": "skipped",
+        "artifact": {
+          "id": 13651455283,
+          "url": "https://github.com/wanghuinet/luckread/actions/runs/42564810402/artifacts/13651455283",
+          "sha256": "sha256:183fd02492242c0d0735c13fe4386e20357320d6fe9942a517ed8fb77041097b"
+        }
+      },
+      "releaseReviewEvidence": {
+        "status": "D1_05_SCHEMA_ONLY_REMOTE_PROVISIONING_APPROVED",
+        "pullRequest": 1676,
+        "pullRequestUrl": "https://github.com/wanghuinet/luckread/pull/1676",
+        "mergeCommitSha": "6d44d8a987d2a47733a82aa8af68eec8ccc5f8d5",
+        "reviewedImplementationMainSha": "7021c141af33c42bc3412386e12b23fe0991cc7d",
+        "reviewedFilePins": 24,
+        "releaseValidationRunId": 42564556552
+      },
+      "remoteApplyWorkflow": {
+        "path": ".github/workflows/neon-d1-05-reviewed-schema-only-apply.yml",
+        "mode": "workflow_dispatch",
+        "branch": "main",
+        "exactConfirmationRequired": "APPLY_REVIEWED_SCHEMA_D1_05_ALLLUCK_SCHEMA_ONLY",
+        "sourcePinnedReviewRequiredBeforeSecretAccess": true
+      },
+      "runtimeAdmissionBlockers": [
+        "Retention policy for event and aggregate classes is not admitted.",
+        "Deletion/privacy-request behavior for actor-linked and creator-linked analytics projections is not admitted.",
+        "Consent, lawful purpose and collection eligibility rules are not admitted."
+      ],
+      "remoteSchemaApplicationEvidence": null
     }
   ],
   "businessDataImport": {
