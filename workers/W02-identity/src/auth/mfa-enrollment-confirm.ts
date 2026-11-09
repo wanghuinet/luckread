@@ -260,7 +260,29 @@ export async function handleMfaEnrollmentConfirmRequest(
     } catch {
       return json({ error: { code: 'MFA_AUDIT_UNAVAILABLE', message: 'MFA confirmation unavailable' } }, 503)
     }
-    const stored = await store.persistConfirmation({ userId: principal.userId, keyHash, requestHash })
+    // A provider may commit the conditional marker update but lose the
+    // response before the caller receives its row-count/result. Resolve that
+    // ambiguity only by reading back the exact key+request fingerprints and
+    // the already-verified authoritative factor state.
+    let stored = false
+    try {
+      stored = await store.persistConfirmation({ userId: principal.userId, keyHash, requestHash })
+    } catch {
+      // Fall through to the authoritative read-back below.
+    }
+    if (!stored) {
+      try {
+        const committed = await store.read(principal.userId)
+        stored = Boolean(
+          committed?.userEnabled &&
+          committed.factorVerified &&
+          committed.confirmationKeyHash === keyHash &&
+          committed.confirmationRequestHash === requestHash,
+        )
+      } catch {
+        stored = false
+      }
+    }
     if (!stored) {
       return json({ error: { code: 'MFA_READBACK_FAILED', message: 'MFA confirmation could not be verified' } }, 503)
     }
