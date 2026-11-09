@@ -12,12 +12,34 @@ if (policy.policyVersion !== 'DEV-2026-09-28.1') throw new Error('Unexpected dev
 
 const escapeSql = (value) => "'" + String(value).replaceAll("'", "''") + "'"
 const renderSql = (sql, args) => { let index = 0; return sql.replaceAll('?', () => escapeSql(args[index++])) }
-const d1Json = (command) => {
-  const output = execFileSync('pnpm', ['exec', 'wrangler', 'd1', 'execute', 'luckread', '--local', '--json', '--persist-to', process.env.CLOUDFLARE_PERSIST_TO || '/tmp/luckread-auth001-state', '--config', 'wrangler.jsonc', '--command', command], { encoding: 'utf8', cwd: process.cwd(), env: process.env, maxBuffer: 8 * 1024 * 1024 })
-  return JSON.parse(output)
+const d1Json = (command, options = {}) => {
+  const retryBusy = options.retryBusy === true
+  const maxBusyRetries = retryBusy ? 8 : 0
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      const output = execFileSync('pnpm', ['exec', 'wrangler', 'd1', 'execute', 'luckread', '--local', '--json', '--persist-to', process.env.CLOUDFLARE_PERSIST_TO || '/tmp/luckread-auth001-state', '--config', 'wrangler.jsonc', '--command', command], { encoding: 'utf8', cwd: process.cwd(), env: process.env, maxBuffer: 8 * 1024 * 1024 })
+      return JSON.parse(output)
+    } catch (failure) {
+      const diagnostic = [
+        failure instanceof Error ? failure.message : String(failure),
+        failure && typeof failure === 'object' && 'stderr' in failure ? String(failure.stderr ?? '') : '',
+        failure && typeof failure === 'object' && 'stdout' in failure ? String(failure.stdout ?? '') : '',
+      ].join('\n')
+      const busy = /SQLITE_BUSY|database is locked/i.test(diagnostic)
+      if (!retryBusy || !busy || attempt >= maxBusyRetries) throw failure
+
+      // Local workerd processes share the same persisted SQLite file. A short
+      // D1 metadata/read probe can collide with an in-flight Worker request;
+      // retry only read-only probes, never write/DDL commands with uncertain
+      // commit outcomes.
+      const delayMs = Math.min(250 * (2 ** attempt), 3_000)
+      console.warn('AUTH-001 local D1 read hit SQLITE_BUSY; retrying in ' + delayMs + 'ms (' + (attempt + 1) + '/' + maxBusyRetries + ')')
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, delayMs)
+    }
+  }
 }
 const d1Rows = (command) => {
-  const value = d1Json(command)
+  const value = d1Json(command, { retryBusy: true })
   if (Array.isArray(value)) return value.flatMap((item) => Array.isArray(item) ? item : item && Array.isArray(item.results) ? item.results : item && Array.isArray(item.result) ? item.result : [])
   if (value && Array.isArray(value.results)) return value.results
   if (value && Array.isArray(value.result)) return value.result
