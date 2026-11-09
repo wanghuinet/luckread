@@ -39,6 +39,8 @@ on:
       - 'workers/W02-identity/src/auth/neon-postgres-runtime-test.config.ts'
       - 'workers/W02-identity/src/neon/role-assignment-postgres.ts'
       - 'workers/W02-identity/src/neon/auth015-account-lifecycle-postgres.ts'
+      - 'workers/W02-identity/src/neon/session-revocation-postgres.ts'
+      - 'workers/W02-identity/scripts/neon/w02-auth010-session-revocation-postgres-runtime-rehearsal.ts'
       - 'workers/W02-identity/scripts/neon/w02-role-assignment-postgres-runtime-rehearsal.ts'
       - 'workers/W02-identity/scripts/neon/w02-better-auth-postgres-runtime-rehearsal.ts'
       - 'workers/W02-identity/src/neon-postgres-migrations/**'
@@ -353,6 +355,12 @@ jobs:
         env:
           W02_SCHEMA_DATABASE_URL: postgresql://schema_generator:schema_generator_local_only@127.0.0.1:5432/luckread_schema
         run: npm run neon:auth010:verify > artifacts/neon/w02-auth010-session-revocation-postgres-schema-postflight.json
+
+      - name: Rehearse AUTH-010 PostgreSQL session revocation and atomic audit outbox
+        working-directory: workers/W02-identity
+        env:
+          W02_RUNTIME_DATABASE_URL: postgresql://schema_generator:schema_generator_local_only@127.0.0.1:5432/luckread_schema
+        run: npm run neon:auth010:runtime
 
       - name: Verify AUTH-007 MFA columns, replay guard, and session lifecycle triggers
         working-directory: workers/W02-identity
