@@ -51,6 +51,7 @@ const userIds = {
   invalid: 'auth007-mfa-reconcile-invalid-' + suffix,
   legacy: 'auth007-mfa-reconcile-legacy-' + suffix,
   terminal: 'auth007-mfa-reconcile-terminal-' + suffix,
+  retry: 'auth007-mfa-reconcile-retry-' + suffix,
   locked: 'auth007-mfa-reconcile-locked-' + suffix,
 }
 const receiptIds: string[] = []
@@ -61,6 +62,7 @@ const checks: Record<string, boolean> = {
   emptyReadyPlanIsQuarantinedAsUnknown: false,
   legacyLockoutEventIdentityIsAdoptedBeforeEmission: false,
   previouslyFailedOutboxIsTerminalAndUnknown: false,
+  transientWriteFailureRemainsReadyWithBoundedRetry: false,
   concurrentReconcilerSkipsLockedReceipt: false,
   syntheticReceiptsAndJournalRowsCleaned: false,
 }
@@ -86,7 +88,7 @@ const createReceipt = async (
 }
 
 const makeEvent = (
-  userId: string,
+  _userId: string,
   idempotencyKey: string,
   overrides: Partial<MfaAuditReceiptEvent> = {},
 ): MfaAuditReceiptEvent => ({
@@ -285,6 +287,48 @@ try {
   assert.equal(terminalRow.lastErrorCode, 'OUTBOX_PREVIOUSLY_FAILED')
   checks.previouslyFailedOutboxIsTerminalAndUnknown = true
 
+  const retryKey = 'mfa-operation:reconcile:' + suffix + ':retry'
+  const retryReceipt = await makeReadyReceipt(
+    userIds.retry,
+    makeEvent(userIds.retry, retryKey),
+  )
+  let injectTransientFailure = true
+  const transientFailureReconciler = async (
+    database: Parameters<typeof reconcileMfaAuditOperationReceiptsPostgres>[0] extends never ? never : import('pg').Pool | import('pg').PoolClient,
+    input: Parameters<typeof import('../../src/neon/mfa-audit-publication-journal-postgres.js').recordMfaAuditEventOncePostgres>[1],
+  ) => {
+    if (injectTransientFailure) {
+      injectTransientFailure = false
+      throw new Error('synthetic temporary PostgreSQL write failure')
+    }
+    const { recordMfaAuditEventOncePostgres } = await import('../../src/neon/mfa-audit-publication-journal-postgres.js')
+    return recordMfaAuditEventOncePostgres(database, input)
+  }
+  const retryFailure = await reconcileMfaAuditOperationReceiptsPostgres(
+    pool,
+    now,
+    1,
+    transientFailureReconciler,
+  )
+  assert.deepEqual(retryFailure, { selected: 1, emitted: 0, failed: 1, unknown: 0 })
+  const retryingRow = await readReceipt(retryReceipt)
+  assert.equal(retryingRow.status, 'READY')
+  assert.equal(Number(retryingRow.attempt), 1)
+  assert.equal(
+    new Date(retryingRow.nextAttemptAt as Date).toISOString(),
+    new Date(Date.parse(now) + 1_000).toISOString(),
+  )
+  assert.equal(retryingRow.lastErrorCode, 'OUTBOX_WRITE_FAILED')
+  const retrySuccess = await reconcileMfaAuditOperationReceiptsPostgres(
+    pool,
+    new Date(Date.parse(now) + 2_000).toISOString(),
+    1,
+  )
+  assert.deepEqual(retrySuccess, { selected: 1, emitted: 1, failed: 0, unknown: 0 })
+  assert.equal((await readReceipt(retryReceipt)).status, 'EMITTED')
+  assert.equal((await readJournal(retryKey))?.status, 'PENDING')
+  checks.transientWriteFailureRemainsReadyWithBoundedRetry = true
+
   const lockedKey = 'mfa-operation:reconcile:' + suffix + ':locked'
   const lockedReceipt = await makeReadyReceipt(
     userIds.locked,
@@ -303,8 +347,11 @@ try {
     const skipped = await reconcileMfaAuditOperationReceiptsPostgres(pool, now, 1)
     assert.deepEqual(skipped, { selected: 0, emitted: 0, failed: 0, unknown: 0 })
   } finally {
-    if (lockTransactionOpen) await lockClient.query('ROLLBACK')
-    lockClient.release()
+    try {
+      if (lockTransactionOpen) await lockClient.query('ROLLBACK')
+    } finally {
+      lockClient.release()
+    }
   }
   const afterLock = await reconcileMfaAuditOperationReceiptsPostgres(pool, now, 1)
   assert.deepEqual(afterLock, { selected: 1, emitted: 1, failed: 0, unknown: 0 })
