@@ -78,19 +78,19 @@ try {
     [factorId, syntheticEncryptedSecret, syntheticEncryptedRecoveryCodes, userId, new Date(now.getTime() + 120_000)],
   )
 
-  assert.equal(await factorStateStore.isActiveSubject( userId), true)
+  assert.equal(await factorStateStore.isActiveSubject(userId), true)
   await pool.query('UPDATE "user" SET account_state = $1 WHERE id = $2', ['SUSPENDED', userId])
-  assert.equal(await factorStateStore.isActiveSubject( userId), false)
+  assert.equal(await factorStateStore.isActiveSubject(userId), false)
   await pool.query('UPDATE "user" SET account_state = $1 WHERE id = $2', ['ACTIVE', userId])
-  assert.equal(await factorStateStore.isActiveSubject( 'missing-' + suffix), false)
+  assert.equal(await factorStateStore.isActiveSubject('missing-' + suffix), false)
   checks.onlyActiveW02SubjectsPassTheAccountGate = true
 
-  const material = await factorStateStore.readVerificationMaterial( userId)
+  const material = await factorStateStore.readVerificationMaterial(userId)
   assert.equal(material?.encryptedSecret, syntheticEncryptedSecret)
   assert.ok(material?.lockedUntil instanceof Date)
   assert.equal(Object.keys(material ?? {}).sort().join(','), 'encryptedSecret,lockedUntil')
   assert.doesNotMatch(JSON.stringify(material), /backupCodes|recovery-code-ciphertext/i)
-  assert.equal(await factorStateStore.readVerificationMaterial( 'missing-' + suffix), null)
+  assert.equal(await factorStateStore.readVerificationMaterial('missing-' + suffix), null)
   checks.factorReadReturnsOnlyEncryptedSecretAndLockoutTimestamp = true
 
   const publicStatus = await readAuthoritativeMfaStatusPostgres(pool, userId, now)
@@ -133,15 +133,15 @@ try {
 
   const step = 8_000_000
   const winners = await Promise.all([
-    factorStateStore.consumeTotpTimeStep( userId, step),
-    factorStateStore.consumeTotpTimeStep( userId, step),
+    factorStateStore.consumeTotpTimeStep(userId, step),
+    factorStateStore.consumeTotpTimeStep(userId, step),
   ])
   assert.deepEqual(winners.sort(), [false, true])
-  const lower = await factorStateStore.consumeTotpTimeStep( userId, step - 1)
-  const repeated = await factorStateStore.consumeTotpTimeStep( userId, step)
+  const lower = await factorStateStore.consumeTotpTimeStep(userId, step - 1)
+  const repeated = await factorStateStore.consumeTotpTimeStep(userId, step)
   assert.equal(lower, false)
   assert.equal(repeated, false)
-  const higher = await factorStateStore.consumeTotpTimeStep( userId, step + 1)
+  const higher = await factorStateStore.consumeTotpTimeStep(userId, step + 1)
   assert.equal(higher, true)
   const storedStep = await pool.query<{ lastStep: number }>(
     'SELECT "lastAcceptedTotpTimeStep" AS "lastStep" FROM "twoFactor" WHERE "userId" = $1',
