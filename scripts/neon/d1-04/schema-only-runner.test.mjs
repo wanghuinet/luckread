@@ -11,6 +11,7 @@ import {
   parseCommandLine,
   verifyRemoteTlsConnection,
   assertD104LedgerRows,
+  assertD104ExactIndexNames,
 } from './schema-only-runner.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
@@ -133,6 +134,22 @@ test('D1-04 ledger rejects domain contamination, wrong order, owner drift and ch
   assert.throws(() => assertD104LedgerRows(manifest, plan, [{ ...ledgerRow(0), artifact_sha256: 'b'.repeat(64) }]), /does not exactly match/)
   assert.throws(() => assertD104LedgerRows(manifest, plan, [{ ...ledgerRow(0), manifest_entry_sha256: 'c'.repeat(64) }]), /does not exactly match/)
   assert.throws(() => assertD104LedgerRows(manifest, plan, manifest.entries.map((_, index) => ledgerRow(index)).concat(ledgerRow(0))), /ordered prefix/)
+})
+
+test('D1-04 final catalog requires the exact explicit index set, with no extras or omissions', () => {
+  assert.equal(assertD104ExactIndexNames(['a_idx', 'b_idx'], ['b_idx', 'a_idx']), 2)
+  assert.throws(
+    () => assertD104ExactIndexNames(['a_idx', 'b_idx'], ['a_idx', 'b_idx', 'unexpected_idx']),
+    /unexpected=\[unexpected_idx\]/,
+  )
+  assert.throws(
+    () => assertD104ExactIndexNames(['a_idx', 'b_idx'], ['a_idx']),
+    /missing=\[b_idx\]/,
+  )
+  assert.throws(
+    () => assertD104ExactIndexNames(['a_idx'], ['a_idx', 'a_idx']),
+    /index set differs/,
+  )
 })
 
 test('D1-04 control metadata is explicitly bounded to the single approved W07 scheduler row', () => {
