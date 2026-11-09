@@ -220,3 +220,11 @@ The W01 schema-owner slice is frozen. Reopen it only for a reproducible W01 sche
 - D1-04 is now recorded as schema-only remote-applied in the five-domain bootstrap contract. This does not widen the canonical shared executor: `neon-schema-migration-ledger.v1.json` still limits the general remote executor to D1-01 and D1-02, while D1-04's local shared-runner readiness remains false for remote execution. The W07 dedicated schema-only release path is a separate domain-scoped exception.
 - Safety boundary remains unchanged: Cloudflare D1 untouched, no business data imported, no Worker runtime bindings changed, and production cutover not authorized. Runtime cutover remains a separate future gate.
 
+## 19. D1-01 full four-owner PostgreSQL 18 rehearsal accepted — 2026-11-09
+
+- Full ordered W01/W02/W07/W08 rehearsal [42460599618](https://github.com/wanghuinet/luckread/actions/runs/42460599618) passed on disposable PostgreSQL 18. The job validates all 14 manifest entries, regenerates the Better Auth core and W02 custom artifacts, regenerates W07/W08 SQL, applies the W01 Payload native baseline first, then uses the reviewed shared runner.
+- Postflight confirms 35 tables, 17 foreign keys with zero cross-owner foreign keys, 14 shared migration ledger rows, one Payload migration bookkeeping row, and zero business rows across all business tables.
+- Artifact [13609582055](https://github.com/wanghuinet/luckread/actions/runs/42460599618/artifacts/13609582055) SHA-256: `73d32e6572aa9dbc79ec31f61e65a7709aa4d4174bf56956af4fb902cfa747ff`.
+- The D1-01 remote review's 14 pinned source files match the current `main` tree exactly (14/14), so the existing source-pinned review remains current. D1-01 is now recorded as full local rehearsal passed with all four schema owners complete.
+- This is not a remote apply: `remoteSchemaApplied=false` remains unchanged. The separate manual-only D1-01 workflow dispatch is still required. No Neon connection was attempted in the local rehearsal, no production D1 was touched, no business data was imported, and production cutover is not authorized.
+
