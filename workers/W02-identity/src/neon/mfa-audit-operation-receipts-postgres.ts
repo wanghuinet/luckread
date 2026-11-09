@@ -1,5 +1,8 @@
 import type { Pool, PoolClient } from 'pg'
 
+import type { MfaAuditOperationReceiptStore } from '../auth/mfa-audit-operation-receipt-store.js'
+import { reconcileMfaAuditOperationReceiptsPostgres } from './mfa-audit-operation-receipt-reconciler-postgres.js'
+
 import {
   mergeMfaAuditReceiptPlan,
   parseMfaAuditReceiptPlan,
@@ -295,4 +298,20 @@ export async function finalizeMfaAuditOperationReceiptPostgres(
   throw lastError instanceof Error
     ? new Error('MFA_AUDIT_RECEIPT_FINALIZE_FAILED')
     : new Error('MFA_AUDIT_RECEIPT_FINALIZE_FAILED')
+}
+
+
+import type { MfaAuditOperationReceiptStore } from '../auth/mfa-audit-operation-receipt-store.js'
+import { reconcileMfaAuditOperationReceiptsPostgres } from './mfa-audit-operation-receipt-reconciler-postgres.js'
+
+/** PostgreSQL adapter over the existing AUTH-007 durable receipt and journal contract. */
+export function createPostgresMfaAuditOperationReceiptStore(pool: Pool): MfaAuditOperationReceiptStore {
+  return {
+    assertOwner: (input) => assertMfaAuditOperationReceiptOwnerPostgres(pool, input),
+    create: (input) => createMfaAuditOperationReceiptPostgres(pool, input),
+    append: (receiptId, event) => appendMfaAuditOperationReceiptEventPostgres(pool, receiptId, event),
+    finalize: (receiptId, events, now) =>
+      finalizeMfaAuditOperationReceiptPostgres(pool, receiptId, events, now),
+    reconcile: (now) => reconcileMfaAuditOperationReceiptsPostgres(pool, now),
+  }
 }
