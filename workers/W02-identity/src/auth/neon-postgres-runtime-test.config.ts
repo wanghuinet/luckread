@@ -3,8 +3,8 @@
  *
  * It reuses the canonical Better Auth builder and official PostgreSQL Pool
  * adapter, but selects the explicit postgres-rehearsal profile. That profile
- * omits D1-only account/MFA side effects; this test proves Better Auth's core
- * user, credential and session persistence only.
+ * omits D1-only account/MFA side effects and injects PostgreSQL-backed L1
+ * registration and AUTH-013 email-verification lifecycle callbacks.
  *
  * This file is never imported by the deployed Worker.
  */
