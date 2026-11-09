@@ -30,6 +30,7 @@ on:
       - 'contracts/security/username-reservation-policy.v1.json'
       - 'scripts/w02-username-change-migration-static-audit.mjs'
       - 'workers/W02-identity/src/auth/username-change.ts'
+    - 'workers/W02-identity/src/auth/username-change-store.ts'
       - 'contracts/persistence/AUTH-015-account-lifecycle-window-persistence-contract.v1.json'
       - 'docs/change-control/CC-AUTH-015-W02-LIFECYCLE-WINDOW-PERSISTENCE-2026-11-06.md'
       - 'contracts/authz/layers.json'
@@ -53,6 +54,7 @@ on:
       - 'workers/W02-identity/src/neon/mfa-audit-publication-journal-postgres.ts'
       - 'workers/W02-identity/src/neon/mfa-audit-publication-journal-publisher-postgres.ts'
       - 'workers/W02-identity/src/neon/mfa-factor-state-postgres.ts'
+      - 'workers/W02-identity/src/neon/username-change-postgres.ts'
       - 'workers/W02-identity/scripts/neon/w02-auth007-mfa-factor-state-postgres-runtime-rehearsal.ts'
       - 'workers/W02-identity/scripts/neon/w02-auth007-mfa-publication-publisher-postgres-runtime-rehearsal.ts'
       - 'workers/W02-identity/scripts/neon/w02-role-assignment-postgres-runtime-rehearsal.ts'
@@ -412,6 +414,12 @@ jobs:
           W02_SCHEMA_DATABASE_URL: postgresql://schema_generator:schema_generator_local_only@127.0.0.1:5432/luckread_schema
         run: npm run neon:username-change:verify > artifacts/neon/w02-username-change-state-postgres-schema-postflight.json
 
+      - name: Rehearse W02 username-change atomic writes, previous-handle leases, idempotency, and concurrency on PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          W02_RUNTIME_DATABASE_URL: postgresql://schema_generator:schema_generator_local_only@127.0.0.1:5432/luckread_schema
+        run: npm run neon:username-change:runtime
+
       - name: Verify AUTH-007 MFA publication journal types, event registry, and retry semantics
         working-directory: workers/W02-identity
         env:
@@ -482,6 +490,7 @@ jobs:
             workers/W02-identity/artifacts/neon/w02-auth007-mfa-publication-journal-postgres-schema-postflight.json
             workers/W02-identity/artifacts/neon/w02-auth007-mfa-publication-journal-postgres-runtime-rehearsal.json
             workers/W02-identity/artifacts/neon/w02-username-change-state-postgres-schema-postflight.json
+            workers/W02-identity/artifacts/neon/w02-username-change-postgres-runtime-rehearsal.json
             workers/W02-identity/artifacts/neon/w02-auth007-mfa-lifecycle-postgres-schema-postflight.json
             workers/W02-identity/artifacts/neon/w02-auth010-session-revocation-postgres-schema-postflight.json
             workers/W02-identity/artifacts/neon/w02-auth003-postgres-schema-postflight.json
