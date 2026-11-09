@@ -62,6 +62,29 @@ try {
   assert.equal(user.email, email)
   assert.equal(user.username, username)
 
+  // Better Auth's user-create hook must materialize the canonical L1 role
+  // through the PostgreSQL adapter before registration is considered ready.
+  const baseRole = await postgresPool.query(
+    'SELECT id, role_id AS "roleId", scope_type AS "scopeType", scope_id AS "scopeId", status ' +
+      'FROM role_assignments WHERE subject_id = $1 AND id = $2',
+    [userId, 'base-user-' + userId],
+  )
+  assert.equal(baseRole.rowCount, 1, 'registration hook must persist the deterministic L1 role assignment')
+  assert.deepEqual(baseRole.rows[0], {
+    id: 'base-user-' + userId,
+    roleId: 'user',
+    scopeType: 'global',
+    scopeId: null,
+    status: 'ACTIVE',
+  })
+
+  const baseRoleVersion = await postgresPool.query<{ roleVersion: number }>(
+    'SELECT role_version AS "roleVersion" FROM role_authorization_versions WHERE subject_id = $1',
+    [userId],
+  )
+  assert.equal(baseRoleVersion.rowCount, 1, 'L1 role creation must advance the authorization version')
+  assert.equal(Number(baseRoleVersion.rows[0]?.roleVersion), 1)
+
   const credential = await postgresPool.query(
     'SELECT provider_id, password FROM "account" WHERE user_id = $1 AND provider_id = $2',
     [userId, 'credential'],
@@ -149,7 +172,11 @@ try {
     [userId],
   )
   assert.equal(roleVersion.rowCount, 1, 'existing authorization-version trigger must observe the L2 grant')
-  assert.ok(Number(roleVersion.rows[0]?.roleVersion) >= 1)
+  assert.equal(
+    Number(roleVersion.rows[0]?.roleVersion),
+    2,
+    'the L1 registration hook and L2 verification hook must each advance the canonical role version once',
+  )
 
   const journal = await postgresPool.query<{ eventId: string; sourceVersion: number; status: string; payload: string }>(
     'SELECT event_id AS "eventId", source_version AS "sourceVersion", status, payload ' +
@@ -229,6 +256,8 @@ try {
     adapter: 'Better Auth native PostgreSQL dialect via pg.Pool plus the W02 PostgreSQL activation adapter',
     operationsVerified: [
       'SIGN_UP_EMAIL',
+      'BASE_USER_L1_ROLE_PERSISTED',
+      'AUTHZ_ROLE_VERSION_ADVANCED_ON_REGISTRATION',
       'CREDENTIAL_ACCOUNT_PERSISTED',
       'EMAIL_VERIFICATION_REQUIRED',
       'EMAIL_VERIFICATION_ACTIVATION_PRECONDITION',
