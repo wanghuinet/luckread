@@ -10,6 +10,7 @@ import {
   stripOuterTransaction,
   validateLocalTarget,
 } from '../shared-domain-schema-runner.mjs'
+import { assertD103RemoteApplyReady } from './assert-remote-apply-release.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
 const requireFromW02 = createRequire(resolve(root, 'workers/W02-identity/package.json'))
@@ -328,6 +329,7 @@ async function runD103Domain({ env = process.env, mode = 'remote' } = {}) {
       confirmation: env.D1_03_REMOTE_APPLY_CONFIRMATION,
     })
     if (!context.valid) fail(context.errors.join('; '))
+    assertD103RemoteApplyReady({ repositoryRoot: root, currentHead: env.GITHUB_SHA })
   }
 
   const manifest = readJson(DOMAIN_MANIFESTS['D1-03'])
@@ -355,7 +357,6 @@ async function runD103Domain({ env = process.env, mode = 'remote' } = {}) {
   let sourceCommitSha
   let executionId
   let output
-  const reportMode = remote ? 'REMOTE_PARTIAL_SCHEMA' : 'LOCAL_PARTIAL_SCHEMA_REHEARSAL'
   if (remote) {
     const release = readJson('contracts/database/neon-d1-03-remote-runner-review.v1.json')
     if (release?.status !== 'PARTIAL_SCHEMA_REMOTE_RELEASE_APPROVED' ||
