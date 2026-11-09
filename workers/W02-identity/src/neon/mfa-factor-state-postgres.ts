@@ -1,4 +1,5 @@
 import type { Pool } from 'pg'
+import type { MfaFactorStateStore } from '../auth/mfa-factor-state-store.js'
 
 export type AuthoritativeMfaStatusPostgres = {
   enabled: boolean
@@ -141,5 +142,23 @@ export async function readAuthoritativeMfaStatusPostgres(
     enabled,
     verified,
     enrolledAt: enabled ? new Date(enrolledAtMs).toISOString() : null,
+  }
+}
+
+/**
+ * Provider adapter exposed through W02's injectable MFA factor-state port.
+ * Keep the SQL helpers above directly reusable by schema/rehearsal checks.
+ */
+export function createPostgresMfaFactorStateStore(pool: Pool): MfaFactorStateStore {
+  return {
+    isActiveSubject(userId) {
+      return isActiveMfaSubjectPostgres(pool, userId)
+    },
+    readVerificationMaterial(userId) {
+      return readMfaFactorVerificationMaterialPostgres(pool, userId)
+    },
+    consumeTotpTimeStep(userId, timeStep) {
+      return consumeTotpTimeStepPostgres(pool, userId, timeStep)
+    },
   }
 }
