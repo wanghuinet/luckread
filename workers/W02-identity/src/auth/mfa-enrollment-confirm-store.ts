@@ -90,6 +90,9 @@ export function createD1MfaEnrollmentConfirmStore(db: D1Database): MfaEnrollment
         'UPDATE "user" SET mfa_enrollment_key_hash = NULL, ' +
           'mfa_enrollment_confirm_key_hash = ?, mfa_enrollment_confirm_request_hash = ? ' +
           'WHERE id = ? AND two_factor_enabled = 1 ' +
+          'AND mfa_enrollment_key_hash IS NOT NULL ' +
+          'AND mfa_enrollment_confirm_key_hash IS NULL ' +
+          'AND mfa_enrollment_confirm_request_hash IS NULL ' +
           'AND EXISTS (SELECT 1 FROM "twoFactor" WHERE userId = ? AND verified = 1)',
       ).bind(input.keyHash, input.requestHash, input.userId, input.userId).run()
       if (result.success !== true) throw new Error('MFA_ENROLLMENT_CONFIRM_MARKER_WRITE_FAILED')
