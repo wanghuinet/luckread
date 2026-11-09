@@ -127,6 +127,65 @@ describe('W02 bounded session list', () => {
     )
   })
 
+  it('accepts an injected persistence store and authenticated session resolver', async () => {
+    const db = makeDatabase()
+    const env = makeEnv(db.database)
+    const store = {
+      list: vi.fn().mockResolvedValue({
+        permissionGranted: true,
+        rows: [
+          {
+            sessionId: 'postgres-session-3',
+            createdAt: '2026-10-03T00:00:00.000Z',
+            expiresAt: '2026-12-01T00:00:00.000Z',
+          },
+          {
+            sessionId: 'postgres-session-2',
+            createdAt: '2026-10-02T00:00:00.000Z',
+            expiresAt: '2026-12-01T00:00:00.000Z',
+          },
+          {
+            sessionId: 'postgres-session-1',
+            createdAt: '2026-10-01T00:00:00.000Z',
+            expiresAt: '2026-12-01T00:00:00.000Z',
+          },
+        ],
+      }),
+    }
+    const getSession = vi.fn().mockResolvedValue({
+      user: { id: 'user-1' },
+      session: { id: 'postgres-session-2' },
+    })
+
+    const response = await handleCurrentUserSessionList(env, request({ limit: 2 }), {
+      store,
+      getSession,
+    })
+    const payload = await response.json() as {
+      items: Array<Record<string, unknown>>
+      currentSessionId: string
+      nextCursor: string | null
+    }
+
+    expect(response.status).toBe(200)
+    expect(payload.items.map((item) => item.sessionId)).toEqual([
+      'postgres-session-3',
+      'postgres-session-2',
+    ])
+    expect(payload.currentSessionId).toBe('postgres-session-2')
+    expect(payload.nextCursor).toMatch(/^s1\\.[A-Za-z0-9_-]+$/)
+    expect(payload.items.every((item) => !('token' in item) && !('userId' in item))).toBe(true)
+    expect(store.list).toHaveBeenCalledWith({
+      userId: 'user-1',
+      now: expect.any(String),
+      limit: 3,
+      cursor: null,
+    })
+    expect(getSession).toHaveBeenCalledTimes(1)
+    expect(mocks.getSession).not.toHaveBeenCalled()
+    expect(db.prepare).not.toHaveBeenCalled()
+  })
+
   it('denies session listing when the explicit user role permission is not effective', async () => {
     const db = makeDatabase([{ permissionGranted: 0, sessionId: null, createdAt: null, expiresAt: null }])
     const env = makeEnv(db.database)
