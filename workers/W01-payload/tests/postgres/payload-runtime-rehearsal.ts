@@ -107,8 +107,8 @@ try {
   }
 
   mkdirSync(path.dirname(reportPath), { recursive: true })
-  writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\\n`)
-  process.stdout.write(`${JSON.stringify(report, null, 2)}\\n`)
+  writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`)
+  process.stdout.write(`${JSON.stringify(report, null, 2)}\n`)
 } finally {
   if (createdId !== undefined && !deleted) {
     await payload.delete({
