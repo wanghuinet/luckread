@@ -49,7 +49,7 @@ concurrency:
 
 jobs:
   validate:
-    if: \${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
+    if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
     name: Validate D1-05 schema-only runner and PostgreSQL 18 rehearsal (no Neon credentials)
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -101,22 +101,22 @@ jobs:
       - name: Rehearse exact D1-05 schema and shared ledger on disposable PostgreSQL 18
         env:
           D1_SHARED_LOCAL_DATABASE_URL: postgresql://schema_generator:schema_generator_local_only@127.0.0.1:5432/alluck_d1_05_shared
-          GITHUB_SHA: \${{ github.sha }}
-          GITHUB_RUN_ID: \${{ github.run_id }}
-          GITHUB_RUN_ATTEMPT: \${{ github.run_attempt }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
           D1_05_LOCAL_SCHEMA_APPLY_REPORT: artifacts/neon/d1-05-schema-runner-local-postflight.json
         run: node scripts/neon/d1-05/remote-schema-runner.mjs --local-only
       - name: Upload sanitized PostgreSQL 18 validation evidence
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: neon-d1-05-schema-only-runner-validation-\${{ github.run_id }}
+          name: neon-d1-05-schema-only-runner-validation-${{ github.run_id }}
           path: artifacts/neon/d1-05-schema-runner-local-postflight.json
           if-no-files-found: error
           retention-days: 90
 
   apply:
-    if: \${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.confirm_target == 'APPLY_REVIEWED_SCHEMA_D1_05_ALLLUCK_SCHEMA_ONLY' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.confirm_target == 'APPLY_REVIEWED_SCHEMA_D1_05_ALLLUCK_SCHEMA_ONLY' }}
     name: Apply only admitted D1-05 W11 analytics schema to Neon allluck
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -124,7 +124,7 @@ jobs:
       - name: Guard exact main ref and D1-05 schema-only confirmation
         shell: bash
         env:
-          CONFIRM_TARGET: \${{ inputs.confirm_target }}
+          CONFIRM_TARGET: ${{ inputs.confirm_target }}
         run: |
           set -euo pipefail
           test "$GITHUB_REF" = "refs/heads/main"
@@ -132,7 +132,7 @@ jobs:
       - name: Checkout the exact dispatched main commit
         uses: actions/checkout@v4
         with:
-          ref: \${{ github.sha }}
+          ref: ${{ github.sha }}
           fetch-depth: 0
       - name: Verify checkout provenance
         shell: bash
@@ -150,7 +150,7 @@ jobs:
         run: npm install --ignore-scripts --no-audit --no-fund
       - name: Enforce exact D1-05 target and full TLS verification
         env:
-          NEON_DATABASE_URL_ALLLUCK: \${{ secrets.NEON_DATABASE_URL_ALLLUCK }}
+          NEON_DATABASE_URL_ALLLUCK: ${{ secrets.NEON_DATABASE_URL_ALLLUCK }}
         shell: bash
         run: |
           set -euo pipefail
@@ -173,11 +173,11 @@ jobs:
       - name: Apply one admitted migration with append-only ledger and PostgreSQL 18 postflight
         env:
           GITHUB_ACTIONS: 'true'
-          GITHUB_REF: \${{ github.ref }}
-          GITHUB_SHA: \${{ github.sha }}
-          GITHUB_RUN_ID: \${{ github.run_id }}
-          GITHUB_RUN_ATTEMPT: \${{ github.run_attempt }}
-          D1_05_REMOTE_APPLY_CONFIRMATION: \${{ inputs.confirm_target }}
+          GITHUB_REF: ${{ github.ref }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
+          D1_05_REMOTE_APPLY_CONFIRMATION: ${{ inputs.confirm_target }}
           D1_05_SCHEMA_APPLY_REPORT: artifacts/neon/d1-05-schema-runner-remote-postflight.json
         run: |
           set -euo pipefail
@@ -187,7 +187,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: neon-d1-05-remote-schema-postflight-\${{ github.run_id }}
+          name: neon-d1-05-remote-schema-postflight-${{ github.run_id }}
           path: artifacts/neon/d1-05-schema-runner-remote-postflight.json
           if-no-files-found: error
           retention-days: 90
