@@ -7,8 +7,6 @@ import type {
   UsernameChangeWriteResult,
 } from '../auth/username-change-store.js'
 
-type PgConnection = Pool | PoolClient
-
 type ContextRow = {
   username: string | null
   accountState: string
@@ -34,7 +32,7 @@ function mapContext(row: ContextRow | undefined): UsernameChangeContext | null {
   if (!row) return null
   const usernameVersion = Number(row.usernameVersion)
   if (!Number.isSafeInteger(usernameVersion) || usernameVersion < 0 || typeof row.accountState !== 'string') {
-    throw new Error('USERNAME_CONTEXT_INVALID')
+    return null
   }
   return {
     username: row.username,
@@ -99,6 +97,7 @@ export function createPostgresUsernameChangeStore(pool: Pool): UsernameChangeSto
     async applyChange(command: UsernameChangeCommand): Promise<UsernameChangeWriteResult> {
       let client: PoolClient | undefined
       let transactionOpen = false
+      let releaseError: Error | undefined
       try {
         client = await pool.connect()
         await client.query('BEGIN')
@@ -188,13 +187,15 @@ export function createPostgresUsernameChangeStore(pool: Pool): UsernameChangeSto
         if (transactionOpen && client) {
           try {
             await client.query('ROLLBACK')
-          } catch {
-            // Preserve the primary database error; the connection is discarded by the Pool if needed.
+          } catch (rollbackError) {
+            releaseError = rollbackError instanceof Error
+              ? rollbackError
+              : new Error('USERNAME_CHANGE_ROLLBACK_FAILED')
           }
         }
         throw error
       } finally {
-        client?.release()
+        if (client) client.release(releaseError)
       }
     },
   }
