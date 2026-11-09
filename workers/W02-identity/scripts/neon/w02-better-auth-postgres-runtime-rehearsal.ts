@@ -262,6 +262,22 @@ try {
     )
   }
 
+  const expiredSessionId = 'session-list-expired-' + nonce
+  syntheticSessionIds.push(expiredSessionId)
+  const expiredCreatedAt = new Date(Date.parse(sessionListNow) - 120_000).toISOString()
+  const expiredAt = new Date(Date.parse(sessionListNow) - 60_000).toISOString()
+  await postgresPool.query(
+    'INSERT INTO "session" (id, expires_at, token, created_at, updated_at, user_id) ' +
+      'VALUES ($1, $2, $3, $4, $4, $5)',
+    [
+      expiredSessionId,
+      expiredAt,
+      'session-list-token-expired-' + nonce,
+      expiredCreatedAt,
+      userId,
+    ],
+  )
+
   const sessionListEnv = {
     D1_01: undefined as unknown as D1Database,
     AUTH_SESSION_READ_LIMITER: {
@@ -292,7 +308,8 @@ try {
     nextCursor: string | null
   }
   assert.equal(firstPageResponse.status, 200, 'PostgreSQL session list first page must succeed')
-  assert.deepEqual(firstPage.items.map((item) => item.sessionId), syntheticSessionIds)
+  assert.deepEqual(firstPage.items.map((item) => item.sessionId), syntheticSessionIds.slice(0, 2))
+  assert.ok(!firstPage.items.some((item) => item.sessionId === expiredSessionId))
   assert.ok(firstPage.items[0]?.createdAt.endsWith('.654321Z'))
   assert.ok(firstPage.items[1]?.createdAt.endsWith('.123456Z'))
   assert.equal(firstPage.currentSessionId, currentSessionId)
