@@ -157,7 +157,7 @@
     ],
     "limitations": [
       "No submitted GitHub review records were present; this is a GPT-6 code-path review, not a human GitHub APPROVE review.",
-      "Remote Neon DDL for the corrective migration has not yet been executed; all new migration evidence is from disposable PostgreSQL 18.6.",
+      "Remote Neon DDL has not been executed; the W03 BIGINT corrective migration remains unapplied until the manual workflow_dispatch.",
       "GitHub repository secrets cannot be enumerated by this review tool; the workflow fails closed if NEON_DATABASE_URL_LUCKREADPRO is missing or does not match the pinned target.",
       "The database UUID is pinned as user-provided Neon metadata; PostgreSQL does not expose the Neon control-plane UUID as a SQL identity field."
     ]
