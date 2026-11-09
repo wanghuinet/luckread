@@ -271,6 +271,11 @@ export async function reconcileMfaAuditOperationReceiptsPostgres(
         } catch {
           // An unproven terminal transition remains visible and retryable.
         }
+        if (await accountForAlreadyTerminalState(pool, row.receiptId, summary)) continue
+        if (forcedTerminalCode) {
+          summary.failed += 1
+          continue
+        }
       }
 
       const delay = retryDelaySeconds(Number(row.attempt))
