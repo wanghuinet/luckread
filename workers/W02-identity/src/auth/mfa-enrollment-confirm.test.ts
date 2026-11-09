@@ -27,7 +27,7 @@ vi.mock('./mfa-audit-receipts.js', () => ({
 import type { BetterAuthEnv } from './better-auth.js'
 import { handleMfaEnrollmentConfirmRequest } from './mfa-enrollment-confirm.js'
 
-const makeDb = (row: unknown = { userEnabled: 0, factorVerified: 0 }) => {
+const makeDb = (row: unknown = { userEnabled: 0, confirmationKeyHash: null, confirmationRequestHash: null, factorVerified: 0 }) => {
   const statement = {
     bind: vi.fn().mockReturnThis(),
     first: vi.fn().mockResolvedValue(row),
