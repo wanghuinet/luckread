@@ -112,6 +112,14 @@ export async function handleMfaEnrollmentStartRequest(
     return json({ error: { code: 'MFA_ENROLLMENT_CONFLICT', message: 'MFA enrollment is already pending or enabled' } }, 409)
   }
 
+  const releaseReservation = async (): Promise<void> => {
+    try {
+      await store.releaseReservationIfNoFactor(principal.userId, keyHash)
+    } catch {
+      // Keep the reservation when release cannot be proven safe.
+    }
+  }
+
   const recordEnrollmentFailure = async (reasonCode: string): Promise<void> => {
     try {
       await store.recordFailure(buildMfaAuditEvent({
@@ -148,7 +156,7 @@ export async function handleMfaEnrollmentStartRequest(
     upstream = await (dependencies.auth ?? createLuckReadAuth(env)).handler(authRequest)
   } catch {
     await recordEnrollmentFailure('UPSTREAM_UNAVAILABLE')
-    await store.releaseReservationIfNoFactor(principal.userId, keyHash)
+    await releaseReservation()
     return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'MFA enrollment unavailable' } }, 503)
   }
 
@@ -158,7 +166,7 @@ export async function handleMfaEnrollmentStartRequest(
     await recordEnrollmentFailure(upstream.status === 429 ? 'UPSTREAM_RATE_LIMITED' :
       upstream.status === 401 ? 'REAUTHENTICATION_REQUIRED' :
       upstream.status >= 500 ? 'UPSTREAM_UNAVAILABLE' : 'UPSTREAM_REJECTED')
-    await store.releaseReservationIfNoFactor(principal.userId, keyHash)
+    await releaseReservation()
     const status = upstream.status === 429 ? 429 : upstream.status === 401 ? 401 :
       upstream.status >= 500 ? 503 : 400
     return json({
