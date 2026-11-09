@@ -189,14 +189,8 @@ export function createPostgresUsernameChangeStore(pool: Pool): UsernameChangeSto
           try {
             await client.query('ROLLBACK')
           } catch {
-            // Preserve the primary error; the connection is released as broken below.
+            // Preserve the primary database error; the connection is discarded by the Pool if needed.
           }
-        }
-        const code = error && typeof error === 'object' && 'code' in error
-          ? String((error as { code?: unknown }).code ?? '')
-          : ''
-        if (code === '23505' || (code === '23514' && error instanceof Error && error.message.includes('USERNAME_RESERVED'))) {
-          throw Object.assign(new Error('USERNAME_UNAVAILABLE'), { cause: error, code })
         }
         throw error
       } finally {
