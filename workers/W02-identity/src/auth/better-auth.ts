@@ -156,6 +156,7 @@ export const buildLuckReadAuth = (
   postgresLifecycleAdapters?: BetterAuthPostgresLifecycleAdapters,
 ) => {
   const postgresRehearsal = persistenceProfile === 'postgres-rehearsal'
+  const postgresEmailVerifiedCallback = postgresLifecycleAdapters?.afterEmailVerified
   // Keep local origins available only to the local evidence/runtime profile.
   // Production must never inherit localhost trust from a shared config.
   const trustedOrigins = [
@@ -486,9 +487,9 @@ export const buildLuckReadAuth = (
         await sendVerificationEmail(env, { user, url })
       },
       ...(postgresRehearsal
-        ? (postgresLifecycleAdapters?.afterEmailVerified ? {
+        ? (postgresEmailVerifiedCallback ? {
             afterEmailVerification: async (user) => {
-              await postgresLifecycleAdapters.afterEmailVerified(String(user.id))
+              await postgresEmailVerifiedCallback(String(user.id))
             },
           } : {})
         : {
