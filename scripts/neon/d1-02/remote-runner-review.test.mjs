@@ -3,6 +3,16 @@ import assert from 'node:assert/strict'
 import { validateD1_02RemoteRunnerReview } from './remote-runner-review.mjs'
 
 const reviewedFiles = [
+  '.github/workflows/neon-d1-02-full-local-rehearsal.yml',
+  '.github/workflows/neon-w03-d1-02-postgres-schema.yml',
+  'contracts/database/neon-d1-02-combined-schema.v1.json',
+  'contracts/database/neon-d1-02-schema-sources.v1.json',
+  'scripts/neon/d1-02/assert-remote-apply-release.test.mjs',
+  'scripts/neon/d1-02/verify-combined-schema-contract.test.mjs',
+  'workers/W03-content/src/neon-postgres-migrations/0002_w03_d1_02_content_snowflake_timestamp_bigint.sql',
+  'workers/W03-content/scripts/neon/verify-d1-02-content-postgres-schema.sql',
+  'workers/W03-content/migrations/0012_content_snowflake_id_allocator.sql',
+  'workers/W03-content/src/content-snowflake-id.ts',
   '.github/workflows/neon-d1-02-reviewed-remote-schema-apply.yml',
   'contracts/database/neon-d1-02-migration-manifest.v1.json',
   'contracts/database/neon-schema-migration-ledger.v1.json',
@@ -28,7 +38,7 @@ const review = {
   review: {
     reviewer:'GPT-6',
     reviewType:'GPT-6 code-path audit plus current-main SHA and CI evidence reconciliation',
-    reviewedAt:'2026-11-08',
+    reviewedAt:'2026-11-09',
     reviewedMainSha:'8a0db7dd0d0567131d51e009302465f8e30b9386',
     implementationMergeSha:'8a0db7dd0d0567131d51e009302465f8e30b9386',
     result:'NO_BLOCKING_FINDINGS',
@@ -43,11 +53,11 @@ const review = {
     reviewedFiles:reviewedFiles.map(path=>({path,gitBlobSha1:sha})),
   },
   verificationEvidence:{
-    fullD1_02LocalPostgres18Rehearsal:{runId:42480684871,headSha:'8a0db7dd0d0567131d51e009302465f8e30b9386',conclusion:'success',url:'https://github.com/wanghuinet/luckread/actions/runs/42480684871'},
-    remoteRunnerGuardsNoCredentials:{runId:42480684866,headSha:'8a0db7dd0d0567131d51e009302465f8e30b9386',conclusion:'success',url:'https://github.com/wanghuinet/luckread/actions/runs/42480684866',remoteApplyJob:'skipped'},
-    contractAdmission:{runId:42480684886,headSha:'8a0db7dd0d0567131d51e009302465f8e30b9386',conclusion:'success',url:'https://github.com/wanghuinet/luckread/actions/runs/42480684886'},
-    mapping0StructuralGate:{runId:42480684852,headSha:'8a0db7dd0d0567131d51e009302465f8e30b9386',conclusion:'success',url:'https://github.com/wanghuinet/luckread/actions/runs/42480684852'},
-    featureInventory:{runId:42480684859,headSha:'8a0db7dd0d0567131d51e009302465f8e30b9386',conclusion:'success',url:'https://github.com/wanghuinet/luckread/actions/runs/42480684859'}
+    fullD1_02LocalPostgres18Rehearsal:{runId:42612620258,headSha:'8a0db7dd0d0567131d51e009302465f8e30b9386',conclusion:'success',url:'https://github.com/wanghuinet/luckread/actions/runs/42612620258'},
+    remoteRunnerGuardsNoCredentials:{runId:42612620075,headSha:'8a0db7dd0d0567131d51e009302465f8e30b9386',conclusion:'success',url:'https://github.com/wanghuinet/luckread/actions/runs/42612620075',remoteApplyJob:'skipped'},
+    contractAdmission:{runId:42612620125,headSha:'8a0db7dd0d0567131d51e009302465f8e30b9386',conclusion:'success',url:'https://github.com/wanghuinet/luckread/actions/runs/42612620125'},
+    mapping0StructuralGate:{runId:42612620155,headSha:'8a0db7dd0d0567131d51e009302465f8e30b9386',conclusion:'success',url:'https://github.com/wanghuinet/luckread/actions/runs/42612620155'},
+    featureInventory:{runId:42612620321,headSha:'8a0db7dd0d0567131d51e009302465f8e30b9386',conclusion:'success',url:'https://github.com/wanghuinet/luckread/actions/runs/42612620321'}
   },
   safety:{remoteNeonDdlExecuted:false,cloudflareD1Touched:false,businessDataImported:false,productionCutoverAuthorized:false,manualWorkflowDispatchRequired:true,exactConfirmationRequired:'APPLY_REVIEWED_SCHEMA_D1_02_LUCKREADPRO'}
 }
