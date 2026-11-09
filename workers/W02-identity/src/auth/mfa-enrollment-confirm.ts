@@ -85,7 +85,7 @@ async function reconcileAmbiguousEnrollmentOutcome(
 ): Promise<'succeeded' | 'failed' | 'unknown'> {
   let status: AuthoritativeMfaStatus | null
   try {
-    status = await statusStore.read(userId)
+    status = await statusStore.read(userId, new Date())
   } catch {
     return 'unknown'
   }
@@ -168,7 +168,7 @@ export async function handleMfaEnrollmentConfirmRequest(
     if (pending.userEnabled && pending.factorVerified) {
       if (pending.confirmationKeyHash === keyHash &&
           pending.confirmationRequestHash === requestHash) {
-        const status = await statusStore.read(principal.userId)
+        const status = await statusStore.read(principal.userId, new Date())
         if (status?.enabled && status.verified && status.enrolledAt) return json({ data: status })
       }
       return json({
