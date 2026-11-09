@@ -59,7 +59,7 @@
       },
       {
         "path": "contracts/database/neon-d1-04-shared-migration-manifest.v1.json",
-        "gitBlobSha1": "3d0f609805db8f928921a386b91dae998ae74af8"
+        "gitBlobSha1": "42b1cc84daa1a50f8ff4bfcea336006d8cab5a41"
       },
       {
         "path": "contracts/transport/worker-d1-access-boundary.v1.json",
@@ -227,7 +227,8 @@
     "The final catalog contains exactly 15 tables, 31 indexes, 72 final triggers, 6 functions and zero foreign keys.",
     "The final W07 artifact drops and recreates exactly the existing payment_provider_events_terminal_immutable trigger; the final trigger count is calculated in manifest order.",
     "Only the PAY-004 scheduler singleton is inserted. It is an exact schema-control metadata row, not business data; all fixture rows are rolled back and all other business tables remain empty.",
-    "The shared runner remains local-only and refuses remote Neon execution."
+    "The shared runner remains local-only and refuses remote Neon execution.",
+    "The remote postflight manifest separately pins the exact 29 PostgreSQL primary-key/unique-constraint-backed index names; the 31 explicitly declared CREATE INDEX objects remain a distinct set."
   ],
   "remoteApplyReady": false,
   "businessDataImport": false,
