@@ -43,7 +43,7 @@ const decodeCursor = (value: string): SessionListCursor | null => {
   try {
     const padded = encoded.replace(/-/g, '+').replace(/_/g, '/')
       + '='.repeat((4 - (encoded.length % 4)) % 4)
-    const parsed = JSON.parse(atob(padded)) as Partial<SessionCursor>
+    const parsed = JSON.parse(atob(padded)) as Partial<SessionListCursor>
     if (
       typeof parsed.createdAt !== 'string' ||
       !Number.isFinite(Date.parse(parsed.createdAt)) ||
