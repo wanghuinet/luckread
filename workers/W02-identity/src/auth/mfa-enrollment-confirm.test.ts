@@ -147,6 +147,49 @@ describe('W02 MFA enrollment confirmation authority', () => {
   })
 
 
+  it('recovers an MFA confirmation marker whose database commit response was lost', async () => {
+    const hash = async (value: string) => {
+      const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))
+      return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
+    }
+    const key = 'mfa-confirm-key-lost-commit-0001'
+    const keyHash = await hash(key)
+    const requestHash = await hash(key + String.fromCharCode(0) + '123456')
+    const { db } = makeDb()
+    const store = {
+      read: vi.fn()
+        .mockResolvedValueOnce({
+          userEnabled: false,
+          confirmationKeyHash: null,
+          confirmationRequestHash: null,
+          factorVerified: false,
+        })
+        .mockResolvedValueOnce({
+          userEnabled: true,
+          confirmationKeyHash: keyHash,
+          confirmationRequestHash: requestHash,
+          factorVerified: true,
+        }),
+      persistConfirmation: vi.fn().mockRejectedValueOnce(new Error('commit response lost')),
+    }
+
+    const response = await handleMfaEnrollmentConfirmRequest(
+      { D1_01: db } as BetterAuthEnv,
+      makeRequest({ code: '123456' }, true, key),
+      { store },
+    )
+
+    expect(response.status).toBe(200)
+    expect(store.persistConfirmation).toHaveBeenCalledWith({
+      userId: principal.userId,
+      keyHash,
+      requestHash,
+    })
+    expect(store.read).toHaveBeenCalledTimes(2)
+    expect(mocks.handler).toHaveBeenCalledTimes(1)
+    expect(response.headers.get('set-cookie')).toContain('rotated-session')
+  })
+
   it('does not invent a failed MFA outcome when the handler throws and D1 read-back is indeterminate', async () => {
     const { db } = makeDb()
     mocks.handler.mockRejectedValueOnce(new Error('ambiguous internal failure'))
