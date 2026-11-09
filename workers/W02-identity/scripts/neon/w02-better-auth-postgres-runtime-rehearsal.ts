@@ -260,7 +260,6 @@ try {
   const expiredSessionId = 'session-list-expired-' + nonce
   const foreignSessionId = 'session-list-foreign-' + nonce
   fixtureSessionIds = [newerSessionId, expiredSessionId, foreignSessionId]
-  const newerCreatedAt = listAt
   const expiredCreatedAt = new Date(Date.now() - 120_000).toISOString()
   const expiredAt = new Date(Date.now() - 60_000).toISOString()
 
@@ -276,6 +275,7 @@ try {
   // Use a timestamp safely after the second user's L1 grant so the query's
   // effective-role check is deterministic even on a busy CI runner.
   const listAt = new Date(Date.now() + 10_000).toISOString()
+  const newerCreatedAt = listAt
 
   await postgresPool.query(
     'INSERT INTO "session" (id, expires_at, token, created_at, updated_at, user_id) ' +
