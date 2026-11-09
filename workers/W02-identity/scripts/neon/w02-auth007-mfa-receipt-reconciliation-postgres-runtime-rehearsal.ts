@@ -4,7 +4,7 @@ import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { Pool } from 'pg'
+import { Pool, type PoolClient } from 'pg'
 
 import {
   buildMfaAuditEvent,
@@ -16,6 +16,9 @@ import {
 import {
   reconcileMfaAuditOperationReceiptsPostgres,
 } from '../../src/neon/mfa-audit-operation-receipt-reconciler-postgres.js'
+import {
+  recordMfaAuditEventOncePostgres,
+} from '../../src/neon/mfa-audit-publication-journal-postgres.js'
 import type { MfaAuditReceiptEvent } from '../../src/auth/mfa-audit-receipts.js'
 
 const connectionString = process.env.W02_RUNTIME_DATABASE_URL
@@ -294,14 +297,13 @@ try {
   )
   let injectTransientFailure = true
   const transientFailureReconciler = async (
-    database: Parameters<typeof reconcileMfaAuditOperationReceiptsPostgres>[0] extends never ? never : import('pg').Pool | import('pg').PoolClient,
-    input: Parameters<typeof import('../../src/neon/mfa-audit-publication-journal-postgres.js').recordMfaAuditEventOncePostgres>[1],
+    database: Pool | PoolClient,
+    input: Parameters<typeof recordMfaAuditEventOncePostgres>[1],
   ) => {
     if (injectTransientFailure) {
       injectTransientFailure = false
       throw new Error('synthetic temporary PostgreSQL write failure')
     }
-    const { recordMfaAuditEventOncePostgres } = await import('../../src/neon/mfa-audit-publication-journal-postgres.js')
     return recordMfaAuditEventOncePostgres(database, input)
   }
   const retryFailure = await reconcileMfaAuditOperationReceiptsPostgres(
