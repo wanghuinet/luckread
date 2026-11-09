@@ -40,7 +40,8 @@ export function validateD103RemoteNeonTarget(connectionString) {
     return { valid: false, reason: 'D1-03 Neon database URL is invalid' }
   }
   const database = (() => {
-    try { return decodeURIComponent(parsed.pathname.replaceAll('/', '')) } catch { return '' }
+    const databasePath = parsed.pathname.startsWith('/') ? parsed.pathname.slice(1) : parsed.pathname
+    try { return decodeURIComponent(databasePath) } catch { return '' }
   })()
   if (!['postgres:', 'postgresql:'].includes(parsed.protocol) ||
       parsed.hostname.toLowerCase() !== approvedHost ||
