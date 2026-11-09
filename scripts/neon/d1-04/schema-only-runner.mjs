@@ -94,6 +94,21 @@ export function assertD104LedgerRows(manifest, plan, rows) {
   return assertLedgerPrefixRows(manifest, plan, rows)
 }
 
+export function assertD104ExactIndexNames(expectedIndexNames, actualIndexNames) {
+  if (!Array.isArray(expectedIndexNames) || !Array.isArray(actualIndexNames)) {
+    fail('D1-04 explicit index verification requires two index-name arrays')
+  }
+  const expected = [...expectedIndexNames].sort()
+  const actual = [...actualIndexNames].sort()
+  const missing = expected.filter((name) => !actual.includes(name))
+  const unexpected = actual.filter((name) => !expected.includes(name))
+  if (missing.length || unexpected.length || new Set(actual).size !== actual.length) {
+    fail('actual D1-04 explicit index set differs from the reviewed manifest: missing=[' +
+      missing.join(',') + '] unexpected=[' + unexpected.join(',') + ']')
+  }
+  return actual.length
+}
+
 function safeName(name) {
   if (typeof name !== 'string' || !/^[A-Za-z_][A-Za-z0-9_$]*$/.test(name)) {
     fail('unsafe PostgreSQL identifier encountered during catalog verification')
@@ -284,12 +299,15 @@ async function verifyAppliedTableState(client, manifest, plan, appliedCount) {
 async function verifyFinalCatalog(client, manifest, plan) {
   const tableState = await verifyAppliedTableState(client, manifest, plan, plan.entries.length)
   const indexRows = await client.query(
-    "SELECT indexname FROM pg_catalog.pg_indexes WHERE schemaname='public' ORDER BY indexname",
+    "SELECT indexname FROM pg_catalog.pg_indexes WHERE schemaname='public' AND tablename <> $1 ORDER BY indexname",
+    [ledgerTable],
   )
-  const actualIndexes = new Set(indexRows.rows.map((row) => row.indexname))
-  const missingIndexes = plan.indexes.filter((name) => !actualIndexes.has(name))
-  if (missingIndexes.length || plan.indexes.length !== manifest.expected.explicitIndexes) {
-    fail('explicit PostgreSQL indexes do not match the reviewed D1-04 manifest: ' + missingIndexes.join(','))
+  const explicitIndexes = assertD104ExactIndexNames(
+    plan.indexes,
+    indexRows.rows.map((row) => row.indexname),
+  )
+  if (explicitIndexes !== manifest.expected.explicitIndexes) {
+    fail('actual D1-04 explicit index count does not match the reviewed manifest')
   }
 
   const triggerRows = await client.query(
@@ -320,7 +338,7 @@ async function verifyFinalCatalog(client, manifest, plan) {
   return {
     ...tableState,
     tables: tableState.tableCount,
-    explicitIndexes: plan.indexes.length,
+    explicitIndexes,
     triggers: plan.triggers.length,
     triggerFunctions: plan.functions.length,
     foreignKeys: Number(foreignKeys.rows[0].count),
