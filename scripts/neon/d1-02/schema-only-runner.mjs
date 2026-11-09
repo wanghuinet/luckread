@@ -10,7 +10,7 @@ const requireFromW02 = createRequire(resolve(repositoryRoot, 'workers/W02-identi
 const manifestPath = 'contracts/database/neon-d1-02-migration-manifest.v1.json'
 const ledgerSqlPath = 'scripts/neon/d1-01/0001_schema_migration_ledger.sql'
 const ledgerTable = 'neon_schema_migration_ledger'
-const runnerVersion = 'd1-02-schema-runner/1.0.0'
+const runnerVersion = 'd1-02-schema-runner/1.1.0'
 const SHA = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/
 const fail = (message) => { throw new Error('D1-02 schema-only runner: ' + message) }
 const readJson = (file) => JSON.parse(readFileSync(resolve(repositoryRoot, file), 'utf8'))
@@ -155,6 +155,15 @@ export function validateManifestShape(manifest) {
       artifactPaths: ['workers/W05-social/src/neon-postgres-migrations/0001_w05_d1_02_social_schema.sql'],
       dependsOn: ['d1-02-w03-content-schema-v1'],
     },
+    {
+      migrationId: 'd1-02-w03-content-snowflake-timestamp-bigint-v1',
+      order: 3,
+      ownerWorker: 'W03',
+      kind: 'POSTGRESQL_SQL',
+      artifactPaths: ['workers/W03-content/src/neon-postgres-migrations/0002_w03_d1_02_content_snowflake_timestamp_bigint.sql'],
+      dependsOn: ['d1-02-w03-content-schema-v1', 'd1-02-w05-social-schema-v1'],
+      expectedTableCount: 0,
+    },
   ]
   if (!Array.isArray(entries) || canonicalJson(entries) !== canonicalJson(expected)) {
     errors.push('manifest entries must contain only W03 first and W05 second with exact committed PostgreSQL artifacts')
@@ -166,7 +175,8 @@ export function validateManifestShape(manifest) {
       manifest?.expected?.businessRows !== 0 ||
       manifest?.expected?.snowflakeAllocatorRows !== 1 ||
       manifest?.expected?.foreignKeys !== 0 ||
-      manifest?.expected?.d1_03EndpointTable !== false) {
+      manifest?.expected?.d1_03EndpointTable !== false ||
+      manifest?.expected?.migrationLedgerRows !== 3) {
     errors.push('manifest object inventory or empty-data invariants do not match the approved D1-02 contract')
   }
   if (errors.length) return { valid: false, errors }
@@ -213,8 +223,11 @@ export function buildArtifactChecksums(manifest, readArtifact) {
     if (new Set(tableNames).size !== tableNames.length) {
       fail('artifact bundle contains duplicate table declarations for ' + entry.migrationId)
     }
-    if (tableNames.length !== (entry.ownerWorker === 'W03' ? 9 : 19)) {
-      fail(entry.ownerWorker + ' table count does not match the combined schema contract')
+    const expectedTableCount = Number.isInteger(entry.expectedTableCount)
+      ? entry.expectedTableCount
+      : (entry.ownerWorker === 'W03' ? 9 : 19)
+    if (tableNames.length !== expectedTableCount) {
+      fail(entry.ownerWorker + ' table count does not match the migration entry contract: ' + entry.migrationId)
     }
     const manifestEntrySha256 = createHash('sha256')
       .update(canonicalJson(entry), 'utf8').digest('hex')
@@ -322,7 +335,7 @@ async function readD1_02LedgerRows(client) {
 
 function assertLedgerPrefix(entries, checksums, rows) {
   if (!Array.isArray(rows) || rows.length > entries.length) {
-    fail('D1-02 ledger must contain only an ordered prefix of the two-entry manifest')
+    fail('D1-02 ledger must contain only an ordered prefix of the current immutable manifest')
   }
   for (let i = 0; i < rows.length; i++) {
     const expected = entries[i]
@@ -365,6 +378,14 @@ async function verifyOwnerTableState(client, appliedEntries, checksums) {
         Number(allocator.rows[0].last_timestamp_ms) !== -1 ||
         Number(allocator.rows[0].sequence) !== 4095) {
       fail('only the required W03 Snowflake allocator singleton may be seeded')
+    }
+  }
+  if (appliedEntries.some((entry) => entry.migrationId === 'd1-02-w03-content-snowflake-timestamp-bigint-v1')) {
+    const timestampColumn = await client.query(
+      "SELECT data_type FROM information_schema.columns WHERE table_schema='public' AND table_name='content_id_snowflake_state' AND column_name='last_timestamp_ms'",
+    )
+    if (timestampColumn.rows.length !== 1 || timestampColumn.rows[0].data_type !== 'bigint') {
+      fail('W03 Snowflake last_timestamp_ms must be PostgreSQL BIGINT for Unix millisecond values')
     }
   }
   return { tableCount: expected.length - 1, businessTableCount: businessTables.length }
@@ -482,7 +503,7 @@ async function run() {
 
     const rows = await readD1_02LedgerRows(client)
     assertLedgerPrefix(shape.entries, checksums, rows)
-    if (rows.length !== shape.entries.length) fail('D1-02 runner did not complete both owner migrations')
+    if (rows.length !== shape.entries.length) fail('D1-02 runner did not complete every manifest migration')
     const schemaState = await verifyOwnerTableState(client, appliedEntries, checksums)
     const report = {
       reportType: remoteNeon ? 'NEON_D1_02_SCHEMA_ONLY_RUNNER_REMOTE_POSTFLIGHT' : 'NEON_D1_02_SCHEMA_ONLY_RUNNER_LOCAL_POSTFLIGHT',
