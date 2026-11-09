@@ -9,7 +9,7 @@ import {
 import { parseCommandLine as parseSharedCommandLine } from '../shared-domain-schema-runner.mjs'
 import { parseCommandLine as parseDomainExecutorCommandLine } from './remote-schema-runner.mjs'
 import { parseCommandLine } from './schema-only-runner.mjs'
-import { assertD103RemoteApplyBlocked } from './assert-remote-apply-release.mjs'
+import { assertD103RemoteApplyReady } from './assert-remote-apply-release.mjs'
 
 const host = 'ep-icy-breeze-azdp8x8q-pooler.c-3.ap-southeast-1.aws.neon.tech'
 const rawUrl = (tail = '') =>
@@ -92,11 +92,16 @@ test('general shared executor remains local-only for every domain', () => {
   })
 })
 
-test('the first implementation slice keeps remote D1-03 release blocked pending source-pinned review', () => {
-  const result = assertD103RemoteApplyBlocked()
+test('source-pinned D1-03 approval authorizes only the admitted partial schema', () => {
+  const result = assertD103RemoteApplyReady({
+    currentHead: process.env.GITHUB_SHA || undefined,
+  })
   assert.deepEqual(result, {
-    blocked: true,
-    partialRemoteApplyReady: false,
+    ready: true,
+    partialRemoteApplyReady: true,
+    remoteApplyReady: false,
+    migrationCount: 3,
+    fullDomainSchemaComplete: false,
     remoteNeonDdlExecuted: false,
   })
 })

@@ -3,9 +3,9 @@
   "$id": "https://luckread.com/contracts/database/neon-d1-03-remote-runner-review.v1.json",
   "title": "LuckRead D1-03 Partial Schema-Only Remote Runner Review and Release",
   "version": "1.0.0",
-  "status": "REMOTE_PARTIAL_SCHEMA_RELEASE_PENDING",
+  "status": "PARTIAL_SCHEMA_REMOTE_RELEASE_APPROVED",
   "repository": "wanghuinet/luckread",
-  "partialRemoteApplyReady": false,
+  "partialRemoteApplyReady": true,
   "remoteApplyReady": false,
   "target": {
     "domainId": "D1-03",
@@ -46,13 +46,166 @@
   "review": {
     "reviewer": "GPT-6",
     "reviewType": "SCOPED_REMOTE_CODE_PATH_AUDIT_AND_CURRENT_MAIN_SOURCE_PIN_RECONCILIATION",
-    "reviewedAt": null,
-    "reviewedMainSha": null,
-    "implementationMergeSha": null,
-    "result": "PENDING",
+    "reviewedAt": "2026-11-09",
+    "reviewedMainSha": "ccdfacfa6603c14e3e894f02bcd38c8dc4be6d89",
+    "implementationMergeSha": "ccdfacfa6603c14e3e894f02bcd38c8dc4be6d89",
+    "result": "NO_BLOCKING_FINDINGS",
     "findings": [],
     "formalGitHubReviewSubmissions": 0,
-    "reviewedFiles": [],
+    "reviewedFiles": [
+      {
+        "path": ".github/workflows/neon-d1-03-reviewed-partial-remote-schema-apply.yml",
+        "gitBlobSha1": "4b01505ae0a2eaf6cdc157cef4f433d7dfd2c31f"
+      },
+      {
+        "path": "scripts/neon/d1-03/remote-schema-runner.mjs",
+        "gitBlobSha1": "cd7ea2f64150ba65f4a59d09d939d60776d5f235"
+      },
+      {
+        "path": "scripts/neon/d1-03/schema-only-runner.mjs",
+        "gitBlobSha1": "73b1928b10b52e65ebb35a984265f5520af409be"
+      },
+      {
+        "path": "scripts/neon/d1-03/assert-remote-apply-release.mjs",
+        "gitBlobSha1": "504ed09e3dec133ab636112baf94c409348a4e9e"
+      },
+      {
+        "path": "scripts/neon/d1-03/remote-runner-review.mjs",
+        "gitBlobSha1": "94be690399cd3aace4dc40a9301d2b7f1570ed9a"
+      },
+      {
+        "path": "scripts/neon/d1-03/remote-runner-review.test.mjs",
+        "gitBlobSha1": "3d0bc9756113fe1c39fa69a0028adc1a513dd9ce"
+      },
+      {
+        "path": "scripts/neon/shared-domain-schema-runner.mjs",
+        "gitBlobSha1": "53706e33929da41f331acf3892d223d341762817"
+      },
+      {
+        "path": "scripts/neon/shared-domain-schema-runner.test.mjs",
+        "gitBlobSha1": "4620c1ce0e35ae97605d76d02b7140c0600f9857"
+      },
+      {
+        "path": "scripts/neon/d1-01/0001_schema_migration_ledger.sql",
+        "gitBlobSha1": "b8cdec415ee4106d0b0618197b12b61d8656a2c9"
+      },
+      {
+        "path": "contracts/database/neon-d1-03-shared-migration-manifest.v1.json",
+        "gitBlobSha1": "4d5192c4baf140f2b9c3a76db401c894b8b45288"
+      },
+      {
+        "path": "contracts/database/neon-d1-03-shared-runner-independent-review.v1.json",
+        "gitBlobSha1": "22c4c40ba70e55014909e8741c11e9119462b5d8"
+      },
+      {
+        "path": "contracts/database/neon-d1-03-w06-moderation-schema.v1.json",
+        "gitBlobSha1": "2feac89859bfe5729d461e369a3bf33dcbe421bc"
+      },
+      {
+        "path": "contracts/database/neon-d1-03-w09-platform-schema.v1.json",
+        "gitBlobSha1": "50e980647710bdaae29e52fae60b1b231b9e2f3c"
+      },
+      {
+        "path": "contracts/database/neon-d1-03-w10-execution-schema.v1.json",
+        "gitBlobSha1": "e5e3bc9bebb4ee13a2d1ed51336bd380d3c7bc35"
+      },
+      {
+        "path": "contracts/transport/d1-03-entity-owner-boundary.v1.json",
+        "gitBlobSha1": "e271a1402d2f2600b88271c29f2e694be70f30c2"
+      },
+      {
+        "path": "contracts/transport/worker-d1-access-boundary.v1.json",
+        "gitBlobSha1": "fb269371ba3f3d6952f019b7b6c47ad1315e0c7d"
+      },
+      {
+        "path": "contracts/persistence/MODERATION-QUEUE-FOUNDATION-persistence.v1.json",
+        "gitBlobSha1": "bb640ff2c68fb9d1087b7ab04c7b43d3e9e74840"
+      },
+      {
+        "path": "contracts/entity/MODERATION-CASE-CONTRACT.v1.json",
+        "gitBlobSha1": "bcd1bfa56dd3dd998b12b328dfab1caab09d7c6a"
+      },
+      {
+        "path": "contracts/entity/MODERATION-DECISION-CONTRACT.v1.json",
+        "gitBlobSha1": "8fd2eddd7d35c10205fcbb2ee7147a53e5f920bf"
+      },
+      {
+        "path": "contracts/api/report-appeal.v1.json",
+        "gitBlobSha1": "869890a821352e057f6487c06f1db36aff33550f"
+      },
+      {
+        "path": "docs/63-MODERATION-APPEALS-SYSTEM-CONTRACT-v1.0.md",
+        "gitBlobSha1": "3043508336409adec77eb63f8d8d9e0486247814"
+      },
+      {
+        "path": "docs/09-D1-DOMAIN-MASTER-v1.0.md",
+        "gitBlobSha1": "6e30adc2a3997d7231c9e18a65d347bfd089fd57"
+      },
+      {
+        "path": "workers/W06-governance/wrangler.jsonc",
+        "gitBlobSha1": "2c4120ded4078feba776cad1c265c401647e47db"
+      },
+      {
+        "path": "workers/W09-platform/wrangler.d1-03-migrations.jsonc",
+        "gitBlobSha1": "bf93e677e553a66083c1f5741294bab9c45d6206"
+      },
+      {
+        "path": "workers/W10-async/wrangler.jsonc",
+        "gitBlobSha1": "04d060a1040fa3b7ea5be24157feddf7b6668447"
+      },
+      {
+        "path": "workers/W11-growth-campaign-analytics-operations/wrangler.jsonc",
+        "gitBlobSha1": "7df80ec418aa46bb2ba09fa9252c88138d00ceaf"
+      },
+      {
+        "path": "workers/W06-governance/migrations/0001_audit_event.sql",
+        "gitBlobSha1": "3066892758fbf7284fdb693af23d68399a9bbca8"
+      },
+      {
+        "path": "workers/W06-governance/migrations/0002_moderation_queue_foundation.sql",
+        "gitBlobSha1": "db06f45f0890d55e7184df299ead306fd1e27279"
+      },
+      {
+        "path": "workers/W06-governance/migrations/0003_moderation_report_v1.sql",
+        "gitBlobSha1": "b88cc1ba8a6bcddf1418d4dee7f381624b6013aa"
+      },
+      {
+        "path": "workers/W09-platform/migrations-d1-03/0001_notification_push_endpoints.sql",
+        "gitBlobSha1": "a3968ee767962de5b0a02f0892079d99d08281de"
+      },
+      {
+        "path": "workers/W09-platform/migrations-d1-03/0002_w10_async_execution_state.sql",
+        "gitBlobSha1": "4db137e07449bf658495cf315df0c0172667dee5"
+      },
+      {
+        "path": "workers/W06-governance/src/neon-postgres-migrations/0001_w06_d1_03_moderation_schema.sql",
+        "gitBlobSha1": "567dfb076d3cb7cfd774e794f45e0e0d41f19aa7"
+      },
+      {
+        "path": "workers/W09-platform/src/neon-postgres-migrations/0001_w09_d1_03_platform_schema.sql",
+        "gitBlobSha1": "914a88a1dbf02b937a701f500ab2c08c7db59b60"
+      },
+      {
+        "path": "workers/W10-async/src/neon-postgres-migrations/0001_w10_d1_03_async_execution.sql",
+        "gitBlobSha1": "77ea1bdbbddf17e77068108b7193a5956cd2fc40"
+      },
+      {
+        "path": "workers/W09-platform/scripts/neon/verify-d1-03-w09-owner-reconciliation.mjs",
+        "gitBlobSha1": "5be972136b374a35e9bc0d598db0371211bd21e5"
+      },
+      {
+        "path": "workers/W11-growth-campaign-analytics-operations/scripts/neon/verify-d1-03-w11-owner-reconciliation.mjs",
+        "gitBlobSha1": "bb849d17cd27d6bad5f042f2349a72341feb30f2"
+      },
+      {
+        "path": "workers/W09-platform/README.md",
+        "gitBlobSha1": "c328e26c76d6659f346c418b95752f89b1402568"
+      },
+      {
+        "path": "workers/W11-growth-campaign-analytics-operations/README.md",
+        "gitBlobSha1": "20d9617df20e9927ea804905bc81e0637bb9cbbb"
+      }
+    ],
     "limitations": [
       "This review is an automated GPT-6 code-path audit by the implementation agent, not a human GitHub APPROVE review.",
       "The release covers only the three already-admitted W06/W09/W10 manifest migrations and does not complete the full D1-03 entity inventory.",
@@ -76,7 +229,16 @@
       "conclusion": "success",
       "url": "https://github.com/wanghuinet/luckread/actions/runs/42560028868"
     },
-    "releaseValidation": null
+    "releaseValidation": {
+      "runId": 42562539811,
+      "conclusion": "success",
+      "headSha": "ccdfacfa6603c14e3e894f02bcd38c8dc4be6d89",
+      "validationScope": "D1_03_PARTIAL_SCHEMA_REMOTE_RUNNER_VALIDATION_NO_NEON_CREDENTIALS",
+      "url": "https://github.com/wanghuinet/luckread/actions/runs/42562539811",
+      "remoteApplyJob": "skipped",
+      "artifactId": 13649718731,
+      "artifactDigest": "sha256:1bb538f99e021d5d66c4ecae31677b037481a6930e27781d54727ca89afbc2cc"
+    }
   },
   "safety": {
     "remoteNeonDdlExecuted": false,
