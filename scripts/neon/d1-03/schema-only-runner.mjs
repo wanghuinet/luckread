@@ -1,6 +1,6 @@
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { runD103RemoteDomain } from '../shared-domain-schema-runner.mjs'
+import { runD103RemoteDomain } from './remote-schema-runner.mjs'
 import { assertD103RemoteApplyReady } from './assert-remote-apply-release.mjs'
 
 const fail = (message) => { throw new Error('D1-03 remote schema apply: ' + message) }
