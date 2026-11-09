@@ -12,7 +12,12 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('./better-auth.js', () => ({ createLuckReadAuth: mocks.createAuth }))
 vi.mock('./principal.js', () => ({ resolveBetterAuthPrincipal: mocks.resolvePrincipal }))
-vi.mock('./mfa-status.js', () => ({ readAuthoritativeMfaStatus: mocks.readStatus }))
+vi.mock('./mfa-status.js', () => ({
+  readAuthoritativeMfaStatus: mocks.readStatus,
+  createD1MfaStatusStore: (db: D1Database) => ({
+    read: (userId: string, now: Date) => mocks.readStatus(db, userId, now),
+  }),
+}))
 vi.mock('./mfa-audit-receipts.js', () => ({
   createMfaAuditOperationReceipt: mocks.createReceipt,
   finalizeMfaAuditOperationReceipt: mocks.finalizeReceipt,
