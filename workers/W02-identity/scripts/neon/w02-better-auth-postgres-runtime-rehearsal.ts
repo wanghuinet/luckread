@@ -5,6 +5,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { AccountStateTransitionError } from '../../src/account/account-state-transition.js'
+import { createPostgresSessionListStore } from '../../src/neon/session-list-postgres.js'
 import {
   auth,
   postgresLifecycleAdapters,
@@ -41,6 +42,9 @@ const nonce = randomUUID().replaceAll('-', '').slice(0, 18).toLowerCase()
 const email = 'w02-pg-' + nonce + '@example.test'
 const username = 'w02pg' + nonce
 const password = 'W02-Pg-Rehearsal-' + randomUUID().replaceAll('-', '').slice(0, 20)
+const foreignEmail = 'w02-pg-foreign-' + nonce + '@example.test'
+let foreignUserId: string | undefined
+let fixtureSessionIds: string[] = []
 let userId: string | undefined
 let signedIn = false
 let signedOut = false
@@ -238,6 +242,94 @@ try {
   )
   assert.equal(Number(sessionRows.rows[0]?.count), 1, 'sign-in must persist exactly one session')
 
+  // Exercise the PostgreSQL repository with the same effective L1 authority
+  // and Better Auth session rows used by the runtime profile.
+  const sessionListStore = createPostgresSessionListStore(postgresPool)
+  const nativeSession = await postgresPool.query<{ createdAt: Date | string; expiresAt: Date | string }>(
+    'SELECT created_at AS "createdAt", expires_at AS "expiresAt" ' +
+      'FROM "session" WHERE id = $1 AND user_id = $2',
+    [session?.session.id, userId],
+  )
+  assert.equal(nativeSession.rowCount, 1, 'the authenticated native session must exist for listing')
+  const listAt = new Date().toISOString()
+  const nativeExpiresAt = new Date(nativeSession.rows[0]!.expiresAt).toISOString()
+  const newerSessionId = 'session-list-newer-' + nonce
+  const expiredSessionId = 'session-list-expired-' + nonce
+  const foreignSessionId = 'session-list-foreign-' + nonce
+  fixtureSessionIds = [newerSessionId, expiredSessionId, foreignSessionId]
+  const expiredCreatedAt = new Date(Date.now() - 120_000).toISOString()
+  const expiredAt = new Date(Date.now() - 60_000).toISOString()
+
+  foreignUserId = 'w02pgforeign' + nonce
+  await postgresPool.query(
+    'INSERT INTO "user" ' +
+      '(id, name, email, email_verified, created_at, updated_at, account_state, account_state_version) ' +
+      "VALUES ($1, 'W02 foreign session fixture', $2, TRUE, $3, $3, 'ACTIVE', 1)",
+    [foreignUserId, foreignEmail, listAt],
+  )
+  await postgresLifecycleAdapters.afterUserCreated(foreignUserId)
+
+  await postgresPool.query(
+    'INSERT INTO "session" (id, expires_at, token, created_at, updated_at, user_id) ' +
+      'VALUES ($1, $2, $3, $4, $4, $5), ' +
+      '($6, $7, $8, $9, $9, $5), ' +
+      '($10, $11, $12, $13, $13, $14)',
+    [
+      newerSessionId,
+      nativeExpiresAt,
+      'session-list-token-newer-' + nonce,
+      listAt,
+      userId,
+      expiredSessionId,
+      expiredAt,
+      'session-list-token-expired-' + nonce,
+      expiredCreatedAt,
+      foreignSessionId,
+      nativeExpiresAt,
+      'session-list-token-foreign-' + nonce,
+      listAt,
+      foreignUserId,
+    ],
+  )
+
+  const firstSessionPage = await sessionListStore.list({
+    userId,
+    now: listAt,
+    limit: 1,
+    cursor: null,
+  })
+  assert.equal(firstSessionPage.permissionGranted, true)
+  assert.equal(firstSessionPage.rows.length, 2, 'one requested row plus one look-ahead row must be returned')
+  assert.deepEqual(firstSessionPage.rows.map((row) => row.sessionId), [
+    newerSessionId,
+    session?.session.id,
+  ], 'listing must be descending, omit expired sessions and exclude another account')
+
+  const secondSessionPage = await sessionListStore.list({
+    userId,
+    now: listAt,
+    limit: 10,
+    cursor: {
+      createdAt: firstSessionPage.rows[0]!.createdAt,
+      sessionId: firstSessionPage.rows[0]!.sessionId,
+    },
+  })
+  assert.deepEqual(secondSessionPage.rows.map((row) => row.sessionId), [session?.session.id])
+
+  const foreignSessionPage = await sessionListStore.list({
+    userId: foreignUserId,
+    now: listAt,
+    limit: 10,
+    cursor: null,
+  })
+  assert.equal(foreignSessionPage.permissionGranted, true)
+  assert.deepEqual(foreignSessionPage.rows.map((row) => row.sessionId), [foreignSessionId])
+
+  await postgresPool.query('DELETE FROM "session" WHERE id = ANY($1::text[])', [fixtureSessionIds])
+  await postgresPool.query('DELETE FROM role_assignments WHERE subject_id = $1', [foreignUserId])
+  await postgresPool.query('DELETE FROM role_authorization_versions WHERE subject_id = $1', [foreignUserId])
+  await postgresPool.query('DELETE FROM "user" WHERE id = $1', [foreignUserId])
+
   await withTimeout('sign-out', () => auth.api.signOut({ headers: sessionHeaders }))
   signedOut = true
   const revokedSession = await withTimeout(
@@ -255,7 +347,7 @@ try {
   report = {
     reportVersion: 2,
     status: 'W02_BETTER_AUTH_POSTGRES_RUNTIME_REHEARSAL_PASS',
-    scope: 'Better Auth core PostgreSQL runtime plus L1 registration-role materialization, AUTH-013 email-verification activation, L2 RoleAssignment and durable publication journal; D1 production remains authoritative.',
+    scope: 'Better Auth core PostgreSQL runtime, L1/L2 lifecycle, AUTH-013 journal and AUTH-010 PostgreSQL session listing with keyset pagination, expiry filtering and cross-account isolation; D1 production remains authoritative.',
     betterAuthVersion: '1.7.8',
     adapter: 'Better Auth native PostgreSQL dialect via pg.Pool plus W02 PostgreSQL registration-role and email-verification lifecycle adapters',
     operationsVerified: [
@@ -272,6 +364,10 @@ try {
       'SIGN_IN_EMAIL',
       'SESSION_PERSISTED',
       'GET_SESSION',
+      'SESSION_LIST_L1_AUTHORIZATION',
+      'SESSION_LIST_KEYSET_PAGINATION',
+      'SESSION_LIST_EXPIRED_SESSION_FILTER',
+      'SESSION_LIST_CROSS_ACCOUNT_ISOLATION',
       'SIGN_OUT',
       'SESSION_REVOKED',
     ],
@@ -302,6 +398,16 @@ try {
     }
 
     await postgresPool.query('DELETE FROM "verification" WHERE identifier = $1', [email])
+    if (fixtureSessionIds.length > 0) {
+      await postgresPool.query('DELETE FROM "session" WHERE id = ANY($1::text[])', [fixtureSessionIds])
+    }
+    if (foreignUserId) {
+      await postgresPool.query('DELETE FROM "session" WHERE user_id = $1', [foreignUserId])
+      await postgresPool.query('DELETE FROM role_assignments WHERE subject_id = $1', [foreignUserId])
+      await postgresPool.query('DELETE FROM role_authorization_versions WHERE subject_id = $1', [foreignUserId])
+      await postgresPool.query('DELETE FROM "user" WHERE id = $1', [foreignUserId])
+    }
+    await postgresPool.query('DELETE FROM "verification" WHERE identifier = $1', [foreignEmail])
     if (cleanupUserId) {
       await postgresPool.query(
         'DELETE FROM auth_013_publication_journal WHERE resource_id = $1',
@@ -322,8 +428,12 @@ try {
         (SELECT COUNT(*) FROM "verification" WHERE identifier = $1) AS verifications,
         (SELECT COUNT(*) FROM auth_013_publication_journal WHERE resource_id = COALESCE($2, '')) AS journals,
         (SELECT COUNT(*) FROM role_assignments WHERE subject_id = COALESCE($2, '')) AS role_assignments,
-        (SELECT COUNT(*) FROM role_authorization_versions WHERE subject_id = COALESCE($2, '')) AS role_versions`,
-      [email, cleanupUserId ?? null],
+        (SELECT COUNT(*) FROM role_authorization_versions WHERE subject_id = COALESCE($2, '')) AS role_versions,
+        (SELECT COUNT(*) FROM "user" WHERE id = COALESCE($3, '')) AS foreign_users,
+        (SELECT COUNT(*) FROM "session" WHERE user_id = COALESCE($3, '')) AS foreign_sessions,
+        (SELECT COUNT(*) FROM role_assignments WHERE subject_id = COALESCE($3, '')) AS foreign_role_assignments,
+        (SELECT COUNT(*) FROM role_authorization_versions WHERE subject_id = COALESCE($3, '')) AS foreign_role_versions`,
+      [email, cleanupUserId ?? null, foreignUserId ?? null],
     )
     if (Object.values(remaining.rows[0] ?? {}).some((value) => Number(value) !== 0)) {
       throw new Error('W02_RUNTIME_SYNTHETIC_CLEANUP_FAILED')
