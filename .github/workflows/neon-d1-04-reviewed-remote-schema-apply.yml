@@ -1,0 +1,179 @@
+name: Neon D1-04 Reviewed W07 Remote Schema Apply
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/neon-d1-04-reviewed-remote-schema-apply.yml'
+      - 'scripts/neon/d1-04/**'
+      - 'scripts/neon/shared-domain-schema-runner.mjs'
+      - 'scripts/neon/d1-01/0001_schema_migration_ledger.sql'
+      - 'contracts/database/neon-d1-04-remote-runner-review.v1.json'
+      - 'contracts/database/neon-d1-04-shared-migration-manifest.v1.json'
+      - 'contracts/database/neon-d1-04-shared-runner-independent-review.v1.json'
+      - 'contracts/database/neon-schema-migration-ledger.v1.json'
+      - 'contracts/database/neon-shared-runner-local-readiness.v1.json'
+      - 'workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/**'
+      - 'contracts/database/neon-d1-04-w07-*-schema.v1.json'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/neon-d1-04-reviewed-remote-schema-apply.yml'
+      - 'scripts/neon/d1-04/**'
+      - 'scripts/neon/shared-domain-schema-runner.mjs'
+      - 'scripts/neon/d1-01/0001_schema_migration_ledger.sql'
+      - 'contracts/database/neon-d1-04-remote-runner-review.v1.json'
+      - 'contracts/database/neon-d1-04-shared-migration-manifest.v1.json'
+      - 'contracts/database/neon-d1-04-shared-runner-independent-review.v1.json'
+      - 'contracts/database/neon-schema-migration-ledger.v1.json'
+      - 'contracts/database/neon-shared-runner-local-readiness.v1.json'
+      - 'workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/**'
+      - 'contracts/database/neon-d1-04-w07-*-schema.v1.json'
+  workflow_dispatch:
+    inputs:
+      confirm_target:
+        description: Apply only the reviewed W07 D1-04 schema to Neon luckread_finance. No business data import or production cutover.
+        required: true
+        type: choice
+        options:
+          - APPLY_REVIEWED_SCHEMA_D1_04_FINANCE
+
+permissions:
+  contents: read
+
+concurrency:
+  group: neon-d1-04-reviewed-remote-schema-apply
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
+    name: Validate D1-04 remote runner and local PostgreSQL 18 rehearsal (no Neon credentials)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:18.6
+        env:
+          POSTGRES_USER: schema_generator
+          POSTGRES_PASSWORD: schema_generator_local_only
+          POSTGRES_DB: luckread_d1_04_shared
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U schema_generator -d luckread_d1_04_shared"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install the pinned W02 PostgreSQL driver
+        working-directory: workers/W02-identity
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Validate D1-04 remote runner, ledger guards and source-pinned review tests
+        run: |
+          set -euo pipefail
+          node --check scripts/neon/shared-domain-schema-runner.mjs
+          node --check scripts/neon/d1-04/schema-only-runner.mjs
+          node --check scripts/neon/d1-04/schema-only-runner.test.mjs
+          node --check scripts/neon/d1-04/remote-runner-review.mjs
+          node --check scripts/neon/d1-04/assert-remote-apply-release.mjs
+          node --test \
+            scripts/neon/d1-04/schema-only-runner.test.mjs \
+            scripts/neon/d1-04/remote-runner-review.test.mjs \
+            scripts/neon/shared-domain-schema-runner.test.mjs
+          node scripts/neon/d1-04/assert-remote-apply-release.mjs --expect-blocked
+      - name: Rehearse the exact D1-04 migration plan on disposable PostgreSQL 18
+        env:
+          D1_SHARED_LOCAL_DATABASE_URL: postgresql://schema_generator:schema_generator_local_only@127.0.0.1:5432/luckread_d1_04_shared
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
+          D1_SHARED_SCHEMA_APPLY_REPORT: artifacts/neon/d1-04-reviewed-remote-runner-local-postflight.json
+        run: node scripts/neon/shared-domain-schema-runner.mjs --domain D1-04 --local-only
+      - name: Upload sanitized local PostgreSQL 18 evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: neon-d1-04-remote-runner-validation-${{ github.run_id }}
+          path: artifacts/neon/d1-04-reviewed-remote-runner-local-postflight.json
+          if-no-files-found: warn
+          retention-days: 90
+
+  apply:
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.confirm_target == 'APPLY_REVIEWED_SCHEMA_D1_04_FINANCE' }}
+    name: Apply separately reviewed W07 schema to Neon D1-04 luckread_finance
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Guard exact main ref and D1-04 confirmation
+        shell: bash
+        env:
+          CONFIRM_TARGET: ${{ inputs.confirm_target }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/heads/main"
+          test "$CONFIRM_TARGET" = "APPLY_REVIEWED_SCHEMA_D1_04_FINANCE"
+      - name: Checkout the exact dispatched main commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - name: Verify checkout provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+      - name: Require source-pinned D1-04 remote review before reading Neon credentials
+        run: node scripts/neon/d1-04/assert-remote-apply-release.mjs --assert-ready
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install the pinned W02 PostgreSQL driver
+        working-directory: workers/W02-identity
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Enforce exact D1-04 Neon target and full TLS verification
+        env:
+          NEON_DATABASE_URL_FINANCE: ${{ secrets.NEON_DATABASE_URL_FINANCE }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE' >> "$GITHUB_ENV"
+          const { appendFileSync } = await import('node:fs')
+          const { validateRemoteNeonTarget, enforceVerifiedNeonConnectionString } =
+            await import('./scripts/neon/d1-04/schema-only-runner.mjs')
+          const raw = process.env.NEON_DATABASE_URL_FINANCE
+          const target = validateRemoteNeonTarget(raw)
+          if (!target.valid) throw new Error(target.reason)
+          const verified = enforceVerifiedNeonConnectionString(raw)
+          process.stdout.write('::add-mask::' + verified + '\\n')
+          appendFileSync(process.env.GITHUB_ENV, 'NEON_DATABASE_URL_FINANCE_VERIFIED=' + verified + '\\n')
+          NODE
+      - name: Apply six ordered W07 D1-04 schema migrations through the shared ledger
+        env:
+          GITHUB_ACTIONS: 'true'
+          GITHUB_REF: ${{ github.ref }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
+          D1_04_REMOTE_APPLY_CONFIRMATION: ${{ inputs.confirm_target }}
+          D1_04_SCHEMA_APPLY_REPORT: artifacts/neon/d1-04-schema-runner-remote-postflight.json
+        run: |
+          mkdir -p artifacts/neon
+          node scripts/neon/d1-04/schema-only-runner.mjs --remote-neon
+      - name: Upload sanitized D1-04 remote schema evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: neon-d1-04-remote-schema-postflight-${{ github.run_id }}
+          path: artifacts/neon/d1-04-schema-runner-remote-postflight.json
+          if-no-files-found: warn
+          retention-days: 90
