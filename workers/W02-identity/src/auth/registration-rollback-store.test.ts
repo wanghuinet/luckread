@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { Pool, PoolClient } from 'pg'
+import type { Pool } from 'pg'
 
 import { createD1RegistrationRollbackStore } from './registration-rollback-store.js'
 import { createPostgresRegistrationRollbackStore } from '../neon/registration-rollback-postgres.js'
@@ -115,7 +115,7 @@ describe('W02 registration rollback store', () => {
     const { pool, calls } = fakePool({ user })
     await expect(createPostgresRegistrationRollbackStore(pool).rollback(command))
       .resolves.toEqual({ rolledBack: true })
-    expect(calls.map((call) => call.sql.trim().split(/\\s+/)[0])).toEqual([
+    expect(calls.map((call) => call.sql.trim().split(/\s+/)[0])).toEqual([
       'BEGIN',
       'SELECT',
       'SELECT',
