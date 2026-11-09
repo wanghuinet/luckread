@@ -48,6 +48,8 @@ on:
       - 'workers/W02-identity/src/neon/mfa-audit-operation-receipt-reconciler-postgres.ts'
       - 'workers/W02-identity/src/neon/mfa-audit-publication-journal-postgres.ts'
       - 'workers/W02-identity/src/neon/mfa-audit-publication-journal-publisher-postgres.ts'
+      - 'workers/W02-identity/src/neon/mfa-factor-state-postgres.ts'
+      - 'workers/W02-identity/scripts/neon/w02-auth007-mfa-factor-state-postgres-runtime-rehearsal.ts'
       - 'workers/W02-identity/scripts/neon/w02-auth007-mfa-publication-publisher-postgres-runtime-rehearsal.ts'
       - 'workers/W02-identity/scripts/neon/w02-role-assignment-postgres-runtime-rehearsal.ts'
       - 'workers/W02-identity/scripts/neon/w02-better-auth-postgres-runtime-rehearsal.ts'
@@ -382,6 +384,12 @@ jobs:
           W02_RUNTIME_DATABASE_URL: postgresql://schema_generator:schema_generator_local_only@127.0.0.1:5432/luckread_schema
         run: npm run neon:auth007-mfa:publisher:runtime
 
+      - name: Rehearse AUTH-007 factor state, TOTP replay guard, and status projection on PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          W02_RUNTIME_DATABASE_URL: postgresql://schema_generator:schema_generator_local_only@127.0.0.1:5432/luckread_schema
+        run: npm run neon:auth007-mfa:factor-state:runtime
+
       - name: Verify AUTH-007 MFA columns, replay guard, and session lifecycle triggers
         working-directory: workers/W02-identity
         env:
@@ -460,6 +468,7 @@ jobs:
             workers/W02-identity/artifacts/neon/w02-auth007-mfa-operation-receipts-postgres-runtime-rehearsal.json
             workers/W02-identity/artifacts/neon/w02-auth007-mfa-receipt-reconciliation-postgres-runtime-rehearsal.json
             workers/W02-identity/artifacts/neon/w02-auth007-mfa-publication-publisher-postgres-runtime-rehearsal.json
+            workers/W02-identity/artifacts/neon/w02-auth007-mfa-factor-state-postgres-runtime-rehearsal.json
             workers/W02-identity/artifacts/neon/w02-auth007-mfa-publication-journal-postgres-schema-postflight.json
             workers/W02-identity/artifacts/neon/w02-auth007-mfa-publication-journal-postgres-runtime-rehearsal.json
             workers/W02-identity/artifacts/neon/w02-username-change-state-postgres-schema-postflight.json
