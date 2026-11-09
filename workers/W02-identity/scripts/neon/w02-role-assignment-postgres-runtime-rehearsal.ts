@@ -13,7 +13,7 @@ import {
   readRoleVersionPostgres,
   resolveGlobalLayerPostgres,
   RoleAssignmentPostgresError,
-} from '../../src/authz/role-assignment-postgres.js'
+} from '../../src/neon/role-assignment-postgres.js'
 
 const connectionString = process.env.W02_RUNTIME_DATABASE_URL
 if (!connectionString) throw new Error('W02_RUNTIME_DATABASE_URL is required')
