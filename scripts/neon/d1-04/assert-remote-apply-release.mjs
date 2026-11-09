@@ -67,6 +67,9 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   if (mode === '--assert-ready') {
     const result = assertD104RemoteApplyReady({ currentHead: process.env.GITHUB_SHA || undefined })
     console.log('D1_04_REMOTE_SCHEMA_APPLY_RELEASED ' + JSON.stringify(result))
+  } else if (mode === '--assert-reviewed-candidate') {
+    const result = assertD104RemoteApplyReady({ currentHead: process.env.GITHUB_SHA || undefined })
+    console.log('D1_04_REMOTE_SCHEMA_REVIEW_CANDIDATE_PASS ' + JSON.stringify(result))
   } else if (mode === '--expect-blocked') {
     if (reviewRecord?.status !== 'REMOTE_RUNNER_REVIEW_PENDING' ||
         reviewRecord?.remoteApplyReady !== false ||
