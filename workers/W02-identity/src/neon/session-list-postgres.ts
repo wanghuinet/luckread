@@ -101,6 +101,7 @@ export function createPostgresSessionListStore(pool: Pool): SessionListStore {
           'SELECT id AS "sessionId", created_at AS "createdAt", expires_at AS "expiresAt" ' +
           'FROM "session" ' +
           'WHERE user_id = $1 AND expires_at > $2 ' +
+          'AND EXISTS (SELECT 1 FROM authorization WHERE "permissionGranted" = TRUE) ' +
           cursorPredicate + ' ' +
           'ORDER BY created_at DESC, id DESC ' +
           'LIMIT ' + limitParameter +
