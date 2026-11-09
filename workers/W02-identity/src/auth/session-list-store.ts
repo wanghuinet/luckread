@@ -89,6 +89,7 @@ export function createD1SessionListStore(db: D1Database): SessionListStore {
             SELECT id AS sessionId, created_at AS createdAt, expires_at AS expiresAt
             FROM "session"
             WHERE user_id = ? AND expires_at > ?
+              AND EXISTS (SELECT 1 FROM authorization WHERE permissionGranted = 1)
               AND (created_at < ? OR (created_at = ? AND id < ?))
             ORDER BY created_at DESC, id DESC
             LIMIT ?
@@ -97,6 +98,7 @@ export function createD1SessionListStore(db: D1Database): SessionListStore {
             SELECT id AS sessionId, created_at AS createdAt, expires_at AS expiresAt
             FROM "session"
             WHERE user_id = ? AND expires_at > ?
+              AND EXISTS (SELECT 1 FROM authorization WHERE permissionGranted = 1)
             ORDER BY created_at DESC, id DESC
             LIMIT ?
           )`
