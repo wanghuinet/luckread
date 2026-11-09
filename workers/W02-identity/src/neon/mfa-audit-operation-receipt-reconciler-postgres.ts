@@ -1,4 +1,4 @@
-import type { Pool, PoolClient } from 'pg'
+import type { Pool } from 'pg'
 
 import {
   deriveMfaAuditEventIdForIdempotencyKey,
@@ -171,7 +171,7 @@ export async function reconcileMfaAuditOperationReceiptsPostgres(
 
       summary.selected += 1
 
-      let plan
+      let plan: ReturnType<typeof parseMfaAuditReceiptPlan>
       try {
         plan = parseMfaAuditReceiptPlan(row.eventPlan)
         if (plan.length === 0) throw new Error('INVALID_MFA_AUDIT_RECEIPT_PLAN')
@@ -188,7 +188,7 @@ export async function reconcileMfaAuditOperationReceiptsPostgres(
           ? await deriveMfaAuditEventIdForIdempotencyKey(event.idempotencyKey)
           : event.eventId
 
-        const recorded = await recordMfaAuditEventOncePostgres(pool, {
+        const recorded = await recordMfaAuditEventOncePostgres(client, {
           eventType: event.eventType,
           ...(event.operationId ? { operationId: event.operationId } : {}),
           userId: row.resourceId,
