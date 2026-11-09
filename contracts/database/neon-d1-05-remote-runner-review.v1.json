@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/database/neon-d1-05-remote-runner-review.v1.json",
+  "title": "LuckRead D1-05 Schema-Only Remote Runner Review and Release",
+  "version": "1.0.0",
+  "status": "REMOTE_SCHEMA_ONLY_PROVISIONING_PENDING_REVIEW",
+  "repository": "wanghuinet/luckread",
+  "schemaOnlyRemoteApplyReady": false,
+  "remoteApplyReady": false,
+  "runtimeDataIngestionEnabled": false,
+  "target": {
+    "domainId": "D1-05",
+    "databaseName": "allluck",
+    "cloudflareD1DatabaseUuid": "77d82be2-d12e-4a17-b410-9aa7d376bc11",
+    "neonHostPattern": "ep-*.neon.tech",
+    "postgresMajor": 18,
+    "scope": "EMPTY_SCHEMA_ONLY",
+    "businessDataImport": false,
+    "productionCutoverAuthorized": false
+  },
+  "scope": {
+    "kind": "ALL_ADMITTED_W11_D1_05_ANALYTICS_SCHEMA_ONLY",
+    "migrationCount": 1,
+    "migrationIds": [
+      "d1-05-w11-analytics-schema-v1"
+    ],
+    "tables": 6,
+    "explicitIndexes": 8,
+    "triggers": 0,
+    "triggerFunctions": 0,
+    "foreignKeys": 0,
+    "businessRows": 0,
+    "controlSeedRows": 0,
+    "admittedSchemaSliceComplete": true,
+    "runtimeDataIngestionEnabled": false,
+    "runtimeBindingChangeAllowed": false
+  },
+  "review": {
+    "reviewer": "PENDING",
+    "reviewType": "PENDING_SOURCE_PINNED_CODE_PATH_AUDIT",
+    "reviewedAt": null,
+    "reviewedMainSha": null,
+    "implementationMergeSha": null,
+    "result": "PENDING",
+    "findings": [],
+    "formalGitHubReviewSubmissions": 0,
+    "reviewedFiles": [],
+    "limitations": [
+      "Remote schema provisioning is limited to empty D1-05 schema objects and one append-only migration ledger row.",
+      "This release does not admit runtime telemetry collection, user/event data import, analytics ingestion, Worker binding changes or production cutover.",
+      "The release review must be a source-pinned code-path audit, not represented as a human GitHub APPROVE review."
+    ]
+  },
+  "verificationEvidence": {
+    "releaseValidation": null
+  },
+  "runtimeAdmissionBlockers": [
+    "Retention policy for event and aggregate classes is not admitted.",
+    "Deletion/privacy-request behavior for actor-linked and creator-linked analytics projections is not admitted.",
+    "Consent, lawful purpose and collection eligibility rules are not admitted."
+  ],
+  "safety": {
+    "remoteNeonDdlExecuted": false,
+    "cloudflareD1Touched": false,
+    "businessDataImported": false,
+    "runtimeBindingsChanged": false,
+    "runtimeDataIngestionEnabled": false,
+    "productionCutoverAuthorized": false,
+    "newWorkers": 0,
+    "newD1Databases": 0,
+    "newQueues": 0,
+    "newServiceBindings": 0
+  },
+  "businessDataImport": false,
+  "productionCutoverAuthorized": false,
+  "exactConfirmationRequired": "APPLY_REVIEWED_SCHEMA_D1_05_ALLLUCK_SCHEMA_ONLY"
+}
