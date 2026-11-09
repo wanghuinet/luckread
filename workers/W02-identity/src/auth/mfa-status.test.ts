@@ -10,6 +10,7 @@ vi.mock('./principal.js', () => ({
 
 import type { BetterAuthEnv } from './better-auth.js'
 import { handleMfaStatusRequest, readAuthoritativeMfaStatus } from './mfa-status.js'
+import type { MfaStatusStore } from './mfa-status.js'
 
 const makeDb = (row: unknown) => {
   const statement = {
@@ -138,6 +139,31 @@ describe('W02 private MFA status service-binding boundary', () => {
       data: { enabled: true, verified: true, enrolledAt: '2026-10-24T11:00:00.000Z' },
     })
     expect(mocks.resolvePrincipal).toHaveBeenCalledWith(env, request)
+  })
+
+  it('uses an explicitly injected store and principal resolver without touching D1', async () => {
+    const env = {} as BetterAuthEnv
+    const store: MfaStatusStore = {
+      read: vi.fn().mockResolvedValue({
+        enabled: false,
+        verified: false,
+        enrolledAt: null,
+      }),
+    }
+    const resolvePrincipal = vi.fn().mockResolvedValue({
+      userId: 'postgres-user-1',
+      accountState: 'ACTIVE',
+    })
+
+    const request = internalRequest()
+    const response = await handleMfaStatusRequest(env, request, { store, resolvePrincipal })
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({
+      data: { enabled: false, verified: false, enrolledAt: null },
+    })
+    expect(resolvePrincipal).toHaveBeenCalledWith(env, request)
+    expect(store.read).toHaveBeenCalledWith('postgres-user-1', expect.any(Date))
   })
 
   it('does not return an invented disabled state when authentication is absent or account is not active', async () => {

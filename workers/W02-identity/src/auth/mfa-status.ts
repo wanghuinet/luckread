@@ -1,4 +1,5 @@
 import { resolveBetterAuthPrincipal } from './principal.js'
+import type { AuthenticatedPrincipal } from './principal.js'
 import type { BetterAuthEnv } from './better-auth.js'
 
 export type AuthoritativeMfaStatus = {
@@ -8,13 +9,25 @@ export type AuthoritativeMfaStatus = {
 }
 
 type MfaStatusRow = {
-  userEnabled: number | boolean
+  userEnabled: number | boolean | null
   enrolledAt: string | null
   factorVerified: number | boolean | null
 }
 
 const isTrue = (value: number | boolean | null | undefined): boolean =>
   value === true || value === 1
+
+export interface MfaStatusStore {
+  read(userId: string, now: Date): Promise<AuthoritativeMfaStatus | null>
+}
+
+export type MfaStatusHandlerDependencies = {
+  store?: MfaStatusStore
+  resolvePrincipal?: (
+    env: BetterAuthEnv,
+    request: Request,
+  ) => Promise<Pick<AuthenticatedPrincipal, 'userId' | 'accountState'> | null>
+}
 
 /**
  * Reads only the public MFA status projection from W02's authoritative D1-01.
@@ -55,6 +68,12 @@ export async function readAuthoritativeMfaStatus(
   }
 }
 
+/** D1 remains the production-default MFA status projection store. */
+export function createD1MfaStatusStore(db: D1Database): MfaStatusStore {
+  return {
+    read: (userId, now) => readAuthoritativeMfaStatus(db, userId, now),
+  }
+}
 
 const response = (body: unknown, status = 200): Response =>
   Response.json(body, { status, headers: { 'cache-control': 'no-store' } })
@@ -67,6 +86,7 @@ const response = (body: unknown, status = 200): Response =>
 export async function handleMfaStatusRequest(
   env: BetterAuthEnv,
   request: Request,
+  dependencies: MfaStatusHandlerDependencies = {},
 ): Promise<Response> {
   if (
     request.headers.get('X-LuckRead-Caller') !== 'W01' ||
@@ -76,11 +96,13 @@ export async function handleMfaStatusRequest(
   }
 
   try {
-    const principal = await resolveBetterAuthPrincipal(env, request)
+    const resolvePrincipal = dependencies.resolvePrincipal ?? resolveBetterAuthPrincipal
+    const principal = await resolvePrincipal(env, request)
     if (!principal || principal.accountState !== 'ACTIVE') {
       return response({ error: { code: 'UNAUTHENTICATED', message: 'Authentication required' } }, 401)
     }
-    const status = await readAuthoritativeMfaStatus(env.D1_01, principal.userId)
+    const store = dependencies.store ?? createD1MfaStatusStore(env.D1_01)
+    const status = await store.read(principal.userId, new Date())
     if (!status) return response({ error: { code: 'UNAUTHENTICATED', message: 'Authentication required' } }, 401)
     return response({ data: status })
   } catch {

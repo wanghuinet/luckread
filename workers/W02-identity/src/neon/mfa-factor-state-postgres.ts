@@ -1,5 +1,6 @@
 import type { Pool } from 'pg'
 import type { MfaFactorStateStore } from '../auth/mfa-factor-state-store.js'
+import type { MfaStatusStore } from '../auth/mfa-status.js'
 
 export type AuthoritativeMfaStatusPostgres = {
   enabled: boolean
@@ -160,5 +161,13 @@ export function createPostgresMfaFactorStateStore(pool: Pool): MfaFactorStateSto
     consumeTotpTimeStep(userId, timeStep) {
       return consumeTotpTimeStepPostgres(pool, userId, timeStep)
     },
+  }
+}
+
+
+/** PostgreSQL implementation of the public, secret-free W02 MFA status read. */
+export function createPostgresMfaStatusStore(pool: Pool): MfaStatusStore {
+  return {
+    read: (userId, now) => readAuthoritativeMfaStatusPostgres(pool, userId, now),
   }
 }
