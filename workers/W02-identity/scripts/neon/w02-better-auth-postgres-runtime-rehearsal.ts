@@ -252,7 +252,8 @@ try {
   for (const [index, offset] of [2_000, 1_000].entries()) {
     const fixtureId = 'session-list-' + nonce + '-' + index
     syntheticSessionIds.push(fixtureId)
-    const createdAt = new Date(fixtureBase - (2_000 - offset)).toISOString()
+    const createdAt = new Date(fixtureBase - (2_000 - offset)).toISOString().slice(0, 19) +
+      (index === 0 ? '.654321Z' : '.123456Z')
     const expiresAt = new Date(Date.parse(sessionListNow) + 24 * 60 * 60 * 1000).toISOString()
     await postgresPool.query(
       'INSERT INTO "session" (id, expires_at, token, created_at, updated_at, user_id) ' +
@@ -292,6 +293,8 @@ try {
   }
   assert.equal(firstPageResponse.status, 200, 'PostgreSQL session list first page must succeed')
   assert.deepEqual(firstPage.items.map((item) => item.sessionId), syntheticSessionIds)
+  assert.ok(firstPage.items[0]?.createdAt.endsWith('.654321Z'))
+  assert.ok(firstPage.items[1]?.createdAt.endsWith('.123456Z'))
   assert.equal(firstPage.currentSessionId, currentSessionId)
   assert.ok(firstPage.nextCursor?.startsWith('s1.'), 'first page must return a keyset cursor')
   assert.ok(firstPage.items.every((item) =>
