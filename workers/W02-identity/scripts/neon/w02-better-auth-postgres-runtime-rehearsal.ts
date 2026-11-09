@@ -257,6 +257,7 @@ try {
   const expiredSessionId = 'session-list-expired-' + nonce
   const foreignSessionId = 'session-list-foreign-' + nonce
   fixtureSessionIds = [newerSessionId, expiredSessionId, foreignSessionId]
+  const newerCreatedAt = new Date(Date.parse(listAt) + 1_000).toISOString()
   const expiredCreatedAt = new Date(Date.now() - 120_000).toISOString()
   const expiredAt = new Date(Date.now() - 60_000).toISOString()
 
@@ -278,7 +279,7 @@ try {
       newerSessionId,
       nativeExpiresAt,
       'session-list-token-newer-' + nonce,
-      listAt,
+      newerCreatedAt,
       userId,
       expiredSessionId,
       expiredAt,
