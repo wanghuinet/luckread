@@ -4,7 +4,7 @@ import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { Pool, type PoolClient } from 'pg'
+import { Pool } from 'pg'
 
 import {
   buildMfaAuditEvent,
@@ -65,7 +65,7 @@ const checks: Record<string, boolean> = {
   emptyReadyPlanIsQuarantinedAsUnknown: false,
   legacyLockoutEventIdentityIsAdoptedBeforeEmission: false,
   previouslyFailedOutboxIsTerminalAndUnknown: false,
-  transientWriteFailureRollsBackPartialJournalAndRetriesAtomically: false,
+  transientWriteFailurePreservesCommittedJournalAndRetriesIdempotently: false,
   concurrentReconcilerSkipsLockedReceipt: false,
   syntheticReceiptsAndJournalRowsCleaned: false,
 }
@@ -302,7 +302,7 @@ try {
   ], now)
   let journalWriteCount = 0
   const transientFailureReconciler = async (
-    database: Pool | PoolClient,
+    database: Pool,
     input: Parameters<typeof recordMfaAuditEventOncePostgres>[1],
   ) => {
     journalWriteCount += 1
@@ -326,8 +326,11 @@ try {
     new Date(Date.parse(now) + 1_000).toISOString(),
   )
   assert.equal(retryingRow.lastErrorCode, 'OUTBOX_WRITE_FAILED')
-  assert.equal(await readJournal(retryKeyA), null, 'a partial multi-event journal write must roll back')
-  assert.equal(await readJournal(retryKeyB), null, 'the failing event must not leave a journal row')
+  const persistedBeforeRetry = await readJournal(retryKeyA)
+  assert.equal(persistedBeforeRetry?.status, 'PENDING',
+    'an earlier successful outbox event remains durable after a later event fails')
+  assert.equal(await readJournal(retryKeyB), null,
+    'the failed event must remain absent until the retry succeeds')
   const retrySuccess = await reconcileMfaAuditOperationReceiptsPostgres(
     pool,
     new Date(Date.parse(now) + 2_000).toISOString(),
