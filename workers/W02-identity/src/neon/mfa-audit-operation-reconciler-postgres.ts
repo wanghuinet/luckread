@@ -114,6 +114,7 @@ export async function reconcileMfaAuditOperationReceiptsPostgres(
   for (const receiptId of receiptIds) {
     const client = await pool.connect()
     let transactionOpen = false
+    let attemptForRetry = 0
     try {
       await client.query('BEGIN')
       transactionOpen = true
@@ -124,6 +125,7 @@ export async function reconcileMfaAuditOperationReceiptsPostgres(
         continue
       }
 
+      attemptForRetry = row.attempt
       let plan: StoredPlanEvent[]
       try {
         plan = parseMfaAuditReceiptPlan(row.eventPlan)
@@ -248,7 +250,7 @@ export async function reconcileMfaAuditOperationReceiptsPostgres(
         if (['EMITTED', 'RESOLVED'].includes(latest.rows[0]?.status ?? '')) continue
       }
 
-      const delay = retryDelaySeconds(row.attempt)
+      const delay = retryDelaySeconds(attemptForRetry)
       await pool.query(
         "UPDATE auth_007_mfa_operation_receipts SET attempt = attempt + 1, " +
           'next_attempt_at = $1, last_error_code = $2 ' +
