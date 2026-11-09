@@ -4,7 +4,7 @@ import { publishPendingMfaAuditEvents } from './auth/mfa-audit-publication-journ
 import { publishPendingSessionRevocationEvents } from './auth/session-revocation-publication-journal.js'
 import { reconcileMfaAuditOperationReceipts } from './auth/mfa-audit-receipts.js'
 import { runScheduledPublicationTicks } from './auth/scheduled-publication.js'
-import { resolveGlobalLayer } from './authz/role-assignment.js'
+import { createD1RoleLayerStore, resolveLayerForSubject } from './authz/role-layer-store.js'
 import { grantCreatorBusinessRole, RoleAssignmentCommandError } from './authz/role-assignment-command.js'
 import { mayApproveRoleGrant } from './authz/role-grant-approval-policy.js'
 import {
@@ -236,18 +236,12 @@ export default {
       }
 
       try {
-        // W02 owns account-state truth. Never trust accountState or evaluation
-        // time supplied by W01 or another internal caller for a privileged role.
-        const account = await env.D1_01.prepare(
-          'SELECT account_state AS accountState FROM "user" WHERE id = ? LIMIT 1',
-        ).bind(body.subjectId).first<{ accountState: string }>()
-        if (!account || typeof account.accountState !== 'string') {
-          return json({ decision: 'DENY' })
-        }
-        const result = await resolveGlobalLayer(
-          env.D1_01,
+        // The store reads W02-owned account state and evaluates the current
+        // role assignments. Neither accountState nor evaluation time is
+        // accepted from the internal caller.
+        const result = await resolveLayerForSubject(
+          createD1RoleLayerStore(env.D1_01),
           body.subjectId,
-          account.accountState,
           new Date().toISOString(),
         )
         return json(result)
