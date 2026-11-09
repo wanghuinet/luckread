@@ -5,11 +5,13 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { AccountStateTransitionError } from '../../src/account/account-state-transition.js'
+import { handleCurrentUserSessionList } from '../../src/auth/session-list.js'
 import {
   auth,
   postgresLifecycleAdapters,
   postgresPool,
 } from '../../src/auth/neon-postgres-runtime-test.config.js'
+import { createPostgresSessionListStore } from '../../src/neon/session-list-postgres.js'
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url))
 const workerRoot = path.resolve(scriptDir, '../..')
@@ -42,6 +44,7 @@ const email = 'w02-pg-' + nonce + '@example.test'
 const username = 'w02pg' + nonce
 const password = 'W02-Pg-Rehearsal-' + randomUUID().replaceAll('-', '').slice(0, 20)
 let userId: string | undefined
+const syntheticSessionIds: string[] = []
 let signedIn = false
 let signedOut = false
 let primaryError: unknown
@@ -238,6 +241,94 @@ try {
   )
   assert.equal(Number(sessionRows.rows[0]?.count), 1, 'sign-in must persist exactly one session')
 
+  // Add two disposable native Better Auth session rows with deterministic
+  // timestamps so the PostgreSQL-backed endpoint can prove keyset paging.
+  const sessionListNow = new Date().toISOString()
+  const fixtureBase = Date.parse(sessionListNow) + 2_000
+  for (const [index, offset] of [2_000, 1_000].entries()) {
+    const fixtureId = 'session-list-' + nonce + '-' + index
+    syntheticSessionIds.push(fixtureId)
+    const createdAt = new Date(fixtureBase - (2_000 - offset)).toISOString()
+    const expiresAt = new Date(Date.parse(sessionListNow) + 24 * 60 * 60 * 1000).toISOString()
+    await postgresPool.query(
+      'INSERT INTO "session" (id, expires_at, token, created_at, updated_at, user_id) ' +
+        'VALUES ($1, $2, $3, $4, $4, $5)',
+      [fixtureId, expiresAt, 'session-list-token-' + nonce + '-' + index, createdAt, userId],
+    )
+  }
+
+  const sessionListEnv = {
+    D1_01: undefined as unknown as D1Database,
+    AUTH_SESSION_READ_LIMITER: {
+      limit: async (_input: { key: string }) => ({ success: true }),
+    },
+  }
+  const sessionListStore = createPostgresSessionListStore(postgresPool)
+  const sessionListRequest = (body: unknown) => new Request(
+    'https://luckread-w02.internal/internal/auth/session/list',
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: cookieHeader },
+      body: JSON.stringify(body),
+    },
+  )
+  const firstPageResponse = await withTimeout('auth010-postgres-session-list-first-page', () =>
+    handleCurrentUserSessionList(sessionListEnv, sessionListRequest({ limit: 2 }), {
+      store: sessionListStore,
+      getSession: (headers) => auth.api.getSession({ headers, query: {} }) as Promise<{
+        user?: { id?: unknown }
+        session?: { id?: unknown }
+      } | null>,
+    }),
+  )
+  const firstPage = await firstPageResponse.json() as {
+    items: Array<{ sessionId: string; createdAt: string; expiresAt: string; lastSeenAt: null }>
+    currentSessionId: string
+    nextCursor: string | null
+  }
+  assert.equal(firstPageResponse.status, 200, 'PostgreSQL session list first page must succeed')
+  assert.deepEqual(firstPage.items.map((item) => item.sessionId), syntheticSessionIds)
+  assert.equal(firstPage.currentSessionId, session.session.id)
+  assert.ok(firstPage.nextCursor?.startsWith('s1.'), 'first page must return a keyset cursor')
+  assert.ok(firstPage.items.every((item) =>
+    !Object.hasOwn(item, 'token') && !Object.hasOwn(item, 'userId'),
+  ), 'session list must not project credentials or account ownership fields')
+  assert.ok(!JSON.stringify(firstPage).includes('session-list-token-' + nonce))
+
+  const secondPageResponse = await withTimeout('auth010-postgres-session-list-next-page', () =>
+    handleCurrentUserSessionList(sessionListEnv, sessionListRequest({
+      limit: 2,
+      cursor: firstPage.nextCursor,
+    }), {
+      store: sessionListStore,
+      getSession: (headers) => auth.api.getSession({ headers, query: {} }) as Promise<{
+        user?: { id?: unknown }
+        session?: { id?: unknown }
+      } | null>,
+    }),
+  )
+  const secondPage = await secondPageResponse.json() as {
+    items: Array<{ sessionId: string }>
+    currentSessionId: string
+    nextCursor: string | null
+  }
+  assert.equal(secondPageResponse.status, 200)
+  assert.deepEqual(secondPage.items.map((item) => item.sessionId), [session.session.id])
+  assert.equal(secondPage.currentSessionId, session.session.id)
+  assert.equal(secondPage.nextCursor, null)
+
+  const missingAccount = await sessionListStore.list({
+    userId: 'missing-session-owner-' + nonce,
+    now: sessionListNow,
+    limit: 2,
+    cursor: null,
+  })
+  assert.equal(missingAccount.permissionGranted, false)
+  assert.deepEqual(missingAccount.rows, [])
+
+  await postgresPool.query('DELETE FROM "session" WHERE id = ANY($1::text[])', [syntheticSessionIds])
+  syntheticSessionIds.length = 0
+
   await withTimeout('sign-out', () => auth.api.signOut({ headers: sessionHeaders }))
   signedOut = true
   const revokedSession = await withTimeout(
@@ -253,11 +344,11 @@ try {
   assert.equal(Number(afterSignOut.rows[0]?.count), 0)
 
   report = {
-    reportVersion: 2,
+    reportVersion: 3,
     status: 'W02_BETTER_AUTH_POSTGRES_RUNTIME_REHEARSAL_PASS',
-    scope: 'Better Auth core PostgreSQL runtime plus L1 registration-role materialization, AUTH-013 email-verification activation, L2 RoleAssignment and durable publication journal; D1 production remains authoritative.',
+    scope: 'Better Auth core PostgreSQL runtime, L1/L2 role materialization, AUTH-013 email-verification activation and journal, and AUTH-010 PostgreSQL session-list read adapter; D1 production remains authoritative.',
     betterAuthVersion: '1.7.8',
-    adapter: 'Better Auth native PostgreSQL dialect via pg.Pool plus W02 PostgreSQL registration-role and email-verification lifecycle adapters',
+    adapter: 'Better Auth native PostgreSQL dialect via pg.Pool plus W02 PostgreSQL identity lifecycle and AUTH-010 session-list adapters',
     operationsVerified: [
       'SIGN_UP_EMAIL',
       'BASE_USER_L1_ROLE_PERSISTED',
@@ -272,6 +363,10 @@ try {
       'SIGN_IN_EMAIL',
       'SESSION_PERSISTED',
       'GET_SESSION',
+      'AUTH010_SESSION_LIST_FIRST_PAGE',
+      'AUTH010_SESSION_LIST_KEYSET_PAGINATION',
+      'AUTH010_SESSION_LIST_NO_SECRET_PROJECTION',
+      'AUTH010_SESSION_LIST_UNAUTHORIZED_SUBJECT',
       'SIGN_OUT',
       'SESSION_REVOKED',
     ],
@@ -302,6 +397,10 @@ try {
     }
 
     await postgresPool.query('DELETE FROM "verification" WHERE identifier = $1', [email])
+    if (syntheticSessionIds.length > 0) {
+      await postgresPool.query('DELETE FROM "session" WHERE id = ANY($1::text[])', [syntheticSessionIds])
+      syntheticSessionIds.length = 0
+    }
     if (cleanupUserId) {
       await postgresPool.query(
         'DELETE FROM auth_013_publication_journal WHERE resource_id = $1',
