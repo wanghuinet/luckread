@@ -193,6 +193,20 @@ function mergePlan(
   return [...byKey.values()]
 }
 
+/** Shared pure receipt-plan helpers for provider-specific persistence adapters. */
+export function parseMfaAuditReceiptPlan(value: string | null): StoredReceiptEvent[] {
+  return parsePlan(value)
+}
+
+export function mergeMfaAuditReceiptPlan(
+  receiptId: string,
+  existing: StoredReceiptEvent[],
+  incoming: MfaAuditReceiptEvent[],
+  occurredAt: string,
+): StoredReceiptEvent[] {
+  return mergePlan(receiptId, existing, incoming, occurredAt)
+}
+
 /**
  * Verify a receipt passed from the W02 enrollment handler into its nested
  * Better Auth verification call. The receipt ID is server-generated and must
