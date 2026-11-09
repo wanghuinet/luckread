@@ -29,6 +29,7 @@ test('D1-03 remote target rejects wrong host/database, missing credentials and u
   assert.equal(validateD103RemoteNeonTarget('').valid, false)
   assert.equal(validateD103RemoteNeonTarget(rawUrl().replace(host, 'evil.example')).valid, false)
   assert.equal(validateD103RemoteNeonTarget(rawUrl().replace('/luckread_governance?', '/luckreadpro?')).valid, false)
+  assert.equal(validateD103RemoteNeonTarget(rawUrl().replace('/luckread_governance?', '//luckread_governance?')).valid, false)
   assert.equal(validateD103RemoteNeonTarget(rawUrl().replace('sslmode=require', 'sslmode=disable')).valid, false)
   assert.equal(validateD103RemoteNeonTarget(rawUrl() + '&sslmode=verify-full').valid, false)
   assert.equal(validateD103RemoteNeonTarget(rawUrl().replace('neondb_owner:local-test-only@', '@')).valid, false)
