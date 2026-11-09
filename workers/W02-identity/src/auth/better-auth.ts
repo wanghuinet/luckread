@@ -4,8 +4,8 @@ import { APIError, createAuthMiddleware } from 'better-auth/api'
 import { symmetricDecrypt } from 'better-auth/crypto'
 import { betterAuth } from 'better-auth'
 import { bearer, twoFactor } from 'better-auth/plugins'
-import { consumeTotpTimeStep, matchTotpTimeStep } from './totp-replay-guard.js'
-import { isActiveMfaSubject } from './mfa-challenge-account-state.js'
+import { matchTotpTimeStep } from './totp-replay-guard.js'
+import { createD1MfaFactorStateStore, type MfaFactorStateStore } from './mfa-factor-state-store.js'
 import { isUnexpiredMfaChallengeRecord } from './mfa-challenge-verification.js'
 import { deriveMfaAuditEventIdForIdempotencyKey } from './mfa-audit-events.js'
 import { sendResendEmail } from './resend-email.js'
@@ -147,6 +147,7 @@ export const buildLuckReadAuth = (
   env: BetterAuthEnv,
   database: BetterAuthDatabase = env.D1_01 as BetterAuthDatabase,
   persistenceProfile: BetterAuthPersistenceProfile = 'production',
+  mfaFactorStateStore: MfaFactorStateStore = createD1MfaFactorStateStore(env.D1_01),
 ) => {
   const postgresRehearsal = persistenceProfile === 'postgres-rehearsal'
   // Keep local origins available only to the local evidence/runtime profile.
@@ -297,7 +298,7 @@ export const buildLuckReadAuth = (
 
         // Factor completion must never activate a suspended, pending or missing
         // account. Check W02-owned account state for TOTP and recovery paths.
-        const accountActive = await isActiveMfaSubject(env.D1_01, subjectId)
+        const accountActive = await mfaFactorStateStore.isActiveSubject(subjectId)
         if (!accountActive) {
           if (!isEnrollmentConfirmation) {
             await finalizeKnownMfaRejection(
@@ -320,15 +321,13 @@ export const buildLuckReadAuth = (
         // persisted monotonic time-step guard applies specifically to TOTP.
         if (isBackupCodeVerification) return
 
-        const factor = await env.D1_01.prepare(
-          'SELECT secret FROM "twoFactor" WHERE userId = ? LIMIT 1',
-        ).bind(subjectId).first<{ secret: string }>()
+        const factor = await mfaFactorStateStore.readVerificationMaterial(subjectId)
         // Let the pinned plugin produce its canonical not-enabled/challenge error.
         if (!factor) return
 
         const secret = await symmetricDecrypt({
           key: ctx.context.secretConfig,
-          data: factor.secret,
+          data: factor.encryptedSecret,
         })
         const match = await matchTotpTimeStep(secret, body.code as string)
         // Invalid codes continue through Better Auth so its failure counters and
@@ -350,7 +349,7 @@ export const buildLuckReadAuth = (
           throw APIError.from('UNAUTHORIZED', { code: 'INVALID_CODE', message: 'Invalid code' })
         }
 
-        const consumed = await consumeTotpTimeStep(env.D1_01, subjectId, match.timeStep)
+        const consumed = await mfaFactorStateStore.consumeTotpTimeStep(subjectId, match.timeStep)
         if (!consumed) {
           // The TOTP was valid but its monotonically increasing step was already
           // accepted. Persist the rejection before returning the auth failure.
