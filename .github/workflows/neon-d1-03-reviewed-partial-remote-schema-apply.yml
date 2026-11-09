@@ -93,6 +93,7 @@ jobs:
           set -euo pipefail
           node --check scripts/neon/shared-domain-schema-runner.mjs
           node --check scripts/neon/d1-03/schema-only-runner.mjs
+          node --check scripts/neon/d1-03/remote-schema-runner.mjs
           node --check scripts/neon/d1-03/assert-remote-apply-release.mjs
           node --check scripts/neon/d1-03/remote-runner-review.mjs
           node --test \
