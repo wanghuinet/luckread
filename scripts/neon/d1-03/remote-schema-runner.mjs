@@ -494,7 +494,7 @@ async function runD103Domain({ env = process.env, mode = 'remote' } = {}) {
       remoteApplyBlockers:manifest.remoteApplyBlockers,
     }
     mkdirSync(dirname(resolve(root,output)),{recursive:true})
-    writeFileSync(resolve(root,output),JSON.stringify(report,null,2)+'\\n')
+    writeFileSync(resolve(root,output),JSON.stringify(report,null,2) + String.fromCharCode(10))
     const result = {
       domainId:'D1-03',
       databaseName:report.databaseName,
@@ -514,7 +514,7 @@ async function runD103Domain({ env = process.env, mode = 'remote' } = {}) {
       fullDomainSchemaComplete:false,
     }
     process.stdout.write((remote ? 'NEON_D1_03_PARTIAL_SCHEMA_REMOTE_PASS ' : 'NEON_D1_03_PARTIAL_SCHEMA_LOCAL_PASS ') +
-      JSON.stringify(result)+'\\n')
+      JSON.stringify(result) + String.fromCharCode(10))
     return report
   } finally {
     if (client) client.release()
@@ -541,7 +541,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   if (!selection.valid) fail(selection.reason)
   const operation = selection.mode === 'REMOTE_NEON' ? runD103RemoteDomain : runD103LocalRehearsal
   operation().catch((error) => {
-    process.stderr.write((error instanceof Error ? error.message : String(error)) + '\\\\n')
+    process.stderr.write((error instanceof Error ? error.message : String(error)) + String.fromCharCode(10))
     process.exitCode = 1
   })
 }
