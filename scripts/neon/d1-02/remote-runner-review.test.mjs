@@ -29,8 +29,8 @@ const review = {
     reviewer:'GPT-6',
     reviewType:'GPT-6 code-path audit plus current-main SHA and CI evidence reconciliation',
     reviewedAt:'2026-11-08',
-    reviewedMainSha:'7f6b4848b86d041aba5cfca7ea4549dc50a9c7d3',
-    implementationMergeSha:'7f6b4848b86d041aba5cfca7ea4549dc50a9c7d3',
+    reviewedMainSha:'8a0db7dd0d0567131d51e009302465f8e30b9386',
+    implementationMergeSha:'8a0db7dd0d0567131d51e009302465f8e30b9386',
     result:'NO_BLOCKING_FINDINGS',
     formalGitHubReviewSubmissions:0,
     findings:[],
@@ -43,11 +43,11 @@ const review = {
     reviewedFiles:reviewedFiles.map(path=>({path,gitBlobSha1:sha})),
   },
   verificationEvidence:{
-    fullD1_02LocalPostgres18Rehearsal:{runId:42480684871,headSha:'7f6b4848b86d041aba5cfca7ea4549dc50a9c7d3',conclusion:'success',url:'https://github.com/wanghuinet/luckread/actions/runs/42480684871'},
-    remoteRunnerGuardsNoCredentials:{runId:42480684866,headSha:'7f6b4848b86d041aba5cfca7ea4549dc50a9c7d3',conclusion:'success',url:'https://github.com/wanghuinet/luckread/actions/runs/42480684866',remoteApplyJob:'skipped'},
-    contractAdmission:{runId:42480684886,headSha:'7f6b4848b86d041aba5cfca7ea4549dc50a9c7d3',conclusion:'success',url:'https://github.com/wanghuinet/luckread/actions/runs/42480684886'},
-    mapping0StructuralGate:{runId:42480684852,headSha:'7f6b4848b86d041aba5cfca7ea4549dc50a9c7d3',conclusion:'success',url:'https://github.com/wanghuinet/luckread/actions/runs/42480684852'},
-    featureInventory:{runId:42480684859,headSha:'7f6b4848b86d041aba5cfca7ea4549dc50a9c7d3',conclusion:'success',url:'https://github.com/wanghuinet/luckread/actions/runs/42480684859'}
+    fullD1_02LocalPostgres18Rehearsal:{runId:42480684871,headSha:'8a0db7dd0d0567131d51e009302465f8e30b9386',conclusion:'success',url:'https://github.com/wanghuinet/luckread/actions/runs/42480684871'},
+    remoteRunnerGuardsNoCredentials:{runId:42480684866,headSha:'8a0db7dd0d0567131d51e009302465f8e30b9386',conclusion:'success',url:'https://github.com/wanghuinet/luckread/actions/runs/42480684866',remoteApplyJob:'skipped'},
+    contractAdmission:{runId:42480684886,headSha:'8a0db7dd0d0567131d51e009302465f8e30b9386',conclusion:'success',url:'https://github.com/wanghuinet/luckread/actions/runs/42480684886'},
+    mapping0StructuralGate:{runId:42480684852,headSha:'8a0db7dd0d0567131d51e009302465f8e30b9386',conclusion:'success',url:'https://github.com/wanghuinet/luckread/actions/runs/42480684852'},
+    featureInventory:{runId:42480684859,headSha:'8a0db7dd0d0567131d51e009302465f8e30b9386',conclusion:'success',url:'https://github.com/wanghuinet/luckread/actions/runs/42480684859'}
   },
   safety:{remoteNeonDdlExecuted:false,cloudflareD1Touched:false,businessDataImported:false,productionCutoverAuthorized:false,manualWorkflowDispatchRequired:true,exactConfirmationRequired:'APPLY_REVIEWED_SCHEMA_D1_02_LUCKREADPRO'}
 }
