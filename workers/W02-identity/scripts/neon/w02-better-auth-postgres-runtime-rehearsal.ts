@@ -234,6 +234,10 @@ try {
   const sessionHeaders = new Headers({ cookie: cookieHeader })
   const session = await withTimeout('get-session', () => auth.api.getSession({ headers: sessionHeaders }))
   assert.equal(session?.user.id, userId, 'Better Auth must read the PostgreSQL-backed session')
+  if (!session?.session || typeof currentSessionId !== 'string') {
+    throw new Error('W02_PG_RUNTIME_SESSION_ID_MISSING')
+  }
+  const currentSessionId = session.session.id
 
   const sessionRows = await postgresPool.query(
     'SELECT COUNT(*)::integer AS count FROM "session" WHERE user_id = $1',
@@ -288,7 +292,7 @@ try {
   }
   assert.equal(firstPageResponse.status, 200, 'PostgreSQL session list first page must succeed')
   assert.deepEqual(firstPage.items.map((item) => item.sessionId), syntheticSessionIds)
-  assert.equal(firstPage.currentSessionId, session.session.id)
+  assert.equal(firstPage.currentSessionId, currentSessionId)
   assert.ok(firstPage.nextCursor?.startsWith('s1.'), 'first page must return a keyset cursor')
   assert.ok(firstPage.items.every((item) =>
     !Object.hasOwn(item, 'token') && !Object.hasOwn(item, 'userId'),
@@ -313,8 +317,8 @@ try {
     nextCursor: string | null
   }
   assert.equal(secondPageResponse.status, 200)
-  assert.deepEqual(secondPage.items.map((item) => item.sessionId), [session.session.id])
-  assert.equal(secondPage.currentSessionId, session.session.id)
+  assert.deepEqual(secondPage.items.map((item) => item.sessionId), [currentSessionId])
+  assert.equal(secondPage.currentSessionId, currentSessionId)
   assert.equal(secondPage.nextCursor, null)
 
   const missingAccount = await sessionListStore.list({
