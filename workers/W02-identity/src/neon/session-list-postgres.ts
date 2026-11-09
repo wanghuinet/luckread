@@ -11,8 +11,8 @@ import type {
 type SessionListPostgresRow = {
   permissionGranted: boolean
   sessionId: string | null
-  createdAt: Date | string | null
-  expiresAt: Date | string | null
+  createdAt: string | null
+  expiresAt: string | null
 }
 
 function assertInput(input: SessionListStoreInput): void {
@@ -41,15 +41,6 @@ function assertInput(input: SessionListStoreInput): void {
   )) {
     throw new TypeError('invalid PostgreSQL AUTH-010 session-list cursor')
   }
-}
-
-function toIso(value: Date | string | null): string | null {
-  if (value === null) return null
-  const parsed = value instanceof Date ? value : new Date(value)
-  if (!Number.isFinite(parsed.getTime())) {
-    throw new Error('invalid PostgreSQL AUTH-010 session timestamp')
-  }
-  return parsed.toISOString()
 }
 
 /**
@@ -98,7 +89,9 @@ export function createPostgresSessionListStore(pool: Pool): SessionListStore {
               'AND (assignment.valid_until IS NULL OR $2 < assignment.valid_until) ' +
           ') AS "permissionGranted" ' +
         '), sessions AS ( ' +
-          'SELECT id AS "sessionId", created_at AS "createdAt", expires_at AS "expiresAt" ' +
+          'SELECT id AS "sessionId", ' +
+            'to_char(created_at AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.US"Z"\') AS "createdAt", ' +
+            'to_char(expires_at AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.US"Z"\') AS "expiresAt" ' +
           'FROM "session" ' +
           'WHERE user_id = $1 AND expires_at > $2 ' +
           'AND EXISTS (SELECT 1 FROM authorization WHERE "permissionGranted" = TRUE) ' +
@@ -122,12 +115,21 @@ export function createPostgresSessionListStore(pool: Pool): SessionListStore {
       const permissionGranted = result.rows[0]?.permissionGranted === true
       const rows = result.rows.flatMap((row): SessionListStoreRow[] => {
         if (typeof row.sessionId !== 'string' || row.sessionId.length === 0) return []
-        const createdAt = toIso(row.createdAt)
-        const expiresAt = toIso(row.expiresAt)
-        if (!createdAt || !expiresAt) {
+        if (
+          typeof row.createdAt !== 'string' ||
+          !Number.isFinite(Date.parse(row.createdAt)) ||
+          typeof row.expiresAt !== 'string' ||
+          !Number.isFinite(Date.parse(row.expiresAt))
+        ) {
           throw new Error('AUTH010_POSTGRES_SESSION_LIST_TIMESTAMP_MISSING')
         }
-        return [{ sessionId: row.sessionId, createdAt, expiresAt }]
+        // Keep PostgreSQL microseconds intact: pg's default Date parser drops
+        // sub-millisecond precision and would make keyset cursors skip rows.
+        return [{
+          sessionId: row.sessionId,
+          createdAt: row.createdAt,
+          expiresAt: row.expiresAt,
+        }]
       })
 
       return { permissionGranted, rows }
