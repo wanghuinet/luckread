@@ -28,8 +28,8 @@
     "limitations": [
       "No submitted GitHub review records are present; this is a GPT-6 code review, not a human GitHub APPROVE review.",
       "The corrected D1-04 runner and catalog verification were validated by source-equivalent PR CI run 42553780174. The validation head is 1704b435374be1e5f773915092de145548b173c2 and all eight reviewed source blobs match the merged main tree at 745e68501ad292eb7d51556006a85d026330dc45. The workflow's remote apply job was skipped; the local PostgreSQL 18 rehearsal ran without Neon credentials.",
-      "Remote Neon DDL execution history is recorded in executionHistory; run 42553336881 applied the six schema migrations and committed six ledger rows, verified 15 tables and zero business rows, then failed only final catalog index classification.",
-      "The corrected final catalog verifier separates the 31 manifest-declared explicit indexes from the exact 29 primary-key/unique-constraint-backed indexes observed in the prior remote catalog. A final remote retry/postflight is still required to produce fresh target evidence.",
+      "Remote Neon DDL execution history is recorded in executionHistory: run 42553336881 committed the six ordered W07 migration and ledger rows but failed only final catalog index classification; run 42555900393 validated the same six-row ledger prefix and completed corrected final catalog Postflight.",
+      "The final remote catalog verifier separately confirmed all 31 manifest-declared explicit indexes and all 29 primary-key/unique-constraint-backed indexes in the D1-04 Neon target. Workflow run 42555900393 produced the successful Postflight report; no further retry is required for this schema-only D1-04 target.",
       "Neon database UUID is pinned from existing W07 D1_04 Wrangler metadata; PostgreSQL SQL cannot independently verify the Neon control-plane UUID."
     ],
     "reviewedFiles": [
@@ -127,6 +127,40 @@
       "foreignKeys": 0,
       "controlSeedRows": 1,
       "businessRows": 0
+    },
+    "remoteSchemaPostflight": {
+      "runId": 42555900393,
+      "conclusion": "success",
+      "url": "https://github.com/wanghuinet/luckread/actions/runs/42555900393",
+      "event": "workflow_dispatch",
+      "branch": "main",
+      "sourceCommitSha": "c18d294d3fc2acac6e9c66eb052dfed6e6c46758",
+      "databaseName": "luckread_finance",
+      "postgresMajor": 18,
+      "verifiedLedgerRows": 6,
+      "verifiedMigrations": 6,
+      "catalog": {
+        "tables": 15,
+        "explicitIndexes": 31,
+        "constraintIndexes": 29,
+        "triggers": 72,
+        "triggerFunctions": 6,
+        "foreignKeys": 0,
+        "controlSeedRows": 1,
+        "businessRows": 0
+      },
+      "artifact": {
+        "id": 13646957840,
+        "url": "https://github.com/wanghuinet/luckread/actions/runs/42555900393/artifacts/13646957840",
+        "sha256": "sha256:b35461e7b49a0131eceee3782244fd0f10d44d2c0b6f7fac90932481f9cd8228"
+      },
+      "safety": {
+        "remoteNeonTouched": true,
+        "cloudflareD1Touched": false,
+        "businessDataImported": false,
+        "runtimeBindingsChanged": false,
+        "productionCutoverAuthorized": false
+      }
     }
   },
   "safety": {
@@ -152,6 +186,29 @@
       "failureReason": "The catalog query used pg_catalog.pg_indexes, which includes PostgreSQL indexes backing primary-key and unique constraints. The reviewed manifest contains 31 explicit indexes and a separate exact list of 29 constraint-backed indexes.",
       "postflightReportProduced": false,
       "recovery": "A retry reads and validates the complete ordered six-row ledger prefix, skips the already committed migrations, and reruns final catalog verification. No cleanup or migration replay is needed."
+    },
+    {
+      "runId": 42555900393,
+      "url": "https://github.com/wanghuinet/luckread/actions/runs/42555900393",
+      "sourceCommitSha": "c18d294d3fc2acac6e9c66eb052dfed6e6c46758",
+      "conclusion": "success",
+      "remoteNeonDdlExecuted": true,
+      "verifiedMigrations": 6,
+      "verifiedLedgerRows": 6,
+      "newlyAppliedMigrations": 0,
+      "verifiedTables": 15,
+      "verifiedExplicitIndexes": 31,
+      "verifiedConstraintIndexes": 29,
+      "verifiedTriggers": 72,
+      "verifiedTriggerFunctions": 6,
+      "verifiedForeignKeys": 0,
+      "controlSeedRows": 1,
+      "businessRows": 0,
+      "postflightReportProduced": true,
+      "artifactId": 13646957840,
+      "artifactUrl": "https://github.com/wanghuinet/luckread/actions/runs/42555900393/artifacts/13646957840",
+      "artifactSha256": "sha256:b35461e7b49a0131eceee3782244fd0f10d44d2c0b6f7fac90932481f9cd8228",
+      "recovery": "The runner verified the complete existing ordered six-row ledger prefix from run 42553336881, had no remaining migration entries to execute, and completed the corrected final catalog Postflight without replaying DDL."
     }
   ]
 }
