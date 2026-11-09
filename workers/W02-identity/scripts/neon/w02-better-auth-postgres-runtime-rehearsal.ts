@@ -251,7 +251,7 @@ try {
     [session?.session.id, userId],
   )
   assert.equal(nativeSession.rowCount, 1, 'the authenticated native session must exist for listing')
-  const listAt = new Date().toISOString()
+  const fixtureCreatedAt = new Date().toISOString()
   const nativeExpiresAtValue = nativeSession.rows[0]!.expiresAt
   const nativeExpiresAt = nativeExpiresAtValue instanceof Date
     ? nativeExpiresAtValue.toISOString()
@@ -260,7 +260,7 @@ try {
   const expiredSessionId = 'session-list-expired-' + nonce
   const foreignSessionId = 'session-list-foreign-' + nonce
   fixtureSessionIds = [newerSessionId, expiredSessionId, foreignSessionId]
-  const newerCreatedAt = new Date(Date.parse(listAt) + 1_000).toISOString()
+  const newerCreatedAt = listAt
   const expiredCreatedAt = new Date(Date.now() - 120_000).toISOString()
   const expiredAt = new Date(Date.now() - 60_000).toISOString()
 
@@ -269,9 +269,13 @@ try {
     'INSERT INTO "user" ' +
       '(id, name, email, email_verified, created_at, updated_at, account_state, account_state_version) ' +
       "VALUES ($1, 'W02 foreign session fixture', $2, TRUE, $3, $3, 'ACTIVE', 1)",
-    [foreignUserId, foreignEmail, listAt],
+    [foreignUserId, foreignEmail, fixtureCreatedAt],
   )
   await postgresLifecycleAdapters.afterUserCreated(foreignUserId)
+
+  // Use a timestamp safely after the second user's L1 grant so the query's
+  // effective-role check is deterministic even on a busy CI runner.
+  const listAt = new Date(Date.now() + 10_000).toISOString()
 
   await postgresPool.query(
     'INSERT INTO "session" (id, expires_at, token, created_at, updated_at, user_id) ' +
