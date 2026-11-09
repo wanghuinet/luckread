@@ -85,7 +85,7 @@ export async function handleCurrentUserSessionList(
     return json({ error: { code: 'VALIDATION_FAILED', message: 'Invalid session list limit' } }, 400)
   }
 
-  let cursor: SessionCursor | null = null
+  let cursor: SessionListCursor | null = null
   if (input.cursor !== undefined && input.cursor !== null) {
     if (typeof input.cursor !== 'string') {
       return json({ error: { code: 'INVALID_CURSOR', message: 'Invalid session list cursor' } }, 400)
