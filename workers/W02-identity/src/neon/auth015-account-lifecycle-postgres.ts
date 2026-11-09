@@ -105,9 +105,10 @@ type AccountStateChangedEvent = {
   reason: string
 }
 
-const permissionGrants = new Map<string, Set<string>>(
-  permissions['x-role-permissions'].roles.map((role) => [role.role, new Set(role.permissions)]),
-)
+const permissionGrants = new Map<string, Set<string>>()
+for (const role of permissions['x-role-permissions'].roles) {
+  permissionGrants.set(role.role, new Set(role.permissions))
+}
 const permissionMinimumLayers = new Map(
   permissions['x-permissions'].map((permission) => [permission.name, permission.minLayer]),
 )
