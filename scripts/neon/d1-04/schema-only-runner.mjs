@@ -243,6 +243,8 @@ async function verifyAppliedTableState(client, manifest, plan, appliedCount) {
   }
 
   const rowCounts = {}
+  const expectedPrefixControlSeedRows = expectedTables.reduce((total, table) =>
+    total + (plan.seedRowsByTable.get(table)?.length ?? 0), 0)
   let controlSeedRows = 0
   for (const table of expectedTables) {
     safeName(table)
@@ -269,7 +271,7 @@ async function verifyAppliedTableState(client, manifest, plan, appliedCount) {
       controlSeedRows++
     }
   }
-  if (controlSeedRows !== plan.seedRowsByTable.size) {
+  if (controlSeedRows !== expectedPrefixControlSeedRows) {
     fail('actual schema-control seed row count does not match the applied manifest prefix')
   }
   if (appliedCount === plan.entries.length &&
