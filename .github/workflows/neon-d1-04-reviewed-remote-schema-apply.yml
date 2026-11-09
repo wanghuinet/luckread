@@ -89,7 +89,7 @@ jobs:
             scripts/neon/d1-04/schema-only-runner.test.mjs \
             scripts/neon/d1-04/remote-runner-review.test.mjs \
             scripts/neon/shared-domain-schema-runner.test.mjs
-          node scripts/neon/d1-04/assert-remote-apply-release.mjs --assert-reviewed-candidate
+          node scripts/neon/d1-04/assert-remote-apply-release.mjs --validate-review-state
       - name: Rehearse the exact D1-04 migration plan on disposable PostgreSQL 18
         env:
           D1_SHARED_LOCAL_DATABASE_URL: postgresql://schema_generator:schema_generator_local_only@127.0.0.1:5432/luckread_d1_04_shared
