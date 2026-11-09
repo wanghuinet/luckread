@@ -24,8 +24,8 @@ function fakeD1(options: FakeD1Options = {}) {
           return this
         },
         async first<T>() {
-          if (sql.includes('FROM "user"')) return (options.user ?? null) as T | null
-          if (sql.includes('FROM "session"')) return (options.session ?? null) as T | null
+          if (sql.includes('FROM "user"')) return (options.user ?? null) as unknown as T | null
+          if (sql.includes('FROM "session"')) return (options.session ?? null) as unknown as T | null
           return null
         },
       }
