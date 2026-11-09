@@ -49,7 +49,7 @@
         "workers/W07-subscription-commerce/migrations",
         "workers/W08-creator/migrations"
       ],
-      "status": "ALL_FOUR_OWNERS_FULL_POSTGRES18_REHEARSAL_PASSED_REMOTE_APPLY_PENDING",
+      "status": "D1_01_SCHEMA_ONLY_REMOTE_APPLIED_ALL_OWNER_POSTFLIGHT_PASSED_RUNTIME_CUTOVER_PENDING",
       "sourceInventoryContract": "contracts/database/neon-d1-01-schema-sources.v1.json",
       "sourceInventoryWorkflow": ".github/workflows/neon-d1-01-schema-source-inventory.yml",
       "schemaVerificationEvidence": {
@@ -64,7 +64,7 @@
         "rollbackGuard": "PASS",
         "rollbackGuardSyntheticRowPreserved": true
       },
-      "remoteSchemaApplied": false,
+      "remoteSchemaApplied": true,
       "completedSchemaOwners": [
         "W01-Payload",
         "W02-Better-Auth-and-custom-identity",
@@ -128,6 +128,82 @@
           "url": "https://github.com/wanghuinet/luckread/actions/runs/42460599618/artifacts/13609582055",
           "sha256": "sha256:73d32e6572aa9dbc79ec31f61e65a7709aa4d4174bf56956af4fb902cfa747ff"
         }
+      },
+      "remoteSchemaApplicationEvidence": {
+        "status": "D1_01_SHARED_REMOTE_SCHEMA_RUNNER_AND_ALL_OWNER_POSTFLIGHT_PASS",
+        "initialRemoteDdlRun": {
+          "workflowRunId": 42466398715,
+          "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42466398715",
+          "branch": "main",
+          "sourceCommitSha": "fc2172e3eced7cb1bca318f775469678a021af2a",
+          "runnerStatus": "D1_01_SHARED_REMOTE_SCHEMA_RUNNER_PASS",
+          "executionId": "github-42466398715-1",
+          "workflowConclusion": "failure",
+          "failureBoundary": "The remote schema runner completed, then the W01 read-only verifier rejected other admitted owners' tables as unexpected. No rollback or DDL failure was reported; the subsequent all-owner verification is recorded below."
+        },
+        "finalVerificationRun": {
+          "workflowRunId": 42558978832,
+          "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42558978832",
+          "event": "workflow_dispatch",
+          "branch": "main",
+          "sourceCommitSha": "92a8d3045c25c3eb83411cd041140edae42690ba",
+          "conclusion": "success",
+          "runnerStatus": "D1_01_SHARED_REMOTE_SCHEMA_RUNNER_PASS",
+          "ledgerStatus": "D1_01_SHARED_LEDGER_REMOTE_VERIFY_PASS"
+        },
+        "databaseName": "luckread",
+        "postgresMajor": 18,
+        "manifestMigrations": 14,
+        "verifiedLedgerRows": 14,
+        "newlyAppliedMigrationsInFinalVerificationRun": 0,
+        "catalog": {
+          "applicationTablesExcludingSharedLedger": 34,
+          "totalTablesIncludingSharedLedger": 35,
+          "businessTableCount": 33,
+          "businessRows": 0,
+          "payloadMigrationRows": 1
+        },
+        "ownerPostflight": {
+          "W01": {
+            "status": "W01_PAYLOAD_NEON_SCHEMA_PASS",
+            "actualTablesIncludingOtherOwners": 35,
+            "indexesObserved": 52,
+            "foreignKeysObserved": 9,
+            "payloadMigrationRows": 1,
+            "businessRows": 0
+          },
+          "W02": {
+            "status": "BETTER_AUTH_CORE_AND_ALL_CUSTOM_POSTFLIGHTS_PASS",
+            "customSchemaPostflights": 10,
+            "postgresMajor": 18
+          },
+          "W07": {
+            "status": "W07_D1_01_MEMBERSHIP_POSTGRES_SCHEMA_PASS",
+            "tablesVerified": 6,
+            "secondaryIndexesVerified": 17,
+            "triggersVerified": 8,
+            "businessRows": 0
+          },
+          "W08": {
+            "status": "W08_D1_01_CREATOR_POSTGRES_SCHEMA_PASS",
+            "tablesVerified": 3,
+            "explicitIndexesVerified": 5,
+            "foreignKeys": 0,
+            "businessRows": 0
+          }
+        },
+        "artifact": {
+          "id": 13649145534,
+          "url": "https://github.com/wanghuinet/luckread/actions/runs/42558978832/artifacts/13649145534",
+          "sha256": "sha256:d8c5a44e7b480b97effc3587e2a19defa5d350ed1f868118479f731cb89010f3"
+        },
+        "safety": {
+          "remoteNeonTouched": true,
+          "cloudflareD1Touched": false,
+          "businessDataImported": false,
+          "runtimeBindingsChanged": false,
+          "productionCutoverAuthorized": false
+        }
       }
     },
     {
@@ -141,13 +217,13 @@
         "workers/W03-content/migrations",
         "workers/W05-social/migrations"
       ],
-      "status": "LOCAL_POSTGRES18_REHEARSAL_PASSED_REMOTE_APPLY_PENDING",
+      "status": "D1_02_SCHEMA_ONLY_REMOTE_APPLIED_RUNTIME_CUTOVER_PENDING",
       "completedSchemaOwners": [
         "W03",
         "W05"
       ],
       "pendingSchemaOwners": [],
-      "remoteSchemaApplied": false,
+      "remoteSchemaApplied": true,
       "schemaContract": "contracts/database/neon-d1-02-combined-schema.v1.json",
       "migrationManifest": "contracts/database/neon-d1-02-migration-manifest.v1.json",
       "schemaVerificationEvidence": {
@@ -169,6 +245,44 @@
         "productionCutoverAuthorized": false,
         "evidenceArtifactId": 13617648427,
         "evidenceArtifactSha256": "6dc320b5fff134d6420fd879df58a10ad510c21d03d3d1e0f10a9693170bfc49"
+      },
+      "remoteSchemaApplicationEvidence": {
+        "status": "D1_02_REMOTE_SCHEMA_ONLY_APPLY_PASS",
+        "workflowRunId": 42559331989,
+        "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42559331989",
+        "event": "workflow_dispatch",
+        "branch": "main",
+        "sourceCommitSha": "92a8d3045c25c3eb83411cd041140edae42690ba",
+        "databaseName": "luckreadpro",
+        "databaseUuid": "6c342634-97f6-4248-9f4a-85772af4f22c",
+        "postgresMajor": 18,
+        "verifiedMigrations": 2,
+        "migrationOwners": [
+          "W03",
+          "W05"
+        ],
+        "catalog": {
+          "tables": 28,
+          "explicitIndexes": 63,
+          "triggers": 9,
+          "triggerFunctions": 10,
+          "foreignKeys": 0,
+          "snowflakeAllocatorRows": 1,
+          "businessRows": 0,
+          "d1_03EndpointTablePresent": false
+        },
+        "artifact": {
+          "id": 13649175665,
+          "url": "https://github.com/wanghuinet/luckread/actions/runs/42559331989/artifacts/13649175665",
+          "sha256": "sha256:1d3c0f197e8eb0d2f521db615b283fb164714840a2482ad508f345d3cc6cf5fe"
+        },
+        "safety": {
+          "remoteNeonTouched": true,
+          "cloudflareD1Touched": false,
+          "businessDataImported": false,
+          "runtimeBindingsChanged": false,
+          "productionCutoverAuthorized": false
+        }
       }
     },
     {
