@@ -39,6 +39,7 @@
     "neon:auth007-mfa-journal:generate": "node scripts/neon/generate-auth007-mfa-publication-journal-postgres-migration.mjs",
     "neon:auth007-mfa-journal:verify": "node scripts/neon/verify-auth007-mfa-publication-journal-postgres-schema.mjs",
     "neon:auth007-mfa-receipts:generate": "node scripts/neon/generate-auth007-mfa-operation-receipts-postgres-migration.mjs",
-    "neon:auth007-mfa-receipts:verify": "node scripts/neon/verify-auth007-mfa-operation-receipts-postgres-schema.mjs"
+    "neon:auth007-mfa-receipts:verify": "node scripts/neon/verify-auth007-mfa-operation-receipts-postgres-schema.mjs",
+    "neon:auth015:runtime": "tsx scripts/neon/w02-auth015-account-lifecycle-postgres-runtime-rehearsal.ts"
   }
 }
