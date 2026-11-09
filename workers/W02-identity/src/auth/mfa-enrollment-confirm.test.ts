@@ -131,7 +131,7 @@ describe('W02 MFA enrollment confirmation authority', () => {
       })]),
     )
     expect(mocks.reconcileReceipts).toHaveBeenCalledWith(db)
-    expect(mocks.readStatus).toHaveBeenCalledWith(db, principal.userId)
+    expect(mocks.readStatus).toHaveBeenCalledWith(db, principal.userId, expect.any(Date))
   })
 
 
