@@ -218,11 +218,14 @@ try {
   assert.equal(restrictedResult.from, 'ACTIVE')
   assert.equal(restrictedResult.to, 'RESTRICTED')
   assert.equal(restrictedResult.accountStateVersion, 2)
-  const restrictedJournal = await pool.query<{ payload: Record<string, unknown> }>(
+  const restrictedJournal = await pool.query<{ payload: Record<string, unknown> | string }>(
     'SELECT payload FROM auth_013_publication_journal WHERE resource_id = $1',
     [users.restricted],
   )
-  const restrictedEvent = restrictedJournal.rows[0]?.payload
+  const restrictedPayload = restrictedJournal.rows[0]?.payload
+  const restrictedEvent = typeof restrictedPayload === 'string'
+    ? JSON.parse(restrictedPayload) as Record<string, unknown>
+    : restrictedPayload
   assert.equal(restrictedEvent?.eventType, 'identity.account_state_changed')
   assert.deepEqual(restrictedEvent?.actor, {
     actorId: users.moderator,
