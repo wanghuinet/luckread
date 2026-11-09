@@ -3,13 +3,14 @@
  *
  * It reuses the canonical Better Auth builder and official PostgreSQL Pool
  * adapter, but selects the explicit postgres-rehearsal profile. That profile
- * omits D1-only account/MFA side effects; this test proves Better Auth's core
- * user, credential and session persistence only.
+ * omits D1-only account/MFA side effects and injects PostgreSQL-backed L1
+ * registration and AUTH-013 email-verification lifecycle callbacks.
  *
  * This file is never imported by the deployed Worker.
  */
 import { Pool } from 'pg'
 
+import { activateEmailVerifiedAccountPostgres } from '../neon/email-verification-activation-postgres.js'
 import { ensureBaseUserRolePostgres } from '../neon/role-assignment-postgres.js'
 
 import {
@@ -44,12 +45,16 @@ const rehearsalEnvironment = {
   CLOUDFLARE_ENV: 'development',
 } satisfies BetterAuthEnv
 
+export const postgresLifecycleAdapters = {
+  afterUserCreated: (userId: string) => ensureBaseUserRolePostgres(postgresPool, userId),
+  afterEmailVerified: (userId: string, now?: string) =>
+    activateEmailVerifiedAccountPostgres(postgresPool, userId, now),
+}
+
 export const auth = buildLuckReadAuth(
   rehearsalEnvironment,
   postgresPool,
   'postgres-rehearsal',
   undefined,
-  {
-    afterUserCreated: (userId) => ensureBaseUserRolePostgres(postgresPool, userId),
-  },
+  postgresLifecycleAdapters,
 )

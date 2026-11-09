@@ -5,8 +5,11 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { AccountStateTransitionError } from '../../src/account/account-state-transition.js'
-import { activateEmailVerifiedAccountPostgres } from '../../src/neon/email-verification-activation-postgres.js'
-import { auth, postgresPool } from '../../src/auth/neon-postgres-runtime-test.config.js'
+import {
+  auth,
+  postgresLifecycleAdapters,
+  postgresPool,
+} from '../../src/auth/neon-postgres-runtime-test.config.js'
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url))
 const workerRoot = path.resolve(scriptDir, '../..')
@@ -103,7 +106,7 @@ try {
   assert.equal(pending.rowCount, 1, 'test subject must enter the pending-verification baseline')
 
   await assert.rejects(
-    activateEmailVerifiedAccountPostgres(postgresPool, userId),
+    postgresLifecycleAdapters.afterEmailVerified(userId),
     (error: unknown) =>
       error instanceof AccountStateTransitionError && error.code === 'PRECONDITION_FAILED',
     'activation must fail closed before Better Auth email verification is persisted',
@@ -124,12 +127,13 @@ try {
   )
   assert.equal(verified.rowCount, 1, 'verified flag must be persisted before lifecycle activation')
 
-  // Two concurrent callbacks must converge on one account-state transition,
-  // one verified_user role and one AUTH-013 journal event.
+  // Exercise the same injected callback used as Better Auth's
+  // afterEmailVerification hook. Two concurrent deliveries must converge on
+  // one account-state transition, one verified_user role and one AUTH-013 journal event.
   const activations = await withTimeout('email-verification-activation-concurrency', () =>
     Promise.all([
-      activateEmailVerifiedAccountPostgres(postgresPool, userId!, verificationAt),
-      activateEmailVerifiedAccountPostgres(postgresPool, userId!, verificationAt),
+      postgresLifecycleAdapters.afterEmailVerified(userId!, verificationAt),
+      postgresLifecycleAdapters.afterEmailVerified(userId!, verificationAt),
     ]),
   )
   assert.equal(activations.filter((result) => result.activated).length, 1)
@@ -138,7 +142,7 @@ try {
   assert.ok(activations.every((result) => result.accountStateVersion === 2))
 
   const activationReplay = await withTimeout('email-verification-activation-replay', () =>
-    activateEmailVerifiedAccountPostgres(postgresPool, userId!, verificationAt),
+    postgresLifecycleAdapters.afterEmailVerified(userId!, verificationAt),
   )
   assert.equal(activationReplay.activated, false)
   assert.equal(activationReplay.accountState, 'ACTIVE')
