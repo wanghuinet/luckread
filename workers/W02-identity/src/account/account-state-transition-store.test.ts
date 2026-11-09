@@ -11,19 +11,20 @@ describe('W02 account-state transition store', () => {
         const call = { sql, values: [] as unknown[] }
         prepared.push(call)
         return {
+          sql,
           bind(...values: unknown[]) {
             call.values = values
             return this
           },
           async first<T>() {
             if (sql.includes('account_state_version')) {
-              return { accountState: 'ACTIVE', accountStateVersion: 7 } as T
+              return { accountState: 'ACTIVE', accountStateVersion: 7 } as unknown as T
             }
-            if (sql.includes('FROM "user"')) return { accountState: 'ACTIVE' } as T
+            if (sql.includes('FROM "user"')) return { accountState: 'ACTIVE' } as unknown as T
             return null
           },
           async all<T>() {
-            return { results: [{ roleId: 'operator', scopeType: 'global' }] } as T
+            return { results: [{ roleId: 'operator', scopeType: 'global' }] } as unknown as T
           },
         }
       },
