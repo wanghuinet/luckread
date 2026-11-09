@@ -23,11 +23,38 @@ if (!localRuntimeTarget) {
 const scriptDir = path.dirname(fileURLToPath(import.meta.url))
 const packageRoot = path.resolve(scriptDir, '../..')
 const reportPath = path.join(packageRoot, 'artifacts/neon/w01-payload-runtime-rehearsal.json')
-const payload = await getPayload({ config })
+const withStepTimeout = async <T>(
+  step: string,
+  operation: () => Promise<T>,
+  timeoutMs = 45_000,
+): Promise<T> => {
+  console.info(JSON.stringify({ event: 'w01.pg.runtime.step.started', step }))
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`W01_PG_RUNTIME_STEP_TIMEOUT:${step}`)), timeoutMs)
+    })
+    const result = await Promise.race([operation(), timeout])
+    console.info(JSON.stringify({ event: 'w01.pg.runtime.step.passed', step }))
+    return result
+  } catch (error) {
+    console.error(JSON.stringify({
+      event: 'w01.pg.runtime.step.failed',
+      step,
+      reason: error instanceof Error ? error.message.slice(0, 200) : 'UNKNOWN',
+    }))
+    throw error
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
+}
+
+let payload: Awaited<ReturnType<typeof getPayload>> | undefined
 let createdId: string | number | undefined
 let deleted = false
 
 try {
+  payload = await withStepTimeout('initialize-payload', () => getPayload({ config }))
   assert.equal(
     payload.db.packageName,
     '@payloadcms/db-postgres',
@@ -39,7 +66,7 @@ try {
   const username = `pgtest${nonce}`
   const identityId = randomUUID()
 
-  const created = await payload.create({
+  const created = await withStepTimeout('create-user', () => payload!.create({
     collection: 'users',
     data: {
       email,
@@ -49,7 +76,7 @@ try {
     },
     depth: 0,
     overrideAccess: true,
-  })
+  }))
   createdId = created.id as string | number
 
   assert.ok(createdId !== undefined && createdId !== null, 'Payload create must return an ID')
@@ -57,38 +84,38 @@ try {
   assert.equal(created.username, username)
   assert.equal(created.identityId, identityId)
 
-  const readBack = await payload.findByID({
+  const readBack = await withStepTimeout('read-user-by-id', () => payload!.findByID({
     collection: 'users',
-    id: createdId,
+    id: createdId!,
     depth: 0,
     overrideAccess: true,
-  })
+  }))
   assert.equal(readBack.email, email, 'Payload Local API read must return the inserted user')
   assert.equal(readBack.username, username)
 
-  const updated = await payload.update({
+  const updated = await withStepTimeout('update-user', () => payload!.update({
     collection: 'users',
-    id: createdId,
+    id: createdId!,
     data: { displayName: 'PostgreSQL runtime update verified' },
     depth: 0,
     overrideAccess: true,
-  })
+  }))
   assert.equal(updated.displayName, 'PostgreSQL runtime update verified')
 
-  await payload.delete({
+  await withStepTimeout('delete-user', () => payload!.delete({
     collection: 'users',
-    id: createdId,
+    id: createdId!,
     overrideAccess: true,
-  })
+  }))
   deleted = true
 
-  const remaining = await payload.find({
+  const remaining = await withStepTimeout('verify-user-deleted', () => payload!.find({
     collection: 'users',
-    where: { id: { equals: createdId } },
+    where: { id: { equals: createdId! } },
     limit: 1,
     depth: 0,
     overrideAccess: true,
-  })
+  }))
   assert.equal(remaining.totalDocs, 0, 'Payload Local API delete must remove the test row')
 
   const report = {
@@ -110,12 +137,12 @@ try {
   writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`)
   process.stdout.write(`${JSON.stringify(report, null, 2)}\n`)
 } finally {
-  if (createdId !== undefined && !deleted) {
+  if (payload && createdId !== undefined && !deleted) {
     await payload.delete({
       collection: 'users',
       id: createdId,
       overrideAccess: true,
     }).catch((): undefined => undefined)
   }
-  await payload.destroy()
+  if (payload) await withStepTimeout('destroy-payload', () => payload!.destroy(), 15_000)
 }
