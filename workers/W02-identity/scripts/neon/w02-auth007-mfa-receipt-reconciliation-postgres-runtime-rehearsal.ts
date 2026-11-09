@@ -340,7 +340,7 @@ try {
   assert.equal((await readReceipt(retryReceipt)).status, 'EMITTED')
   assert.equal((await readJournal(retryKeyA))?.status, 'PENDING')
   assert.equal((await readJournal(retryKeyB))?.status, 'PENDING')
-  checks.transientWriteFailureRollsBackPartialJournalAndRetriesAtomically = true
+  checks.transientWriteFailurePreservesCommittedJournalAndRetriesIdempotently = true
 
   const lockedKey = 'mfa-operation:reconcile:' + suffix + ':locked'
   const lockedReceipt = await makeReadyReceipt(
