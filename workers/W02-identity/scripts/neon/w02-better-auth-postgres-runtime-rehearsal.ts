@@ -810,6 +810,7 @@ try {
         'DELETE FROM auth_007_mfa_publication_journal WHERE resource_id = $1',
         [cleanupUserId],
       )
+      await postgresPool.query('DELETE FROM "twoFactor" WHERE "userId" = $1', [cleanupUserId])
       await postgresPool.query('DELETE FROM "session" WHERE user_id = $1', [cleanupUserId])
       await postgresPool.query('DELETE FROM "account" WHERE user_id = $1', [cleanupUserId])
       await postgresPool.query('DELETE FROM role_assignments WHERE subject_id = $1', [cleanupUserId])
@@ -824,6 +825,8 @@ try {
         (SELECT COUNT(*) FROM "session" WHERE user_id = COALESCE($2, '')) AS sessions,
         (SELECT COUNT(*) FROM "verification" WHERE identifier = $1) AS verifications,
         (SELECT COUNT(*) FROM auth_013_publication_journal WHERE resource_id = COALESCE($2, '')) AS journals,
+        (SELECT COUNT(*) FROM auth_007_mfa_publication_journal WHERE resource_id = COALESCE($2, '')) AS mfa_journals,
+        (SELECT COUNT(*) FROM "twoFactor" WHERE "userId" = COALESCE($2, '')) AS mfa_factors,
         (SELECT COUNT(*) FROM role_assignments WHERE subject_id = COALESCE($2, '')) AS role_assignments,
         (SELECT COUNT(*) FROM role_authorization_versions WHERE subject_id = COALESCE($2, '')) AS role_versions,
         (SELECT COUNT(*) FROM auth_010_session_revocation_journal WHERE resource_id = COALESCE($3, '')) AS session_revocation_journals,
