@@ -172,7 +172,7 @@ export default {
               code: error.code === 'INVALID_INPUT' ? 'VALIDATION_FAILED' : 'PRECONDITION_FAILED',
               message: error.code === 'INVALID_INPUT'
                 ? 'invalid registration rollback request'
-                : 'registration rollback precondition failed',
+                : error.message,
             },
           }, status)
         }
