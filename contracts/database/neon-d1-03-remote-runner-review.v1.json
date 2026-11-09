@@ -66,10 +66,6 @@
         "gitBlobSha1": "73b1928b10b52e65ebb35a984265f5520af409be"
       },
       {
-        "path": "scripts/neon/d1-03/schema-only-runner.test.mjs",
-        "gitBlobSha1": "a25c7539e0366978778a7aeaf1e3d425a5c20487"
-      },
-      {
         "path": "scripts/neon/d1-03/assert-remote-apply-release.mjs",
         "gitBlobSha1": "504ed09e3dec133ab636112baf94c409348a4e9e"
       },
