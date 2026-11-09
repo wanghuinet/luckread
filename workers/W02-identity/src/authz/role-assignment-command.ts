@@ -1,12 +1,27 @@
 import layers from '../../../../contracts/authz/layers.json'
 
 type ScopeType = 'global'
-type RoleGrantCommand = {
+export type CreatorRoleGrantCommand = {
   subjectId: string
   roleId: 'creator'
   scopeType: ScopeType
   scopeId: string | null
   approvalRef: string
+}
+
+export type CreatorRoleGrantResult = {
+  assignmentId: string
+  roleId: string
+  replayed: boolean
+}
+
+/**
+ * Persistence boundary for W02's narrowly admitted global L3 creator grant.
+ * W02 remains the authorization authority; implementations only persist the
+ * deterministic RoleAssignment after the caller has authenticated an L7/L8 approver.
+ */
+export interface CreatorRoleGrantStore {
+  grant(command: CreatorRoleGrantCommand, now: string): Promise<CreatorRoleGrantResult>
 }
 type PersistedAssignment = {
   id: string
@@ -24,10 +39,10 @@ for (const layer of layers['x-layers']) {
   for (const role of layer.roles ?? []) roleToLayer.set(role, layer.id)
 }
 
-const roleScopeMatches = (command: RoleGrantCommand): boolean =>
+const roleScopeMatches = (command: CreatorRoleGrantCommand): boolean =>
   command.roleId === 'creator' && command.scopeType === 'global' && command.scopeId === null
 
-const sameScope = (row: PersistedAssignment, command: RoleGrantCommand): boolean =>
+const sameScope = (row: PersistedAssignment, command: CreatorRoleGrantCommand): boolean =>
   row.subjectId === command.subjectId &&
   row.roleId === command.roleId &&
   row.scopeType === command.scopeType &&
@@ -44,11 +59,11 @@ export class RoleAssignmentCommandError extends Error {
  * The caller (W08) remains responsible for proving the creator application
  * represented by approvalRef.
  */
-export async function grantCreatorBusinessRole(
+async function grantCreatorBusinessRoleD1(
   db: D1Database,
-  command: RoleGrantCommand,
-  now = new Date().toISOString(),
-): Promise<{ assignmentId: string; roleId: string; replayed: boolean }> {
+  command: CreatorRoleGrantCommand,
+  now: string,
+): Promise<CreatorRoleGrantResult> {
   if (
     !command ||
     typeof command.subjectId !== 'string' ||
@@ -159,4 +174,32 @@ export async function grantCreatorBusinessRole(
   }
 
   return { assignmentId, roleId: command.roleId, replayed: false }
+}
+
+
+/** Keep the existing D1 implementation as the production default until W02's
+ * identity, session, RoleAssignment and lifecycle stores are switched together.
+ */
+export function createD1CreatorRoleGrantStore(db: D1Database): CreatorRoleGrantStore {
+  return {
+    grant: (command, now) => grantCreatorBusinessRoleD1(db, command, now),
+  }
+}
+
+/** Run the command against an explicitly selected W02 persistence adapter. */
+export async function grantCreatorBusinessRoleWithStore(
+  store: CreatorRoleGrantStore,
+  command: CreatorRoleGrantCommand,
+  now = new Date().toISOString(),
+): Promise<CreatorRoleGrantResult> {
+  return store.grant(command, now)
+}
+
+/** Backward-compatible production entrypoint: always uses the existing D1 store. */
+export async function grantCreatorBusinessRole(
+  db: D1Database,
+  command: CreatorRoleGrantCommand,
+  now = new Date().toISOString(),
+): Promise<CreatorRoleGrantResult> {
+  return grantCreatorBusinessRoleWithStore(createD1CreatorRoleGrantStore(db), command, now)
 }

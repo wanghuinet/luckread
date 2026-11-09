@@ -7,12 +7,15 @@ import { fileURLToPath } from 'node:url'
 import { Pool } from 'pg'
 
 import {
+  grantCreatorBusinessRoleWithStore,
+  RoleAssignmentCommandError,
+} from '../../src/authz/role-assignment-command.js'
+import { createPostgresCreatorRoleGrantStore } from '../../src/neon/creator-role-grant-store-postgres.js'
+import {
   ensureBaseUserRolePostgres,
   ensureVerifiedUserRolePostgres,
-  grantCreatorBusinessRolePostgres,
   readRoleVersionPostgres,
   resolveGlobalLayerPostgres,
-  RoleAssignmentPostgresError,
 } from '../../src/neon/role-assignment-postgres.js'
 
 const connectionString = process.env.W02_RUNTIME_DATABASE_URL
@@ -33,6 +36,8 @@ const pool = new Pool({
   connectionTimeoutMillis: 5_000,
   idleTimeoutMillis: 5_000,
 })
+
+const creatorRoleGrantStore = createPostgresCreatorRoleGrantStore(pool)
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url))
 const workerRoot = path.resolve(scriptDir, '../..')
@@ -73,7 +78,7 @@ const expectErrorCode = async (
   } catch (error) {
     caught = error
   }
-  assert.ok(caught instanceof RoleAssignmentPostgresError, 'expected RoleAssignmentPostgresError')
+  assert.ok(caught instanceof RoleAssignmentCommandError, 'expected RoleAssignmentCommandError')
   assert.equal(caught.code, code)
 }
 
@@ -142,7 +147,7 @@ try {
   assert.equal(pendingLayer.decision, 'ALLOW')
   assert.equal(pendingLayer.layer, 'L1')
 
-  const creatorGrant = await grantCreatorBusinessRolePostgres(pool, {
+  const creatorGrant = await grantCreatorBusinessRoleWithStore(creatorRoleGrantStore, {
     subjectId: userA,
     roleId: 'creator',
     scopeType: 'global',
@@ -156,7 +161,7 @@ try {
   })
   assert.equal(await readRoleVersionPostgres(pool, userA), 3)
 
-  const creatorReplay = await grantCreatorBusinessRolePostgres(pool, {
+  const creatorReplay = await grantCreatorBusinessRoleWithStore(creatorRoleGrantStore, {
     subjectId: userA,
     roleId: 'creator',
     scopeType: 'global',
@@ -167,7 +172,7 @@ try {
   assert.equal(await readRoleVersionPostgres(pool, userA), 3)
 
   await expectErrorCode('ROLE_ASSIGNMENT_ALREADY_ACTIVE', () =>
-    grantCreatorBusinessRolePostgres(pool, {
+    grantCreatorBusinessRoleWithStore(creatorRoleGrantStore, {
       subjectId: userA,
       roleId: 'creator',
       scopeType: 'global',
@@ -176,7 +181,7 @@ try {
     }, now),
   )
   await expectErrorCode('VALIDATION_FAILED', () =>
-    grantCreatorBusinessRolePostgres(pool, {
+    grantCreatorBusinessRoleWithStore(creatorRoleGrantStore, {
       subjectId: userA,
       roleId: 'creator',
       scopeType: 'global',
@@ -185,7 +190,7 @@ try {
     }, now),
   )
   await expectErrorCode('TARGET_NOT_ELIGIBLE', () =>
-    grantCreatorBusinessRolePostgres(pool, {
+    grantCreatorBusinessRoleWithStore(creatorRoleGrantStore, {
       subjectId: userC,
       roleId: 'creator',
       scopeType: 'global',
@@ -204,8 +209,8 @@ try {
     approvalRef: approvalRefB,
   }
   const concurrent = await Promise.all([
-    grantCreatorBusinessRolePostgres(pool, concurrentCommand, now),
-    grantCreatorBusinessRolePostgres(pool, concurrentCommand, now),
+    grantCreatorBusinessRoleWithStore(creatorRoleGrantStore, concurrentCommand, now),
+    grantCreatorBusinessRoleWithStore(creatorRoleGrantStore, concurrentCommand, now),
   ])
   assert.equal(concurrent.filter((result) => !result.replayed).length, 1)
   assert.equal(concurrent.filter((result) => result.replayed).length, 1)
