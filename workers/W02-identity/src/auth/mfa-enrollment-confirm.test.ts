@@ -27,10 +27,17 @@ vi.mock('./mfa-audit-receipts.js', () => ({
 import type { BetterAuthEnv } from './better-auth.js'
 import { handleMfaEnrollmentConfirmRequest } from './mfa-enrollment-confirm.js'
 
-const makeDb = (row: unknown = { userEnabled: 0, confirmationKeyHash: null, confirmationRequestHash: null, factorVerified: 0 }) => {
+const makeDb = (row: unknown = {}) => {
+  const stateRow = {
+    userEnabled: 0,
+    confirmationKeyHash: null,
+    confirmationRequestHash: null,
+    factorVerified: 0,
+    ...(typeof row === 'object' && row !== null ? row as Record<string, unknown> : {}),
+  }
   const statement = {
     bind: vi.fn().mockReturnThis(),
-    first: vi.fn().mockResolvedValue(row),
+    first: vi.fn().mockResolvedValue(stateRow),
     run: vi.fn().mockResolvedValue({ success: true, meta: { changes: 1 } }),
   }
   const db = {
