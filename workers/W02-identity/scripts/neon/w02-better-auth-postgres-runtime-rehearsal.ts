@@ -251,9 +251,9 @@ try {
   report = {
     reportVersion: 2,
     status: 'W02_BETTER_AUTH_POSTGRES_RUNTIME_REHEARSAL_PASS',
-    scope: 'Better Auth core PostgreSQL runtime plus AUTH-013 email-verification activation, L2 RoleAssignment and durable publication journal; D1 production remains authoritative.',
+    scope: 'Better Auth core PostgreSQL runtime plus L1 registration-role materialization, AUTH-013 email-verification activation, L2 RoleAssignment and durable publication journal; D1 production remains authoritative.',
     betterAuthVersion: '1.7.8',
-    adapter: 'Better Auth native PostgreSQL dialect via pg.Pool plus the W02 PostgreSQL activation adapter',
+    adapter: 'Better Auth native PostgreSQL dialect via pg.Pool plus W02 PostgreSQL registration-role and email-verification lifecycle adapters',
     operationsVerified: [
       'SIGN_UP_EMAIL',
       'BASE_USER_L1_ROLE_PERSISTED',
