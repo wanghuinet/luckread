@@ -7,10 +7,8 @@ import { fileURLToPath } from 'node:url'
 import { Pool } from 'pg'
 
 import { ensureBaseUserRolePostgres } from '../../src/neon/role-assignment-postgres.js'
-import {
-  AccountStateTransitionPostgresError,
-  applyModeratorAccountStateTransitionPostgres,
-} from '../../src/neon/account-state-transition-postgres.js'
+import { AccountStateTransitionError } from '../../src/account/account-state-transition.js'
+import { createPostgresAccountStateTransitionStore } from '../../src/neon/account-state-transition-store-postgres.js'
 
 const connectionString = process.env.W02_RUNTIME_DATABASE_URL
 if (!connectionString) throw new Error('W02_RUNTIME_DATABASE_URL is required')
@@ -30,6 +28,8 @@ const pool = new Pool({
   connectionTimeoutMillis: 5_000,
   idleTimeoutMillis: 5_000,
 })
+
+const accountStateStore = createPostgresAccountStateTransitionStore(pool)
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url))
 const workerRoot = path.resolve(scriptDir, '../..')
@@ -71,6 +71,7 @@ let cleanupError: unknown
 let cleanupVerified = false
 
 const checks: Record<string, boolean> = {
+  accountStateTransitionExecutedThroughProviderNeutralStore: false,
   moderatorPermissionMfaAndLayerAreRecheckedInsideTransaction: false,
   adminSuspensionWritesJournalAndInvalidatesSessionsAtomically: false,
   freezePreservesSessionsAndCanBeReversed: false,
@@ -136,7 +137,7 @@ const expectCode = async (
   } catch (error) {
     caught = error
   }
-  assert.ok(caught instanceof AccountStateTransitionPostgresError, 'expected AccountStateTransitionPostgresError')
+  assert.ok(caught instanceof AccountStateTransitionError, 'expected shared W02 AccountStateTransitionError')
   assert.equal(caught.code, code)
 }
 
@@ -145,19 +146,15 @@ const transition = (
   targetUserId: string,
   to: 'ACTIVE' | 'RESTRICTED' | 'FROZEN' | 'SUSPENDED' | 'BANNED',
   expectedVersion = 1,
-) => applyModeratorAccountStateTransitionPostgres(
-  pool,
-  {
-    subjectId,
-    targetUserId,
-    to,
-    reason: 'AUTH-013 PostgreSQL controlled runtime rehearsal',
-    expectedVersion,
-    correlationId: 'corr-auth013-' + suffix,
-    causationId: 'cause-auth013-' + suffix,
-  },
-  clock(now),
-)
+) => accountStateStore.transition({
+  subjectId,
+  targetUserId,
+  to,
+  reason: 'AUTH-013 PostgreSQL controlled runtime rehearsal',
+  expectedVersion,
+  correlationId: 'corr-auth013-' + suffix,
+  causationId: 'cause-auth013-' + suffix,
+})
 
 const readAccount = async (id: string) => {
   const result = await pool.query<{ accountState: string; accountStateVersion: number }>(
@@ -233,6 +230,7 @@ try {
     operationalRole: 'PLATFORM_OPERATOR',
   })
   assert.equal(await countJournal(users.restricted), 1)
+  checks.accountStateTransitionExecutedThroughProviderNeutralStore = true
   checks.moderatorPermissionMfaAndLayerAreRecheckedInsideTransaction = true
 
   // The actor role may exist, but a lower layer, inactive actor, or missing MFA
@@ -314,7 +312,7 @@ try {
   const rejected = concurrent.filter((result) => result.status === 'rejected')
   assert.equal(rejected.length, 1)
   assert.ok(rejected[0]?.status === 'rejected')
-  assert.ok(rejected[0].reason instanceof AccountStateTransitionPostgresError)
+  assert.ok(rejected[0].reason instanceof AccountStateTransitionError)
   // The canonical D1 kernel evaluates the current state-machine edge before
   // comparing If-Match. Depending on which concurrent transition wins, the
   // stale command is therefore a CONFLICT or an INVALID_STATE; both guarantee
