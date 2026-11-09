@@ -43,6 +43,7 @@
     "neon:auth015:runtime": "tsx scripts/neon/w02-auth015-account-lifecycle-postgres-runtime-rehearsal.ts",
     "neon:auth010:runtime": "tsx scripts/neon/w02-auth010-session-revocation-postgres-runtime-rehearsal.ts",
     "neon:auth010:publisher:runtime": "tsx scripts/neon/w02-auth010-session-revocation-publisher-postgres-runtime-rehearsal.ts",
-    "neon:auth007-mfa-receipts:runtime": "tsx scripts/neon/w02-auth007-mfa-operation-receipts-postgres-runtime-rehearsal.ts"
+    "neon:auth007-mfa-receipts:runtime": "tsx scripts/neon/w02-auth007-mfa-operation-receipts-postgres-runtime-rehearsal.ts",
+    "neon:auth007-mfa-journal:runtime": "tsx scripts/neon/w02-auth007-mfa-publication-journal-postgres-runtime-rehearsal.ts"
   }
 }
