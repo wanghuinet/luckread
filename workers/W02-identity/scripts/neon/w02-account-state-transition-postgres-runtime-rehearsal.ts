@@ -315,7 +315,11 @@ try {
   assert.equal(rejected.length, 1)
   assert.ok(rejected[0]?.status === 'rejected')
   assert.ok(rejected[0].reason instanceof AccountStateTransitionPostgresError)
-  assert.equal(rejected[0].reason.code, 'CONFLICT')
+  // The canonical D1 kernel evaluates the current state-machine edge before
+  // comparing If-Match. Depending on which concurrent transition wins, the
+  // stale command is therefore a CONFLICT or an INVALID_STATE; both guarantee
+  // that the losing command has no side effects.
+  assert.ok(['CONFLICT', 'INVALID_STATE'].includes(rejected[0].reason.code))
   assert.equal((await readAccount(users.concurrent)).accountStateVersion, 2)
   assert.equal(await countJournal(users.concurrent), 1)
   checks.concurrentSameVersionTransitionsHaveExactlyOneWinner = true
