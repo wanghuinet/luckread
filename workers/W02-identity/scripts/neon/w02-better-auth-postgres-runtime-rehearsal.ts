@@ -6,12 +6,14 @@ import { fileURLToPath } from 'node:url'
 
 import { AccountStateTransitionError } from '../../src/account/account-state-transition.js'
 import { handleCurrentUserSessionList } from '../../src/auth/session-list.js'
+import { handleCurrentUserSessionRevoke } from '../../src/auth/session-revoke.js'
 import {
   auth,
   postgresLifecycleAdapters,
   postgresPool,
 } from '../../src/auth/neon-postgres-runtime-test.config.js'
 import { createPostgresSessionListStore } from '../../src/neon/session-list-postgres.js'
+import { createPostgresSessionRevocationStore } from '../../src/neon/session-revocation-postgres-store.js'
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url))
 const workerRoot = path.resolve(scriptDir, '../..')
@@ -47,6 +49,7 @@ let userId: string | undefined
 const syntheticSessionIds: string[] = []
 let signedIn = false
 let signedOut = false
+let revocationTargetSessionId: string | undefined
 let primaryError: unknown
 let report: Record<string, unknown> | undefined
 let cleanupVerified = false
@@ -353,6 +356,93 @@ try {
   await postgresPool.query('DELETE FROM "session" WHERE id = ANY($1::text[])', [syntheticSessionIds])
   syntheticSessionIds.length = 0
 
+  // Exercise the full revoke HTTP handler through the injected PostgreSQL
+  // command store. The caller's native Better Auth session must remain valid,
+  // while the target session and durable AUTH-010 journal change atomically.
+  revocationTargetSessionId = 'session-revoke-target-' + nonce
+  syntheticSessionIds.push(revocationTargetSessionId)
+  const revokeCreatedAt = new Date().toISOString()
+  const revokeExpiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString()
+  await postgresPool.query(
+    'INSERT INTO "session" (id, expires_at, token, created_at, updated_at, user_id) ' +
+      'VALUES ($1, $2, $3, $4, $4, $5)',
+    [
+      revocationTargetSessionId,
+      revokeExpiresAt,
+      'session-revoke-token-' + nonce,
+      revokeCreatedAt,
+      userId,
+    ],
+  )
+
+  const sessionRevokeEnv = {
+    D1_01: undefined as unknown as D1Database,
+    AUTH_SESSION_WRITE_LIMITER: {
+      limit: async (_input: { key: string }) => ({ success: true }),
+    },
+  }
+  const sessionRevokeStore = createPostgresSessionRevocationStore(postgresPool)
+  const sessionRevokeRequest = () => new Request(
+    'https://luckread-w02.internal/internal/auth/session/revoke-by-id',
+    {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        cookie: cookieHeader,
+        'X-LuckRead-Request-Id': 'req_auth010_revoke_' + nonce,
+        'X-LuckRead-Correlation-Id': 'auth010-revoke-trace-' + nonce,
+      },
+      body: JSON.stringify({ sessionId: revocationTargetSessionId }),
+    },
+  )
+  const sessionRevokeDependencies = {
+    store: sessionRevokeStore,
+    getSession: (headers: Headers) => auth.api.getSession({ headers, query: {} }) as Promise<{
+      user?: { id?: unknown }
+      session?: { id?: unknown }
+    } | null>,
+  }
+  const revokeResponse = await withTimeout('auth010-postgres-session-revoke-handler', () =>
+    handleCurrentUserSessionRevoke(sessionRevokeEnv, sessionRevokeRequest(), sessionRevokeDependencies),
+  )
+  assert.equal(revokeResponse.status, 200, 'PostgreSQL session revocation handler must succeed')
+  assert.deepEqual(await revokeResponse.json(), { revoked: true })
+
+  const revokedTarget = await postgresPool.query(
+    'SELECT COUNT(*)::integer AS count FROM "session" WHERE id = $1 AND user_id = $2',
+    [revocationTargetSessionId, userId],
+  )
+  assert.equal(Number(revokedTarget.rows[0]?.count), 0, 'target session must be deleted by the command transaction')
+
+  const revokeJournal = await postgresPool.query<{ payload: string }>(
+    'SELECT payload FROM auth_010_session_revocation_journal ' +
+      'WHERE resource_id = $1 AND event_type = $2',
+    [revocationTargetSessionId, 'user.session.revoked'],
+  )
+  assert.equal(revokeJournal.rowCount, 1, 'session delete must commit exactly one AUTH-010 audit row')
+  const revokeEvent = JSON.parse(revokeJournal.rows[0]?.payload ?? '{}')
+  assert.equal(revokeEvent.actor.actorId, userId)
+  assert.equal(revokeEvent.resourceId, revocationTargetSessionId)
+  assert.equal(revokeEvent.payload.operationId, 'authSessionRevoke')
+  assert.equal(revokeEvent.payload.reasonCode, 'USER_INITIATED')
+  assert.equal(revokeEvent.correlationId, 'req_auth010_revoke_' + nonce)
+  assert.ok(!JSON.stringify(revokeEvent).includes('session-revoke-token-' + nonce))
+
+  const revokeReplayResponse = await withTimeout('auth010-postgres-session-revoke-replay', () =>
+    handleCurrentUserSessionRevoke(sessionRevokeEnv, sessionRevokeRequest(), sessionRevokeDependencies),
+  )
+  assert.equal(revokeReplayResponse.status, 200)
+  assert.deepEqual(await revokeReplayResponse.json(), { revoked: true })
+  const revokeReplayJournal = await postgresPool.query(
+    'SELECT COUNT(*)::integer AS count FROM auth_010_session_revocation_journal ' +
+      'WHERE resource_id = $1 AND event_type = $2',
+    [revocationTargetSessionId, 'user.session.revoked'],
+  )
+  assert.equal(Number(revokeReplayJournal.rows[0]?.count), 1, 'retry must not create a second logical event')
+
+  const currentSessionAfterRevoke = await auth.api.getSession({ headers: sessionHeaders })
+  assert.equal(currentSessionAfterRevoke?.session.id, currentSessionId, 'revoking another session must preserve the caller session')
+
   await withTimeout('sign-out', () => auth.api.signOut({ headers: sessionHeaders }))
   signedOut = true
   const revokedSession = await withTimeout(
@@ -370,9 +460,9 @@ try {
   report = {
     reportVersion: 3,
     status: 'W02_BETTER_AUTH_POSTGRES_RUNTIME_REHEARSAL_PASS',
-    scope: 'Better Auth core PostgreSQL runtime, L1/L2 role materialization, AUTH-013 email-verification activation and journal, and AUTH-010 PostgreSQL session-list read adapter; D1 production remains authoritative.',
+    scope: 'Better Auth core PostgreSQL runtime, L1/L2 role materialization, AUTH-013 email-verification activation and journal, and AUTH-010 PostgreSQL session-list and session-revocation HTTP adapters; D1 production remains authoritative.',
     betterAuthVersion: '1.7.8',
-    adapter: 'Better Auth native PostgreSQL dialect via pg.Pool plus W02 PostgreSQL identity lifecycle and AUTH-010 session-list adapters',
+    adapter: 'Better Auth native PostgreSQL dialect via pg.Pool plus W02 PostgreSQL identity lifecycle, AUTH-010 session-list and atomic session-revocation adapters',
     operationsVerified: [
       'SIGN_UP_EMAIL',
       'BASE_USER_L1_ROLE_PERSISTED',
@@ -391,6 +481,9 @@ try {
       'AUTH010_SESSION_LIST_KEYSET_PAGINATION',
       'AUTH010_SESSION_LIST_NO_SECRET_PROJECTION',
       'AUTH010_SESSION_LIST_UNAUTHORIZED_SUBJECT',
+      'AUTH010_SESSION_REVOKE_HTTP_HANDLER',
+      'AUTH010_SESSION_REVOKE_ATOMIC_AUDIT',
+      'AUTH010_SESSION_REVOKE_IDEMPOTENT_REPLAY',
       'SIGN_OUT',
       'SESSION_REVOKED',
     ],
@@ -422,6 +515,10 @@ try {
 
     await postgresPool.query('DELETE FROM "verification" WHERE identifier = $1', [email])
     if (syntheticSessionIds.length > 0) {
+      await postgresPool.query(
+        'DELETE FROM auth_010_session_revocation_journal WHERE resource_id = ANY($1::text[])',
+        [syntheticSessionIds],
+      )
       await postgresPool.query('DELETE FROM "session" WHERE id = ANY($1::text[])', [syntheticSessionIds])
       syntheticSessionIds.length = 0
     }
@@ -445,8 +542,9 @@ try {
         (SELECT COUNT(*) FROM "verification" WHERE identifier = $1) AS verifications,
         (SELECT COUNT(*) FROM auth_013_publication_journal WHERE resource_id = COALESCE($2, '')) AS journals,
         (SELECT COUNT(*) FROM role_assignments WHERE subject_id = COALESCE($2, '')) AS role_assignments,
-        (SELECT COUNT(*) FROM role_authorization_versions WHERE subject_id = COALESCE($2, '')) AS role_versions`,
-      [email, cleanupUserId ?? null],
+        (SELECT COUNT(*) FROM role_authorization_versions WHERE subject_id = COALESCE($2, '')) AS role_versions,
+        (SELECT COUNT(*) FROM auth_010_session_revocation_journal WHERE resource_id = COALESCE($3, '')) AS session_revocation_journals`,
+      [email, cleanupUserId ?? null, revocationTargetSessionId ?? null],
     )
     if (Object.values(remaining.rows[0] ?? {}).some((value) => Number(value) !== 0)) {
       throw new Error('W02_RUNTIME_SYNTHETIC_CLEANUP_FAILED')
