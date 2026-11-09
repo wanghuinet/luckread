@@ -1,0 +1,193 @@
+name: Neon D1-05 Reviewed Schema-Only Remote Apply
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/neon-d1-05-reviewed-schema-only-apply.yml'
+      - 'contracts/database/neon-d1-05-remote-runner-review.v1.json'
+      - 'contracts/database/neon-d1-05-shared-migration-manifest.v1.json'
+      - 'contracts/database/neon-d1-05-w11-analytics-schema.v1.json'
+      - 'contracts/database/neon-d1-05-shared-runner-independent-review.v1.json'
+      - 'scripts/neon/d1-05/**'
+      - 'scripts/neon/shared-domain-schema-runner.mjs'
+      - 'scripts/neon/shared-domain-schema-runner.test.mjs'
+      - 'scripts/neon/d1-01/0001_schema_migration_ledger.sql'
+      - 'workers/W11-growth-campaign-analytics-operations/migrations/**'
+      - 'workers/W11-growth-campaign-analytics-operations/src/neon-postgres-migrations-d1-05/**'
+      - 'workers/W11-growth-campaign-analytics-operations/scripts/neon/**'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/neon-d1-05-reviewed-schema-only-apply.yml'
+      - 'contracts/database/neon-d1-05-remote-runner-review.v1.json'
+      - 'contracts/database/neon-d1-05-shared-migration-manifest.v1.json'
+      - 'contracts/database/neon-d1-05-w11-analytics-schema.v1.json'
+      - 'contracts/database/neon-d1-05-shared-runner-independent-review.v1.json'
+      - 'scripts/neon/d1-05/**'
+      - 'scripts/neon/shared-domain-schema-runner.mjs'
+      - 'scripts/neon/shared-domain-schema-runner.test.mjs'
+      - 'scripts/neon/d1-01/0001_schema_migration_ledger.sql'
+      - 'workers/W11-growth-campaign-analytics-operations/migrations/**'
+      - 'workers/W11-growth-campaign-analytics-operations/src/neon-postgres-migrations-d1-05/**'
+      - 'workers/W11-growth-campaign-analytics-operations/scripts/neon/**'
+  workflow_dispatch:
+    inputs:
+      confirm_target:
+        description: Create only the admitted empty D1-05 W11 schema and append-only migration ledger. No telemetry, data import, runtime binding or production cutover.
+        required: true
+        type: choice
+        options:
+          - APPLY_REVIEWED_SCHEMA_D1_05_ALLLUCK_SCHEMA_ONLY
+
+permissions:
+  contents: read
+
+concurrency:
+  group: neon-d1-05-reviewed-schema-only-apply
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    if: \${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
+    name: Validate D1-05 schema-only runner and PostgreSQL 18 rehearsal (no Neon credentials)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:18.6
+        env:
+          POSTGRES_USER: schema_generator
+          POSTGRES_PASSWORD: schema_generator_local_only
+          POSTGRES_DB: alluck_d1_05_shared
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U schema_generator -d alluck_d1_05_shared"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - name: Checkout reviewed source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install PostgreSQL driver reused from W02
+        working-directory: workers/W02-identity
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Validate target, release gate and negative safety tests
+        run: |
+          set -euo pipefail
+          node --check scripts/neon/shared-domain-schema-runner.mjs
+          node --check scripts/neon/d1-05/remote-schema-runner.mjs
+          node --check scripts/neon/d1-05/assert-remote-apply-release.mjs
+          node --check scripts/neon/d1-05/remote-runner-review.mjs
+          node --test \
+            scripts/neon/shared-domain-schema-runner.test.mjs \
+            scripts/neon/d1-05/remote-schema-runner.test.mjs \
+            scripts/neon/d1-05/remote-runner-review.test.mjs \
+            scripts/neon/review-d1-05-shared-runner-independent.test.mjs \
+            workers/W11-growth-campaign-analytics-operations/scripts/neon/generate-d1-05-w11-postgres-migration.test.mjs
+          node scripts/neon/d1-05/assert-remote-apply-release.mjs --validate-current-state
+      - name: Regenerate the admitted W11 PostgreSQL artifact
+        run: |
+          set -euo pipefail
+          node workers/W11-growth-campaign-analytics-operations/scripts/neon/generate-d1-05-w11-postgres-migration.mjs
+          git diff --exit-code -- workers/W11-growth-campaign-analytics-operations/src/neon-postgres-migrations-d1-05/0001_w11_d1_05_analytics_schema.sql
+      - name: Rehearse exact D1-05 schema and shared ledger on disposable PostgreSQL 18
+        env:
+          D1_SHARED_LOCAL_DATABASE_URL: postgresql://schema_generator:schema_generator_local_only@127.0.0.1:5432/alluck_d1_05_shared
+          GITHUB_SHA: \${{ github.sha }}
+          GITHUB_RUN_ID: \${{ github.run_id }}
+          GITHUB_RUN_ATTEMPT: \${{ github.run_attempt }}
+          D1_05_LOCAL_SCHEMA_APPLY_REPORT: artifacts/neon/d1-05-schema-runner-local-postflight.json
+        run: node scripts/neon/d1-05/remote-schema-runner.mjs --local-only
+      - name: Upload sanitized PostgreSQL 18 validation evidence
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: neon-d1-05-schema-only-runner-validation-\${{ github.run_id }}
+          path: artifacts/neon/d1-05-schema-runner-local-postflight.json
+          if-no-files-found: error
+          retention-days: 90
+
+  apply:
+    if: \${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.confirm_target == 'APPLY_REVIEWED_SCHEMA_D1_05_ALLLUCK_SCHEMA_ONLY' }}
+    name: Apply only admitted D1-05 W11 analytics schema to Neon allluck
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Guard exact main ref and D1-05 schema-only confirmation
+        shell: bash
+        env:
+          CONFIRM_TARGET: \${{ inputs.confirm_target }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/heads/main"
+          test "$CONFIRM_TARGET" = "APPLY_REVIEWED_SCHEMA_D1_05_ALLLUCK_SCHEMA_ONLY"
+      - name: Checkout the exact dispatched main commit
+        uses: actions/checkout@v4
+        with:
+          ref: \${{ github.sha }}
+          fetch-depth: 0
+      - name: Verify checkout provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+      - name: Require current source-pinned D1-05 review before reading Neon credentials
+        run: node scripts/neon/d1-05/assert-remote-apply-release.mjs --assert-ready
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install the pinned W02 PostgreSQL driver
+        working-directory: workers/W02-identity
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Enforce exact D1-05 target and full TLS verification
+        env:
+          NEON_DATABASE_URL_ALLLUCK: \${{ secrets.NEON_DATABASE_URL_ALLLUCK }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE' >> "$GITHUB_ENV"
+          const { appendFileSync } = await import('node:fs')
+          const {
+            validateD105RemoteNeonTarget,
+            enforceD105VerifiedNeonConnectionString,
+          } = await import('./scripts/neon/d1-05/remote-schema-runner.mjs')
+          const raw = process.env.NEON_DATABASE_URL_ALLLUCK
+          if (typeof raw !== 'string' || raw.length === 0) {
+            throw new Error('NEON_DATABASE_URL_ALLLUCK is required')
+          }
+          const verified = enforceD105VerifiedNeonConnectionString(raw)
+          const target = validateD105RemoteNeonTarget(verified)
+          if (!target.valid) throw new Error(target.reason)
+          process.stdout.write('::add-mask::' + verified + '\\n')
+          appendFileSync(process.env.GITHUB_ENV, 'NEON_DATABASE_URL_ALLLUCK_VERIFIED=' + verified + '\\n')
+          NODE
+      - name: Apply one admitted migration with append-only ledger and PostgreSQL 18 postflight
+        env:
+          GITHUB_ACTIONS: 'true'
+          GITHUB_REF: \${{ github.ref }}
+          GITHUB_SHA: \${{ github.sha }}
+          GITHUB_RUN_ID: \${{ github.run_id }}
+          GITHUB_RUN_ATTEMPT: \${{ github.run_attempt }}
+          D1_05_REMOTE_APPLY_CONFIRMATION: \${{ inputs.confirm_target }}
+          D1_05_SCHEMA_APPLY_REPORT: artifacts/neon/d1-05-schema-runner-remote-postflight.json
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/neon
+          node scripts/neon/d1-05/remote-schema-runner.mjs --remote-neon
+      - name: Upload sanitized D1-05 remote schema evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: neon-d1-05-remote-schema-postflight-\${{ github.run_id }}
+          path: artifacts/neon/d1-05-schema-runner-remote-postflight.json
+          if-no-files-found: error
+          retention-days: 90
