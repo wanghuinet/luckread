@@ -70,6 +70,16 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   } else if (mode === '--assert-reviewed-candidate') {
     const result = assertD104RemoteApplyReady({ currentHead: process.env.GITHUB_SHA || undefined })
     console.log('D1_04_REMOTE_SCHEMA_REVIEW_CANDIDATE_PASS ' + JSON.stringify(result))
+  } else if (mode === '--validate-review-state') {
+    if (reviewRecord?.status === 'REMOTE_RUNNER_REVIEW_PENDING' &&
+        reviewRecord?.remoteApplyReady === false &&
+        manifest?.remoteApplyReady === false &&
+        ledger?.execution?.domainReadiness?.['D1-04']?.remoteApplyReady === false) {
+      console.log('D1_04_REMOTE_SCHEMA_APPLY_BLOCKED_REVIEW_PENDING')
+    } else {
+      const result = assertD104RemoteApplyReady({ currentHead: process.env.GITHUB_SHA || undefined })
+      console.log('D1_04_REMOTE_SCHEMA_REVIEW_CANDIDATE_PASS ' + JSON.stringify(result))
+    }
   } else if (mode === '--expect-blocked') {
     if (reviewRecord?.status !== 'REMOTE_RUNNER_REVIEW_PENDING' ||
         reviewRecord?.remoteApplyReady !== false ||
