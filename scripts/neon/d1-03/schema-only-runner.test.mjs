@@ -6,7 +6,7 @@ import {
   validateD103RemoteNeonTarget,
   verifyD103RemoteTlsConnection,
   parseCommandLine as parseSharedCommandLine,
-} from '../shared-domain-schema-runner.mjs'
+} from './remote-schema-runner.mjs'
 import { parseCommandLine } from './schema-only-runner.mjs'
 import { assertD103RemoteApplyBlocked } from './assert-remote-apply-release.mjs'
 
