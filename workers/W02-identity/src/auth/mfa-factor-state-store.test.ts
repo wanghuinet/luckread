@@ -3,8 +3,6 @@ import { describe, expect, it } from 'vitest'
 
 import { createD1MfaFactorStateStore } from './mfa-factor-state-store.js'
 
-const NOW = '2026-11-09T12:00:00.000Z'
-
 const makeD1 = () => {
   const sqlite = new DatabaseSync(':memory:')
   sqlite.exec(
@@ -25,9 +23,9 @@ const makeD1 = () => {
   const db = {
     prepare(sql: string) {
       const statement = sqlite.prepare(sql)
-      let values: unknown[] = []
+      let values: (string | number | null)[] = []
       return {
-        bind(...next: unknown[]) {
+        bind(...next: (string | number | null)[]) {
           values = next
           return this
         },
@@ -35,7 +33,7 @@ const makeD1 = () => {
           return (statement.get(...values) as T | undefined) ?? null
         },
         async run() {
-          const result = statement.run(...values as (string | number | null)[])
+          const result = statement.run(...values)
           return { success: true, meta: { changes: Number(result.changes) } }
         },
       }
