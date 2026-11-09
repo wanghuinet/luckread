@@ -8,6 +8,7 @@ on:
       - 'workers/W01-payload/src/neon-postgres-schema.config.ts'
       - 'workers/W01-payload/src/neon-postgres-migrations/**'
       - 'workers/W01-payload/scripts/neon/**'
+      - 'workers/W01-payload/tests/postgres/**'
       - 'workers/W01-payload/README-neon-postgres-schema.md'
       - '.github/workflows/neon-w01-payload-postgres-schema.yml'
 
@@ -95,6 +96,14 @@ jobs:
           PAYLOAD_SCHEMA_REPORT: artifacts/neon/w01-payload-postgres-schema.json
         run: pnpm run neon:schema:verify
 
+      - name: Rehearse Payload Local API CRUD through the official PostgreSQL adapter
+        working-directory: workers/W01-payload
+        env:
+          NODE_ENV: development
+          PAYLOAD_SECRET: local-postgres-runtime-rehearsal-only
+          PAYLOAD_SCHEMA_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/luckread_schema
+        run: pnpm exec tsx tests/postgres/payload-runtime-rehearsal.ts
+
       - name: Create second disposable database for rollback guard testing
         env:
           PGPASSWORD: postgres
@@ -149,6 +158,7 @@ jobs:
             workers/W01-payload/src/neon-postgres-migrations/
             workers/W01-payload/artifacts/neon/w01-payload-postgres-schema.json
             workers/W01-payload/artifacts/neon/w01-payload-rollback-guard.json
+            workers/W01-payload/artifacts/neon/w01-payload-runtime-rehearsal.json
           if-no-files-found: error
           retention-days: 30
 
