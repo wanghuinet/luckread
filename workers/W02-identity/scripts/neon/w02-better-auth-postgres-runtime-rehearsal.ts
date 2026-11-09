@@ -657,7 +657,7 @@ try {
     {
       method: 'POST',
       headers: {
-        cookie: enrollmentCookieHeader,
+        cookie: cookieHeader,
         origin: 'https://luckread.com',
         'content-type': 'application/json',
         'X-LuckRead-Caller': 'W01',
@@ -788,7 +788,7 @@ try {
   const totp = totpCodeForUri(String(mfaEnrollmentPayload.data?.totpUri))
   const confirmKey = 'mfa-enrollment-confirm-' + nonce
   const confirmCode = totp.code
-  const mfaEnrollmentConfirmRequest = (code: string) => new Request(
+  const mfaEnrollmentConfirmRequest = (code: string, cookieHeader = enrollmentCookieHeader) => new Request(
     'https://luckread-w02.internal/internal/auth/mfa/enrollment/confirm',
     {
       method: 'POST',
@@ -850,6 +850,20 @@ try {
     'successful enrollment confirmation must forward the rotated HTTP-only session cookie')
   assert.ok(confirmCookies.every((cookie) => !cookie.includes(confirmCode)),
     'the TOTP code must never appear in a session cookie')
+
+  // Enabling MFA revokes pre-existing sessions in the PG lifecycle trigger.
+  // The exact replay must use the freshly rotated cookie returned here.
+  const rotatedCookiePairs = new Map<string, string>()
+  for (const setCookie of confirmCookies) {
+    const pair = setCookie.split(';', 1)[0]?.trim() ?? ''
+    const separator = pair.indexOf('=')
+    if (separator > 0 && pair.slice(separator + 1).length > 0) {
+      rotatedCookiePairs.set(pair.slice(0, separator), pair)
+    }
+  }
+  const rotatedSessionCookieHeader = [...rotatedCookiePairs.values()].join('; ')
+  assert.ok(rotatedSessionCookieHeader.length > 0,
+    'the enrollment-confirm response must provide a usable rotated session cookie')
 
   const confirmKeyHash = await sha256Hex(confirmKey)
   const confirmRequestHash = await sha256Hex(confirmKey + String.fromCharCode(0) + confirmCode)
@@ -916,14 +930,14 @@ try {
   // changing the code while reusing the same key is a hard conflict.
   const replayResponse = await handleMfaEnrollmentConfirmRequest(
     mfaEnrollmentEnv,
-    mfaEnrollmentConfirmRequest(confirmCode),
+    mfaEnrollmentConfirmRequest(confirmCode, rotatedSessionCookieHeader),
     mfaEnrollmentConfirmDependencies,
   )
   assert.equal(replayResponse.status, 200, 'same-key/same-code confirmation replay must be idempotent')
   const replayConflictCode = String((Number(confirmCode) + 1) % 1_000_000).padStart(6, '0')
   const replayConflictResponse = await handleMfaEnrollmentConfirmRequest(
     mfaEnrollmentEnv,
-    mfaEnrollmentConfirmRequest(replayConflictCode),
+    mfaEnrollmentConfirmRequest(replayConflictCode, rotatedSessionCookieHeader),
     mfaEnrollmentConfirmDependencies,
   )
   assert.equal(replayConflictResponse.status, 409,
