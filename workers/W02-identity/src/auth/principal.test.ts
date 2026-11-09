@@ -103,7 +103,7 @@ describe('W02 Better Auth principal authority', () => {
 
   it('resolves a Better Auth session through an injected PostgreSQL-compatible authority store', async () => {
     const now = '2026-10-07T20:00:00.000Z'
-    mocks.getSession.mockResolvedValueOnce({
+    const getSession = vi.fn().mockResolvedValueOnce({
       user: {
         id: 'pg-user-1',
         email: 'pg-user@example.com',
@@ -140,9 +140,10 @@ describe('W02 Better Auth principal authority', () => {
         headers: { cookie: 'better-auth.session_token=postgres-session' },
       }),
       now,
-      { store },
+      { store, getSession },
     )
 
+    expect(getSession).toHaveBeenCalledWith(expect.any(Headers))
     expect(store.activateEmailVerifiedAccount).toHaveBeenCalledWith('pg-user-1', now)
     expect(store.ensureVerifiedUserRole).toHaveBeenCalledWith('pg-user-1', now)
     expect(store.resolveGlobalLayer).toHaveBeenCalledWith('pg-user-1', 'ACTIVE', now, true)
