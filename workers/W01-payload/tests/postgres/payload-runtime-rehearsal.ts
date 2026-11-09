@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 
 import { getPayload } from 'payload'
 
-import config from '../../src/neon-postgres-runtime-test.config.ts'
+import config from '../../src/neon-postgres-runtime-test.config.js'
 
 const databaseUrl = process.env.PAYLOAD_SCHEMA_DATABASE_URL
 if (!databaseUrl) throw new Error('PAYLOAD_SCHEMA_DATABASE_URL is required')
@@ -115,7 +115,7 @@ try {
       collection: 'users',
       id: createdId,
       overrideAccess: true,
-    }).catch(() => undefined)
+    }).catch((): undefined => undefined)
   }
   await payload.destroy()
 }
