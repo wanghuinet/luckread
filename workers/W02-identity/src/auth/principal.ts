@@ -1,6 +1,9 @@
-import { activateEmailVerifiedAccount } from '../account/account-state-transition.js'
 import { createLuckReadAuth, type BetterAuthEnv } from './better-auth.js'
-import { ensureVerifiedUserRole, resolveGlobalLayer, type LayerResolution, type ResolvedRoleAssignment } from '../authz/role-assignment.js'
+import {
+  createD1PrincipalAuthorityStore,
+  type PrincipalAuthorityStore,
+} from './principal-store.js'
+import type { ResolvedRoleAssignment } from '../authz/role-assignment.js'
 
 type AuthSession = {
   user: {
@@ -26,21 +29,37 @@ export type AuthenticatedPrincipal = {
   roleAssignments: ResolvedRoleAssignment[]
 }
 
+export type PrincipalResolverDependencies = {
+  /** Provider injection is for controlled PostgreSQL rehearsal/admission only. */
+  store?: PrincipalAuthorityStore
+  /** A session reader already bound to the same provider as the injected store. */
+  getSession?: (headers: Headers) => Promise<unknown>
+}
+
 const toIso = (value: Date | string): string =>
   value instanceof Date ? value.toISOString() : new Date(value).toISOString()
 
+/**
+ * Resolve the authenticated Better Auth session and then reconcile the
+ * authoritative W02 account lifecycle and effective authorization facts.
+ *
+ * D1-01 remains the production default. A provider-matched store can be
+ * injected by the isolated PostgreSQL runtime rehearsal without changing
+ * the deployed Worker binding or Better Auth session authority.
+ */
 export async function resolveBetterAuthPrincipal(
   env: BetterAuthEnv,
   request: Request,
   now = new Date().toISOString(),
+  dependencies: PrincipalResolverDependencies = {},
 ): Promise<AuthenticatedPrincipal | null> {
-  const db = env.D1_01
-  const auth = createLuckReadAuth(env)
-
-  const result = await auth.api.getSession({
-    headers: request.headers,
-    query: {},
-  }) as AuthSession | null
+  const store = dependencies.store ?? createD1PrincipalAuthorityStore(env.D1_01)
+  const result = (dependencies.getSession
+    ? await dependencies.getSession(request.headers)
+    : await createLuckReadAuth(env).api.getSession({
+        headers: request.headers,
+        query: {},
+      })) as AuthSession | null
 
   if (!result?.user?.id || !result.session?.id) return null
 
@@ -61,16 +80,15 @@ export async function resolveBetterAuthPrincipal(
   // idempotent recovery path. It repairs a callback interrupted after token
   // verification without allowing unverified sessions to obtain L2.
   if (result.user.emailVerified === true) {
-    const activation = await activateEmailVerifiedAccount(db, String(result.user.id), now)
+    const activation = await store.activateEmailVerifiedAccount(String(result.user.id), now)
     accountState = activation.accountState
     accountStateVersion = activation.accountStateVersion
     if (accountState === 'ACTIVE') {
-      await ensureVerifiedUserRole(db, String(result.user.id), now)
+      await store.ensureVerifiedUserRole(String(result.user.id), now)
     }
   }
 
-  const layerResolution: LayerResolution = await resolveGlobalLayer(
-    db,
+  const layerResolution = await store.resolveGlobalLayer(
     String(result.user.id),
     accountState,
     now,

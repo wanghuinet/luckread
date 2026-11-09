@@ -100,4 +100,66 @@ describe('W02 Better Auth principal authority', () => {
       roleAssignments: [{ id: 'ra-1', roleId: 'creator', scopeType: 'global', scopeId: null }],
     })
   })
+
+  it('resolves a Better Auth session through an injected PostgreSQL-compatible authority store', async () => {
+    const now = '2026-10-07T20:00:00.000Z'
+    const getSession = vi.fn().mockResolvedValueOnce({
+      user: {
+        id: 'pg-user-1',
+        email: 'pg-user@example.com',
+        emailVerified: true,
+        accountState: 'PENDING_VERIFICATION',
+        accountStateVersion: 1,
+      },
+      session: {
+        id: 'pg-session-1',
+        expiresAt: new Date('2026-10-08T00:00:00.000Z'),
+      },
+    })
+    const store = {
+      activateEmailVerifiedAccount: vi.fn().mockResolvedValue({
+        accountState: 'ACTIVE',
+        accountStateVersion: 2,
+      }),
+      ensureVerifiedUserRole: vi.fn().mockResolvedValue(undefined),
+      resolveGlobalLayer: vi.fn().mockResolvedValue({
+        decision: 'ALLOW',
+        layer: 'L2',
+        roleAssignments: [{
+          id: 'verified-user-pg-user-1',
+          roleId: 'verified_user',
+          scopeType: 'global',
+          scopeId: null,
+        }],
+      }),
+    }
+    const env = {} as Parameters<typeof resolveBetterAuthPrincipal>[0]
+    const result = await resolveBetterAuthPrincipal(
+      env,
+      new Request('https://luckread.test', {
+        headers: { cookie: 'better-auth.session_token=postgres-session' },
+      }),
+      now,
+      { store, getSession },
+    )
+
+    expect(getSession).toHaveBeenCalledWith(expect.any(Headers))
+    expect(store.activateEmailVerifiedAccount).toHaveBeenCalledWith('pg-user-1', now)
+    expect(store.ensureVerifiedUserRole).toHaveBeenCalledWith('pg-user-1', now)
+    expect(store.resolveGlobalLayer).toHaveBeenCalledWith('pg-user-1', 'ACTIVE', now, true)
+    expect(result).toEqual({
+      userId: 'pg-user-1',
+      email: 'pg-user@example.com',
+      sessionId: 'pg-session-1',
+      accountState: 'ACTIVE',
+      accountStateVersion: 2,
+      layer: 'L2',
+      roleAssignments: [{
+        id: 'verified-user-pg-user-1',
+        roleId: 'verified_user',
+        scopeType: 'global',
+        scopeId: null,
+      }],
+    })
+  })
 })
