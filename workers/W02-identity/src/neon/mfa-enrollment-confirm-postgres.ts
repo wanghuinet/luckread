@@ -67,6 +67,9 @@ export function createPostgresMfaEnrollmentConfirmStore(pool: Pool): MfaEnrollme
         'UPDATE "user" SET mfa_enrollment_key_hash = NULL, ' +
           'mfa_enrollment_confirm_key_hash = $1, mfa_enrollment_confirm_request_hash = $2 ' +
           'WHERE id = $3 AND two_factor_enabled = TRUE ' +
+          'AND mfa_enrollment_key_hash IS NOT NULL ' +
+          'AND mfa_enrollment_confirm_key_hash IS NULL ' +
+          'AND mfa_enrollment_confirm_request_hash IS NULL ' +
           'AND EXISTS (SELECT 1 FROM "twoFactor" WHERE "userId" = $4 AND verified = TRUE) ' +
           'RETURNING id',
         [input.keyHash, input.requestHash, input.userId, input.userId],
