@@ -20,6 +20,31 @@ export function verifyCombinedSchemaContract({ contract, inventory, loadArtifact
       inventory?.target?.businessDataImport !== false || inventory?.target?.productionCutoverAuthorized !== false) {
     fail('combined target diverges from frozen D1-02 source inventory')
   }
+  const correction = contract.correctiveMigration ?? {}
+  if (correction.migrationId !== 'd1-02-w03-content-snowflake-timestamp-bigint-v1' ||
+      correction.ownerWorker !== 'W03' ||
+      correction.artifactPath !== 'workers/W03-content/src/neon-postgres-migrations/0002_w03_d1_02_content_snowflake_timestamp_bigint.sql' ||
+      correction.table !== 'content_id_snowflake_state' ||
+      correction.column !== 'last_timestamp_ms' ||
+      correction.previousPostgresType !== 'integer (signed 32-bit)' ||
+      correction.targetPostgresType !== 'bigint (signed 64-bit)' ||
+      correction.executionMode !== 'FORWARD_ONLY_ALTER_COLUMN' ||
+      correction.rewritesExistingRows !== false ||
+      correction.changesSnowflakeIDs !== false ||
+      correction.createsTables !== 0 ||
+      correction.businessDataImport !== false ||
+      correction.productionCutoverAuthorized !== false ||
+      correction.remoteApplyReady !== false) {
+    fail('W03 Snowflake millisecond corrective migration contract or safety state drift')
+  }
+  const correctionSql = loadArtifact(correction.artifactPath)
+  if (typeof correctionSql !== 'string' ||
+      !/^BEGIN;\s*$/m.test(correctionSql) ||
+      !/^COMMIT;\s*$/m.test(correctionSql) ||
+      !/ALTER TABLE public\.content_id_snowflake_state\s+ALTER COLUMN last_timestamp_ms TYPE BIGINT/i.test(correctionSql) ||
+      /\b(?:DROP|TRUNCATE)\s+TABLE\b|\bDELETE\s+FROM\b|\bUPDATE\s+contents\b/i.test(correctionSql)) {
+    fail('W03 corrective migration must be a transaction-wrapped forward-only BIGINT column alteration')
+  }
 
   const owners = contract.owners ?? []
   if (JSON.stringify(owners.map((item) => item.worker).sort()) !== JSON.stringify(['W03', 'W05'])) {
