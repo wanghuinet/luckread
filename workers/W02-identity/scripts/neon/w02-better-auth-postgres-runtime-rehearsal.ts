@@ -12,6 +12,7 @@ import { buildLuckReadAuth } from '../../src/auth/better-auth.js'
 import { buildMfaAuditEvent } from '../../src/auth/mfa-audit-events.js'
 import { handleCurrentUserSessionList } from '../../src/auth/session-list.js'
 import { handleCurrentUserSessionLogout } from '../../src/auth/session-logout.js'
+import { resolveBetterAuthPrincipal } from '../../src/auth/principal.js'
 import { handleCurrentUserSessionRevoke } from '../../src/auth/session-revoke.js'
 import {
   auth,
@@ -28,6 +29,7 @@ import { createPostgresMfaAuditOperationReceiptStore } from '../../src/neon/mfa-
 import { createPostgresSessionListStore } from '../../src/neon/session-list-postgres.js'
 import { createPostgresSessionLogoutStore } from '../../src/neon/session-logout-postgres-store.js'
 import { createPostgresSessionRevocationStore } from '../../src/neon/session-revocation-postgres-store.js'
+import { createPostgresPrincipalAuthorityStore } from '../../src/neon/principal-authority-postgres.js'
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url))
 const workerRoot = path.resolve(scriptDir, '../..')
@@ -300,6 +302,45 @@ try {
     throw new Error('W02_PG_RUNTIME_SESSION_ID_MISSING')
   }
   const currentSessionId = session.session.id
+
+  // Exercise the complete principal boundary with one provider-matched
+  // Better Auth session reader and PostgreSQL account/RoleAssignment store.
+  // The D1 placeholder is intentionally unused because both authorities are
+  // injected; this rehearsal never falls back to the production D1 binding.
+  const principalEnv = {
+    D1_01: undefined as unknown as D1Database,
+  } as Parameters<typeof resolveBetterAuthPrincipal>[0]
+  const principalAuthorityStore = createPostgresPrincipalAuthorityStore(postgresPool)
+  const resolvedPrincipal = await withTimeout('postgres-principal-authority-resolution', () =>
+    resolveBetterAuthPrincipal(
+      principalEnv,
+      new Request('https://luckread.com/internal/auth/principal', { headers: sessionHeaders }),
+      new Date().toISOString(),
+      {
+        store: principalAuthorityStore,
+        getSession: (headers) => auth.api.getSession({ headers, query: {} }),
+      },
+    ),
+  )
+  assert.ok(resolvedPrincipal, 'PostgreSQL principal store must resolve the real Better Auth session')
+  assert.equal(resolvedPrincipal.userId, userId)
+  assert.equal(resolvedPrincipal.accountState, 'ACTIVE')
+  assert.equal(resolvedPrincipal.accountStateVersion, 2)
+  assert.equal(resolvedPrincipal.layer, 'L2')
+  assert.deepEqual(resolvedPrincipal.roleAssignments, [
+    {
+      id: 'base-user-' + userId,
+      roleId: 'user',
+      scopeType: 'global',
+      scopeId: null,
+    },
+    {
+      id: 'verified-user-' + userId,
+      roleId: 'verified_user',
+      scopeType: 'global',
+      scopeId: null,
+    },
+  ])
 
   const sessionRows = await postgresPool.query(
     'SELECT COUNT(*)::integer AS count FROM "session" WHERE user_id = $1',
@@ -946,9 +987,9 @@ try {
   mfaEnrollmentConfirmed = true
 
   report = {
-    reportVersion: 7,
+    reportVersion: 8,
     status: 'W02_BETTER_AUTH_POSTGRES_RUNTIME_REHEARSAL_PASS',
-    scope: 'Better Auth core PostgreSQL runtime, L1/L2 role materialization, AUTH-013 activation, AUTH-007 MFA status, enrollment-start and enrollment-confirm HTTP handlers with provider-backed factor/replay/receipt stores, and AUTH-010 session-list, session-revocation and current-session logout HTTP adapters; D1 production remains authoritative.',
+    scope: 'Better Auth core PostgreSQL runtime, provider-bound principal resolution, L1/L2 role materialization, AUTH-013 activation, AUTH-007 MFA status/enrollment-start/enrollment-confirm HTTP handlers with provider-backed factor/replay/receipt stores, and AUTH-010 session-list, session-revocation and current-session logout HTTP adapters; D1 production remains authoritative.',
     betterAuthVersion: '1.7.8',
     adapter: 'Better Auth native PostgreSQL dialect via pg.Pool plus W02 PostgreSQL identity lifecycle, AUTH-007 MFA status/enrollment-start/enrollment-confirm and durable receipt hooks, AUTH-010 session-list, atomic session-revocation and current-session logout adapters',
     operationsVerified: [
@@ -965,6 +1006,7 @@ try {
       'SIGN_IN_EMAIL',
       'SESSION_PERSISTED',
       'GET_SESSION',
+      'POSTGRES_PRINCIPAL_AUTHORITY_STORE',
       'AUTH007_MFA_STATUS_HTTP_HANDLER',
       'AUTH007_MFA_STATUS_SECRET_FREE_PROJECTION',
       'AUTH007_MFA_ENROLLMENT_START_HTTP_HANDLER',
@@ -996,6 +1038,7 @@ try {
     activationReplaySafe: !activationReplay.activated,
     signedIn,
     signedOut,
+    principalAuthorityResolved: true,
     mfaEnrollmentStarted,
     mfaEnrollmentConfirmed,
     testUserRowsRemaining: 0,
