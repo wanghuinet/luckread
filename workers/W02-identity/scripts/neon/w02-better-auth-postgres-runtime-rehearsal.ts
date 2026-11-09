@@ -5,7 +5,9 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { AccountStateTransitionError } from '../../src/account/account-state-transition.js'
+import { handleMfaEnrollmentStartRequest } from '../../src/auth/mfa-enrollment-start.js'
 import { handleMfaStatusRequest } from '../../src/auth/mfa-status.js'
+import { buildMfaAuditEvent } from '../../src/auth/mfa-audit-events.js'
 import { handleCurrentUserSessionList } from '../../src/auth/session-list.js'
 import { handleCurrentUserSessionLogout } from '../../src/auth/session-logout.js'
 import { handleCurrentUserSessionRevoke } from '../../src/auth/session-revoke.js'
@@ -14,6 +16,7 @@ import {
   postgresLifecycleAdapters,
   postgresPool,
 } from '../../src/auth/neon-postgres-runtime-test.config.js'
+import { createPostgresMfaEnrollmentStartStore } from '../../src/neon/mfa-enrollment-start-postgres.js'
 import { createPostgresMfaStatusStore } from '../../src/neon/mfa-factor-state-postgres.js'
 import { createPostgresSessionListStore } from '../../src/neon/session-list-postgres.js'
 import { createPostgresSessionLogoutStore } from '../../src/neon/session-logout-postgres-store.js'
@@ -55,6 +58,7 @@ let signedIn = false
 let signedOut = false
 let revocationTargetSessionId: string | undefined
 let logoutSessionId: string | undefined
+let mfaEnrollmentStarted = false
 let primaryError: unknown
 let report: Record<string, unknown> | undefined
 let cleanupVerified = false
@@ -573,12 +577,153 @@ try {
   )
   assert.equal(Number(afterSignOut.rows[0]?.count), 0)
 
+  // Exercise the actual W01 -> W02 MFA enrollment-start HTTP handler against
+  // Better Auth's native PostgreSQL adapter. This happens after the logout
+  // assertion so the factor lifecycle cannot interfere with AUTH-010 evidence.
+  const enrollmentSignIn = await withTimeout('mfa-enrollment-start-sign-in', () =>
+    auth.api.signInEmail({
+      body: { email, password, rememberMe: true },
+      returnHeaders: true,
+    }),
+  )
+  assert.equal(enrollmentSignIn.response.user.id, userId)
+  const enrollmentCookieSource = enrollmentSignIn.headers as Headers & { getSetCookie?: () => string[] }
+  const enrollmentCookieHeader = (enrollmentCookieSource.getSetCookie?.() ??
+    [enrollmentSignIn.headers.get('set-cookie') ?? ''])
+    .map((value) => value.split(';', 1)[0])
+    .filter((value) => value.includes('='))
+    .join('; ')
+  assert.ok(enrollmentCookieHeader.length > 0, 'MFA enrollment sign-in must issue a session cookie')
+
+  const mfaEnrollmentEnv = {
+    D1_01: undefined as unknown as D1Database,
+    AUTH_SESSION_WRITE_LIMITER: {
+      limit: async (_input: { key: string }) => ({ success: true }),
+    },
+  }
+  const mfaEnrollmentStore = createPostgresMfaEnrollmentStartStore(postgresPool)
+  const mfaEnrollmentRequest = () => new Request(
+    'https://luckread-w02.internal/internal/auth/mfa/enrollment/start',
+    {
+      method: 'POST',
+      headers: {
+        cookie: enrollmentCookieHeader,
+        origin: 'https://luckread.com',
+        'content-type': 'application/json',
+        'X-LuckRead-Caller': 'W01',
+        'X-LuckRead-Transport-Version': '1.0',
+        'Idempotency-Key': 'mfa-enrollment-start-' + nonce,
+        'X-LuckRead-Correlation-Id': 'mfa-enrollment-trace-' + nonce,
+        'X-LuckRead-Request-Id': 'req_mfa_enrollment_' + nonce,
+      },
+      body: JSON.stringify({ currentPassword: password }),
+    },
+  )
+  const mfaEnrollmentDependencies = {
+    auth,
+    store: mfaEnrollmentStore,
+    resolvePrincipal: async (_env: unknown, request: Request) => {
+      const activeSession = await auth.api.getSession({ headers: request.headers, query: {} })
+      if (!activeSession?.user?.id) return null
+      return {
+        userId: String(activeSession.user.id),
+        accountState: String(activeSession.user.accountState ?? 'PENDING_VERIFICATION'),
+      }
+    },
+  }
+  const mfaEnrollmentResponse = await withTimeout('auth007-postgres-enrollment-start-handler', () =>
+    handleMfaEnrollmentStartRequest(
+      mfaEnrollmentEnv,
+      mfaEnrollmentRequest(),
+      mfaEnrollmentDependencies,
+    ),
+  )
+  assert.equal(mfaEnrollmentResponse.status, 200, 'PostgreSQL MFA enrollment-start handler must succeed')
+  const mfaEnrollmentPayload = await mfaEnrollmentResponse.json() as {
+    data?: { totpUri?: unknown; recoveryCodes?: unknown[] }
+  }
+  assert.equal(typeof mfaEnrollmentPayload.data?.totpUri, 'string')
+  assert.ok(
+    String(mfaEnrollmentPayload.data?.totpUri).startsWith('otpauth://totp/'),
+    'MFA enrollment must return the Better Auth TOTP URI to the authenticated caller',
+  )
+  assert.ok(
+    Array.isArray(mfaEnrollmentPayload.data?.recoveryCodes) &&
+      mfaEnrollmentPayload.data.recoveryCodes.length >= 1 &&
+      mfaEnrollmentPayload.data.recoveryCodes.every((code) => typeof code === 'string'),
+    'MFA enrollment must return one-time recovery codes to the authenticated caller',
+  )
+
+  const enrollmentAccount = await postgresPool.query<{ enrollmentKeyHash: string | null }>(
+    'SELECT mfa_enrollment_key_hash AS "enrollmentKeyHash" FROM "user" WHERE id = $1',
+    [userId],
+  )
+  assert.equal(enrollmentAccount.rowCount, 1)
+  assert.match(enrollmentAccount.rows[0]?.enrollmentKeyHash ?? '', /^[a-f0-9]{64}$/,
+    'only the hashed enrollment idempotency key may be persisted')
+  const enrollmentFactor = await postgresPool.query<{ userId: string; secret: string }>(
+    'SELECT "userId", secret FROM "twoFactor" WHERE "userId" = $1',
+    [userId],
+  )
+  assert.equal(enrollmentFactor.rowCount, 1, 'Better Auth PostgreSQL adapter must persist the pending TOTP factor')
+  assert.equal(enrollmentFactor.rows[0]?.userId, userId)
+  assert.ok(enrollmentFactor.rows[0]?.secret, 'pending factor secret must be persisted by Better Auth')
+  const enrollmentJournal = await postgresPool.query<{ payload: string }>(
+    'SELECT payload FROM auth_007_mfa_publication_journal ' +
+      'WHERE resource_id = $1 AND event_type = $2',
+    [userId, 'auth.mfa.enrollment_started'],
+  )
+  assert.equal(enrollmentJournal.rowCount, 1, 'reservation and enrollment_started audit must commit atomically')
+  const enrollmentEvent = JSON.parse(enrollmentJournal.rows[0]?.payload ?? '{}')
+  assert.equal(enrollmentEvent.payload.operationId, 'authMfaEnrollmentStart')
+  assert.equal(enrollmentEvent.payload.result, 'started')
+  assert.equal(enrollmentEvent.payload.factorState, 'PENDING_VERIFICATION')
+  assert.ok(!JSON.stringify(enrollmentEvent).includes(password))
+  assert.ok(!JSON.stringify(enrollmentEvent).includes(String(mfaEnrollmentPayload.data?.totpUri)))
+  for (const code of mfaEnrollmentPayload.data?.recoveryCodes ?? []) {
+    assert.ok(!JSON.stringify(enrollmentEvent).includes(String(code)))
+  }
+
+  const competingReservation = await mfaEnrollmentStore.reserve({
+    userId,
+    keyHash: 'b'.repeat(64),
+    event: buildMfaAuditEvent({
+      eventType: 'auth.mfa.enrollment_started',
+      operationId: 'authMfaEnrollmentStart',
+      userId,
+      occurredAt: new Date().toISOString(),
+      result: 'started',
+      reasonCode: 'USER_INITIATED',
+      factorState: 'PENDING_VERIFICATION',
+    }),
+  })
+  assert.equal(competingReservation, false, 'a competing enrollment key must not replace the pending factor')
+  const enrollmentJournalCount = await postgresPool.query<{ count: number }>(
+    'SELECT COUNT(*)::integer AS count FROM auth_007_mfa_publication_journal ' +
+      'WHERE resource_id = $1 AND event_type = $2',
+    [userId, 'auth.mfa.enrollment_started'],
+  )
+  assert.equal(Number(enrollmentJournalCount.rows[0]?.count), 1,
+    'a rejected competing reservation must not append a second started event')
+
+  await mfaEnrollmentStore.releaseReservationIfNoFactor(userId, enrollmentAccount.rows[0]!.enrollmentKeyHash!)
+  const protectedEnrollmentReservation = await postgresPool.query<{ enrollmentKeyHash: string | null }>(
+    'SELECT mfa_enrollment_key_hash AS "enrollmentKeyHash" FROM "user" WHERE id = $1',
+    [userId],
+  )
+  assert.equal(
+    protectedEnrollmentReservation.rows[0]?.enrollmentKeyHash,
+    enrollmentAccount.rows[0]?.enrollmentKeyHash,
+    'a materialized TOTP factor must prevent reservation release',
+  )
+  mfaEnrollmentStarted = true
+
   report = {
-    reportVersion: 5,
+    reportVersion: 6,
     status: 'W02_BETTER_AUTH_POSTGRES_RUNTIME_REHEARSAL_PASS',
-    scope: 'Better Auth core PostgreSQL runtime, L1/L2 role materialization, AUTH-013 email-verification activation and journal, AUTH-007 MFA status read handler, and AUTH-010 PostgreSQL session-list, session-revocation and current-session logout HTTP adapters; D1 production remains authoritative.',
+    scope: 'Better Auth core PostgreSQL runtime, L1/L2 role materialization, AUTH-013 activation, AUTH-007 MFA status and enrollment-start HTTP handlers, and AUTH-010 session-list, session-revocation and current-session logout HTTP adapters; D1 production remains authoritative.',
     betterAuthVersion: '1.7.8',
-    adapter: 'Better Auth native PostgreSQL dialect via pg.Pool plus W02 PostgreSQL identity lifecycle, AUTH-007 MFA status, AUTH-010 session-list, atomic session-revocation and current-session logout adapters',
+    adapter: 'Better Auth native PostgreSQL dialect via pg.Pool plus W02 PostgreSQL identity lifecycle, AUTH-007 MFA status/enrollment-start, AUTH-010 session-list, atomic session-revocation and current-session logout adapters',
     operationsVerified: [
       'SIGN_UP_EMAIL',
       'BASE_USER_L1_ROLE_PERSISTED',
@@ -595,6 +740,11 @@ try {
       'GET_SESSION',
       'AUTH007_MFA_STATUS_HTTP_HANDLER',
       'AUTH007_MFA_STATUS_SECRET_FREE_PROJECTION',
+      'AUTH007_MFA_ENROLLMENT_START_HTTP_HANDLER',
+      'AUTH007_MFA_ENROLLMENT_RESERVATION_AND_AUDIT_ATOMIC',
+      'AUTH007_MFA_ENROLLMENT_SECRET_AND_RECOVERY_CODE_RESPONSE',
+      'AUTH007_MFA_ENROLLMENT_COMPETING_RESERVATION_REJECTED',
+      'AUTH007_MFA_ENROLLMENT_RESERVATION_RELEASE_GUARDED_BY_FACTOR',
       'AUTH010_SESSION_LIST_FIRST_PAGE',
       'AUTH010_SESSION_LIST_KEYSET_PAGINATION',
       'AUTH010_SESSION_LIST_NO_SECRET_PROJECTION',
@@ -614,6 +764,7 @@ try {
     activationReplaySafe: !activationReplay.activated,
     signedIn,
     signedOut,
+    mfaEnrollmentStarted,
     testUserRowsRemaining: 0,
     productionAuthorityChanged: false,
     neonConnectionAttempted: false,
@@ -655,6 +806,11 @@ try {
         'DELETE FROM auth_013_publication_journal WHERE resource_id = $1',
         [cleanupUserId],
       )
+      await postgresPool.query(
+        'DELETE FROM auth_007_mfa_publication_journal WHERE resource_id = $1',
+        [cleanupUserId],
+      )
+      await postgresPool.query('DELETE FROM "twoFactor" WHERE "userId" = $1', [cleanupUserId])
       await postgresPool.query('DELETE FROM "session" WHERE user_id = $1', [cleanupUserId])
       await postgresPool.query('DELETE FROM "account" WHERE user_id = $1', [cleanupUserId])
       await postgresPool.query('DELETE FROM role_assignments WHERE subject_id = $1', [cleanupUserId])
@@ -669,6 +825,8 @@ try {
         (SELECT COUNT(*) FROM "session" WHERE user_id = COALESCE($2, '')) AS sessions,
         (SELECT COUNT(*) FROM "verification" WHERE identifier = $1) AS verifications,
         (SELECT COUNT(*) FROM auth_013_publication_journal WHERE resource_id = COALESCE($2, '')) AS journals,
+        (SELECT COUNT(*) FROM auth_007_mfa_publication_journal WHERE resource_id = COALESCE($2, '')) AS mfa_journals,
+        (SELECT COUNT(*) FROM "twoFactor" WHERE "userId" = COALESCE($2, '')) AS mfa_factors,
         (SELECT COUNT(*) FROM role_assignments WHERE subject_id = COALESCE($2, '')) AS role_assignments,
         (SELECT COUNT(*) FROM role_authorization_versions WHERE subject_id = COALESCE($2, '')) AS role_versions,
         (SELECT COUNT(*) FROM auth_010_session_revocation_journal WHERE resource_id = COALESCE($3, '')) AS session_revocation_journals,
