@@ -267,7 +267,9 @@ try {
   checks.legacyLockoutEventIdentityIsAdoptedBeforeEmission = true
 
   const terminalKey = 'mfa-operation:reconcile:' + suffix + ':failed'
+  const terminalEventId = 'evt_' + randomUUID().replaceAll('-', '')
   const terminalInput = {
+    eventId: terminalEventId,
     eventType: 'auth.mfa.challenge_succeeded' as const,
     operationId: 'authMfaChallengeVerify',
     userId: userIds.terminal,
@@ -281,7 +283,7 @@ try {
   await insertJournal(terminalInput, 'FAILED')
   const terminalReceipt = await makeReadyReceipt(
     userIds.terminal,
-    makeEvent(userIds.terminal, terminalKey),
+    makeEvent(userIds.terminal, terminalKey, { eventId: terminalEventId }),
   )
   const terminalSummary = await reconcileMfaAuditOperationReceiptsPostgres(pool, now, 1)
   assert.deepEqual(terminalSummary, { selected: 1, emitted: 0, failed: 0, unknown: 1 })
