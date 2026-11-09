@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { validateD1_02ReleaseState } from './assert-remote-apply-release.mjs'
+import { validateD1_02BlockedReleaseState, validateD1_02ReleaseState } from './assert-remote-apply-release.mjs'
 
 const reviewRef='contracts/database/neon-d1-02-remote-runner-review.v1.json'
 const d1ReviewRef='contracts/database/neon-d1-01-remote-runner-review.v1.json'
@@ -38,4 +38,30 @@ test('keeps D1-03 through D1-05 blocked and rejects missing review refs', () => 
   assert.equal(validateD1_02ReleaseState({manifest,ledgerContract:unblocked,reviewValid:true}),false)
   const noRef=structuredClone(ledgerContract); delete noRef.execution.domainReadiness['D1-02'].reviewEvidenceRef
   assert.equal(validateD1_02ReleaseState({manifest,ledgerContract:noRef,reviewValid:true}),false)
+})
+
+
+test('holds D1-02 remote DDL closed while the forward-only Snowflake correction awaits a refreshed release review', () => {
+  const corrective = {
+    status:'CORRECTIVE_MIGRATION_LOCAL_READY_RELEASE_REVIEW_PENDING',
+    domainId:'D1-02',
+    databaseName:'luckreadpro',
+    remoteApplyReady:false,
+    businessDataImport:false,
+    productionCutoverAuthorized:false,
+    expected:{ migrationLedgerRows:3 },
+    execution:{ runnerStatus:'IMPLEMENTED_LOCAL_ONLY_RELEASE_REVIEW_PENDING', remoteApplyReady:false, reviewEvidenceRef:null },
+    entries:[
+      { migrationId:'d1-02-w03-content-schema-v1', ownerWorker:'W03', kind:'GENERATED_POSTGRESQL_SQL' },
+      { migrationId:'d1-02-w05-social-schema-v1', ownerWorker:'W05', kind:'GENERATED_POSTGRESQL_SQL' },
+      { migrationId:'d1-02-w03-content-snowflake-timestamp-bigint-v1', ownerWorker:'W03', kind:'POSTGRESQL_SQL', expectedTableCount:0 }
+    ]
+  }
+  assert.equal(validateD1_02BlockedReleaseState({ manifest:corrective }),true)
+  const prematurelyReleased = structuredClone(corrective)
+  prematurelyReleased.remoteApplyReady = true
+  assert.equal(validateD1_02BlockedReleaseState({ manifest:prematurelyReleased }),false)
+  const badMigration = structuredClone(corrective)
+  badMigration.entries[2].expectedTableCount = 9
+  assert.equal(validateD1_02BlockedReleaseState({ manifest:badMigration }),false)
 })

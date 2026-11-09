@@ -123,6 +123,20 @@ BEGIN
     RAISE EXCEPTION 'W03 Snowflake allocator singleton state missing or drifted';
   END IF;
 
+  IF (SELECT data_type FROM information_schema.columns
+       WHERE table_schema='public' AND table_name='content_id_snowflake_state'
+         AND column_name='last_timestamp_ms') <> 'bigint' THEN
+    RAISE EXCEPTION 'W03 Snowflake last_timestamp_ms must be BIGINT in PostgreSQL';
+  END IF;
+
+  UPDATE content_id_snowflake_state
+     SET last_timestamp_ms=1800000000000::BIGINT,sequence=0
+   WHERE id=1;
+  IF NOT EXISTS (SELECT 1 FROM content_id_snowflake_state
+    WHERE id=1 AND last_timestamp_ms=1800000000000::BIGINT AND sequence=0) THEN
+    RAISE EXCEPTION 'W03 Snowflake allocator cannot store current Unix millisecond timestamps';
+  END IF;
+
   IF (SELECT data_type FROM information_schema.columns WHERE table_schema='public' AND table_name='contents' AND column_name='created_at') <> 'timestamp with time zone'
      OR (SELECT data_type FROM information_schema.columns WHERE table_schema='public' AND table_name='social_notifications' AND column_name='payload_json') <> 'text'
      OR (SELECT data_type FROM information_schema.columns WHERE table_schema='public' AND table_name='contents' AND column_name='media_refs_json') <> 'text'

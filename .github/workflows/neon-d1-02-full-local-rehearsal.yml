@@ -122,8 +122,8 @@ jobs:
           if (report.database !== 'luckread_d1_02_schema' || report.postgresMajor !== 18 ||
               report.tables !== 28 || report.explicitIndexes !== 63 || report.triggers !== 9 ||
               report.triggerFunctions !== 10 || report.businessRows !== 0 ||
-              report.snowflakeAllocatorRows !== 1 || report.migrationLedgerRows !== 2 ||
-              report.migrationLedgerTotalRows !== 2 || report.d1_03EndpointTablePresent ||
+              report.snowflakeAllocatorRows !== 1 || report.migrationLedgerRows !== 3 ||
+              report.migrationLedgerTotalRows !== 3 || report.d1_03EndpointTablePresent ||
               report.foreignKeyCount !== 0 || report.remoteNeonTouched ||
               report.cloudflareD1Touched || report.businessDataImported) {
             throw new Error('Combined D1-02 PostgreSQL 18 postflight mismatch: ' + JSON.stringify(report))

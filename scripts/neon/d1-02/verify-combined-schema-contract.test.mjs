@@ -8,7 +8,9 @@ const root = process.cwd()
 const contract = JSON.parse(readFileSync(path.join(root, 'contracts/database/neon-d1-02-combined-schema.v1.json'), 'utf8'))
 const inventory = JSON.parse(readFileSync(path.join(root, 'contracts/database/neon-d1-02-schema-sources.v1.json'), 'utf8'))
 const artifacts = new Map(contract.owners.map((owner) => [owner.worker, readFileSync(path.join(root, owner.artifactPath), 'utf8')]))
+const correctiveMigrationSql = readFileSync(path.join(root, contract.correctiveMigration.artifactPath), 'utf8')
 const loadArtifact = (file) => {
+  if (file === contract.correctiveMigration.artifactPath) return correctiveMigrationSql
   const owner = contract.owners.find((item) => item.artifactPath === file)
   return owner ? artifacts.get(owner.worker) : null
 }
@@ -57,4 +59,16 @@ test('combined contract rejects source inventory count drift', () => {
   const invalid = clone(inventory)
   invalid.owners.find((item) => item.worker === 'W03').sqlMigrations.pop()
   assert.throws(() => verifyCombinedSchemaContract({ contract, inventory:invalid, loadArtifact }), /migration source inventory drift/)
+})
+
+
+test('W03 Snowflake timestamp correction is a forward-only BIGINT alteration and remains remote-blocked', () => {
+  const correction = contract.correctiveMigration
+  assert.equal(correction.ownerWorker, 'W03')
+  assert.equal(correction.previousPostgresType, 'integer (signed 32-bit)')
+  assert.equal(correction.targetPostgresType, 'bigint (signed 64-bit)')
+  assert.equal(correction.remoteApplyReady, false)
+  assert.match(correctiveMigrationSql, /ALTER COLUMN last_timestamp_ms TYPE BIGINT/i)
+  assert.doesNotMatch(correctiveMigrationSql, /DROP TABLE|TRUNCATE TABLE|DELETE FROM|UPDATE contents/i)
+  assert.equal(verifyCombinedSchemaContract({ contract, inventory, loadArtifact }).safety.remoteDdlExecuted, false)
 })
