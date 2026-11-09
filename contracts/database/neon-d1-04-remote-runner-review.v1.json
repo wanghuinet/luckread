@@ -3,9 +3,9 @@
   "$id": "https://luckread.com/contracts/database/neon-d1-04-remote-runner-review.v1.json",
   "title": "LuckRead D1-04 W07 Remote Schema Runner Review and Release",
   "version": "1.0.0",
-  "status": "REMOTE_RUNNER_REVIEW_PENDING",
+  "status": "AI_REVIEW_PASS_NO_BLOCKING_FINDINGS",
   "repository": "wanghuinet/luckread",
-  "remoteApplyReady": false,
+  "remoteApplyReady": true,
   "target": {
     "domainId": "D1-04",
     "databaseName": "luckread_finance",
@@ -17,23 +17,55 @@
     "productionCutoverAuthorized": false
   },
   "review": {
-    "reviewer": null,
-    "reviewType": null,
-    "reviewedAt": null,
-    "reviewedMainSha": null,
-    "implementationMergeSha": null,
-    "result": "PENDING",
+    "reviewer": "GPT-6",
+    "reviewType": "GPT-6 code-path audit plus current-main SHA and CI evidence reconciliation",
+    "reviewedAt": "2026-11-09",
+    "reviewedMainSha": "745e68501ad292eb7d51556006a85d026330dc45",
+    "implementationMergeSha": "745e68501ad292eb7d51556006a85d026330dc45",
+    "result": "NO_BLOCKING_FINDINGS",
     "formalGitHubReviewSubmissions": 0,
-    "findings": [
-      "D1-04 remote run 42553336881 committed all six W07 schema migrations and their ledger rows, then failed final index catalog verification because pg_indexes included PostgreSQL constraint-backed indexes in the explicit-index comparison."
-    ],
+    "findings": [],
     "limitations": [
-      "The D1-04 runner/index catalog correction is pending CI validation and a fresh source-pinned review.",
-      "No submitted GitHub review records are present; the prior GPT-6 code review is not a human GitHub APPROVE review.",
-      "Remote Neon DDL execution history is recorded in executionHistory; run 42553336881 applied the six schema migrations but failed final catalog verification.",
+      "No submitted GitHub review records are present; this is a GPT-6 code review, not a human GitHub APPROVE review.",
+      "The corrected D1-04 runner and catalog verification were validated by source-equivalent PR CI run 42553780174. The validation head is 1704b435374be1e5f773915092de145548b173c2 and all eight reviewed source blobs match the merged main tree at 745e68501ad292eb7d51556006a85d026330dc45. The workflow's remote apply job was skipped; the local PostgreSQL 18 rehearsal ran without Neon credentials.",
+      "Remote Neon DDL execution history is recorded in executionHistory; run 42553336881 applied the six schema migrations and committed six ledger rows, verified 15 tables and zero business rows, then failed only final catalog index classification.",
+      "The corrected final catalog verifier separates the 31 manifest-declared explicit indexes from the exact 29 primary-key/unique-constraint-backed indexes observed in the prior remote catalog. A final remote retry/postflight is still required to produce fresh target evidence.",
       "Neon database UUID is pinned from existing W07 D1_04 Wrangler metadata; PostgreSQL SQL cannot independently verify the Neon control-plane UUID."
     ],
-    "reviewedFiles": []
+    "reviewedFiles": [
+      {
+        "path": "scripts/neon/d1-04/schema-only-runner.mjs",
+        "gitBlobSha1": "a22b7e6e55b0ca3731df0285d16674b1b042b87f"
+      },
+      {
+        "path": "scripts/neon/d1-04/schema-only-runner.test.mjs",
+        "gitBlobSha1": "00a36d6f24393bc67189a209197f2406950d4ef3"
+      },
+      {
+        "path": ".github/workflows/neon-d1-04-reviewed-remote-schema-apply.yml",
+        "gitBlobSha1": "820ad4212f4fcd8a51eaa129d9310e95b07978f8"
+      },
+      {
+        "path": "scripts/neon/d1-04/remote-runner-review.mjs",
+        "gitBlobSha1": "f3482ea5b118b41f9cc844edcdca0df9db6e81e2"
+      },
+      {
+        "path": "scripts/neon/d1-04/assert-remote-apply-release.mjs",
+        "gitBlobSha1": "872f8fa8bf3a75d9782910f7d8780490ab13def9"
+      },
+      {
+        "path": "contracts/database/neon-d1-04-shared-migration-manifest.v1.json",
+        "gitBlobSha1": "42b1cc84daa1a50f8ff4bfcea336006d8cab5a41"
+      },
+      {
+        "path": "contracts/database/neon-d1-04-shared-runner-independent-review.v1.json",
+        "gitBlobSha1": "cd3897130108968305b9109b98026be8efc5f187"
+      },
+      {
+        "path": "workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0001_w07_d1_04_order_payment_schema.sql",
+        "gitBlobSha1": "27020aef0c4cd911b290b159553d3c41f9705c0c"
+      }
+    ]
   },
   "verificationEvidence": {
     "d1_04SharedPostgres18": {
@@ -42,22 +74,54 @@
       "url": "https://github.com/wanghuinet/luckread/actions/runs/42509822425"
     },
     "remoteRunnerValidation": {
-      "runId": 42549185345,
+      "runId": 42553780174,
       "conclusion": "success",
-      "headSha": "eef683ccb141e8dead433b834803a3bfdc733233",
-      "sourceCommitSha": "f96fc13f44ae46250c2afd000a30557717a35578",
-      "headBranch": "review/neon-d1-04-remote-runner-release",
+      "headSha": "1704b435374be1e5f773915092de145548b173c2",
+      "sourceCommitSha": "4cba8141a2a34b287160c84a749d47218c54c503",
+      "headBranch": "fix/neon-d1-04-constraint-index-catalog-20261109",
       "validationScope": "D1_04_SCHEMA_ONLY_LOCAL_PG18_NO_NEON_CREDENTIALS",
-      "url": "https://github.com/wanghuinet/luckread/actions/runs/42549185345",
+      "url": "https://github.com/wanghuinet/luckread/actions/runs/42553780174",
       "remoteApplyJob": "skipped",
-      "artifactId": 13644956340,
-      "artifactDigest": "sha256:f81abbd7b55fee3e36584956e5550cf2f40f1d66010235bd08b16b1711a43152"
+      "artifactId": 13646875712,
+      "artifactDigest": "sha256:8fb6f14737131e708f65beb1c183cc9516b3dad9a28b90f73745dfde3fe165c7"
     },
     "catalogPostflight": {
       "postgresMajor": 18,
       "migrations": 6,
       "tables": 15,
       "explicitIndexes": 31,
+      "constraintIndexes": 29,
+      "constraintIndexNames": [
+        "billing_documents_pkey",
+        "order_create_idempotency_customer_id_operation_key_idempote_key",
+        "order_create_idempotency_pkey",
+        "order_lines_pkey",
+        "orders_pkey",
+        "payment_mandates_pkey",
+        "payment_mandates_provider_merchant_id_source_event_id_key",
+        "payment_mandates_provider_merchant_id_source_payment_id_key",
+        "payment_method_revocation_requests_pkey",
+        "payment_provider_event_confli_provider_merchant_id_event_id_key",
+        "payment_provider_event_conflicts_pkey",
+        "payment_provider_events_pkey",
+        "payment_provider_events_provider_merchant_id_event_id_key",
+        "payments_customer_id_idempotency_key_key",
+        "payments_pkey",
+        "refunds_pkey",
+        "revenuecat_webhook_event_conflicts_pkey",
+        "revenuecat_webhook_events_pkey",
+        "saved_payment_methods_pkey",
+        "saved_payment_methods_provider_merchant_id_payment_method_i_key",
+        "subscription_renewal_cycles_pkey",
+        "subscription_renewal_scheduler_state_pkey",
+        "uq_billing_documents_number",
+        "uq_billing_documents_type_order",
+        "uq_payment_method_revocation_saved_method",
+        "uq_refunds_customer_idempotency",
+        "uq_refunds_provider_merchant_refund",
+        "uq_revenuecat_webhook_event_conflicts_payload",
+        "uq_revenuecat_webhook_events_app_event"
+      ],
       "triggers": 72,
       "triggerFunctions": 6,
       "foreignKeys": 0,
