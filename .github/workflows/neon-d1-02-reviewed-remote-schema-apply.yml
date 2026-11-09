@@ -54,7 +54,7 @@ jobs:
           node --check scripts/neon/d1-02/remote-runner-review.mjs
           node --check scripts/neon/d1-02/assert-remote-apply-release.mjs
           node --test scripts/neon/d1-02/schema-only-runner.test.mjs scripts/neon/d1-02/remote-runner-review.test.mjs scripts/neon/d1-02/assert-remote-apply-release.test.mjs
-          node scripts/neon/d1-02/assert-remote-apply-release.mjs --assert-ready
+          node scripts/neon/d1-02/assert-remote-apply-release.mjs --expect-blocked
 
   apply:
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.confirm_target == 'APPLY_REVIEWED_SCHEMA_D1_02_LUCKREADPRO' }}
