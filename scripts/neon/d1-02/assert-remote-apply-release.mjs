@@ -41,6 +41,24 @@ export function validateD1_02ReleaseState({ manifest: manifestValue, ledgerContr
     laterDomainsBlocked
 }
 
+export function validateD1_02BlockedReleaseState({ manifest: manifestValue = manifest } = {}) {
+  return manifestValue?.status === 'CORRECTIVE_MIGRATION_LOCAL_READY_RELEASE_REVIEW_PENDING' &&
+    manifestValue?.domainId === 'D1-02' &&
+    manifestValue?.databaseName === 'luckreadpro' &&
+    manifestValue?.remoteApplyReady === false &&
+    manifestValue?.businessDataImport === false &&
+    manifestValue?.productionCutoverAuthorized === false &&
+    manifestValue?.execution?.runnerStatus === 'IMPLEMENTED_LOCAL_ONLY_RELEASE_REVIEW_PENDING' &&
+    manifestValue?.execution?.remoteApplyReady === false &&
+    manifestValue?.execution?.reviewEvidenceRef === null &&
+    manifestValue?.expected?.migrationLedgerRows === 3 &&
+    manifestValue?.entries?.length === 3 &&
+    manifestValue?.entries?.[2]?.migrationId === 'd1-02-w03-content-snowflake-timestamp-bigint-v1' &&
+    manifestValue?.entries?.[2]?.ownerWorker === 'W03' &&
+    manifestValue?.entries?.[2]?.kind === 'POSTGRESQL_SQL' &&
+    manifestValue?.entries?.[2]?.expectedTableCount === 0
+}
+
 export function assertD1_02RemoteApplyReady({ root: repositoryRoot = root, currentHead } = {}) {
   const evidence = validateD1_02RemoteRunnerReview({ root: repositoryRoot, currentHead })
   if (!evidence.valid) fail('review evidence invalid: ' + evidence.errors.join('; '))
@@ -53,7 +71,12 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   if (process.argv[2] === '--assert-ready' || process.argv[2] === '--assert-configured') {
     const result = assertD1_02RemoteApplyReady({ currentHead: process.env.GITHUB_SHA || undefined })
     console.log('D1_02_REMOTE_SCHEMA_APPLY_RELEASED ' + JSON.stringify(result))
+  } else if (process.argv[2] === '--expect-blocked') {
+    if (!validateD1_02BlockedReleaseState()) {
+      fail('D1-02 must remain blocked until the corrected source-pinned remote release review is merged')
+    }
+    console.log('D1_02_REMOTE_SCHEMA_APPLY_BLOCKED_RELEASE_REVIEW_PENDING')
   } else {
-    fail('Select --assert-configured or --assert-ready')
+    fail('Select --assert-configured, --assert-ready or --expect-blocked')
   }
 }
