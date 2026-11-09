@@ -12,11 +12,21 @@ const reportPath = path.join(workerRoot, 'artifacts/neon/w02-better-auth-postgre
 
 const withTimeout = async <T>(label: string, action: () => Promise<T>, timeoutMs = 20_000): Promise<T> => {
   let timer: ReturnType<typeof setTimeout> | undefined
+  console.info(JSON.stringify({ event: 'w02.pg.runtime.step.started', step: label }))
   try {
     const timeout = new Promise<never>((_, reject) => {
       timer = setTimeout(() => reject(new Error('W02_RUNTIME_STEP_TIMEOUT:' + label)), timeoutMs)
     })
-    return await Promise.race([action(), timeout])
+    const result = await Promise.race([action(), timeout])
+    console.info(JSON.stringify({ event: 'w02.pg.runtime.step.passed', step: label }))
+    return result
+  } catch (error) {
+    console.error(JSON.stringify({
+      event: 'w02.pg.runtime.step.failed',
+      step: label,
+      errorType: error instanceof Error ? error.name : 'UNKNOWN',
+    }))
+    throw error
   } finally {
     if (timer) clearTimeout(timer)
   }
@@ -30,6 +40,7 @@ let userId: string | undefined
 let signedIn = false
 let signedOut = false
 let primaryError: unknown
+let report: Record<string, unknown> | undefined
 
 try {
   const signUp = await withTimeout('sign-up-email', () => auth.api.signUpEmail({
@@ -106,7 +117,7 @@ try {
   )
   assert.equal(Number(afterSignOut.rows[0]?.count), 0)
 
-  const report = {
+  report = {
     reportVersion: 1,
     status: 'W02_BETTER_AUTH_POSTGRES_RUNTIME_REHEARSAL_PASS',
     scope: 'Better Auth core PostgreSQL runtime only; W02 D1 lifecycle, role, MFA and publication-journal side effects are intentionally excluded from this profile.',
@@ -138,22 +149,31 @@ try {
 } catch (error) {
   primaryError = error
 } finally {
-  if (userId) {
-    try {
+  let cleanupUserId = userId
+  try {
+    if (!cleanupUserId) {
+      const byEmail = await postgresPool.query(
+        'SELECT id FROM "user" WHERE email = $1 LIMIT 1',
+        [email],
+      )
+      if (typeof byEmail.rows[0]?.id === 'string') cleanupUserId = byEmail.rows[0].id
+    }
+
+    if (cleanupUserId) {
       await postgresPool.query('DELETE FROM "verification" WHERE identifier = $1', [email])
-      await postgresPool.query('DELETE FROM "session" WHERE user_id = $1', [userId])
-      await postgresPool.query('DELETE FROM "account" WHERE user_id = $1', [userId])
-      await postgresPool.query('DELETE FROM "user" WHERE id = $1', [userId])
+      await postgresPool.query('DELETE FROM "session" WHERE user_id = $1', [cleanupUserId])
+      await postgresPool.query('DELETE FROM "account" WHERE user_id = $1', [cleanupUserId])
+      await postgresPool.query('DELETE FROM "user" WHERE id = $1', [cleanupUserId])
       const remaining = await postgresPool.query(
         'SELECT COUNT(*)::integer AS count FROM "user" WHERE id = $1',
-        [userId],
+        [cleanupUserId],
       )
       if (Number(remaining.rows[0]?.count) !== 0 && !primaryError) {
         primaryError = new Error('W02_RUNTIME_SYNTHETIC_USER_CLEANUP_FAILED')
       }
-    } catch (cleanupError) {
-      if (!primaryError) primaryError = cleanupError
     }
+  } catch (cleanupError) {
+    if (!primaryError) primaryError = cleanupError
   }
 
   try {
@@ -164,3 +184,8 @@ try {
 }
 
 if (primaryError) throw primaryError
+if (!report) throw new Error('W02_RUNTIME_REHEARSAL_REPORT_NOT_CREATED')
+
+mkdirSync(path.dirname(reportPath), { recursive: true })
+writeFileSync(reportPath, JSON.stringify(report, null, 2) + '\\n')
+process.stdout.write(JSON.stringify(report, null, 2) + '\\n')
