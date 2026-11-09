@@ -14,11 +14,13 @@
     "@types/node": "24.3.0",
     "auth": "1.7.8",
     "pg": "8.20.0",
-    "@types/pg": "8.23.1"
+    "@types/pg": "8.23.1",
+    "tsx": "4.23.15"
   },
   "scripts": {
     "neon:schema:generate": "auth generate --config src/auth/neon-postgres-schema.config.ts --output artifacts/neon/w02-better-auth-postgres-schema.sql --yes",
     "neon:schema:check": "auth check schema --config src/auth/neon-postgres-schema.config.ts",
+    "neon:runtime:rehearsal": "tsx scripts/neon/w02-better-auth-postgres-runtime-rehearsal.ts",
     "neon:role-assignment:generate": "node scripts/neon/generate-role-assignment-postgres-migrations.mjs",
     "neon:role-assignment:verify": "node scripts/neon/verify-role-assignment-postgres-schema.mjs",
     "neon:auth003:generate": "node scripts/neon/generate-auth003-credentials-postgres-migration.mjs",

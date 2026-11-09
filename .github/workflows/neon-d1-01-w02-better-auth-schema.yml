@@ -36,6 +36,8 @@ on:
       - 'workers/W02-identity/package.json'
       - 'workers/W02-identity/src/auth/better-auth.ts'
       - 'workers/W02-identity/src/auth/neon-postgres-schema.config.ts'
+      - 'workers/W02-identity/src/auth/neon-postgres-runtime-test.config.ts'
+      - 'workers/W02-identity/scripts/neon/w02-better-auth-postgres-runtime-rehearsal.ts'
       - 'workers/W02-identity/src/neon-postgres-migrations/**'
       - 'workers/W02-identity/scripts/neon/**'
   workflow_dispatch:
@@ -295,6 +297,12 @@ jobs:
             --dbname luckread_schema --set ON_ERROR_STOP=1 \
             --file src/neon-postgres-migrations/0010_auth_007_mfa_operation_receipts.sql
 
+      - name: Rehearse Better Auth PostgreSQL registration, credentials, and session lifecycle
+        working-directory: workers/W02-identity
+        env:
+          W02_RUNTIME_DATABASE_URL: postgresql://schema_generator:schema_generator_local_only@127.0.0.1:5432/luckread_schema
+        run: npm run neon:runtime:rehearsal
+
       - name: Verify Better Auth core tables and empty business rows
         working-directory: workers/W02-identity
         env:
@@ -374,6 +382,7 @@ jobs:
             workers/W02-identity/artifacts/neon/w02-better-auth-postgres-schema.sql
             workers/W02-identity/artifacts/neon/w02-better-auth-postgres-schema-generation-provenance.txt
             workers/W02-identity/artifacts/neon/w02-better-auth-postgres-schema-postflight.json
+            workers/W02-identity/artifacts/neon/w02-better-auth-postgres-runtime-rehearsal.json
             workers/W02-identity/artifacts/neon/w02-role-assignment-postgres-schema-postflight.json
             workers/W02-identity/src/neon-postgres-migrations/0001_role_assignments.sql
             workers/W02-identity/src/neon-postgres-migrations/0002_role_authorization_versions.sql
