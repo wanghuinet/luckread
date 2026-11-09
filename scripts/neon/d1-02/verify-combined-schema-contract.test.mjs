@@ -67,7 +67,7 @@ test('W03 Snowflake timestamp correction is a forward-only BIGINT alteration and
   assert.equal(correction.ownerWorker, 'W03')
   assert.equal(correction.previousPostgresType, 'integer (signed 32-bit)')
   assert.equal(correction.targetPostgresType, 'bigint (signed 64-bit)')
-  assert.equal(correction.remoteApplyReady, false)
+  assert.equal(correction.remoteApplyReady, true)
   assert.match(correctiveMigrationSql, /ALTER COLUMN last_timestamp_ms TYPE BIGINT/i)
   assert.doesNotMatch(correctiveMigrationSql, /DROP TABLE|TRUNCATE TABLE|DELETE FROM|UPDATE contents/i)
   assert.equal(verifyCombinedSchemaContract({ contract, inventory, loadArtifact }).safety.remoteDdlExecuted, false)

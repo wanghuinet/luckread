@@ -6,7 +6,7 @@ const SHA40 = /^[0-9a-f]{40}$/
 const BLOB_SHA1 = /^[0-9a-f]{40}$/
 const RUN_URL = /^https:\/\/github\.com\/wanghuinet\/luckread\/actions\/runs\/\d+$/
 const REVIEW_REF = 'contracts/database/neon-d1-02-remote-runner-review.v1.json'
-const IMPLEMENTATION_MERGE_SHA = '7f6b4848b86d041aba5cfca7ea4549dc50a9c7d3'
+const IMPLEMENTATION_MERGE_SHA = '8a0db7dd0d0567131d51e009302465f8e30b9386'
 const fail = (errors, message) => errors.push(message)
 
 export function validateD1_02RemoteRunnerReview({
@@ -99,11 +99,11 @@ export function validateD1_02RemoteRunnerReview({
 
   const evidence = record.verificationEvidence ?? {}
   const required = {
-    fullD1_02LocalPostgres18Rehearsal: 42480684871,
-    remoteRunnerGuardsNoCredentials: 42480684866,
-    contractAdmission: 42480684886,
-    mapping0StructuralGate: 42480684852,
-    featureInventory: 42480684859,
+    fullD1_02LocalPostgres18Rehearsal: 42612620258,
+    remoteRunnerGuardsNoCredentials: 42612620075,
+    contractAdmission: 42612620125,
+    mapping0StructuralGate: 42612620155,
+    featureInventory: 42612620321,
   }
   for (const [key, runId] of Object.entries(required)) {
     const item = evidence[key]
