@@ -144,9 +144,9 @@ export async function reconcileMfaAuditOperationReceiptsPostgres(
     let released = false
     let row: ReadyReceiptRow | undefined
     let forcedTerminalCode: string | null = null
-    const release = (): void => {
+    const release = (error?: Error): void => {
       if (!released) {
-        client.release()
+        client.release(error)
         released = true
       }
     }
@@ -239,15 +239,19 @@ export async function reconcileMfaAuditOperationReceiptsPostgres(
       release()
       summary.emitted += 1
     } catch (error) {
+      let releaseError: Error | undefined
       if (transactionOpen) {
         try {
           await client.query('ROLLBACK')
-        } catch {
-          // Preserve the original failure; read-back below determines the outcome.
+        } catch (rollbackError) {
+          // Destroy a client whose transaction state cannot be proven.
+          releaseError = rollbackError instanceof Error
+            ? rollbackError
+            : new Error('MFA_AUDIT_RECEIPT_ROLLBACK_FAILED')
         }
         transactionOpen = false
       }
-      release()
+      release(releaseError)
 
       if (!row) {
         throw new Error('MFA_AUDIT_RECEIPT_SELECT_FAILED')
