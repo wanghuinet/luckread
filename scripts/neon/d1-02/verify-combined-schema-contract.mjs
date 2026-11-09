@@ -34,7 +34,7 @@ export function verifyCombinedSchemaContract({ contract, inventory, loadArtifact
       correction.createsTables !== 0 ||
       correction.businessDataImport !== false ||
       correction.productionCutoverAuthorized !== false ||
-      correction.remoteApplyReady !== false) {
+      correction.remoteApplyReady !== true) {
     fail('W03 Snowflake millisecond corrective migration contract or safety state drift')
   }
   const correctionSql = loadArtifact(correction.artifactPath)
