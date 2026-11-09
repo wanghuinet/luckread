@@ -1,20 +1,23 @@
 import permissions from '../../../../contracts/authz/permissions.json'
 import { createLuckReadAuth, type BetterAuthEnv } from './better-auth.js'
 import {
+  createD1SessionListStore,
+  type SessionListCursor,
+  type SessionListStore,
+} from './session-list-store.js'
+import {
   enforceSessionListRateLimits,
   sessionRateLimitErrorResponse,
 } from './session-rate-limit.js'
 
-type SessionCursor = {
-  createdAt: string
-  sessionId: string
-}
+type SessionIdentity = {
+  user?: { id?: unknown }
+  session?: { id?: unknown }
+} | null
 
-type SessionRow = {
-  permissionGranted: number
-  sessionId: string
-  createdAt: string
-  expiresAt: string
+export type SessionListHandlerDependencies = {
+  store?: SessionListStore
+  getSession?: (headers: Headers) => Promise<SessionIdentity>
 }
 
 const userRole = permissions['x-role-permissions'].roles.find((role) => role.role === 'user')
@@ -24,7 +27,7 @@ const userRoleCanReadSessions = userRole?.permissions.includes(SESSION_READ_PERM
 const json = (body: unknown, status = 200): Response =>
   Response.json(body, { status, headers: { 'cache-control': 'no-store' } })
 
-const encodeCursor = (cursor: SessionCursor): string => {
+const encodeCursor = (cursor: SessionListCursor): string => {
   const encoded = btoa(JSON.stringify(cursor))
     .replace(/\+/g, '-')
     .replace(/\//g, '_')
@@ -32,7 +35,7 @@ const encodeCursor = (cursor: SessionCursor): string => {
   return 's1.' + encoded
 }
 
-const decodeCursor = (value: string): SessionCursor | null => {
+const decodeCursor = (value: string): SessionListCursor | null => {
   if (!value.startsWith('s1.') || value.length > 256) return null
   const encoded = value.slice(3)
   if (!encoded || !/^[A-Za-z0-9_-]+$/.test(encoded)) return null
@@ -63,6 +66,7 @@ const decodeCursor = (value: string): SessionCursor | null => {
 export async function handleCurrentUserSessionList(
   env: BetterAuthEnv,
   request: Request,
+  dependencies: SessionListHandlerDependencies = {},
 ): Promise<Response> {
   let body: unknown
   try {
@@ -90,10 +94,14 @@ export async function handleCurrentUserSessionList(
     if (!cursor) return json({ error: { code: 'INVALID_CURSOR', message: 'Invalid session list cursor' } }, 400)
   }
 
-  let current: { user?: { id?: string }; session?: { id?: string } } | null
+  let current: SessionIdentity
   try {
-    const auth = createLuckReadAuth(env)
-    current = await auth.api.getSession({ headers: request.headers, query: {} })
+    if (dependencies.getSession) {
+      current = await dependencies.getSession(request.headers)
+    } else {
+      const auth = createLuckReadAuth(env)
+      current = await auth.api.getSession({ headers: request.headers, query: {} }) as SessionIdentity
+    }
   } catch {
     return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Session service unavailable' } }, 503)
   }
@@ -111,73 +119,26 @@ export async function handleCurrentUserSessionList(
   }
 
   const now = new Date().toISOString()
-  // A user-layer name or a client-supplied subject is never an authorization
-  // fact. Resolve the explicit base-user permission from the canonical catalog
-  // and require the effective W02-owned RoleAssignment for this account.
+  // A user-layer name or client-supplied subject is never an authorization
+  // fact. The selected store rechecks the effective W02-owned base-user role.
   if (!userRoleCanReadSessions) {
     return json({ error: { code: 'PERMISSION_DENIED', message: 'Session access is not permitted' } }, 403)
   }
-  const authorizationCte = `
-    authorization AS (
-      SELECT CASE WHEN EXISTS (
-        SELECT 1
-        FROM "user" AS account
-        INNER JOIN role_assignments AS assignment ON assignment.subject_id = account.id
-        WHERE account.id = ?
-          AND account.account_state IN ('PENDING_VERIFICATION', 'ACTIVE')
-          AND assignment.role_id = 'user'
-          AND assignment.scope_type = 'global'
-          AND assignment.scope_id IS NULL
-          AND assignment.status = 'ACTIVE'
-          AND assignment.valid_from <= ?
-          AND (assignment.valid_until IS NULL OR ? < assignment.valid_until)
-      ) THEN 1 ELSE 0 END AS permissionGranted
-    )`
-  const sessionCte = cursor
-    ? `sessions AS (
-        SELECT id AS sessionId, created_at AS createdAt, expires_at AS expiresAt
-        FROM "session"
-        WHERE user_id = ? AND expires_at > ?
-          AND (created_at < ? OR (created_at = ? AND id < ?))
-        ORDER BY created_at DESC, id DESC
-        LIMIT ?
-      )`
-    : `sessions AS (
-        SELECT id AS sessionId, created_at AS createdAt, expires_at AS expiresAt
-        FROM "session"
-        WHERE user_id = ? AND expires_at > ?
-        ORDER BY created_at DESC, id DESC
-        LIMIT ?
-      )`
-  const sql = `WITH ${authorizationCte}, ${sessionCte}
-    SELECT authorization.permissionGranted,
-      sessions.sessionId, sessions.createdAt, sessions.expiresAt
-    FROM authorization
-    LEFT JOIN sessions ON 1 = 1
-    ORDER BY sessions.createdAt DESC, sessions.sessionId DESC`
 
   try {
-    const statement = env.D1_01.prepare(sql)
-    const bound = cursor
-      ? statement.bind(userId, now, now, userId, now, cursor.createdAt, cursor.createdAt, cursor.sessionId, limit + 1)
-      : statement.bind(userId, now, now, userId, now, limit + 1)
-    const result = await bound.all<SessionRow>()
-    // A D1 SELECT may resolve with success=false; never treat that as an empty
-    // session list, because it would hide a storage failure behind HTTP 200.
-    if (result.success !== true || !Array.isArray(result.results) || result.results.length === 0) {
-      throw new Error('SESSION_LIST_SELECT_FAILED')
-    }
-    if (Number(result.results[0]?.permissionGranted) !== 1) {
+    const store = dependencies.store ?? createD1SessionListStore(env.D1_01)
+    const result = await store.list({
+      userId,
+      now,
+      limit: limit + 1,
+      cursor,
+    })
+    if (!result.permissionGranted) {
       return json({ error: { code: 'PERMISSION_DENIED', message: 'Session access is not permitted' } }, 403)
     }
-    const rows = result.results.filter((row) =>
-      typeof row.sessionId === 'string' &&
-      row.sessionId.length > 0 &&
-      typeof row.createdAt === 'string' &&
-      typeof row.expiresAt === 'string',
-    )
-    const page = rows.slice(0, limit)
-    const hasMore = rows.length > limit
+
+    const page = result.rows.slice(0, limit)
+    const hasMore = result.rows.length > limit
     const last = page[page.length - 1]
 
     return json({
@@ -192,6 +153,7 @@ export async function handleCurrentUserSessionList(
         ? encodeCursor({ createdAt: last.createdAt, sessionId: last.sessionId })
         : null,
     })
+
   } catch {
     return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Session service unavailable' } }, 503)
   }
