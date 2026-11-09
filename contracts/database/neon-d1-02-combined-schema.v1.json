@@ -132,5 +132,26 @@
       "runtimeBindingsChanged": false,
       "productionCutoverAuthorized": false
     }
+  },
+  "correctiveMigration": {
+    "migrationId": "d1-02-w03-content-snowflake-timestamp-bigint-v1",
+    "ownerWorker": "W03",
+    "artifactPath": "workers/W03-content/src/neon-postgres-migrations/0002_w03_d1_02_content_snowflake_timestamp_bigint.sql",
+    "ledgerOrder": 3,
+    "table": "content_id_snowflake_state",
+    "column": "last_timestamp_ms",
+    "sourceType": "SQLite/D1 INTEGER (signed 64-bit)",
+    "previousPostgresType": "integer (signed 32-bit)",
+    "targetPostgresType": "bigint (signed 64-bit)",
+    "reason": "W03 allocates Snowflake IDs from Unix millisecond timestamps; PostgreSQL INTEGER cannot represent the current millisecond epoch range.",
+    "executionMode": "FORWARD_ONLY_ALTER_COLUMN",
+    "rewritesExistingRows": false,
+    "changesSnowflakeIDs": false,
+    "createsTables": 0,
+    "businessDataImport": false,
+    "productionCutoverAuthorized": false,
+    "localPostgres18Status": "PENDING_CI_REHEARSAL",
+    "remoteApplyReady": false,
+    "releaseReviewStatus": "PENDING_UPDATED_SOURCE_PINNED_REVIEW"
   }
 }
