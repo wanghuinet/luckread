@@ -282,14 +282,14 @@ try {
     }
 
     const remaining = await postgresPool.query(
-      'SELECT ' +
-        '(SELECT COUNT(*) FROM "user" WHERE email = $1) AS users, ' +
-        '(SELECT COUNT(*) FROM "account" WHERE user_id = COALESCE($2, '')) AS accounts, ' +
-        '(SELECT COUNT(*) FROM "session" WHERE user_id = COALESCE($2, '')) AS sessions, ' +
-        '(SELECT COUNT(*) FROM "verification" WHERE identifier = $1) AS verifications, ' +
-        '(SELECT COUNT(*) FROM auth_013_publication_journal WHERE resource_id = COALESCE($2, '')) AS journals, ' +
-        '(SELECT COUNT(*) FROM role_assignments WHERE subject_id = COALESCE($2, '')) AS role_assignments, ' +
-        '(SELECT COUNT(*) FROM role_authorization_versions WHERE subject_id = COALESCE($2, '')) AS role_versions',
+      `SELECT
+        (SELECT COUNT(*) FROM "user" WHERE email = $1) AS users,
+        (SELECT COUNT(*) FROM "account" WHERE user_id = COALESCE($2, '')) AS accounts,
+        (SELECT COUNT(*) FROM "session" WHERE user_id = COALESCE($2, '')) AS sessions,
+        (SELECT COUNT(*) FROM "verification" WHERE identifier = $1) AS verifications,
+        (SELECT COUNT(*) FROM auth_013_publication_journal WHERE resource_id = COALESCE($2, '')) AS journals,
+        (SELECT COUNT(*) FROM role_assignments WHERE subject_id = COALESCE($2, '')) AS role_assignments,
+        (SELECT COUNT(*) FROM role_authorization_versions WHERE subject_id = COALESCE($2, '')) AS role_versions`,
       [email, cleanupUserId ?? null],
     )
     if (Object.values(remaining.rows[0] ?? {}).some((value) => Number(value) !== 0)) {
