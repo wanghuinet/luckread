@@ -145,6 +145,20 @@ describe('W02 D1 MFA enrollment-start store', () => {
     }
   })
 
+  it('clears the matching reservation after an upstream failure when no factor was materialized', async () => {
+    const { db, sqlite, close } = makeDb()
+    try {
+      const store = createD1MfaEnrollmentStartStore(db)
+      await store.reserve({ userId, keyHash, event: startedEvent() })
+      await store.releaseReservationIfNoFactor(userId, keyHash)
+      const account = sqlite.prepare('SELECT mfa_enrollment_key_hash FROM "user" WHERE id = ?')
+        .get(userId) as { mfa_enrollment_key_hash: string | null }
+      expect(account.mfa_enrollment_key_hash).toBeNull()
+    } finally {
+      close()
+    }
+  })
+
   it('releases only an unmaterialized matching reservation', async () => {
     const { db, sqlite, close } = makeDb()
     try {
