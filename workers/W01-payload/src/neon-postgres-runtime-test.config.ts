@@ -2,7 +2,6 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { postgresAdapter } from '@payloadcms/db-postgres'
-import { text } from '@payloadcms/db-postgres/drizzle/pg-core'
 import { redirectsPlugin } from '@payloadcms/plugin-redirects'
 import { buildConfig } from 'payload'
 
@@ -25,7 +24,9 @@ if (!localRuntimeTarget) {
 }
 
 // This config deliberately excludes R2 and is only used for Local API CRUD
-// against the disposable PostgreSQL 18 service in CI. It is not a Worker config.
+// against the disposable PostgreSQL 18 service in CI. Payload's auth collection
+// already defines reset_password_requested_at; do not extend it a second time.
+// It is not a Worker config.
 export default buildConfig({
   admin: {
     user: Users.slug,
@@ -38,19 +39,6 @@ export default buildConfig({
     idType: 'serial',
     push: false,
     disableCreateDatabase: true,
-    afterSchemaInit: [
-      ({ schema, extendTable }) => {
-        const users = schema.tables.users
-        if (!users) throw new Error('W01 PostgreSQL runtime rehearsal is missing the users table')
-        if (!('reset_password_requested_at' in users)) {
-          extendTable({
-            table: users,
-            columns: { reset_password_requested_at: text('reset_password_requested_at') },
-          })
-        }
-        return schema
-      },
-    ],
   }),
   plugins: [
     redirectsPlugin({
