@@ -89,10 +89,10 @@ export function createD1UsernameChangeStore(db: D1Database): UsernameChangeStore
         idempotencyKeyHash, nowIso,
         userId,
       ).first<UsernameChangeContext>()
-      return row ? {
-        ...row,
-        usernameVersion: Number(row.usernameVersion),
-      } : null
+      if (!row || typeof row.accountState !== 'string') return null
+      const usernameVersion = Number(row.usernameVersion)
+      if (!Number.isSafeInteger(usernameVersion) || usernameVersion < 0) return null
+      return { ...row, usernameVersion }
     },
 
     async loadState(userId) {
