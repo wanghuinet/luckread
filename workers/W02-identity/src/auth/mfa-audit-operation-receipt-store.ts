@@ -38,7 +38,11 @@ export function createD1MfaAuditOperationReceiptStore(db: D1Database): MfaAuditO
     assertOwner: (input) => assertMfaAuditOperationReceiptOwner(db, input),
     create: (input) => createMfaAuditOperationReceipt(db, input),
     append: (receiptId, event) => appendMfaAuditOperationReceiptEvent(db, receiptId, event),
-    finalize: (receiptId, events, now) => finalizeMfaAuditOperationReceipt(db, receiptId, events, now),
-    reconcile: (now) => reconcileMfaAuditOperationReceipts(db, now),
+    finalize: (receiptId, events, now) => now === undefined
+      ? finalizeMfaAuditOperationReceipt(db, receiptId, events)
+      : finalizeMfaAuditOperationReceipt(db, receiptId, events, now),
+    reconcile: (now) => now === undefined
+      ? reconcileMfaAuditOperationReceipts(db)
+      : reconcileMfaAuditOperationReceipts(db, now),
   }
 }
