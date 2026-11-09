@@ -9,7 +9,7 @@ export type AuthoritativeMfaStatus = {
 }
 
 type MfaStatusRow = {
-  userEnabled: number | boolean
+  userEnabled: number | boolean | null
   enrolledAt: string | null
   factorVerified: number | boolean | null
 }
