@@ -10,6 +10,7 @@ vi.mock('./better-auth.js', () => ({
 
 import type { BetterAuthEnv } from './better-auth.js'
 import { handleCurrentUserSessionRevoke } from './session-revoke.js'
+import type { SessionRevocationStore } from './session-revoke-store.js'
 
 const request = (sessionId: unknown) => new Request(
   'https://luckread-w02.internal/internal/auth/session/revoke-by-id',
@@ -209,6 +210,51 @@ describe('W02 policy-scoped session revoke', () => {
     expect(await response.json()).toEqual({ revoked: true })
     expect(db.batch).toHaveBeenCalledTimes(1)
     expect(db.prepared[1]?.sql).toContain('WHERE changes() = 1')
+  })
+
+  it('uses an explicitly injected PostgreSQL store and authenticated session resolver without touching D1', async () => {
+    const db = makeEnv({ id: 'target-session', userId: 'user-1' })
+    const store: SessionRevocationStore = {
+      revoke: vi.fn().mockResolvedValue({ status: 'REVOKED' }),
+    }
+    const getSession = vi.fn().mockResolvedValue({
+      user: { id: 'user-1' },
+      session: { id: 'current-session' },
+    })
+
+    const response = await handleCurrentUserSessionRevoke(
+      db.env,
+      request('target-session'),
+      { store, getSession },
+    )
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ revoked: true })
+    expect(getSession).toHaveBeenCalledTimes(1)
+    expect(store.revoke).toHaveBeenCalledWith({
+      userId: 'user-1',
+      sessionId: 'target-session',
+      now: expect.any(String),
+      correlationId: 'req_session_revoke_test',
+      causationId: 'trace-session-revoke-test',
+    })
+    expect(db.prepare).not.toHaveBeenCalled()
+    expect(db.batch).not.toHaveBeenCalled()
+  })
+
+  it('maps an injected store permission denial to 403 without exposing persistence details', async () => {
+    const db = makeEnv({ id: 'target-session', userId: 'user-1' })
+    const store: SessionRevocationStore = {
+      revoke: vi.fn().mockResolvedValue({ status: 'PERMISSION_DENIED' }),
+    }
+
+    const response = await handleCurrentUserSessionRevoke(db.env, request('target-session'), { store })
+    const payload = await response.json() as { error?: { code?: string } }
+
+    expect(response.status).toBe(403)
+    expect(payload.error?.code).toBe('PERMISSION_DENIED')
+    expect(db.prepare).not.toHaveBeenCalled()
+    expect(db.batch).not.toHaveBeenCalled()
   })
 
   it('returns 503 when the atomic delete-plus-outbox transaction fails', async () => {
