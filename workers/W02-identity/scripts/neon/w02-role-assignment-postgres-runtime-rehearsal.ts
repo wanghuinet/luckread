@@ -243,14 +243,21 @@ try {
     'UPDATE "user" SET two_factor_enabled = TRUE, mfa_enrolled_at = $1 WHERE id = $2',
     [now, userD],
   )
+  const enrollmentState = await pool.query<{ mfaEnrolledAt: Date | string | null }>(
+    'SELECT mfa_enrolled_at AS "mfaEnrolledAt" FROM "user" WHERE id = $1',
+    [userD],
+  )
+  const persistedEnrollmentAt = enrollmentState.rows[0]?.mfaEnrolledAt
+  assert.ok(persistedEnrollmentAt, 'PostgreSQL MFA enable trigger must persist its enrollment timestamp')
+  const mfaEffectiveNow = new Date(new Date(persistedEnrollmentAt).getTime() + 1_000).toISOString()
 
-  const afterMfa = await resolveGlobalLayerPostgres(pool, userD, 'ACTIVE', now, true)
+  const afterMfa = await resolveGlobalLayerPostgres(pool, userD, 'ACTIVE', mfaEffectiveNow, true)
   assert.equal(afterMfa.decision, 'ALLOW')
   assert.equal(afterMfa.layer, 'L8')
   assert.ok(afterMfa.roleAssignments?.some((assignment) => assignment.roleId === 'super_admin'))
   assert.equal(await readRoleVersionPostgres(pool, userD), 3)
 
-  const denyState = await resolveGlobalLayerPostgres(pool, userD, 'SUSPENDED', now, true)
+  const denyState = await resolveGlobalLayerPostgres(pool, userD, 'SUSPENDED', mfaEffectiveNow, true)
   assert.equal(denyState.decision, 'DENY')
 
   const checks = {
