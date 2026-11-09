@@ -1,9 +1,23 @@
 import { createLuckReadAuth, type BetterAuthEnv } from './better-auth.js'
-import { buildSessionRevocationOutboxInsert, buildSessionRevokedEvent } from './session-revocation-events.js'
+import {
+  createD1SessionLogoutStore,
+  type SessionLogoutStore,
+} from './session-logout-store.js'
 import {
   enforceSessionLogoutRateLimits,
   sessionRateLimitErrorResponse,
 } from './session-rate-limit.js'
+
+type SessionIdentity = {
+  user?: { id?: unknown }
+  session?: { id?: unknown }
+} | null
+
+export type SessionLogoutHandlerDependencies = {
+  store?: SessionLogoutStore
+  auth?: ReturnType<typeof createLuckReadAuth>
+  getSession?: (headers: Headers) => Promise<SessionIdentity>
+}
 
 const json = (body: unknown, status = 200): Response =>
   Response.json(body, { status, headers: { 'cache-control': 'no-store' } })
@@ -63,11 +77,12 @@ async function clearBetterAuthSessionCookies(
 export async function handleCurrentUserSessionLogout(
   env: BetterAuthEnv,
   request: Request,
+  dependencies: SessionLogoutHandlerDependencies = {},
 ): Promise<Response> {
   let auth: ReturnType<typeof createLuckReadAuth>
   let current: { user?: { id?: unknown }; session?: { id?: unknown } } | null
   try {
-    auth = createLuckReadAuth(env)
+    auth = dependencies.auth ?? createLuckReadAuth(env)
     const authContext = await auth.$context
 
     // Mirror Better Auth's default CSRF rule: unsafe requests carrying cookies
@@ -86,10 +101,12 @@ export async function handleCurrentUserSessionLogout(
       }
     }
 
-    current = await auth.api.getSession({
-      headers: request.headers,
-      query: { disableCookieCache: true, disableRefresh: true },
-    }) as { user?: { id?: unknown }; session?: { id?: unknown } } | null
+    current = dependencies.getSession
+      ? await dependencies.getSession(request.headers)
+      : await auth.api.getSession({
+          headers: request.headers,
+          query: { disableCookieCache: true, disableRefresh: true },
+        }) as SessionIdentity
   } catch {
     return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Session service unavailable' } }, 503)
   }
@@ -108,41 +125,14 @@ export async function handleCurrentUserSessionLogout(
     }
 
     try {
-      const now = new Date().toISOString()
-      const event = await buildSessionRevokedEvent({
-        sessionId,
+      const store = dependencies.store ?? createD1SessionLogoutStore(env.D1_01)
+      await store.logout({
         userId,
-        operationId: 'authLogout',
-        occurredAt: now,
+        sessionId,
+        now: new Date().toISOString(),
         correlationId: request.headers.get('X-LuckRead-Request-Id'),
         causationId: request.headers.get('X-LuckRead-Correlation-Id'),
       })
-
-      // DELETE and outbox INSERT share one D1-01 transaction. The second
-      // statement inserts only if this exact session row was deleted.
-      const committed = await env.D1_01.batch([
-        env.D1_01.prepare(
-          'DELETE FROM "session" WHERE id = ? AND user_id = ?',
-        ).bind(sessionId, userId),
-        buildSessionRevocationOutboxInsert(env.D1_01, event),
-      ])
-      const deleted = committed[0]
-      const journaled = committed[1]
-      if (deleted?.success !== true || journaled?.success !== true) {
-        throw new Error('SESSION_LOGOUT_AUDIT_BATCH_FAILED')
-      }
-
-      if (!Number.isInteger(deleted.meta?.changes) || !Number.isInteger(journaled.meta?.changes)) {
-        throw new Error('SESSION_LOGOUT_AUDIT_BATCH_METADATA_MISSING')
-      }
-      const deletedChanges = deleted.meta.changes
-      const journaledChanges = journaled.meta.changes
-      if (
-        !((deletedChanges === 1 && journaledChanges === 1) ||
-          (deletedChanges === 0 && journaledChanges === 0))
-      ) {
-        throw new Error('SESSION_LOGOUT_AUDIT_BATCH_INCOMPLETE')
-      }
     } catch {
       // Fail closed: do not clear credentials or report logout when the
       // authoritative DELETE + durable audit intent could not be committed.
