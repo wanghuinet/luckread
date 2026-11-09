@@ -150,8 +150,9 @@
     "createsTables": 0,
     "businessDataImport": false,
     "productionCutoverAuthorized": false,
-    "localPostgres18Status": "PENDING_CI_REHEARSAL",
-    "remoteApplyReady": false,
-    "releaseReviewStatus": "PENDING_UPDATED_SOURCE_PINNED_REVIEW"
+    "localPostgres18Status": "PASSED_ON_MERGED_MAIN",
+    "remoteApplyReady": true,
+    "releaseReviewStatus": "REMOTE_SCHEMA_ONLY_APPLY_REVIEWED",
+    "remoteSchemaApplied": false
   }
 }
