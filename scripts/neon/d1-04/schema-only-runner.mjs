@@ -109,6 +109,32 @@ export function assertD104ExactIndexNames(expectedIndexNames, actualIndexNames) 
   return actual.length
 }
 
+export function assertD104IndexCatalog(manifest, plan, catalogRows) {
+  if (!Array.isArray(catalogRows)) {
+    fail('D1-04 index catalog verification requires catalog rows')
+  }
+  const explicitIndexNames = []
+  const constraintIndexNames = []
+  for (const row of catalogRows) {
+    if (!row || typeof row.indexname !== 'string' ||
+        typeof row.constraint_backed !== 'boolean') {
+      fail('D1-04 index catalog row is malformed')
+    }
+    ;(row.constraint_backed ? constraintIndexNames : explicitIndexNames).push(row.indexname)
+  }
+
+  const explicitIndexes = assertD104ExactIndexNames(plan.indexes, explicitIndexNames)
+  const constraintIndexes = assertD104ExactIndexNames(
+    manifest?.expected?.constraintIndexNames,
+    constraintIndexNames,
+  )
+  if (explicitIndexes !== manifest.expected.explicitIndexes ||
+      constraintIndexes !== manifest.expected.constraintIndexes) {
+    fail('actual D1-04 explicit and constraint-backed index counts do not match the reviewed manifest')
+  }
+  return { explicitIndexes, constraintIndexes }
+}
+
 function safeName(name) {
   if (typeof name !== 'string' || !/^[A-Za-z_][A-Za-z0-9_$]*$/.test(name)) {
     fail('unsafe PostgreSQL identifier encountered during catalog verification')
@@ -299,16 +325,19 @@ async function verifyAppliedTableState(client, manifest, plan, appliedCount) {
 async function verifyFinalCatalog(client, manifest, plan) {
   const tableState = await verifyAppliedTableState(client, manifest, plan, plan.entries.length)
   const indexRows = await client.query(
-    "SELECT indexname FROM pg_catalog.pg_indexes WHERE schemaname='public' AND tablename <> $1 ORDER BY indexname",
+    "SELECT index_class.relname AS indexname, " +
+    "EXISTS (SELECT 1 FROM pg_catalog.pg_constraint AS constraint_row " +
+    "WHERE constraint_row.conindid = index_row.indexrelid) AS constraint_backed " +
+    "FROM pg_catalog.pg_index AS index_row " +
+    "JOIN pg_catalog.pg_class AS index_class ON index_class.oid = index_row.indexrelid " +
+    "JOIN pg_catalog.pg_class AS table_class ON table_class.oid = index_row.indrelid " +
+    "JOIN pg_catalog.pg_namespace AS namespace ON namespace.oid = table_class.relnamespace " +
+    "WHERE namespace.nspname = 'public' AND table_class.relname <> $1 " +
+    "ORDER BY index_class.relname",
     [ledgerTable],
   )
-  const explicitIndexes = assertD104ExactIndexNames(
-    plan.indexes,
-    indexRows.rows.map((row) => row.indexname),
-  )
-  if (explicitIndexes !== manifest.expected.explicitIndexes) {
-    fail('actual D1-04 explicit index count does not match the reviewed manifest')
-  }
+  const indexCatalog = assertD104IndexCatalog(manifest, plan, indexRows.rows)
+  const { explicitIndexes, constraintIndexes } = indexCatalog
 
   const triggerRows = await client.query(
     "SELECT t.tgname FROM pg_catalog.pg_trigger t JOIN pg_catalog.pg_class c ON c.oid=t.tgrelid JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relname <> $1 AND NOT t.tgisinternal ORDER BY t.tgname",
@@ -339,6 +368,7 @@ async function verifyFinalCatalog(client, manifest, plan) {
     ...tableState,
     tables: tableState.tableCount,
     explicitIndexes,
+    constraintIndexes,
     triggers: plan.triggers.length,
     triggerFunctions: plan.functions.length,
     foreignKeys: Number(foreignKeys.rows[0].count),

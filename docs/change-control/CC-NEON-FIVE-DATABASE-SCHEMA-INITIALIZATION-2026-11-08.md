@@ -190,3 +190,13 @@ This change control is complete when the repository has an agreed five-domain sc
 - Production W01 continues to use Cloudflare D1 and R2. No business data import, runtime adapter switch, dual write or production cutover is included.
 
 The W01 schema-owner slice is frozen. Reopen it only for a reproducible W01 schema mismatch/regression, source/contract drift, invalidated evidence, or explicit user authorization with a new scope.
+
+
+## 16. D1-04 first remote schema-only apply — 2026-11-09
+
+- Workflow [42553336881](https://github.com/wanghuinet/luckread/actions/runs/42553336881) passed the exact-main, target-confirmation, checkout-provenance, source-pinned release-gate, Neon endpoint and full-TLS checks.
+- The W07 schema-only runner committed all six ordered migrations and their six append-only ledger rows in separate transactions. After the final ledger-prefix check, the 15-table state and empty business-row checks passed.
+- The final catalog step failed because the runner compared the manifest's 31 explicitly declared indexes against every row in `pg_catalog.pg_indexes`. PostgreSQL also exposes 29 indexes that back primary-key and unique constraints; these are expected schema objects, not undeclared explicit indexes.
+- The report artifact was not produced because the runner writes it only after final catalog verification succeeds. The run did not import business data, touch Cloudflare D1, change runtime bindings or authorize production cutover.
+- Recovery is ledger-driven: the next run must validate the exact six-entry ordered ledger prefix, skip the already committed migrations, then rerun final catalog verification and write fresh postflight evidence. No table/index cleanup or migration replay is permitted.
+- The correction records the exact constraint-backed index names separately from the 31 explicit index names, verifies both sets independently, and adds regression tests for unexpected/missing members in either set.

@@ -31,7 +31,7 @@ const baseReview = {
     findings: [],
     limitations: [
       'No submitted GitHub review records are present; this is a GPT-6 code review, not a human GitHub APPROVE review.',
-      'Remote Neon DDL has not been executed.',
+      'Remote Neon DDL execution history is recorded in executionHistory.',
       'Neon database UUID is pinned from existing W07 D1_04 Wrangler metadata and is not exposed for independent verification by PostgreSQL SQL.',
     ],
     reviewedFiles: [
@@ -133,6 +133,28 @@ test('D1-04 review rejects moved source pins and stale review commits', () => {
   })
   assert.equal(stale.valid, false)
   assert.ok(stale.errors.some((item) => /not an ancestor/.test(item)))
+})
+
+test('D1-04 review can record an earlier schema-only execution while preserving no-business-data and no-cutover boundaries', () => {
+  const executed = structuredClone(baseReview)
+  executed.safety.remoteNeonDdlExecuted = true
+  executed.executionHistory = [{
+    runId: 42553336881,
+    remoteNeonDdlExecuted: true,
+    appliedMigrations: 6,
+    committedLedgerRows: 6,
+    businessRows: 0,
+    conclusion: 'failure',
+  }]
+  const result = validateD104RemoteRunnerReview({
+    root: process.cwd(),
+    review: executed,
+    currentHead: sha,
+    hashBlob: () => sha,
+    hashBlobAtCommit: () => sha,
+    isAncestor: () => true,
+  })
+  assert.equal(result.valid, true, result.errors.join('; '))
 })
 
 test('D1-04 release rejects an unpinned CI run or artifact even when the status says success', () => {

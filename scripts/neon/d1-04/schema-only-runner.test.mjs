@@ -12,6 +12,7 @@ import {
   verifyRemoteTlsConnection,
   assertD104LedgerRows,
   assertD104ExactIndexNames,
+  assertD104IndexCatalog,
 } from './schema-only-runner.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
@@ -30,6 +31,8 @@ test('D1-04 plan is the exact six-entry W07-only shared migration manifest', () 
   assert.ok(plan.entries.every((item) => item.entry.ownerWorker === 'W07'))
   assert.equal(plan.tables.length, 15)
   assert.equal(plan.indexes.length, 31)
+  assert.equal(manifest.expected.constraintIndexes, 29)
+  assert.equal(manifest.expected.constraintIndexNames.length, manifest.expected.constraintIndexes)
   assert.equal(plan.triggers.length, 72)
   assert.equal(plan.functions.length, 6)
   assert.equal(plan.references.length, 0)
@@ -149,6 +152,44 @@ test('D1-04 final catalog requires the exact explicit index set, with no extras 
   assert.throws(
     () => assertD104ExactIndexNames(['a_idx'], ['a_idx', 'a_idx']),
     /index set differs/,
+  )
+})
+
+test('D1-04 final catalog separates explicit indexes from PostgreSQL constraint-backed indexes', () => {
+  const catalogRows = [
+    ...plan.indexes.map((indexname) => ({ indexname, constraint_backed: false })),
+    ...manifest.expected.constraintIndexNames.map((indexname) => ({ indexname, constraint_backed: true })),
+  ]
+  assert.deepEqual(assertD104IndexCatalog(manifest, plan, catalogRows), {
+    explicitIndexes: 31,
+    constraintIndexes: 29,
+  })
+  assert.throws(
+    () => assertD104IndexCatalog(manifest, plan, [
+      ...catalogRows,
+      { indexname: 'unexpected_explicit_idx', constraint_backed: false },
+    ]),
+    /unexpected=\[unexpected_explicit_idx\]/,
+  )
+  assert.throws(
+    () => assertD104IndexCatalog(manifest, plan, [
+      ...catalogRows,
+      { indexname: 'unexpected_constraint_key', constraint_backed: true },
+    ]),
+    /unexpected=\[unexpected_constraint_key\]/,
+  )
+  assert.throws(
+    () => assertD104IndexCatalog(manifest, plan, [
+      ...catalogRows.filter((row) => row.indexname !== manifest.expected.constraintIndexNames[0]),
+    ]),
+    /missing=\[/,
+  )
+  assert.throws(
+    () => assertD104IndexCatalog(manifest, plan, [
+      ...catalogRows,
+      { indexname: 'malformed_idx', constraint_backed: 'true' },
+    ]),
+    /catalog row is malformed/,
   )
 })
 

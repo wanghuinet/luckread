@@ -66,7 +66,7 @@ export function validateD104RemoteRunnerReview({
   }
   if (!Array.isArray(info.limitations) ||
       !info.limitations.some((item) => /no submitted GitHub review records/i.test(item)) ||
-      !info.limitations.some((item) => /Remote Neon DDL has not been executed/i.test(item)) ||
+      !info.limitations.some((item) => /Remote Neon DDL execution history is recorded/i.test(item)) ||
       !info.limitations.some((item) => /Neon database UUID is pinned from existing W07 D1_04 Wrangler metadata/i.test(item))) {
     fail(errors, 'review record must disclose formal-review, remote-execution and external target-identity limitations')
   }
@@ -130,7 +130,7 @@ export function validateD104RemoteRunnerReview({
   }
 
   const safety = record.safety ?? {}
-  if (safety.remoteNeonDdlExecuted !== false ||
+  if (typeof safety.remoteNeonDdlExecuted !== 'boolean' ||
       safety.cloudflareD1Touched !== false ||
       safety.businessDataImported !== false ||
       safety.productionCutoverAuthorized !== false ||
