@@ -277,6 +277,7 @@ try {
     correlationId: 'req_auth007_reconcile_' + suffix,
     causationId: 'trace_auth007_reconcile_' + suffix,
     result: 'succeeded' as const,
+    reasonCode: 'CHALLENGE_VERIFIED',
     challengeMethod: 'totp' as const,
     idempotencyKey: terminalKey,
   }
