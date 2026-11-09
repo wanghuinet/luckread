@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/database/neon-d1-03-remote-runner-review.v1.json",
+  "title": "LuckRead D1-03 Partial Schema-Only Remote Runner Review and Release",
+  "version": "1.0.0",
+  "status": "REMOTE_PARTIAL_SCHEMA_RELEASE_PENDING",
+  "repository": "wanghuinet/luckread",
+  "partialRemoteApplyReady": false,
+  "remoteApplyReady": false,
+  "target": {
+    "domainId": "D1-03",
+    "databaseName": "luckread_governance",
+    "cloudflareD1DatabaseUuid": "bda1d247-a371-4244-91ae-aef96034db7f",
+    "neonHost": "ep-icy-breeze-azdp8x8q-pooler.c-3.ap-southeast-1.aws.neon.tech",
+    "postgresMajor": 18,
+    "scope": "schema-only",
+    "businessDataImport": false,
+    "productionCutoverAuthorized": false
+  },
+  "scope": {
+    "kind": "ADMITTED_MANIFEST_ENTRIES_ONLY",
+    "migrationCount": 3,
+    "migrationIds": [
+      "d1-03-w06-moderation-schema-v1",
+      "d1-03-w09-platform-schema-v1",
+      "d1-03-w10-async-execution-schema-v1"
+    ],
+    "tables": 15,
+    "explicitIndexes": 22,
+    "triggers": 2,
+    "triggerFunctions": 1,
+    "foreignKeys": 2,
+    "businessRows": 0,
+    "controlSeedRows": 0,
+    "fullDomainSchemaComplete": false,
+    "omittedEntities": [
+      "Appeal",
+      "PlatformRuntime",
+      "ReconciliationOperation",
+      "RecoveryOperation",
+      "Campaign",
+      "GrowthOperation"
+    ],
+    "omittedEntitiesRemainUnadmitted": true
+  },
+  "review": {
+    "reviewer": "GPT-6",
+    "reviewType": "SCOPED_REMOTE_CODE_PATH_AUDIT_AND_CURRENT_MAIN_SOURCE_PIN_RECONCILIATION",
+    "reviewedAt": null,
+    "reviewedMainSha": null,
+    "implementationMergeSha": null,
+    "result": "PENDING",
+    "findings": [],
+    "formalGitHubReviewSubmissions": 0,
+    "reviewedFiles": [],
+    "limitations": [
+      "This review is an automated GPT-6 code-path audit by the implementation agent, not a human GitHub APPROVE review.",
+      "The release covers only the three already-admitted W06/W09/W10 manifest migrations and does not complete the full D1-03 entity inventory.",
+      "Neon control-plane database UUID is not readable from PostgreSQL SQL; the remote guard pins the exact endpoint host and database name while retaining the canonical Cloudflare D1 UUID as a separate owner-boundary reference.",
+      "Remote DDL will still require a manual workflow_dispatch on main with the exact confirmation token."
+    ]
+  },
+  "verificationEvidence": {
+    "sharedD103Postgres18": {
+      "runId": 42509822425,
+      "conclusion": "success",
+      "url": "https://github.com/wanghuinet/luckread/actions/runs/42509822425"
+    },
+    "latestW06Postgres18": {
+      "runId": 42560028818,
+      "conclusion": "success",
+      "url": "https://github.com/wanghuinet/luckread/actions/runs/42560028818"
+    },
+    "latestW11OwnerReconciliation": {
+      "runId": 42560028868,
+      "conclusion": "success",
+      "url": "https://github.com/wanghuinet/luckread/actions/runs/42560028868"
+    },
+    "releaseValidation": null
+  },
+  "safety": {
+    "remoteNeonDdlExecuted": false,
+    "cloudflareD1Touched": false,
+    "businessDataImported": false,
+    "runtimeBindingsChanged": false,
+    "productionCutoverAuthorized": false,
+    "newWorkers": 0,
+    "newD1Databases": 0,
+    "newQueues": 0,
+    "newServiceBindings": 0
+  },
+  "businessDataImport": false,
+  "productionCutoverAuthorized": false,
+  "exactConfirmationRequired": "APPLY_REVIEWED_SCHEMA_D1_03_GOVERNANCE_PARTIAL"
+}
