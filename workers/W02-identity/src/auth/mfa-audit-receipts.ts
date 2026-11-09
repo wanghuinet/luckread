@@ -40,7 +40,7 @@ type ReceiptRow = {
   attempt: number
 }
 
-type StoredReceiptEvent = Omit<MfaAuditReceiptEvent, 'operationId'> & {
+type StoredMfaAuditReceiptEvent = Omit<MfaAuditReceiptEvent, 'operationId'> & {
   operationId: MfaAuditOperationId
   eventId: string
   idempotencyKey: string
@@ -73,7 +73,7 @@ function safeCorrelation(value: string | null | undefined, fallback: string): st
   return value && correlationPattern.test(value) ? value : fallback
 }
 
-function validateEvent(value: unknown): StoredReceiptEvent {
+function validateEvent(value: unknown): StoredMfaAuditReceiptEvent {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     throw new Error('INVALID_MFA_AUDIT_RECEIPT_PLAN')
   }
@@ -127,17 +127,17 @@ function validateEvent(value: unknown): StoredReceiptEvent {
     result: event.result as MfaAuditResult,
     ...(typeof event.reasonCode === 'string' ? { reasonCode: event.reasonCode } : {}),
     ...(typeof event.factorState === 'string'
-      ? { factorState: event.factorState as StoredReceiptEvent['factorState'] }
+      ? { factorState: event.factorState as StoredMfaAuditReceiptEvent['factorState'] }
       : {}),
     ...(typeof event.challengeMethod === 'string'
-      ? { challengeMethod: event.challengeMethod as StoredReceiptEvent['challengeMethod'] }
+      ? { challengeMethod: event.challengeMethod as StoredMfaAuditReceiptEvent['challengeMethod'] }
       : {}),
     idempotencyKey: event.idempotencyKey,
     occurredAt: event.occurredAt,
   }
 }
 
-function parsePlan(value: string | null): StoredReceiptEvent[] {
+export function parseMfaAuditReceiptPlan(value: string | null): StoredMfaAuditReceiptEvent[] {
   if (value === null) return []
   let parsed: unknown
   try {
@@ -151,12 +151,12 @@ function parsePlan(value: string | null): StoredReceiptEvent[] {
   return parsed.map(validateEvent)
 }
 
-function mergePlan(
+export function mergeMfaAuditReceiptPlan(
   receiptId: string,
-  existing: StoredReceiptEvent[],
+  existing: StoredMfaAuditReceiptEvent[],
   incoming: MfaAuditReceiptEvent[],
   occurredAt: string,
-): StoredReceiptEvent[] {
+): StoredMfaAuditReceiptEvent[] {
   const byKey = new Map(existing.map((event) => [event.idempotencyKey, event]))
   for (const input of incoming) {
     const idempotencyKey = input.idempotencyKey ??
@@ -326,8 +326,8 @@ export async function appendMfaAuditOperationReceiptEvent(
       throw new Error('MFA_AUDIT_RECEIPT_NOT_APPENDABLE')
     }
 
-    const currentPlan = parsePlan(row.eventPlan)
-    const plan = mergePlan(
+    const currentPlan = parseMfaAuditReceiptPlan(row.eventPlan)
+    const plan = mergeMfaAuditReceiptPlan(
       receiptId,
       currentPlan,
       [event],
@@ -376,8 +376,8 @@ export async function finalizeMfaAuditOperationReceipt(
     const row = await loadReceipt(db, receiptId)
     if (row.status === 'UNKNOWN') throw new Error('MFA_AUDIT_RECEIPT_OUTCOME_UNKNOWN')
 
-    const currentPlan = parsePlan(row.eventPlan)
-    const plan = mergePlan(receiptId, currentPlan, events, now)
+    const currentPlan = parseMfaAuditReceiptPlan(row.eventPlan)
+    const plan = mergeMfaAuditReceiptPlan(receiptId, currentPlan, events, now)
 
     // READY is the immutable hand-off to the existing Cron publisher. A retry
     // of the same finalization is idempotent; a new event after finalization is
@@ -473,9 +473,9 @@ export async function reconcileMfaAuditOperationReceipts(
   let unknown = stale.success ? Number(stale.meta?.changes ?? 0) : 0
 
   for (const row of rows) {
-    let plan: StoredReceiptEvent[]
+    let plan: StoredMfaAuditReceiptEvent[]
     try {
-      plan = parsePlan(row.eventPlan)
+      plan = parseMfaAuditReceiptPlan(row.eventPlan)
       if (plan.length === 0) throw new Error('INVALID_MFA_AUDIT_RECEIPT_PLAN')
     } catch {
       try {
@@ -533,7 +533,7 @@ export async function reconcileMfaAuditOperationReceipts(
         ).bind(updatedPlan, row.receiptId, 'READY', row.eventPlan).run()
         if (!persisted.success || persisted.meta?.changes !== 1) {
           const latest = await loadReceipt(db, row.receiptId)
-          const latestPlan = parsePlan(latest.eventPlan)
+          const latestPlan = parseMfaAuditReceiptPlan(latest.eventPlan)
           const allIdentitiesAlreadyAdopted = plan.every((event) =>
             latestPlan.some((candidate) =>
               candidate.idempotencyKey === event.idempotencyKey &&
