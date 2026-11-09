@@ -46,6 +46,7 @@
     "neon:auth007-mfa-receipts:runtime": "tsx scripts/neon/w02-auth007-mfa-operation-receipts-postgres-runtime-rehearsal.ts",
     "neon:auth007-mfa-journal:runtime": "tsx scripts/neon/w02-auth007-mfa-publication-journal-postgres-runtime-rehearsal.ts",
     "neon:auth007-mfa-receipts:reconcile:runtime": "tsx scripts/neon/w02-auth007-mfa-receipt-reconciliation-postgres-runtime-rehearsal.ts",
-    "neon:auth007-mfa:publisher:runtime": "tsx scripts/neon/w02-auth007-mfa-publication-publisher-postgres-runtime-rehearsal.ts"
+    "neon:auth007-mfa:publisher:runtime": "tsx scripts/neon/w02-auth007-mfa-publication-publisher-postgres-runtime-rehearsal.ts",
+    "neon:auth007-mfa:factor-state:runtime": "tsx scripts/neon/w02-auth007-mfa-factor-state-postgres-runtime-rehearsal.ts"
   }
 }
