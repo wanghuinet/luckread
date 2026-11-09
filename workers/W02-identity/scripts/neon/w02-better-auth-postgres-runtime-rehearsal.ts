@@ -501,7 +501,7 @@ try {
   assert.equal(Number(afterSignOut.rows[0]?.count), 0)
 
   report = {
-    reportVersion: 3,
+    reportVersion: 4,
     status: 'W02_BETTER_AUTH_POSTGRES_RUNTIME_REHEARSAL_PASS',
     scope: 'Better Auth core PostgreSQL runtime, L1/L2 role materialization, AUTH-013 email-verification activation and journal, AUTH-007 MFA status read handler, and AUTH-010 PostgreSQL session-list and session-revocation HTTP adapters; D1 production remains authoritative.',
     betterAuthVersion: '1.7.8',
