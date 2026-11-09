@@ -5,7 +5,6 @@ import {
 } from '../auth/mfa-audit-events.js'
 import {
   parseMfaAuditReceiptPlan,
-  type MfaAuditReceiptEvent,
 } from '../auth/mfa-audit-receipts.js'
 import { recordMfaAuditEventOncePostgres } from './mfa-audit-publication-journal-postgres.js'
 
@@ -80,7 +79,7 @@ function buildJournalInput(row: ReceiptRow, event: StoredPlanEvent) {
 
 /**
  * PostgreSQL counterpart of the existing W02 Cron receipt reconciler.
- * Receipt rows are claimed with FOR UPDATE SKIP LOCKED and remain locked while
+ * Receipt rows are selected in a bounded batch and locked with FOR UPDATE while
  * idempotent journal writes are proven. Only after every event is durable is
  * READY transitioned to EMITTED. This function does not publish to Queue.
  */
