@@ -7,6 +7,7 @@ import {
   verifyD103RemoteTlsConnection,
 } from './remote-schema-runner.mjs'
 import { parseCommandLine as parseSharedCommandLine } from '../shared-domain-schema-runner.mjs'
+import { parseCommandLine as parseDomainExecutorCommandLine } from './remote-schema-runner.mjs'
 import { parseCommandLine } from './schema-only-runner.mjs'
 import { assertD103RemoteApplyBlocked } from './assert-remote-apply-release.mjs'
 
@@ -74,6 +75,13 @@ test('remote wrapper CLI accepts only the explicit remote entry point', () => {
   assert.equal(parseCommandLine(['--local-only']).valid, false)
   assert.equal(parseCommandLine([]).valid, false)
   assert.equal(parseCommandLine(['--remote-neon', '--local-only']).valid, false)
+})
+
+test('isolated D1-03 executor exposes only explicit local-only rehearsal and remote modes', () => {
+  assert.deepEqual(parseDomainExecutorCommandLine(['--local-only']), { valid: true, mode: 'LOCAL_ONLY' })
+  assert.deepEqual(parseDomainExecutorCommandLine(['--remote-neon']), { valid: true, mode: 'REMOTE_NEON' })
+  assert.equal(parseDomainExecutorCommandLine([]).valid, false)
+  assert.equal(parseDomainExecutorCommandLine(['--remote-neon', '--local-only']).valid, false)
 })
 
 test('general shared executor remains local-only for every domain', () => {
