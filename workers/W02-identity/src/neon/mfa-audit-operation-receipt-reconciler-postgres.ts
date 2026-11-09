@@ -112,10 +112,13 @@ async function accountForAlreadyTerminalState(
  * W02 runtime-adapter change-control is approved. It does not publish a Queue
  * message; delivery remains a separate existing-AUTH013_QUEUE operation.
  */
+type MfaAuditEventRecorder = typeof recordMfaAuditEventOncePostgres
+
 export async function reconcileMfaAuditOperationReceiptsPostgres(
   pool: Pool,
   now = new Date().toISOString(),
   maxBatch = MAX_BATCH,
+  recordEvent: MfaAuditEventRecorder = recordMfaAuditEventOncePostgres,
 ): Promise<MfaAuditReceiptDrainSummary> {
   assertReconcileInput(now, maxBatch)
   const nowDate = new Date(now)
@@ -188,7 +191,7 @@ export async function reconcileMfaAuditOperationReceiptsPostgres(
           ? await deriveMfaAuditEventIdForIdempotencyKey(event.idempotencyKey)
           : event.eventId
 
-        const recorded = await recordMfaAuditEventOncePostgres(client, {
+        const recorded = await recordEvent(client, {
           eventType: event.eventType,
           ...(event.operationId ? { operationId: event.operationId } : {}),
           userId: row.resourceId,
