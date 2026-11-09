@@ -1,7 +1,5 @@
 import type { Pool, PoolClient } from 'pg'
 
-import type { MfaAuditOperationReceiptStore } from '../auth/mfa-audit-operation-receipt-store.js'
-import { reconcileMfaAuditOperationReceiptsPostgres } from './mfa-audit-operation-receipt-reconciler-postgres.js'
 
 import {
   mergeMfaAuditReceiptPlan,
