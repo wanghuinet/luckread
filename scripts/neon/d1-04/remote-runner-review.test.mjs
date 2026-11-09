@@ -5,6 +5,7 @@ import { validateD104ReleaseState } from './assert-remote-apply-release.mjs'
 
 const sha = 'a'.repeat(40)
 const run = 'https://github.com/wanghuinet/luckread/actions/runs/42509822425'
+const validationRun = 'https://github.com/wanghuinet/luckread/actions/runs/42547646161'
 const baseReview = {
   status: 'AI_REVIEW_PASS_NO_BLOCKING_FINDINGS',
   remoteApplyReady: true,
@@ -46,7 +47,18 @@ const baseReview = {
   },
   verificationEvidence: {
     d1_04SharedPostgres18: { runId: 42509822425, conclusion: 'success', url: run },
-    remoteRunnerValidation: { runId: 42509822425, conclusion: 'success', headSha: sha, url: run, remoteApplyJob: 'not-dispatched' },
+    remoteRunnerValidation: {
+      runId: 42547646161,
+      conclusion: 'success',
+      headSha: 'b'.repeat(40),
+      sourceCommitSha: 'c'.repeat(40),
+      headBranch: 'feat/neon-d1-04-reviewed-remote-runner',
+      validationScope: 'D1_04_SCHEMA_ONLY_LOCAL_PG18_NO_NEON_CREDENTIALS',
+      url: validationRun,
+      remoteApplyJob: 'skipped',
+      artifactId: 13644425675,
+      artifactDigest: 'sha256:' + 'd'.repeat(64),
+    },
   },
   safety: {
     remoteNeonDdlExecuted: false,
@@ -94,6 +106,7 @@ test('D1-04 source-pinned review accepts the exact reviewed target and evidence'
     review: baseReview,
     currentHead: sha,
     hashBlob: () => sha,
+    hashBlobAtCommit: () => sha,
     isAncestor: () => true,
   })
   assert.equal(result.valid, true, result.errors.join('; '))
@@ -105,6 +118,7 @@ test('D1-04 review rejects moved source pins and stale review commits', () => {
     review: baseReview,
     currentHead: sha,
     hashBlob: () => 'b'.repeat(40),
+    hashBlobAtCommit: () => sha,
     isAncestor: () => true,
   })
   assert.equal(drift.valid, false)
@@ -114,10 +128,39 @@ test('D1-04 review rejects moved source pins and stale review commits', () => {
     review: baseReview,
     currentHead: 'c'.repeat(40),
     hashBlob: () => sha,
+    hashBlobAtCommit: () => sha,
     isAncestor: () => false,
   })
   assert.equal(stale.valid, false)
   assert.ok(stale.errors.some((item) => /not an ancestor/.test(item)))
+})
+
+test('D1-04 release rejects an unpinned CI run or artifact even when the status says success', () => {
+  const changed = structuredClone(baseReview)
+  changed.verificationEvidence.remoteRunnerValidation.artifactDigest = 'not-a-sha256-digest'
+  const result = validateD104RemoteRunnerReview({
+    root: process.cwd(),
+    review: changed,
+    currentHead: sha,
+    hashBlob: () => sha,
+    hashBlobAtCommit: () => sha,
+    isAncestor: () => true,
+  })
+  assert.equal(result.valid, false)
+  assert.ok(result.errors.some((item) => /source-equivalent PR validation/.test(item)))
+})
+
+test('D1-04 CI evidence may use a PR SHA only when every reviewed source blob matches current main', () => {
+  const drift = validateD104RemoteRunnerReview({
+    root: process.cwd(),
+    review: baseReview,
+    currentHead: sha,
+    hashBlob: () => sha,
+    hashBlobAtCommit: () => 'e'.repeat(40),
+    isAncestor: () => true,
+  })
+  assert.equal(drift.valid, false)
+  assert.ok(drift.errors.some((item) => /CI validation source blob differs/.test(item)))
 })
 
 test('D1-04 release may use its separate runner without broadening the canonical D1-01/D1-02 runner', () => {

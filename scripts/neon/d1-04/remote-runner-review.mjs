@@ -13,6 +13,8 @@ export function validateD104RemoteRunnerReview({
   review,
   currentHead,
   hashBlob = (relativePath) => execFileSync('git', ['hash-object', relativePath], { cwd: root, encoding: 'utf8' }).trim(),
+  hashBlobAtCommit = (commitSha, relativePath) =>
+    execFileSync('git', ['rev-parse', commitSha + ':' + relativePath], { cwd: root, encoding: 'utf8' }).trim(),
   isAncestor = (ancestor, descendant) => {
     try {
       execFileSync('git', ['merge-base', '--is-ancestor', ancestor, descendant], { cwd: root, stdio: 'ignore' })
@@ -69,6 +71,12 @@ export function validateD104RemoteRunnerReview({
     fail(errors, 'review record must disclose formal-review, remote-execution and external target-identity limitations')
   }
 
+  const validation = record.verificationEvidence?.remoteRunnerValidation
+  const validationHeadSha = validation?.headSha
+  if (!SHA40.test(validationHeadSha ?? '')) {
+    fail(errors, 'remote-runner CI head SHA is missing or malformed')
+  }
+
   const reviewedFiles = info.reviewedFiles
   if (!Array.isArray(reviewedFiles) || reviewedFiles.length < 8) {
     fail(errors, 'review must pin the D1-04 remote runner, tests, workflow, release gate and W07 schema sources')
@@ -90,6 +98,12 @@ export function validateD104RemoteRunnerReview({
         if (hashBlob(relativePath) !== item.gitBlobSha1) {
           fail(errors, 'reviewed source blob drift invalidates D1-04 release: ' + relativePath)
         }
+        if (SHA40.test(validationHeadSha ?? '')) {
+          const validationBlob = hashBlobAtCommit(validationHeadSha, relativePath)
+          if (validationBlob !== item.gitBlobSha1) {
+            fail(errors, 'CI validation source blob differs from the reviewed main source: ' + relativePath)
+          }
+        }
       } catch (error) {
         fail(errors, 'cannot verify reviewed source blob for ' + relativePath + ': ' + error.message)
       }
@@ -98,7 +112,6 @@ export function validateD104RemoteRunnerReview({
 
   const evidence = record.verificationEvidence ?? {}
   const local = evidence.d1_04SharedPostgres18
-  const validation = evidence.remoteRunnerValidation
   if (local?.runId !== 42509822425 ||
       local?.conclusion !== 'success' ||
       typeof local?.url !== 'string' || !RUN_URL.test(local.url)) {
@@ -106,10 +119,14 @@ export function validateD104RemoteRunnerReview({
   }
   if (!Number.isSafeInteger(validation?.runId) ||
       validation?.conclusion !== 'success' ||
-      validation?.headSha !== info.reviewedMainSha ||
+      !SHA40.test(validation?.sourceCommitSha ?? '') ||
+      validation?.validationScope !== 'D1_04_SCHEMA_ONLY_LOCAL_PG18_NO_NEON_CREDENTIALS' ||
+      typeof validation?.headBranch !== 'string' ||
       typeof validation?.url !== 'string' || !RUN_URL.test(validation.url) ||
-      validation?.remoteApplyJob !== 'not-dispatched') {
-    fail(errors, 'successful current-main remote-runner validation evidence is missing or mismatched')
+      validation?.remoteApplyJob !== 'skipped' ||
+      !Number.isSafeInteger(validation?.artifactId) ||
+      !/^sha256:[0-9a-f]{64}$/.test(validation?.artifactDigest ?? '')) {
+    fail(errors, 'successful source-equivalent PR validation and sanitized PG18 artifact evidence is missing or mismatched')
   }
 
   const safety = record.safety ?? {}
