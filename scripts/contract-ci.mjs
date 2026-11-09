@@ -366,6 +366,7 @@ async function checkEvents() {
     const mfaChallengeVerificationSource = await readFile('workers/W02-identity/src/auth/mfa-challenge-verification.ts', 'utf8')
     const mfaHookSource = await readFile('workers/W02-identity/src/auth/mfa-audit-hooks.ts', 'utf8')
     const mfaReceiptSource = await readFile('workers/W02-identity/src/auth/mfa-audit-receipts.ts', 'utf8')
+    const mfaReceiptStorePortSource = await readFile('workers/W02-identity/src/auth/mfa-audit-operation-receipt-store.ts', 'utf8')
     const mfaEventSource = await readFile('workers/W02-identity/src/auth/mfa-audit-events.ts', 'utf8')
     const mfaPublicationSource = await readFile('workers/W02-identity/src/auth/mfa-audit-publication-journal.ts', 'utf8')
     const mfaAuditEvidenceSource = await readFile('scripts/auth-007-mfa-audit-evidence.mjs', 'utf8')
@@ -377,13 +378,24 @@ async function checkEvents() {
       "'/two-factor/disable'",
       "'/two-factor/generate-backup-codes'",
       "classifyMfaAuditHookOutcome",
-      'createMfaAuditOperationReceipt',
-      'finalizeMfaAuditOperationReceipt',
-      'reconcileMfaAuditOperationReceipts',
+      'mfaAuditOperationReceiptStore?: MfaAuditOperationReceiptStore',
+      'createD1MfaAuditOperationReceiptStore(env.D1_01)',
+      'effectiveMfaAuditReceiptStore!.create(',
+      'effectiveMfaAuditReceiptStore!.append(',
+      'finalizeMfaAuditOperationReceiptWithRetry(effectiveMfaAuditReceiptStore!',
+      'effectiveMfaAuditReceiptStore!.reconcile()',
       'isUnexpiredMfaChallengeRecord',
       'consumeTotpTimeStep',
       'auth.mfa.replay_rejected',
       'auth.mfa.locked',
+    ]
+    const requiredReceiptStorePortTokens = [
+      'createD1MfaAuditOperationReceiptStore(db: D1Database)',
+      'assertMfaAuditOperationReceiptOwner(db, input)',
+      'createMfaAuditOperationReceipt(db, input)',
+      'appendMfaAuditOperationReceiptEvent(db, receiptId, event)',
+      'finalizeMfaAuditOperationReceipt(db, receiptId, events)',
+      'reconcileMfaAuditOperationReceipts(db)',
     ]
     const requiredChallengeExpiryTokens = [
       'Date.parse(String(challenge.expiresAt))',
@@ -427,6 +439,7 @@ async function checkEvents() {
         !(await fileExists('workers/W02-identity/src/auth/mfa-audit-events.test.ts')) ||
         !(await fileExists('workers/W02-identity/src/auth/mfa-audit-receipts.test.ts')) ||
         !requiredHookTokens.every((token) => mfaProducerSource.includes(token)) ||
+        !requiredReceiptStorePortTokens.every((token) => mfaReceiptStorePortSource.includes(token)) ||
         !requiredChallengeExpiryTokens.every((token) => mfaChallengeVerificationSource.includes(token)) ||
         !(await fileExists('workers/W02-identity/src/auth/mfa-challenge-verification.test.ts')) ||
         !requiredReceiptTokens.every((token) => mfaReceiptSource.includes(token)) ||
