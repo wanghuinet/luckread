@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luckread.com/contracts/database/neon-d1-04-remote-runner-review.v1.json",
+  "title": "LuckRead D1-04 W07 Remote Schema Runner Review and Release",
+  "version": "1.0.0",
+  "status": "REMOTE_RUNNER_REVIEW_PENDING",
+  "repository": "wanghuinet/luckread",
+  "remoteApplyReady": false,
+  "target": {
+    "domainId": "D1-04",
+    "databaseName": "luckread_finance",
+    "databaseUuid": "9bfb89a5-fbb5-45b1-a2ee-eab674b0d736",
+    "neonHost": "ep-icy-breeze-azdp8x8q-pooler.c-3.ap-southeast-1.aws.neon.tech",
+    "postgresMajor": 18,
+    "scope": "schema-only",
+    "businessDataImport": false,
+    "productionCutoverAuthorized": false
+  },
+  "review": {
+    "reviewer": null,
+    "reviewType": null,
+    "reviewedAt": null,
+    "reviewedMainSha": null,
+    "implementationMergeSha": null,
+    "result": "PENDING",
+    "formalGitHubReviewSubmissions": 0,
+    "reviewedFiles": [],
+    "findings": [],
+    "limitations": [
+      "Remote execution remains blocked until the implementation is merged, current-main CI passes, and the independent source-pinned review record is completed.",
+      "Remote Neon DDL has not been executed.",
+      "The Neon database UUID is copied from existing W07 D1-04 Wrangler metadata; PostgreSQL SQL cannot independently verify the Neon control-plane UUID."
+    ]
+  },
+  "verificationEvidence": {
+    "d1_04SharedPostgres18": {
+      "runId": 42509822425,
+      "conclusion": "success",
+      "url": "https://github.com/wanghuinet/luckread/actions/runs/42509822425"
+    },
+    "remoteRunnerValidation": null
+  },
+  "safety": {
+    "remoteNeonDdlExecuted": false,
+    "cloudflareD1Touched": false,
+    "businessDataImported": false,
+    "productionCutoverAuthorized": false,
+    "manualWorkflowDispatchRequired": true,
+    "exactConfirmationRequired": "APPLY_REVIEWED_SCHEMA_D1_04_FINANCE"
+  }
+}
