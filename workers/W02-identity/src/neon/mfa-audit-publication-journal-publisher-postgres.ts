@@ -74,7 +74,7 @@ export function assertMfaAuditQueueEvent(value: unknown): MfaAuditEvent {
     value.producer !== 'W02' ||
     value.resourceType !== 'User' ||
     typeof value.resourceId !== 'string' || !RESOURCE_ID.test(value.resourceId) ||
-    !isCanonicalTimestamp(value.occurredAt) ||
+    typeof value.occurredAt !== 'string' || !Number.isFinite(Date.parse(value.occurredAt)) ||
     !isCanonicalTimestamp(value.publishedAt) ||
     typeof value.correlationId !== 'string' || !TOKEN.test(value.correlationId) ||
     typeof value.causationId !== 'string' || !TOKEN.test(value.causationId) ||
