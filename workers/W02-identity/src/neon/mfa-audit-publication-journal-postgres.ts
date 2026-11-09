@@ -1,4 +1,4 @@
-import type { Pool, PoolClient } from 'pg'
+import type { Pool } from 'pg'
 
 import {
   buildMfaAuditEvent,
@@ -26,10 +26,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 async function loadByIdempotencyKey(
-  database: Pool | PoolClient,
+  pool: Pool,
   idempotencyKey: string,
 ): Promise<StoredJournalRow | null> {
-  const result = await database.query<StoredJournalRow>(
+  const result = await pool.query<StoredJournalRow>(
     'SELECT event_id AS "eventId", event_type AS "eventType", resource_id AS "resourceId", ' +
       'status, payload FROM auth_007_mfa_publication_journal ' +
       'WHERE idempotency_key = $1 LIMIT 1',
@@ -106,7 +106,7 @@ function assertSameIntent(
  * AUTH013_QUEUE contract. W06 remains the canonical AuditEvent authority.
  */
 export async function recordMfaAuditEventOncePostgres(
-  database: Pool | PoolClient,
+  pool: Pool,
   input: RecordMfaAuditEventOnceInput,
 ): Promise<{ inserted: boolean; eventId: string }> {
   const event = buildMfaAuditEvent(input)
@@ -116,13 +116,8 @@ export async function recordMfaAuditEventOncePostgres(
     input.eventId === await deriveMfaAuditEventIdForIdempotencyKey(input.idempotencyKey)
 
   const journalId = crypto.randomUUID()
-  const isTransactionClient = typeof (database as PoolClient).release === 'function'
-  const savepoint = 'mfa_audit_event_once'
-  if (isTransactionClient) {
-    await database.query('SAVEPOINT ' + savepoint)
-  }
   try {
-    const inserted = await database.query<{ eventId: string }>(
+    const inserted = await pool.query<{ eventId: string }>(
       'INSERT INTO auth_007_mfa_publication_journal ' +
         '(journal_id, event_id, event_type, schema_version, resource_id, source_version, ' +
         'idempotency_key, payload, status, attempt, next_attempt_at, created_at, published_at, last_error_code) ' +
@@ -141,20 +136,15 @@ export async function recordMfaAuditEventOncePostgres(
         new Date(event.publishedAt),
       ],
     )
-    if (isTransactionClient) await database.query('RELEASE SAVEPOINT ' + savepoint)
     if (inserted.rowCount === 1) {
       return { inserted: true, eventId: inserted.rows[0]!.eventId }
     }
   } catch (writeError) {
-    if (isTransactionClient) {
-      await database.query('ROLLBACK TO SAVEPOINT ' + savepoint)
-      await database.query('RELEASE SAVEPOINT ' + savepoint)
-    }
     // A lost response may follow a committed insert. First prove whether the
     // idempotency key is already durable before classifying the write as failed.
     let existing: StoredJournalRow | null = null
     try {
-      existing = await loadByIdempotencyKey(database, event.idempotencyKey)
+      existing = await loadByIdempotencyKey(pool, event.idempotencyKey)
     } catch {
       throw new Error('MFA_AUDIT_OUTBOX_WRITE_FAILED')
     }
@@ -174,7 +164,7 @@ export async function recordMfaAuditEventOncePostgres(
 
   let existing: StoredJournalRow | null
   try {
-    existing = await loadByIdempotencyKey(database, event.idempotencyKey)
+    existing = await loadByIdempotencyKey(pool, event.idempotencyKey)
   } catch {
     throw new Error('MFA_AUDIT_OUTBOX_WRITE_FAILED')
   }
