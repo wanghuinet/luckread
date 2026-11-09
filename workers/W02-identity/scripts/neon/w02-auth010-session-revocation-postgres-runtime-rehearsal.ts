@@ -72,7 +72,7 @@ const insertBaseRole = async (userId: string): Promise<void> => {
     'INSERT INTO role_assignments ' +
       '(id, subject_id, role_id, scope_type, scope_id, status, valid_from, valid_until, created_at, updated_at) ' +
       "VALUES ($1, $2, 'user', 'global', NULL, 'ACTIVE', $3, NULL, $4, $4)",
-    ['auth010-role-' + suffix + '-' + userId.slice(-12), userId, validFrom, now],
+    ['auth010-role-' + userId, userId, validFrom, now],
   )
 }
 
