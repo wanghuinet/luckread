@@ -74,7 +74,7 @@ export function createPostgresSessionListStore(pool: Pool): SessionListStore {
         : [input.userId, input.now, input.limit]
 
       const result = await pool.query<SessionListPostgresRow>(
-        'WITH authorization AS ( ' +
+        'WITH authorization_facts AS ( ' +
           'SELECT EXISTS ( ' +
             'SELECT 1 ' +
             'FROM "user" AS account ' +
@@ -94,16 +94,16 @@ export function createPostgresSessionListStore(pool: Pool): SessionListStore {
             'to_char(expires_at AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.US"Z"\') AS "expiresAt" ' +
           'FROM "session" ' +
           'WHERE user_id = $1 AND expires_at > $2 ' +
-          'AND EXISTS (SELECT 1 FROM authorization WHERE "permissionGranted" = TRUE) ' +
+          'AND EXISTS (SELECT 1 FROM authorization_facts WHERE "permissionGranted" = TRUE) ' +
           cursorPredicate + ' ' +
           'ORDER BY created_at DESC, id DESC ' +
           'LIMIT ' + limitParameter +
         ') ' +
-        'SELECT authorization."permissionGranted" AS "permissionGranted", ' +
+        'SELECT authorization_facts."permissionGranted" AS "permissionGranted", ' +
           'sessions."sessionId" AS "sessionId", ' +
           'sessions."createdAt" AS "createdAt", ' +
           'sessions."expiresAt" AS "expiresAt" ' +
-        'FROM authorization LEFT JOIN sessions ON TRUE ' +
+        'FROM authorization_facts LEFT JOIN sessions ON TRUE ' +
         'ORDER BY sessions."createdAt" DESC NULLS LAST, sessions."sessionId" DESC NULLS LAST',
         values,
       )
