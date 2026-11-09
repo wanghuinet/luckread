@@ -127,8 +127,9 @@ try {
   )
   assert.equal(verified.rowCount, 1, 'verified flag must be persisted before lifecycle activation')
 
-  // Two concurrent callbacks must converge on one account-state transition,
-  // one verified_user role and one AUTH-013 journal event.
+  // Exercise the same injected callback used as Better Auth's
+  // afterEmailVerification hook. Two concurrent deliveries must converge on
+  // one account-state transition, one verified_user role and one AUTH-013 journal event.
   const activations = await withTimeout('email-verification-activation-concurrency', () =>
     Promise.all([
       postgresLifecycleAdapters.afterEmailVerified(userId!, verificationAt),
