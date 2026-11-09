@@ -90,7 +90,7 @@ const baseReadiness = {
 
 test('D1-04 source-pinned review accepts the exact reviewed target and evidence', () => {
   const result = validateD104RemoteRunnerReview({
-    root: '/repo',
+    root: process.cwd(),
     review: baseReview,
     currentHead: sha,
     hashBlob: () => sha,
@@ -101,7 +101,7 @@ test('D1-04 source-pinned review accepts the exact reviewed target and evidence'
 
 test('D1-04 review rejects moved source pins and stale review commits', () => {
   const drift = validateD104RemoteRunnerReview({
-    root: '/repo',
+    root: process.cwd(),
     review: baseReview,
     currentHead: sha,
     hashBlob: () => 'b'.repeat(40),
@@ -110,7 +110,7 @@ test('D1-04 review rejects moved source pins and stale review commits', () => {
   assert.equal(drift.valid, false)
   assert.ok(drift.errors.some((item) => /blob drift/.test(item)))
   const stale = validateD104RemoteRunnerReview({
-    root: '/repo',
+    root: process.cwd(),
     review: baseReview,
     currentHead: 'c'.repeat(40),
     hashBlob: () => sha,
