@@ -182,7 +182,7 @@ jobs:
           node --input-type=module <<'NODE' >> "$GITHUB_ENV"
           const { appendFileSync } = await import('node:fs')
           const { validateD103RemoteNeonTarget, enforceD103VerifiedNeonConnectionString } =
-            await import('./scripts/neon/shared-domain-schema-runner.mjs')
+            await import('./scripts/neon/d1-03/remote-schema-runner.mjs')
           const raw = process.env.NEON_DATABASE_URL_GOVERNANCE
           if (typeof raw !== 'string' || raw.length === 0) throw new Error('NEON_DATABASE_URL_GOVERNANCE is required')
           const verified = enforceD103VerifiedNeonConnectionString(raw)
