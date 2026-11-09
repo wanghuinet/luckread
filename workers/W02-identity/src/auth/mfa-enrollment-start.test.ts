@@ -10,7 +10,8 @@ const mocks = vi.hoisted(() => ({
 vi.mock('./principal.js', () => ({ resolveBetterAuthPrincipal: mocks.resolvePrincipal }))
 vi.mock('./better-auth.js', () => ({ createLuckReadAuth: mocks.createAuth }))
 
-import type { BetterAuthEnv } from './better-auth.js'
+import { createLuckReadAuth, type BetterAuthEnv } from './better-auth.js'
+import type { MfaEnrollmentStartStore } from './mfa-enrollment-start-store.js'
 import { handleMfaEnrollmentStartRequest } from './mfa-enrollment-start.js'
 
 const makeDb = () => {
@@ -142,6 +143,45 @@ describe('W02 MFA enrollment-start authority', () => {
     } finally {
       close()
     }
+  })
+
+  it('uses an injected PostgreSQL-compatible store and Better Auth instance without touching D1', async () => {
+    const store: MfaEnrollmentStartStore = {
+      reserve: vi.fn(async () => true),
+      recordFailure: vi.fn(async () => undefined),
+      releaseReservationIfNoFactor: vi.fn(async () => undefined),
+    }
+    const auth = createLuckReadAuth({} as BetterAuthEnv)
+    const resolvePrincipal = vi.fn(async () => ({
+      userId: principal.userId,
+      accountState: principal.accountState,
+    }))
+    const response = await handleMfaEnrollmentStartRequest({
+      AUTH_SESSION_WRITE_LIMITER: mocks.limiter,
+    } as BetterAuthEnv, makeRequest(), {
+      auth,
+      store,
+      resolvePrincipal,
+    })
+
+    expect(response.status).toBe(200)
+    expect(store.reserve).toHaveBeenCalledTimes(1)
+    const reservation = store.reserve.mock.calls[0]?.[0]
+    expect(reservation?.userId).toBe(principal.userId)
+    expect(reservation?.keyHash).toMatch(/^[a-f0-9]{64}$/)
+    expect(reservation?.event).toMatchObject({
+      eventType: 'auth.mfa.enrollment_started',
+      resourceId: principal.userId,
+      payload: {
+        operationId: 'authMfaEnrollmentStart',
+        result: 'started',
+        factorState: 'PENDING_VERIFICATION',
+      },
+    })
+    expect(store.recordFailure).not.toHaveBeenCalled()
+    expect(store.releaseReservationIfNoFactor).not.toHaveBeenCalled()
+    expect(resolvePrincipal).toHaveBeenCalledTimes(1)
+    expect(mocks.handler).toHaveBeenCalledTimes(1)
   })
 
   it('rejects non-W01 callers and inactive identities before a factor write', async () => {
