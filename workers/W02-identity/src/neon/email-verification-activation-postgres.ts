@@ -1,13 +1,11 @@
 import { randomUUID } from 'node:crypto'
-import type { Pool, PoolClient } from 'pg'
+import type { Pool } from 'pg'
 
 import {
   AccountStateTransitionError,
   type AccountState,
 } from '../account/account-state-transition.js'
 import { ensureVerifiedUserRolePostgres } from './role-assignment-postgres.js'
-
-type ActivationConnection = Pool | PoolClient
 
 type CurrentAccount = {
   accountState: string
