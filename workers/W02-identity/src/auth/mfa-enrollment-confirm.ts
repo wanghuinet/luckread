@@ -250,7 +250,7 @@ export async function handleMfaEnrollmentConfirmRequest(
       return json({ error: { code: 'MFA_CONFIRM_REJECTED', message: 'MFA confirmation failed' } }, 400)
     }
 
-    const status = await statusStore.read(principal.userId)
+    const status = await statusStore.read(principal.userId, new Date())
     if (!status || !status.enabled || !status.verified || !status.enrolledAt) {
       return json({ error: { code: 'MFA_READBACK_FAILED', message: 'MFA confirmation could not be verified' } }, 503)
     }
