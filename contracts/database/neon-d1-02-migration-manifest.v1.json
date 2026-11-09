@@ -3,14 +3,14 @@
   "$id": "https://luckread.com/contracts/database/neon-d1-02-migration-manifest.v1.json",
   "title": "LuckRead D1-02 W03 and W05 PostgreSQL Schema-Only Migration Manifest",
   "version": "1.0.0",
-  "status": "CORRECTIVE_MIGRATION_LOCAL_READY_RELEASE_REVIEW_PENDING",
+  "status": "REMOTE_RUNNER_REVIEWED_REMOTE_APPLY_READY",
   "domainId": "D1-02",
   "databaseName": "luckreadpro",
   "databaseUuid": "6c342634-97f6-4248-9f4a-85772af4f22c",
   "postgresMajor": 18,
   "businessDataImport": false,
   "productionCutoverAuthorized": false,
-  "remoteApplyReady": false,
+  "remoteApplyReady": true,
   "ledger": {
     "table": "neon_schema_migration_ledger",
     "ddlPath": "scripts/neon/d1-01/0001_schema_migration_ledger.sql",
@@ -77,9 +77,9 @@
     "Remote Neon execution is allowed only through the reviewed main-only manual workflow_dispatch with the exact D1-02 confirmation; merging this contract does not trigger execution."
   ],
   "execution": {
-    "runnerStatus": "IMPLEMENTED_LOCAL_ONLY_RELEASE_REVIEW_PENDING",
-    "remoteApplyReady": false,
-    "reviewEvidenceRef": null,
+    "runnerStatus": "IMPLEMENTED_AND_REVIEWED",
+    "remoteApplyReady": true,
+    "reviewEvidenceRef": "contracts/database/neon-d1-02-remote-runner-review.v1.json",
     "manualWorkflowDispatchRequired": true
   }
 }
