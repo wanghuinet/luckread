@@ -10,6 +10,8 @@
  */
 import { Pool } from 'pg'
 
+import { ensureBaseUserRolePostgres } from '../neon/role-assignment-postgres.js'
+
 import {
   buildLuckReadAuth,
   type BetterAuthEnv,
@@ -46,4 +48,8 @@ export const auth = buildLuckReadAuth(
   rehearsalEnvironment,
   postgresPool,
   'postgres-rehearsal',
+  undefined,
+  {
+    afterUserCreated: (userId) => ensureBaseUserRolePostgres(postgresPool, userId),
+  },
 )
