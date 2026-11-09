@@ -1,6 +1,7 @@
 import usernameReservationPolicy from '../../../../contracts/security/username-reservation-policy.v1.json'
 import type { BetterAuthEnv } from './better-auth.js'
 import { resolveBetterAuthPrincipal, type AuthenticatedPrincipal } from './principal.js'
+import { createD1UsernameChangeStore, type UsernameChangeContext, type UsernameChangeStore } from './username-change-store.js'
 
 const COOLDOWN_MS = Number(usernameReservationPolicy.ownerDecision.renameCooldownDays) * 24 * 60 * 60 * 1000
 const RESERVATION_MS = Number(usernameReservationPolicy.ownerDecision.previousUsernameReservationDays) * 24 * 60 * 60 * 1000
@@ -11,40 +12,7 @@ const IDEMPOTENCY_PATTERN = /^[A-Za-z0-9._:-]{16,255}$/
 const ETAG_PATTERN = /^"username-v(0|[1-9][0-9]*)"$/
 
 type UsernameCandidate = { display: string; normalized: string }
-type UsernameContext = {
-  username: string | null
-  accountState: string
-  usernameVersion: number
-  lastChangedAt: string | null
-  replayKeyHash: string | null
-  replayUsername: string | null
-  replayFingerprint: string | null
-  replayChangedAt: string | null
-  replayExpiresAt: string | null
-}
-
-const CONTEXT_SQL = [
-  'SELECT u.username AS username, u.account_state AS accountState,',
-  '       COALESCE(s.username_version, 0) AS usernameVersion,',
-  '       s.last_changed_at AS lastChangedAt,',
-  '       CASE WHEN s.idempotency_key_hash = ? AND s.idempotency_expires_at > ? THEN s.idempotency_key_hash END AS replayKeyHash,',
-  '       CASE WHEN s.idempotency_key_hash = ? AND s.idempotency_expires_at > ? THEN s.changed_username END AS replayUsername,',
-  '       CASE WHEN s.idempotency_key_hash = ? AND s.idempotency_expires_at > ? THEN s.request_fingerprint END AS replayFingerprint,',
-  '       CASE WHEN s.idempotency_key_hash = ? AND s.idempotency_expires_at > ? THEN s.last_changed_at END AS replayChangedAt,',
-  '       CASE WHEN s.idempotency_key_hash = ? AND s.idempotency_expires_at > ? THEN s.idempotency_expires_at END AS replayExpiresAt',
-  'FROM "user" u',
-  'LEFT JOIN auth_username_change_state s ON s.user_id = u.id',
-  'WHERE u.id = ? LIMIT 1',
-].join('\n')
-
-const STATE_SQL = [
-  'SELECT u.username AS username, u.account_state AS accountState,',
-  '       COALESCE(s.username_version, 0) AS usernameVersion,',
-  '       s.last_changed_at AS lastChangedAt',
-  'FROM "user" u',
-  'LEFT JOIN auth_username_change_state s ON s.user_id = u.id',
-  'WHERE u.id = ? LIMIT 1',
-].join('\n')
+type UsernameContext = UsernameChangeContext
 
 const json = (body: unknown, status = 200, headers?: HeadersInit): Response => {
   const outputHeaders = new Headers(headers)
@@ -87,29 +55,6 @@ export async function fingerprintUsernameChange(display: string, ifMatch: string
 }
 
 const etagForVersion = (version: number): string => '"username-v' + String(version) + '"'
-
-function contextFromRow(row: UsernameContext | null): UsernameContext | null {
-  if (!row || typeof row.accountState !== 'string' ||
-      !Number.isSafeInteger(Number(row.usernameVersion)) || Number(row.usernameVersion) < 0) return null
-  return { ...row, usernameVersion: Number(row.usernameVersion) }
-}
-
-async function loadContext(
-  env: BetterAuthEnv,
-  userId: string,
-  idempotencyKeyHash: string,
-  nowIso: string,
-): Promise<UsernameContext | null> {
-  const row = await env.D1_01.prepare(CONTEXT_SQL).bind(
-    idempotencyKeyHash, nowIso,
-    idempotencyKeyHash, nowIso,
-    idempotencyKeyHash, nowIso,
-    idempotencyKeyHash, nowIso,
-    idempotencyKeyHash, nowIso,
-    userId,
-  ).first<UsernameContext>()
-  return contextFromRow(row)
-}
 
 type UsernameAuthentication =
   | { ok: true; principal: AuthenticatedPrincipal }
@@ -204,7 +149,12 @@ function replayResponse(context: UsernameContext, now = new Date()): Response {
   }, 200, { ETag: etagForVersion(context.usernameVersion) })
 }
 
-export async function handleUsernameStateRequest(env: BetterAuthEnv, request: Request, now = new Date()): Promise<Response> {
+export async function handleUsernameStateRequest(
+  env: BetterAuthEnv,
+  request: Request,
+  now = new Date(),
+  store: UsernameChangeStore = createD1UsernameChangeStore(env.D1_01),
+): Promise<Response> {
   if (!callerAllowed(request)) return error(403, 'FORBIDDEN', 'Authorized W01 service boundary required')
   const auth = await authenticate(env, request)
   if (!auth.ok) return auth.response
@@ -212,8 +162,7 @@ export async function handleUsernameStateRequest(env: BetterAuthEnv, request: Re
   if (limited) return limited
 
   try {
-    const row = await env.D1_01.prepare(STATE_SQL).bind(auth.principal.userId)
-      .first<Omit<UsernameContext, 'replayKeyHash' | 'replayFingerprint' | 'replayChangedAt' | 'replayExpiresAt'>>()
+    const row = await store.loadState(auth.principal.userId)
     if (!row || typeof row.accountState !== 'string') return error(404, 'NOT_FOUND', 'Username record not found')
     if (row.accountState !== 'ACTIVE') return error(403, 'ACCOUNT_NOT_ELIGIBLE', 'Account is not eligible for this operation')
     const version = Number(row.usernameVersion)
@@ -233,7 +182,12 @@ export async function handleUsernameStateRequest(env: BetterAuthEnv, request: Re
   }
 }
 
-export async function handleUsernameChangeRequest(env: BetterAuthEnv, request: Request, now = new Date()): Promise<Response> {
+export async function handleUsernameChangeRequest(
+  env: BetterAuthEnv,
+  request: Request,
+  now = new Date(),
+  store: UsernameChangeStore = createD1UsernameChangeStore(env.D1_01),
+): Promise<Response> {
   if (!callerAllowed(request)) return error(403, 'FORBIDDEN', 'Authorized W01 service boundary required')
   const auth = await authenticate(env, request)
   if (!auth.ok) return auth.response
@@ -265,7 +219,7 @@ export async function handleUsernameChangeRequest(env: BetterAuthEnv, request: R
   const idempotencyExpiresAt = new Date(now.getTime() + IDEMPOTENCY_RETENTION_MS).toISOString()
 
   let context: UsernameContext | null
-  try { context = await loadContext(env, auth.principal.userId, idempotencyKeyHash, nowIso) }
+  try { context = await store.loadContext(auth.principal.userId, idempotencyKeyHash, nowIso) }
   catch { return error(503, 'SERVICE_UNAVAILABLE', 'Username service unavailable') }
   if (!context) return error(404, 'NOT_FOUND', 'Username record not found')
 
@@ -292,64 +246,34 @@ export async function handleUsernameChangeRequest(env: BetterAuthEnv, request: R
     return error(409, 'USERNAME_CHANGE_COOLDOWN', 'Username can only be changed once every 30 days', { canChangeAt, retryAfter }, { 'retry-after': String(retryAfter) })
   }
 
-  const updateUser = env.D1_01.prepare(
-    'UPDATE "user" SET username = ?, updated_at = ? ' +
-    'WHERE id = ? AND username = ? AND account_state = \'ACTIVE\' ' +
-    'AND COALESCE((SELECT username_version FROM auth_username_change_state WHERE user_id = ?), 0) = ? ' +
-    'AND NOT EXISTS (SELECT 1 FROM auth_username_change_state WHERE previous_username_normalized = ? AND previous_username_expires_at > ?) ' +
-    'AND NOT EXISTS (SELECT 1 FROM auth_identities WHERE username_normalized = ? AND user_id <> ?) ' +
-    'AND NOT EXISTS (SELECT 1 FROM "user" WHERE lower(username) = ? AND id <> ?) ' +
-    'AND NOT EXISTS (SELECT 1 FROM auth_credentials c JOIN auth_identities i ON i.id = c.identity_id ' +
-    'WHERE c.kind = \'username\' AND c.active = 1 AND c.normalized_value = ? AND i.user_id <> ?)',
-  ).bind(
-    candidate.display, nowIso, auth.principal.userId, context.username,
-    auth.principal.userId, expectedVersion,
-    candidate.normalized, nowIso,
-    candidate.normalized, auth.principal.userId, candidate.normalized,
-    auth.principal.userId, candidate.normalized, auth.principal.userId,
-  )
-
-  const saveState = env.D1_01.prepare(
-    'INSERT INTO auth_username_change_state (' +
-      'user_id, username_version, last_changed_at, previous_username, previous_username_normalized, ' +
-      'previous_username_expires_at, idempotency_key_hash, request_fingerprint, idempotency_expires_at, changed_username' +
-    ') SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ? ' +
-    'WHERE EXISTS (SELECT 1 FROM "user" WHERE id = ? AND username = ? AND updated_at = ? AND account_state = \'ACTIVE\') ' +
-    'ON CONFLICT(user_id) DO UPDATE SET ' +
-      'username_version = excluded.username_version, ' +
-      'last_changed_at = excluded.last_changed_at, ' +
-      'previous_username = excluded.previous_username, ' +
-      'previous_username_normalized = excluded.previous_username_normalized, ' +
-      'previous_username_expires_at = excluded.previous_username_expires_at, ' +
-      'idempotency_key_hash = excluded.idempotency_key_hash, ' +
-      'request_fingerprint = excluded.request_fingerprint, ' +
-      'idempotency_expires_at = excluded.idempotency_expires_at, ' +
-      'changed_username = excluded.changed_username ' +
-    'WHERE auth_username_change_state.username_version = ?',
-  ).bind(
-    auth.principal.userId, expectedVersion + 1, nowIso,
-    context.username, oldNormalized, reservationExpiresAt,
-    idempotencyKeyHash, requestFingerprint, idempotencyExpiresAt, candidate.display,
-    auth.principal.userId, candidate.display, nowIso, expectedVersion,
-  )
-
   try {
-    const results = await env.D1_01.batch([updateUser, saveState])
-    if (!Array.isArray(results) || results.length !== 2 || results.some(result => result.success !== true)) {
-      throw new Error('USERNAME_CHANGE_BATCH_FAILED')
-    }
-    const updated = Number(results[0].meta?.changes ?? 0)
-    const saved = Number(results[1].meta?.changes ?? 0)
-    if (updated !== 1 || saved !== 1) {
-      const latest = await loadContext(env, auth.principal.userId, idempotencyKeyHash, nowIso)
+    const result = await store.applyChange({
+      userId: auth.principal.userId,
+      currentUsername: context.username,
+      nextUsername: candidate.display,
+      currentUsernameNormalized: oldNormalized,
+      nextUsernameNormalized: candidate.normalized,
+      expectedVersion,
+      nowIso,
+      reservationExpiresAt,
+      idempotencyKeyHash,
+      requestFingerprint,
+      idempotencyExpiresAt,
+    })
+    if (result.updated !== 1 || result.saved !== 1) {
+      const latest = await store.loadContext(auth.principal.userId, idempotencyKeyHash, nowIso)
       if (latest?.replayKeyHash && latest.replayFingerprint === requestFingerprint) return replayResponse(latest, now)
       return error(412, 'PRECONDITION_FAILED', 'Username changed before this request was applied', undefined, latest ? { ETag: etagForVersion(latest.usernameVersion) } : undefined)
     }
   } catch (failure) {
-    const latest = await loadContext(env, auth.principal.userId, idempotencyKeyHash, nowIso).catch(() => null)
+    const latest = await store.loadContext(auth.principal.userId, idempotencyKeyHash, nowIso).catch(() => null)
     if (latest?.replayKeyHash && latest.replayFingerprint === requestFingerprint) return replayResponse(latest, now)
     const message = failure instanceof Error ? failure.message : ''
-    if (/UNIQUE constraint failed|constraint failed|USERNAME_RESERVED/i.test(message)) {
+    const sqlState = failure && typeof failure === 'object' && 'code' in failure
+      ? String((failure as { code?: unknown }).code ?? '')
+      : ''
+    if (/UNIQUE constraint failed|constraint failed|USERNAME_RESERVED/i.test(message) ||
+        sqlState === '23505' || (sqlState === '23514' && /USERNAME_RESERVED/i.test(message))) {
       return error(409, 'USERNAME_UNAVAILABLE', 'This username is unavailable')
     }
     return error(503, 'SERVICE_UNAVAILABLE', 'Username change could not be committed')
