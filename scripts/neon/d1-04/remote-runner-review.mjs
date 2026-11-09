@@ -117,15 +117,16 @@ export function validateD104RemoteRunnerReview({
       typeof local?.url !== 'string' || !RUN_URL.test(local.url)) {
     fail(errors, 'successful shared D1-04 PostgreSQL 18 rehearsal evidence is missing or mismatched')
   }
-  if (!Number.isSafeInteger(validation?.runId) ||
+  if (validation?.runId !== 42547646161 ||
       validation?.conclusion !== 'success' ||
-      !SHA40.test(validation?.sourceCommitSha ?? '') ||
+      validation?.headSha !== '335f6bd25e1ca2bc32b04fd725c7c9b281b4ee2c' ||
+      validation?.sourceCommitSha !== 'd83c1f0b0cd2444418facd54c7b3adc182817057' ||
+      validation?.headBranch !== 'feat/neon-d1-04-reviewed-remote-runner' ||
       validation?.validationScope !== 'D1_04_SCHEMA_ONLY_LOCAL_PG18_NO_NEON_CREDENTIALS' ||
-      typeof validation?.headBranch !== 'string' ||
-      typeof validation?.url !== 'string' || !RUN_URL.test(validation.url) ||
+      validation?.url !== 'https://github.com/wanghuinet/luckread/actions/runs/42547646161' ||
       validation?.remoteApplyJob !== 'skipped' ||
-      !Number.isSafeInteger(validation?.artifactId) ||
-      !/^sha256:[0-9a-f]{64}$/.test(validation?.artifactDigest ?? '')) {
+      validation?.artifactId !== 13644425675 ||
+      validation?.artifactDigest !== 'sha256:98b8f8fd5c40dd4c0780a8ca8fa5677ab2a352f86d1538e5843b46b9893490d3') {
     fail(errors, 'successful source-equivalent PR validation and sanitized PG18 artifact evidence is missing or mismatched')
   }
 
