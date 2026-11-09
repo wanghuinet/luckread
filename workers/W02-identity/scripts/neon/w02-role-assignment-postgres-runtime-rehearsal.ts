@@ -17,6 +17,8 @@ import {
   readRoleVersionPostgres,
   resolveGlobalLayerPostgres,
 } from '../../src/neon/role-assignment-postgres.js'
+import { resolveLayerForSubject } from '../../src/authz/role-layer-store.js'
+import { createPostgresRoleLayerStore } from '../../src/neon/role-layer-postgres.js'
 
 const connectionString = process.env.W02_RUNTIME_DATABASE_URL
 if (!connectionString) throw new Error('W02_RUNTIME_DATABASE_URL is required')
@@ -147,6 +149,15 @@ try {
   assert.equal(pendingLayer.decision, 'ALLOW')
   assert.equal(pendingLayer.layer, 'L1')
 
+  // Exercise the same provider-neutral authority boundary used by the
+  // /internal/authz/resolve-layer route. It reads account_state from PostgreSQL
+  // itself and cannot accept a caller-supplied state or timestamp.
+  const roleLayerStore = createPostgresRoleLayerStore(pool)
+  const routeLayerA = await resolveLayerForSubject(roleLayerStore, userA, now)
+  assert.deepEqual(routeLayerA, { decision: 'ALLOW', layer: 'L2' })
+  const routeLayerPending = await resolveLayerForSubject(roleLayerStore, userC, now)
+  assert.deepEqual(routeLayerPending, { decision: 'ALLOW', layer: 'L1' })
+
   const creatorGrant = await grantCreatorBusinessRoleWithStore(creatorRoleGrantStore, {
     subjectId: userA,
     roleId: 'creator',
@@ -262,8 +273,14 @@ try {
   assert.ok(afterMfa.roleAssignments?.some((assignment) => assignment.roleId === 'super_admin'))
   assert.equal(await readRoleVersionPostgres(pool, userD), 3)
 
+  const routeLayerPrivileged = await resolveLayerForSubject(roleLayerStore, userD, mfaEffectiveNow)
+  assert.deepEqual(routeLayerPrivileged, { decision: 'ALLOW', layer: 'L8' })
+
+  await pool.query('UPDATE "user" SET account_state = $1 WHERE id = $2', ['SUSPENDED', userD])
   const denyState = await resolveGlobalLayerPostgres(pool, userD, 'SUSPENDED', mfaEffectiveNow, true)
   assert.equal(denyState.decision, 'DENY')
+  const routeLayerSuspended = await resolveLayerForSubject(roleLayerStore, userD, mfaEffectiveNow)
+  assert.deepEqual(routeLayerSuspended, { decision: 'DENY' })
 
   const checks = {
     baseRoleMaterialized: true,
@@ -283,6 +300,8 @@ try {
     privilegedRoleWithheldWithoutMfa: true,
     privilegedRoleIncludedAfterVerifiedTotpEnrollment: true,
     suspendedAccountDenied: true,
+    internalResolveLayerStoreReadsAuthoritativeAccountState: true,
+    internalResolveLayerStoreSupportsL1L2L8AndDeniesSuspended: true,
     syntheticRowsCleaned: true,
   }
   report = {
