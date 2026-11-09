@@ -5,6 +5,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { AccountStateTransitionError } from '../../src/account/account-state-transition.js'
+import { handleMfaStatusRequest } from '../../src/auth/mfa-status.js'
 import { handleCurrentUserSessionList } from '../../src/auth/session-list.js'
 import { handleCurrentUserSessionRevoke } from '../../src/auth/session-revoke.js'
 import {
@@ -12,6 +13,7 @@ import {
   postgresLifecycleAdapters,
   postgresPool,
 } from '../../src/auth/neon-postgres-runtime-test.config.js'
+import { createPostgresMfaStatusStore } from '../../src/neon/mfa-factor-state-postgres.js'
 import { createPostgresSessionListStore } from '../../src/neon/session-list-postgres.js'
 import { createPostgresSessionRevocationStore } from '../../src/neon/session-revocation-postgres-store.js'
 
@@ -248,6 +250,47 @@ try {
   )
   assert.equal(Number(sessionRows.rows[0]?.count), 1, 'sign-in must persist exactly one session')
 
+  // Exercise the private W01 -> W02 MFA status handler with a PostgreSQL
+  // read store and a real Better Auth PostgreSQL session. The response is
+  // restricted to the public status DTO and does not touch D1.
+  const mfaStatusEnv = {
+    D1_01: undefined as unknown as D1Database,
+  } as Parameters<typeof handleMfaStatusRequest>[0]
+  const mfaStatusRequest = new Request(
+    'https://luckread-w02.internal/internal/auth/mfa/status',
+    {
+      method: 'POST',
+      headers: {
+        cookie: cookieHeader,
+        'X-LuckRead-Caller': 'W01',
+        'X-LuckRead-Transport-Version': '1.0',
+      },
+    },
+  )
+  const mfaStatusStore = createPostgresMfaStatusStore(postgresPool)
+  const mfaStatusResponse = await withTimeout('auth007-postgres-mfa-status-handler', () =>
+    handleMfaStatusRequest(mfaStatusEnv, mfaStatusRequest, {
+      store: mfaStatusStore,
+      resolvePrincipal: async (_env, request) => {
+        const activeSession = await auth.api.getSession({ headers: request.headers, query: {} })
+        if (!activeSession?.user?.id) return null
+        return {
+          userId: String(activeSession.user.id),
+          accountState: String(activeSession.user.accountState ?? 'PENDING_VERIFICATION'),
+        }
+      },
+    }),
+  )
+  assert.equal(mfaStatusResponse.status, 200, 'PostgreSQL MFA status handler must succeed')
+  const mfaStatusPayload = await mfaStatusResponse.json() as {
+    data: { enabled: boolean; verified: boolean; enrolledAt: string | null }
+  }
+  assert.deepEqual(mfaStatusPayload, {
+    data: { enabled: false, verified: false, enrolledAt: null },
+  })
+  assert.deepEqual(Object.keys(mfaStatusPayload.data).sort(), ['enabled', 'enrolledAt', 'verified'])
+  assert.ok(!JSON.stringify(mfaStatusPayload).match(/secret|backup|recovery|lockedUntil|lastAccepted/i))
+
   // Add two disposable native Better Auth session rows with deterministic
   // timestamps so the PostgreSQL-backed endpoint can prove keyset paging.
   const sessionListNow = new Date().toISOString()
@@ -460,9 +503,9 @@ try {
   report = {
     reportVersion: 3,
     status: 'W02_BETTER_AUTH_POSTGRES_RUNTIME_REHEARSAL_PASS',
-    scope: 'Better Auth core PostgreSQL runtime, L1/L2 role materialization, AUTH-013 email-verification activation and journal, and AUTH-010 PostgreSQL session-list and session-revocation HTTP adapters; D1 production remains authoritative.',
+    scope: 'Better Auth core PostgreSQL runtime, L1/L2 role materialization, AUTH-013 email-verification activation and journal, AUTH-007 MFA status read handler, and AUTH-010 PostgreSQL session-list and session-revocation HTTP adapters; D1 production remains authoritative.',
     betterAuthVersion: '1.7.8',
-    adapter: 'Better Auth native PostgreSQL dialect via pg.Pool plus W02 PostgreSQL identity lifecycle, AUTH-010 session-list and atomic session-revocation adapters',
+    adapter: 'Better Auth native PostgreSQL dialect via pg.Pool plus W02 PostgreSQL identity lifecycle, AUTH-007 MFA status, AUTH-010 session-list and atomic session-revocation adapters',
     operationsVerified: [
       'SIGN_UP_EMAIL',
       'BASE_USER_L1_ROLE_PERSISTED',
@@ -477,6 +520,8 @@ try {
       'SIGN_IN_EMAIL',
       'SESSION_PERSISTED',
       'GET_SESSION',
+      'AUTH007_MFA_STATUS_HTTP_HANDLER',
+      'AUTH007_MFA_STATUS_SECRET_FREE_PROJECTION',
       'AUTH010_SESSION_LIST_FIRST_PAGE',
       'AUTH010_SESSION_LIST_KEYSET_PAGINATION',
       'AUTH010_SESSION_LIST_NO_SECRET_PROJECTION',
