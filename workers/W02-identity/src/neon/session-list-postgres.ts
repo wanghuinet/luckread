@@ -61,7 +61,7 @@ export function createPostgresSessionListStore(pool: Pool): SessionListStore {
       assertQuery(input)
 
       const authorization = `
-        authorization AS (
+        session_authority AS (
           SELECT CASE WHEN EXISTS (
             SELECT 1
             FROM "user" AS account
@@ -93,9 +93,9 @@ export function createPostgresSessionListStore(pool: Pool): SessionListStore {
             LIMIT $6
           )`
       const sql = `WITH ${authorization}, ${sessions}
-        SELECT authorization."permissionGranted",
+        SELECT session_authority."permissionGranted",
           sessions."sessionId", sessions."createdAt", sessions."expiresAt"
-        FROM authorization
+        FROM session_authority
         LEFT JOIN sessions ON TRUE
         ORDER BY sessions."createdAt" DESC, sessions."sessionId" DESC`
       const values = input.cursor
