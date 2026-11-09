@@ -26,16 +26,32 @@ const renderSql = (sql, args = []) => {
   let index = 0
   return sql.replaceAll('?', () => escapeSql(args[index++]))
 }
-const d1Json = (command) => {
-  const output = execFileSync(
-    'pnpm',
-    ['exec', 'wrangler', 'd1', 'execute', 'luckread', '--local', '--json', '--persist-to', persistTo, '--config', 'wrangler.jsonc', '--command', command],
-    { encoding: 'utf8', cwd: process.cwd(), env: process.env, maxBuffer: 8 * 1024 * 1024 },
-  )
-  return JSON.parse(output)
+const d1Json = (command, options = {}) => {
+  const retryBusy = options.retryBusy === true
+  const maxRetries = retryBusy ? 8 : 0
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      const output = execFileSync(
+        'pnpm',
+        ['exec', 'wrangler', 'd1', 'execute', 'luckread', '--local', '--json', '--persist-to', persistTo, '--config', 'wrangler.jsonc', '--command', command],
+        { encoding: 'utf8', cwd: process.cwd(), env: process.env, maxBuffer: 8 * 1024 * 1024 },
+      )
+      return JSON.parse(output)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      const busy = /SQLITE_BUSY|database is locked/i.test(message)
+      if (!retryBusy || !busy || attempt >= maxRetries) throw error
+
+      // W01 and W02 local Workers share one SQLite persistence directory.
+      // Retry only read-only CLI queries while workerd briefly holds its lock.
+      // Writes/DDL are never replayed because their commit outcome may be unknown.
+      const delayMs = Math.min(250 * (2 ** attempt), 3_000)
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, delayMs)
+    }
+  }
 }
 const d1Rows = (command) => {
-  const value = d1Json(command)
+  const value = d1Json(command, { retryBusy: true })
   if (Array.isArray(value)) return value.flatMap((item) => Array.isArray(item) ? item : item && Array.isArray(item.results) ? item.results : item && Array.isArray(item.result) ? item.result : [])
   if (value && Array.isArray(value.results)) return value.results
   if (value && Array.isArray(value.result)) return value.result
