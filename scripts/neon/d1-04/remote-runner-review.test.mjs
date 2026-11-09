@@ -50,14 +50,14 @@ const baseReview = {
     remoteRunnerValidation: {
       runId: 42547646161,
       conclusion: 'success',
-      headSha: '335f6bd25e1ca2bc32b04fd725c7c9b281b4ee2c',
-      sourceCommitSha: 'd83c1f0b0cd2444418facd54c7b3adc182817057',
+      headSha: 'b'.repeat(40),
+      sourceCommitSha: 'c'.repeat(40),
       headBranch: 'feat/neon-d1-04-reviewed-remote-runner',
       validationScope: 'D1_04_SCHEMA_ONLY_LOCAL_PG18_NO_NEON_CREDENTIALS',
       url: validationRun,
       remoteApplyJob: 'skipped',
       artifactId: 13644425675,
-      artifactDigest: 'sha256:98b8f8fd5c40dd4c0780a8ca8fa5677ab2a352f86d1538e5843b46b9893490d3',
+      artifactDigest: 'sha256:' + 'd'.repeat(64),
     },
   },
   safety: {
@@ -137,7 +137,7 @@ test('D1-04 review rejects moved source pins and stale review commits', () => {
 
 test('D1-04 release rejects an unpinned CI run or artifact even when the status says success', () => {
   const changed = structuredClone(baseReview)
-  changed.verificationEvidence.remoteRunnerValidation.artifactId++
+  changed.verificationEvidence.remoteRunnerValidation.artifactDigest = 'not-a-sha256-digest'
   const result = validateD104RemoteRunnerReview({
     root: process.cwd(),
     review: changed,
