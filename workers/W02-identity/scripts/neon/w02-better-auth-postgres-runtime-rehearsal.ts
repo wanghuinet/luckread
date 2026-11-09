@@ -234,7 +234,7 @@ try {
   const sessionHeaders = new Headers({ cookie: cookieHeader })
   const session = await withTimeout('get-session', () => auth.api.getSession({ headers: sessionHeaders }))
   assert.equal(session?.user.id, userId, 'Better Auth must read the PostgreSQL-backed session')
-  if (!session?.session || typeof currentSessionId !== 'string') {
+  if (!session?.session || typeof session.session.id !== 'string') {
     throw new Error('W02_PG_RUNTIME_SESSION_ID_MISSING')
   }
   const currentSessionId = session.session.id
