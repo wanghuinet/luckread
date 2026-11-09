@@ -480,10 +480,12 @@ export const buildLuckReadAuth = (
       sendVerificationEmail: async ({ user, url }) => {
         await sendVerificationEmail(env, { user, url })
       },
-      afterEmailVerification: async (user) => {
-        const userId = String(user.id)
-        await activateVerifiedAccount(env.D1_01, userId)
-      },
+      ...(postgresRehearsal ? {} : {
+        afterEmailVerification: async (user) => {
+          const userId = String(user.id)
+          await activateVerifiedAccount(env.D1_01, userId)
+        },
+      }),
     },
     ...(postgresRehearsal ? {} : { databaseHooks: {
       user: {
