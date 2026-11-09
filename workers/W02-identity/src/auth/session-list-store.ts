@@ -68,7 +68,7 @@ export function createD1SessionListStore(db: D1Database): SessionListStore {
       assertQuery(input)
 
       const authorizationCte = `
-        authorization AS (
+        session_authority AS (
           SELECT CASE WHEN EXISTS (
             SELECT 1
             FROM "user" AS account
@@ -100,9 +100,9 @@ export function createD1SessionListStore(db: D1Database): SessionListStore {
             LIMIT ?
           )`
       const sql = `WITH ${authorizationCte}, ${sessionCte}
-        SELECT authorization.permissionGranted,
+        SELECT session_authority.permissionGranted,
           sessions.sessionId, sessions.createdAt, sessions.expiresAt
-        FROM authorization
+        FROM session_authority
         LEFT JOIN sessions ON 1 = 1
         ORDER BY sessions.createdAt DESC, sessions.sessionId DESC`
 
