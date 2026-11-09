@@ -65,7 +65,7 @@ const checks: Record<string, boolean> = {
   emptyReadyPlanIsQuarantinedAsUnknown: false,
   legacyLockoutEventIdentityIsAdoptedBeforeEmission: false,
   previouslyFailedOutboxIsTerminalAndUnknown: false,
-  transientWriteFailureRemainsReadyWithBoundedRetry: false,
+  transientWriteFailureRollsBackPartialJournalAndRetriesAtomically: false,
   concurrentReconcilerSkipsLockedReceipt: false,
   syntheticReceiptsAndJournalRowsCleaned: false,
 }
@@ -290,18 +290,20 @@ try {
   assert.equal(terminalRow.lastErrorCode, 'OUTBOX_PREVIOUSLY_FAILED')
   checks.previouslyFailedOutboxIsTerminalAndUnknown = true
 
-  const retryKey = 'mfa-operation:reconcile:' + suffix + ':retry'
-  const retryReceipt = await makeReadyReceipt(
-    userIds.retry,
-    makeEvent(userIds.retry, retryKey),
-  )
-  let injectTransientFailure = true
+  const retryKeyA = 'mfa-operation:reconcile:' + suffix + ':retry-a'
+  const retryKeyB = 'mfa-operation:reconcile:' + suffix + ':retry-b'
+  const retryReceipt = await createReceipt(userIds.retry)
+  await finalizeMfaAuditOperationReceiptPostgres(pool, retryReceipt, [
+    makeEvent(userIds.retry, retryKeyA, { reasonCode: 'RETRY_TEST_A' }),
+    makeEvent(userIds.retry, retryKeyB, { reasonCode: 'RETRY_TEST_B' }),
+  ], now)
+  let journalWriteCount = 0
   const transientFailureReconciler = async (
     database: Pool | PoolClient,
     input: Parameters<typeof recordMfaAuditEventOncePostgres>[1],
   ) => {
-    if (injectTransientFailure) {
-      injectTransientFailure = false
+    journalWriteCount += 1
+    if (journalWriteCount === 2) {
       throw new Error('synthetic temporary PostgreSQL write failure')
     }
     return recordMfaAuditEventOncePostgres(database, input)
@@ -321,6 +323,8 @@ try {
     new Date(Date.parse(now) + 1_000).toISOString(),
   )
   assert.equal(retryingRow.lastErrorCode, 'OUTBOX_WRITE_FAILED')
+  assert.equal(await readJournal(retryKeyA), null, 'a partial multi-event journal write must roll back')
+  assert.equal(await readJournal(retryKeyB), null, 'the failing event must not leave a journal row')
   const retrySuccess = await reconcileMfaAuditOperationReceiptsPostgres(
     pool,
     new Date(Date.parse(now) + 2_000).toISOString(),
@@ -328,8 +332,9 @@ try {
   )
   assert.deepEqual(retrySuccess, { selected: 1, emitted: 1, failed: 0, unknown: 0 })
   assert.equal((await readReceipt(retryReceipt)).status, 'EMITTED')
-  assert.equal((await readJournal(retryKey))?.status, 'PENDING')
-  checks.transientWriteFailureRemainsReadyWithBoundedRetry = true
+  assert.equal((await readJournal(retryKeyA))?.status, 'PENDING')
+  assert.equal((await readJournal(retryKeyB))?.status, 'PENDING')
+  checks.transientWriteFailureRollsBackPartialJournalAndRetriesAtomically = true
 
   const lockedKey = 'mfa-operation:reconcile:' + suffix + ':locked'
   const lockedReceipt = await makeReadyReceipt(
