@@ -50,7 +50,7 @@ const makeEvent = (resourceId: string, eventTag: string) =>
     eventType: 'auth.mfa.challenge_succeeded',
     operationId: 'authMfaChallengeVerify',
     userId: resourceId,
-    occurredAt: now,
+    occurredAt: eventTag === 'success' ? now.replace(/Z$/, '+00:00') : now,
     correlationId: 'corr_auth007_pub_' + eventTag + '_' + suffix,
     causationId: 'cause_auth007_pub_' + eventTag + '_' + suffix,
     result: 'succeeded',
