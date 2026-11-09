@@ -10,6 +10,7 @@ import {
 } from './remote-schema-runner.mjs'
 import {
   assertD105RemoteApplyBlocked,
+  assertD105RemoteApplyReady,
   validateD105SchemaOnlyReleaseState,
 } from './assert-remote-apply-release.mjs'
 
@@ -82,12 +83,20 @@ test('W11 D1-05 manifest remains exactly one admitted six-table schema slice', (
   assert.equal(manifest.expected.controlSeedRows, 0)
 })
 
-test('schema-only release keeps runtime privacy blockers and is not implicitly approved', () => {
-  assert.equal(validateD105SchemaOnlyReleaseState({ manifest, review }), false)
-  assert.deepEqual(assertD105RemoteApplyBlocked(), {
-    blocked: true,
-    schemaOnlyRemoteApplyReady: false,
-    runtimeDataIngestionEnabled: false,
-    remoteNeonDdlExecuted: false,
-  })
+test('schema-only release keeps runtime privacy blockers and honors only the current release state', () => {
+  const ready = validateD105SchemaOnlyReleaseState({ manifest, review })
+  if (review.status === 'REMOTE_SCHEMA_ONLY_PROVISIONING_PENDING_REVIEW') {
+    assert.equal(ready, false)
+    assert.deepEqual(assertD105RemoteApplyBlocked(), {
+      blocked: true,
+      schemaOnlyRemoteApplyReady: false,
+      runtimeDataIngestionEnabled: false,
+      remoteNeonDdlExecuted: false,
+    })
+  } else {
+    assert.equal(ready, true)
+    assert.equal(assertD105RemoteApplyReady().schemaOnlyRemoteApplyReady, true)
+    assert.equal(review.remoteApplyReady, false)
+    assert.equal(review.runtimeDataIngestionEnabled, false)
+  }
 })
