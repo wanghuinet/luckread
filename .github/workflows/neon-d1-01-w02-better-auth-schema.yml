@@ -38,6 +38,7 @@ on:
       - 'workers/W02-identity/src/auth/neon-postgres-schema.config.ts'
       - 'workers/W02-identity/src/auth/neon-postgres-runtime-test.config.ts'
       - 'workers/W02-identity/src/neon/role-assignment-postgres.ts'
+      - 'workers/W02-identity/src/neon/auth015-account-lifecycle-postgres.ts'
       - 'workers/W02-identity/scripts/neon/w02-role-assignment-postgres-runtime-rehearsal.ts'
       - 'workers/W02-identity/scripts/neon/w02-better-auth-postgres-runtime-rehearsal.ts'
       - 'workers/W02-identity/src/neon-postgres-migrations/**'
@@ -341,6 +342,12 @@ jobs:
           W02_SCHEMA_DATABASE_URL: postgresql://schema_generator:schema_generator_local_only@127.0.0.1:5432/luckread_schema
         run: npm run neon:auth015:verify > artifacts/neon/w02-auth015-lifecycle-windows-postgres-schema-postflight.json
 
+      - name: Rehearse AUTH-015 trusted deletion and reactivation windows on PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          W02_RUNTIME_DATABASE_URL: postgresql://schema_generator:schema_generator_local_only@127.0.0.1:5432/luckread_schema
+        run: npm run neon:auth015:runtime
+
       - name: Verify AUTH-010 secret-free session revocation journal and retry constraints
         working-directory: workers/W02-identity
         env:
@@ -411,5 +418,6 @@ jobs:
             workers/W02-identity/artifacts/neon/w02-auth003-postgres-schema-postflight.json
             workers/W02-identity/artifacts/neon/w02-auth013-publication-journal-postgres-schema-postflight.json
             workers/W02-identity/artifacts/neon/w02-auth015-lifecycle-windows-postgres-schema-postflight.json
+            workers/W02-identity/artifacts/neon/w02-auth015-account-lifecycle-postgres-runtime-rehearsal.json
           if-no-files-found: error
           retention-days: 30
