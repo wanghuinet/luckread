@@ -252,7 +252,10 @@ try {
   )
   assert.equal(nativeSession.rowCount, 1, 'the authenticated native session must exist for listing')
   const listAt = new Date().toISOString()
-  const nativeExpiresAt = new Date(nativeSession.rows[0]!.expiresAt).toISOString()
+  const nativeExpiresAtValue = nativeSession.rows[0]!.expiresAt
+  const nativeExpiresAt = nativeExpiresAtValue instanceof Date
+    ? nativeExpiresAtValue.toISOString()
+    : new Date(nativeExpiresAtValue).toISOString()
   const newerSessionId = 'session-list-newer-' + nonce
   const expiredSessionId = 'session-list-expired-' + nonce
   const foreignSessionId = 'session-list-foreign-' + nonce
