@@ -834,7 +834,7 @@ async function runDomain(domainId, mode = 'local') {
         release?.target?.neonHost !== D1_03_REMOTE_TARGET.neonHost ||
         release?.scope?.kind !== 'ADMITTED_MANIFEST_ENTRIES_ONLY' ||
         release?.scope?.migrationCount !== 3 ||
-        release?.scope?.tableCount !== 15 ||
+        release?.scope?.tables !== 15 ||
         release?.scope?.fullDomainSchemaComplete !== false ||
         release?.businessDataImport !== false ||
         release?.productionCutoverAuthorized !== false) {
