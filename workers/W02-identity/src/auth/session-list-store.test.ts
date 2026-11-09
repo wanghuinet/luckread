@@ -138,7 +138,7 @@ describe('W02 D1 session-list store', () => {
       now,
       limit: 0,
       cursor: null,
-    })).rejects.toThrow('invalid session list query')
+    })).rejects.toThrow('invalid AUTH-010 session-list store input')
     expect(storeDb.prepare).not.toHaveBeenCalled()
   })
 })
