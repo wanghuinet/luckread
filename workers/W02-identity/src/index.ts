@@ -5,7 +5,7 @@ import { publishPendingSessionRevocationEvents } from './auth/session-revocation
 import { reconcileMfaAuditOperationReceipts } from './auth/mfa-audit-receipts.js'
 import { runScheduledPublicationTicks } from './auth/scheduled-publication.js'
 import { createD1RoleLayerStore, resolveLayerForSubject } from './authz/role-layer-store.js'
-import { grantCreatorBusinessRole, RoleAssignmentCommandError } from './authz/role-assignment-command.js'
+import { createD1CreatorRoleGrantStore, grantCreatorBusinessRoleWithStore, RoleAssignmentCommandError } from './authz/role-assignment-command.js'
 import { mayApproveRoleGrant } from './authz/role-grant-approval-policy.js'
 import { AccountStateTransitionError, type AccountState } from './account/account-state-transition.js'
 import { createD1AccountStateTransitionStore } from './account/account-state-transition-store.js'
@@ -442,7 +442,7 @@ export default {
       }
 
       try {
-        const result = await grantCreatorBusinessRole(env.D1_01, {
+        const result = await grantCreatorBusinessRoleWithStore(createD1CreatorRoleGrantStore(env.D1_01), {
           subjectId: body.subjectId,
           roleId: body.roleId as 'creator',
           scopeType: body.scopeType as 'global',
