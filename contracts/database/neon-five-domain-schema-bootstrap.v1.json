@@ -261,7 +261,7 @@
       "schemaSources": [
         "workers/W07-subscription-commerce/migrations-d1-04"
       ],
-      "status": "W07_D1_04_ALL_SEVEN_SOURCE_SLICES_LOCAL_POSTGRES18_REHEARSAL_PASSED_REMOTE_RUNNER_PENDING",
+      "status": "W07_D1_04_SCHEMA_ONLY_REMOTE_APPLIED_RUNTIME_CUTOVER_PENDING",
       "schemaContract": "contracts/database/neon-d1-04-w07-order-payment-schema.v1.json",
       "implementedSchemaSlices": [
         "W07_ORDER_PAYMENT_0001_0002",
@@ -300,7 +300,7 @@
         "businessDataImported": false,
         "productionCutoverAuthorized": false
       },
-      "remoteSchemaApplied": false,
+      "remoteSchemaApplied": true,
       "schemaSliceContracts": [
         "contracts/database/neon-d1-04-w07-order-payment-schema.v1.json",
         "contracts/database/neon-d1-04-w07-saved-methods-mandates-schema.v1.json",
@@ -381,6 +381,42 @@
         "cloudflareD1Touched": false,
         "businessDataImported": false,
         "productionCutoverAuthorized": false
+      },
+      "remoteSchemaApplicationEvidence": {
+        "status": "D1_04_REMOTE_SCHEMA_ONLY_APPLY_PASS",
+        "workflowRunId": 42555900393,
+        "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42555900393",
+        "event": "workflow_dispatch",
+        "branch": "main",
+        "sourceCommitSha": "c18d294d3fc2acac6e9c66eb052dfed6e6c46758",
+        "databaseName": "luckread_finance",
+        "databaseUuid": "9bfb89a5-fbb5-45b1-a2ee-eab674b0d736",
+        "postgresMajor": 18,
+        "verifiedMigrations": 6,
+        "verifiedLedgerRows": 6,
+        "newlyAppliedMigrations": 0,
+        "catalog": {
+          "tables": 15,
+          "explicitIndexes": 31,
+          "constraintIndexes": 29,
+          "triggers": 72,
+          "triggerFunctions": 6,
+          "foreignKeys": 0,
+          "controlSeedRows": 1,
+          "businessRows": 0
+        },
+        "artifact": {
+          "id": 13646957840,
+          "url": "https://github.com/wanghuinet/luckread/actions/runs/42555900393/artifacts/13646957840",
+          "sha256": "sha256:b35461e7b49a0131eceee3782244fd0f10d44d2c0b6f7fac90932481f9cd8228"
+        },
+        "safety": {
+          "remoteNeonTouched": true,
+          "cloudflareD1Touched": false,
+          "businessDataImported": false,
+          "runtimeBindingsChanged": false,
+          "productionCutoverAuthorized": false
+        }
       }
     },
     {
