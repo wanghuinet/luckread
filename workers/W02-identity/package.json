@@ -23,6 +23,7 @@
     "neon:runtime:rehearsal": "tsx scripts/neon/w02-better-auth-postgres-runtime-rehearsal.ts",
     "neon:role-assignment:generate": "node scripts/neon/generate-role-assignment-postgres-migrations.mjs",
     "neon:role-assignment:verify": "node scripts/neon/verify-role-assignment-postgres-schema.mjs",
+    "neon:role-assignment:runtime": "tsx scripts/neon/w02-role-assignment-postgres-runtime-rehearsal.ts",
     "neon:auth003:generate": "node scripts/neon/generate-auth003-credentials-postgres-migration.mjs",
     "neon:auth003:verify": "node scripts/neon/verify-auth003-credentials-postgres-schema.mjs",
     "neon:auth013-journal:generate": "node scripts/neon/generate-auth013-publication-journal-postgres-migration.mjs",
