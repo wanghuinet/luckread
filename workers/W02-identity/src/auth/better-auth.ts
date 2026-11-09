@@ -141,10 +141,14 @@ async function finalizeKnownMfaRejection(
 
 type BetterAuthDatabase = NonNullable<Parameters<typeof betterAuth>[0]['database']>
 
+export type BetterAuthPersistenceProfile = 'production' | 'postgres-rehearsal'
+
 export const buildLuckReadAuth = (
   env: BetterAuthEnv,
   database: BetterAuthDatabase = env.D1_01 as BetterAuthDatabase,
+  persistenceProfile: BetterAuthPersistenceProfile = 'production',
 ) => {
+  const postgresRehearsal = persistenceProfile === 'postgres-rehearsal'
   // Keep local origins available only to the local evidence/runtime profile.
   // Production must never inherit localhost trust from a shared config.
   const trustedOrigins = [
@@ -159,6 +163,7 @@ export const buildLuckReadAuth = (
   ]
 
   return betterAuth({
+    ...(postgresRehearsal ? {} : {
     hooks: {
       before: createAuthMiddleware(async (ctx) => {
         const isTotpVerification = ctx.path === '/two-factor/verify-totp'
@@ -445,6 +450,7 @@ export const buildLuckReadAuth = (
         }
       }),
     },
+    }),
     // W02 is the platform identity authority. Better Auth uses native D1
     // persistence here; Payload is not an authentication/database adapter.
     database,
@@ -479,7 +485,7 @@ export const buildLuckReadAuth = (
         await activateVerifiedAccount(env.D1_01, userId)
       },
     },
-    databaseHooks: {
+    ...(postgresRehearsal ? {} : { databaseHooks: {
       user: {
         create: {
           after: async (user) => {
@@ -507,7 +513,7 @@ export const buildLuckReadAuth = (
           },
         },
       },
-    },
+    } }),
     user: {
       // The checked-in D1 schema deliberately uses snake_case columns.
       // Map Better Auth's camelCase core fields to those exact column names.
