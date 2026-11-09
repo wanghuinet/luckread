@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { grantCreatorBusinessRole, RoleAssignmentCommandError } from './role-assignment-command.js'
+import {
+  createD1CreatorRoleGrantStore,
+  grantCreatorBusinessRole,
+  grantCreatorBusinessRoleWithStore,
+  RoleAssignmentCommandError,
+} from './role-assignment-command.js'
 
 type Assignment = {
   id: string
@@ -85,6 +90,16 @@ const fixedNow = '2026-10-12T09:30:00.000Z'
 describe('W02 creator role assignment authority', () => {
   let db: MockD1
   beforeEach(() => { db = new MockD1() })
+
+  it('exposes the D1 implementation through the provider-neutral store contract', async () => {
+    const store = createD1CreatorRoleGrantStore(db as unknown as D1Database)
+    const first = await grantCreatorBusinessRoleWithStore(store, command(), fixedNow)
+    const replay = await grantCreatorBusinessRoleWithStore(store, command(), fixedNow)
+
+    expect(first.replayed).toBe(false)
+    expect(replay).toEqual({ ...first, replayed: true })
+    expect(db.assignments.size).toBe(1)
+  })
 
   it('grants global L3 only after active, verified L2 admission and verifies persisted state', async () => {
     const result = await grantCreatorBusinessRole(db as unknown as D1Database, command(), fixedNow)
