@@ -125,8 +125,6 @@ const grantRole = async (subjectId: string, roleId: 'moderator' | 'admin', assig
   )
 }
 
-const clock = (instant: string) => () => new Date(instant)
-
 const expectCode = async (
   code: string,
   operation: () => Promise<unknown>,
