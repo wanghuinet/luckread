@@ -129,14 +129,14 @@ jobs:
           GITHUB_SHA: ${{ github.sha }}
           GITHUB_RUN_ID: ${{ github.run_id }}
           GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
-          D1_SHARED_SCHEMA_APPLY_REPORT: artifacts/neon/d1-03-reviewed-remote-runner-local-postflight.json
-        run: node scripts/neon/shared-domain-schema-runner.mjs --domain D1-03 --local-only
+          D1_03_LOCAL_SCHEMA_APPLY_REPORT: artifacts/neon/d1-03-partial-runner-local-postflight.json
+        run: node scripts/neon/d1-03/remote-schema-runner.mjs --local-only
       - name: Upload sanitized local PostgreSQL 18 evidence
         if: success()
         uses: actions/upload-artifact@v4
         with:
           name: neon-d1-03-partial-remote-runner-validation-${{ github.run_id }}
-          path: artifacts/neon/d1-03-reviewed-remote-runner-local-postflight.json
+          path: artifacts/neon/d1-03-partial-runner-local-postflight.json
           if-no-files-found: error
           retention-days: 90
 
