@@ -17,7 +17,8 @@ vi.mock('./better-auth.js', () => ({
   }),
 }))
 
-import type { BetterAuthEnv } from './better-auth.js'
+import { createLuckReadAuth, type BetterAuthEnv } from './better-auth.js'
+import type { SessionLogoutStoreInput } from './session-logout-store.js'
 import { handleCurrentUserSessionLogout } from './session-logout.js'
 
 const makeRequest = () => new Request(
@@ -115,6 +116,43 @@ describe('W02 authenticated current-session logout', () => {
     expect(cleanupCookies).toContain('better-auth.session_data.0=session-cache-chunk')
     expect(cleanupRequest.headers.has('authorization')).toBe(false)
     expect(cleanupRequest.headers.has('x-luckread-session-token')).toBe(false)
+  })
+
+  it('uses an injected PostgreSQL-compatible store and authenticated session without touching D1', async () => {
+    const env = {
+      AUTH_SESSION_WRITE_LIMITER: {
+        limit: vi.fn(async () => ({ success: true })),
+      },
+    } as unknown as BetterAuthEnv
+    const store = {
+      logout: vi.fn(async (_input: SessionLogoutStoreInput) => ({ status: 'REVOKED' as const })),
+    }
+    const getSession = vi.fn().mockResolvedValue({
+      user: { id: 'user-1' },
+      session: { id: 'current-session' },
+    })
+    const auth = createLuckReadAuth(env)
+
+    const response = await handleCurrentUserSessionLogout(env, makeRequest(), {
+      auth,
+      getSession,
+      store,
+    })
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get('set-cookie')).toContain('Max-Age=0')
+    expect(getSession).toHaveBeenCalledTimes(1)
+    expect(store.logout).toHaveBeenCalledTimes(1)
+    const input = store.logout.mock.calls[0]?.[0]
+    expect(input).toMatchObject({
+      userId: 'user-1',
+      sessionId: 'current-session',
+      correlationId: 'req_session_logout_test',
+      causationId: 'trace-session-logout-test',
+    })
+    expect(typeof input?.now).toBe('string')
+    expect(Number.isFinite(Date.parse(input?.now ?? ''))).toBe(true)
+    expect(mocks.handler).toHaveBeenCalledTimes(1)
   })
 
   it('clears stale cookies without writing an audit event when no session remains', async () => {
