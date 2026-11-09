@@ -36,13 +36,16 @@ describe('W02 D1 session-list store', () => {
     const result = await store.list({
       userId: 'authenticated-user',
       now,
-      limit: 1,
+      limit: 2,
       cursor: null,
     })
 
     expect(result.permissionGranted).toBe(true)
     expect(result.rows.map((row) => row.sessionId)).toEqual(['session-new', 'session-old'])
     expect(storeDb.prepare).toHaveBeenCalledWith(expect.stringContaining('INNER JOIN role_assignments'))
+    expect(storeDb.prepare).toHaveBeenCalledWith(
+      expect.stringContaining('EXISTS (SELECT 1 FROM authorization WHERE permissionGranted = 1)'),
+    )
     expect(storeDb.prepare).toHaveBeenCalledWith(expect.stringContaining('WHERE user_id = ? AND expires_at > ?'))
     expect(storeDb.prepare).toHaveBeenCalledWith(expect.stringContaining('ORDER BY created_at DESC, id DESC'))
     expect(storeDb.statement.bind).toHaveBeenCalledWith(
@@ -69,7 +72,7 @@ describe('W02 D1 session-list store', () => {
     const result = await store.list({
       userId: 'authenticated-user',
       now,
-      limit: 10,
+      limit: 11,
       cursor: {
         createdAt: '2026-11-09T14:59:00.000Z',
         sessionId: 'session-newer',
@@ -135,7 +138,7 @@ describe('W02 D1 session-list store', () => {
       now,
       limit: 0,
       cursor: null,
-    })).rejects.toThrow('invalid session list query')
+    })).rejects.toThrow('invalid AUTH-010 session-list store input')
     expect(storeDb.prepare).not.toHaveBeenCalled()
   })
 })

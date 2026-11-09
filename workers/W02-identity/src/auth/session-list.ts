@@ -1,14 +1,23 @@
 import permissions from '../../../../contracts/authz/permissions.json'
 import { createLuckReadAuth, type BetterAuthEnv } from './better-auth.js'
-import { createD1SessionListStore, type SessionListStore } from './session-list-store.js'
+import {
+  createD1SessionListStore,
+  type SessionListCursor,
+  type SessionListStore,
+} from './session-list-store.js'
 import {
   enforceSessionListRateLimits,
   sessionRateLimitErrorResponse,
 } from './session-rate-limit.js'
 
-type SessionCursor = {
-  createdAt: string
-  sessionId: string
+type SessionIdentity = {
+  user?: { id?: unknown }
+  session?: { id?: unknown }
+} | null
+
+export type SessionListHandlerDependencies = {
+  store?: SessionListStore
+  getSession?: (headers: Headers) => Promise<SessionIdentity>
 }
 
 const userRole = permissions['x-role-permissions'].roles.find((role) => role.role === 'user')
@@ -18,7 +27,7 @@ const userRoleCanReadSessions = userRole?.permissions.includes(SESSION_READ_PERM
 const json = (body: unknown, status = 200): Response =>
   Response.json(body, { status, headers: { 'cache-control': 'no-store' } })
 
-const encodeCursor = (cursor: SessionCursor): string => {
+const encodeCursor = (cursor: SessionListCursor): string => {
   const encoded = btoa(JSON.stringify(cursor))
     .replace(/\+/g, '-')
     .replace(/\//g, '_')
@@ -26,7 +35,7 @@ const encodeCursor = (cursor: SessionCursor): string => {
   return 's1.' + encoded
 }
 
-const decodeCursor = (value: string): SessionCursor | null => {
+const decodeCursor = (value: string): SessionListCursor | null => {
   if (!value.startsWith('s1.') || value.length > 256) return null
   const encoded = value.slice(3)
   if (!encoded || !/^[A-Za-z0-9_-]+$/.test(encoded)) return null
@@ -34,7 +43,7 @@ const decodeCursor = (value: string): SessionCursor | null => {
   try {
     const padded = encoded.replace(/-/g, '+').replace(/_/g, '/')
       + '='.repeat((4 - (encoded.length % 4)) % 4)
-    const parsed = JSON.parse(atob(padded)) as Partial<SessionCursor>
+    const parsed = JSON.parse(atob(padded)) as Partial<SessionListCursor>
     if (
       typeof parsed.createdAt !== 'string' ||
       !Number.isFinite(Date.parse(parsed.createdAt)) ||
@@ -57,7 +66,7 @@ const decodeCursor = (value: string): SessionCursor | null => {
 export async function handleCurrentUserSessionList(
   env: BetterAuthEnv,
   request: Request,
-  store: SessionListStore = createD1SessionListStore(env.D1_01),
+  dependencies: SessionListHandlerDependencies = {},
 ): Promise<Response> {
   let body: unknown
   try {
@@ -76,7 +85,7 @@ export async function handleCurrentUserSessionList(
     return json({ error: { code: 'VALIDATION_FAILED', message: 'Invalid session list limit' } }, 400)
   }
 
-  let cursor: SessionCursor | null = null
+  let cursor: SessionListCursor | null = null
   if (input.cursor !== undefined && input.cursor !== null) {
     if (typeof input.cursor !== 'string') {
       return json({ error: { code: 'INVALID_CURSOR', message: 'Invalid session list cursor' } }, 400)
@@ -85,10 +94,14 @@ export async function handleCurrentUserSessionList(
     if (!cursor) return json({ error: { code: 'INVALID_CURSOR', message: 'Invalid session list cursor' } }, 400)
   }
 
-  let current: { user?: { id?: string }; session?: { id?: string } } | null
+  let current: SessionIdentity
   try {
-    const auth = createLuckReadAuth(env)
-    current = await auth.api.getSession({ headers: request.headers, query: {} })
+    if (dependencies.getSession) {
+      current = await dependencies.getSession(request.headers)
+    } else {
+      const auth = createLuckReadAuth(env)
+      current = await auth.api.getSession({ headers: request.headers, query: {} }) as SessionIdentity
+    }
   } catch {
     return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Session service unavailable' } }, 503)
   }
@@ -106,21 +119,26 @@ export async function handleCurrentUserSessionList(
   }
 
   const now = new Date().toISOString()
-  // A user-layer name or a client-supplied subject is never an authorization
-  // fact. Resolve the explicit base-user permission from the canonical catalog
-  // and require the effective W02-owned RoleAssignment for this account.
+  // A user-layer name or client-supplied subject is never an authorization
+  // fact. The selected store rechecks the effective W02-owned base-user role.
   if (!userRoleCanReadSessions) {
     return json({ error: { code: 'PERMISSION_DENIED', message: 'Session access is not permitted' } }, 403)
   }
 
   try {
-    const result = await store.list({ userId, now, limit, cursor })
+    const store = dependencies.store ?? createD1SessionListStore(env.D1_01)
+    const result = await store.list({
+      userId,
+      now,
+      limit: limit + 1,
+      cursor,
+    })
     if (!result.permissionGranted) {
       return json({ error: { code: 'PERMISSION_DENIED', message: 'Session access is not permitted' } }, 403)
     }
-    const rows = result.rows
-    const page = rows.slice(0, limit)
-    const hasMore = rows.length > limit
+
+    const page = result.rows.slice(0, limit)
+    const hasMore = result.rows.length > limit
     const last = page[page.length - 1]
 
     return json({
@@ -135,6 +153,7 @@ export async function handleCurrentUserSessionList(
         ? encodeCursor({ createdAt: last.createdAt, sessionId: last.sessionId })
         : null,
     })
+
   } catch {
     return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Session service unavailable' } }, 503)
   }
