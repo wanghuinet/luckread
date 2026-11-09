@@ -9,6 +9,7 @@ import { createD1CreatorRoleGrantStore, grantCreatorBusinessRoleWithStore, RoleA
 import { mayApproveRoleGrant } from './authz/role-grant-approval-policy.js'
 import { AccountStateTransitionError, type AccountState } from './account/account-state-transition.js'
 import { createD1AccountStateTransitionStore } from './account/account-state-transition-store.js'
+import { createD1RegistrationRollbackStore, RegistrationRollbackStoreError } from './auth/registration-rollback-store.js'
 import { resolveBetterAuthPrincipal } from './auth/principal.js'
 import { handleCurrentUserSessionList } from './auth/session-list.js'
 import { handleCurrentUserSessionRevoke } from './auth/session-revoke.js'
@@ -157,31 +158,24 @@ export default {
       }
 
       try {
-        const row = await env.D1_01
-          .prepare('SELECT id, email, username, account_state AS accountState FROM "user" WHERE id = ? LIMIT 1')
-          .bind(body.userId)
-          .first<{ id: string; email: string; username: string | null; accountState: string }>()
-
-        if (!row) return json({ rolledBack: true })
-        if (row.email !== body.email.trim().toLowerCase() || String(row.username ?? '') !== body.username.trim() || row.accountState !== 'PENDING_VERIFICATION') {
-          return json({ error: { code: 'PRECONDITION_FAILED', message: 'registration rollback precondition failed' } }, 412)
+        const result = await createD1RegistrationRollbackStore(env.D1_01).rollback({
+          userId: body.userId,
+          email: body.email,
+          username: body.username,
+        })
+        return json(result)
+      } catch (error) {
+        if (error instanceof RegistrationRollbackStoreError) {
+          const status = error.code === 'INVALID_INPUT' ? 400 : 412
+          return json({
+            error: {
+              code: error.code === 'INVALID_INPUT' ? 'VALIDATION_FAILED' : 'PRECONDITION_FAILED',
+              message: error.code === 'INVALID_INPUT'
+                ? 'invalid registration rollback request'
+                : error.message,
+            },
+          }, status)
         }
-
-        const activeSession = await env.D1_01
-          .prepare('SELECT 1 AS present FROM "session" WHERE user_id = ? LIMIT 1')
-          .bind(body.userId)
-          .first<{ present: number }>()
-        if (activeSession) return json({ error: { code: 'PRECONDITION_FAILED', message: 'registration rollback cannot remove an active session' } }, 412)
-
-        await env.D1_01.batch([
-          env.D1_01.prepare('DELETE FROM role_assignments WHERE subject_id = ?').bind(body.userId),
-          env.D1_01.prepare('DELETE FROM "verification" WHERE identifier = ?').bind(body.email.trim().toLowerCase()),
-          env.D1_01.prepare('DELETE FROM "account" WHERE user_id = ?').bind(body.userId),
-          env.D1_01.prepare('DELETE FROM "user" WHERE id = ? AND account_state = ?').bind(body.userId, 'PENDING_VERIFICATION'),
-        ])
-
-        return json({ rolledBack: true })
-      } catch {
         return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'registration rollback unavailable' } }, 503)
       }
     }
