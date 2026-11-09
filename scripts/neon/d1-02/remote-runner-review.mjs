@@ -99,11 +99,11 @@ export function validateD1_02RemoteRunnerReview({
 
   const evidence = record.verificationEvidence ?? {}
   const required = {
-    fullD1_02LocalPostgres18Rehearsal: 42480684871,
-    remoteRunnerGuardsNoCredentials: 42480684866,
-    contractAdmission: 42480684886,
-    mapping0StructuralGate: 42480684852,
-    featureInventory: 42480684859,
+    fullD1_02LocalPostgres18Rehearsal: 42612620258,
+    remoteRunnerGuardsNoCredentials: 42612620075,
+    contractAdmission: 42612620125,
+    mapping0StructuralGate: 42612620155,
+    featureInventory: 42612620321,
   }
   for (const [key, runId] of Object.entries(required)) {
     const item = evidence[key]
