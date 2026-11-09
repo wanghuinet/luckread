@@ -167,8 +167,8 @@ jobs:
           const verified = enforceD105VerifiedNeonConnectionString(raw)
           const target = validateD105RemoteNeonTarget(verified)
           if (!target.valid) throw new Error(target.reason)
-          process.stdout.write('::add-mask::' + verified + '\\n')
-          appendFileSync(process.env.GITHUB_ENV, 'NEON_DATABASE_URL_ALLLUCK_VERIFIED=' + verified + '\\n')
+          process.stdout.write('::add-mask::' + verified + '\n')
+          appendFileSync(process.env.GITHUB_ENV, 'NEON_DATABASE_URL_ALLLUCK_VERIFIED=' + verified + '\n')
           NODE
       - name: Apply one admitted migration with append-only ledger and PostgreSQL 18 postflight
         env:
