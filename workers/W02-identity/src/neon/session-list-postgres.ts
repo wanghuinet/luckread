@@ -4,6 +4,7 @@ import type {
   SessionListCursor,
   SessionListStore,
   SessionListStoreInput,
+  SessionListStoreResult,
   SessionListStoreRow,
 } from '../auth/session-list-store.js'
 
