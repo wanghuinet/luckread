@@ -37,7 +37,7 @@ on:
       - 'workers/W02-identity/src/auth/better-auth.ts'
       - 'workers/W02-identity/src/auth/neon-postgres-schema.config.ts'
       - 'workers/W02-identity/src/auth/neon-postgres-runtime-test.config.ts'
-      - 'workers/W02-identity/src/authz/role-assignment-postgres.ts'
+      - 'workers/W02-identity/src/neon/role-assignment-postgres.ts'
       - 'workers/W02-identity/scripts/neon/w02-role-assignment-postgres-runtime-rehearsal.ts'
       - 'workers/W02-identity/scripts/neon/w02-better-auth-postgres-runtime-rehearsal.ts'
       - 'workers/W02-identity/src/neon-postgres-migrations/**'
