@@ -104,9 +104,9 @@ async function accountForAlreadyTerminalState(
 /**
  * Reconcile READY MFA operation receipts into the PostgreSQL W02 publication
  * journal. Each receipt is locked with FOR UPDATE SKIP LOCKED while it is
- * processed. The receipt transition and all event-journal inserts share one
- * PostgreSQL transaction; unique idempotency keys make a retry safe after an
- * ambiguous commit response.
+ * processed. Each event is independently committed to preserve the D1 outbox
+ * contract: a later event failure does not erase earlier durable journal rows.
+ * Stable idempotency keys let the next retry safely adopt those earlier rows.
  *
  * Stale STARTED receipts and malformed/empty READY plans become UNKNOWN rather
  * than inventing an MFA outcome. This helper is test-only until the separate
@@ -192,7 +192,7 @@ export async function reconcileMfaAuditOperationReceiptsPostgres(
           ? await deriveMfaAuditEventIdForIdempotencyKey(event.idempotencyKey)
           : event.eventId
 
-        const recorded = await recordEvent(client, {
+        const recorded = await recordEvent(pool, {
           eventType: event.eventType,
           ...(event.operationId ? { operationId: event.operationId } : {}),
           userId: row.resourceId,
