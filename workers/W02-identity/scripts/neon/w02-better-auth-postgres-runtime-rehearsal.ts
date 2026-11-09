@@ -41,6 +41,7 @@ let signedIn = false
 let signedOut = false
 let primaryError: unknown
 let report: Record<string, unknown> | undefined
+let cleanupVerified = false
 
 try {
   const signUp = await withTimeout('sign-up-email', () => auth.api.signUpEmail({
@@ -143,9 +144,6 @@ try {
     businessDataImported: false,
   }
 
-  mkdirSync(path.dirname(reportPath), { recursive: true })
-  writeFileSync(reportPath, JSON.stringify(report, null, 2) + '\n')
-  process.stdout.write(JSON.stringify(report, null, 2) + '\n')
 } catch (error) {
   primaryError = error
 } finally {
@@ -159,19 +157,25 @@ try {
       if (typeof byEmail.rows[0]?.id === 'string') cleanupUserId = byEmail.rows[0].id
     }
 
+    await postgresPool.query('DELETE FROM "verification" WHERE identifier = $1', [email])
     if (cleanupUserId) {
-      await postgresPool.query('DELETE FROM "verification" WHERE identifier = $1', [email])
       await postgresPool.query('DELETE FROM "session" WHERE user_id = $1', [cleanupUserId])
       await postgresPool.query('DELETE FROM "account" WHERE user_id = $1', [cleanupUserId])
       await postgresPool.query('DELETE FROM "user" WHERE id = $1', [cleanupUserId])
-      const remaining = await postgresPool.query(
-        'SELECT COUNT(*)::integer AS count FROM "user" WHERE id = $1',
-        [cleanupUserId],
-      )
-      if (Number(remaining.rows[0]?.count) !== 0 && !primaryError) {
-        primaryError = new Error('W02_RUNTIME_SYNTHETIC_USER_CLEANUP_FAILED')
-      }
     }
+
+    const remaining = await postgresPool.query(
+      'SELECT ' +
+        '(SELECT COUNT(*) FROM "user" WHERE email = $1) AS users, ' +
+        '(SELECT COUNT(*) FROM "account" WHERE user_id = COALESCE($2, \'\')) AS accounts, ' +
+        '(SELECT COUNT(*) FROM "session" WHERE user_id = COALESCE($2, \'\')) AS sessions, ' +
+        '(SELECT COUNT(*) FROM "verification" WHERE identifier = $1) AS verifications',
+      [email, cleanupUserId ?? null],
+    )
+    if (Object.values(remaining.rows[0] ?? {}).some((value) => Number(value) !== 0)) {
+      throw new Error('W02_RUNTIME_SYNTHETIC_CLEANUP_FAILED')
+    }
+    cleanupVerified = true
   } catch (cleanupError) {
     if (!primaryError) primaryError = cleanupError
   }
@@ -185,7 +189,8 @@ try {
 
 if (primaryError) throw primaryError
 if (!report) throw new Error('W02_RUNTIME_REHEARSAL_REPORT_NOT_CREATED')
+if (!cleanupVerified) throw new Error('W02_RUNTIME_REHEARSAL_CLEANUP_NOT_VERIFIED')
 
 mkdirSync(path.dirname(reportPath), { recursive: true })
-writeFileSync(reportPath, JSON.stringify(report, null, 2) + '\\n')
-process.stdout.write(JSON.stringify(report, null, 2) + '\\n')
+writeFileSync(reportPath, JSON.stringify(report, null, 2) + '\n')
+process.stdout.write(JSON.stringify(report, null, 2) + '\n')
