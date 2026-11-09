@@ -537,7 +537,6 @@ export const buildLuckReadAuth = (
       // Map Better Auth's camelCase core fields to those exact column names.
       fields: {
         emailVerified: 'email_verified',
-        twoFactorEnabled: 'two_factor_enabled',
         createdAt: 'created_at',
         updatedAt: 'updated_at',
       },
