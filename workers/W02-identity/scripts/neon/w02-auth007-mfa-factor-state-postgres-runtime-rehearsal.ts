@@ -126,7 +126,7 @@ try {
   await pool.query('UPDATE "user" SET two_factor_enabled = FALSE WHERE id = $1', [userId])
   assert.deepEqual(await readAuthoritativeMfaStatusPostgres(pool, userId, now), {
     enabled: false,
-    verified: true,
+    verified: false,
     enrolledAt: null,
   })
   checks.publicStatusProjectionRequiresEnabledVerifiedAndValidEnrollmentTime = true
