@@ -34,7 +34,7 @@ export function validateRemoteNeonTarget(connectionString) {
     return { valid: false, reason: 'Neon database URL is invalid' }
   }
   let targetDatabase
-  try { targetDatabase = decodeURIComponent(parsed.pathname.replace(/^\\/+/, '')) } catch {
+  try { targetDatabase = decodeURIComponent(parsed.pathname.startsWith('/') ? parsed.pathname.slice(1) : parsed.pathname) } catch {
     targetDatabase = ''
   }
   if (!['postgres:', 'postgresql:'].includes(parsed.protocol) ||
@@ -125,7 +125,8 @@ async function verifyEmptyBootstrapTarget(client) {
   )
   if (routines.rows.length !== 0) fail('first D1-04 apply requires no pre-existing public routines')
   const otherObjects = await client.query(
-    "SELECT c.collname AS object_name,'collation' AS object_kind FROM pg_catalog.pg_collation c JOIN pg_catalog.pg_namespace n ON n.oid=c.collnamespace WHERE n.nspname='public' " +
+    "SELECT o.oprname AS object_name,'operator' AS object_kind FROM pg_catalog.pg_operator o JOIN pg_catalog.pg_namespace n ON n.oid=o.oprnamespace WHERE n.nspname='public' " +
+    "UNION ALL SELECT c.collname,'collation' FROM pg_catalog.pg_collation c JOIN pg_catalog.pg_namespace n ON n.oid=c.collnamespace WHERE n.nspname='public' " +
     "UNION ALL SELECT c.conname,'conversion' FROM pg_catalog.pg_conversion c JOIN pg_catalog.pg_namespace n ON n.oid=c.connamespace WHERE n.nspname='public' " +
     "UNION ALL SELECT t.cfgname,'text_search_config' FROM pg_catalog.pg_ts_config t JOIN pg_catalog.pg_namespace n ON n.oid=t.cfgnamespace WHERE n.nspname='public' " +
     "UNION ALL SELECT t.dictname,'text_search_dictionary' FROM pg_catalog.pg_ts_dict t JOIN pg_catalog.pg_namespace n ON n.oid=t.dictnamespace WHERE n.nspname='public' " +
