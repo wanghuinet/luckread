@@ -55,6 +55,9 @@ jobs:
           psql "postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_d1_02_schema" \
             --set ON_ERROR_STOP=1 --no-psqlrc \
             --file workers/W03-content/src/neon-postgres-migrations/0001_w03_d1_02_content_schema.sql
+          psql "postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_d1_02_schema" \
+            --set ON_ERROR_STOP=1 --no-psqlrc \
+            --file workers/W03-content/src/neon-postgres-migrations/0002_w03_d1_02_content_snowflake_timestamp_bigint.sql
       - name: Verify schema, event semantics and rollback of synthetic rows
         run: |
           set -euo pipefail
@@ -96,6 +99,7 @@ jobs:
           name: neon-w03-d1-02-postgres18-${{ github.sha }}
           path: |
             workers/W03-content/src/neon-postgres-migrations/0001_w03_d1_02_content_schema.sql
+            workers/W03-content/src/neon-postgres-migrations/0002_w03_d1_02_content_snowflake_timestamp_bigint.sql
             artifacts/neon/w03-d1-02-source-hashes.json
             artifacts/neon/w03-d1-02-postgres-schema-postflight.json
           if-no-files-found: error
