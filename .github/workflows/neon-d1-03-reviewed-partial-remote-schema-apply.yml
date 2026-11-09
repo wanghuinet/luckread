@@ -132,7 +132,7 @@ jobs:
           D1_SHARED_SCHEMA_APPLY_REPORT: artifacts/neon/d1-03-reviewed-remote-runner-local-postflight.json
         run: node scripts/neon/shared-domain-schema-runner.mjs --domain D1-03 --local-only
       - name: Upload sanitized local PostgreSQL 18 evidence
-        if: always()
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: neon-d1-03-partial-remote-runner-validation-${{ github.run_id }}
