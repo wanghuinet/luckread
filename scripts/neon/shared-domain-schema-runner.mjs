@@ -4,14 +4,13 @@ import { createRequire } from 'node:module'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import tls from 'node:tls'
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 const requireFromW02 = createRequire(resolve(repositoryRoot, 'workers/W02-identity/package.json'))
 const ledgerSqlPath = 'scripts/neon/d1-01/0001_schema_migration_ledger.sql'
 const ledgerTable = 'neon_schema_migration_ledger'
 const ledgerFunction = 'neon_schema_migration_ledger_reject_mutation'
-const runnerVersion = 'd1-03-05-shared-schema-executor/1.1.0'
+const runnerVersion = 'd1-03-05-shared-schema-executor/1.0.0'
 const SHA = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/
 
 export const DOMAIN_MANIFESTS = Object.freeze({
@@ -454,72 +453,6 @@ export function validateLocalTarget(connectionString, manifest) {
   return {valid:true,parsed}
 }
 
-
-const D1_03_REMOTE_TARGET = Object.freeze({
-  databaseName: 'luckread_governance',
-  neonHost: 'ep-icy-breeze-azdp8x8q-pooler.c-3.ap-southeast-1.aws.neon.tech',
-  confirmation: 'APPLY_REVIEWED_SCHEMA_D1_03_GOVERNANCE_PARTIAL',
-})
-
-export function validateD103RemoteNeonTarget(connectionString) {
-  if (typeof connectionString !== 'string' || connectionString.length === 0) {
-    return { valid: false, reason: 'NEON_DATABASE_URL_GOVERNANCE_VERIFIED is required' }
-  }
-  let parsed
-  try { parsed = new URL(connectionString) } catch {
-    return { valid: false, reason: 'D1-03 Neon database URL is invalid' }
-  try { database = decodeURIComponent(parsed.pathname.replaceAll('/', '')) } catch {
-  let database
-  try { database = decodeURIComponent(parsed.pathname.replace(/^\\/+/, '')) } catch {
-    database = ''
-  }
-  if (!['postgres:', 'postgresql:'].includes(parsed.protocol) ||
-      parsed.hostname.toLowerCase() !== D1_03_REMOTE_TARGET.neonHost ||
-      !['', '5432'].includes(parsed.port) ||
-      database !== D1_03_REMOTE_TARGET.databaseName) {
-    return { valid: false, reason: 'remote runner accepts only the pinned D1-03 Neon endpoint and luckread_governance database' }
-  }
-  if (parsed.searchParams.getAll('sslmode').length !== 1 ||
-      parsed.searchParams.get('sslmode') !== 'verify-full' ||
-      parsed.searchParams.getAll('channel_binding').length !== 1 ||
-      parsed.searchParams.get('channel_binding') !== 'require') {
-    return { valid: false, reason: 'D1-03 Neon connection must use sslmode=verify-full and channel_binding=require' }
-  }
-  if (!parsed.username || !parsed.password) {
-    return { valid: false, reason: 'D1-03 Neon database credentials are required' }
-  }
-  return { valid: true, parsed }
-}
-
-export function enforceD103VerifiedNeonConnectionString(connectionString) {
-  const parsed = new URL(connectionString)
-  parsed.searchParams.set('sslmode', 'verify-full')
-  parsed.searchParams.set('channel_binding', 'require')
-  return parsed.toString()
-}
-
-export function validateD103RemoteApplyContext({ githubActions, githubRef, confirmation } = {}) {
-  const errors = []
-  if (githubActions !== 'true') errors.push('D1-03 remote apply is permitted only inside GitHub Actions')
-  if (githubRef !== 'refs/heads/main') errors.push('D1-03 remote apply is permitted only from the main branch')
-  if (confirmation !== D1_03_REMOTE_TARGET.confirmation) {
-    errors.push('exact D1-03 partial-schema remote apply confirmation is required')
-  }
-  return { valid: errors.length === 0, errors }
-}
-
-export function verifyD103RemoteTlsConnection(client, hostname = D1_03_REMOTE_TARGET.neonHost) {
-  const socket = client?.connection?.stream
-  const certificate = socket?.getPeerCertificate?.()
-  const identityError = certificate
-    ? tls.checkServerIdentity(hostname, certificate)
-    : new Error('peer certificate unavailable')
-  if (socket?.encrypted !== true || socket?.authorized !== true || identityError) {
-    fail('D1-03 Neon TLS certificate chain or hostname verification failed')
-  }
-  return true
-}
-
 export function assertLedgerPrefixRows(manifest, plan, rows) {
   const entries = plan.entries.map((item) => item.entry)
   const checksums = new Map(plan.ledgerChecksums.map((item) => [item.migrationId,item]))
@@ -793,124 +726,43 @@ export function parseCommandLine(argv) {
   return {valid:true,domainId:argv[1]}
 }
 
-
-async function runDomain(domainId, mode = 'local') {
-  const remote = mode === 'remote'
-  if (remote && domainId !== 'D1-03') {
-    fail('the reviewed remote exception is restricted to D1-03 only')
-  }
-  if (mode !== 'local' && mode !== 'remote') fail('unsupported shared schema execution mode')
-
+async function runDomain(domainId) {
   const manifest = readJson(DOMAIN_MANIFESTS[domainId])
   const plan = buildDomainPlan(manifest)
-  let connectionString
-  let remoteTarget
-  if (remote) {
-    const context = validateD103RemoteApplyContext({
-      githubActions: process.env.GITHUB_ACTIONS,
-      githubRef: process.env.GITHUB_REF,
-      confirmation: process.env.D1_03_REMOTE_APPLY_CONFIRMATION,
-    })
-    if (!context.valid) fail(context.errors.join('; '))
-    if (manifest.domainId !== 'D1-03' ||
-        manifest.databaseName !== D1_03_REMOTE_TARGET.databaseName ||
-        manifest.cloudflareD1DatabaseUuid !== DOMAIN_CONFIG['D1-03'].cloudflareD1DatabaseUuid ||
-        manifest.postgresMajor !== 18 ||
-        manifest.remoteApplyReady !== false ||
-        manifest.businessDataImport !== false ||
-        manifest.productionCutoverAuthorized !== false ||
-        manifest.entries.length !== 3 ||
-        manifest.expected?.tables !== 15 ||
-        manifest.expected?.businessRows !== 0 ||
-        manifest.expected?.controlSeedRows !== 0) {
-      fail('D1-03 remote scope must remain exactly the three admitted W06/W09/W10 schema entries with no data import or cutover')
-    }
-    const release = readJson('contracts/database/neon-d1-03-remote-runner-review.v1.json')
-    if (release?.status !== 'PARTIAL_SCHEMA_REMOTE_RELEASE_APPROVED' ||
-        release?.partialRemoteApplyReady !== true ||
-        release?.remoteApplyReady !== false ||
-        release?.target?.domainId !== 'D1-03' ||
-        release?.target?.databaseName !== D1_03_REMOTE_TARGET.databaseName ||
-        release?.target?.neonHost !== D1_03_REMOTE_TARGET.neonHost ||
-        release?.scope?.kind !== 'ADMITTED_MANIFEST_ENTRIES_ONLY' ||
-        release?.scope?.migrationCount !== 3 ||
-        release?.scope?.tables !== 15 ||
-        release?.scope?.fullDomainSchemaComplete !== false ||
-        release?.businessDataImport !== false ||
-        release?.productionCutoverAuthorized !== false) {
-      fail('D1-03 partial remote release record is absent, stale or outside the exact admitted schema scope')
-    }
-    connectionString = process.env.NEON_DATABASE_URL_GOVERNANCE_VERIFIED
-    remoteTarget = validateD103RemoteNeonTarget(connectionString)
-    if (!remoteTarget.valid) fail(remoteTarget.reason)
-  } else {
-    connectionString = process.env.D1_SHARED_LOCAL_DATABASE_URL
-    const target = validateLocalTarget(connectionString, manifest)
-    if (!target.valid) fail(target.reason)
-  }
+  const target = validateLocalTarget(process.env.D1_SHARED_LOCAL_DATABASE_URL,manifest)
+  if (!target.valid) fail(target.reason)
 
-  const sourceCommitSha = remote
-    ? process.env.GITHUB_SHA
-    : (process.env.GITHUB_SHA || process.env.REHEARSAL_SOURCE_COMMIT_SHA)
+  const sourceCommitSha = process.env.GITHUB_SHA || process.env.REHEARSAL_SOURCE_COMMIT_SHA
   if (!SHA.test(sourceCommitSha || '')) fail('an exact source commit SHA is required for migration provenance')
-  const executionId = (remote ? 'github-' : 'local-') +
-    (process.env.GITHUB_RUN_ID || 'manual') + '-' +
+  const executionId = 'local-' + (process.env.GITHUB_RUN_ID || 'manual') + '-' +
     (process.env.GITHUB_RUN_ATTEMPT || '1') + '-' + process.pid
 
   const { Pool } = requireFromW02('pg')
-  const poolOptions = {
-    connectionString,
-    max: 2,
-    connectionTimeoutMillis: 15000,
-    idleTimeoutMillis: 1000,
-  }
-  if (remote) poolOptions.ssl = { rejectUnauthorized: true }
-  const pool = new Pool(poolOptions)
+  const pool = new Pool({
+    connectionString:process.env.D1_SHARED_LOCAL_DATABASE_URL,
+    max:2,
+    connectionTimeoutMillis:15000,
+    idleTimeoutMillis:1000,
+  })
   let lockClient
   let client
   let lockOpen = false
   try {
     lockClient = await pool.connect()
-    if (remote) verifyD103RemoteTlsConnection(lockClient, remoteTarget.parsed.hostname)
     await lockClient.query('BEGIN')
     lockOpen = true
     const identity = await lockClient.query(
       "SELECT current_database() AS database_name,current_setting('server_version_num')::integer AS version_num",
     )
     const major = Math.floor(Number(identity.rows[0]?.version_num) / 10000)
-    const expectedDatabase = remote ? manifest.databaseName : manifest.localRehearsal.databaseName
-    if (identity.rows[0]?.database_name !== expectedDatabase || major !== 18) {
-      fail('connected database must be the exact D1-03 PostgreSQL 18 target')
+    if (identity.rows[0]?.database_name !== manifest.localRehearsal.databaseName || major !== 18) {
+      fail('connected database must be the exact disposable PostgreSQL 18 target')
     }
     await lockClient.query(
       "SELECT pg_advisory_xact_lock(hashtextextended('luckread:neon-schema-migration:' || current_database(),0))",
     )
 
     client = await pool.connect()
-    if (remote) verifyD103RemoteTlsConnection(client, remoteTarget.parsed.hostname)
-    if (remote) {
-      await verifyPublicSchema(client)
-      const ledgerPresent = (await client.query(
-        "SELECT to_regclass('public.neon_schema_migration_ledger') IS NOT NULL AS present",
-      )).rows[0].present
-      if (!ledgerPresent) {
-        const types = await client.query(
-          "SELECT t.typname FROM pg_catalog.pg_type t JOIN pg_catalog.pg_namespace n ON n.oid=t.typnamespace WHERE n.nspname='public' AND t.typtype IN ('c','d','e','r','m') ORDER BY t.typname",
-        )
-        if (types.rows.length !== 0) fail('first D1-03 remote apply requires no pre-existing public custom types')
-        const routines = await client.query(
-          "SELECT p.proname FROM pg_catalog.pg_proc p JOIN pg_catalog.pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public' ORDER BY p.proname",
-        )
-        if (routines.rows.length !== 0) fail('first D1-03 remote apply requires no pre-existing public routines')
-        const globalObjects = await client.query(
-          "SELECT evtname AS object_name,'event_trigger' AS object_kind FROM pg_catalog.pg_event_trigger " +
-          "UNION ALL SELECT pubname,'publication' FROM pg_catalog.pg_publication " +
-          "UNION ALL SELECT fdwname,'foreign_data_wrapper' FROM pg_catalog.pg_foreign_data_wrapper " +
-          "UNION ALL SELECT srvname,'foreign_server' FROM pg_catalog.pg_foreign_server",
-        )
-        if (globalObjects.rows.length !== 0) fail('unexpected database-global PostgreSQL objects block D1-03 bootstrap')
-      }
-    }
     await ensureLedger(client)
     let ledgerRows = await readLedgerRows(client)
     let appliedEntries = assertLedgerPrefixRows(manifest,plan,ledgerRows)
@@ -942,69 +794,54 @@ async function runDomain(domainId, mode = 'local') {
     if (finalRows.length !== plan.entries.length) fail('shared schema executor did not commit every migration')
     const catalog = await verifyFinalCatalog(client,manifest,plan)
     const report = {
-      reportType: remote
-        ? 'NEON_D1_03_PARTIAL_SCHEMA_REMOTE_POSTFLIGHT'
-        : 'NEON_SHARED_DOMAIN_SCHEMA_LOCAL_POSTFLIGHT',
-      status: remote ? 'D1_03_PARTIAL_SCHEMA_REMOTE_APPLY_PASS' : 'LOCAL_SCHEMA_ONLY_APPLY_PASS',
-      domainId: manifest.domainId,
-      databaseName: manifest.databaseName,
-      ...(remote ? {
-        scope: 'ADMITTED_MANIFEST_ENTRIES_ONLY',
-        partialRemoteApplyReady: true,
-        fullDomainSchemaComplete: false,
-      } : { localDatabaseName: manifest.localRehearsal.databaseName }),
-      postgresMajor: 18,
+      reportType:'NEON_SHARED_DOMAIN_SCHEMA_LOCAL_POSTFLIGHT',
+      status:'LOCAL_SCHEMA_ONLY_APPLY_PASS',
+      domainId:manifest.domainId,
+      databaseName:manifest.databaseName,
+      localDatabaseName:manifest.localRehearsal.databaseName,
+      postgresMajor:18,
       sourceCommitSha,
       runnerVersion,
-      appliedMigrations: finalRows.map((row) => ({
-        ownerWorker: row.owner_worker,
-        logicalOwnerWorker: plan.entries.find((item) => item.entry.migrationId === row.migration_id)?.entry.logicalOwnerWorker || row.owner_worker,
-        migrationId: row.migration_id,
-        migrationOrder: Number(row.migration_order),
-        migrationKind: row.migration_kind,
-        artifactSha256: row.artifact_sha256,
-        manifestEntrySha256: row.manifest_entry_sha256,
-        sourceCommitSha: row.source_commit_sha,
+      appliedMigrations:finalRows.map((row) => ({
+        ownerWorker:row.owner_worker,
+        migrationId:row.migration_id,
+        migrationOrder:Number(row.migration_order),
+        migrationKind:row.migration_kind,
+        artifactSha256:row.artifact_sha256,
+        manifestEntrySha256:row.manifest_entry_sha256,
+        sourceCommitSha:row.source_commit_sha,
       })),
       catalog,
-      safety: {
-        remoteNeonTouched: remote,
-        cloudflareD1Touched: false,
-        businessDataImported: false,
-        runtimeBindingsChanged: false,
-        productionCutoverAuthorized: false,
+      safety:{
+        remoteNeonTouched:false,
+        cloudflareD1Touched:false,
+        businessDataImported:false,
+        runtimeBindingsChanged:false,
+        productionCutoverAuthorized:false,
       },
-      remoteApplyReady: false,
-      remoteApplyBlockers: manifest.remoteApplyBlockers,
+      remoteApplyReady:false,
+      remoteApplyBlockers:manifest.remoteApplyBlockers,
     }
-    const output = remote
-      ? (process.env.D1_03_SCHEMA_APPLY_REPORT || 'artifacts/neon/d1-03-schema-runner-remote-postflight.json')
-      : (process.env.D1_SHARED_SCHEMA_APPLY_REPORT ||
-        'artifacts/neon/' + manifest.domainId.toLowerCase() + '-shared-runner-postflight.json')
+    const output = process.env.D1_SHARED_SCHEMA_APPLY_REPORT ||
+      'artifacts/neon/' + manifest.domainId.toLowerCase() + '-shared-runner-postflight.json'
     if (!isSafeRepositoryPath(output)) fail('postflight report path must remain inside the repository')
     mkdirSync(dirname(resolve(repositoryRoot,output)),{recursive:true})
     writeFileSync(resolve(repositoryRoot,output),JSON.stringify(report,null,2)+'\n')
-    const result = {
-      domainId: manifest.domainId,
-      databaseName: manifest.databaseName,
-      postgresMajor: 18,
-      migrations: finalRows.length,
-      tables: catalog.tables,
-      explicitIndexes: catalog.explicitIndexes,
-      triggers: catalog.triggers,
-      triggerFunctions: catalog.triggerFunctions,
-      foreignKeys: catalog.foreignKeys,
-      businessRows: catalog.businessRows,
-      remoteNeonTouched: remote,
-      cloudflareD1Touched: false,
-      businessDataImported: false,
-      productionCutoverAuthorized: false,
-      remoteApplyReady: false,
-      ...(remote ? { partialRemoteApplyReady: true, fullDomainSchemaComplete: false } : {}),
-    }
-    process.stdout.write((remote ? 'NEON_D1_03_PARTIAL_SCHEMA_REMOTE_PASS ' : 'NEON_SHARED_DOMAIN_SCHEMA_LOCAL_PASS ') +
-      JSON.stringify(result) + '\n')
-    return report
+    process.stdout.write('NEON_SHARED_DOMAIN_SCHEMA_LOCAL_PASS ' + JSON.stringify({
+      domainId:manifest.domainId,
+      databaseName:manifest.databaseName,
+      postgresMajor:18,
+      migrations:finalRows.length,
+      tables:catalog.tables,
+      explicitIndexes:catalog.explicitIndexes,
+      triggers:catalog.triggers,
+      triggerFunctions:catalog.triggerFunctions,
+      foreignKeys:catalog.foreignKeys,
+      businessRows:catalog.businessRows,
+      remoteNeonTouched:false,
+      cloudflareD1Touched:false,
+      remoteApplyReady:false,
+    })+'\n')
   } finally {
     if (client) client.release()
     if (lockClient) {
@@ -1015,10 +852,6 @@ async function runDomain(domainId, mode = 'local') {
     }
     await pool.end()
   }
-}
-
-export async function runD103RemoteDomain() {
-  return runDomain('D1-03', 'remote')
 }
 
 async function run() {
