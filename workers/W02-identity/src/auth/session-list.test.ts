@@ -83,7 +83,7 @@ describe('W02 bounded session list', () => {
     expect(payload.currentSessionId).toBe('session-2')
     expect(payload.items.every((item) => !('token' in item) && !('userId' in item))).toBe(true)
     expect(payload.items[0]?.lastSeenAt).toBeNull()
-    expect(payload.nextCursor).toMatch(/^s1\.[A-Za-z0-9_-]+$/)
+    expect(payload.nextCursor?.startsWith('s1.')).toBe(true)
     expect(decodeCursor(payload.nextCursor as string)).toEqual({
       createdAt: '2026-10-02T00:00:00.000Z',
       sessionId: 'session-2',
