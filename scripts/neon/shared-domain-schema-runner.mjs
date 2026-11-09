@@ -468,7 +468,7 @@ export function validateD103RemoteNeonTarget(connectionString) {
   let parsed
   try { parsed = new URL(connectionString) } catch {
     return { valid: false, reason: 'D1-03 Neon database URL is invalid' }
-  try { database = decodeURIComponent(parsed.pathname.replace(/^\/+/, '')) } catch {
+  }
   let database
   try { database = decodeURIComponent(parsed.pathname.replace(/^\\/+/, '')) } catch {
     database = ''
