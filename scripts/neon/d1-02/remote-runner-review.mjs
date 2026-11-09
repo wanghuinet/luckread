@@ -6,7 +6,7 @@ const SHA40 = /^[0-9a-f]{40}$/
 const BLOB_SHA1 = /^[0-9a-f]{40}$/
 const RUN_URL = /^https:\/\/github\.com\/wanghuinet\/luckread\/actions\/runs\/\d+$/
 const REVIEW_REF = 'contracts/database/neon-d1-02-remote-runner-review.v1.json'
-const IMPLEMENTATION_MERGE_SHA = '7f6b4848b86d041aba5cfca7ea4549dc50a9c7d3'
+const IMPLEMENTATION_MERGE_SHA = '8a0db7dd0d0567131d51e009302465f8e30b9386'
 const fail = (errors, message) => errors.push(message)
 
 export function validateD1_02RemoteRunnerReview({
