@@ -1,0 +1,212 @@
+name: Neon D1-03 Reviewed Partial Remote Schema Apply
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/neon-d1-03-reviewed-partial-remote-schema-apply.yml'
+      - 'scripts/neon/shared-domain-schema-runner.mjs'
+      - 'scripts/neon/d1-03/**'
+      - 'scripts/neon/d1-01/0001_schema_migration_ledger.sql'
+      - 'contracts/database/neon-d1-03-remote-runner-review.v1.json'
+      - 'contracts/database/neon-d1-03-shared-migration-manifest.v1.json'
+      - 'contracts/database/neon-d1-03-shared-runner-independent-review.v1.json'
+      - 'contracts/database/neon-d1-03-w06-moderation-schema.v1.json'
+      - 'contracts/database/neon-d1-03-w09-platform-schema.v1.json'
+      - 'contracts/database/neon-d1-03-w10-execution-schema.v1.json'
+      - 'contracts/transport/d1-03-entity-owner-boundary.v1.json'
+      - 'contracts/transport/worker-d1-access-boundary.v1.json'
+      - 'workers/W06-governance/migrations/**'
+      - 'workers/W06-governance/scripts/neon/**'
+      - 'workers/W06-governance/src/neon-postgres-migrations/**'
+      - 'workers/W09-platform/migrations-d1-03/**'
+      - 'workers/W09-platform/scripts/neon/**'
+      - 'workers/W09-platform/src/neon-postgres-migrations/**'
+      - 'workers/W10-async/scripts/neon/**'
+      - 'workers/W10-async/src/neon-postgres-migrations/**'
+      - 'workers/W06-governance/wrangler.jsonc'
+      - 'workers/W09-platform/wrangler.d1-03-migrations.jsonc'
+      - 'workers/W10-async/wrangler.jsonc'
+      - 'workers/W11-growth-campaign-analytics-operations/wrangler.jsonc'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/neon-d1-03-reviewed-partial-remote-schema-apply.yml'
+      - 'scripts/neon/shared-domain-schema-runner.mjs'
+      - 'scripts/neon/d1-03/**'
+      - 'contracts/database/neon-d1-03-remote-runner-review.v1.json'
+      - 'contracts/database/neon-d1-03-shared-migration-manifest.v1.json'
+      - 'contracts/database/neon-d1-03-shared-runner-independent-review.v1.json'
+      - 'workers/W06-governance/src/neon-postgres-migrations/**'
+      - 'workers/W09-platform/src/neon-postgres-migrations/**'
+      - 'workers/W10-async/src/neon-postgres-migrations/**'
+  workflow_dispatch:
+    inputs:
+      confirm_target:
+        description: Apply only the three admitted D1-03 W06/W09/W10 schema migrations. No data import or production cutover.
+        required: true
+        type: choice
+        options:
+          - APPLY_REVIEWED_SCHEMA_D1_03_GOVERNANCE_PARTIAL
+
+permissions:
+  contents: read
+
+concurrency:
+  group: neon-d1-03-reviewed-partial-remote-schema-apply
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
+    name: Validate D1-03 partial remote runner and PostgreSQL 18 rehearsal (no Neon credentials)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:18.6
+        env:
+          POSTGRES_USER: schema_generator
+          POSTGRES_PASSWORD: schema_generator_local_only
+          POSTGRES_DB: luckread_d1_03_shared
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U schema_generator -d luckread_d1_03_shared"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - name: Checkout reviewed source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install PostgreSQL driver reused from W02
+        working-directory: workers/W02-identity
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Validate remote target, release gate and negative safety tests
+        run: |
+          set -euo pipefail
+          node --check scripts/neon/shared-domain-schema-runner.mjs
+          node --check scripts/neon/d1-03/schema-only-runner.mjs
+          node --check scripts/neon/d1-03/assert-remote-apply-release.mjs
+          node --check scripts/neon/d1-03/remote-runner-review.mjs
+          node --test \
+            scripts/neon/shared-domain-schema-runner.test.mjs \
+            scripts/neon/d1-03/schema-only-runner.test.mjs \
+            scripts/neon/d1-03/remote-runner-review.test.mjs \
+            scripts/neon/review-d1-03-shared-runner-independent.test.mjs \
+            workers/W06-governance/scripts/neon/generate-d1-03-w06-postgres-migration.test.mjs \
+            workers/W09-platform/scripts/neon/generate-d1-03-w09-postgres-migration.test.mjs \
+            workers/W09-platform/scripts/neon/verify-d1-03-w09-owner-reconciliation.test.mjs \
+            workers/W10-async/scripts/neon/generate-d1-03-w10-postgres-migration.test.mjs \
+            workers/W11-growth-campaign-analytics-operations/scripts/neon/verify-d1-03-w11-owner-reconciliation.test.mjs
+          node scripts/neon/d1-03/assert-remote-apply-release.mjs --validate-current-state
+      - name: Regenerate admitted W06/W09/W10 PostgreSQL artifacts
+        run: |
+          set -euo pipefail
+          node workers/W06-governance/scripts/neon/generate-d1-03-w06-postgres-migration.mjs
+          node workers/W09-platform/scripts/neon/generate-d1-03-w09-postgres-migration.mjs
+          node workers/W10-async/scripts/neon/generate-d1-03-w10-postgres-migration.mjs
+          git diff --exit-code -- \
+            workers/W06-governance/src/neon-postgres-migrations/0001_w06_d1_03_moderation_schema.sql \
+            workers/W09-platform/src/neon-postgres-migrations/0001_w09_d1_03_platform_schema.sql \
+            workers/W10-async/src/neon-postgres-migrations/0001_w10_d1_03_async_execution.sql
+      - name: Preserve W09/W11 owner reconciliation and D1-03 entity boundary
+        run: |
+          set -euo pipefail
+          node workers/W09-platform/scripts/neon/verify-d1-03-w09-owner-reconciliation.mjs
+          node workers/W11-growth-campaign-analytics-operations/scripts/neon/verify-d1-03-w11-owner-reconciliation.mjs
+          node scripts/verify-d1-03-entity-owner-boundary.mjs
+      - name: Rehearse the exact 15-table D1-03 schema on disposable PostgreSQL 18
+        env:
+          D1_SHARED_LOCAL_DATABASE_URL: postgresql://schema_generator:schema_generator_local_only@127.0.0.1:5432/luckread_d1_03_shared
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
+          D1_SHARED_SCHEMA_APPLY_REPORT: artifacts/neon/d1-03-reviewed-remote-runner-local-postflight.json
+        run: node scripts/neon/shared-domain-schema-runner.mjs --domain D1-03 --local-only
+      - name: Upload sanitized local PostgreSQL 18 evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: neon-d1-03-partial-remote-runner-validation-${{ github.run_id }}
+          path: artifacts/neon/d1-03-reviewed-remote-runner-local-postflight.json
+          if-no-files-found: error
+          retention-days: 90
+
+  apply:
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.confirm_target == 'APPLY_REVIEWED_SCHEMA_D1_03_GOVERNANCE_PARTIAL' }}
+    name: Apply only admitted D1-03 W06/W09/W10 schema to Neon luckread_governance
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Guard exact main ref and D1-03 partial schema confirmation
+        shell: bash
+        env:
+          CONFIRM_TARGET: ${{ inputs.confirm_target }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/heads/main"
+          test "$CONFIRM_TARGET" = "APPLY_REVIEWED_SCHEMA_D1_03_GOVERNANCE_PARTIAL"
+      - name: Checkout the exact dispatched main commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - name: Verify checkout provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+      - name: Require the current source-pinned partial release review before reading Neon credentials
+        run: node scripts/neon/d1-03/assert-remote-apply-release.mjs --assert-ready
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install the pinned W02 PostgreSQL driver
+        working-directory: workers/W02-identity
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Enforce exact D1-03 Neon target and full TLS verification
+        env:
+          NEON_DATABASE_URL_GOVERNANCE: ${{ secrets.NEON_DATABASE_URL_GOVERNANCE }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE' >> "$GITHUB_ENV"
+          const { appendFileSync } = await import('node:fs')
+          const { validateD103RemoteNeonTarget, enforceD103VerifiedNeonConnectionString } =
+            await import('./scripts/neon/shared-domain-schema-runner.mjs')
+          const raw = process.env.NEON_DATABASE_URL_GOVERNANCE
+          if (typeof raw !== 'string' || raw.length === 0) throw new Error('NEON_DATABASE_URL_GOVERNANCE is required')
+          const verified = enforceD103VerifiedNeonConnectionString(raw)
+          const target = validateD103RemoteNeonTarget(verified)
+          if (!target.valid) throw new Error(target.reason)
+          process.stdout.write('::add-mask::' + verified + '\n')
+          appendFileSync(process.env.GITHUB_ENV, 'NEON_DATABASE_URL_GOVERNANCE_VERIFIED=' + verified + '\n')
+          NODE
+      - name: Apply the three admitted migrations with shared ledger and PostgreSQL 18 postflight
+        env:
+          GITHUB_ACTIONS: 'true'
+          GITHUB_REF: ${{ github.ref }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
+          D1_03_REMOTE_APPLY_CONFIRMATION: ${{ inputs.confirm_target }}
+          D1_03_SCHEMA_APPLY_REPORT: artifacts/neon/d1-03-schema-runner-remote-postflight.json
+        run: |
+          mkdir -p artifacts/neon
+          node scripts/neon/d1-03/schema-only-runner.mjs --remote-neon
+      - name: Upload sanitized D1-03 remote schema evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: neon-d1-03-remote-schema-postflight-${{ github.run_id }}
+          path: artifacts/neon/d1-03-schema-runner-remote-postflight.json
+          if-no-files-found: error
+          retention-days: 90
