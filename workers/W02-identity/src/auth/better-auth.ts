@@ -464,7 +464,7 @@ export const buildLuckReadAuth = (
         }
       }),
     },
-    }),
+    } : {}),
     // W02 is the platform identity authority. Better Auth uses native D1
     // persistence here; Payload is not an authentication/database adapter.
     database,
