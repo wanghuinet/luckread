@@ -10,14 +10,11 @@ import { isUnexpiredMfaChallengeRecord } from './mfa-challenge-verification.js'
 import { deriveMfaAuditEventIdForIdempotencyKey } from './mfa-audit-events.js'
 import { sendResendEmail } from './resend-email.js'
 import { buildPasswordResetPageUrl } from './password-reset-link.js'
+import type { MfaAuditReceiptEvent } from './mfa-audit-receipts.js'
 import {
-  appendMfaAuditOperationReceiptEvent,
-  assertMfaAuditOperationReceiptOwner,
-  createMfaAuditOperationReceipt,
-  finalizeMfaAuditOperationReceipt,
-  reconcileMfaAuditOperationReceipts,
-  type MfaAuditReceiptEvent,
-} from './mfa-audit-receipts.js'
+  createD1MfaAuditOperationReceiptStore,
+  type MfaAuditOperationReceiptStore,
+} from './mfa-audit-operation-receipt-store.js'
 import {
   classifyMfaAuditHookOutcome,
   getMfaAuditHookState,
@@ -97,16 +94,16 @@ const sanitizeAuthDiagnostic = (value: string): string => value
   .slice(0, 240)
 
 async function finalizeMfaAuditOperationReceiptWithRetry(
-  db: D1Database,
+  store: MfaAuditOperationReceiptStore,
   receiptId: string,
   events: MfaAuditReceiptEvent[],
 ): Promise<boolean> {
   let lastError: unknown
-  // A D1 response can be lost after commit. Retrying the idempotent receipt
-  // transition lets us read the committed state and avoids false UNKNOWN rows.
+  // A lost response after commit is safe to retry: the receipt transition
+  // is idempotent and the provider adapter reads the committed state back.
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
-      return await finalizeMfaAuditOperationReceipt(db, receiptId, events)
+      return await store.finalize(receiptId, events)
     } catch (error) {
       lastError = error
     }
@@ -115,12 +112,12 @@ async function finalizeMfaAuditOperationReceiptWithRetry(
 }
 
 async function finalizeKnownMfaRejection(
-  db: D1Database,
+  store: MfaAuditOperationReceiptStore,
   receiptId: string,
   events: MfaAuditReceiptEvent[],
 ): Promise<void> {
   try {
-    await finalizeMfaAuditOperationReceiptWithRetry(db, receiptId, events)
+    await finalizeMfaAuditOperationReceiptWithRetry(store, receiptId, events)
   } catch {
     throw APIError.from('INTERNAL_SERVER_ERROR', {
       code: 'MFA_AUDIT_UNAVAILABLE',
@@ -129,9 +126,9 @@ async function finalizeKnownMfaRejection(
   }
 
   try {
-    await reconcileMfaAuditOperationReceipts(db)
+    await store.reconcile()
   } catch {
-    // A durable READY receipt is retried by the existing W02 Cron.
+    // A durable READY receipt is retried by the existing W02 scheduled publisher.
     console.error(JSON.stringify({
       event: 'auth.mfa.audit_receipt_reconcile_failed',
       code: 'MFA_AUDIT_RECEIPT_RECONCILE_FAILED',
@@ -154,9 +151,15 @@ export const buildLuckReadAuth = (
   persistenceProfile: BetterAuthPersistenceProfile = 'production',
   mfaFactorStateStore: MfaFactorStateStore = createD1MfaFactorStateStore(env.D1_01),
   postgresLifecycleAdapters?: BetterAuthPostgresLifecycleAdapters,
+  mfaAuditOperationReceiptStore?: MfaAuditOperationReceiptStore,
+  resolveMfaSessionSubject?: (headers: Headers) => Promise<string | null>,
 ) => {
   const postgresRehearsal = persistenceProfile === 'postgres-rehearsal'
   const postgresEmailVerifiedCallback = postgresLifecycleAdapters?.afterEmailVerified
+  // Production defaults to D1. A rehearsal enables these hooks only by
+  // explicitly injecting a provider-matched receipt store.
+  const effectiveMfaAuditReceiptStore = mfaAuditOperationReceiptStore ??
+    (postgresRehearsal ? undefined : createD1MfaAuditOperationReceiptStore(env.D1_01))
   // Keep local origins available only to the local evidence/runtime profile.
   // Production must never inherit localhost trust from a shared config.
   const trustedOrigins = [
@@ -171,7 +174,7 @@ export const buildLuckReadAuth = (
   ]
 
   return betterAuth({
-    ...(postgresRehearsal ? {} : {
+    ...(effectiveMfaAuditReceiptStore ? {
     hooks: {
       before: createAuthMiddleware(async (ctx) => {
         const isTotpVerification = ctx.path === '/two-factor/verify-totp'
@@ -192,13 +195,21 @@ export const buildLuckReadAuth = (
         const requestHeaders = ctx.request?.headers ?? ctx.headers
         if (requestHeaders) {
           try {
-            const session = await createLuckReadAuth(env).api.getSession({
-              headers: requestHeaders,
-              query: {},
-            }) as { user?: { id?: unknown } } | null
-            if (typeof session?.user?.id === 'string') {
-              subjectId = session.user.id
-              sessionSubject = true
+            if (resolveMfaSessionSubject) {
+              const resolvedSubject = await resolveMfaSessionSubject(requestHeaders)
+              if (typeof resolvedSubject === 'string') {
+                subjectId = resolvedSubject
+                sessionSubject = true
+              }
+            } else {
+              const session = await createLuckReadAuth(env).api.getSession({
+                headers: requestHeaders,
+                query: {},
+              }) as { user?: { id?: unknown } } | null
+              if (typeof session?.user?.id === 'string') {
+                subjectId = session.user.id
+                sessionSubject = true
+              }
             }
           } catch {
             sessionLookupFailed = true
@@ -255,7 +266,7 @@ export const buildLuckReadAuth = (
         let receiptId: string
         if (isEnrollmentConfirmation) {
           try {
-            await assertMfaAuditOperationReceiptOwner(env.D1_01, {
+            await effectiveMfaAuditReceiptStore!.assertOwner({
               receiptId: suppliedReceiptId as string,
               userId: subjectId,
               operationPath: '/two-factor/verify-totp',
@@ -272,7 +283,7 @@ export const buildLuckReadAuth = (
           try {
             // Persist the secret-free intent before Better Auth can change MFA
             // state. If this fails, the operation is not allowed to proceed.
-            receiptId = await createMfaAuditOperationReceipt(env.D1_01, {
+            receiptId = await effectiveMfaAuditReceiptStore!.create({
               userId: subjectId,
               operationPath: ctx.path as
                 | '/two-factor/verify-totp'
@@ -308,9 +319,7 @@ export const buildLuckReadAuth = (
         const accountActive = await mfaFactorStateStore.isActiveSubject(subjectId)
         if (!accountActive) {
           if (!isEnrollmentConfirmation) {
-            await finalizeKnownMfaRejection(
-              env.D1_01,
-              receiptId,
+            await finalizeKnownMfaRejection(effectiveMfaAuditReceiptStore!, receiptId,
               isChallenge ? [{
                 eventType: 'auth.mfa.challenge_failed',
                 result: 'failed',
@@ -342,9 +351,7 @@ export const buildLuckReadAuth = (
         if (match.kind === 'invalid') return
         if (match.kind === 'ambiguous') {
           if (!isEnrollmentConfirmation) {
-            await finalizeKnownMfaRejection(
-              env.D1_01,
-              receiptId,
+            await finalizeKnownMfaRejection(effectiveMfaAuditReceiptStore!, receiptId,
               isChallenge ? [{
                 eventType: 'auth.mfa.challenge_failed',
                 result: 'failed',
@@ -361,7 +368,7 @@ export const buildLuckReadAuth = (
           // The TOTP was valid but its monotonically increasing step was already
           // accepted. Persist the rejection before returning the auth failure.
           try {
-            await appendMfaAuditOperationReceiptEvent(env.D1_01, receiptId, {
+            await effectiveMfaAuditReceiptStore!.append(receiptId, {
               eventType: 'auth.mfa.replay_rejected',
               result: 'rejected',
               reasonCode: 'TOTP_STEP_ALREADY_ACCEPTED',
@@ -373,7 +380,7 @@ export const buildLuckReadAuth = (
             // durable audit plan here instead of depending on an after hook that
             // may not run when the hook itself throws.
             if (!isEnrollmentConfirmation) {
-              await finalizeKnownMfaRejection(env.D1_01, receiptId, [])
+              await finalizeKnownMfaRejection(effectiveMfaAuditReceiptStore!, receiptId, [])
             }
           } catch {
             throw APIError.from('INTERNAL_SERVER_ERROR', {
@@ -408,10 +415,11 @@ export const buildLuckReadAuth = (
         if (failed &&
             (ctx.path === '/two-factor/verify-totp' || ctx.path === '/two-factor/verify-backup-code')) {
           try {
-            const factor = await env.D1_01.prepare(
-              'SELECT lockedUntil FROM "twoFactor" WHERE userId = ? LIMIT 1',
-            ).bind(state.userId).first<{ lockedUntil: string | null }>()
-            const lockUntil = typeof factor?.lockedUntil === 'string' ? Date.parse(factor.lockedUntil) : Number.NaN
+            const factor = await mfaFactorStateStore.readVerificationMaterial(state.userId)
+            const lockUntilValue = factor?.lockedUntil
+            const lockUntil = lockUntilValue instanceof Date
+              ? lockUntilValue.getTime()
+              : typeof lockUntilValue === 'string' ? Date.parse(lockUntilValue) : Number.NaN
             if (Number.isFinite(lockUntil) && lockUntil > Date.now()) {
               const lockoutIdempotencyKey = 'mfa-lock:' + state.userId + ':' + lockUntil
               outcomes.push({
@@ -433,7 +441,7 @@ export const buildLuckReadAuth = (
         try {
           // Persist the terminal outcome before trying the ordinary outbox.
           // A failed outbox insert leaves READY work for the existing W02 Cron.
-          await finalizeMfaAuditOperationReceiptWithRetry(env.D1_01, state.receiptId, outcomes)
+          await finalizeMfaAuditOperationReceiptWithRetry(effectiveMfaAuditReceiptStore!, state.receiptId, outcomes)
         } catch {
           // Do not turn a completed MFA mutation into a misleading failure:
           // the durable STARTED receipt will be surfaced as UNKNOWN if recovery
@@ -446,7 +454,7 @@ export const buildLuckReadAuth = (
         }
 
         try {
-          await reconcileMfaAuditOperationReceipts(env.D1_01)
+          await effectiveMfaAuditReceiptStore!.reconcile()
         } catch {
           // The receipt is already durable; the scheduled publisher retries it.
           console.error(JSON.stringify({
@@ -456,7 +464,7 @@ export const buildLuckReadAuth = (
         }
       }),
     },
-    }),
+    } : {}),
     // W02 is the platform identity authority. Better Auth uses native D1
     // persistence here; Payload is not an authentication/database adapter.
     database,

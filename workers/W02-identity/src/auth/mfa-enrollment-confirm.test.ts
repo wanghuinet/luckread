@@ -12,7 +12,12 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('./better-auth.js', () => ({ createLuckReadAuth: mocks.createAuth }))
 vi.mock('./principal.js', () => ({ resolveBetterAuthPrincipal: mocks.resolvePrincipal }))
-vi.mock('./mfa-status.js', () => ({ readAuthoritativeMfaStatus: mocks.readStatus }))
+vi.mock('./mfa-status.js', () => ({
+  readAuthoritativeMfaStatus: mocks.readStatus,
+  createD1MfaStatusStore: (db: D1Database) => ({
+    read: (userId: string, now: Date) => mocks.readStatus(db, userId, now),
+  }),
+}))
 vi.mock('./mfa-audit-receipts.js', () => ({
   createMfaAuditOperationReceipt: mocks.createReceipt,
   finalizeMfaAuditOperationReceipt: mocks.finalizeReceipt,
@@ -22,10 +27,17 @@ vi.mock('./mfa-audit-receipts.js', () => ({
 import type { BetterAuthEnv } from './better-auth.js'
 import { handleMfaEnrollmentConfirmRequest } from './mfa-enrollment-confirm.js'
 
-const makeDb = (row: unknown = { userEnabled: 0, factorVerified: 0 }) => {
+const makeDb = (row: unknown = {}) => {
+  const stateRow = {
+    userEnabled: 0,
+    confirmationKeyHash: null,
+    confirmationRequestHash: null,
+    factorVerified: 0,
+    ...(typeof row === 'object' && row !== null ? row as Record<string, unknown> : {}),
+  }
   const statement = {
     bind: vi.fn().mockReturnThis(),
-    first: vi.fn().mockResolvedValue(row),
+    first: vi.fn().mockResolvedValue(stateRow),
     run: vi.fn().mockResolvedValue({ success: true, meta: { changes: 1 } }),
   }
   const db = {
@@ -131,9 +143,52 @@ describe('W02 MFA enrollment confirmation authority', () => {
       })]),
     )
     expect(mocks.reconcileReceipts).toHaveBeenCalledWith(db)
-    expect(mocks.readStatus).toHaveBeenCalledWith(db, principal.userId)
+    expect(mocks.readStatus).toHaveBeenCalledWith(db, principal.userId, expect.any(Date))
   })
 
+
+  it('recovers an MFA confirmation marker whose database commit response was lost', async () => {
+    const hash = async (value: string) => {
+      const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))
+      return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
+    }
+    const key = 'mfa-confirm-key-lost-commit-0001'
+    const keyHash = await hash(key)
+    const requestHash = await hash(key + String.fromCharCode(0) + '123456')
+    const { db } = makeDb()
+    const store = {
+      read: vi.fn()
+        .mockResolvedValueOnce({
+          userEnabled: false,
+          confirmationKeyHash: null,
+          confirmationRequestHash: null,
+          factorVerified: false,
+        })
+        .mockResolvedValueOnce({
+          userEnabled: true,
+          confirmationKeyHash: keyHash,
+          confirmationRequestHash: requestHash,
+          factorVerified: true,
+        }),
+      persistConfirmation: vi.fn().mockRejectedValueOnce(new Error('commit response lost')),
+    }
+
+    const response = await handleMfaEnrollmentConfirmRequest(
+      { D1_01: db } as BetterAuthEnv,
+      makeRequest({ code: '123456' }, true, key),
+      { store },
+    )
+
+    expect(response.status).toBe(200)
+    expect(store.persistConfirmation).toHaveBeenCalledWith({
+      userId: principal.userId,
+      keyHash,
+      requestHash,
+    })
+    expect(store.read).toHaveBeenCalledTimes(2)
+    expect(mocks.handler).toHaveBeenCalledTimes(1)
+    expect(response.headers.get('set-cookie')).toContain('rotated-session')
+  })
 
   it('does not invent a failed MFA outcome when the handler throws and D1 read-back is indeterminate', async () => {
     const { db } = makeDb()

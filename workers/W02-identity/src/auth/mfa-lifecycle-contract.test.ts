@@ -109,7 +109,7 @@ describe('AUTH-007 MFA lifecycle contract', () => {
     expect(betterAuth).toContain("trustDeviceMaxAge: 0")
     expect(betterAuth).toContain("storeBackupCodes: 'encrypted'")
     expect(replayGuard).toContain('UPDATE "twoFactor" SET lastAcceptedTotpTimeStep')
-    expect(enrollmentConfirm).toContain('readAuthoritativeMfaStatus')
+    expect(enrollmentConfirm).toContain('statusStore.read')
     expect(roleAssignment).toContain('requireMfaForPrivilegedAction')
     expect(roleAssignment).toContain('mfa_enrolled_at')
     expect(roleAssignment).toContain('mfaEnabled')

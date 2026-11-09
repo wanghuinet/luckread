@@ -229,6 +229,7 @@ if (blockers.length === 0) {
   const mfaAuditOutboxContract = JSON.parse(read(mfaAuditOutboxContractPath))
   const logicalDataAuthority = JSON.parse(read(logicalDataAuthorityPath))
   const betterAuth = read(betterAuthPath)
+  const mfaAuditReceiptStorePort = read('workers/W02-identity/src/auth/mfa-audit-operation-receipt-store.ts')
   const replayGuard = read(replayGuardPath)
   const challengeVerification = read('workers/W02-identity/src/auth/mfa-challenge-verification.ts')
   const apiContract = JSON.parse(read(authContractPath))
@@ -396,10 +397,17 @@ if (blockers.length === 0) {
     mfaAuditLifecycleProducerHooksWired:
       /after:\s*createAuthMiddleware/.test(betterAuth) &&
       /classifyMfaAuditHookOutcome/.test(betterAuth) &&
-      /createMfaAuditOperationReceipt/.test(betterAuth) &&
-      /finalizeMfaAuditOperationReceipt/.test(betterAuth) &&
-      /reconcileMfaAuditOperationReceipts/.test(betterAuth) &&
-      /auth\.mfa\.replay_rejected/.test(betterAuth),
+      /effectiveMfaAuditReceiptStore!\.create\(/.test(betterAuth) &&
+      /effectiveMfaAuditReceiptStore!\.append\(/.test(betterAuth) &&
+      /finalizeMfaAuditOperationReceiptWithRetry\(effectiveMfaAuditReceiptStore!/.test(betterAuth) &&
+      /effectiveMfaAuditReceiptStore!\.reconcile\(\)/.test(betterAuth) &&
+      /auth\.mfa\.replay_rejected/.test(betterAuth) &&
+      /mfaAuditOperationReceiptStore\?: MfaAuditOperationReceiptStore/.test(betterAuth) &&
+      /createD1MfaAuditOperationReceiptStore\(env\.D1_01\)/.test(betterAuth) &&
+      /createD1MfaAuditOperationReceiptStore\(db: D1Database\)/.test(mfaAuditReceiptStorePort) &&
+      /appendMfaAuditOperationReceiptEvent\(db/.test(mfaAuditReceiptStorePort) &&
+      /finalizeMfaAuditOperationReceipt\(db/.test(mfaAuditReceiptStorePort) &&
+      /reconcileMfaAuditOperationReceipts\(db/.test(mfaAuditReceiptStorePort),
     mfaChallengeExpiryIsFailClosedAndWired:
       /isUnexpiredMfaChallengeRecord\(challenge\)/.test(betterAuth) &&
       /Number\.isFinite\(expiresAt\) && expiresAt > nowMs/.test(challengeVerification) &&
