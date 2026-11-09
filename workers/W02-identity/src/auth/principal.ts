@@ -32,6 +32,8 @@ export type AuthenticatedPrincipal = {
 export type PrincipalResolverDependencies = {
   /** Provider injection is for controlled PostgreSQL rehearsal/admission only. */
   store?: PrincipalAuthorityStore
+  /** A session reader already bound to the same provider as the injected store. */
+  getSession?: (headers: Headers) => Promise<unknown>
 }
 
 const toIso = (value: Date | string): string =>
@@ -52,12 +54,12 @@ export async function resolveBetterAuthPrincipal(
   dependencies: PrincipalResolverDependencies = {},
 ): Promise<AuthenticatedPrincipal | null> {
   const store = dependencies.store ?? createD1PrincipalAuthorityStore(env.D1_01)
-  const auth = createLuckReadAuth(env)
-
-  const result = await auth.api.getSession({
-    headers: request.headers,
-    query: {},
-  }) as AuthSession | null
+  const result = (dependencies.getSession
+    ? await dependencies.getSession(request.headers)
+    : await createLuckReadAuth(env).api.getSession({
+        headers: request.headers,
+        query: {},
+      })) as AuthSession | null
 
   if (!result?.user?.id || !result.session?.id) return null
 
