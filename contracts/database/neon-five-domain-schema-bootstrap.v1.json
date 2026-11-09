@@ -227,26 +227,79 @@
       "schemaContract": "contracts/database/neon-d1-02-combined-schema.v1.json",
       "migrationManifest": "contracts/database/neon-d1-02-migration-manifest.v1.json",
       "schemaVerificationEvidence": {
-        "workflowRunId": 42481970245,
-        "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42481970245",
+        "status": "D1_02_FULL_LOCAL_POSTGRES18_REHEARSAL_PASS",
+        "workflowRunId": 42612620258,
+        "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42612620258",
         "postgresVersion": "18.6",
+        "database": "luckread_d1_02_schema",
+        "owners": 2,
+        "migrationSources": 30,
+        "manifestEntries": 3,
+        "migrationLedgerRows": 3,
         "tables": 28,
         "explicitIndexes": 63,
         "triggers": 9,
         "triggerFunctions": 10,
         "businessRows": 0,
         "snowflakeAllocatorRows": 1,
-        "migrationLedgerRows": 2,
         "foreignKeys": 0,
         "d1_03EndpointTablePresent": false,
+        "snowflakeLastTimestampType": "bigint",
+        "snowflakeMillisecondWriteTest": 1800000000000,
         "remoteNeonTouched": false,
         "cloudflareD1Touched": false,
         "businessDataImported": false,
-        "productionCutoverAuthorized": false,
-        "evidenceArtifactId": 13617648427,
-        "evidenceArtifactSha256": "6dc320b5fff134d6420fd879df58a10ad510c21d03d3d1e0f10a9693170bfc49"
+        "productionCutoverAuthorized": false
       },
       "remoteSchemaApplicationEvidence": {
+        "status": "D1_02_REMOTE_SCHEMA_ONLY_APPLY_PASS",
+        "workflowRunId": 42615052620,
+        "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42615052620",
+        "event": "workflow_dispatch",
+        "branch": "main",
+        "sourceCommitSha": "d9e461c6aed02cc61b75465b8bcace3e6cc80aa7",
+        "databaseName": "luckreadpro",
+        "databaseUuid": "6c342634-97f6-4248-9f4a-85772af4f22c",
+        "postgresMajor": 18,
+        "verifiedMigrations": 3,
+        "migrationLedgerRows": 3,
+        "migrationOwners": [
+          "W03",
+          "W05",
+          "W03"
+        ],
+        "migrationIds": [
+          "d1-02-w03-content-schema-v1",
+          "d1-02-w05-social-schema-v1",
+          "d1-02-w03-content-snowflake-timestamp-bigint-v1"
+        ],
+        "catalog": {
+          "tables": 28,
+          "explicitIndexes": 63,
+          "triggers": 9,
+          "triggerFunctions": 10,
+          "foreignKeys": 0,
+          "snowflakeAllocatorRows": 1,
+          "businessRows": 0,
+          "d1_03EndpointTablePresent": false,
+          "snowflakeLastTimestampType": "bigint",
+          "snowflakeMillisecondWriteTest": 1800000000000
+        },
+        "artifact": {
+          "id": 13672660983,
+          "url": "https://github.com/wanghuinet/luckread/actions/runs/42615052620/artifacts/13672660983",
+          "name": "neon-d1-02-remote-schema-postflight-42615052620",
+          "sha256": "sha256:eb096551d501cd28b350f0f214e65e02acbe8b72fd4ec290362a77b4d8872efb"
+        },
+        "safety": {
+          "remoteNeonTouched": true,
+          "cloudflareD1Touched": false,
+          "businessDataImported": false,
+          "runtimeBindingsChanged": false,
+          "productionCutoverAuthorized": false
+        }
+      },
+      "priorTwoMigrationRemoteSchemaApplicationEvidence": {
         "status": "D1_02_REMOTE_SCHEMA_ONLY_APPLY_PASS",
         "workflowRunId": 42559331989,
         "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42559331989",
@@ -283,7 +336,42 @@
           "runtimeBindingsChanged": false,
           "productionCutoverAuthorized": false
         }
-      }
+      },
+      "priorTwoMigrationSchemaVerificationEvidence": {
+        "workflowRunId": 42481970245,
+        "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42481970245",
+        "postgresVersion": "18.6",
+        "tables": 28,
+        "explicitIndexes": 63,
+        "triggers": 9,
+        "triggerFunctions": 10,
+        "businessRows": 0,
+        "snowflakeAllocatorRows": 1,
+        "migrationLedgerRows": 2,
+        "foreignKeys": 0,
+        "d1_03EndpointTablePresent": false,
+        "remoteNeonTouched": false,
+        "cloudflareD1Touched": false,
+        "businessDataImported": false,
+        "productionCutoverAuthorized": false,
+        "evidenceArtifactId": 13617648427,
+        "evidenceArtifactSha256": "6dc320b5fff134d6420fd879df58a10ad510c21d03d3d1e0f10a9693170bfc49"
+      },
+      "correctiveMigrations": [
+        {
+          "migrationId": "d1-02-w03-content-snowflake-timestamp-bigint-v1",
+          "ownerWorker": "W03",
+          "ledgerOrder": 3,
+          "table": "content_id_snowflake_state",
+          "column": "last_timestamp_ms",
+          "postgresType": "bigint",
+          "status": "REMOTE_APPLIED",
+          "workflowRunId": 42615052620,
+          "rewritesExistingRows": false,
+          "changesSnowflakeIds": false,
+          "productionCutoverAuthorized": false
+        }
+      ]
     },
     {
       "domainId": "D1-03",
@@ -646,12 +734,12 @@
       "schemaSources": [
         "workers/W11-growth-campaign-analytics-operations/migrations"
       ],
-      "status": "SCHEMA_ONLY_REMOTE_APPLY_READY_PENDING_MANUAL_DISPATCH",
+      "status": "W11_SCHEMA_ONLY_REMOTE_APPLIED_RUNTIME_ADMISSION_BLOCKED",
       "schemaContract": "contracts/database/neon-d1-05-w11-analytics-schema.v1.json",
       "migrationManifest": "contracts/database/neon-d1-05-shared-migration-manifest.v1.json",
       "remoteReviewContract": "contracts/database/neon-d1-05-remote-runner-review.v1.json",
       "schemaOnlyRemoteApplyReady": true,
-      "remoteSchemaApplied": false,
+      "remoteSchemaApplied": true,
       "runtimeDataIngestionEnabled": false,
       "businessDataImported": false,
       "productionCutoverAuthorized": false,
@@ -697,7 +785,59 @@
         "Deletion/privacy-request behavior for actor-linked and creator-linked analytics projections is not admitted.",
         "Consent, lawful purpose and collection eligibility rules are not admitted."
       ],
-      "remoteSchemaApplicationEvidence": null
+      "remoteSchemaApplicationEvidence": {
+        "status": "D1_05_SCHEMA_ONLY_REMOTE_APPLY_PASS",
+        "workflowRunId": 42616370545,
+        "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42616370545",
+        "event": "workflow_dispatch",
+        "branch": "main",
+        "sourceCommitSha": "d9e461c6aed02cc61b75465b8bcace3e6cc80aa7",
+        "databaseName": "allluck",
+        "cloudflareD1DatabaseUuid": "77d82be2-d12e-4a17-b410-9aa7d376bc11",
+        "postgresMajor": 18,
+        "migrationCount": 1,
+        "migrationLedgerRows": 1,
+        "migrations": [
+          {
+            "ownerWorker": "W11",
+            "migrationId": "d1-05-w11-analytics-schema-v1",
+            "migrationOrder": 100,
+            "migrationKind": "GENERATED_POSTGRESQL_SQL",
+            "artifactSha256": "45fc4f6717267f7e30f14f676274a3fc25457e652ab66e0b8946a54bcd5951f0",
+            "manifestEntrySha256": "3a11009162ac4d68b656b78a7048eb1f1b49fcd7f07ae837db79f431faafa247",
+            "sourceCommitSha": "d9e461c6aed02cc61b75465b8bcace3e6cc80aa7"
+          }
+        ],
+        "catalog": {
+          "tables": 6,
+          "explicitIndexes": 8,
+          "constraintIndexes": 7,
+          "triggers": 0,
+          "triggerFunctions": 0,
+          "foreignKeys": 0,
+          "controlSeedRows": 0,
+          "businessRows": 0
+        },
+        "artifact": {
+          "id": 13673235808,
+          "url": "https://github.com/wanghuinet/luckread/actions/runs/42616370545/artifacts/13673235808",
+          "name": "neon-d1-05-remote-schema-postflight-42616370545",
+          "sha256": "sha256:bb1f57e70f855c363ded007c6e0dd0eab4cf9a6857b8cd69521e74441b3d500f"
+        },
+        "safety": {
+          "remoteNeonTouched": true,
+          "cloudflareD1Touched": false,
+          "businessDataImported": false,
+          "runtimeBindingsChanged": false,
+          "runtimeDataIngestionEnabled": false,
+          "productionCutoverAuthorized": false
+        },
+        "runtimeAdmissionBlockers": [
+          "Retention policy for event and aggregate classes is not admitted.",
+          "Deletion/privacy-request behavior for actor-linked and creator-linked analytics projections is not admitted.",
+          "Consent, lawful purpose and collection eligibility rules are not admitted."
+        ]
+      }
     }
   ],
   "businessDataImport": {
