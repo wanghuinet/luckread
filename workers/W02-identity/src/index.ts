@@ -7,12 +7,8 @@ import { runScheduledPublicationTicks } from './auth/scheduled-publication.js'
 import { createD1RoleLayerStore, resolveLayerForSubject } from './authz/role-layer-store.js'
 import { grantCreatorBusinessRole, RoleAssignmentCommandError } from './authz/role-assignment-command.js'
 import { mayApproveRoleGrant } from './authz/role-grant-approval-policy.js'
-import {
-  AccountStateTransitionError,
-  applyAccountStateTransition,
-  authorizeAccountStateTransition,
-  type AccountState,
-} from './account/account-state-transition.js'
+import { AccountStateTransitionError, type AccountState } from './account/account-state-transition.js'
+import { createD1AccountStateTransitionStore } from './account/account-state-transition-store.js'
 import { resolveBetterAuthPrincipal } from './auth/principal.js'
 import { handleCurrentUserSessionList } from './auth/session-list.js'
 import { handleCurrentUserSessionRevoke } from './auth/session-revoke.js'
@@ -86,20 +82,12 @@ export default {
       }
 
       try {
-        const authorization = await authorizeAccountStateTransition(env.D1_01, {
+        const result = await createD1AccountStateTransitionStore(env.D1_01).transition({
           subjectId: body.subjectId,
           targetUserId: body.targetUserId,
           to: body.to as AccountState,
-        })
-
-        const result = await applyAccountStateTransition(env.D1_01, {
-          userId: body.targetUserId,
-          to: body.to as AccountState,
           reason: body.reason,
           expectedVersion: body.expectedVersion as number,
-          actor: authorization.actor,
-          permission: authorization.permission,
-          approvalLevel: authorization.approvalLevel,
         })
 
         return json({
