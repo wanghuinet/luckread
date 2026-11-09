@@ -49,7 +49,7 @@
         "workers/W07-subscription-commerce/migrations",
         "workers/W08-creator/migrations"
       ],
-      "status": "PARTIAL_W01_PAYLOAD_SCHEMA_VERIFIED_REMOTE_APPLY_PENDING",
+      "status": "ALL_FOUR_OWNERS_FULL_POSTGRES18_REHEARSAL_PASSED_REMOTE_APPLY_PENDING",
       "sourceInventoryContract": "contracts/database/neon-d1-01-schema-sources.v1.json",
       "sourceInventoryWorkflow": ".github/workflows/neon-d1-01-schema-source-inventory.yml",
       "schemaVerificationEvidence": {
@@ -66,13 +66,12 @@
       },
       "remoteSchemaApplied": false,
       "completedSchemaOwners": [
-        "W01-Payload"
-      ],
-      "pendingSchemaOwners": [
+        "W01-Payload",
         "W02-Better-Auth-and-custom-identity",
         "W07-D1-01-subscriptions",
         "W08-Creator"
       ],
+      "pendingSchemaOwners": [],
       "localSchemaRehearsalProgress": {
         "W02": {
           "schemaContract": "contracts/database/neon-d1-01-w02-identity-schema.v1.json",
@@ -92,6 +91,42 @@
           "remoteSchemaApplied": false,
           "businessDataImported": false,
           "productionCutoverAuthorized": false
+        }
+      },
+      "fullLocalSchemaRehearsalEvidence": {
+        "status": "D1_01_FULL_LOCAL_POSTGRES18_REHEARSAL_PASS",
+        "workflowRunId": 42460599618,
+        "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42460599618",
+        "sourceCommitSha": "85699257af0c24f3dea336dd66600d94425047f9",
+        "currentMainSourcePinCheck": {
+          "reviewedFiles": 14,
+          "matchedFiles": 14,
+          "mismatchedFiles": 0,
+          "currentMainSha": "d1ffe805ffe5580ffc20aec5eb67e8d307f3a51b"
+        },
+        "postgresMajor": 18,
+        "database": "luckread_schema",
+        "manifestEntries": 14,
+        "ownerWorkers": [
+          "W01",
+          "W02",
+          "W07",
+          "W08"
+        ],
+        "tableCount": 35,
+        "foreignKeyCount": 17,
+        "crossOwnerForeignKeys": 0,
+        "ledgerRows": 14,
+        "payloadMigrationRows": 1,
+        "businessRows": 0,
+        "businessDataImported": false,
+        "remoteNeonConnectionAttempted": false,
+        "productionD1Touched": false,
+        "productionCutoverAuthorized": false,
+        "evidenceArtifact": {
+          "id": 13609582055,
+          "url": "https://github.com/wanghuinet/luckread/actions/runs/42460599618/artifacts/13609582055",
+          "sha256": "sha256:73d32e6572aa9dbc79ec31f61e65a7709aa4d4174bf56956af4fb902cfa747ff"
         }
       }
     },
