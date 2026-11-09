@@ -793,7 +793,7 @@ try {
     {
       method: 'POST',
       headers: {
-        cookie: enrollmentCookieHeader,
+        cookie: cookieHeader,
         origin: 'https://luckread.com',
         'content-type': 'application/json',
         'X-LuckRead-Caller': 'W01',
