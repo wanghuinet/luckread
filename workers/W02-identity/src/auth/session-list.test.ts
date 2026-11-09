@@ -10,6 +10,7 @@ vi.mock('./better-auth.js', () => ({
 
 import type { BetterAuthEnv } from './better-auth.js'
 import { handleCurrentUserSessionList } from './session-list.js'
+import type { SessionListStore } from './session-list-store.js'
 
 const request = (body: unknown) => new Request('https://luckread-w02.internal/internal/auth/session/list', {
   method: 'POST',
@@ -100,6 +101,30 @@ describe('W02 bounded session list', () => {
     expect(env.AUTH_SESSION_READ_LIMITER?.limit).toHaveBeenNthCalledWith(2, {
       key: 'auth010:session-list:endpoint',
     })
+  })
+
+  it('uses an explicitly injected persistence store without reaching into D1', async () => {
+    const db = makeDatabase()
+    const env = makeEnv(db.database)
+    const store: SessionListStore = {
+      list: vi.fn().mockResolvedValue({
+        permissionGranted: true,
+        rows: [row('postgres-session-1', '2026-11-09T14:00:00.000Z')],
+      }),
+    }
+
+    const response = await handleCurrentUserSessionList(env, request({ limit: 10 }), store)
+    const payload = await response.json() as { items: Array<{ sessionId: string }> }
+
+    expect(response.status).toBe(200)
+    expect(payload.items.map((item) => item.sessionId)).toEqual(['postgres-session-1'])
+    expect(store.list).toHaveBeenCalledWith({
+      userId: 'user-1',
+      now: expect.any(String),
+      limit: 10,
+      cursor: null,
+    })
+    expect(db.prepare).not.toHaveBeenCalled()
   })
 
   it('uses the decoded cursor in the keyset predicate and bounds the look-ahead query', async () => {
