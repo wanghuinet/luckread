@@ -1,5 +1,8 @@
 import type { Pool, PoolClient } from 'pg'
 
+import type { MfaAuditOperationReceiptStore } from '../auth/mfa-audit-operation-receipt-store.js'
+import { reconcileMfaAuditOperationReceiptsPostgres } from './mfa-audit-operation-receipt-reconciler-postgres.js'
+
 
 import {
   mergeMfaAuditReceiptPlan,
@@ -299,8 +302,6 @@ export async function finalizeMfaAuditOperationReceiptPostgres(
 }
 
 
-import type { MfaAuditOperationReceiptStore } from '../auth/mfa-audit-operation-receipt-store.js'
-import { reconcileMfaAuditOperationReceiptsPostgres } from './mfa-audit-operation-receipt-reconciler-postgres.js'
 
 /** PostgreSQL adapter over the existing AUTH-007 durable receipt and journal contract. */
 export function createPostgresMfaAuditOperationReceiptStore(pool: Pool): MfaAuditOperationReceiptStore {
