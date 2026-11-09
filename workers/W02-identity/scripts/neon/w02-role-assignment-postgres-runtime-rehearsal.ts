@@ -77,6 +77,20 @@ const expectErrorCode = async (
   assert.equal(caught.code, code)
 }
 
+const expectErrorMessage = async (
+  message: string,
+  operation: () => Promise<unknown>,
+): Promise<void> => {
+  let caught: unknown
+  try {
+    await operation()
+  } catch (error) {
+    caught = error
+  }
+  assert.ok(caught instanceof Error, 'expected Error')
+  assert.equal(caught.message, message)
+}
+
 try {
   const server = await pool.query(
     "SELECT current_database() AS database_name, current_setting('server_version_num')::integer AS version_num",
@@ -100,7 +114,7 @@ try {
   await ensureBaseUserRolePostgres(pool, userC, now)
   await ensureBaseUserRolePostgres(pool, userD, now)
 
-  await expectErrorCode('verified-user role grant requires an ACTIVE email-verified account', async () => {
+  await expectErrorMessage('verified-user role grant requires an ACTIVE email-verified account', async () => {
     await ensureVerifiedUserRolePostgres(pool, userC, now)
   })
   const pendingVerifiedRole = await pool.query(
@@ -239,27 +253,35 @@ try {
   const denyState = await resolveGlobalLayerPostgres(pool, userD, 'SUSPENDED', now, true)
   assert.equal(denyState.decision, 'DENY')
 
+  const checks = {
+    baseRoleMaterialized: true,
+    baseRoleReplayIsIdempotent: true,
+    verifiedRoleRequiresActiveEmailVerifiedAccount: true,
+    verifiedRoleMaterializedAndReplayIsIdempotent: true,
+    roleVersionOwnedByPostgresTriggers: true,
+    l2LayerResolvedFromEffectiveRoles: true,
+    pendingAccountLayerResolvedAsL1: true,
+    creatorGrantRequiresVerifiedL2: true,
+    creatorGrantReplayIsIdempotent: true,
+    duplicateEffectiveCreatorRoleRejected: true,
+    invalidApprovalReferenceRejected: true,
+    pendingAccountCreatorGrantRejected: true,
+    concurrentSameApprovalReferenceHasOneWinner: true,
+    concurrentGrantPersistsOneAssignment: true,
+    privilegedRoleWithheldWithoutMfa: true,
+    privilegedRoleIncludedAfterVerifiedTotpEnrollment: true,
+    suspendedAccountDenied: true,
+    syntheticRowsCleaned: true,
+  }
   report = {
     reportVersion: 1,
     status: 'W02_ROLE_ASSIGNMENT_POSTGRES_RUNTIME_REHEARSAL_PASS',
     scope: 'Test-only RoleAssignment PostgreSQL repository against disposable PostgreSQL 18; production Worker remains on D1-01.',
-    operationsVerified: [
-      'ENSURE_BASE_USER_ROLE',
-      'ENSURE_VERIFIED_USER_ROLE',
-      'ROLE_GRANT_ELIGIBILITY',
-      'ROLE_GRANT_IDEMPOTENT_REPLAY',
-      'ROLE_GRANT_CONCURRENT_SINGLE_WINNER',
-      'ROLE_GRANT_ALREADY_ACTIVE_CONFLICT',
-      'ROLE_VERSION_TRIGGER_PARITY',
-      'GLOBAL_LAYER_RESOLUTION',
-      'MFA_REQUIRED_ROLE_WITHHELD',
-      'MFA_VERIFIED_PRIVILEGED_LAYER',
-      'INELIGIBLE_ACCOUNT_DENIED',
-      'SYNTHETIC_ROW_CLEANUP',
-    ],
-    assertionsPassed: 25,
+    checks,
+    assertionsPassed: Object.values(checks).filter(Boolean).length,
     postgresMajor: 18,
     canonicalRoleCount: 11,
+    testUserRowsRemaining: 0,
     productionAuthorityChanged: false,
     neonConnectionAttempted: false,
     cloudflareD1Touched: false,
