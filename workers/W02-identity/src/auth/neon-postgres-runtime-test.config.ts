@@ -10,6 +10,7 @@
  */
 import { Pool } from 'pg'
 
+import { activateEmailVerifiedAccountPostgres } from '../neon/email-verification-activation-postgres.js'
 import { ensureBaseUserRolePostgres } from '../neon/role-assignment-postgres.js'
 
 import {
@@ -44,12 +45,16 @@ const rehearsalEnvironment = {
   CLOUDFLARE_ENV: 'development',
 } satisfies BetterAuthEnv
 
+export const postgresLifecycleAdapters = {
+  afterUserCreated: (userId: string) => ensureBaseUserRolePostgres(postgresPool, userId),
+  afterEmailVerified: (userId: string, now?: string) =>
+    activateEmailVerifiedAccountPostgres(postgresPool, userId, now),
+}
+
 export const auth = buildLuckReadAuth(
   rehearsalEnvironment,
   postgresPool,
   'postgres-rehearsal',
   undefined,
-  {
-    afterUserCreated: (userId) => ensureBaseUserRolePostgres(postgresPool, userId),
-  },
+  postgresLifecycleAdapters,
 )
