@@ -143,11 +143,16 @@ type BetterAuthDatabase = NonNullable<Parameters<typeof betterAuth>[0]['database
 
 export type BetterAuthPersistenceProfile = 'production' | 'postgres-rehearsal'
 
+export type BetterAuthPostgresLifecycleAdapters = {
+  afterUserCreated: (userId: string) => Promise<void>
+}
+
 export const buildLuckReadAuth = (
   env: BetterAuthEnv,
   database: BetterAuthDatabase = env.D1_01 as BetterAuthDatabase,
   persistenceProfile: BetterAuthPersistenceProfile = 'production',
   mfaFactorStateStore: MfaFactorStateStore = createD1MfaFactorStateStore(env.D1_01),
+  postgresLifecycleAdapters?: BetterAuthPostgresLifecycleAdapters,
 ) => {
   const postgresRehearsal = persistenceProfile === 'postgres-rehearsal'
   // Keep local origins available only to the local evidence/runtime profile.
@@ -486,35 +491,47 @@ export const buildLuckReadAuth = (
         },
       }),
     },
-    ...(postgresRehearsal ? {} : { databaseHooks: {
-      user: {
-        create: {
-          after: async (user) => {
-            await ensureBaseUserRole(env.D1_01, String(user.id), new Date().toISOString())
+    ...(postgresRehearsal
+      ? (postgresLifecycleAdapters ? {
+          databaseHooks: {
+            user: {
+              create: {
+                after: async (user) => {
+                  await postgresLifecycleAdapters.afterUserCreated(String(user.id))
+                },
+              },
+            },
           },
-        },
-        update: {
-          after: async (user) => {
-            const userId = String(user.id)
-            const pendingMfaEnrollment = await env.D1_01.prepare(
-              'SELECT id FROM "user" WHERE id = ? AND two_factor_enabled = 1 AND mfa_enrolled_at IS NULL LIMIT 1',
-            ).bind(userId).first<{ id: string }>()
-            if (!pendingMfaEnrollment) return
+        } : {})
+      : { databaseHooks: {
+          user: {
+            create: {
+              after: async (user) => {
+                await ensureBaseUserRole(env.D1_01, String(user.id), new Date().toISOString())
+              },
+            },
+            update: {
+              after: async (user) => {
+                const userId = String(user.id)
+                const pendingMfaEnrollment = await env.D1_01.prepare(
+                  'SELECT id FROM "user" WHERE id = ? AND two_factor_enabled = 1 AND mfa_enrolled_at IS NULL LIMIT 1',
+                ).bind(userId).first<{ id: string }>()
+                if (!pendingMfaEnrollment) return
 
-            // The reviewed D1 lifecycle triggers are authoritative and revoke
-            // sessions on every enable/disable transition. This hook is a fallback
-            // for a legacy or partially migrated row with a missing enrollment time.
-            const enrolledAt = new Date().toISOString()
-            await env.D1_01.batch([
-              env.D1_01.prepare(
-                'UPDATE "user" SET mfa_enrolled_at = ? WHERE id = ? AND two_factor_enabled = 1 AND mfa_enrolled_at IS NULL',
-              ).bind(enrolledAt, userId),
-              env.D1_01.prepare('DELETE FROM "session" WHERE user_id = ?').bind(userId),
-            ])
+                // The reviewed D1 lifecycle triggers are authoritative and revoke
+                // sessions on every enable/disable transition. This hook is a fallback
+                // for a legacy or partially migrated row with a missing enrollment time.
+                const enrolledAt = new Date().toISOString()
+                await env.D1_01.batch([
+                  env.D1_01.prepare(
+                    'UPDATE "user" SET mfa_enrolled_at = ? WHERE id = ? AND two_factor_enabled = 1 AND mfa_enrolled_at IS NULL',
+                  ).bind(enrolledAt, userId),
+                  env.D1_01.prepare('DELETE FROM "session" WHERE user_id = ?').bind(userId),
+                ])
+              },
+            },
           },
-        },
-      },
-    } }),
+        } }),
     user: {
       // The checked-in D1 schema deliberately uses snake_case columns.
       // Map Better Auth's camelCase core fields to those exact column names.
