@@ -16,7 +16,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: neon-w01-payload-schema-${{ github.event.pull_request.number }}
+  group: neon-w01-payload-schema-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
   cancel-in-progress: false
 
 jobs:
