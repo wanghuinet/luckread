@@ -3,9 +3,9 @@
   "$id": "https://luckread.com/contracts/database/neon-d1-05-remote-runner-review.v1.json",
   "title": "LuckRead D1-05 Schema-Only Remote Runner Review and Release",
   "version": "1.0.0",
-  "status": "REMOTE_SCHEMA_ONLY_PROVISIONING_PENDING_REVIEW",
+  "status": "D1_05_SCHEMA_ONLY_REMOTE_PROVISIONING_APPROVED",
   "repository": "wanghuinet/luckread",
-  "schemaOnlyRemoteApplyReady": false,
+  "schemaOnlyRemoteApplyReady": true,
   "remoteApplyReady": false,
   "runtimeDataIngestionEnabled": false,
   "target": {
@@ -36,23 +36,130 @@
     "runtimeBindingChangeAllowed": false
   },
   "review": {
-    "reviewer": "PENDING",
-    "reviewType": "PENDING_SOURCE_PINNED_CODE_PATH_AUDIT",
-    "reviewedAt": null,
-    "reviewedMainSha": null,
-    "implementationMergeSha": null,
-    "result": "PENDING",
+    "reviewer": "GPT-6",
+    "reviewType": "SCOPED_REMOTE_CODE_PATH_AUDIT_AND_CURRENT_MAIN_SOURCE_PIN_RECONCILIATION",
+    "reviewedAt": "2026-11-09",
+    "reviewedMainSha": "7021c141af33c42bc3412386e12b23fe0991cc7d",
+    "implementationMergeSha": "7021c141af33c42bc3412386e12b23fe0991cc7d",
+    "result": "NO_BLOCKING_FINDINGS",
     "findings": [],
     "formalGitHubReviewSubmissions": 0,
-    "reviewedFiles": [],
+    "reviewedFiles": [
+      {
+        "path": ".github/workflows/neon-d1-05-reviewed-schema-only-apply.yml",
+        "gitBlobSha1": "a5cc8dea041cf00f7dd89fcd2b566f99850b7a9a"
+      },
+      {
+        "path": "scripts/neon/d1-05/remote-schema-runner.mjs",
+        "gitBlobSha1": "2b8eb5b87af9accecb9af2aa5780b235fafd5966"
+      },
+      {
+        "path": "scripts/neon/d1-05/assert-remote-apply-release.mjs",
+        "gitBlobSha1": "dcbb208de2135523f6c31240d9cdb11af6f573b4"
+      },
+      {
+        "path": "scripts/neon/d1-05/remote-runner-review.mjs",
+        "gitBlobSha1": "86d25bf3ee123dd32c1b778fcca4afff9f5b2e35"
+      },
+      {
+        "path": "scripts/neon/d1-05/remote-schema-runner.test.mjs",
+        "gitBlobSha1": "e1f61cc2ace44333072f616bf3a4311339a06932"
+      },
+      {
+        "path": "scripts/neon/d1-05/remote-runner-review.test.mjs",
+        "gitBlobSha1": "4d7c0001bb520a3d4443a4da7127c6d346736427"
+      },
+      {
+        "path": "contracts/database/neon-d1-05-shared-migration-manifest.v1.json",
+        "gitBlobSha1": "8c4759f1d2f3f06228c0baebcad410514d02b75b"
+      },
+      {
+        "path": "contracts/database/neon-d1-05-w11-analytics-schema.v1.json",
+        "gitBlobSha1": "949a5c80a3ed56a73b66bebcc0849d6875c065a6"
+      },
+      {
+        "path": "contracts/database/neon-d1-05-shared-runner-independent-review.v1.json",
+        "gitBlobSha1": "4a24a51fa20a99be235e5d8212a461fcd3d86f28"
+      },
+      {
+        "path": "scripts/neon/shared-domain-schema-runner.mjs",
+        "gitBlobSha1": "53706e33929da41f331acf3892d223d341762817"
+      },
+      {
+        "path": "scripts/neon/shared-domain-schema-runner.test.mjs",
+        "gitBlobSha1": "4620c1ce0e35ae97605d76d02b7140c0600f9857"
+      },
+      {
+        "path": "scripts/neon/d1-01/0001_schema_migration_ledger.sql",
+        "gitBlobSha1": "b8cdec415ee4106d0b0618197b12b61d8656a2c9"
+      },
+      {
+        "path": "workers/W11-growth-campaign-analytics-operations/src/neon-postgres-migrations-d1-05/0001_w11_d1_05_analytics_schema.sql",
+        "gitBlobSha1": "020f05b82b13ad9541825b19ede2e24e16537384"
+      },
+      {
+        "path": "workers/W11-growth-campaign-analytics-operations/scripts/neon/generate-d1-05-w11-postgres-migration.mjs",
+        "gitBlobSha1": "0254a4396adf3dcbfa66ba4f7fefbc954935f26f"
+      },
+      {
+        "path": "workers/W11-growth-campaign-analytics-operations/scripts/neon/generate-d1-05-w11-postgres-migration.test.mjs",
+        "gitBlobSha1": "839d0cba87252598b668e32dc24b11153da0289e"
+      },
+      {
+        "path": "workers/W11-growth-campaign-analytics-operations/scripts/neon/templates/d1-05-w11-analytics-postgres.sql",
+        "gitBlobSha1": "020f05b82b13ad9541825b19ede2e24e16537384"
+      },
+      {
+        "path": "workers/W11-growth-campaign-analytics-operations/scripts/neon/verify-d1-05-w11-postgres-schema.sql",
+        "gitBlobSha1": "7e0c6dac6801a4a9f71f94db0053ef382f977bf7"
+      },
+      {
+        "path": "contracts/transport/d1-05-analytics-owner-boundary.v1.json",
+        "gitBlobSha1": "ec4e6ced8adc76b1a11b6d92b9c72fe1dc3c1e40"
+      },
+      {
+        "path": "workers/W11-growth-campaign-analytics-operations/wrangler.jsonc",
+        "gitBlobSha1": "7df80ec418aa46bb2ba09fa9252c88138d00ceaf"
+      },
+      {
+        "path": "workers/W11-growth-campaign-analytics-operations/migrations/0001_analytics_projection.sql",
+        "gitBlobSha1": "e957128a506ec21a1fa30c92ea062cc15dc83c23"
+      },
+      {
+        "path": "workers/W11-growth-campaign-analytics-operations/migrations/0002_analytics_projection_rebuild_state.sql",
+        "gitBlobSha1": "b4935dd6927c4410bc950744f2f7126f3ed9c076"
+      },
+      {
+        "path": "workers/W11-growth-campaign-analytics-operations/migrations/0003_analytics_late_event_replay.sql",
+        "gitBlobSha1": "699f0f63cbef1a6a98e7163362e22d6fd9c6324d"
+      },
+      {
+        "path": "workers/W11-growth-campaign-analytics-operations/migrations/0004_analytics_w01_client_telemetry.sql",
+        "gitBlobSha1": "d265bbb7b3eb8e56c5b9fd3c5a947d17d7f53db3"
+      },
+      {
+        "path": "docs/change-control/CC-NEON-D1-05-EMPTY-SCHEMA-ONLY-PROVISIONING-2026-11-09.md",
+        "gitBlobSha1": "bae1726eb02587b826ec780fc3421f92027cca4c"
+      }
+    ],
     "limitations": [
-      "Remote schema provisioning is limited to empty D1-05 schema objects and one append-only migration ledger row.",
-      "This release does not admit runtime telemetry collection, user/event data import, analytics ingestion, Worker binding changes or production cutover.",
-      "The release review must be a source-pinned code-path audit, not represented as a human GitHub APPROVE review."
+      "This is an automated GPT-6 code-path audit and source-pin reconciliation, not a human GitHub APPROVE review.",
+      "Remote schema provisioning requires a manual workflow_dispatch on main with the exact confirmation token; no unattended remote DDL is permitted.",
+      "Runtime data ingestion remains blocked pending separate D1-05 retention, deletion/privacy and consent/lawful-purpose policy admission.",
+      "PostgreSQL SQL cannot read the Cloudflare D1 control-plane UUID; the remote guard pins the database name, Neon endpoint class, PostgreSQL 18 and full TLS, while the canonical D1 UUID remains pinned in owner-boundary and manifest contracts."
     ]
   },
   "verificationEvidence": {
-    "releaseValidation": null
+    "releaseValidation": {
+      "runId": 42564556552,
+      "conclusion": "success",
+      "headSha": "8c98a141ed3a3b63cd299cc3319b275282c8daf2",
+      "validationScope": "D1_05_SCHEMA_ONLY_REMOTE_RUNNER_VALIDATION_NO_NEON_CREDENTIALS",
+      "url": "https://github.com/wanghuinet/luckread/actions/runs/42564556552",
+      "remoteApplyJob": "skipped",
+      "artifactId": 13650638321,
+      "artifactDigest": "sha256:baa1658be4b121c6e38666b9951b00a4c7df6c1c7b064b28c4cb392eb8834ce4"
+    }
   },
   "runtimeAdmissionBlockers": [
     "Retention policy for event and aggregate classes is not admitted.",
@@ -72,6 +179,7 @@
     "newServiceBindings": 0
   },
   "businessDataImport": false,
+  "runtimeDataIngestionEnabled": false,
   "productionCutoverAuthorized": false,
   "exactConfirmationRequired": "APPLY_REVIEWED_SCHEMA_D1_05_ALLLUCK_SCHEMA_ONLY"
 }
