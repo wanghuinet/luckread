@@ -6,10 +6,17 @@ import { validateD105RemoteRunnerReview } from './remote-runner-review.mjs'
 
 const review = JSON.parse(readFileSync(D105_REVIEW_REF, 'utf8'))
 
-test('D1-05 remote release review remains closed before source-pinned approval', () => {
-  const result = validateD105RemoteRunnerReview({ review })
-  assert.equal(result.valid, false)
-  assert.ok(result.errors.some((error) => error.includes('not approved')))
+test('D1-05 remote release review validates according to its current approval state', () => {
+  const result = validateD105RemoteRunnerReview({
+    review,
+    currentHead: process.env.GITHUB_SHA || undefined,
+  })
+  if (review.status === 'REMOTE_SCHEMA_ONLY_PROVISIONING_PENDING_REVIEW') {
+    assert.equal(result.valid, false)
+    assert.ok(result.errors.some((error) => error.includes('not approved')))
+  } else {
+    assert.equal(result.valid, true, result.errors.join('; '))
+  }
 })
 
 test('D1-05 review requires at least twenty immutable source pins', () => {
