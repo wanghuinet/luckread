@@ -146,10 +146,13 @@ describe('W02 MFA enrollment-start authority', () => {
   })
 
   it('uses an injected PostgreSQL-compatible store and Better Auth instance without touching D1', async () => {
+    const reserve = vi.fn(async (_input: Parameters<MfaEnrollmentStartStore['reserve']>[0]) => true)
+    const recordFailure = vi.fn(async (_event: Parameters<MfaEnrollmentStartStore['recordFailure']>[0]) => undefined)
+    const releaseReservationIfNoFactor = vi.fn(async (_userId: string, _keyHash: string) => undefined)
     const store: MfaEnrollmentStartStore = {
-      reserve: vi.fn(async () => true),
-      recordFailure: vi.fn(async () => undefined),
-      releaseReservationIfNoFactor: vi.fn(async () => undefined),
+      reserve,
+      recordFailure,
+      releaseReservationIfNoFactor,
     }
     const auth = createLuckReadAuth({} as BetterAuthEnv)
     const resolvePrincipal = vi.fn(async () => ({
@@ -158,15 +161,15 @@ describe('W02 MFA enrollment-start authority', () => {
     }))
     const response = await handleMfaEnrollmentStartRequest({
       AUTH_SESSION_WRITE_LIMITER: mocks.limiter,
-    } as BetterAuthEnv, makeRequest(), {
+    } as unknown as BetterAuthEnv, makeRequest(), {
       auth,
       store,
       resolvePrincipal,
     })
 
     expect(response.status).toBe(200)
-    expect(store.reserve).toHaveBeenCalledTimes(1)
-    const reservation = store.reserve.mock.calls[0]?.[0]
+    expect(reserve).toHaveBeenCalledTimes(1)
+    const reservation = reserve.mock.calls[0]?.[0]
     expect(reservation?.userId).toBe(principal.userId)
     expect(reservation?.keyHash).toMatch(/^[a-f0-9]{64}$/)
     expect(reservation?.event).toMatchObject({
@@ -178,8 +181,8 @@ describe('W02 MFA enrollment-start authority', () => {
         factorState: 'PENDING_VERIFICATION',
       },
     })
-    expect(store.recordFailure).not.toHaveBeenCalled()
-    expect(store.releaseReservationIfNoFactor).not.toHaveBeenCalled()
+    expect(recordFailure).not.toHaveBeenCalled()
+    expect(releaseReservationIfNoFactor).not.toHaveBeenCalled()
     expect(resolvePrincipal).toHaveBeenCalledTimes(1)
     expect(mocks.handler).toHaveBeenCalledTimes(1)
   })
