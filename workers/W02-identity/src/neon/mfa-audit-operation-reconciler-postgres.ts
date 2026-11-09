@@ -248,7 +248,7 @@ export async function reconcileMfaAuditOperationReceiptsPostgres(
         if (['EMITTED', 'RESOLVED'].includes(latest.rows[0]?.status ?? '')) continue
       }
 
-      const delay = retryDelaySeconds(Number(receiptIds.length ? 0 : 0) + 0)
+      const delay = retryDelaySeconds(row.attempt)
       await pool.query(
         "UPDATE auth_007_mfa_operation_receipts SET attempt = attempt + 1, " +
           'next_attempt_at = $1, last_error_code = $2 ' +
