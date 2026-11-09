@@ -266,7 +266,7 @@ export const buildLuckReadAuth = (
         let receiptId: string
         if (isEnrollmentConfirmation) {
           try {
-            await effectiveMfaAuditReceiptStore.assertOwner({
+            await effectiveMfaAuditReceiptStore!.assertOwner({
               receiptId: suppliedReceiptId as string,
               userId: subjectId,
               operationPath: '/two-factor/verify-totp',
@@ -283,7 +283,7 @@ export const buildLuckReadAuth = (
           try {
             // Persist the secret-free intent before Better Auth can change MFA
             // state. If this fails, the operation is not allowed to proceed.
-            receiptId = await effectiveMfaAuditReceiptStore.create({
+            receiptId = await effectiveMfaAuditReceiptStore!.create({
               userId: subjectId,
               operationPath: ctx.path as
                 | '/two-factor/verify-totp'
@@ -319,7 +319,7 @@ export const buildLuckReadAuth = (
         const accountActive = await mfaFactorStateStore.isActiveSubject(subjectId)
         if (!accountActive) {
           if (!isEnrollmentConfirmation) {
-            await finalizeKnownMfaRejection(effectiveMfaAuditReceiptStore, receiptId,
+            await finalizeKnownMfaRejection(effectiveMfaAuditReceiptStore!, receiptId,
               isChallenge ? [{
                 eventType: 'auth.mfa.challenge_failed',
                 result: 'failed',
@@ -351,7 +351,7 @@ export const buildLuckReadAuth = (
         if (match.kind === 'invalid') return
         if (match.kind === 'ambiguous') {
           if (!isEnrollmentConfirmation) {
-            await finalizeKnownMfaRejection(effectiveMfaAuditReceiptStore, receiptId,
+            await finalizeKnownMfaRejection(effectiveMfaAuditReceiptStore!, receiptId,
               isChallenge ? [{
                 eventType: 'auth.mfa.challenge_failed',
                 result: 'failed',
@@ -368,7 +368,7 @@ export const buildLuckReadAuth = (
           // The TOTP was valid but its monotonically increasing step was already
           // accepted. Persist the rejection before returning the auth failure.
           try {
-            await effectiveMfaAuditReceiptStore.append(receiptId, {
+            await effectiveMfaAuditReceiptStore!.append(receiptId, {
               eventType: 'auth.mfa.replay_rejected',
               result: 'rejected',
               reasonCode: 'TOTP_STEP_ALREADY_ACCEPTED',
@@ -380,7 +380,7 @@ export const buildLuckReadAuth = (
             // durable audit plan here instead of depending on an after hook that
             // may not run when the hook itself throws.
             if (!isEnrollmentConfirmation) {
-              await finalizeKnownMfaRejection(effectiveMfaAuditReceiptStore, receiptId, [])
+              await finalizeKnownMfaRejection(effectiveMfaAuditReceiptStore!, receiptId, [])
             }
           } catch {
             throw APIError.from('INTERNAL_SERVER_ERROR', {
@@ -441,7 +441,7 @@ export const buildLuckReadAuth = (
         try {
           // Persist the terminal outcome before trying the ordinary outbox.
           // A failed outbox insert leaves READY work for the existing W02 Cron.
-          await finalizeMfaAuditOperationReceiptWithRetry(effectiveMfaAuditReceiptStore, state.receiptId, outcomes)
+          await finalizeMfaAuditOperationReceiptWithRetry(effectiveMfaAuditReceiptStore!, state.receiptId, outcomes)
         } catch {
           // Do not turn a completed MFA mutation into a misleading failure:
           // the durable STARTED receipt will be surfaced as UNKNOWN if recovery
@@ -454,7 +454,7 @@ export const buildLuckReadAuth = (
         }
 
         try {
-          await effectiveMfaAuditReceiptStore.reconcile()
+          await effectiveMfaAuditReceiptStore!.reconcile()
         } catch {
           // The receipt is already durable; the scheduled publisher retries it.
           console.error(JSON.stringify({
