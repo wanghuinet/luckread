@@ -18,6 +18,7 @@ vi.mock('./better-auth.js', () => ({
 }))
 
 import { createLuckReadAuth, type BetterAuthEnv } from './better-auth.js'
+import type { SessionLogoutStoreInput } from './session-logout-store.js'
 import { handleCurrentUserSessionLogout } from './session-logout.js'
 
 const makeRequest = () => new Request(
@@ -124,7 +125,7 @@ describe('W02 authenticated current-session logout', () => {
       },
     } as unknown as BetterAuthEnv
     const store = {
-      logout: vi.fn().mockResolvedValue({ status: 'REVOKED' as const }),
+      logout: vi.fn(async (_input: SessionLogoutStoreInput) => ({ status: 'REVOKED' as const })),
     }
     const getSession = vi.fn().mockResolvedValue({
       user: { id: 'user-1' },
