@@ -3,7 +3,7 @@
   "$id": "https://luckread.com/contracts/database/neon-d1-02-combined-schema.v1.json",
   "title": "LuckRead D1-02 Combined W03 and W05 PostgreSQL 18 Schema Contract",
   "version": "1.0.0",
-  "status": "COMBINED_LOCAL_POSTGRES18_REHEARSAL_PASSED_REMOTE_APPLY_PENDING",
+  "status": "D1_02_SCHEMA_ONLY_REMOTE_APPLIED_RUNTIME_CUTOVER_PENDING",
   "target": {
     "domainId": "D1-02",
     "databaseName": "luckreadpro",
@@ -94,5 +94,43 @@
     "evidenceArtifactId": 13617648427,
     "evidenceArtifactName": "neon-d1-02-combined-postgres18-9b42ab42bb7e6d2ba188c28c7d2c6530b56c471e",
     "evidenceArtifactSha256": "6dc320b5fff134d6420fd879df58a10ad510c21d03d3d1e0f10a9693170bfc49"
+  },
+  "remoteSchemaApplicationEvidence": {
+    "status": "D1_02_REMOTE_SCHEMA_ONLY_APPLY_PASS",
+    "workflowRunId": 42559331989,
+    "workflowUrl": "https://github.com/wanghuinet/luckread/actions/runs/42559331989",
+    "event": "workflow_dispatch",
+    "branch": "main",
+    "sourceCommitSha": "92a8d3045c25c3eb83411cd041140edae42690ba",
+    "databaseName": "luckreadpro",
+    "databaseUuid": "6c342634-97f6-4248-9f4a-85772af4f22c",
+    "postgresMajor": 18,
+    "verifiedMigrations": 2,
+    "migrationOwners": [
+      "W03",
+      "W05"
+    ],
+    "catalog": {
+      "tables": 28,
+      "explicitIndexes": 63,
+      "triggers": 9,
+      "triggerFunctions": 10,
+      "foreignKeys": 0,
+      "snowflakeAllocatorRows": 1,
+      "businessRows": 0,
+      "d1_03EndpointTablePresent": false
+    },
+    "artifact": {
+      "id": 13649175665,
+      "url": "https://github.com/wanghuinet/luckread/actions/runs/42559331989/artifacts/13649175665",
+      "sha256": "sha256:1d3c0f197e8eb0d2f521db615b283fb164714840a2482ad508f345d3cc6cf5fe"
+    },
+    "safety": {
+      "remoteNeonTouched": true,
+      "cloudflareD1Touched": false,
+      "businessDataImported": false,
+      "runtimeBindingsChanged": false,
+      "productionCutoverAuthorized": false
+    }
   }
 }
