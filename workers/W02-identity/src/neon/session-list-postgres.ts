@@ -1,20 +1,21 @@
 import type { Pool } from 'pg'
 
 import type {
-  SessionListQuery,
-  SessionListRow,
+  SessionListCursor,
   SessionListStore,
+  SessionListStoreInput,
   SessionListStoreResult,
+  SessionListStoreRow,
 } from '../auth/session-list-store.js'
 
-type PostgresSessionRow = {
+type SessionListPostgresRow = {
   permissionGranted: boolean
   sessionId: string | null
-  createdAt: Date | string | null
-  expiresAt: Date | string | null
+  createdAt: string | null
+  expiresAt: string | null
 }
 
-function assertQuery(input: SessionListQuery): void {
+function assertInput(input: SessionListStoreInput): void {
   if (
     !input ||
     typeof input.userId !== 'string' ||
@@ -24,114 +25,114 @@ function assertQuery(input: SessionListQuery): void {
     !Number.isFinite(Date.parse(input.now)) ||
     new Date(input.now).toISOString() !== input.now ||
     !Number.isInteger(input.limit) ||
-    input.limit < 1 ||
-    input.limit > 50
+    input.limit < 2 ||
+    input.limit > 51
   ) {
-    throw new TypeError('invalid PostgreSQL session list query')
+    throw new TypeError('invalid PostgreSQL AUTH-010 session-list input')
   }
-  if (input.cursor && (
-    typeof input.cursor.createdAt !== 'string' ||
-    !Number.isFinite(Date.parse(input.cursor.createdAt)) ||
-    typeof input.cursor.sessionId !== 'string' ||
-    input.cursor.sessionId.length < 1 ||
-    input.cursor.sessionId.length > 128
-  )) {
-    throw new TypeError('invalid PostgreSQL session list cursor')
-  }
-}
 
-function toIso(value: Date | string | null): string | null {
-  if (value === null) return null
-  const date = value instanceof Date ? value : new Date(value)
-  if (!Number.isFinite(date.getTime())) throw new Error('invalid persisted session timestamp')
-  return date.toISOString()
+  const cursor: SessionListCursor | null = input.cursor
+  if (cursor && (
+    typeof cursor.createdAt !== 'string' ||
+    !Number.isFinite(Date.parse(cursor.createdAt)) ||
+    typeof cursor.sessionId !== 'string' ||
+    cursor.sessionId.length < 1 ||
+    cursor.sessionId.length > 128
+  )) {
+    throw new TypeError('invalid PostgreSQL AUTH-010 session-list cursor')
+  }
 }
 
 /**
- * PostgreSQL implementation of the AUTH-010 bounded session-list query.
- * It only reads sessions for the server-derived subject and rechecks the
- * effective base-user RoleAssignment in the same SQL statement.
+ * PostgreSQL-native read adapter for AUTH-010.
  *
- * This is a store adapter for disposable PostgreSQL rehearsal and future
- * staged runtime admission; the deployed Worker still defaults to D1.
+ * It mirrors the D1 query's keyset pagination and rechecks the authenticated
+ * subject's effective base-user RoleAssignment in the same statement. It
+ * returns no token, IP, user-agent, or cross-account session fields.
+ *
+ * This adapter is for disposable PostgreSQL rehearsal and future staged
+ * admission. The deployed W02 Worker still uses createD1SessionListStore.
  */
 export function createPostgresSessionListStore(pool: Pool): SessionListStore {
   return {
-    async list(input): Promise<SessionListStoreResult> {
-      assertQuery(input)
+    async list(input: SessionListStoreInput): Promise<SessionListStoreResult> {
+      assertInput(input)
 
-      const authorization = `
-        session_authority AS (
-          SELECT CASE WHEN EXISTS (
-            SELECT 1
-            FROM "user" AS account
-            INNER JOIN role_assignments AS assignment ON assignment.subject_id = account.id
-            WHERE account.id = $1
-              AND account.account_state IN ('PENDING_VERIFICATION', 'ACTIVE')
-              AND assignment.role_id = 'user'
-              AND assignment.scope_type = 'global'
-              AND assignment.scope_id IS NULL
-              AND assignment.status = 'ACTIVE'
-              AND assignment.valid_from <= $2
-              AND (assignment.valid_until IS NULL OR $3 < assignment.valid_until)
-          ) THEN TRUE ELSE FALSE END AS "permissionGranted"
-        )`
-      const sessions = input.cursor
-        ? `sessions AS (
-            SELECT id AS "sessionId", created_at AS "createdAt", expires_at AS "expiresAt"
-            FROM "session"
-            WHERE user_id = $4 AND expires_at > $5
-              AND (created_at < $6 OR (created_at = $7 AND id < $8))
-            ORDER BY created_at DESC, id DESC
-            LIMIT $9
-          )`
-        : `sessions AS (
-            SELECT id AS "sessionId", created_at AS "createdAt", expires_at AS "expiresAt"
-            FROM "session"
-            WHERE user_id = $4 AND expires_at > $5
-            ORDER BY created_at DESC, id DESC
-            LIMIT $6
-          )`
-      const sql = `WITH ${authorization}, ${sessions}
-        SELECT session_authority."permissionGranted",
-          sessions."sessionId", sessions."createdAt", sessions."expiresAt"
-        FROM session_authority
-        LEFT JOIN sessions ON TRUE
-        ORDER BY sessions."createdAt" DESC, sessions."sessionId" DESC`
+      const cursorPredicate = input.cursor
+        ? 'AND (created_at < $3 OR (created_at = $4 AND id < $5))'
+        : ''
+      const limitParameter = input.cursor ? '$6' : '$3'
       const values = input.cursor
         ? [
-            input.userId,
-            input.now,
-            input.now,
             input.userId,
             input.now,
             input.cursor.createdAt,
             input.cursor.createdAt,
             input.cursor.sessionId,
-            input.limit + 1,
+            input.limit,
           ]
-        : [
-            input.userId,
-            input.now,
-            input.now,
-            input.userId,
-            input.now,
-            input.limit + 1,
-          ]
+        : [input.userId, input.now, input.limit]
 
-      const result = await pool.query<PostgresSessionRow>(sql, values)
+      const result = await pool.query<SessionListPostgresRow>(
+        'WITH authorization_facts AS ( ' +
+          'SELECT EXISTS ( ' +
+            'SELECT 1 ' +
+            'FROM "user" AS account ' +
+            'INNER JOIN role_assignments AS assignment ON assignment.subject_id = account.id ' +
+            'WHERE account.id = $1 ' +
+              "AND account.account_state IN ('PENDING_VERIFICATION', 'ACTIVE') " +
+              "AND assignment.role_id = 'user' " +
+              "AND assignment.scope_type = 'global' " +
+              'AND assignment.scope_id IS NULL ' +
+              "AND assignment.status = 'ACTIVE' " +
+              'AND assignment.valid_from <= $2 ' +
+              'AND (assignment.valid_until IS NULL OR $2 < assignment.valid_until) ' +
+          ') AS "permissionGranted" ' +
+        '), sessions AS ( ' +
+          'SELECT id AS "sessionId", ' +
+            'to_char(created_at AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.US"Z"\') AS "createdAt", ' +
+            'to_char(expires_at AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.US"Z"\') AS "expiresAt" ' +
+          'FROM "session" ' +
+          'WHERE user_id = $1 AND expires_at > $2 ' +
+          'AND EXISTS (SELECT 1 FROM authorization_facts WHERE "permissionGranted" = TRUE) ' +
+          cursorPredicate + ' ' +
+          'ORDER BY created_at DESC, id DESC ' +
+          'LIMIT ' + limitParameter +
+        ') ' +
+        'SELECT authorization_facts."permissionGranted" AS "permissionGranted", ' +
+          'sessions."sessionId" AS "sessionId", ' +
+          'sessions."createdAt" AS "createdAt", ' +
+          'sessions."expiresAt" AS "expiresAt" ' +
+        'FROM authorization_facts LEFT JOIN sessions ON TRUE ' +
+        'ORDER BY sessions."createdAt" DESC NULLS LAST, sessions."sessionId" DESC NULLS LAST',
+        values,
+      )
+
+      if (result.rows.length === 0) {
+        throw new Error('AUTH010_POSTGRES_SESSION_LIST_EMPTY_AUTHORITY_RESULT')
+      }
+
       const permissionGranted = result.rows[0]?.permissionGranted === true
-      if (!permissionGranted) return { permissionGranted: false, rows: [] }
-
-      const rows: SessionListRow[] = result.rows.flatMap((row) => {
+      const rows = result.rows.flatMap((row): SessionListStoreRow[] => {
         if (typeof row.sessionId !== 'string' || row.sessionId.length === 0) return []
-        const createdAt = toIso(row.createdAt)
-        const expiresAt = toIso(row.expiresAt)
-        if (!createdAt || !expiresAt) return []
-        return [{ sessionId: row.sessionId, createdAt, expiresAt }]
+        if (
+          typeof row.createdAt !== 'string' ||
+          !Number.isFinite(Date.parse(row.createdAt)) ||
+          typeof row.expiresAt !== 'string' ||
+          !Number.isFinite(Date.parse(row.expiresAt))
+        ) {
+          throw new Error('AUTH010_POSTGRES_SESSION_LIST_TIMESTAMP_MISSING')
+        }
+        // Keep PostgreSQL microseconds intact: pg's default Date parser drops
+        // sub-millisecond precision and would make keyset cursors skip rows.
+        return [{
+          sessionId: row.sessionId,
+          createdAt: row.createdAt,
+          expiresAt: row.expiresAt,
+        }]
       })
 
-      return { permissionGranted: true, rows }
+      return { permissionGranted, rows }
     },
   }
 }
