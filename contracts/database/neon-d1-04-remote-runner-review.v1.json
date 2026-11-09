@@ -42,11 +42,11 @@
       },
       {
         "path": "scripts/neon/d1-04/remote-runner-review.mjs",
-        "gitBlobSha1": "bf3b544cba31b41f4eb8516c95b15622fd60662a"
+        "gitBlobSha1": "5a92288e0d5cbb8684f860aad10ca14cf6a0e0fa"
       },
       {
         "path": "scripts/neon/d1-04/remote-runner-review.test.mjs",
-        "gitBlobSha1": "29d965c27347852c6ea522cad214891553030b9f"
+        "gitBlobSha1": "af028433365bc9fe297db4c1d0c9bc06f6473b54"
       },
       {
         "path": "scripts/neon/d1-04/assert-remote-apply-release.mjs",
