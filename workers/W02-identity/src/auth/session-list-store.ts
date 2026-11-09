@@ -3,14 +3,14 @@ export type SessionListCursor = {
   sessionId: string
 }
 
-export type SessionListQuery = {
+export type SessionListStoreInput = {
   userId: string
   now: string
   limit: number
   cursor: SessionListCursor | null
 }
 
-export type SessionListRow = {
+export type SessionListStoreRow = {
   sessionId: string
   createdAt: string
   expiresAt: string
@@ -18,11 +18,17 @@ export type SessionListRow = {
 
 export type SessionListStoreResult = {
   permissionGranted: boolean
-  rows: SessionListRow[]
+  rows: SessionListStoreRow[]
 }
 
+/**
+ * Read-only persistence boundary for AUTH-010 current-user session listing.
+ * The handler authenticates the caller, checks rate limits and applies its
+ * response/cursor policy. Stores re-check the effective W02 base-user role
+ * and return only non-secret session metadata for the supplied subject.
+ */
 export interface SessionListStore {
-  list(input: SessionListQuery): Promise<SessionListStoreResult>
+  list(input: SessionListStoreInput): Promise<SessionListStoreResult>
 }
 
 type D1SessionListRow = {
@@ -32,7 +38,7 @@ type D1SessionListRow = {
   expiresAt: string | null
 }
 
-function assertQuery(input: SessionListQuery): void {
+function assertInput(input: SessionListStoreInput): void {
   if (
     !input ||
     typeof input.userId !== 'string' ||
@@ -41,10 +47,10 @@ function assertQuery(input: SessionListQuery): void {
     typeof input.now !== 'string' ||
     !Number.isFinite(Date.parse(input.now)) ||
     !Number.isInteger(input.limit) ||
-    input.limit < 1 ||
-    input.limit > 50
+    input.limit < 2 ||
+    input.limit > 51
   ) {
-    throw new TypeError('invalid session list query')
+    throw new TypeError('invalid AUTH-010 session-list store input')
   }
   if (input.cursor && (
     typeof input.cursor.createdAt !== 'string' ||
@@ -53,22 +59,17 @@ function assertQuery(input: SessionListQuery): void {
     input.cursor.sessionId.length < 1 ||
     input.cursor.sessionId.length > 128
   )) {
-    throw new TypeError('invalid session list cursor')
+    throw new TypeError('invalid AUTH-010 session-list store cursor')
   }
 }
 
-/**
- * D1 remains the production-default AUTH-010 session-list repository.
- * The effective base-user RoleAssignment and native Better Auth sessions are
- * checked in one bounded query, with a single look-ahead row for pagination.
- */
+/** D1 remains the production default until the complete W02 runtime switch. */
 export function createD1SessionListStore(db: D1Database): SessionListStore {
   return {
     async list(input) {
-      assertQuery(input)
-
+      assertInput(input)
       const authorizationCte = `
-        session_authority AS (
+        authorization AS (
           SELECT CASE WHEN EXISTS (
             SELECT 1
             FROM "user" AS account
@@ -88,6 +89,7 @@ export function createD1SessionListStore(db: D1Database): SessionListStore {
             SELECT id AS sessionId, created_at AS createdAt, expires_at AS expiresAt
             FROM "session"
             WHERE user_id = ? AND expires_at > ?
+              AND EXISTS (SELECT 1 FROM authorization WHERE permissionGranted = 1)
               AND (created_at < ? OR (created_at = ? AND id < ?))
             ORDER BY created_at DESC, id DESC
             LIMIT ?
@@ -96,13 +98,14 @@ export function createD1SessionListStore(db: D1Database): SessionListStore {
             SELECT id AS sessionId, created_at AS createdAt, expires_at AS expiresAt
             FROM "session"
             WHERE user_id = ? AND expires_at > ?
+              AND EXISTS (SELECT 1 FROM authorization WHERE permissionGranted = 1)
             ORDER BY created_at DESC, id DESC
             LIMIT ?
           )`
       const sql = `WITH ${authorizationCte}, ${sessionCte}
-        SELECT session_authority.permissionGranted,
+        SELECT authorization.permissionGranted,
           sessions.sessionId, sessions.createdAt, sessions.expiresAt
-        FROM session_authority
+        FROM authorization
         LEFT JOIN sessions ON 1 = 1
         ORDER BY sessions.createdAt DESC, sessions.sessionId DESC`
 
@@ -117,38 +120,32 @@ export function createD1SessionListStore(db: D1Database): SessionListStore {
             input.cursor.createdAt,
             input.cursor.createdAt,
             input.cursor.sessionId,
-            input.limit + 1,
+            input.limit,
           )
-        : statement.bind(
-            input.userId,
-            input.now,
-            input.now,
-            input.userId,
-            input.now,
-            input.limit + 1,
-          )
+        : statement.bind(input.userId, input.now, input.now, input.userId, input.now, input.limit)
       const result = await bound.all<D1SessionListRow>()
-
-      // A D1 SELECT may resolve with success=false; never hide a storage
-      // failure behind an empty session list.
       if (result.success !== true || !Array.isArray(result.results) || result.results.length === 0) {
         throw new Error('SESSION_LIST_SELECT_FAILED')
       }
 
-      const permissionGranted = Number(result.results[0]?.permissionGranted) === 1
-      if (!permissionGranted) return { permissionGranted: false, rows: [] }
-
-      const rows = result.results.flatMap((row) => {
+      const first = result.results[0]
+      const rows = result.results.flatMap((row): SessionListStoreRow[] => {
         if (
           typeof row.sessionId !== 'string' ||
           row.sessionId.length === 0 ||
           typeof row.createdAt !== 'string' ||
           typeof row.expiresAt !== 'string'
         ) return []
-        return [{ sessionId: row.sessionId, createdAt: row.createdAt, expiresAt: row.expiresAt }]
+        return [{
+          sessionId: row.sessionId,
+          createdAt: row.createdAt,
+          expiresAt: row.expiresAt,
+        }]
       })
-
-      return { permissionGranted: true, rows }
+      return {
+        permissionGranted: first?.permissionGranted === true || Number(first?.permissionGranted) === 1,
+        rows,
+      }
     },
   }
 }
