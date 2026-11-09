@@ -47,7 +47,7 @@ export function validateD104RemoteRunnerReview({
   const info = record.review ?? {}
   if (info.reviewer !== 'GPT-6' ||
       info.reviewType !== 'GPT-6 code-path audit plus current-main SHA and CI evidence reconciliation' ||
-      !/^2026-11-\\d{2}$/.test(info.reviewedAt ?? '') ||
+      !/^2026-11-[0-9]{2}$/.test(info.reviewedAt ?? '') ||
       info.reviewedMainSha !== info.implementationMergeSha ||
       info.result !== 'NO_BLOCKING_FINDINGS' ||
       info.formalGitHubReviewSubmissions !== 0) {
