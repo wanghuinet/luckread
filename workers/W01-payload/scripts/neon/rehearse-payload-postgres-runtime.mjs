@@ -14,7 +14,9 @@ if (
   throw new Error('Refusing to run the Payload Local API rehearsal outside local PostgreSQL luckread_schema')
 }
 
+process.stdout.write('W01_PG_RUNTIME_CONFIG_IMPORT_START\\n')
 const { default: config } = await import('../../src/neon-postgres-runtime.config.ts')
+process.stdout.write('W01_PG_RUNTIME_CONFIG_IMPORT_PASS\\n')
 const marker = 'w01-pg-runtime-' + randomUUID()
 const sourcePath = '/' + marker
 const destinationUsername = marker + '-updated'
