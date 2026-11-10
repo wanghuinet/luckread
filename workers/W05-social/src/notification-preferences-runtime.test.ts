@@ -2,6 +2,11 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import worker from './index.js'
+import {
+  getNotificationPreferences,
+  setNotificationPreferences,
+  SocialClosureRuntimeError,
+} from './social-closure-runtime.js'
 
 const transportHeaders = {
   'X-LuckRead-Caller': 'W01',
@@ -40,6 +45,38 @@ function dbFor(first: (sql: string, values: unknown[]) => unknown | Promise<unkn
 }
 
 describe('W05 notification preferences runtime', () => {
+  it('supports an injected preferences store without touching the D1 runtime binding', async () => {
+    const defaults = { follow: true, like: true, comment: true, mention: true }
+    const saved = { follow: false, like: true, comment: true, mention: false }
+    const store = {
+      get: vi.fn(async () => defaults),
+      set: vi.fn(async () => saved),
+    }
+    const d1 = { prepare: vi.fn() } as unknown as D1Database
+
+    await expect(getNotificationPreferences(store, 'viewer-2')).resolves.toEqual(defaults)
+    await expect(setNotificationPreferences(store, 'viewer-2', {
+      like: true,
+      mention: false,
+    })).resolves.toEqual(saved)
+
+    expect(store.get).toHaveBeenCalledWith('viewer-2')
+    expect(store.set).toHaveBeenCalledWith('viewer-2', { like: true, mention: false })
+    expect(d1.prepare).not.toHaveBeenCalled()
+  })
+
+  it('maps injected notification preference storage failures to a sanitized internal error', async () => {
+    const store = {
+      get: vi.fn(async () => { throw new Error('private-storage-host-detail') }),
+      set: vi.fn(async () => { throw new Error('private-storage-host-detail') }),
+    }
+    await expect(getNotificationPreferences(store, 'viewer-3')).rejects.toBeInstanceOf(SocialClosureRuntimeError)
+    await expect(setNotificationPreferences(store, 'viewer-3', { like: false })).rejects.toMatchObject({
+      code: 'INTERNAL_ERROR',
+      status: 500,
+    })
+  })
+
   it('returns default-on preferences scoped to the authenticated W01 principal', async () => {
     const { db, statements } = dbFor(async () => null)
     const response = await worker.fetch(requestFor('GET'), { DB: db })
