@@ -2,6 +2,7 @@
 import { fetchPublishedContentSocialContext, type PublishedContentSocialContext, type W03ContentBinding } from './w03-content-context-client.js'
 
 import { createD1CommentCreateStore, type CommentCreateStore } from './comment-create-store.js'
+import { createD1CommentMutationStore, type CommentMutationStore } from './comment-mutation-store.js'
 
 export class CommentRuntimeError extends Error {
   constructor(readonly code: string, readonly status: number) { super(code) }
@@ -381,31 +382,17 @@ export async function deleteComment(
   actorUserIdValue: string,
   commentIdValue: string,
   correlationId: string,
+  store: CommentMutationStore = createD1CommentMutationStore(db),
 ): Promise<string> {
   const actorUserId = validateId(actorUserIdValue, 'UNAUTHENTICATED')
   const commentId = validateId(commentIdValue)
 
-  const row = await db.prepare(
-    `SELECT
-       c.id,
-       c.content_id,
-       c.author_user_id,
-       c.state,
-       EXISTS (
-         SELECT 1
-         FROM social_comments child
-         WHERE child.parent_id = c.id
-       ) AS has_replies
-     FROM social_comments c
-     WHERE c.id = ?
-     LIMIT 1`,
-  ).bind(commentId).first<{
-    id: string
-    content_id: string
-    author_user_id: string
-    state: 'PENDING' | 'PUBLISHED' | 'REJECTED' | 'AUTHOR_DELETED'
-    has_replies: number
-  }>()
+  let row: Awaited<ReturnType<CommentMutationStore['getForDelete']>>
+  try {
+    row = await store.getForDelete(commentId)
+  } catch {
+    throw new CommentRuntimeError('INTERNAL_ERROR', 500)
+  }
 
   if (!row) throw new CommentRuntimeError('NOT_FOUND', 404)
   if (row.author_user_id !== actorUserId) {
@@ -423,29 +410,25 @@ export async function deleteComment(
     throw new CommentRuntimeError('CONFLICT', 409)
   }
 
-  const now = new Date().toISOString()
-  const result = await db.prepare(
-    `UPDATE social_comments
-        SET state = 'AUTHOR_DELETED', updated_at = ?
-      WHERE id = ?
-        AND author_user_id = ?
-        AND state = 'PUBLISHED'
-        AND NOT EXISTS (
-          SELECT 1
-            FROM social_comments child
-           WHERE child.parent_id = social_comments.id
-        )`,
-  ).bind(now, commentId, actorUserId).run()
+  let deleted: boolean
+  try {
+    deleted = await store.markDeleted({
+      commentId,
+      actorUserId,
+      now: new Date().toISOString(),
+    })
+  } catch {
+    throw new CommentRuntimeError('INTERNAL_ERROR', 500)
+  }
 
-  if (Number(result.meta?.changes ?? 0) !== 1) {
-    const afterConflict = await db.prepare(
-      `SELECT state
-         FROM social_comments
-        WHERE id = ?
-          AND author_user_id = ?
-        LIMIT 1`,
-    ).bind(commentId, actorUserId).first<{ state: 'PUBLISHED' | 'AUTHOR_DELETED' | 'PENDING' | 'REJECTED' }>()
-    if (afterConflict?.state === 'AUTHOR_DELETED') return row.content_id
+  if (!deleted) {
+    let afterConflict: Awaited<ReturnType<CommentMutationStore['getDeleteState']>>
+    try {
+      afterConflict = await store.getDeleteState(commentId, actorUserId)
+    } catch {
+      throw new CommentRuntimeError('INTERNAL_ERROR', 500)
+    }
+    if (afterConflict === 'AUTHOR_DELETED') return row.content_id
     throw new CommentRuntimeError('CONFLICT', 409)
   }
   return row.content_id
@@ -458,6 +441,7 @@ export async function updateComment(
   commentIdValue: string,
   input: CommentUpdateInput,
   correlationId: string,
+  store: CommentMutationStore = createD1CommentMutationStore(db),
 ): Promise<{ item: CommentItem; etag: string }> {
   const actorUserId = validateId(actorUserIdValue, 'UNAUTHENTICATED')
   const commentId = validateId(commentIdValue)
@@ -468,31 +452,12 @@ export async function updateComment(
     throw new CommentRuntimeError('VALIDATION_FAILED', 400)
   }
 
-  const current = await db.prepare(
-    `SELECT
-       c.id,
-       c.content_id,
-       c.author_user_id,
-       c.parent_id,
-       c.body,
-       c.state,
-       c.depth,
-       c.created_at,
-       c.updated_at
-     FROM social_comments c
-     WHERE c.id = ?
-     LIMIT 1`,
-  ).bind(commentId).first<{
-    id: string
-    content_id: string
-    author_user_id: string
-    parent_id: string | null
-    body: string
-    state: 'PENDING' | 'PUBLISHED' | 'REJECTED'
-    depth: number
-    created_at: string
-    updated_at: string
-  }>()
+  let current: Awaited<ReturnType<CommentMutationStore['getForUpdate']>>
+  try {
+    current = await store.getForUpdate(commentId)
+  } catch {
+    throw new CommentRuntimeError('INTERNAL_ERROR', 500)
+  }
 
   if (!current) throw new CommentRuntimeError('NOT_FOUND', 404)
   await fetchPublishedContentSocialContext(w03Content, {
@@ -516,26 +481,18 @@ export async function updateComment(
     throw new CommentRuntimeError('PRECONDITION_FAILED', 412)
   }
 
-  const now = new Date().toISOString()
-  const updated = await db.prepare(
-    `UPDATE social_comments
-     SET body = ?, updated_at = ?
-     WHERE id = ?
-       AND author_user_id = ?
-       AND state = 'PUBLISHED'
-       AND updated_at = ?
-     RETURNING id, content_id, author_user_id, parent_id, body, state, depth, created_at, updated_at`,
-  ).bind(body, now, commentId, actorUserId, expectedUpdatedAt).first<{
-    id: string
-    content_id: string
-    author_user_id: string
-    parent_id: string | null
-    body: string
-    state: 'PENDING' | 'PUBLISHED' | 'REJECTED'
-    depth: number
-    created_at: string
-    updated_at: string
-  }>()
+  let updated: Awaited<ReturnType<CommentMutationStore['update']>>
+  try {
+    updated = await store.update({
+      commentId,
+      actorUserId,
+      body,
+      now: new Date().toISOString(),
+      expectedUpdatedAt,
+    })
+  } catch {
+    throw new CommentRuntimeError('INTERNAL_ERROR', 500)
+  }
 
   if (!updated) throw new CommentRuntimeError('PRECONDITION_FAILED', 412)
 
