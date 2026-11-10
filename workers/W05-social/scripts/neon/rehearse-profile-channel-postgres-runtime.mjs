@@ -73,7 +73,7 @@ const w03Content = {
       data: {
         items: body.contentIds.flatMap(contentId => {
           const context = contexts.get(contentId)
-          return context ? [context] : []
+          return context?.state === 'PUBLISHED' ? [context] : []
         }),
       },
     })
