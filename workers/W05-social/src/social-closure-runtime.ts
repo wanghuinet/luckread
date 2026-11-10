@@ -1,5 +1,11 @@
 /// <reference types="@cloudflare/workers-types" />
 import { fetchPublishedContentSocialContexts, type PublishedContentSocialContext, type W03ContentBinding } from './w03-content-context-client.js'
+import {
+  createD1NotificationPreferencesStore,
+  NotificationPreferencesStoreError,
+  type NotificationPreferencePatch,
+  type NotificationPreferencesStore,
+} from './notification-preferences-store.js'
 
 export class SocialClosureRuntimeError extends Error {
   constructor(readonly code: string, readonly status: number) { super(code) }
@@ -912,54 +918,46 @@ export async function markAllNotificationsRead(db: D1Database, recipientUserIdVa
   ).bind(recipientUserId).run()
 }
 
-export async function getNotificationPreferences(db: D1Database, userIdValue: string) {
+type NotificationPreferencesDataSource = D1Database | NotificationPreferencesStore
+
+function resolveNotificationPreferencesStore(
+  source: NotificationPreferencesDataSource,
+): NotificationPreferencesStore {
+  if (
+    typeof (source as NotificationPreferencesStore).get === 'function' &&
+    typeof (source as NotificationPreferencesStore).set === 'function'
+  ) {
+    return source as NotificationPreferencesStore
+  }
+  return createD1NotificationPreferencesStore(source as D1Database)
+}
+
+const mapNotificationPreferencesStoreError = (error: unknown): SocialClosureRuntimeError => {
+  if (error instanceof NotificationPreferencesStoreError) {
+    return new SocialClosureRuntimeError(error.code, error.status)
+  }
+  return new SocialClosureRuntimeError('INTERNAL_ERROR', 500)
+}
+
+export async function getNotificationPreferences(source: NotificationPreferencesDataSource, userIdValue: string) {
   const userId = id(userIdValue, 'UNAUTHENTICATED')
-  const row = await db.prepare(
-    'SELECT follow_enabled, like_enabled, comment_enabled, mention_enabled FROM social_notification_preferences WHERE user_id = ? LIMIT 1',
-  ).bind(userId).first<{ follow_enabled: number; like_enabled: number; comment_enabled: number; mention_enabled: number }>()
-  return {
-    follow: Number(row?.follow_enabled ?? 1) === 1,
-    like: Number(row?.like_enabled ?? 1) === 1,
-    comment: Number(row?.comment_enabled ?? 1) === 1,
-    mention: Number(row?.mention_enabled ?? 1) === 1,
+  try {
+    return await resolveNotificationPreferencesStore(source).get(userId)
+  } catch (error) {
+    throw mapNotificationPreferencesStoreError(error)
   }
 }
 
 export async function setNotificationPreferences(
-  db: D1Database,
+  source: NotificationPreferencesDataSource,
   userIdValue: string,
-  input: Partial<{ follow: boolean; like: boolean; comment: boolean; mention: boolean }>,
+  input: NotificationPreferencePatch,
 ) {
   const userId = id(userIdValue, 'UNAUTHENTICATED')
-  const values = {
-    follow: input.follow === undefined ? null : input.follow ? 1 : 0,
-    like: input.like === undefined ? null : input.like ? 1 : 0,
-    comment: input.comment === undefined ? null : input.comment ? 1 : 0,
-    mention: input.mention === undefined ? null : input.mention ? 1 : 0,
-  }
-  const row = await db.prepare(
-    `INSERT INTO social_notification_preferences
-      (user_id, follow_enabled, like_enabled, comment_enabled, mention_enabled, updated_at)
-     VALUES (?, COALESCE(?, 1), COALESCE(?, 1), COALESCE(?, 1), COALESCE(?, 1), CURRENT_TIMESTAMP)
-     ON CONFLICT(user_id) DO UPDATE SET
-       follow_enabled = COALESCE(?, social_notification_preferences.follow_enabled),
-       like_enabled = COALESCE(?, social_notification_preferences.like_enabled),
-       comment_enabled = COALESCE(?, social_notification_preferences.comment_enabled),
-       mention_enabled = COALESCE(?, social_notification_preferences.mention_enabled),
-       updated_at = CURRENT_TIMESTAMP
-     RETURNING follow_enabled, like_enabled, comment_enabled, mention_enabled`,
-  ).bind(
-    userId,
-    values.follow, values.like, values.comment, values.mention,
-    values.follow, values.like, values.comment, values.mention,
-  ).first<{ follow_enabled: number; like_enabled: number; comment_enabled: number; mention_enabled: number }>()
-
-  if (!row) throw new SocialClosureRuntimeError('INTERNAL_ERROR', 500)
-  return {
-    follow: Number(row.follow_enabled) === 1,
-    like: Number(row.like_enabled) === 1,
-    comment: Number(row.comment_enabled) === 1,
-    mention: Number(row.mention_enabled) === 1,
+  try {
+    return await resolveNotificationPreferencesStore(source).set(userId, input)
+  } catch (error) {
+    throw mapNotificationPreferencesStoreError(error)
   }
 }
 
