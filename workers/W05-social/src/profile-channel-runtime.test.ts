@@ -1,6 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 import { describe, expect, it, vi } from 'vitest'
 import { listProfileLikedContents, listProfileReplies } from './profile-channel-runtime.js'
+import type { ProfileChannelReadStore } from './profile-channel-read-store.js'
 import type { W03ContentBinding } from './w03-content-context-client.js'
 
 const publishedContextsBinding = (): W03ContentBinding & { fetch: ReturnType<typeof vi.fn> } => ({
@@ -174,4 +175,51 @@ describe('W05 profile channel runtime', () => {
     await expect(listProfileLikedContents(db(), undefined, 'user-2', page.nextCursor, 1, 'viewer-1', 'profile-likes-cursor')).rejects.toMatchObject({ code: 'INVALID_CURSOR', status: 400 })
     await expect(listProfileLikedContents(db(), undefined, 'user-1', null, 51, null, 'profile-likes-cursor')).rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 })
   })
+
+  it('accepts the injected PostgreSQL read-store port for both profile channels', async () => {
+    const replyRows = [{
+      id: 'reply-pg-1',
+      content_id: 'content-1',
+      author_user_id: 'user-1',
+      parent_id: null,
+      body: 'PostgreSQL reply',
+      state: 'PUBLISHED' as const,
+      depth: 0,
+      created_at: '2026-11-10T04:00:00.123456Z',
+      updated_at: '2026-11-10T04:00:00.123789Z',
+    }]
+    const likedRows = [{
+      relationship_id: 'like-pg-1',
+      target_id: 'content-2',
+      created_at: '2026-11-10T05:00:00.456789Z',
+    }]
+    const store: ProfileChannelReadStore = {
+      profileVisibility: vi.fn(async () => ({ blocked: false, muted: false })),
+      listReplies: vi.fn(async () => replyRows),
+      listReplyOwnerBlockRelations: vi.fn(async () => []),
+      listLikedContents: vi.fn(async () => likedRows),
+      listLikedContentBlockRelations: vi.fn(async () => []),
+      listMutedOwners: vi.fn(async () => []),
+    }
+    const binding = publishedContextsBinding()
+
+    await expect(listProfileReplies(store, binding, 'user-1', null, 10, 'viewer-1', 'profile-pg-test'))
+      .resolves.toMatchObject({
+        items: [{ id: 'reply-pg-1', createdAt: '2026-11-10T04:00:00.123456Z' }],
+        hasMore: false,
+        nextCursor: null,
+      })
+    await expect(listProfileLikedContents(store, binding, 'user-1', null, 10, 'viewer-1', 'profile-pg-test'))
+      .resolves.toMatchObject({
+        items: [{ contentId: 'content-2', likedAt: '2026-11-10T05:00:00.456789Z' }],
+        hasMore: false,
+        nextCursor: null,
+      })
+    expect(store.profileVisibility).toHaveBeenCalledWith({ profileUserId: 'user-1', viewerUserId: 'viewer-1' })
+    expect(store.listReplies).toHaveBeenCalledWith({ profileUserId: 'user-1', cursor: null, limit: 11 })
+    expect(store.listLikedContents).toHaveBeenCalledWith({
+      profileUserId: 'user-1', viewerUserId: 'viewer-1', cursor: null, limit: 11,
+    })
+  })
+
 })
