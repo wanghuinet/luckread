@@ -3,6 +3,17 @@ import { randomUUID } from 'node:crypto'
 
 import { getPayload } from 'payload'
 
+const databaseUrl = process.env.PAYLOAD_SCHEMA_DATABASE_URL
+if (!databaseUrl) throw new Error('PAYLOAD_SCHEMA_DATABASE_URL is required')
+const target = new URL(databaseUrl)
+if (
+  !['127.0.0.1', 'localhost', 'postgres'].includes(target.hostname) ||
+  target.port !== '5432' ||
+  target.pathname !== '/luckread_schema'
+) {
+  throw new Error('Refusing to run the Payload Local API rehearsal outside local PostgreSQL luckread_schema')
+}
+
 const { default: config } = await import('../../src/neon-postgres-runtime.config.ts')
 const marker = 'w01-pg-runtime-' + randomUUID()
 const sourcePath = '/' + marker
