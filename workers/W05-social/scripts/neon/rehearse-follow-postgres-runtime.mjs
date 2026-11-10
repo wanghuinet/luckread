@@ -107,13 +107,13 @@ try {
     followerUserId: listFollowerOld,
     targetUserId: listTarget,
     relationshipId: marker + '-list-r1',
-    createdAt: '2026-11-10T01:00:00.000Z',
+    createdAt: '2026-11-10T02:00:00.000100Z',
   })
   await store.follow({
     followerUserId: listFollowerNew,
     targetUserId: listTarget,
     relationshipId: marker + '-list-r2',
-    createdAt: '2026-11-10T02:00:00.000Z',
+    createdAt: '2026-11-10T02:00:00.000900Z',
   })
   await store.follow({
     followerUserId: listFollowerBlocked,
@@ -124,11 +124,13 @@ try {
   await insertBlock(listFollowerBlocked, listTarget, marker + '-list-block')
   const followerPageOne = await listFollowers(readStore, listTarget, null, 1)
   assert.deepEqual(followerPageOne.items.map((item) => item.userId), [listFollowerNew])
+  assert.equal(followerPageOne.items[0]?.followedAt, '2026-11-10T02:00:00.000Z', 'API timestamps remain millisecond-compatible')
   assert.equal(followerPageOne.totalCount, 2, 'Blocked followers must not contribute to the total count')
   assert.equal(followerPageOne.hasMore, true)
   assert.ok(followerPageOne.nextCursor)
   const followerPageTwo = await listFollowers(readStore, listTarget, followerPageOne.nextCursor, 1)
-  assert.deepEqual(followerPageTwo.items.map((item) => item.userId), [listFollowerOld])
+  assert.deepEqual(followerPageTwo.items.map((item) => item.userId), [listFollowerOld], 'The microsecond cursor must preserve rows within the same millisecond')
+  assert.equal(followerPageTwo.items[0]?.followedAt, '2026-11-10T02:00:00.000Z')
   assert.equal(followerPageTwo.totalCount, 2)
   assert.equal(followerPageTwo.hasMore, false)
   assert.equal(new Set([...followerPageOne.items, ...followerPageTwo.items].map((item) => item.userId)).size, 2,
