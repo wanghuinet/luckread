@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 
 import { BlockMuteListReadStoreError } from './block-mute-list-read-store.js'
 import { createPostgresBlockMuteListReadStore } from './block-mute-list-read-store-postgres.js'
-import { clearRelationshipGraphCacheForTests } from './relationship-graph-runtime.js'
 import { listRelations } from './block-mute-runtime.js'
 import type { BlockMuteListReadRow } from './block-mute-list-read-store.js'
 
@@ -73,7 +72,7 @@ describe('W05 PostgreSQL Block/Mute list read store', () => {
   it('maps PostgreSQL list failures to the public runtime service-unavailable error', async () => {
     const { db } = fakePostgres({ fail: true })
     await expect(listRelations(
-      createPostgresBlockMuteListReadStore(db) as never,
+      createPostgresBlockMuteListReadStore(db),
       'viewer-runtime-error',
       'mute',
       null,
