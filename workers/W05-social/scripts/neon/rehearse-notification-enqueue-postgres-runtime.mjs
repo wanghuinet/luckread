@@ -165,9 +165,14 @@ try {
   assertionsPassed = true
 } finally {
   try {
-    await pool.query(
-      'DELETE FROM social_notification_push_deliveries WHERE notification_id IN (SELECT notification_id FROM social_notifications WHERE recipient_user_id LIKE $1)',
+    const fixtureIds = await pool.query(
+      'SELECT notification_id FROM social_notifications WHERE recipient_user_id LIKE $1',
       [marker + '%'],
+    )
+    const notificationIds = fixtureIds.rows.map((row) => row.notification_id)
+    await pool.query(
+      'DELETE FROM social_notification_push_deliveries WHERE notification_id = ANY($1::text[])',
+      [notificationIds],
     )
     await pool.query('DELETE FROM social_notification_push_outbox WHERE recipient_user_id LIKE $1', [marker + '%'])
     await pool.query('DELETE FROM social_notifications WHERE recipient_user_id LIKE $1', [marker + '%'])
@@ -178,10 +183,10 @@ try {
       `SELECT
          (SELECT count(*)::int FROM social_notifications WHERE recipient_user_id LIKE $1) AS notifications,
          (SELECT count(*)::int FROM social_notification_push_outbox WHERE recipient_user_id LIKE $1) AS outbox,
-         (SELECT count(*)::int FROM social_notification_push_deliveries WHERE notification_id IN (SELECT notification_id FROM social_notifications WHERE recipient_user_id LIKE $1)) AS deliveries,
+         (SELECT count(*)::int FROM social_notification_push_deliveries WHERE notification_id = ANY($2::text[])) AS deliveries,
          (SELECT count(*)::int FROM social_notification_preferences WHERE user_id LIKE $1) AS preferences,
          (SELECT count(*)::int FROM social_user_interactions WHERE relationship_id LIKE $1) AS blocks`,
-      [marker + '%'],
+      [marker + '%', notificationIds],
     )
     const remaining = postflight.rows[0] ?? {}
     for (const [name, value] of Object.entries(remaining)) {
