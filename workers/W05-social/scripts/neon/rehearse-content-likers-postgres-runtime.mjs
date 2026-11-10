@@ -103,7 +103,7 @@ try {
   assert.equal(secondPage.hasMore, true)
 
   const thirdPage = await listContentLikers(
-    store, secondPage.nextCursor, 1, viewerId, context(contentId, contentOwnerId),
+    store, contentId, secondPage.nextCursor, 1, viewerId, context(contentId, contentOwnerId),
   )
   assert.deepEqual(thirdPage.items, [{
     userId: oldestLiker,
