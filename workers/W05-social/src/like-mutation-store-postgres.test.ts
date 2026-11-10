@@ -33,7 +33,7 @@ describe('PostgreSQL like mutation store', () => {
     expect(sql).toContain("block.relation_type = 'block'")
     expect(sql).toContain('ON CONFLICT (actor_user_id, target_type, target_id)')
     expect(sql).toContain('RETURNING relationship_id')
-    expect(sql).not.toMatch(/(?:FROM|JOIN)\\s+social_comments/i)
+    expect(sql).not.toMatch(/(?:FROM|JOIN)\s+social_comments/i)
     expect(values).toEqual([
       'new-like-id',
       'actor-1',
@@ -62,7 +62,7 @@ describe('PostgreSQL like mutation store', () => {
     const [sql, values] = query.mock.calls[0] as unknown as [string, unknown[]]
     expect(sql).toContain('FROM social_comments c')
     expect(sql).toContain("c.state = 'PUBLISHED'")
-    expect(sql.match(/block\\.relation_type = 'block'/g)).toHaveLength(1)
+    expect(sql.match(/block\.relation_type = 'block'/g)).toHaveLength(1)
     expect(sql).toContain('block.target_user_id = c.author_user_id')
     expect(values).toEqual([
       'comment-like-id',
