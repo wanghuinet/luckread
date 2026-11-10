@@ -757,7 +757,7 @@ const isTransientNotificationDbError = (error: unknown): boolean => {
 }
 
 /**
- * Retry the complete inbox-write attempt for transient D1 errors. The operation
+ * Retry the complete inbox-write attempt for transient D1 or PostgreSQL errors. The operation
  * reuses one notification ID and one unique dedupe key across attempts, so an
  * ambiguous first-write result cannot create duplicate inbox notifications.
  * This is bounded in-request recovery, not a substitute for a durable Queue.
