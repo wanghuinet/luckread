@@ -1,5 +1,12 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import {
+  createD1RelationshipGraphReadStore,
+  RelationshipGraphStoreError,
+  type RelationshipGraphReadStore,
+  type RelationshipGraphReadRow,
+} from './relationship-graph-store.js'
+
 export type RelationshipGraph = {
   viewerUserId: string
   targetUserId: string
@@ -38,8 +45,17 @@ const validateUserId = (value: string): string => {
   return normalized
 }
 
+type RelationshipGraphDataSource = D1Database | RelationshipGraphReadStore
+
+function resolveRelationshipGraphReadStore(source: RelationshipGraphDataSource): RelationshipGraphReadStore {
+  if (typeof (source as RelationshipGraphReadStore).read === 'function') {
+    return source as RelationshipGraphReadStore
+  }
+  return createD1RelationshipGraphReadStore(source as D1Database)
+}
+
 export async function getRelationshipGraph(
-  db: D1Database,
+  source: RelationshipGraphDataSource,
   viewerUserId: string,
   targetUserId: string,
 ): Promise<RelationshipGraph> {
@@ -68,60 +84,15 @@ export async function getRelationshipGraph(
     relationshipGraphCache.delete(cacheKey)
   }
 
-  const row = await db.prepare(
-    `SELECT
-       EXISTS (
-         SELECT 1 FROM social_follow_relationships
-         WHERE follower_user_id = ? AND target_user_id = ?
-       ) AS following,
-       EXISTS (
-         SELECT 1 FROM social_follow_relationships
-         WHERE follower_user_id = ? AND target_user_id = ?
-       ) AS followed_by,
-       (
-         SELECT relationship_id
-         FROM social_follow_relationships
-         WHERE follower_user_id = ? AND target_user_id = ?
-         LIMIT 1
-       ) AS relationship_id,
-       (
-         SELECT created_at
-         FROM social_follow_relationships
-         WHERE follower_user_id = ? AND target_user_id = ?
-         LIMIT 1
-       ) AS created_at,
-       EXISTS (
-         SELECT 1 FROM social_user_interactions
-         WHERE relation_type = 'block'
-           AND actor_user_id = ? AND target_user_id = ?
-       ) AS blocked,
-       EXISTS (
-         SELECT 1 FROM social_user_interactions
-         WHERE relation_type = 'block'
-           AND actor_user_id = ? AND target_user_id = ?
-       ) AS blocked_by,
-       EXISTS (
-         SELECT 1 FROM social_user_interactions
-         WHERE relation_type = 'mute'
-           AND actor_user_id = ? AND target_user_id = ?
-       ) AS muted`,
-  ).bind(
-    viewer, target,
-    target, viewer,
-    viewer, target,
-    viewer, target,
-    viewer, target,
-    target, viewer,
-    viewer, target,
-  ).first<{
-    following: number
-    followed_by: number
-    relationship_id: string | null
-    created_at: string | null
-    blocked: number
-    blocked_by: number
-    muted: number
-  }>()
+  let row: RelationshipGraphReadRow | null
+  try {
+    row = await resolveRelationshipGraphReadStore(source).read(viewer, target)
+  } catch (error) {
+    if (error instanceof RelationshipGraphStoreError) {
+      throw new RelationshipGraphRuntimeError(error.code, error.status)
+    }
+    throw error
+  }
 
   const blocked = Boolean(row?.blocked)
   const blockedBy = Boolean(row?.blocked_by)
@@ -151,6 +122,5 @@ export const invalidateRelationshipGraph = async (viewerUserId: string, targetUs
   relationshipGraphCache.delete(relationshipGraphKey(viewer, target))
   relationshipGraphCache.delete(relationshipGraphKey(target, viewer))
 }
-
 
 export const clearRelationshipGraphCacheForTests = (): void => relationshipGraphCache.clear()
