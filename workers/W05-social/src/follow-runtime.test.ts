@@ -8,6 +8,7 @@ import {
   parseFollowListLimit,
   unfollow,
 } from './follow-runtime.js'
+import { FollowStoreError } from './follow-store.js'
 
 const db = (
   firstResults: unknown[] = [],
@@ -53,6 +54,41 @@ describe('follow runtime', () => {
       created_at: '2026-10-02T00:00:00.000Z',
     }
     await expect(follow(db([{ blocked: 0 }, row]), 'u1', 'u2')).resolves.toEqual(row)
+  })
+
+  it('accepts an injected provider-neutral follow store', async () => {
+    const row = {
+      relationship_id: 'pg_r1',
+      follower_user_id: 'u1',
+      target_user_id: 'u2',
+      created_at: '2026-11-10T00:00:00.000Z',
+    }
+    const store = {
+      follow: vi.fn(async () => row),
+      unfollow: vi.fn(async () => {}),
+    }
+    await expect(follow(store, 'u1', 'u2')).resolves.toEqual(row)
+    expect(store.follow).toHaveBeenCalledWith(expect.objectContaining({
+      followerUserId: 'u1',
+      targetUserId: 'u2',
+      relationshipId: expect.any(String),
+      createdAt: expect.any(String),
+    }))
+  })
+
+  it('maps provider storage failures to a sanitized service-unavailable error', async () => {
+    const store = {
+      follow: vi.fn(async () => { throw new FollowStoreError() }),
+      unfollow: vi.fn(async () => { throw new FollowStoreError() }),
+    }
+    await expect(follow(store, 'u1', 'u2')).rejects.toMatchObject({
+      code: 'SERVICE_UNAVAILABLE',
+      status: 503,
+    })
+    await expect(unfollow(store, 'u1', 'u2')).rejects.toMatchObject({
+      code: 'SERVICE_UNAVAILABLE',
+      status: 503,
+    })
   })
 
   it('is idempotent', async () => {
