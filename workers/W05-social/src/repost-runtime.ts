@@ -2,7 +2,7 @@
 
 import { ReplyAudienceRuntimeError } from './reply-audience-runtime.js'
 import { fetchPublishedContentSocialContext, type W03ContentBinding } from './w03-content-context-client.js'
-import { createD1RepostStore, RepostStoreError, type RepostStore } from './repost-store.js'
+import { createD1RepostStore, RepostStoreError, type RepostStorageRow, type RepostStore } from './repost-store.js'
 
 export class RepostRuntimeError extends Error {
   constructor(readonly code: string, readonly status: number) { super(code) }
@@ -64,7 +64,7 @@ export async function createRepost(
   const contentId = validateId(contentIdValue)
   const ownerUserId = await getPublishedOwner(w03Content, contentId, correlationId)
 
-  let existing
+  let existing: RepostStorageRow | null
   try {
     if (await store.isBlocked(actorUserId, ownerUserId)) {
       throw new RepostRuntimeError('NOT_FOUND', 404)
@@ -82,7 +82,7 @@ export async function createRepost(
 
   const repostId = crypto.randomUUID()
   const createdAt = new Date().toISOString()
-  let row
+  let row: RepostStorageRow | null
   try {
     await store.insertIfAbsent(repostId, contentId, actorUserId, createdAt)
     row = await store.find(actorUserId, contentId)
