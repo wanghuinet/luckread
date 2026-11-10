@@ -46,7 +46,7 @@ export interface LikeMutationD1QueryExecutor {
   }
 }
 
-const CONTENT_LIKE_SQL = \`INSERT INTO interaction_likes
+const CONTENT_LIKE_SQL = `INSERT INTO interaction_likes
   (relationship_id, actor_user_id, target_type, target_id, created_at)
  SELECT ?, ?, 'content', c.id, ?
    FROM contents c
@@ -64,9 +64,9 @@ const CONTENT_LIKE_SQL = \`INSERT INTO interaction_likes
     )
  ON CONFLICT(actor_user_id, target_type, target_id)
  DO UPDATE SET relationship_id = interaction_likes.relationship_id
- RETURNING relationship_id, actor_user_id, target_type, target_id, created_at\`
+ RETURNING relationship_id, actor_user_id, target_type, target_id, created_at`
 
-const COMMENT_LIKE_SQL = \`INSERT INTO interaction_likes
+const COMMENT_LIKE_SQL = `INSERT INTO interaction_likes
   (relationship_id, actor_user_id, target_type, target_id, created_at)
  SELECT ?, ?, 'comment', c.id, ?
    FROM social_comments c
@@ -88,7 +88,7 @@ const COMMENT_LIKE_SQL = \`INSERT INTO interaction_likes
     )
  ON CONFLICT(actor_user_id, target_type, target_id)
  DO UPDATE SET relationship_id = interaction_likes.relationship_id
- RETURNING relationship_id, actor_user_id, target_type, target_id, created_at\`
+ RETURNING relationship_id, actor_user_id, target_type, target_id, created_at`
 
 /** D1 remains the default production adapter until a separately authorized cutover. */
 export function createD1LikeMutationStore(db: LikeMutationD1QueryExecutor): LikeMutationStore {
