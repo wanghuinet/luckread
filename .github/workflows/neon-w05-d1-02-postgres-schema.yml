@@ -9,6 +9,11 @@ on:
       - 'contracts/persistence/SOCIAL-001-follow-relationship-persistence-contract.v1.json'
       - 'contracts/persistence/SOCIAL-001-follow-relationship-migration-contract.v1.json'
       - 'contracts/transport/W05-W09-notification-push-delivery.v1.json'
+      - 'workers/W05-social/src/follow-runtime.ts'
+      - 'workers/W05-social/src/follow-runtime.test.ts'
+      - 'workers/W05-social/src/follow-store.ts'
+      - 'workers/W05-social/src/follow-store-postgres.ts'
+      - 'workers/W05-social/scripts/neon/rehearse-follow-postgres-runtime.mjs'
       - 'workers/W05-social/migrations/**'
       - 'workers/W05-social/scripts/neon/**'
       - 'workers/W05-social/src/neon-postgres-migrations/**'
@@ -89,6 +94,14 @@ jobs:
           await writeFile('artifacts/neon/w05-d1-02-postgres-schema-postflight.json', JSON.stringify(report,null,2)+'\n')
           console.log('W05_D1_02_POSTGRES18_REHEARSAL_PASS ' + JSON.stringify(report))
           NODE
+      - name: Install the pinned W02 PostgreSQL driver and TS runner for W05 runtime rehearsal
+        working-directory: workers/W02-identity
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Rehearse W05 Follow and Unfollow writes against PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          W05_FOLLOW_POSTGRES_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_w05_d1_02_schema
+        run: node --import=tsx/esm ../../workers/W05-social/scripts/neon/rehearse-follow-postgres-runtime.mjs
       - name: Upload W05 D1-02 PostgreSQL 18 evidence
         if: always()
         uses: actions/upload-artifact@v4
