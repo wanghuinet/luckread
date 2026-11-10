@@ -9,6 +9,7 @@ describe('X-style notifications page', () => {
   const shell = read('src/app/(twitter-clone)/TwitterCloneSecondaryPageLayout.tsx')
   const home = read('src/app/(twitter-clone)/home/page.tsx')
   const w05Runtime = read('../../workers/W05-social/src/social-closure-runtime.ts')
+  const w05ReadStore = read('../../workers/W05-social/src/social-closure-read-store.ts')
   const w05Worker = read('../../workers/W05-social/src/index.ts')
   const apiContract = read('../../contracts/openapi/v1/openapi.yaml')
 
@@ -60,8 +61,9 @@ describe('X-style notifications page', () => {
     expect(page).toContain("setFilter('mentions')")
     expect(page).toContain('labels.emptyMentions')
     expect(w05Worker).toContain("url.searchParams.get('type')")
-    expect(w05Runtime).toContain("notification_type = ?")
     expect(w05Runtime).toContain("NOTIFICATION_TYPES.includes")
+    expect(w05ReadStore).toContain("notification_type = ?")
+    expect(w05ReadStore).toContain("recipient_user_id = ?")
     expect(apiContract).toContain('description: Optional notification type filter.')
   })
 
