@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 import { describe, expect, it, vi } from 'vitest'
-import { listRelations, removeRelation, setRelation } from './block-mute-runtime.js'
+import { getRelation, listRelations, removeRelation, setRelation } from './block-mute-runtime.js'
 
 const db = (firstResults: unknown[] = [], allResults: unknown[] = []) => {
   let firstIndex = 0
@@ -15,6 +15,22 @@ const db = (firstResults: unknown[] = [], allResults: unknown[] = []) => {
 }
 
 describe('block/mute runtime', () => {
+  it('reads one relation through the default D1 store', async () => {
+    const d = db([{
+      relationship_id: 'block-read-1',
+      actor_user_id: 'user-1',
+      target_user_id: 'target-1',
+      relation_type: 'block',
+      created_at: '2026-10-02T00:00:00.000Z',
+      updated_at: '2026-10-02T00:00:00.000Z',
+    }])
+
+    await expect(getRelation(d, 'user-1', 'target-1', 'block')).resolves.toMatchObject({
+      relationshipId: 'block-read-1',
+      relationType: 'block',
+    })
+  })
+
   it('creates and converges through a single authoritative upsert', async () => {
     const d = db([{
       relationship_id: 'block-1',
