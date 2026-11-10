@@ -4,6 +4,7 @@ import type { PublishedContentSocialContext } from './w03-content-context-client
 import { ReplyAudienceRuntimeError } from './reply-audience-runtime.js'
 import { fetchPublishedOwnerPostContext, type W03ContentBinding } from './w03-content-context-client.js'
 import { createD1PollReadStore, type PollReadStore } from './poll-read-store.js'
+import { createD1PollDeleteStore, type PollDeleteStore } from './poll-delete-store.js'
 
 export class SocialPollError extends Error {
   constructor(readonly code: string, readonly status: number) { super(code) }
@@ -363,6 +364,7 @@ export async function deleteContentPoll(
   actorUserIdValue: string,
   contentIdValue: string,
   contentContext?: OwnedPostContext,
+  store: PollDeleteStore = createD1PollDeleteStore(db),
 ): Promise<void> {
   const actorUserId = validateId(actorUserIdValue, 'UNAUTHENTICATED')
   const contentId = validateId(contentIdValue)
@@ -372,16 +374,45 @@ export async function deleteContentPoll(
     throw new SocialPollError('NOT_FOUND', 404)
   }
   if (content.state !== 'DRAFT') throw new SocialPollError('CONFLICT', 409)
-  const poll = await readPollRow(db, contentId)
+
+  let poll: Awaited<ReturnType<PollDeleteStore['getPoll']>>
+  try {
+    poll = await store.getPoll(contentId)
+  } catch {
+    throw new SocialPollError('INTERNAL_ERROR', 500)
+  }
   if (!poll) return
-  const voteCount = await db.prepare(
-    'SELECT COUNT(*) AS count FROM social_poll_votes WHERE poll_id = ?',
-  ).bind(poll.poll_id).first<{ count: number }>()
-  if (Number(voteCount?.count ?? 0) > 0) throw new SocialPollError('CONFLICT', 409)
-  await db.batch([
-    db.prepare('DELETE FROM social_poll_options WHERE poll_id = ?').bind(poll.poll_id),
-    db.prepare('DELETE FROM social_polls WHERE poll_id = ? AND owner_user_id = ? AND content_id = ?').bind(poll.poll_id, actorUserId, contentId),
-  ])
+
+  let voteCount: number
+  try {
+    voteCount = await store.countVotes(poll.poll_id)
+  } catch {
+    throw new SocialPollError('INTERNAL_ERROR', 500)
+  }
+  if (voteCount > 0) throw new SocialPollError('CONFLICT', 409)
+
+  let deleted: boolean
+  try {
+    deleted = await store.deleteDraftPoll({
+      pollId: poll.poll_id,
+      actorUserId,
+      contentId,
+    })
+  } catch {
+    throw new SocialPollError('INTERNAL_ERROR', 500)
+  }
+  if (deleted) return
+
+  // A concurrent delete is idempotent; a still-present poll means its
+  // owner/vote guard changed while the delete was being committed.
+  let current: Awaited<ReturnType<PollDeleteStore['getPoll']>>
+  try {
+    current = await store.getPoll(contentId)
+  } catch {
+    throw new SocialPollError('INTERNAL_ERROR', 500)
+  }
+  if (!current) return
+  throw new SocialPollError('CONFLICT', 409)
 }
 
 export async function castContentPollVote(
