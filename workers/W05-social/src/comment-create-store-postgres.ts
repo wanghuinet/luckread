@@ -22,7 +22,7 @@ export interface CommentCreatePostgresQueryExecutor {
   ): Promise<QueryResult<Row>>
 }
 
-const validateSql = \`WITH existing_comment AS (
+const validateSql = `WITH existing_comment AS (
   SELECT id, content_id, parent_id, body, author_user_id, state, depth,
          to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at,
          to_char(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS updated_at
@@ -63,14 +63,14 @@ SELECT
        )
   ) AS blocked,
   (
-    SELECT CASE WHEN \${replyAudienceAllowedPostgresSql} THEN TRUE ELSE FALSE END
+    SELECT CASE WHEN ${replyAudienceAllowedPostgresSql} THEN TRUE ELSE FALSE END
       FROM contents content
      WHERE content.id = $11
   ) AS reply_audience_allowed
 FROM (SELECT 1) seed
-LEFT JOIN existing_comment ec ON TRUE\`
+LEFT JOIN existing_comment ec ON TRUE`
 
-const insertSql = \`INSERT INTO social_comments
+const insertSql = `INSERT INTO social_comments
   (id, content_id, author_user_id, parent_id, body, state, depth, idempotency_key, created_at, updated_at)
 SELECT $10, $11, $12, $13::text, $14, 'PUBLISHED', $15, $16, $17::timestamptz, $18::timestamptz
   FROM contents content
@@ -105,18 +105,18 @@ SELECT $10, $11, $12, $13::text, $14, 'PUBLISHED', $15, $16, $17::timestamptz, $
           ) AND block.target_user_id = $27)
         )
    )
-   AND \${replyAudienceAllowedPostgresSql}
+   AND ${replyAudienceAllowedPostgresSql}
 ON CONFLICT (author_user_id, idempotency_key)
 DO UPDATE SET id = social_comments.id
 RETURNING id, content_id, author_user_id, parent_id, body, state, depth,
   to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at,
-  to_char(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS updated_at\`
+  to_char(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS updated_at`
 
-const finalStateSql = \`SELECT content.state AS content_state,
-  CASE WHEN \${replyAudienceAllowedPostgresSql} THEN TRUE ELSE FALSE END AS reply_audience_allowed
+const finalStateSql = `SELECT content.state AS content_state,
+  CASE WHEN ${replyAudienceAllowedPostgresSql} THEN TRUE ELSE FALSE END AS reply_audience_allowed
 FROM contents content
 WHERE content.id = $10
-LIMIT 1\`
+LIMIT 1`
 
 export function createPostgresCommentCreateStore(
   db: CommentCreatePostgresQueryExecutor,

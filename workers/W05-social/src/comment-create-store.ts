@@ -66,7 +66,7 @@ export class CommentCreateStoreError extends Error {
   constructor() { super('COMMENT_CREATE_STORE_UNAVAILABLE') }
 }
 
-const validateSql = \`WITH existing_comment AS (
+const validateSql = `WITH existing_comment AS (
        SELECT id, content_id, parent_id, body, author_user_id, state, depth, created_at, updated_at
        FROM social_comments
        WHERE author_user_id = ? AND idempotency_key = ?
@@ -104,14 +104,14 @@ const validateSql = \`WITH existing_comment AS (
            )
        ) AS blocked,
        (
-         SELECT CASE WHEN \${replyAudienceAllowedSql} THEN 1 ELSE 0 END
+         SELECT CASE WHEN ${replyAudienceAllowedSql} THEN 1 ELSE 0 END
            FROM contents content
           WHERE content.id = ?
        ) AS reply_audience_allowed
      FROM (SELECT 1) seed
-     LEFT JOIN existing_comment ec ON 1 = 1\`
+     LEFT JOIN existing_comment ec ON 1 = 1`
 
-const insertSql = \`INSERT INTO social_comments
+const insertSql = `INSERT INTO social_comments
       (id, content_id, author_user_id, parent_id, body, state, depth, idempotency_key, created_at, updated_at)
      SELECT ?, ?, ?, ?, ?, 'PUBLISHED', ?, ?, ?, ?
        FROM contents content
@@ -146,10 +146,10 @@ const insertSql = \`INSERT INTO social_comments
                ) AND block.target_user_id = ?)
              )
         )
-        AND \${replyAudienceAllowedSql}
+        AND ${replyAudienceAllowedSql}
      ON CONFLICT(author_user_id, idempotency_key)
      DO UPDATE SET id = social_comments.id
-     RETURNING id, content_id, author_user_id, parent_id, body, state, depth, created_at, updated_at\`
+     RETURNING id, content_id, author_user_id, parent_id, body, state, depth, created_at, updated_at`
 
 export function createD1CommentCreateStore(db: D1Database): CommentCreateStore {
   return {
@@ -212,10 +212,10 @@ export function createD1CommentCreateStore(db: D1Database): CommentCreateStore {
     async getFinalState(input) {
       try {
         return await db.prepare(
-          \`SELECT content.state AS content_state,
-                  CASE WHEN \${replyAudienceAllowedSql} THEN 1 ELSE 0 END AS reply_audience_allowed
+          `SELECT content.state AS content_state,
+                  CASE WHEN ${replyAudienceAllowedSql} THEN 1 ELSE 0 END AS reply_audience_allowed
              FROM contents content
-            WHERE content.id = ? LIMIT 1\`,
+            WHERE content.id = ? LIMIT 1`,
         ).bind(...replyAudienceAllowedParams(input.actorUserId, input.actorVerified), input.contentId)
           .first<CommentCreateFinalState>()
       } catch {

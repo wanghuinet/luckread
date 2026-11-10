@@ -250,7 +250,7 @@ export async function createComment(
   const contentId = validateId(contentIdValue)
   const { body, idempotencyKey, parentId } = validateCreateInput(input)
 
-  let validation
+  let validation: Awaited<ReturnType<CommentCreateStore['validate']>>
   try {
     validation = await store.validate({
       actorUserId: actor,
@@ -316,7 +316,7 @@ export async function createComment(
   const id = crypto.randomUUID()
   const now = new Date().toISOString()
 
-  let inserted
+  let inserted: Awaited<ReturnType<CommentCreateStore['insert']>>
   try {
     inserted = await store.insert({
       actorUserId: actor,
@@ -337,7 +337,7 @@ export async function createComment(
     // The final INSERT re-checks policy, follow graph, block relations, and
     // parent visibility. Distinguish a concurrent audience denial from other
     // stale preconditions without ever allowing the comment to bypass policy.
-    let finalState
+    let finalState: Awaited<ReturnType<CommentCreateStore['getFinalState']>>
     try {
       finalState = await store.getFinalState({ actorUserId: actor, contentId, actorVerified })
     } catch {

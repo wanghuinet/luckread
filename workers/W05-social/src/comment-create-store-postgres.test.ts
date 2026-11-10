@@ -24,7 +24,7 @@ const insertInput = {
 describe('W05 PostgreSQL comment-create store', () => {
   it('validates idempotency, content, parent, rate limit, block and reply audience with parameterized PostgreSQL SQL', async () => {
     const row = { content_state: 'PUBLISHED', blocked: false, reply_audience_allowed: true, recent_count: 0 }
-    const query = vi.fn(async () => ({ rows: [row] }))
+    const query = vi.fn(async (_sql: string, _values?: unknown[]) => ({ rows: [row] }))
     const store = createPostgresCommentCreateStore({ query } as unknown as CommentCreatePostgresQueryExecutor)
 
     await expect(store.validate(validationInput)).resolves.toEqual(row)
@@ -42,7 +42,7 @@ describe('W05 PostgreSQL comment-create store', () => {
   })
 
   it('performs the final atomic insert with parent, block and reply-audience predicates rechecked', async () => {
-    const query = vi.fn(async () => ({ rows: [{ id: 'comment-1' }] }))
+    const query = vi.fn(async (_sql: string, _values?: unknown[]) => ({ rows: [{ id: 'comment-1' }] }))
     const store = createPostgresCommentCreateStore({ query } as unknown as CommentCreatePostgresQueryExecutor)
 
     await store.insert(insertInput)
@@ -62,7 +62,7 @@ describe('W05 PostgreSQL comment-create store', () => {
   })
 
   it('rechecks the audience after a final insert loses a race', async () => {
-    const query = vi.fn(async () => ({ rows: [{ content_state: 'PUBLISHED', reply_audience_allowed: false }] }))
+    const query = vi.fn(async (_sql: string, _values?: unknown[]) => ({ rows: [{ content_state: 'PUBLISHED', reply_audience_allowed: false }] }))
     const store = createPostgresCommentCreateStore({ query } as unknown as CommentCreatePostgresQueryExecutor)
 
     await expect(store.getFinalState({

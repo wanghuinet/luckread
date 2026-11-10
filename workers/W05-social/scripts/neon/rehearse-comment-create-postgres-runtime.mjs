@@ -56,14 +56,14 @@ try {
 
   // W03 owns contents. This TEMP table exists only on the disposable rehearsal
   // connection, so the harness does not mutate W03 or create a W05-owned table.
-  await client.query(\`
+  await client.query(`
     CREATE TEMP TABLE contents (
       id TEXT PRIMARY KEY,
       owner_user_id TEXT NOT NULL,
       state TEXT NOT NULL,
       content_type TEXT NOT NULL
     ) ON COMMIT PRESERVE ROWS
-  \`)
+  `)
   await client.query(
     'INSERT INTO contents (id, owner_user_id, state, content_type) VALUES ' +
     '($1, $2, $3, $4), ($5, $2, $3, $4), ($6, $2, $3, $4), ($7, $2, $3, $4), ($8, $2, $3, $4)',
