@@ -174,8 +174,8 @@ try {
       unusedD1, mismatchedOwnerBinding, marker + '-mismatch-viewer', pollFixture.contentId,
       pollFixture.options[0], marker + '-correlation-owner-mismatch', voteStore, readStore,
     ),
-    'NOT_FOUND',
-    404,
+    'SERVICE_UNAVAILABLE',
+    503,
   )
   pollOwnerContextMismatchDenied = true
 
