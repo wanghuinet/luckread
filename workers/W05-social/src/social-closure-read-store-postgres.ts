@@ -48,7 +48,7 @@ export function createPostgresSocialClosureReadStore(
       try {
         const result = await db.query<SocialTopicContentEdge>(
           `SELECT st.target_id,
-                  to_char(st.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at
+                  to_char(st.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS created_at
              FROM social_target_topics st
             WHERE st.target_type = 'content'
               AND st.topic_id = $1
@@ -102,9 +102,9 @@ export function createPostgresSocialClosureReadStore(
         const result = await db.query<NotificationInboxRow>(
           `SELECT notification_id, notification_type, actor_user_id, target_type, target_id, payload_json,
                   CASE WHEN read_at IS NULL THEN NULL
-                       ELSE to_char(read_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
+                       ELSE to_char(read_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
                   END AS read_at,
-                  to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at
+                  to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS created_at
              FROM social_notifications
             WHERE ${where.join(' AND ')}
             ORDER BY created_at DESC, notification_id DESC
