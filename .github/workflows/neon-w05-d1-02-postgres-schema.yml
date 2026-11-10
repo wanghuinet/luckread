@@ -101,6 +101,7 @@ jobs:
         working-directory: workers/W02-identity
         env:
           W05_FOLLOW_POSTGRES_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_w05_d1_02_schema
+          W05_FOLLOW_POSTGRES_REPORT: ../../artifacts/neon/w05-follow-postgres-runtime-postflight.json
         run: node --import=tsx/esm ../../workers/W05-social/scripts/neon/rehearse-follow-postgres-runtime.mjs
       - name: Upload W05 D1-02 PostgreSQL 18 evidence
         if: always()
@@ -111,5 +112,6 @@ jobs:
             workers/W05-social/src/neon-postgres-migrations/0001_w05_d1_02_social_schema.sql
             artifacts/neon/w05-d1-02-source-hashes.json
             artifacts/neon/w05-d1-02-postgres-schema-postflight.json
+            artifacts/neon/w05-follow-postgres-runtime-postflight.json
           if-no-files-found: error
           retention-days: 90
