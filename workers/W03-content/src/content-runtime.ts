@@ -3,6 +3,11 @@
 import { contentSlugFor, isContentSlug } from './content-slug.js'
 import { allocateContentSnowflakeId } from './content-snowflake-id.js'
 import { normalizePreflightInput, preflightContent } from './publish-preflight.js'
+import {
+  createD1PublishedMediaReferenceReadStore,
+  type PublishedMediaReferenceReadStore,
+  type PublishedMediaReferenceRecord,
+} from './published-media-reference-read-store.js'
 
 export type ContentState =
   | 'DRAFT'
@@ -292,14 +297,6 @@ export type PublishedMediaReferenceAccess = Readonly<{
   allowed: boolean
 }>
 
-type PublishedMediaReferenceRow = Readonly<{
-  id: string
-  owner_user_id: string
-  creator_id: string | null
-  content_type: ContentType
-  access_mode: ContentAccessMode
-}>
-
 /**
  * Resolves a delivery URL against currently published content references.
  * Public media keeps the existing public-post-only rule. If a reference is used
@@ -312,34 +309,16 @@ export async function resolvePublishedMediaReferenceAccess(
   mediaUrlValue: string,
   viewerUserId: string | null,
   hasCreatorMembership?: CreatorMembershipAccessResolver,
+  readStore?: PublishedMediaReferenceReadStore,
 ): Promise<PublishedMediaReferenceAccess> {
   const candidates = publicPostMediaReferenceCandidates(mediaUrlValue)
   if (candidates.length === 0) {
     return { isPublic: false, isMemberContent: false, allowed: false }
   }
-  const placeholders = candidates.map(() => '?').join(', ')
-  const sql = [
-    'SELECT id, owner_user_id, creator_id, content_type, access_mode',
-    'FROM contents',
-    "WHERE state = 'PUBLISHED'",
-    '  AND (',
-    '    body_ref IN (' + placeholders + ')',
-    '    OR cover_ref IN (' + placeholders + ')',
-    '    OR EXISTS (',
-    '      SELECT 1',
-    '      FROM json_each(contents.media_refs_json) AS media_ref',
-    '      WHERE media_ref.value IN (' + placeholders + ')',
-    '    )',
-    '  )',
-    'ORDER BY id ASC',
-    'LIMIT 51',
-  ].join('\n')
-  let rows: PublishedMediaReferenceRow[]
+  let rows: readonly PublishedMediaReferenceRecord[]
   try {
-    const result = await db.prepare(sql)
-      .bind(...candidates, ...candidates, ...candidates)
-      .all<PublishedMediaReferenceRow>()
-    rows = result.results ?? []
+    rows = await (readStore ?? createD1PublishedMediaReferenceReadStore(db))
+      .listPublishedMediaReferences(candidates, 51)
   } catch {
     throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
   }
