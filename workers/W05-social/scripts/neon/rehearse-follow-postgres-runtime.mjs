@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { createRequire } from 'node:module'
+import { dirname } from 'node:path'
+import { mkdir, writeFile } from 'node:fs/promises'
 
 import { FollowRuntimeError, follow, unfollow } from '../../src/follow-runtime.ts'
 import { createPostgresFollowStore } from '../../src/follow-store-postgres.ts'
@@ -21,6 +23,7 @@ if (
 }
 
 const marker = 'w05-pg-follow-' + randomUUID()
+const reportPath = process.env.W05_FOLLOW_POSTGRES_REPORT || '../../artifacts/neon/w05-follow-postgres-runtime-postflight.json'
 const pool = new Pool({ connectionString, max: 4, connectionTimeoutMillis: 5_000 })
 const store = createPostgresFollowStore(pool)
 
@@ -90,20 +93,6 @@ try {
   const afterRefollow = await follow(store, follower, targetUser)
   assert.notEqual(afterRefollow.relationship_id, first.relationship_id, 'A removed relationship identifier must never be reused')
   await unfollow(store, follower, targetUser)
-
-  console.log('W05_FOLLOW_POSTGRES_RUNTIME_PASS ' + JSON.stringify({
-    concurrentFollowConverged: true,
-    uniqueRelationshipRows: 1,
-    bothBlockDirectionsDenied: true,
-    selfFollowDenied: true,
-    repeatedUnfollowIdempotent: true,
-    relationshipIdNotReused: true,
-    remainingFixtureRows: 0,
-    remoteNeonTouched: false,
-    cloudflareD1Touched: false,
-    businessDataImported: false,
-    workerBindingsChanged: false,
-  }))
 } finally {
   try {
     await pool.query(
@@ -114,6 +103,38 @@ try {
       'DELETE FROM social_user_interactions WHERE actor_user_id LIKE $1 OR target_user_id LIKE $1',
       [marker + '%'],
     )
+
+    const postflight = await pool.query(
+      `SELECT
+         (SELECT count(*)::int FROM social_follow_relationships
+           WHERE follower_user_id LIKE $1 OR target_user_id LIKE $1) AS follow_rows,
+         (SELECT count(*)::int FROM social_user_interactions
+           WHERE actor_user_id LIKE $1 OR target_user_id LIKE $1) AS interaction_rows`,
+      [marker + '%'],
+    )
+    const followRows = postflight.rows[0]?.follow_rows ?? -1
+    const interactionRows = postflight.rows[0]?.interaction_rows ?? -1
+    assert.equal(followRows, 0, 'All synthetic Follow rows must be removed')
+    assert.equal(interactionRows, 0, 'All synthetic Block rows must be removed')
+
+    const report = {
+      status: 'W05_FOLLOW_POSTGRES_RUNTIME_PASS',
+      postgresDatabase: target.pathname.slice(1),
+      concurrentFollowConverged: true,
+      uniqueRelationshipRows: 1,
+      bothBlockDirectionsDenied: true,
+      selfFollowDenied: true,
+      repeatedUnfollowIdempotent: true,
+      relationshipIdNotReused: true,
+      remainingFixtureRows: { follow: followRows, interactions: interactionRows },
+      remoteNeonTouched: false,
+      cloudflareD1Touched: false,
+      businessDataImported: false,
+      workerBindingsChanged: false,
+    }
+    await mkdir(dirname(reportPath), { recursive: true })
+    await writeFile(reportPath, JSON.stringify(report, null, 2) + '\n')
+    console.log('W05_FOLLOW_POSTGRES_RUNTIME_PASS ' + JSON.stringify(report))
   } finally {
     await pool.end()
   }
