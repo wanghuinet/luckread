@@ -151,4 +151,82 @@ describe('favorite runtime', () => {
       .rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 })
     expect((d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
   })
+
+  it('accepts an injected favorite list read store and preserves the exact keyset cursor', async () => {
+    const store = {
+      list: vi.fn()
+        .mockResolvedValueOnce([
+          {
+            relationship_id: 'favorite-newer',
+            target_id: 'content-newer',
+            created_at: '2026-11-10T04:00:00.900Z',
+            cursor_created_at: '2026-11-10T04:00:00.900456Z',
+          },
+          {
+            relationship_id: 'favorite-older',
+            target_id: 'content-older',
+            created_at: '2026-11-10T04:00:00.789Z',
+            cursor_created_at: '2026-11-10T04:00:00.789123Z',
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            relationship_id: 'favorite-older',
+            target_id: 'content-older',
+            created_at: '2026-11-10T04:00:00.789Z',
+            cursor_created_at: '2026-11-10T04:00:00.789123Z',
+          },
+          {
+            relationship_id: 'favorite-oldest',
+            target_id: 'content-oldest',
+            created_at: '2026-11-10T04:00:00.456Z',
+            cursor_created_at: '2026-11-10T04:00:00.456789Z',
+          },
+        ]),
+    }
+
+    const first = await listFavorites(store, 'actor-1', null, 1)
+    expect(first).toMatchObject({
+      items: [{ targetId: 'content-newer', createdAt: '2026-11-10T04:00:00.900Z' }],
+      hasMore: true,
+      nextCursor: expect.any(String),
+    })
+
+    const second = await listFavorites(store, 'actor-1', first.nextCursor, 1)
+    expect(second).toEqual({
+      items: [{ targetId: 'content-older', createdAt: '2026-11-10T04:00:00.789Z' }],
+      hasMore: true,
+      nextCursor: expect.any(String),
+    })
+    expect(store.list).toHaveBeenNthCalledWith(1, {
+      actorUserId: 'actor-1',
+      cursor: null,
+      limit: 2,
+    })
+    expect(store.list).toHaveBeenNthCalledWith(2, {
+      actorUserId: 'actor-1',
+      cursor: {
+        createdAt: '2026-11-10T04:00:00.900456Z',
+        relationshipId: 'favorite-newer',
+      },
+      limit: 2,
+    })
+  })
+
+  it('maps D1 favorite list read failures to a sanitized 503', async () => {
+    const failingDb = {
+      prepare: vi.fn(() => ({
+        bind: vi.fn(() => ({
+          all: vi.fn(async () => { throw new Error('secret-d1-connection-detail') }),
+        })),
+      })),
+    } as unknown as D1Database
+
+    await expect(listFavorites(failingDb, 'actor-1', null, 20)).rejects.toMatchObject({
+      code: 'SERVICE_UNAVAILABLE',
+      status: 503,
+      message: 'FAVORITE_LIST_READ_UNAVAILABLE',
+    })
+  })
+
 })

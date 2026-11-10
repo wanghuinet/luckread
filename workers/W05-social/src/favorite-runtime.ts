@@ -1,6 +1,11 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import { ReplyAudienceRuntimeError } from './reply-audience-runtime.js'
+import {
+  createD1FavoriteListReadStore,
+  FavoriteListReadStoreError,
+  type FavoriteListReadStore,
+} from './favorite-list-read-store.js'
 import { fetchPublishedContentSocialContext, type W03ContentBinding } from './w03-content-context-client.js'
 
 export class FavoriteRuntimeError extends Error {
@@ -218,8 +223,17 @@ const decodeFavoriteListCursor = (cursor: string, actorUserId: string): Favorite
   }
 }
 
+type FavoriteListDataSource = D1Database | FavoriteListReadStore
+
+function resolveFavoriteListReadStore(source: FavoriteListDataSource): FavoriteListReadStore {
+  if (typeof (source as FavoriteListReadStore).list === 'function') {
+    return source as FavoriteListReadStore
+  }
+  return createD1FavoriteListReadStore(source as D1Database)
+}
+
 export async function listFavorites(
-  db: D1Database,
+  source: FavoriteListDataSource,
   actorUserId: string,
   cursor: string | null,
   limit: number,
@@ -229,35 +243,24 @@ export async function listFavorites(
     throw new FavoriteRuntimeError('VALIDATION_FAILED', 400)
   }
   const decoded = cursor ? decodeFavoriteListCursor(cursor, actor) : null
-  const rows = decoded
-    ? await db.prepare(
-        `SELECT relationship_id, target_id, created_at
-           FROM interaction_favorites
-          WHERE actor_user_id = ?
-            AND target_type = 'content'
-            AND (created_at < ? OR (created_at = ? AND relationship_id < ?))
-          ORDER BY created_at DESC, relationship_id DESC
-          LIMIT ?`,
-      ).bind(actor, decoded.createdAt, decoded.createdAt, decoded.relationshipId, limit + 1).all<{
-        relationship_id: string
-        target_id: string
-        created_at: string
-      }>()
-    : await db.prepare(
-        `SELECT relationship_id, target_id, created_at
-           FROM interaction_favorites
-          WHERE actor_user_id = ?
-            AND target_type = 'content'
-          ORDER BY created_at DESC, relationship_id DESC
-          LIMIT ?`,
-      ).bind(actor, limit + 1).all<{
-        relationship_id: string
-        target_id: string
-        created_at: string
-      }>()
+  let rows
+  try {
+    rows = await resolveFavoriteListReadStore(source).list({
+      actorUserId: actor,
+      cursor: decoded
+        ? { createdAt: decoded.createdAt, relationshipId: decoded.relationshipId }
+        : null,
+      limit: limit + 1,
+    })
+  } catch (error) {
+    if (error instanceof FavoriteListReadStoreError) {
+      throw new FavoriteRuntimeError(error.code, error.status)
+    }
+    throw error
+  }
 
-  const hasMore = rows.results.length > limit
-  const page = rows.results.slice(0, limit)
+  const hasMore = rows.length > limit
+  const page = rows.slice(0, limit)
   const last = page.at(-1)
   return {
     items: page.map(row => ({ targetId: row.target_id, createdAt: row.created_at })),
@@ -266,7 +269,7 @@ export async function listFavorites(
       ? encodeFavoriteListCursor({
           v: 1,
           actorUserId: actor,
-          createdAt: last.created_at,
+          createdAt: last.cursor_created_at ?? last.created_at,
           relationshipId: last.relationship_id,
         })
       : null,
