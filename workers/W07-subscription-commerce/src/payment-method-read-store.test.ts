@@ -5,7 +5,6 @@ import {
   createPostgresPaymentMethodReadStore,
   type PaymentMethodPostgresQueryExecutor,
 } from './payment-method-read-store-postgres.js'
-import { PaymentMethodPersistenceError } from './payment-method-persistence.js'
 
 const CUSTOMER_ID = 'customer_01'
 const MERCHANT_ID = 'merchant_01'
