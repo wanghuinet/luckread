@@ -46,7 +46,11 @@ export function createPostgresFollowListReadStore(
              to_char(
                rel.created_at AT TIME ZONE 'UTC',
                'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'
-             ) AS followed_at
+             ) AS followed_at,
+             to_char(
+               rel.created_at AT TIME ZONE 'UTC',
+               'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'
+             ) AS cursor_created_at
            FROM social_follow_relationships rel
            WHERE rel.${relationColumn} = $1
              ${cursorPredicate}
