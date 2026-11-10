@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { ModerationRuntimeError, decideModerationCase } from './moderation-runtime'
+import { ModerationRuntimeError, decideModerationCase, listModerationQueue } from './moderation-runtime'
+import { createPostgresModerationQueueReadStore } from './moderation-queue-read-store-postgres'
+import type { ModerationQueuePostgresQueryExecutor } from './moderation-queue-read-store-postgres'
 
 const baseInput = {
   reviewerId: 'reviewer_1',
@@ -120,4 +122,160 @@ describe('moderation runtime admission guards', () => {
     expect(error.status).toBe(403)
     expect(error.code).toBe('PERMISSION_DENIED')
   })
+
+  it('keeps D1 as the default moderation queue read adapter', async () => {
+    const calls: Array<{ sql: string; values: unknown[] }> = []
+    const row = {
+      case_id: 'case_1',
+      target_type: 'content',
+      target_id: 'content_1',
+      target_version: 1,
+      policy_version: 'moderation-v1',
+      state: 'OPEN',
+      priority: 10,
+      assigned_reviewer_id: null,
+      current_decision_id: null,
+      evidence_bundle_ref: null,
+      version: 1,
+      created_at: '2026-11-10T00:00:00.000Z',
+      updated_at: '2026-11-10T00:00:00.000Z',
+      decision_id: null,
+      case_version: null,
+      outcome: null,
+      decision_policy_version: null,
+      decision_effective_at: null,
+      decision_request_id: null,
+      decision_created_at: null,
+    }
+    const db = {
+      prepare(sql: string) {
+        return {
+          bind(...values: unknown[]) {
+            calls.push({ sql, values })
+            return { all: async () => ({ results: [row] }) }
+          },
+        }
+      },
+    } as unknown as D1Database
+
+    const result = await listModerationQueue(db, 'reviewer_1', null, 1)
+
+    expect(result.items).toHaveLength(1)
+    expect(result.items[0]?.caseId).toBe('case_1')
+    expect(result.hasMore).toBe(false)
+    expect(calls).toHaveLength(1)
+    expect(calls[0]?.values).toEqual(['OPEN', 'UNDER_REVIEW', 'ESCALATED', 'APPEALED', 'reviewer_1', 2])
+    expect(calls[0]?.sql).toContain('c.state IN (?,?,?,?)')
+    expect(calls[0]?.sql).toContain("c.target_type = 'content'")
+    expect(calls[0]?.sql).toContain('c.assigned_reviewer_id = ?')
+    expect(calls[0]?.sql).toContain('ORDER BY c.priority DESC, c.created_at ASC, c.case_id ASC')
+  })
+
+  it('uses the PostgreSQL moderation queue store with identical reviewer and page boundaries', async () => {
+    const calls: Array<{ sql: string; values: unknown[] }> = []
+    const makeRow = (caseId: string, priority: number, decisionId: string | null) => ({
+      case_id: caseId,
+      target_type: 'content',
+      target_id: 'content_' + caseId,
+      target_version: 2,
+      policy_version: 'moderation-v1',
+      state: 'OPEN',
+      priority,
+      assigned_reviewer_id: null,
+      current_decision_id: decisionId,
+      evidence_bundle_ref: 'evidence/' + caseId,
+      version: 2,
+      created_at: '2026-11-10T04:02:00.123456Z',
+      updated_at: '2026-11-10T04:02:00.123456Z',
+      decision_id: decisionId,
+      case_version: decisionId ? 2 : null,
+      outcome: decisionId ? 'APPROVED' : null,
+      decision_policy_version: decisionId ? 'moderation-v1' : null,
+      decision_effective_at: decisionId ? '2026-11-10T04:02:00.123456Z' : null,
+      decision_request_id: decisionId ? 'req_case_1' : null,
+      decision_created_at: decisionId ? '2026-11-10T04:02:00.123456Z' : null,
+    })
+    const db: ModerationQueuePostgresQueryExecutor = {
+      async query<Row extends Record<string, unknown>>(sql: string, values: unknown[] = []) {
+        calls.push({ sql, values })
+        return { rows: [
+          makeRow('case_1', 90, 'decision_1'),
+          makeRow('case_2', 80, null),
+          makeRow('case_3', 70, null),
+        ] as unknown as Row[] }
+      },
+    }
+
+    const result = await listModerationQueue(
+      createPostgresModerationQueueReadStore(db),
+      'reviewer_1',
+      null,
+      2,
+    )
+
+    expect(result.items.map((item) => item.caseId)).toEqual(['case_1', 'case_2'])
+    expect(result.items[0]?.currentDecision).toEqual({
+      decisionId: 'decision_1',
+      outcome: 'APPROVED',
+      policyVersion: 'moderation-v1',
+      effectiveAt: '2026-11-10T04:02:00.123456Z',
+    })
+    expect(result.hasMore).toBe(true)
+    expect(result.nextCursor).toBeTruthy()
+    expect(calls).toHaveLength(1)
+    expect(calls[0]?.values).toEqual([['OPEN', 'UNDER_REVIEW', 'ESCALATED', 'APPEALED'], 'reviewer_1', 3])
+    expect(calls[0]?.sql).toContain('c.state = ANY($1::text[])')
+    expect(calls[0]?.sql).toContain("c.target_type = 'content'")
+    expect(calls[0]?.sql).toContain('(c.assigned_reviewer_id IS NULL OR c.assigned_reviewer_id = $2)')
+    expect(calls[0]?.sql).toContain('ORDER BY c.priority DESC, c.created_at ASC, c.case_id ASC')
+    expect(calls[0]?.sql).toContain('LIMIT $3')
+    expect(calls[0]?.sql).toContain('HH24:MI:SS.US')
+  })
+
+  it('preserves microsecond queue cursors in PostgreSQL keyset pagination', async () => {
+    const calls: Array<{ sql: string; values: unknown[] }> = []
+    const db: ModerationQueuePostgresQueryExecutor = {
+      async query<Row extends Record<string, unknown>>(sql: string, values: unknown[] = []) {
+        calls.push({ sql, values })
+        return { rows: [] as Row[] }
+      },
+    }
+    const encoded = btoa(JSON.stringify({
+      version: 1,
+      reviewerId: 'reviewer_1',
+      priority: 40,
+      createdAt: '2026-11-10T04:02:00.123456Z',
+      caseId: 'case_cursor',
+    })).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '')
+
+    await listModerationQueue(createPostgresModerationQueueReadStore(db), 'reviewer_1', encoded, 1)
+
+    expect(calls[0]?.values).toEqual([
+      ['OPEN', 'UNDER_REVIEW', 'ESCALATED', 'APPEALED'],
+      'reviewer_1',
+      40,
+      '2026-11-10T04:02:00.123456Z',
+      'case_cursor',
+      2,
+    ])
+    expect(calls[0]?.sql).toContain('c.created_at > $4::timestamptz')
+    expect(calls[0]?.sql).toContain('c.created_at = $4::timestamptz AND c.case_id > $5')
+  })
+
+  it('maps PostgreSQL queue failures to a sanitized service-unavailable error', async () => {
+    const db: ModerationQueuePostgresQueryExecutor = {
+      async query<Row extends Record<string, unknown>>() {
+        throw new Error('private-postgres-driver-detail')
+      },
+    }
+
+    await expect(
+      listModerationQueue(createPostgresModerationQueueReadStore(db), 'reviewer_1', null, 20),
+    ).rejects.toMatchObject({
+      code: 'SERVICE_UNAVAILABLE',
+      status: 503,
+      message: 'SERVICE_UNAVAILABLE',
+    })
+  })
+
 })
