@@ -11,7 +11,7 @@ describe('W05 PostgreSQL comment mutation store', () => {
       state: 'PUBLISHED',
       has_replies: false,
     }
-    const query = vi.fn(async () => ({ rows: [row] }))
+    const query = vi.fn(async (_sql: string, _values?: unknown[]) => ({ rows: [row] }))
     const store = createPostgresCommentMutationStore({ query } as unknown as CommentMutationPostgresQueryExecutor)
 
     await expect(store.getForDelete('comment-1')).resolves.toEqual(row)
@@ -23,7 +23,7 @@ describe('W05 PostgreSQL comment mutation store', () => {
   })
 
   it('marks only an owned published leaf comment as author-deleted', async () => {
-    const query = vi.fn(async () => ({ rows: [{ id: 'comment-1' }] }))
+    const query = vi.fn(async (_sql: string, _values?: unknown[]) => ({ rows: [{ id: 'comment-1' }] }))
     const store = createPostgresCommentMutationStore({ query } as unknown as CommentMutationPostgresQueryExecutor)
 
     await expect(store.markDeleted({
@@ -40,7 +40,7 @@ describe('W05 PostgreSQL comment mutation store', () => {
   })
 
   it('re-reads the post-race deletion state scoped to the author', async () => {
-    const query = vi.fn(async () => ({ rows: [{ state: 'AUTHOR_DELETED' }] }))
+    const query = vi.fn(async (_sql: string, _values?: unknown[]) => ({ rows: [{ state: 'AUTHOR_DELETED' }] }))
     const store = createPostgresCommentMutationStore({ query } as unknown as CommentMutationPostgresQueryExecutor)
 
     await expect(store.getDeleteState('comment-1', 'actor-1')).resolves.toBe('AUTHOR_DELETED')
@@ -61,7 +61,7 @@ describe('W05 PostgreSQL comment mutation store', () => {
       created_at: '2026-11-10T11:00:00.123Z',
       updated_at: '2026-11-10T11:00:00.456Z',
     }
-    const query = vi.fn(async () => ({ rows: [row] }))
+    const query = vi.fn(async (_sql: string, _values?: unknown[]) => ({ rows: [row] }))
     const store = createPostgresCommentMutationStore({ query } as unknown as CommentMutationPostgresQueryExecutor)
 
     await expect(store.getForUpdate('comment-1')).resolves.toEqual(row)
@@ -82,7 +82,7 @@ describe('W05 PostgreSQL comment mutation store', () => {
       created_at: '2026-11-10T11:00:00.123Z',
       updated_at: '2026-11-10T12:00:00.000Z',
     }
-    const query = vi.fn(async () => ({ rows: [row] }))
+    const query = vi.fn(async (_sql: string, _values?: unknown[]) => ({ rows: [row] }))
     const store = createPostgresCommentMutationStore({ query } as unknown as CommentMutationPostgresQueryExecutor)
 
     await expect(store.update({
@@ -106,7 +106,7 @@ describe('W05 PostgreSQL comment mutation store', () => {
   })
 
   it('returns null when the edit compare-and-swap loses a race', async () => {
-    const query = vi.fn(async () => ({ rows: [] }))
+    const query = vi.fn(async (_sql: string, _values?: unknown[]) => ({ rows: [] }))
     const store = createPostgresCommentMutationStore({ query } as unknown as CommentMutationPostgresQueryExecutor)
 
     await expect(store.update({
@@ -120,7 +120,7 @@ describe('W05 PostgreSQL comment mutation store', () => {
 
   it('sanitizes all PostgreSQL provider failures', async () => {
     const store = createPostgresCommentMutationStore({
-      query: vi.fn(async () => { throw new Error('secret host, password and query') }),
+      query: vi.fn(async (_sql: string, _values?: unknown[]) => { throw new Error('secret host, password and query') }),
     } as unknown as CommentMutationPostgresQueryExecutor)
 
     await expect(store.getForDelete('comment-1')).rejects.toMatchObject({ message: 'COMMENT_MUTATION_STORE_UNAVAILABLE' })
