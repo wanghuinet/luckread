@@ -27,10 +27,10 @@ export function createD1PollDeleteStore(db: D1Database): PollDeleteStore {
     async getPoll(contentId) {
       try {
         return await db.prepare(
-          \`SELECT poll_id, content_id, owner_user_id
+          `SELECT poll_id, content_id, owner_user_id
              FROM social_polls
             WHERE content_id = ?
-            LIMIT 1\`,
+            LIMIT 1`,
         ).bind(contentId).first<PollDeleteRow>()
       } catch {
         throw new PollDeleteStoreError()
@@ -52,7 +52,7 @@ export function createD1PollDeleteStore(db: D1Database): PollDeleteStore {
       try {
         const results = await db.batch([
           db.prepare(
-            \`DELETE FROM social_poll_options
+            `DELETE FROM social_poll_options
               WHERE poll_id = ?
                 AND EXISTS (
                   SELECT 1
@@ -63,16 +63,16 @@ export function createD1PollDeleteStore(db: D1Database): PollDeleteStore {
                      AND NOT EXISTS (
                        SELECT 1 FROM social_poll_votes WHERE poll_id = ?
                      )
-                )\`,
+                )`,
           ).bind(input.pollId, input.pollId, input.actorUserId, input.contentId, input.pollId),
           db.prepare(
-            \`DELETE FROM social_polls
+            `DELETE FROM social_polls
               WHERE poll_id = ?
                 AND owner_user_id = ?
                 AND content_id = ?
                 AND NOT EXISTS (
                   SELECT 1 FROM social_poll_votes WHERE poll_id = ?
-                )\`,
+                )`,
           ).bind(input.pollId, input.actorUserId, input.contentId, input.pollId),
         ])
         return Number(results[1]?.meta?.changes ?? 0) === 1
