@@ -11,10 +11,42 @@ import {
   SocialTargetsReadStoreError,
   type SocialTargetsReadStore,
 } from './social-targets-read-store.js'
+import {
+  createD1SocialClosureReadStore,
+  SocialClosureReadStoreError,
+  type SocialClosureReadStore,
+} from './social-closure-read-store.js'
 
 export class SocialClosureRuntimeError extends Error {
   constructor(readonly code: string, readonly status: number) { super(code) }
 }
+
+type SocialClosureDataSource = D1Database | SocialClosureReadStore
+
+function resolveSocialClosureReadStore(source: SocialClosureDataSource): SocialClosureReadStore {
+  if (
+    typeof (source as SocialClosureReadStore).getTopicByName === 'function' &&
+    typeof (source as SocialClosureReadStore).listNotificationRows === 'function' &&
+    typeof (source as SocialClosureReadStore).getContentSocialCounts === 'function'
+  ) {
+    return source as SocialClosureReadStore
+  }
+  return createD1SocialClosureReadStore(source as D1Database)
+}
+
+async function withSocialClosureRead<T>(operation: () => Promise<T>): Promise<T> {
+  try {
+    return await operation()
+  } catch (error) {
+    if (error instanceof SocialClosureReadStoreError) {
+      throw new SocialClosureRuntimeError(error.code, error.status)
+    }
+    throw error
+  }
+}
+
+const isSqlTrue = (value: number | boolean | null | undefined): boolean =>
+  value === true || Number(value ?? 0) === 1
 
 export type SocialTargetType = 'content' | 'comment'
 export type SocialNotificationType = 'FOLLOW' | 'LIKE' | 'COMMENT' | 'REPLY' | 'MENTION'
@@ -395,7 +427,7 @@ export async function getSocialTargets(
 }
 
 export async function getTopicPage(
-  db: D1Database,
+  source: SocialClosureDataSource,
   w03Content: W03ContentBinding | undefined,
   topicNameValue: string,
   limitValue: string | null,
@@ -415,9 +447,8 @@ export async function getTopicPage(
 
   const limit = parseLimit(limitValue)
   const cursor = cursorValue ? decodeCursor(cursorValue) : null
-  const topic = await db.prepare(
-    'SELECT topic_id, normalized_name, display_name, status FROM social_topics WHERE normalized_name = ? LIMIT 1',
-  ).bind(normalizedName).first<{ topic_id: string; normalized_name: string; display_name: string; status: string }>()
+  const store = resolveSocialClosureReadStore(source)
+  const topic = await withSocialClosureRead(() => store.getTopicByName(normalizedName))
   if (!topic || topic.status !== 'ACTIVE') throw new SocialClosureRuntimeError('NOT_FOUND', 404)
 
   // W05 pages its own topic edges in bounded batches. W03 remains authoritative
@@ -437,21 +468,11 @@ export async function getTopicPage(
   }> = []
 
   while (batchesScanned < maxBatches && visible.length <= limit && !sourceExhausted) {
-    const where = scanCursor
-      ? ' AND (st.created_at < ? OR (st.created_at = ? AND st.target_id < ?))'
-      : ''
-    const binds = scanCursor
-      ? [topic.topic_id, scanCursor.createdAt, scanCursor.createdAt, scanCursor.targetId, batchSize]
-      : [topic.topic_id, batchSize]
-    const candidates = await db.prepare(
-      `SELECT st.target_id, st.created_at
-         FROM social_target_topics st
-        WHERE st.target_type = 'content'
-          AND st.topic_id = ?${where}
-        ORDER BY st.created_at DESC, st.target_id DESC
-        LIMIT ?`,
-    ).bind(...binds).all<{ target_id: string; created_at: string }>()
-    const rows = candidates.results ?? []
+    const rows = await withSocialClosureRead(() => store.listTopicContentEdges({
+      topicId: topic.topic_id,
+      cursor: scanCursor,
+      limit: batchSize,
+    }))
     batchesScanned += 1
     if (rows.length === 0) {
       sourceExhausted = true
@@ -562,7 +583,7 @@ const decodeDiscoveryTopicCursor = (value: string | null): DiscoveryTopicCursor 
  * topic relations; search ranking and canonical content state remain elsewhere.
  */
 export async function listDiscoveryTopics(
-  db: D1Database,
+  source: SocialClosureDataSource,
   w03Content: W03ContentBinding | undefined,
   correlationId: string,
   limitValue: string | null,
@@ -605,32 +626,16 @@ export async function listDiscoveryTopics(
     return updatedAt
   }
   const stats = new Map<string, RankedDiscoveryTopic>()
+  const store = resolveSocialClosureReadStore(source)
   type DiscoveryTopicRelation = { topic_id: string; normalized_name: string; display_name: string; target_id: string }
   let relationCursor: { topicId: string; targetId: string } | null = null
 
   while (true) {
-    const cursorClause: string = relationCursor
-      ? 'AND (st.topic_id, st.target_id) > (?, ?)'
-      : ''
-    const cursorBindings: string[] = relationCursor
-      ? [relationCursor.topicId, relationCursor.targetId]
-      : []
-    // The partial covering index returns only content edges in ranking order.
-    // CROSS JOIN fixes the loop order; the tuple cursor lets SQLite seek into
-    // the composite index without DISTINCT or a temporary ORDER BY b-tree.
-    const result: { results?: DiscoveryTopicRelation[] | null } = await db.prepare(`
-      SELECT t.topic_id, t.normalized_name, t.display_name, st.target_id
-        FROM social_target_topics st
-          INDEXED BY ix_social_target_topics_content_topic_target
-        CROSS JOIN social_topics t
-       WHERE st.target_type = 'content'
-         AND t.topic_id = st.topic_id
-         AND t.status = 'ACTIVE'
-         ${cursorClause}
-       ORDER BY st.topic_id ASC, st.target_id ASC
-       LIMIT ?
-    `).bind(...cursorBindings, relationBatchSize).all<DiscoveryTopicRelation>()
-    const edges: DiscoveryTopicRelation[] = result.results ?? []
+    // The D1 adapter pins the partial covering index; PostgreSQL uses the
+    // equivalent owner-schema index and the same keyset shape.
+    const edges: readonly DiscoveryTopicRelation[] = await withSocialClosureRead(() =>
+      store.listDiscoveryContentEdges({ cursor: relationCursor, limit: relationBatchSize })
+    )
     if (edges.length === 0) break
 
     const last: DiscoveryTopicRelation = edges[edges.length - 1]!
@@ -837,7 +842,7 @@ export async function enqueueNotification(
 const NOTIFICATION_TYPES: readonly SocialNotificationType[] = ['FOLLOW', 'LIKE', 'COMMENT', 'REPLY', 'MENTION']
 
 export async function listNotifications(
-  db: D1Database,
+  source: SocialClosureDataSource,
   recipientUserIdValue: string,
   cursorValue: string | null,
   limitValue: string | null,
@@ -854,40 +859,17 @@ export async function listNotifications(
   }
   const notificationIdText = notificationIdValue?.trim() ?? ''
   const notificationId = notificationIdText ? id(notificationIdText) : null
-  const whereType = notificationType ? ' AND notification_type = ?' : ''
-  const whereNotificationId = notificationId ? ' AND notification_id = ?' : ''
-  const whereCursor = cursor ? ' AND (created_at < ? OR (created_at = ? AND notification_id < ?))' : ''
-  const cursorBinds = cursor ? [cursor.createdAt, cursor.createdAt, cursor.notificationId] : []
-  const binds = [
+  const store = resolveSocialClosureReadStore(source)
+  const rows = await withSocialClosureRead(() => store.listNotificationRows({
     recipientUserId,
-    ...(notificationType ? [notificationType] : []),
-    ...(notificationId ? [notificationId] : []),
-    ...cursorBinds,
-    limit + 1,
-  ]
+    notificationType: notificationType as SocialNotificationType | null,
+    notificationId,
+    cursor,
+    limit: limit + 1,
+  }))
+  const unreadCount = await withSocialClosureRead(() => store.countUnreadNotifications(recipientUserId))
 
-  const rows = await db.prepare(
-    `SELECT notification_id, notification_type, actor_user_id, target_type, target_id, payload_json, read_at, created_at
-       FROM social_notifications
-      WHERE recipient_user_id = ?${whereType}${whereNotificationId}${whereCursor}
-      ORDER BY created_at DESC, notification_id DESC
-      LIMIT ?`,
-  ).bind(...binds).all<{
-    notification_id: string
-    notification_type: SocialNotificationType
-    actor_user_id: string
-    target_type: string
-    target_id: string
-    payload_json: string
-    read_at: string | null
-    created_at: string
-  }>()
-
-  const unread = await db.prepare(
-    'SELECT COUNT(*) AS count FROM social_notifications WHERE recipient_user_id = ? AND read_at IS NULL',
-  ).bind(recipientUserId).first<{ count: number }>()
-
-  const items = rows.results ?? []
+  const items = rows
   const visible = items.slice(0, limit)
   const last = visible.at(-1)
   return {
@@ -901,29 +883,27 @@ export async function listNotifications(
       readAt: row.read_at,
       createdAt: row.created_at,
     })),
-    unreadCount: Number(unread?.count ?? 0),
+    unreadCount,
     hasMore: items.length > limit,
     nextCursor: items.length > limit && last ? encodeCursor(last.created_at, last.notification_id) : null,
   }
 }
 
 export async function markNotificationRead(
-  db: D1Database,
+  source: SocialClosureDataSource,
   recipientUserIdValue: string,
   notificationIdValue: string,
 ): Promise<void> {
   const recipientUserId = id(recipientUserIdValue, 'UNAUTHENTICATED')
   const notificationId = id(notificationIdValue)
-  await db.prepare(
-    'UPDATE social_notifications SET read_at = CURRENT_TIMESTAMP WHERE notification_id = ? AND recipient_user_id = ?',
-  ).bind(notificationId, recipientUserId).run()
+  await withSocialClosureRead(() => resolveSocialClosureReadStore(source)
+    .markNotificationRead(recipientUserId, notificationId))
 }
 
-export async function markAllNotificationsRead(db: D1Database, recipientUserIdValue: string): Promise<void> {
+export async function markAllNotificationsRead(source: SocialClosureDataSource, recipientUserIdValue: string): Promise<void> {
   const recipientUserId = id(recipientUserIdValue, 'UNAUTHENTICATED')
-  await db.prepare(
-    'UPDATE social_notifications SET read_at = CURRENT_TIMESTAMP WHERE recipient_user_id = ? AND read_at IS NULL',
-  ).bind(recipientUserId).run()
+  await withSocialClosureRead(() => resolveSocialClosureReadStore(source)
+    .markAllNotificationsRead(recipientUserId))
 }
 
 type NotificationPreferencesDataSource = D1Database | NotificationPreferencesStore
@@ -970,7 +950,7 @@ export async function setNotificationPreferences(
 }
 
 export async function getContentSocialSummary(
-  db: D1Database,
+  source: SocialClosureDataSource,
   contentIdValue: string,
   contentContext: PublishedContentSocialContext,
   viewerUserIdValue?: string | null,
@@ -989,37 +969,22 @@ export async function getContentSocialSummary(
   const pinnedOwnerUserId = contentContext.contentType === 'post'
     ? contentContext.ownerUserId
     : null
-  const counts = await db.prepare(
-    `SELECT
-       (SELECT COUNT(*) FROM interaction_likes WHERE target_type = 'content' AND target_id = ?) AS likes,
-       (SELECT COUNT(*) FROM social_comments WHERE content_id = ? AND state = 'PUBLISHED') AS comments,
-       (SELECT COUNT(*) FROM interaction_favorites WHERE target_type = 'content' AND target_id = ?) AS favorites,
-       (SELECT COUNT(*) FROM social_share_links WHERE content_id = ?) AS shares,
-       (SELECT COUNT(*) FROM social_reposts WHERE content_id = ?) AS reposts,
-       EXISTS (
-         SELECT 1 FROM social_profile_pins p
-         WHERE p.content_id = ? AND p.user_id = ?
-       ) AS pinned`,
-  ).bind(contentId, contentId, contentId, contentId, contentId, contentId, pinnedOwnerUserId).first<{
-    likes: number; comments: number; favorites: number; shares: number; reposts: number; pinned: number
-  }>()
+  const store = resolveSocialClosureReadStore(source)
+  const counts = await withSocialClosureRead(() =>
+    store.getContentSocialCounts(contentId, pinnedOwnerUserId)
+  )
 
-  const social = await getSocialTargets(db, 'content', contentId)
+  const social = await getSocialTargets(source, 'content', contentId)
   let viewer: { liked: boolean; favorited: boolean; reposted: boolean } | null = null
   if (viewerUserIdValue) {
     const viewerUserId = id(viewerUserIdValue, 'UNAUTHENTICATED')
-    const state = await db.prepare(
-      `SELECT
-         EXISTS (SELECT 1 FROM interaction_likes WHERE actor_user_id = ? AND target_type = 'content' AND target_id = ?) AS liked,
-         EXISTS (SELECT 1 FROM interaction_favorites WHERE actor_user_id = ? AND target_type = 'content' AND target_id = ?) AS favorited,
-         EXISTS (SELECT 1 FROM social_reposts WHERE actor_user_id = ? AND content_id = ?) AS reposted`,
-    ).bind(viewerUserId, contentId, viewerUserId, contentId, viewerUserId, contentId).first<{
-      liked: number; favorited: number; reposted: number
-    }>()
+    const state = await withSocialClosureRead(() =>
+      store.getContentSocialViewerState(viewerUserId, contentId)
+    )
     viewer = {
-      liked: Boolean(state?.liked),
-      favorited: Boolean(state?.favorited),
-      reposted: Boolean(state?.reposted),
+      liked: isSqlTrue(state?.liked),
+      favorited: isSqlTrue(state?.favorited),
+      reposted: isSqlTrue(state?.reposted),
     }
   }
 
@@ -1033,7 +998,7 @@ export async function getContentSocialSummary(
       shares: Number(counts?.shares ?? 0),
       reposts: Number(counts?.reposts ?? 0),
     },
-    pinned: Number(counts?.pinned ?? 0) === 1,
+    pinned: isSqlTrue(counts?.pinned),
     viewer,
     topics: social.topics,
     mentions: social.mentions,
