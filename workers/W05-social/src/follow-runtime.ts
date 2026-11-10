@@ -17,6 +17,10 @@ import {
   FollowingAuthorIdsReadStoreError,
   type FollowingAuthorIdsReadStore,
 } from './following-author-ids-read-store.js'
+import {
+  createD1FollowStatusReadStore,
+  type FollowStatusReadStore,
+} from './follow-status-read-store.js'
 export type { FollowRow } from './follow-store.js'
 
 export class FollowRuntimeError extends Error {
@@ -356,32 +360,32 @@ export async function unfollow(
   await invalidateFollowListCountCache(follower, target)
 }
 
-export async function getFollowStatus(db: D1Database, followerUserId: string, targetUserId: string) {
+type FollowStatusDataSource = D1Database | FollowStatusReadStore
+
+function resolveFollowStatusReadStore(source: FollowStatusDataSource): FollowStatusReadStore {
+  if (typeof (source as FollowStatusReadStore).getStatus === 'function') {
+    return source as FollowStatusReadStore
+  }
+  return createD1FollowStatusReadStore(source as D1Database)
+}
+
+export async function getFollowStatus(
+  source: FollowStatusDataSource,
+  followerUserId: string,
+  targetUserId: string,
+) {
   const follower = userId(followerUserId)
   const target = userId(targetUserId)
-  const row = await db.prepare(
-    `SELECT
-       r.relationship_id,
-       r.created_at,
-       EXISTS (
-         SELECT 1
-         FROM social_user_interactions block
-         WHERE block.relation_type = 'block'
-           AND (
-             (block.actor_user_id = ? AND block.target_user_id = ?)
-             OR
-             (block.actor_user_id = ? AND block.target_user_id = ?)
-           )
-       ) AS blocked
-       FROM social_follow_relationships r
-       WHERE r.follower_user_id = ? AND r.target_user_id = ?
-       LIMIT 1`,
-  ).bind(follower, target, target, follower, follower, target).first<{
-    relationship_id: string
-    created_at: string
-    blocked: number
-  }>()
-  if (Number(row?.blocked ?? 0) === 1) {
+  let row
+  try {
+    row = await resolveFollowStatusReadStore(source).getStatus({
+      followerUserId: follower,
+      targetUserId: target,
+    })
+  } catch (error) {
+    mapFollowStoreError(error)
+  }
+  if (row?.blocked === true || Number(row?.blocked ?? 0) === 1) {
     return { following: false, relationshipId: null, createdAt: null }
   }
   return {
