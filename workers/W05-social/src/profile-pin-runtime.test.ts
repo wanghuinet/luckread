@@ -38,6 +38,34 @@ describe('profile pin runtime', () => {
     expect(String(prepare.mock.calls[1]?.[0])).toContain('FROM social_profile_pins')
   })
 
+  it('uses an injected store for pin, reference read and unpin without D1 access', async () => {
+    const store = {
+      pin: vi.fn(async () => pin),
+      get: vi.fn(async () => pin),
+      unpin: vi.fn(async () => undefined),
+    }
+    const d = db()
+    await expect(pinProfileContent(d, 'viewer-1', 'content-1', publishedContext, store)).resolves.toMatchObject({
+      userId: 'viewer-1', contentId: 'content-1',
+    })
+    await expect(getProfilePinReference(d, 'viewer-1', store)).resolves.toMatchObject({ contentId: 'content-1' })
+    await expect(unpinProfileContent(d, 'viewer-1', 'content-1', store)).resolves.toBeUndefined()
+    expect(store.pin).toHaveBeenCalledTimes(1)
+    expect(store.get).toHaveBeenCalledWith('viewer-1')
+    expect(store.unpin).toHaveBeenCalledWith('viewer-1', 'content-1')
+    expect((d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
+  })
+
+  it('rejects non-owner context before consulting an injected store', async () => {
+    const store = { pin: vi.fn(), get: vi.fn(), unpin: vi.fn() }
+    const d = db()
+    await expect(pinProfileContent(d, 'viewer-1', 'content-1', {
+      ...publishedContext, ownerUserId: 'someone-else',
+    }, store)).rejects.toMatchObject({ code: 'PERMISSION_DENIED', status: 403 })
+    expect(store.pin).not.toHaveBeenCalled()
+    expect((d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
+  })
+
   it('rejects non-owner context and does not query or write W05 state', async () => {
     const d = db()
     await expect(pinProfileContent(d, 'viewer-1', 'content-1', {

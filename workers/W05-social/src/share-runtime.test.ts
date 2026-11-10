@@ -56,6 +56,30 @@ describe('share runtime', () => {
     expect(prepare.mock.calls.some(([sql]) => /\b(?:FROM|JOIN)\s+contents\b/i.test(String(sql)))).toBe(false)
   })
 
+  it('uses an injected share store while keeping W03 publication validation', async () => {
+    const store = {
+      findByActorAndKey: vi.fn()
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({
+          share_id: 'share-injected', content_id: 'content-1', actor_user_id: 'user-1',
+          created_at: '2026-10-02T00:00:00.000Z',
+        }),
+      insertIfAbsent: vi.fn(async () => undefined),
+      findById: vi.fn(async () => ({
+        share_id: 'share-injected', content_id: 'content-1', created_at: '2026-10-02T00:00:00.000Z',
+      })),
+    }
+    const d = db()
+    await expect(createShare(d, publishedContextBinding(), 'user-1', 'content-1', 'key-injected', 'corr', store))
+      .resolves.toMatchObject({ shareId: 'share-injected', contentId: 'content-1' })
+    await expect(resolveShare(d, publishedContextBinding(), 'share-injected', 'corr', store))
+      .resolves.toMatchObject({ shareId: 'share-injected', contentId: 'content-1' })
+    expect(store.findByActorAndKey).toHaveBeenCalledTimes(2)
+    expect(store.insertIfAbsent).toHaveBeenCalledWith(expect.any(String), 'content-1', 'user-1', 'key-injected', expect.any(String))
+    expect(store.findById).toHaveBeenCalledWith('share-injected')
+    expect((d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
+  })
+
   it('fails closed before reading or writing a share record when W03 says content is not published', async () => {
     const d = db()
     const binding = publishedContextBinding(404)

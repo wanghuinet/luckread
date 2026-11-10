@@ -2,6 +2,7 @@
 
 import { ReplyAudienceRuntimeError } from './reply-audience-runtime.js'
 import { fetchPublishedContentSocialContext, type W03ContentBinding } from './w03-content-context-client.js'
+import { createD1ShareStore, ShareStoreError, type ShareStorageRow, type ShareStore } from './share-store.js'
 
 export class ShareRuntimeError extends Error {
   constructor(readonly code: string, readonly status: number) { super(code) }
@@ -71,6 +72,7 @@ export async function createShare(
   contentIdValue: string,
   idempotencyKeyValue: string,
   correlationId: string,
+  store: ShareStore = createD1ShareStore(db),
 ): Promise<ShareRecord> {
   const actor = validateActor(actorUserId)
   const contentId = validateId(contentIdValue)
@@ -78,19 +80,16 @@ export async function createShare(
 
   await assertPublishedContent(w03Content, contentId, correlationId)
 
-  const existing = await db.prepare(
-    'SELECT share_id, content_id, actor_user_id, created_at FROM social_share_links WHERE actor_user_id = ? AND idempotency_key = ? LIMIT 1',
-  ).bind(actor, idempotencyKey).first<{
-    share_id: string
-    content_id: string
-    actor_user_id: string
-    created_at: string
-  }>()
+  let existing: ShareStorageRow | null
+  try {
+    existing = await store.findByActorAndKey(actor, idempotencyKey)
+  } catch (error) {
+    if (error instanceof ShareStoreError) throw new ShareRuntimeError(error.code, error.status)
+    throw new ShareRuntimeError('SERVICE_UNAVAILABLE', 503)
+  }
 
   if (existing) {
-    if (existing.content_id !== contentId) {
-      throw new ShareRuntimeError('CONFLICT', 409)
-    }
+    if (existing.content_id !== contentId) throw new ShareRuntimeError('CONFLICT', 409)
     return {
       shareId: existing.share_id,
       contentId: existing.content_id,
@@ -101,25 +100,14 @@ export async function createShare(
 
   const shareId = crypto.randomUUID()
   const createdAt = new Date().toISOString()
-
+  let row: ShareStorageRow | null
   try {
-    await db.prepare(
-      'INSERT INTO social_share_links (share_id, content_id, actor_user_id, idempotency_key, created_at) VALUES (?, ?, ?, ?, ?)',
-    ).bind(shareId, contentId, actor, idempotencyKey, createdAt).run()
+    await store.insertIfAbsent(shareId, contentId, actor, idempotencyKey, createdAt)
+    row = await store.findByActorAndKey(actor, idempotencyKey)
   } catch (error) {
-    if (!(error instanceof Error) || !error.message.toLowerCase().includes('unique')) {
-      throw error
-    }
+    if (error instanceof ShareStoreError) throw new ShareRuntimeError(error.code, error.status)
+    throw new ShareRuntimeError('SERVICE_UNAVAILABLE', 503)
   }
-
-  const row = await db.prepare(
-    'SELECT share_id, content_id, actor_user_id, created_at FROM social_share_links WHERE actor_user_id = ? AND idempotency_key = ? LIMIT 1',
-  ).bind(actor, idempotencyKey).first<{
-    share_id: string
-    content_id: string
-    actor_user_id: string
-    created_at: string
-  }>()
 
   if (!row) throw new ShareRuntimeError('INTERNAL_ERROR', 500)
   if (row.content_id !== contentId) throw new ShareRuntimeError('CONFLICT', 409)
@@ -137,15 +125,16 @@ export async function resolveShare(
   w03Content: W03ContentBinding | undefined,
   shareIdValue: string,
   correlationId: string,
+  store: ShareStore = createD1ShareStore(db),
 ): Promise<{ shareId: string; contentId: string; createdAt: string }> {
   const shareId = validateId(shareIdValue)
-  const row = await db.prepare(
-    'SELECT share_id, content_id, created_at FROM social_share_links WHERE share_id = ? LIMIT 1',
-  ).bind(shareId).first<{
-    share_id: string
-    content_id: string
-    created_at: string
-  }>()
+  let row: Pick<ShareStorageRow, 'share_id' | 'content_id' | 'created_at'> | null
+  try {
+    row = await store.findById(shareId)
+  } catch (error) {
+    if (error instanceof ShareStoreError) throw new ShareRuntimeError(error.code, error.status)
+    throw new ShareRuntimeError('SERVICE_UNAVAILABLE', 503)
+  }
 
   if (!row) throw new ShareRuntimeError('NOT_FOUND', 404)
   await assertPublishedContent(w03Content, row.content_id, correlationId)

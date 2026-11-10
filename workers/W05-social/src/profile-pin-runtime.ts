@@ -1,5 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 import type { OwnedPostContext } from './owned-post-context.js'
+import { createD1ProfilePinStore, ProfilePinStoreError, type ProfilePinStorageRow, type ProfilePinStore } from './profile-pin-store.js'
 
 export class ProfilePinRuntimeError extends Error {
   constructor(readonly code: string, readonly status: number) { super(code) }
@@ -25,6 +26,7 @@ export async function pinProfileContent(
   actorUserIdValue: string,
   contentIdValue: string,
   context: OwnedPostContext,
+  store: ProfilePinStore = createD1ProfilePinStore(db),
 ): Promise<ProfilePinRecord> {
   const actorUserId = validateId(actorUserIdValue, true)
   const contentId = validateId(contentIdValue)
@@ -35,20 +37,15 @@ export async function pinProfileContent(
   if (context.ownerUserId !== actorUserId) throw new ProfilePinRuntimeError('PERMISSION_DENIED', 403)
 
   const pinnedAt = new Date().toISOString()
-  await db.prepare(
-    `INSERT INTO social_profile_pins (user_id, content_id, pinned_at)
-     VALUES (?, ?, ?)
-     ON CONFLICT(user_id) DO UPDATE SET
-       content_id = excluded.content_id,
-       pinned_at = CASE
-         WHEN social_profile_pins.content_id = excluded.content_id THEN social_profile_pins.pinned_at
-         ELSE excluded.pinned_at
-       END`,
-  ).bind(actorUserId, contentId, pinnedAt).run()
-
-  const row = await db.prepare(
-    'SELECT user_id, content_id, pinned_at FROM social_profile_pins WHERE user_id = ? LIMIT 1',
-  ).bind(actorUserId).first<{ user_id: string; content_id: string; pinned_at: string }>()
+  let row: ProfilePinStorageRow | null
+  try {
+    row = await store.pin(actorUserId, contentId, pinnedAt)
+  } catch (error) {
+    if (error instanceof ProfilePinStoreError) {
+      throw new ProfilePinRuntimeError(error.code, error.status)
+    }
+    throw new ProfilePinRuntimeError('SERVICE_UNAVAILABLE', 503)
+  }
 
   if (!row || row.content_id !== contentId) throw new ProfilePinRuntimeError('CONFLICT', 409)
   return { userId: row.user_id, contentId: row.content_id, pinnedAt: row.pinned_at }
@@ -59,12 +56,18 @@ export async function unpinProfileContent(
   db: D1Database,
   actorUserIdValue: string,
   contentIdValue: string,
+  store: ProfilePinStore = createD1ProfilePinStore(db),
 ): Promise<void> {
   const actorUserId = validateId(actorUserIdValue, true)
   const contentId = validateId(contentIdValue)
-  await db.prepare(
-    'DELETE FROM social_profile_pins WHERE user_id = ? AND content_id = ?',
-  ).bind(actorUserId, contentId).run()
+  try {
+    await store.unpin(actorUserId, contentId)
+  } catch (error) {
+    if (error instanceof ProfilePinStoreError) {
+      throw new ProfilePinRuntimeError(error.code, error.status)
+    }
+    throw new ProfilePinRuntimeError('SERVICE_UNAVAILABLE', 503)
+  }
 }
 
 /**
@@ -74,13 +77,16 @@ export async function unpinProfileContent(
 export async function getProfilePinReference(
   db: D1Database,
   userIdValue: string,
+  store: ProfilePinStore = createD1ProfilePinStore(db),
 ): Promise<ProfilePinRecord | null> {
   const userId = validateId(userIdValue)
-  const row = await db.prepare(
-    `SELECT user_id, content_id, pinned_at
-       FROM social_profile_pins
-      WHERE user_id = ?
-      LIMIT 1`,
-  ).bind(userId).first<{ user_id: string; content_id: string; pinned_at: string }>()
-  return row ? { userId: row.user_id, contentId: row.content_id, pinnedAt: row.pinned_at } : null
+  try {
+    const row = await store.get(userId)
+    return row ? { userId: row.user_id, contentId: row.content_id, pinnedAt: row.pinned_at } : null
+  } catch (error) {
+    if (error instanceof ProfilePinStoreError) {
+      throw new ProfilePinRuntimeError(error.code, error.status)
+    }
+    throw new ProfilePinRuntimeError('SERVICE_UNAVAILABLE', 503)
+  }
 }
