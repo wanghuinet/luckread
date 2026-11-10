@@ -5,6 +5,7 @@ import { ReplyAudienceRuntimeError } from './reply-audience-runtime.js'
 import { fetchPublishedOwnerPostContext, type W03ContentBinding } from './w03-content-context-client.js'
 import { createD1PollReadStore, type PollReadStore } from './poll-read-store.js'
 import { createD1PollDeleteStore, type PollDeleteStore } from './poll-delete-store.js'
+import { createD1PollConfigurationStore, type PollConfigurationStore } from './poll-configuration-store.js'
 
 export class SocialPollError extends Error {
   constructor(readonly code: string, readonly status: number) { super(code) }
@@ -268,6 +269,8 @@ export async function configureContentPoll(
   optionsInput: unknown,
   durationInput: unknown,
   contentContext?: OwnedPostContext,
+  configurationStore: PollConfigurationStore = createD1PollConfigurationStore(db),
+  readStore: PollReadStore = createD1PollReadStore(db),
 ): Promise<PollView> {
   const actorUserId = validateId(actorUserIdValue, 'UNAUTHENTICATED')
   const contentId = validateId(contentIdValue)
@@ -280,78 +283,107 @@ export async function configureContentPoll(
     throw new SocialPollError('NOT_FOUND', 404)
   }
 
-  const existing = await readPollRow(db, contentId)
+  let existing: PollRow | null
+  try {
+    existing = await configurationStore.getPoll(contentId)
+  } catch {
+    throw new SocialPollError('INTERNAL_ERROR', 500)
+  }
+
   if (content.state !== 'DRAFT') {
     if (content.state !== 'PUBLISHED' || !existing) throw new SocialPollError('CONFLICT', 409)
-    const existingOptions = await db.prepare(
-      'SELECT option_text FROM social_poll_options WHERE poll_id = ? ORDER BY position ASC',
-    ).bind(existing.poll_id).all<{ option_text: string }>()
-    const sameOptions = (existingOptions.results ?? []).map(row => row.option_text)
-    if (existing.duration_minutes !== durationMinutes || JSON.stringify(sameOptions) !== JSON.stringify(options)) {
+    let existingOptions: string[]
+    try {
+      existingOptions = await configurationStore.listOptionTexts(existing.poll_id)
+    } catch {
+      throw new SocialPollError('INTERNAL_ERROR', 500)
+    }
+    if (Number(existing.duration_minutes) !== durationMinutes ||
+        JSON.stringify(existingOptions) !== JSON.stringify(options)) {
       throw new SocialPollError('CONFLICT', 409)
     }
-    const current = await getContentPoll(db, contentId, actorUserId, contentContext)
+    const current = await getContentPoll(db, contentId, actorUserId, contentContext, readStore)
     if (!current) throw new SocialPollError('CONFLICT', 409)
     return current
   }
 
   if (existing) {
-    const existingOptions = await db.prepare(
-      'SELECT option_text FROM social_poll_options WHERE poll_id = ? ORDER BY position ASC',
-    ).bind(existing.poll_id).all<{ option_text: string }>()
-    const currentOptions = (existingOptions.results ?? []).map(row => row.option_text)
-    const voteCount = await db.prepare(
-      'SELECT COUNT(*) AS count FROM social_poll_votes WHERE poll_id = ?',
-    ).bind(existing.poll_id).first<{ count: number }>()
-    const sameOptions = JSON.stringify(currentOptions) === JSON.stringify(options)
-    if (Number(voteCount?.count ?? 0) > 0) {
-      if (sameOptions && Number(existing.duration_minutes) === durationMinutes) {
-        const current = await getContentPoll(db, contentId, actorUserId, contentContext)
+    let existingOptions: string[]
+    let voteCount: number
+    try {
+      [existingOptions, voteCount] = await Promise.all([
+        configurationStore.listOptionTexts(existing.poll_id),
+        configurationStore.countVotes(existing.poll_id),
+      ])
+    } catch {
+      throw new SocialPollError('INTERNAL_ERROR', 500)
+    }
+    const sameOptions = JSON.stringify(existingOptions) === JSON.stringify(options)
+    const sameDuration = Number(existing.duration_minutes) === durationMinutes
+    if (voteCount > 0) {
+      if (sameOptions && sameDuration) {
+        const current = await getContentPoll(db, contentId, actorUserId, contentContext, readStore)
         if (current) return current
       }
       throw new SocialPollError('CONFLICT', 409)
     }
-    if (sameOptions && Number(existing.duration_minutes) === durationMinutes) {
-      const current = await getContentPoll(db, contentId, actorUserId, contentContext)
+    if (sameOptions && sameDuration) {
+      const current = await getContentPoll(db, contentId, actorUserId, contentContext, readStore)
       if (current) return current
     }
 
     const now = new Date().toISOString()
-    const statements = [
-      db.prepare(
-        'UPDATE social_polls SET duration_minutes = ?, duration_hours = ?, ends_at = NULL, updated_at = ? WHERE poll_id = ? AND NOT EXISTS (SELECT 1 FROM social_poll_votes WHERE poll_id = ?)',
-      ).bind(durationMinutes, toLegacyDurationHours(durationMinutes), now, existing.poll_id, existing.poll_id),
-      db.prepare(
-        'DELETE FROM social_poll_options WHERE poll_id = ? AND EXISTS (SELECT 1 FROM social_polls WHERE poll_id = ? AND updated_at = ?)',
-      ).bind(existing.poll_id, existing.poll_id, now),
-      ...options.map((text, position) => db.prepare(
-        `INSERT INTO social_poll_options (option_id, poll_id, option_text, position)
-         SELECT ?, ?, ?, ?
-          WHERE EXISTS (SELECT 1 FROM social_polls WHERE poll_id = ? AND updated_at = ?)
-            AND NOT EXISTS (SELECT 1 FROM social_poll_votes WHERE poll_id = ?)`,
-      ).bind(crypto.randomUUID(), existing.poll_id, text, position, existing.poll_id, now, existing.poll_id)),
-    ]
-    await db.batch(statements)
-    const refreshed = await getContentPoll(db, contentId, actorUserId, contentContext)
-    if (!refreshed || refreshed.options.length !== options.length) throw new SocialPollError('CONFLICT', 409)
+    try {
+      await configurationStore.updateDraftPoll({
+        pollId: existing.poll_id,
+        contentId,
+        ownerUserId: actorUserId,
+        durationHours: toLegacyDurationHours(durationMinutes),
+        durationMinutes,
+        updatedAt: now,
+        options: options.map((text, position) => ({
+          optionId: crypto.randomUUID(),
+          text,
+          position,
+        })),
+      })
+    } catch {
+      throw new SocialPollError('INTERNAL_ERROR', 500)
+    }
+
+    const refreshed = await getContentPoll(db, contentId, actorUserId, contentContext, readStore)
+    if (!refreshed ||
+        refreshed.options.length !== options.length ||
+        refreshed.durationMinutes !== durationMinutes ||
+        refreshed.options.some((option, i) => option.text !== options[i])) {
+      throw new SocialPollError('CONFLICT', 409)
+    }
     return refreshed
   }
 
-  if (content.state !== 'DRAFT') throw new SocialPollError('CONFLICT', 409)
   const pollId = crypto.randomUUID()
   const now = new Date().toISOString()
-  const statements = [
-    db.prepare(
-      'INSERT OR IGNORE INTO social_polls (poll_id, content_id, owner_user_id, duration_hours, duration_minutes, ends_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, NULL, ?, ?)',
-    ).bind(pollId, contentId, actorUserId, toLegacyDurationHours(durationMinutes), durationMinutes, now, now),
-    ...options.map((text, position) => db.prepare(
-      `INSERT OR IGNORE INTO social_poll_options (option_id, poll_id, option_text, position)
-       SELECT ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM social_polls WHERE poll_id = ?)`,
-    ).bind(crypto.randomUUID(), pollId, text, position, pollId)),
-  ]
-  await db.batch(statements)
-  const configured = await getContentPoll(db, contentId, actorUserId, contentContext)
-  if (!configured || configured.options.length !== options.length ||
+  try {
+    await configurationStore.createDraftPoll({
+      pollId,
+      contentId,
+      ownerUserId: actorUserId,
+      durationHours: toLegacyDurationHours(durationMinutes),
+      durationMinutes,
+      createdAt: now,
+      options: options.map((text, position) => ({
+        optionId: crypto.randomUUID(),
+        text,
+        position,
+      })),
+    })
+  } catch {
+    throw new SocialPollError('INTERNAL_ERROR', 500)
+  }
+
+  const configured = await getContentPoll(db, contentId, actorUserId, contentContext, readStore)
+  if (!configured ||
+      configured.options.length !== options.length ||
       configured.durationMinutes !== durationMinutes ||
       configured.options.some((option, i) => option.text !== options[i])) {
     throw new SocialPollError('CONFLICT', 409)
