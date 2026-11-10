@@ -25,7 +25,9 @@ let payload
 let createdId
 
 try {
-  payload = await getPayload({ config })
+  // The R2 plugin's initialization hook is intentionally disabled for this
+  // CRUD-only rehearsal. The test never uploads media or contacts R2.
+  payload = await getPayload({ config, disableOnInit: true })
 
   const created = await payload.create({
     collection: 'redirects',
