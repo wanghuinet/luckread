@@ -56,7 +56,7 @@ export function createPostgresBlockMuteListReadStore(
            WHERE actor_user_id = $1
              AND relation_type = $2
              ${cursorPredicate}
-           ORDER BY created_at DESC, relationship_id DESC
+           ORDER BY social_user_interactions.created_at DESC, social_user_interactions.relationship_id DESC
            LIMIT ${limitParameter}`,
           values,
         )
