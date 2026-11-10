@@ -27,7 +27,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: w01-payload-postgres-runtime-rehearsal-${{ github.ref }}
+  group: w01-payload-postgres-runtime-rehearsal-${{ github.sha }}
   cancel-in-progress: true
 
 jobs:
