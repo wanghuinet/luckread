@@ -199,7 +199,8 @@ async function listFollowRelations(
   const store = resolveFollowListReadStore(source)
 
   const [rows, cachedTotalCount] = await Promise.all([
-    store.list({ userId: ownerId, direction, cursor, limit }),
+    store.list({ userId: ownerId, direction, cursor, limit })
+      .catch((error) => mapFollowStoreError(error)),
     readCachedFollowCount(direction, ownerId),
   ])
   const hasMore = rows.length > limit
