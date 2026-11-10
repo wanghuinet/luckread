@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { getLikeStatus, like, unlike } from './like-runtime.js'
+import { LikeStatusReadStoreError } from './like-status-read-store.js'
 import type { W03ContentBinding } from './w03-content-context-client.js'
 
 const publishedContextBinding = (
@@ -95,6 +96,78 @@ describe('like runtime', () => {
     await expect(getLikeStatus(unpublished, publishedContextBinding('user-2', 404), 'user-1', { targetType: 'content', targetId: 'content-3' }, correlationId))
       .resolves.toEqual({ liked: false, likeCount: 0 })
     expect(unpublished.prepare).not.toHaveBeenCalled()
+  })
+
+  it('uses an injected like status store only after W03 visibility and Block checks', async () => {
+    const d = db([{ blocked: 0 }])
+    const statusStore = {
+      read: vi.fn(async () => ({ liked: true, likeCount: 12 })),
+    }
+
+    await expect(getLikeStatus(
+      d,
+      publishedContextBinding(),
+      'user-1',
+      { targetType: 'content', targetId: 'content-1' },
+      correlationId,
+      undefined,
+      statusStore,
+    )).resolves.toEqual({ liked: true, likeCount: 12 })
+
+    expect(d.prepare).toHaveBeenCalledTimes(1)
+    expect(String((d.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]))
+      .toContain('social_user_interactions')
+    expect(statusStore.read).toHaveBeenCalledWith({
+      actorUserId: 'user-1',
+      targetType: 'content',
+      targetId: 'content-1',
+      includeCount: true,
+    })
+  })
+
+  it('does not consult the injected status store for unpublished or Blocked targets', async () => {
+    const statusStore = {
+      read: vi.fn(async () => ({ liked: true, likeCount: 1 })),
+    }
+    await expect(getLikeStatus(
+      db(),
+      publishedContextBinding('user-2', 404),
+      'user-1',
+      { targetType: 'content', targetId: 'content-hidden' },
+      correlationId,
+      undefined,
+      statusStore,
+    )).resolves.toEqual({ liked: false, likeCount: 0 })
+    expect(statusStore.read).not.toHaveBeenCalled()
+
+    await expect(getLikeStatus(
+      db([{ blocked: 1 }]),
+      publishedContextBinding(),
+      'user-1',
+      { targetType: 'content', targetId: 'content-blocked' },
+      correlationId,
+      undefined,
+      statusStore,
+    )).rejects.toMatchObject({ code: 'CONFLICT', status: 409 })
+    expect(statusStore.read).not.toHaveBeenCalled()
+  })
+
+  it('maps injected status store failures to a sanitized 503', async () => {
+    const statusStore = {
+      read: vi.fn(async () => { throw new LikeStatusReadStoreError() }),
+    }
+    await expect(getLikeStatus(
+      db([{ blocked: 0 }]),
+      publishedContextBinding(),
+      'user-1',
+      { targetType: 'content', targetId: 'content-1' },
+      correlationId,
+      undefined,
+      statusStore,
+    )).rejects.toMatchObject({
+      code: 'SERVICE_UNAVAILABLE',
+      status: 503,
+    })
   })
 
   it('hides content like status when either actor or owner is blocked', async () => {
