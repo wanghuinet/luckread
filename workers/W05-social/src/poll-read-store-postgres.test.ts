@@ -41,7 +41,7 @@ describe('W05 PostgreSQL poll read store', () => {
 
     await expect(store.setEndsAtIfUnset('poll-1', '2026-11-10T12:05:00.000Z')).resolves.toBeUndefined()
     const [sql, values] = query.mock.calls[0] ?? []
-    expect(String(sql)).toContain('ends_at = NULL')
+    expect(String(sql)).toContain('ends_at IS NULL')
     expect(String(sql)).toContain('ends_at = $1::timestamptz')
     expect(values).toEqual(['2026-11-10T12:05:00.000Z', 'poll-1'])
   })
