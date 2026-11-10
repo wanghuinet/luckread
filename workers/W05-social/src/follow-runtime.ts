@@ -232,7 +232,7 @@ async function listFollowRelations(
           version: 1,
           userId: ownerId,
           direction,
-          createdAt: last.followed_at,
+          createdAt: last.cursor_created_at ?? last.followed_at,
           relationshipId: last.relationship_id,
         })
       : null,
