@@ -196,9 +196,16 @@ try {
     contentId: likeVisible,
     likedAt: '2026-11-11T06:00:00.789123Z',
   }])
-  checks.likedContentsRespectProfileAndViewerBlock = !likedPage.items.some(item => item.contentId === likeBlocked)
+  assert.equal(likedPage.items.some(item => item.contentId === likeBlocked), false)
   checks.likedContentsRespectViewerDirectedMute = !likedPage.items.some(item => item.contentId === likeMuted)
   checks.likedContentsRespectPublicationContext = !likedPage.items.some(item => item.contentId === likeUnpublished)
+
+  await insertInteraction(marker + '-viewer-profile-block', likedViewer, likedProfile, 'block', '2026-11-11T06:02:00.000001Z')
+  const blockedProfileLikes = await listProfileLikedContents(
+    store, w03Content, likedProfile, null, 10, likedViewer, marker + '-liked-profile-block',
+  )
+  assert.deepEqual(blockedProfileLikes.items, [])
+  checks.likedContentsRespectProfileAndViewerBlock = true
 
   const likedPaginationProfile = marker + '-liked-pagination-profile'
   const likedPaginationContentA = marker + '-liked-page-a'
