@@ -36,7 +36,7 @@ describe('W05 PostgreSQL Block/Mute list read store', () => {
     expect(calls).toHaveLength(1)
     expect(calls[0]?.sql).toContain('actor_user_id = $1')
     expect(calls[0]?.sql).toContain('relation_type = $2')
-    expect(calls[0]?.sql).toContain('ORDER BY created_at DESC, relationship_id DESC')
+    expect(calls[0]?.sql).toContain('ORDER BY social_user_interactions.created_at DESC, social_user_interactions.relationship_id DESC')
     expect(calls[0]?.sql).toContain('YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
     expect(calls[0]?.sql).toContain('YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
     expect(calls[0]?.sql).toContain('AS cursor_created_at')
