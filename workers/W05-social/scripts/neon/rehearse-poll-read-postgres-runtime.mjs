@@ -55,19 +55,19 @@ const expectNotFound = async (promise) => {
 
 try {
   await client.query(
-    \`INSERT INTO social_polls
+    `INSERT INTO social_polls
       (poll_id, content_id, owner_user_id, duration_hours, duration_minutes, ends_at, created_at, updated_at)
-     VALUES ($1, $2, $3, 24, 5, NULL, $4::timestamptz, $4::timestamptz)\`,
+     VALUES ($1, $2, $3, 24, 5, NULL, $4::timestamptz, $4::timestamptz)`,
     [pollId, contentId, owner, now],
   )
   await client.query(
-    \`INSERT INTO social_poll_options (option_id, poll_id, option_text, position)
-     VALUES ($1, $3, 'Yes', 0), ($2, $3, 'No', 1)\`,
+    `INSERT INTO social_poll_options (option_id, poll_id, option_text, position)
+     VALUES ($1, $3, 'Yes', 0), ($2, $3, 'No', 1)`,
     [optionOne, optionTwo, pollId],
   )
   await client.query(
-    \`INSERT INTO social_poll_votes (vote_id, poll_id, option_id, user_id, created_at)
-     VALUES ($1, $3, $4, $5, $6::timestamptz), ($2, $3, $7, $8, $6::timestamptz)\`,
+    `INSERT INTO social_poll_votes (vote_id, poll_id, option_id, user_id, created_at)
+     VALUES ($1, $3, $4, $5, $6::timestamptz), ($2, $3, $7, $8, $6::timestamptz)`,
     [voteOne, voteTwo, pollId, optionOne, viewer, now, optionTwo, owner],
   )
 
@@ -94,9 +94,9 @@ try {
   assert.equal(afterConditionalWrite?.ends_at, result.endsAt)
 
   await client.query(
-    \`INSERT INTO social_user_interactions
+    `INSERT INTO social_user_interactions
       (relationship_id, actor_user_id, target_user_id, relation_type, created_at, updated_at)
-     VALUES ($1, $2, $3, 'block', $4::timestamptz, $4::timestamptz)\`,
+     VALUES ($1, $2, $3, 'block', $4::timestamptz, $4::timestamptz)`,
     [marker + '-block', owner, viewer, now],
   )
   await expectNotFound(getContentPoll(unusedD1, contentId, viewer, publishedContext, store))
@@ -113,11 +113,11 @@ try {
     await client.query('DELETE FROM social_poll_options WHERE option_id LIKE $1', [marker + '-%'])
     await client.query('DELETE FROM social_polls WHERE poll_id LIKE $1', [marker + '-%'])
     const residue = await client.query(
-      \`SELECT
+      `SELECT
          (SELECT COUNT(*)::integer FROM social_polls WHERE poll_id LIKE $1) AS polls,
          (SELECT COUNT(*)::integer FROM social_poll_options WHERE option_id LIKE $1) AS options,
          (SELECT COUNT(*)::integer FROM social_poll_votes WHERE vote_id LIKE $1) AS votes,
-         (SELECT COUNT(*)::integer FROM social_user_interactions WHERE relationship_id LIKE $1) AS interactions\`,
+         (SELECT COUNT(*)::integer FROM social_user_interactions WHERE relationship_id LIKE $1) AS interactions`,
       [marker + '-%'],
     )
     assert.deepEqual(residue.rows[0], { polls: 0, options: 0, votes: 0, interactions: 0 })
