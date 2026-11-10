@@ -95,25 +95,31 @@ try {
   const viewer = marker + '-viewer'
   const contentVisible = marker + '-content-visible'
   const contentBlockedOwner = marker + '-content-blocked-owner'
+  const contentBlockedByProfile = marker + '-content-blocked-by-profile'
   const contentUnpublished = marker + '-content-unpublished'
   const ownerVisible = marker + '-owner-visible'
   const ownerBlocked = marker + '-owner-blocked'
+  const ownerBlockedByProfile = marker + '-owner-blocked-by-profile'
   const ownerMuted = marker + '-owner-muted'
 
   setContext(contentVisible, ownerVisible)
   setContext(contentBlockedOwner, ownerBlocked)
+  setContext(contentBlockedByProfile, ownerBlockedByProfile)
   setContext(contentUnpublished, ownerVisible, 'DRAFT')
 
   await insertComment(marker + '-reply-visible', contentVisible, profile, '2026-11-11T04:00:00.789123Z')
   await insertComment(marker + '-reply-blocked-owner', contentBlockedOwner, profile, '2026-11-11T04:00:00.700000Z')
+  await insertComment(marker + '-reply-blocked-by-profile', contentBlockedByProfile, profile, '2026-11-11T04:00:00.650000Z')
   await insertComment(marker + '-reply-unpublished', contentUnpublished, profile, '2026-11-11T04:00:00.600000Z')
   await insertInteraction(marker + '-reply-owner-block', ownerBlocked, profile, 'block', '2026-11-11T04:01:00.000001Z')
+  await insertInteraction(marker + '-reply-profile-block-owner', profile, ownerBlockedByProfile, 'block', '2026-11-11T04:01:00.000002Z')
 
   const replyVisibility = await listProfileReplies(
     store, w03Content, profile, null, 10, viewer, marker + '-replies-visible',
   )
   assert.deepEqual(replyVisibility.items.map(item => item.id), [marker + '-reply-visible'])
-  checks.profileRepliesRespectBidirectionalBlock = !replyVisibility.items.some(item => item.id === marker + '-reply-blocked-owner')
+  checks.profileRepliesRespectBidirectionalBlock = !replyVisibility.items.some(item => item.id === marker + '-reply-blocked-owner') &&
+    !replyVisibility.items.some(item => item.id === marker + '-reply-blocked-by-profile')
   checks.replyOwnerBlockFilteringPreserved = checks.profileRepliesRespectBidirectionalBlock
   checks.replyPublicationContextFailsClosed = !replyVisibility.items.some(item => item.id === marker + '-reply-unpublished')
 
@@ -175,19 +181,23 @@ try {
   const likedViewer = marker + '-liked-viewer'
   const likeVisible = marker + '-like-visible'
   const likeBlocked = marker + '-like-blocked'
+  const likeBlockedByProfile = marker + '-like-blocked-by-profile'
   const likeMuted = marker + '-like-muted'
   const likeUnpublished = marker + '-like-unpublished'
   setContext(likeVisible, marker + '-liked-owner-visible')
   setContext(likeBlocked, marker + '-liked-owner-blocked')
+  setContext(likeBlockedByProfile, marker + '-liked-owner-blocked-by-profile')
   setContext(likeMuted, ownerMuted)
   setContext(likeUnpublished, marker + '-liked-owner-unpublished', 'DRAFT')
 
   await insertLike(marker + '-liked-visible', likedProfile, likeVisible, '2026-11-11T06:00:00.789123Z')
   await insertLike(marker + '-liked-blocked', likedProfile, likeBlocked, '2026-11-11T06:00:00.700000Z')
+  await insertLike(marker + '-liked-blocked-by-profile', likedProfile, likeBlockedByProfile, '2026-11-11T06:00:00.650000Z')
   await insertLike(marker + '-liked-muted', likedProfile, likeMuted, '2026-11-11T06:00:00.600000Z')
   await insertLike(marker + '-liked-unpublished', likedProfile, likeUnpublished, '2026-11-11T06:00:00.500000Z')
   await insertInteraction(marker + '-liked-owner-block', likedViewer, marker + '-liked-owner-blocked', 'block', '2026-11-11T06:01:00.000001Z')
-  await insertInteraction(marker + '-liked-owner-mute', likedViewer, ownerMuted, 'mute', '2026-11-11T06:01:00.000002Z')
+  await insertInteraction(marker + '-liked-profile-owner-block', marker + '-liked-owner-blocked-by-profile', likedProfile, 'block', '2026-11-11T06:01:00.000002Z')
+  await insertInteraction(marker + '-liked-owner-mute', likedViewer, ownerMuted, 'mute', '2026-11-11T06:01:00.000003Z')
 
   const likedPage = await listProfileLikedContents(
     store, w03Content, likedProfile, null, 10, likedViewer, marker + '-liked-visibility',
@@ -197,6 +207,7 @@ try {
     likedAt: '2026-11-11T06:00:00.789123Z',
   }])
   assert.equal(likedPage.items.some(item => item.contentId === likeBlocked), false)
+  assert.equal(likedPage.items.some(item => item.contentId === likeBlockedByProfile), false)
   checks.likedContentsRespectViewerDirectedMute = !likedPage.items.some(item => item.contentId === likeMuted)
   checks.likedContentsRespectPublicationContext = !likedPage.items.some(item => item.contentId === likeUnpublished)
 
