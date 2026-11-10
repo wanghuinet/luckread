@@ -79,4 +79,21 @@ describe('W05 content like list runtime', () => {
     await expect(listContentLikers(db(), 'content-1', null, 0, null, publishedContext())).rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 })
     await expect(listContentLikers(db(), 'content-1', null, 51, null, publishedContext())).rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 })
   })
+  it('maps D1 content liker read failures to a sanitized 503', async () => {
+    const d = {
+      prepare: vi.fn(() => ({
+        bind: vi.fn(() => ({
+          all: vi.fn(async () => { throw new Error('secret-d1-connection-detail') }),
+        })),
+      })),
+    } as unknown as D1Database
+
+    await expect(listContentLikers(d, 'content-1', null, 10, 'viewer-1', publishedContext()))
+      .rejects.toMatchObject({
+        code: 'SERVICE_UNAVAILABLE',
+        status: 503,
+        message: 'CONTENT_LIKER_READ_UNAVAILABLE',
+      })
+  })
+
 })
