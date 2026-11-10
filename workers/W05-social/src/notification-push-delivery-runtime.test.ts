@@ -7,7 +7,9 @@ import {
   isRetryableExpoError,
   notificationPushMessage,
   runNotificationPushBatch,
+  claimDueDeliveries,
 } from './notification-push-delivery-runtime.js'
+import type { NotificationPushDeliveryClaimStore } from './notification-push-delivery-claim-store.js'
 
 describe('W05 durable Expo push delivery runtime', () => {
   it('keeps push execution disabled unless explicitly enabled', async () => {
@@ -155,4 +157,89 @@ describe('W05 durable Expo push delivery runtime', () => {
     expect(isRetryableExpoError('MessageTooBig')).toBe(false)
     expect(isRetryableExpoError('InvalidCredentials')).toBe(false)
   })
+
+  it('keeps endpoint reads on W09 D1-03 and stores only a token hash in W05', async () => {
+    const candidate = {
+      delivery_id:'delivery-1', notification_id:'notification-1', endpoint_id:'endpoint-1',
+      lease_token:'lease-1', attempt_count:2, recipient_user_id:'recipient-1',
+      notification_type:'LIKE' as const, target_type:'content' as const, target_id:'content-1',
+    }
+    const savePushTokenHash = vi.fn(async () => true)
+    const store: NotificationPushDeliveryClaimStore = {
+      claimDue: vi.fn(async () => [candidate]),
+      cancel: vi.fn(async () => true),
+      savePushTokenHash,
+    }
+    const token = 'ExponentPushToken[private-token-value]'
+    const endpointDb = {
+      prepare: vi.fn(() => ({bind: (..._values: unknown[]) => ({
+        first: async () => ({endpoint_id:'endpoint-1',owner_user_id:'recipient-1',push_token:token}),
+      })})),
+    } as unknown as D1Database
+
+    const result = await claimDueDeliveries(store, endpointDb, new Date('2026-11-11T08:00:00.000Z'))
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token))
+    const expectedHash = Array.from(new Uint8Array(digest), value => value.toString(16).padStart(2,'0')).join('')
+    expect(result).toHaveLength(1)
+    expect(result[0]).toMatchObject({deliveryId:'delivery-1',pushTokenHash:expectedHash,pushToken:token,leaseToken:'lease-1'})
+    expect(endpointDb.prepare).toHaveBeenCalledWith(expect.stringContaining('FROM notification_push_endpoints'))
+    expect(savePushTokenHash).toHaveBeenCalledWith({
+      deliveryId:'delivery-1',leaseToken:'lease-1',pushTokenHash:expectedHash,now:'2026-11-11T08:00:00.000Z',
+    })
+    expect(JSON.stringify(savePushTokenHash.mock.calls)).not.toContain(token)
+  })
+
+  it('cancels deliveries with missing W09 endpoints', async () => {
+    const candidate = {
+      delivery_id:'delivery-2',notification_id:'notification-2',endpoint_id:'endpoint-2',
+      lease_token:'lease-2',attempt_count:1,recipient_user_id:'recipient-2',
+      notification_type:'COMMENT' as const,target_type:'content' as const,target_id:'content-2',
+    }
+    const store: NotificationPushDeliveryClaimStore = {
+      claimDue: vi.fn(async () => [candidate]),
+      cancel: vi.fn(async () => true),
+      savePushTokenHash: vi.fn(async () => true),
+    }
+    const endpointDb = {prepare:()=>({bind:()=>({first:async()=>null})})} as unknown as D1Database
+    await expect(claimDueDeliveries(store,endpointDb,new Date('2026-11-11T08:00:00.000Z'))).resolves.toEqual([])
+    expect(store.cancel).toHaveBeenCalledWith({
+      deliveryId:'delivery-2',leaseToken:'lease-2',reason:'ENDPOINT_NOT_ACTIVE',now:'2026-11-11T08:00:00.000Z',
+    })
+    expect(store.savePushTokenHash).not.toHaveBeenCalled()
+  })
+
+  it('skips a lease superseded before the token-hash snapshot', async () => {
+    const candidate = {
+      delivery_id:'delivery-3',notification_id:'notification-3',endpoint_id:'endpoint-3',
+      lease_token:'stale-lease',attempt_count:1,recipient_user_id:'recipient-3',
+      notification_type:'FOLLOW' as const,target_type:'user' as const,target_id:'user-3',
+    }
+    const store: NotificationPushDeliveryClaimStore = {
+      claimDue: vi.fn(async () => [candidate]),cancel: vi.fn(async () => true),
+      savePushTokenHash: vi.fn(async () => false),
+    }
+    const endpointDb = {prepare:()=>({bind:()=>({first:async()=>({
+      endpoint_id:'endpoint-3',owner_user_id:'recipient-3',push_token:'ExponentPushToken[stale]',
+    })})})} as unknown as D1Database
+    await expect(claimDueDeliveries(store,endpointDb,new Date('2026-11-11T08:00:00.000Z'))).resolves.toEqual([])
+  })
+
+  it('cancels deliveries missing W05 notification context without querying W09', async () => {
+    const candidate = {
+      delivery_id:'delivery-4',notification_id:'notification-missing',endpoint_id:'endpoint-4',
+      lease_token:'lease-4',attempt_count:1,recipient_user_id:null,
+      notification_type:null,target_type:null,target_id:null,
+    }
+    const store: NotificationPushDeliveryClaimStore = {
+      claimDue: vi.fn(async () => [candidate]),cancel: vi.fn(async () => true),
+      savePushTokenHash: vi.fn(async () => true),
+    }
+    const endpointDb = {prepare:vi.fn()} as unknown as D1Database
+    await expect(claimDueDeliveries(store,endpointDb,new Date('2026-11-11T08:00:00.000Z'))).resolves.toEqual([])
+    expect(store.cancel).toHaveBeenCalledWith({
+      deliveryId:'delivery-4',leaseToken:'lease-4',reason:'NOTIFICATION_NOT_FOUND',now:'2026-11-11T08:00:00.000Z',
+    })
+    expect(endpointDb.prepare).not.toHaveBeenCalled()
+  })
+
 })

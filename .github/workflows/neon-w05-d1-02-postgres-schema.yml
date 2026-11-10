@@ -2,7 +2,7 @@ name: Neon W05 D1-02 PostgreSQL 18 Local Schema Rehearsal
 
 on:
   pull_request:
-    branches: [main, 'codex/w05-push-fanout-postgres-20261111']
+    branches: [main, 'codex/w05-push-fanout-postgres-20261111', 'codex/w05-push-ticket-state-postgres-20261111']
     paths:
       - '.github/workflows/neon-w05-d1-02-postgres-schema.yml'
       - 'contracts/database/neon-d1-02-schema-sources.v1.json'
@@ -48,6 +48,11 @@ on:
       - 'workers/W05-social/scripts/neon/**'
       - 'workers/W05-social/src/notification-push-fanout-runtime.ts'
       - 'workers/W05-social/src/notification-push-send-result-store.ts'
+      - 'workers/W05-social/src/notification-push-delivery-claim-store.ts'
+      - 'workers/W05-social/src/notification-push-delivery-claim-store-d1.ts'
+      - 'workers/W05-social/src/notification-push-delivery-claim-store-postgres.ts'
+      - 'workers/W05-social/src/notification-push-delivery-claim-store-d1.test.ts'
+      - 'workers/W05-social/src/notification-push-delivery-claim-store-postgres.test.ts'
       - 'workers/W05-social/src/notification-push-send-result-store-postgres.ts'
       - 'workers/W05-social/src/notification-push-send-result-store.test.ts'
       - 'workers/W05-social/src/notification-push-send-result-store-postgres.test.ts'
@@ -169,6 +174,7 @@ jobs:
           node --check workers/W05-social/scripts/neon/rehearse-content-likers-postgres-runtime.mjs
           node --check workers/W05-social/scripts/neon/rehearse-push-fanout-postgres-runtime.mjs
           node --check workers/W05-social/scripts/neon/rehearse-push-send-result-postgres-runtime.mjs
+          node --check workers/W05-social/scripts/neon/rehearse-push-delivery-claim-postgres-runtime.mjs
           node --check workers/W05-social/scripts/neon/rehearse-social-targets-read-postgres-runtime.mjs
           node --check workers/W05-social/scripts/neon/rehearse-social-closure-read-postgres-runtime.mjs
           node --check workers/W05-social/scripts/neon/rehearse-favorite-list-postgres-runtime.mjs
@@ -274,6 +280,13 @@ jobs:
           W05_PUSH_SEND_RESULT_POSTGRES_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_w05_d1_02_schema
           W05_PUSH_SEND_RESULT_POSTGRES_REPORT: ../../artifacts/neon/w05-push-send-result-postgres-runtime-postflight.json
         run: node --import=tsx/esm ../../workers/W05-social/scripts/neon/rehearse-push-send-result-postgres-runtime.mjs
+
+      - name: Rehearse W05 push delivery claims and lease recovery against PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          W05_PUSH_DELIVERY_CLAIM_POSTGRES_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_w05_d1_02_schema
+          W05_PUSH_DELIVERY_CLAIM_POSTGRES_REPORT: ../../artifacts/neon/w05-push-delivery-claim-postgres-runtime-postflight.json
+        run: node --import=tsx/esm ../../workers/W05-social/scripts/neon/rehearse-push-delivery-claim-postgres-runtime.mjs
 
       - name: Rehearse W05 content liker reads against PostgreSQL 18
         working-directory: workers/W02-identity
@@ -395,6 +408,7 @@ jobs:
             artifacts/neon/w05-block-mute-relation-postgres-runtime-postflight.json
             artifacts/neon/w05-content-likers-postgres-runtime-postflight.json
             artifacts/neon/w05-push-fanout-postgres-runtime-postflight.json
+            artifacts/neon/w05-push-delivery-claim-postgres-runtime-postflight.json
             artifacts/neon/w05-favorite-list-postgres-runtime-postflight.json
             artifacts/neon/w05-like-status-postgres-runtime-postflight.json
             artifacts/neon/w05-like-mutation-postgres-runtime-postflight.json
