@@ -48,6 +48,39 @@ describe('repost runtime', () => {
     expect(sent.headers.has('Cookie')).toBe(false)
   })
 
+  it('uses an injected repost store after W03 and Block policy checks', async () => {
+    const store = {
+      isBlocked: vi.fn(async () => false),
+      find: vi.fn()
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(relation),
+      insertIfAbsent: vi.fn(async () => undefined),
+      remove: vi.fn(async () => undefined),
+    }
+    const d = db()
+    await expect(createRepost(d, publishedBinding(), 'viewer-1', 'content-1', 'corr-1', store))
+      .resolves.toMatchObject({ repostId: 'repost-1', contentId: 'content-1' })
+    await expect(removeRepost(d, 'viewer-1', 'content-1', store)).resolves.toBeUndefined()
+    expect(store.isBlocked).toHaveBeenCalledWith('viewer-1', 'owner-1')
+    expect(store.find).toHaveBeenCalledTimes(2)
+    expect(store.insertIfAbsent).toHaveBeenCalledWith(expect.any(String), 'content-1', 'viewer-1', expect.any(String))
+    expect(store.remove).toHaveBeenCalledWith('viewer-1', 'content-1')
+    expect((d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
+  })
+
+  it('does not read or write repost state for blocked content when using an injected store', async () => {
+    const store = {
+      isBlocked: vi.fn(async () => true),
+      find: vi.fn(),
+      insertIfAbsent: vi.fn(),
+      remove: vi.fn(),
+    }
+    await expect(createRepost(db(), publishedBinding(), 'viewer-1', 'content-1', 'corr-1', store))
+      .rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 })
+    expect(store.find).not.toHaveBeenCalled()
+    expect(store.insertIfAbsent).not.toHaveBeenCalled()
+  })
+
   it('fails closed before any W05 D1 access when W03 says content is not published', async () => {
     const d = db()
     await expect(createRepost(d, publishedBinding(404), 'viewer-1', 'content-1', 'corr-1'))
