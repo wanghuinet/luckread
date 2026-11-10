@@ -2,6 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { clearFavoriteStatusCacheForTests, favorite, getFavoriteStatus, listFavorites, unfavorite } from './favorite-runtime.js'
 import type { W03ContentBinding } from './w03-content-context-client.js'
+import { FavoriteStatusReadStoreError } from './favorite-status-read-store.js'
 
 const db = (firstResults: unknown[] = [], allResults: unknown[] = []) => {
   let firstIndex = 0
@@ -87,6 +88,56 @@ describe('favorite runtime', () => {
     const prepare = (d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare
     expect(String(prepare.mock.calls[0]?.[0])).toContain('FROM interaction_favorites')
     expect(String(prepare.mock.calls[0]?.[0])).not.toMatch(/\b(?:FROM|JOIN)\s+contents\b/i)
+  })
+
+  it('accepts an injected favorite status store only after W03 publication validation', async () => {
+    const store = { isFavorited: vi.fn(async () => true) }
+    const binding = publishedBinding()
+
+    await expect(getFavoriteStatus(
+      store,
+      binding,
+      'pg-status-actor',
+      { targetType: 'content', targetId: 'pg-status-content' },
+      'corr-pg-status',
+    )).resolves.toEqual({ favorited: true })
+
+    expect(binding.fetch).toHaveBeenCalledTimes(1)
+    expect(store.isFavorited).toHaveBeenCalledWith({
+      actorUserId: 'pg-status-actor',
+      targetId: 'pg-status-content',
+    })
+  })
+
+  it('does not query the injected favorite status store when W03 says content is unpublished', async () => {
+    const store = { isFavorited: vi.fn(async () => true) }
+    const binding = publishedBinding(404)
+
+    await expect(getFavoriteStatus(
+      store,
+      binding,
+      'pg-status-hidden-actor',
+      { targetType: 'content', targetId: 'pg-status-hidden-content' },
+      'corr-pg-status-hidden',
+    )).resolves.toEqual({ favorited: false })
+    expect(store.isFavorited).not.toHaveBeenCalled()
+  })
+
+  it('maps favorite status provider failures to a sanitized 503', async () => {
+    const store = {
+      isFavorited: vi.fn(async () => { throw new FavoriteStatusReadStoreError() }),
+    }
+    await expect(getFavoriteStatus(
+      store,
+      publishedBinding(),
+      'pg-status-error-actor',
+      { targetType: 'content', targetId: 'pg-status-error-content' },
+      'corr-pg-status-error',
+    )).rejects.toMatchObject({
+      code: 'SERVICE_UNAVAILABLE',
+      status: 503,
+      message: 'FAVORITE_STATUS_READ_UNAVAILABLE',
+    })
   })
 
   it('returns false for unpublished targets without reading W05 D1', async () => {

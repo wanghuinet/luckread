@@ -3,8 +3,9 @@ import { randomUUID } from 'node:crypto'
 import { createRequire } from 'node:module'
 import { dirname } from 'node:path'
 import { mkdir, writeFile } from 'node:fs/promises'
-import { listFavorites } from '../../src/favorite-runtime.ts'
+import { getFavoriteStatus, listFavorites } from '../../src/favorite-runtime.ts'
 import { createPostgresFavoriteListReadStore } from '../../src/favorite-list-read-store-postgres.ts'
+import { createPostgresFavoriteStatusReadStore } from '../../src/favorite-status-read-store-postgres.ts'
 
 const requireFromW02 = createRequire(new URL('../../../W02-identity/package.json', import.meta.url))
 const { Pool } = requireFromW02('pg')
@@ -19,7 +20,9 @@ const marker = 'w05-favorite-list-' + randomUUID()
 const reportPath = process.env.W05_FAVORITE_LIST_POSTGRES_REPORT || '../../artifacts/neon/w05-favorite-list-postgres-runtime-postflight.json'
 const pool = new Pool({ connectionString, max: 4, connectionTimeoutMillis: 5_000 })
 const store = createPostgresFavoriteListReadStore(pool)
+const statusStore = createPostgresFavoriteStatusReadStore(pool)
 let passed = false
+let statusReadsPassed = false
 const insert = (actor, targetId, id, createdAt) => pool.query(
   "INSERT INTO interaction_favorites (relationship_id, actor_user_id, target_type, target_id, created_at) VALUES ($1, $2, 'content', $3, $4::timestamptz)",
   [id, actor, targetId, createdAt],
@@ -52,6 +55,39 @@ try {
   assert.equal(second.hasMore, false)
   assert.deepEqual([...first.items, ...second.items].map(x => x.targetId), targets)
   assert.equal(new Set([...first.items, ...second.items].map(x => x.targetId)).size, 4)
+  const publishedBinding = {
+    async fetch(input, init) {
+      const request = input instanceof Request ? input : new Request(input, init)
+      const contentId = new URL(request.url).pathname.split('/').filter(Boolean).at(-2)
+      return Response.json({
+        data: {
+          contentId,
+          ownerUserId: marker + '-content-owner',
+          contentType: 'post',
+          state: 'PUBLISHED',
+          updatedAt: '2026-11-10T00:00:00.000Z',
+        },
+      })
+    },
+  }
+  const publishedFavorite = await getFavoriteStatus(
+    statusStore,
+    publishedBinding,
+    actor,
+    { targetType: 'content', targetId: targets[0] },
+    marker + '-published-favorite-correlation',
+  )
+  assert.deepEqual(publishedFavorite, { favorited: true })
+  const missingFavorite = await getFavoriteStatus(
+    statusStore,
+    publishedBinding,
+    actor,
+    { targetType: 'content', targetId: marker + '-content-not-favorited' },
+    marker + '-unfavorited-correlation',
+  )
+  assert.deepEqual(missingFavorite, { favorited: false })
+  statusReadsPassed = true
+
   const otherPage = await listFavorites(store, other, null, 10)
   assert.deepEqual(otherPage.items, [{
     targetId: marker + '-unrelated-content',
@@ -74,6 +110,7 @@ try {
       status: passed ? 'W05_FAVORITE_LIST_POSTGRES_RUNTIME_PASS' : 'W05_FAVORITE_LIST_POSTGRES_RUNTIME_FAILED',
       postgresDatabase: target.pathname.slice(1),
       actorScopedFavorites: true,
+      favoriteStatusPointReads: statusReadsPassed,
       newestFirstPagination: true,
       microsecondCursorPrecision: true,
       noDuplicateOrMissingRows: true,

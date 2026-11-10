@@ -49,6 +49,9 @@ on:
       - 'workers/W05-social/src/favorite-list-read-store.ts'
       - 'workers/W05-social/src/favorite-list-read-store-postgres.ts'
       - 'workers/W05-social/src/favorite-list-read-store-postgres.test.ts'
+      - 'workers/W05-social/src/favorite-status-read-store.ts'
+      - 'workers/W05-social/src/favorite-status-read-store-postgres.ts'
+      - 'workers/W05-social/src/favorite-status-read-store-postgres.test.ts'
       - 'workers/W05-social/scripts/neon/rehearse-favorite-list-postgres-runtime.mjs'
   workflow_dispatch:
 

@@ -6,6 +6,11 @@ import {
   FavoriteListReadStoreError,
   type FavoriteListReadStore,
 } from './favorite-list-read-store.js'
+import {
+  createD1FavoriteStatusReadStore,
+  FavoriteStatusReadStoreError,
+  type FavoriteStatusReadStore,
+} from './favorite-status-read-store.js'
 import { fetchPublishedContentSocialContext, type W03ContentBinding } from './w03-content-context-client.js'
 
 export class FavoriteRuntimeError extends Error {
@@ -129,18 +134,28 @@ export async function favorite(
   }
 }
 
+type FavoriteStatusDataSource = D1Database | FavoriteStatusReadStore
+
+function resolveFavoriteStatusReadStore(source: FavoriteStatusDataSource): FavoriteStatusReadStore {
+  if (typeof (source as FavoriteStatusReadStore).isFavorited === 'function') {
+    return source as FavoriteStatusReadStore
+  }
+  return createD1FavoriteStatusReadStore(source as D1Database)
+}
+
 export async function getFavoriteStatus(
-  db: D1Database,
+  source: FavoriteStatusDataSource,
   w03Content: W03ContentBinding | undefined,
   actorUserId: string,
   target: FavoriteTarget,
   correlationId: string,
 ): Promise<{ favorited: boolean }> {
   const actor = validateActor(actorUserId)
-  const { targetType, targetId } = validateTarget(target)
+  const { targetId } = validateTarget(target)
   const cacheKey = favoriteStatusKey(actor, targetId)
 
   try {
+    // Canonical W03 visibility must be revalidated before cache or storage reads.
     await fetchPublishedTarget(w03Content, targetId, correlationId)
   } catch (error) {
     if (error instanceof FavoriteRuntimeError && error.status === 404) {
@@ -156,17 +171,20 @@ export async function getFavoriteStatus(
     favoriteStatusCache.delete(cacheKey)
   }
 
-  const row = await db.prepare(
-    `SELECT EXISTS (
-       SELECT 1
-       FROM interaction_favorites
-       WHERE actor_user_id = ?
-         AND target_type = ?
-         AND target_id = ?
-     ) AS favorited`,
-  ).bind(actor, targetType, targetId).first<{ favorited: number }>()
+  let favorited: boolean
+  try {
+    favorited = await resolveFavoriteStatusReadStore(source).isFavorited({
+      actorUserId: actor,
+      targetId,
+    })
+  } catch (error) {
+    if (error instanceof FavoriteStatusReadStoreError) {
+      throw new FavoriteRuntimeError(error.code, error.status)
+    }
+    throw error
+  }
 
-  const value = { favorited: Boolean(row?.favorited) }
+  const value = { favorited }
   pruneFavoriteStatusCache()
   favoriteStatusCache.set(cacheKey, { value, expiresAt: Date.now() + FAVORITE_STATUS_CACHE_TTL_MS })
   return { ...value }
