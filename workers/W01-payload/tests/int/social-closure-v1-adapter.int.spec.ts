@@ -85,7 +85,7 @@ describe('unified W05 social closure adapters', () => {
     expect(discoveryRuntime).toContain('store.listDiscoveryContentEdges')
     expect(closureReadStore).toContain("t.status = 'ACTIVE'")
     expect(closureReadStore).toContain('INDEXED BY ix_social_target_topics_content_topic_target')
-    expect(closureReadStore).not.toMatch(/(?:FROM|JOIN)\\s+contents\\b/i)
+    expect(closureReadStore).not.toMatch(/(?:FROM|JOIN)\s+contents\b/i)
     expect(discoveryRuntime).not.toMatch(/(?:FROM|JOIN)\s+contents\b/i)
   })
 
