@@ -2,6 +2,7 @@
 
 import { ReplyAudienceRuntimeError } from './reply-audience-runtime.js'
 import { fetchPublishedContentSocialContext, type W03ContentBinding } from './w03-content-context-client.js'
+import { createD1RepostStore, RepostStoreError, type RepostStore } from './repost-store.js'
 
 export class RepostRuntimeError extends Error {
   constructor(readonly code: string, readonly status: number) { super(code) }
@@ -57,28 +58,23 @@ export async function createRepost(
   actorUserIdValue: string,
   contentIdValue: string,
   correlationId: string,
+  store: RepostStore = createD1RepostStore(db),
 ): Promise<RepostRecord> {
   const actorUserId = validateActor(actorUserIdValue)
   const contentId = validateId(contentIdValue)
   const ownerUserId = await getPublishedOwner(w03Content, contentId, correlationId)
 
-  const block = await db.prepare(
-    `SELECT EXISTS (
-       SELECT 1 FROM social_user_interactions block
-        WHERE block.relation_type = 'block'
-          AND (
-            (block.actor_user_id = ? AND block.target_user_id = ?)
-            OR (block.actor_user_id = ? AND block.target_user_id = ?)
-          )
-     ) AS blocked`,
-  ).bind(actorUserId, ownerUserId, ownerUserId, actorUserId).first<{ blocked: number }>()
-  if (Number(block?.blocked ?? 0) !== 0) throw new RepostRuntimeError('NOT_FOUND', 404)
-
-  const existing = await db.prepare(
-    'SELECT repost_id, content_id, actor_user_id, created_at FROM social_reposts WHERE actor_user_id = ? AND content_id = ? LIMIT 1',
-  ).bind(actorUserId, contentId).first<{
-    repost_id: string; content_id: string; actor_user_id: string; created_at: string
-  }>()
+  let existing
+  try {
+    if (await store.isBlocked(actorUserId, ownerUserId)) {
+      throw new RepostRuntimeError('NOT_FOUND', 404)
+    }
+    existing = await store.find(actorUserId, contentId)
+  } catch (error) {
+    if (error instanceof RepostRuntimeError) throw error
+    if (error instanceof RepostStoreError) throw new RepostRuntimeError(error.code, error.status)
+    throw new RepostRuntimeError('SERVICE_UNAVAILABLE', 503)
+  }
   if (existing) return {
     repostId: existing.repost_id, contentId: existing.content_id,
     actorUserId: existing.actor_user_id, createdAt: existing.created_at,
@@ -86,15 +82,14 @@ export async function createRepost(
 
   const repostId = crypto.randomUUID()
   const createdAt = new Date().toISOString()
-  await db.prepare(
-    'INSERT OR IGNORE INTO social_reposts (repost_id, content_id, actor_user_id, created_at) VALUES (?, ?, ?, ?)',
-  ).bind(repostId, contentId, actorUserId, createdAt).run()
-
-  const row = await db.prepare(
-    'SELECT repost_id, content_id, actor_user_id, created_at FROM social_reposts WHERE actor_user_id = ? AND content_id = ? LIMIT 1',
-  ).bind(actorUserId, contentId).first<{
-    repost_id: string; content_id: string; actor_user_id: string; created_at: string
-  }>()
+  let row
+  try {
+    await store.insertIfAbsent(repostId, contentId, actorUserId, createdAt)
+    row = await store.find(actorUserId, contentId)
+  } catch (error) {
+    if (error instanceof RepostStoreError) throw new RepostRuntimeError(error.code, error.status)
+    throw new RepostRuntimeError('SERVICE_UNAVAILABLE', 503)
+  }
   if (!row) throw new RepostRuntimeError('NOT_FOUND', 404)
   return {
     repostId: row.repost_id, contentId: row.content_id,
@@ -107,9 +102,14 @@ export async function removeRepost(
   db: D1Database,
   actorUserIdValue: string,
   contentIdValue: string,
+  store: RepostStore = createD1RepostStore(db),
 ): Promise<void> {
   const actorUserId = validateActor(actorUserIdValue)
   const contentId = validateId(contentIdValue)
-  await db.prepare('DELETE FROM social_reposts WHERE actor_user_id = ? AND content_id = ?')
-    .bind(actorUserId, contentId).run()
+  try {
+    await store.remove(actorUserId, contentId)
+  } catch (error) {
+    if (error instanceof RepostStoreError) throw new RepostRuntimeError(error.code, error.status)
+    throw new RepostRuntimeError('SERVICE_UNAVAILABLE', 503)
+  }
 }
