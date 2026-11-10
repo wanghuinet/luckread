@@ -98,6 +98,7 @@ const insertDecision = async (input) => {
 try {
   const reviewer = marker + '-reviewer'
   const otherReviewer = marker + '-other-reviewer'
+  const caseBefore = marker + '-case-before'
   const caseA = marker + '-case-a'
   const caseB = marker + '-case-b'
   const caseTie = marker + '-case-d'
@@ -116,7 +117,17 @@ try {
     priority: 90,
     assignedReviewerId: reviewer,
     decisionId: null,
-    createdAt: '2026-11-10T04:03:00.000123Z',
+    createdAt: '2026-11-10T04:03:00.000456Z',
+  })
+  await insertCase({
+    caseId: caseBefore,
+    targetType: 'content',
+    targetId: marker + '-content-before',
+    state: 'OPEN',
+    priority: 90,
+    assignedReviewerId: null,
+    decisionId: null,
+    createdAt: '2026-11-10T04:03:00.000050Z',
   })
   await insertCase({
     caseId: caseA,
@@ -137,7 +148,7 @@ try {
     priority: 90,
     assignedReviewerId: null,
     decisionId: null,
-    createdAt: '2026-11-10T04:03:00.000123Z',
+    createdAt: '2026-11-10T04:03:00.000456Z',
   })
   await insertCase({
     caseId: caseC,
@@ -188,11 +199,11 @@ try {
   })
 
   const firstPage = await listModerationQueue(store, reviewer, null, 2)
-  assert.deepEqual(firstPage.items.map((item) => item.caseId), [caseA, caseB])
+  assert.deepEqual(firstPage.items.map((item) => item.caseId), [caseBefore, caseA])
   assert.equal(firstPage.hasMore, true)
   assert.ok(firstPage.nextCursor)
-  assert.equal(firstPage.items[0]?.currentDecision?.decisionId, decisionA)
-  assert.equal(firstPage.items[0]?.currentDecision?.effectiveAt, '2026-11-10T04:02:00.000123Z')
+  assert.equal(firstPage.items[1]?.currentDecision?.decisionId, decisionA)
+  assert.equal(firstPage.items[1]?.currentDecision?.effectiveAt, '2026-11-10T04:02:00.000123Z')
   assert.equal(firstPage.items.some((item) => item.caseId === caseOtherReviewer), false)
   assert.equal(firstPage.items.some((item) => item.caseId === caseClosed), false)
   assert.equal(firstPage.items.some((item) => item.caseId === caseNonContent), false)
@@ -200,24 +211,33 @@ try {
   checks.openQueueStatesOnly = true
   checks.contentTargetScopePreserved = true
   checks.unassignedAndAssignedCasesVisible =
-    firstPage.items[0]?.caseId === caseA && firstPage.items[1]?.caseId === caseB
+    firstPage.items[0]?.caseId === caseBefore && firstPage.items[1]?.caseId === caseA
   checks.currentDecisionProjectionPreserved =
-    firstPage.items[0]?.currentDecision?.decisionId === decisionA
+    firstPage.items[1]?.currentDecision?.decisionId === decisionA
   checks.stablePriorityCreatedAtCaseIdOrdering =
     firstPage.items[0]?.caseId === caseA && firstPage.items[1]?.caseId === caseB
   checks.pageSizePlusOneHasMorePreserved = firstPage.hasMore && firstPage.items.length === 2
 
   const secondPage = await listModerationQueue(store, reviewer, firstPage.nextCursor, 2)
-  assert.deepEqual(secondPage.items.map((item) => item.caseId), [caseTie, caseC])
-  assert.equal(secondPage.hasMore, false)
-  assert.equal(secondPage.nextCursor, null)
-  assert.equal(
-    new Set([...firstPage.items, ...secondPage.items].map((item) => item.caseId)).size,
-    4,
-  )
+  assert.deepEqual(secondPage.items.map((item) => item.caseId), [caseB, caseTie])
+  assert.equal(secondPage.hasMore, true)
+  assert.ok(secondPage.nextCursor)
+
+  const thirdPage = await listModerationQueue(store, reviewer, secondPage.nextCursor, 2)
+  assert.deepEqual(thirdPage.items.map((item) => item.caseId), [caseC])
+  assert.equal(thirdPage.hasMore, false)
+  assert.equal(thirdPage.nextCursor, null)
+  const seenIds = [...firstPage.items, ...secondPage.items, ...thirdPage.items].map((item) => item.caseId)
+  assert.equal(new Set(seenIds).size, 5)
+  assert.deepEqual(seenIds, [caseBefore, caseA, caseB, caseTie, caseC])
+
+  checks.stablePriorityCreatedAtCaseIdOrdering =
+    seenIds[0] === caseBefore && seenIds[1] === caseA &&
+    seenIds[2] === caseB && seenIds[3] === caseTie
   checks.keysetCursorPreservesMicroseconds =
-    firstPage.nextCursor !== null && secondPage.items[0]?.caseId === caseTie
-  checks.nextPageHasNoDuplicates = true
+    firstPage.nextCursor !== null && secondPage.items[0]?.caseId === caseB &&
+    thirdPage.items[0]?.caseId === caseC
+  checks.nextPageHasNoDuplicates = new Set(seenIds).size === 5
 
   runtimePassed = true
 } finally {
