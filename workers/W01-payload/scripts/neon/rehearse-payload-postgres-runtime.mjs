@@ -43,7 +43,7 @@ async function step(name, operation, timeoutMs = 45_000) {
 }
 
 try {
-  payload = await step('GET_PAYLOAD', () => getPayload({ config, disableOnInit: true }))
+  payload = await step('GET_PAYLOAD', () => getPayload({ config, cron: false, disableOnInit: true }))
 
   const created = await step('CREATE_REDIRECT', () => payload.create({
     collection: 'redirects',
