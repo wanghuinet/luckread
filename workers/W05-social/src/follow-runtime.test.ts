@@ -152,7 +152,7 @@ describe('follow runtime', () => {
   it('reads status', async () => {
     await expect(
       getFollowStatus(
-        db([{ relationship_id: 'r1', created_at: '2026-10-02T00:00:00.000Z' }]),
+        db([{ relationship_id: 'r1', created_at: '2026-10-02T00:00:00.000Z', blocked: 0 }]),
         'u1',
         'u2',
       ),
@@ -160,6 +160,35 @@ describe('follow runtime', () => {
       following: true,
       relationshipId: 'r1',
       createdAt: '2026-10-02T00:00:00.000Z',
+    })
+  })
+
+  it('accepts an injected provider-neutral follow-status read store', async () => {
+    const store = {
+      getStatus: vi.fn(async () => ({
+        relationship_id: 'pg-r1',
+        created_at: '2026-11-10T00:00:00.000Z',
+        blocked: false,
+      })),
+    }
+    await expect(getFollowStatus(store, 'u1', 'u2')).resolves.toEqual({
+      following: true,
+      relationshipId: 'pg-r1',
+      createdAt: '2026-11-10T00:00:00.000Z',
+    })
+    expect(store.getStatus).toHaveBeenCalledWith({
+      followerUserId: 'u1',
+      targetUserId: 'u2',
+    })
+  })
+
+  it('maps injected follow-status storage failures to a sanitized service-unavailable error', async () => {
+    const store = {
+      getStatus: vi.fn(async () => { throw new FollowStoreError() }),
+    }
+    await expect(getFollowStatus(store, 'u1', 'u2')).rejects.toMatchObject({
+      code: 'SERVICE_UNAVAILABLE',
+      status: 503,
     })
   })
 
