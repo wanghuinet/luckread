@@ -46,6 +46,7 @@ on:
       - 'workers/W05-social/scripts/neon/rehearse-follow-postgres-runtime.mjs'
       - 'workers/W05-social/migrations/**'
       - 'workers/W05-social/scripts/neon/**'
+      - 'workers/W05-social/src/notification-push-fanout-runtime.ts'
       - 'workers/W05-social/src/neon-postgres-migrations/**'
       - 'workers/W05-social/src/following-author-ids-read-store.ts'
       - 'workers/W05-social/src/following-author-ids-read-store-postgres.ts'
