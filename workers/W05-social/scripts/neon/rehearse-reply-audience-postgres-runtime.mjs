@@ -40,7 +40,7 @@ let writeReadPassed = false
 let ownerConflictPassed = false
 let ownerScopePassed = false
 let cleanupPassed = false
-let postgresMajor: number | null = null
+let postgresMajor = null
 
 try {
   const version = await pool.query(
