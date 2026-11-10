@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { RelationshipGraphStoreError } from './relationship-graph-store.js'
 import { createPostgresRelationshipGraphReadStore } from './relationship-graph-store-postgres.js'
 import type { RelationshipGraphReadRow } from './relationship-graph-store.js'
+import { clearRelationshipGraphCacheForTests, getRelationshipGraph } from './relationship-graph-runtime.js'
 
 function fakePostgres(options: {
   row?: RelationshipGraphReadRow | null
@@ -64,5 +65,15 @@ describe('W05 PostgreSQL RelationshipGraph read store', () => {
     const { db } = fakePostgres({ fail: true })
     await expect(createPostgresRelationshipGraphReadStore(db).read('viewer-1', 'target-1'))
       .rejects.toBeInstanceOf(RelationshipGraphStoreError)
+  })
+  it('maps PostgreSQL failures to the public runtime service-unavailable error', async () => {
+    const { db } = fakePostgres({ fail: true })
+    clearRelationshipGraphCacheForTests()
+    await expect(getRelationshipGraph(
+      createPostgresRelationshipGraphReadStore(db),
+      'viewer-error',
+      'target-error',
+    )).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE', status: 503 })
+    clearRelationshipGraphCacheForTests()
   })
 })
