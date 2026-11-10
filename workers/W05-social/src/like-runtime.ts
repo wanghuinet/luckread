@@ -1,6 +1,11 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import { ReplyAudienceRuntimeError } from './reply-audience-runtime.js'
+import {
+  createD1LikeStatusReadStore,
+  LikeStatusReadStoreError,
+  type LikeStatusReadStore,
+} from './like-status-read-store.js'
 import { fetchPublishedContentSocialContext, type PublishedContentSocialContext, type W03ContentBinding } from './w03-content-context-client.js'
 
 export class LikeRuntimeError extends Error {
@@ -344,6 +349,7 @@ export async function getLikeStatus(
   target: LikeTarget,
   correlationId: string,
   prevalidatedContentContext?: PublishedContentSocialContext,
+  statusReadStore: LikeStatusReadStore = createD1LikeStatusReadStore(db),
 ): Promise<{ liked: boolean; likeCount: number }> {
   const actor = validateActor(actorUserId)
   const { targetType, targetId } = validateTarget(target)
@@ -374,30 +380,25 @@ export async function getLikeStatus(
     return { liked: cachedLiked, likeCount: cachedCount }
   }
 
-  const countSelect = cachedCount === null
-    ? `, (SELECT COUNT(*)
-         FROM interaction_likes il_count
-        WHERE il_count.target_type = ?
-          AND il_count.target_id = ?) AS like_count`
-    : ''
-  const row = await db.prepare(
-    `SELECT EXISTS (
-       SELECT 1
-       FROM interaction_likes il
-       WHERE il.actor_user_id = ?
-         AND il.target_type = ?
-         AND il.target_id = ?
-     ) AS liked${countSelect}`,
-  ).bind(
-    actor,
-    targetType,
-    targetId,
-    ...(cachedCount === null ? [targetType, targetId] : []),
-  ).first<{ liked: number; like_count?: number }>()
+  let row
+  try {
+    row = await statusReadStore.read({
+      actorUserId: actor,
+      targetType,
+      targetId,
+      includeCount: cachedCount === null,
+    })
+  } catch (error) {
+    // Storage adapters must not leak provider details through the social API.
+    throw new LikeRuntimeError(
+      error instanceof LikeStatusReadStoreError ? error.code : 'SERVICE_UNAVAILABLE',
+      503,
+    )
+  }
 
-  const likeCount = cachedCount ?? Math.max(0, Number(row?.like_count ?? 0))
+  const likeCount = cachedCount ?? Math.max(0, Number(row.likeCount ?? 0))
   const result = {
-    liked: Boolean(row?.liked),
+    liked: row.liked,
     likeCount,
   }
   await writeCachedLikeViewerState(actor, targetType, targetId, result.liked)
