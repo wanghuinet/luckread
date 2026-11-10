@@ -19,19 +19,25 @@ describe('content liker list adapter and UI', () => {
 
   it('uses an authoritative, bounded W05 query with stable pagination and block filters', () => {
     const runtime = read('../W05-social/src/like-list-runtime.ts')
-    expect(runtime).toContain('FROM interaction_likes il')
-    expect(runtime).toContain("il.target_type = 'content'")
+    const d1Store = read('../W05-social/src/like-list-read-store.ts')
+    const postgresStore = read('../W05-social/src/like-list-read-store-postgres.ts')
     expect(runtime).toContain("contentContext.state !== 'PUBLISHED'")
     expect(runtime).toContain("contentContext.contentId !== contentId")
-    expect(runtime.toLowerCase()).not.toContain('join contents')
-    expect(runtime.toLowerCase()).not.toContain('from contents')
-    expect(runtime).toContain("content_block.relation_type = 'block'")
-    expect(runtime).toContain("viewer_block.relation_type = 'block'")
-    expect(runtime).toContain("liker_block.relation_type = 'block'")
-    expect(runtime).toContain('ORDER BY il.created_at DESC, il.relationship_id DESC')
-    expect(runtime).toContain('LIMIT ?')
     expect(runtime).toContain('parsed.contentId !== contentId')
     expect(runtime).toContain('parsed.viewerUserId !== viewerUserId')
+
+    for (const store of [d1Store, postgresStore]) {
+      expect(store).toContain('interaction_likes il')
+      expect(store).toContain("il.target_type = 'content'")
+      expect(store.toLowerCase()).not.toContain('join contents')
+      expect(store.toLowerCase()).not.toContain('from contents')
+      expect(store).toContain("content_block.relation_type = 'block'")
+      expect(store).toContain("viewer_block.relation_type = 'block'")
+      expect(store).toContain("liker_block.relation_type = 'block'")
+      expect(store).toContain('ORDER BY il.created_at DESC, il.relationship_id DESC')
+    }
+    expect(d1Store).toContain('LIMIT ?')
+    expect(postgresStore).toContain('LIMIT $')
   })
 
   it('opens a responsive liked-by dialog from the count without replacing like/unlike', () => {
