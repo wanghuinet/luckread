@@ -10,6 +10,12 @@ on:
       - 'contracts/persistence/SOCIAL-001-follow-relationship-migration-contract.v1.json'
       - 'contracts/transport/W05-W09-notification-push-delivery.v1.json'
       - 'workers/W05-social/src/follow-runtime.ts'
+      - 'workers/W05-social/src/social-closure-runtime.ts'
+      - 'workers/W05-social/src/social-closure-runtime.test.ts'
+      - 'workers/W05-social/src/social-targets-read-store.ts'
+      - 'workers/W05-social/src/social-targets-read-store-postgres.ts'
+      - 'workers/W05-social/src/social-targets-read-store-postgres.test.ts'
+      - 'workers/W05-social/scripts/neon/rehearse-social-targets-read-postgres-runtime.mjs'
       - 'workers/W05-social/src/follow-runtime.test.ts'
       - 'workers/W05-social/src/follow-status-read-store.ts'
       - 'workers/W05-social/src/follow-status-read-store-postgres.ts'
@@ -152,6 +158,7 @@ jobs:
         run: |
           set -euo pipefail
           node --check workers/W05-social/scripts/neon/rehearse-content-likers-postgres-runtime.mjs
+          node --check workers/W05-social/scripts/neon/rehearse-social-targets-read-postgres-runtime.mjs
           node --check workers/W05-social/scripts/neon/rehearse-favorite-list-postgres-runtime.mjs
           node --check workers/W05-social/scripts/neon/rehearse-like-status-postgres-runtime.mjs
           node --check workers/W05-social/scripts/neon/rehearse-like-mutation-postgres-runtime.mjs
@@ -269,6 +276,13 @@ jobs:
           W05_LIKE_MUTATION_POSTGRES_REPORT: ../../artifacts/neon/w05-like-mutation-postgres-runtime-postflight.json
         run: node --import=tsx/esm ../../workers/W05-social/scripts/neon/rehearse-like-mutation-postgres-runtime.mjs
 
+      - name: Rehearse W05 social targets against PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          W05_SOCIAL_TARGETS_POSTGRES_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_w05_d1_02_schema
+          W05_SOCIAL_TARGETS_POSTGRES_REPORT: ../../artifacts/neon/w05-social-targets-postgres-runtime-postflight.json
+        run: node --import=tsx/esm ../../workers/W05-social/scripts/neon/rehearse-social-targets-read-postgres-runtime.mjs
+
       - name: Rehearse W05 notification preferences against PostgreSQL 18
         working-directory: workers/W02-identity
         env:
@@ -350,6 +364,7 @@ jobs:
             artifacts/neon/w05-favorite-list-postgres-runtime-postflight.json
             artifacts/neon/w05-like-status-postgres-runtime-postflight.json
             artifacts/neon/w05-like-mutation-postgres-runtime-postflight.json
+            artifacts/neon/w05-social-targets-postgres-runtime-postflight.json
             artifacts/neon/w05-notification-preferences-postgres-runtime-postflight.json
             artifacts/neon/w05-publication-relations-postgres-runtime-postflight.json
             artifacts/neon/w05-reply-audience-postgres-runtime-postflight.json
