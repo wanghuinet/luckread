@@ -143,7 +143,14 @@ describe('W10 T16 membership-renewal execution job read store', () => {
   it('maps D1 and PostgreSQL failures to a sanitized service-unavailable error', async () => {
     const d1 = createD1W10T16MembershipRenewalJobReadStore({
       prepare() {
-        return { bind() { return { first: async () => { throw new Error('private D1 detail') }, all: async () => { throw new Error('private D1 detail') } } }
+        return {
+          bind() {
+            return {
+              first: async () => { throw new Error('private D1 detail') },
+              all: async () => { throw new Error('private D1 detail') },
+            }
+          },
+        }
       },
     })
     const pg = createPostgresW10T16MembershipRenewalJobReadStore({
