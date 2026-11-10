@@ -16,6 +16,11 @@ import {
   SocialClosureReadStoreError,
   type SocialClosureReadStore,
 } from './social-closure-read-store.js'
+import {
+  createD1NotificationEnqueueStore,
+  NotificationEnqueueStoreError,
+  type NotificationEnqueueStore,
+} from './notification-enqueue-store.js'
 
 export class SocialClosureRuntimeError extends Error {
   constructor(readonly code: string, readonly status: number) { super(code) }
@@ -47,6 +52,15 @@ async function withSocialClosureRead<T>(operation: () => Promise<T>): Promise<T>
 
 const isSqlTrue = (value: number | boolean | null | undefined): boolean =>
   value === true || Number(value ?? 0) === 1
+
+type NotificationEnqueueDataSource = D1Database | NotificationEnqueueStore
+
+function resolveNotificationEnqueueStore(source: NotificationEnqueueDataSource): NotificationEnqueueStore {
+  if (typeof (source as NotificationEnqueueStore).enqueue === 'function') {
+    return source as NotificationEnqueueStore
+  }
+  return createD1NotificationEnqueueStore(source as D1Database)
+}
 
 export type SocialTargetType = 'content' | 'comment'
 export type SocialNotificationType = 'FOLLOW' | 'LIKE' | 'COMMENT' | 'REPLY' | 'MENTION'
@@ -737,8 +751,9 @@ const NOTIFICATION_DB_RETRY_DELAYS_MS = [25, 75] as const
  * repeating the whole notification attempt.
  */
 const isTransientNotificationDbError = (error: unknown): boolean => {
+  if (error instanceof NotificationEnqueueStoreError) return error.retryable
   const message = error instanceof Error ? error.message : String(error ?? '')
-  return /\b(?:SQLITE_BUSY|SQLITE_LOCKED|database is locked|temporar(?:y|ily)|timed?\s*out|timeout|connection (?:reset|closed|lost)|network (?:error|failure)|fetch failed|service unavailable|upstream unavailable)\b/i.test(message)
+  return /\\b(?:SQLITE_BUSY|SQLITE_LOCKED|database is locked|temporar(?:y|ily)|timed?\\s*out|timeout|connection (?:reset|closed|lost)|network (?:error|failure)|fetch failed|service unavailable|upstream unavailable)\\b/i.test(message)
 }
 
 /**
@@ -765,7 +780,7 @@ const withNotificationDbRetry = async <T>(operation: () => Promise<T>): Promise<
 }
 
 export async function enqueueNotification(
-  db: D1Database,
+  source: NotificationEnqueueDataSource,
   input: {
     recipientUserId: string
     actorUserId: string
@@ -781,52 +796,21 @@ export async function enqueueNotification(
     const targetId = id(input.targetId)
     if (recipientUserId === actorUserId) return
 
-    const dedupeKey = [input.type, recipientUserId, actorUserId, input.targetType, targetId].join(':')
-    const notificationId = crypto.randomUUID()
-    const payloadJson = JSON.stringify(input.payload ?? {})
-    const now = new Date().toISOString()
-
-    await withNotificationDbRetry(async () => {
-      const blocked = await db.prepare(
-        `SELECT 1 FROM social_user_interactions
-          WHERE relation_type = 'block'
-            AND (
-              (actor_user_id = ? AND target_user_id = ?)
-              OR (actor_user_id = ? AND target_user_id = ?)
-            )
-          LIMIT 1`,
-      ).bind(actorUserId, recipientUserId, recipientUserId, actorUserId).first()
-      if (blocked) return
-
-      const preferenceColumn = ({
-        FOLLOW: 'follow_enabled',
-        LIKE: 'like_enabled',
-        COMMENT: 'comment_enabled',
-        REPLY: 'comment_enabled',
-        MENTION: 'mention_enabled',
-      } as const)[input.type]
-
-      const preference = await db.prepare(
-        'SELECT ' + preferenceColumn + ' AS enabled FROM social_notification_preferences WHERE user_id = ? LIMIT 1',
-      ).bind(recipientUserId).first<{ enabled: number }>()
-      if (preference && Number(preference.enabled) === 0) return
-
-      await db.prepare(
-        `INSERT OR IGNORE INTO social_notifications
-          (notification_id, recipient_user_id, actor_user_id, notification_type, target_type, target_id, dedupe_key, payload_json, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      ).bind(
-        notificationId,
-        recipientUserId,
-        actorUserId,
-        input.type,
-        input.targetType,
-        targetId,
-        dedupeKey,
-        payloadJson,
-        now,
-      ).run()
-    })
+    // One notification ID, dedupe key, payload and timestamp are reused across
+    // bounded retries so an ambiguous committed insert cannot fan out twice.
+    const enqueueInput = {
+      notificationId: crypto.randomUUID(),
+      recipientUserId,
+      actorUserId,
+      notificationType: input.type,
+      targetType: input.targetType,
+      targetId,
+      dedupeKey: [input.type, recipientUserId, actorUserId, input.targetType, targetId].join(':'),
+      payloadJson: JSON.stringify(input.payload ?? {}),
+      createdAt: new Date().toISOString(),
+    }
+    const store = resolveNotificationEnqueueStore(source)
+    await withNotificationDbRetry(() => store.enqueue(enqueueInput))
   } catch (error) {
     // Notifications are a non-authoritative social side effect. A bounded
     // retry exhaustion must never roll back a successful follow/like/comment.
