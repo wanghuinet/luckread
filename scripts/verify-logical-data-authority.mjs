@@ -119,6 +119,9 @@ const accessViolation = (access, worker, relativePath, tablePolicy) => {
 const selfChecks = [
   { access: { table: 'contents', action: 'write' }, worker: 'W03', path: 'workers/W03-content/src/index.ts', expected: false },
   { access: { table: 'contents', action: 'read' }, worker: 'W05', path: 'workers/W05-social/src/like-runtime.ts', expected: false },
+  { access: { table: 'contents', action: 'read' }, worker: 'W05', path: 'workers/W05-social/src/comment-create-store.ts', expected: false },
+  { access: { table: 'contents', action: 'read' }, worker: 'W05', path: 'workers/W05-social/src/comment-create-store-postgres.ts', expected: false },
+  { access: { table: 'contents', action: 'read' }, worker: 'W05', path: 'workers/W05-social/src/comment-runtime.ts', expected: true },
   { access: { table: 'contents', action: 'read' }, worker: 'W05', path: 'workers/W05-social/src/index.ts', expected: true },
   { access: { table: 'contents', action: 'write' }, worker: 'W05', path: 'workers/W05-social/src/like-runtime.ts', expected: true },
   { access: { table: 'role_assignments', action: 'write' }, worker: 'W08', path: 'workers/W08-creator/src/worker.ts', expected: true },

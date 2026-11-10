@@ -73,6 +73,11 @@ on:
       - 'workers/W05-social/src/reply-audience-store-postgres.ts'
       - 'workers/W05-social/src/reply-audience-store-postgres.test.ts'
       - 'workers/W05-social/src/reply-audience-runtime.test.ts'
+      - 'workers/W05-social/src/comment-create-store.ts'
+      - 'workers/W05-social/src/comment-create-store-postgres.ts'
+      - 'workers/W05-social/src/comment-create-store-postgres.test.ts'
+      - 'workers/W05-social/src/comment-runtime.ts'
+      - 'workers/W05-social/scripts/neon/rehearse-comment-create-postgres-runtime.mjs'
       - 'workers/W05-social/scripts/neon/rehearse-reply-audience-postgres-runtime.mjs'
       - 'workers/W05-social/src/profile-pin-runtime.ts'
       - 'workers/W05-social/src/repost-runtime.ts'
@@ -123,6 +128,7 @@ jobs:
           node --check workers/W05-social/scripts/neon/rehearse-notification-preferences-postgres-runtime.mjs
           node --check workers/W05-social/scripts/neon/rehearse-publication-relations-postgres-runtime.mjs
           node --check workers/W05-social/scripts/neon/rehearse-reply-audience-postgres-runtime.mjs
+          node --check workers/W05-social/scripts/neon/rehearse-comment-create-postgres-runtime.mjs
           node --test workers/W05-social/scripts/neon/generate-d1-02-postgres-migration.test.mjs
           node workers/W05-social/scripts/neon/generate-d1-02-postgres-migration.mjs --report artifacts/neon/w05-d1-02-source-hashes.json
           git diff --exit-code -- workers/W05-social/src/neon-postgres-migrations/0001_w05_d1_02_social_schema.sql
@@ -242,6 +248,13 @@ jobs:
           W05_REPLY_AUDIENCE_POSTGRES_REPORT: ../../artifacts/neon/w05-reply-audience-postgres-runtime-postflight.json
         run: node --import=tsx/esm ../../workers/W05-social/scripts/neon/rehearse-reply-audience-postgres-runtime.mjs
 
+      - name: Rehearse W05 comment creation against PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          W05_COMMENT_CREATE_POSTGRES_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_w05_d1_02_schema
+          W05_COMMENT_CREATE_POSTGRES_REPORT: ../../artifacts/neon/w05-comment-create-postgres-runtime-postflight.json
+        run: node --import=tsx/esm ../../workers/W05-social/scripts/neon/rehearse-comment-create-postgres-runtime.mjs
+
       - name: Upload W05 D1-02 PostgreSQL 18 evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -262,5 +275,6 @@ jobs:
             artifacts/neon/w05-notification-preferences-postgres-runtime-postflight.json
             artifacts/neon/w05-publication-relations-postgres-runtime-postflight.json
             artifacts/neon/w05-reply-audience-postgres-runtime-postflight.json
+            artifacts/neon/w05-comment-create-postgres-runtime-postflight.json
           if-no-files-found: error
           retention-days: 90
