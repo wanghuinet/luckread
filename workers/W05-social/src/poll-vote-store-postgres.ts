@@ -25,11 +25,11 @@ const getVoteSql = `SELECT option_id,
 const insertVoteSql = `INSERT INTO social_poll_votes (
     vote_id, poll_id, option_id, user_id, created_at
   )
-  SELECT $1, poll.poll_id, option.option_id, $2, $3::timestamptz
+  SELECT $1, poll.poll_id, poll_option.option_id, $2, $3::timestamptz
     FROM social_polls poll
-    JOIN social_poll_options option
-      ON option.poll_id = poll.poll_id
-     AND option.option_id = $4
+    JOIN social_poll_options poll_option
+      ON poll_option.poll_id = poll.poll_id
+     AND poll_option.option_id = $4
    WHERE poll.content_id = $5
      AND poll.owner_user_id = $6
      AND poll.ends_at IS NOT NULL
