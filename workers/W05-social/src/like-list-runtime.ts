@@ -2,6 +2,11 @@
 
 import { LikeRuntimeError } from './like-runtime.js'
 import type { PublishedContentSocialContext } from './w03-content-context-client.js'
+import {
+  createD1ContentLikerReadStore,
+  ContentLikerReadStoreError,
+  type ContentLikerReadStore,
+} from './like-list-read-store.js'
 
 const MAX_ID = 128
 const MAX_CURSOR = 2048
@@ -77,8 +82,17 @@ const decodeCursor = (
  * W05/D1-02 remains the sole source of the like relationship; no projection table
  * or per-user copied counter is introduced.
  */
+type ContentLikerDataSource = D1Database | ContentLikerReadStore
+
+function resolveContentLikerReadStore(source: ContentLikerDataSource): ContentLikerReadStore {
+  if (typeof (source as ContentLikerReadStore).list === 'function') {
+    return source as ContentLikerReadStore
+  }
+  return createD1ContentLikerReadStore(source as D1Database)
+}
+
 export async function listContentLikers(
-  db: D1Database,
+  source: ContentLikerDataSource,
   contentIdValue: string,
   cursorValue: string | null,
   limit: number,
@@ -99,64 +113,23 @@ export async function listContentLikers(
     throw new LikeRuntimeError('NOT_FOUND', 404)
   }
 
-  const contentOwnerUserId = contentContext.ownerUserId
-  const params: unknown[] = [contentId, contentOwnerUserId, contentOwnerUserId]
-  let visibility = `
-    AND NOT EXISTS (
-      SELECT 1
-        FROM social_user_interactions content_block
-       WHERE content_block.relation_type = 'block'
-         AND (
-           (content_block.actor_user_id = il.actor_user_id AND content_block.target_user_id = ?)
-           OR (content_block.actor_user_id = ? AND content_block.target_user_id = il.actor_user_id)
-         )
-    )`
-
-  if (viewerUserId) {
-    visibility += `
-    AND NOT EXISTS (
-      SELECT 1
-        FROM social_user_interactions viewer_block
-       WHERE viewer_block.relation_type = 'block'
-         AND (
-           (viewer_block.actor_user_id = ? AND viewer_block.target_user_id = ?)
-           OR (viewer_block.actor_user_id = ? AND viewer_block.target_user_id = ?)
-         )
-    )
-    AND NOT EXISTS (
-      SELECT 1
-        FROM social_user_interactions liker_block
-       WHERE liker_block.relation_type = 'block'
-         AND (
-           (liker_block.actor_user_id = ? AND liker_block.target_user_id = il.actor_user_id)
-           OR (liker_block.actor_user_id = il.actor_user_id AND liker_block.target_user_id = ?)
-         )
-    )`
-    params.push(viewerUserId, contentOwnerUserId, contentOwnerUserId, viewerUserId, viewerUserId, viewerUserId)
+  let rows
+  try {
+    rows = await resolveContentLikerReadStore(source).list({
+      contentId,
+      contentOwnerUserId: contentContext.ownerUserId,
+      viewerUserId,
+      cursor: cursor
+        ? { createdAt: cursor.createdAt, relationshipId: cursor.relationshipId }
+        : null,
+      limit: limit + 1,
+    })
+  } catch (error) {
+    if (error instanceof ContentLikerReadStoreError) {
+      throw new LikeRuntimeError(error.code, error.status)
+    }
+    throw error
   }
-
-  const cursorSql = cursor
-    ? ' AND (il.created_at < ? OR (il.created_at = ? AND il.relationship_id < ?))'
-    : ''
-  if (cursor) params.push(cursor.createdAt, cursor.createdAt, cursor.relationshipId)
-  params.push(limit + 1)
-
-  const result = await db.prepare(`
-    SELECT il.relationship_id, il.actor_user_id, il.created_at
-      FROM interaction_likes il
-     WHERE il.target_type = 'content'
-       AND il.target_id = ?
-       ${visibility}
-       ${cursorSql}
-     ORDER BY il.created_at DESC, il.relationship_id DESC
-     LIMIT ?
-  `).bind(...params).all<{
-    relationship_id: string
-    actor_user_id: string
-    created_at: string
-  }>()
-
-  const rows = result.results ?? []
   const hasMore = rows.length > limit
   const visible = hasMore ? rows.slice(0, limit) : rows
   const last = visible.at(-1)
