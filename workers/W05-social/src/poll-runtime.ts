@@ -192,7 +192,7 @@ export async function getContentPoll(
   const isPublic = content.state === 'PUBLISHED'
   if (!isPublic && !isOwner) throw new SocialPollError('NOT_FOUND', 404)
 
-  if (viewerUserId && content.owner_user_id) {
+  if (viewerUserId && content.owner_user_id && viewerUserId !== content.owner_user_id) {
     let blocked: boolean
     try {
       blocked = await store.isBlocked(viewerUserId, content.owner_user_id)
