@@ -1,5 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 import type { OwnedPostContext } from './owned-post-context.js'
+import { createD1ReplyAudienceStore, type ReplyAudienceStore } from './reply-audience-store.js'
 
 export type ReplyAudience = 'everyone' | 'verified' | 'following' | 'mentioned' | 'followingNetwork'
 
@@ -60,6 +61,7 @@ export async function setContentReplyAudience(
   audienceValue: unknown,
   mentionedUserIdsValue: unknown,
   context: OwnedPostContext,
+  store: ReplyAudienceStore = createD1ReplyAudienceStore(db),
 ): Promise<ReplyAudienceRecord> {
   const actorUserId = validateId(actorUserIdValue, true)
   const contentId = validateId(contentIdValue)
@@ -77,33 +79,33 @@ export async function setContentReplyAudience(
   }
 
   const now = new Date().toISOString()
-  const saved = await db.prepare(
-    `INSERT INTO social_content_reply_policies
-       (content_id, owner_user_id, audience, mentioned_user_ids_json, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?)
-     ON CONFLICT(content_id) DO UPDATE SET
-       audience = excluded.audience,
-       mentioned_user_ids_json = excluded.mentioned_user_ids_json,
-       updated_at = excluded.updated_at
-     WHERE social_content_reply_policies.owner_user_id = excluded.owner_user_id
-     RETURNING content_id, owner_user_id, audience, mentioned_user_ids_json, updated_at`,
-  ).bind(contentId, actorUserId, replyAudience, mentionedUserIdsJson, now, now)
-    .first<{ content_id: string; owner_user_id: string; audience: ReplyAudience; mentioned_user_ids_json: string; updated_at: string }>()
+  let saved: Awaited<ReturnType<ReplyAudienceStore['set']>>
+  try {
+    saved = await store.set({
+      contentId,
+      ownerUserId: actorUserId,
+      audience: replyAudience,
+      mentionedUserIdsJson,
+      now,
+    })
+  } catch {
+    throw new ReplyAudienceRuntimeError('INTERNAL_ERROR', 500)
+  }
 
   if (!saved) throw new ReplyAudienceRuntimeError('CONFLICT', 409)
   let savedMentions: unknown
-  try { savedMentions = JSON.parse(saved.mentioned_user_ids_json) } catch {
+  try { savedMentions = JSON.parse(saved.mentionedUserIdsJson) } catch {
     throw new ReplyAudienceRuntimeError('INTERNAL_ERROR', 500)
   }
   if (!Array.isArray(savedMentions) || savedMentions.some((id) => typeof id !== 'string')) {
     throw new ReplyAudienceRuntimeError('INTERNAL_ERROR', 500)
   }
   return {
-    contentId: saved.content_id,
-    ownerUserId: saved.owner_user_id,
+    contentId: saved.contentId,
+    ownerUserId: saved.ownerUserId,
     replyAudience: saved.audience,
     mentionedUserIds: savedMentions as string[],
-    updatedAt: saved.updated_at,
+    updatedAt: saved.updatedAt,
   }
 }
 
@@ -113,6 +115,7 @@ export async function getContentReplyAudience(
   actorUserIdValue: string,
   contentIdValue: string,
   context: OwnedPostContext,
+  store: ReplyAudienceStore = createD1ReplyAudienceStore(db),
 ): Promise<ReplyAudienceRecord> {
   const actorUserId = validateId(actorUserIdValue, true)
   const contentId = validateId(contentIdValue)
@@ -125,17 +128,14 @@ export async function getContentReplyAudience(
   ) {
     throw new ReplyAudienceRuntimeError('NOT_FOUND', 404)
   }
-  const row = await db.prepare(
-    `SELECT content_id, owner_user_id, audience, mentioned_user_ids_json, updated_at
-       FROM social_content_reply_policies
-      WHERE content_id = ? AND owner_user_id = ?
-      LIMIT 1`,
-  ).bind(contentId, actorUserId).first<{
-    content_id: string; owner_user_id: string; audience: ReplyAudience;
-    mentioned_user_ids_json: string; updated_at: string
-  }>()
+  let row: Awaited<ReturnType<ReplyAudienceStore['get']>>
+  try {
+    row = await store.get(contentId, actorUserId)
+  } catch {
+    throw new ReplyAudienceRuntimeError('INTERNAL_ERROR', 500)
+  }
   let mentionedUserIds: unknown
-  try { mentionedUserIds = JSON.parse(row?.mentioned_user_ids_json ?? '[]') } catch {
+  try { mentionedUserIds = JSON.parse(row?.mentionedUserIdsJson ?? '[]') } catch {
     throw new ReplyAudienceRuntimeError('INTERNAL_ERROR', 500)
   }
   if (!Array.isArray(mentionedUserIds) || mentionedUserIds.some((id) => typeof id !== 'string')) {
@@ -146,7 +146,7 @@ export async function getContentReplyAudience(
     ownerUserId: actorUserId,
     replyAudience: row?.audience ?? 'everyone',
     mentionedUserIds: mentionedUserIds as string[],
-    updatedAt: row?.updated_at ?? context.updatedAt,
+    updatedAt: row?.updatedAt ?? context.updatedAt,
   }
 }
 

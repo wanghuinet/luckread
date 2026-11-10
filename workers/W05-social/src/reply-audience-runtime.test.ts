@@ -1,5 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 import { describe, expect, it, vi } from 'vitest'
+import type { ReplyAudienceStore, StoredReplyAudiencePolicy } from './reply-audience-store.js'
 import {
   getContentReplyAudience,
   replyAudienceAllowedParams,
@@ -147,5 +148,93 @@ describe('W05 reply audience runtime', () => {
     expect(replyAudienceAllowedSql).toContain("= 'verified'")
     expect(replyAudienceAllowedSql).toContain('mentioned_override')
     expect(replyAudienceAllowedParams('reply-1', true)).toEqual(['reply-1', 1, 'reply-1', 'reply-1', 'reply-1', 'reply-1', 'reply-1', 'reply-1', 'reply-1'])
+  })
+})
+
+describe('W05 reply-audience runtime store injection', () => {
+  const context = (ownerUserId: string) => ({
+    contentId: 'content-1',
+    ownerUserId,
+    contentType: 'post' as const,
+    state: 'PUBLISHED' as const,
+    updatedAt: '2026-11-10T00:00:00.000Z',
+  })
+
+  it('uses an injected PostgreSQL-compatible store for owner-scoped writes and reads without touching D1', async () => {
+    let stored: StoredReplyAudiencePolicy = {
+      contentId: 'content-1',
+      ownerUserId: 'owner-1',
+      audience: 'mentioned',
+      mentionedUserIdsJson: '["user-2"]',
+      updatedAt: '2026-11-10T00:00:00.000Z',
+    }
+    const store: ReplyAudienceStore = {
+      async set(input) {
+        stored = {
+          contentId: input.contentId,
+          ownerUserId: input.ownerUserId,
+          audience: input.audience,
+          mentionedUserIdsJson: input.mentionedUserIdsJson,
+          updatedAt: input.now,
+        }
+        return stored
+      },
+      async get(contentId, ownerUserId) {
+        return contentId === stored.contentId && ownerUserId === stored.ownerUserId ? stored : null
+      },
+    }
+    const d1 = { prepare: () => { throw new Error('D1 must not be accessed by injected store') } } as unknown as D1Database
+
+    await expect(setContentReplyAudience(
+      d1, 'owner-1', 'content-1', 'mentioned', ['user-2', 'user-2'], context('owner-1'), store,
+    )).resolves.toMatchObject({
+      contentId: 'content-1',
+      ownerUserId: 'owner-1',
+      replyAudience: 'mentioned',
+      mentionedUserIds: ['user-2'],
+    })
+
+    await expect(getContentReplyAudience(
+      d1, 'owner-1', 'content-1', context('owner-1'), store,
+    )).resolves.toMatchObject({
+      contentId: 'content-1',
+      ownerUserId: 'owner-1',
+      replyAudience: 'mentioned',
+      mentionedUserIds: ['user-2'],
+    })
+  })
+
+  it('keeps the W03 owner check ahead of injected persistence', async () => {
+    const store: ReplyAudienceStore = {
+      set: vi.fn(async () => null),
+      get: vi.fn(async () => null),
+    }
+    const d1 = { prepare: () => { throw new Error('unexpected D1 access') } } as unknown as D1Database
+    await expect(setContentReplyAudience(
+      d1, 'actor-1', 'content-1', 'everyone', [], context('owner-1'), store,
+    )).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 })
+    expect(store.set).not.toHaveBeenCalled()
+  })
+
+  it('keeps owner conflicts and provider failures distinct at the runtime boundary', async () => {
+    const d1 = { prepare: () => { throw new Error('unexpected D1 access') } } as unknown as D1Database
+    const conflictStore: ReplyAudienceStore = {
+      set: async () => null,
+      get: async () => null,
+    }
+    await expect(setContentReplyAudience(
+      d1, 'owner-1', 'content-1', 'everyone', [], context('owner-1'), conflictStore,
+    )).rejects.toMatchObject({ code: 'CONFLICT', status: 409 })
+
+    const unavailableStore: ReplyAudienceStore = {
+      set: async () => { throw new Error('private database connection detail') },
+      get: async () => { throw new Error('private database connection detail') },
+    }
+    await expect(setContentReplyAudience(
+      d1, 'owner-1', 'content-1', 'everyone', [], context('owner-1'), unavailableStore,
+    )).rejects.toMatchObject({ code: 'INTERNAL_ERROR', status: 500 })
+    await expect(getContentReplyAudience(
+      d1, 'owner-1', 'content-1', context('owner-1'), unavailableStore,
+    )).rejects.toMatchObject({ code: 'INTERNAL_ERROR', status: 500 })
   })
 })
