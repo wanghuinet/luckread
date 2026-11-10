@@ -1,5 +1,3 @@
-import { FollowStoreError } from './follow-store.js'
-
 export type FollowListDirection = 'followers' | 'following'
 
 export type FollowListCursor = Readonly<{
@@ -112,8 +110,4 @@ export function createD1FollowListReadStore(db: FollowListD1Database): FollowLis
       return Number(row?.total_count ?? 0)
     },
   }
-}
-
-export function mapFollowListReadStoreError(): FollowStoreError {
-  return new FollowStoreError()
 }
