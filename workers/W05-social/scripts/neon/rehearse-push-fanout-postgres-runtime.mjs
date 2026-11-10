@@ -71,7 +71,7 @@ try {
   const nowIso = now.toISOString()
 
   await pool.query(
-    'INSERT INTO social_notification_push_outbox (notification_id, recipient_user_id, status, endpoint_count, created_at, updated_at) VALUES ($1, $2, \'PENDING\', 0, $3::timestamptz, $3::timestamptz), ($4, $5, \'PENDING\', 0, $6::timestamptz, $6::timestamptz',
+    'INSERT INTO social_notification_push_outbox (notification_id, recipient_user_id, status, endpoint_count, created_at, updated_at) VALUES ($1, $2, \'PENDING\', 0, $3::timestamptz, $3::timestamptz), ($4, $5, \'PENDING\', 0, $6::timestamptz, $6::timestamptz)',
     [
       notificationWithEndpoints, recipientWithEndpoints, nowIso,
       notificationWithoutEndpoints, recipientWithoutEndpoints, nowIso,
@@ -121,6 +121,7 @@ try {
     call.sql.includes("permission_status = 'granted'") &&
     call.sql.includes('ORDER BY updated_at DESC LIMIT ?')
   ))
+  assert.deepEqual(endpointQueries.map(call => call.values[0]), [recipientWithEndpoints, recipientWithoutEndpoints])
   assert.ok(endpointQueries.every(call => call.values[1] === 20))
   checks.activeEndpointsReadThroughW09D103Boundary = true
 
