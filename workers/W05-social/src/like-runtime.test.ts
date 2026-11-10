@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { getLikeStatus, like, unlike } from './like-runtime.js'
 import { LikeStatusReadStoreError } from './like-status-read-store.js'
+import { LikeMutationStoreError } from './like-mutation-store.js'
 import type { W03ContentBinding } from './w03-content-context-client.js'
 
 const publishedContextBinding = (
@@ -351,6 +352,131 @@ describe('like runtime', () => {
 
   it('unlikes idempotently without a read', async () => {
     await expect(unlike(db(), 'user-1', { targetType: 'content', targetId: 'content-1' })).resolves.toBeUndefined()
+  })
+
+  it('uses an injected mutation store after W03 visibility and Block checks', async () => {
+    const d = db([{ blocked: 0 }])
+    const mutationStore = {
+      create: vi.fn(async () => ({
+        relationship_id: 'pg-like-1',
+        actor_user_id: 'user-1',
+        target_type: 'content' as const,
+        target_id: 'content-1',
+        created_at: '2026-11-10T00:00:00.000Z',
+      })),
+      remove: vi.fn(async () => undefined),
+    }
+
+    await expect(like(
+      d,
+      publishedContextBinding('user-2'),
+      'user-1',
+      { targetType: 'content', targetId: 'content-1' },
+      correlationId,
+      undefined,
+      mutationStore,
+    )).resolves.toMatchObject({ relationshipId: 'pg-like-1', targetId: 'content-1' })
+
+    expect(d.prepare).toHaveBeenCalledTimes(1)
+    expect(String((d.prepare as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]))
+      .toContain('social_user_interactions')
+    expect(mutationStore.create).toHaveBeenCalledWith(expect.objectContaining({
+      actorUserId: 'user-1',
+      targetType: 'content',
+      targetId: 'content-1',
+    }))
+  })
+
+  it('passes the W03 parent owner into the final injected comment-like guard', async () => {
+    const d = db([
+      { id: 'comment-1', state: 'PUBLISHED', author_user_id: 'comment-author', content_id: 'content-1' },
+      { blocked: 0 },
+    ])
+    const mutationStore = {
+      create: vi.fn(async () => ({
+        relationship_id: 'pg-comment-like-1',
+        actor_user_id: 'user-1',
+        target_type: 'comment' as const,
+        target_id: 'comment-1',
+        created_at: '2026-11-10T00:00:00.000Z',
+      })),
+      remove: vi.fn(async () => undefined),
+    }
+
+    await expect(like(
+      d,
+      publishedContextBinding('content-owner'),
+      'user-1',
+      { targetType: 'comment', targetId: 'comment-1' },
+      correlationId,
+      undefined,
+      mutationStore,
+    )).resolves.toMatchObject({ relationshipId: 'pg-comment-like-1' })
+    expect(mutationStore.create).toHaveBeenCalledWith(expect.objectContaining({
+      targetType: 'comment',
+      parentOwnerUserId: 'content-owner',
+    }))
+  })
+
+  it('maps a missing final guarded insert and mutation-store failures safely', async () => {
+    const missingStore = {
+      create: vi.fn(async () => null),
+      remove: vi.fn(async () => undefined),
+    }
+    await expect(like(
+      db([{ blocked: 0 }]),
+      publishedContextBinding(),
+      'user-1',
+      { targetType: 'content', targetId: 'content-1' },
+      correlationId,
+      undefined,
+      missingStore,
+    )).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 })
+
+    const failedStore = {
+      create: vi.fn(async () => { throw new LikeMutationStoreError() }),
+      remove: vi.fn(async () => { throw new LikeMutationStoreError() }),
+    }
+    await expect(like(
+      db([{ blocked: 0 }]),
+      publishedContextBinding(),
+      'user-1',
+      { targetType: 'content', targetId: 'content-1' },
+      correlationId,
+      undefined,
+      failedStore,
+    )).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE', status: 503 })
+    await expect(unlike(db(), 'user-1', { targetType: 'content', targetId: 'content-1' }, failedStore))
+      .rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE', status: 503 })
+  })
+
+  it('uses an injected mutation store for idempotent actor-scoped removal', async () => {
+    const cache = {
+      match: vi.fn(async () => undefined),
+      put: vi.fn(async () => undefined),
+      delete: vi.fn(async () => true),
+    }
+    Object.defineProperty(globalThis, 'caches', { value: { default: cache }, configurable: true })
+    const mutationStore = {
+      create: vi.fn(async () => null),
+      remove: vi.fn(async () => undefined),
+    }
+    const database = db()
+
+    await expect(unlike(
+      database,
+      'user-1',
+      { targetType: 'comment', targetId: 'comment-1' },
+      mutationStore,
+    )).resolves.toBeUndefined()
+
+    expect(database.prepare).not.toHaveBeenCalled()
+    expect(mutationStore.remove).toHaveBeenCalledWith({
+      actorUserId: 'user-1',
+      targetType: 'comment',
+      targetId: 'comment-1',
+    })
+    expect(cache.delete).toHaveBeenCalledTimes(2)
   })
 
   it('rejects invalid actor ids', async () => {
