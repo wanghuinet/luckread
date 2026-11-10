@@ -64,7 +64,7 @@ export function createPostgresW10T16MembershipRenewalJobReadStore(
       if (input.states?.length === 0) return []
 
       const values: unknown[] = []
-      const predicates = [\"j.owner_worker = 'W07'\", \"j.owner_task_id = 'T16'\"]
+      const predicates = ["j.owner_worker = 'W07'", "j.owner_task_id = 'T16'"]
 
       if (input.states) {
         const parameter = values.length + 1
