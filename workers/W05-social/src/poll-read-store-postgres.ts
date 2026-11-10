@@ -44,7 +44,7 @@ const listOptionsSql = \`SELECT
     o.option_id,
     o.option_text,
     o.position,
-    COUNT(v.vote_id)::integer AS votes
+    COUNT(v.vote_id) AS votes
   FROM social_poll_options o
   LEFT JOIN social_poll_votes v
     ON v.poll_id = o.poll_id
