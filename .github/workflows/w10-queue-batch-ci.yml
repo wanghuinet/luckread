@@ -62,6 +62,9 @@ jobs:
           workers/W10-async/src/event-envelope.ts
           workers/W10-async/src/event-envelope.test.ts
           workers/W10-async/src/canonical-json-idempotency.ts
+          workers/W10-async/src/execution-job-read-store.ts
+          workers/W10-async/src/execution-job-read-store-postgres.ts
+          workers/W10-async/src/execution-job-read-store.test.ts
           workers/W10-async/src/expo-push-service.ts
           workers/W10-async/src/expo-push-service.test.ts
           workers/W10-async/src/membership-renewal-workflow-runtime.ts
