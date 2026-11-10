@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 import type { OwnedPostContext } from './owned-post-context.js'
-import { createD1ProfilePinStore, ProfilePinStoreError, type ProfilePinStore } from './profile-pin-store.js'
+import { createD1ProfilePinStore, ProfilePinStoreError, type ProfilePinStorageRow, type ProfilePinStore } from './profile-pin-store.js'
 
 export class ProfilePinRuntimeError extends Error {
   constructor(readonly code: string, readonly status: number) { super(code) }
@@ -37,7 +37,7 @@ export async function pinProfileContent(
   if (context.ownerUserId !== actorUserId) throw new ProfilePinRuntimeError('PERMISSION_DENIED', 403)
 
   const pinnedAt = new Date().toISOString()
-  let row
+  let row: ProfilePinStorageRow | null
   try {
     row = await store.pin(actorUserId, contentId, pinnedAt)
   } catch (error) {
