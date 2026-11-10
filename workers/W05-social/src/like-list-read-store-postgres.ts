@@ -78,6 +78,362 @@ export function createPostgresContentLikerReadStore(
         const relationshipParameter = timestampParameter + 1
         cursorSql =
           ' AND (il.created_at < 
+      const limitParameter = values.length
+      const sql = `
+        SELECT
+          il.relationship_id,
+          il.actor_user_id,
+          to_char(il.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS created_at
+          FROM interaction_likes il
+         WHERE il.target_type = 'content'
+           AND il.target_id = $1
+           ${visibility}
+           ${cursorSql}
+         ORDER BY il.created_at DESC, il.relationship_id DESC
+         LIMIT $${limitParameter}
+      `
+
+      try {
+        const result = await db.query<ContentLikerReadRow>(sql, values)
+        return result.rows
+      } catch {
+        // Never expose driver messages, SQL text or connection metadata.
+        throw new ContentLikerReadStoreError()
+      }
+    },
+  }
+}
+ + timestampParameter + '::timestamptz' +
+          ' OR (il.created_at = 
+        values.push(input.cursor.createdAt, input.cursor.relationshipId)
+      }
+
+      values.push(input.limit)
+      const limitParameter = values.length
+      const sql = `
+        SELECT
+          il.relationship_id,
+          il.actor_user_id,
+          to_char(il.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS created_at
+          FROM interaction_likes il
+         WHERE il.target_type = 'content'
+           AND il.target_id = $1
+           ${visibility}
+           ${cursorSql}
+         ORDER BY il.created_at DESC, il.relationship_id DESC
+         LIMIT $${limitParameter}
+      `
+
+      try {
+        const result = await db.query<ContentLikerReadRow>(sql, values)
+        return result.rows
+      } catch {
+        // Never expose driver messages, SQL text or connection metadata.
+        throw new ContentLikerReadStoreError()
+      }
+    },
+  }
+}
+ + timestampParameter + '::timestamptz' +
+          ' AND il.relationship_id < 
+        values.push(input.cursor.createdAt, input.cursor.relationshipId)
+      }
+
+      values.push(input.limit)
+      const limitParameter = values.length
+      const sql = `
+        SELECT
+          il.relationship_id,
+          il.actor_user_id,
+          to_char(il.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS created_at
+          FROM interaction_likes il
+         WHERE il.target_type = 'content'
+           AND il.target_id = $1
+           ${visibility}
+           ${cursorSql}
+         ORDER BY il.created_at DESC, il.relationship_id DESC
+         LIMIT $${limitParameter}
+      `
+
+      try {
+        const result = await db.query<ContentLikerReadRow>(sql, values)
+        return result.rows
+      } catch {
+        // Never expose driver messages, SQL text or connection metadata.
+        throw new ContentLikerReadStoreError()
+      }
+    },
+  }
+}
+ + relationshipParameter + '))'
+        values.push(input.cursor.createdAt, input.cursor.relationshipId)
+      }
+
+      values.push(input.limit)
+      const limitParameter = values.length
+      const sql = `
+        SELECT
+          il.relationship_id,
+          il.actor_user_id,
+          to_char(il.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS created_at
+          FROM interaction_likes il
+         WHERE il.target_type = 'content'
+           AND il.target_id = $1
+           ${visibility}
+           ${cursorSql}
+         ORDER BY il.created_at DESC, il.relationship_id DESC
+         LIMIT $${limitParameter}
+      `
+
+      try {
+        const result = await db.query<ContentLikerReadRow>(sql, values)
+        return result.rows
+      } catch {
+        // Never expose driver messages, SQL text or connection metadata.
+        throw new ContentLikerReadStoreError()
+      }
+    },
+  }
+}
+ + timestampParameter + '::timestamptz' +
+          ' OR (il.created_at = 
+      const limitParameter = values.length
+      const sql = `
+        SELECT
+          il.relationship_id,
+          il.actor_user_id,
+          to_char(il.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS created_at
+          FROM interaction_likes il
+         WHERE il.target_type = 'content'
+           AND il.target_id = $1
+           ${visibility}
+           ${cursorSql}
+         ORDER BY il.created_at DESC, il.relationship_id DESC
+         LIMIT $${limitParameter}
+      `
+
+      try {
+        const result = await db.query<ContentLikerReadRow>(sql, values)
+        return result.rows
+      } catch {
+        // Never expose driver messages, SQL text or connection metadata.
+        throw new ContentLikerReadStoreError()
+      }
+    },
+  }
+}
+ + timestampParameter + '::timestamptz' +
+          ' OR (il.created_at = 
+        values.push(input.cursor.createdAt, input.cursor.relationshipId)
+      }
+
+      values.push(input.limit)
+      const limitParameter = values.length
+      const sql = `
+        SELECT
+          il.relationship_id,
+          il.actor_user_id,
+          to_char(il.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS created_at
+          FROM interaction_likes il
+         WHERE il.target_type = 'content'
+           AND il.target_id = $1
+           ${visibility}
+           ${cursorSql}
+         ORDER BY il.created_at DESC, il.relationship_id DESC
+         LIMIT $${limitParameter}
+      `
+
+      try {
+        const result = await db.query<ContentLikerReadRow>(sql, values)
+        return result.rows
+      } catch {
+        // Never expose driver messages, SQL text or connection metadata.
+        throw new ContentLikerReadStoreError()
+      }
+    },
+  }
+}
+ + timestampParameter + '::timestamptz' +
+          ' AND il.relationship_id < 
+        values.push(input.cursor.createdAt, input.cursor.relationshipId)
+      }
+
+      values.push(input.limit)
+      const limitParameter = values.length
+      const sql = `
+        SELECT
+          il.relationship_id,
+          il.actor_user_id,
+          to_char(il.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS created_at
+          FROM interaction_likes il
+         WHERE il.target_type = 'content'
+           AND il.target_id = $1
+           ${visibility}
+           ${cursorSql}
+         ORDER BY il.created_at DESC, il.relationship_id DESC
+         LIMIT $${limitParameter}
+      `
+
+      try {
+        const result = await db.query<ContentLikerReadRow>(sql, values)
+        return result.rows
+      } catch {
+        // Never expose driver messages, SQL text or connection metadata.
+        throw new ContentLikerReadStoreError()
+      }
+    },
+  }
+}
+ + relationshipParameter + '))'
+        values.push(input.cursor.createdAt, input.cursor.relationshipId)
+      }
+
+      values.push(input.limit)
+      const limitParameter = values.length
+      const sql = `
+        SELECT
+          il.relationship_id,
+          il.actor_user_id,
+          to_char(il.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS created_at
+          FROM interaction_likes il
+         WHERE il.target_type = 'content'
+           AND il.target_id = $1
+           ${visibility}
+           ${cursorSql}
+         ORDER BY il.created_at DESC, il.relationship_id DESC
+         LIMIT $${limitParameter}
+      `
+
+      try {
+        const result = await db.query<ContentLikerReadRow>(sql, values)
+        return result.rows
+      } catch {
+        // Never expose driver messages, SQL text or connection metadata.
+        throw new ContentLikerReadStoreError()
+      }
+    },
+  }
+}
+ + timestampParameter + '::timestamptz' +
+          ' AND il.relationship_id < 
+      const limitParameter = values.length
+      const sql = `
+        SELECT
+          il.relationship_id,
+          il.actor_user_id,
+          to_char(il.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS created_at
+          FROM interaction_likes il
+         WHERE il.target_type = 'content'
+           AND il.target_id = $1
+           ${visibility}
+           ${cursorSql}
+         ORDER BY il.created_at DESC, il.relationship_id DESC
+         LIMIT $${limitParameter}
+      `
+
+      try {
+        const result = await db.query<ContentLikerReadRow>(sql, values)
+        return result.rows
+      } catch {
+        // Never expose driver messages, SQL text or connection metadata.
+        throw new ContentLikerReadStoreError()
+      }
+    },
+  }
+}
+ + timestampParameter + '::timestamptz' +
+          ' OR (il.created_at = 
+        values.push(input.cursor.createdAt, input.cursor.relationshipId)
+      }
+
+      values.push(input.limit)
+      const limitParameter = values.length
+      const sql = `
+        SELECT
+          il.relationship_id,
+          il.actor_user_id,
+          to_char(il.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS created_at
+          FROM interaction_likes il
+         WHERE il.target_type = 'content'
+           AND il.target_id = $1
+           ${visibility}
+           ${cursorSql}
+         ORDER BY il.created_at DESC, il.relationship_id DESC
+         LIMIT $${limitParameter}
+      `
+
+      try {
+        const result = await db.query<ContentLikerReadRow>(sql, values)
+        return result.rows
+      } catch {
+        // Never expose driver messages, SQL text or connection metadata.
+        throw new ContentLikerReadStoreError()
+      }
+    },
+  }
+}
+ + timestampParameter + '::timestamptz' +
+          ' AND il.relationship_id < 
+        values.push(input.cursor.createdAt, input.cursor.relationshipId)
+      }
+
+      values.push(input.limit)
+      const limitParameter = values.length
+      const sql = `
+        SELECT
+          il.relationship_id,
+          il.actor_user_id,
+          to_char(il.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS created_at
+          FROM interaction_likes il
+         WHERE il.target_type = 'content'
+           AND il.target_id = $1
+           ${visibility}
+           ${cursorSql}
+         ORDER BY il.created_at DESC, il.relationship_id DESC
+         LIMIT $${limitParameter}
+      `
+
+      try {
+        const result = await db.query<ContentLikerReadRow>(sql, values)
+        return result.rows
+      } catch {
+        // Never expose driver messages, SQL text or connection metadata.
+        throw new ContentLikerReadStoreError()
+      }
+    },
+  }
+}
+ + relationshipParameter + '))'
+        values.push(input.cursor.createdAt, input.cursor.relationshipId)
+      }
+
+      values.push(input.limit)
+      const limitParameter = values.length
+      const sql = `
+        SELECT
+          il.relationship_id,
+          il.actor_user_id,
+          to_char(il.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS created_at
+          FROM interaction_likes il
+         WHERE il.target_type = 'content'
+           AND il.target_id = $1
+           ${visibility}
+           ${cursorSql}
+         ORDER BY il.created_at DESC, il.relationship_id DESC
+         LIMIT $${limitParameter}
+      `
+
+      try {
+        const result = await db.query<ContentLikerReadRow>(sql, values)
+        return result.rows
+      } catch {
+        // Never expose driver messages, SQL text or connection metadata.
+        throw new ContentLikerReadStoreError()
+      }
+    },
+  }
+}
+ + relationshipParameter + '))'
         values.push(input.cursor.createdAt, input.cursor.relationshipId)
       }
 
