@@ -23,6 +23,7 @@ const marker = 'w05-publication-relations-' + randomUUID()
 const reportPath = process.env.W05_PUBLICATION_RELATIONS_POSTGRES_REPORT ||
   '../../artifacts/neon/w05-publication-relations-postgres-runtime-postflight.json'
 const pool = new Pool({ connectionString, max: 4, connectionTimeoutMillis: 5_000 })
+const unusedD1 = { prepare() { throw new Error('Unexpected D1 access in PostgreSQL publication relation rehearsal') } }
 const pinStore = createPostgresProfilePinStore(pool)
 const repostStore = createPostgresRepostStore(pool)
 const shareStore = createPostgresShareStore(pool)
@@ -68,28 +69,28 @@ let shareIdempotencyPassed = false
 let shareVisibilityPassed = false
 
 try {
-  const firstPin = await pinProfileContent(pinStore, owner, pinContent, ownedPostContext)
-  const secondPin = await pinProfileContent(pinStore, owner, pinContent, ownedPostContext)
+  const firstPin = await pinProfileContent(unusedD1, owner, pinContent, ownedPostContext, pinStore)
+  const secondPin = await pinProfileContent(unusedD1, owner, pinContent, ownedPostContext, pinStore)
   assert.equal(firstPin.userId, owner)
   assert.equal(firstPin.contentId, pinContent)
   assert.equal(secondPin.pinnedAt, firstPin.pinnedAt, 'pinning the same item must preserve pinned_at')
   pinUpsertPassed = true
 
-  const readPin = await getProfilePinReference(pinStore, owner)
+  const readPin = await getProfilePinReference(unusedD1, owner, pinStore)
   assert.deepEqual(readPin, firstPin)
-  await unpinProfileContent(pinStore, owner, pinContent)
-  assert.equal(await getProfilePinReference(pinStore, owner), null)
+  await unpinProfileContent(unusedD1, owner, pinContent, pinStore)
+  assert.equal(await getProfilePinReference(unusedD1, owner, pinStore), null)
   pinReadAndDeletePassed = true
 
   const firstRepost = await createRepost(
-    repostStore, publishedBinding, actor, repostContent, marker + '-repost-correlation',
+    unusedD1, publishedBinding, actor, repostContent, marker + '-repost-correlation', repostStore,
   )
   const repeatedRepost = await createRepost(
-    repostStore, publishedBinding, actor, repostContent, marker + '-repost-retry-correlation',
+    unusedD1, publishedBinding, actor, repostContent, marker + '-repost-retry-correlation', repostStore,
   )
   assert.equal(repeatedRepost.repostId, firstRepost.repostId)
   assert.equal(repeatedRepost.createdAt, firstRepost.createdAt)
-  await removeRepost(repostStore, actor, repostContent)
+  await removeRepost(unusedD1, actor, repostContent, repostStore)
   assert.equal(await repostStore.find(actor, repostContent), null)
   repostIdempotencyPassed = true
 
@@ -98,26 +99,26 @@ try {
     [relationId, blockedActor, owner],
   )
   await assert.rejects(
-    createRepost(repostStore, publishedBinding, blockedActor, blockedRepostContent, marker + '-blocked-correlation'),
+    createRepost(unusedD1, publishedBinding, blockedActor, blockedRepostContent, marker + '-blocked-correlation', repostStore),
     error => error?.code === 'NOT_FOUND' && error?.status === 404,
   )
   assert.equal(await repostStore.find(blockedActor, blockedRepostContent), null)
   repostBlockPolicyPassed = true
 
   const firstShare = await createShare(
-    shareStore, publishedBinding, actor, shareContent, marker + '-share-idempotency-key',
-    marker + '-share-create-correlation',
+    unusedD1, publishedBinding, actor, shareContent, marker + '-share-idempotency-key',
+    marker + '-share-create-correlation', shareStore,
   )
   const repeatedShare = await createShare(
-    shareStore, publishedBinding, actor, shareContent, marker + '-share-idempotency-key',
-    marker + '-share-retry-correlation',
+    unusedD1, publishedBinding, actor, shareContent, marker + '-share-idempotency-key',
+    marker + '-share-retry-correlation', shareStore,
   )
   assert.equal(repeatedShare.shareId, firstShare.shareId)
   assert.equal(repeatedShare.createdAt, firstShare.createdAt)
   shareIdempotencyPassed = true
 
   const resolved = await resolveShare(
-    shareStore, publishedBinding, firstShare.shareId, marker + '-share-resolve-correlation',
+    unusedD1, publishedBinding, firstShare.shareId, marker + '-share-resolve-correlation', shareStore,
   )
   assert.deepEqual(resolved, {
     shareId: firstShare.shareId,
@@ -126,8 +127,8 @@ try {
   })
   await assert.rejects(
     createShare(
-      shareStore, publishedBinding, actor, shareOtherContent, marker + '-share-idempotency-key',
-      marker + '-share-conflict-correlation',
+      unusedD1, publishedBinding, actor, shareOtherContent, marker + '-share-idempotency-key',
+      marker + '-share-conflict-correlation', shareStore,
     ),
     error => error?.code === 'CONFLICT' && error?.status === 409,
   )
