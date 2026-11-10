@@ -53,7 +53,7 @@ export function createD1CommentMutationStore(db: D1Database): CommentMutationSto
     async getForDelete(commentId) {
       try {
         return await db.prepare(
-          \`SELECT
+          `SELECT
              c.id,
              c.content_id,
              c.author_user_id,
@@ -65,7 +65,7 @@ export function createD1CommentMutationStore(db: D1Database): CommentMutationSto
              ) AS has_replies
            FROM social_comments c
            WHERE c.id = ?
-           LIMIT 1\`,
+           LIMIT 1`,
         ).bind(commentId).first<CommentDeleteRow>()
       } catch {
         throw new CommentMutationStoreError()
@@ -75,7 +75,7 @@ export function createD1CommentMutationStore(db: D1Database): CommentMutationSto
     async markDeleted(input) {
       try {
         const result = await db.prepare(
-          \`UPDATE social_comments
+          `UPDATE social_comments
               SET state = 'AUTHOR_DELETED', updated_at = ?
             WHERE id = ?
               AND author_user_id = ?
@@ -84,7 +84,7 @@ export function createD1CommentMutationStore(db: D1Database): CommentMutationSto
                 SELECT 1
                   FROM social_comments child
                  WHERE child.parent_id = social_comments.id
-              )\`,
+              )`,
         ).bind(input.now, input.commentId, input.actorUserId).run()
         return Number(result.meta?.changes ?? 0) === 1
       } catch {
@@ -95,11 +95,11 @@ export function createD1CommentMutationStore(db: D1Database): CommentMutationSto
     async getDeleteState(commentId, actorUserId) {
       try {
         const row = await db.prepare(
-          \`SELECT state
+          `SELECT state
              FROM social_comments
             WHERE id = ?
               AND author_user_id = ?
-            LIMIT 1\`,
+            LIMIT 1`,
         ).bind(commentId, actorUserId).first<{ state: CommentMutationState }>()
         return row?.state ?? null
       } catch {
@@ -110,7 +110,7 @@ export function createD1CommentMutationStore(db: D1Database): CommentMutationSto
     async getForUpdate(commentId) {
       try {
         return await db.prepare(
-          \`SELECT
+          `SELECT
              c.id,
              c.content_id,
              c.author_user_id,
@@ -122,7 +122,7 @@ export function createD1CommentMutationStore(db: D1Database): CommentMutationSto
              c.updated_at
            FROM social_comments c
            WHERE c.id = ?
-           LIMIT 1\`,
+           LIMIT 1`,
         ).bind(commentId).first<CommentUpdateRow>()
       } catch {
         throw new CommentMutationStoreError()
@@ -132,13 +132,13 @@ export function createD1CommentMutationStore(db: D1Database): CommentMutationSto
     async update(input) {
       try {
         return await db.prepare(
-          \`UPDATE social_comments
+          `UPDATE social_comments
               SET body = ?, updated_at = ?
             WHERE id = ?
               AND author_user_id = ?
               AND state = 'PUBLISHED'
               AND updated_at = ?
-            RETURNING id, content_id, author_user_id, parent_id, body, state, depth, created_at, updated_at\`,
+            RETURNING id, content_id, author_user_id, parent_id, body, state, depth, created_at, updated_at`,
         ).bind(
           input.body,
           input.now,
