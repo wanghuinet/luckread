@@ -79,10 +79,10 @@ const updateDraftPollSql = `WITH eligible_poll AS MATERIALIZED (
     RETURNING poll.poll_id
   ),
   deleted_options AS (
-    DELETE FROM social_poll_options option
+    DELETE FROM social_poll_options opt
      USING updated_poll poll
-     WHERE option.poll_id = poll.poll_id
-    RETURNING option.option_id
+     WHERE opt.poll_id = poll.poll_id
+    RETURNING opt.option_id
   ),
   inserted_options AS (
     INSERT INTO social_poll_options (option_id, poll_id, option_text, position)
