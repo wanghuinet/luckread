@@ -128,7 +128,17 @@ const report = {
   d1Touched: false,
   remoteNeonTouched: false,
 }
-if (Object.values(report).some(value => value === false)) {
+const requiredPasses = [
+  report.createdAndReadBack,
+  report.updatedWithoutVotes,
+  report.sameConfigurationAllowedAfterVote,
+  report.changedConfigurationRejectedAfterVote,
+  report.publishedConfigurationImmutable,
+  report.cleanupPassed,
+]
+if (report.database !== 'luckread_w05_d1_02_schema' || report.postgresMajor !== 18 ||
+    requiredPasses.some(value => value !== true) ||
+    report.d1Touched !== false || report.remoteNeonTouched !== false) {
   throw new Error('W05 poll configuration PostgreSQL 18 rehearsal failed: ' + JSON.stringify(report))
 }
 await mkdir(new URL('../../../../artifacts/neon/', import.meta.url), { recursive: true }).catch(() => {})
