@@ -25,7 +25,7 @@ let payload
 
 async function step(name, operation, timeoutMs = 45_000) {
   process.stdout.write('W01_PG_RUNTIME_STEP_START ' + name + '\\n')
-  let timeout: ReturnType<typeof setTimeout> | undefined
+  let timeout
   try {
     const value = await Promise.race([
       operation(),
