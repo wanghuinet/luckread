@@ -40,7 +40,7 @@ describe('W10 T16 membership-renewal execution job read store', () => {
         return {
           bind(...values: unknown[]) {
             calls.push({ sql, values })
-            return { first: async <T>() => row as T, all: async () => ({ results: [] }) },
+            return { first: async <T>() => row as T, all: async () => ({ results: [] }) }
           },
         }
       },
