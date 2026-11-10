@@ -18,6 +18,8 @@ on:
       - 'workers/W10-async/src/canonical-json-idempotency.ts'
       - 'workers/W10-async/scripts/neon/**'
       - 'workers/W10-async/src/neon-postgres-migrations/**'
+      - 'workers/W10-async/src/execution-job-read-store*.ts'
+      - 'workers/W10-async/scripts/neon/rehearse-d1-03-w10-execution-job-read-postgres.mjs'
   push:
     branches: [main]
     paths:
@@ -35,6 +37,8 @@ on:
       - 'workers/W10-async/src/canonical-json-idempotency.ts'
       - 'workers/W10-async/scripts/neon/**'
       - 'workers/W10-async/src/neon-postgres-migrations/**'
+      - 'workers/W10-async/src/execution-job-read-store*.ts'
+      - 'workers/W10-async/scripts/neon/rehearse-d1-03-w10-execution-job-read-postgres.mjs'
   workflow_dispatch:
 
 permissions:
@@ -76,6 +80,7 @@ jobs:
         run: |
           set -euo pipefail
           node --check workers/W10-async/scripts/neon/generate-d1-03-w10-postgres-migration.mjs
+          node --check workers/W10-async/scripts/neon/rehearse-d1-03-w10-execution-job-read-postgres.mjs
           node --test workers/W10-async/scripts/neon/generate-d1-03-w10-postgres-migration.test.mjs
           node workers/W10-async/scripts/neon/generate-d1-03-w10-postgres-migration.mjs
           git diff --exit-code -- workers/W10-async/src/neon-postgres-migrations/0001_w10_d1_03_async_execution.sql
@@ -100,11 +105,24 @@ jobs:
             --file workers/W10-async/scripts/neon/verify-d1-03-w10-postgres-schema.sql \
             | tee artifacts/neon/d1-03-w10-execution-postflight.txt
 
+      - name: Install pinned W02 PostgreSQL driver and TypeScript runner
+        working-directory: workers/W02-identity
+        run: npm install --ignore-scripts --no-audit --no-fund
+
+      - name: Rehearse W10 execution job reads against PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          D1_03_W10_LOCAL_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_d1_03_w10_rehearsal
+          D1_03_W10_JOB_READ_REPORT: ../../artifacts/neon/d1-03-w10-execution-job-read-postflight.json
+        run: node --import=tsx/esm ../../workers/W10-async/scripts/neon/rehearse-d1-03-w10-execution-job-read-postgres.mjs
+
       - name: Upload W10 D1-03 PostgreSQL 18 rehearsal evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: neon-d1-03-w10-execution-postgres18-${{ github.sha }}
-          path: artifacts/neon/d1-03-w10-execution-postflight.txt
+          path: |
+            artifacts/neon/d1-03-w10-execution-postflight.txt
+            artifacts/neon/d1-03-w10-execution-job-read-postflight.json
           if-no-files-found: error
           retention-days: 90
