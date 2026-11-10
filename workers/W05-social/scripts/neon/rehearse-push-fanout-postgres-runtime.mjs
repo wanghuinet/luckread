@@ -65,10 +65,8 @@ const endpointDb = {
 try {
   const notificationWithEndpoints = marker + '-notification-with-endpoints'
   const notificationWithoutEndpoints = marker + '-notification-without-endpoints'
-  const concurrentNotification = marker + '-notification-concurrent'
   const recipientWithEndpoints = marker + '-recipient-with-endpoints'
   const recipientWithoutEndpoints = marker + '-recipient-without-endpoints'
-  const concurrentRecipient = marker + '-recipient-concurrent'
   const now = new Date('2026-11-11T08:00:00.000Z')
   const nowIso = now.toISOString()
 
@@ -77,7 +75,6 @@ try {
     [
       notificationWithEndpoints, recipientWithEndpoints, nowIso,
       notificationWithoutEndpoints, recipientWithoutEndpoints, nowIso,
-      concurrentNotification, concurrentRecipient, nowIso,
     ],
   )
 
@@ -139,7 +136,12 @@ try {
 
   // Two overlapping fan-out attempts for the same outbox row must serialize
   // on the locked PENDING row and converge to one notification/endpoint edge.
+  const concurrentNotification = marker + '-notification-concurrent'
   const racedEndpoint = marker + '-endpoint-raced'
+  await pool.query(
+    "INSERT INTO social_notification_push_outbox (notification_id, recipient_user_id, status, endpoint_count, created_at, updated_at) VALUES ($1, $2, 'PENDING', 0, $3::timestamptz, $3::timestamptz)",
+    [concurrentNotification, marker + '-recipient-concurrent', nowIso],
+  )
   const raceInput = (deliveryId) => ({
     notificationId: concurrentNotification,
     deliveries: [{ delivery_id: deliveryId, endpoint_id: racedEndpoint }],
