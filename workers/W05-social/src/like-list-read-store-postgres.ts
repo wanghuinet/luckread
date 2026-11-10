@@ -69,7 +69,7 @@ export function createPostgresContentLikerReadStore(
         cursorSql,
         ' ORDER BY il.created_at DESC, il.relationship_id DESC',
         ' LIMIT $' + values.length,
-      ].filter(Boolean).join('\\n')
+      ].filter(Boolean).join('\n')
 
       try {
         const result = await db.query<ContentLikerReadRow>(sql, values)
