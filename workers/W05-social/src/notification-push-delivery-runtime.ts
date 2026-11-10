@@ -131,8 +131,8 @@ export async function claimDueDeliveries(
     const endpoint = await endpointDb.prepare(
       "SELECT endpoint_id, owner_user_id, push_token FROM notification_push_endpoints " +
       "WHERE endpoint_id = ? AND owner_user_id = ? AND provider = 'expo' " +
-      "AND permission_status = 'granted' AND push_token IS NOT NULL LIMIT 1",
-    ).bind(candidate.endpoint_id, candidate.recipient_user_id).first<ActiveEndpointRow>()
+      "AND permission_status = 'granted' AND push_token IS NOT NULL LIMIT ?",
+    ).bind(candidate.endpoint_id, candidate.recipient_user_id, 1).first<ActiveEndpointRow>()
 
     if (!endpoint) {
       await store.cancel({
