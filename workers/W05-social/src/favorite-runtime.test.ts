@@ -2,6 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { clearFavoriteStatusCacheForTests, favorite, getFavoriteStatus, listFavorites, unfavorite } from './favorite-runtime.js'
 import type { W03ContentBinding } from './w03-content-context-client.js'
+import { FavoriteStatusReadStoreError } from './favorite-status-read-store.js'
 
 const db = (firstResults: unknown[] = [], allResults: unknown[] = []) => {
   let firstIndex = 0
@@ -124,7 +125,7 @@ describe('favorite runtime', () => {
 
   it('maps favorite status provider failures to a sanitized 503', async () => {
     const store = {
-      isFavorited: vi.fn(async () => { throw new Error('secret-provider-detail') }),
+      isFavorited: vi.fn(async () => { throw new FavoriteStatusReadStoreError() }),
     }
     await expect(getFavoriteStatus(
       store,
