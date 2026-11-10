@@ -1,4 +1,10 @@
 import type { AuditActor, AuditEvent } from './audit-event'
+import {
+  createD1ModerationQueueReadStore,
+  ModerationQueueReadStoreError,
+  type ModerationQueueReadCursor,
+  type ModerationQueueReadStore,
+} from './moderation-queue-read-store.js'
 
 const OPEN_QUEUE_STATES = ['OPEN', 'UNDER_REVIEW', 'ESCALATED', 'APPEALED'] as const
 type ModerationCaseState =
@@ -201,53 +207,45 @@ const readCurrentDecision = async (db: D1Database, caseId: string): Promise<Mode
     .bind(caseId)
     .first<ModerationDecisionRow>()
 
+type ModerationQueueReadSource = D1Database | ModerationQueueReadStore
+
+function resolveModerationQueueReadStore(source: ModerationQueueReadSource): ModerationQueueReadStore {
+  if (typeof (source as ModerationQueueReadStore).list === 'function') {
+    return source as ModerationQueueReadStore
+  }
+  return createD1ModerationQueueReadStore(source as D1Database)
+}
+
 export async function listModerationQueue(
-  db: D1Database,
+  source: ModerationQueueReadSource,
   reviewerId: string,
   cursor: string | null,
   requestedLimit: number | null,
 ): Promise<{ items: ReturnType<typeof responseForCase>[]; nextCursor: string | null; hasMore: boolean }> {
   requireResource('reviewer_id', reviewerId)
   const pageSize = Math.min(Math.max(Number.isInteger(requestedLimit) ? Number(requestedLimit) : 20, 1), 50)
-  const decoded = cursor ? decodeCursor(cursor, reviewerId) : null
-  const statePlaceholders = OPEN_QUEUE_STATES.map(() => '?').join(',')
-  const params: unknown[] = [...OPEN_QUEUE_STATES, reviewerId]
-  let tail = ''
+  const decoded: ModerationQueueReadCursor = cursor ? decodeCursor(cursor, reviewerId) : null
 
-  if (decoded) {
-    tail = ' AND (c.priority < ? OR (c.priority = ? AND (c.created_at > ? OR (c.created_at = ? AND c.case_id > ?))))'
-    params.push(decoded.priority, decoded.priority, decoded.createdAt, decoded.createdAt, decoded.caseId)
+  let rows
+  try {
+    rows = await resolveModerationQueueReadStore(source).list({
+      reviewerId,
+      openStates: OPEN_QUEUE_STATES,
+      cursor: decoded,
+      limit: pageSize + 1,
+    })
+  } catch (error) {
+    if (error instanceof ModerationQueueReadStoreError) {
+      throw new ModerationRuntimeError(error.code, error.status)
+    }
+    throw error
   }
 
-  const rows = await db.prepare(
-    `SELECT c.case_id,c.target_type,c.target_id,c.target_version,c.policy_version,c.state,c.priority,
-            c.assigned_reviewer_id,c.current_decision_id,c.evidence_bundle_ref,c.version,c.created_at,c.updated_at,
-            d.decision_id,d.case_version,d.outcome,d.policy_version AS decision_policy_version,
-            d.effective_at AS decision_effective_at,d.request_id AS decision_request_id,
-            d.created_at AS decision_created_at
-       FROM moderation_cases c
-       LEFT JOIN moderation_decisions d ON d.decision_id = c.current_decision_id
-      WHERE c.state IN (${statePlaceholders})
-        AND c.target_type = 'content'
-        AND (c.assigned_reviewer_id IS NULL OR c.assigned_reviewer_id = ?)
-        ${tail}
-      ORDER BY c.priority DESC, c.created_at ASC, c.case_id ASC
-      LIMIT ?`,
-  ).bind(...params, pageSize + 1).all<ModerationCaseRow & {
-    decision_id: string | null
-    case_version: number | null
-    outcome: ModerationOutcome | null
-    decision_policy_version: string | null
-    decision_effective_at: string | null
-    decision_request_id: string | null
-    decision_created_at: string | null
-  }>()
-
-  const hasMore = rows.results.length > pageSize
-  const page = rows.results.slice(0, pageSize)
+  const hasMore = rows.length > pageSize
+  const page = rows.slice(0, pageSize)
   const last = page.at(-1)
   return {
-    items: page.map((row) => responseForCase(row, row.decision_id ? ({
+    items: page.map((row) => responseForCase(row as ModerationCaseRow, row.decision_id ? ({
       decision_id: row.decision_id,
       case_id: row.case_id,
       case_version: row.case_version ?? row.version,
@@ -271,7 +269,6 @@ export async function listModerationQueue(
     nextCursor: hasMore && last ? opaqueCursor(last.priority, last.created_at, last.case_id, reviewerId) : null,
   }
 }
-
 export async function getModerationCase(
   db: D1Database,
   reviewerId: string,
