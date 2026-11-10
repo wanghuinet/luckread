@@ -12,6 +12,11 @@ import type {
   FollowListDirection,
   FollowListReadStore,
 } from './follow-list-read-store.js'
+import {
+  createD1FollowingAuthorIdsReadStore,
+  FollowingAuthorIdsReadStoreError,
+  type FollowingAuthorIdsReadStore,
+} from './following-author-ids-read-store.js'
 export type { FollowRow } from './follow-store.js'
 
 export class FollowRuntimeError extends Error {
@@ -247,47 +252,41 @@ export type FollowingAuthorCandidates = {
 
 const MAX_FOLLOWING_FEED_AUTHORS = 500
 
+type FollowingAuthorIdsDataSource = D1Database | FollowingAuthorIdsReadStore
+
+function resolveFollowingAuthorIdsReadStore(
+  source: FollowingAuthorIdsDataSource,
+): FollowingAuthorIdsReadStore {
+  if (typeof (source as FollowingAuthorIdsReadStore).list === 'function') {
+    return source as FollowingAuthorIdsReadStore
+  }
+  return createD1FollowingAuthorIdsReadStore(source as D1Database)
+}
+
 /**
  * W05 owns follow/block/mute relationships. It deliberately returns author IDs
  * only; W03 remains the authority that selects and projects published content.
  * The candidate window is bounded to keep the W04 fan-out request predictable.
+ * D1 remains the default read path; PostgreSQL is injectable for rehearsal.
  */
 export async function listFollowingAuthorIds(
-  db: D1Database,
+  source: FollowingAuthorIdsDataSource,
   viewerUserId: string,
 ): Promise<FollowingAuthorCandidates> {
   const viewerId = userId(viewerUserId)
-  const result = await db.prepare(`
-    SELECT f.target_user_id AS user_id
-      FROM social_follow_relationships f
-     WHERE f.follower_user_id = ?
-       AND NOT EXISTS (
-         SELECT 1
-           FROM social_user_interactions b
-          WHERE b.relation_type = 'block'
-            AND (
-              (b.actor_user_id = ? AND b.target_user_id = f.target_user_id)
-              OR
-              (b.actor_user_id = f.target_user_id AND b.target_user_id = ?)
-            )
-       )
-       AND NOT EXISTS (
-         SELECT 1
-           FROM social_user_interactions m
-          WHERE m.relation_type = 'mute'
-            AND m.actor_user_id = ?
-            AND m.target_user_id = f.target_user_id
-       )
-     ORDER BY f.created_at DESC, f.target_user_id DESC
-     LIMIT ?`).bind(
-       viewerId,
-       viewerId,
-       viewerId,
-       viewerId,
-       MAX_FOLLOWING_FEED_AUTHORS + 1,
-     ).all<{ user_id: string }>()
+  let rows
+  try {
+    rows = await resolveFollowingAuthorIdsReadStore(source).list(
+      viewerId,
+      MAX_FOLLOWING_FEED_AUTHORS + 1,
+    )
+  } catch (error) {
+    if (error instanceof FollowingAuthorIdsReadStoreError) {
+      throw new FollowRuntimeError(error.code, error.status)
+    }
+    throw error
+  }
 
-  const rows = result.results ?? []
   return {
     items: rows.slice(0, MAX_FOLLOWING_FEED_AUTHORS)
       .map((row) => ({ userId: row.user_id })),

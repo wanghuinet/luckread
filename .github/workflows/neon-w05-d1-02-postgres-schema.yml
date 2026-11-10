@@ -34,6 +34,10 @@ on:
       - 'workers/W05-social/migrations/**'
       - 'workers/W05-social/scripts/neon/**'
       - 'workers/W05-social/src/neon-postgres-migrations/**'
+      - 'workers/W05-social/src/following-author-ids-read-store.ts'
+      - 'workers/W05-social/src/following-author-ids-read-store-postgres.ts'
+      - 'workers/W05-social/src/following-feed.test.ts'
+      - 'workers/W05-social/scripts/neon/rehearse-following-author-ids-postgres-runtime.mjs'
   workflow_dispatch:
 
 permissions:
@@ -127,6 +131,13 @@ jobs:
           W05_RELATIONSHIP_GRAPH_POSTGRES_REPORT: ../../artifacts/neon/w05-relationship-graph-postgres-runtime-postflight.json
         run: node --import=tsx/esm ../../workers/W05-social/scripts/neon/rehearse-relationship-graph-postgres-runtime.mjs
 
+      - name: Rehearse W05 Following author ID reads against PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          W05_FOLLOWING_AUTHOR_IDS_POSTGRES_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_w05_d1_02_schema
+          W05_FOLLOWING_AUTHOR_IDS_POSTGRES_REPORT: ../../artifacts/neon/w05-following-author-ids-postgres-runtime-postflight.json
+        run: node --import=tsx/esm ../../workers/W05-social/scripts/neon/rehearse-following-author-ids-postgres-runtime.mjs
+
       - name: Rehearse W05 Block/Mute list reads against PostgreSQL 18
         working-directory: workers/W02-identity
         env:
@@ -152,6 +163,7 @@ jobs:
             artifacts/neon/w05-d1-02-postgres-schema-postflight.json
             artifacts/neon/w05-follow-postgres-runtime-postflight.json
             artifacts/neon/w05-relationship-graph-postgres-runtime-postflight.json
+            artifacts/neon/w05-following-author-ids-postgres-runtime-postflight.json
             artifacts/neon/w05-block-mute-list-postgres-runtime-postflight.json
             artifacts/neon/w05-block-mute-relation-postgres-runtime-postflight.json
           if-no-files-found: error
