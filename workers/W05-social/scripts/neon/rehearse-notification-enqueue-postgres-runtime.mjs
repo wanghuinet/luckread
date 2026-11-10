@@ -32,6 +32,8 @@ const actorId = marker + '-actor'
 const recipientId = marker + '-recipient'
 const blockedActorId = marker + '-blocked-actor'
 const blockedRecipientId = marker + '-blocked-recipient'
+const actorBlockedActorId = marker + '-actor-blocked-actor'
+const actorBlockedRecipientId = marker + '-actor-blocked-recipient'
 const disabledRecipientId = marker + '-disabled-recipient'
 const commentTargetId = marker + '-comment-target'
 const followTargetId = marker + '-follow-target'
@@ -49,8 +51,12 @@ try {
   await pool.query(
     `INSERT INTO social_user_interactions
        (relationship_id, actor_user_id, target_user_id, relation_type, created_at, updated_at)
-     VALUES ($1, $2, $3, 'block', $4, $4)`,
-    [marker + '-block', blockedRecipientId, blockedActorId, now],
+     VALUES ($1, $2, $3, 'block', $4, $4),
+            ($5, $6, $7, 'block', $4, $4)`,
+    [
+      marker + '-block-recipient-side', blockedRecipientId, blockedActorId, now,
+      marker + '-block-actor-side', actorBlockedActorId, actorBlockedRecipientId,
+    ],
   )
   await pool.query(
     `INSERT INTO social_notification_preferences
@@ -91,6 +97,14 @@ try {
     payload: { eventId: marker + '-blocked-event' },
   })
   await enqueueNotification(store, {
+    recipientUserId: actorBlockedRecipientId,
+    actorUserId: actorBlockedActorId,
+    type: 'REPLY',
+    targetType: 'comment',
+    targetId: marker + '-actor-blocked-target',
+    payload: { eventId: marker + '-actor-blocked-event' },
+  })
+  await enqueueNotification(store, {
     recipientUserId: disabledRecipientId,
     actorUserId: actorId,
     type: 'MENTION',
@@ -124,7 +138,13 @@ try {
     'SELECT notification_id FROM social_notifications WHERE dedupe_key = $1',
     [dedupeKey('LIKE', blockedRecipientId, blockedActorId, 'content', blockedTargetId)],
   )
-  assert.equal(blockedRow.rows.length, 0, 'A block in either direction must suppress notification enqueue')
+  assert.equal(blockedRow.rows.length, 0, 'A recipient-side block must suppress notification enqueue')
+
+  const actorBlockedRow = await pool.query(
+    'SELECT notification_id FROM social_notifications WHERE dedupe_key = $1',
+    [dedupeKey('REPLY', actorBlockedRecipientId, actorBlockedActorId, 'comment', marker + '-actor-blocked-target')],
+  )
+  assert.equal(actorBlockedRow.rows.length, 0, 'An actor-side block must suppress notification enqueue')
 
   const disabledRow = await pool.query(
     'SELECT notification_id FROM social_notifications WHERE dedupe_key = $1',
