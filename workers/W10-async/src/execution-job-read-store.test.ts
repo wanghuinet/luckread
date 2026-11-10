@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   createD1W10T16MembershipRenewalJobReadStore,
   W10ExecutionJobReadStoreError,
+  type W10D1ReadExecutor,
   type W10ExecutionJobReadRow,
 } from './execution-job-read-store.js'
 import {
@@ -39,7 +40,7 @@ describe('W10 T16 membership-renewal execution job read store', () => {
         return {
           bind(...values: unknown[]) {
             calls.push({ sql, values })
-            return { first: async <T>() => row as T },
+            return { first: async <T>() => row as T, all: async () => ({ results: [] }) },
           },
         }
       },
@@ -64,7 +65,7 @@ describe('W10 T16 membership-renewal execution job read store', () => {
         return {
           bind(...values: unknown[]) {
             calls.push({ sql, values })
-            return { all: async () => ({ results: rows }) }
+            return { first: async () => null, all: async () => ({ results: rows }) }
           },
         }
       },
@@ -94,8 +95,8 @@ describe('W10 T16 membership-renewal execution job read store', () => {
   })
 
   it('returns no D1 rows for an explicitly empty state filter without querying', async () => {
-    const prepare = vi.fn()
-    const result = await createD1W10T16MembershipRenewalJobReadStore({ prepare }).list({
+    const prepare = vi.fn(() => { throw new Error('empty state filter must not query D1') })
+    const result = await createD1W10T16MembershipRenewalJobReadStore({ prepare } as unknown as W10D1ReadExecutor).list({
       states: [],
       limit: 10,
     })
