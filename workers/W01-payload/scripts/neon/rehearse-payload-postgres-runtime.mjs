@@ -14,9 +14,9 @@ if (
   throw new Error('Refusing to run the Payload Local API rehearsal outside local PostgreSQL luckread_schema')
 }
 
-process.stdout.write('W01_PG_RUNTIME_CONFIG_IMPORT_START\\n')
+process.stdout.write('W01_PG_RUNTIME_CONFIG_IMPORT_START\n')
 const { default: config } = await import('../../src/neon-postgres-runtime.config.ts')
-process.stdout.write('W01_PG_RUNTIME_CONFIG_IMPORT_PASS\\n')
+process.stdout.write('W01_PG_RUNTIME_CONFIG_IMPORT_PASS\n')
 const marker = 'w01-pg-runtime-' + randomUUID()
 const sourcePath = '/' + marker
 const destinationUsername = marker + '-updated'
@@ -26,16 +26,15 @@ const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString()
 let payload
 
 async function step(name, operation, timeoutMs = 45_000) {
-  process.stdout.write('W01_PG_RUNTIME_STEP_START ' + name + '\\n')
+  const startedAt = Date.now()
+  process.stdout.write('W01_PG_RUNTIME_STEP_START ' + name + '\n')
   let timeout
+  const timeoutPromise = new Promise((_, reject) => {
+    timeout = setTimeout(() => reject(new Error('W01_PG_RUNTIME_STEP_TIMEOUT ' + name)), timeoutMs)
+  })
   try {
-    const value = await Promise.race([
-      operation(),
-      new Promise((_, reject) => {
-        timeout = setTimeout(() => reject(new Error('W01_PG_RUNTIME_STEP_TIMEOUT ' + name)), timeoutMs)
-      }),
-    ])
-    process.stdout.write('W01_PG_RUNTIME_STEP_PASS ' + name + '\\n')
+    const value = await Promise.race([Promise.resolve().then(operation), timeoutPromise])
+    process.stdout.write('W01_PG_RUNTIME_STEP_PASS ' + name + ' elapsedMs=' + (Date.now() - startedAt) + '\n')
     return value
   } finally {
     if (timeout) clearTimeout(timeout)
@@ -43,7 +42,9 @@ async function step(name, operation, timeoutMs = 45_000) {
 }
 
 try {
-  payload = await step('GET_PAYLOAD', () => getPayload({ config, cron: false, disableOnInit: true }))
+  // Cold initialization includes Payload's full production Collection/plugin
+  // graph. The observed Node 24 CI startup took ~177 seconds on PostgreSQL 18.
+  payload = await step('GET_PAYLOAD', () => getPayload({ config, cron: false, disableOnInit: true }), 240_000)
 
   const created = await step('CREATE_REDIRECT', () => payload.create({
     collection: 'redirects',
@@ -103,9 +104,9 @@ try {
   }))
   assert.equal(remaining.docs.length, 0, 'Payload Local API delete must remove the runtime fixture')
 
-  process.stdout.write('W01_PAYLOAD_POSTGRES_RUNTIME_PASS: Payload create/update/read/delete completed on local PostgreSQL 18; fixture count=0.\\n')
+  process.stdout.write('W01_PAYLOAD_POSTGRES_RUNTIME_PASS: Payload create/update/read/delete completed on local PostgreSQL 18; fixture count=0.\n')
 } catch (error) {
-  process.stderr.write('W01_PAYLOAD_POSTGRES_RUNTIME_FAIL: ' + (error instanceof Error ? error.message : String(error)) + '\\n')
+  process.stderr.write('W01_PAYLOAD_POSTGRES_RUNTIME_FAIL: ' + (error instanceof Error ? error.message : String(error)) + '\n')
   process.exitCode = 1
 } finally {
   if (payload) {
@@ -129,15 +130,31 @@ try {
         }
       }, 15_000)
     } catch (cleanupError) {
-      process.stderr.write('W01_PG_RUNTIME_CLEANUP_FAILED: ' + (cleanupError instanceof Error ? cleanupError.message : String(cleanupError)) + '\\n')
+      process.stderr.write('W01_PG_RUNTIME_CLEANUP_FAILED: ' + (cleanupError instanceof Error ? cleanupError.message : String(cleanupError)) + '\n')
       process.exitCode = 1
     }
 
     const database = payload.db
-    if (typeof database.destroy === 'function') {
-      await database.destroy()
-    } else if (typeof database.drizzle?.$client?.end === 'function') {
-      await database.drizzle.$client.end()
+    try {
+      await step('DESTROY_PAYLOAD', () => payload.destroy(), 15_000)
+    } catch (destroyError) {
+      process.stderr.write('W01_PG_RUNTIME_DESTROY_FAILED: ' + (destroyError instanceof Error ? destroyError.message : String(destroyError)) + '\n')
+      process.exitCode = 1
+    }
+
+    // Payload 3.x's db.destroy() resets Drizzle state but does not end pg.Pool.
+    // The CI-only upstream release patch above prevents a checked-out bootstrap
+    // client from making pool.end() wait forever.
+    if (typeof database.pool?.end === 'function') {
+      try {
+        await step('CLOSE_POSTGRES_POOL', () => database.pool.end(), 20_000)
+      } catch (poolError) {
+        process.stderr.write('W01_PG_RUNTIME_POOL_CLOSE_FAILED: ' + (poolError instanceof Error ? poolError.message : String(poolError)) + '\n')
+        process.exitCode = 1
+      }
+    } else {
+      process.stderr.write('W01_PG_RUNTIME_POOL_CLOSE_FAILED: Payload Postgres pool.end() is unavailable\n')
+      process.exitCode = 1
     }
   }
 }
