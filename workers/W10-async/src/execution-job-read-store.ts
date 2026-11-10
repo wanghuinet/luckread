@@ -123,7 +123,7 @@ export function createD1W10T16MembershipRenewalJobReadStore(
       if (input.states?.length === 0) return []
 
       const values: unknown[] = []
-      const predicates = [\"j.owner_worker = 'W07'\", \"j.owner_task_id = 'T16'\"]
+      const predicates = ["j.owner_worker = 'W07'", "j.owner_task_id = 'T16'"]
 
       if (input.states) {
         predicates.push('j.state IN (' + input.states.map(() => '?').join(',') + ')')
