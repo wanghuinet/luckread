@@ -91,7 +91,7 @@ describe('W05 PostgreSQL notification enqueue store', () => {
     await expect(reset.enqueue(input)).rejects.toMatchObject({ retryable: true, message: 'NOTIFICATION_ENQUEUE_STORE_UNAVAILABLE' })
 
     const timeout = createPostgresNotificationEnqueueStore(executor({
-      name: 'TimeoutError',
+      error: { name: 'TimeoutError' },
     }).db)
     await expect(timeout.enqueue(input)).rejects.toMatchObject({ retryable: true })
   })
