@@ -41,13 +41,13 @@ async function addNotification(id) {
     [id,marker+'-recipient',marker+'-actor',marker+'-content',marker+'-dedupe-'+id,now],
   )
 }
-async function addDelivery(id,status,attemptCount,nextAttemptAt,previousLeaseToken=null,leaseExpires=null) {
+async function addDelivery(id,status,attemptCount,nextAttemptAt,previousLeaseToken=null,leaseExpires=null,createdAt=nextAttemptAt) {
   await pool.query(
     `INSERT INTO social_notification_push_deliveries
       (delivery_id,notification_id,endpoint_id,status,attempt_count,receipt_poll_count,next_attempt_at,
        lease_token,lease_expires_at,created_at,updated_at)
-     VALUES ($1,$2,$3,$4,$5,0,$6::timestamptz,$7,$8::timestamptz,$6::timestamptz,$6::timestamptz)`,
-    [id,marker+'-notification-'+id,marker+'-endpoint-'+id,status,attemptCount,nextAttemptAt,previousLeaseToken,leaseExpires],
+     VALUES ($1,$2,$3,$4,$5,0,$6::timestamptz,$7,$8::timestamptz,$9::timestamptz,$6::timestamptz)`,
+    [id,marker+'-notification-'+id,marker+'-endpoint-'+id,status,attemptCount,nextAttemptAt,previousLeaseToken,leaseExpires,createdAt],
   )
 }
 
@@ -64,7 +64,7 @@ try {
   await addNotification(marker+'-notification-'+exhaustedId)
   await addDelivery(exhaustedId,'LEASED',6,'2026-11-11T07:00:00.000Z',marker+'-exhausted-lease','2026-11-11T07:59:00.000Z')
   const missingContextId = marker+'-missing-context'
-  await addDelivery(missingContextId,'PENDING',0,now)
+  await addDelivery(missingContextId,'PENDING',0,now,null,null,'2026-11-11T08:00:01.000Z')
 
   const first = await store.claimDue({now,leaseExpiresAt,limit:3,maxAttempts:6})
   assert.equal(first.length,3)
