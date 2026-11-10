@@ -117,7 +117,7 @@ try {
     priority: 90,
     assignedReviewerId: reviewer,
     decisionId: null,
-    createdAt: '2026-11-10T04:03:00.000456Z',
+    createdAt: '2026-11-10T04:02:00.000456Z',
   })
   await insertCase({
     caseId: caseBefore,
@@ -127,7 +127,7 @@ try {
     priority: 90,
     assignedReviewerId: null,
     decisionId: null,
-    createdAt: '2026-11-10T04:03:00.000050Z',
+    createdAt: '2026-11-10T04:02:00.000050Z',
   })
   await insertCase({
     caseId: caseA,
@@ -148,7 +148,7 @@ try {
     priority: 90,
     assignedReviewerId: null,
     decisionId: null,
-    createdAt: '2026-11-10T04:03:00.000456Z',
+    createdAt: '2026-11-10T04:02:00.000456Z',
   })
   await insertCase({
     caseId: caseC,
