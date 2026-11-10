@@ -39,6 +39,7 @@ const nowIso = now.toISOString()
 const timestamp = (offsetSeconds) => new Date(now.getTime() + offsetSeconds * 1000).toISOString()
 const contentId = marker + '-content'
 const topicId = marker + '-topic'
+const normalizedTopicName = 'closure-' + randomUUID().replace(/-/g, '').slice(0, 20)
 const secondTopicId = marker + '-topic-second'
 const restrictedTopicId = marker + '-topic-restricted'
 const recipientId = marker + '-recipient'
@@ -86,7 +87,7 @@ try {
             ($5, $6, $7, 'ACTIVE', $4, $4),
             ($8, $9, $10, 'RESTRICTED', $4, $4)`,
     [
-      topicId, marker + '-topic-name', 'Batch topic',
+      topicId, normalizedTopicName, 'Batch topic',
       timestamp(-10),
       secondTopicId, marker + '-second-name', 'Second topic',
       restrictedTopicId, marker + '-restricted-name', 'Restricted topic',
@@ -132,7 +133,7 @@ try {
   const topicPage = await getTopicPage(
     store,
     contentBinding,
-    marker + '-topic-name',
+    normalizedTopicName,
     '2',
     null,
     'w05-social-closure-read-postgres',
