@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
 import { createD1PaymentMethodReadStore } from './payment-method-read-store.js'
 import {
@@ -38,15 +38,13 @@ function fakeD1(allResults: Record<string, unknown[]>) {
 
 function fakePostgres(rowsByCall: unknown[][] = []) {
   const calls: Array<{ sql: string; values: unknown[] }> = []
-  const query = vi.fn(async <Row extends Record<string, unknown>>(
-    sql: string,
-    values: unknown[] = [],
-  ) => {
-    calls.push({ sql, values })
-    return { rows: (rowsByCall[calls.length - 1] ?? []) as Row[] }
-  })
-  const db: PaymentMethodPostgresQueryExecutor = { query }
-  return { db, calls, query }
+  const db: PaymentMethodPostgresQueryExecutor = {
+    async query<Row extends Record<string, unknown>>(sql: string, values: unknown[] = []) {
+      calls.push({ sql, values })
+      return { rows: (rowsByCall[calls.length - 1] ?? []) as Row[] }
+    },
+  }
+  return { db, calls }
 }
 
 describe('W07 payment-method read store', () => {
