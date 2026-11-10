@@ -37,7 +37,7 @@ export function createPostgresModerationQueueReadStore(
           '      OR (c.priority = $' + priorityParameter + ' AND (',
           '        c.created_at > $' + createdAtParameter + '::timestamptz',
           '        OR (c.created_at = $' + createdAtParameter + '::timestamptz AND c.case_id > $' + caseIdParameter + ')',
-          '      ))',
+          '      )))',
         ].join('\n')
         values.push(
           input.cursor.priority,
