@@ -18,11 +18,11 @@ export interface CommentMutationPostgresQueryExecutor {
   ): Promise<QueryResult<Row>>
 }
 
-const COMMENT_UPDATE_RETURNING = \`id, content_id, author_user_id, parent_id, body, state, depth,
+const COMMENT_UPDATE_RETURNING = `id, content_id, author_user_id, parent_id, body, state, depth,
   to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at,
-  to_char(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS updated_at\`
+  to_char(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS updated_at`
 
-const getForDeleteSql = \`SELECT
+const getForDeleteSql = `SELECT
     c.id,
     c.content_id,
     c.author_user_id,
@@ -34,9 +34,9 @@ const getForDeleteSql = \`SELECT
     ) AS has_replies
   FROM social_comments c
  WHERE c.id = $1
- LIMIT 1\`
+ LIMIT 1`
 
-const markDeletedSql = \`UPDATE social_comments
+const markDeletedSql = `UPDATE social_comments
    SET state = 'AUTHOR_DELETED', updated_at = $1::timestamptz
  WHERE id = $2
    AND author_user_id = $3
@@ -46,26 +46,26 @@ const markDeletedSql = \`UPDATE social_comments
        FROM social_comments child
       WHERE child.parent_id = social_comments.id
    )
- RETURNING id\`
+ RETURNING id`
 
-const getDeleteStateSql = \`SELECT state
+const getDeleteStateSql = `SELECT state
   FROM social_comments
  WHERE id = $1
    AND author_user_id = $2
- LIMIT 1\`
+ LIMIT 1`
 
-const getForUpdateSql = \`SELECT \${COMMENT_UPDATE_RETURNING}
+const getForUpdateSql = `SELECT ${COMMENT_UPDATE_RETURNING}
   FROM social_comments c
  WHERE c.id = $1
- LIMIT 1\`
+ LIMIT 1`
 
-const updateSql = \`UPDATE social_comments
+const updateSql = `UPDATE social_comments
    SET body = $1, updated_at = $2::timestamptz
  WHERE id = $3
    AND author_user_id = $4
    AND state = 'PUBLISHED'
    AND updated_at = $5::timestamptz
- RETURNING \${COMMENT_UPDATE_RETURNING}\`
+ RETURNING ${COMMENT_UPDATE_RETURNING}`
 
 export function createPostgresCommentMutationStore(
   db: CommentMutationPostgresQueryExecutor,
