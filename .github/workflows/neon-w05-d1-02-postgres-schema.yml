@@ -14,6 +14,11 @@ on:
       - 'workers/W05-social/src/follow-list-read-store.ts'
       - 'workers/W05-social/src/follow-list-read-store-postgres.ts'
       - 'workers/W05-social/src/follow-list-read-store-postgres.test.ts'
+      - 'workers/W05-social/src/relationship-graph-runtime.ts'
+      - 'workers/W05-social/src/relationship-graph-store.ts'
+      - 'workers/W05-social/src/relationship-graph-store-postgres.ts'
+      - 'workers/W05-social/src/relationship-graph-store-postgres.test.ts'
+      - 'workers/W05-social/scripts/neon/rehearse-relationship-graph-postgres-runtime.mjs'
       - 'workers/W05-social/src/follow-store.ts'
       - 'workers/W05-social/src/follow-store-postgres.ts'
       - 'workers/W05-social/scripts/neon/rehearse-follow-postgres-runtime.mjs'
@@ -106,6 +111,13 @@ jobs:
           W05_FOLLOW_POSTGRES_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_w05_d1_02_schema
           W05_FOLLOW_POSTGRES_REPORT: ../../artifacts/neon/w05-follow-postgres-runtime-postflight.json
         run: node --import=tsx/esm ../../workers/W05-social/scripts/neon/rehearse-follow-postgres-runtime.mjs
+      - name: Rehearse W05 RelationshipGraph reads against PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          W05_RELATIONSHIP_GRAPH_POSTGRES_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_w05_d1_02_schema
+          W05_RELATIONSHIP_GRAPH_POSTGRES_REPORT: ../../artifacts/neon/w05-relationship-graph-postgres-runtime-postflight.json
+        run: node --import=tsx/esm ../../workers/W05-social/scripts/neon/rehearse-relationship-graph-postgres-runtime.mjs
+
       - name: Upload W05 D1-02 PostgreSQL 18 evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -116,5 +128,6 @@ jobs:
             artifacts/neon/w05-d1-02-source-hashes.json
             artifacts/neon/w05-d1-02-postgres-schema-postflight.json
             artifacts/neon/w05-follow-postgres-runtime-postflight.json
+            artifacts/neon/w05-relationship-graph-postgres-runtime-postflight.json
           if-no-files-found: error
           retention-days: 90
