@@ -1,5 +1,11 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import {
+  createD1BlockMuteListReadStore,
+  BlockMuteListReadStoreError,
+  type BlockMuteListReadStore,
+} from './block-mute-list-read-store.js'
+
 export type BlockMuteType = 'block' | 'mute'
 
 export type BlockMuteRecord = {
@@ -201,13 +207,22 @@ export const parseBlockMuteListLimit = (value: string | null): number => {
   return Math.min(Number(normalized), MAX_RELATION_LIST_LIMIT)
 }
 
+type BlockMuteListDataSource = D1Database | BlockMuteListReadStore
+
+function resolveBlockMuteListReadStore(source: BlockMuteListDataSource): BlockMuteListReadStore {
+  if (typeof (source as BlockMuteListReadStore).list === 'function') {
+    return source as BlockMuteListReadStore
+  }
+  return createD1BlockMuteListReadStore(source as D1Database)
+}
+
 /**
- * Lists a viewer's own block or mute relationships from W05's authoritative
- * D1 table. Cursors are bound to the viewer and relation type to prevent reuse
- * across principals or between the block and mute lists.
+ * Lists a viewer's own Block or Mute relationships. The cursor is bound to the
+ * actor and relation type; D1 remains the default authority while PostgreSQL
+ * can be injected for isolated rehearsal.
  */
 export async function listRelations(
-  db: D1Database,
+  source: BlockMuteListDataSource,
   actorUserId: string,
   relationType: BlockMuteType,
   cursorValue: string | null,
@@ -218,24 +233,25 @@ export async function listRelations(
     throw new BlockMuteRuntimeError('VALIDATION_FAILED', 400)
   }
   const cursor = decodeRelationCursor(cursorValue, actor, relationType)
-  const where = cursor
-    ? `WHERE actor_user_id = ? AND relation_type = ?
-       AND (created_at < ? OR (created_at = ? AND relationship_id < ?))`
-    : 'WHERE actor_user_id = ? AND relation_type = ?'
-  const statement = `SELECT relationship_id, target_user_id, created_at
-    FROM social_user_interactions
-    ${where}
-    ORDER BY created_at DESC, relationship_id DESC
-    LIMIT ?`
-  const parameters = cursor
-    ? [actor, relationType, cursor.createdAt, cursor.createdAt, cursor.relationshipId, limit + 1]
-    : [actor, relationType, limit + 1]
-  const result = await db.prepare(statement).bind(...parameters).all<{
-    relationship_id: string
-    target_user_id: string
-    created_at: string
-  }>()
-  const rows = result.results ?? []
+
+  let rows
+  try {
+    rows = await resolveBlockMuteListReadStore(source).list({
+      actorUserId: actor,
+      relationType,
+      cursor: cursor ? {
+        createdAt: cursor.createdAt,
+        relationshipId: cursor.relationshipId,
+      } : null,
+      limit,
+    })
+  } catch (error) {
+    if (error instanceof BlockMuteListReadStoreError) {
+      throw new BlockMuteRuntimeError(error.code, error.status)
+    }
+    throw error
+  }
+
   const hasMore = rows.length > limit
   const visibleRows = hasMore ? rows.slice(0, limit) : rows
   const last = visibleRows.at(-1)
@@ -252,7 +268,7 @@ export async function listRelations(
           version: 1,
           actorUserId: actor,
           relationType,
-          createdAt: last.created_at,
+          createdAt: last.cursor_created_at ?? last.created_at,
           relationshipId: last.relationship_id,
         })
       : null,
