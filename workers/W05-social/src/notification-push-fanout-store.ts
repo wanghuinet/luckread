@@ -30,16 +30,17 @@ export class NotificationPushFanoutStoreError extends Error {
 }
 
 type D1Result<Row> = Readonly<{ results?: Row[] | null }>
+type D1BoundStatement = Readonly<{
+  all<Row>(): Promise<D1Result<Row>>
+  run(): Promise<unknown>
+}>
 type D1Statement = Readonly<{
-  bind(...values: unknown[]): {
-    all<Row>(): Promise<D1Result<Row>>
-    run(): Promise<unknown>
-  }
+  bind(...values: unknown[]): D1BoundStatement
 }>
 
 export interface NotificationPushFanoutD1Executor {
   prepare(sql: string): D1Statement
-  batch(statements: D1Statement[]): Promise<unknown[]>
+  batch(statements: D1BoundStatement[]): Promise<unknown[]>
 }
 
 /** D1 remains the production adapter until an explicitly authorized cutover. */
