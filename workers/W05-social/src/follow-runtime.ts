@@ -1,4 +1,5 @@
 /// <reference types="@cloudflare/workers-types" />
+
 import {
   createD1FollowStore,
   FollowStoreError,
@@ -10,6 +11,7 @@ export type { FollowRow } from './follow-store.js'
 export class FollowRuntimeError extends Error {
   constructor(readonly code: string, readonly status: number) { super(code) }
 }
+
 export type FollowListDirection = 'followers' | 'following'
 
 export type FollowListItem = {
