@@ -19,6 +19,7 @@ import {
 } from './following-author-ids-read-store.js'
 import {
   createD1FollowStatusReadStore,
+  type FollowStatusReadRow,
   type FollowStatusReadStore,
 } from './follow-status-read-store.js'
 export type { FollowRow } from './follow-store.js'
@@ -376,7 +377,7 @@ export async function getFollowStatus(
 ) {
   const follower = userId(followerUserId)
   const target = userId(targetUserId)
-  let row
+  let row: FollowStatusReadRow | null
   try {
     row = await resolveFollowStatusReadStore(source).getStatus({
       followerUserId: follower,
