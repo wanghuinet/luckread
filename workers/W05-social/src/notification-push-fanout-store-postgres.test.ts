@@ -43,7 +43,7 @@ describe('W05 notification push fan-out stores', () => {
     await store.markNoEndpoint('notification-2', '2026-11-11T10:00:00.000Z')
 
     expect(pending).toEqual([])
-    expect(prepared).toHaveLength(4)
+    expect(prepared).toHaveLength(5)
     expect(prepared[0]?.sql).toContain("WHERE status = 'PENDING'")
     expect(prepared[1]?.sql).toContain('INSERT OR IGNORE INTO social_notification_push_deliveries')
     expect(prepared[1]?.values).toEqual([
@@ -51,7 +51,8 @@ describe('W05 notification push fan-out stores', () => {
       '2026-11-11T10:00:00.000Z', '2026-11-11T10:00:00.000Z', '2026-11-11T10:00:00.000Z',
     ])
     expect(prepared[2]?.sql).toContain('INSERT OR IGNORE INTO social_notification_push_deliveries')
-    expect(prepared[3]?.sql).toContain("status = 'NO_ENDPOINT'")
+    expect(prepared[3]?.sql).toContain("status = 'FANNED_OUT'")
+    expect(prepared[4]?.sql).toContain("status = 'NO_ENDPOINT'")
   })
 
   it('uses a single PostgreSQL CTE to lock, insert deliveries and transition the outbox', async () => {
