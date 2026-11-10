@@ -1,5 +1,9 @@
 /// <reference types="@cloudflare/workers-types" />
 import Expo, { type ExpoPushMessage, type ExpoPushReceipt, type ExpoPushTicket } from 'expo-server-sdk'
+import {
+  createD1NotificationPushFanoutStore,
+  type NotificationPushFanoutStore,
+} from './notification-push-fanout-store.js'
 
 type PushReceiptLike = ExpoPushReceipt
 type PushTicketLike = ExpoPushTicket
@@ -93,14 +97,28 @@ export function notificationPushMessage(task: Pick<ClaimedDelivery,
   }
 }
 
-async function fanOutPendingNotifications(db: D1Database, endpointDb: D1Database, now: Date): Promise<number> {
-  const pending = await db.prepare(
-    'SELECT notification_id, recipient_user_id FROM social_notification_push_outbox ' +
-    "WHERE status = 'PENDING' ORDER BY created_at ASC, notification_id ASC LIMIT ?",
-  ).bind(FANOUT_LIMIT).all<{ notification_id: string; recipient_user_id: string }>()
+type PushFanoutDataSource = D1Database | NotificationPushFanoutStore
 
+function resolveNotificationPushFanoutStore(source: PushFanoutDataSource): NotificationPushFanoutStore {
+  if (typeof (source as NotificationPushFanoutStore).listPending === 'function') {
+    return source as NotificationPushFanoutStore
+  }
+  return createD1NotificationPushFanoutStore(source as D1Database)
+}
+
+/**
+ * Fan out W05-owned outbox rows to W09-owned active Expo endpoints.
+ * The endpoint database remains the existing W09 D1-03 authority.
+ */
+export async function fanOutPendingNotifications(
+  source: PushFanoutDataSource,
+  endpointDb: D1Database,
+  now: Date,
+): Promise<number> {
+  const store = resolveNotificationPushFanoutStore(source)
+  const pending = await store.listPending(FANOUT_LIMIT)
   let count = 0
-  for (const item of pending.results ?? []) {
+  for (const item of pending) {
     const endpoints = await endpointDb.prepare(
       'SELECT endpoint_id, owner_user_id, push_token FROM notification_push_endpoints ' +
       "WHERE owner_user_id = ? AND provider = 'expo' AND permission_status = 'granted' " +
@@ -110,23 +128,19 @@ async function fanOutPendingNotifications(db: D1Database, endpointDb: D1Database
     const nowIso = now.toISOString()
 
     if (rows.length === 0) {
-      await db.prepare(
-        "UPDATE social_notification_push_outbox SET status = 'NO_ENDPOINT', endpoint_count = 0, updated_at = ? " +
-        "WHERE notification_id = ? AND status = 'PENDING'",
-      ).bind(nowIso, item.notification_id).run()
+      await store.markNoEndpoint(item.notification_id, nowIso)
       continue
     }
 
-    const statements = rows.map((endpoint) => db.prepare(
-      "INSERT OR IGNORE INTO social_notification_push_deliveries " +
-      "(delivery_id, notification_id, endpoint_id, status, attempt_count, receipt_poll_count, next_attempt_at, created_at, updated_at) " +
-      "VALUES (?, ?, ?, 'PENDING', 0, 0, ?, ?, ?)",
-    ).bind(crypto.randomUUID(), item.notification_id, endpoint.endpoint_id, nowIso, nowIso, nowIso))
-    statements.push(db.prepare(
-      "UPDATE social_notification_push_outbox SET status = 'FANNED_OUT', endpoint_count = ?, updated_at = ? " +
-      "WHERE notification_id = ? AND status = 'PENDING'",
-    ).bind(rows.length, nowIso, item.notification_id))
-    await db.batch(statements)
+    await store.fanOut({
+      notificationId: item.notification_id,
+      deliveries: rows.map(endpoint => ({
+        delivery_id: crypto.randomUUID(),
+        endpoint_id: endpoint.endpoint_id,
+      })),
+      endpointCount: rows.length,
+      now: nowIso,
+    })
     count += 1
   }
   return count
