@@ -118,6 +118,13 @@ try {
     ],
   )
   fixturePrepared = true
+  const outbox = await pool.query(
+    'SELECT count(*)::int AS count FROM social_notification_push_outbox WHERE notification_id LIKE $1',
+    [marker + '%'],
+  )
+  assert.equal(outbox.rows[0]?.count, 3, 'The PostgreSQL-native notification trigger must create one outbox row per notification')
+  // This runner must exercise the cold discovery projection, not an edge cache.
+  globalThis.caches = undefined
 
   // W05 topic-page lookup and keyset edge scan, with publication still resolved by W03.
   const topicPage = await getTopicPage(
@@ -259,7 +266,7 @@ try {
       discoveryActiveTopicAndW03PublicationAuthorityVerified: true,
       notificationPaginationRecipientScopeAndUnreadCountVerified: true,
       singleAndBulkReadUpdatesVerified: true,
-      notificationOutboxTriggerObserved: fixturePrepared,
+      notificationOutboxTriggerObserved: fixturePrepared && outbox.rows[0]?.count === 3,
       contentSocialCountersAndViewerStateVerified: true,
       noW03ContentTableReadByW05: true,
       remainingFixtureRows: remaining,
