@@ -44,6 +44,8 @@ describe('W05 PostgreSQL Follow list read store', () => {
     expect(calls[0]?.sql).toContain('block.actor_user_id = $1 AND block.target_user_id = rel.follower_user_id')
     expect(calls[0]?.sql).toContain('block.actor_user_id = rel.follower_user_id AND block.target_user_id = $1')
     expect(calls[0]?.sql).toContain('ORDER BY rel.created_at DESC, rel.relationship_id DESC')
+    expect(calls[0]?.sql).toContain('YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
+    expect(calls[0]?.sql).toContain('AS cursor_created_at')
     expect(calls[0]?.sql).toContain('LIMIT $2')
     expect(calls[0]?.values).toEqual([owner, 21])
   })
