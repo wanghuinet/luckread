@@ -4,9 +4,10 @@ import { createRequire } from 'node:module'
 import { dirname } from 'node:path'
 import { mkdir, writeFile } from 'node:fs/promises'
 
-import { FollowRuntimeError, follow, listFollowers, listFollowing, unfollow } from '../../src/follow-runtime.ts'
+import { FollowRuntimeError, follow, getFollowStatus, listFollowers, listFollowing, unfollow } from '../../src/follow-runtime.ts'
 import { createPostgresFollowStore } from '../../src/follow-store-postgres.ts'
 import { createPostgresFollowListReadStore } from '../../src/follow-list-read-store-postgres.ts'
+import { createPostgresFollowStatusReadStore } from '../../src/follow-status-read-store-postgres.ts'
 
 const requireFromW02 = createRequire(new URL('../../../W02-identity/package.json', import.meta.url))
 const { Pool } = requireFromW02('pg')
@@ -28,6 +29,7 @@ const reportPath = process.env.W05_FOLLOW_POSTGRES_REPORT || '../../artifacts/ne
 const pool = new Pool({ connectionString, max: 4, connectionTimeoutMillis: 5_000 })
 const store = createPostgresFollowStore(pool)
 const readStore = createPostgresFollowListReadStore(pool)
+const statusReadStore = createPostgresFollowStatusReadStore(pool)
 let runtimePassed = false
 
 const countRelationship = async (followerUserId, targetUserId) => {
@@ -62,6 +64,42 @@ try {
   assert.equal(first.target_user_id, targetUser)
   assert.match(first.created_at, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/)
   assert.equal(await countRelationship(follower, targetUser), 1, 'Unique pair constraint must retain exactly one active relationship')
+
+  const visibleFollowStatus = await getFollowStatus(statusReadStore, follower, targetUser)
+  assert.deepEqual(visibleFollowStatus, {
+    following: true,
+    relationshipId: first.relationship_id,
+    createdAt: first.created_at,
+  }, 'An active relationship without a Block must be visible')
+
+  const missingFollowStatus = await getFollowStatus(
+    statusReadStore,
+    marker + '-missing-follower',
+    marker + '-missing-target',
+  )
+  assert.deepEqual(missingFollowStatus, {
+    following: false,
+    relationshipId: null,
+    createdAt: null,
+  }, 'A missing relationship must return the established false status')
+
+  const statusOutboundBlockId = marker + '-status-block-outbound'
+  await insertBlock(follower, targetUser, statusOutboundBlockId)
+  assert.deepEqual(await getFollowStatus(statusReadStore, follower, targetUser), {
+    following: false,
+    relationshipId: null,
+    createdAt: null,
+  }, 'An outbound Block must hide an existing follow status')
+  await pool.query('DELETE FROM social_user_interactions WHERE relationship_id = $1', [statusOutboundBlockId])
+
+  const statusInboundBlockId = marker + '-status-block-inbound'
+  await insertBlock(targetUser, follower, statusInboundBlockId)
+  assert.deepEqual(await getFollowStatus(statusReadStore, follower, targetUser), {
+    following: false,
+    relationshipId: null,
+    createdAt: null,
+  }, 'An inbound Block must hide an existing follow status')
+  await pool.query('DELETE FROM social_user_interactions WHERE relationship_id = $1', [statusInboundBlockId])
 
   const blockedFollower = marker + '-blocked-a'
   const blockedTarget = marker + '-blocked-a-target'
@@ -198,6 +236,9 @@ try {
       selfFollowDenied: true,
       repeatedUnfollowIdempotent: true,
       relationshipIdNotReused: true,
+      followStatusVisibleWhenUnblocked: true,
+      missingFollowStatusReturnsFalse: true,
+      bothBlockDirectionsHideFollowStatus: true,
       followerAndFollowingPaginationVerified: true,
       blockedRowsExcludedFromListAndCount: true,
       remainingFixtureRows: { follow: followRows, interactions: interactionRows },
