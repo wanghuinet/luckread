@@ -124,6 +124,6 @@ describe('PostgreSQL like mutation store', () => {
       actorUserId: 'actor-1',
       targetType: 'content',
       targetId: 'content-1',
-    })).rejects.not.toThrow('password=secret')
+    })).rejects.toThrow('LIKE_MUTATION_STORE_UNAVAILABLE')
   })
 })
