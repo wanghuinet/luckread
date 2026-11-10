@@ -79,7 +79,7 @@ export async function setContentReplyAudience(
   }
 
   const now = new Date().toISOString()
-  let saved
+  let saved: Awaited<ReturnType<ReplyAudienceStore['set']>>
   try {
     saved = await store.set({
       contentId,
@@ -128,7 +128,7 @@ export async function getContentReplyAudience(
   ) {
     throw new ReplyAudienceRuntimeError('NOT_FOUND', 404)
   }
-  let row
+  let row: Awaited<ReturnType<ReplyAudienceStore['get']>>
   try {
     row = await store.get(contentId, actorUserId)
   } catch {

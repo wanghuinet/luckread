@@ -40,8 +40,15 @@ let writeReadPassed = false
 let ownerConflictPassed = false
 let ownerScopePassed = false
 let cleanupPassed = false
+let postgresMajor: number | null = null
 
 try {
+  const version = await pool.query(
+    "SELECT current_setting('server_version_num')::integer / 10000 AS major",
+  )
+  postgresMajor = Number(version.rows[0]?.major)
+  assert.equal(postgresMajor, 18, 'runtime rehearsal must use PostgreSQL 18')
+
   const saved = await setContentReplyAudience(
     unusedD1, owner, contentId, 'mentioned', [mentionedUser, mentionedUser], context(owner), store,
   )
@@ -67,14 +74,17 @@ try {
   assert.deepEqual(otherOwnerView.mentionedUserIds, [])
   ownerScopePassed = true
 } finally {
-  await pool.query('DELETE FROM social_content_reply_policies WHERE content_id = $1', [contentId])
-  const residue = await pool.query(
-    'SELECT 1 FROM social_content_reply_policies WHERE content_id = $1 LIMIT 1',
-    [contentId],
-  )
-  assert.equal(residue.rows.length, 0, 'synthetic reply-audience policy row must be removed')
-  cleanupPassed = true
-  await pool.end()
+  try {
+    await pool.query('DELETE FROM social_content_reply_policies WHERE content_id = $1', [contentId])
+    const residue = await pool.query(
+      'SELECT 1 FROM social_content_reply_policies WHERE content_id = $1 LIMIT 1',
+      [contentId],
+    )
+    assert.equal(residue.rows.length, 0, 'synthetic reply-audience policy row must be removed')
+    cleanupPassed = true
+  } finally {
+    await pool.end()
+  }
 }
 
 if (!writeReadPassed || !ownerConflictPassed || !ownerScopePassed || !cleanupPassed) {
@@ -82,7 +92,7 @@ if (!writeReadPassed || !ownerConflictPassed || !ownerScopePassed || !cleanupPas
 }
 const report = {
   database: target.pathname.slice(1),
-  postgresMajor: 18,
+  postgresMajor,
   checks: {
     writeRead: writeReadPassed,
     ownerConflict: ownerConflictPassed,
