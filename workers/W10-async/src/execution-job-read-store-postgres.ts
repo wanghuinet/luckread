@@ -39,7 +39,7 @@ function assertValidRead(input: W10ExecutionJobReadInput): void {
  * PostgreSQL adapter for the already-admitted W10 jobs table.
  * Timestamp output remains six-digit UTC text so keyset cursors retain microseconds.
  */
-export function createPostgresW10ExecutionJobReadStore(
+export function createPostgresW10T16MembershipRenewalJobReadStore(
   db: W10PostgresQueryExecutor,
 ): W10ExecutionJobReadStore {
   return {
@@ -48,7 +48,9 @@ export function createPostgresW10ExecutionJobReadStore(
         const result = await db.query<W10ExecutionJobReadRow>(
           `SELECT ${JOB_COLUMNS}
              FROM jobs j
-            WHERE j.operation_id = $1`,
+            WHERE j.operation_id = $1
+              AND j.owner_worker = 'W07'
+              AND j.owner_task_id = 'T16'`,
           [operationId],
         )
         return result.rows[0] ?? null
@@ -61,18 +63,8 @@ export function createPostgresW10ExecutionJobReadStore(
       assertValidRead(input)
       if (input.states?.length === 0) return []
 
-      const values: unknown[] = [input.ownerWorker]
-      const predicates = ['j.owner_worker = $1']
-
-      if (input.ownerTaskId !== undefined) {
-        const parameter = values.length + 1
-        if (input.ownerTaskId === null) {
-          predicates.push('j.owner_task_id IS NULL')
-        } else {
-          predicates.push('j.owner_task_id = $' + parameter)
-          values.push(input.ownerTaskId)
-        }
-      }
+      const values: unknown[] = []
+      const predicates = [\"j.owner_worker = 'W07'\", \"j.owner_task_id = 'T16'\"]
 
       if (input.states) {
         const parameter = values.length + 1
