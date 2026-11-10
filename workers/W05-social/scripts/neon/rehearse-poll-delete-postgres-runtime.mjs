@@ -35,22 +35,22 @@ const draftContext = (contentId) => ({
 
 const fixturePoll = async ({ pollId, contentId, pollOwner = owner, optionIds = [], voteId = null }) => {
   await client.query(
-    \`INSERT INTO social_polls
+    `INSERT INTO social_polls
       (poll_id, content_id, owner_user_id, duration_hours, duration_minutes, ends_at, created_at, updated_at)
-     VALUES ($1, $2, $3, 24, 60, NULL, $4::timestamptz, $4::timestamptz)\`,
+     VALUES ($1, $2, $3, 24, 60, NULL, $4::timestamptz, $4::timestamptz)`,
     [pollId, contentId, pollOwner, now],
   )
   for (const [position, optionId] of optionIds.entries()) {
     await client.query(
-      \`INSERT INTO social_poll_options (option_id, poll_id, option_text, position)
-       VALUES ($1, $2, $3, $4)\`,
+      `INSERT INTO social_poll_options (option_id, poll_id, option_text, position)
+       VALUES ($1, $2, $3, $4)`,
       [optionId, pollId, 'Option ' + (position + 1), position],
     )
   }
   if (voteId && optionIds[0]) {
     await client.query(
-      \`INSERT INTO social_poll_votes (vote_id, poll_id, option_id, user_id, created_at)
-       VALUES ($1, $2, $3, $4, $5::timestamptz)\`,
+      `INSERT INTO social_poll_votes (vote_id, poll_id, option_id, user_id, created_at)
+       VALUES ($1, $2, $3, $4, $5::timestamptz)`,
       [voteId, pollId, optionIds[0], voter, now],
     )
   }
@@ -108,10 +108,10 @@ try {
     deleteContentPoll(unusedD1, owner, votedContentId, draftContext(votedContentId), store),
   )
   const preserved = await client.query(
-    \`SELECT
+    `SELECT
        (SELECT COUNT(*)::integer FROM social_polls WHERE poll_id = $1) AS polls,
        (SELECT COUNT(*)::integer FROM social_poll_options WHERE poll_id = $1) AS options,
-       (SELECT COUNT(*)::integer FROM social_poll_votes WHERE poll_id = $1) AS votes\`,
+       (SELECT COUNT(*)::integer FROM social_poll_votes WHERE poll_id = $1) AS votes`,
     [votedPollId],
   )
   assert.deepEqual(preserved.rows[0], { polls: 1, options: 2, votes: 1 })
@@ -134,10 +134,10 @@ try {
     await client.query('DELETE FROM social_poll_options WHERE option_id LIKE $1', [marker + '-%'])
     await client.query('DELETE FROM social_polls WHERE poll_id LIKE $1', [marker + '-%'])
     const residue = await client.query(
-      \`SELECT
+      `SELECT
          (SELECT COUNT(*)::integer FROM social_polls WHERE poll_id LIKE $1) AS polls,
          (SELECT COUNT(*)::integer FROM social_poll_options WHERE option_id LIKE $1) AS options,
-         (SELECT COUNT(*)::integer FROM social_poll_votes WHERE vote_id LIKE $1) AS votes\`,
+         (SELECT COUNT(*)::integer FROM social_poll_votes WHERE vote_id LIKE $1) AS votes`,
       [marker + '-%'],
     )
     assert.deepEqual(residue.rows[0], { polls: 0, options: 0, votes: 0 })
