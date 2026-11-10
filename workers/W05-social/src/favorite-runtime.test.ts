@@ -171,6 +171,12 @@ describe('favorite runtime', () => {
         ])
         .mockResolvedValueOnce([
           {
+            relationship_id: 'favorite-older',
+            target_id: 'content-older',
+            created_at: '2026-11-10T04:00:00.789Z',
+            cursor_created_at: '2026-11-10T04:00:00.789123Z',
+          },
+          {
             relationship_id: 'favorite-oldest',
             target_id: 'content-oldest',
             created_at: '2026-11-10T04:00:00.456Z',
