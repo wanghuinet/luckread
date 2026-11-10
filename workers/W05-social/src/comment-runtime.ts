@@ -1,7 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 import { fetchPublishedContentSocialContext, type PublishedContentSocialContext, type W03ContentBinding } from './w03-content-context-client.js'
 
-import { replyAudienceAllowedParams, replyAudienceAllowedSql } from './reply-audience-runtime.js'
+import { createD1CommentCreateStore, type CommentCreateStore } from './comment-create-store.js'
 
 export class CommentRuntimeError extends Error {
   constructor(readonly code: string, readonly status: number) { super(code) }
@@ -244,96 +244,24 @@ export async function createComment(
   contentIdValue: string,
   input: CommentCreateInput,
   actorVerified = false,
+  store: CommentCreateStore = createD1CommentCreateStore(db),
 ): Promise<CommentItem> {
   const actor = validateId(actorUserId, 'UNAUTHENTICATED')
   const contentId = validateId(contentIdValue)
   const { body, idempotencyKey, parentId } = validateCreateInput(input)
 
-  const validation = await db.prepare(
-    `WITH existing_comment AS (
-       SELECT id, content_id, parent_id, body, author_user_id, state, depth, created_at, updated_at
-       FROM social_comments
-       WHERE author_user_id = ? AND idempotency_key = ?
-       LIMIT 1
-     )
-     SELECT
-       ec.id AS existing_id,
-       ec.content_id AS existing_content_id,
-       ec.parent_id AS existing_parent_id,
-       ec.body AS existing_body,
-       ec.author_user_id AS existing_author_user_id,
-       ec.state AS existing_state,
-       ec.depth AS existing_depth,
-       ec.created_at AS existing_created_at,
-       ec.updated_at AS existing_updated_at,
-       (SELECT state FROM contents WHERE id = ? LIMIT 1) AS content_state,
-       (SELECT owner_user_id FROM contents WHERE id = ? LIMIT 1) AS content_owner_user_id,
-       (SELECT content_id FROM social_comments WHERE id = ? LIMIT 1) AS parent_content_id,
-       (SELECT author_user_id FROM social_comments WHERE id = ? LIMIT 1) AS parent_author_user_id,
-       (SELECT state FROM social_comments WHERE id = ? LIMIT 1) AS parent_state,
-       (SELECT depth FROM social_comments WHERE id = ? LIMIT 1) AS parent_depth,
-       (SELECT COUNT(*) FROM social_comments WHERE author_user_id = ? AND created_at > datetime('now', '-60 seconds')) AS recent_count,
-       EXISTS (
-         SELECT 1
-         FROM social_user_interactions block
-         WHERE block.relation_type = 'block'
-           AND (
-             (block.actor_user_id = ? AND block.target_user_id = (SELECT owner_user_id FROM contents WHERE id = ? LIMIT 1))
-             OR
-             (block.actor_user_id = (SELECT owner_user_id FROM contents WHERE id = ? LIMIT 1) AND block.target_user_id = ?)
-             OR
-             (block.actor_user_id = ? AND block.target_user_id = (SELECT author_user_id FROM social_comments WHERE id = ? LIMIT 1))
-             OR
-             (block.actor_user_id = (SELECT author_user_id FROM social_comments WHERE id = ? LIMIT 1) AND block.target_user_id = ?)
-           )
-       ) AS blocked,
-       (
-         SELECT CASE WHEN ${replyAudienceAllowedSql} THEN 1 ELSE 0 END
-           FROM contents content
-          WHERE content.id = ?
-       ) AS reply_audience_allowed
-     FROM (SELECT 1) seed
-     LEFT JOIN existing_comment ec ON 1 = 1`,
-  ).bind(
-    actor,
-    idempotencyKey,
-    contentId,
-    contentId,
-    parentId,
-    parentId,
-    parentId,
-    parentId,
-    actor,
-    actor,
-    contentId,
-    contentId,
-    actor,
-    actor,
-    parentId,
-    parentId,
-    actor,
-    ...replyAudienceAllowedParams(actor, actorVerified),
-    contentId,
-  ).first<{
-    existing_id: string | null
-    existing_content_id: string | null
-    existing_parent_id: string | null
-    existing_body: string | null
-    existing_author_user_id: string | null
-    existing_state: 'PENDING' | 'PUBLISHED' | 'REJECTED' | 'AUTHOR_DELETED' | null
-    existing_depth: number | null
-    existing_created_at: string | null
-    existing_updated_at: string | null
-    content_state: string | null
-    content_owner_user_id: string | null
-    parent_content_id: string | null
-    parent_author_user_id: string | null
-    parent_state: string | null
-    parent_depth: number | null
-    recent_count: number
-    blocked: number
-    reply_audience_allowed: number
-  }>();
+  let validation
+  try {
+    validation = await store.validate({
+      actorUserId: actor,
+      contentId,
+      parentId,
+      idempotencyKey,
+      actorVerified,
+    })
+  } catch {
+    throw new CommentRuntimeError('INTERNAL_ERROR', 500)
+  }
 
   if (validation?.existing_id) {
     if (
@@ -388,89 +316,33 @@ export async function createComment(
   const id = crypto.randomUUID()
   const now = new Date().toISOString()
 
-  const inserted = await db.prepare(
-    `INSERT INTO social_comments
-      (id, content_id, author_user_id, parent_id, body, state, depth, idempotency_key, created_at, updated_at)
-     SELECT ?, ?, ?, ?, ?, 'PUBLISHED', ?, ?, ?, ?
-       FROM contents content
-      WHERE content.id = ?
-        AND content.state = 'PUBLISHED'
-        AND (
-          ? IS NULL
-          OR EXISTS (
-            SELECT 1
-              FROM social_comments parent
-             WHERE parent.id = ?
-               AND parent.content_id = content.id
-               AND parent.state = 'PUBLISHED'
-               AND parent.depth < 3
-          )
-        )
-        AND NOT EXISTS (
-          SELECT 1
-            FROM social_user_interactions block
-           WHERE block.relation_type = 'block'
-             AND (
-               (block.actor_user_id = ? AND block.target_user_id = content.owner_user_id)
-               OR
-               (block.actor_user_id = content.owner_user_id AND block.target_user_id = ?)
-               OR
-               (block.actor_user_id = ? AND block.target_user_id = (
-                 SELECT author_user_id FROM social_comments WHERE id = ? LIMIT 1
-               ))
-               OR
-               (block.actor_user_id = (
-                 SELECT author_user_id FROM social_comments WHERE id = ? LIMIT 1
-               ) AND block.target_user_id = ?)
-             )
-        )
-        AND ${replyAudienceAllowedSql}
-     ON CONFLICT(author_user_id, idempotency_key)
-     DO UPDATE SET id = social_comments.id
-     RETURNING id, content_id, author_user_id, parent_id, body, state, depth, created_at, updated_at`,
-  ).bind(
-    id,
-    contentId,
-    actor,
-    parentId,
-    body,
-    depth,
-    idempotencyKey,
-    now,
-    now,
-    contentId,
-    parentId,
-    parentId,
-    actor,
-    actor,
-    actor,
-    parentId,
-    parentId,
-    actor,
-    ...replyAudienceAllowedParams(actor, actorVerified),
-  ).first<{
-    id: string
-    content_id: string
-    author_user_id: string
-    parent_id: string | null
-    body: string
-    state: 'PENDING' | 'PUBLISHED' | 'REJECTED'
-    depth: number
-    created_at: string
-    updated_at: string
-  }>()
+  let inserted
+  try {
+    inserted = await store.insert({
+      actorUserId: actor,
+      contentId,
+      parentId,
+      idempotencyKey,
+      actorVerified,
+      id,
+      body,
+      depth,
+      now,
+    })
+  } catch {
+    throw new CommentRuntimeError('INTERNAL_ERROR', 500)
+  }
 
   if (!inserted) {
     // The final INSERT re-checks policy, follow graph, block relations, and
     // parent visibility. Distinguish a concurrent audience denial from other
     // stale preconditions without ever allowing the comment to bypass policy.
-    const finalState = await db.prepare(
-      `SELECT content.state AS content_state,
-              CASE WHEN ${replyAudienceAllowedSql} THEN 1 ELSE 0 END AS reply_audience_allowed
-         FROM contents content
-        WHERE content.id = ? LIMIT 1`,
-    ).bind(...replyAudienceAllowedParams(actor, actorVerified), contentId)
-      .first<{ content_state: string; reply_audience_allowed: number }>()
+    let finalState
+    try {
+      finalState = await store.getFinalState({ actorUserId: actor, contentId, actorVerified })
+    } catch {
+      throw new CommentRuntimeError('INTERNAL_ERROR', 500)
+    }
     if (!finalState || finalState.content_state !== 'PUBLISHED') {
       throw new CommentRuntimeError('NOT_FOUND', 404)
     }
