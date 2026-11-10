@@ -96,7 +96,7 @@ try {
     `INSERT INTO social_target_topics
        (relation_id, target_type, target_id, topic_id, token, created_at)
      VALUES ($1, 'content', $2, $3, '#second', $4),
-            ($5, 'content', $6, $7, '#restricted', $4)`,
+            ($5, 'content', $6, $7, '#restricted', $8)`,
     [
       marker + '-second-edge', marker + '-topic-content-second', secondTopicId, timestamp(-5),
       marker + '-restricted-edge', marker + '-topic-content-restricted', restrictedTopicId, timestamp(-4),
