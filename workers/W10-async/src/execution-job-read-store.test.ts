@@ -69,7 +69,7 @@ describe('W10 T16 membership-renewal execution job read store', () => {
           },
         }
       },
-    }
+    } as unknown as W10D1ReadExecutor
 
     const result = await createD1W10T16MembershipRenewalJobReadStore(db).list({
       states: ['RUNNING', 'SUCCEEDED'],
