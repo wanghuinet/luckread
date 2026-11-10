@@ -463,4 +463,60 @@ describe('W05 poll runtime', () => {
     expect(unpublished.prepare.mock.calls.some(([sql]) => /INSERT OR IGNORE INTO social_poll_votes/.test(String(sql)))).toBe(false)
   })
 
+  it('uses injectable PostgreSQL vote and read stores without touching D1', async () => {
+    const db = noDatabase()
+    const poll = {
+      poll_id: 'poll-1',
+      content_id: 'content-1',
+      owner_user_id: 'author-1',
+      duration_minutes: 1440,
+      ends_at: '2099-10-16T04:00:00.000Z',
+      created_at: '2026-10-15T04:00:00.000Z',
+      updated_at: '2026-10-15T04:00:00.000Z',
+    }
+    let savedOptionId: string | null = null
+    const readStore = {
+      isBlocked: vi.fn(async () => false),
+      getPoll: vi.fn(async () => poll),
+      setEndsAtIfUnset: vi.fn(async () => undefined),
+      listOptionsWithVoteCounts: vi.fn(async () => [
+        { option_id: 'option-1', option_text: 'Yes', position: 0, votes: savedOptionId === 'option-1' ? 1 : 0 },
+        { option_id: 'option-2', option_text: 'No', position: 1, votes: savedOptionId === 'option-2' ? 1 : 0 },
+      ]),
+      getViewerOptionId: vi.fn(async () => savedOptionId),
+    }
+    const voteStore = {
+      getVote: vi.fn(async () => savedOptionId ? { option_id: savedOptionId, created_at: '2026-10-17T05:00:00.000Z' } : null),
+      insertVote: vi.fn(async (input: { optionId: string }) => { savedOptionId = input.optionId }),
+    }
+    const binding = publishedOwnerContextBinding()
+
+    await expect(castContentPollVote(
+      db, binding, 'viewer-1', 'content-1', 'option-1', 'poll-vote-postgres-store',
+      voteStore, readStore,
+    )).resolves.toMatchObject({
+      pollId: 'poll-1',
+      viewerOptionId: 'option-1',
+      totalVotes: 1,
+      options: [
+        { optionId: 'option-1', votes: 1 },
+        { optionId: 'option-2', votes: 0 },
+      ],
+    })
+
+    await expect(castContentPollVote(
+      db, binding, 'viewer-1', 'content-1', 'option-1', 'poll-vote-postgres-store-retry',
+      voteStore, readStore,
+    )).resolves.toMatchObject({ viewerOptionId: 'option-1', totalVotes: 1 })
+
+    await expect(castContentPollVote(
+      db, binding, 'viewer-1', 'content-1', 'option-2', 'poll-vote-postgres-store-change',
+      voteStore, readStore,
+    )).rejects.toMatchObject({ code: 'ALREADY_VOTED', status: 409 })
+
+    expect(voteStore.insertVote).toHaveBeenCalledTimes(1)
+    expect(readStore.getPoll).toHaveBeenCalled()
+    expect(db.prepare).not.toHaveBeenCalled()
+  })
+
 })
