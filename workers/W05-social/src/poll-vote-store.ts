@@ -47,6 +47,7 @@ export function createD1PollVoteStore(db: D1Database): PollVoteStore {
               AND p.owner_user_id = ?
               AND p.ends_at IS NOT NULL
               AND p.ends_at > ?
+              AND p.poll_id = ?
               AND NOT EXISTS (
                 SELECT 1 FROM social_user_interactions b
                  WHERE b.relation_type = 'block'
@@ -65,6 +66,7 @@ export function createD1PollVoteStore(db: D1Database): PollVoteStore {
           input.contentId,
           input.ownerUserId,
           input.createdAt,
+          input.pollId,
           input.userId,
           input.ownerUserId,
           input.ownerUserId,
