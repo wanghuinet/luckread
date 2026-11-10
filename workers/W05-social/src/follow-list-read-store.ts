@@ -16,6 +16,8 @@ export type FollowListReadRow = Readonly<{
   relationship_id: string
   user_id: string
   followed_at: string
+  /** Exact database ordering value for cursor pagination; omitted by D1. */
+  cursor_created_at?: string
 }>
 
 export type FollowListCountInput = Readonly<{
