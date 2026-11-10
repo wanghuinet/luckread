@@ -76,6 +76,7 @@ on:
       - 'workers/W05-social/src/comment-create-store.ts'
       - 'workers/W05-social/src/comment-create-store-postgres.ts'
       - 'workers/W05-social/src/comment-create-store-postgres.test.ts'
+      - 'workers/W05-social/src/comment-runtime.ts'
       - 'workers/W05-social/scripts/neon/rehearse-comment-create-postgres-runtime.mjs'
       - 'workers/W05-social/scripts/neon/rehearse-reply-audience-postgres-runtime.mjs'
       - 'workers/W05-social/src/profile-pin-runtime.ts'
