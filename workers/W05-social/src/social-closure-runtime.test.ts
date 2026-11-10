@@ -1,5 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 import { describe, expect, it, vi } from 'vitest'
+import { SocialTargetsReadStoreError } from './social-targets-read-store.js'
 import { enqueueNotification, extractSocialTokens, getContentSocialSummary, getSocialTargets, listDiscoveryTopics, listNotifications, syncSocialTokens } from './social-closure-runtime.js'
 
 describe('W05 unified social closure', () => {
@@ -143,6 +144,40 @@ describe('W05 unified social closure', () => {
     const mentionInsert = inserts.find(({ sql }) => sql.includes('INSERT OR IGNORE INTO social_mentions'))
     expect(mentionInsert?.values[4]).toBe('mentioned-user')
     expect(inserts.some(({ sql }) => sql.includes('INSERT OR IGNORE INTO social_notifications'))).toBe(true)
+  })
+
+  it('accepts an injected provider-neutral social-target read store', async () => {
+    const store = {
+      getTargets: vi.fn(async () => ({
+        topics: [{
+          topic_id: 'topic-reading',
+          normalized_name: 'reading',
+          display_name: 'Reading',
+        }],
+        mentions: [{
+          mentioned_user_id: 'stable-user-id',
+          handle: 'alice',
+        }],
+      })),
+    }
+    await expect(getSocialTargets(store, 'content', 'content-1')).resolves.toEqual({
+      topics: [{ topicId: 'topic-reading', name: 'reading', displayName: 'Reading' }],
+      mentions: [{ userId: 'stable-user-id', handle: 'alice' }],
+    })
+    expect(store.getTargets).toHaveBeenCalledWith({
+      targetType: 'content',
+      targetId: 'content-1',
+    })
+  })
+
+  it('maps provider social-target read failures to a sanitized service-unavailable error', async () => {
+    const store = {
+      getTargets: vi.fn(async () => { throw new SocialTargetsReadStoreError() }),
+    }
+    await expect(getSocialTargets(store, 'comment', 'comment-1')).rejects.toMatchObject({
+      code: 'SERVICE_UNAVAILABLE',
+      status: 503,
+    })
   })
 
   it('keeps a historical mention attached to its stored identity after its handle is reclaimed', async () => {

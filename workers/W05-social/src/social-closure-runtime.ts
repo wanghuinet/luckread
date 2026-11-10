@@ -6,6 +6,11 @@ import {
   type NotificationPreferencePatch,
   type NotificationPreferencesStore,
 } from './notification-preferences-store.js'
+import {
+  createD1SocialTargetsReadStore,
+  SocialTargetsReadStoreError,
+  type SocialTargetsReadStore,
+} from './social-targets-read-store.js'
 
 export class SocialClosureRuntimeError extends Error {
   constructor(readonly code: string, readonly status: number) { super(code) }
@@ -347,8 +352,17 @@ export async function syncSocialTokens(
   return { topics: topics.length, mentions: mentionCount }
 }
 
+type SocialTargetsDataSource = D1Database | SocialTargetsReadStore
+
+function resolveSocialTargetsReadStore(source: SocialTargetsDataSource): SocialTargetsReadStore {
+  if (typeof (source as SocialTargetsReadStore).getTargets === 'function') {
+    return source as SocialTargetsReadStore
+  }
+  return createD1SocialTargetsReadStore(source as D1Database)
+}
+
 export async function getSocialTargets(
-  db: D1Database,
+  source: SocialTargetsDataSource,
   targetTypeValue: string,
   targetIdValue: string,
 ): Promise<{
@@ -356,33 +370,27 @@ export async function getSocialTargets(
   mentions: Array<{ userId: string; handle: string }>
 }> {
   const targetValue = target(targetTypeValue, targetIdValue)
-  const topics = await db.prepare(
-    `SELECT t.topic_id, t.normalized_name, t.display_name
-       FROM social_target_topics st
-       JOIN social_topics t ON t.topic_id = st.topic_id
-      WHERE st.target_type = ? AND st.target_id = ? AND t.status = 'ACTIVE'
-      ORDER BY st.created_at ASC
-      LIMIT 50`,
-  ).bind(targetValue.targetType, targetValue.targetId).all<{ topic_id: string; normalized_name: string; display_name: string }>()
-
-  const mentions = await db.prepare(
-    `SELECT mentioned_user_id, handle
-       FROM social_mentions
-      WHERE target_type = ? AND target_id = ?
-      ORDER BY created_at ASC
-      LIMIT 100`,
-  ).bind(targetValue.targetType, targetValue.targetId).all<{ mentioned_user_id: string; handle: string }>()
-
-  return {
-    topics: (topics.results ?? []).map((row) => ({
-      topicId: row.topic_id,
-      name: row.normalized_name,
-      displayName: row.display_name,
-    })),
-    mentions: (mentions.results ?? []).map((row) => ({
-      userId: row.mentioned_user_id,
-      handle: row.handle,
-    })),
+  try {
+    const result = await resolveSocialTargetsReadStore(source).getTargets({
+      targetType: targetValue.targetType,
+      targetId: targetValue.targetId,
+    })
+    return {
+      topics: result.topics.map((row) => ({
+        topicId: row.topic_id,
+        name: row.normalized_name,
+        displayName: row.display_name,
+      })),
+      mentions: result.mentions.map((row) => ({
+        userId: row.mentioned_user_id,
+        handle: row.handle,
+      })),
+    }
+  } catch (error) {
+    if (error instanceof SocialTargetsReadStoreError) {
+      throw new SocialClosureRuntimeError(error.code, error.status)
+    }
+    throw error
   }
 }
 
