@@ -34,12 +34,12 @@ export function createD1PollReadStore(db: D1Database): PollReadStore {
     async isBlocked(viewerUserId, ownerUserId) {
       try {
         const row = await db.prepare(
-          \`SELECT 1
+          `SELECT 1
              FROM social_user_interactions
             WHERE relation_type = 'block'
               AND ((actor_user_id = ? AND target_user_id = ?)
                 OR (actor_user_id = ? AND target_user_id = ?))
-            LIMIT 1\`,
+            LIMIT 1`,
         ).bind(viewerUserId, ownerUserId, ownerUserId, viewerUserId).first()
         return Boolean(row)
       } catch {
@@ -50,10 +50,10 @@ export function createD1PollReadStore(db: D1Database): PollReadStore {
     async getPoll(contentId) {
       try {
         return await db.prepare(
-          \`SELECT poll_id, content_id, owner_user_id, duration_minutes, ends_at, created_at, updated_at
+          `SELECT poll_id, content_id, owner_user_id, duration_minutes, ends_at, created_at, updated_at
              FROM social_polls
             WHERE content_id = ?
-            LIMIT 1\`,
+            LIMIT 1`,
         ).bind(contentId).first<PollReadRow>()
       } catch {
         throw new PollReadStoreError()
@@ -73,12 +73,12 @@ export function createD1PollReadStore(db: D1Database): PollReadStore {
     async listOptionsWithVoteCounts(pollId) {
       try {
         const result = await db.prepare(
-          \`SELECT o.option_id, o.option_text, o.position, COUNT(v.vote_id) AS votes
+          `SELECT o.option_id, o.option_text, o.position, COUNT(v.vote_id) AS votes
              FROM social_poll_options o
              LEFT JOIN social_poll_votes v ON v.poll_id = o.poll_id AND v.option_id = o.option_id
             WHERE o.poll_id = ?
             GROUP BY o.option_id, o.option_text, o.position
-            ORDER BY o.position ASC\`,
+            ORDER BY o.position ASC`,
         ).bind(pollId).all<PollOptionCountRow>()
         return result.results ?? []
       } catch {
