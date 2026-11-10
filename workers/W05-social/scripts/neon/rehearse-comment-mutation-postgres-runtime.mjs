@@ -46,7 +46,7 @@ const insertFixture = async (id, authorUserId, body = 'fixture', parentId = null
   await client.query(
     `INSERT INTO social_comments
       (id, content_id, author_user_id, parent_id, body, state, depth, idempotency_key, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, $5, 'PUBLISHED', $6, $7, NOW() - INTERVAL '2 minutes', NOW() - INTERVAL '1 minute')`,
+     VALUES ($1, $2, $3, $4, $5, 'PUBLISHED', $6, $7, date_trunc('milliseconds', NOW() - INTERVAL '2 minutes'), date_trunc('milliseconds', NOW() - INTERVAL '1 minute'))`,
     [id, contentId, authorUserId, parentId, body, parentId ? 1 : 0, id + '-key'],
   )
 }
