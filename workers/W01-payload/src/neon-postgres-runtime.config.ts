@@ -3,7 +3,6 @@ import { fileURLToPath } from 'node:url'
 
 import { postgresAdapter } from '@payloadcms/db-postgres'
 import { text } from '@payloadcms/db-postgres/drizzle/pg-core'
-import { buildConfig } from 'payload'
 
 import productionConfig from './payload.config.js'
 
@@ -45,7 +44,7 @@ if (
 // the D1 default and is not modified by this rehearsal.
 const sharedConfig = await Promise.resolve(productionConfig)
 
-export default buildConfig({
+const postgresRuntimeConfig = {
   ...sharedConfig,
   db: postgresAdapter({
     pool: {
@@ -89,4 +88,6 @@ export default buildConfig({
       },
     ],
   }),
-})
+}
+
+export default postgresRuntimeConfig
