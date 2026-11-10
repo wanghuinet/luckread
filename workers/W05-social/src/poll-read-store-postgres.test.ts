@@ -56,7 +56,7 @@ describe('W05 PostgreSQL poll read store', () => {
 
     await expect(store.listOptionsWithVoteCounts('poll-1')).resolves.toEqual(rows)
     const [sql, values] = query.mock.calls[0] ?? []
-    expect(String(sql)).toContain('COUNT(v.vote_id)::integer AS votes')
+    expect(String(sql)).toContain('COUNT(v.vote_id) AS votes')
     expect(String(sql)).toContain('LEFT JOIN social_poll_votes')
     expect(String(sql)).toContain('ORDER BY o.position ASC')
     expect(values).toEqual(['poll-1'])
