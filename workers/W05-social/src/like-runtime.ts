@@ -2,6 +2,11 @@
 
 import { ReplyAudienceRuntimeError } from './reply-audience-runtime.js'
 import {
+  createD1LikeMutationStore,
+  LikeMutationStoreError,
+  type LikeMutationStore,
+} from './like-mutation-store.js'
+import {
   createD1LikeStatusReadStore,
   LikeStatusReadStoreError,
   type LikeStatusReadStore,
@@ -253,6 +258,7 @@ export async function like(
   target: LikeTarget,
   correlationId: string,
   prevalidatedContentContext?: PublishedContentSocialContext,
+  mutationStore: LikeMutationStore = createD1LikeMutationStore(db),
 ): Promise<LikeResult> {
   const actor = validateActor(actorUserId)
   const { targetType, targetId } = validateTarget(target)
@@ -270,61 +276,22 @@ export async function like(
 
   const createdAt = new Date().toISOString()
   const relationshipId = crypto.randomUUID()
-  const insertSql = targetType === 'content'
-    ? `INSERT INTO interaction_likes
-        (relationship_id, actor_user_id, target_type, target_id, created_at)
-       SELECT ?, ?, 'content', c.id, ?
-         FROM contents c
-        WHERE c.id = ?
-          AND c.state = 'PUBLISHED'
-          AND NOT EXISTS (
-            SELECT 1
-              FROM social_user_interactions block
-             WHERE block.relation_type = 'block'
-               AND (
-                 (block.actor_user_id = ? AND block.target_user_id = c.owner_user_id)
-                 OR
-                 (block.actor_user_id = c.owner_user_id AND block.target_user_id = ?)
-               )
-          )
-       ON CONFLICT(actor_user_id, target_type, target_id)
-       DO UPDATE SET relationship_id = interaction_likes.relationship_id
-       RETURNING relationship_id, actor_user_id, target_type, target_id, created_at`
-    : `INSERT INTO interaction_likes
-        (relationship_id, actor_user_id, target_type, target_id, created_at)
-       SELECT ?, ?, 'comment', c.id, ?
-         FROM social_comments c
-        WHERE c.id = ?
-          AND c.state = 'PUBLISHED'
-          AND NOT EXISTS (
-            SELECT 1
-              FROM social_user_interactions block
-             WHERE block.relation_type = 'block'
-               AND (
-                 (block.actor_user_id = ? AND block.target_user_id = c.author_user_id)
-                 OR
-                 (block.actor_user_id = c.author_user_id AND block.target_user_id = ?)
-                 OR
-                 (block.actor_user_id = ? AND block.target_user_id = ?)
-                 OR
-                 (block.actor_user_id = ? AND block.target_user_id = ?)
-               )
-          )
-       ON CONFLICT(actor_user_id, target_type, target_id)
-       DO UPDATE SET relationship_id = interaction_likes.relationship_id
-       RETURNING relationship_id, actor_user_id, target_type, target_id, created_at`
-
-  const row = await db.prepare(insertSql)
-    .bind(
+  let row
+  try {
+    row = await mutationStore.create({
       relationshipId,
-      actor,
-      createdAt,
+      actorUserId: actor,
+      targetType,
       targetId,
-      ...(targetType === 'content'
-        ? [actor, actor]
-        : [actor, actor, actor, targetContext.parentOwnerUserId ?? null, targetContext.parentOwnerUserId ?? null, actor]),
-    )
-    .first<{ relationship_id: string; actor_user_id: string; target_type: 'content' | 'comment'; target_id: string; created_at: string }>()
+      createdAt,
+      parentOwnerUserId: targetContext.parentOwnerUserId,
+    })
+  } catch (error) {
+    if (error instanceof LikeMutationStoreError) {
+      throw new LikeRuntimeError(error.code, error.status)
+    }
+    throw error
+  }
 
   if (!row) throw new LikeRuntimeError('NOT_FOUND', 404)
 
@@ -412,12 +379,18 @@ export async function unlike(
   db: D1Database,
   actorUserId: string,
   target: LikeTarget,
+  mutationStore: LikeMutationStore = createD1LikeMutationStore(db),
 ): Promise<void> {
   const actor = validateActor(actorUserId)
   const { targetType, targetId } = validateTarget(target)
-  await db.prepare(
-    'DELETE FROM interaction_likes WHERE actor_user_id = ? AND target_type = ? AND target_id = ?',
-  ).bind(actor, targetType, targetId).run()
+  try {
+    await mutationStore.remove({ actorUserId: actor, targetType, targetId })
+  } catch (error) {
+    if (error instanceof LikeMutationStoreError) {
+      throw new LikeRuntimeError(error.code, error.status)
+    }
+    throw error
+  }
   await Promise.all([
     invalidateCachedLikeViewerState(actor, targetType, targetId),
     invalidateCachedLikeAggregate(targetType, targetId),
