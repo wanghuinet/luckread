@@ -5,6 +5,11 @@ import {
   BlockMuteListReadStoreError,
   type BlockMuteListReadStore,
 } from './block-mute-list-read-store.js'
+import {
+  createD1BlockMuteRelationStore,
+  BlockMuteRelationStoreError,
+  type BlockMuteRelationStore,
+} from './block-mute-relation-store.js'
 
 export type BlockMuteType = 'block' | 'mute'
 
@@ -48,91 +53,102 @@ const validateTarget = (actorUserId: string, targetUserId: string): [string, str
   return [actor, target]
 }
 
+type BlockMuteRelationDataSource = D1Database | BlockMuteRelationStore
+
+function resolveBlockMuteRelationStore(source: BlockMuteRelationDataSource): BlockMuteRelationStore {
+  if (
+    typeof (source as BlockMuteRelationStore).get === 'function' &&
+    typeof (source as BlockMuteRelationStore).set === 'function' &&
+    typeof (source as BlockMuteRelationStore).remove === 'function'
+  ) {
+    return source as BlockMuteRelationStore
+  }
+  return createD1BlockMuteRelationStore(source as D1Database)
+}
+
+function mapBlockMuteRelationStoreError(error: unknown): never {
+  if (error instanceof BlockMuteRelationStoreError) {
+    throw new BlockMuteRuntimeError(error.code, error.status)
+  }
+  throw error
+}
+
+const toBlockMuteRecord = (row: {
+  relationship_id: string
+  actor_user_id: string
+  target_user_id: string
+  relation_type: BlockMuteType
+  created_at: string
+  updated_at: string
+}): BlockMuteRecord => ({
+  relationshipId: row.relationship_id,
+  actorUserId: row.actor_user_id,
+  targetUserId: row.target_user_id,
+  relationType: row.relation_type,
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
+})
+
 export async function getRelation(
-  db: D1Database,
+  source: BlockMuteRelationDataSource,
   actorUserId: string,
   targetUserId: string,
   relationType: BlockMuteType,
 ): Promise<BlockMuteRecord | null> {
   const [actor, target] = validateTarget(actorUserId, targetUserId)
-  const row = await db.prepare(
-    'SELECT relationship_id, actor_user_id, target_user_id, relation_type, created_at, updated_at FROM social_user_interactions WHERE actor_user_id = ? AND target_user_id = ? AND relation_type = ? LIMIT 1',
-  ).bind(actor, target, relationType).first<{
-    relationship_id: string
-    actor_user_id: string
-    target_user_id: string
-    relation_type: BlockMuteType
-    created_at: string
-    updated_at: string
-  }>()
-
-  return row
-    ? {
-        relationshipId: row.relationship_id,
-        actorUserId: row.actor_user_id,
-        targetUserId: row.target_user_id,
-        relationType: row.relation_type,
-        createdAt: row.created_at,
-        updatedAt: row.updated_at,
-      }
-    : null
+  try {
+    const row = await resolveBlockMuteRelationStore(source).get({
+      actorUserId: actor,
+      targetUserId: target,
+      relationType,
+    })
+    return row ? toBlockMuteRecord(row) : null
+  } catch (error) {
+    mapBlockMuteRelationStoreError(error)
+  }
 }
 
 export async function setRelation(
-  db: D1Database,
+  source: BlockMuteRelationDataSource,
   actorUserId: string,
   targetUserId: string,
   relationType: BlockMuteType,
 ): Promise<BlockMuteRecord> {
   const [actor, target] = validateTarget(actorUserId, targetUserId)
-  const relationshipId = crypto.randomUUID()
   const now = new Date().toISOString()
-
-  const row = await db.prepare(
-    `INSERT INTO social_user_interactions
-      (relationship_id, actor_user_id, target_user_id, relation_type, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?)
-     ON CONFLICT(actor_user_id, target_user_id, relation_type)
-     DO UPDATE SET updated_at = social_user_interactions.updated_at
-     RETURNING relationship_id, actor_user_id, target_user_id, relation_type, created_at, updated_at`,
-  ).bind(
-    relationshipId,
-    actor,
-    target,
-    relationType,
-    now,
-    now,
-  ).first<{
-    relationship_id: string
-    actor_user_id: string
-    target_user_id: string
-    relation_type: BlockMuteType
-    created_at: string
-    updated_at: string
-  }>()
-
-  if (!row) throw new BlockMuteRuntimeError('INTERNAL_ERROR', 500)
-
-  return {
-    relationshipId: row.relationship_id,
-    actorUserId: row.actor_user_id,
-    targetUserId: row.target_user_id,
-    relationType: row.relation_type,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
+  let row
+  try {
+    row = await resolveBlockMuteRelationStore(source).set({
+      relationshipId: crypto.randomUUID(),
+      actorUserId: actor,
+      targetUserId: target,
+      relationType,
+      createdAt: now,
+      updatedAt: now,
+    })
+  } catch (error) {
+    mapBlockMuteRelationStoreError(error)
   }
+  if (!row) throw new BlockMuteRuntimeError('INTERNAL_ERROR', 500)
+  return toBlockMuteRecord(row)
 }
 
 export async function removeRelation(
-  db: D1Database,
+  source: BlockMuteRelationDataSource,
   actorUserId: string,
   targetUserId: string,
   relationType: BlockMuteType,
 ): Promise<void> {
   const [actor, target] = validateTarget(actorUserId, targetUserId)
-  await db.prepare(
-    'DELETE FROM social_user_interactions WHERE actor_user_id = ? AND target_user_id = ? AND relation_type = ?',
-  ).bind(actor, target, relationType).run()
+  try {
+    await resolveBlockMuteRelationStore(source).remove({
+      actorUserId: actor,
+      targetUserId: target,
+      relationType,
+    })
+  } catch (error) {
+    mapBlockMuteRelationStoreError(error)
+  }
 }
 
 export type BlockMuteListItem = {
