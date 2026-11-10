@@ -1,0 +1,113 @@
+name: W01 Payload PostgreSQL 18 Runtime Rehearsal
+
+on:
+  pull_request:
+    paths:
+      - 'workers/W01-payload/src/payload.config.ts'
+      - 'workers/W01-payload/src/neon-postgres-runtime.config.ts'
+      - 'workers/W01-payload/src/neon-postgres-schema.config.ts'
+      - 'workers/W01-payload/src/neon-postgres-migrations/**'
+      - 'workers/W01-payload/scripts/neon/**'
+      - 'workers/W01-payload/package.json'
+      - 'workers/W01-payload/pnpm-lock.yaml'
+      - '.github/workflows/neon-w01-payload-postgres-runtime-rehearsal.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'workers/W01-payload/src/payload.config.ts'
+      - 'workers/W01-payload/src/neon-postgres-runtime.config.ts'
+      - 'workers/W01-payload/src/neon-postgres-schema.config.ts'
+      - 'workers/W01-payload/src/neon-postgres-migrations/**'
+      - 'workers/W01-payload/scripts/neon/**'
+      - 'workers/W01-payload/package.json'
+      - 'workers/W01-payload/pnpm-lock.yaml'
+      - '.github/workflows/neon-w01-payload-postgres-runtime-rehearsal.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: w01-payload-postgres-runtime-rehearsal-${{ github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  payload-runtime-postgres18:
+    name: Payload Local API CRUD on PostgreSQL 18 (no Neon credentials)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:18.6
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: luckread_schema
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d luckread_schema"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Setup pnpm 11
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+          run_install: false
+
+      - name: Install exact W01 dependency graph
+        working-directory: workers/W01-payload
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Apply the committed official Payload PostgreSQL migration to disposable PostgreSQL 18
+        working-directory: workers/W01-payload
+        env:
+          NODE_ENV: development
+          PAYLOAD_SECRET: w01-payload-local-runtime-rehearsal-only
+          PAYLOAD_SCHEMA_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/luckread_schema
+          PAYLOAD_CONFIG_PATH: src/neon-postgres-schema.config.ts
+        run: pnpm run neon:schema:apply
+
+      - name: Syntax-check the JavaScript runtime rehearsal script
+        working-directory: workers/W01-payload
+        run: node --check scripts/neon/rehearse-payload-postgres-runtime.mjs
+
+      - name: Apply the upstream Postgres pool-client release fix to this disposable 3.90.2 rehearsal install
+        working-directory: workers/W01-payload
+        run: |
+          node --check scripts/neon/patch-payload-postgres-runtime-connect.mjs
+          node scripts/neon/patch-payload-postgres-runtime-connect.mjs
+
+      - name: Exercise the same W01 production Collections and plugins through Payload Local API
+        working-directory: workers/W01-payload
+        env:
+          NODE_ENV: test
+          PAYLOAD_SECRET: w01-payload-local-runtime-rehearsal-only
+          PAYLOAD_SCHEMA_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/luckread_schema
+          PAYLOAD_CONFIG_PATH: src/neon-postgres-runtime.config.ts
+          CLOUDFLARE_PERSIST_TO: ${{ runner.temp }}/w01-payload-cloudflare-runtime
+        run: timeout --signal=TERM --kill-after=10s 360s node --import=tsx/esm scripts/neon/rehearse-payload-postgres-runtime.mjs
+
+      - name: Verify all W01 Payload business tables are empty after CRUD cleanup
+        working-directory: workers/W01-payload
+        env:
+          PAYLOAD_SCHEMA_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/luckread_schema
+          PAYLOAD_SCHEMA_REPORT: artifacts/neon/w01-payload-postgres-runtime-postflight.json
+        run: pnpm run neon:schema:verify
+
+      - name: Upload sanitized runtime postflight evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: w01-payload-postgres-runtime-rehearsal-${{ github.sha }}
+          path: workers/W01-payload/artifacts/neon/w01-payload-postgres-runtime-postflight.json
+          if-no-files-found: error
+          retention-days: 30
