@@ -77,7 +77,7 @@ jobs:
           PAYLOAD_CONFIG_PATH: src/neon-postgres-schema.config.ts
         run: pnpm run neon:schema:apply
 
-      - name: Exercise the same W01 production Collections and plugins through Payload Local API
+      - name: Syntax-check the JavaScript runtime rehearsal script\n        working-directory: workers/W01-payload\n        run: node --check scripts/neon/rehearse-payload-postgres-runtime.mjs\n\n      - name: Exercise the same W01 production Collections and plugins through Payload Local API
         working-directory: workers/W01-payload
         env:
           NODE_ENV: test
