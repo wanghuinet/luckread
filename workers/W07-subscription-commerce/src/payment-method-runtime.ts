@@ -212,7 +212,7 @@ export async function revokeOwnedSavedPaymentMethod(
     return { savedPaymentMethodId, status: 'REVOCATION_PENDING', replayed: started.replayed };
   }
 
-  let mandates: Awaited<PaymentMethodReadStore['getSavedPaymentMethodMandates'] extends (...args: never[]) => Promise<infer T> ? T : never>;
+  let mandates: Awaited<ReturnType<PaymentMethodReadStore['getSavedPaymentMethodMandates']>>;
   try {
     mandates = await readStore.getSavedPaymentMethodMandates(
       customerId, String(config.expectedMerchantId), savedPaymentMethodId,
