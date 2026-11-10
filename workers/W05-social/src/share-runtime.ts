@@ -2,7 +2,7 @@
 
 import { ReplyAudienceRuntimeError } from './reply-audience-runtime.js'
 import { fetchPublishedContentSocialContext, type W03ContentBinding } from './w03-content-context-client.js'
-import { createD1ShareStore, ShareStoreError, type ShareStore } from './share-store.js'
+import { createD1ShareStore, ShareStoreError, type ShareStorageRow, type ShareStore } from './share-store.js'
 
 export class ShareRuntimeError extends Error {
   constructor(readonly code: string, readonly status: number) { super(code) }
@@ -80,7 +80,7 @@ export async function createShare(
 
   await assertPublishedContent(w03Content, contentId, correlationId)
 
-  let existing
+  let existing: ShareStorageRow | null
   try {
     existing = await store.findByActorAndKey(actor, idempotencyKey)
   } catch (error) {
@@ -100,7 +100,7 @@ export async function createShare(
 
   const shareId = crypto.randomUUID()
   const createdAt = new Date().toISOString()
-  let row
+  let row: ShareStorageRow | null
   try {
     await store.insertIfAbsent(shareId, contentId, actor, idempotencyKey, createdAt)
     row = await store.findByActorAndKey(actor, idempotencyKey)
@@ -128,7 +128,7 @@ export async function resolveShare(
   store: ShareStore = createD1ShareStore(db),
 ): Promise<{ shareId: string; contentId: string; createdAt: string }> {
   const shareId = validateId(shareIdValue)
-  let row
+  let row: Pick<ShareStorageRow, 'share_id' | 'content_id' | 'created_at'> | null
   try {
     row = await store.findById(shareId)
   } catch (error) {
