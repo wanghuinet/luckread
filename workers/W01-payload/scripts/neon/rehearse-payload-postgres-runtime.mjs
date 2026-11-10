@@ -23,13 +23,13 @@ const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString()
 
 let payload
 
-async function step<T>(name: string, operation: () => Promise<T>, timeoutMs = 45_000): Promise<T> {
+async function step(name, operation, timeoutMs = 45_000) {
   process.stdout.write('W01_PG_RUNTIME_STEP_START ' + name + '\\n')
   let timeout: ReturnType<typeof setTimeout> | undefined
   try {
     const value = await Promise.race([
       operation(),
-      new Promise<T>((_, reject) => {
+      new Promise((_, reject) => {
         timeout = setTimeout(() => reject(new Error('W01_PG_RUNTIME_STEP_TIMEOUT ' + name)), timeoutMs)
       }),
     ])
