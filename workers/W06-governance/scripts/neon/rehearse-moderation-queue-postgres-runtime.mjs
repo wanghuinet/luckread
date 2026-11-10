@@ -100,6 +100,7 @@ try {
   const otherReviewer = marker + '-other-reviewer'
   const caseA = marker + '-case-a'
   const caseB = marker + '-case-b'
+  const caseTie = marker + '-case-d'
   const caseC = marker + '-case-c'
   const caseOtherReviewer = marker + '-case-other-reviewer'
   const caseClosed = marker + '-case-closed'
@@ -127,6 +128,16 @@ try {
     decisionId: decisionA,
     version: 2,
     createdAt: '2026-11-10T04:02:00.000123Z',
+  })
+  await insertCase({
+    caseId: caseTie,
+    targetType: 'content',
+    targetId: marker + '-content-d',
+    state: 'OPEN',
+    priority: 90,
+    assignedReviewerId: null,
+    decisionId: null,
+    createdAt: '2026-11-10T04:03:00.000123Z',
   })
   await insertCase({
     caseId: caseC,
@@ -192,19 +203,20 @@ try {
     firstPage.items[0]?.caseId === caseA && firstPage.items[1]?.caseId === caseB
   checks.currentDecisionProjectionPreserved =
     firstPage.items[0]?.currentDecision?.decisionId === decisionA
-  checks.stablePriorityCreatedAtCaseIdOrdering = true
+  checks.stablePriorityCreatedAtCaseIdOrdering =
+    firstPage.items[0]?.caseId === caseA && firstPage.items[1]?.caseId === caseB
   checks.pageSizePlusOneHasMorePreserved = firstPage.hasMore && firstPage.items.length === 2
 
   const secondPage = await listModerationQueue(store, reviewer, firstPage.nextCursor, 2)
-  assert.deepEqual(secondPage.items.map((item) => item.caseId), [caseC])
+  assert.deepEqual(secondPage.items.map((item) => item.caseId), [caseTie, caseC])
   assert.equal(secondPage.hasMore, false)
   assert.equal(secondPage.nextCursor, null)
   assert.equal(
     new Set([...firstPage.items, ...secondPage.items].map((item) => item.caseId)).size,
-    3,
+    4,
   )
   checks.keysetCursorPreservesMicroseconds =
-    firstPage.nextCursor !== null && secondPage.items[0]?.caseId === caseC
+    firstPage.nextCursor !== null && secondPage.items[0]?.caseId === caseTie
   checks.nextPageHasNoDuplicates = true
 
   runtimePassed = true
