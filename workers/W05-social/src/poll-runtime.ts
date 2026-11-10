@@ -3,6 +3,7 @@ import type { OwnedPostContext } from './owned-post-context.js'
 import type { PublishedContentSocialContext } from './w03-content-context-client.js'
 import { ReplyAudienceRuntimeError } from './reply-audience-runtime.js'
 import { fetchPublishedOwnerPostContext, type W03ContentBinding } from './w03-content-context-client.js'
+import { createD1PollReadStore, type PollReadStore } from './poll-read-store.js'
 
 export class SocialPollError extends Error {
   constructor(readonly code: string, readonly status: number) { super(code) }
@@ -180,6 +181,7 @@ export async function getContentPoll(
   contentIdValue: string,
   viewerUserIdValue: string | null,
   contentContext: PollContentContext,
+  store: PollReadStore = createD1PollReadStore(db),
 ): Promise<PollView | null> {
   const contentId = validateId(contentIdValue)
   const viewerUserId = viewerUserIdValue ? validateId(viewerUserIdValue, 'UNAUTHENTICATED') : null
@@ -190,11 +192,22 @@ export async function getContentPoll(
   const isPublic = content.state === 'PUBLISHED'
   if (!isPublic && !isOwner) throw new SocialPollError('NOT_FOUND', 404)
 
-  if (viewerUserId && content.owner_user_id && await isBlocked(db, viewerUserId, content.owner_user_id)) {
-    throw new SocialPollError('NOT_FOUND', 404)
+  if (viewerUserId && content.owner_user_id && viewerUserId !== content.owner_user_id) {
+    let blocked: boolean
+    try {
+      blocked = await store.isBlocked(viewerUserId, content.owner_user_id)
+    } catch {
+      throw new SocialPollError('INTERNAL_ERROR', 500)
+    }
+    if (blocked) throw new SocialPollError('NOT_FOUND', 404)
   }
 
-  const poll = await readPollRow(db, contentId)
+  let poll: Awaited<ReturnType<PollReadStore['getPoll']>>
+  try {
+    poll = await store.getPoll(contentId)
+  } catch {
+    throw new SocialPollError('INTERNAL_ERROR', 500)
+  }
   if (!poll) return null
   if (poll.owner_user_id !== content.owner_user_id) throw new SocialPollError('CONFLICT', 409)
 
@@ -202,20 +215,21 @@ export async function getContentPoll(
   if (!isValidPollDurationMinutes(durationMinutes)) throw new SocialPollError('INTERNAL_ERROR', 500)
   const endsAt = effectiveEndTime(poll, content.updated_at, isPublic)
   if (isPublic && !poll.ends_at && endsAt) {
-    await db.prepare('UPDATE social_polls SET ends_at = ? WHERE poll_id = ? AND ends_at IS NULL')
-      .bind(endsAt, poll.poll_id).run()
+    try {
+      await store.setEndsAtIfUnset(poll.poll_id, endsAt)
+    } catch {
+      throw new SocialPollError('INTERNAL_ERROR', 500)
+    }
   }
 
-  const rows = await db.prepare(
-    `SELECT o.option_id, o.option_text, o.position, COUNT(v.vote_id) AS votes
-       FROM social_poll_options o
-       LEFT JOIN social_poll_votes v ON v.poll_id = o.poll_id AND v.option_id = o.option_id
-      WHERE o.poll_id = ?
-      GROUP BY o.option_id, o.option_text, o.position
-      ORDER BY o.position ASC`,
-  ).bind(poll.poll_id).all<{ option_id: string; option_text: string; position: number; votes: number }>()
+  let rows: Awaited<ReturnType<PollReadStore['listOptionsWithVoteCounts']>>
+  try {
+    rows = await store.listOptionsWithVoteCounts(poll.poll_id)
+  } catch {
+    throw new SocialPollError('INTERNAL_ERROR', 500)
+  }
 
-  const options = (rows.results ?? []).map(row => ({
+  const options = rows.map(row => ({
     optionId: row.option_id,
     text: row.option_text,
     position: Number(row.position),
@@ -225,10 +239,11 @@ export async function getContentPoll(
 
   let viewerOptionId: string | null = null
   if (viewerUserId && isPublic) {
-    const vote = await db.prepare(
-      'SELECT option_id FROM social_poll_votes WHERE poll_id = ? AND user_id = ? LIMIT 1',
-    ).bind(poll.poll_id, viewerUserId).first<{ option_id: string }>()
-    viewerOptionId = vote?.option_id ?? null
+    try {
+      viewerOptionId = await store.getViewerOptionId(poll.poll_id, viewerUserId)
+    } catch {
+      throw new SocialPollError('INTERNAL_ERROR', 500)
+    }
   }
   const totalVotes = options.reduce((total, option) => total + option.votes, 0)
   const closed = Boolean(isPublic && endsAt && Date.parse(endsAt) <= Date.now())
