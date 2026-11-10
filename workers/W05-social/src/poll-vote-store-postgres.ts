@@ -34,6 +34,7 @@ const insertVoteSql = `INSERT INTO social_poll_votes (
      AND poll.owner_user_id = $6
      AND poll.ends_at IS NOT NULL
      AND poll.ends_at > $7::timestamptz
+     AND poll.poll_id = $8
      AND NOT EXISTS (
        SELECT 1
          FROM social_user_interactions block_relation
@@ -71,6 +72,7 @@ export function createPostgresPollVoteStore(db: PollVotePostgresQueryExecutor): 
           input.contentId,
           input.ownerUserId,
           input.createdAt,
+          input.pollId,
         ])
       } catch {
         throw new PollVoteStoreError()
