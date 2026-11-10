@@ -26,6 +26,7 @@ const marker = 'w05-pg-follow-' + randomUUID()
 const reportPath = process.env.W05_FOLLOW_POSTGRES_REPORT || '../../artifacts/neon/w05-follow-postgres-runtime-postflight.json'
 const pool = new Pool({ connectionString, max: 4, connectionTimeoutMillis: 5_000 })
 const store = createPostgresFollowStore(pool)
+let runtimePassed = false
 
 const countRelationship = async (followerUserId, targetUserId) => {
   const result = await pool.query(
@@ -93,6 +94,7 @@ try {
   const afterRefollow = await follow(store, follower, targetUser)
   assert.notEqual(afterRefollow.relationship_id, first.relationship_id, 'A removed relationship identifier must never be reused')
   await unfollow(store, follower, targetUser)
+  runtimePassed = true
 } finally {
   try {
     await pool.query(
@@ -118,7 +120,7 @@ try {
     assert.equal(interactionRows, 0, 'All synthetic Block rows must be removed')
 
     const report = {
-      status: 'W05_FOLLOW_POSTGRES_RUNTIME_PASS',
+      status: runtimePassed ? 'W05_FOLLOW_POSTGRES_RUNTIME_PASS' : 'W05_FOLLOW_POSTGRES_RUNTIME_FAILED',
       postgresDatabase: target.pathname.slice(1),
       concurrentFollowConverged: true,
       uniqueRelationshipRows: 1,
@@ -134,7 +136,7 @@ try {
     }
     await mkdir(dirname(reportPath), { recursive: true })
     await writeFile(reportPath, JSON.stringify(report, null, 2) + '\n')
-    console.log('W05_FOLLOW_POSTGRES_RUNTIME_PASS ' + JSON.stringify(report))
+    console.log((runtimePassed ? 'W05_FOLLOW_POSTGRES_RUNTIME_PASS ' : 'W05_FOLLOW_POSTGRES_RUNTIME_FAILED ') + JSON.stringify(report))
   } finally {
     await pool.end()
   }
