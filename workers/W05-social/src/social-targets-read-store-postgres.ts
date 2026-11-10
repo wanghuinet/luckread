@@ -3,6 +3,8 @@ import type {
   SocialTargetsReadInput,
   SocialTargetsReadResult,
   SocialTargetsReadStore,
+  SocialTargetMentionRow,
+  SocialTargetTopicRow,
 } from './social-targets-read-store.js'
 
 type QueryResult<Row> = Readonly<{ rows: Row[] }>
@@ -21,7 +23,7 @@ export function createPostgresSocialTargetsReadStore(
   return {
     async getTargets(input: SocialTargetsReadInput): Promise<SocialTargetsReadResult> {
       try {
-        const topics = await db.query(
+        const topics = await db.query<SocialTargetTopicRow>(
           `SELECT t.topic_id, t.normalized_name, t.display_name
              FROM social_target_topics st
              JOIN social_topics t ON t.topic_id = st.topic_id
@@ -30,7 +32,7 @@ export function createPostgresSocialTargetsReadStore(
             LIMIT 50`,
           [input.targetType, input.targetId],
         )
-        const mentions = await db.query(
+        const mentions = await db.query<SocialTargetMentionRow>(
           `SELECT mentioned_user_id, handle
              FROM social_mentions
             WHERE target_type = $1 AND target_id = $2
