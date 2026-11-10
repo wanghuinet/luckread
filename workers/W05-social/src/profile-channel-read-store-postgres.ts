@@ -1,7 +1,6 @@
 import {
   ProfileChannelReadStoreError,
   type ProfileBlockRelationRow,
-  type ProfileChannelCursor,
   type ProfileChannelReadStore,
   type ProfileLikedContentReadRow,
   type ProfileReplyReadRow,
@@ -156,6 +155,3 @@ export function createPostgresProfileChannelReadStore(
     },
   }
 }
-
-/** Keeps the type available to rehearsal scripts without exporting a runtime dependency. */
-export type ProfileChannelPostgresCursor = ProfileChannelCursor
