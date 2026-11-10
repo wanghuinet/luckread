@@ -36,6 +36,7 @@ describe('W05 PostgreSQL poll vote store', () => {
     expect(String(sql)).toContain('JOIN social_poll_options')
     expect(String(sql)).toContain('poll.ends_at IS NOT NULL')
     expect(String(sql)).toContain('poll.ends_at > $7::timestamptz')
+    expect(String(sql)).toContain('poll.poll_id = $8')
     expect(String(sql)).toContain("block_relation.relation_type = 'block'")
     expect(String(sql)).toContain('block_relation.actor_user_id = $2 AND block_relation.target_user_id = $6')
     expect(String(sql)).toContain('block_relation.actor_user_id = $6 AND block_relation.target_user_id = $2')
@@ -43,7 +44,7 @@ describe('W05 PostgreSQL poll vote store', () => {
     expect(String(sql)).toContain('ON CONFLICT (poll_id, user_id) DO NOTHING')
     expect(values).toEqual([
       'vote-1', 'viewer-1', '2026-11-10T12:00:00.000Z', 'option-1',
-      'content-1', 'owner-1', '2026-11-10T12:00:00.000Z',
+      'content-1', 'owner-1', '2026-11-10T12:00:00.000Z', 'poll-1',
     ])
   })
 
