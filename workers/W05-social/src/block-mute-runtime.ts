@@ -8,6 +8,7 @@ import {
 import {
   createD1BlockMuteRelationStore,
   BlockMuteRelationStoreError,
+  type BlockMuteRelationRow,
   type BlockMuteRelationStore,
 } from './block-mute-relation-store.js'
 
@@ -116,7 +117,7 @@ export async function setRelation(
 ): Promise<BlockMuteRecord> {
   const [actor, target] = validateTarget(actorUserId, targetUserId)
   const now = new Date().toISOString()
-  let row
+  let row: BlockMuteRelationRow | null
   try {
     row = await resolveBlockMuteRelationStore(source).set({
       relationshipId: crypto.randomUUID(),
