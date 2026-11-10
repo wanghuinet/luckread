@@ -32,7 +32,6 @@ on:
       - 'workers/W05-social/src/neon-postgres-migrations/**'
       - 'workers/W05-social/src/following-author-ids-read-store.ts'
       - 'workers/W05-social/src/following-author-ids-read-store-postgres.ts'
-      - 'workers/W05-social/src/following-author-ids-read-store-postgres.test.ts'
       - 'workers/W05-social/src/following-feed.test.ts'
       - 'workers/W05-social/scripts/neon/rehearse-following-author-ids-postgres-runtime.mjs'
   workflow_dispatch:
