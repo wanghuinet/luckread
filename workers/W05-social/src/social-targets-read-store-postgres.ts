@@ -10,7 +10,7 @@ import type {
 type QueryResult<Row> = Readonly<{ rows: Row[] }>
 
 export interface SocialTargetsPostgresQueryExecutor {
-  query<Row extends Record<string, unknown> = Record<string, unknown>>(
+  query<Row = Record<string, unknown>>(
     sql: string,
     values?: unknown[],
   ): Promise<QueryResult<Row>>
