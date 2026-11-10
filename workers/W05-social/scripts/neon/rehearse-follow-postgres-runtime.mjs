@@ -4,8 +4,9 @@ import { createRequire } from 'node:module'
 import { dirname } from 'node:path'
 import { mkdir, writeFile } from 'node:fs/promises'
 
-import { FollowRuntimeError, follow, unfollow } from '../../src/follow-runtime.ts'
+import { FollowRuntimeError, follow, listFollowers, listFollowing, unfollow } from '../../src/follow-runtime.ts'
 import { createPostgresFollowStore } from '../../src/follow-store-postgres.ts'
+import { createPostgresFollowListReadStore } from '../../src/follow-list-read-store-postgres.ts'
 
 const requireFromW02 = createRequire(new URL('../../../W02-identity/package.json', import.meta.url))
 const { Pool } = requireFromW02('pg')
@@ -26,6 +27,7 @@ const marker = 'w05-pg-follow-' + randomUUID()
 const reportPath = process.env.W05_FOLLOW_POSTGRES_REPORT || '../../artifacts/neon/w05-follow-postgres-runtime-postflight.json'
 const pool = new Pool({ connectionString, max: 4, connectionTimeoutMillis: 5_000 })
 const store = createPostgresFollowStore(pool)
+const readStore = createPostgresFollowListReadStore(pool)
 let runtimePassed = false
 
 const countRelationship = async (followerUserId, targetUserId) => {
@@ -94,6 +96,74 @@ try {
   const afterRefollow = await follow(store, follower, targetUser)
   assert.notEqual(afterRefollow.relationship_id, first.relationship_id, 'A removed relationship identifier must never be reused')
   await unfollow(store, follower, targetUser)
+
+  // Followers pagination: newest visible relationship first, the blocked
+  // follower is excluded from both page rows and the separate total count.
+  const listTarget = marker + '-list-target'
+  const listFollowerOld = marker + '-list-old'
+  const listFollowerNew = marker + '-list-new'
+  const listFollowerBlocked = marker + '-list-blocked'
+  await store.follow({
+    followerUserId: listFollowerOld,
+    targetUserId: listTarget,
+    relationshipId: marker + '-list-r1',
+    createdAt: '2026-11-10T02:00:00.000100Z',
+  })
+  await store.follow({
+    followerUserId: listFollowerNew,
+    targetUserId: listTarget,
+    relationshipId: marker + '-list-r2',
+    createdAt: '2026-11-10T02:00:00.000900Z',
+  })
+  await store.follow({
+    followerUserId: listFollowerBlocked,
+    targetUserId: listTarget,
+    relationshipId: marker + '-list-r3',
+    createdAt: '2026-11-10T03:00:00.000Z',
+  })
+  await insertBlock(listFollowerBlocked, listTarget, marker + '-list-block')
+  const followerPageOne = await listFollowers(readStore, listTarget, null, 1)
+  assert.deepEqual(followerPageOne.items.map((item) => item.userId), [listFollowerNew])
+  assert.equal(followerPageOne.items[0]?.followedAt, '2026-11-10T02:00:00.000Z', 'API timestamps remain millisecond-compatible')
+  assert.equal(followerPageOne.totalCount, 2, 'Blocked followers must not contribute to the total count')
+  assert.equal(followerPageOne.hasMore, true)
+  assert.ok(followerPageOne.nextCursor)
+  const followerPageTwo = await listFollowers(readStore, listTarget, followerPageOne.nextCursor, 1)
+  assert.deepEqual(followerPageTwo.items.map((item) => item.userId), [listFollowerOld], 'The microsecond cursor must preserve rows within the same millisecond')
+  assert.equal(followerPageTwo.items[0]?.followedAt, '2026-11-10T02:00:00.000Z')
+  assert.equal(followerPageTwo.totalCount, 2)
+  assert.equal(followerPageTwo.hasMore, false)
+  assert.equal(new Set([...followerPageOne.items, ...followerPageTwo.items].map((item) => item.userId)).size, 2,
+    'Follower cursor pages must not duplicate or omit visible rows')
+
+  // Following pagination also excludes an inbound block from the target side.
+  const listViewer = marker + '-list-viewer'
+  const listTargetOld = marker + '-list-target-old'
+  const listTargetNew = marker + '-list-target-new'
+  const listTargetBlocked = marker + '-list-target-blocked'
+  await store.follow({
+    followerUserId: listViewer,
+    targetUserId: listTargetOld,
+    relationshipId: marker + '-list-f1',
+    createdAt: '2026-11-10T01:00:00.000Z',
+  })
+  await store.follow({
+    followerUserId: listViewer,
+    targetUserId: listTargetNew,
+    relationshipId: marker + '-list-f2',
+    createdAt: '2026-11-10T02:00:00.000Z',
+  })
+  await store.follow({
+    followerUserId: listViewer,
+    targetUserId: listTargetBlocked,
+    relationshipId: marker + '-list-f3',
+    createdAt: '2026-11-10T03:00:00.000Z',
+  })
+  await insertBlock(listTargetBlocked, listViewer, marker + '-list-reverse-block')
+  const followingPage = await listFollowing(readStore, listViewer, null, 10)
+  assert.deepEqual(followingPage.items.map((item) => item.userId), [listTargetNew, listTargetOld])
+  assert.equal(followingPage.totalCount, 2, 'Inbound blocks must be excluded from following totals')
+
   runtimePassed = true
 } finally {
   try {
@@ -128,6 +198,8 @@ try {
       selfFollowDenied: true,
       repeatedUnfollowIdempotent: true,
       relationshipIdNotReused: true,
+      followerAndFollowingPaginationVerified: true,
+      blockedRowsExcludedFromListAndCount: true,
       remainingFixtureRows: { follow: followRows, interactions: interactionRows },
       remoteNeonTouched: false,
       cloudflareD1Touched: false,

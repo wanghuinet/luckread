@@ -6,13 +6,19 @@ import {
   type FollowStore,
 } from './follow-store.js'
 import type { FollowRow } from './follow-store.js'
+import { createD1FollowListReadStore } from './follow-list-read-store.js'
+import type {
+  FollowListCursor,
+  FollowListDirection,
+  FollowListReadStore,
+} from './follow-list-read-store.js'
 export type { FollowRow } from './follow-store.js'
 
 export class FollowRuntimeError extends Error {
   constructor(readonly code: string, readonly status: number) { super(code) }
 }
 
-export type FollowListDirection = 'followers' | 'following'
+export type { FollowListDirection } from './follow-list-read-store.js'
 
 export type FollowListItem = {
   relationshipId: string
@@ -166,76 +172,49 @@ const decodeCursor = (value: string | null, direction: FollowListDirection, user
   }
 }
 
+type FollowListDataSource = D1Database | FollowListReadStore
+
+function resolveFollowListReadStore(source: FollowListDataSource): FollowListReadStore {
+  if (
+    typeof (source as FollowListReadStore).list === 'function' &&
+    typeof (source as FollowListReadStore).count === 'function'
+  ) {
+    return source as FollowListReadStore
+  }
+  return createD1FollowListReadStore(source as D1Database)
+}
+
 async function listFollowRelations(
-  db: D1Database,
+  source: FollowListDataSource,
   userIdValue: string,
   direction: FollowListDirection,
   cursorValue: string | null,
   limit: number,
 ): Promise<FollowListPage> {
   const ownerId = userId(userIdValue)
-  const cursor = decodeCursor(cursorValue, direction, ownerId)
-  const isFollowers = direction === 'followers'
-  const relationColumn = isFollowers ? 'target_user_id' : 'follower_user_id'
-  const itemColumn = isFollowers ? 'follower_user_id' : 'target_user_id'
-  const blockPredicate = `NOT EXISTS (
-      SELECT 1
-      FROM social_user_interactions block
-      WHERE block.relation_type = 'block'
-        AND (
-          (block.actor_user_id = ? AND block.target_user_id = ${itemColumn})
-          OR
-          (block.actor_user_id = ${itemColumn} AND block.target_user_id = ?)
-        )
-    )`
-  const where = cursor
-    ? `WHERE ${relationColumn} = ?
-       AND (created_at < ? OR (created_at = ? AND relationship_id < ?))
-       AND ${blockPredicate}`
-    : `WHERE ${relationColumn} = ?
-       AND ${blockPredicate}`
-  const statement = `SELECT relationship_id, ${itemColumn} AS user_id, created_at AS followed_at
-    FROM social_follow_relationships
-    ${where}
-    ORDER BY created_at DESC, relationship_id DESC
-    LIMIT ?`
-  const parameters = cursor
-    ? [
-        ownerId,
-        cursor.createdAt,
-        cursor.createdAt,
-        cursor.relationshipId,
-        ownerId,
-        ownerId,
-        limit + 1,
-      ]
-    : [ownerId, ownerId, ownerId, limit + 1]
+  const decodedCursor = decodeCursor(cursorValue, direction, ownerId)
+  const cursor: FollowListCursor | null = decodedCursor
+    ? { createdAt: decodedCursor.createdAt, relationshipId: decodedCursor.relationshipId }
+    : null
+  const store = resolveFollowListReadStore(source)
 
-  const [result, cachedTotalCount] = await Promise.all([
-    db.prepare(statement).bind(...parameters).all<{
-      relationship_id: string
-      user_id: string
-      followed_at: string
-    }>(),
+  const [rows, cachedTotalCount] = await Promise.all([
+    store.list({ userId: ownerId, direction, cursor, limit })
+      .catch((error) => mapFollowStoreError(error)),
     readCachedFollowCount(direction, ownerId),
   ])
-  const rows = result.results ?? []
   const hasMore = rows.length > limit
   const visibleRows = hasMore ? rows.slice(0, limit) : rows
 
   let totalCount = cachedTotalCount
   if (totalCount === null) {
-    // COUNT is deliberately a separate aggregate query. Embedding COUNT(*) as a
-    // correlated subquery in the page SELECT can re-scan the same relationship
-    // index for every returned row, multiplying D1 rows-read on hot accounts.
-    const countStatement = `SELECT COUNT(*) AS total_count
-      FROM social_follow_relationships rel_count
-      WHERE rel_count.${relationColumn} = ?
-        AND ${blockPredicate.replaceAll(`${itemColumn}`, `rel_count.${itemColumn}`)}`
-    const countResult = await db.prepare(countStatement)
-      .bind(ownerId, ownerId, ownerId)
-      .first<{ total_count: number }>()
-    totalCount = Number(countResult?.total_count ?? 0)
+    // Keep the aggregate separate from the page query so a hot relationship
+    // index is scanned once, not once per returned row.
+    try {
+      totalCount = await store.count({ userId: ownerId, direction })
+    } catch (error) {
+      mapFollowStoreError(error)
+    }
     await writeCachedFollowCount(direction, ownerId, totalCount)
   }
 
@@ -253,7 +232,7 @@ async function listFollowRelations(
           version: 1,
           userId: ownerId,
           direction,
-          createdAt: last.followed_at,
+          createdAt: last.cursor_created_at ?? last.followed_at,
           relationshipId: last.relationship_id,
         })
       : null,
@@ -414,7 +393,7 @@ export async function getFollowStatus(db: D1Database, followerUserId: string, ta
 }
 
 export async function listFollowers(
-  db: D1Database,
+  db: FollowListDataSource,
   userIdValue: string,
   cursor: string | null,
   limit: number,
@@ -423,7 +402,7 @@ export async function listFollowers(
 }
 
 export async function listFollowing(
-  db: D1Database,
+  db: FollowListDataSource,
   userIdValue: string,
   cursor: string | null,
   limit: number,
