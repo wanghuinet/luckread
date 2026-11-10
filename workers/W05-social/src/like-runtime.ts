@@ -4,6 +4,7 @@ import { ReplyAudienceRuntimeError } from './reply-audience-runtime.js'
 import {
   createD1LikeMutationStore,
   LikeMutationStoreError,
+  type LikeMutationRow,
   type LikeMutationStore,
 } from './like-mutation-store.js'
 import {
@@ -276,7 +277,7 @@ export async function like(
 
   const createdAt = new Date().toISOString()
   const relationshipId = crypto.randomUUID()
-  let row
+  let row: LikeMutationRow | null
   try {
     row = await mutationStore.create({
       relationshipId,
