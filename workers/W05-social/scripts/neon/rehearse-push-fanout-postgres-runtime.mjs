@@ -4,7 +4,7 @@ import { createRequire } from 'node:module'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 
-import { fanOutPendingNotifications } from '../../src/notification-push-delivery-runtime.ts'
+import { fanOutPendingNotifications } from '../../src/notification-push-fanout-runtime.ts'
 import { createPostgresNotificationPushFanoutStore } from '../../src/notification-push-fanout-store-postgres.ts'
 
 const requireFromW02 = createRequire(new URL('../../../W02-identity/package.json', import.meta.url))
