@@ -16,10 +16,10 @@ export interface LikeMutationPostgresQueryExecutor {
   ): Promise<QueryResult<Row>>
 }
 
-const RETURNING = \`relationship_id, actor_user_id, target_type, target_id,
-  to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at\`
+const RETURNING = `relationship_id, actor_user_id, target_type, target_id,
+  to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at`
 
-const CONTENT_LIKE_SQL = \`INSERT INTO interaction_likes
+const CONTENT_LIKE_SQL = `INSERT INTO interaction_likes
   (relationship_id, actor_user_id, target_type, target_id, created_at)
  SELECT $1, $2, 'content', c.id, $3
    FROM contents c
@@ -37,9 +37,9 @@ const CONTENT_LIKE_SQL = \`INSERT INTO interaction_likes
     )
  ON CONFLICT (actor_user_id, target_type, target_id)
  DO UPDATE SET relationship_id = interaction_likes.relationship_id
- RETURNING \${RETURNING}\`
+ RETURNING ${RETURNING}`
 
-const COMMENT_LIKE_SQL = \`INSERT INTO interaction_likes
+const COMMENT_LIKE_SQL = `INSERT INTO interaction_likes
   (relationship_id, actor_user_id, target_type, target_id, created_at)
  SELECT $1, $2, 'comment', c.id, $3
    FROM social_comments c
@@ -61,7 +61,7 @@ const COMMENT_LIKE_SQL = \`INSERT INTO interaction_likes
     )
  ON CONFLICT (actor_user_id, target_type, target_id)
  DO UPDATE SET relationship_id = interaction_likes.relationship_id
- RETURNING \${RETURNING}\`
+ RETURNING ${RETURNING}`
 
 /** PostgreSQL counterpart for W05's final guarded like write and idempotent removal. */
 export function createPostgresLikeMutationStore(db: LikeMutationPostgresQueryExecutor): LikeMutationStore {
