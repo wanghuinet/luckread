@@ -7,6 +7,8 @@ import {
 } from './notification-push-send-result-store.js'
 import { createD1NotificationPushDeliveryClaimStore } from './notification-push-delivery-claim-store-d1.js'
 import type { NotificationPushDeliveryClaimStore as NotificationPushDeliveryClaimStorePort } from './notification-push-delivery-claim-store.js'
+import { createD1NotificationPushReceiptStore } from './notification-push-receipt-store-d1.js'
+import type { NotificationPushReceiptStore } from './notification-push-receipt-store.js'
 
 type PushReceiptLike = ExpoPushReceipt
 type PushTicketLike = ExpoPushTicket
@@ -215,92 +217,75 @@ async function recordPushTicket(
     })
     return updated ? 'sent' : 'stale'
   }
-  const errorCode = ticket.status === 'error' ? String(ticket.details?.error ?? 'EXPO_TICKET_ERROR') : 'EXPO_TICKET_INVALID'
-  if (errorCode === 'DeviceNotRegistered') await deactivateInvalidEndpoint(endpointDb, task, now)
-  return scheduleDeliveryRetry(store, task, now, errorCode)
-}
-
-async function claimDueReceipts(db: D1Database, now: Date): Promise<ClaimedReceipt[]> {
+  const errorCode = ticket.status === 'error' ? String(ticket.details?.error ?? 'EXPO_TICKET_ERROR') :export async function claimDueReceipts(
+  store: NotificationPushReceiptStore,
+  now: Date,
+): Promise<ClaimedReceipt[]> {
   const nowIso = now.toISOString()
-  await db.prepare(
-    "UPDATE social_notification_push_deliveries SET status = 'FAILED', lease_token = NULL, lease_expires_at = NULL, " +
-    "last_error_code = 'RECEIPT_LEASE_EXPIRED_MAX_POLLS', updated_at = ? " +
-    "WHERE status = 'RECEIPT_LEASED' AND lease_expires_at IS NOT NULL AND lease_expires_at <= ? AND receipt_poll_count >= ?",
-  ).bind(nowIso, nowIso, MAX_RECEIPT_POLLS).run()
-  const candidates = await db.prepare(
-    "SELECT delivery_id, notification_id, endpoint_id, expo_ticket_id FROM social_notification_push_deliveries " +
-    "WHERE ((status = 'RECEIPT_PENDING' AND expo_ticket_id IS NOT NULL AND next_attempt_at <= ? AND receipt_poll_count < ?) " +
-    "OR (status = 'RECEIPT_LEASED' AND lease_expires_at IS NOT NULL AND lease_expires_at <= ? AND receipt_poll_count < ?)) " +
-    'ORDER BY next_attempt_at ASC, created_at ASC LIMIT ?',
-  ).bind(nowIso, MAX_RECEIPT_POLLS, nowIso, MAX_RECEIPT_POLLS, RECEIPT_LIMIT).all<{
-    delivery_id: string; notification_id: string; endpoint_id: string; expo_ticket_id: string
-  }>()
-
+  const candidates = await store.claimDue({
+    now: nowIso,
+    leaseExpiresAt: isoAfter(now, LEASE_SECONDS),
+    limit: RECEIPT_LIMIT,
+    maxReceiptPolls: MAX_RECEIPT_POLLS,
+  })
   const claimed: ClaimedReceipt[] = []
-  for (const candidate of candidates.results ?? []) {
-    const leaseToken = crypto.randomUUID()
-    const row = await db.prepare(
-      "UPDATE social_notification_push_deliveries SET status = 'RECEIPT_LEASED', lease_token = ?, " +
-      'lease_expires_at = ?, receipt_poll_count = receipt_poll_count + 1, updated_at = ? ' +
-      "WHERE delivery_id = ? AND ((status = 'RECEIPT_PENDING' AND next_attempt_at <= ? AND receipt_poll_count < ?) " +
-      "OR (status = 'RECEIPT_LEASED' AND lease_expires_at IS NOT NULL AND lease_expires_at <= ? AND receipt_poll_count < ?)) " +
-      'RETURNING delivery_id, notification_id, endpoint_id, expo_ticket_id, attempt_count, receipt_poll_count, push_token_hash',
-    ).bind(leaseToken, isoAfter(now, LEASE_SECONDS), nowIso, candidate.delivery_id, nowIso, MAX_RECEIPT_POLLS, nowIso, MAX_RECEIPT_POLLS).first<{
-      delivery_id: string; notification_id: string; endpoint_id: string; expo_ticket_id: string
-      attempt_count: number; receipt_poll_count: number; push_token_hash: string | null
-    }>()
-    if (!row) continue
-    const owner = await db.prepare(
-      'SELECT recipient_user_id FROM social_notification_push_outbox WHERE notification_id = ? LIMIT 1',
-    ).bind(row.notification_id).first<{ recipient_user_id: string }>()
-    if (!owner) {
-      await db.prepare(
-        "UPDATE social_notification_push_deliveries SET status = 'CANCELLED', lease_token = NULL, lease_expires_at = NULL, " +
-        "last_error_code = 'OUTBOX_NOT_FOUND', updated_at = ? WHERE delivery_id = ? AND lease_token = ?",
-      ).bind(nowIso, row.delivery_id, leaseToken).run()
+  for (const candidate of candidates) {
+    if (!candidate.recipient_user_id) {
+      await store.cancelMissingOutbox({
+        deliveryId: candidate.delivery_id,
+        leaseToken: candidate.lease_token,
+        now: nowIso,
+      })
       continue
     }
     claimed.push({
-      deliveryId: row.delivery_id,
-      notificationId: row.notification_id,
-      endpointId: row.endpoint_id,
-      recipientUserId: owner.recipient_user_id,
-      expoTicketId: row.expo_ticket_id,
-      leaseToken,
-      attemptCount: row.attempt_count,
-      receiptPollCount: row.receipt_poll_count,
-      pushTokenHash: row.push_token_hash ?? '',
+      deliveryId: candidate.delivery_id,
+      notificationId: candidate.notification_id,
+      endpointId: candidate.endpoint_id,
+      recipientUserId: candidate.recipient_user_id,
+      expoTicketId: candidate.expo_ticket_id,
+      leaseToken: candidate.lease_token,
+      attemptCount: candidate.attempt_count,
+      receiptPollCount: candidate.receipt_poll_count,
+      pushTokenHash: candidate.push_token_hash ?? '',
     })
   }
   return claimed
 }
 
 async function applyReceipt(
-  db: D1Database, endpointDb: D1Database, task: ClaimedReceipt, receipt: PushReceiptLike | undefined, now: Date,
-): Promise<'provider-accepted' | 'retried' | 'failed' | 'pending'> {
+  store: NotificationPushReceiptStore,
+  endpointDb: D1Database,
+  task: ClaimedReceipt,
+  receipt: PushReceiptLike | undefined,
+  now: Date,
+): Promise<'provider-accepted' | 'retried' | 'failed' | 'pending' | 'stale'> {
+  const nowIso = now.toISOString()
   if (!receipt) {
     if (task.receiptPollCount >= MAX_RECEIPT_POLLS) {
-      await db.prepare(
-        "UPDATE social_notification_push_deliveries SET status = 'FAILED', lease_token = NULL, lease_expires_at = NULL, " +
-        "last_error_code = 'RECEIPT_TIMEOUT', updated_at = ? WHERE delivery_id = ? AND status = 'RECEIPT_LEASED' AND lease_token = ?",
-      ).bind(now.toISOString(), task.deliveryId, task.leaseToken).run()
-      return 'failed'
+      const updated = await store.timeoutReceipt({
+        deliveryId: task.deliveryId,
+        leaseToken: task.leaseToken,
+        now: nowIso,
+      })
+      return updated ? 'failed' : 'stale'
     }
-    await db.prepare(
-      "UPDATE social_notification_push_deliveries SET status = 'RECEIPT_PENDING', next_attempt_at = ?, " +
-      "lease_token = NULL, lease_expires_at = NULL, last_error_code = 'RECEIPT_NOT_READY', updated_at = ? " +
-      "WHERE delivery_id = ? AND status = 'RECEIPT_LEASED' AND lease_token = ?",
-    ).bind(isoAfter(now, RECEIPT_RETRY_SECONDS), now.toISOString(), task.deliveryId, task.leaseToken).run()
-    return 'pending'
+    const updated = await store.deferReceipt({
+      deliveryId: task.deliveryId,
+      leaseToken: task.leaseToken,
+      nextAttemptAt: isoAfter(now, RECEIPT_RETRY_SECONDS),
+      now: nowIso,
+    })
+    return updated ? 'pending' : 'stale'
   }
 
   if (receipt.status === 'ok') {
-    await db.prepare(
-      "UPDATE social_notification_push_deliveries SET status = 'PROVIDER_ACCEPTED', lease_token = NULL, " +
-      "lease_expires_at = NULL, last_error_code = NULL, updated_at = ? " +
-      "WHERE delivery_id = ? AND status = 'RECEIPT_LEASED' AND lease_token = ?",
-    ).bind(now.toISOString(), task.deliveryId, task.leaseToken).run()
-    return 'provider-accepted'
+    const updated = await store.acceptReceipt({
+      deliveryId: task.deliveryId,
+      leaseToken: task.leaseToken,
+      now: nowIso,
+    })
+    return updated ? 'provider-accepted' : 'stale'
   }
 
   const errorCode = String(receipt.details?.error ?? 'EXPO_RECEIPT_ERROR')
@@ -308,14 +293,19 @@ async function applyReceipt(
     await deactivateInvalidEndpoint(endpointDb, task, now)
   }
   const canRetry = isRetryableExpoError(errorCode) && task.attemptCount < MAX_SEND_ATTEMPTS
-  const status = canRetry ? 'RETRY' : 'FAILED'
-  await db.prepare(
-    'UPDATE social_notification_push_deliveries SET status = ?, next_attempt_at = ?, expo_ticket_id = NULL, ' +
-    'lease_token = NULL, lease_expires_at = NULL, last_error_code = ?, updated_at = ? ' +
-    "WHERE delivery_id = ? AND status = 'RECEIPT_LEASED' AND lease_token = ?",
-  ).bind(
-    status,
-    canRetry ? isoAfter(now, calculatePushRetryDelaySeconds(task.attemptCount)) : now.toISOString(),
+  const updated = await store.failReceipt({
+    deliveryId: task.deliveryId,
+    leaseToken: task.leaseToken,
+    status: canRetry ? 'RETRY' : 'FAILED',
+    nextAttemptAt: canRetry ? isoAfter(now, calculatePushRetryDelaySeconds(task.attemptCount)) : nowIso,
+    errorCode,
+    now: nowIso,
+  })
+  if (!updated) return 'stale'
+  return canRetry ? 'retried' : 'failed'
+}
+
+ySeconds(task.attemptCount)) : now.toISOString(),
     errorCode,
     now.toISOString(),
     task.deliveryId,
@@ -362,35 +352,42 @@ async function processSendBatch(
 }
 
 async function processReceiptBatch(
-  db: D1Database, endpointDb: D1Database, client: Expo, tasks: ClaimedReceipt[], now: Date,
-): Promise<{ providerAccepted: number; retried: number; failed: number; pending: number }> {
-  const result = { providerAccepted: 0, retried: 0, failed: 0, pending: 0 }
-  if (!tasks.length) return result
-  let receipts: Record<string, PushReceiptLike> = {}
+  store: NotificationPushReceiptStore,
+  endpointDb: D1Database,
+  client: Expo,
+  tasks: ClaimedReceipt[],
+  now: Date,
+): Promise<{ providerAccepted:number; retried:number; failed:number; pending:number; skipped:number }> {
+  const result={providerAccepted:0,retried:0,failed:0,pending:0,skipped:0}
+  if(!tasks.length)return result
+  let receipts:Record<string,PushReceiptLike>={}
   try {
-    for (const chunk of client.chunkPushNotificationReceiptIds(tasks.map((task) => task.expoTicketId))) {
-      Object.assign(receipts, await client.getPushNotificationReceiptsAsync(chunk))
+    for(const chunk of client.chunkPushNotificationReceiptIds(tasks.map(task=>task.expoTicketId))){
+      Object.assign(receipts,await client.getPushNotificationReceiptsAsync(chunk))
     }
-  } catch {
-    for (const task of tasks) {
-      const outcome = await applyReceipt(db, endpointDb, task, undefined, now)
-      if (outcome === 'pending') result.pending += 1
+  }catch{
+    for(const task of tasks){
+      const outcome=await applyReceipt(store,endpointDb,task,undefined,now)
+      if(outcome==='pending')result.pending+=1
+      else if(outcome==='failed')result.failed+=1
+      else if(outcome==='stale')result.skipped+=1
     }
     return result
   }
-  for (const task of tasks) {
-    const outcome = await applyReceipt(db, endpointDb, task, receipts[task.expoTicketId], now)
-    if (outcome === 'provider-accepted') result.providerAccepted += 1
-    else if (outcome === 'retried') result.retried += 1
-    else if (outcome === 'failed') result.failed += 1
-    else result.pending += 1
+  for(const task of tasks){
+    const outcome=await applyReceipt(store,endpointDb,task,receipts[task.expoTicketId],now)
+    if(outcome==='provider-accepted')result.providerAccepted+=1
+    else if(outcome==='retried')result.retried+=1
+    else if(outcome==='failed')result.failed+=1
+    else if(outcome==='pending')result.pending+=1
+    else result.skipped+=1
   }
   return result
 }
-
 export type NotificationPushDeliveryRuntimeDependencies = Readonly<{
   sendResultStore?: NotificationPushSendResultStore
   deliveryClaimStore?: NotificationPushDeliveryClaimStorePort
+  receiptStore?: NotificationPushReceiptStore
 }>
 
 export async function runNotificationPushBatch(
@@ -409,8 +406,9 @@ export async function runNotificationPushBatch(
   const sendResultStore = dependencies.sendResultStore ?? createD1NotificationPushSendResultStore(env.DB)
   const client = new Expo(env.EXPO_ACCESS_TOKEN?.trim() ? { accessToken: env.EXPO_ACCESS_TOKEN.trim() } : {})
   const sendResult = await processSendBatch(sendResultStore, env.D1_03, client, deliveries, now)
-  const receipts = await claimDueReceipts(env.DB, now)
-  const receiptResult = await processReceiptBatch(env.DB, env.D1_03, client, receipts, now)
+  const receiptStore = dependencies.receiptStore ?? createD1NotificationPushReceiptStore(env.DB)
+  const receipts = await claimDueReceipts(receiptStore, now)
+  const receiptResult = await processReceiptBatch(receiptStore, env.D1_03, client, receipts, now)
 
   return {
     status: 'COMPLETED',
@@ -419,6 +417,6 @@ export async function runNotificationPushBatch(
     providerAccepted: receiptResult.providerAccepted,
     retried: sendResult.retried + receiptResult.retried,
     failed: sendResult.failed + receiptResult.failed,
-    skipped: deliveries.length - sendResult.sent - sendResult.retried - sendResult.failed,
+    skipped: deliveries.length - sendResult.sent - sendResult.retried - sendResult.failed + receiptResult.skipped,
   }
 }
