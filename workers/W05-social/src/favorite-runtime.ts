@@ -151,7 +151,7 @@ export async function getFavoriteStatus(
   correlationId: string,
 ): Promise<{ favorited: boolean }> {
   const actor = validateActor(actorUserId)
-  const { targetType, targetId } = validateTarget(target)
+  const { targetId } = validateTarget(target)
   const cacheKey = favoriteStatusKey(actor, targetId)
 
   try {
