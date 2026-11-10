@@ -18,6 +18,10 @@ on:
       - 'workers/W06-governance/migrations/**'
       - 'workers/W06-governance/scripts/neon/**'
       - 'workers/W06-governance/src/neon-postgres-migrations/**'
+      - 'workers/W06-governance/src/moderation-runtime.ts'
+      - 'workers/W06-governance/src/moderation-runtime.test.ts'
+      - 'workers/W06-governance/src/moderation-queue-read-store*.ts'
+      - 'workers/W06-governance/scripts/neon/rehearse-moderation-queue-postgres-runtime.mjs'
   push:
     branches: [main]
     paths:
@@ -35,6 +39,10 @@ on:
       - 'workers/W06-governance/migrations/**'
       - 'workers/W06-governance/scripts/neon/**'
       - 'workers/W06-governance/src/neon-postgres-migrations/**'
+      - 'workers/W06-governance/src/moderation-runtime.ts'
+      - 'workers/W06-governance/src/moderation-runtime.test.ts'
+      - 'workers/W06-governance/src/moderation-queue-read-store*.ts'
+      - 'workers/W06-governance/scripts/neon/rehearse-moderation-queue-postgres-runtime.mjs'
   workflow_dispatch:
 
 permissions:
@@ -76,6 +84,7 @@ jobs:
         run: |
           set -euo pipefail
           node --check workers/W06-governance/scripts/neon/generate-d1-03-w06-postgres-migration.mjs
+          node --check workers/W06-governance/scripts/neon/rehearse-moderation-queue-postgres-runtime.mjs
           node --test workers/W06-governance/scripts/neon/generate-d1-03-w06-postgres-migration.test.mjs
           node workers/W06-governance/scripts/neon/generate-d1-03-w06-postgres-migration.mjs
           git diff --exit-code -- workers/W06-governance/src/neon-postgres-migrations/0001_w06_d1_03_moderation_schema.sql
@@ -100,11 +109,24 @@ jobs:
             --file workers/W06-governance/scripts/neon/verify-d1-03-w06-postgres-schema.sql \
             | tee artifacts/neon/d1-03-w06-moderation-postflight.txt
 
+      - name: Install pinned W02 PostgreSQL driver and TypeScript runner
+        working-directory: workers/W02-identity
+        run: npm install --ignore-scripts --no-audit --no-fund
+
+      - name: Rehearse W06 moderation queue reads against PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          D1_03_W06_LOCAL_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_d1_03_w06_rehearsal
+          D1_03_W06_QUEUE_POSTGRES_REPORT: ../../artifacts/neon/d1-03-w06-moderation-queue-postgres-runtime-postflight.json
+        run: node --import=tsx/esm ../../workers/W06-governance/scripts/neon/rehearse-moderation-queue-postgres-runtime.mjs
+
       - name: Upload W06 D1-03 PostgreSQL 18 rehearsal evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: neon-d1-03-w06-moderation-postgres18-${{ github.sha }}
-          path: artifacts/neon/d1-03-w06-moderation-postflight.txt
+          path: |
+            artifacts/neon/d1-03-w06-moderation-postflight.txt
+            artifacts/neon/d1-03-w06-moderation-queue-postgres-runtime-postflight.json
           if-no-files-found: error
           retention-days: 90
