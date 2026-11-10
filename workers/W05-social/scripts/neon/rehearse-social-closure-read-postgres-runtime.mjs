@@ -48,6 +48,7 @@ const ownerId = marker + '-owner'
 const notifications = [marker + '-notification-1', marker + '-notification-2', marker + '-notification-other']
 let runtimePassed = false
 let fixturePrepared = false
+let notificationOutboxRows = 0
 
 const contentBinding = {
   async fetch(input) {
@@ -122,7 +123,8 @@ try {
     'SELECT count(*)::int AS count FROM social_notification_push_outbox WHERE notification_id LIKE $1',
     [marker + '%'],
   )
-  assert.equal(outbox.rows[0]?.count, 3, 'The PostgreSQL-native notification trigger must create one outbox row per notification')
+  notificationOutboxRows = Number(outbox.rows[0]?.count ?? 0)
+  assert.equal(notificationOutboxRows, 3, 'The PostgreSQL-native notification trigger must create one outbox row per notification')
   // This runner must exercise the cold discovery projection, not an edge cache.
   globalThis.caches = undefined
 
@@ -266,7 +268,7 @@ try {
       discoveryActiveTopicAndW03PublicationAuthorityVerified: true,
       notificationPaginationRecipientScopeAndUnreadCountVerified: true,
       singleAndBulkReadUpdatesVerified: true,
-      notificationOutboxTriggerObserved: fixturePrepared && outbox.rows[0]?.count === 3,
+      notificationOutboxTriggerObserved: fixturePrepared && notificationOutboxRows === 3,
       contentSocialCountersAndViewerStateVerified: true,
       noW03ContentTableReadByW05: true,
       remainingFixtureRows: remaining,
