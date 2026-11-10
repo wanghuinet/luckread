@@ -46,7 +46,7 @@ const checks = {
 const insertComment = async (id, contentId, authorId, createdAt) => {
   await pool.query(
     'INSERT INTO social_comments (id, content_id, author_user_id, parent_id, body, state, depth, idempotency_key, created_at, updated_at) VALUES ($1, $2, $3, NULL, $4, \'PUBLISHED\', 0, $5, $6::timestamptz, $6::timestamptz)',
-    [id, contentId, authorId, 'reply-' + id, 'profile channel rehearsal', marker + '-' + id, createdAt],
+    [id, contentId, authorId, 'profile channel rehearsal', marker + '-' + id, createdAt],
   )
 }
 
