@@ -80,6 +80,7 @@ jobs:
       - name: Run generator and source/contract unit tests
         run: |
           set -euo pipefail
+          node --check workers/W05-social/scripts/neon/rehearse-content-likers-postgres-runtime.mjs
           node --test workers/W05-social/scripts/neon/generate-d1-02-postgres-migration.test.mjs
           node workers/W05-social/scripts/neon/generate-d1-02-postgres-migration.mjs --report artifacts/neon/w05-d1-02-source-hashes.json
           git diff --exit-code -- workers/W05-social/src/neon-postgres-migrations/0001_w05_d1_02_social_schema.sql
@@ -164,6 +165,7 @@ jobs:
           W05_CONTENT_LIKERS_POSTGRES_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_w05_d1_02_schema
           W05_CONTENT_LIKERS_POSTGRES_REPORT: ../../artifacts/neon/w05-content-likers-postgres-runtime-postflight.json
         run: node --import=tsx/esm ../../workers/W05-social/scripts/neon/rehearse-content-likers-postgres-runtime.mjs
+
       - name: Upload W05 D1-02 PostgreSQL 18 evidence
         if: always()
         uses: actions/upload-artifact@v4
