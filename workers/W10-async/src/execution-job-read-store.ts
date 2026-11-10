@@ -46,15 +46,13 @@ export type W10ExecutionJobReadRow = Readonly<{
 }>
 
 export type W10ExecutionJobReadInput = Readonly<{
-  ownerWorker: W10ExecutionWorkerId
-  /** Omitted means all tasks for the owner; null explicitly selects ownerless jobs. */
-  ownerTaskId?: string | null
   states?: readonly W10ExecutionJobState[]
   cursor?: W10ExecutionJobReadCursor
   /** Requested row count, including a page-size-plus-one sentinel when needed. */
   limit: number
 }>
 
+/** The first admitted task slice is deliberately limited to W07 T16 membership renewal. */
 export interface W10ExecutionJobReadStore {
   getByOperationId(operationId: string): Promise<W10ExecutionJobReadRow | null>
   list(input: W10ExecutionJobReadInput): Promise<readonly W10ExecutionJobReadRow[]>
@@ -102,7 +100,7 @@ const SELECT_JOB_COLUMNS = `
 `
 
 /** D1 remains the current production-default adapter. */
-export function createD1W10ExecutionJobReadStore(
+export function createD1W10T16MembershipRenewalJobReadStore(
   db: W10D1ReadExecutor,
 ): W10ExecutionJobReadStore {
   return {
@@ -111,7 +109,9 @@ export function createD1W10ExecutionJobReadStore(
         return await db.prepare(
           `SELECT ${SELECT_JOB_COLUMNS}
              FROM jobs j
-            WHERE j.operation_id = ?`,
+            WHERE j.operation_id = ?
+              AND j.owner_worker = 'W07'
+              AND j.owner_task_id = 'T16'`,
         ).bind(operationId).first<W10ExecutionJobReadRow>()
       } catch {
         throw new W10ExecutionJobReadStoreError()
@@ -122,17 +122,8 @@ export function createD1W10ExecutionJobReadStore(
       assertValidRead(input)
       if (input.states?.length === 0) return []
 
-      const values: unknown[] = [input.ownerWorker]
-      const predicates = ['j.owner_worker = ?']
-
-      if (input.ownerTaskId !== undefined) {
-        if (input.ownerTaskId === null) {
-          predicates.push('j.owner_task_id IS NULL')
-        } else {
-          predicates.push('j.owner_task_id = ?')
-          values.push(input.ownerTaskId)
-        }
-      }
+      const values: unknown[] = []
+      const predicates = [\"j.owner_worker = 'W07'\", \"j.owner_task_id = 'T16'\"]
 
       if (input.states) {
         predicates.push('j.state IN (' + input.states.map(() => '?').join(',') + ')')
