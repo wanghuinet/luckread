@@ -15,32 +15,32 @@ export interface PollReadPostgresQueryExecutor {
   ): Promise<QueryResult<Row>>
 }
 
-const POLL_COLUMNS = \`poll_id, content_id, owner_user_id, duration_minutes,
+const POLL_COLUMNS = `poll_id, content_id, owner_user_id, duration_minutes,
   CASE WHEN ends_at IS NULL THEN NULL
     ELSE to_char(ends_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
   END AS ends_at,
   to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at,
-  to_char(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS updated_at\`
+  to_char(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS updated_at`
 
-const isBlockedSql = \`SELECT EXISTS (
+const isBlockedSql = `SELECT EXISTS (
     SELECT 1
       FROM social_user_interactions
      WHERE relation_type = 'block'
        AND ((actor_user_id = $1 AND target_user_id = $2)
          OR (actor_user_id = $2 AND target_user_id = $1))
-  ) AS blocked\`
+  ) AS blocked`
 
-const getPollSql = \`SELECT \${POLL_COLUMNS}
+const getPollSql = `SELECT ${POLL_COLUMNS}
   FROM social_polls
  WHERE content_id = $1
- LIMIT 1\`
+ LIMIT 1`
 
-const setEndsAtIfUnsetSql = \`UPDATE social_polls
+const setEndsAtIfUnsetSql = `UPDATE social_polls
    SET ends_at = $1::timestamptz
  WHERE poll_id = $2
-   AND ends_at IS NULL\`
+   AND ends_at IS NULL`
 
-const listOptionsSql = \`SELECT
+const listOptionsSql = `SELECT
     o.option_id,
     o.option_text,
     o.position,
@@ -51,13 +51,13 @@ const listOptionsSql = \`SELECT
    AND v.option_id = o.option_id
  WHERE o.poll_id = $1
  GROUP BY o.option_id, o.option_text, o.position
- ORDER BY o.position ASC\`
+ ORDER BY o.position ASC`
 
-const getViewerOptionIdSql = \`SELECT option_id
+const getViewerOptionIdSql = `SELECT option_id
   FROM social_poll_votes
  WHERE poll_id = $1
    AND user_id = $2
- LIMIT 1\`
+ LIMIT 1`
 
 export function createPostgresPollReadStore(db: PollReadPostgresQueryExecutor): PollReadStore {
   return {
