@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 
-import { createPostgresW10ExecutionJobReadStore } from '../../src/execution-job-read-store-postgres.ts'
+import { createPostgresW10T16MembershipRenewalJobReadStore } from '../../src/execution-job-read-store-postgres.ts'
 
 const requireFromW02 = createRequire(new URL('../../../W02-identity/package.json', import.meta.url))
 const { Pool } = requireFromW02('pg')
@@ -25,7 +25,7 @@ const marker = 'w10-job-read-' + randomUUID()
 const reportPath = process.env.D1_03_W10_JOB_READ_REPORT ||
   'artifacts/neon/d1-03-w10-execution-job-read-postflight.json'
 const pool = new Pool({ connectionString, max: 4, connectionTimeoutMillis: 5_000 })
-const store = createPostgresW10ExecutionJobReadStore(pool)
+const store = createPostgresW10T16MembershipRenewalJobReadStore(pool)
 let runtimePassed = false
 const checks = {
   operationIdLookupPreserved: false,
@@ -35,7 +35,7 @@ const checks = {
   stableUpdatedAtOperationIdOrdering: false,
   keysetCursorPreservesMicroseconds: false,
   nextPageHasNoDuplicates: false,
-  safeProjectionExcludesActorSubjectIds: true,
+  safeProjectionExcludesActorSubjectIds: false,
   cleanupVerified: false,
 }
 
@@ -161,11 +161,11 @@ try {
   assert.equal(byOperation?.owner_task_id, 'T16')
   assert.equal(Object.hasOwn(byOperation ?? {}, 'actor_id'), false)
   assert.equal(Object.hasOwn(byOperation ?? {}, 'subject_id'), false)
+  checks.safeProjectionExcludesActorSubjectIds =
+    !Object.hasOwn(byOperation ?? {}, 'actor_id') && !Object.hasOwn(byOperation ?? {}, 'subject_id')
   checks.operationIdLookupPreserved = byOperation?.operation_id === opZ
 
   const firstPage = await store.list({
-    ownerWorker: 'W07',
-    ownerTaskId: 'T16',
     states: ['RUNNING', 'SUCCEEDED'],
     limit: 3,
   })
@@ -179,8 +179,6 @@ try {
   const last = firstPage.at(-1)
   assert.ok(last)
   const secondPage = await store.list({
-    ownerWorker: 'W07',
-    ownerTaskId: 'T16',
     states: ['RUNNING', 'SUCCEEDED'],
     cursor: { updatedAt: last.updated_at, operationId: last.operation_id },
     limit: 3,
