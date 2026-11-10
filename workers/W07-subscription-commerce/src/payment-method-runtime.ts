@@ -10,13 +10,15 @@ import {
 } from './hyperswitch-client.js';
 import {
   createPaymentMethodRevocationRequest,
-  getSavedPaymentMethodMandates,
-  listSavedPaymentMethodRecords,
   markPaymentMethodProviderDeleted,
   PaymentMethodPersistenceError,
   type PaymentMethodRevocationRequest,
   type SavedPaymentMethodRecord,
 } from './payment-method-persistence.js';
+import {
+  createD1PaymentMethodReadStore,
+  type PaymentMethodReadStore,
+} from './payment-method-read-store.js';
 
 export type PaymentMethodRuntimeEnv = Readonly<{
   D1_04: D1Database;
@@ -108,11 +110,12 @@ function toSavedPaymentMethodDto(
 export async function listOwnedSavedPaymentMethods(
   env: PaymentMethodRuntimeEnv,
   customerId: string,
+  readStore: PaymentMethodReadStore = createD1PaymentMethodReadStore(env.D1_04),
 ): Promise<readonly SavedPaymentMethodDto[]> {
   const config = resolveHyperswitchConfig(env);
   let local: readonly SavedPaymentMethodRecord[];
   try {
-    local = await listSavedPaymentMethodRecords(env.D1_04, customerId, String(config.expectedMerchantId));
+    local = await readStore.listSavedPaymentMethodRecords(customerId, String(config.expectedMerchantId));
   } catch (error) {
     if (error instanceof PaymentMethodPersistenceError) throw mapPersistenceError(error);
     throw new PaymentMethodRuntimeError('SERVICE_UNAVAILABLE', 503);
@@ -175,6 +178,7 @@ export async function revokeOwnedSavedPaymentMethod(
   customerId: string,
   savedPaymentMethodId: string,
   idempotencyKey: string | null,
+  readStore: PaymentMethodReadStore = createD1PaymentMethodReadStore(env.D1_04),
 ): Promise<Readonly<{ savedPaymentMethodId: string; status: 'REVOCATION_PENDING' | 'REMOVED'; replayed: boolean }>> {
   const config = resolveHyperswitchConfig(env);
   const key = idempotencyKey?.trim() ?? '';
@@ -210,8 +214,8 @@ export async function revokeOwnedSavedPaymentMethod(
 
   let mandates: Awaited<ReturnType<typeof getSavedPaymentMethodMandates>>;
   try {
-    mandates = await getSavedPaymentMethodMandates(
-      env.D1_04, customerId, String(config.expectedMerchantId), savedPaymentMethodId,
+    mandates = await readStore.getSavedPaymentMethodMandates(
+      customerId, String(config.expectedMerchantId), savedPaymentMethodId,
     );
   } catch (error) {
     if (error instanceof PaymentMethodPersistenceError) throw mapPersistenceError(error);
