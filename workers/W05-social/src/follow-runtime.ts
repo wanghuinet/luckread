@@ -1,14 +1,15 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import {
+  createD1FollowStore,
+  FollowStoreError,
+  type FollowStore,
+} from './follow-store.js'
+import type { FollowRow } from './follow-store.js'
+export type { FollowRow } from './follow-store.js'
+
 export class FollowRuntimeError extends Error {
   constructor(readonly code: string, readonly status: number) { super(code) }
-}
-
-type FollowRow = {
-  relationship_id: string
-  follower_user_id: string
-  target_user_id: string
-  created_at: string
 }
 
 export type FollowListDirection = 'followers' | 'following'
@@ -315,96 +316,65 @@ export async function listFollowingAuthorIds(
   }
 }
 
-export async function follow(db: D1Database, followerUserId: string, targetUserId: string): Promise<FollowRow> {
+type FollowDataSource = D1Database | FollowStore
+
+function resolveFollowStore(source: FollowDataSource): FollowStore {
+  if (
+    typeof (source as FollowStore).follow === 'function' &&
+    typeof (source as FollowStore).unfollow === 'function'
+  ) {
+    return source as FollowStore
+  }
+  return createD1FollowStore(source as D1Database)
+}
+
+function mapFollowStoreError(error: unknown): never {
+  if (error instanceof FollowStoreError) {
+    throw new FollowRuntimeError(error.code, error.status)
+  }
+  throw error
+}
+
+export async function follow(
+  source: FollowDataSource,
+  followerUserId: string,
+  targetUserId: string,
+): Promise<FollowRow> {
   const follower = userId(followerUserId)
   const target = userId(targetUserId)
   if (follower === target) throw new FollowRuntimeError('CONFLICT', 409)
 
-  const state = await db.prepare(
-    `SELECT
-       EXISTS (
-         SELECT 1
-         FROM social_user_interactions
-         WHERE relation_type = 'block'
-           AND (
-             (actor_user_id = ? AND target_user_id = ?)
-             OR
-             (actor_user_id = ? AND target_user_id = ?)
-           )
-       ) AS blocked,
-       r.relationship_id,
-       r.follower_user_id,
-       r.target_user_id,
-       r.created_at
-       FROM (SELECT 1) AS seed
-       LEFT JOIN social_follow_relationships AS r
-         ON r.follower_user_id = ? AND r.target_user_id = ?
-       LIMIT 1`,
-  ).bind(follower, target, target, follower, follower, target).first<{
-    blocked: number
-    relationship_id?: string
-    follower_user_id?: string
-    target_user_id?: string
-    created_at?: string
-  }>()
-
-  if (Number(state?.blocked ?? 0) === 1) {
-    throw new FollowRuntimeError('CONFLICT', 409)
+  let row: FollowRow | null
+  try {
+    row = await resolveFollowStore(source).follow({
+      followerUserId: follower,
+      targetUserId: target,
+      relationshipId: crypto.randomUUID(),
+      createdAt: new Date().toISOString(),
+    })
+  } catch (error) {
+    mapFollowStoreError(error)
   }
-
-  if (
-    state?.relationship_id &&
-    state.follower_user_id &&
-    state.target_user_id &&
-    state.created_at
-  ) {
-    return {
-      relationship_id: state.relationship_id,
-      follower_user_id: state.follower_user_id,
-      target_user_id: state.target_user_id,
-      created_at: state.created_at,
-    }
-  }
-
-  const relationshipId = crypto.randomUUID()
-  const createdAt = new Date().toISOString()
-  const row = await db.prepare(
-    `INSERT INTO social_follow_relationships
-      (relationship_id, follower_user_id, target_user_id, created_at)
-     SELECT ?, ?, ?, ?
-      WHERE NOT EXISTS (
-        SELECT 1
-        FROM social_user_interactions block
-        WHERE block.relation_type = 'block'
-          AND (
-            (block.actor_user_id = ? AND block.target_user_id = ?)
-            OR
-            (block.actor_user_id = ? AND block.target_user_id = ?)
-          )
-      )
-     ON CONFLICT(follower_user_id, target_user_id)
-     DO UPDATE SET relationship_id = social_follow_relationships.relationship_id
-     RETURNING relationship_id, follower_user_id, target_user_id, created_at`,
-  ).bind(
-    relationshipId,
-    follower,
-    target,
-    createdAt,
-    follower,
-    target,
-    target,
-    follower,
-  ).first<FollowRow>()
 
   if (!row) throw new FollowRuntimeError('CONFLICT', 409)
   await invalidateFollowListCountCache(follower, target)
   return row
 }
 
-export async function unfollow(db: D1Database, followerUserId: string, targetUserId: string): Promise<void> {
-  const follower=userId(followerUserId), target=userId(targetUserId)
-  if (follower===target) throw new FollowRuntimeError('CONFLICT',409)
-  await db.prepare('DELETE FROM social_follow_relationships WHERE follower_user_id = ? AND target_user_id = ?').bind(follower,target).run()
+export async function unfollow(
+  source: FollowDataSource,
+  followerUserId: string,
+  targetUserId: string,
+): Promise<void> {
+  const follower = userId(followerUserId)
+  const target = userId(targetUserId)
+  if (follower === target) throw new FollowRuntimeError('CONFLICT', 409)
+
+  try {
+    await resolveFollowStore(source).unfollow(follower, target)
+  } catch (error) {
+    mapFollowStoreError(error)
+  }
   await invalidateFollowListCountCache(follower, target)
 }
 
