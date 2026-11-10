@@ -111,12 +111,13 @@ describe('W03 content contract core', () => {
     expect(query).toContain('cover_ref IN (')
     expect(query).toContain('json_each(contents.media_refs_json)')
     expect(query).toContain('media_ref.value IN (')
-    const candidatesPerColumn = (query.match(/\?/g) ?? []).length / 3
+    const candidatesPerColumn = ((query.match(/\?/g) ?? []).length - 1) / 3
     expect(candidatesPerColumn).toBe(1)
-    expect(bindings.length).toBe(candidatesPerColumn * 3)
+    expect(bindings.length).toBe(candidatesPerColumn * 3 + 1)
     expect(bindings[0]).toBe(publicUrl)
     expect(bindings[candidatesPerColumn]).toBe(publicUrl)
     expect(bindings[candidatesPerColumn * 2]).toBe(publicUrl)
+    expect(bindings.at(-1)).toBe(51)
     expect(bindings).not.toContain(historicalUrl)
     expect(w07Calls).toBe(0)
 
