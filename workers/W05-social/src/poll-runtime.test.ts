@@ -299,6 +299,83 @@ describe('W05 poll runtime', () => {
     expect(queries.some(sql => /(?:FROM|JOIN)\s+contents/i.test(sql))).toBe(false)
   })
 
+  it('deletes an unvoted draft poll through the storage boundary', async () => {
+    const context = {
+      contentId: 'content-1',
+      ownerUserId: 'author-1',
+      contentType: 'post',
+      state: 'DRAFT',
+      updatedAt: '2026-10-17T04:00:00.000Z',
+    } as const
+    const store = {
+      getPoll: vi.fn(async () => ({
+        poll_id: 'poll-1',
+        content_id: 'content-1',
+        owner_user_id: 'author-1',
+      })),
+      countVotes: vi.fn(async () => 0),
+      deleteDraftPoll: vi.fn(async () => true),
+    }
+
+    await expect(deleteContentPoll(noDatabase(), 'author-1', 'content-1', context, store))
+      .resolves.toBeUndefined()
+    expect(store.getPoll).toHaveBeenCalledWith('content-1')
+    expect(store.countVotes).toHaveBeenCalledWith('poll-1')
+    expect(store.deleteDraftPoll).toHaveBeenCalledWith({
+      pollId: 'poll-1',
+      actorUserId: 'author-1',
+      contentId: 'content-1',
+    })
+  })
+
+  it('does not delete a draft poll after a vote exists', async () => {
+    const context = {
+      contentId: 'content-1',
+      ownerUserId: 'author-1',
+      contentType: 'post',
+      state: 'DRAFT',
+      updatedAt: '2026-10-17T04:00:00.000Z',
+    } as const
+    const store = {
+      getPoll: vi.fn(async () => ({
+        poll_id: 'poll-1',
+        content_id: 'content-1',
+        owner_user_id: 'author-1',
+      })),
+      countVotes: vi.fn(async () => 1),
+      deleteDraftPoll: vi.fn(async () => true),
+    }
+
+    await expect(deleteContentPoll(noDatabase(), 'author-1', 'content-1', context, store))
+      .rejects.toMatchObject({ code: 'CONFLICT', status: 409 })
+    expect(store.deleteDraftPoll).not.toHaveBeenCalled()
+  })
+
+  it('treats a concurrent poll deletion as idempotent success', async () => {
+    const context = {
+      contentId: 'content-1',
+      ownerUserId: 'author-1',
+      contentType: 'post',
+      state: 'DRAFT',
+      updatedAt: '2026-10-17T04:00:00.000Z',
+    } as const
+    const store = {
+      getPoll: vi.fn()
+        .mockResolvedValueOnce({
+          poll_id: 'poll-1',
+          content_id: 'content-1',
+          owner_user_id: 'author-1',
+        })
+        .mockResolvedValueOnce(null),
+      countVotes: vi.fn(async () => 0),
+      deleteDraftPoll: vi.fn(async () => false),
+    }
+
+    await expect(deleteContentPoll(noDatabase(), 'author-1', 'content-1', context, store))
+      .resolves.toBeUndefined()
+    expect(store.getPoll).toHaveBeenCalledTimes(2)
+  })
+
   it('prevents voting on a closed poll', async () => {
     const { db } = pollDb({
       content: {
