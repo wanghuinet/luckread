@@ -102,8 +102,12 @@ try {
   await expectNotFound(getContentPoll(unusedD1, contentId, viewer, publishedContext, store))
   blockFailsClosed = true
 
-  // Owners retain access to their own poll without an unnecessary Block lookup.
-  const ownerRead = await getContentPoll(unusedD1, contentId, owner, publishedContext, store)
+  // Owners retain access to their own poll without invoking the Block store.
+  const ownerStore = {
+    ...store,
+    async isBlocked() { throw new Error('Owner poll read must skip Block lookup') },
+  }
+  const ownerRead = await getContentPoll(unusedD1, contentId, owner, publishedContext, ownerStore)
   assert.equal(ownerRead?.pollId, pollId)
   ownerBlockLookupSkipped = true
 } finally {
