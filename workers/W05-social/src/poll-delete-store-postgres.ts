@@ -15,16 +15,16 @@ export interface PollDeletePostgresQueryExecutor {
   ): Promise<QueryResult<Row>>
 }
 
-const getPollSql = \`SELECT poll_id, content_id, owner_user_id
+const getPollSql = `SELECT poll_id, content_id, owner_user_id
   FROM social_polls
  WHERE content_id = $1
- LIMIT 1\`
+ LIMIT 1`
 
-const countVotesSql = \`SELECT COUNT(*) AS count
+const countVotesSql = `SELECT COUNT(*) AS count
   FROM social_poll_votes
- WHERE poll_id = $1\`
+ WHERE poll_id = $1`
 
-const deleteDraftPollSql = \`WITH eligible_poll AS MATERIALIZED (
+const deleteDraftPollSql = `WITH eligible_poll AS MATERIALIZED (
     SELECT poll_id
       FROM social_polls
      WHERE poll_id = $1
@@ -49,7 +49,7 @@ const deleteDraftPollSql = \`WITH eligible_poll AS MATERIALIZED (
      WHERE p.poll_id = e.poll_id
      RETURNING p.poll_id
   )
-  SELECT EXISTS (SELECT 1 FROM deleted_poll) AS deleted\`
+  SELECT EXISTS (SELECT 1 FROM deleted_poll) AS deleted`
 
 export function createPostgresPollDeleteStore(db: PollDeletePostgresQueryExecutor): PollDeleteStore {
   return {
