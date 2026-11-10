@@ -1,9 +1,32 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import { fetchPublishedContentSocialContexts, type W03ContentBinding } from './w03-content-context-client.js'
+import {
+  createD1ProfileChannelReadStore,
+  ProfileChannelReadStoreError,
+  type ProfileChannelReadStore,
+} from './profile-channel-read-store.js'
 
 export class ProfileChannelRuntimeError extends Error {
   constructor(readonly code: string, readonly status: number) { super(code) }
+}
+
+type ProfileChannelDataSource = D1Database | ProfileChannelReadStore
+
+function resolveProfileChannelReadStore(source: ProfileChannelDataSource): ProfileChannelReadStore {
+  if (
+    typeof (source as ProfileChannelReadStore).profileVisibility === 'function' &&
+    typeof (source as ProfileChannelReadStore).listReplies === 'function' &&
+    typeof (source as ProfileChannelReadStore).listLikedContents === 'function'
+  ) return source as ProfileChannelReadStore
+  return createD1ProfileChannelReadStore(source as D1Database)
+}
+
+function mapProfileChannelReadError(error: unknown): never {
+  if (error instanceof ProfileChannelReadStoreError) {
+    throw new ProfileChannelRuntimeError(error.code, error.status)
+  }
+  throw error
 }
 
 type Cursor = {
@@ -87,7 +110,7 @@ export type ProfileReplyPage = {
 }
 
 export async function listProfileReplies(
-  db: D1Database,
+  source: ProfileChannelDataSource,
   w03Content: W03ContentBinding | undefined,
   profileUserIdValue: string,
   cursorValue: string | null,
@@ -98,58 +121,25 @@ export async function listProfileReplies(
   const profileUserId = validateId(profileUserIdValue)
   const viewerUserId = viewerUserIdValue ? validateId(viewerUserIdValue) : null
   const cursor = decodeCursor(cursorValue, 'replies', profileUserId, viewerUserId)
+  const store = resolveProfileChannelReadStore(source)
   if (!Number.isInteger(limit) || limit < 1 || limit > 50) {
     throw new ProfileChannelRuntimeError('VALIDATION_FAILED', 400)
   }
   if (!correlationId.trim()) throw new ProfileChannelRuntimeError('VALIDATION_FAILED', 400)
 
   if (viewerUserId) {
-    const policy = await db.prepare(
-      `SELECT
-         EXISTS (
-           SELECT 1 FROM social_user_interactions block
-            WHERE block.relation_type = 'block'
-              AND ((block.actor_user_id = ? AND block.target_user_id = ?)
-                OR (block.actor_user_id = ? AND block.target_user_id = ?))
-         ) AS blocked,
-         EXISTS (
-           SELECT 1 FROM social_user_interactions mute
-            WHERE mute.relation_type = 'mute'
-              AND mute.actor_user_id = ? AND mute.target_user_id = ?
-         ) AS muted`,
-    ).bind(viewerUserId, profileUserId, profileUserId, viewerUserId, viewerUserId, profileUserId)
-      .first<{ blocked: number; muted: number }>()
-    if (Number(policy?.blocked ?? 0) === 1 || Number(policy?.muted ?? 0) === 1) {
+    const policy = await store.profileVisibility({ profileUserId, viewerUserId })
+      .catch(mapProfileChannelReadError)
+    if (policy.blocked || policy.muted) {
       return { items: [], nextCursor: null, hasMore: false }
     }
   }
 
-  const params: unknown[] = [profileUserId]
-  const cursorSql = cursor ? ' AND (c.created_at < ? OR (c.created_at = ? AND c.id < ?))' : ''
-  if (cursor) params.push(cursor.createdAt, cursor.createdAt, cursor.tieBreaker)
-  params.push(limit + 1)
-
-  const result = await db.prepare(
-    `SELECT c.id, c.content_id, c.author_user_id, c.parent_id, c.body, c.state, c.depth, c.created_at, c.updated_at
-       FROM social_comments c
-      WHERE c.author_user_id = ?
-        AND c.state = 'PUBLISHED'
-        ${cursorSql}
-      ORDER BY c.created_at DESC, c.id DESC
-      LIMIT ?`,
-  ).bind(...params).all<{
-    id: string
-    content_id: string
-    author_user_id: string
-    parent_id: string | null
-    body: string
-    state: 'PUBLISHED'
-    depth: number
-    created_at: string
-    updated_at: string
-  }>()
-
-  const candidates = result.results ?? []
+  const candidates = await store.listReplies({
+    profileUserId,
+    cursor: cursor ? { createdAt: cursor.createdAt, tieBreaker: cursor.tieBreaker } : null,
+    limit: limit + 1,
+  }).catch(mapProfileChannelReadError)
   const hasMore = candidates.length > limit
   const scanned = hasMore ? candidates.slice(0, limit) : candidates
   const contentIds = [...new Set(scanned.map(row => row.content_id))]
@@ -161,21 +151,10 @@ export async function listProfileReplies(
   )]
 
   const blockedOwners = new Set<string>()
-  if (ownerIds.length > 0) {
-    const placeholders = ownerIds.map(() => '?').join(', ')
-    const blockedRows = await db.prepare(
-      `SELECT actor_user_id, target_user_id
-         FROM social_user_interactions
-        WHERE relation_type = 'block'
-          AND (
-            (actor_user_id = ? AND target_user_id IN (${placeholders}))
-            OR (target_user_id = ? AND actor_user_id IN (${placeholders}))
-          )`,
-    ).bind(profileUserId, ...ownerIds, profileUserId, ...ownerIds)
-      .all<{ actor_user_id: string; target_user_id: string }>()
-    for (const row of blockedRows.results ?? []) {
-      blockedOwners.add(row.actor_user_id === profileUserId ? row.target_user_id : row.actor_user_id)
-    }
+  const blockedRows = await store.listReplyOwnerBlockRelations({ profileUserId, ownerUserIds: ownerIds })
+    .catch(mapProfileChannelReadError)
+  for (const row of blockedRows) {
+    blockedOwners.add(row.actor_user_id === profileUserId ? row.target_user_id : row.actor_user_id)
   }
 
   const visible = scanned.filter(row => {
@@ -220,7 +199,7 @@ export type ProfileLikedContentPage = {
 }
 
 export async function listProfileLikedContents(
-  db: D1Database,
+  source: ProfileChannelDataSource,
   w03Content: W03ContentBinding | undefined,
   profileUserIdValue: string,
   cursorValue: string | null,
@@ -231,51 +210,20 @@ export async function listProfileLikedContents(
   const profileUserId = validateId(profileUserIdValue)
   const viewerUserId = viewerUserIdValue ? validateId(viewerUserIdValue) : null
   const cursor = decodeCursor(cursorValue, 'likes', profileUserId, viewerUserId)
+  const store = resolveProfileChannelReadStore(source)
   if (!Number.isInteger(limit) || limit < 1 || limit > 50) {
     throw new ProfileChannelRuntimeError('VALIDATION_FAILED', 400)
   }
   if (!correlationId.trim()) throw new ProfileChannelRuntimeError('VALIDATION_FAILED', 400)
 
-  const params: unknown[] = [profileUserId]
-  let viewerVisibility = ''
-  if (viewerUserId) {
-    viewerVisibility = `
-    AND NOT EXISTS (
-      SELECT 1 FROM social_user_interactions block_profile
-       WHERE block_profile.relation_type = 'block'
-         AND ((block_profile.actor_user_id = ? AND block_profile.target_user_id = il.actor_user_id)
-           OR (block_profile.actor_user_id = il.actor_user_id AND block_profile.target_user_id = ?))
-    )
-    AND NOT EXISTS (
-      SELECT 1 FROM social_user_interactions mute_profile
-       WHERE mute_profile.relation_type = 'mute'
-         AND mute_profile.actor_user_id = ? AND mute_profile.target_user_id = il.actor_user_id
-    )`
-    params.push(viewerUserId, viewerUserId, viewerUserId)
-  }
-
-  const cursorSql = cursor ? ' AND (il.created_at < ? OR (il.created_at = ? AND il.relationship_id < ?))' : ''
-  if (cursor) params.push(cursor.createdAt, cursor.createdAt, cursor.tieBreaker)
-  params.push(limit + 1)
-
   // W05 first pages through its own like relationships only. Canonical
   // publication and owner context are validated in one bounded W03 call.
-  const result = await db.prepare(`
-    SELECT il.relationship_id, il.target_id, il.created_at
-      FROM interaction_likes il
-     WHERE il.actor_user_id = ?
-       AND il.target_type = 'content'
-       ${viewerVisibility}
-       ${cursorSql}
-     ORDER BY il.created_at DESC, il.relationship_id DESC
-     LIMIT ?
-  `).bind(...params).all<{
-    relationship_id: string
-    target_id: string
-    created_at: string
-  }>()
-
-  const candidates = result.results ?? []
+  const candidates = await store.listLikedContents({
+    profileUserId,
+    viewerUserId,
+    cursor: cursor ? { createdAt: cursor.createdAt, tieBreaker: cursor.tieBreaker } : null,
+    limit: limit + 1,
+  }).catch(mapProfileChannelReadError)
   const hasMore = candidates.length > limit
   const scanned = hasMore ? candidates.slice(0, limit) : candidates
   const contentIds = [...new Set(scanned.map(row => row.target_id))]
@@ -290,24 +238,12 @@ export async function listProfileLikedContents(
   const blockedOwners = new Set<string>()
   const mutedOwners = new Set<string>()
   if (ownerIds.length > 0) {
-    const ownerPlaceholders = ownerIds.map(() => '?').join(', ')
-    const principalPlaceholders = [...blockedPrincipals].map(() => '?').join(', ')
-    const blockRows = await db.prepare(`
-      SELECT actor_user_id, target_user_id
-        FROM social_user_interactions
-       WHERE relation_type = 'block'
-         AND (
-           (actor_user_id IN (${principalPlaceholders}) AND target_user_id IN (${ownerPlaceholders}))
-           OR
-           (target_user_id IN (${principalPlaceholders}) AND actor_user_id IN (${ownerPlaceholders}))
-         )
-    `).bind(
-      ...blockedPrincipals, ...ownerIds,
-      ...blockedPrincipals, ...ownerIds,
-    ).all<{ actor_user_id: string; target_user_id: string }>()
-
     const ownerSet = new Set(ownerIds)
-    for (const row of blockRows.results ?? []) {
+    const blockRows = await store.listLikedContentBlockRelations({
+      principalUserIds: [...blockedPrincipals],
+      ownerUserIds: ownerIds,
+    }).catch(mapProfileChannelReadError)
+    for (const row of blockRows) {
       if (blockedPrincipals.has(row.actor_user_id) && ownerSet.has(row.target_user_id)) {
         blockedOwners.add(row.target_user_id)
       }
@@ -317,14 +253,9 @@ export async function listProfileLikedContents(
     }
 
     if (viewerUserId) {
-      const muteRows = await db.prepare(`
-        SELECT target_user_id
-          FROM social_user_interactions
-         WHERE relation_type = 'mute'
-           AND actor_user_id = ?
-           AND target_user_id IN (${ownerPlaceholders})
-      `).bind(viewerUserId, ...ownerIds).all<{ target_user_id: string }>()
-      for (const row of muteRows.results ?? []) mutedOwners.add(row.target_user_id)
+      const muteRows = await store.listMutedOwners({ viewerUserId, ownerUserIds: ownerIds })
+        .catch(mapProfileChannelReadError)
+      for (const row of muteRows) mutedOwners.add(row.target_user_id)
     }
   }
 
