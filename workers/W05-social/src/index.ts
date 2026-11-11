@@ -50,6 +50,7 @@ import {
   unfollow,
 } from './follow-runtime.js'
 import type { FollowListReadStore } from './follow-list-read-store.js'
+import type { FollowingAuthorIdsReadStore } from './following-author-ids-read-store.js'
 import type { CommentListReadStore } from './comment-list-read-store.js'
 
 type RateLimitBinding = { limit(input: { key: string }): Promise<{ success: boolean }> }
@@ -252,6 +253,8 @@ const parseProfileChannelPath = (pathname: string): { userId: string; kind: 'rep
 export type W05SocialWorkerDependencies = Readonly<{
   /** Optional internal adapter injection; D1 remains the deployed default. */
   followListReadStore?: FollowListReadStore
+  /** Optional PostgreSQL-capable Following-feed author reader; D1 remains the deployed default. */
+  followingAuthorIdsReadStore?: FollowingAuthorIdsReadStore
   /** Optional PostgreSQL-capable comment page reader; D1 remains the deployed default. */
   commentListReadStore?: CommentListReadStore
   /** Optional PostgreSQL-capable Block/Mute list reader; D1 remains the deployed default. */
@@ -1053,7 +1056,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
           throw new FollowRuntimeError('VALIDATION_FAILED', 400)
         }
         const viewerUserId = requireFollowingFeedPrincipal(request)
-        const candidates = await listFollowingAuthorIds(env.DB, viewerUserId)
+        const candidates = await listFollowingAuthorIds(dependencies.followingAuthorIdsReadStore ?? env.DB, viewerUserId)
         return json({ data: candidates, requestId: createRequestId() })
       }
 
