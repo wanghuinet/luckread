@@ -181,7 +181,8 @@ export function buildCommentListReadQuery(
     : 'c.thread_created_at'
   const limitParameter = parameter(input.limit + 1)
 
-  const sql = `WITH RECURSIVE viewer AS (SELECT ${viewerParameter} AS user_id), public_comments AS (
+  const viewerSelect = dialect === 'postgres' ? `${viewerParameter}::text` : viewerParameter
+  const sql = `WITH RECURSIVE viewer AS (SELECT ${viewerSelect} AS user_id), public_comments AS (
        SELECT
          c.id,
          c.content_id,
