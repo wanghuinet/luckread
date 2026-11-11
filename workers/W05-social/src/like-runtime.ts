@@ -321,7 +321,7 @@ export async function getLikeStatus(
 
   // Validate target visibility and block relationships before consulting caches.
   const targetContext = await resolveLikeTargetContext(
-    db,
+    targetContextReadStore,
     w03Content,
     targetType,
     targetId,
@@ -335,7 +335,7 @@ export async function getLikeStatus(
     ])
     return { liked: false, likeCount: 0 }
   }
-  await assertTargetNotBlocked(db, actor, targetContext.relatedUserIds)
+  await assertTargetNotBlocked(targetContextReadStore, actor, targetContext.relatedUserIds)
 
   const [cachedLiked, cachedCount] = await Promise.all([
     readCachedLikeViewerState(actor, targetType, targetId),
