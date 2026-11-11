@@ -217,7 +217,12 @@ async function recordPushTicket(
     })
     return updated ? 'sent' : 'stale'
   }
-  const errorCode = ticket.status === 'error' ? String(ticket.details?.error ?? 'EXPO_TICKET_ERROR') :export async function claimDueReceipts(
+  const errorCode = ticket.status === 'error' ? String(ticket.details?.error ?? 'EXPO_TICKET_ERROR') : 'EXPO_TICKET_INVALID'
+  if (errorCode === 'DeviceNotRegistered') await deactivateInvalidEndpoint(endpointDb, task, now)
+  return scheduleDeliveryRetry(store, task, now, errorCode)
+}
+
+export async function claimDueReceipts(
   store: NotificationPushReceiptStore,
   now: Date,
 ): Promise<ClaimedReceipt[]> {
@@ -305,14 +310,6 @@ async function applyReceipt(
   return canRetry ? 'retried' : 'failed'
 }
 
-ySeconds(task.attemptCount)) : now.toISOString(),
-    errorCode,
-    now.toISOString(),
-    task.deliveryId,
-    task.leaseToken,
-  ).run()
-  return canRetry ? 'retried' : 'failed'
-}
 
 async function processSendBatch(
   store: NotificationPushSendResultStore, endpointDb: D1Database, client: Expo,
