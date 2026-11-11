@@ -11,6 +11,12 @@ on:
       - 'contracts/transport/W05-W09-notification-push-delivery.v1.json'
       - 'workers/W05-social/src/follow-runtime.ts'
       - 'workers/W05-social/src/social-closure-runtime.ts'
+      - 'workers/W05-social/src/notification-enqueue-store.ts'
+      - 'workers/W05-social/src/notification-enqueue-store-postgres.ts'
+      - 'workers/W05-social/src/notification-enqueue-store.test.ts'
+      - 'workers/W05-social/src/notification-enqueue-store-postgres.test.ts'
+      - 'workers/W05-social/src/notification-enqueue-runtime.test.ts'
+      - 'workers/W05-social/scripts/neon/rehearse-notification-enqueue-postgres-runtime.mjs'
       - 'workers/W05-social/src/social-closure-runtime.test.ts'
       - 'workers/W05-social/src/social-closure-read-store.ts'
       - 'workers/W05-social/src/social-closure-read-store-postgres.ts'
@@ -171,6 +177,7 @@ jobs:
           node --check workers/W05-social/scripts/neon/rehearse-profile-channel-postgres-runtime.mjs
           node --check workers/W05-social/scripts/neon/rehearse-social-targets-read-postgres-runtime.mjs
           node --check workers/W05-social/scripts/neon/rehearse-social-closure-read-postgres-runtime.mjs
+          node --check workers/W05-social/scripts/neon/rehearse-notification-enqueue-postgres-runtime.mjs
           node --check workers/W05-social/scripts/neon/rehearse-favorite-list-postgres-runtime.mjs
           node --check workers/W05-social/scripts/neon/rehearse-like-status-postgres-runtime.mjs
           node --check workers/W05-social/scripts/neon/rehearse-like-mutation-postgres-runtime.mjs
@@ -309,6 +316,13 @@ jobs:
           W05_SOCIAL_CLOSURE_READ_POSTGRES_REPORT: ../../artifacts/neon/w05-social-closure-read-postgres-runtime-postflight.json
         run: node --import=tsx/esm ../../workers/W05-social/scripts/neon/rehearse-social-closure-read-postgres-runtime.mjs
 
+      - name: Rehearse W05 notification inbox enqueue and atomic outbox against PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          W05_NOTIFICATION_ENQUEUE_POSTGRES_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_w05_d1_02_schema
+          W05_NOTIFICATION_ENQUEUE_POSTGRES_REPORT: ../../artifacts/neon/w05-notification-enqueue-postgres-runtime-postflight.json
+        run: node --import=tsx/esm ../../workers/W05-social/scripts/neon/rehearse-notification-enqueue-postgres-runtime.mjs
+
       - name: Rehearse W05 notification preferences against PostgreSQL 18
         working-directory: workers/W02-identity
         env:
@@ -393,6 +407,7 @@ jobs:
             artifacts/neon/w05-like-mutation-postgres-runtime-postflight.json
             artifacts/neon/w05-social-targets-postgres-runtime-postflight.json
             artifacts/neon/w05-social-closure-read-postgres-runtime-postflight.json
+            artifacts/neon/w05-notification-enqueue-postgres-runtime-postflight.json
             artifacts/neon/w05-notification-preferences-postgres-runtime-postflight.json
             artifacts/neon/w05-publication-relations-postgres-runtime-postflight.json
             artifacts/neon/w05-reply-audience-postgres-runtime-postflight.json
