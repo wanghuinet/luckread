@@ -207,7 +207,7 @@ try {
     await assert.rejects(
       createCommerceOrder(
         store, customerId, 'retry-after-rollback', request, duplicatePricing,
-        dependencies('rollback', { duplicateLineIds: true }),
+        dependencies(marker + '-rollback', { duplicateLineIds: true }),
       ),
       (error) => error instanceof OrderPersistenceError &&
         error.code === 'CONFLICT' && error.status === 409,
@@ -216,7 +216,7 @@ try {
     assert.equal(await count('order_create_idempotency', customerId), 0)
     const partialLines = await pool.query(
       'SELECT count(*)::int AS count FROM order_lines WHERE order_id LIKE $1',
-      [marker + '_rollback_order_%'],
+      [marker + '-rollback_order_%'],
     )
     assert.equal(Number(partialLines.rows[0]?.count), 0)
     checks.lineFailureRollsBackClaimAndOrder = true
