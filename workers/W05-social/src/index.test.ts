@@ -7,6 +7,7 @@ import type { FollowListReadInput, FollowListReadRow, FollowListCountInput, Foll
 import type { BlockMuteListReadInput, BlockMuteListReadRow, BlockMuteListReadStore } from './block-mute-list-read-store.js'
 import type { ProfileChannelReadStore } from './profile-channel-read-store.js'
 import type { FollowingAuthorIdRow, FollowingAuthorIdsReadStore } from './following-author-ids-read-store.js'
+import type { ContentLikerReadInput, ContentLikerReadRow, ContentLikerReadStore } from './like-list-read-store.js'
 
 
 const dbFor = (results: unknown[] = []) => {
@@ -544,6 +545,42 @@ describe('W05 social query transport', () => {
     await expect(response.json()).resolves.toMatchObject({
       data: { items: [{ contentId: 'content-1', likedAt: '2026-10-15T10:00:00.000Z' }], hasMore: false, nextCursor: null },
     })
+  })
+
+  it('uses the injected PostgreSQL-capable content-liker store without touching D1', async () => {
+    const binding = publishedContextBinding()
+    const store: ContentLikerReadStore = {
+      list: vi.fn(async (_input: ContentLikerReadInput): Promise<readonly ContentLikerReadRow[]> => [{
+        relationship_id: 'pg-like-1',
+        actor_user_id: 'pg-liker-1',
+        created_at: '2026-11-11T09:00:00.000Z',
+      }]),
+    }
+    const d1Prepare = vi.fn()
+    const injectedWorker = createW05SocialWorker({ contentLikerReadStore: store })
+    const response = await injectedWorker.fetch(
+      request('/internal/social/content/content-1/likes?limit=6', transportHeaders),
+      { DB: { prepare: d1Prepare }, W03_CONTENT: binding } as never,
+      {} as never,
+    )
+
+    expect(response.status).toBe(200)
+    expect(binding.fetch).toHaveBeenCalledTimes(1)
+    expect(store.list).toHaveBeenCalledWith({
+      contentId: 'content-1',
+      contentOwnerUserId: 'owner-1',
+      viewerUserId: 'viewer-1',
+      cursor: null,
+      limit: 7,
+    })
+    await expect(response.json()).resolves.toMatchObject({
+      data: {
+        items: [{ userId: 'pg-liker-1', likedAt: '2026-11-11T09:00:00.000Z' }],
+        hasMore: false,
+        nextCursor: null,
+      },
+    })
+    expect(d1Prepare).not.toHaveBeenCalled()
   })
 
   it('serves a bounded list of users who liked a published content item through W03 visibility context', async () => {
