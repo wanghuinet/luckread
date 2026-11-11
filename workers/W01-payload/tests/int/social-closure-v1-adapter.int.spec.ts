@@ -209,10 +209,11 @@ describe('unified W05 social closure adapters', () => {
 
   it('supports persisted topics and mentions in W05', () => {
     const runtime = read('../../workers/W05-social/src/social-closure-runtime.ts')
+    const notificationEnqueueStore = read('../../workers/W05-social/src/notification-enqueue-store.ts')
     const migration = read('../../workers/W05-social/migrations/20261008_011_social_closure_v1.sql')
     expect(runtime).toContain('social_topics')
     expect(runtime).toContain('social_mentions')
-    expect(runtime).toContain('social_notifications')
+    expect(notificationEnqueueStore).toContain('social_notifications')
     expect(migration).toContain("target_type IN ('content','comment')")
     expect(migration).toContain('social_topics')
     expect(migration).toContain('social_mentions')
