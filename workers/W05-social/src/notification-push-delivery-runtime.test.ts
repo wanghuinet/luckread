@@ -11,9 +11,61 @@ import {
   claimDueReceipts,
 } from './notification-push-delivery-runtime.js'
 import type { NotificationPushDeliveryClaimStore } from './notification-push-delivery-claim-store.js'
+import type { NotificationPushFanoutStore } from './notification-push-fanout-store.js'
 import type { NotificationPushReceiptStore } from './notification-push-receipt-store.js'
 
 describe('W05 durable Expo push delivery runtime', () => {
+  it('uses the injected fan-out store while preserving the D1 fallback for other callers', async () => {
+    const fanoutStore: NotificationPushFanoutStore = {
+      listPending: vi.fn(async () => []),
+      markNoEndpoint: vi.fn(async () => undefined),
+      fanOut: vi.fn(async () => undefined),
+    }
+    const deliveryClaimStore = {
+      claimDue: vi.fn(async () => []),
+      cancel: vi.fn(async () => true),
+      savePushTokenHash: vi.fn(async () => true),
+    }
+    const sendResultStore = {
+      recordTicket: vi.fn(async () => true),
+      scheduleRetry: vi.fn(async () => true),
+    }
+    const receiptStore = {
+      claimDue: vi.fn(async () => []),
+      cancelMissingOutbox: vi.fn(async () => true),
+      deferReceipt: vi.fn(async () => true),
+      timeoutReceipt: vi.fn(async () => true),
+      acceptReceipt: vi.fn(async () => true),
+      failReceipt: vi.fn(async () => true),
+    }
+    const d1Prepare = vi.fn()
+    const endpointPrepare = vi.fn()
+    const env = {
+      PUSH_DELIVERY_ENABLED: 'true',
+      DB: { prepare: d1Prepare },
+      D1_03: { prepare: endpointPrepare },
+    } as unknown as Parameters<typeof runNotificationPushBatch>[0]
+
+    await expect(runNotificationPushBatch(env, new Date('2026-11-11T08:00:00.000Z'), {
+      fanoutStore,
+      deliveryClaimStore,
+      sendResultStore,
+      receiptStore,
+    })).resolves.toEqual({
+      status: 'COMPLETED',
+      fannedOut: 0,
+      sent: 0,
+      providerAccepted: 0,
+      retried: 0,
+      failed: 0,
+      skipped: 0,
+    })
+
+    expect(fanoutStore.listPending).toHaveBeenCalledWith(25)
+    expect(d1Prepare).not.toHaveBeenCalled()
+    expect(endpointPrepare).not.toHaveBeenCalled()
+  })
+
   it('keeps push execution disabled unless explicitly enabled', async () => {
     const prepare = vi.fn()
     const env = { PUSH_DELIVERY_ENABLED: 'false', DB: { prepare }, D1_03: { prepare } } as never

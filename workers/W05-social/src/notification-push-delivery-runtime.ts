@@ -1,6 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 import Expo, { type ExpoPushMessage, type ExpoPushReceipt, type ExpoPushTicket } from 'expo-server-sdk'
 import { fanOutPendingNotifications } from './notification-push-fanout-runtime.js'
+import type { NotificationPushFanoutStore } from './notification-push-fanout-store.js'
 import {
   createD1NotificationPushSendResultStore,
   type NotificationPushSendResultStore,
@@ -382,6 +383,8 @@ async function processReceiptBatch(
   return result
 }
 export type NotificationPushDeliveryRuntimeDependencies = Readonly<{
+  /** Inject the PostgreSQL-capable W05 outbox fan-out store; D1 remains the default. */
+  fanoutStore?: NotificationPushFanoutStore
   sendResultStore?: NotificationPushSendResultStore
   deliveryClaimStore?: NotificationPushDeliveryClaimStorePort
   receiptStore?: NotificationPushReceiptStore
@@ -397,7 +400,7 @@ export async function runNotificationPushBatch(
   }
   if (!env.DB || !env.D1_03) throw new Error('W05_PUSH_DELIVERY_D1_BINDING_MISSING')
 
-  const fannedOut = await fanOutPendingNotifications(env.DB, env.D1_03, now)
+  const fannedOut = await fanOutPendingNotifications(dependencies.fanoutStore ?? env.DB, env.D1_03, now)
   const deliveryClaimStore = dependencies.deliveryClaimStore ?? createD1NotificationPushDeliveryClaimStore(env.DB)
   const deliveries = await claimDueDeliveries(deliveryClaimStore, env.D1_03, now)
   const sendResultStore = dependencies.sendResultStore ?? createD1NotificationPushSendResultStore(env.DB)
