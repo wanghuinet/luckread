@@ -25,7 +25,7 @@ async function addNotification(id){
  VALUES($1,$2,$3,'MENTION','content',$4,$5,$6::timestamptz)`,
  [id,marker+'-recipient',marker+'-actor',marker+'-content',marker+'-dedupe-'+id,now])
 }
-async function addDelivery(id,status,attempt,polls,nextAt,lease=null,expires=null,ticket='ticket'){
+async function addDelivery(id,status,attempt,polls,nextAt,lease=null,expires=null,ticket=marker+'-ticket-'+id){
  await pool.query(`INSERT INTO social_notification_push_deliveries
  (delivery_id,notification_id,endpoint_id,status,attempt_count,receipt_poll_count,next_attempt_at,lease_token,lease_expires_at,expo_ticket_id,push_token_hash,created_at,updated_at)
  VALUES($1,$2,$3,$4,$5,$6,$7::timestamptz,$8,$9::timestamptz,$10,$11,$7::timestamptz,$7::timestamptz)`,
@@ -60,7 +60,7 @@ try{
  assert.ok(noReceipt)
  assert.equal(await store.deferReceipt({deliveryId:noReceipt.delivery_id,leaseToken:noReceipt.lease_token,nextAttemptAt:'2026-11-11T08:05:00.000Z',now}),true)
  const deferred=await pool.query('SELECT status,expo_ticket_id,last_error_code,lease_token FROM social_notification_push_deliveries WHERE delivery_id=$1',[expired])
- assert.deepEqual(deferred.rows[0],{status:'RECEIPT_PENDING',expo_ticket_id:'ticket',last_error_code:'RECEIPT_NOT_READY',lease_token:null})
+ assert.deepEqual(deferred.rows[0],{status:'RECEIPT_PENDING',expo_ticket_id:marker+'-ticket-'+expired,last_error_code:'RECEIPT_NOT_READY',lease_token:null})
  checks.notReadyDeferred=true
  const timeout=marker+'-timeout';await addNotification(marker+'-notification-'+timeout)
  await addDelivery(timeout,'RECEIPT_LEASED',6,24,now,marker+'-timeout-lease',leaseExpiresAt)
