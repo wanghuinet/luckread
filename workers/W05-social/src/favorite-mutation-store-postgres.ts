@@ -34,7 +34,7 @@ export function createPostgresFavoriteMutationStore(
 
   return {
     async create(input: FavoriteMutationCreateInput) {
-      const rows = await query<FavoriteMutationRow>(`
+      const rows = await query<FavoriteMutationRow & Record<string, unknown>>(`
         INSERT INTO interaction_favorites
           (relationship_id, actor_user_id, target_type, target_id, created_at)
         VALUES ($1, $2, 'content', $3, $4::timestamptz)
