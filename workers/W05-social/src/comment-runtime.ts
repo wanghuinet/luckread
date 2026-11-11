@@ -7,6 +7,7 @@ import {
   createD1CommentListReadStore,
   CommentListReadStoreError,
   type CommentListReadStore,
+  type CommentListReadRow,
 } from './comment-list-read-store.js'
 
 export class CommentRuntimeError extends Error {
@@ -505,7 +506,7 @@ export async function updateComment(
 }
 
 export async function listComments(
-  db: D1Database,
+  db: D1Database | CommentListReadStore,
   contentIdValue: string,
   cursorValue: string | null,
   limit: number,
@@ -524,7 +525,7 @@ export async function listComments(
   const store: CommentListReadStore = typeof (db as CommentListReadStore).list === 'function'
     ? db as CommentListReadStore
     : createD1CommentListReadStore(db as D1Database)
-  let rows
+  let rows: CommentListReadRow[]
   try {
     rows = await store.list({
       contentId,
