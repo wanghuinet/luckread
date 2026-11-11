@@ -91,7 +91,7 @@ function fakePool(options: {
       } else if (sql.includes('INSERT INTO order_lines')) {
         rows = [{ order_line_id: INPUT.lines[0]!.orderLineId }]
       }
-      return { rows: rows as Row[] }
+      return { rows: rows as unknown as Row[] }
     },
     release() { released += 1 },
   }
@@ -111,7 +111,7 @@ function fakePool(options: {
           response_json: INPUT.responseJson,
           created_at: INPUT.createdAt,
           expires_at: INPUT.expiresAt,
-        }] as Row[],
+        }] as unknown as Row[],
       }
     },
     async connect() {
