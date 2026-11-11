@@ -25,11 +25,11 @@ async function addNotification(id){
  VALUES($1,$2,$3,'MENTION','content',$4,$5,$6::timestamptz)`,
  [id,marker+'-recipient',marker+'-actor',marker+'-content',marker+'-dedupe-'+id,now])
 }
-async function addDelivery(id,status,attempt,polls,nextAt,lease=null,expires=null,ticket=marker+'-ticket-'+id){
+async function addDelivery(id,status,attempt,polls,nextAt,lease=null,expires=null,ticket=marker+'-ticket-'+id,createdAt=nextAt){
  await pool.query(`INSERT INTO social_notification_push_deliveries
  (delivery_id,notification_id,endpoint_id,status,attempt_count,receipt_poll_count,next_attempt_at,lease_token,lease_expires_at,expo_ticket_id,push_token_hash,created_at,updated_at)
- VALUES($1,$2,$3,$4,$5,$6,$7::timestamptz,$8,$9::timestamptz,$10,$11,$7::timestamptz,$7::timestamptz)`,
- [id,marker+'-notification-'+id,marker+'-endpoint-'+id,status,attempt,polls,nextAt,lease,expires,ticket,'a'.repeat(64)])
+ VALUES($1,$2,$3,$4,$5,$6,$7::timestamptz,$8,$9::timestamptz,$10,$11,$12::timestamptz,$7::timestamptz)`,
+ [id,marker+'-notification-'+id,marker+'-endpoint-'+id,status,attempt,polls,nextAt,lease,expires,ticket,'a'.repeat(64),createdAt])
 }
 try{
  const pending=marker+'-pending',expired=marker+'-expired',exhausted=marker+'-exhausted',missing=marker+'-missing'
@@ -37,7 +37,7 @@ try{
  await addDelivery(pending,'RECEIPT_PENDING',2,0,now)
  await addDelivery(expired,'RECEIPT_LEASED',2,2,'2026-11-11T07:00:00.000Z',marker+'-old','2026-11-11T07:59:00.000Z')
  await addDelivery(exhausted,'RECEIPT_LEASED',2,24,'2026-11-11T07:00:00.000Z',marker+'-max','2026-11-11T07:59:00.000Z')
- await addDelivery(missing,'RECEIPT_PENDING',1,0,now)
+ await addDelivery(missing,'RECEIPT_PENDING',1,0,now,null,null,marker+'-ticket-'+missing,'2026-11-11T08:00:01.000Z')
  const first=await store.claimDue({now,leaseExpiresAt,limit:2,maxReceiptPolls:24})
  assert.equal(first.length,2)
  assert.ok(first.some(x=>x.delivery_id===pending))
