@@ -1,5 +1,5 @@
 name: Provision Neon D1-01 Hyperdrive
-run-name: Provision D1-01 Hyperdrive @ \${{ github.sha }}
+run-name: Provision D1-01 Hyperdrive @ ${{ github.sha }}
 
 on:
   pull_request:
@@ -32,7 +32,7 @@ concurrency:
 
 jobs:
   validate:
-    if: \${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
+    if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
     name: Validate target guards and idempotent provisioning logic
     runs-on: ubuntu-latest
     steps:
@@ -48,7 +48,7 @@ jobs:
           node --test scripts/cloudflare/create-neon-hyperdrive.test.mjs
 
   provision:
-    if: \${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.confirm_target == 'CREATE_D1_01_NEON_HYPERDRIVE' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.confirm_target == 'CREATE_D1_01_NEON_HYPERDRIVE' }}
     name: Create or reuse Cloudflare Hyperdrive for Neon D1-01
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -56,16 +56,16 @@ jobs:
       - name: Guard exact main ref and explicit D1-01 confirmation
         shell: bash
         env:
-          CONFIRM_TARGET: \${{ inputs.confirm_target }}
+          CONFIRM_TARGET: ${{ inputs.confirm_target }}
         run: |
           set -euo pipefail
-          test "\${GITHUB_REF}" = "refs/heads/main"
-          test "\${CONFIRM_TARGET}" = "CREATE_D1_01_NEON_HYPERDRIVE"
+          test "${GITHUB_REF}" = "refs/heads/main"
+          test "${CONFIRM_TARGET}" = "CREATE_D1_01_NEON_HYPERDRIVE"
 
       - name: Checkout dispatched main commit
         uses: actions/checkout@v4
         with:
-          ref: \${{ github.sha }}
+          ref: ${{ github.sha }}
           fetch-depth: 1
 
       - uses: actions/setup-node@v4
@@ -76,20 +76,20 @@ jobs:
         id: provision
         env:
           GITHUB_ACTIONS: 'true'
-          GITHUB_EVENT_NAME: \${{ github.event_name }}
-          GITHUB_REF: \${{ github.ref }}
-          CONFIRM_TARGET: \${{ inputs.confirm_target }}
-          CF_ACCOUNT_ID: \${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CF_API_TOKEN: \${{ secrets.CLOUDFLARE_HYPERDRIVE_API_TOKEN }}
-          NEON_DATABASE_URL_LUCKREAD: \${{ secrets.NEON_DATABASE_URL_LUCKREAD }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          GITHUB_REF: ${{ github.ref }}
+          CONFIRM_TARGET: ${{ inputs.confirm_target }}
+          CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CF_API_TOKEN: ${{ secrets.CLOUDFLARE_HYPERDRIVE_API_TOKEN }}
+          NEON_DATABASE_URL_LUCKREAD: ${{ secrets.NEON_DATABASE_URL_LUCKREAD }}
         run: node scripts/cloudflare/create-neon-hyperdrive.mjs
 
       - name: Publish sanitized provisioning summary
         shell: bash
         env:
-          HYPERDRIVE_ID: \${{ steps.provision.outputs.hyperdrive_id }}
-          HYPERDRIVE_NAME: \${{ steps.provision.outputs.hyperdrive_name }}
-          HYPERDRIVE_CREATED: \${{ steps.provision.outputs.hyperdrive_created }}
+          HYPERDRIVE_ID: ${{ steps.provision.outputs.hyperdrive_id }}
+          HYPERDRIVE_NAME: ${{ steps.provision.outputs.hyperdrive_name }}
+          HYPERDRIVE_CREATED: ${{ steps.provision.outputs.hyperdrive_created }}
         run: |
           set -euo pipefail
           {
