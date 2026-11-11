@@ -5,6 +5,8 @@ import {
   createD1NotificationPushSendResultStore,
   type NotificationPushSendResultStore,
 } from './notification-push-send-result-store.js'
+import { createD1NotificationPushDeliveryClaimStore } from './notification-push-delivery-claim-store-d1.js'
+import type { NotificationPushDeliveryClaimStore as NotificationPushDeliveryClaimStorePort } from './notification-push-delivery-claim-store.js'
 
 type PushReceiptLike = ExpoPushReceipt
 type PushTicketLike = ExpoPushTicket
@@ -97,84 +99,70 @@ export function notificationPushMessage(task: Pick<ClaimedDelivery,
 }
 
 
-async function claimDueDeliveries(db: D1Database, endpointDb: D1Database, now: Date): Promise<ClaimedDelivery[]> {
+export async function claimDueDeliveries(
+  store: NotificationPushDeliveryClaimStorePort,
+  endpointDb: D1Database,
+  now: Date,
+): Promise<ClaimedDelivery[]> {
   const nowIso = now.toISOString()
-  await db.prepare(
-    "UPDATE social_notification_push_deliveries SET status = 'FAILED', lease_token = NULL, lease_expires_at = NULL, " +
-    "last_error_code = 'SEND_LEASE_EXPIRED_MAX_ATTEMPTS', updated_at = ? " +
-    "WHERE status = 'LEASED' AND lease_expires_at IS NOT NULL AND lease_expires_at <= ? AND attempt_count >= ?",
-  ).bind(nowIso, nowIso, MAX_SEND_ATTEMPTS).run()
-  const candidates = await db.prepare(
-    'SELECT delivery_id, notification_id, endpoint_id FROM social_notification_push_deliveries ' +
-    "WHERE ((status IN ('PENDING','RETRY') AND next_attempt_at <= ? AND attempt_count < ?) " +
-    "OR (status = 'LEASED' AND lease_expires_at IS NOT NULL AND lease_expires_at <= ? AND attempt_count < ?)) " +
-    'ORDER BY next_attempt_at ASC, created_at ASC LIMIT ?',
-  ).bind(nowIso, MAX_SEND_ATTEMPTS, nowIso, MAX_SEND_ATTEMPTS, DELIVERY_LIMIT).all<{ delivery_id: string; notification_id: string; endpoint_id: string }>()
+  const candidates = await store.claimDue({
+    now: nowIso,
+    leaseExpiresAt: isoAfter(now, LEASE_SECONDS),
+    limit: DELIVERY_LIMIT,
+    maxAttempts: MAX_SEND_ATTEMPTS,
+  })
 
   const claimed: ClaimedDelivery[] = []
-  for (const candidate of candidates.results ?? []) {
-    const leaseToken = crypto.randomUUID()
-    const updated = await db.prepare(
-      "UPDATE social_notification_push_deliveries SET status = 'LEASED', lease_token = ?, lease_expires_at = ?, " +
-      'attempt_count = attempt_count + 1, updated_at = ? WHERE delivery_id = ? AND ' +
-      "((status IN ('PENDING','RETRY') AND next_attempt_at <= ? AND attempt_count < ?) " +
-      "OR (status = 'LEASED' AND lease_expires_at IS NOT NULL AND lease_expires_at <= ? AND attempt_count < ?)) " +
-      'RETURNING delivery_id, notification_id, endpoint_id, attempt_count',
-    ).bind(leaseToken, isoAfter(now, LEASE_SECONDS), nowIso, candidate.delivery_id, nowIso, MAX_SEND_ATTEMPTS, nowIso, MAX_SEND_ATTEMPTS)
-      .first<{ delivery_id: string; notification_id: string; endpoint_id: string; attempt_count: number }>()
-    if (!updated) continue
-
-    const notification = await db.prepare(
-      'SELECT o.recipient_user_id, n.notification_type, n.target_type, n.target_id ' +
-      'FROM social_notification_push_outbox o JOIN social_notifications n ON n.notification_id = o.notification_id ' +
-      'WHERE o.notification_id = ? LIMIT 1',
-    ).bind(updated.notification_id).first<{
-      recipient_user_id: string
-      notification_type: ClaimedDelivery['notificationType']
-      target_type: ClaimedDelivery['targetType']
-      target_id: string
-    }>()
-
-    if (!notification) {
-      await db.prepare(
-        "UPDATE social_notification_push_deliveries SET status = 'CANCELLED', lease_token = NULL, lease_expires_at = NULL, " +
-        "last_error_code = 'NOTIFICATION_NOT_FOUND', updated_at = ? WHERE delivery_id = ? AND lease_token = ?",
-      ).bind(nowIso, updated.delivery_id, leaseToken).run()
+  for (const candidate of candidates) {
+    if (!candidate.recipient_user_id || !candidate.notification_type ||
+        !candidate.target_type || !candidate.target_id) {
+      await store.cancel({
+        deliveryId: candidate.delivery_id,
+        leaseToken: candidate.lease_token,
+        reason: 'NOTIFICATION_NOT_FOUND',
+        now: nowIso,
+      })
       continue
     }
 
+    // W09 remains the only authority for endpoint state and raw Expo push tokens.
     const endpoint = await endpointDb.prepare(
       "SELECT endpoint_id, owner_user_id, push_token FROM notification_push_endpoints " +
       "WHERE endpoint_id = ? AND owner_user_id = ? AND provider = 'expo' " +
       "AND permission_status = 'granted' AND push_token IS NOT NULL LIMIT 1",
-    ).bind(updated.endpoint_id, notification.recipient_user_id).first<ActiveEndpointRow>()
+    ).bind(candidate.endpoint_id, candidate.recipient_user_id).first<ActiveEndpointRow>()
 
     if (!endpoint) {
-      await db.prepare(
-        "UPDATE social_notification_push_deliveries SET status = 'CANCELLED', lease_token = NULL, lease_expires_at = NULL, " +
-        "last_error_code = 'ENDPOINT_NOT_ACTIVE', updated_at = ? WHERE delivery_id = ? AND lease_token = ?",
-      ).bind(nowIso, updated.delivery_id, leaseToken).run()
+      await store.cancel({
+        deliveryId: candidate.delivery_id,
+        leaseToken: candidate.lease_token,
+        reason: 'ENDPOINT_NOT_ACTIVE',
+        now: nowIso,
+      })
       continue
     }
 
     const pushTokenHash = await hashPushToken(endpoint.push_token)
-    const tokenSnapshotSaved = await db.prepare(
-      'UPDATE social_notification_push_deliveries SET push_token_hash = ?, updated_at = ? WHERE delivery_id = ? AND status = ? AND lease_token = ?',
-    ).bind(pushTokenHash, nowIso, updated.delivery_id, 'LEASED', leaseToken).run()
-    if (Number(tokenSnapshotSaved.meta?.changes ?? 0) !== 1) continue
+    const tokenSnapshotSaved = await store.savePushTokenHash({
+      deliveryId: candidate.delivery_id,
+      leaseToken: candidate.lease_token,
+      pushTokenHash,
+      now: nowIso,
+    })
+    if (!tokenSnapshotSaved) continue
 
     claimed.push({
-      deliveryId: updated.delivery_id,
-      notificationId: updated.notification_id,
-      endpointId: updated.endpoint_id,
-      recipientUserId: notification.recipient_user_id,
+      deliveryId: candidate.delivery_id,
+      notificationId: candidate.notification_id,
+      endpointId: candidate.endpoint_id,
+      recipientUserId: candidate.recipient_user_id,
       pushToken: endpoint.push_token,
       pushTokenHash,
-      notificationType: notification.notification_type,
-      targetType: notification.target_type,
-      targetId: notification.target_id,
-      leaseToken,
-      attemptCount: updated.attempt_count,
+      notificationType: candidate.notification_type,
+      targetType: candidate.target_type,
+      targetId: candidate.target_id,
+      leaseToken: candidate.lease_token,
+      attemptCount: candidate.attempt_count,
     })
   }
   return claimed
@@ -360,13 +348,13 @@ async function processSendBatch(
         const outcome = await recordPushTicket(store, endpointDb, task, ticket, now)
         if (outcome === 'sent') result.sent += 1
         else if (outcome === 'retried') result.retried += 1
-        else result.failed += 1
+        else if (outcome === 'failed') result.failed += 1
       }
     } catch {
       for (const task of chunkTasks) {
         const outcome = await scheduleDeliveryRetry(store, task, now, 'ExpoServerError')
         if (outcome === 'retried') result.retried += 1
-        else result.failed += 1
+        else if (outcome === 'failed') result.failed += 1
       }
     }
   }
@@ -402,6 +390,7 @@ async function processReceiptBatch(
 
 export type NotificationPushDeliveryRuntimeDependencies = Readonly<{
   sendResultStore?: NotificationPushSendResultStore
+  deliveryClaimStore?: NotificationPushDeliveryClaimStorePort
 }>
 
 export async function runNotificationPushBatch(
@@ -415,7 +404,8 @@ export async function runNotificationPushBatch(
   if (!env.DB || !env.D1_03) throw new Error('W05_PUSH_DELIVERY_D1_BINDING_MISSING')
 
   const fannedOut = await fanOutPendingNotifications(env.DB, env.D1_03, now)
-  const deliveries = await claimDueDeliveries(env.DB, env.D1_03, now)
+  const deliveryClaimStore = dependencies.deliveryClaimStore ?? createD1NotificationPushDeliveryClaimStore(env.DB)
+  const deliveries = await claimDueDeliveries(deliveryClaimStore, env.D1_03, now)
   const sendResultStore = dependencies.sendResultStore ?? createD1NotificationPushSendResultStore(env.DB)
   const client = new Expo(env.EXPO_ACCESS_TOKEN?.trim() ? { accessToken: env.EXPO_ACCESS_TOKEN.trim() } : {})
   const sendResult = await processSendBatch(sendResultStore, env.D1_03, client, deliveries, now)
