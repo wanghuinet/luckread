@@ -14,6 +14,7 @@ import {
 import {
   createD1FavoriteMutationStore,
   FavoriteMutationStoreError,
+  type FavoriteMutationRow,
   type FavoriteMutationStore,
 } from './favorite-mutation-store.js'
 import { fetchPublishedContentSocialContext, type W03ContentBinding } from './w03-content-context-client.js'
@@ -125,7 +126,7 @@ export async function favorite(
 
   const relationshipId = crypto.randomUUID()
   const createdAt = new Date().toISOString()
-  let row
+  let row: FavoriteMutationRow | null
   try {
     row = await resolveFavoriteMutationStore(source).create({
       relationshipId,
