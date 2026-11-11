@@ -5,6 +5,7 @@ import worker, { createW05SocialWorker } from './index.js'
 import type { CommentListReadInput, CommentListReadRow, CommentListReadStore } from './comment-list-read-store.js'
 import type { FollowListReadInput, FollowListReadRow, FollowListCountInput, FollowListReadStore } from './follow-list-read-store.js'
 import type { BlockMuteListReadInput, BlockMuteListReadRow, BlockMuteListReadStore } from './block-mute-list-read-store.js'
+import type { FollowingAuthorIdRow, FollowingAuthorIdsReadStore } from './following-author-ids-read-store.js'
 
 
 const dbFor = (results: unknown[] = []) => {
@@ -120,6 +121,62 @@ describe('W05 follow-list PostgreSQL runtime injection', () => {
       data: { items: [{ relationshipId: 'rel-d1', userId: 'd1-follower' }], totalCount: 1 },
     })
     expect(prepare).toHaveBeenCalled()
+  })
+})
+
+
+describe('W05 following-feed author PostgreSQL runtime injection', () => {
+  const followingFeedHeaders = {
+    'X-LuckRead-Caller': 'W04',
+    'X-LuckRead-Transport-Version': '1.0',
+    'X-LuckRead-Correlation-Id': 'following-feed-test',
+    'X-LuckRead-Principal-User-Id': 'viewer-1',
+  }
+
+  it('uses an injected PostgreSQL-capable author store through the W04 HTTP route without touching D1', async () => {
+    const store: FollowingAuthorIdsReadStore = {
+      list: vi.fn(async (_viewerUserId: string, _limit: number): Promise<readonly FollowingAuthorIdRow[]> => [
+        { user_id: 'postgres-author-1' },
+        { user_id: 'postgres-author-2' },
+      ]),
+    }
+    const d1Prepare = vi.fn()
+    const injectedWorker = createW05SocialWorker({ followingAuthorIdsReadStore: store })
+    const response = await injectedWorker.fetch(
+      request('/internal/social/feed/following-authors', followingFeedHeaders),
+      { DB: { prepare: d1Prepare } } as never,
+      {} as never,
+    )
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      data: {
+        items: [{ userId: 'postgres-author-1' }, { userId: 'postgres-author-2' }],
+        candidateWindowTruncated: false,
+      },
+    })
+    expect(store.list).toHaveBeenCalledWith('viewer-1', 501)
+    expect(d1Prepare).not.toHaveBeenCalled()
+  })
+
+  it('preserves the D1 route fallback when no PostgreSQL store is injected', async () => {
+    const all = vi.fn(async () => ({ results: [{ user_id: 'd1-author-1' }] }))
+    const bind = vi.fn(() => ({ all }))
+    const d1Prepare = vi.fn((_sql: string) => ({ bind }))
+
+    const response = await worker.fetch(
+      request('/internal/social/feed/following-authors', followingFeedHeaders),
+      { DB: { prepare: d1Prepare } } as never,
+      {} as never,
+    )
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      data: { items: [{ userId: 'd1-author-1' }], candidateWindowTruncated: false },
+    })
+    expect(d1Prepare).toHaveBeenCalledTimes(1)
+    expect(bind).toHaveBeenCalledWith('viewer-1', 'viewer-1', 'viewer-1', 'viewer-1', 501)
+    expect(all).toHaveBeenCalledTimes(1)
   })
 })
 
