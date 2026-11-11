@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import worker, { createW05SocialWorker } from './index.js'
 import type { CommentListReadInput, CommentListReadRow, CommentListReadStore } from './comment-list-read-store.js'
 import type { FollowListReadInput, FollowListReadRow, FollowListCountInput, FollowListReadStore } from './follow-list-read-store.js'
+import type { BlockMuteListReadInput, BlockMuteListReadRow, BlockMuteListReadStore } from './block-mute-list-read-store.js'
 
 
 const dbFor = (results: unknown[] = []) => {
@@ -592,6 +593,47 @@ describe('W05 social query transport', () => {
       },
       requestId: expect.stringMatching(/^req_/),
     })
+  })
+
+  it('uses an injected Block/Mute list read store for both GET routes without touching D1', async () => {
+    const store: BlockMuteListReadStore = {
+      list: vi.fn(async (input: BlockMuteListReadInput): Promise<readonly BlockMuteListReadRow[]> => [{
+        relationship_id: input.relationType === 'block' ? 'block-pg-1' : 'mute-pg-1',
+        target_user_id: input.relationType === 'block' ? 'blocked-pg-user' : 'muted-pg-user',
+        created_at: '2026-10-18T00:00:00.000Z',
+        cursor_created_at: '2026-10-18T00:00:00.000000Z',
+      }]),
+    }
+    const d1Prepare = vi.fn()
+    const injectedWorker = createW05SocialWorker({ blockMuteListReadStore: store })
+    const env = { DB: { prepare: d1Prepare } } as never
+
+    const blocks = await injectedWorker.fetch(
+      request('/internal/social/interactions/blocks?limit=10', transportHeaders),
+      env,
+      {} as never,
+    )
+    const mutes = await injectedWorker.fetch(
+      request('/internal/social/interactions/mutes?limit=10', transportHeaders),
+      env,
+      {} as never,
+    )
+
+    expect(blocks.status).toBe(200)
+    await expect(blocks.json()).resolves.toMatchObject({
+      data: { items: [{ relationshipId: 'block-pg-1', targetUserId: 'blocked-pg-user' }], hasMore: false, nextCursor: null },
+    })
+    expect(mutes.status).toBe(200)
+    await expect(mutes.json()).resolves.toMatchObject({
+      data: { items: [{ relationshipId: 'mute-pg-1', targetUserId: 'muted-pg-user' }], hasMore: false, nextCursor: null },
+    })
+    expect(store.list).toHaveBeenNthCalledWith(1, {
+      actorUserId: 'viewer-1', relationType: 'block', cursor: null, limit: 10,
+    })
+    expect(store.list).toHaveBeenNthCalledWith(2, {
+      actorUserId: 'viewer-1', relationType: 'mute', cursor: null, limit: 10,
+    })
+    expect(d1Prepare).not.toHaveBeenCalled()
   })
 
   it('creates an idempotent block relation for an active actor and existing target', async () => {
