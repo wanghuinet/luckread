@@ -53,6 +53,10 @@ on:
       - 'workers/W05-social/migrations/**'
       - 'workers/W05-social/scripts/neon/**'
       - 'workers/W05-social/src/notification-push-fanout-runtime.ts'
+      - 'workers/W05-social/src/notification-push-send-result-store.ts'
+      - 'workers/W05-social/src/notification-push-send-result-store-postgres.ts'
+      - 'workers/W05-social/src/notification-push-send-result-store.test.ts'
+      - 'workers/W05-social/src/notification-push-send-result-store-postgres.test.ts'
       - 'workers/W05-social/src/neon-postgres-migrations/**'
       - 'workers/W05-social/src/following-author-ids-read-store.ts'
       - 'workers/W05-social/src/following-author-ids-read-store-postgres.ts'
@@ -176,6 +180,7 @@ jobs:
           set -euo pipefail
           node --check workers/W05-social/scripts/neon/rehearse-content-likers-postgres-runtime.mjs
           node --check workers/W05-social/scripts/neon/rehearse-push-fanout-postgres-runtime.mjs
+          node --check workers/W05-social/scripts/neon/rehearse-push-send-result-postgres-runtime.mjs
           node --check workers/W05-social/scripts/neon/rehearse-profile-channel-postgres-runtime.mjs
           node --check workers/W05-social/scripts/neon/rehearse-social-targets-read-postgres-runtime.mjs
           node --check workers/W05-social/scripts/neon/rehearse-social-closure-read-postgres-runtime.mjs
@@ -276,6 +281,13 @@ jobs:
           W05_PUSH_FANOUT_POSTGRES_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_w05_d1_02_schema
           W05_PUSH_FANOUT_POSTGRES_REPORT: ../../artifacts/neon/w05-push-fanout-postgres-runtime-postflight.json
         run: node --import=tsx/esm ../../workers/W05-social/scripts/neon/rehearse-push-fanout-postgres-runtime.mjs
+
+      - name: Rehearse W05 push send-result lease transitions against PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          W05_PUSH_SEND_RESULT_POSTGRES_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_w05_d1_02_schema
+          W05_PUSH_SEND_RESULT_POSTGRES_REPORT: ../../artifacts/neon/w05-push-send-result-postgres-runtime-postflight.json
+        run: node --import=tsx/esm ../../workers/W05-social/scripts/neon/rehearse-push-send-result-postgres-runtime.mjs
 
       - name: Rehearse W05 content liker reads against PostgreSQL 18
         working-directory: workers/W02-identity
@@ -411,6 +423,7 @@ jobs:
             artifacts/neon/w05-block-mute-relation-postgres-runtime-postflight.json
             artifacts/neon/w05-content-likers-postgres-runtime-postflight.json
             artifacts/neon/w05-push-fanout-postgres-runtime-postflight.json
+            artifacts/neon/w05-push-send-result-postgres-runtime-postflight.json
             artifacts/neon/w05-profile-channel-postgres-runtime-postflight.json
             artifacts/neon/w05-favorite-list-postgres-runtime-postflight.json
             artifacts/neon/w05-like-status-postgres-runtime-postflight.json
