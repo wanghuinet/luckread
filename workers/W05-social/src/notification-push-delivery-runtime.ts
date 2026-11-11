@@ -1,6 +1,10 @@
 /// <reference types="@cloudflare/workers-types" />
 import Expo, { type ExpoPushMessage, type ExpoPushReceipt, type ExpoPushTicket } from 'expo-server-sdk'
 import { fanOutPendingNotifications } from './notification-push-fanout-runtime.js'
+import {
+  createD1NotificationPushSendResultStore,
+  type NotificationPushSendResultStore,
+} from './notification-push-send-result-store.js'
 
 type PushReceiptLike = ExpoPushReceipt
 type PushTicketLike = ExpoPushTicket
@@ -194,39 +198,38 @@ export async function deactivateInvalidEndpoint(
 }
 
 async function scheduleDeliveryRetry(
-  db: D1Database, task: ClaimedDelivery, now: Date, errorCode: string,
-): Promise<'retried' | 'failed'> {
+  store: NotificationPushSendResultStore, task: ClaimedDelivery, now: Date, errorCode: string,
+): Promise<'retried' | 'failed' | 'stale'> {
   const canRetry = isRetryableExpoError(errorCode) && task.attemptCount < MAX_SEND_ATTEMPTS
-  const status = canRetry ? 'RETRY' : 'FAILED'
-  await db.prepare(
-    'UPDATE social_notification_push_deliveries SET status = ?, next_attempt_at = ?, expo_ticket_id = NULL, ' +
-    'lease_token = NULL, lease_expires_at = NULL, last_error_code = ?, updated_at = ? ' +
-    "WHERE delivery_id = ? AND status = 'LEASED' AND lease_token = ?",
-  ).bind(
-    status,
-    canRetry ? isoAfter(now, calculatePushRetryDelaySeconds(task.attemptCount)) : now.toISOString(),
+  const updated = await store.scheduleRetry({
+    deliveryId: task.deliveryId,
+    leaseToken: task.leaseToken,
+    status: canRetry ? 'RETRY' : 'FAILED',
+    nextAttemptAt: canRetry ? isoAfter(now, calculatePushRetryDelaySeconds(task.attemptCount)) : now.toISOString(),
     errorCode,
-    now.toISOString(),
-    task.deliveryId,
-    task.leaseToken,
-  ).run()
+    now: now.toISOString(),
+  })
+  if (!updated) return 'stale'
   return canRetry ? 'retried' : 'failed'
 }
 
 async function recordPushTicket(
-  db: D1Database, endpointDb: D1Database, task: ClaimedDelivery, ticket: PushTicketLike, now: Date,
-): Promise<'sent' | 'retried' | 'failed'> {
+  store: NotificationPushSendResultStore, endpointDb: D1Database,
+  task: ClaimedDelivery, ticket: PushTicketLike, now: Date,
+): Promise<'sent' | 'retried' | 'failed' | 'stale'> {
   if (ticket.status === 'ok' && typeof ticket.id === 'string' && ticket.id.trim()) {
-    await db.prepare(
-      "UPDATE social_notification_push_deliveries SET status = 'RECEIPT_PENDING', expo_ticket_id = ?, receipt_poll_count = 0, " +
-      'next_attempt_at = ?, lease_token = NULL, lease_expires_at = NULL, last_error_code = NULL, updated_at = ? ' +
-      "WHERE delivery_id = ? AND status = 'LEASED' AND lease_token = ?",
-    ).bind(ticket.id, isoAfter(now, RECEIPT_DELAY_SECONDS), now.toISOString(), task.deliveryId, task.leaseToken).run()
-    return 'sent'
+    const updated = await store.recordTicket({
+      deliveryId: task.deliveryId,
+      leaseToken: task.leaseToken,
+      ticketId: ticket.id,
+      nextAttemptAt: isoAfter(now, RECEIPT_DELAY_SECONDS),
+      now: now.toISOString(),
+    })
+    return updated ? 'sent' : 'stale'
   }
   const errorCode = ticket.status === 'error' ? String(ticket.details?.error ?? 'EXPO_TICKET_ERROR') : 'EXPO_TICKET_INVALID'
   if (errorCode === 'DeviceNotRegistered') await deactivateInvalidEndpoint(endpointDb, task, now)
-  return scheduleDeliveryRetry(db, task, now, errorCode)
+  return scheduleDeliveryRetry(store, task, now, errorCode)
 }
 
 async function claimDueReceipts(db: D1Database, now: Date): Promise<ClaimedReceipt[]> {
@@ -334,7 +337,8 @@ async function applyReceipt(
 }
 
 async function processSendBatch(
-  db: D1Database, endpointDb: D1Database, client: Expo, tasks: ClaimedDelivery[], now: Date,
+  store: NotificationPushSendResultStore, endpointDb: D1Database, client: Expo,
+  tasks: ClaimedDelivery[], now: Date,
 ): Promise<{ sent: number; retried: number; failed: number }> {
   const result = { sent: 0, retried: 0, failed: 0 }
   if (!tasks.length) return result
@@ -353,14 +357,14 @@ async function processSendBatch(
         const task = message ? taskByMessage.get(message) : undefined
         const ticket = tickets[index]
         if (!task || !ticket) continue
-        const outcome = await recordPushTicket(db, endpointDb, task, ticket, now)
+        const outcome = await recordPushTicket(store, endpointDb, task, ticket, now)
         if (outcome === 'sent') result.sent += 1
         else if (outcome === 'retried') result.retried += 1
         else result.failed += 1
       }
     } catch {
       for (const task of chunkTasks) {
-        const outcome = await scheduleDeliveryRetry(db, task, now, 'ExpoServerError')
+        const outcome = await scheduleDeliveryRetry(store, task, now, 'ExpoServerError')
         if (outcome === 'retried') result.retried += 1
         else result.failed += 1
       }
@@ -396,9 +400,14 @@ async function processReceiptBatch(
   return result
 }
 
+export type NotificationPushDeliveryRuntimeDependencies = Readonly<{
+  sendResultStore?: NotificationPushSendResultStore
+}>
+
 export async function runNotificationPushBatch(
   env: NotificationPushDeliveryEnv,
   now = new Date(),
+  dependencies: NotificationPushDeliveryRuntimeDependencies = {},
 ): Promise<NotificationPushBatchResult> {
   if (env.PUSH_DELIVERY_ENABLED !== 'true') {
     return { status: 'DISABLED', fannedOut: 0, sent: 0, providerAccepted: 0, retried: 0, failed: 0, skipped: 0 }
@@ -407,8 +416,9 @@ export async function runNotificationPushBatch(
 
   const fannedOut = await fanOutPendingNotifications(env.DB, env.D1_03, now)
   const deliveries = await claimDueDeliveries(env.DB, env.D1_03, now)
+  const sendResultStore = dependencies.sendResultStore ?? createD1NotificationPushSendResultStore(env.DB)
   const client = new Expo(env.EXPO_ACCESS_TOKEN?.trim() ? { accessToken: env.EXPO_ACCESS_TOKEN.trim() } : {})
-  const sendResult = await processSendBatch(env.DB, env.D1_03, client, deliveries, now)
+  const sendResult = await processSendBatch(sendResultStore, env.D1_03, client, deliveries, now)
   const receipts = await claimDueReceipts(env.DB, now)
   const receiptResult = await processReceiptBatch(env.DB, env.D1_03, client, receipts, now)
 
