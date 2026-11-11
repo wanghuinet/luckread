@@ -164,7 +164,7 @@ describe('W07 PostgreSQL order-create persistence store', () => {
       orderChanges: 1,
       lineChanges: [1],
     })
-    expect(fake.calls.map((call) => call.sql.trim().split(/\\s+/)[0])).toEqual([
+    expect(fake.calls.map((call) => call.sql.trim().split(/\s+/)[0])).toEqual([
       'BEGIN',
       'DELETE',
       'INSERT',
