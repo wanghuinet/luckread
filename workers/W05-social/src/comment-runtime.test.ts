@@ -704,10 +704,7 @@ describe('comment runtime', () => {
       },
     }
 
-    const unusedD1 = {
-      prepare() { throw new Error('PostgreSQL comment list read must not access D1') },
-    } as unknown as D1Database
-    await expect(listComments(unusedD1, 'content-1', null, 20, publishedContext(), 'viewer-1', 'liked'))
+    await expect(listComments(store, 'content-1', null, 20, publishedContext(), 'viewer-1', 'liked'))
       .resolves.toMatchObject({
         items: [{
           id: 'pg-comment-1',
