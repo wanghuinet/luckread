@@ -46,7 +46,7 @@ describe('PostgreSQL comment list read store', () => {
 
     expect(calls).toHaveLength(1)
     const { sql, values } = calls[0]!
-    expect(sql).toContain('WITH RECURSIVE viewer AS (SELECT $1 AS user_id)')
+    expect(sql).toContain('WITH RECURSIVE viewer AS (SELECT $1::text AS user_id)')
     expect(sql).toContain('json_agg(json_build_object(')
     expect(sql).toContain("), '[]'::json)::text AS mentions_json")
     expect(sql).toContain('to_char(c.created_at AT TIME ZONE')
