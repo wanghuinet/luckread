@@ -1,5 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 import Expo, { type ExpoPushMessage, type ExpoPushReceipt, type ExpoPushTicket } from 'expo-server-sdk'
+import { fanOutPendingNotifications } from './notification-push-fanout-runtime.js'
 
 type PushReceiptLike = ExpoPushReceipt
 type PushTicketLike = ExpoPushTicket
@@ -26,10 +27,8 @@ export type NotificationPushBatchResult = Readonly<{
   retried: number; failed: number; skipped: number
 }>
 
-const FANOUT_LIMIT = 25
 const DELIVERY_LIMIT = 100
 const RECEIPT_LIMIT = 300
-const ENDPOINT_LIMIT = 20
 const MAX_SEND_ATTEMPTS = 6
 const MAX_RECEIPT_POLLS = 24
 const LEASE_SECONDS = 180
@@ -93,44 +92,6 @@ export function notificationPushMessage(task: Pick<ClaimedDelivery,
   }
 }
 
-async function fanOutPendingNotifications(db: D1Database, endpointDb: D1Database, now: Date): Promise<number> {
-  const pending = await db.prepare(
-    'SELECT notification_id, recipient_user_id FROM social_notification_push_outbox ' +
-    "WHERE status = 'PENDING' ORDER BY created_at ASC, notification_id ASC LIMIT ?",
-  ).bind(FANOUT_LIMIT).all<{ notification_id: string; recipient_user_id: string }>()
-
-  let count = 0
-  for (const item of pending.results ?? []) {
-    const endpoints = await endpointDb.prepare(
-      'SELECT endpoint_id, owner_user_id, push_token FROM notification_push_endpoints ' +
-      "WHERE owner_user_id = ? AND provider = 'expo' AND permission_status = 'granted' " +
-      'AND push_token IS NOT NULL ORDER BY updated_at DESC LIMIT ?',
-    ).bind(item.recipient_user_id, ENDPOINT_LIMIT).all<ActiveEndpointRow>()
-    const rows = endpoints.results ?? []
-    const nowIso = now.toISOString()
-
-    if (rows.length === 0) {
-      await db.prepare(
-        "UPDATE social_notification_push_outbox SET status = 'NO_ENDPOINT', endpoint_count = 0, updated_at = ? " +
-        "WHERE notification_id = ? AND status = 'PENDING'",
-      ).bind(nowIso, item.notification_id).run()
-      continue
-    }
-
-    const statements = rows.map((endpoint) => db.prepare(
-      "INSERT OR IGNORE INTO social_notification_push_deliveries " +
-      "(delivery_id, notification_id, endpoint_id, status, attempt_count, receipt_poll_count, next_attempt_at, created_at, updated_at) " +
-      "VALUES (?, ?, ?, 'PENDING', 0, 0, ?, ?, ?)",
-    ).bind(crypto.randomUUID(), item.notification_id, endpoint.endpoint_id, nowIso, nowIso, nowIso))
-    statements.push(db.prepare(
-      "UPDATE social_notification_push_outbox SET status = 'FANNED_OUT', endpoint_count = ?, updated_at = ? " +
-      "WHERE notification_id = ? AND status = 'PENDING'",
-    ).bind(rows.length, nowIso, item.notification_id))
-    await db.batch(statements)
-    count += 1
-  }
-  return count
-}
 
 async function claimDueDeliveries(db: D1Database, endpointDb: D1Database, now: Date): Promise<ClaimedDelivery[]> {
   const nowIso = now.toISOString()
