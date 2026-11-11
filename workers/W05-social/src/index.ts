@@ -48,6 +48,7 @@ import {
   parseFollowListLimit,
   unfollow,
 } from './follow-runtime.js'
+import type { FollowListReadStore } from './follow-list-read-store.js'
 
 type RateLimitBinding = { limit(input: { key: string }): Promise<{ success: boolean }> }
 
@@ -246,7 +247,13 @@ const parseProfileChannelPath = (pathname: string): { userId: string; kind: 'rep
   return { userId, kind: parts[4] }
 }
 
-export default {
+export type W05SocialWorkerDependencies = Readonly<{
+  /** Optional internal adapter injection; D1 remains the deployed default. */
+  followListReadStore?: FollowListReadStore
+}>
+
+export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies = {}) {
+  return {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     try {
       const url = new URL(request.url)
@@ -1163,9 +1170,10 @@ export default {
         throw new FollowRuntimeError('INVALID_CURSOR', 400)
       }
 
+      const followListSource = dependencies.followListReadStore ?? env.DB
       const page = path.kind === 'followers'
-        ? await listFollowers(env.DB, path.userId, cursor, limit)
-        : await listFollowing(env.DB, path.userId, cursor, limit)
+        ? await listFollowers(followListSource, path.userId, cursor, limit)
+        : await listFollowing(followListSource, path.userId, cursor, limit)
 
       return json({
         data: page,
@@ -1209,4 +1217,7 @@ export default {
       }, 500)
     }
   },
+  }
 }
+
+export default createW05SocialWorker()
