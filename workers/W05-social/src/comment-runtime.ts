@@ -3,6 +3,12 @@ import { fetchPublishedContentSocialContext, type PublishedContentSocialContext,
 
 import { createD1CommentCreateStore, type CommentCreateStore } from './comment-create-store.js'
 import { createD1CommentMutationStore, type CommentMutationStore } from './comment-mutation-store.js'
+import {
+  createD1CommentListReadStore,
+  CommentListReadStoreError,
+  type CommentListReadStore,
+  type CommentListReadRow,
+} from './comment-list-read-store.js'
 
 export class CommentRuntimeError extends Error {
   constructor(readonly code: string, readonly status: number) { super(code) }
@@ -500,7 +506,7 @@ export async function updateComment(
 }
 
 export async function listComments(
-  db: D1Database,
+  db: D1Database | CommentListReadStore,
   contentIdValue: string,
   cursorValue: string | null,
   limit: number,
@@ -516,190 +522,31 @@ export async function listComments(
   const sort = parseCommentSort(sortValue)
   const cursor = decodeCursor(cursorValue, contentId, viewerUserId, sort)
 
-  // Keep every reply beneath its root comment. Recent/liked modes rank threads,
-  // then preserve chronological order within each thread to avoid orphan-looking replies.
-  const whereCursor = cursor
-    ? sort === 'liked'
-      ? 'AND (c.thread_like_count < ? OR (c.thread_like_count = ? AND (c.thread_created_at < ? OR (c.thread_created_at = ? AND c.thread_id < ?))) OR (c.thread_like_count = ? AND c.thread_created_at = ? AND c.thread_id = ? AND (c.created_at > ? OR (c.created_at = ? AND c.id > ?))))'
-      : sort === 'recent'
-        ? 'AND ((c.thread_created_at < ? OR (c.thread_created_at = ? AND c.thread_id < ?)) OR (c.thread_created_at = ? AND c.thread_id = ? AND (c.created_at > ? OR (c.created_at = ? AND c.id > ?))))'
-        : 'AND (c.created_at > ? OR (c.created_at = ? AND c.id > ?))'
-    : ''
+  const store: CommentListReadStore = typeof (db as CommentListReadStore).list === 'function'
+    ? db as CommentListReadStore
+    : createD1CommentListReadStore(db as D1Database)
+  let rows: CommentListReadRow[]
+  try {
+    rows = await store.list({
+      contentId,
+      viewerUserId,
+      limit,
+      sort,
+      cursor: cursor ? {
+        createdAt: cursor.createdAt,
+        id: cursor.id,
+        ...(cursor.threadCreatedAt !== undefined ? { threadCreatedAt: cursor.threadCreatedAt } : {}),
+        ...(cursor.threadId !== undefined ? { threadId: cursor.threadId } : {}),
+        ...(cursor.threadLikeCount !== undefined ? { threadLikeCount: cursor.threadLikeCount } : {}),
+      } : null,
+    })
+  } catch (error) {
+    if (error instanceof CommentListReadStoreError) {
+      throw new CommentRuntimeError('INTERNAL_ERROR', 500)
+    }
+    throw error
+  }
 
-  const orderBy = sort === 'liked'
-    ? 'c.thread_like_count DESC, c.thread_created_at DESC, c.thread_id DESC, c.created_at ASC, c.id ASC'
-    : sort === 'recent'
-      ? 'c.thread_created_at DESC, c.thread_id DESC, c.created_at ASC, c.id ASC'
-      : 'c.created_at ASC, c.id ASC'
-
-  const visibilitySql = viewerUserId
-    ? `AND NOT EXISTS (
-         SELECT 1
-           FROM social_user_interactions block
-          WHERE block.relation_type = 'block'
-            AND (
-              (block.actor_user_id = ? AND block.target_user_id = c.author_user_id)
-              OR
-              (block.actor_user_id = c.author_user_id AND block.target_user_id = ?)
-            )
-       )
-       AND NOT EXISTS (
-         SELECT 1
-           FROM social_user_interactions mute
-          WHERE mute.relation_type = 'mute'
-            AND mute.actor_user_id = ?
-            AND mute.target_user_id = c.author_user_id
-       )`
-    : ''
-  const childVisibilitySql = viewerUserId
-    ? `AND NOT EXISTS (
-         SELECT 1
-           FROM social_user_interactions block
-          WHERE block.relation_type = 'block'
-            AND (
-              (block.actor_user_id = ? AND block.target_user_id = child.author_user_id)
-              OR
-              (block.actor_user_id = child.author_user_id AND block.target_user_id = ?)
-            )
-       )
-       AND NOT EXISTS (
-         SELECT 1
-           FROM social_user_interactions mute
-          WHERE mute.relation_type = 'mute'
-            AND mute.actor_user_id = ?
-            AND mute.target_user_id = child.author_user_id
-       )`
-    : ''
-
-  const visibilityParams = viewerUserId
-    ? [viewerUserId, viewerUserId, viewerUserId, viewerUserId, viewerUserId, viewerUserId]
-    : []
-  const cursorParams = !cursor
-    ? []
-    : sort === 'liked'
-      ? [
-          cursor.threadLikeCount ?? 0, cursor.threadLikeCount ?? 0,
-          cursor.threadCreatedAt ?? cursor.createdAt, cursor.threadCreatedAt ?? cursor.createdAt,
-          cursor.threadId ?? cursor.id, cursor.threadLikeCount ?? 0,
-          cursor.threadCreatedAt ?? cursor.createdAt, cursor.threadId ?? cursor.id,
-          cursor.createdAt, cursor.createdAt, cursor.id,
-        ]
-      : sort === 'recent'
-        ? [
-            cursor.threadCreatedAt ?? cursor.createdAt, cursor.threadCreatedAt ?? cursor.createdAt,
-            cursor.threadId ?? cursor.id, cursor.threadCreatedAt ?? cursor.createdAt,
-            cursor.threadId ?? cursor.id, cursor.createdAt, cursor.createdAt, cursor.id,
-          ]
-        : [cursor.createdAt, cursor.createdAt, cursor.id]
-  const params = [viewerUserId, contentId, ...visibilityParams, contentId, ...cursorParams, limit + 1]
-  const threadLikeCountSql = sort === 'liked'
-    ? `(SELECT COUNT(*) FROM interaction_likes thread_likes WHERE thread_likes.target_type = 'comment' AND thread_likes.target_id = c.thread_id) AS thread_like_count`
-    : '0 AS thread_like_count'
-
-  const result = await db.prepare(
-    `WITH RECURSIVE viewer AS (SELECT ? AS user_id), public_comments AS (
-       SELECT
-         c.id,
-         c.content_id,
-         c.author_user_id,
-         c.parent_id,
-         c.body,
-         c.state,
-         c.depth,
-         c.created_at,
-         c.updated_at,
-         c.created_at AS thread_created_at,
-         c.id AS thread_id
-       FROM social_comments c
-       WHERE c.content_id = ?
-         AND c.state = 'PUBLISHED'
-         AND c.parent_id IS NULL
-         ${visibilitySql}
-
-       UNION ALL
-
-       SELECT
-         child.id,
-         child.content_id,
-         child.author_user_id,
-         child.parent_id,
-         child.body,
-         child.state,
-         child.depth,
-         child.created_at,
-         child.updated_at,
-         parent.thread_created_at,
-         parent.thread_id
-       FROM social_comments child
-       JOIN public_comments parent ON parent.id = child.parent_id
-       WHERE child.state = 'PUBLISHED'
-         AND parent.depth < 3
-         ${childVisibilitySql}
-     ), ranked_comments AS (
-       SELECT
-         c.*,
-         ${threadLikeCountSql},
-         EXISTS (
-           SELECT 1
-             FROM interaction_likes liked
-             JOIN viewer v ON v.user_id = liked.actor_user_id
-            WHERE liked.target_type = 'comment'
-              AND liked.target_id = c.id
-         ) AS liked_by_viewer
-       FROM public_comments c
-       WHERE c.content_id = ?
-     )
-     SELECT
-       c.id,
-       c.content_id,
-       c.author_user_id,
-       c.parent_id,
-       c.body,
-       c.state,
-       c.depth,
-       c.created_at,
-       c.updated_at,
-       COALESCE((
-         SELECT json_group_array(json_object(
-           'userId', mention.mentioned_user_id,
-           'handle', mention.handle
-         ))
-         FROM (
-           SELECT mentioned_user_id, handle
-             FROM social_mentions
-            WHERE target_type = 'comment'
-              AND target_id = c.id
-            ORDER BY created_at ASC
-            LIMIT 100
-         ) mention
-       ), '[]') AS mentions_json,
-       c.liked_by_viewer,
-       c.thread_created_at,
-       c.thread_id,
-       c.thread_like_count
-     FROM ranked_comments c
-     WHERE 1 = 1
-       ${whereCursor}
-     ORDER BY ${orderBy}
-     LIMIT ?`,
-  ).bind(...params).all<{
-    id: string
-    content_id: string
-    author_user_id: string
-    parent_id: string | null
-    body: string
-    state: 'PENDING' | 'PUBLISHED' | 'REJECTED'
-    depth: number
-    created_at: string
-    updated_at: string
-    mentions_json: string
-    liked_by_viewer: number
-    thread_created_at: string
-    thread_id: string
-    thread_like_count: number
-  }>()
-
-  const rows = result.results ?? []
   const hasMore = rows.length > limit
   const visible = hasMore ? rows.slice(0, limit) : rows
   const last = visible.at(-1)

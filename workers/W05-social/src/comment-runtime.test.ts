@@ -668,6 +668,55 @@ describe('comment runtime', () => {
     expect(queries[0]).not.toContain('username')
   })
 
+  it('maps rows from an injected PostgreSQL comment list store without accessing D1', async () => {
+    const rows = [{
+      id: 'pg-comment-1',
+      content_id: 'content-1',
+      author_user_id: 'author-1',
+      parent_id: null,
+      body: 'PostgreSQL comment',
+      state: 'PUBLISHED' as const,
+      depth: 0,
+      created_at: '2026-11-11T10:00:00.123456Z',
+      updated_at: '2026-11-11T10:00:00.123456Z',
+      mentions_json: '[{"userId":"mentioned-1","handle":"alice"}]',
+      liked_by_viewer: true,
+      thread_created_at: '2026-11-11T10:00:00.123456Z',
+      thread_id: 'pg-comment-1',
+      thread_like_count: '3',
+    }]
+    const store = {
+      async list(input: {
+        contentId: string
+        viewerUserId: string | null
+        cursor: { createdAt: string; id: string; threadCreatedAt?: string; threadId?: string; threadLikeCount?: number } | null
+        limit: number
+        sort: 'relevant' | 'recent' | 'liked'
+      }) {
+        expect(input).toEqual({
+          contentId: 'content-1',
+          viewerUserId: 'viewer-1',
+          cursor: null,
+          limit: 20,
+          sort: 'liked',
+        })
+        return rows
+      },
+    }
+
+    await expect(listComments(store, 'content-1', null, 20, publishedContext(), 'viewer-1', 'liked'))
+      .resolves.toMatchObject({
+        items: [{
+          id: 'pg-comment-1',
+          createdAt: '2026-11-11T10:00:00.123456Z',
+          mentions: [{ userId: 'mentioned-1', handle: 'alice' }],
+          likedByViewer: true,
+        }],
+        hasMore: false,
+        nextCursor: null,
+      })
+  })
+
   it('returns the authenticated viewer like state in the same bounded comment list query', async () => {
     const d = db([], [{
       id: 'c-liked',

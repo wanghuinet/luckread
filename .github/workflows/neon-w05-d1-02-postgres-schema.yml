@@ -135,6 +135,11 @@ on:
       - 'workers/W05-social/src/comment-notification-context-store-postgres.test.ts'
       - 'workers/W05-social/src/comment-notification-context-runtime.ts'
       - 'workers/W05-social/src/comment-notification-context-runtime.test.ts'
+      - 'workers/W05-social/src/comment-list-read-store.ts'
+      - 'workers/W05-social/src/comment-list-read-store-postgres.ts'
+      - 'workers/W05-social/src/comment-list-read-store.test.ts'
+      - 'workers/W05-social/src/comment-list-read-store-postgres.test.ts'
+      - 'workers/W05-social/scripts/neon/rehearse-comment-list-read-postgres-runtime.mjs'
       - 'workers/W05-social/scripts/neon/rehearse-comment-notification-context-postgres-runtime.mjs'
       - 'workers/W05-social/scripts/neon/rehearse-comment-mutation-postgres-runtime.mjs'
       - 'workers/W05-social/src/poll-runtime.ts'
@@ -219,6 +224,7 @@ jobs:
           node --check workers/W05-social/scripts/neon/rehearse-comment-create-postgres-runtime.mjs
           node --check workers/W05-social/scripts/neon/rehearse-comment-mutation-postgres-runtime.mjs
           node --check workers/W05-social/scripts/neon/rehearse-comment-notification-context-postgres-runtime.mjs
+          node --check workers/W05-social/scripts/neon/rehearse-comment-list-read-postgres-runtime.mjs
           node --check workers/W05-social/scripts/neon/rehearse-poll-read-postgres-runtime.mjs
           node --check workers/W05-social/scripts/neon/rehearse-poll-delete-postgres-runtime.mjs
           node --check workers/W05-social/scripts/neon/rehearse-poll-configuration-postgres-runtime.mjs
@@ -433,6 +439,13 @@ jobs:
           W05_COMMENT_MUTATION_POSTGRES_REPORT: ../../artifacts/neon/w05-comment-mutation-postgres-runtime-postflight.json
         run: node --import=tsx/esm ../../workers/W05-social/scripts/neon/rehearse-comment-mutation-postgres-runtime.mjs
 
+      - name: Rehearse W05 comment list reads against PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          W05_COMMENT_LIST_READ_POSTGRES_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_w05_d1_02_schema
+          W05_COMMENT_LIST_READ_POSTGRES_REPORT: ../../artifacts/neon/w05-comment-list-read-postgres-runtime-postflight.json
+        run: node --import=tsx/esm ../../workers/W05-social/scripts/neon/rehearse-comment-list-read-postgres-runtime.mjs
+
       - name: Rehearse W05 poll reads against PostgreSQL 18
         working-directory: workers/W02-identity
         env:
@@ -494,6 +507,7 @@ jobs:
             artifacts/neon/w05-reply-audience-postgres-runtime-postflight.json
             artifacts/neon/w05-comment-create-postgres-runtime-postflight.json
             artifacts/neon/w05-comment-mutation-postgres-runtime-postflight.json
+            artifacts/neon/w05-comment-list-read-postgres-runtime-postflight.json
             artifacts/neon/w05-poll-read-postgres-runtime-postflight.json
             artifacts/neon/w05-poll-delete-postgres-runtime-postflight.json
             artifacts/neon/w05-poll-configuration-postgres-runtime-postflight.json
