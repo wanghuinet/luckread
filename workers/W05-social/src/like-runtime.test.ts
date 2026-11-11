@@ -5,6 +5,7 @@ import { resolve } from 'node:path'
 import { getLikeStatus, like, unlike } from './like-runtime.js'
 import { LikeStatusReadStoreError } from './like-status-read-store.js'
 import { LikeMutationStoreError } from './like-mutation-store.js'
+import type { LikeTargetContextReadStore } from './like-target-context-read-store.js'
 import type { W03ContentBinding } from './w03-content-context-client.js'
 
 const publishedContextBinding = (
@@ -477,6 +478,91 @@ describe('like runtime', () => {
       targetId: 'comment-1',
     })
     expect(cache.delete).toHaveBeenCalledTimes(2)
+  })
+
+  it('uses an injected target context store for comment visibility and bidirectional Block preflight', async () => {
+    const database = db()
+    const targetContextStore: LikeTargetContextReadStore = {
+      readCommentTarget: vi.fn(async () => ({
+        id: 'comment-1',
+        state: 'PUBLISHED',
+        author_user_id: 'comment-author',
+        content_id: 'content-1',
+      })),
+      hasBidirectionalBlock: vi.fn(async () => false),
+    }
+    const mutationStore = {
+      create: vi.fn(async () => ({
+        relationship_id: 'like-pg-context',
+        actor_user_id: 'user-1',
+        target_type: 'comment' as const,
+        target_id: 'comment-1',
+        created_at: '2026-11-11T00:00:00.000Z',
+      })),
+      remove: vi.fn(async () => undefined),
+    }
+
+    await expect(like(
+      database,
+      publishedContextBinding('content-owner'),
+      'user-1',
+      { targetType: 'comment', targetId: 'comment-1' },
+      correlationId,
+      undefined,
+      mutationStore,
+      targetContextStore,
+    )).resolves.toMatchObject({ relationshipId: 'like-pg-context' })
+
+    expect(database.prepare).not.toHaveBeenCalled()
+    expect(targetContextStore.readCommentTarget).toHaveBeenCalledWith('comment-1')
+    expect(targetContextStore.hasBidirectionalBlock).toHaveBeenCalledWith(
+      'user-1',
+      ['comment-author', 'content-owner'],
+    )
+    expect(mutationStore.create).toHaveBeenCalledWith(expect.objectContaining({
+      parentOwnerUserId: 'content-owner',
+    }))
+  })
+
+  it('runs injected Block preflight before like-status storage and maps store failures to 503', async () => {
+    const statusStore = {
+      read: vi.fn(async () => ({ liked: true, likeCount: 2 })),
+    }
+    const blockedContextStore: LikeTargetContextReadStore = {
+      readCommentTarget: vi.fn(async () => null),
+      hasBidirectionalBlock: vi.fn(async () => true),
+    }
+    const database = db()
+    await expect(getLikeStatus(
+      database,
+      publishedContextBinding(),
+      'user-1',
+      { targetType: 'content', targetId: 'content-1' },
+      correlationId,
+      undefined,
+      statusStore,
+      blockedContextStore,
+    )).rejects.toMatchObject({ code: 'CONFLICT', status: 409 })
+    expect(statusStore.read).not.toHaveBeenCalled()
+    expect(database.prepare).not.toHaveBeenCalled()
+
+    const failedContextStore: LikeTargetContextReadStore = {
+      readCommentTarget: vi.fn(async () => { throw new Error('provider credentials leaked') }),
+      hasBidirectionalBlock: vi.fn(async () => false),
+    }
+    await expect(like(
+      database,
+      publishedContextBinding(),
+      'user-1',
+      { targetType: 'comment', targetId: 'comment-1' },
+      correlationId,
+      undefined,
+      {
+        create: vi.fn(async () => null),
+        remove: vi.fn(async () => undefined),
+      },
+      failedContextStore,
+    )).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE', status: 503 })
   })
 
   it('rejects invalid actor ids', async () => {

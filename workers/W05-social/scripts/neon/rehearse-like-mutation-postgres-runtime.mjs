@@ -5,6 +5,7 @@ import { dirname } from 'node:path'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { like, unlike, LikeRuntimeError } from '../../src/like-runtime.ts'
 import { createPostgresLikeMutationStore } from '../../src/like-mutation-store-postgres.ts'
+import { createPostgresLikeTargetContextReadStore } from '../../src/like-target-context-read-store-postgres.ts'
 
 const requireFromW02 = createRequire(new URL('../../../W02-identity/package.json', import.meta.url))
 const { Pool } = requireFromW02('pg')
@@ -20,6 +21,12 @@ const reportPath = process.env.W05_LIKE_MUTATION_POSTGRES_REPORT || '../../artif
 const pool = new Pool({ connectionString, max: 2, connectionTimeoutMillis: 5_000 })
 const client = await pool.connect()
 const store = createPostgresLikeMutationStore(client)
+const targetContextStore = createPostgresLikeTargetContextReadStore(client)
+const finalGuardTargetContextStore = {
+  readCommentTarget: (commentId) => targetContextStore.readCommentTarget(commentId),
+  // Simulate a Block relation appearing after preflight; the atomic mutation predicate must still reject it.
+  hasBidirectionalBlock: async () => false,
+}
 const actor = marker + '-actor'
 const owner = marker + '-owner'
 const contentId = marker + '-content'
@@ -31,6 +38,11 @@ let contentIdempotencyPassed = false
 let contentBlockRacePassed = false
 let draftGuardPassed = false
 let commentInsertPassed = false
+let commentTargetReadPassed = false
+let bidirectionalBlockForwardReadPassed = false
+let bidirectionalBlockReverseReadPassed = false
+let bidirectionalCommentAuthorBlockReadPassed = false
+let bidirectionalParentOwnerBlockReadPassed = false
 let commentAuthorBlockRacePassed = false
 let parentOwnerBlockRacePassed = false
 let unlikePassed = false
@@ -91,6 +103,15 @@ try {
     [commentId, contentId, commentAuthor, 'synthetic rehearsal comment', 'PUBLISHED', marker + '-comment-key'],
   )
 
+  const resolvedComment = await targetContextStore.readCommentTarget(commentId)
+  assert.deepEqual(resolvedComment, {
+    id: commentId,
+    state: 'PUBLISHED',
+    author_user_id: commentAuthor,
+    content_id: contentId,
+  })
+  commentTargetReadPassed = true
+
   const created = await like(
     policyExecutor,
     publishedBinding,
@@ -99,6 +120,7 @@ try {
     marker + '-content-correlation',
     undefined,
     store,
+    targetContextStore,
   )
   assert.equal(created.actorUserId, actor)
   assert.equal(created.targetId, contentId)
@@ -112,6 +134,7 @@ try {
     marker + '-content-retry-correlation',
     undefined,
     store,
+    targetContextStore,
   )
   assert.equal(retried.relationshipId, created.relationshipId)
   const duplicateCount = await client.query(
@@ -129,6 +152,7 @@ try {
     marker + '-draft-correlation',
     undefined,
     store,
+    targetContextStore,
   ))
   draftGuardPassed = true
 
@@ -141,6 +165,8 @@ try {
     'INSERT INTO social_user_interactions (relationship_id, actor_user_id, target_user_id, relation_type, created_at, updated_at) VALUES ($1,$2,$3,$4,now(),now())',
     [marker + '-block-forward', actor, owner, 'block'],
   )
+  assert.equal(await targetContextStore.hasBidirectionalBlock(actor, [owner, owner, actor]), true)
+  bidirectionalBlockForwardReadPassed = true
   await expectNotFound(like(
     policyExecutor,
     publishedBinding,
@@ -149,12 +175,15 @@ try {
     marker + '-block-forward-correlation',
     undefined,
     store,
+    finalGuardTargetContextStore,
   ))
   await client.query('DELETE FROM social_user_interactions WHERE relationship_id = $1', [marker + '-block-forward'])
   await client.query(
     'INSERT INTO social_user_interactions (relationship_id, actor_user_id, target_user_id, relation_type, created_at, updated_at) VALUES ($1,$2,$3,$4,now(),now())',
     [marker + '-block-reverse', owner, actor, 'block'],
   )
+  assert.equal(await targetContextStore.hasBidirectionalBlock(actor, [owner]), true)
+  bidirectionalBlockReverseReadPassed = true
   await expectNotFound(like(
     policyExecutor,
     publishedBinding,
@@ -163,6 +192,7 @@ try {
     marker + '-block-reverse-correlation',
     undefined,
     store,
+    finalGuardTargetContextStore,
   ))
   contentBlockRacePassed = true
   await client.query('DELETE FROM social_user_interactions WHERE relationship_id = $1', [marker + '-block-reverse'])
@@ -175,6 +205,7 @@ try {
     marker + '-comment-correlation',
     undefined,
     store,
+    targetContextStore,
   )
   assert.equal(commentCreated.targetType, 'comment')
   assert.equal(commentCreated.targetId, commentId)
@@ -189,6 +220,8 @@ try {
     'INSERT INTO social_user_interactions (relationship_id, actor_user_id, target_user_id, relation_type, created_at, updated_at) VALUES ($1,$2,$3,$4,now(),now())',
     [marker + '-comment-block', actor, marker + '-blocked-comment-author', 'block'],
   )
+  assert.equal(await targetContextStore.hasBidirectionalBlock(actor, [marker + '-blocked-comment-author']), true)
+  bidirectionalCommentAuthorBlockReadPassed = true
   await expectNotFound(like(
     policyExecutor,
     publishedBinding,
@@ -197,6 +230,7 @@ try {
     marker + '-comment-block-correlation',
     undefined,
     store,
+    finalGuardTargetContextStore,
   ))
   commentAuthorBlockRacePassed = true
   await client.query('DELETE FROM social_user_interactions WHERE relationship_id = $1', [marker + '-comment-block'])
@@ -210,6 +244,8 @@ try {
     'INSERT INTO social_user_interactions (relationship_id, actor_user_id, target_user_id, relation_type, created_at, updated_at) VALUES ($1,$2,$3,$4,now(),now())',
     [marker + '-parent-block', owner, actor, 'block'],
   )
+  assert.equal(await targetContextStore.hasBidirectionalBlock(actor, [owner]), true)
+  bidirectionalParentOwnerBlockReadPassed = true
   await expectNotFound(like(
     policyExecutor,
     publishedBinding,
@@ -218,6 +254,7 @@ try {
     marker + '-parent-block-correlation',
     undefined,
     store,
+    finalGuardTargetContextStore,
   ))
   parentOwnerBlockRacePassed = true
   await client.query('DELETE FROM social_user_interactions WHERE relationship_id = $1', [marker + '-parent-block'])
@@ -243,8 +280,10 @@ try {
     assert.equal(remaining, 0, 'All synthetic likes, comments and Block relations must be removed')
     cleanupVerified = true
     const passed = contentInsertPassed && contentIdempotencyPassed && contentBlockRacePassed &&
-      draftGuardPassed && commentInsertPassed && commentAuthorBlockRacePassed &&
-      parentOwnerBlockRacePassed && unlikePassed && cleanupVerified
+      draftGuardPassed && commentInsertPassed && commentTargetReadPassed &&
+      bidirectionalBlockForwardReadPassed && bidirectionalBlockReverseReadPassed &&
+      bidirectionalCommentAuthorBlockReadPassed && bidirectionalParentOwnerBlockReadPassed &&
+      commentAuthorBlockRacePassed && parentOwnerBlockRacePassed && unlikePassed && cleanupVerified
     const report = {
       status: passed ? 'W05_LIKE_MUTATION_POSTGRES_RUNTIME_PASS' : 'W05_LIKE_MUTATION_POSTGRES_RUNTIME_FAILED',
       postgresDatabase: target.pathname.slice(1),
@@ -253,6 +292,11 @@ try {
       contentBidirectionalBlockRaceRejected: contentBlockRacePassed,
       unpublishedContentFinalGuard: draftGuardPassed,
       publishedCommentLikeInsert: commentInsertPassed,
+      postgresCommentTargetRead: commentTargetReadPassed,
+      bidirectionalBlockForwardRead: bidirectionalBlockForwardReadPassed,
+      bidirectionalBlockReverseRead: bidirectionalBlockReverseReadPassed,
+      bidirectionalCommentAuthorBlockRead: bidirectionalCommentAuthorBlockReadPassed,
+      bidirectionalParentOwnerBlockRead: bidirectionalParentOwnerBlockReadPassed,
       commentAuthorBlockRaceRejected: commentAuthorBlockRacePassed,
       w03ParentOwnerBlockRaceRejected: parentOwnerBlockRacePassed,
       unlikeRemoval: unlikePassed,

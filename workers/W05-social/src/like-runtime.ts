@@ -12,6 +12,10 @@ import {
   LikeStatusReadStoreError,
   type LikeStatusReadStore,
 } from './like-status-read-store.js'
+import {
+  createD1LikeTargetContextReadStore,
+  type LikeTargetContextReadStore,
+} from './like-target-context-read-store.js'
 import { fetchPublishedContentSocialContext, type PublishedContentSocialContext, type W03ContentBinding } from './w03-content-context-client.js'
 
 export class LikeRuntimeError extends Error {
@@ -190,7 +194,7 @@ const resolvePublishedContext = async (
 }
 
 const resolveLikeTargetContext = async (
-  db: D1Database,
+  readStore: LikeTargetContextReadStore,
   w03Content: W03ContentBinding | undefined,
   targetType: 'content' | 'comment',
   targetId: string,
@@ -210,14 +214,12 @@ const resolveLikeTargetContext = async (
     return { relatedUserIds: context.ownerUserId ? [context.ownerUserId] : [] }
   }
 
-  const comment = await db.prepare(
-    'SELECT id, state, author_user_id, content_id FROM social_comments WHERE id = ? LIMIT 1',
-  ).bind(targetId).first<{
-    id: string
-    state: string
-    author_user_id: string | null
-    content_id: string
-  }>()
+  let comment
+  try {
+    comment = await readStore.readCommentTarget(targetId)
+  } catch {
+    throw new LikeRuntimeError('SERVICE_UNAVAILABLE', 503)
+  }
   if (!comment || comment.state !== 'PUBLISHED') return null
 
   const parentContext = await resolvePublishedContext(w03Content, comment.content_id, correlationId)
@@ -230,26 +232,19 @@ const resolveLikeTargetContext = async (
 }
 
 const assertTargetNotBlocked = async (
-  db: D1Database,
+  readStore: LikeTargetContextReadStore,
   actorUserId: string,
   relatedUserIds: string[],
 ): Promise<void> => {
   const targets = [...new Set(relatedUserIds.filter(userId => userId !== actorUserId))]
   if (targets.length === 0) return
-  const placeholders = targets.map(() => '?').join(', ')
-  const row = await db.prepare(
-    `SELECT EXISTS (
-       SELECT 1
-       FROM social_user_interactions block
-       WHERE block.relation_type = 'block'
-         AND (
-           (block.actor_user_id = ? AND block.target_user_id IN (${placeholders}))
-           OR
-           (block.target_user_id = ? AND block.actor_user_id IN (${placeholders}))
-         )
-     ) AS blocked`,
-  ).bind(actorUserId, ...targets, actorUserId, ...targets).first<{ blocked: number }>()
-  if (Number(row?.blocked ?? 0) === 1) throw new LikeRuntimeError('CONFLICT', 409)
+  let blocked: boolean
+  try {
+    blocked = await readStore.hasBidirectionalBlock(actorUserId, targets)
+  } catch {
+    throw new LikeRuntimeError('SERVICE_UNAVAILABLE', 503)
+  }
+  if (blocked) throw new LikeRuntimeError('CONFLICT', 409)
 }
 
 export async function like(
@@ -260,12 +255,13 @@ export async function like(
   correlationId: string,
   prevalidatedContentContext?: PublishedContentSocialContext,
   mutationStore: LikeMutationStore = createD1LikeMutationStore(db),
+  targetContextReadStore: LikeTargetContextReadStore = createD1LikeTargetContextReadStore(db),
 ): Promise<LikeResult> {
   const actor = validateActor(actorUserId)
   const { targetType, targetId } = validateTarget(target)
 
   const targetContext = await resolveLikeTargetContext(
-    db,
+    targetContextReadStore,
     w03Content,
     targetType,
     targetId,
@@ -273,7 +269,7 @@ export async function like(
     prevalidatedContentContext,
   )
   if (!targetContext) throw new LikeRuntimeError('NOT_FOUND', 404)
-  await assertTargetNotBlocked(db, actor, targetContext.relatedUserIds)
+  await assertTargetNotBlocked(targetContextReadStore, actor, targetContext.relatedUserIds)
 
   const createdAt = new Date().toISOString()
   const relationshipId = crypto.randomUUID()
@@ -318,13 +314,14 @@ export async function getLikeStatus(
   correlationId: string,
   prevalidatedContentContext?: PublishedContentSocialContext,
   statusReadStore: LikeStatusReadStore = createD1LikeStatusReadStore(db),
+  targetContextReadStore: LikeTargetContextReadStore = createD1LikeTargetContextReadStore(db),
 ): Promise<{ liked: boolean; likeCount: number }> {
   const actor = validateActor(actorUserId)
   const { targetType, targetId } = validateTarget(target)
 
   // Validate target visibility and block relationships before consulting caches.
   const targetContext = await resolveLikeTargetContext(
-    db,
+    targetContextReadStore,
     w03Content,
     targetType,
     targetId,
@@ -338,7 +335,7 @@ export async function getLikeStatus(
     ])
     return { liked: false, likeCount: 0 }
   }
-  await assertTargetNotBlocked(db, actor, targetContext.relatedUserIds)
+  await assertTargetNotBlocked(targetContextReadStore, actor, targetContext.relatedUserIds)
 
   const [cachedLiked, cachedCount] = await Promise.all([
     readCachedLikeViewerState(actor, targetType, targetId),
