@@ -63,6 +63,12 @@ on:
       - 'workers/W05-social/src/like-list-read-store-postgres.ts'
       - 'workers/W05-social/src/like-list-read-store-postgres.test.ts'
       - 'workers/W05-social/scripts/neon/rehearse-content-likers-postgres-runtime.mjs'
+      - 'workers/W05-social/src/profile-channel-runtime.ts'
+      - 'workers/W05-social/src/profile-channel-runtime.test.ts'
+      - 'workers/W05-social/src/profile-channel-read-store.ts'
+      - 'workers/W05-social/src/profile-channel-read-store-postgres.ts'
+      - 'workers/W05-social/src/profile-channel-read-store-postgres.test.ts'
+      - 'workers/W05-social/scripts/neon/rehearse-profile-channel-postgres-runtime.mjs'
       - 'workers/W05-social/src/favorite-runtime.ts'
       - 'workers/W05-social/src/favorite-runtime.test.ts'
       - 'workers/W05-social/src/favorite-list-read-store.ts'
@@ -168,6 +174,7 @@ jobs:
         run: |
           set -euo pipefail
           node --check workers/W05-social/scripts/neon/rehearse-content-likers-postgres-runtime.mjs
+          node --check workers/W05-social/scripts/neon/rehearse-profile-channel-postgres-runtime.mjs
           node --check workers/W05-social/scripts/neon/rehearse-social-targets-read-postgres-runtime.mjs
           node --check workers/W05-social/scripts/neon/rehearse-social-closure-read-postgres-runtime.mjs
           node --check workers/W05-social/scripts/neon/rehearse-notification-enqueue-postgres-runtime.mjs
@@ -267,6 +274,13 @@ jobs:
           W05_CONTENT_LIKERS_POSTGRES_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_w05_d1_02_schema
           W05_CONTENT_LIKERS_POSTGRES_REPORT: ../../artifacts/neon/w05-content-likers-postgres-runtime-postflight.json
         run: node --import=tsx/esm ../../workers/W05-social/scripts/neon/rehearse-content-likers-postgres-runtime.mjs
+
+      - name: Rehearse W05 Profile Channel reads against PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          W05_PROFILE_CHANNEL_POSTGRES_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_w05_d1_02_schema
+          W05_PROFILE_CHANNEL_POSTGRES_REPORT: ../../artifacts/neon/w05-profile-channel-postgres-runtime-postflight.json
+        run: node --import=tsx/esm ../../workers/W05-social/scripts/neon/rehearse-profile-channel-postgres-runtime.mjs
 
       - name: Rehearse W05 favorite list reads against PostgreSQL 18
         working-directory: workers/W02-identity
@@ -387,6 +401,7 @@ jobs:
             artifacts/neon/w05-block-mute-list-postgres-runtime-postflight.json
             artifacts/neon/w05-block-mute-relation-postgres-runtime-postflight.json
             artifacts/neon/w05-content-likers-postgres-runtime-postflight.json
+            artifacts/neon/w05-profile-channel-postgres-runtime-postflight.json
             artifacts/neon/w05-favorite-list-postgres-runtime-postflight.json
             artifacts/neon/w05-like-status-postgres-runtime-postflight.json
             artifacts/neon/w05-like-mutation-postgres-runtime-postflight.json
