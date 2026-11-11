@@ -7,7 +7,7 @@ const API_BASE = 'https://api.cloudflare.com/client/v4'
 
 function required(value, name) {
   if (typeof value !== 'string' || value.trim() === '') {
-    throw new Error(\`Required configuration is missing: \${name}\`)
+    throw new Error(\`Required configuration is missing: ${name}\`)
   }
   return value.trim()
 }
@@ -69,10 +69,10 @@ export function parseNeonConnectionString(connectionString) {
 }
 
 async function cloudflareRequest({ accountId, apiToken, fetchImpl, method, path, body }) {
-  const response = await fetchImpl(\`\${API_BASE}\${path}\`, {
+  const response = await fetchImpl(\`${API_BASE}${path}\`, {
     method,
     headers: {
-      Authorization: \`Bearer \${apiToken}\`,
+      Authorization: \`Bearer ${apiToken}\`,
       'Content-Type': 'application/json',
     },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
@@ -82,7 +82,7 @@ async function cloudflareRequest({ accountId, apiToken, fetchImpl, method, path,
   try {
     payload = await response.json()
   } catch {
-    throw new Error(\`Cloudflare Hyperdrive API returned a non-JSON response (HTTP \${response.status})\`)
+    throw new Error(\`Cloudflare Hyperdrive API returned a non-JSON response (HTTP ${response.status})\`)
   }
 
   if (!response.ok || payload?.success !== true) {
@@ -90,7 +90,7 @@ async function cloudflareRequest({ accountId, apiToken, fetchImpl, method, path,
       ? payload.errors.map((error) => error?.code).filter((code) => Number.isInteger(code)).join(',')
       : ''
     throw new Error(
-      \`Cloudflare Hyperdrive API \${method} failed (HTTP \${response.status}\${codes ? \`, error codes \${codes}\` : ''})\`,
+      \`Cloudflare Hyperdrive API ${method} failed (HTTP ${response.status}${codes ? \`, error codes ${codes}\` : ''})\`,
     )
   }
 
@@ -106,7 +106,7 @@ async function listHyperdriveConfigs({ accountId, apiToken, fetchImpl }) {
       apiToken,
       fetchImpl,
       method: 'GET',
-      path: \`/accounts/\${encodeURIComponent(accountId)}/hyperdrive/configs?\${params}\`,
+      path: \`/accounts/${encodeURIComponent(accountId)}/hyperdrive/configs?${params}\`,
     })
     if (!Array.isArray(payload.result)) {
       throw new Error('Cloudflare Hyperdrive list response did not contain a configuration array')
@@ -149,14 +149,14 @@ export async function ensureD1_01Hyperdrive({
   const named = configs.filter((config) => config?.name === HYPERDRIVE_CONFIG_NAME)
 
   if (named.length > 1) {
-    throw new Error(\`Multiple Cloudflare Hyperdrive configurations use the reserved name \${HYPERDRIVE_CONFIG_NAME}\`)
+    throw new Error(\`Multiple Cloudflare Hyperdrive configurations use the reserved name ${HYPERDRIVE_CONFIG_NAME}\`)
   }
 
   if (named.length === 1) {
     const existing = named[0]
     if (!matchesExpectedOrigin(existing, origin)) {
       throw new Error(
-        \`Existing Hyperdrive config \${HYPERDRIVE_CONFIG_NAME} does not match the approved D1-01 target; refusing to update it\`,
+        \`Existing Hyperdrive config ${HYPERDRIVE_CONFIG_NAME} does not match the approved D1-01 target; refusing to update it\`,
       )
     }
     if (typeof existing.id !== 'string' || existing.id.length === 0) {
@@ -170,7 +170,7 @@ export async function ensureD1_01Hyperdrive({
     apiToken,
     fetchImpl,
     method: 'POST',
-    path: \`/accounts/\${encodeURIComponent(accountId)}/hyperdrive/configs\`,
+    path: \`/accounts/${encodeURIComponent(accountId)}/hyperdrive/configs\`,
     body: {
       name: HYPERDRIVE_CONFIG_NAME,
       origin,
@@ -213,13 +213,13 @@ async function main() {
   if (process.env.GITHUB_OUTPUT) {
     await appendFile(
       process.env.GITHUB_OUTPUT,
-      \`hyperdrive_id=\${result.id}\nhyperdrive_name=\${result.name}\nhyperdrive_created=\${String(result.created)}\`,
+      \`hyperdrive_id=${result.id}\nhyperdrive_name=${result.name}\nhyperdrive_created=${String(result.created)}\`,
       'utf8',
     )
   }
 
   console.log(
-    \`D1-01 Hyperdrive \${result.created ? 'created' : 'reused'}: name=\${result.name}, id=\${result.id}\`,
+    \`D1-01 Hyperdrive ${result.created ? 'created' : 'reused'}: name=${result.name}, id=${result.id}\`,
   )
 }
 
