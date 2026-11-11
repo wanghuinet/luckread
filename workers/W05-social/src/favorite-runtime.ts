@@ -11,6 +11,11 @@ import {
   FavoriteStatusReadStoreError,
   type FavoriteStatusReadStore,
 } from './favorite-status-read-store.js'
+import {
+  createD1FavoriteMutationStore,
+  FavoriteMutationStoreError,
+  type FavoriteMutationStore,
+} from './favorite-mutation-store.js'
 import { fetchPublishedContentSocialContext, type W03ContentBinding } from './w03-content-context-client.js'
 
 export class FavoriteRuntimeError extends Error {
@@ -87,8 +92,27 @@ const fetchPublishedTarget = async (
  * Cross-Worker publication changes cannot be locked in the same transaction,
  * so reads revalidate published visibility through W03 before using the cache.
  */
+type FavoriteMutationDataSource = D1Database | FavoriteMutationStore
+
+function resolveFavoriteMutationStore(source: FavoriteMutationDataSource): FavoriteMutationStore {
+  if (
+    typeof (source as FavoriteMutationStore).create === 'function' &&
+    typeof (source as FavoriteMutationStore).remove === 'function'
+  ) {
+    return source as FavoriteMutationStore
+  }
+  return createD1FavoriteMutationStore(source as D1Database)
+}
+
+function mapFavoriteMutationStoreError(error: unknown): never {
+  if (error instanceof FavoriteMutationStoreError) {
+    throw new FavoriteRuntimeError(error.code, error.status)
+  }
+  throw error
+}
+
 export async function favorite(
-  db: D1Database,
+  source: FavoriteMutationDataSource,
   w03Content: W03ContentBinding | undefined,
   actorUserId: string,
   target: FavoriteTarget,
@@ -101,25 +125,18 @@ export async function favorite(
 
   const relationshipId = crypto.randomUUID()
   const createdAt = new Date().toISOString()
-  const row = await db.prepare(
-    `INSERT INTO interaction_favorites
-      (relationship_id, actor_user_id, target_type, target_id, created_at)
-     VALUES (?, ?, 'content', ?, ?)
-     ON CONFLICT(actor_user_id, target_type, target_id)
-     DO UPDATE SET relationship_id = interaction_favorites.relationship_id
-     RETURNING relationship_id, actor_user_id, target_type, target_id, created_at`,
-  ).bind(
-    relationshipId,
-    actor,
-    targetId,
-    createdAt,
-  ).first<{
-    relationship_id: string
-    actor_user_id: string
-    target_type: 'content'
-    target_id: string
-    created_at: string
-  }>()
+  let row
+  try {
+    row = await resolveFavoriteMutationStore(source).create({
+      relationshipId,
+      actorUserId: actor,
+      targetType,
+      targetId,
+      createdAt,
+    })
+  } catch (error) {
+    mapFavoriteMutationStoreError(error)
+  }
 
   if (!row) throw new FavoriteRuntimeError('NOT_FOUND', 404)
 
@@ -191,16 +208,22 @@ export async function getFavoriteStatus(
 }
 
 export async function unfavorite(
-  db: D1Database,
+  source: FavoriteMutationDataSource,
   actorUserId: string,
   target: FavoriteTarget,
 ): Promise<void> {
   const actor = validateActor(actorUserId)
   const { targetType, targetId } = validateTarget(target)
 
-  await db.prepare(
-    'DELETE FROM interaction_favorites WHERE actor_user_id = ? AND target_type = ? AND target_id = ?',
-  ).bind(actor, targetType, targetId).run()
+  try {
+    await resolveFavoriteMutationStore(source).remove({
+      actorUserId: actor,
+      targetType,
+      targetId,
+    })
+  } catch (error) {
+    mapFavoriteMutationStoreError(error)
+  }
   favoriteStatusCache.delete(favoriteStatusKey(actor, targetId))
 }
 
