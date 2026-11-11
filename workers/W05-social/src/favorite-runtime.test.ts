@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { clearFavoriteStatusCacheForTests, favorite, getFavoriteStatus, listFavorites, unfavorite } from './favorite-runtime.js'
 import type { W03ContentBinding } from './w03-content-context-client.js'
 import { FavoriteStatusReadStoreError } from './favorite-status-read-store.js'
+import { FavoriteMutationStoreError } from './favorite-mutation-store.js'
 
 const db = (firstResults: unknown[] = [], allResults: unknown[] = []) => {
   let firstIndex = 0
@@ -29,7 +30,7 @@ const publishedBinding = (status = 200) => ({
 const favoriteRow = {
   relationship_id: 'favorite-1',
   actor_user_id: 'user-1',
-  target_type: 'content',
+  target_type: 'content' as const,
   target_id: 'content-1',
   created_at: '2026-10-02T00:00:00.000Z',
 }
@@ -277,6 +278,93 @@ describe('favorite runtime', () => {
       code: 'SERVICE_UNAVAILABLE',
       status: 503,
       message: 'FAVORITE_LIST_READ_UNAVAILABLE',
+    })
+  })
+
+
+  it('uses an injected favorite mutation store after W03 publication validation', async () => {
+    const store = {
+      create: vi.fn(async () => favoriteRow),
+      remove: vi.fn(async () => undefined),
+    }
+    const database = { prepare: vi.fn() } as unknown as D1Database
+    const binding = publishedBinding()
+
+    await expect(favorite(store, binding, 'user-1', {
+      targetType: 'content',
+      targetId: 'content-1',
+    }, 'corr-pg-mutation')).resolves.toEqual({
+      relationshipId: 'favorite-1',
+      actorUserId: 'user-1',
+      targetType: 'content',
+      targetId: 'content-1',
+      createdAt: favoriteRow.created_at,
+    })
+
+    expect(binding.fetch).toHaveBeenCalledTimes(1)
+    expect(store.create).toHaveBeenCalledWith(expect.objectContaining({
+      actorUserId: 'user-1',
+      targetType: 'content',
+      targetId: 'content-1',
+      createdAt: expect.any(String),
+      relationshipId: expect.any(String),
+    }))
+    expect(database.prepare).not.toHaveBeenCalled()
+  })
+
+  it('does not call the injected favorite mutation store when W03 rejects publication', async () => {
+    const store = {
+      create: vi.fn(async () => favoriteRow),
+      remove: vi.fn(async () => undefined),
+    }
+    await expect(favorite(store, publishedBinding(404), 'user-1', {
+      targetType: 'content',
+      targetId: 'content-1',
+    }, 'corr-unpublished')).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 })
+    expect(store.create).not.toHaveBeenCalled()
+  })
+
+  it('uses the injected mutation store for idempotent actor-scoped unfavorite', async () => {
+    const store = {
+      create: vi.fn(async () => favoriteRow),
+      remove: vi.fn(async () => undefined),
+    }
+    await expect(unfavorite(store, 'user-1', {
+      targetType: 'content',
+      targetId: 'content-1',
+    })).resolves.toBeUndefined()
+    expect(store.remove).toHaveBeenCalledWith({
+      actorUserId: 'user-1',
+      targetType: 'content',
+      targetId: 'content-1',
+    })
+  })
+
+  it('maps favorite mutation store failures to a sanitized 503', async () => {
+    const createStore = {
+      create: vi.fn(async () => { throw new FavoriteMutationStoreError() }),
+      remove: vi.fn(async () => undefined),
+    }
+    await expect(favorite(createStore, publishedBinding(), 'user-1', {
+      targetType: 'content',
+      targetId: 'content-1',
+    }, 'corr-error')).rejects.toMatchObject({
+      code: 'SERVICE_UNAVAILABLE',
+      status: 503,
+      message: 'FAVORITE_MUTATION_STORE_UNAVAILABLE',
+    })
+
+    const removeStore = {
+      create: vi.fn(async () => favoriteRow),
+      remove: vi.fn(async () => { throw new FavoriteMutationStoreError() }),
+    }
+    await expect(unfavorite(removeStore, 'user-1', {
+      targetType: 'content',
+      targetId: 'content-1',
+    })).rejects.toMatchObject({
+      code: 'SERVICE_UNAVAILABLE',
+      status: 503,
+      message: 'FAVORITE_MUTATION_STORE_UNAVAILABLE',
     })
   })
 
