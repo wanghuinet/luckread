@@ -915,8 +915,11 @@ describe('W05 social query transport', () => {
             target_id: 'comment-1',
             created_at: '2026-10-02T00:00:00.000Z',
           },
-          { author_user_id: 'author-1' },
-          { content_id: 'content-1' },
+          {
+            comment_id: 'comment-1',
+            author_user_id: 'author-1',
+            content_id: 'content-1',
+          },
         ]),
         W03_CONTENT: publishedContextBinding('owner-1'),
       },
