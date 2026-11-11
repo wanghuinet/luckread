@@ -17,6 +17,7 @@ import { RepostRuntimeError, createRepost, removeRepost } from './repost-runtime
 import { ProfilePinRuntimeError, getProfilePinReference, pinProfileContent, unpinProfileContent } from './profile-pin-runtime.js'
 import { BlockMuteRuntimeError, listRelations, parseBlockMuteListLimit, removeRelation, setRelation } from './block-mute-runtime.js'
 import type { BlockMuteListReadStore } from './block-mute-list-read-store.js'
+import type { ProfileChannelReadStore } from './profile-channel-read-store.js'
 import { getRelationshipGraph, invalidateRelationshipGraph, RelationshipGraphRuntimeError } from './relationship-graph-runtime.js'
 import {
   SocialClosureRuntimeError,
@@ -259,6 +260,8 @@ export type W05SocialWorkerDependencies = Readonly<{
   commentListReadStore?: CommentListReadStore
   /** Optional PostgreSQL-capable Block/Mute list reader; D1 remains the deployed default. */
   blockMuteListReadStore?: BlockMuteListReadStore
+  /** Optional PostgreSQL-capable profile replies/likes reader; D1 remains the deployed default. */
+  profileChannelReadStore?: ProfileChannelReadStore
 }>
 
 export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies = {}) {
@@ -1097,9 +1100,10 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
         const cursor = url.searchParams.get('cursor')
         if (cursor && cursor.length > 2048) throw new ProfileChannelRuntimeError('INVALID_CURSOR', 400)
         const viewerUserId = request.headers.get('X-LuckRead-Principal-User-Id')?.trim() || null
+        const profileChannelSource = dependencies.profileChannelReadStore ?? env.DB
         const data = profileChannel.kind === 'replies'
-          ? await listProfileReplies(env.DB, env.W03_CONTENT, profileChannel.userId, cursor, limit, viewerUserId, request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '')
-          : await listProfileLikedContents(env.DB, env.W03_CONTENT, profileChannel.userId, cursor, limit, viewerUserId, request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '')
+          ? await listProfileReplies(profileChannelSource, env.W03_CONTENT, profileChannel.userId, cursor, limit, viewerUserId, request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '')
+          : await listProfileLikedContents(profileChannelSource, env.W03_CONTENT, profileChannel.userId, cursor, limit, viewerUserId, request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '')
         return json({ data, requestId: createRequestId() })
       }
 
