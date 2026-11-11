@@ -1,7 +1,8 @@
 /// <reference types="@cloudflare/workers-types" />
 import { describe, expect, it, vi } from 'vitest'
 
-import worker from './index.js'
+import worker, { createW05SocialWorker } from './index.js'
+import type { FollowListReadInput, FollowListReadRow, FollowListCountInput, FollowListReadStore } from './follow-list-read-store.js'
 
 
 const dbFor = (results: unknown[] = []) => {
@@ -51,6 +52,73 @@ const publishedContextBinding = () => ({
       data: { contentId, ownerUserId: 'owner-1', contentType: 'post', state: 'PUBLISHED', updatedAt: '2026-10-17T04:00:00.000Z' },
     })
   }),
+})
+
+describe('W05 follow-list PostgreSQL runtime injection', () => {
+  it('uses an injected follow-list store for both HTTP routes without touching D1', async () => {
+    const store: FollowListReadStore = {
+      list: vi.fn(async (input: FollowListReadInput): Promise<readonly FollowListReadRow[]> => [{
+        relationship_id: input.direction === 'followers' ? 'rel-follower' : 'rel-following',
+        user_id: input.direction === 'followers' ? 'follower-user' : 'followed-user',
+        followed_at: '2026-11-11T08:00:00.000Z',
+        cursor_created_at: '2026-11-11T08:00:00.000000Z',
+      }]),
+      count: vi.fn(async (_input: FollowListCountInput) => 1),
+    }
+    const d1Prepare = vi.fn()
+    const injectedWorker = createW05SocialWorker({ followListReadStore: store })
+    const env = { DB: { prepare: d1Prepare } } as never
+
+    const followers = await injectedWorker.fetch(
+      request('/internal/social/users/target-user/followers', transportHeaders),
+      env,
+      {} as never,
+    )
+    const following = await injectedWorker.fetch(
+      request('/internal/social/users/owner-user/following', transportHeaders),
+      env,
+      {} as never,
+    )
+
+    expect(followers.status).toBe(200)
+    await expect(followers.json()).resolves.toMatchObject({
+      data: { items: [{ relationshipId: 'rel-follower', userId: 'follower-user' }], totalCount: 1 },
+    })
+    expect(following.status).toBe(200)
+    await expect(following.json()).resolves.toMatchObject({
+      data: { items: [{ relationshipId: 'rel-following', userId: 'followed-user' }], totalCount: 1 },
+    })
+    expect(store.list).toHaveBeenNthCalledWith(1, {
+      userId: 'target-user', direction: 'followers', cursor: null, limit: 20,
+    })
+    expect(store.list).toHaveBeenNthCalledWith(2, {
+      userId: 'owner-user', direction: 'following', cursor: null, limit: 20,
+    })
+    expect(d1Prepare).not.toHaveBeenCalled()
+  })
+
+  it('keeps D1 as the default follow-list adapter when no dependency is injected', async () => {
+    const prepare = vi.fn((_sql: string) => ({
+      bind: vi.fn(() => ({
+        first: vi.fn(async () => ({ total_count: 1 })),
+        all: vi.fn(async () => ({ results: [{
+          relationship_id: 'rel-d1',
+          user_id: 'd1-follower',
+          followed_at: '2026-11-11T08:00:00.000Z',
+        }] })),
+      })),
+    }))
+    const response = await worker.fetch(
+      request('/internal/social/users/target-user/followers', transportHeaders),
+      { DB: { prepare } as unknown as D1Database },
+      {} as never,
+    )
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      data: { items: [{ relationshipId: 'rel-d1', userId: 'd1-follower' }], totalCount: 1 },
+    })
+    expect(prepare).toHaveBeenCalled()
+  })
 })
 
 describe('W05 topic page transport', () => {
