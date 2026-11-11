@@ -37,6 +37,7 @@ import {
   upsertPushEndpoint,
 } from './push-endpoint-runtime.js'
 import { castContentPollVote, configureContentPoll, deleteContentPoll, getContentPoll, SocialPollError } from './poll-runtime.js'
+import { CommentNotificationContextRuntimeError, getPublishedCommentNotificationContext } from './comment-notification-context-runtime.js'
 import {
   FollowRuntimeError,
   follow,
@@ -160,23 +161,27 @@ const getPublishedContentOwnerUserId = async (
   }
 }
 
-const getInteractionRecipient = async (
+const getInteractionNotificationContext = async (
   db: D1Database,
   targetType: string,
   targetId: string,
   w03Content: W03ContentBinding | undefined,
   correlationId: string,
-): Promise<string | null> => {
+): Promise<{ recipientUserId: string | null; contentId: string | null }> => {
   if (targetType === 'content') {
-    return getPublishedContentOwnerUserId(w03Content, targetId, correlationId)
+    return {
+      recipientUserId: await getPublishedContentOwnerUserId(w03Content, targetId, correlationId),
+      contentId: null,
+    }
   }
   if (targetType === 'comment') {
-    const row = await db.prepare(
-      'SELECT author_user_id FROM social_comments WHERE id = ? AND state = \'PUBLISHED\' LIMIT 1',
-    ).bind(targetId).first<{ author_user_id: string | null }>()
-    return row?.author_user_id ?? null
+    const row = await getPublishedCommentNotificationContext(db, targetId)
+    return {
+      recipientUserId: row?.author_user_id ?? null,
+      contentId: row?.content_id ?? null,
+    }
   }
-  return null
+  return { recipientUserId: null, contentId: null }
 }
 
 const decodePathPart = (value: string): string | null => {
@@ -881,9 +886,7 @@ export default {
         await syncSocialTokens(env.DB, viewerUserId, 'comment', comment.id, bodyValue, mentionTargets)
         const persistedMentions = await getSocialTargets(env.DB, 'comment', comment.id)
         if (parentId) {
-          const parent = await env.DB.prepare(
-            'SELECT author_user_id FROM social_comments WHERE id = ? AND state = \'PUBLISHED\' LIMIT 1',
-          ).bind(parentId).first<{ author_user_id: string | null }>()
+          const parent = await getPublishedCommentNotificationContext(env.DB, parentId)
           if (parent?.author_user_id) {
             await enqueueNotification(env.DB, {
               recipientUserId: parent.author_user_id,
@@ -1004,22 +1007,23 @@ export default {
             ? await fetchPublishedContentSocialContext(env.W03_CONTENT, { contentId: target.targetId, correlationId })
             : undefined
           const result = await like(env.DB, env.W03_CONTENT, viewerUserId, target, correlationId, publishedContentContext)
-          const recipientUserId = publishedContentContext
-            ? publishedContentContext.ownerUserId
-            : await getInteractionRecipient(env.DB, target.targetType, target.targetId, env.W03_CONTENT, correlationId)
-          const relatedContent = target.targetType === 'comment'
-            ? await env.DB.prepare(
-                'SELECT content_id FROM social_comments WHERE id = ? LIMIT 1',
-              ).bind(target.targetId).first<{ content_id: string }>()
-            : null
-          if (recipientUserId) {
+          const notificationContext = publishedContentContext
+            ? { recipientUserId: publishedContentContext.ownerUserId, contentId: null }
+            : await getInteractionNotificationContext(
+                env.DB,
+                target.targetType,
+                target.targetId,
+                env.W03_CONTENT,
+                correlationId,
+              )
+          if (notificationContext.recipientUserId) {
             await enqueueNotification(env.DB, {
-              recipientUserId,
+              recipientUserId: notificationContext.recipientUserId,
               actorUserId: viewerUserId,
               type: 'LIKE',
               targetType: target.targetType as 'content' | 'comment',
               targetId: target.targetId,
-              payload: relatedContent?.content_id ? { contentId: relatedContent.content_id } : undefined,
+              payload: notificationContext.contentId ? { contentId: notificationContext.contentId } : undefined,
             })
           }
           return json({ data: result, requestId: createRequestId() }, 200)
@@ -1170,6 +1174,7 @@ export default {
     } catch (error) {
       if (
         error instanceof PushEndpointRuntimeError ||
+        error instanceof CommentNotificationContextRuntimeError ||
         error instanceof SocialPollError ||
         error instanceof FollowRuntimeError ||
         error instanceof LikeRuntimeError ||
