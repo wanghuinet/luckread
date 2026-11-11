@@ -14,6 +14,9 @@ on:
       - 'contracts/transport/worker-d1-access-boundary.v1.json'
       - 'workers/W07-subscription-commerce/migrations-d1-04/0001_order_commerce.sql'
       - 'workers/W07-subscription-commerce/migrations-d1-04/0002_payment_provider_events.sql'
+      - 'workers/W07-subscription-commerce/src/order-persistence.ts'
+      - 'workers/W07-subscription-commerce/src/order-create-store-postgres.ts'
+      - 'workers/W07-subscription-commerce/src/order-create-store-postgres.test.ts'
       - 'workers/W07-subscription-commerce/scripts/test_order_d1_04_migration.py'
       - 'workers/W07-subscription-commerce/scripts/neon-d1-04/**'
       - 'workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/**'
@@ -30,6 +33,9 @@ on:
       - 'contracts/transport/worker-d1-access-boundary.v1.json'
       - 'workers/W07-subscription-commerce/migrations-d1-04/0001_order_commerce.sql'
       - 'workers/W07-subscription-commerce/migrations-d1-04/0002_payment_provider_events.sql'
+      - 'workers/W07-subscription-commerce/src/order-persistence.ts'
+      - 'workers/W07-subscription-commerce/src/order-create-store-postgres.ts'
+      - 'workers/W07-subscription-commerce/src/order-create-store-postgres.test.ts'
       - 'workers/W07-subscription-commerce/scripts/test_order_d1_04_migration.py'
       - 'workers/W07-subscription-commerce/scripts/neon-d1-04/**'
       - 'workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/**'
@@ -100,6 +106,17 @@ jobs:
             --set ON_ERROR_STOP=1 --no-psqlrc \
             --file workers/W07-subscription-commerce/scripts/neon-d1-04/verify-w07-order-payment-postgres-schema.sql \
             | tee artifacts/neon/w07-d1-04-order-payment-postflight.txt
+
+      - name: Install pinned W02 PostgreSQL driver and TS runner for W07 runtime rehearsal
+        working-directory: workers/W02-identity
+        run: npm install --ignore-scripts --no-audit --no-fund
+
+      - name: Rehearse W07 order persistence against PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          W07_ORDER_PERSISTENCE_POSTGRES_DATABASE_URL: postgresql://schema_generator:schema_local_only@127.0.0.1:5432/luckread_finance_schema
+          W07_ORDER_PERSISTENCE_POSTGRES_REPORT: ../../artifacts/neon/w07-order-persistence-postgres-runtime-postflight.json
+        run: node --import=tsx/esm ../../workers/W07-subscription-commerce/scripts/neon-d1-04/rehearse-order-persistence-postgres-runtime.mjs
 
       - name: Upload W07 D1-04 PostgreSQL 18 rehearsal evidence
         if: always()
