@@ -5,6 +5,7 @@ import worker, { createW05SocialWorker } from './index.js'
 import type { CommentListReadInput, CommentListReadRow, CommentListReadStore } from './comment-list-read-store.js'
 import type { FollowListReadInput, FollowListReadRow, FollowListCountInput, FollowListReadStore } from './follow-list-read-store.js'
 import type { BlockMuteListReadInput, BlockMuteListReadRow, BlockMuteListReadStore } from './block-mute-list-read-store.js'
+import type { ProfileChannelReadStore } from './profile-channel-read-store.js'
 import type { FollowingAuthorIdRow, FollowingAuthorIdsReadStore } from './following-author-ids-read-store.js'
 
 
@@ -177,6 +178,88 @@ describe('W05 following-feed author PostgreSQL runtime injection', () => {
     expect(d1Prepare).toHaveBeenCalledTimes(1)
     expect(bind).toHaveBeenCalledWith('viewer-1', 'viewer-1', 'viewer-1', 'viewer-1', 501)
     expect(all).toHaveBeenCalledTimes(1)
+  })
+})
+
+
+describe('W05 profile-channel PostgreSQL runtime injection', () => {
+  it('uses the injected profile-channel store for replies and likes without touching D1', async () => {
+    const store: ProfileChannelReadStore = {
+      profileVisibility: vi.fn(async () => ({ blocked: false, muted: false })),
+      listReplies: vi.fn(async () => [{
+        id: 'reply-pg-1',
+        content_id: 'content-reply-pg',
+        author_user_id: 'profile-user',
+        parent_id: null,
+        body: 'PostgreSQL profile reply',
+        state: 'PUBLISHED' as const,
+        depth: 0,
+        created_at: '2026-11-11T08:00:00.000000Z',
+        updated_at: '2026-11-11T08:00:00.000000Z',
+      }]),
+      listReplyOwnerBlockRelations: vi.fn(async () => []),
+      listLikedContents: vi.fn(async () => [{
+        relationship_id: 'like-pg-1',
+        target_id: 'content-liked-pg',
+        created_at: '2026-11-11T07:00:00.000000Z',
+      }]),
+      listLikedContentBlockRelations: vi.fn(async () => []),
+      listMutedOwners: vi.fn(async () => []),
+    }
+    const d1Prepare = vi.fn()
+    const injectedWorker = createW05SocialWorker({ profileChannelReadStore: store })
+    const env = {
+      DB: { prepare: d1Prepare },
+      W03_CONTENT: publishedContextsBatchBinding(),
+    } as never
+
+    const replies = await injectedWorker.fetch(
+      request('/internal/social/users/profile-user/replies?limit=6', transportHeaders),
+      env,
+      {} as never,
+    )
+    const likes = await injectedWorker.fetch(
+      request('/internal/social/users/profile-user/likes?limit=6', transportHeaders),
+      env,
+      {} as never,
+    )
+
+    expect(replies.status).toBe(200)
+    await expect(replies.json()).resolves.toMatchObject({
+      data: { items: [{ id: 'reply-pg-1', contentId: 'content-reply-pg' }], hasMore: false, nextCursor: null },
+    })
+    expect(likes.status).toBe(200)
+    await expect(likes.json()).resolves.toMatchObject({
+      data: { items: [{ contentId: 'content-liked-pg' }], hasMore: false, nextCursor: null },
+    })
+    expect(store.profileVisibility).toHaveBeenCalledWith({
+      profileUserId: 'profile-user',
+      viewerUserId: 'viewer-1',
+    })
+    expect(store.listReplies).toHaveBeenCalledWith({
+      profileUserId: 'profile-user',
+      cursor: null,
+      limit: 7,
+    })
+    expect(store.listLikedContents).toHaveBeenCalledWith({
+      profileUserId: 'profile-user',
+      viewerUserId: 'viewer-1',
+      cursor: null,
+      limit: 7,
+    })
+    expect(store.listReplyOwnerBlockRelations).toHaveBeenCalledWith({
+      profileUserId: 'profile-user',
+      ownerUserIds: ['owner-1'],
+    })
+    expect(store.listLikedContentBlockRelations).toHaveBeenCalledWith({
+      principalUserIds: ['profile-user', 'viewer-1'],
+      ownerUserIds: ['owner-1'],
+    })
+    expect(store.listMutedOwners).toHaveBeenCalledWith({
+      viewerUserId: 'viewer-1',
+      ownerUserIds: ['owner-1'],
+    })
+    expect(d1Prepare).not.toHaveBeenCalled()
   })
 })
 
