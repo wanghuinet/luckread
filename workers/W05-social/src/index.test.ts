@@ -2,6 +2,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import worker, { createW05SocialWorker } from './index.js'
+import type { CommentListReadInput, CommentListReadRow, CommentListReadStore } from './comment-list-read-store.js'
 import type { FollowListReadInput, FollowListReadRow, FollowListCountInput, FollowListReadStore } from './follow-list-read-store.js'
 
 
@@ -1278,6 +1279,68 @@ describe('W05 social query transport', () => {
   })
 })
 
+
+describe('W05 PostgreSQL comment-list runtime injection', () => {
+  it('uses the injected comment read store after W03 publication validation without touching D1', async () => {
+    const commentListReadStore: CommentListReadStore = {
+      list: vi.fn(async (input: CommentListReadInput): Promise<CommentListReadRow[]> => [{
+        id: 'comment-postgres-1',
+        content_id: input.contentId,
+        author_user_id: 'comment-author',
+        parent_id: null,
+        body: 'Comment from injected PostgreSQL store',
+        state: 'PUBLISHED',
+        depth: 0,
+        created_at: '2026-11-11T08:00:00.000Z',
+        updated_at: '2026-11-11T08:00:00.000Z',
+        mentions_json: '[]',
+        liked_by_viewer: false,
+        thread_created_at: '2026-11-11T08:00:00.000Z',
+        thread_id: 'comment-postgres-1',
+        thread_like_count: 0,
+      }]),
+    }
+    const d1Prepare = vi.fn()
+    const binding = publishedContextBinding()
+    const injectedWorker = createW05SocialWorker({ commentListReadStore })
+    const response = await injectedWorker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/contents/content-1/comments?limit=20&sort=recent', {
+        headers: {
+          'X-LuckRead-Caller': 'W01',
+          'X-LuckRead-Transport-Version': '1.0',
+          'X-LuckRead-Correlation-Id': 'comment-postgres-route',
+          'X-LuckRead-Principal-User-Id': 'viewer-1',
+        },
+      }),
+      { DB: { prepare: d1Prepare }, W03_CONTENT: binding } as never,
+      {} as never,
+    )
+
+    expect(response.status).toBe(200)
+    expect(binding.fetch).toHaveBeenCalledTimes(1)
+    expect(commentListReadStore.list).toHaveBeenCalledWith({
+      contentId: 'content-1',
+      viewerUserId: 'viewer-1',
+      limit: 20,
+      sort: 'recent',
+      cursor: null,
+    })
+    await expect(response.json()).resolves.toMatchObject({
+      data: {
+        items: [{
+          id: 'comment-postgres-1',
+          contentId: 'content-1',
+          authorUserId: 'comment-author',
+          body: 'Comment from injected PostgreSQL store',
+          likedByViewer: false,
+        }],
+        hasMore: false,
+        nextCursor: null,
+      },
+    })
+    expect(d1Prepare).not.toHaveBeenCalled()
+  })
+})
 
 describe('W05 social comment transport', () => {
   const commentHeaders = {
