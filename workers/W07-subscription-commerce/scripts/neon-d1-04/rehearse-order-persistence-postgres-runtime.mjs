@@ -234,8 +234,12 @@ try {
     checks.failedKeyCanBeRetried = true
   }
 
-  const allPassed = Object.values(checks).every(Boolean)
-  if (!allPassed) throw new Error('W07 order persistence rehearsal incomplete: ' + JSON.stringify(checks))
+  const scenarioChecks = Object.entries(checks)
+    .filter(([name]) => name !== 'fixtureRowsCleaned')
+    .map(([, passed]) => passed)
+  if (scenarioChecks.some((passed) => !passed)) {
+    throw new Error('W07 order persistence rehearsal incomplete: ' + JSON.stringify(checks))
+  }
 } finally {
   await clearFixtures()
   const [orders, lines, idempotency] = await Promise.all([
