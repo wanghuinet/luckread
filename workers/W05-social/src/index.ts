@@ -16,6 +16,7 @@ import { ShareRuntimeError, createShare, resolveShare } from './share-runtime.js
 import { RepostRuntimeError, createRepost, removeRepost } from './repost-runtime.js'
 import { ProfilePinRuntimeError, getProfilePinReference, pinProfileContent, unpinProfileContent } from './profile-pin-runtime.js'
 import { BlockMuteRuntimeError, listRelations, parseBlockMuteListLimit, removeRelation, setRelation } from './block-mute-runtime.js'
+import type { BlockMuteListReadStore } from './block-mute-list-read-store.js'
 import { getRelationshipGraph, invalidateRelationshipGraph, RelationshipGraphRuntimeError } from './relationship-graph-runtime.js'
 import {
   SocialClosureRuntimeError,
@@ -253,6 +254,8 @@ export type W05SocialWorkerDependencies = Readonly<{
   followListReadStore?: FollowListReadStore
   /** Optional PostgreSQL-capable comment page reader; D1 remains the deployed default. */
   commentListReadStore?: CommentListReadStore
+  /** Optional PostgreSQL-capable Block/Mute list reader; D1 remains the deployed default. */
+  blockMuteListReadStore?: BlockMuteListReadStore
 }>
 
 export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies = {}) {
@@ -378,7 +381,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
           }
           const limit = parseBlockMuteListLimit(limitValues[0] ?? null)
           return json({
-            data: await listRelations(env.DB, actorUserId, relationType, cursorValues[0] ?? null, limit),
+            data: await listRelations(dependencies.blockMuteListReadStore ?? env.DB, actorUserId, relationType, cursorValues[0] ?? null, limit),
             requestId: createRequestId(),
           })
         }
