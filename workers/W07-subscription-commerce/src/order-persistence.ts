@@ -78,7 +78,8 @@ export type OrderPersistenceErrorCode =
   | 'CONFLICT'
   | 'IDEMPOTENCY_KEY_REUSE_CONFLICT'
   | 'IDEMPOTENCY_IN_PROGRESS'
-  | 'INTEGRITY_VIOLATION';
+  | 'INTEGRITY_VIOLATION'
+  | 'SERVICE_UNAVAILABLE';
 
 export class OrderPersistenceError extends Error {
   constructor(readonly code: OrderPersistenceErrorCode, readonly status: number) {
@@ -87,7 +88,7 @@ export class OrderPersistenceError extends Error {
   }
 }
 
-type IdempotencyRow = {
+export type OrderCreateIdempotencyRow = {
   id: string;
   customer_id: string;
   operation_key: string;
@@ -99,6 +100,52 @@ type IdempotencyRow = {
   created_at: string;
   expires_at: string;
 };
+
+type IdempotencyRow = OrderCreateIdempotencyRow;
+
+export type OrderCreateTransactionInput = Readonly<{
+  customerId: string;
+  idempotencyId: string;
+  operationKey: string;
+  idempotencyKey: string;
+  requestHash: string;
+  createdAt: string;
+  expiresAt: string;
+  responseJson: string;
+  order: Readonly<{
+    orderId: string;
+    currency: string;
+    subtotalMinor: number;
+    discountMinor: number;
+    taxMinor: number;
+    totalMinor: number;
+  }>;
+  lines: readonly Readonly<{
+    orderLineId: string;
+    item: AuthoritativelyPricedOrderItem;
+    lineSubtotalMinor: number;
+    lineTotalMinor: number;
+  }>[];
+}>;
+
+export type OrderCreateTransactionResult = Readonly<{
+  statementCount: number;
+  expireChanges: number;
+  claimChanges: number;
+  completionChanges: number;
+  orderChanges: number;
+  lineChanges: readonly number[];
+}>;
+
+/**
+ * Injected order-create persistence boundary. The D1 adapter remains the
+ * default; the PostgreSQL adapter owns the same atomic claim/order/lines
+ * transaction and is used only by explicit local rehearsal until cutover.
+ */
+export interface OrderCreatePersistenceStore {
+  readIdempotencyRow(customerId: string, idempotencyKey: string): Promise<OrderCreateIdempotencyRow | null>;
+  persistNewOrder(input: OrderCreateTransactionInput): Promise<OrderCreateTransactionResult>;
+}
 
 type OrderRow = {
   order_id: string;
@@ -343,6 +390,71 @@ const readIdempotencyRow = async (
   'FROM order_create_idempotency WHERE customer_id = ? AND operation_key = ? AND idempotency_key = ? LIMIT 1',
 ).bind(customerId, OPERATION_KEY, idempotencyKey).first<IdempotencyRow>();
 
+function isOrderCreatePersistenceStore(
+  source: D1Database | OrderCreatePersistenceStore,
+): source is OrderCreatePersistenceStore {
+  const candidate = source as Partial<OrderCreatePersistenceStore>;
+  return typeof candidate.readIdempotencyRow === 'function' &&
+    typeof candidate.persistNewOrder === 'function';
+}
+
+async function persistNewOrderWithD1(
+  db: D1Database,
+  input: OrderCreateTransactionInput,
+): Promise<OrderCreateTransactionResult> {
+  const { customerId, idempotencyId, operationKey, idempotencyKey, requestHash, createdAt, expiresAt, responseJson, order } = input;
+  const statements: D1PreparedStatement[] = [
+    db.prepare(
+      '/* pay002:expire */ DELETE FROM order_create_idempotency ' +
+      'WHERE customer_id = ? AND operation_key = ? AND idempotency_key = ? AND expires_at <= ?',
+    ).bind(customerId, operationKey, idempotencyKey, createdAt),
+    db.prepare(
+      '/* pay002:claim */ INSERT INTO order_create_idempotency ' +
+      '(id, customer_id, operation_key, idempotency_key, request_hash, state, response_status, response_json, created_at, expires_at) ' +
+      "VALUES (?, ?, ?, ?, ?, 'IN_PROGRESS', NULL, NULL, ?, ?) " +
+      'ON CONFLICT(customer_id, operation_key, idempotency_key) DO NOTHING',
+    ).bind(idempotencyId, customerId, operationKey, idempotencyKey, requestHash, createdAt, expiresAt),
+    db.prepare(
+      '/* pay002:complete */ UPDATE order_create_idempotency ' +
+      "SET state = 'COMPLETED', response_status = 201, response_json = ? " +
+      "WHERE id = ? AND customer_id = ? AND operation_key = ? AND idempotency_key = ? AND request_hash = ? AND state = 'IN_PROGRESS'",
+    ).bind(responseJson, idempotencyId, customerId, operationKey, idempotencyKey, requestHash),
+    db.prepare(
+      '/* pay002:order */ INSERT INTO orders ' +
+      '(order_id, customer_id, status, version, currency, subtotal_minor, discount_minor, tax_minor, total_minor, created_at, updated_at, confirmed_at, cancelled_at, failure_code) ' +
+      "SELECT ?, ?, 'CREATED', 1, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL " +
+      "WHERE EXISTS (SELECT 1 FROM order_create_idempotency WHERE id = ? AND customer_id = ? AND operation_key = ? AND idempotency_key = ? AND request_hash = ? AND state = 'COMPLETED' AND response_json = ?)",
+    ).bind(
+      order.orderId, customerId, order.currency, order.subtotalMinor, order.discountMinor,
+      order.taxMinor, order.totalMinor, createdAt, createdAt,
+      idempotencyId, customerId, operationKey, idempotencyKey, requestHash, responseJson,
+    ),
+    ...input.lines.map(({ orderLineId, item, lineSubtotalMinor, lineTotalMinor }) =>
+      db.prepare(
+        '/* pay002:line */ INSERT INTO order_lines ' +
+        '(order_line_id, order_id, item_type, item_ref, item_version, quantity, unit_amount_minor, line_subtotal_minor, line_discount_minor, line_tax_minor, line_total_minor, item_snapshot_json, created_at) ' +
+        'SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE EXISTS ' +
+        '(SELECT 1 FROM orders WHERE order_id = ? AND customer_id = ?)',
+      ).bind(
+        orderLineId, order.orderId, item.itemType, item.itemRef, item.itemVersion, item.quantity,
+        item.unitAmountMinor, lineSubtotalMinor, item.lineDiscountMinor, item.lineTaxMinor,
+        lineTotalMinor, item.itemSnapshotJson, createdAt, order.orderId, customerId,
+      ),
+    ),
+  ];
+
+  // D1 batch remains the production path and commits this complete ordered set atomically.
+  const results = await db.batch(statements);
+  return {
+    statementCount: results.length,
+    expireChanges: Number(results[0]?.meta?.changes ?? 0),
+    claimChanges: Number(results[1]?.meta?.changes ?? 0),
+    completionChanges: Number(results[2]?.meta?.changes ?? 0),
+    orderChanges: Number(results[3]?.meta?.changes ?? 0),
+    lineChanges: results.slice(4).map((result) => Number(result?.meta?.changes ?? 0)),
+  };
+}
+
 const replayOrReject = (
   row: IdempotencyRow,
   requestHash: string,
@@ -471,7 +583,7 @@ const validatePricing = (
 };
 
 export async function createCommerceOrder(
-  db: D1Database,
+  db: D1Database | OrderCreatePersistenceStore,
   customerIdInput: string,
   idempotencyKeyInput: string | null | undefined,
   rawRequest: unknown,
@@ -495,7 +607,11 @@ export async function createCommerceOrder(
   if (!Number.isFinite(nowDate.getTime())) throw new OrderPersistenceError('INTEGRITY_VIOLATION', 500);
   const now = nowDate.toISOString();
 
-  const existing = await readIdempotencyRow(db, customerId, key);
+  const store = isOrderCreatePersistenceStore(db) ? db : null;
+  const readExistingIdempotencyRow = () => store
+    ? store.readIdempotencyRow(customerId, key)
+    : readIdempotencyRow(db as D1Database, customerId, key);
+  const existing = await readExistingIdempotencyRow();
   if (existing) {
     const replay = replayOrReject(existing, requestHash, now);
     if (replay) return replay;
@@ -546,63 +662,43 @@ export async function createCommerceOrder(
     throw new OrderPersistenceError('INTEGRITY_VIOLATION', 500);
   }
 
-  const statements: D1PreparedStatement[] = [
-    db.prepare(
-      '/* pay002:expire */ DELETE FROM order_create_idempotency ' +
-      'WHERE customer_id = ? AND operation_key = ? AND idempotency_key = ? AND expires_at <= ?',
-    ).bind(customerId, OPERATION_KEY, key, now),
-    db.prepare(
-      '/* pay002:claim */ INSERT INTO order_create_idempotency ' +
-      '(id, customer_id, operation_key, idempotency_key, request_hash, state, response_status, response_json, created_at, expires_at) ' +
-      "VALUES (?, ?, ?, ?, ?, 'IN_PROGRESS', NULL, NULL, ?, ?) " +
-      'ON CONFLICT(customer_id, operation_key, idempotency_key) DO NOTHING',
-    ).bind(idempotencyId, customerId, OPERATION_KEY, key, requestHash, createdAt, expiresAt),
-    db.prepare(
-      '/* pay002:complete */ UPDATE order_create_idempotency ' +
-      "SET state = 'COMPLETED', response_status = 201, response_json = ? " +
-      "WHERE id = ? AND customer_id = ? AND operation_key = ? AND idempotency_key = ? AND request_hash = ? AND state = 'IN_PROGRESS'",
-    ).bind(responseJson, idempotencyId, customerId, OPERATION_KEY, key, requestHash),
-    db.prepare(
-      '/* pay002:order */ INSERT INTO orders ' +
-      '(order_id, customer_id, status, version, currency, subtotal_minor, discount_minor, tax_minor, total_minor, created_at, updated_at, confirmed_at, cancelled_at, failure_code) ' +
-      "SELECT ?, ?, 'CREATED', 1, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL " +
-      "WHERE EXISTS (SELECT 1 FROM order_create_idempotency WHERE id = ? AND customer_id = ? AND operation_key = ? AND idempotency_key = ? AND request_hash = ? AND state = 'COMPLETED' AND response_json = ?)",
-    ).bind(
-      orderId, customerId, pricing.currency, pricing.subtotalMinor, pricing.discountMinor,
-      pricing.taxMinor, pricing.totalMinor, createdAt, createdAt,
-      idempotencyId, customerId, OPERATION_KEY, key, requestHash, responseJson,
-    ),
-    ...lineRecords.map(({ orderLineId, item, lineSubtotalMinor, lineTotalMinor }) =>
-      db.prepare(
-        '/* pay002:line */ INSERT INTO order_lines ' +
-        '(order_line_id, order_id, item_type, item_ref, item_version, quantity, unit_amount_minor, line_subtotal_minor, line_discount_minor, line_tax_minor, line_total_minor, item_snapshot_json, created_at) ' +
-        'SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE EXISTS ' +
-        '(SELECT 1 FROM orders WHERE order_id = ? AND customer_id = ?)',
-      ).bind(
-        orderLineId, orderId, item.itemType, item.itemRef, item.itemVersion, item.quantity,
-        item.unitAmountMinor, lineSubtotalMinor, item.lineDiscountMinor, item.lineTaxMinor,
-        lineTotalMinor, item.itemSnapshotJson, createdAt, orderId, customerId,
-      ),
-    ),
-  ];
+  const transactionInput: OrderCreateTransactionInput = {
+    customerId,
+    idempotencyId,
+    operationKey: OPERATION_KEY,
+    idempotencyKey: key,
+    requestHash,
+    createdAt,
+    expiresAt,
+    responseJson,
+    order: {
+      orderId,
+      currency: pricing.currency,
+      subtotalMinor: pricing.subtotalMinor,
+      discountMinor: pricing.discountMinor,
+      taxMinor: pricing.taxMinor,
+      totalMinor: pricing.totalMinor,
+    },
+    lines: lineRecords,
+  };
+  const result = store
+    ? await store.persistNewOrder(transactionInput)
+    : await persistNewOrderWithD1(db as D1Database, transactionInput);
 
-  // D1 batch wraps this ordered set in one transaction. If any insert violates a
-  // database constraint, the claim, Order and all OrderLines roll back together.
-  const results = await db.batch(statements);
-  const claimChanges = Number(results[1]?.meta?.changes ?? 0);
-  if (claimChanges !== 1) {
-    const raced = await readIdempotencyRow(db, customerId, key);
+  if (result.claimChanges !== 1) {
+    const raced = await readExistingIdempotencyRow();
     if (!raced) throw new OrderPersistenceError('INTEGRITY_VIOLATION', 500);
     const replay = replayOrReject(raced, requestHash, now);
     if (replay) return replay;
     throw new OrderPersistenceError('IDEMPOTENCY_IN_PROGRESS', 409);
   }
 
-  if (results.length !== statements.length ||
-      ![0, 1].includes(Number(results[0]?.meta?.changes ?? 0)) ||
-      Number(results[2]?.meta?.changes ?? 0) !== 1 ||
-      Number(results[3]?.meta?.changes ?? 0) !== 1 ||
-      results.slice(4).some((result) => Number(result?.meta?.changes ?? 0) !== 1)) {
+  if (result.statementCount !== lineRecords.length + 4 ||
+      ![0, 1].includes(result.expireChanges) ||
+      result.completionChanges !== 1 ||
+      result.orderChanges !== 1 ||
+      result.lineChanges.length !== lineRecords.length ||
+      result.lineChanges.some((changes) => changes !== 1)) {
     throw new OrderPersistenceError('INTEGRITY_VIOLATION', 500);
   }
 
