@@ -3,6 +3,7 @@ import {
   buildCommentListReadQuery,
   CommentListReadStoreError,
   createD1CommentListReadStore,
+  type CommentListReadD1Executor,
   type CommentListReadInput,
   type CommentListReadRow,
 } from './comment-list-read-store.js'
@@ -38,7 +39,7 @@ describe('comment list D1 read store', () => {
       },
     }
 
-    const store = createD1CommentListReadStore(db)
+    const store = createD1CommentListReadStore(db as unknown as CommentListReadD1Executor)
     await expect(store.list(input())).resolves.toEqual([])
     expect(all).toHaveBeenCalledOnce()
     expect(values).toHaveLength(1)
@@ -100,7 +101,7 @@ describe('comment list D1 read store', () => {
         return { bind() { return { async all() { throw new Error('private database detail') } } } }
       },
     }
-    await expect(createD1CommentListReadStore(broken).list(input())).rejects.toBeInstanceOf(CommentListReadStoreError)
-    await expect(createD1CommentListReadStore(broken).list(input())).rejects.toThrow('COMMENT_LIST_READ_STORE_UNAVAILABLE')
+    await expect(createD1CommentListReadStore(broken as unknown as CommentListReadD1Executor).list(input())).rejects.toBeInstanceOf(CommentListReadStoreError)
+    await expect(createD1CommentListReadStore(broken as unknown as CommentListReadD1Executor).list(input())).rejects.toThrow('COMMENT_LIST_READ_STORE_UNAVAILABLE')
   })
 })
