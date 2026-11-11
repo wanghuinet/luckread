@@ -30,7 +30,7 @@ const publishedBinding = (status = 200) => ({
 const favoriteRow = {
   relationship_id: 'favorite-1',
   actor_user_id: 'user-1',
-  target_type: 'content',
+  target_type: 'content' as const,
   target_id: 'content-1',
   created_at: '2026-10-02T00:00:00.000Z',
 }
