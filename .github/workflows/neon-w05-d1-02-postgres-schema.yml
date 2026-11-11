@@ -2,7 +2,7 @@ name: Neon W05 D1-02 PostgreSQL 18 Local Schema Rehearsal
 
 on:
   pull_request:
-    branches: [main, 'codex/w05-push-fanout-postgres-20261111', 'codex/w05-push-ticket-state-postgres-20261111', 'codex/w05-push-send-claim-postgres-20261111', 'codex/w05-push-receipt-lifecycle-postgres-20261111']
+    branches: [main, 'codex/w05-push-fanout-postgres-20261111', 'codex/w05-push-ticket-state-postgres-20261111', 'codex/w05-push-send-claim-postgres-20261111', 'codex/w05-push-receipt-lifecycle-postgres-20261111', 'codex/w05-favorite-mutation-postgres-20261111']
     paths:
       - '.github/workflows/neon-w05-d1-02-postgres-schema.yml'
       - 'contracts/database/neon-d1-02-schema-sources.v1.json'
@@ -78,6 +78,13 @@ on:
       - 'workers/W05-social/src/favorite-mutation-store-postgres.ts'
       - 'workers/W05-social/src/favorite-mutation-store.test.ts'
       - 'workers/W05-social/src/favorite-mutation-store-postgres.test.ts'
+      - 'workers/W05-social/src/comment-notification-context-store.ts'
+      - 'workers/W05-social/src/comment-notification-context-store-postgres.ts'
+      - 'workers/W05-social/src/comment-notification-context-store.test.ts'
+      - 'workers/W05-social/src/comment-notification-context-store-postgres.test.ts'
+      - 'workers/W05-social/src/comment-notification-context-runtime.ts'
+      - 'workers/W05-social/src/comment-notification-context-runtime.test.ts'
+      - 'workers/W05-social/scripts/neon/rehearse-comment-notification-context-postgres-runtime.mjs'
       - 'workers/W05-social/scripts/neon/rehearse-favorite-mutation-postgres-runtime.mjs'
       - 'workers/W05-social/src/favorite-list-read-store.ts'
       - 'workers/W05-social/src/favorite-list-read-store-postgres.ts'
@@ -197,6 +204,7 @@ jobs:
           node --check workers/W05-social/scripts/neon/rehearse-reply-audience-postgres-runtime.mjs
           node --check workers/W05-social/scripts/neon/rehearse-comment-create-postgres-runtime.mjs
           node --check workers/W05-social/scripts/neon/rehearse-comment-mutation-postgres-runtime.mjs
+          node --check workers/W05-social/scripts/neon/rehearse-comment-notification-context-postgres-runtime.mjs
           node --check workers/W05-social/scripts/neon/rehearse-poll-read-postgres-runtime.mjs
           node --check workers/W05-social/scripts/neon/rehearse-poll-delete-postgres-runtime.mjs
           node --check workers/W05-social/scripts/neon/rehearse-poll-configuration-postgres-runtime.mjs
@@ -327,6 +335,13 @@ jobs:
           W05_FAVORITE_MUTATION_POSTGRES_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_w05_d1_02_schema
           W05_FAVORITE_MUTATION_POSTGRES_REPORT: ../../artifacts/neon/w05-favorite-mutation-postgres-runtime-postflight.json
         run: node --import=tsx/esm ../../workers/W05-social/scripts/neon/rehearse-favorite-mutation-postgres-runtime.mjs
+
+      - name: Rehearse W05 comment notification context against PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          W05_COMMENT_NOTIFICATION_CONTEXT_POSTGRES_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_w05_d1_02_schema
+          W05_COMMENT_NOTIFICATION_CONTEXT_POSTGRES_REPORT: ../../artifacts/neon/w05-comment-notification-context-postgres-runtime-postflight.json
+        run: node --import=tsx/esm ../../workers/W05-social/scripts/neon/rehearse-comment-notification-context-postgres-runtime.mjs
       - name: Rehearse W05 like status reads against PostgreSQL 18
         working-directory: workers/W02-identity
         env:
@@ -438,6 +453,7 @@ jobs:
             artifacts/neon/w05-push-receipt-postgres-runtime-postflight.json
             artifacts/neon/w05-favorite-list-postgres-runtime-postflight.json
             artifacts/neon/w05-favorite-mutation-postgres-runtime-postflight.json
+            artifacts/neon/w05-comment-notification-context-postgres-runtime-postflight.json
             artifacts/neon/w05-like-status-postgres-runtime-postflight.json
             artifacts/neon/w05-like-mutation-postgres-runtime-postflight.json
             artifacts/neon/w05-social-targets-postgres-runtime-postflight.json
