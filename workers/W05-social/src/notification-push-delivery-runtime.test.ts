@@ -8,8 +8,10 @@ import {
   notificationPushMessage,
   runNotificationPushBatch,
   claimDueDeliveries,
+  claimDueReceipts,
 } from './notification-push-delivery-runtime.js'
 import type { NotificationPushDeliveryClaimStore } from './notification-push-delivery-claim-store.js'
+import type { NotificationPushReceiptStore } from './notification-push-receipt-store.js'
 
 describe('W05 durable Expo push delivery runtime', () => {
   it('keeps push execution disabled unless explicitly enabled', async () => {
@@ -241,5 +243,24 @@ describe('W05 durable Expo push delivery runtime', () => {
     })
     expect(endpointDb.prepare).not.toHaveBeenCalled()
   })
+
+  it('cancels claimed receipts whose W05 outbox owner is missing',async()=>{
+    const candidate={
+      delivery_id:'receipt-1',notification_id:'notification-1',endpoint_id:'endpoint-1',
+      expo_ticket_id:'ticket-1',lease_token:'lease-1',attempt_count:2,receipt_poll_count:3,
+      push_token_hash:'a'.repeat(64),recipient_user_id:null,
+    }
+    const cancelMissingOutbox=vi.fn(async()=>true)
+    const store:NotificationPushReceiptStore={
+      claimDue:vi.fn(async()=>[candidate]),cancelMissingOutbox,
+      deferReceipt:vi.fn(async()=>true),timeoutReceipt:vi.fn(async()=>true),
+      acceptReceipt:vi.fn(async()=>true),failReceipt:vi.fn(async()=>true),
+    }
+    await expect(claimDueReceipts(store,new Date('2026-11-11T08:00:00.000Z'))).resolves.toEqual([])
+    expect(cancelMissingOutbox).toHaveBeenCalledWith({
+      deliveryId:'receipt-1',leaseToken:'lease-1',now:'2026-11-11T08:00:00.000Z',
+    })
+  })
+
 
 })
