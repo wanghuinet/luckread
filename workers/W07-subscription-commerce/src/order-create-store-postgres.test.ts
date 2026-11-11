@@ -215,12 +215,13 @@ describe('W07 PostgreSQL order-create persistence store', () => {
     const fake = fakePool({ failAt: 'connect' })
     const store = createPostgresOrderCreateStore(fake.pool)
 
-    await expect(store.persistNewOrder(INPUT)).rejects.toBeInstanceOf(OrderPersistenceError)
-    await expect(store.persistNewOrder(INPUT)).rejects.toMatchObject({
+    const error = store.persistNewOrder(INPUT)
+    await expect(error).rejects.toBeInstanceOf(OrderPersistenceError)
+    await expect(error).rejects.toMatchObject({
       code: 'SERVICE_UNAVAILABLE',
       status: 503,
     })
-    expect(fake.connected).toBe(2)
+    expect(fake.connected).toBe(1)
     expect(fake.calls).toHaveLength(0)
   })
 })
