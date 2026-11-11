@@ -49,6 +49,7 @@ import {
   unfollow,
 } from './follow-runtime.js'
 import type { FollowListReadStore } from './follow-list-read-store.js'
+import type { CommentListReadStore } from './comment-list-read-store.js'
 
 type RateLimitBinding = { limit(input: { key: string }): Promise<{ success: boolean }> }
 
@@ -250,6 +251,8 @@ const parseProfileChannelPath = (pathname: string): { userId: string; kind: 'rep
 export type W05SocialWorkerDependencies = Readonly<{
   /** Optional internal adapter injection; D1 remains the deployed default. */
   followListReadStore?: FollowListReadStore
+  /** Optional PostgreSQL-capable comment page reader; D1 remains the deployed default. */
+  commentListReadStore?: CommentListReadStore
 }>
 
 export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies = {}) {
@@ -843,7 +846,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
             contentId: commentContentId,
             correlationId: request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '',
           })
-          const page = await listComments(env.DB, commentContentId, cursor, limit, contentContext, viewerUserId, sort)
+          const page = await listComments(dependencies.commentListReadStore ?? env.DB, commentContentId, cursor, limit, contentContext, viewerUserId, sort)
           return json({ data: page, requestId: createRequestId() })
         }
 
