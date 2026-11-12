@@ -56,12 +56,13 @@ export function createD1NotificationPushEndpointAccessStore(
       try {
         const result = await db.prepare(
           "UPDATE notification_push_endpoints SET permission_status = 'undetermined', push_token = NULL, " +
-          "updated_at = ? WHERE endpoint_id = ? AND owner_user_id = ? AND provider = 'expo' " +
+          "updated_at = ? WHERE endpoint_id = ? AND owner_user_id = ? AND provider = ? " +
           "AND permission_status = 'granted' AND push_token = ?",
         ).bind(
           input.now,
           input.endpointId,
           input.ownerUserId,
+          'expo',
           input.expectedPushToken,
         ).run()
         return Number(result.meta?.changes ?? 0) === 1
