@@ -152,12 +152,13 @@ export async function ensureHyperdriveConfig({
 }) {
   accountId = required(accountId, 'CLOUDFLARE_ACCOUNT_ID')
   apiToken = required(apiToken, 'CLOUDFLARE_HYPERDRIVE_API_TOKEN')
-  if (
-    !target ||
-    typeof target.database !== 'string' ||
-    typeof target.configName !== 'string' ||
-    typeof target.domainId !== 'string'
-  ) {
+  const approvedTarget = HYPERDRIVE_TARGETS.some((candidate) =>
+    candidate.domainId === target?.domainId &&
+    candidate.database === target?.database &&
+    candidate.secret === target?.secret &&
+    candidate.configName === target?.configName,
+  )
+  if (!approvedTarget) {
     throw new Error('A registered Neon database target is required')
   }
 
