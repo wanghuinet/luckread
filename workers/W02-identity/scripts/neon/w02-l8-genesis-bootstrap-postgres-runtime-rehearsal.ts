@@ -119,6 +119,46 @@ async function readRoleVersion(subjectId: string): Promise<number> {
   return Number(result.rows[0]?.roleVersion ?? 0)
 }
 
+async function seedCandidate(input: {
+  userId: string
+  now: string
+  accountState: 'ACTIVE' | 'PENDING_VERIFICATION'
+  emailVerified: boolean
+  mfaEnabled: boolean
+  verifiedFactor: boolean
+  grantL2: boolean
+}): Promise<void> {
+  await pool!.query(
+    'INSERT INTO "user" ' +
+      '(id, name, email, email_verified, two_factor_enabled, account_state, account_state_version, mfa_enrolled_at) ' +
+      'VALUES ($1, $2, $3, $4, $5, $6, 1, $7)',
+    [
+      input.userId,
+      'L8 PG Rehearsal',
+      input.userId + '@example.invalid',
+      input.emailVerified,
+      input.mfaEnabled,
+      input.accountState,
+      input.mfaEnabled ? input.now : null,
+    ],
+  )
+  if (input.verifiedFactor) {
+    await pool!.query(
+      'INSERT INTO "twoFactor" (id, secret, "backupCodes", "userId", verified, "failedVerificationCount") ' +
+        'VALUES ($1, $2, $3, $4, TRUE, 0)',
+      ['l8-factor-' + input.userId, 'synthetic-secret-not-a-real-factor', '[]', input.userId],
+    )
+  }
+  if (input.grantL2) {
+    await pool!.query(
+      'INSERT INTO role_assignments ' +
+        '(id, subject_id, role_id, scope_type, scope_id, status, valid_from, valid_until, created_at, updated_at) ' +
+        "VALUES ($1, $2, 'verified_user', 'global', NULL, 'ACTIVE', $3, NULL, $3, $3)",
+      ['l8-l2-' + input.userId, input.userId, new Date(Date.parse(input.now) - 60_000).toISOString()],
+    )
+  }
+}
+
 try {
   const sourceCheck = await adminPool.query(
     "SELECT current_setting('server_version_num')::integer AS version_num",
@@ -141,26 +181,60 @@ try {
   assert.ok(triggerNames.has('l8_genesis_bootstrap_audit_no_update_or_delete'))
   assert.ok(triggerNames.has('l8_genesis_bootstrap_audit_no_truncate'))
 
-  const userId = 'w02l8rehearsal' + suffix
   const now = new Date().toISOString()
-  await pool.query(
-    'INSERT INTO "user" ' +
-      '(id, name, email, email_verified, two_factor_enabled, account_state, account_state_version, mfa_enrolled_at) ' +
-      'VALUES ($1, $2, $3, TRUE, TRUE, \'ACTIVE\', 1, $4)',
-    [userId, 'L8 PG Rehearsal', userId + '@example.invalid', now],
-  )
-  await pool.query(
-    'INSERT INTO "twoFactor" (id, secret, "backupCodes", "userId", verified, "failedVerificationCount") ' +
-      'VALUES ($1, $2, $3, $4, TRUE, 0)',
-    ['l8-factor-' + suffix, 'synthetic-secret-not-a-real-factor', '[]', userId],
-  )
-  await pool.query(
-    'INSERT INTO role_assignments ' +
-      '(id, subject_id, role_id, scope_type, scope_id, status, valid_from, valid_until, created_at, updated_at) ' +
-      "VALUES ($1, $2, 'verified_user', 'global', NULL, 'ACTIVE', $3, NULL, $3, $3)",
-    ['l8-l2-' + suffix, userId, new Date(Date.parse(now) - 60_000).toISOString()],
+  const pendingUserId = 'w02l8pending' + suffix
+  const mfaDisabledUserId = 'w02l8nomfa' + suffix
+  const missingL2UserId = 'w02l8nol2' + suffix
+  const userId = 'w02l8rehearsal' + suffix
+
+  await seedCandidate({
+    userId: pendingUserId,
+    now,
+    accountState: 'PENDING_VERIFICATION',
+    emailVerified: false,
+    mfaEnabled: false,
+    verifiedFactor: false,
+    grantL2: false,
+  })
+  await expectReadinessError('TARGET_NOT_ELIGIBLE', () =>
+    checkL8BootstrapReadinessPostgres(pool!, buildApproval(pendingUserId, now, suffix + '01'), now),
   )
 
+  await seedCandidate({
+    userId: mfaDisabledUserId,
+    now,
+    accountState: 'ACTIVE',
+    emailVerified: true,
+    mfaEnabled: false,
+    verifiedFactor: false,
+    grantL2: true,
+  })
+  await expectReadinessError('MFA_REQUIRED', () =>
+    checkL8BootstrapReadinessPostgres(pool!, buildApproval(mfaDisabledUserId, now, suffix + '02'), now),
+  )
+
+  await seedCandidate({
+    userId: missingL2UserId,
+    now,
+    accountState: 'ACTIVE',
+    emailVerified: true,
+    mfaEnabled: true,
+    verifiedFactor: true,
+    grantL2: false,
+  })
+  await expectReadinessError('VERIFIED_ROLE_REQUIRED', () =>
+    checkL8BootstrapReadinessPostgres(pool!, buildApproval(missingL2UserId, now, suffix + '03'), now),
+  )
+
+  await seedCandidate({
+    userId,
+    now,
+    accountState: 'ACTIVE',
+    emailVerified: true,
+    mfaEnabled: true,
+    verifiedFactor: true,
+    grantL2: true,
+  })
   const approval = buildApproval(userId, now, suffix)
   assert.equal(await readAuditCount(), 0)
   assert.equal(await readRoleVersion(userId), 1)
