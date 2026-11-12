@@ -84,7 +84,6 @@ describe('W03 published media reference read store', () => {
           },
         },
       } as never,
-      {} as never,
     )
 
     expect(response.status).toBe(200)
