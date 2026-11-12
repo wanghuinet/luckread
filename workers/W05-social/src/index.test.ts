@@ -1246,7 +1246,7 @@ describe('W05 social query transport', () => {
     }
     const targetContextStore: LikeTargetContextReadStore = {
       readCommentTarget: vi.fn(async (_commentId: string) => ({
-        id: 'comment-1',
+        id: 'comment-pg-1',
         state: 'PUBLISHED',
         author_user_id: 'comment-author-1',
         content_id: 'content-1',
@@ -1260,9 +1260,9 @@ describe('W05 social query transport', () => {
       likeTargetContextReadStore: targetContextStore,
     })
     const response = await injectedWorker.fetch(
-      new Request('https://luckread-w05.internal/internal/social/interactions/likes?targetType=comment&targetId=comment-1', {
+      new Request('https://luckread-w05.internal/internal/social/interactions/likes?targetType=comment&targetId=comment-pg-1', {
         method: 'GET',
-        headers: { ...transportHeaders, 'X-LuckRead-Principal-Layer': 'L2' },
+        headers: { ...transportHeaders, 'X-LuckRead-Principal-User-Id': 'viewer-pg-1', 'X-LuckRead-Principal-Layer': 'L2' },
       }),
       { DB: { prepare: d1Prepare }, W03_CONTENT: binding } as never,
       {} as never,
@@ -1270,15 +1270,15 @@ describe('W05 social query transport', () => {
 
     expect(response.status).toBe(200)
     expect(binding.fetch).toHaveBeenCalledTimes(1)
-    expect(targetContextStore.readCommentTarget).toHaveBeenCalledWith('comment-1')
+    expect(targetContextStore.readCommentTarget).toHaveBeenCalledWith('comment-pg-1')
     expect(targetContextStore.hasBidirectionalBlock).toHaveBeenCalledWith(
-      'viewer-1',
-      ['comment-author-1', 'owner-1'],
+      'viewer-pg-1',
+      ['comment-author-1', 'owner-1'], 
     )
     expect(statusStore.read).toHaveBeenCalledWith({
-      actorUserId: 'viewer-1',
+      actorUserId: 'viewer-pg-1',
       targetType: 'comment',
-      targetId: 'comment-1',
+      targetId: 'comment-pg-1',
       includeCount: true,
     })
     await expect(response.json()).resolves.toMatchObject({
