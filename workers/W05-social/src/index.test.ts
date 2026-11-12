@@ -9,6 +9,8 @@ import type { ProfileChannelReadStore } from './profile-channel-read-store.js'
 import type { FollowingAuthorIdRow, FollowingAuthorIdsReadStore } from './following-author-ids-read-store.js'
 import type { ContentLikerReadInput, ContentLikerReadRow, ContentLikerReadStore } from './like-list-read-store.js'
 import type { FavoriteListReadInput, FavoriteListReadRow, FavoriteListReadStore } from './favorite-list-read-store.js'
+import type { LikeStatusReadInput, LikeStatusReadResult, LikeStatusReadStore } from './like-status-read-store.js'
+import type { LikeTargetContextReadStore } from './like-target-context-read-store.js'
 
 
 const dbFor = (results: unknown[] = []) => {
@@ -1233,6 +1235,56 @@ describe('W05 social query transport', () => {
     await expect(response.json()).resolves.toMatchObject({
       data: { liked: true },
     })
+  })
+
+  it('uses injected PostgreSQL like-status and target-context stores without touching D1', async () => {
+    const statusStore: LikeStatusReadStore = {
+      read: vi.fn(async (_input: LikeStatusReadInput): Promise<LikeStatusReadResult> => ({
+        liked: true,
+        likeCount: 7,
+      })),
+    }
+    const targetContextStore: LikeTargetContextReadStore = {
+      readCommentTarget: vi.fn(async (_commentId: string) => ({
+        id: 'comment-pg-1',
+        state: 'PUBLISHED',
+        author_user_id: 'comment-author-1',
+        content_id: 'content-1',
+      })),
+      hasBidirectionalBlock: vi.fn(async (_actorUserId: string, _relatedUserIds: readonly string[]) => false),
+    }
+    const d1Prepare = vi.fn()
+    const binding = publishedContextBinding()
+    const injectedWorker = createW05SocialWorker({
+      likeStatusReadStore: statusStore,
+      likeTargetContextReadStore: targetContextStore,
+    })
+    const response = await injectedWorker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/interactions/likes?targetType=comment&targetId=comment-pg-1', {
+        method: 'GET',
+        headers: { ...transportHeaders, 'X-LuckRead-Principal-User-Id': 'viewer-pg-1', 'X-LuckRead-Principal-Layer': 'L2' },
+      }),
+      { DB: { prepare: d1Prepare }, W03_CONTENT: binding } as never,
+      {} as never,
+    )
+
+    expect(response.status).toBe(200)
+    expect(binding.fetch).toHaveBeenCalledTimes(1)
+    expect(targetContextStore.readCommentTarget).toHaveBeenCalledWith('comment-pg-1')
+    expect(targetContextStore.hasBidirectionalBlock).toHaveBeenCalledWith(
+      'viewer-pg-1',
+      ['comment-author-1', 'owner-1'],
+    )
+    expect(statusStore.read).toHaveBeenCalledWith({
+      actorUserId: 'viewer-pg-1',
+      targetType: 'comment',
+      targetId: 'comment-pg-1',
+      includeCount: true,
+    })
+    await expect(response.json()).resolves.toMatchObject({
+      data: { liked: true, likeCount: 7 },
+    })
+    expect(d1Prepare).not.toHaveBeenCalled()
   })
 
   it('accepts a comment like through the shared interaction transport', async () => {
