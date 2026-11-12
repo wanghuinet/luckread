@@ -95,6 +95,24 @@ jobs:
           console.log('W01_RUNTIME_BINDINGS=PASS; PAYLOAD_DATABASE_DRIVER=d1; D1_01 preserved; Hyperdrive staged')
           NODE
 
+      - name: Verify PostgreSQL adapter and driver are production dependencies
+        working-directory: workers/W01-payload
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs'
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'))
+          if (pkg.dependencies?.['@payloadcms/db-postgres'] !== '3.90.2') {
+            throw new Error('Payload PostgreSQL adapter must be a pinned production dependency')
+          }
+          if (pkg.dependencies?.pg !== '8.20.0') {
+            throw new Error('node-postgres must be a pinned production dependency')
+          }
+          if (pkg.devDependencies?.['@payloadcms/db-postgres'] || pkg.devDependencies?.pg) {
+            throw new Error('PostgreSQL runtime packages must not remain development-only dependencies')
+          }
+          console.log('W01_POSTGRES_RUNTIME_DEPENDENCIES=PASS')
+          NODE
+
       - name: Run W01 database driver mode tests
         working-directory: workers/W01-payload
         run: pnpm exec vitest run --config ./vitest.config.mts tests/int/payload-database-driver.int.spec.ts
