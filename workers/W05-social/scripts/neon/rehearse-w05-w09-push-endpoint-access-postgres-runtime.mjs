@@ -4,7 +4,7 @@ import { createRequire } from 'node:module'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 
-import { deactivateInvalidEndpoint } from '../../src/notification-push-delivery-runtime.ts'
+import { deactivateInvalidNotificationPushEndpoint } from '../../src/notification-push-endpoint-access-runtime.ts'
 import { createPostgresNotificationPushEndpointAccessStore } from '../../src/notification-push-endpoint-access-store-postgres.ts'
 
 const requireFromW02 = createRequire(new URL('../../../W02-identity/package.json', import.meta.url))
@@ -103,7 +103,7 @@ try {
     token: clearToken,
     updatedAt: now.toISOString(),
   })
-  assert.equal(await deactivateInvalidEndpoint(store, {
+  assert.equal(await deactivateInvalidNotificationPushEndpoint(store, {
     endpointId: clearId,
     recipientUserId: owner,
     pushTokenHash: hashToken(clearToken),
@@ -137,7 +137,7 @@ try {
     },
     clearTokenIfMatches: (input) => store.clearTokenIfMatches(input),
   }
-  assert.equal(await deactivateInvalidEndpoint(racingStore, {
+  assert.equal(await deactivateInvalidNotificationPushEndpoint(racingStore, {
     endpointId: rotatedId,
     recipientUserId: owner,
     pushTokenHash: hashToken(oldToken),
