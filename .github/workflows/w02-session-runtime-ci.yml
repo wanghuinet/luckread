@@ -8,6 +8,8 @@ on:
       - 'workers/W02-identity/src/authz/**'
       - 'workers/W02-identity/src/account/**'
       - 'workers/W02-identity/src/index.ts'
+      - 'workers/W02-identity/src/neon/**'
+      - 'workers/W02-identity/package.json'
       - 'workers/W02-identity/wrangler.jsonc'
       - 'workers/W02-identity/migrations/0006_better_auth_two_factor.sql'
       - 'workers/W02-identity/migrations/0007_l8_genesis_bootstrap_audit.sql'
@@ -132,6 +134,8 @@ jobs:
       - name: Install W02 runtime dependencies for MFA tests
         working-directory: workers/W02-identity
         run: npm install --ignore-scripts --no-audit --no-fund --package-lock=false
+      - name: Test W02 D1 default and Neon Hyperdrive runtime selection
+        run: npx vitest@3.2.4 run workers/W02-identity/src/neon/runtime.test.ts
       - name: Run W02 username change authority tests
         run: npx vitest@3.2.4 run workers/W02-identity/src/auth/username-change.test.ts
       - name: Audit W02 username history migration with local SQLite only
