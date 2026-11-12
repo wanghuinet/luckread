@@ -69,7 +69,13 @@ describe('W03 published media reference read store', () => {
     }
     const worker = createW03ContentWorker({ publishedMediaReferenceReadStore: store })
     const response = await worker.fetch(
-      new Request('https://luckread-w03.internal/internal/content/public-media-reference?url=' + encodeURIComponent(mediaUrl)),
+      new Request('https://luckread-w03.internal/internal/content/public-media-reference?url=' + encodeURIComponent(mediaUrl), {
+        headers: {
+          'X-LuckRead-Caller': 'W01',
+          'X-LuckRead-Transport-Version': '1.0',
+          'X-LuckRead-Correlation-Id': 'w03-postgres-media-route-injection',
+        },
+      }),
       {
         D1_02: {
           prepare() {
