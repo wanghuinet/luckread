@@ -6,6 +6,7 @@ import {
   PublishedMediaReferenceReadStoreError,
 } from './published-media-reference-read-store.js'
 import { createPostgresPublishedMediaReferenceReadStore } from './published-media-reference-read-store-postgres.js'
+import { createW03ContentWorker } from './index.js'
 
 const candidates = [
   'https://img.luckread.com/media/photo-one.png',
@@ -54,6 +55,40 @@ function fakePostgres(options: { rows?: typeof rows; fail?: boolean } = {}) {
 }
 
 describe('W03 published media reference read store', () => {
+  it('routes media authorization through the injected PostgreSQL-capable store without touching D1', async () => {
+    let storeCalls = 0
+    let d1Calls = 0
+    const mediaUrl = 'https://img.luckread.com/media/neon-read-only.png'
+    const store = {
+      async listPublishedMediaReferences(candidates: readonly string[], limit: number) {
+        storeCalls += 1
+        expect(candidates).toEqual([mediaUrl])
+        expect(limit).toBe(51)
+        return rows
+      },
+    }
+    const worker = createW03ContentWorker({ publishedMediaReferenceReadStore: store })
+    const response = await worker.fetch(
+      new Request('https://luckread-w03.internal/internal/content/public-media-reference?url=' + encodeURIComponent(mediaUrl)),
+      {
+        D1_02: {
+          prepare() {
+            d1Calls += 1
+            throw new Error('injected PostgreSQL store must not touch D1')
+          },
+        },
+      } as never,
+      {} as never,
+    )
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      data: { isPublic: true, isMemberContent: false, allowed: true },
+    })
+    expect(storeCalls).toBe(1)
+    expect(d1Calls).toBe(0)
+  })
+
   it('preserves the D1 JSON1 lookup, deterministic ordering and row bound', async () => {
     const { db, calls } = fakeD1()
     const result = await createD1PublishedMediaReferenceReadStore(db as never)
