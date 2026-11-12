@@ -273,7 +273,7 @@ async function handleAdminApplicationDecision(env: Env, request: Request, store:
     request.headers.get('cf-ray')?.trim().slice(0, 128) || null
   if (decision === 'APPROVED') {
     const existingCreator = await store.findCreatorByUser(application.user_id)
-    if (existingCreator && existingCreator.applicationId !== application.application_id) {
+    if (existingCreator && existingCreator.application_id !== application.application_id) {
       return errorResponse(409, 'CREATOR_IDENTITY_CONFLICT', 'User already has a creator identity')
     }
     const now = new Date().toISOString()
