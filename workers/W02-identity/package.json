@@ -50,6 +50,8 @@
     "neon:auth007-mfa:publisher:runtime": "tsx scripts/neon/w02-auth007-mfa-publication-publisher-postgres-runtime-rehearsal.ts",
     "neon:auth007-mfa:factor-state:runtime": "tsx scripts/neon/w02-auth007-mfa-factor-state-postgres-runtime-rehearsal.ts",
     "neon:account-state:runtime": "tsx scripts/neon/w02-account-state-transition-postgres-runtime-rehearsal.ts",
-    "neon:auth013-publisher:runtime": "tsx scripts/neon/w02-auth013-postgres-publisher-runtime-rehearsal.ts"
+    "neon:auth013-publisher:runtime": "tsx scripts/neon/w02-auth013-postgres-publisher-runtime-rehearsal.ts",
+    "neon:l8-bootstrap:generate": "node scripts/neon/generate-l8-genesis-bootstrap-postgres-migration.mjs",
+    "neon:l8-bootstrap:runtime": "tsx scripts/neon/w02-l8-genesis-bootstrap-postgres-runtime-rehearsal.ts"
   }
 }
