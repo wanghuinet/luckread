@@ -139,6 +139,32 @@ function d1AuditStatement(db: W08D1Database, input: AuditEventInput): W08D1Prepa
   )
 }
 
+function d1DecisionAuditStatement(
+  db: W08D1Database,
+  input: AuditEventInput & Readonly<{ applicationId: string; expectedStatus: 'APPROVED' | 'REJECTED' }>,
+): W08D1PreparedStatement {
+  return db.prepare(
+    'INSERT OR IGNORE INTO creator_authorization_audit ' +
+    '(audit_id,event_key,actor_id,subject_id,event_type,resource_type,resource_id,from_state,to_state,idempotency_key,correlation_id,occurred_at,details_json) ' +
+    'SELECT ?, ?, ?, user_id, ?, \'creator_application\', application_id, \'PENDING\', ?, ?, ?, ?, ? ' +
+    'FROM creator_applications WHERE application_id = ? AND status = ? AND decision_idempotency_key = ? AND decided_by = ?',
+  ).bind(
+    crypto.randomUUID(),
+    input.eventKey,
+    input.actorId,
+    input.eventType,
+    input.toState,
+    input.idempotencyKey,
+    correlationFor(input),
+    input.occurredAt,
+    JSON.stringify(input.details),
+    input.applicationId,
+    input.expectedStatus,
+    input.idempotencyKey,
+    input.actorId,
+  )
+}
+
 function postgresAuditValues(input: AuditEventInput): unknown[] {
   return [
     crypto.randomUUID(),
@@ -269,7 +295,9 @@ export function createD1W08CreatorStore(db: W08D1Database): W08CreatorStore {
           input.idempotencyKey,
           input.actorId,
         ),
-        d1AuditStatement(db, {
+        d1DecisionAuditStatement(db, {
+          applicationId: input.applicationId,
+          expectedStatus: 'APPROVED',
           eventKey: 'creator-application-decision:' + input.applicationId + ':' + input.idempotencyKey,
           actorId: input.actorId,
           subjectId: input.applicantId,
@@ -302,7 +330,9 @@ export function createD1W08CreatorStore(db: W08D1Database): W08CreatorStore {
           input.applicationId,
           input.expectedVersion,
         ),
-        d1AuditStatement(db, {
+        d1DecisionAuditStatement(db, {
+          applicationId: input.applicationId,
+          expectedStatus: 'REJECTED',
           eventKey: 'creator-application-decision:' + input.applicationId + ':' + input.idempotencyKey,
           actorId: input.actorId,
           subjectId: input.applicantId,
