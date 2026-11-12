@@ -14,7 +14,6 @@ import {
 } from './notification-push-endpoint-access-store-d1.js'
 import type { NotificationPushEndpointAccessStore } from './notification-push-endpoint-access-store.js'
 import { deactivateInvalidNotificationPushEndpoint, hashNotificationPushToken } from './notification-push-endpoint-access-runtime.js'
-export { deactivateInvalidEndpoint } from './notification-push-endpoint-access-runtime.js'
 import type { NotificationPushReceiptStore } from './notification-push-receipt-store.js'
 
 type PushReceiptLike = ExpoPushReceipt
@@ -183,7 +182,7 @@ export async function claimDueDeliveries(
   return claimed
 }
 
-async function deactivateInvalidEndpoint(
+export async function deactivateInvalidEndpoint(
   endpointSource: EndpointAccessSource,
   task: Readonly<{ endpointId: string; recipientUserId: string; pushTokenHash: string }>,
   now: Date,
