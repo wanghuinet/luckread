@@ -29,6 +29,8 @@ export interface RateLimitBinding {
 
 export interface BetterAuthEnv {
   D1_01: D1Database
+  W02_DATABASE_DRIVER?: string
+  HYPERDRIVE?: { connectionString: string }
   RESEND_API_KEY?: string
   AUTH_EMAIL_FROM?: string
   CLOUDFLARE_ENV?: string
@@ -138,7 +140,7 @@ async function finalizeKnownMfaRejection(
 
 type BetterAuthDatabase = NonNullable<Parameters<typeof betterAuth>[0]['database']>
 
-export type BetterAuthPersistenceProfile = 'production' | 'postgres-rehearsal'
+export type BetterAuthPersistenceProfile = 'production' | 'postgres-rehearsal' | 'postgres'
 
 export type BetterAuthPostgresLifecycleAdapters = {
   afterUserCreated: (userId: string) => Promise<void>
@@ -154,12 +156,12 @@ export const buildLuckReadAuth = (
   mfaAuditOperationReceiptStore?: MfaAuditOperationReceiptStore,
   resolveMfaSessionSubject?: (headers: Headers) => Promise<string | null>,
 ) => {
-  const postgresRehearsal = persistenceProfile === 'postgres-rehearsal'
+  const postgresPersistence = persistenceProfile !== 'production'
   const postgresEmailVerifiedCallback = postgresLifecycleAdapters?.afterEmailVerified
   // Production defaults to D1. A rehearsal enables these hooks only by
   // explicitly injecting a provider-matched receipt store.
   const effectiveMfaAuditReceiptStore = mfaAuditOperationReceiptStore ??
-    (postgresRehearsal ? undefined : createD1MfaAuditOperationReceiptStore(env.D1_01))
+    (postgresPersistence ? undefined : createD1MfaAuditOperationReceiptStore(env.D1_01))
   // Keep local origins available only to the local evidence/runtime profile.
   // Production must never inherit localhost trust from a shared config.
   const trustedOrigins = [
@@ -494,7 +496,7 @@ export const buildLuckReadAuth = (
       sendVerificationEmail: async ({ user, url }) => {
         await sendVerificationEmail(env, { user, url })
       },
-      ...(postgresRehearsal
+      ...(postgresPersistence
         ? (postgresEmailVerifiedCallback ? {
             afterEmailVerification: async (user) => {
               await postgresEmailVerifiedCallback(String(user.id))
@@ -507,7 +509,7 @@ export const buildLuckReadAuth = (
             },
           }),
     },
-    ...(postgresRehearsal
+    ...(postgresPersistence
       ? (postgresLifecycleAdapters ? {
           databaseHooks: {
             user: {
@@ -689,16 +691,39 @@ export const buildLuckReadAuth = (
   })
 }
 
-const authInstances = new WeakMap<D1Database, ReturnType<typeof buildLuckReadAuth>>()
+const authInstances = new WeakMap<object, ReturnType<typeof buildLuckReadAuth>>()
 
-// W02 routes share one initialized Better Auth instance per D1 binding/isolate.
-// This preserves Better Auth's cached schema validation and avoids rebuilding
-// its router and database adapter for every authentication request.
+// Each isolate keeps one Better Auth instance per selected persistence binding.
+// Neon mode composes all core identity stores from the same Hyperdrive pool;
+// D1 remains the default until an explicit worker variable selects Neon.
 export const createLuckReadAuth = (env: BetterAuthEnv) => {
-  const cached = authInstances.get(env.D1_01)
+  if (isW02NeonRuntime(env)) {
+    const runtime = getW02PostgresRuntime(env)
+    const cached = authInstances.get(runtime.pool)
+    if (cached) return cached
+
+    const auth = buildLuckReadAuth(
+      env,
+      runtime.pool,
+      'postgres',
+      runtime.mfaFactorStateStore,
+      {
+        afterUserCreated: (userId) =>
+          ensureBaseUserRolePostgres(runtime.pool, userId, new Date().toISOString()),
+        afterEmailVerified: (userId, now) =>
+          activateEmailVerifiedAccountPostgres(runtime.pool, userId, now),
+      },
+      runtime.mfaAuditOperationReceiptStore,
+    )
+    authInstances.set(runtime.pool, auth)
+    return auth
+  }
+
+  const database = env.D1_01 as object
+  const cached = authInstances.get(database)
   if (cached) return cached
 
   const auth = buildLuckReadAuth(env)
-  authInstances.set(env.D1_01, auth)
+  authInstances.set(database, auth)
   return auth
 }
