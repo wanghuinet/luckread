@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import worker, { createW05SocialWorker } from './index.js'
 import type { CommentListReadInput, CommentListReadRow, CommentListReadStore } from './comment-list-read-store.js'
 import type { FollowListReadInput, FollowListReadRow, FollowListCountInput, FollowListReadStore } from './follow-list-read-store.js'
+import type { FollowMutation, FollowRow, FollowStore } from './follow-store.js'
 import type { BlockMuteListReadInput, BlockMuteListReadRow, BlockMuteListReadStore } from './block-mute-list-read-store.js'
 import type { ProfileChannelReadStore } from './profile-channel-read-store.js'
 import type { FollowingAuthorIdRow, FollowingAuthorIdsReadStore } from './following-author-ids-read-store.js'
@@ -126,6 +127,96 @@ describe('W05 follow-list PostgreSQL runtime injection', () => {
       data: { items: [{ relationshipId: 'rel-d1', userId: 'd1-follower' }], totalCount: 1 },
     })
     expect(prepare).toHaveBeenCalled()
+  })
+})
+
+
+describe('W05 Follow/Unfollow PostgreSQL runtime injection', () => {
+  it('routes Follow and Unfollow writes through the injected store while keeping notification persistence on D1', async () => {
+    const row: FollowRow = {
+      relationship_id: 'pg-follow-1',
+      follower_user_id: 'viewer-1',
+      target_user_id: 'target-1',
+      created_at: '2026-11-12T00:00:00.000Z',
+    }
+    const store: FollowStore = {
+      follow: vi.fn(async (_input: FollowMutation) => row),
+      unfollow: vi.fn(async (_followerUserId: string, _targetUserId: string) => {}),
+    }
+    const d1Sql: string[] = []
+    const d1Prepare = vi.fn((sql: string) => {
+      d1Sql.push(sql)
+      return {
+        bind: vi.fn(() => ({
+          first: vi.fn(async () => null),
+          run: vi.fn(async () => ({ meta: { changes: 1 } })),
+        })),
+      }
+    })
+    const injectedWorker = createW05SocialWorker({ followStore: store })
+    const env = { DB: { prepare: d1Prepare } as unknown as D1Database }
+
+    const post = await injectedWorker.fetch(
+      requestWithMethod('/internal/social/follows/target-1', 'POST', {
+        ...transportHeaders,
+        'X-LuckRead-Principal-Layer': 'L2',
+        'Idempotency-Key': 'pg-follow-1',
+      }),
+      env,
+      {} as never,
+    )
+    expect(post.status).toBe(201)
+    await expect(post.json()).resolves.toMatchObject({
+      data: {
+        following: true,
+        relationshipId: 'pg-follow-1',
+        targetUserId: 'target-1',
+      },
+    })
+    expect(store.follow).toHaveBeenCalledWith(expect.objectContaining({
+      followerUserId: 'viewer-1',
+      targetUserId: 'target-1',
+    }))
+    expect(d1Sql.some((sql) => sql.includes('social_follow_relationships'))).toBe(false)
+    expect(d1Sql.some((sql) => sql.includes('social_notifications'))).toBe(true)
+
+    const callsBeforeUnfollow = d1Prepare.mock.calls.length
+    const del = await injectedWorker.fetch(
+      requestWithMethod('/internal/social/follows/target-1', 'DELETE', {
+        ...transportHeaders,
+        'X-LuckRead-Principal-Layer': 'L2',
+        'Idempotency-Key': 'pg-unfollow-1',
+      }),
+      env,
+      {} as never,
+    )
+    expect(del.status).toBe(204)
+    expect(store.unfollow).toHaveBeenCalledWith('viewer-1', 'target-1')
+    expect(d1Prepare).toHaveBeenCalledTimes(callsBeforeUnfollow)
+  })
+
+  it('keeps the D1 FollowStore as the default when no provider store is injected', async () => {
+    const statements: string[] = []
+    const prepare = vi.fn((sql: string) => {
+      statements.push(sql)
+      return {
+        bind: vi.fn(() => ({
+          run: vi.fn(async () => ({ meta: { changes: 1 } })),
+        })),
+      }
+    })
+    const response = await worker.fetch(
+      requestWithMethod('/internal/social/follows/target-1', 'DELETE', {
+        ...transportHeaders,
+        'X-LuckRead-Principal-Layer': 'L2',
+        'Idempotency-Key': 'd1-unfollow-1',
+      }),
+      { DB: { prepare } as unknown as D1Database },
+      {} as never,
+    )
+    expect(response.status).toBe(204)
+    expect(statements).toHaveLength(1)
+    expect(statements[0]).toContain('DELETE FROM social_follow_relationships')
   })
 })
 
