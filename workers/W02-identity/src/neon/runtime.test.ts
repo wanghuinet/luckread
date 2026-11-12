@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
 import {
   getW02PostgresPool,
