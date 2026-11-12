@@ -4,6 +4,7 @@ import {
   type PrincipalAuthorityStore,
 } from './principal-store.js'
 import type { ResolvedRoleAssignment } from '../authz/role-assignment.js'
+import { getW02PostgresRuntime, isW02NeonRuntime } from '../neon/runtime.js'
 
 type AuthSession = {
   user: {
@@ -43,9 +44,8 @@ const toIso = (value: Date | string): string =>
  * Resolve the authenticated Better Auth session and then reconcile the
  * authoritative W02 account lifecycle and effective authorization facts.
  *
- * D1-01 remains the production default. A provider-matched store can be
- * injected by the isolated PostgreSQL runtime rehearsal without changing
- * the deployed Worker binding or Better Auth session authority.
+ * D1-01 remains the default. In explicit Neon mode, session lookup and
+ * principal authority both use the same W02 Hyperdrive-backed PG runtime.
  */
 export async function resolveBetterAuthPrincipal(
   env: BetterAuthEnv,
@@ -53,7 +53,9 @@ export async function resolveBetterAuthPrincipal(
   now = new Date().toISOString(),
   dependencies: PrincipalResolverDependencies = {},
 ): Promise<AuthenticatedPrincipal | null> {
-  const store = dependencies.store ?? createD1PrincipalAuthorityStore(env.D1_01)
+  const store = dependencies.store ?? (isW02NeonRuntime(env)
+    ? getW02PostgresRuntime(env).principalAuthorityStore
+    : createD1PrincipalAuthorityStore(env.D1_01))
   const result = (dependencies.getSession
     ? await dependencies.getSession(request.headers)
     : await createLuckReadAuth(env).api.getSession({
