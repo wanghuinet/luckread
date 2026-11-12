@@ -14,6 +14,11 @@ import { Users } from './collections/Users'
 import { Media } from './collections/Media'
 import { payloadAdminOnly } from './auth/payload-admin-access'
 import { createPublicMediaUrl } from './media/public-media-url'
+import { createW01NeonPostgresAdapter } from './neon-postgres-adapter'
+import {
+  resolveW01PayloadDatabaseDriver,
+  type W01PayloadDatabaseEnvironment,
+} from './payload-database-driver'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -52,6 +57,19 @@ const cloudflare = isWorkerRuntime
   ? await getCloudflareContext({ async: true })
   : await getCloudflareContextFromWrangler()
 
+// A missing flag deliberately preserves the current D1 runtime. Neon is used
+// only when the deployed Worker explicitly sets PAYLOAD_DATABASE_DRIVER=neon.
+const databaseSelection = resolveW01PayloadDatabaseDriver(
+  cloudflare.env as unknown as W01PayloadDatabaseEnvironment,
+)
+const databaseAdapter = databaseSelection.kind === 'neon'
+  ? createW01NeonPostgresAdapter(databaseSelection.connectionString)
+  : sqliteD1Adapter({
+      binding: cloudflare.env.D1,
+      push: false,
+      migrationDir: path.resolve(dirname, 'migrations'),
+    })
+
 export default buildConfig({
   admin: {
     user: Users.slug,
@@ -70,14 +88,13 @@ export default buildConfig({
   typescript: {
     outputFile: path.resolve(dirname, 'payload-types.ts'),
   },
-  db: sqliteD1Adapter({
-    binding: cloudflare.env.D1,
-    push: false,
-    migrationDir: path.resolve(dirname, 'migrations'),
-  }),
+  db: databaseAdapter,
   logger: isProduction ? cloudflareLogger : undefined,
   onInit: async (payload: Payload) => {
-    if (payload.db.packageName !== '@payloadcms/db-d1-sqlite') return
+    if (
+      databaseSelection.kind !== 'd1' ||
+      payload.db.packageName !== '@payloadcms/db-d1-sqlite'
+    ) return
     const updateOne = payload.db.updateOne.bind(payload.db)
     payload.db.upsert = (args) =>
       updateOne({
