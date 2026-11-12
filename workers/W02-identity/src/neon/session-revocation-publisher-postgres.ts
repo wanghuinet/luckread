@@ -5,7 +5,7 @@ import {
 } from '../auth/session-revocation-events.js'
 
 export type SessionRevocationQueue = {
-  send(message: SessionRevokedEvent): Promise<void>
+  send(message: SessionRevokedEvent): Promise<unknown>
 }
 
 export type SessionRevocationPublisherResult = {
