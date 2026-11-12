@@ -17,9 +17,6 @@ importers:
       '@payloadcms/db-postgres':
         specifier: 3.90.2
         version: 3.90.2(payload@3.90.2(graphql@16.14.2)(supports-color@10.2.2)(typescript@5.7.3))(supports-color@10.2.2)
-      pg:
-        specifier: 8.20.0
-        version: 8.20.0
       '@payloadcms/next':
         specifier: 3.90.2
         version: 3.90.2(@types/react@19.2.14)(graphql@16.14.2)(monaco-editor@0.56.0)(next@16.3.3(@babel/core@7.29.7(supports-color@10.2.2))(@playwright/test@1.63.0)(@types/node@24.12.3)(babel-plugin-macros@3.1.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.77.4))(payload@3.90.2(graphql@16.14.2)(supports-color@10.2.2)(typescript@5.7.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(supports-color@10.2.2)(typescript@5.7.3)
@@ -50,6 +47,9 @@ importers:
       payload:
         specifier: 3.90.2
         version: 3.90.2(graphql@16.14.2)(supports-color@10.2.2)(typescript@5.7.3)
+      pg:
+        specifier: 8.20.0
+        version: 8.20.0
       react:
         specifier: 19.2.6
         version: 19.2.6
