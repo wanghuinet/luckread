@@ -39,6 +39,7 @@ targetUrl.pathname = '/' + rehearsalDatabase
 const adminPool = new Pool({ connectionString: adminUrl.toString(), max: 1, connectionTimeoutMillis: 5_000 })
 let pool: Pool | undefined
 let databaseCreated = false
+let adminPoolClosed = false
 let primaryError: unknown
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url))
@@ -125,6 +126,7 @@ try {
   await adminPool.query('CREATE DATABASE "' + rehearsalDatabase + '" TEMPLATE "luckread_schema"')
   databaseCreated = true
   await adminPool.end()
+  adminPoolClosed = true
   pool = new Pool({ connectionString: targetUrl.toString(), max: 6, connectionTimeoutMillis: 5_000 })
 
   const migrationPath = path.join(workerRoot, 'src/neon-postgres-migrations/0011_l8_genesis_bootstrap_audit.sql')
@@ -243,7 +245,7 @@ try {
   primaryError = error
 } finally {
   await pool?.end().catch(() => undefined)
-  if (!adminPool.ended) await adminPool.end().catch(() => undefined)
+  if (!adminPoolClosed) await adminPool.end().catch(() => undefined)
   if (databaseCreated) {
     const cleanupPool = new Pool({ connectionString: adminUrl.toString(), max: 1, connectionTimeoutMillis: 5_000 })
     try {
