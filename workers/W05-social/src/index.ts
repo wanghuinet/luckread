@@ -52,6 +52,7 @@ import {
 } from './follow-runtime.js'
 import type { FollowListReadStore } from './follow-list-read-store.js'
 import type { FollowingAuthorIdsReadStore } from './following-author-ids-read-store.js'
+import type { ContentLikerReadStore } from './like-list-read-store.js'
 import type { CommentListReadStore } from './comment-list-read-store.js'
 
 type RateLimitBinding = { limit(input: { key: string }): Promise<{ success: boolean }> }
@@ -262,6 +263,8 @@ export type W05SocialWorkerDependencies = Readonly<{
   blockMuteListReadStore?: BlockMuteListReadStore
   /** Optional PostgreSQL-capable profile replies/likes reader; D1 remains the deployed default. */
   profileChannelReadStore?: ProfileChannelReadStore
+  /** Optional PostgreSQL-capable content-liker page reader; D1 remains the deployed default. */
+  contentLikerReadStore?: ContentLikerReadStore
 }>
 
 export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies = {}) {
@@ -1088,7 +1091,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
           contentId,
           correlationId: request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '',
         })
-        const data = await listContentLikers(env.DB, contentId, cursor, limit, viewerUserId, contentContext)
+        const data = await listContentLikers(dependencies.contentLikerReadStore ?? env.DB, contentId, cursor, limit, viewerUserId, contentContext)
         return json({ data, requestId: createRequestId() })
       }
 
