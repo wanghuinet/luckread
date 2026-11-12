@@ -73,8 +73,31 @@ jobs:
         working-directory: workers/W08-creator
         run: npm install --ignore-scripts --no-audit --no-fund --package-lock=false
 
+      - name: Verify W08 keeps D1 as default and reuses the existing D1-01 Hyperdrive
+        working-directory: workers/W08-creator
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs'
+          const config = JSON.parse(fs.readFileSync('wrangler.jsonc', 'utf8'))
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'))
+          const d1 = (config.d1_databases ?? []).find((binding) => binding.binding === 'D1_01')
+          const hyperdrive = (config.hyperdrive ?? []).find((binding) => binding.binding === 'HYPERDRIVE')
+          if (config.vars?.W08_DATABASE_DRIVER !== 'd1') throw new Error('W08 production default must remain D1')
+          if (d1?.database_id !== '2f80471e-3756-49f9-8db1-7707a433ad64') throw new Error('W08 D1-01 rollback binding changed')
+          if (hyperdrive?.id !== '0c53a1bb9bc0484bac146e8ae2d3158b') throw new Error('W08 must reuse the existing D1-01 Hyperdrive')
+          if (pkg.dependencies?.pg !== '8.20.0') throw new Error('W08 pg must be a pinned runtime dependency')
+          console.log('W08_D1_DEFAULT_ROLLBACK_AND_HYPERDRIVE_BINDING=PASS')
+          NODE
+
+      - name: Test W08 Neon runtime selection and PostgreSQL store transactions
+        run: npx --yes vitest@3.2.4 run workers/W08-creator/src/neon/runtime.test.ts workers/W08-creator/src/creator-store.test.ts
+
+      - name: Bundle W08 Worker with the PostgreSQL runtime dependency
+        working-directory: workers/W08-creator
+        run: npx --yes wrangler@4.116.0 deploy --dry-run --config wrangler.jsonc
+
       - name: Verify creator authorization policy tests
-        run: npx --yes vitest@3.2.4 run workers/W02-identity/src/authz/role-assignment-command.test.ts workers/W08-creator/src/policy.test.ts workers/W08-creator/src/authz/casl-policy.test.ts workers/W08-creator/src/authz/handler.test.ts workers/W08-creator/src/authz/role-layer.test.ts workers/W08-creator/src/index.runtime.test.ts workers/W01-payload/tests/int/creator-application-page.int.spec.ts
+        run: npx --yes vitest@3.2.4 run workers/W02-identity/src/authz/role-assignment-command.test.ts workers/W08-creator/src/policy.test.ts workers/W08-creator/src/authz/casl-policy.test.ts workers/W08-creator/src/authz/handler.test.ts workers/W08-creator/src/authz/role-layer.test.ts workers/W08-creator/src/index.runtime.test.ts workers/W08-creator/src/neon/runtime.test.ts workers/W08-creator/src/creator-store.test.ts workers/W01-payload/tests/int/creator-application-page.int.spec.ts
 
       - name: Typecheck W08 Creator Worker
         run: npx --no-install tsc --noEmit -p workers/W08-creator/tsconfig.json

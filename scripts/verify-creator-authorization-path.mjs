@@ -25,6 +25,7 @@ const w08Casl = read('workers/W08-creator/src/authz/casl-policy.ts')
 const w08AuthzHandler = read('workers/W08-creator/src/authz/handler.ts')
 const w08RoleLayer = read('workers/W08-creator/src/authz/role-layer.ts')
 const w08Runtime = read('workers/W08-creator/src/worker.ts')
+const w08Store = read('workers/W08-creator/src/creator-store.ts')
 const w08Migration = read('workers/W08-creator/migrations/0001_creator_authorization.sql')
 const w02Runtime = read('workers/W02-identity/src/index.ts')
 const w02Grant = read('workers/W02-identity/src/authz/role-assignment-command.ts')
@@ -88,7 +89,16 @@ requireText('internal CASL endpoint must reject caller-supplied layer or state',
 if (!w08AuthzHandler.includes('/internal/auth/principal')) failures.push('internal CASL endpoint must resolve actor identity through W02 session binding')
 if (!w08AuthzHandler.includes("new Set(['action', 'resourceType', 'resourceAttributes'])")) failures.push('internal CASL endpoint must not accept body-supplied subjectId')
 requireText('W08 must independently resolve the W02 principal', w08Runtime, /internal\/auth\/principal/)
-requireText('W08 must return only an ACTIVE creator identity for creator plan management', w08Runtime, /handleActiveCreatorSelf[\s\S]*creator\.read\.self[\s\S]*status = 'ACTIVE'/)
+requireText(
+  'W08 must return only an ACTIVE creator identity for creator plan management',
+  w08Runtime,
+  /handleActiveCreatorSelf[\s\S]*creator\.read\.self[\s\S]*store\.findActiveCreator\(principal\.userId\)[\s\S]*return json\(\{ creatorId: creator\.creator_id, status: 'ACTIVE' \}\)/,
+)
+requireText(
+  'provider stores must filter creator self reads to ACTIVE identities',
+  w08Store,
+  /findActiveCreator\(userId\)[\s\S]*status = 'ACTIVE'/,
+)
 requireText('MembershipPlan is a CASL subject and own-scope plan permissions are granted', w08Casl, /'MembershipPlan'[\s\S]*membership\.plan\.create\.own[\s\S]*membership\.plan\.read\.own/)
 requireText('creator plan creation must use existing W06 binding for durable audit', membershipPlanRoute, /callW06MembershipPlanAudit[\s\S]*Membership plan audit was not durably confirmed/)
 requireText('W01 must wait for W06 durable confirmation before returning plan success', membershipPlanRoute, /Membership plan audit was not durably confirmed[\s\S]*return w07Response/)
@@ -104,7 +114,16 @@ requireText('W01 W06 client must use the fixed membership plan audit path', w06M
 requireText('W06 membership plan audit endpoint must require W01 transport', w06Runtime, /membership-plan-created[\s\S]*requireW01Transport/)
 
 requireText('W08 must call the W02 RoleAssignment authority', w08Runtime, /internal\/authz\/role-assignment/)
-requireText('W08 must persist submission, decision and grant audit', w08Runtime, /CREATOR_APPLICATION_SUBMITTED[\s\S]*CREATOR_APPLICATION_APPROVED[\s\S]*CREATOR_ROLE_GRANTED/)
+requireText(
+  'W08 provider stores must persist submission, approval, rejection and grant audit',
+  w08Store,
+  /eventType: 'CREATOR_APPLICATION_SUBMITTED'[\s\S]*eventType: 'CREATOR_APPLICATION_APPROVED'[\s\S]*eventType: 'CREATOR_APPLICATION_REJECTED'[\s\S]*eventType: 'CREATOR_ROLE_GRANTED'/,
+)
+requireText(
+  'W08 PostgreSQL application creation, approval, rejection and grant must persist audit within transactions',
+  w08Store,
+  /createPostgresW08CreatorStore[\s\S]*async createApplication[\s\S]*inTransaction\(pool[\s\S]*auditInsertSql[\s\S]*async approveApplication[\s\S]*inTransaction\(pool[\s\S]*auditInsertSql[\s\S]*async rejectApplication[\s\S]*inTransaction\(pool[\s\S]*auditInsertSql[\s\S]*async completeCreatorGrant[\s\S]*inTransaction\(pool[\s\S]*auditInsertSql/,
+)
 requireText('creator audit table must exist', w08Migration, /CREATE TABLE IF NOT EXISTS creator_authorization_audit/)
 requireText('W02 must authorize the current approver', w02Runtime, /mayApproveRoleGrant\(actor\.layer\)/)
 requireText('W02 endpoint must reject role/scope escalation', w02Runtime, /body\.roleId !== 'creator' \|\| body\.scopeType !== 'global' \|\| body\.scopeId !== null/)

@@ -3,8 +3,10 @@ import { evaluateCreatorApplicationPermission } from './authz/creator-applicatio
 import { handlePermissionCheck } from './authz/handler.js'
 import { handleScheduledPublishPermission } from './authz/scheduled-publish.js'
 import { evaluateCaslPermission, type LayerId } from './authz/casl-policy.js'
+import { getW08CreatorStore, type W08RuntimeEnv } from './neon/runtime.js'
+import type { CreatorApplicationRow, W08CreatorStore } from './creator-store.js'
 
-interface Env {
+interface Env extends W08RuntimeEnv {
   D1_01: D1Database
   W02_AUTH: Fetcher
 }
@@ -17,22 +19,7 @@ type Principal = {
   layer?: string
 }
 
-type ApplicationRow = {
-  application_id: string
-  user_id: string
-  creator_type: string
-  statement: string
-  status: 'PENDING' | 'APPROVED' | 'REJECTED'
-  grant_state: 'NOT_REQUESTED' | 'PENDING' | 'GRANTED'
-  version: number
-  application_idempotency_key: string
-  decision_idempotency_key: string | null
-  decided_by: string | null
-  decision_reason: string | null
-  created_at: string
-  updated_at: string
-  decided_at: string | null
-}
+type ApplicationRow = CreatorApplicationRow
 
 const json = (body: unknown, status = 200, extraHeaders?: HeadersInit) => {
   const headers = new Headers({ 'cache-control': 'no-store' })
@@ -81,46 +68,7 @@ async function principalFor(env: Env, request: Request): Promise<Principal | Res
   }
 }
 
-function auditStatement(
-  env: Env,
-  input: {
-    eventKey: string
-    actorId: string
-    subjectId: string
-    eventType: 'CREATOR_APPLICATION_SUBMITTED' | 'CREATOR_APPLICATION_APPROVED' | 'CREATOR_APPLICATION_REJECTED' | 'CREATOR_ROLE_GRANTED'
-    resourceType: 'creator_application' | 'creator' | 'role_assignment'
-    resourceId: string
-    fromState: string | null
-    toState: string | null
-    idempotencyKey?: string | null
-    request: Request
-    details?: Record<string, unknown>
-    occurredAt?: string
-  },
-): D1PreparedStatement {
-  const occurredAt = input.occurredAt ?? new Date().toISOString()
-  const correlationId = input.request.headers.get('X-LuckRead-Correlation-Id')?.trim().slice(0, 128) ||
-    input.request.headers.get('cf-ray')?.trim().slice(0, 128) || null
-  return env.D1_01.prepare(
-    'INSERT OR IGNORE INTO creator_authorization_audit ' +
-    '(audit_id,event_key,actor_id,subject_id,event_type,resource_type,resource_id,from_state,to_state,idempotency_key,correlation_id,occurred_at,details_json) ' +
-    'VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
-  ).bind(
-    crypto.randomUUID(),
-    input.eventKey,
-    input.actorId,
-    input.subjectId,
-    input.eventType,
-    input.resourceType,
-    input.resourceId,
-    input.fromState,
-    input.toState,
-    input.idempotencyKey ?? null,
-    correlationId,
-    occurredAt,
-    JSON.stringify(input.details ?? {}),
-  )
-}
+
 
 async function callRoleGrant(
   env: Env,
@@ -160,17 +108,12 @@ async function callRoleGrant(
   }
 }
 
-async function readApplication(env: Env, applicationId: string): Promise<ApplicationRow | null> {
-  return env.D1_01.prepare(
-    'SELECT application_id, user_id, creator_type, statement, status, grant_state, version, ' +
-    'application_idempotency_key, decision_idempotency_key, decided_by, decision_reason, created_at, updated_at, decided_at ' +
-    'FROM creator_applications WHERE application_id = ? LIMIT 1',
-  ).bind(applicationId).first<ApplicationRow>()
-}
+
 
 async function retryCreatorGrant(
   env: Env,
   request: Request,
+  store: W08CreatorStore,
   application: ApplicationRow,
 ): Promise<Response> {
   if (application.status !== 'APPROVED') {
@@ -180,11 +123,8 @@ async function retryCreatorGrant(
     return json({ applicationId: application.application_id, status: application.status, grantState: application.grant_state, version: application.version, replayed: true })
   }
 
-  const creator = await env.D1_01.prepare(
-    'SELECT creator_id AS creatorId, application_id AS applicationId FROM creators WHERE user_id = ? LIMIT 1',
-  ).bind(application.user_id).first<{ creatorId: string; applicationId: string }>()
-
-  if (!creator || creator.applicationId !== application.application_id) {
+  const creator = await store.findCreatorByUser(application.user_id)
+  if (!creator || creator.application_id !== application.application_id) {
     return errorResponse(409, 'CREATOR_IDENTITY_CONFLICT', 'Creator identity is already linked to another application')
   }
 
@@ -200,31 +140,17 @@ async function retryCreatorGrant(
   }
 
   const now = new Date().toISOString()
-  await env.D1_01.batch([
-    env.D1_01.prepare(
-      "UPDATE creator_applications SET grant_state = 'GRANTED', version = version + 1, updated_at = ? " +
-      "WHERE application_id = ? AND status = 'APPROVED' AND grant_state = 'PENDING'",
-    ).bind(now, application.application_id),
-    env.D1_01.prepare(
-      "UPDATE creators SET status = 'ACTIVE', version = version + 1, updated_at = ? " +
-      "WHERE application_id = ? AND status = 'PENDING_ROLE_GRANT'",
-    ).bind(now, application.application_id),
-    auditStatement(env, {
-      eventKey: 'creator-role-granted:' + application.application_id,
-      actorId: application.decided_by ?? 'system',
-      subjectId: application.user_id,
-      eventType: 'CREATOR_ROLE_GRANTED',
-      resourceType: 'creator',
-      resourceId: creator.creatorId,
-      fromState: 'PENDING_ROLE_GRANT',
-      toState: 'ACTIVE',
-      idempotencyKey: application.decision_idempotency_key,
-      request,
-      details: { roleId: 'creator', approvalRef: 'creator-application-' + application.application_id },
-      occurredAt: now,
-    }),
-  ])
-  const latest = await readApplication(env, application.application_id)
+  await store.completeCreatorGrant({
+    applicationId: application.application_id,
+    applicantId: application.user_id,
+    creatorId: creator.creator_id,
+    actorId: application.decided_by ?? 'system',
+    idempotencyKey: application.decision_idempotency_key,
+    correlationId: request.headers.get('X-LuckRead-Correlation-Id')?.trim().slice(0, 128) ||
+      request.headers.get('cf-ray')?.trim().slice(0, 128) || null,
+    now,
+  })
+  const latest = await store.readApplication(application.application_id)
   return json({
     applicationId: application.application_id,
     status: latest?.status ?? 'APPROVED',
@@ -234,7 +160,7 @@ async function retryCreatorGrant(
   })
 }
 
-async function handleApplicationCreate(env: Env, request: Request): Promise<Response> {
+async function handleApplicationCreate(env: Env, request: Request, store: W08CreatorStore): Promise<Response> {
   const principal = await principalFor(env, request)
   if (principal instanceof Response) return principal
   const key = request.headers.get('Idempotency-Key')
@@ -248,91 +174,61 @@ async function handleApplicationCreate(env: Env, request: Request): Promise<Resp
     return errorResponse(400, 'VALIDATION_FAILED', 'Unsupported creator type')
   }
   if (statement.length > 2000) return errorResponse(400, 'VALIDATION_FAILED', 'Application statement is too long')
-  // Any client-supplied role/layer/approval/scope fields are ignored. Only the
-  // allow-listed application fields above are persisted.
-  const now = new Date().toISOString()
-  const replay = await env.D1_01.prepare(
-    'SELECT application_id, user_id, creator_type, statement, status, grant_state, version, created_at ' +
-    'FROM creator_applications WHERE user_id = ? AND application_idempotency_key = ? LIMIT 1',
-  ).bind(principal.userId, key).first<{
-    application_id: string; user_id: string; creator_type: string; statement: string; status: string; grant_state: string; version: number; created_at: string
-  }>()
+
+  const replay = await store.findApplicationByIdempotency(principal.userId, key)
   if (replay) {
     if (!creatorApplicationReplayMatches(replay, { creatorType, statement })) return errorResponse(409, 'IDEMPOTENCY_CONFLICT', 'Idempotency key was used with different application data')
     return json({ applicationId: replay.application_id, status: replay.status, grantState: replay.grant_state, version: replay.version, replayed: true })
   }
   if (evaluateCreatorApplicationPermission(principal, 'creator.application.apply', { ownerId: principal.userId }).decision !== 'ALLOW') return errorResponse(403, 'VERIFIED_USER_REQUIRED', 'Email verification and L2 access are required')
 
-  const existingCreator = await env.D1_01.prepare(
-    'SELECT creator_id FROM creators WHERE user_id = ? LIMIT 1',
-  ).bind(principal.userId).first<{ creator_id: string }>()
+  const existingCreator = await store.findCreatorByUser(principal.userId)
   if (existingCreator) return errorResponse(409, 'CREATOR_ALREADY_EXISTS', 'This account already has a creator identity')
 
-  const existingPending = await env.D1_01.prepare(
-    "SELECT application_id FROM creator_applications WHERE user_id = ? AND status = 'PENDING' LIMIT 1",
-  ).bind(principal.userId).first<{ application_id: string }>()
+  const existingPending = await store.findPendingApplicationByUser(principal.userId)
   if (existingPending) return errorResponse(409, 'APPLICATION_ALREADY_PENDING', 'A creator application is already pending')
 
   const applicationId = crypto.randomUUID()
+  const now = new Date().toISOString()
   try {
-    await env.D1_01.batch([
-      env.D1_01.prepare(
-        "INSERT INTO creator_applications " +
-        "(application_id,user_id,creator_type,statement,status,grant_state,version,application_idempotency_key,created_at,updated_at) " +
-        "VALUES (?,?,?,?,'PENDING','NOT_REQUESTED',1,?,?,?)",
-      ).bind(applicationId, principal.userId, creatorType, statement, key, now, now),
-      auditStatement(env, {
-        eventKey: 'creator-application-submitted:' + applicationId,
-        actorId: principal.userId,
-        subjectId: principal.userId,
-        eventType: 'CREATOR_APPLICATION_SUBMITTED',
-        resourceType: 'creator_application',
-        resourceId: applicationId,
-        fromState: null,
-        toState: 'PENDING',
-        idempotencyKey: key,
-        request,
-        details: { creatorType },
-        occurredAt: now,
-      }),
-    ])
+    await store.createApplication({
+      applicationId,
+      userId: principal.userId,
+      creatorType,
+      statement,
+      idempotencyKey: key,
+      correlationId: request.headers.get('X-LuckRead-Correlation-Id')?.trim().slice(0, 128) ||
+        request.headers.get('cf-ray')?.trim().slice(0, 128) || null,
+      now,
+    })
   } catch {
     return errorResponse(409, 'APPLICATION_CONFLICT', 'Creator application could not be created; refresh and retry')
   }
   return json({ applicationId, status: 'PENDING', grantState: 'NOT_REQUESTED', version: 1 }, 201, { etag: '"1"' })
 }
 
-async function handleApplicationRead(env: Env, request: Request): Promise<Response> {
+async function handleApplicationRead(env: Env, request: Request, store: W08CreatorStore): Promise<Response> {
   const principal = await principalFor(env, request)
   if (principal instanceof Response) return principal
   if (evaluateCreatorApplicationPermission(principal, 'creator.application.read.own', { ownerId: principal.userId }).decision !== 'ALLOW') {
     return errorResponse(403, 'PERMISSION_DENIED', 'You may only read your own creator application')
   }
-  const row = await env.D1_01.prepare(
-    'SELECT application_id, creator_type, statement, status, grant_state, version, created_at, updated_at, decided_at, decision_reason ' +
-    'FROM creator_applications WHERE user_id = ? ORDER BY created_at DESC LIMIT 1',
-  ).bind(principal.userId).first<{
-    application_id: string; creator_type: string; statement: string; status: string; grant_state: string; version: number
-    created_at: string; updated_at: string; decided_at: string | null; decision_reason: string | null
-  }>()
+  const row = await store.findOwnApplication(principal.userId)
   return json({ application: row ?? null }, 200, row ? { etag: '"' + row.version + '"' } : undefined)
 }
 
-async function handleAdminApplicationList(env: Env, request: Request): Promise<Response> {
+async function handleAdminApplicationList(env: Env, request: Request, store: W08CreatorStore): Promise<Response> {
   const principal = await principalFor(env, request)
   if (principal instanceof Response) return principal
   if (evaluateCreatorApplicationPermission(principal, 'creator.application.review', {}).decision !== 'ALLOW') return errorResponse(403, 'PERMISSION_DENIED', 'L7 or L8 authorization is required')
   const url = new URL(request.url)
   const limitValue = Number(url.searchParams.get('limit') ?? '25')
   const limit = Number.isSafeInteger(limitValue) ? Math.max(1, Math.min(50, limitValue)) : 25
-  const rows = await env.D1_01.prepare(
-    "SELECT application_id, user_id, creator_type, statement, status, grant_state, version, created_at " +
-    "FROM creator_applications WHERE status = 'PENDING' OR (status = 'APPROVED' AND grant_state = 'PENDING' AND decided_by = ?) ORDER BY created_at ASC LIMIT ?",
-  ).bind(principal.userId, limit).all()
-  return json({ data: rows.results ?? [], limit })
+  const rows = await store.listReviewableApplications(principal.userId, limit)
+  return json({ data: rows, limit })
 }
 
-async function handleAdminApplicationDecision(env: Env, request: Request): Promise<Response> {
+async function handleAdminApplicationDecision(env: Env, request: Request, store: W08CreatorStore): Promise<Response> {
   const principal = await principalFor(env, request)
   if (principal instanceof Response) return principal
   if (evaluateCreatorApplicationPermission(principal, 'creator.application.review', {}).decision !== 'ALLOW') return errorResponse(403, 'PERMISSION_DENIED', 'L7 or L8 authorization is required')
@@ -347,7 +243,7 @@ async function handleAdminApplicationDecision(env: Env, request: Request): Promi
   const reason = typeof body.reason === 'string' ? body.reason.trim() : ''
   if (reason.length > 500) return errorResponse(400, 'VALIDATION_FAILED', 'Decision reason is too long')
 
-  let application = await readApplication(env, body.applicationId)
+  let application = await store.readApplication(body.applicationId)
   if (!application) return errorResponse(404, 'NOT_FOUND', 'Creator application not found')
   const admission = admitCreatorDecision({
     applicationStatus: application.status,
@@ -361,7 +257,7 @@ async function handleAdminApplicationDecision(env: Env, request: Request): Promi
   })
   if (admission === 'SELF_APPROVAL_DENIED') return errorResponse(403, 'SELF_APPROVAL_DENIED', 'An application cannot be approved by its own applicant')
   if (admission === 'DECISION_CONFLICT') return errorResponse(409, 'DECISION_CONFLICT', 'This application already has a different final decision')
-  if (admission === 'REPLAY') return decision === 'APPROVED' ? retryCreatorGrant(env, request, application) : json({
+  if (admission === 'REPLAY') return decision === 'APPROVED' ? retryCreatorGrant(env, request, store, application) : json({
     applicationId: application.application_id,
     status: application.status,
     grantState: application.grant_state,
@@ -373,43 +269,28 @@ async function handleAdminApplicationDecision(env: Env, request: Request): Promi
   if (expectedVersion === null) return errorResponse(428, 'PRECONDITION_REQUIRED', 'If-Match with the current application version is required')
   if (expectedVersion !== application.version) return errorResponse(412, 'PRECONDITION_FAILED', 'Creator application changed; refresh before deciding')
 
+  const correlationId = request.headers.get('X-LuckRead-Correlation-Id')?.trim().slice(0, 128) ||
+    request.headers.get('cf-ray')?.trim().slice(0, 128) || null
   if (decision === 'APPROVED') {
-    const existingCreator = await env.D1_01.prepare(
-      'SELECT application_id FROM creators WHERE user_id = ? LIMIT 1',
-    ).bind(application.user_id).first<{ application_id: string }>()
+    const existingCreator = await store.findCreatorByUser(application.user_id)
     if (existingCreator && existingCreator.application_id !== application.application_id) {
       return errorResponse(409, 'CREATOR_IDENTITY_CONFLICT', 'User already has a creator identity')
     }
     const now = new Date().toISOString()
     try {
-      const results = await env.D1_01.batch([
-        env.D1_01.prepare(
-          "UPDATE creator_applications SET status = 'APPROVED', grant_state = 'PENDING', version = version + 1, " +
-          'decision_idempotency_key = ?, decided_by = ?, decision_reason = ?, decided_at = ?, updated_at = ? ' +
-          "WHERE application_id = ? AND status = 'PENDING' AND version = ?",
-        ).bind(idempotencyKey, principal.userId, reason, now, now, application.application_id, expectedVersion),
-        env.D1_01.prepare(
-          "INSERT INTO creators (creator_id,user_id,application_id,creator_type,status,version,created_at,updated_at) " +
-          "SELECT ?, user_id, application_id, creator_type, 'PENDING_ROLE_GRANT', 1, ?, ? " +
-          "FROM creator_applications WHERE application_id = ? AND status = 'APPROVED' " +
-          "AND decision_idempotency_key = ? AND decided_by = ? " +
-          "ON CONFLICT(application_id) DO NOTHING",
-        ).bind('creator-' + application.application_id, now, now, application.application_id, idempotencyKey, principal.userId),
-        env.D1_01.prepare(
-          "INSERT OR IGNORE INTO creator_authorization_audit " +
-          "(audit_id,event_key,actor_id,subject_id,event_type,resource_type,resource_id,from_state,to_state,idempotency_key,correlation_id,occurred_at,details_json) " +
-          "SELECT ?, ?, ?, user_id, 'CREATOR_APPLICATION_APPROVED', 'creator_application', application_id, 'PENDING', 'APPROVED', ?, ?, ?, ? " +
-          "FROM creator_applications WHERE application_id = ? AND status = 'APPROVED' " +
-          "AND decision_idempotency_key = ? AND decided_by = ?",
-        ).bind(
-          crypto.randomUUID(), 'creator-application-decision:' + application.application_id + ':' + idempotencyKey,
-          principal.userId, idempotencyKey,
-          request.headers.get('X-LuckRead-Correlation-Id')?.trim().slice(0, 128) || request.headers.get('cf-ray')?.trim().slice(0, 128) || null,
-          now, JSON.stringify({ reason }), application.application_id, idempotencyKey, principal.userId,
-        ),
-      ])
-      if ((results[0]?.meta?.changes ?? 0) !== 1) {
-        const current = await readApplication(env, application.application_id)
+      const changed = await store.approveApplication({
+        applicationId: application.application_id,
+        applicantId: application.user_id,
+        creatorType: application.creator_type,
+        actorId: principal.userId,
+        idempotencyKey,
+        reason,
+        expectedVersion,
+        correlationId,
+        now,
+      })
+      if (!changed) {
+        const current = await store.readApplication(application.application_id)
         if (!current || current.status !== 'APPROVED' || current.decided_by !== principal.userId || current.decision_idempotency_key !== idempotencyKey) {
           return errorResponse(412, 'PRECONDITION_FAILED', 'Creator application changed; refresh before deciding')
         }
@@ -417,36 +298,28 @@ async function handleAdminApplicationDecision(env: Env, request: Request): Promi
     } catch {
       return errorResponse(409, 'CREATOR_IDENTITY_CONFLICT', 'Creator identity could not be established')
     }
-    application = (await readApplication(env, application.application_id)) ?? application
-    return retryCreatorGrant(env, request, application)
+    application = (await store.readApplication(application.application_id)) ?? application
+    return retryCreatorGrant(env, request, store, application)
   }
 
   const now = new Date().toISOString()
-  const results = await env.D1_01.batch([
-    env.D1_01.prepare(
-      "UPDATE creator_applications SET status = 'REJECTED', grant_state = 'NOT_REQUESTED', version = version + 1, " +
-      'decision_idempotency_key = ?, decided_by = ?, decision_reason = ?, decided_at = ?, updated_at = ? ' +
-      "WHERE application_id = ? AND status = 'PENDING' AND version = ?",
-    ).bind(idempotencyKey, principal.userId, reason, now, now, application.application_id, expectedVersion),
-    env.D1_01.prepare(
-      "INSERT OR IGNORE INTO creator_authorization_audit " +
-      "(audit_id,event_key,actor_id,subject_id,event_type,resource_type,resource_id,from_state,to_state,idempotency_key,correlation_id,occurred_at,details_json) " +
-      "SELECT ?, ?, ?, user_id, 'CREATOR_APPLICATION_REJECTED', 'creator_application', application_id, 'PENDING', 'REJECTED', ?, ?, ?, ? " +
-      "FROM creator_applications WHERE application_id = ? AND status = 'REJECTED' " +
-      "AND decision_idempotency_key = ? AND decided_by = ?",
-    ).bind(
-      crypto.randomUUID(), 'creator-application-decision:' + application.application_id + ':' + idempotencyKey,
-      principal.userId, idempotencyKey,
-      request.headers.get('X-LuckRead-Correlation-Id')?.trim().slice(0, 128) || request.headers.get('cf-ray')?.trim().slice(0, 128) || null,
-      now, JSON.stringify({ reason }), application.application_id, idempotencyKey, principal.userId,
-    ),
-  ])
-  if ((results[0]?.meta?.changes ?? 0) !== 1) return errorResponse(412, 'PRECONDITION_FAILED', 'Creator application changed; refresh before deciding')
-  application = (await readApplication(env, application.application_id)) ?? application
+  const changed = await store.rejectApplication({
+    applicationId: application.application_id,
+    applicantId: application.user_id,
+    creatorType: application.creator_type,
+    actorId: principal.userId,
+    idempotencyKey,
+    reason,
+    expectedVersion,
+    correlationId,
+    now,
+  })
+  if (!changed) return errorResponse(412, 'PRECONDITION_FAILED', 'Creator application changed; refresh before deciding')
+  application = (await store.readApplication(application.application_id)) ?? application
   return json({ applicationId: application.application_id, status: application.status, grantState: application.grant_state, version: application.version })
 }
 
-async function handleActiveCreatorSelf(env: Env, request: Request): Promise<Response> {
+async function handleActiveCreatorSelf(env: Env, request: Request, store: W08CreatorStore): Promise<Response> {
   const principal = await principalFor(env, request)
   if (principal instanceof Response) return principal
 
@@ -462,9 +335,7 @@ async function handleActiveCreatorSelf(env: Env, request: Request): Promise<Resp
     return errorResponse(403, 'CREATOR_PERMISSION_REQUIRED', 'An active creator identity is required')
   }
 
-  const creator = await env.D1_01.prepare(
-    "SELECT creator_id FROM creators WHERE user_id = ? AND status = 'ACTIVE' LIMIT 1",
-  ).bind(principal.userId).first<{ creator_id: string }>()
+  const creator = await store.findActiveCreator(principal.userId)
   if (!creator) return errorResponse(403, 'CREATOR_NOT_ACTIVE', 'An active creator identity is required')
   return json({ creatorId: creator.creator_id, status: 'ACTIVE' })
 }
@@ -493,19 +364,19 @@ export default {
       }
     }
     if (url.pathname === '/internal/creator/self' && request.method === 'GET') {
-      try { return await handleActiveCreatorSelf(env, request) } catch { return errorResponse(503, 'CREATOR_SERVICE_UNAVAILABLE', 'Creator service unavailable') }
+      try { return await handleActiveCreatorSelf(env, request, getW08CreatorStore(env)) } catch { return errorResponse(503, 'CREATOR_SERVICE_UNAVAILABLE', 'Creator service unavailable') }
     }
     if (url.pathname === '/api/v1/creator-applications' && request.method === 'POST') {
-      try { return await handleApplicationCreate(env, request) } catch { return errorResponse(503, 'CREATOR_SERVICE_UNAVAILABLE', 'Creator application service unavailable') }
+      try { return await handleApplicationCreate(env, request, getW08CreatorStore(env)) } catch { return errorResponse(503, 'CREATOR_SERVICE_UNAVAILABLE', 'Creator application service unavailable') }
     }
     if (url.pathname === '/api/v1/creator-applications/me' && request.method === 'GET') {
-      try { return await handleApplicationRead(env, request) } catch { return errorResponse(503, 'CREATOR_SERVICE_UNAVAILABLE', 'Creator application service unavailable') }
+      try { return await handleApplicationRead(env, request, getW08CreatorStore(env)) } catch { return errorResponse(503, 'CREATOR_SERVICE_UNAVAILABLE', 'Creator application service unavailable') }
     }
     if (url.pathname === '/api/v1/admin/creator-applications' && request.method === 'GET') {
-      try { return await handleAdminApplicationList(env, request) } catch { return errorResponse(503, 'CREATOR_SERVICE_UNAVAILABLE', 'Creator application service unavailable') }
+      try { return await handleAdminApplicationList(env, request, getW08CreatorStore(env)) } catch { return errorResponse(503, 'CREATOR_SERVICE_UNAVAILABLE', 'Creator application service unavailable') }
     }
     if (url.pathname === '/api/v1/admin/creator-applications/decision' && request.method === 'POST') {
-      try { return await handleAdminApplicationDecision(env, request) } catch { return errorResponse(503, 'CREATOR_SERVICE_UNAVAILABLE', 'Creator application service unavailable') }
+      try { return await handleAdminApplicationDecision(env, request, getW08CreatorStore(env)) } catch { return errorResponse(503, 'CREATOR_SERVICE_UNAVAILABLE', 'Creator application service unavailable') }
     }
     return errorResponse(404, 'NOT_FOUND', 'Creator endpoint not found')
   },

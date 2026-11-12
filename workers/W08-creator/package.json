@@ -11,8 +11,18 @@
       "default": "./src/index.ts"
     }
   },
-  "engines": { "node": ">=24" },
+  "engines": {
+    "node": ">=24"
+  },
   "dependencies": {
-    "@casl/ability": "7.1.1"
+    "@casl/ability": "7.1.1",
+    "pg": "8.20.0"
+  },
+  "devDependencies": {
+    "@types/pg": "8.23.1",
+    "tsx": "4.23.15"
+  },
+  "scripts": {
+    "neon:creator-runtime": "tsx scripts/neon/w08-creator-runtime-postgres-rehearsal.ts"
   }
 }

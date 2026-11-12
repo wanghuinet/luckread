@@ -3,7 +3,9 @@
   "name": "luckread-w08-creator",
   "main": "src/worker.ts",
   "compatibility_date": "2025-08-15",
-  "compatibility_flags": ["nodejs_compat"],
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
   "workers_dev": false,
   "observability": {
     "enabled": true,
@@ -24,6 +26,15 @@
       "database_name": "luckread",
       "database_id": "2f80471e-3756-49f9-8db1-7707a433ad64",
       "migrations_dir": "migrations"
+    }
+  ],
+  "vars": {
+    "W08_DATABASE_DRIVER": "d1"
+  },
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "0c53a1bb9bc0484bac146e8ae2d3158b"
     }
   ]
 }
