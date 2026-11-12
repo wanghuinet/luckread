@@ -79,6 +79,7 @@ on:
       - 'workers/W02-identity/scripts/neon/w02-auth007-mfa-publication-publisher-postgres-runtime-rehearsal.ts'
       - 'workers/W02-identity/scripts/neon/w02-role-assignment-postgres-runtime-rehearsal.ts'
       - 'workers/W02-identity/scripts/neon/w02-better-auth-postgres-runtime-rehearsal.ts'
+      - 'workers/W02-identity/src/neon/**'
       - 'workers/W02-identity/src/neon-postgres-migrations/**'
       - 'workers/W02-identity/scripts/neon/**'
   workflow_dispatch:
@@ -117,6 +118,17 @@ jobs:
       - name: Install pinned W02 toolchain
         working-directory: workers/W02-identity
         run: npm install --ignore-scripts --no-audit --no-fund
+
+      - name: Verify L8 PostgreSQL migration generator is deterministic and isolated from D1-01 baseline
+        working-directory: workers/W02-identity
+        run: |
+          set -euo pipefail
+          migration=src/neon-postgres-migrations/0011_l8_genesis_bootstrap_audit.sql
+          cp "$migration" /tmp/w02-l8-genesis-bootstrap-postgres.sql
+          npm run neon:l8-bootstrap:generate
+          cmp --silent /tmp/w02-l8-genesis-bootstrap-postgres.sql "$migration"
+          git diff --exit-code -- "$migration"
+          grep -F "outside the reviewed fourteen-entry D1-01 shared ledger" "$migration"
 
       - name: Verify Better Auth and CLI versions are pinned together
         working-directory: workers/W02-identity
@@ -392,6 +404,12 @@ jobs:
           W02_RUNTIME_DATABASE_URL: postgresql://schema_generator:schema_generator_local_only@127.0.0.1:5432/luckread_schema
         run: npm run neon:account-state:runtime
 
+      - name: Rehearse AUTH-013 PostgreSQL dual-queue publisher and retry on PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          W02_RUNTIME_DATABASE_URL: postgresql://schema_generator:schema_generator_local_only@127.0.0.1:5432/luckread_schema
+        run: npm run neon:auth013-publisher:runtime
+
       - name: Verify AUTH-010 secret-free session revocation journal and retry constraints
         working-directory: workers/W02-identity
         env:
@@ -480,6 +498,12 @@ jobs:
             --file scripts/neon/verify-w02-identity-postgres-schema.sql \
             | tee artifacts/neon/w02-identity-postflight.txt
 
+      - name: Rehearse separately reviewed L8 one-time bootstrap on a disposable PostgreSQL 18 database clone
+        working-directory: workers/W02-identity
+        env:
+          W02_RUNTIME_DATABASE_URL: postgresql://schema_generator:schema_generator_local_only@127.0.0.1:5432/luckread_schema
+        run: npm run neon:l8-bootstrap:runtime
+
       - name: Upload generated schema and postflight evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -502,6 +526,8 @@ jobs:
             workers/W02-identity/src/neon-postgres-migrations/0008_auth_username_change_state.sql
             workers/W02-identity/src/neon-postgres-migrations/0009_auth_007_mfa_publication_journal.sql
             workers/W02-identity/src/neon-postgres-migrations/0010_auth_007_mfa_operation_receipts.sql
+            workers/W02-identity/src/neon-postgres-migrations/0011_l8_genesis_bootstrap_audit.sql
+            workers/W02-identity/artifacts/neon/w02-l8-genesis-bootstrap-postgres-runtime-rehearsal.json
             workers/W02-identity/artifacts/neon/w02-auth007-mfa-operation-receipts-postgres-schema-postflight.json
             workers/W02-identity/artifacts/neon/w02-auth007-mfa-operation-receipts-postgres-runtime-rehearsal.json
             workers/W02-identity/artifacts/neon/w02-auth007-mfa-receipt-reconciliation-postgres-runtime-rehearsal.json

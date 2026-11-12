@@ -3,21 +3,30 @@
   "name": "luckread-w02",
   "main": "src/index.ts",
   "compatibility_date": "2025-08-15",
-  "compatibility_flags": ["nodejs_compat"],
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
   "workers_dev": false,
   "vars": {
-    "AUTH_EMAIL_FROM": "noreply@good.luckread.com"
+    "AUTH_EMAIL_FROM": "noreply@good.luckread.com",
+    "W02_DATABASE_DRIVER": "d1"
   },
   "ratelimits": [
     {
       "name": "AUTH_SESSION_READ_LIMITER",
       "namespace_id": "2026100312",
-      "simple": { "limit": 300, "period": 60 }
+      "simple": {
+        "limit": 300,
+        "period": 60
+      }
     },
     {
       "name": "AUTH_SESSION_WRITE_LIMITER",
       "namespace_id": "2026100320",
-      "simple": { "limit": 60, "period": 60 }
+      "simple": {
+        "limit": 60,
+        "period": 60
+      }
     }
   ],
   "observability": {
@@ -51,6 +60,12 @@
       "database_name": "luckread",
       "database_id": "2f80471e-3756-49f9-8db1-7707a433ad64",
       "migrations_dir": "migrations"
+    }
+  ],
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "0c53a1bb9bc0484bac146e8ae2d3158b"
     }
   ]
 }

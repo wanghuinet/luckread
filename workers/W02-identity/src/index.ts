@@ -1,4 +1,9 @@
 import { createLuckReadAuth, type RateLimitBinding } from './auth/better-auth.js'
+import { getW02PostgresRuntime, isW02NeonRuntime } from './neon/runtime.js'
+import { publishPendingAccountStateEventsPostgres } from './neon/account-state-publication-journal-publisher-postgres.js'
+import { publishPendingSessionRevocationEventsPostgres } from './neon/session-revocation-publisher-postgres.js'
+import { publishPendingMfaAuditEventsPostgres } from './neon/mfa-audit-publication-journal-publisher-postgres.js'
+import { reconcileMfaAuditOperationReceiptsPostgres } from './neon/mfa-audit-operation-receipt-reconciler-postgres.js'
 import { publishPendingAccountStateEvents } from './account/publication-journal-publisher.js'
 import { publishPendingMfaAuditEvents } from './auth/mfa-audit-publication-journal.js'
 import { publishPendingSessionRevocationEvents } from './auth/session-revocation-publication-journal.js'
@@ -21,11 +26,14 @@ import { handleMfaEnrollmentConfirmRequest } from './auth/mfa-enrollment-confirm
 import { verifyTargetBoundSingleApproval, L8BootstrapApprovalError } from './authz/l8-genesis-bootstrap-approval.js'
 import { bootstrapSuperAdmin, L8BootstrapCommandError } from './authz/l8-genesis-bootstrap-command.js'
 import { checkL8BootstrapReadiness, L8BootstrapReadinessError } from './authz/l8-genesis-bootstrap-readiness.js'
+import { bootstrapSuperAdminPostgres, checkL8BootstrapReadinessPostgres } from './neon/l8-genesis-bootstrap-postgres.js'
 
 interface Env {
   D1_01: D1Database
   AUTH_SESSION_READ_LIMITER: RateLimitBinding
   AUTH_SESSION_WRITE_LIMITER: RateLimitBinding
+  W02_DATABASE_DRIVER?: string
+  HYPERDRIVE?: { connectionString: string }
   RESEND_API_KEY?: string
   AUTH_EMAIL_FROM?: string
   AUTH013_QUEUE: Queue
@@ -51,6 +59,12 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
+    let postgres: ReturnType<typeof getW02PostgresRuntime> | undefined
+    try {
+      if (isW02NeonRuntime(env)) postgres = getW02PostgresRuntime(env)
+    } catch {
+      return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'identity service unavailable' } }, 503)
+    }
     const url = new URL(request.url)
 
     if (url.pathname === '/api/auth' || url.pathname.startsWith('/api/auth/')) {
@@ -83,7 +97,9 @@ export default {
       }
 
       try {
-        const result = await createD1AccountStateTransitionStore(env.D1_01).transition({
+        const transitionStore = postgres?.accountStateTransitionStore ??
+          createD1AccountStateTransitionStore(env.D1_01)
+        const result = await transitionStore.transition({
           subjectId: body.subjectId,
           targetUserId: body.targetUserId,
           to: body.to as AccountState,
@@ -158,7 +174,9 @@ export default {
       }
 
       try {
-        const result = await createD1RegistrationRollbackStore(env.D1_01).rollback({
+        const rollbackStore = postgres?.registrationRollbackStore ??
+          createD1RegistrationRollbackStore(env.D1_01)
+        const result = await rollbackStore.rollback({
           userId: body.userId,
           email: body.email,
           username: body.username,
@@ -180,35 +198,46 @@ export default {
       }
     }
     if (request.method === 'POST' && url.pathname === '/internal/auth/mfa/enrollment/start') {
-      return handleMfaEnrollmentStartRequest(env, request)
+      return handleMfaEnrollmentStartRequest(env, request, postgres ? {
+        store: postgres.mfaEnrollmentStartStore,
+        auth: createLuckReadAuth(env),
+      } : {})
     }
 
     if (request.method === 'POST' && url.pathname === '/internal/auth/mfa/enrollment/confirm') {
-      return handleMfaEnrollmentConfirmRequest(env, request)
+      return handleMfaEnrollmentConfirmRequest(env, request, postgres ? {
+        store: postgres.mfaEnrollmentConfirmStore,
+        receiptStore: postgres.mfaAuditOperationReceiptStore,
+        statusStore: postgres.mfaStatusStore,
+        auth: createLuckReadAuth(env),
+      } : {})
     }
 
     if (request.method === 'POST' && url.pathname === '/internal/auth/mfa/status') {
-      return handleMfaStatusRequest(env, request)
+      return handleMfaStatusRequest(env, request, postgres ? { store: postgres.mfaStatusStore } : {})
     }
 
     if (url.pathname === '/internal/auth/username/state' && request.method === 'GET') {
-      return handleUsernameStateRequest(env, request)
+      return handleUsernameStateRequest(env, request, new Date(), postgres?.usernameChangeStore)
     }
 
     if (url.pathname === '/internal/auth/username/change' && request.method === 'POST') {
-      return handleUsernameChangeRequest(env, request)
+      return handleUsernameChangeRequest(env, request, new Date(), postgres?.usernameChangeStore)
     }
 
     if (request.method === 'POST' && url.pathname === '/internal/auth/session/list') {
-      return handleCurrentUserSessionList(env, request)
+      return handleCurrentUserSessionList(env, request, postgres ? { store: postgres.sessionListStore } : {})
     }
 
     if (request.method === 'POST' && url.pathname === '/internal/auth/session/revoke-by-id') {
-      return handleCurrentUserSessionRevoke(env, request)
+      return handleCurrentUserSessionRevoke(env, request, postgres ? { store: postgres.sessionRevocationStore } : {})
     }
 
     if (request.method === 'POST' && url.pathname === '/internal/auth/session/logout') {
-      return handleCurrentUserSessionLogout(env, request)
+      return handleCurrentUserSessionLogout(env, request, postgres ? {
+        store: postgres.sessionLogoutStore,
+        auth: createLuckReadAuth(env),
+      } : {})
     }
 
     if (request.method === 'POST' && url.pathname === '/internal/authz/resolve-layer') {
@@ -222,7 +251,7 @@ export default {
         // role assignments. Neither accountState nor evaluation time is
         // accepted from the internal caller.
         const result = await resolveLayerForSubject(
-          createD1RoleLayerStore(env.D1_01),
+          postgres?.roleLayerStore ?? createD1RoleLayerStore(env.D1_01),
           body.subjectId,
           new Date().toISOString(),
         )
@@ -268,7 +297,9 @@ export default {
           githubToken: body.githubToken,
           requestPrNumber: body.requestPrNumber as number,
         })
-        const readiness = await checkL8BootstrapReadiness(env.D1_01, approval)
+        const readiness = postgres
+          ? await checkL8BootstrapReadinessPostgres(postgres.pool, approval)
+          : await checkL8BootstrapReadiness(env.D1_01, approval)
         return json({ data: readiness })
       } catch (error) {
         if (error instanceof L8BootstrapApprovalError) {
@@ -345,7 +376,9 @@ export default {
           githubToken: body.githubToken,
           requestPrNumber: body.requestPrNumber as number,
         })
-        const grant = await bootstrapSuperAdmin(env.D1_01, approval)
+        const grant = postgres
+          ? await bootstrapSuperAdminPostgres(postgres.pool, approval)
+          : await bootstrapSuperAdmin(env.D1_01, approval)
         return json({
           data: {
             ...grant,
@@ -436,7 +469,9 @@ export default {
       }
 
       try {
-        const result = await grantCreatorBusinessRoleWithStore(createD1CreatorRoleGrantStore(env.D1_01), {
+        const creatorRoleGrantStore = postgres?.creatorRoleGrantStore ??
+          createD1CreatorRoleGrantStore(env.D1_01)
+        const result = await grantCreatorBusinessRoleWithStore(creatorRoleGrantStore, {
           subjectId: body.subjectId,
           roleId: body.roleId as 'creator',
           scopeType: body.scopeType as 'global',
@@ -473,6 +508,47 @@ export default {
       cron: controller.cron,
       scheduledTime: controller.scheduledTime,
     })
+    if (isW02NeonRuntime(env)) {
+      const postgres = getW02PostgresRuntime(env)
+      await runScheduledPublicationTicks([
+        {
+          name: 'account-state',
+          publish: () => publishPendingAccountStateEventsPostgres(postgres.pool, {
+            auth013: env.AUTH013_QUEUE,
+            projection: env.AUTH013_PROJECTION_QUEUE,
+          }),
+        },
+        {
+          name: 'session-audit',
+          publish: () => publishPendingSessionRevocationEventsPostgres(postgres.pool, env.AUTH013_QUEUE),
+        },
+        {
+          name: 'mfa-audit',
+          publish: async () => {
+            let receiptSummary = { selected: 0, emitted: 0, failed: 0, unknown: 0 }
+            try {
+              receiptSummary = await reconcileMfaAuditOperationReceiptsPostgres(postgres.pool)
+            } catch {
+              console.error(JSON.stringify({
+                event: 'auth.mfa.audit_receipt_reconcile_failed',
+                code: 'MFA_AUDIT_RECEIPT_RECONCILE_FAILED',
+              }))
+              receiptSummary.failed = 1
+            }
+            const publication = await publishPendingMfaAuditEventsPostgres(postgres.pool, env.AUTH013_QUEUE)
+            return {
+              ...publication,
+              receiptSelected: receiptSummary.selected,
+              receiptEmitted: receiptSummary.emitted,
+              receiptFailed: receiptSummary.failed,
+              receiptUnknown: receiptSummary.unknown,
+            }
+          },
+        },
+      ])
+      return
+    }
+
     await runScheduledPublicationTicks([
       { name: 'account-state', publish: () => publishPendingAccountStateEvents(env) },
       { name: 'session-audit', publish: () => publishPendingSessionRevocationEvents(env) },
