@@ -1273,7 +1273,7 @@ describe('W05 social query transport', () => {
     expect(targetContextStore.readCommentTarget).toHaveBeenCalledWith('comment-pg-1')
     expect(targetContextStore.hasBidirectionalBlock).toHaveBeenCalledWith(
       'viewer-pg-1',
-      ['comment-author-1', 'owner-1'], 
+      ['comment-author-1', 'owner-1'],
     )
     expect(statusStore.read).toHaveBeenCalledWith({
       actorUserId: 'viewer-pg-1',
