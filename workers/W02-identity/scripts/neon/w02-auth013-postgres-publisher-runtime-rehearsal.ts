@@ -17,7 +17,7 @@ if (
 
 const pool = new Pool({ connectionString, max: 2, connectionTimeoutMillis: 5_000 })
 const journalIds: string[] = []
-const now = new Date().toISOString()
+const now = '2000-01-01T00:00:00.000Z'
 
 function eventFor(resourceId: string, sourceVersion: number) {
   const eventId = randomUUID()
@@ -42,7 +42,7 @@ function eventFor(resourceId: string, sourceVersion: number) {
   }
 }
 
-async function insertJournal(event: ReturnType<typeof eventFor>): Promise<string> {
+async function insertJournal(event: ReturnType<typeof eventFor>, createdAt: string): Promise<string> {
   const journalId = randomUUID()
   journalIds.push(journalId)
   await pool.query(
@@ -52,7 +52,7 @@ async function insertJournal(event: ReturnType<typeof eventFor>): Promise<string
     ') VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)',
     [
       journalId, event.eventId, event.eventType, event.schemaVersion, event.resourceId,
-      event.sourceVersion, JSON.stringify(event), 'PENDING', 1, null, now, null, null,
+      event.sourceVersion, JSON.stringify(event), 'PENDING', 1, null, createdAt, null, null,
     ],
   )
   return journalId
@@ -61,11 +61,11 @@ async function insertJournal(event: ReturnType<typeof eventFor>): Promise<string
 try {
   const deliveredAuth: unknown[] = []
   const deliveredProjection: unknown[] = []
-  const successJournalId = await insertJournal(eventFor('w02auth013ok' + randomUUID().slice(0, 8), 2))
+  const successJournalId = await insertJournal(eventFor('w02auth013ok' + randomUUID().slice(0, 8), 2), '1990-01-01T00:00:00.000Z')
   const success = await publishPendingAccountStateEventsPostgres(pool, {
     auth013: { send: async (message) => { deliveredAuth.push(message) } },
     projection: { send: async (message) => { deliveredProjection.push(message) } },
-  }, now)
+  }, now, 1)
   assert.deepEqual(success, { selected: 1, published: 1, failed: 0 })
   assert.equal(deliveredAuth.length, 1)
   assert.equal(deliveredProjection.length, 1)
@@ -76,11 +76,11 @@ try {
   assert.equal(published.rows[0]?.status, 'PUBLISHED')
   assert.ok(published.rows[0]?.publishedAt)
 
-  const retryJournalId = await insertJournal(eventFor('w02auth013retry' + randomUUID().slice(0, 8), 2))
+  const retryJournalId = await insertJournal(eventFor('w02auth013retry' + randomUUID().slice(0, 8), 2), '1991-01-01T00:00:00.000Z')
   const retry = await publishPendingAccountStateEventsPostgres(pool, {
     auth013: { send: async () => undefined },
     projection: { send: async () => { throw new Error('synthetic queue delivery failure') } },
-  }, now)
+  }, now, 1)
   assert.deepEqual(retry, { selected: 1, published: 0, failed: 1 })
   const pending = await pool.query<{
     status: string
