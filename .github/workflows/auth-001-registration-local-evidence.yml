@@ -57,6 +57,20 @@ jobs:
   runtime-evidence:
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:18.6
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: local_postgres_only
+          POSTGRES_DB: luckread_auth001
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d luckread_auth001"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
     env:
       NODE_ENV: development
       PAYLOAD_SECRET: ignore
@@ -142,6 +156,7 @@ jobs:
         working-directory: workers/W02-identity
         env:
           NODE_ENV: development
+          CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE: postgresql://postgres:local_postgres_only@127.0.0.1:5432/luckread_auth001
         run: |
           set -euo pipefail
           pnpm --dir ../W01-payload exec wrangler dev --local --persist-to /tmp/luckread-auth001-state --config ../W02-identity/wrangler.jsonc --port 8788 --var "CLOUDFLARE_ENV:development" > auth-001-w02-preview.log 2>&1 &
