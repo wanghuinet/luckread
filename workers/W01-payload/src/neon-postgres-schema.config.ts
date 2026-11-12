@@ -1,13 +1,12 @@
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { postgresAdapter } from '@payloadcms/db-postgres'
-import { text } from '@payloadcms/db-postgres/drizzle/pg-core'
 import { redirectsPlugin } from '@payloadcms/plugin-redirects'
 import { lexicalEditor, UploadFeature } from '@payloadcms/richtext-lexical'
 import { r2Storage } from '@payloadcms/storage-r2'
 import { buildConfig } from 'payload'
 
+import { createW01NeonPostgresAdapter } from './neon-postgres-adapter.js'
 import { payloadAdminOnly } from './auth/payload-admin-access.js'
 import { Media } from './collections/Media.js'
 import { Users } from './collections/Users.js'
@@ -58,44 +57,7 @@ export default buildConfig({
   typescript: {
     outputFile: path.resolve(dirname, 'neon-postgres-payload-types.ts'),
   },
-  db: postgresAdapter({
-    pool: { connectionString: databaseUrl },
-    idType: 'serial',
-    push: false,
-    disableCreateDatabase: true,
-    migrationDir: path.resolve(dirname, 'neon-postgres-migrations'),
-    afterSchemaInit: [
-      ({ schema, extendTable }) => {
-        const users = schema.tables.users
-        if (!users) throw new Error('W01 PostgreSQL schema is missing the users table')
-        // Preserve this existing W01 physical column without exposing a new
-        // public Payload Collection field.
-        extendTable({
-          table: users,
-          columns: {
-            reset_password_requested_at: text('reset_password_requested_at'),
-          },
-        })
-
-        const media = schema.tables.media
-        if (!media) throw new Error('W01 PostgreSQL schema is missing the media table')
-        if (!('prefix' in media)) {
-          extendTable({
-            table: media,
-            columns: { prefix: text('prefix').default('media') },
-          })
-        }
-        if (!('_objectKey' in media)) {
-          extendTable({
-            table: media,
-            columns: { _objectKey: text('_objectkey') },
-          })
-        }
-
-        return schema
-      },
-    ],
-  }),
+  db: createW01NeonPostgresAdapter(databaseUrl),
   plugins: [
     redirectsPlugin({
       collections: ['users'],
@@ -143,7 +105,6 @@ export default buildConfig({
             name: 'expiresAt',
             type: 'date',
             required: true,
-            index: true,
             admin: { position: 'sidebar', readOnly: true },
           },
         ],
@@ -152,8 +113,6 @@ export default buildConfig({
     // v3.90.2's R2 plugin can insert its schema fields while disabled.
     // It adds prefix and _objectKey without enabling upload/storage handlers.
     r2Storage({
-      // Keep the R2 field schema active. The schema CLI's disableOnInit mode
-      // prevents storage initialization and no upload handlers are invoked.
       alwaysInsertFields: true,
       bucket: Object.freeze({}) as never,
       collections: {
