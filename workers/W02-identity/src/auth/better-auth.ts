@@ -158,8 +158,8 @@ export const buildLuckReadAuth = (
 ) => {
   const postgresPersistence = persistenceProfile !== 'production'
   const postgresEmailVerifiedCallback = postgresLifecycleAdapters?.afterEmailVerified
-  // Production defaults to D1. A rehearsal enables these hooks only by
-  // explicitly injecting a provider-matched receipt store.
+  // PostgreSQL runtime profiles require a provider-matched receipt store;
+  // D1 production continues to construct its native store by default.
   const effectiveMfaAuditReceiptStore = mfaAuditOperationReceiptStore ??
     (postgresPersistence ? undefined : createD1MfaAuditOperationReceiptStore(env.D1_01))
   // Keep local origins available only to the local evidence/runtime profile.
