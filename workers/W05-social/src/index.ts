@@ -52,6 +52,7 @@ import {
   unfollow,
 } from './follow-runtime.js'
 import type { FollowListReadStore } from './follow-list-read-store.js'
+import type { FollowStore } from './follow-store.js'
 import type { FollowingAuthorIdsReadStore } from './following-author-ids-read-store.js'
 import type { ContentLikerReadStore } from './like-list-read-store.js'
 import type { LikeStatusReadStore } from './like-status-read-store.js'
@@ -258,6 +259,8 @@ const parseProfileChannelPath = (pathname: string): { userId: string; kind: 'rep
 export type W05SocialWorkerDependencies = Readonly<{
   /** Optional internal adapter injection; D1 remains the deployed default. */
   followListReadStore?: FollowListReadStore
+  /** Optional PostgreSQL-capable Follow/Unfollow writer; D1 remains the deployed default. */
+  followStore?: FollowStore
   /** Optional PostgreSQL-capable Following-feed author reader; D1 remains the deployed default. */
   followingAuthorIdsReadStore?: FollowingAuthorIdsReadStore
   /** Optional PostgreSQL-capable comment page reader; D1 remains the deployed default. */
@@ -1138,7 +1141,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
           const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
           if (!idempotencyKey) throw new FollowRuntimeError('PRECONDITION_REQUIRED', 428)
           if (idempotencyKey.length > 256) throw new FollowRuntimeError('VALIDATION_FAILED', 400)
-          const row = await follow(env.DB, viewerUserId, path.userId)
+          const row = await follow(dependencies.followStore ?? env.DB, viewerUserId, path.userId)
           await invalidateRelationshipGraph(viewerUserId, path.userId)
           await enqueueNotification(env.DB, {
             recipientUserId: path.userId,
@@ -1163,7 +1166,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
           const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
           if (!idempotencyKey) throw new FollowRuntimeError('PRECONDITION_REQUIRED', 428)
           if (idempotencyKey.length > 256) throw new FollowRuntimeError('VALIDATION_FAILED', 400)
-          await unfollow(env.DB, viewerUserId, path.userId)
+          await unfollow(dependencies.followStore ?? env.DB, viewerUserId, path.userId)
           await invalidateRelationshipGraph(viewerUserId, path.userId)
           return new Response(null, { status: 204 })
         }
