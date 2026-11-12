@@ -96,7 +96,7 @@ export default {
       }
 
       try {
-        const result = (postgres?.accountStateTransitionStore ?? createD1AccountStateTransitionStore(env.D1_01)).transition({
+        const result = await (postgres?.accountStateTransitionStore ?? createD1AccountStateTransitionStore(env.D1_01)).transition({
           subjectId: body.subjectId,
           targetUserId: body.targetUserId,
           to: body.to as AccountState,
