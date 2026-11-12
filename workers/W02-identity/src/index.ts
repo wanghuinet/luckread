@@ -96,7 +96,8 @@ export default {
       }
 
       try {
-        const transitionStore = postgres?.accountStateTransitionStore ?? createD1AccountStateTransitionStore(env.D1_01)
+        const transitionStore = postgres?.accountStateTransitionStore ??
+          createD1AccountStateTransitionStore(env.D1_01)
         const result = await transitionStore.transition({
           subjectId: body.subjectId,
           targetUserId: body.targetUserId,
@@ -172,7 +173,9 @@ export default {
       }
 
       try {
-        const result = await (postgres?.registrationRollbackStore ?? createD1RegistrationRollbackStore(env.D1_01)).rollback({
+        const rollbackStore = postgres?.registrationRollbackStore ??
+          createD1RegistrationRollbackStore(env.D1_01)
+        const result = await rollbackStore.rollback({
           userId: body.userId,
           email: body.email,
           username: body.username,
@@ -343,7 +346,14 @@ export default {
     }
 
     if (request.method === 'POST' && url.pathname === '/internal/authz/bootstrap-super-admin') {
-      if (postgres) return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'L8 bootstrap is unavailable in the staged Neon runtime' } }, 503)
+      if (postgres) {
+        return json({
+          error: {
+            code: 'SERVICE_UNAVAILABLE',
+            message: 'L8 bootstrap is unavailable in the staged Neon runtime',
+          },
+        }, 503)
+      }
       // First-L8 bootstrap is workflow-authenticated, not application-session-authenticated.
       // W01 is only the public boundary; W02 independently verifies GitHub OIDC, the merged
       // target-bound request PR, one required environment reviewer, one-time state, and the grant.
@@ -470,7 +480,8 @@ export default {
       }
 
       try {
-        const creatorRoleGrantStore = postgres?.creatorRoleGrantStore ?? createD1CreatorRoleGrantStore(env.D1_01)
+        const creatorRoleGrantStore = postgres?.creatorRoleGrantStore ??
+          createD1CreatorRoleGrantStore(env.D1_01)
         const result = await grantCreatorBusinessRoleWithStore(creatorRoleGrantStore, {
           subjectId: body.subjectId,
           roleId: body.roleId as 'creator',
