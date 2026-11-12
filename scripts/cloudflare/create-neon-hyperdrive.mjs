@@ -1,7 +1,14 @@
 import { appendFile } from 'node:fs/promises'
 
-export const HYPERDRIVE_CONFIG_NAME = 'luckread-d1-01-neon'
-export const HYPERDRIVE_DATABASE_NAME = 'luckread'
+export const HYPERDRIVE_TARGETS = Object.freeze([
+  { domainId: 'D1-01', database: 'luckread', secret: 'NEON_DATABASE_URL_LUCKREAD', configName: 'luckread-d1-01-neon' },
+  { domainId: 'D1-02', database: 'luckreadpro', secret: 'NEON_DATABASE_URL_LUCKREADPRO', configName: 'luckreadpro-d1-02-neon' },
+  { domainId: 'D1-03', database: 'luckread_governance', secret: 'NEON_DATABASE_URL_GOVERNANCE', configName: 'luckread-governance-d1-03-neon' },
+  { domainId: 'D1-04', database: 'luckread_finance', secret: 'NEON_DATABASE_URL_FINANCE', configName: 'luckread-finance-d1-04-neon' },
+  { domainId: 'D1-05', database: 'allluck', secret: 'NEON_DATABASE_URL_ALLLUCK', configName: 'allluck-d1-05-neon' },
+])
+export const HYPERDRIVE_CONFIG_NAME = HYPERDRIVE_TARGETS[0].configName
+export const HYPERDRIVE_DATABASE_NAME = HYPERDRIVE_TARGETS[0].database
 
 const API_BASE = 'https://api.cloudflare.com/client/v4'
 
@@ -12,7 +19,7 @@ function required(value, name) {
   return value.trim()
 }
 
-export function parseNeonConnectionString(connectionString) {
+export function parseNeonConnectionString(connectionString, expectedDatabase = HYPERDRIVE_DATABASE_NAME) {
   let parsed
   try {
     parsed = new URL(required(connectionString, 'NEON_DATABASE_URL_LUCKREAD'))
@@ -43,8 +50,8 @@ export function parseNeonConnectionString(connectionString) {
     throw new Error('Neon connection URL contains invalid percent-encoding')
   }
 
-  if (database !== HYPERDRIVE_DATABASE_NAME) {
-    throw new Error('D1-01 Hyperdrive target database must be exactly luckread')
+  if (database !== expectedDatabase) {
+    throw new Error(`Hyperdrive target database must be exactly ${expectedDatabase}`)
   }
   if (!user || !password) {
     throw new Error('Neon connection URL must include a database user and password')
@@ -136,33 +143,44 @@ function matchesExpectedOrigin(config, expected) {
   )
 }
 
-export async function ensureD1_01Hyperdrive({
+export async function ensureHyperdriveConfig({
   accountId,
   apiToken,
   connectionString,
+  target,
   fetchImpl = fetch,
 }) {
   accountId = required(accountId, 'CLOUDFLARE_ACCOUNT_ID')
   apiToken = required(apiToken, 'CLOUDFLARE_HYPERDRIVE_API_TOKEN')
-  const origin = parseNeonConnectionString(connectionString)
+  const approvedTarget = HYPERDRIVE_TARGETS.some((candidate) =>
+    candidate.domainId === target?.domainId &&
+    candidate.database === target?.database &&
+    candidate.secret === target?.secret &&
+    candidate.configName === target?.configName,
+  )
+  if (!approvedTarget) {
+    throw new Error('A registered Neon database target is required')
+  }
+
+  const origin = parseNeonConnectionString(connectionString, target.database)
   const configs = await listHyperdriveConfigs({ accountId, apiToken, fetchImpl })
-  const named = configs.filter((config) => config?.name === HYPERDRIVE_CONFIG_NAME)
+  const named = configs.filter((config) => config?.name === target.configName)
 
   if (named.length > 1) {
-    throw new Error(`Multiple Cloudflare Hyperdrive configurations use the reserved name ${HYPERDRIVE_CONFIG_NAME}`)
+    throw new Error(`Multiple Cloudflare Hyperdrive configurations use the reserved name ${target.configName}`)
   }
 
   if (named.length === 1) {
     const existing = named[0]
     if (!matchesExpectedOrigin(existing, origin)) {
       throw new Error(
-        `Existing Hyperdrive config ${HYPERDRIVE_CONFIG_NAME} does not match the approved D1-01 target; refusing to update it`,
+        `Existing Hyperdrive config ${target.configName} does not match the approved ${target.domainId} target; refusing to update it`,
       )
     }
     if (typeof existing.id !== 'string' || existing.id.length === 0) {
       throw new Error('Existing Hyperdrive config is missing its identifier')
     }
-    return Object.freeze({ created: false, id: existing.id, name: HYPERDRIVE_CONFIG_NAME })
+    return Object.freeze({ created: false, id: existing.id, name: target.configName })
   }
 
   const payload = await cloudflareRequest({
@@ -172,55 +190,117 @@ export async function ensureD1_01Hyperdrive({
     method: 'POST',
     path: `/accounts/${encodeURIComponent(accountId)}/hyperdrive/configs`,
     body: {
-      name: HYPERDRIVE_CONFIG_NAME,
+      name: target.configName,
       origin,
       // Keep SQL response caching disabled until application-level cache semantics
-      // have been explicitly accepted for each W01/W02/W07/W08 owner.
+      // have been explicitly accepted for each Worker owner.
       caching: { disabled: true },
-      // Hyperdrive requires TLS to the origin by default and validates its
-      // certificate through WebPKI. Do not opt into a weaker plaintext mode.
+      // Hyperdrive negotiates TLS to the public Neon origin by default.
     },
   })
 
   const created = payload.result
   if (
     typeof created?.id !== 'string' ||
-    created.name !== HYPERDRIVE_CONFIG_NAME ||
+    created.name !== target.configName ||
     !matchesExpectedOrigin(created, origin)
   ) {
-    throw new Error('Cloudflare created a Hyperdrive resource but its returned metadata failed target verification')
+    throw new Error(`Cloudflare created ${target.domainId} Hyperdrive but returned metadata failed target verification`)
   }
 
-  return Object.freeze({ created: true, id: created.id, name: HYPERDRIVE_CONFIG_NAME })
+  return Object.freeze({ created: true, id: created.id, name: target.configName })
+}
+
+export async function ensureD1_01Hyperdrive(options) {
+  return ensureHyperdriveConfig({
+    ...options,
+    target: HYPERDRIVE_TARGETS[0],
+  })
+}
+
+export async function ensureAllFiveNeonHyperdrive({
+  accountId,
+  apiToken,
+  connectionStrings,
+  fetchImpl = fetch,
+}) {
+  accountId = required(accountId, 'CLOUDFLARE_ACCOUNT_ID')
+  apiToken = required(apiToken, 'CLOUDFLARE_HYPERDRIVE_API_TOKEN')
+  if (!connectionStrings || typeof connectionStrings !== 'object') {
+    throw new Error('All five Neon database connection strings are required')
+  }
+
+  // Validate every secret and exact database identity before the first Cloudflare
+  // write. A bad URL therefore cannot create a partially configured batch.
+  const prepared = HYPERDRIVE_TARGETS.map((target) => {
+    const connectionString = connectionStrings[target.secret]
+    parseNeonConnectionString(connectionString, target.database)
+    return { target, connectionString }
+  })
+
+  const results = []
+  for (const item of prepared) {
+    const result = await ensureHyperdriveConfig({
+      accountId,
+      apiToken,
+      connectionString: item.connectionString,
+      target: item.target,
+      fetchImpl,
+    })
+    results.push({
+      domainId: item.target.domainId,
+      database: item.target.database,
+      ...result,
+    })
+  }
+  return results
 }
 
 async function main() {
+  const allowedTargets = [
+    'CREATE_D1_01_NEON_HYPERDRIVE',
+    'CREATE_ALL_FIVE_NEON_HYPERDRIVE',
+  ]
   if (
     process.env.GITHUB_ACTIONS !== 'true' ||
     process.env.GITHUB_EVENT_NAME !== 'workflow_dispatch' ||
     process.env.GITHUB_REF !== 'refs/heads/main' ||
-    process.env.CONFIRM_TARGET !== 'CREATE_D1_01_NEON_HYPERDRIVE'
+    !allowedTargets.includes(process.env.CONFIRM_TARGET)
   ) {
-    throw new Error('Hyperdrive provisioning is restricted to the confirmed workflow_dispatch on main')
+    throw new Error('Hyperdrive provisioning is restricted to a confirmed workflow_dispatch on main')
   }
 
-  const result = await ensureD1_01Hyperdrive({
-    accountId: process.env.CF_ACCOUNT_ID,
-    apiToken: process.env.CF_API_TOKEN,
-    connectionString: process.env.NEON_DATABASE_URL_LUCKREAD,
-  })
+  let results
+  if (process.env.CONFIRM_TARGET === 'CREATE_D1_01_NEON_HYPERDRIVE') {
+    const result = await ensureD1_01Hyperdrive({
+      accountId: process.env.CF_ACCOUNT_ID,
+      apiToken: process.env.CF_API_TOKEN,
+      connectionString: process.env.NEON_DATABASE_URL_LUCKREAD,
+    })
+    results = [{ domainId: 'D1-01', database: 'luckread', ...result }]
+  } else {
+    results = await ensureAllFiveNeonHyperdrive({
+      accountId: process.env.CF_ACCOUNT_ID,
+      apiToken: process.env.CF_API_TOKEN,
+      connectionStrings: Object.fromEntries(
+        HYPERDRIVE_TARGETS.map((target) => [target.secret, process.env[target.secret]]),
+      ),
+    })
+  }
+
+  const summary = results.map((item) =>
+    `${item.domainId} ${item.database}: ${item.name} (id=${item.id}, created=${item.created})`,
+  ).join('\n')
 
   if (process.env.GITHUB_OUTPUT) {
     await appendFile(
       process.env.GITHUB_OUTPUT,
-      `hyperdrive_id=${result.id}\nhyperdrive_name=${result.name}\nhyperdrive_created=${String(result.created)}`,
+      `hyperdrive_summary<<HYPERDRIVE_SUMMARY\n${summary}\nHYPERDRIVE_SUMMARY\n`,
       'utf8',
     )
   }
 
-  console.log(
-    `D1-01 Hyperdrive ${result.created ? 'created' : 'reused'}: name=${result.name}, id=${result.id}`,
-  )
+  console.log(summary)
 }
 
 if (process.argv[1] && new URL(import.meta.url).pathname === process.argv[1]) {

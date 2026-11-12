@@ -1,4 +1,4 @@
-name: Provision Neon D1-01 Hyperdrive
+name: Provision Neon Hyperdrive resources
 run-name: Provision D1-01 Hyperdrive @ ${{ github.sha }}
 
 on:
@@ -17,11 +17,12 @@ on:
   workflow_dispatch:
     inputs:
       confirm_target:
-        description: Create or reuse the dedicated Hyperdrive configuration for Neon D1-01 (luckread); no Worker binding, deployment, data import, or cutover.
+        description: Create or reuse the dedicated Hyperdrive configuration for D1-01 (luckread) or all five Neon databases; no Worker binding, deployment, data import, or cutover.
         required: true
         type: choice
         options:
           - CREATE_D1_01_NEON_HYPERDRIVE
+          - CREATE_ALL_FIVE_NEON_HYPERDRIVE
 
 permissions:
   contents: read
@@ -48,8 +49,8 @@ jobs:
           node --test scripts/cloudflare/create-neon-hyperdrive.test.mjs
 
   provision:
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.confirm_target == 'CREATE_D1_01_NEON_HYPERDRIVE' }}
-    name: Create or reuse Cloudflare Hyperdrive for Neon D1-01
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && (inputs.confirm_target == 'CREATE_D1_01_NEON_HYPERDRIVE' || inputs.confirm_target == 'CREATE_ALL_FIVE_NEON_HYPERDRIVE') }}
+    name: Create or reuse Cloudflare Hyperdrive for selected Neon targets
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -60,7 +61,10 @@ jobs:
         run: |
           set -euo pipefail
           test "${GITHUB_REF}" = "refs/heads/main"
-          test "${CONFIRM_TARGET}" = "CREATE_D1_01_NEON_HYPERDRIVE"
+          case "${CONFIRM_TARGET}" in
+            CREATE_D1_01_NEON_HYPERDRIVE|CREATE_ALL_FIVE_NEON_HYPERDRIVE) ;;
+            *) echo "Unsupported Hyperdrive target" >&2; exit 1 ;;
+          esac
 
       - name: Checkout dispatched main commit
         uses: actions/checkout@v4
@@ -72,7 +76,7 @@ jobs:
         with:
           node-version: 24
 
-      - name: Provision the D1-01 Hyperdrive resource
+      - name: Provision the selected Neon Hyperdrive resources
         id: provision
         env:
           GITHUB_ACTIONS: 'true'
@@ -82,22 +86,24 @@ jobs:
           CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CF_API_TOKEN: ${{ secrets.CLOUDFLARE_HYPERDRIVE_API_TOKEN }}
           NEON_DATABASE_URL_LUCKREAD: ${{ secrets.NEON_DATABASE_URL_LUCKREAD }}
+          NEON_DATABASE_URL_LUCKREADPRO: ${{ inputs.confirm_target == 'CREATE_ALL_FIVE_NEON_HYPERDRIVE' && secrets.NEON_DATABASE_URL_LUCKREADPRO || '' }}
+          NEON_DATABASE_URL_GOVERNANCE: ${{ inputs.confirm_target == 'CREATE_ALL_FIVE_NEON_HYPERDRIVE' && secrets.NEON_DATABASE_URL_GOVERNANCE || '' }}
+          NEON_DATABASE_URL_FINANCE: ${{ inputs.confirm_target == 'CREATE_ALL_FIVE_NEON_HYPERDRIVE' && secrets.NEON_DATABASE_URL_FINANCE || '' }}
+          NEON_DATABASE_URL_ALLLUCK: ${{ inputs.confirm_target == 'CREATE_ALL_FIVE_NEON_HYPERDRIVE' && secrets.NEON_DATABASE_URL_ALLLUCK || '' }}
         run: node scripts/cloudflare/create-neon-hyperdrive.mjs
 
       - name: Publish sanitized provisioning summary
         shell: bash
         env:
-          HYPERDRIVE_ID: ${{ steps.provision.outputs.hyperdrive_id }}
-          HYPERDRIVE_NAME: ${{ steps.provision.outputs.hyperdrive_name }}
-          HYPERDRIVE_CREATED: ${{ steps.provision.outputs.hyperdrive_created }}
+          HYPERDRIVE_SUMMARY: ${{ steps.provision.outputs.hyperdrive_summary }}
         run: |
           set -euo pipefail
           {
-            echo "## Neon D1-01 Hyperdrive provisioning"
+            echo "## Neon Hyperdrive provisioning"
             echo
-            echo "- Configuration: \`$HYPERDRIVE_NAME\`"
-            echo "- Hyperdrive ID: \`$HYPERDRIVE_ID\`"
-            echo "- Created in this run: \`$HYPERDRIVE_CREATED\`"
+            echo "### Resource results"
+            echo
+            echo "$HYPERDRIVE_SUMMARY"
             echo "- Worker binding changed: **No**"
             echo "- Worker deployed: **No**"
             echo "- Production database cutover: **No**"

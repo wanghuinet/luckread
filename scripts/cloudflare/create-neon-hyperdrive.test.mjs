@@ -3,6 +3,8 @@ import assert from 'node:assert/strict'
 
 import {
   HYPERDRIVE_CONFIG_NAME,
+  HYPERDRIVE_TARGETS,
+  ensureAllFiveNeonHyperdrive,
   ensureD1_01Hyperdrive,
   parseNeonConnectionString,
 } from './create-neon-hyperdrive.mjs'
@@ -167,4 +169,77 @@ test('refuses to mutate a reserved name when its existing origin differs', async
     /refusing to update it/,
   )
   assert.equal(createCalls, 0)
+})
+
+
+test('prevalidates every Neon target before creating any of the five Hyperdrive resources', async () => {
+  let apiCalls = 0
+  const connectionStrings = Object.fromEntries(HYPERDRIVE_TARGETS.map((target) => [
+    target.secret,
+    `postgresql://lr_hyperdrive:password@ep-${target.domainId.toLowerCase()}.us-east-2.aws.neon.tech:5432/${target.database}?sslmode=require&channel_binding=require`,
+  ]))
+  connectionStrings.NEON_DATABASE_URL_ALLLUCK =
+    'postgresql://lr_hyperdrive:password@ep-d1-05.us-east-2.aws.neon.tech:5432/wrong?sslmode=require&channel_binding=require'
+
+  await assert.rejects(
+    ensureAllFiveNeonHyperdrive({
+      accountId: 'account-id',
+      apiToken: 'api-token',
+      connectionStrings,
+      fetchImpl: async () => {
+        apiCalls += 1
+        return jsonResponse({ success: true, result: [], result_info: { total_pages: 1 } })
+      },
+    }),
+    /exactly allluck/,
+  )
+  assert.equal(apiCalls, 0)
+})
+
+test('creates one guarded, cache-disabled Hyperdrive resource for each of the five Neon databases', async () => {
+  const connectionStrings = Object.fromEntries(HYPERDRIVE_TARGETS.map((target) => [
+    target.secret,
+    `postgresql://lr_hyperdrive:password@ep-${target.domainId.toLowerCase()}.us-east-2.aws.neon.tech:5432/${target.database}?sslmode=require&channel_binding=require`,
+  ]))
+  const createBodies = []
+  const results = await ensureAllFiveNeonHyperdrive({
+    accountId: 'account-id',
+    apiToken: 'api-token',
+    connectionStrings,
+    fetchImpl: async (_url, init = {}) => {
+      if (init.method === 'GET') {
+        return jsonResponse({ success: true, result: [], result_info: { total_pages: 1 } })
+      }
+      const body = JSON.parse(init.body)
+      createBodies.push(body)
+      return jsonResponse({
+        success: true,
+        result: {
+          id: `id-${body.origin.database}`,
+          name: body.name,
+          origin: {
+            host: body.origin.host,
+            database: body.origin.database,
+            user: body.origin.user,
+            port: body.origin.port,
+            scheme: body.origin.scheme,
+          },
+          caching: { disabled: true },
+        },
+      })
+    },
+  })
+
+  assert.equal(results.length, 5)
+  assert.deepEqual(results.map((item) => [item.domainId, item.database, item.name, item.created]), [
+    ['D1-01', 'luckread', 'luckread-d1-01-neon', true],
+    ['D1-02', 'luckreadpro', 'luckreadpro-d1-02-neon', true],
+    ['D1-03', 'luckread_governance', 'luckread-governance-d1-03-neon', true],
+    ['D1-04', 'luckread_finance', 'luckread-finance-d1-04-neon', true],
+    ['D1-05', 'allluck', 'allluck-d1-05-neon', true],
+  ])
+  assert.equal(createBodies.length, 5)
+  assert.deepEqual(createBodies.map((body) => body.origin.database), HYPERDRIVE_TARGETS.map((target) => target.database))
+  assert.ok(createBodies.every((body) => body.caching.disabled === true))
+  assert.ok(createBodies.every((body) => !JSON.stringify(body).includes('channel_binding')))
 })
