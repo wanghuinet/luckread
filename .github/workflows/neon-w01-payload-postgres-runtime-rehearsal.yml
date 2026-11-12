@@ -4,23 +4,31 @@ on:
   pull_request:
     paths:
       - 'workers/W01-payload/src/payload.config.ts'
+      - 'workers/W01-payload/src/neon-postgres-adapter.ts'
+      - 'workers/W01-payload/src/payload-database-driver.ts'
+      - 'workers/W01-payload/src/payload-database-driver.test.ts'
       - 'workers/W01-payload/src/neon-postgres-runtime.config.ts'
       - 'workers/W01-payload/src/neon-postgres-schema.config.ts'
       - 'workers/W01-payload/src/neon-postgres-migrations/**'
       - 'workers/W01-payload/scripts/neon/**'
       - 'workers/W01-payload/package.json'
       - 'workers/W01-payload/pnpm-lock.yaml'
+      - 'workers/W01-payload/wrangler.jsonc'
       - '.github/workflows/neon-w01-payload-postgres-runtime-rehearsal.yml'
   push:
     branches: [main]
     paths:
       - 'workers/W01-payload/src/payload.config.ts'
+      - 'workers/W01-payload/src/neon-postgres-adapter.ts'
+      - 'workers/W01-payload/src/payload-database-driver.ts'
+      - 'workers/W01-payload/src/payload-database-driver.test.ts'
       - 'workers/W01-payload/src/neon-postgres-runtime.config.ts'
       - 'workers/W01-payload/src/neon-postgres-schema.config.ts'
       - 'workers/W01-payload/src/neon-postgres-migrations/**'
       - 'workers/W01-payload/scripts/neon/**'
       - 'workers/W01-payload/package.json'
       - 'workers/W01-payload/pnpm-lock.yaml'
+      - 'workers/W01-payload/wrangler.jsonc'
       - '.github/workflows/neon-w01-payload-postgres-runtime-rehearsal.yml'
 
 permissions:
@@ -67,6 +75,29 @@ jobs:
       - name: Install exact W01 dependency graph
         working-directory: workers/W01-payload
         run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Verify D1 remains the default and W01 binds the existing D1-01 Hyperdrive
+        working-directory: workers/W01-payload
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs'
+          const config = JSON.parse(fs.readFileSync('wrangler.jsonc', 'utf8'))
+          if (config.name !== 'luckread-w01-payload') throw new Error('W01 Worker identity mismatch')
+          if (config.vars?.PAYLOAD_DATABASE_DRIVER !== 'd1') throw new Error('W01 database driver must remain D1 by default')
+          const d1 = (config.d1_databases || []).find((item) => item.binding === 'D1')
+          if (!d1 || d1.database_name !== 'luckread' || d1.database_id !== '2f80471e-3756-49f9-8db1-7707a433ad64') {
+            throw new Error('W01 D1-01 compatibility binding must be preserved')
+          }
+          const hyperdrive = (config.hyperdrive || []).find((item) => item.binding === 'HYPERDRIVE')
+          if (!hyperdrive || hyperdrive.id !== '0c53a1bb9bc0484bac146e8ae2d3158b') {
+            throw new Error('W01 must bind the verified D1-01 Neon Hyperdrive resource')
+          }
+          console.log('W01_RUNTIME_BINDINGS=PASS; PAYLOAD_DATABASE_DRIVER=d1; D1_01 preserved; Hyperdrive staged')
+          NODE
+
+      - name: Run W01 database driver mode tests
+        working-directory: workers/W01-payload
+        run: pnpm exec vitest run --config ./vitest.config.mts src/payload-database-driver.test.ts
 
       - name: Apply the committed official Payload PostgreSQL migration to disposable PostgreSQL 18
         working-directory: workers/W01-payload
