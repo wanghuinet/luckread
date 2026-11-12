@@ -1,3 +1,6 @@
+import { isW02NeonRuntime, getW02PostgresRuntime } from '../neon/runtime.js'
+import { activateEmailVerifiedAccountPostgres } from '../neon/email-verification-activation-postgres.js'
+import { ensureBaseUserRolePostgres } from '../neon/role-assignment-postgres.js'
 import { activateEmailVerifiedAccount } from '../account/account-state-transition.js'
 import { ensureBaseUserRole, ensureVerifiedUserRole } from '../authz/role-assignment.js'
 import { APIError, createAuthMiddleware } from 'better-auth/api'
