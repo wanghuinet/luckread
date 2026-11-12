@@ -8,6 +8,7 @@ import type { BlockMuteListReadInput, BlockMuteListReadRow, BlockMuteListReadSto
 import type { ProfileChannelReadStore } from './profile-channel-read-store.js'
 import type { FollowingAuthorIdRow, FollowingAuthorIdsReadStore } from './following-author-ids-read-store.js'
 import type { ContentLikerReadInput, ContentLikerReadRow, ContentLikerReadStore } from './like-list-read-store.js'
+import type { FavoriteListReadInput, FavoriteListReadRow, FavoriteListReadStore } from './favorite-list-read-store.js'
 
 
 const dbFor = (results: unknown[] = []) => {
@@ -1029,6 +1030,55 @@ describe('W05 social query transport', () => {
         nextCursor: expect.any(String),
       },
     })
+  })
+
+  it('uses the injected PostgreSQL-capable favorite list store without touching D1', async () => {
+    const cursor = btoa(encodeURIComponent(JSON.stringify({
+      v: 1,
+      actorUserId: 'viewer-1',
+      createdAt: '2026-11-11T09:00:00.123456Z',
+      relationshipId: 'pg-favorite-cursor',
+    }))).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '')
+    const store: FavoriteListReadStore = {
+      list: vi.fn(async (_input: FavoriteListReadInput): Promise<readonly FavoriteListReadRow[]> => [
+        {
+          relationship_id: 'pg-favorite-1',
+          target_id: 'content-pg-1',
+          created_at: '2026-11-11T09:00:00.123Z',
+          cursor_created_at: '2026-11-11T09:00:00.123456Z',
+        },
+        {
+          relationship_id: 'pg-favorite-2',
+          target_id: 'content-pg-2',
+          created_at: '2026-11-10T09:00:00.000Z',
+        },
+      ]),
+    }
+    const d1Prepare = vi.fn()
+    const injectedWorker = createW05SocialWorker({ favoriteListReadStore: store })
+    const response = await injectedWorker.fetch(
+      request(`/internal/social/interactions/bookmarks/list?limit=1&cursor=${cursor}`, transportHeaders),
+      { DB: { prepare: d1Prepare } } as never,
+      {} as never,
+    )
+
+    expect(response.status).toBe(200)
+    expect(store.list).toHaveBeenCalledWith({
+      actorUserId: 'viewer-1',
+      cursor: {
+        createdAt: '2026-11-11T09:00:00.123456Z',
+        relationshipId: 'pg-favorite-cursor',
+      },
+      limit: 2,
+    })
+    await expect(response.json()).resolves.toMatchObject({
+      data: {
+        items: [{ targetId: 'content-pg-1', createdAt: '2026-11-11T09:00:00.123Z' }],
+        hasMore: true,
+        nextCursor: expect.any(String),
+      },
+    })
+    expect(d1Prepare).not.toHaveBeenCalled()
   })
 
   it('requires an authenticated transport for favorite-list reads', async () => {
