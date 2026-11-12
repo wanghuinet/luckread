@@ -32,6 +32,7 @@ import {
   type ContentD1,
 } from './content-runtime.js'
 import { normalizePreflightInput, preflightContent } from './publish-preflight.js'
+import type { PublishedMediaReferenceReadStore } from './published-media-reference-read-store.js'
 import {
   createContentRelationship,
   listContentRelationships,
@@ -332,7 +333,13 @@ const getPath = (pathname: string): {id?: string; state?: boolean; preflight?: b
   return null
 }
 
-const worker = {
+export type W03ContentWorkerDependencies = Readonly<{
+  /** Optional PostgreSQL-capable media-reference reader; D1 remains the default. */
+  publishedMediaReferenceReadStore?: PublishedMediaReferenceReadStore
+}>
+
+export function createW03ContentWorker(dependencies: W03ContentWorkerDependencies = {}) {
+  return {
   async fetch(request: Request, env: Env): Promise<Response> {
     try {
       const url = new URL(request.url)
@@ -690,6 +697,7 @@ const worker = {
           viewerUserId
             ? (creatorId) => resolveCreatorMembershipAccess(request, env, viewerUserId, creatorId)
             : undefined,
+          dependencies.publishedMediaReferenceReadStore,
         )
         return json({ data: access, requestId: createRequestId() })
       }
@@ -1525,7 +1533,7 @@ const worker = {
       return toErrorResponse(error)
     }
   },
-
-
+  }
 }
-export default worker
+
+export default createW03ContentWorker()
