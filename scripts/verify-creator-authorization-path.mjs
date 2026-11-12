@@ -92,12 +92,12 @@ requireText('W08 must independently resolve the W02 principal', w08Runtime, /int
 requireText(
   'W08 must return only an ACTIVE creator identity for creator plan management',
   w08Runtime,
-  /handleActiveCreatorSelf[\\s\\S]*creator\\.read\\.self[\\s\\S]*store\\.findActiveCreator\\(principal\\.userId\\)[\\s\\S]*return json\\(\\{ creatorId: creator\\.creator_id, status: 'ACTIVE' \\}\\)/,
+  /handleActiveCreatorSelf[\s\S]*creator\.read\.self[\s\S]*store\.findActiveCreator\(principal\.userId\)[\s\S]*return json\(\{ creatorId: creator\.creator_id, status: 'ACTIVE' \}\)/,
 )
 requireText(
   'provider stores must filter creator self reads to ACTIVE identities',
   w08Store,
-  /findActiveCreator\\(userId\\)[\\s\\S]*status = 'ACTIVE'/,
+  /findActiveCreator\(userId\)[\s\S]*status = 'ACTIVE'/,
 )
 requireText('MembershipPlan is a CASL subject and own-scope plan permissions are granted', w08Casl, /'MembershipPlan'[\s\S]*membership\.plan\.create\.own[\s\S]*membership\.plan\.read\.own/)
 requireText('creator plan creation must use existing W06 binding for durable audit', membershipPlanRoute, /callW06MembershipPlanAudit[\s\S]*Membership plan audit was not durably confirmed/)
@@ -117,12 +117,12 @@ requireText('W08 must call the W02 RoleAssignment authority', w08Runtime, /inter
 requireText(
   'W08 provider stores must persist submission, approval, rejection and grant audit',
   w08Store,
-  /eventType: 'CREATOR_APPLICATION_SUBMITTED'[\\s\\S]*eventType: 'CREATOR_APPLICATION_APPROVED'[\\s\\S]*eventType: 'CREATOR_APPLICATION_REJECTED'[\\s\\S]*eventType: 'CREATOR_ROLE_GRANTED'/,
+  /eventType: 'CREATOR_APPLICATION_SUBMITTED'[\s\S]*eventType: 'CREATOR_APPLICATION_APPROVED'[\s\S]*eventType: 'CREATOR_APPLICATION_REJECTED'[\s\S]*eventType: 'CREATOR_ROLE_GRANTED'/,
 )
 requireText(
   'W08 PostgreSQL application creation, approval, rejection and grant must persist audit within transactions',
   w08Store,
-  /createPostgresW08CreatorStore[\\s\\S]*async createApplication[\\s\\S]*inTransaction\\(pool[\\s\\S]*auditInsertSql[\\s\\S]*async approveApplication[\\s\\S]*inTransaction\\(pool[\\s\\S]*auditInsertSql[\\s\\S]*async rejectApplication[\\s\\S]*inTransaction\\(pool[\\s\\S]*auditInsertSql[\\s\\S]*async completeCreatorGrant[\\s\\S]*inTransaction\\(pool[\\s\\S]*auditInsertSql/,
+  /createPostgresW08CreatorStore[\s\S]*async createApplication[\s\S]*inTransaction\(pool[\s\S]*auditInsertSql[\s\S]*async approveApplication[\s\S]*inTransaction\(pool[\s\S]*auditInsertSql[\s\S]*async rejectApplication[\s\S]*inTransaction\(pool[\s\S]*auditInsertSql[\s\S]*async completeCreatorGrant[\s\S]*inTransaction\(pool[\s\S]*auditInsertSql/,
 )
 requireText('creator audit table must exist', w08Migration, /CREATE TABLE IF NOT EXISTS creator_authorization_audit/)
 requireText('W02 must authorize the current approver', w02Runtime, /mayApproveRoleGrant\(actor\.layer\)/)
