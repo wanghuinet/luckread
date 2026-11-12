@@ -11,8 +11,8 @@ import type { NotificationPushDeliveryClaimStore as NotificationPushDeliveryClai
 import { createD1NotificationPushReceiptStore } from './notification-push-receipt-store-d1.js'
 import {
   createD1NotificationPushEndpointAccessStore,
-  type NotificationPushEndpointAccessStore,
 } from './notification-push-endpoint-access-store-d1.js'
+import type { NotificationPushEndpointAccessStore } from './notification-push-endpoint-access-store.js'
 import type { NotificationPushReceiptStore } from './notification-push-receipt-store.js'
 
 type PushReceiptLike = ExpoPushReceipt
