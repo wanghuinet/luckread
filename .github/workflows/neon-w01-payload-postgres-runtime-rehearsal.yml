@@ -95,22 +95,31 @@ jobs:
           console.log('W01_RUNTIME_BINDINGS=PASS; PAYLOAD_DATABASE_DRIVER=d1; D1_01 preserved; Hyperdrive staged')
           NODE
 
-      - name: Verify PostgreSQL adapter and driver are production dependencies
+      - name: Verify PostgreSQL adapter is bundled and node-postgres is a runtime dependency
         working-directory: workers/W01-payload
         run: |
           node --input-type=module <<'NODE'
           import fs from 'node:fs'
           const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'))
-          if (pkg.dependencies?.['@payloadcms/db-postgres'] !== '3.90.2') {
-            throw new Error('Payload PostgreSQL adapter must be a pinned production dependency')
+          const payloadConfig = fs.readFileSync('src/payload.config.ts', 'utf8')
+          const adapterSource = fs.readFileSync('src/neon-postgres-adapter.ts', 'utf8')
+          const deployWorkflow = fs.readFileSync('../../.github/workflows/w01-payload-app-deploy.yml', 'utf8')
+          if (pkg.devDependencies?.['@payloadcms/db-postgres'] !== '3.90.2') {
+            throw new Error('Payload PostgreSQL adapter must remain pinned for the W01 production bundle build')
           }
           if (pkg.dependencies?.pg !== '8.20.0') {
-            throw new Error('node-postgres must be a pinned production dependency')
+            throw new Error('node-postgres must be a pinned runtime dependency')
           }
-          if (pkg.devDependencies?.['@payloadcms/db-postgres'] !== '3.90.2') {
-            throw new Error('Payload PostgreSQL schema tooling must retain its pinned CLI dependency')
+          if (!payloadConfig.includes("from './neon-postgres-adapter'") ||
+              !adapterSource.includes("from '@payloadcms/db-postgres'")) {
+            throw new Error('W01 runtime must statically import the PostgreSQL adapter for bundling')
           }
-          console.log('W01_POSTGRES_RUNTIME_AND_SCHEMA_DEPENDENCIES=PASS')
+          if (!deployWorkflow.includes('pnpm install --frozen-lockfile --ignore-scripts') ||
+              deployWorkflow.includes('pnpm install --prod') ||
+              !deployWorkflow.includes('pnpm run deploy:app')) {
+            throw new Error('W01 production deploy must install build dependencies and bundle the application')
+          }
+          console.log('W01_POSTGRES_ADAPTER_BUNDLED_AND_PG_RUNTIME_DEPENDENCY=PASS')
           NODE
 
       - name: Run W01 database driver mode tests
