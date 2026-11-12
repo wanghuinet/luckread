@@ -102,7 +102,6 @@ FOR EACH ROW EXECUTE FUNCTION reject_l8_genesis_bootstrap_audit_mutation_fn();
 CREATE TRIGGER l8_genesis_bootstrap_audit_no_truncate
 BEFORE TRUNCATE ON l8_genesis_bootstrap_audit
 FOR EACH STATEMENT EXECUTE FUNCTION reject_l8_genesis_bootstrap_audit_mutation_fn();
-
 `
 
 writeFileSync(outputPath, output)
