@@ -111,7 +111,10 @@ test('flags a wrong database, pooler host, enabled cache and missing target', as
       if (String(url).includes('/hyperdrive/configs?')) {
         return jsonResponse({ success: true, result: configs, result_info: { total_pages: 1 } })
       }
-      return jsonResponse({ success: true, result: { bindings: [] } })
+      const bindings = String(url).includes('/scripts/luckread-w02/settings')
+        ? [{ type: 'hyperdrive', name: 'NEON_DB', id: 'id-D1-02' }]
+        : []
+      return jsonResponse({ success: true, result: { bindings } })
     },
   })
 
@@ -125,6 +128,10 @@ test('flags a wrong database, pooler host, enabled cache and missing target', as
   assert.equal(inventory.summary.matchedHyperdrives, 1)
   assert.equal(inventory.summary.missingHyperdrives, 1)
   assert.equal(inventory.summary.mismatchedHyperdrives, 3)
+  assert.equal(
+    inventory.workers.find((item) => item.worker === 'W02')?.hyperdriveBindings[0]?.target,
+    'UNKNOWN_RESOURCE',
+  )
 })
 
 test('records missing scripts separately from permission/API errors without exposing response messages', async () => {
