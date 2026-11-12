@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import worker, { createW05SocialWorker } from './index.js'
 import type { CommentListReadInput, CommentListReadRow, CommentListReadStore } from './comment-list-read-store.js'
 import type { FollowListReadInput, FollowListReadRow, FollowListCountInput, FollowListReadStore } from './follow-list-read-store.js'
-import type { FollowRow, FollowStore } from './follow-store.js'
+import type { FollowMutation, FollowRow, FollowStore } from './follow-store.js'
 import type { BlockMuteListReadInput, BlockMuteListReadRow, BlockMuteListReadStore } from './block-mute-list-read-store.js'
 import type { ProfileChannelReadStore } from './profile-channel-read-store.js'
 import type { FollowingAuthorIdRow, FollowingAuthorIdsReadStore } from './following-author-ids-read-store.js'
@@ -140,8 +140,8 @@ describe('W05 Follow/Unfollow PostgreSQL runtime injection', () => {
       created_at: '2026-11-12T00:00:00.000Z',
     }
     const store: FollowStore = {
-      follow: vi.fn(async (_input) => row),
-      unfollow: vi.fn(async (_followerUserId, _targetUserId) => {}),
+      follow: vi.fn(async (_input: FollowMutation) => row),
+      unfollow: vi.fn(async (_followerUserId: string, _targetUserId: string) => {}),
     }
     const d1Sql: string[] = []
     const d1Prepare = vi.fn((sql: string) => {
