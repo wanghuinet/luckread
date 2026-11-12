@@ -216,6 +216,23 @@ export async function checkL8BootstrapReadinessPostgres(
     throw new L8BootstrapReadinessError('SCHEMA_NOT_READY', 'PostgreSQL MFA lifecycle session-revocation triggers are missing')
   }
 
+  const auditTriggers = await pool.query<{ triggerName: string }>(
+    'SELECT t.tgname AS "triggerName" FROM pg_trigger t ' +
+      'JOIN pg_class c ON c.oid = t.tgrelid ' +
+      'JOIN pg_namespace n ON n.oid = c.relnamespace ' +
+      "WHERE n.nspname = current_schema() AND c.relname = 'l8_genesis_bootstrap_audit' AND NOT t.tgisinternal",
+  )
+  const installedAuditTriggers = new Set(auditTriggers.rows.map((row) => row.triggerName))
+  if (
+    !installedAuditTriggers.has('l8_genesis_bootstrap_audit_no_update_or_delete') ||
+    !installedAuditTriggers.has('l8_genesis_bootstrap_audit_no_truncate')
+  ) {
+    throw new L8BootstrapReadinessError(
+      'SCHEMA_NOT_READY',
+      'permanent L8 bootstrap audit immutability triggers are missing',
+    )
+  }
+
   const targetResult = await pool.query<{ accountState: string | null; emailVerified: boolean | null }>(
     'SELECT account_state AS "accountState", email_verified AS "emailVerified" ' +
       'FROM "user" WHERE id = $1 LIMIT 1',
