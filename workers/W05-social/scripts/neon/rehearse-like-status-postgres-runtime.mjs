@@ -5,6 +5,7 @@ import { dirname } from 'node:path'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { getLikeStatus } from '../../src/like-runtime.ts'
 import { createPostgresLikeStatusReadStore } from '../../src/like-status-read-store-postgres.ts'
+import { createPostgresLikeTargetContextReadStore } from '../../src/like-target-context-read-store-postgres.ts'
 
 const requireFromW02 = createRequire(new URL('../../../W02-identity/package.json', import.meta.url))
 const { Pool } = requireFromW02('pg')
@@ -19,6 +20,8 @@ const marker = 'w05-like-status-' + randomUUID()
 const reportPath = process.env.W05_LIKE_STATUS_POSTGRES_REPORT || '../../artifacts/neon/w05-like-status-postgres-runtime-postflight.json'
 const pool = new Pool({ connectionString, max: 4, connectionTimeoutMillis: 5_000 })
 const store = createPostgresLikeStatusReadStore(pool)
+const targetContextStore = createPostgresLikeTargetContextReadStore(pool)
+const noD1Database = Object.freeze({})
 let contentReadPassed = false
 let actorScopePassed = false
 let commentReadPassed = false
@@ -27,28 +30,6 @@ const otherActor = marker + '-other'
 const contentId = marker + '-content'
 const commentId = marker + '-comment'
 
-const d1PolicyExecutor = {
-  prepare(sql) {
-    return {
-      bind(..._values) {
-        return {
-          async first() {
-            if (sql.includes('FROM social_comments')) {
-              return {
-                id: commentId,
-                state: 'PUBLISHED',
-                author_user_id: marker + '-comment-author',
-                content_id: contentId,
-              }
-            }
-            if (sql.includes('FROM social_user_interactions')) return { blocked: 0 }
-            throw new Error('Unexpected D1 policy query in PostgreSQL like-status rehearsal')
-          },
-        }
-      },
-    }
-  },
-}
 const publishedBinding = {
   async fetch(input, init) {
     const request = input instanceof Request ? input : new Request(input, init)
@@ -80,37 +61,40 @@ try {
   )
 
   const contentStatus = await getLikeStatus(
-    d1PolicyExecutor,
+    noD1Database,
     publishedBinding,
     actor,
     { targetType: 'content', targetId: contentId },
     marker + '-content-correlation',
     undefined,
     store,
+    targetContextStore,
   )
   assert.deepEqual(contentStatus, { liked: true, likeCount: 2 })
   contentReadPassed = true
 
   const otherActorContentStatus = await getLikeStatus(
-    d1PolicyExecutor,
+    noD1Database,
     publishedBinding,
     marker + '-third-actor',
     { targetType: 'content', targetId: contentId },
     marker + '-actor-scope-correlation',
     undefined,
     store,
+    targetContextStore,
   )
   assert.deepEqual(otherActorContentStatus, { liked: false, likeCount: 2 })
   actorScopePassed = true
 
   const commentStatus = await getLikeStatus(
-    d1PolicyExecutor,
+    noD1Database,
     publishedBinding,
     actor,
     { targetType: 'comment', targetId: commentId },
     marker + '-comment-correlation',
     undefined,
     store,
+    targetContextStore,
   )
   assert.deepEqual(commentStatus, { liked: true, likeCount: 1 })
   commentReadPassed = true
