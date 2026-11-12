@@ -5,6 +5,7 @@ import worker, { createW05SocialWorker } from './index.js'
 import type { CommentListReadInput, CommentListReadRow, CommentListReadStore } from './comment-list-read-store.js'
 import type { FollowListReadInput, FollowListReadRow, FollowListCountInput, FollowListReadStore } from './follow-list-read-store.js'
 import type { FollowMutation, FollowRow, FollowStore } from './follow-store.js'
+import type { RelationshipGraphReadRow, RelationshipGraphReadStore } from './relationship-graph-store.js'
 import type { BlockMuteListReadInput, BlockMuteListReadRow, BlockMuteListReadStore } from './block-mute-list-read-store.js'
 import type { ProfileChannelReadStore } from './profile-channel-read-store.js'
 import type { FollowingAuthorIdRow, FollowingAuthorIdsReadStore } from './following-author-ids-read-store.js'
@@ -1579,6 +1580,54 @@ describe('W05 social query transport', () => {
         },
       },
     })
+  })
+
+  it('serves relationship graph through an injected PostgreSQL-capable store without touching D1', async () => {
+    const store: RelationshipGraphReadStore = {
+      read: vi.fn(async (_viewerUserId: string, _targetUserId: string): Promise<RelationshipGraphReadRow> => ({
+        following: true,
+        followed_by: false,
+        relationship_id: 'pg-relationship-1',
+        created_at: '2026-11-12T16:00:00.000Z',
+        blocked: false,
+        blocked_by: false,
+        muted: true,
+      })),
+    }
+    const d1Prepare = vi.fn()
+    const injectedWorker = createW05SocialWorker({ relationshipGraphReadStore: store })
+    const response = await injectedWorker.fetch(
+      request('/internal/social/follows/pg-relationship-target-20261112', {
+        ...transportHeaders,
+        'X-LuckRead-Principal-Layer': 'L2',
+      }),
+      { DB: { prepare: d1Prepare } as unknown as D1Database },
+      {} as never,
+    )
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      data: {
+        following: true,
+        relationshipId: 'pg-relationship-1',
+        targetUserId: 'pg-relationship-target-20261112',
+        createdAt: '2026-11-12T16:00:00.000Z',
+        relationship: {
+          viewerUserId: 'viewer-1',
+          targetUserId: 'pg-relationship-target-20261112',
+          following: true,
+          followedBy: false,
+          mutualFollow: false,
+          blocked: false,
+          blockedBy: false,
+          muted: true,
+          relationshipId: 'pg-relationship-1',
+          createdAt: '2026-11-12T16:00:00.000Z',
+        },
+      },
+    })
+    expect(store.read).toHaveBeenCalledWith('viewer-1', 'pg-relationship-target-20261112')
+    expect(d1Prepare).not.toHaveBeenCalled()
   })
 
   it('denies follow status below the minimum interaction permission layer', async () => {
