@@ -7,6 +7,16 @@
     "nodejs_compat",
     "global_fetch_strictly_public"
   ],
+  "vars": {
+    "PAYLOAD_DATABASE_DRIVER": "d1"
+  },
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "0c53a1bb9bc0484bac146e8ae2d3158b",
+      "localConnectionString": "postgresql://postgres:postgres@127.0.0.1:5432/luckread_schema"
+    }
+  ],
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS",
