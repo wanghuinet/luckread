@@ -36,8 +36,8 @@ export type CreatorApplicationReviewRow = Pick<
 >
 
 export type CreatorIdentityRow = Readonly<{
-  creatorId: string
-  applicationId: string
+  creator_id: string
+  application_id: string
   status: string
 }>
 
@@ -83,7 +83,7 @@ export interface W08CreatorStore {
   approveApplication(input: DecideCreatorApplicationInput): Promise<boolean>
   rejectApplication(input: DecideCreatorApplicationInput): Promise<boolean>
   completeCreatorGrant(input: CompleteCreatorGrantInput): Promise<void>
-  findActiveCreator(userId: string): Promise<{ creatorId: string } | null>
+  findActiveCreator(userId: string): Promise<{ creator_id: string } | null>
 }
 
 export interface W08D1PreparedStatement {
@@ -200,7 +200,7 @@ export function createD1W08CreatorStore(db: W08D1Database): W08CreatorStore {
 
     findCreatorByUser(userId) {
       return db.prepare(
-        'SELECT creator_id AS creatorId, application_id AS applicationId, status ' +
+        'SELECT creator_id, application_id, status ' +
         'FROM creators WHERE user_id = ? LIMIT 1',
       ).bind(userId).first<CreatorIdentityRow>()
     },
@@ -379,8 +379,8 @@ export function createD1W08CreatorStore(db: W08D1Database): W08CreatorStore {
 
     async findActiveCreator(userId) {
       return db.prepare(
-        "SELECT creator_id AS creatorId FROM creators WHERE user_id = ? AND status = 'ACTIVE' LIMIT 1",
-      ).bind(userId).first<{ creatorId: string }>()
+        "SELECT creator_id FROM creators WHERE user_id = ? AND status = 'ACTIVE' LIMIT 1",
+      ).bind(userId).first<{ creator_id: string }>()
     },
   }
 }
@@ -440,7 +440,7 @@ export function createPostgresW08CreatorStore(pool: Pool): W08CreatorStore {
 
     async findCreatorByUser(userId) {
       const result = await pool.query<CreatorIdentityRow>(
-        'SELECT creator_id AS "creatorId", application_id AS "applicationId", status ' +
+        'SELECT creator_id, application_id, status ' +
           'FROM creators WHERE user_id = $1 LIMIT 1',
         [userId],
       )
@@ -632,7 +632,7 @@ export function createPostgresW08CreatorStore(pool: Pool): W08CreatorStore {
     },
 
     async findActiveCreator(userId) {
-      const result = await pool.query<{ creatorId: string }>(
+      const result = await pool.query<{ creator_id: string }>(
         "SELECT creator_id AS \"creatorId\" FROM creators WHERE user_id = $1 AND status = 'ACTIVE' LIMIT 1",
         [userId],
       )
