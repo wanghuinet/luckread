@@ -213,9 +213,12 @@ export async function collectNeonHyperdriveInventory({
 
   const configs = await listHyperdrives({ accountId, apiToken, fetchImpl })
   const hyperdrives = EXPECTED_HYPERDRIVES.map((expected) => inspectExpectedHyperdrive(configs, expected))
+  const verifiedHyperdriveNames = new Set(
+    hyperdrives.filter((item) => item.status === 'MATCH').map((item) => item.name),
+  )
   const configById = new Map(
     configs
-      .filter((config) => typeof config?.id === 'string')
+      .filter((config) => typeof config?.id === 'string' && verifiedHyperdriveNames.has(config.name))
       .map((config) => [config.id, EXPECTED_HYPERDRIVES.find((expected) => expected.name === config.name)])
       .filter((entry) => entry[1] !== undefined),
   )
