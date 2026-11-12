@@ -9,7 +9,7 @@ type PendingPublicationRow = {
 }
 
 export type AccountStatePublicationQueues = {
-  auth013: { send(message: unknown): Promise<void> }
+  auth013: { send(message: unknown): Promise<unknown> }
   projection: { send(message: unknown): Promise<void> }
 }
 
