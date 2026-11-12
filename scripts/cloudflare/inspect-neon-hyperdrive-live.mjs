@@ -121,7 +121,7 @@ function inspectExpectedHyperdrive(configs, expected) {
   const checks = {
     databaseMatches: config?.origin?.database === expected.database,
     neonHost: host.endsWith('.neon.tech'),
-    directEndpoint: host !== '' && !/-pooler(?:\\.|$)/i.test(host),
+    directEndpoint: host !== '' && !/-pooler(?:\.|$)/i.test(host),
     postgresScheme: ['postgres', 'postgresql'].includes(config?.origin?.scheme),
     cachingDisabled: config?.caching?.disabled === true,
     resourceIdPresent: typeof config?.id === 'string' && config.id.length > 0,
@@ -256,10 +256,10 @@ export async function collectNeonHyperdriveInventory({
 function toMarkdown(inventory) {
   const rows = inventory.hyperdrives.map((item) =>
     `| ${item.domainId} | ${item.database} | ${item.status} | ${item.id ?? '—'} |`,
-  ).join('\\n')
+  ).join('\n')
   const workerRows = inventory.workers.map((item) =>
     `| ${item.worker} | ${item.script} | ${item.status} | ${item.hyperdriveBindings.map((binding) => `${binding.name ?? '?'} → ${binding.target}`).join(', ') || '无'} | ${item.d1BindingNames.join(', ') || '无'} |`,
-  ).join('\\n')
+  ).join('\n')
   const s = inventory.summary
   return [
     '## Cloudflare Neon Hyperdrive 只读核验',
@@ -277,7 +277,7 @@ function toMarkdown(inventory) {
     workerRows,
     '',
     '> 本报告仅执行 Cloudflare GET 查询；不读取凭据内容，不创建/更新/删除资源，不修改 Worker 绑定，不部署。',
-  ].join('\\n')
+  ].join('\n')
 }
 
 async function main() {
@@ -295,10 +295,10 @@ async function main() {
     apiToken: process.env.CF_API_TOKEN,
   })
   await mkdir('artifacts', { recursive: true })
-  await writeFile(OUTPUT_PATH, `${JSON.stringify(inventory, null, 2)}\\n`, 'utf8')
+  await writeFile(OUTPUT_PATH, `${JSON.stringify(inventory, null, 2)}\n`, 'utf8')
   const markdown = toMarkdown(inventory)
   if (process.env.GITHUB_STEP_SUMMARY) {
-    await appendFile(process.env.GITHUB_STEP_SUMMARY, `${markdown}\\n`, 'utf8')
+    await appendFile(process.env.GITHUB_STEP_SUMMARY, `${markdown}\n`, 'utf8')
   }
   console.log(JSON.stringify(inventory, null, 2))
 }
