@@ -146,5 +146,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: neon-d1-03-w09-platform-postgres18-${{ github.sha }}
-          path: |\n            artifacts/neon/d1-03-w09-platform-postflight.txt\n            artifacts/neon/w05-w09-push-endpoint-access-postgres-runtime-postflight.json\n          if-no-files-found: error
+          path: |
+            artifacts/neon/d1-03-w09-platform-postflight.txt
+            artifacts/neon/w05-w09-push-endpoint-access-postgres-runtime-postflight.json
+          if-no-files-found: error
           retention-days: 90
