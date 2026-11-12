@@ -12,9 +12,12 @@ CREATE OR REPLACE FUNCTION l8_bootstrap_jsonb_object_key_count(input_value JSONB
 RETURNS INTEGER
 LANGUAGE plpgsql IMMUTABLE STRICT PARALLEL SAFE
 AS $function$
+DECLARE
+  key_count INTEGER;
 BEGIN
   IF jsonb_typeof(input_value) <> 'object' THEN RETURN 0; END IF;
-  RETURN (SELECT count(*)::INTEGER FROM jsonb_object_keys(input_value));
+  SELECT count(*)::INTEGER INTO key_count FROM jsonb_object_keys(input_value);
+  RETURN key_count;
 END;
 $function$;
 
