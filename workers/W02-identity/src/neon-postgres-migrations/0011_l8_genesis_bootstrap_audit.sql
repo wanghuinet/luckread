@@ -18,6 +18,16 @@ BEGIN
 END;
 $function$;
 
+CREATE OR REPLACE FUNCTION l8_bootstrap_jsonb_array_item_count(input_value JSONB)
+RETURNS INTEGER
+LANGUAGE plpgsql IMMUTABLE STRICT PARALLEL SAFE
+AS $function$
+BEGIN
+  IF jsonb_typeof(input_value) <> 'array' THEN RETURN 0; END IF;
+  RETURN jsonb_array_length(input_value);
+END;
+$function$;
+
 CREATE TABLE l8_genesis_bootstrap_audit (
   bootstrap_key TEXT NOT NULL PRIMARY KEY CHECK (bootstrap_key = 'first-l8'),
   operation TEXT NOT NULL CHECK (operation = 'INITIAL_L8_BOOTSTRAP'),
@@ -27,7 +37,7 @@ CREATE TABLE l8_genesis_bootstrap_audit (
   target_user_id TEXT NOT NULL CHECK (length(target_user_id) BETWEEN 8 AND 128),
   role_assignment_id TEXT NOT NULL UNIQUE,
   nonce_sha256 TEXT NOT NULL UNIQUE CHECK (nonce_sha256 ~ '^[0-9a-f]{64}$'),
-  approved_reviewers_json JSONB NOT NULL CHECK (jsonb_typeof(approved_reviewers_json) = 'array' AND jsonb_array_length(approved_reviewers_json) = 1),
+  approved_reviewers_json JSONB NOT NULL CHECK (jsonb_typeof(approved_reviewers_json) = 'array' AND l8_bootstrap_jsonb_array_item_count(approved_reviewers_json) = 1),
   reviewer_permissions_json JSONB NOT NULL CHECK (jsonb_typeof(reviewer_permissions_json) = 'object' AND l8_bootstrap_jsonb_object_key_count(reviewer_permissions_json) = 1),
   workflow_run_id TEXT NOT NULL CHECK (workflow_run_id ~ '^[0-9]+$'),
   valid_from TIMESTAMPTZ NOT NULL,
