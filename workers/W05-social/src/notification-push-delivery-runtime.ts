@@ -13,6 +13,8 @@ import {
   createD1NotificationPushEndpointAccessStore,
 } from './notification-push-endpoint-access-store-d1.js'
 import type { NotificationPushEndpointAccessStore } from './notification-push-endpoint-access-store.js'
+import { deactivateInvalidNotificationPushEndpoint, hashNotificationPushToken } from './notification-push-endpoint-access-runtime.js'
+export { deactivateInvalidEndpoint } from './notification-push-endpoint-access-runtime.js'
 import type { NotificationPushReceiptStore } from './notification-push-receipt-store.js'
 
 type PushReceiptLike = ExpoPushReceipt
@@ -60,10 +62,7 @@ const LEASE_SECONDS = 180
 const RECEIPT_DELAY_SECONDS = 15 * 60
 const RECEIPT_RETRY_SECONDS = 5 * 60
 const isoAfter = (now: Date, seconds: number) => new Date(now.getTime() + seconds * 1000).toISOString()
-async function hashPushToken(token: string): Promise<string> {
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token))
-  return Array.from(new Uint8Array(digest), (value) => value.toString(16).padStart(2, '0')).join('')
-}
+const hashPushToken = hashNotificationPushToken
 
 export function calculatePushRetryDelaySeconds(attemptCount: number): number {
   const attempt = Number.isSafeInteger(attemptCount) && attemptCount > 0 ? attemptCount : 1
@@ -184,26 +183,16 @@ export async function claimDueDeliveries(
   return claimed
 }
 
-export async function deactivateInvalidEndpoint(
+async function deactivateInvalidEndpoint(
   endpointSource: EndpointAccessSource,
   task: Readonly<{ endpointId: string; recipientUserId: string; pushTokenHash: string }>,
   now: Date,
 ): Promise<boolean> {
-  const endpointStore = resolveNotificationPushEndpointAccessStore(endpointSource)
-  const endpoint = await endpointStore.findEndpointForOwner(task.endpointId, task.recipientUserId)
-  if (
-    !endpoint ||
-    endpoint.permission_status !== 'granted' ||
-    !endpoint.push_token ||
-    await hashPushToken(endpoint.push_token) !== task.pushTokenHash
-  ) return false
-
-  return endpointStore.clearTokenIfMatches({
-    endpointId: task.endpointId,
-    ownerUserId: task.recipientUserId,
-    expectedPushToken: endpoint.push_token,
-    now: now.toISOString(),
-  })
+  return deactivateInvalidNotificationPushEndpoint(
+    resolveNotificationPushEndpointAccessStore(endpointSource),
+    task,
+    now,
+  )
 }
 
 async function scheduleDeliveryRetry(
