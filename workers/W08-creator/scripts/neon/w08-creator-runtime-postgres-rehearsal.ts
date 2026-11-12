@@ -91,7 +91,7 @@ try {
   assert.equal(afterGrant?.grant_state, 'GRANTED')
   assert.equal(afterGrant?.version, 3)
   const activeCreator = await store.findActiveCreator(applicantOne)
-  assert.equal(activeCreator?.creatorId, 'creator-' + applicationOne)
+  assert.equal(activeCreator?.creator_id, 'creator-' + applicationOne)
 
   await store.createApplication({
     applicationId: applicationTwo,
