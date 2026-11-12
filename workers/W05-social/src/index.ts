@@ -54,6 +54,8 @@ import {
 import type { FollowListReadStore } from './follow-list-read-store.js'
 import type { FollowingAuthorIdsReadStore } from './following-author-ids-read-store.js'
 import type { ContentLikerReadStore } from './like-list-read-store.js'
+import type { LikeStatusReadStore } from './like-status-read-store.js'
+import type { LikeTargetContextReadStore } from './like-target-context-read-store.js'
 import type { CommentListReadStore } from './comment-list-read-store.js'
 
 type RateLimitBinding = { limit(input: { key: string }): Promise<{ success: boolean }> }
@@ -268,6 +270,10 @@ export type W05SocialWorkerDependencies = Readonly<{
   contentLikerReadStore?: ContentLikerReadStore
   /** Optional PostgreSQL-capable favorite list reader; D1 remains the deployed default. */
   favoriteListReadStore?: FavoriteListReadStore
+  /** Optional PostgreSQL-capable like-status reader; D1 remains the deployed default. */
+  likeStatusReadStore?: LikeStatusReadStore
+  /** Optional PostgreSQL-capable like-target context and Block preflight reader; D1 remains the deployed default. */
+  likeTargetContextReadStore?: LikeTargetContextReadStore
 }>
 
 export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies = {}) {
@@ -1018,7 +1024,16 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
             }
           : await parseJsonTarget(request)
         if (request.method === 'GET') {
-          const result = await getLikeStatus(env.DB, env.W03_CONTENT, viewerUserId, target, request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '')
+          const result = await getLikeStatus(
+            env.DB,
+            env.W03_CONTENT,
+            viewerUserId,
+            target,
+            request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '',
+            undefined,
+            dependencies.likeStatusReadStore,
+            dependencies.likeTargetContextReadStore,
+          )
           return json({ data: result, requestId: createRequestId() }, 200)
         }
 
