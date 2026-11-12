@@ -56,6 +56,8 @@ on:
       - 'workers/W02-identity/src/authz/**'
       - 'workers/W02-identity/src/account/**'
       - 'workers/W02-identity/src/index.ts'
+      - 'workers/W02-identity/src/neon/**'
+      - 'workers/W02-identity/package.json'
       - 'workers/W02-identity/wrangler.jsonc'
       - 'workers/W02-identity/migrations/0008_auth_007_mfa_publication_journal.sql'
       - 'workers/W02-identity/migrations/0009_auth_007_mfa_operation_receipts.sql'
@@ -136,6 +138,28 @@ jobs:
         run: npm install --ignore-scripts --no-audit --no-fund --package-lock=false
       - name: Test W02 D1 default and Neon Hyperdrive runtime selection
         run: npx vitest@3.2.4 run workers/W02-identity/src/neon/runtime.test.ts
+      - name: Verify W02 keeps D1 default and binds the existing D1-01 Hyperdrive
+        working-directory: workers/W02-identity
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs'
+          const config = JSON.parse(fs.readFileSync('wrangler.jsonc', 'utf8'))
+          const d1 = (config.d1_databases ?? []).find((binding) => binding.binding === 'D1_01')
+          const hyperdrive = (config.hyperdrive ?? []).find((binding) => binding.binding === 'HYPERDRIVE')
+          if (config.vars?.W02_DATABASE_DRIVER !== 'd1') {
+            throw new Error('W02 production default must remain D1 until explicit cutover')
+          }
+          if (d1?.database_id !== '2f80471e-3756-49f9-8db1-7707a433ad64') {
+            throw new Error('W02 D1_01 rollback binding must remain unchanged')
+          }
+          if (hyperdrive?.id !== '0c53a1bb9bc0484bac146e8ae2d3158b') {
+            throw new Error('W02 must reuse the existing D1-01 Hyperdrive resource')
+          }
+          console.log('W02 D1 default, D1 rollback binding and existing Hyperdrive binding: PASS')
+          NODE
+      - name: Bundle W02 Worker with the PostgreSQL runtime dependency
+        working-directory: workers/W02-identity
+        run: npx --yes wrangler@4.116.0 deploy --dry-run --config wrangler.jsonc
       - name: Run W02 username change authority tests
         run: npx vitest@3.2.4 run workers/W02-identity/src/auth/username-change.test.ts
       - name: Audit W02 username history migration with local SQLite only
