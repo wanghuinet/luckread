@@ -96,7 +96,8 @@ export default {
       }
 
       try {
-        const result = await (postgres?.accountStateTransitionStore ?? createD1AccountStateTransitionStore(env.D1_01)).transition({
+        const transitionStore = postgres?.accountStateTransitionStore ?? createD1AccountStateTransitionStore(env.D1_01)
+        const result = await transitionStore.transition({
           subjectId: body.subjectId,
           targetUserId: body.targetUserId,
           to: body.to as AccountState,
@@ -257,7 +258,14 @@ export default {
     }
 
     if (request.method === 'POST' && url.pathname === '/internal/authz/bootstrap-super-admin/readiness') {
-      if (postgres) return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'L8 bootstrap is unavailable in the staged Neon runtime' } }, 503)
+      if (postgres) {
+        return json({
+          error: {
+            code: 'SERVICE_UNAVAILABLE',
+            message: 'L8 bootstrap is unavailable in the staged Neon runtime',
+          },
+        }, 503)
+      }
       // This is a read-only preflight. It independently verifies the same
       // protected GitHub workflow identity and target-bound single protected environment approval as
       // the write route but never calls the grant command.
@@ -462,7 +470,8 @@ export default {
       }
 
       try {
-        const result = await grantCreatorBusinessRoleWithStore(postgres?.creatorRoleGrantStore ?? createD1CreatorRoleGrantStore(env.D1_01), {
+        const creatorRoleGrantStore = postgres?.creatorRoleGrantStore ?? createD1CreatorRoleGrantStore(env.D1_01)
+        const result = await grantCreatorBusinessRoleWithStore(creatorRoleGrantStore, {
           subjectId: body.subjectId,
           roleId: body.roleId as 'creator',
           scopeType: body.scopeType as 'global',
