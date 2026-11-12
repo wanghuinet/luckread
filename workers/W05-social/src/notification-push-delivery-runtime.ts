@@ -9,10 +9,27 @@ import {
 import { createD1NotificationPushDeliveryClaimStore } from './notification-push-delivery-claim-store-d1.js'
 import type { NotificationPushDeliveryClaimStore as NotificationPushDeliveryClaimStorePort } from './notification-push-delivery-claim-store.js'
 import { createD1NotificationPushReceiptStore } from './notification-push-receipt-store-d1.js'
+import {
+  createD1NotificationPushEndpointAccessStore,
+  type NotificationPushEndpointAccessStore,
+} from './notification-push-endpoint-access-store-d1.js'
 import type { NotificationPushReceiptStore } from './notification-push-receipt-store.js'
 
 type PushReceiptLike = ExpoPushReceipt
 type PushTicketLike = ExpoPushTicket
+
+type EndpointAccessSource = D1Database | NotificationPushEndpointAccessStore
+
+function resolveNotificationPushEndpointAccessStore(
+  source: EndpointAccessSource,
+): NotificationPushEndpointAccessStore {
+  if (
+    typeof (source as NotificationPushEndpointAccessStore).listActiveForRecipient === 'function' &&
+    typeof (source as NotificationPushEndpointAccessStore).findEndpointForOwner === 'function' &&
+    typeof (source as NotificationPushEndpointAccessStore).clearTokenIfMatches === 'function'
+  ) return source as NotificationPushEndpointAccessStore
+  return createD1NotificationPushEndpointAccessStore(source as D1Database)
+}
 
 export interface NotificationPushDeliveryEnv {
   readonly DB: D1Database
@@ -21,7 +38,6 @@ export interface NotificationPushDeliveryEnv {
   readonly EXPO_ACCESS_TOKEN?: string
 }
 
-type ActiveEndpointRow = Readonly<{ endpoint_id: string; owner_user_id: string; push_token: string }>
 type ClaimedDelivery = Readonly<{
   deliveryId: string; notificationId: string; endpointId: string; recipientUserId: string
   pushToken: string; pushTokenHash: string; notificationType: 'FOLLOW' | 'LIKE' | 'COMMENT' | 'REPLY' | 'MENTION'
@@ -104,9 +120,10 @@ export function notificationPushMessage(task: Pick<ClaimedDelivery,
 
 export async function claimDueDeliveries(
   store: NotificationPushDeliveryClaimStorePort,
-  endpointDb: D1Database,
+  endpointSource: EndpointAccessSource,
   now: Date,
 ): Promise<ClaimedDelivery[]> {
+  const endpointStore = resolveNotificationPushEndpointAccessStore(endpointSource)
   const nowIso = now.toISOString()
   const candidates = await store.claimDue({
     now: nowIso,
@@ -129,13 +146,9 @@ export async function claimDueDeliveries(
     }
 
     // W09 remains the only authority for endpoint state and raw Expo push tokens.
-    const endpoint = await endpointDb.prepare(
-      "SELECT endpoint_id, owner_user_id, push_token FROM notification_push_endpoints " +
-      "WHERE endpoint_id = ? AND owner_user_id = ? AND provider = 'expo' " +
-      "AND permission_status = 'granted' AND push_token IS NOT NULL LIMIT ?",
-    ).bind(candidate.endpoint_id, candidate.recipient_user_id, 1).first<ActiveEndpointRow>()
+    const endpoint = await endpointStore.findEndpointForOwner(candidate.endpoint_id, candidate.recipient_user_id)
 
-    if (!endpoint) {
+    if (!endpoint || endpoint.permission_status !== 'granted' || !endpoint.push_token) {
       await store.cancel({
         deliveryId: candidate.delivery_id,
         leaseToken: candidate.lease_token,
@@ -172,20 +185,25 @@ export async function claimDueDeliveries(
 }
 
 export async function deactivateInvalidEndpoint(
-  endpointDb: D1Database,
+  endpointSource: EndpointAccessSource,
   task: Readonly<{ endpointId: string; recipientUserId: string; pushTokenHash: string }>,
   now: Date,
 ): Promise<boolean> {
-  const endpoint = await endpointDb.prepare(
-    'SELECT push_token FROM notification_push_endpoints WHERE endpoint_id = ? AND owner_user_id = ? AND provider = ? LIMIT 1',
-  ).bind(task.endpointId, task.recipientUserId, 'expo').first<{ push_token: string | null }>()
-  if (!endpoint?.push_token || await hashPushToken(endpoint.push_token) !== task.pushTokenHash) return false
+  const endpointStore = resolveNotificationPushEndpointAccessStore(endpointSource)
+  const endpoint = await endpointStore.findEndpointForOwner(task.endpointId, task.recipientUserId)
+  if (
+    !endpoint ||
+    endpoint.permission_status !== 'granted' ||
+    !endpoint.push_token ||
+    await hashPushToken(endpoint.push_token) !== task.pushTokenHash
+  ) return false
 
-  await endpointDb.prepare(
-    "UPDATE notification_push_endpoints SET permission_status = 'undetermined', push_token = NULL, " +
-    'updated_at = ? WHERE endpoint_id = ? AND owner_user_id = ? AND provider = ? AND push_token = ?',
-  ).bind(now.toISOString(), task.endpointId, task.recipientUserId, 'expo', endpoint.push_token).run()
-  return true
+  return endpointStore.clearTokenIfMatches({
+    endpointId: task.endpointId,
+    ownerUserId: task.recipientUserId,
+    expectedPushToken: endpoint.push_token,
+    now: now.toISOString(),
+  })
 }
 
 async function scheduleDeliveryRetry(
@@ -205,7 +223,7 @@ async function scheduleDeliveryRetry(
 }
 
 async function recordPushTicket(
-  store: NotificationPushSendResultStore, endpointDb: D1Database,
+  store: NotificationPushSendResultStore, endpointSource: EndpointAccessSource,
   task: ClaimedDelivery, ticket: PushTicketLike, now: Date,
 ): Promise<'sent' | 'retried' | 'failed' | 'stale'> {
   if (ticket.status === 'ok' && typeof ticket.id === 'string' && ticket.id.trim()) {
@@ -219,7 +237,7 @@ async function recordPushTicket(
     return updated ? 'sent' : 'stale'
   }
   const errorCode = ticket.status === 'error' ? String(ticket.details?.error ?? 'EXPO_TICKET_ERROR') : 'EXPO_TICKET_INVALID'
-  if (errorCode === 'DeviceNotRegistered') await deactivateInvalidEndpoint(endpointDb, task, now)
+  if (errorCode === 'DeviceNotRegistered') await deactivateInvalidEndpoint(endpointSource, task, now)
   return scheduleDeliveryRetry(store, task, now, errorCode)
 }
 
@@ -261,7 +279,7 @@ export async function claimDueReceipts(
 
 async function applyReceipt(
   store: NotificationPushReceiptStore,
-  endpointDb: D1Database,
+  endpointSource: EndpointAccessSource,
   task: ClaimedReceipt,
   receipt: PushReceiptLike | undefined,
   now: Date,
@@ -296,7 +314,7 @@ async function applyReceipt(
 
   const errorCode = String(receipt.details?.error ?? 'EXPO_RECEIPT_ERROR')
   if (errorCode === 'DeviceNotRegistered' && task.pushTokenHash) {
-    await deactivateInvalidEndpoint(endpointDb, task, now)
+    await deactivateInvalidEndpoint(endpointSource, task, now)
   }
   const canRetry = isRetryableExpoError(errorCode) && task.attemptCount < MAX_SEND_ATTEMPTS
   const updated = await store.failReceipt({
@@ -313,7 +331,7 @@ async function applyReceipt(
 
 
 async function processSendBatch(
-  store: NotificationPushSendResultStore, endpointDb: D1Database, client: Expo,
+  store: NotificationPushSendResultStore, endpointSource: EndpointAccessSource, client: Expo,
   tasks: ClaimedDelivery[], now: Date,
 ): Promise<{ sent: number; retried: number; failed: number }> {
   const result = { sent: 0, retried: 0, failed: 0 }
@@ -333,7 +351,7 @@ async function processSendBatch(
         const task = message ? taskByMessage.get(message) : undefined
         const ticket = tickets[index]
         if (!task || !ticket) continue
-        const outcome = await recordPushTicket(store, endpointDb, task, ticket, now)
+        const outcome = await recordPushTicket(store, endpointSource, task, ticket, now)
         if (outcome === 'sent') result.sent += 1
         else if (outcome === 'retried') result.retried += 1
         else if (outcome === 'failed') result.failed += 1
@@ -351,7 +369,7 @@ async function processSendBatch(
 
 async function processReceiptBatch(
   store: NotificationPushReceiptStore,
-  endpointDb: D1Database,
+  endpointSource: EndpointAccessSource,
   client: Expo,
   tasks: ClaimedReceipt[],
   now: Date,
@@ -365,7 +383,7 @@ async function processReceiptBatch(
     }
   }catch{
     for(const task of tasks){
-      const outcome=await applyReceipt(store,endpointDb,task,undefined,now)
+      const outcome=await applyReceipt(store,endpointSource,task,undefined,now)
       if(outcome==='pending')result.pending+=1
       else if(outcome==='failed')result.failed+=1
       else if(outcome==='stale')result.skipped+=1
@@ -373,7 +391,7 @@ async function processReceiptBatch(
     return result
   }
   for(const task of tasks){
-    const outcome=await applyReceipt(store,endpointDb,task,receipts[task.expoTicketId],now)
+    const outcome=await applyReceipt(store,endpointSource,task,receipts[task.expoTicketId],now)
     if(outcome==='provider-accepted')result.providerAccepted+=1
     else if(outcome==='retried')result.retried+=1
     else if(outcome==='failed')result.failed+=1
@@ -388,6 +406,8 @@ export type NotificationPushDeliveryRuntimeDependencies = Readonly<{
   sendResultStore?: NotificationPushSendResultStore
   deliveryClaimStore?: NotificationPushDeliveryClaimStorePort
   receiptStore?: NotificationPushReceiptStore
+  /** Inject the scoped W09 D1-03 endpoint access store; D1 remains the default. */
+  endpointAccessStore?: NotificationPushEndpointAccessStore
 }>
 
 export async function runNotificationPushBatch(
@@ -398,17 +418,21 @@ export async function runNotificationPushBatch(
   if (env.PUSH_DELIVERY_ENABLED !== 'true') {
     return { status: 'DISABLED', fannedOut: 0, sent: 0, providerAccepted: 0, retried: 0, failed: 0, skipped: 0 }
   }
-  if (!env.DB || !env.D1_03) throw new Error('W05_PUSH_DELIVERY_D1_BINDING_MISSING')
+  if (!env.DB || (!env.D1_03 && !dependencies.endpointAccessStore)) {
+    throw new Error('W05_PUSH_DELIVERY_D1_BINDING_MISSING')
+  }
 
-  const fannedOut = await fanOutPendingNotifications(dependencies.fanoutStore ?? env.DB, env.D1_03, now)
+  const endpointAccessStore = dependencies.endpointAccessStore ??
+    createD1NotificationPushEndpointAccessStore(env.D1_03 as D1Database)
+  const fannedOut = await fanOutPendingNotifications(dependencies.fanoutStore ?? env.DB, endpointAccessStore, now)
   const deliveryClaimStore = dependencies.deliveryClaimStore ?? createD1NotificationPushDeliveryClaimStore(env.DB)
-  const deliveries = await claimDueDeliveries(deliveryClaimStore, env.D1_03, now)
+  const deliveries = await claimDueDeliveries(deliveryClaimStore, endpointAccessStore, now)
   const sendResultStore = dependencies.sendResultStore ?? createD1NotificationPushSendResultStore(env.DB)
   const client = new Expo(env.EXPO_ACCESS_TOKEN?.trim() ? { accessToken: env.EXPO_ACCESS_TOKEN.trim() } : {})
-  const sendResult = await processSendBatch(sendResultStore, env.D1_03, client, deliveries, now)
+  const sendResult = await processSendBatch(sendResultStore, endpointAccessStore, client, deliveries, now)
   const receiptStore = dependencies.receiptStore ?? createD1NotificationPushReceiptStore(env.DB)
   const receipts = await claimDueReceipts(receiptStore, now)
-  const receiptResult = await processReceiptBatch(receiptStore, env.D1_03, client, receipts, now)
+  const receiptResult = await processReceiptBatch(receiptStore, endpointAccessStore, client, receipts, now)
 
   return {
     status: 'COMPLETED',
