@@ -50,7 +50,7 @@ export function parseNeonConnectionString(connectionString, expectedDatabase = H
     throw new Error('Neon connection URL contains invalid percent-encoding')
   }
 
-  if (database !== HYPERDRIVE_DATABASE_NAME) {
+  if (database !== expectedDatabase) {
     throw new Error(`Hyperdrive target database must be exactly ${expectedDatabase}`)
   }
   if (!user || !password) {
