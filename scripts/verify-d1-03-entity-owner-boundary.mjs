@@ -33,6 +33,11 @@ const w09MigrationConfigPath = resolve(root, 'workers/W09-platform/wrangler.d1-0
 const w05SourcePath = resolve(root, 'workers/W05-social/src/index.ts')
 const pushRuntimePath = resolve(root, 'workers/W05-social/src/push-endpoint-runtime.ts')
 const deliveryRuntimePath = resolve(root, 'workers/W05-social/src/notification-push-delivery-runtime.ts')
+const fanoutRuntimePath = resolve(root, 'workers/W05-social/src/notification-push-fanout-runtime.ts')
+const endpointAccessPortPath = resolve(root, 'workers/W05-social/src/notification-push-endpoint-access-store.ts')
+const endpointAccessD1Path = resolve(root, 'workers/W05-social/src/notification-push-endpoint-access-store-d1.ts')
+const endpointAccessPostgresPath = resolve(root, 'workers/W05-social/src/notification-push-endpoint-access-store-postgres.ts')
+const endpointAccessRuntimePath = resolve(root, 'workers/W05-social/src/notification-push-endpoint-access-runtime.ts')
 const deliveryContractPath = resolve(root, 'contracts/transport/W05-W09-notification-push-delivery.v1.json')
 const pushMigrationPath = resolve(root, 'workers/W09-platform/migrations-d1-03/0001_notification_push_endpoints.sql')
 const auditSchemaPath = resolve(root, 'contracts/schemas/common/audit-event.json')
@@ -40,7 +45,7 @@ const w06MigrationReadmePath = resolve(root, 'workers/W06-governance/migrations/
 const w09NeonMigrationPath = resolve(root, 'workers/W09-platform/src/neon-postgres-migrations/0001_w09_d1_03_platform_schema.sql')
 const w09NeonSchemaContractPath = resolve(root, 'contracts/database/neon-d1-03-w09-platform-schema.v1.json')
 
-for (const path of [w05ConfigPath, w09MigrationConfigPath, w05SourcePath, pushRuntimePath, deliveryRuntimePath, deliveryContractPath, pushMigrationPath, auditSchemaPath, w06MigrationReadmePath, w09NeonMigrationPath, w09NeonSchemaContractPath]) {
+for (const path of [w05ConfigPath, w09MigrationConfigPath, w05SourcePath, pushRuntimePath, deliveryRuntimePath, fanoutRuntimePath, endpointAccessPortPath, endpointAccessD1Path, endpointAccessPostgresPath, endpointAccessRuntimePath, deliveryContractPath, pushMigrationPath, auditSchemaPath, w06MigrationReadmePath, w09NeonMigrationPath, w09NeonSchemaContractPath]) {
   if (!existsSync(path)) throw new Error(`Missing scoped NotificationPushEndpoint owner artifact: ${path}`)
 }
 
@@ -137,6 +142,11 @@ if (
 }
 
 const deliveryRuntime = readFileSync(deliveryRuntimePath, 'utf8')
+const fanoutRuntime = readFileSync(fanoutRuntimePath, 'utf8')
+const endpointAccessPort = readFileSync(endpointAccessPortPath, 'utf8')
+const endpointAccessD1 = readFileSync(endpointAccessD1Path, 'utf8')
+const endpointAccessPostgres = readFileSync(endpointAccessPostgresPath, 'utf8')
+const endpointAccessRuntime = readFileSync(endpointAccessRuntimePath, 'utf8')
 const deliveryContract = JSON.parse(readFileSync(deliveryContractPath, 'utf8'))
 const runtimeDelegation = pushDelegation?.delegatedDeliveryRuntime
 const deliveryOperations = new Set((deliveryContract.operations ?? []).map((operation) => operation.id))
@@ -154,13 +164,30 @@ if (
   deliveryContract.authority?.maxEndpointsPerRecipient !== 20 ||
   !deliveryOperations.has('resolveActiveRecipientPushEndpoints') ||
   !deliveryOperations.has('clearProviderInvalidExpoToken') ||
-  !deliveryRuntime.includes("owner_user_id = ?") ||
-  !deliveryRuntime.includes("permission_status = 'granted'") ||
-  !deliveryRuntime.includes('LIMIT ?') ||
-  !deliveryRuntime.includes('await hashPushToken(endpoint.push_token) !== task.pushTokenHash') ||
-  !deliveryRuntime.includes("AND push_token = ?") ||
+  !endpointAccessPort.includes('listActiveForRecipient') ||
+  !endpointAccessPort.includes('findEndpointForOwner') ||
+  !endpointAccessPort.includes('clearTokenIfMatches') ||
+  !deliveryRuntime.includes('endpointStore.findEndpointForOwner') ||
+  !deliveryRuntime.includes('deactivateInvalidNotificationPushEndpoint') ||
+  !endpointAccessRuntime.includes('store.clearTokenIfMatches') ||
+  !fanoutRuntime.includes('endpointStore.listActiveForRecipient') ||
+  !endpointAccessRuntime.includes('await hashNotificationPushToken(endpoint.push_token) !== task.pushTokenHash') ||
   !deliveryRuntime.includes("errorCode === 'DeviceNotRegistered'") ||
-  deliveryRuntime.includes('last_seen_at =')
+  deliveryRuntime.includes('notification_push_endpoints') ||
+  fanoutRuntime.includes('notification_push_endpoints') ||
+  !endpointAccessD1.includes('owner_user_id = ?') ||
+  !endpointAccessD1.includes("provider = ?") ||
+  !endpointAccessD1.includes("permission_status = 'granted'") ||
+  !endpointAccessD1.includes('LIMIT ?') ||
+  !endpointAccessD1.includes('AND push_token = ?') ||
+  !endpointAccessPostgres.includes('owner_user_id = $1') ||
+  !endpointAccessPostgres.includes("provider = 'expo'") ||
+  !endpointAccessPostgres.includes("permission_status = 'granted'") ||
+  !endpointAccessPostgres.includes('LIMIT $2') ||
+  !endpointAccessPostgres.includes('AND push_token = $4') ||
+  !endpointAccessPostgres.includes('RETURNING endpoint_id') ||
+  deliveryRuntime.includes('last_seen_at =') ||
+  fanoutRuntime.includes('last_seen_at =')
 ) {
   throw new Error('W05 notification delivery D1-03 access exceeds the scoped W09/T25 delegation')
 }

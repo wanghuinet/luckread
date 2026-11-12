@@ -5,10 +5,26 @@ import {
   type NotificationPushFanoutStore,
 } from './notification-push-fanout-store.js'
 
-type ActiveEndpointRow = Readonly<{ endpoint_id: string; owner_user_id: string; push_token: string }>
+import {
+  createD1NotificationPushEndpointAccessStore,
+} from './notification-push-endpoint-access-store-d1.js'
+import type { NotificationPushEndpointAccessStore } from './notification-push-endpoint-access-store.js'
 
 const FANOUT_LIMIT = 25
 const ENDPOINT_LIMIT = 20
+
+type EndpointAccessSource = D1Database | NotificationPushEndpointAccessStore
+
+function resolveNotificationPushEndpointAccessStore(
+  source: EndpointAccessSource,
+): NotificationPushEndpointAccessStore {
+  if (
+    typeof (source as NotificationPushEndpointAccessStore).listActiveForRecipient === 'function' &&
+    typeof (source as NotificationPushEndpointAccessStore).findEndpointForOwner === 'function' &&
+    typeof (source as NotificationPushEndpointAccessStore).clearTokenIfMatches === 'function'
+  ) return source as NotificationPushEndpointAccessStore
+  return createD1NotificationPushEndpointAccessStore(source as D1Database)
+}
 
 type PushFanoutDataSource = D1Database | NotificationPushFanoutStore
 
@@ -21,23 +37,19 @@ function resolveNotificationPushFanoutStore(source: PushFanoutDataSource): Notif
 
 /**
  * Fan out W05-owned outbox rows to W09-owned active Expo endpoints.
- * The endpoint database remains the existing W09 D1-03 authority.
+ * W09 remains the D1-03 endpoint authority; D1 is the default until cutover.
  */
 export async function fanOutPendingNotifications(
   source: PushFanoutDataSource,
-  endpointDb: D1Database,
+  endpointSource: EndpointAccessSource,
   now: Date,
 ): Promise<number> {
   const store = resolveNotificationPushFanoutStore(source)
+  const endpointStore = resolveNotificationPushEndpointAccessStore(endpointSource)
   const pending = await store.listPending(FANOUT_LIMIT)
   let count = 0
   for (const item of pending) {
-    const endpoints = await endpointDb.prepare(
-      'SELECT endpoint_id, owner_user_id, push_token FROM notification_push_endpoints ' +
-      "WHERE owner_user_id = ? AND provider = 'expo' AND permission_status = 'granted' " +
-      'AND push_token IS NOT NULL ORDER BY updated_at DESC LIMIT ?',
-    ).bind(item.recipient_user_id, ENDPOINT_LIMIT).all<ActiveEndpointRow>()
-    const rows = endpoints.results ?? []
+    const rows = await endpointStore.listActiveForRecipient(item.recipient_user_id, ENDPOINT_LIMIT)
     const nowIso = now.toISOString()
 
     if (rows.length === 0) {
