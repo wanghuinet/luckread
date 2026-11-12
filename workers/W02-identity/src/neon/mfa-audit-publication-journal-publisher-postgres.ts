@@ -7,7 +7,7 @@ import {
 } from '../auth/mfa-audit-events.js'
 
 export type MfaAuditQueue = {
-  send(message: MfaAuditEvent): Promise<void>
+  send(message: MfaAuditEvent): Promise<unknown>
 }
 
 export type MfaAuditPublisherResult = {
