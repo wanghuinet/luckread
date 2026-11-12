@@ -124,7 +124,7 @@ async function retryCreatorGrant(
   }
 
   const creator = await store.findCreatorByUser(application.user_id)
-  if (!creator || creator.applicationId !== application.application_id) {
+  if (!creator || creator.application_id !== application.application_id) {
     return errorResponse(409, 'CREATOR_IDENTITY_CONFLICT', 'Creator identity is already linked to another application')
   }
 
@@ -143,7 +143,7 @@ async function retryCreatorGrant(
   await store.completeCreatorGrant({
     applicationId: application.application_id,
     applicantId: application.user_id,
-    creatorId: creator.creatorId,
+    creatorId: creator.creator_id,
     actorId: application.decided_by ?? 'system',
     idempotencyKey: application.decision_idempotency_key,
     correlationId: request.headers.get('X-LuckRead-Correlation-Id')?.trim().slice(0, 128) ||
@@ -337,7 +337,7 @@ async function handleActiveCreatorSelf(env: Env, request: Request, store: W08Cre
 
   const creator = await store.findActiveCreator(principal.userId)
   if (!creator) return errorResponse(403, 'CREATOR_NOT_ACTIVE', 'An active creator identity is required')
-  return json({ creatorId: creator.creatorId, status: 'ACTIVE' })
+  return json({ creatorId: creator.creator_id, status: 'ACTIVE' })
 }
 
 export default {
