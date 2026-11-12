@@ -133,8 +133,8 @@ jobs:
           if (pkg.devDependencies.auth !== '1.7.8' || cli.version !== '1.7.8') {
             throw new Error('W02 Better Auth schema CLI must match runtime version 1.7.8')
           }
-          if (pkg.dependencies.pg !== '8.20.0') {
-            throw new Error('W02 PostgreSQL runtime driver pin drifted')
+          if (pkg.devDependencies.pg !== '8.20.0') {
+            throw new Error('W02 schema-generation PostgreSQL driver pin drifted')
           }
           console.log('Better Auth runtime, schema CLI, and PostgreSQL driver pins: PASS')
           NODE
