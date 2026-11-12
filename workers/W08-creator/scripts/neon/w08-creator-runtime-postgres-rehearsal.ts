@@ -74,7 +74,7 @@ try {
   assert.equal(afterApproval?.version, 2)
 
   const creator = await store.findCreatorByUser(applicantOne)
-  assert.equal(creator?.applicationId, applicationOne)
+  assert.equal(creator?.application_id, applicationOne)
   assert.equal(creator?.status, 'PENDING_ROLE_GRANT')
 
   await store.completeCreatorGrant({
