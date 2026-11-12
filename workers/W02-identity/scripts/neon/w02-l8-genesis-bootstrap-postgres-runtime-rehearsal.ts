@@ -240,9 +240,6 @@ try {
     cloudflareD1Touched: false,
     secretsCaptured: false,
   }
-  mkdirSync(artifactDirectory, { recursive: true })
-  writeFileSync(reportPath, JSON.stringify(report, null, 2) + '\n')
-  console.log(JSON.stringify(report, null, 2))
 } catch (error) {
   primaryError = error
 } finally {
