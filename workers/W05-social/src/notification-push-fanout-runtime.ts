@@ -7,8 +7,8 @@ import {
 
 import {
   createD1NotificationPushEndpointAccessStore,
-  type NotificationPushEndpointAccessStore,
 } from './notification-push-endpoint-access-store-d1.js'
+import type { NotificationPushEndpointAccessStore } from './notification-push-endpoint-access-store.js'
 
 const FANOUT_LIMIT = 25
 const ENDPOINT_LIMIT = 20
