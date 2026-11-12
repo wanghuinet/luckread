@@ -50,15 +50,19 @@ export async function publishPendingAccountStateEventsPostgres(
   pool: Pool,
   queues: AccountStatePublicationQueues,
   now = new Date().toISOString(),
+  maxBatch = MAX_BATCH,
 ): Promise<AccountStatePostgresPublicationSummary> {
   assertTimestamp(now)
+  if (!Number.isInteger(maxBatch) || maxBatch < 1 || maxBatch > MAX_BATCH) {
+    throw new TypeError('AUTH-013 PostgreSQL publisher batch size must be 1-10')
+  }
   const summary: AccountStatePostgresPublicationSummary = {
     selected: 0,
     published: 0,
     failed: 0,
   }
 
-  while (summary.selected < MAX_BATCH) {
+  while (summary.selected < maxBatch) {
     const client = await pool.connect()
     let transactionOpen = false
 
