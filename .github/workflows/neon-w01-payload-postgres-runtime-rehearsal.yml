@@ -6,7 +6,7 @@ on:
       - 'workers/W01-payload/src/payload.config.ts'
       - 'workers/W01-payload/src/neon-postgres-adapter.ts'
       - 'workers/W01-payload/src/payload-database-driver.ts'
-      - 'workers/W01-payload/src/payload-database-driver.test.ts'
+      - 'workers/W01-payload/tests/int/payload-database-driver.int.spec.ts'
       - 'workers/W01-payload/src/neon-postgres-runtime.config.ts'
       - 'workers/W01-payload/src/neon-postgres-schema.config.ts'
       - 'workers/W01-payload/src/neon-postgres-migrations/**'
@@ -21,7 +21,7 @@ on:
       - 'workers/W01-payload/src/payload.config.ts'
       - 'workers/W01-payload/src/neon-postgres-adapter.ts'
       - 'workers/W01-payload/src/payload-database-driver.ts'
-      - 'workers/W01-payload/src/payload-database-driver.test.ts'
+      - 'workers/W01-payload/tests/int/payload-database-driver.int.spec.ts'
       - 'workers/W01-payload/src/neon-postgres-runtime.config.ts'
       - 'workers/W01-payload/src/neon-postgres-schema.config.ts'
       - 'workers/W01-payload/src/neon-postgres-migrations/**'
@@ -97,7 +97,7 @@ jobs:
 
       - name: Run W01 database driver mode tests
         working-directory: workers/W01-payload
-        run: pnpm exec vitest run --config ./vitest.config.mts src/payload-database-driver.test.ts
+        run: pnpm exec vitest run --config ./vitest.config.mts tests/int/payload-database-driver.int.spec.ts
 
       - name: Apply the committed official Payload PostgreSQL migration to disposable PostgreSQL 18
         working-directory: workers/W01-payload
