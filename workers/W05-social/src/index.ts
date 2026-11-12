@@ -17,6 +17,7 @@ import { RepostRuntimeError, createRepost, removeRepost } from './repost-runtime
 import { ProfilePinRuntimeError, getProfilePinReference, pinProfileContent, unpinProfileContent } from './profile-pin-runtime.js'
 import { BlockMuteRuntimeError, listRelations, parseBlockMuteListLimit, removeRelation, setRelation } from './block-mute-runtime.js'
 import type { BlockMuteListReadStore } from './block-mute-list-read-store.js'
+import type { FavoriteListReadStore } from './favorite-list-read-store.js'
 import type { ProfileChannelReadStore } from './profile-channel-read-store.js'
 import { getRelationshipGraph, invalidateRelationshipGraph, RelationshipGraphRuntimeError } from './relationship-graph-runtime.js'
 import {
@@ -265,6 +266,8 @@ export type W05SocialWorkerDependencies = Readonly<{
   profileChannelReadStore?: ProfileChannelReadStore
   /** Optional PostgreSQL-capable content-liker page reader; D1 remains the deployed default. */
   contentLikerReadStore?: ContentLikerReadStore
+  /** Optional PostgreSQL-capable favorite list reader; D1 remains the deployed default. */
+  favoriteListReadStore?: FavoriteListReadStore
 }>
 
 export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies = {}) {
@@ -959,7 +962,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
         const cursor = url.searchParams.get('cursor')
         if (cursor && cursor.length > 2048) throw new FavoriteRuntimeError('INVALID_CURSOR', 400)
         return json({
-          data: await listFavorites(env.DB, viewerUserId, cursor, limitText ? Number(limitText) : 20),
+          data: await listFavorites(dependencies.favoriteListReadStore ?? env.DB, viewerUserId, cursor, limitText ? Number(limitText) : 20),
           requestId: createRequestId(),
         })
       }
