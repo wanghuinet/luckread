@@ -60,7 +60,8 @@ describe('W05 PostgreSQL follow store', () => {
     })).resolves.toBeNull()
 
     expect(query).toHaveBeenCalledTimes(1)
-    expect(query.mock.calls[0]?.[1]).toEqual([
+    const [, values] = query.mock.calls[0] as unknown as [string, unknown[]]
+    expect(values).toEqual([
       'new-follow-id',
       'viewer-1',
       'blocked-creator',
