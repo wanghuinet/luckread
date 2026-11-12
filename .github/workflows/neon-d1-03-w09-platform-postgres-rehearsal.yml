@@ -14,6 +14,14 @@ on:
       - 'contracts/persistence/NOTIFY-002-W05-D1-03-PUSH-ENDPOINT-PERSISTENCE.v1.json'
       - 'contracts/transport/d1-03-entity-owner-boundary.v1.json'
       - 'contracts/transport/W05-W09-notification-push-delivery.v1.json'
+      - 'workers/W05-social/src/notification-push-endpoint-access-store.ts'
+      - 'workers/W05-social/src/notification-push-endpoint-access-store-d1.ts'
+      - 'workers/W05-social/src/notification-push-endpoint-access-store-postgres.ts'
+      - 'workers/W05-social/src/notification-push-endpoint-access-store-postgres.test.ts'
+      - 'workers/W05-social/src/notification-push-delivery-runtime.ts'
+      - 'workers/W05-social/src/notification-push-delivery-runtime.test.ts'
+      - 'workers/W05-social/src/notification-push-fanout-runtime.ts'
+      - 'workers/W05-social/scripts/neon/rehearse-w05-w09-push-endpoint-access-postgres-runtime.mjs'
       - 'docs/09-D1-DOMAIN-MASTER-v1.0.md'
       - 'workers/W06-governance/README.md'
       - 'workers/W06-governance/migrations/README.md'
@@ -36,6 +44,14 @@ on:
       - 'contracts/persistence/NOTIFY-002-W05-D1-03-PUSH-ENDPOINT-PERSISTENCE.v1.json'
       - 'contracts/transport/d1-03-entity-owner-boundary.v1.json'
       - 'contracts/transport/W05-W09-notification-push-delivery.v1.json'
+      - 'workers/W05-social/src/notification-push-endpoint-access-store.ts'
+      - 'workers/W05-social/src/notification-push-endpoint-access-store-d1.ts'
+      - 'workers/W05-social/src/notification-push-endpoint-access-store-postgres.ts'
+      - 'workers/W05-social/src/notification-push-endpoint-access-store-postgres.test.ts'
+      - 'workers/W05-social/src/notification-push-delivery-runtime.ts'
+      - 'workers/W05-social/src/notification-push-delivery-runtime.test.ts'
+      - 'workers/W05-social/src/notification-push-fanout-runtime.ts'
+      - 'workers/W05-social/scripts/neon/rehearse-w05-w09-push-endpoint-access-postgres-runtime.mjs'
       - 'docs/09-D1-DOMAIN-MASTER-v1.0.md'
       - 'workers/W06-governance/README.md'
       - 'workers/W06-governance/migrations/README.md'
@@ -87,6 +103,7 @@ jobs:
           set -euo pipefail
           node --check workers/W09-platform/scripts/neon/generate-d1-03-w09-postgres-migration.mjs
           node --check workers/W09-platform/scripts/neon/verify-d1-03-w09-owner-reconciliation.mjs
+          node --check workers/W05-social/scripts/neon/rehearse-w05-w09-push-endpoint-access-postgres-runtime.mjs
           node --test workers/W09-platform/scripts/neon/generate-d1-03-w09-postgres-migration.test.mjs workers/W09-platform/scripts/neon/verify-d1-03-w09-owner-reconciliation.test.mjs
           node workers/W09-platform/scripts/neon/verify-d1-03-w09-owner-reconciliation.mjs
           node workers/W09-platform/scripts/neon/generate-d1-03-w09-postgres-migration.mjs
@@ -112,12 +129,22 @@ jobs:
             --set ON_ERROR_STOP=1 --no-psqlrc \
             --file workers/W09-platform/scripts/neon/verify-d1-03-w09-postgres-schema.sql \
             | tee artifacts/neon/d1-03-w09-platform-postflight.txt
+ 
+      - name: Install pinned W02 PostgreSQL driver and TS runner for delegated W05 access rehearsal
+        working-directory: workers/W02-identity
+        run: npm install --ignore-scripts --no-audit --no-fund
+
+      - name: Rehearse W05 delegated W09 endpoint access against PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          W05_W09_PUSH_ENDPOINT_ACCESS_POSTGRES_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_d1_03_w09_rehearsal
+          W05_W09_PUSH_ENDPOINT_ACCESS_POSTGRES_REPORT: ../../artifacts/neon/w05-w09-push-endpoint-access-postgres-runtime-postflight.json
+        run: node --import=tsx/esm ../../workers/W05-social/scripts/neon/rehearse-w05-w09-push-endpoint-access-postgres-runtime.mjs
 
       - name: Upload W09 D1-03 PostgreSQL 18 rehearsal evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: neon-d1-03-w09-platform-postgres18-${{ github.sha }}
-          path: artifacts/neon/d1-03-w09-platform-postflight.txt
-          if-no-files-found: error
+          path: |\n            artifacts/neon/d1-03-w09-platform-postflight.txt\n            artifacts/neon/w05-w09-push-endpoint-access-postgres-runtime-postflight.json\n          if-no-files-found: error
           retention-days: 90
