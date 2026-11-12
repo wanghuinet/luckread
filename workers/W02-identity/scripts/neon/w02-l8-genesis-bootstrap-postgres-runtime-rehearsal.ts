@@ -41,6 +41,8 @@ let pool: Pool | undefined
 let databaseCreated = false
 let adminPoolClosed = false
 let primaryError: unknown
+let report: Record<string, unknown> | undefined
+let databaseDropped = false
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url))
 const workerRoot = path.resolve(scriptDir, '../..')
@@ -214,7 +216,7 @@ try {
   )
   assert.equal(await readAuditCount(), 1, 'expiration must not reopen the consumed genesis path')
 
-  const report = {
+  report = {
     status: 'W02_L8_GENESIS_BOOTSTRAP_POSTGRES_RUNTIME_PASS',
     postgresMajor: 18,
     databaseTarget: 'disposable-clone-of-luckread_schema',
@@ -230,7 +232,7 @@ try {
       exactApprovalReplayIsIdempotent: true,
       auditUpdateDeleteAndTruncateRejected: true,
       consumedGenesisCannotBeReissuedAfterFourHourRoleExpires: true,
-      syntheticDatabaseDroppedAfterRehearsal: true,
+      syntheticDatabaseDroppedAfterRehearsal: false,
     },
     auditRowsBeforeDatabaseDrop: 1,
     productionDatabaseTouched: false,
@@ -250,6 +252,7 @@ try {
     const cleanupPool = new Pool({ connectionString: adminUrl.toString(), max: 1, connectionTimeoutMillis: 5_000 })
     try {
       await cleanupPool.query('DROP DATABASE IF EXISTS "' + rehearsalDatabase + '" WITH (FORCE)')
+      databaseDropped = true
     } catch (cleanupError) {
       if (!primaryError) primaryError = cleanupError
     } finally {
@@ -259,3 +262,11 @@ try {
 }
 
 if (primaryError) throw primaryError
+if (!databaseDropped || !report) throw new Error('W02_L8_REHEARSAL_DATABASE_CLEANUP_NOT_VERIFIED')
+report.assertions = {
+  ...(report.assertions as Record<string, unknown>),
+  syntheticDatabaseDroppedAfterRehearsal: true,
+}
+mkdirSync(artifactDirectory, { recursive: true })
+writeFileSync(reportPath, JSON.stringify(report, null, 2) + '\\n')
+console.log(JSON.stringify(report, null, 2))
