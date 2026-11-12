@@ -26,6 +26,7 @@ import { handleMfaEnrollmentConfirmRequest } from './auth/mfa-enrollment-confirm
 import { verifyTargetBoundSingleApproval, L8BootstrapApprovalError } from './authz/l8-genesis-bootstrap-approval.js'
 import { bootstrapSuperAdmin, L8BootstrapCommandError } from './authz/l8-genesis-bootstrap-command.js'
 import { checkL8BootstrapReadiness, L8BootstrapReadinessError } from './authz/l8-genesis-bootstrap-readiness.js'
+import { bootstrapSuperAdminPostgres, checkL8BootstrapReadinessPostgres } from './neon/l8-genesis-bootstrap-postgres.js'
 
 interface Env {
   D1_01: D1Database
@@ -261,14 +262,6 @@ export default {
     }
 
     if (request.method === 'POST' && url.pathname === '/internal/authz/bootstrap-super-admin/readiness') {
-      if (postgres) {
-        return json({
-          error: {
-            code: 'SERVICE_UNAVAILABLE',
-            message: 'L8 bootstrap is unavailable in the staged Neon runtime',
-          },
-        }, 503)
-      }
       // This is a read-only preflight. It independently verifies the same
       // protected GitHub workflow identity and target-bound single protected environment approval as
       // the write route but never calls the grant command.
@@ -304,7 +297,9 @@ export default {
           githubToken: body.githubToken,
           requestPrNumber: body.requestPrNumber as number,
         })
-        const readiness = await checkL8BootstrapReadiness(env.D1_01, approval)
+        const readiness = postgres
+          ? await checkL8BootstrapReadinessPostgres(postgres.pool, approval)
+          : await checkL8BootstrapReadiness(env.D1_01, approval)
         return json({ data: readiness })
       } catch (error) {
         if (error instanceof L8BootstrapApprovalError) {
@@ -346,14 +341,6 @@ export default {
     }
 
     if (request.method === 'POST' && url.pathname === '/internal/authz/bootstrap-super-admin') {
-      if (postgres) {
-        return json({
-          error: {
-            code: 'SERVICE_UNAVAILABLE',
-            message: 'L8 bootstrap is unavailable in the staged Neon runtime',
-          },
-        }, 503)
-      }
       // First-L8 bootstrap is workflow-authenticated, not application-session-authenticated.
       // W01 is only the public boundary; W02 independently verifies GitHub OIDC, the merged
       // target-bound request PR, one required environment reviewer, one-time state, and the grant.
@@ -389,7 +376,9 @@ export default {
           githubToken: body.githubToken,
           requestPrNumber: body.requestPrNumber as number,
         })
-        const grant = await bootstrapSuperAdmin(env.D1_01, approval)
+        const grant = postgres
+          ? await bootstrapSuperAdminPostgres(postgres.pool, approval)
+          : await bootstrapSuperAdmin(env.D1_01, approval)
         return json({
           data: {
             ...grant,
