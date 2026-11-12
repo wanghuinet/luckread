@@ -10,6 +10,11 @@ on:
       - 'workers/W08-creator/migrations/**'
       - 'workers/W08-creator/scripts/neon/**'
       - 'workers/W08-creator/src/neon-postgres-migrations/**'
+      - 'workers/W08-creator/src/creator-store.ts'
+      - 'workers/W08-creator/src/neon/**'
+      - 'workers/W08-creator/scripts/neon/**'
+      - 'workers/W08-creator/package.json'
+      - 'workers/W08-creator/wrangler.jsonc'
       - 'workers/W08-creator/README-neon-postgres-schema.md'
 
 permissions:
@@ -83,6 +88,24 @@ jobs:
             --dbname luckread_schema --set ON_ERROR_STOP=1 --no-psqlrc \
             --file workers/W08-creator/scripts/neon/verify-d1-01-creator-postgres-schema.sql \
             > workers/W08-creator/artifacts/neon/w08-d1-01-creator-postgres-schema-postflight.json
+
+      - name: Install W08 PostgreSQL runtime dependencies
+        working-directory: workers/W08-creator
+        run: npm install --ignore-scripts --no-audit --no-fund --package-lock=false
+
+      - name: Rehearse W08 creator application, review CAS, role grant and audit on PostgreSQL 18
+        working-directory: workers/W08-creator
+        env:
+          W08_RUNTIME_DATABASE_URL: postgresql://schema_generator:schema_generator_local_only@127.0.0.1:5432/luckread_schema
+        run: npm run neon:creator-runtime
+
+      - name: Upload W08 PostgreSQL runtime evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: neon-d1-01-w08-creator-postgres-runtime-${{ github.sha }}
+          path: workers/W08-creator/artifacts/neon/w08-d1-01-creator-postgres-runtime-postflight.json
+          if-no-files-found: error
+          retention-days: 90
 
       - name: Upload W08 PostgreSQL schema evidence
         uses: actions/upload-artifact@v4
