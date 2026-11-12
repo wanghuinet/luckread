@@ -47,7 +47,6 @@
     "payload": "3.90.2",
     "react": "19.2.6",
     "react-dom": "19.2.6",
-    "@payloadcms/db-postgres": "3.90.2",
     "pg": "8.20.0"
   },
   "devDependencies": {
