@@ -107,10 +107,10 @@ jobs:
           if (pkg.dependencies?.pg !== '8.20.0') {
             throw new Error('node-postgres must be a pinned production dependency')
           }
-          if (pkg.devDependencies?.['@payloadcms/db-postgres'] || pkg.devDependencies?.pg) {
-            throw new Error('PostgreSQL runtime packages must not remain development-only dependencies')
+          if (pkg.devDependencies?.['@payloadcms/db-postgres'] !== '3.90.2') {
+            throw new Error('Payload PostgreSQL schema tooling must retain its pinned CLI dependency')
           }
-          console.log('W01_POSTGRES_RUNTIME_DEPENDENCIES=PASS')
+          console.log('W01_POSTGRES_RUNTIME_AND_SCHEMA_DEPENDENCIES=PASS')
           NODE
 
       - name: Run W01 database driver mode tests
