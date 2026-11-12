@@ -8,12 +8,12 @@
   },
   "dependencies": {
     "@better-auth/utils": "0.5.0",
-    "better-auth": "1.7.8"
+    "better-auth": "1.7.8",
+    "pg": "8.20.0"
   },
   "devDependencies": {
     "@types/node": "24.3.0",
     "auth": "1.7.8",
-    "pg": "8.20.0",
     "@types/pg": "8.23.1",
     "tsx": "4.23.15"
   },
