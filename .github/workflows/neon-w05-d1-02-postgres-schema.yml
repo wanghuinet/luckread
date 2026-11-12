@@ -49,6 +49,7 @@ on:
       - 'workers/W05-social/scripts/neon/rehearse-block-mute-relation-postgres-runtime.mjs'
       - 'workers/W05-social/src/follow-store.ts'
       - 'workers/W05-social/src/follow-store-postgres.ts'
+      - 'workers/W05-social/src/follow-store-postgres.test.ts'
       - 'workers/W05-social/scripts/neon/rehearse-follow-postgres-runtime.mjs'
       - 'workers/W05-social/migrations/**'
       - 'workers/W05-social/scripts/neon/**'
