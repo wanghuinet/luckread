@@ -56,7 +56,7 @@ describe('W03 public media reference database driver', () => {
     expect(first).toBeDefined()
     expect(first).toBe(second)
     await expect(first?.list([], null, 1)).resolves.toEqual([])
-    getW03PublicMediaReferencePostgresPool(env).end()
+    await getW03PublicMediaReferencePostgresPool(env).end()
   })
 
   it('reuses the same Hyperdrive pool for the separate bookmark-content read store', async () => {
