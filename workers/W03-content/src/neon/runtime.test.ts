@@ -4,6 +4,7 @@ import {
   getW03PublicMediaReferencePostgresPool,
   getW03PublishedMediaReferenceReadStore,
   getW03PublishedContentsByIdsReadStore,
+  getW03FollowingOwnerContentsReadStore,
   resolveW03PublicMediaReferenceDriver,
 } from './runtime.js'
 
@@ -39,6 +40,23 @@ describe('W03 public media reference database driver', () => {
       W03_PUBLIC_MEDIA_REFERENCE_DRIVER: 'neon',
       HYPERDRIVE_D1_02: { connectionString: 'https://example.invalid/database' },
     })).toThrow('W03_HYPERDRIVE_D1_02_CONNECTION_STRING_INVALID')
+  })
+
+  it('caches the Neon following-feed read store on the shared Hyperdrive pool', async () => {
+    const binding = {
+      connectionString: 'postgresql://postgres:postgres@127.0.0.1:5432/luckread',
+    }
+    const env = {
+      W03_CONTENT_READ_DRIVER: 'neon',
+      HYPERDRIVE_D1_02: binding,
+    }
+    const first = getW03FollowingOwnerContentsReadStore(env)
+    const second = getW03FollowingOwnerContentsReadStore(env)
+
+    expect(first).toBeDefined()
+    expect(first).toBe(second)
+    await expect(first?.list([], null, 1)).resolves.toEqual([])
+    getW03PublicMediaReferencePostgresPool(env).end()
   })
 
   it('reuses the same Hyperdrive pool for the separate bookmark-content read store', async () => {
