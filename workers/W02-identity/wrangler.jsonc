@@ -9,7 +9,7 @@
   "workers_dev": false,
   "vars": {
     "AUTH_EMAIL_FROM": "noreply@good.luckread.com",
-    "W02_DATABASE_DRIVER": "d1"
+    "W02_DATABASE_DRIVER": "neon"
   },
   "ratelimits": [
     {
