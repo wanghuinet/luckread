@@ -47,16 +47,29 @@ test('rejects removal or renaming of an existing D1 rollback binding', () => {
   )
 })
 
-test('rejects enabling W02 or W08 Neon mode in Wrangler vars', () => {
-  const expected = STAGED_WORKERS.find((worker) => worker.worker === 'W02')
+test('requires W01 and W02 Neon mode while keeping W08 on D1 until its cutover slice', () => {
+  const w02 = STAGED_WORKERS.find((worker) => worker.worker === 'W02')
+  const w02Config = {
+    name: w02.script,
+    d1_databases: w02.d1Bindings.map((binding) => ({ binding })),
+    hyperdrive: [{ binding: w02.binding, id: w02.hyperdriveId }],
+    vars: { W02_DATABASE_DRIVER: 'neon' },
+  }
+  assert.doesNotThrow(() => verifyWorkerConfig(w02Config, w02))
+  assert.throws(
+    () => verifyWorkerConfig({ ...w02Config, vars: { W02_DATABASE_DRIVER: 'd1' } }, w02),
+    /production database driver must be neon/,
+  )
+
+  const w08 = STAGED_WORKERS.find((worker) => worker.worker === 'W08')
   assert.throws(
     () => verifyWorkerConfig({
-      name: expected.script,
-      d1_databases: expected.d1Bindings.map((binding) => ({ binding })),
-      hyperdrive: [{ binding: expected.binding, id: expected.hyperdriveId }],
-      vars: { W02_DATABASE_DRIVER: 'neon' },
-    }, expected),
-    /production database driver must remain D1 by default/,
+      name: w08.script,
+      d1_databases: w08.d1Bindings.map((binding) => ({ binding })),
+      hyperdrive: [{ binding: w08.binding, id: w08.hyperdriveId }],
+      vars: { W08_DATABASE_DRIVER: 'neon' },
+    }, w08),
+    /production database driver must be d1/,
   )
 })
 
