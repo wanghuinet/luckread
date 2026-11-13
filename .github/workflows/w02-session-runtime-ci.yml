@@ -138,7 +138,7 @@ jobs:
         run: npm install --ignore-scripts --no-audit --no-fund --package-lock=false
       - name: Test W02 D1 default and Neon Hyperdrive runtime selection
         run: npx vitest@3.2.4 run workers/W02-identity/src/neon/runtime.test.ts
-      - name: Verify W02 keeps D1 default and binds the existing D1-01 Hyperdrive
+      - name: Verify W02 selects Neon and retains the D1-01 rollback binding
         working-directory: workers/W02-identity
         run: |
           node --input-type=module <<'NODE'
@@ -146,16 +146,21 @@ jobs:
           const config = JSON.parse(fs.readFileSync('wrangler.jsonc', 'utf8'))
           const d1 = (config.d1_databases ?? []).find((binding) => binding.binding === 'D1_01')
           const hyperdrive = (config.hyperdrive ?? []).find((binding) => binding.binding === 'HYPERDRIVE')
-          if (config.vars?.W02_DATABASE_DRIVER !== 'd1') {
-            throw new Error('W02 production default must remain D1 until explicit cutover')
+          if (config.name !== 'luckread-w02') {
+            throw new Error('W02 Worker identity mismatch')
           }
-          if (d1?.database_id !== '2f80471e-3756-49f9-8db1-7707a433ad64') {
+          if (config.vars?.W02_DATABASE_DRIVER !== 'neon') {
+            throw new Error('W02 production runtime must select Neon for D1-01')
+          }
+          if (d1?.database_name !== 'luckread' ||
+              d1?.database_id !== '2f80471e-3756-49f9-8db1-7707a433ad64' ||
+              d1?.migrations_dir !== 'migrations') {
             throw new Error('W02 D1_01 rollback binding must remain unchanged')
           }
           if (hyperdrive?.id !== '0c53a1bb9bc0484bac146e8ae2d3158b') {
             throw new Error('W02 must reuse the existing D1-01 Hyperdrive resource')
           }
-          console.log('W02 D1 default, D1 rollback binding and existing Hyperdrive binding: PASS')
+          console.log('W02 Neon runtime target, D1 rollback binding and existing Hyperdrive binding: PASS')
           NODE
       - name: Bundle W02 Worker with the PostgreSQL runtime dependency
         working-directory: workers/W02-identity
