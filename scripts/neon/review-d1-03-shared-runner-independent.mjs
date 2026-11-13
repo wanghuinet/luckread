@@ -41,14 +41,14 @@ export function gitBlobSha1(content) {
 }
 
 const reviewedHyperdriveStagingSuffixes = Object.freeze({
-  [paths.w06Wrangler]: ',\n  "hyperdrive": [\n    {\n      "binding": "HYPERDRIVE_D1_03",\n      "id": "7c8831416c18494faee04b96aa551cb9"\n    }\n  ]\n}',
+  [paths.w06Wrangler]: ',\n  "hyperdrive": [\n    {\n      "binding": "HYPERDRIVE_D1_03",\n      "id": "7c8831416c18494faee04b96aa551cb9"\n    }\n  ]\n}\n',
 })
 
 function reviewedPinnedSource(pin, source) {
   if (gitBlobSha1(source) === pin.gitBlobSha1) return source
   const suffix = reviewedHyperdriveStagingSuffixes[pin.path]
   if (suffix && source.endsWith(suffix)) {
-    return source.slice(0, -suffix.length) + '\n}'
+    return source.slice(0, -suffix.length) + '\n}\n'
   }
   return source
 }
