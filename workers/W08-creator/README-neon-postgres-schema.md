@@ -11,8 +11,8 @@ This is the PostgreSQL 18 translation and staged runtime adapter for the canonic
 - No cross-domain foreign keys are introduced. The source D1 migration declares no foreign keys or table triggers.
 - W07 membership/subscription tables, W01 Payload tables and D1-04 financial tables are not included.
 - No existing application, creator, identity or audit business rows are imported or seeded.
-- W08 now has a provider-selected store for these three tables. `W08_DATABASE_DRIVER=d1` remains the production default; explicit `neon` mode uses the existing D1-01 Hyperdrive binding. W02 identity and RoleAssignment writes remain behind the existing W02 Service Binding.
-- The W08 Worker still retains its D1-01 binding for rollback. This change does not deploy the Worker, change its production default, import business rows, or switch traffic.
+- W08 has a provider-selected store for these three tables. The production Wrangler config now selects `W08_DATABASE_DRIVER=neon` through the existing D1-01 Hyperdrive binding; the original D1-01 binding remains available for explicit rollback. W02 identity and RoleAssignment writes remain behind the existing W02 Service Binding.
+- The remote D1-01 schema was applied by GitHub Actions run `42558978832` on 2026-11-09. The shared runner reported `D1_01_SHARED_REMOTE_SCHEMA_RUNNER_PASS`; W08's owner-specific schema probe then completed successfully. This runtime cutover change does not deploy the Worker or switch production traffic.
 
 ## Source mapping
 
@@ -24,6 +24,6 @@ The three source tables and their columns, enum checks, defaults, unique constra
 
 The dedicated GitHub Actions workflow applies the generated schema only to a disposable PostgreSQL 18.6 CI service. Its verifier asserts the exact 14/8/13-column table shapes, timestamp mapping, indexes, uniqueness and lifecycle checks, confirms zero foreign keys/triggers and excludes W02/W07/D1-04 tables. A separate runtime rehearsal exercises application creation/replay, approval and rejection CAS, creator grant completion, and audit writes through the PostgreSQL store; it removes all synthetic rows and emits postflight evidence.
 
-This PR does not apply schema to remote Neon. D1-01 remote application remains blocked until every D1-01 owner schema is reviewed, the shared deterministic migration ledger/checksum runner and migration ordering are ready, and the target is revalidated read-only immediately before schema apply. No remote Neon secret is read and this workflow has no manual-dispatch or remote-DDL path.
+The remote D1-01 application was performed separately by the reviewed workflow run linked above, after the shared migration runner release gate and TLS target validation passed. Its W08 postflight probe ran against the Neon `luckread` target and the workflow uploaded the owner-specific evidence artifact. The dedicated W08 schema workflow and full local rehearsal remain disposable-PostgreSQL-only checks.
 
-The runtime adapter is staged only. Remote Neon DDL, Worker deployment, production default changes, data import and traffic cutover remain separate operations requiring their own change control and evidence.
+The W08 source configuration selects Neon, while the live Worker remains unchanged until a separately controlled Worker deployment. No business rows were imported; no production Worker deployment or traffic cutover was performed as part of this change.
