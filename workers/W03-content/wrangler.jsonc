@@ -54,6 +54,6 @@
     "nodejs_compat"
   ],
   "vars": {
-    "W03_PUBLIC_MEDIA_REFERENCE_DRIVER": "d1"
+    "W03_CONTENT_READ_DRIVER": "d1"
   }
 }
