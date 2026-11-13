@@ -7,9 +7,10 @@ import {
 } from './runtime.js'
 
 describe('W08 database driver selection', () => {
-  it('preserves D1 as the default and requires no Hyperdrive binding', () => {
+  it('keeps explicit D1 rollback and resolves the configured Neon runtime', () => {
     expect(resolveW08DatabaseDriver({})).toBe('d1')
     expect(resolveW08DatabaseDriver({ W08_DATABASE_DRIVER: 'd1' })).toBe('d1')
+    expect(resolveW08DatabaseDriver({ W08_DATABASE_DRIVER: 'neon' })).toBe('neon')
     expect(() => getW08CreatorStore({})).toThrow('W08_D1_01_BINDING_REQUIRED')
   })
 
