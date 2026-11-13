@@ -90,5 +90,11 @@
     "runtimeBindingsChanged": false,
     "productionCutoverAuthorized": false
   },
-  "remoteApplyReady": false
+  "remoteApplyReady": false,
+  "remoteSchemaProvisioningEvidence": {
+    "status": "FIVE_DATABASE_REMOTE_SCHEMA_POSTFLIGHTS_RECONCILED_WITH_SCOPE_LIMITS",
+    "evidenceRef": "contracts/database/neon-five-database-remote-schema-evidence.v1.json",
+    "domainCount": 5,
+    "runtimeCutoverAuthorized": false
+  }
 }

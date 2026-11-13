@@ -18,6 +18,8 @@ function baseline() {
     readiness:readJson('contracts/database/neon-shared-runner-local-readiness.v1.json'),
     reviews:Object.fromEntries(Object.entries(reviewPaths).map(([domain,path]) => [domain,readJson(path)])),
     d104RemoteReview:readJson('contracts/database/neon-d1-04-remote-runner-review.v1.json'),
+    remoteSchemaEvidence:readJson('contracts/database/neon-five-database-remote-schema-evidence.v1.json'),
+    remoteSchemaReviews:Object.fromEntries(['D1-01','D1-02','D1-03','D1-04','D1-05'].map((domain) => [domain,readJson('contracts/database/neon-' + domain.toLowerCase() + '-remote-runner-review.v1.json')])),
   }
 }
 
@@ -35,6 +37,13 @@ test('reconciles immutable five-database migration ledger with supplemental D1-0
   assert.equal(result.domains['D1-04'].remoteSchemaEvidence.verifiedLedgerRows,6)
   assert.equal(result.domains['D1-04'].remoteSchemaEvidence.businessRows,0)
   assert.equal(result.domains['D1-04'].remoteSchemaEvidence.productionCutoverAuthorized,false)
+  assert.equal(result.remoteSchemaProvisioning.databaseCount,5)
+  assert.equal(result.remoteSchemaProvisioning.domains['D1-01'].migrationCount,14)
+  assert.equal(result.remoteSchemaProvisioning.domains['D1-02'].tablesVerified,28)
+  assert.equal(result.remoteSchemaProvisioning.domains['D1-03'].fullDomainSchemaComplete,false)
+  assert.equal(result.remoteSchemaProvisioning.domains['D1-04'].businessDataImported,false)
+  assert.equal(result.remoteSchemaProvisioning.domains['D1-05'].runtimeDataIngestionEnabled,false)
+  assert.equal(result.remoteSchemaProvisioning.productionCutoverAuthorized,false)
   assert.equal(result.domains['D1-05'].localStatus,'LOCAL_SHARED_SCHEMA_REVIEW_PASSED_ADMISSION_BLOCKED')
   assert.equal(result.safety.remoteNeonTouched,false)
 })
@@ -111,4 +120,28 @@ test('fails closed if D1-04 remote schema evidence is omitted from the readiness
   const data = baseline()
   delete data.readiness.domains['D1-04'].remoteSchemaEvidence
   assert.throws(() => validateSharedRunnerLedgerReadiness(data), /separately record the existing remote schema-only Postflight/)
+})
+
+test('fails closed if the D1-03 partial schema is mislabeled as a complete domain schema', () => {
+  const data = baseline()
+  data.remoteSchemaEvidence.domains['D1-03'].fullDomainSchemaComplete = true
+  assert.throws(() => validateSharedRunnerLedgerReadiness(data), /D1-03 must remain explicitly partial/)
+})
+
+test('fails closed if D1-05 analytics data ingestion is enabled before privacy-policy admission', () => {
+  const data = baseline()
+  data.remoteSchemaEvidence.domains['D1-05'].runtimeDataIngestionEnabled = true
+  assert.throws(() => validateSharedRunnerLedgerReadiness(data), /D1-05 must remain schema-only/)
+})
+
+test('fails closed if any of the five remote artifact digests drift', () => {
+  const data = baseline()
+  data.remoteSchemaEvidence.domains['D1-02'].artifact.digest = 'sha256:' + '0'.repeat(64)
+  assert.throws(() => validateSharedRunnerLedgerReadiness(data), /D1-02 remote Schema Postflight/)
+})
+
+test('fails closed if the five-database evidence set loses a domain', () => {
+  const data = baseline()
+  delete data.remoteSchemaEvidence.domains['D1-04']
+  assert.throws(() => validateSharedRunnerLedgerReadiness(data), /exact Neon domain set/)
 })
