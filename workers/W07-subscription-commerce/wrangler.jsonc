@@ -52,5 +52,11 @@
       "binding": "W06_GOVERNANCE",
       "service": "luckread-w06"
     }
+  ],
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE_D1_04",
+      "id": "3ae15e6dfb5e4b44979eee30e1d5ede4"
+    }
   ]
 }
