@@ -11,16 +11,16 @@ import {
   verifyWorkerConfig,
 } from './verify-neon-worker-hyperdrive-staging.mjs'
 
-test('all seven admitted Worker configs target the matching existing Neon Hyperdrive and retain D1 fallbacks', async () => {
+test('all six admitted Worker configs target the matching existing Neon Hyperdrive and retain D1 fallbacks', async () => {
   const result = await inspectNeonWorkerHyperdriveStaging()
   assert.equal(result.status, 'SOURCE_CONFIG_STAGED_ONLY')
-  assert.equal(result.stagedWorkerCount, 7)
+  assert.equal(result.stagedWorkerCount, 6)
   assert.equal(result.d1FallbacksPreserved, true)
   assert.equal(result.runtimeDriversEnabled, false)
   assert.equal(result.productionDeployPerformed, false)
   assert.equal(result.productionCutoverPerformed, false)
   assert.equal(result.businessDataImported, false)
-  assert.deepEqual(result.workers.map((worker) => worker.worker), ['W01', 'W02', 'W03', 'W05', 'W06', 'W07', 'W08'])
+  assert.deepEqual(result.workers.map((worker) => worker.worker), ['W01', 'W02', 'W03', 'W05', 'W07', 'W08'])
 })
 
 test('rejects a Hyperdrive resource id that does not match the authoritative domain', () => {
