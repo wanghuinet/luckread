@@ -92,7 +92,7 @@ export interface ContentD1 {
   batch(statements: D1PreparedStatement[]): Promise<D1Result<unknown>[]>
 }
 
-interface ContentRow {
+export interface ContentRow {
   id: string
   content_type: ContentType
   owner_user_id: string
@@ -112,6 +112,11 @@ interface ContentRow {
   etag: string
   created_at: string
   updated_at: string
+}
+
+export interface PublishedContentsByIdsReadStore {
+  /** Return the published rows in the same order as the supplied IDs. */
+  list(contentIds: readonly string[]): Promise<readonly ContentRow[]>
 }
 
 
@@ -1018,6 +1023,7 @@ export async function listCreatorContents(
 export async function listPublishedContentsByIds(
   db: ContentD1,
   contentIds: string[],
+  readStore?: PublishedContentsByIdsReadStore,
 ): Promise<ContentRecord[]> {
   if (!Array.isArray(contentIds) || contentIds.length > 50) {
     throw new ContentRuntimeError('VALIDATION_FAILED', 400)
@@ -1026,18 +1032,20 @@ export async function listPublishedContentsByIds(
   for (const id of ids) assertResourceId(id)
   if (ids.length === 0) return []
 
-  const rows = await db.prepare(
-    `SELECT c.id, c.content_type, c.owner_user_id, c.creator_id, c.ip_id, c.state,
-            c.scheduled_at, c.access_mode, c.version, c.revision, c.slug, c.title, c.body_ref,
-            c.media_refs_json, c.cover_ref, c.media_warning, c.etag, c.created_at, c.updated_at
-       FROM json_each(?) AS requested
-       INNER JOIN contents AS c ON c.id = requested.value
-      WHERE c.state = 'PUBLISHED'
-      ORDER BY CAST(requested.key AS INTEGER) ASC
-      LIMIT ?`,
-  ).bind(JSON.stringify(ids), ids.length).all<ContentRow>()
+  const rows = readStore
+    ? await readStore.list(ids)
+    : (await db.prepare(
+        `SELECT c.id, c.content_type, c.owner_user_id, c.creator_id, c.ip_id, c.state,
+                c.scheduled_at, c.access_mode, c.version, c.revision, c.slug, c.title, c.body_ref,
+                c.media_refs_json, c.cover_ref, c.media_warning, c.etag, c.created_at, c.updated_at
+           FROM json_each(?) AS requested
+           INNER JOIN contents AS c ON c.id = requested.value
+          WHERE c.state = 'PUBLISHED'
+          ORDER BY CAST(requested.key AS INTEGER) ASC
+          LIMIT ?`,
+      ).bind(JSON.stringify(ids), ids.length).all<ContentRow>()).results ?? []
 
-  return rows.results.map(toContent)
+  return rows.map(toContent)
 }
 
 export async function listContents(
