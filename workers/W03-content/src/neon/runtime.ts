@@ -4,7 +4,9 @@ import {
   createD1PublishedMediaReferenceReadStore,
   type PublishedMediaReferenceReadStore,
 } from '../published-media-reference-read-store.js'
+import type { PublishedContentsByIdsReadStore } from '../content-runtime.js'
 import { createPostgresPublishedMediaReferenceReadStore } from '../published-media-reference-read-store-postgres.js'
+import { createPostgresPublishedContentsByIdsReadStore } from '../published-contents-by-ids-read-store-postgres.js'
 import type { W03PublishedMediaReferenceRuntimeEnv } from '../published-media-reference-read-store.js'
 
 export type W03PublicMediaReferenceDriver = 'd1' | 'neon'
@@ -13,10 +15,12 @@ export type W03PublicMediaReferenceRuntimeEnv = W03PublishedMediaReferenceRuntim
 
 const pools = new WeakMap<object, Pool>()
 const stores = new WeakMap<object, PublishedMediaReferenceReadStore>()
+const bookmarkedContentsStores = new WeakMap<object, PublishedContentsByIdsReadStore>()
 
 /**
- * This driver controls only the public-media-reference lookup. All other W03
- * content reads and writes continue to use D1_02 until separately admitted.
+ * The explicit D1-02 read driver controls only the PostgreSQL stores wired
+ * from the W03 entrypoint: public-media-reference lookup and bookmark-content
+ * batch projection. All other W03 content reads and writes remain on D1_02.
  * D1 is the safe default and unknown values fail closed.
  */
 export function resolveW03PublicMediaReferenceDriver(
@@ -97,5 +101,28 @@ export function getW03PublishedMediaReferenceReadStore(
     getW03PublicMediaReferencePostgresPool(env),
   )
   stores.set(binding, store)
+  return store
+}
+
+/**
+ * PostgreSQL provider for the bookmark projection read only. D1 mode keeps the
+ * canonical D1 query in content-runtime.ts; no other W03 route is switched.
+ */
+export function getW03PublishedContentsByIdsReadStore(
+  env: W03PublicMediaReferenceRuntimeEnv,
+): PublishedContentsByIdsReadStore | undefined {
+  if (resolveW03PublicMediaReferenceDriver(env) === 'd1') return undefined
+
+  const binding = env.HYPERDRIVE_D1_02
+  if (!binding || typeof binding !== 'object') {
+    throw new Error('W03_HYPERDRIVE_D1_02_BINDING_REQUIRED')
+  }
+  const cached = bookmarkedContentsStores.get(binding)
+  if (cached) return cached
+
+  const store = createPostgresPublishedContentsByIdsReadStore(
+    getW03PublicMediaReferencePostgresPool(env),
+  )
+  bookmarkedContentsStores.set(binding, store)
   return store
 }
