@@ -2,18 +2,14 @@ import { Pool } from 'pg'
 
 import {
   createD1PublishedMediaReferenceReadStore,
-  type PublishedMediaReferenceD1Database,
   type PublishedMediaReferenceReadStore,
 } from '../published-media-reference-read-store.js'
 import { createPostgresPublishedMediaReferenceReadStore } from '../published-media-reference-read-store-postgres.js'
+import type { W03PublishedMediaReferenceRuntimeEnv } from '../published-media-reference-read-store.js'
 
 export type W03PublicMediaReferenceDriver = 'd1' | 'neon'
 
-export type W03PublicMediaReferenceRuntimeEnv = Readonly<{
-  D1_02?: PublishedMediaReferenceD1Database
-  W03_PUBLIC_MEDIA_REFERENCE_DRIVER?: string
-  HYPERDRIVE_D1_02?: Readonly<{ connectionString?: string }>
-}>
+export type W03PublicMediaReferenceRuntimeEnv = W03PublishedMediaReferenceRuntimeEnv
 
 const pools = new WeakMap<object, Pool>()
 const stores = new WeakMap<object, PublishedMediaReferenceReadStore>()
