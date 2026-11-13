@@ -18,6 +18,7 @@ import {
   listFollowingOwnerContents,
   listPublishedContentsByIds,
   type PublishedContentsByIdsReadStore,
+  type FollowingOwnerContentsReadStore,
   listCreatorContents,
   validateListFilters,
   toErrorResponse,
@@ -350,6 +351,10 @@ export type W03ContentWorkerDependencies = Readonly<{
   publishedContentsByIdsReadStoreProvider?: (
     env: W03PublishedMediaReferenceRuntimeEnv,
   ) => PublishedContentsByIdsReadStore | undefined
+  /** Optional D1-02 provider for the authorized following-feed content projection. */
+  followingOwnerContentsReadStoreProvider?: (
+    env: W03PublishedMediaReferenceRuntimeEnv,
+  ) => FollowingOwnerContentsReadStore | undefined
 }>
 
 export function createW03ContentWorker(dependencies: W03ContentWorkerDependencies = {}) {
@@ -510,6 +515,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
           ownerUserIds as string[],
           cursor,
           parseListLimit(body.limit === undefined ? null : String(body.limit)),
+          dependencies.followingOwnerContentsReadStoreProvider?.(env),
         )
         return json({
           data: {
