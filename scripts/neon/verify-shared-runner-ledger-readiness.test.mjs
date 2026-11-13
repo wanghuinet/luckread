@@ -17,18 +17,24 @@ function baseline() {
     ledger:readJson('contracts/database/neon-schema-migration-ledger.v1.json'),
     readiness:readJson('contracts/database/neon-shared-runner-local-readiness.v1.json'),
     reviews:Object.fromEntries(Object.entries(reviewPaths).map(([domain,path]) => [domain,readJson(path)])),
+    d104RemoteReview:readJson('contracts/database/neon-d1-04-remote-runner-review.v1.json'),
   }
 }
 
 test('reconciles immutable five-database migration ledger with supplemental D1-03/D1-04/D1-05 local review evidence', () => {
   const result = validateSharedRunnerLedgerReadiness(baseline())
-  assert.equal(result.status,'SHARED_LOCAL_RUNNER_EVIDENCE_RECONCILED_REMOTE_APPLY_BLOCKED')
+  assert.equal(result.status,'SHARED_RUNNER_EVIDENCE_RECONCILED_D1_04_SCHEMA_ALREADY_APPLIED_REMOTE_CUTOVER_BLOCKED')
   assert.equal(result.remoteRunner.status,'IMPLEMENTED_FOR_D1_01_AND_D1_02_ONLY')
   assert.equal(result.remoteRunner.remoteApplyReady,false)
   assert.deepEqual(result.remoteRunner.supportedDomains,['D1-01','D1-02'])
   assert.deepEqual(result.localSharedRunner.supportedDomains,['D1-03','D1-04','D1-05'])
   assert.equal(result.domains['D1-03'].localStatus,'LOCAL_SHARED_SCHEMA_REVIEW_PASSED_REMOTE_APPLY_BLOCKED')
   assert.equal(result.domains['D1-04'].localStatus,'LOCAL_SHARED_SCHEMA_REVIEW_PASSED_REMOTE_APPLY_BLOCKED')
+  assert.equal(result.domains['D1-04'].remoteSchemaEvidence.status,'REMOTE_SCHEMA_ONLY_APPLIED')
+  assert.equal(result.domains['D1-04'].remoteSchemaEvidence.workflowRunId,42555900393)
+  assert.equal(result.domains['D1-04'].remoteSchemaEvidence.verifiedLedgerRows,6)
+  assert.equal(result.domains['D1-04'].remoteSchemaEvidence.businessRows,0)
+  assert.equal(result.domains['D1-04'].remoteSchemaEvidence.productionCutoverAuthorized,false)
   assert.equal(result.domains['D1-05'].localStatus,'LOCAL_SHARED_SCHEMA_REVIEW_PASSED_ADMISSION_BLOCKED')
   assert.equal(result.safety.remoteNeonTouched,false)
 })
@@ -87,4 +93,22 @@ test('fails closed if the immutable remote migration runner is broadened to D1-0
     () => validateSharedRunnerLedgerReadiness(data),
     /supplemental readiness register must preserve the immutable remote runner contract/,
   )
+})
+
+test('fails closed if D1-04 remote history no longer proves six verified rows without DDL replay', () => {
+  const data = baseline()
+  data.d104RemoteReview.executionHistory.find((entry) => entry.runId === 42555900393).newlyAppliedMigrations = 1
+  assert.throws(() => validateSharedRunnerLedgerReadiness(data), /without replaying DDL/)
+})
+
+test('fails closed if D1-04 remote schema evidence reports business data', () => {
+  const data = baseline()
+  data.d104RemoteReview.verificationEvidence.remoteSchemaPostflight.catalog.businessRows = 1
+  assert.throws(() => validateSharedRunnerLedgerReadiness(data), /six-migration catalog evidence/)
+})
+
+test('fails closed if D1-04 remote schema evidence is omitted from the readiness register', () => {
+  const data = baseline()
+  delete data.readiness.domains['D1-04'].remoteSchemaEvidence
+  assert.throws(() => validateSharedRunnerLedgerReadiness(data), /separately record the existing remote schema-only Postflight/)
 })

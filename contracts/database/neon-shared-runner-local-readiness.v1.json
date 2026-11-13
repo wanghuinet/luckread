@@ -57,7 +57,17 @@
       "remoteApplyBlockers": [
         "The D1-04 shared runner has only been exercised against an isolated local PostgreSQL 18.6 database; a separate reviewed remote runner release record is still required.",
         "Remote Neon schema apply, business data import and production cutover remain unauthorized."
-      ]
+      ],
+      "remoteSchemaEvidence": {
+        "status": "REMOTE_SCHEMA_ONLY_APPLIED",
+        "evidenceRef": "contracts/database/neon-d1-04-remote-runner-review.v1.json",
+        "workflowRunId": 42555900393,
+        "verifiedMigrations": 6,
+        "verifiedLedgerRows": 6,
+        "businessRows": 0,
+        "runtimeBindingsChanged": false,
+        "productionCutoverAuthorized": false
+      }
     },
     "D1-05": {
       "localStatus": "LOCAL_SHARED_SCHEMA_REVIEW_PASSED_ADMISSION_BLOCKED",

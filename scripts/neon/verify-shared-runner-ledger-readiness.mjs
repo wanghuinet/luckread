@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 const ledgerPath = 'contracts/database/neon-schema-migration-ledger.v1.json'
 const readinessPath = 'contracts/database/neon-shared-runner-local-readiness.v1.json'
+const d104RemoteReviewPath = 'contracts/database/neon-d1-04-remote-runner-review.v1.json'
 const reviewPaths = Object.freeze({
   'D1-03':'contracts/database/neon-d1-03-shared-runner-independent-review.v1.json',
   'D1-04':'contracts/database/neon-d1-04-shared-runner-independent-review.v1.json',
@@ -24,7 +25,97 @@ function sameSet(actual,expected) {
     [...actual].sort().every((value,index) => value === [...expected].sort()[index])
 }
 
-export function validateSharedRunnerLedgerReadiness({ledger,readiness,reviews} = {}) {
+function validateD104RemoteSchemaEvidence({review,readinessEvidence} = {}) {
+  const record = review ?? {}
+  const target = record.target ?? {}
+  const postflight = record.verificationEvidence?.remoteSchemaPostflight ?? {}
+  const catalog = postflight.catalog ?? {}
+  const artifact = postflight.artifact ?? {}
+  const history = (record.executionHistory ?? []).find((entry) => entry.runId === postflight.runId)
+
+  if (record.status !== 'AI_REVIEW_PASS_NO_BLOCKING_FINDINGS' ||
+      record.remoteApplyReady !== true ||
+      target.domainId !== 'D1-04' ||
+      target.databaseName !== 'luckread_finance' ||
+      target.databaseUuid !== '9bfb89a5-fbb5-45b1-a2ee-eab674b0d736' ||
+      target.postgresMajor !== 18 ||
+      target.scope !== 'schema-only' ||
+      target.businessDataImport !== false ||
+      target.productionCutoverAuthorized !== false) {
+    fail('D1-04 remote review must pin the exact approved schema-only Neon target')
+  }
+  if (postflight.runId !== 42555900393 ||
+      postflight.conclusion !== 'success' ||
+      postflight.event !== 'workflow_dispatch' ||
+      postflight.branch !== 'main' ||
+      !/^[0-9a-f]{40}$/.test(postflight.sourceCommitSha ?? '') ||
+      postflight.databaseName !== 'luckread_finance' ||
+      postflight.postgresMajor !== 18 ||
+      postflight.verifiedLedgerRows !== 6 ||
+      postflight.verifiedMigrations !== 6 ||
+      catalog.tables !== 15 ||
+      catalog.explicitIndexes !== 31 ||
+      catalog.constraintIndexes !== 29 ||
+      catalog.triggers !== 72 ||
+      catalog.triggerFunctions !== 6 ||
+      catalog.foreignKeys !== 0 ||
+      catalog.controlSeedRows !== 1 ||
+      catalog.businessRows !== 0 ||
+      artifact.id !== 13646957840 ||
+      artifact.url !== 'https://github.com/wanghuinet/luckread/actions/runs/42555900393/artifacts/13646957840' ||
+      !/^sha256:[0-9a-f]{64}$/.test(artifact.sha256 ?? '')) {
+    fail('D1-04 remote Schema Postflight must match the successful six-migration catalog evidence')
+  }
+  if (!history ||
+      history.conclusion !== 'success' ||
+      history.remoteNeonDdlExecuted !== true ||
+      history.verifiedMigrations !== 6 ||
+      history.verifiedLedgerRows !== 6 ||
+      history.newlyAppliedMigrations !== 0 ||
+      history.verifiedTables !== 15 ||
+      history.verifiedExplicitIndexes !== 31 ||
+      history.verifiedConstraintIndexes !== 29 ||
+      history.verifiedTriggers !== 72 ||
+      history.verifiedTriggerFunctions !== 6 ||
+      history.verifiedForeignKeys !== 0 ||
+      history.controlSeedRows !== 1 ||
+      history.businessRows !== 0 ||
+      history.postflightReportProduced !== true ||
+      history.artifactId !== artifact.id ||
+      history.artifactSha256 !== artifact.sha256) {
+    fail('D1-04 remote execution history must prove the existing six-row ledger was verified without replaying DDL')
+  }
+  if (record.safety?.remoteNeonDdlExecuted !== true ||
+      record.safety?.cloudflareD1Touched !== false ||
+      record.safety?.businessDataImported !== false ||
+      record.safety?.productionCutoverAuthorized !== false ||
+      postflight.safety?.remoteNeonTouched !== true ||
+      postflight.safety?.cloudflareD1Touched !== false ||
+      postflight.safety?.businessDataImported !== false ||
+      postflight.safety?.runtimeBindingsChanged !== false ||
+      postflight.safety?.productionCutoverAuthorized !== false) {
+    fail('D1-04 remote schema evidence must preserve D1, business-data and production-cutover safety boundaries')
+  }
+
+  const expectedEvidence = {
+    status: 'REMOTE_SCHEMA_ONLY_APPLIED',
+    evidenceRef: d104RemoteReviewPath,
+    workflowRunId: postflight.runId,
+    verifiedMigrations: postflight.verifiedMigrations,
+    verifiedLedgerRows: postflight.verifiedLedgerRows,
+    businessRows: catalog.businessRows,
+    runtimeBindingsChanged: false,
+    productionCutoverAuthorized: false,
+  }
+  if (!readinessEvidence ||
+      Object.keys(expectedEvidence).some((key) => readinessEvidence[key] !== expectedEvidence[key])) {
+    fail('D1-04 readiness register must separately record the existing remote schema-only Postflight')
+  }
+  return expectedEvidence
+}
+
+export function validateSharedRunnerLedgerReadiness({ledger,readiness,reviews,d104RemoteReview} = {}) {
+  const d104RemoteSchema = validateD104RemoteSchemaEvidence({review:d104RemoteReview,readinessEvidence:readiness?.domains?.['D1-04']?.remoteSchemaEvidence})
   const execution = ledger?.execution
   const remoteDomains = execution?.domainReadiness ?? {}
   if (ledger?.remoteApplyReady !== false ||
@@ -119,6 +210,7 @@ export function validateSharedRunnerLedgerReadiness({ledger,readiness,reviews} =
       reviewEvidenceRef:entry.reviewEvidenceRef,
       blockerCount:entry.remoteApplyBlockers.length,
       localPostflightWorkflowRunId:entry.sharedPostflightRunId,
+      ...(domain === 'D1-04' ? {remoteSchemaEvidence:d104RemoteSchema} : {}),
     }
   }
 
@@ -135,7 +227,7 @@ export function validateSharedRunnerLedgerReadiness({ledger,readiness,reviews} =
   }
 
   return {
-    status:'SHARED_LOCAL_RUNNER_EVIDENCE_RECONCILED_REMOTE_APPLY_BLOCKED',
+    status:'SHARED_RUNNER_EVIDENCE_RECONCILED_D1_04_SCHEMA_ALREADY_APPLIED_REMOTE_CUTOVER_BLOCKED',
     remoteRunner:{
       status:execution.runnerStatus,
       supportedDomains:['D1-01','D1-02'],
@@ -165,7 +257,8 @@ export function verifySharedRunnerLedgerReadiness({readSource = readText} = {}) 
   const reviews = Object.fromEntries(Object.entries(reviewPaths).map(([domain,path]) => [
     domain,readJson(path,readSource),
   ]))
-  return validateSharedRunnerLedgerReadiness({ledger,readiness,reviews})
+  const d104RemoteReview = readJson(d104RemoteReviewPath,readSource)
+  return validateSharedRunnerLedgerReadiness({ledger,readiness,reviews,d104RemoteReview})
 }
 
 function run() {
