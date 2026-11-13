@@ -25,7 +25,7 @@ function baseline() {
 
 test('reconciles immutable five-database migration ledger with supplemental D1-03/D1-04/D1-05 local review evidence', () => {
   const result = validateSharedRunnerLedgerReadiness(baseline())
-  assert.equal(result.status,'SHARED_RUNNER_EVIDENCE_RECONCILED_D1_04_SCHEMA_ALREADY_APPLIED_REMOTE_CUTOVER_BLOCKED')
+  assert.equal(result.status,'FIVE_DATABASE_REMOTE_SCHEMA_EVIDENCE_RECONCILED_RUNTIME_CUTOVER_BLOCKED')
   assert.equal(result.remoteRunner.status,'IMPLEMENTED_FOR_D1_01_AND_D1_02_ONLY')
   assert.equal(result.remoteRunner.remoteApplyReady,false)
   assert.deepEqual(result.remoteRunner.supportedDomains,['D1-01','D1-02'])

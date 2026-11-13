@@ -388,7 +388,7 @@ export function validateSharedRunnerLedgerReadiness({ledger,readiness,reviews,d1
   }
 
   return {
-    status:'SHARED_RUNNER_EVIDENCE_RECONCILED_D1_04_SCHEMA_ALREADY_APPLIED_REMOTE_CUTOVER_BLOCKED',
+    status:'FIVE_DATABASE_REMOTE_SCHEMA_EVIDENCE_RECONCILED_RUNTIME_CUTOVER_BLOCKED',
     remoteRunner:{
       status:execution.runnerStatus,
       supportedDomains:['D1-01','D1-02'],
