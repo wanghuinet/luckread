@@ -172,7 +172,7 @@ jobs:
           CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE: postgresql://postgres:local_postgres_only@127.0.0.1:5432/luckread_auth001
         run: |
           set -euo pipefail
-          pnpm --dir ../W01-payload exec wrangler dev --local --persist-to /tmp/luckread-auth001-state --config ../W02-identity/wrangler.jsonc --port 8788 --var "CLOUDFLARE_ENV:development" > auth-001-w02-preview.log 2>&1 &
+          pnpm --dir ../W01-payload exec wrangler dev --local --persist-to /tmp/luckread-auth001-state --config ../W02-identity/wrangler.jsonc --port 8788 --var "CLOUDFLARE_ENV:development" --var "W02_DATABASE_DRIVER:d1" > auth-001-w02-preview.log 2>&1 &
           echo $! > auth-001-w02-preview.pid
           ready=0
           for _ in $(seq 1 120); do
