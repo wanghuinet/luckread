@@ -192,15 +192,15 @@ for (const owner of contract.owners.slice(1)) {
   if (owner.config) {
     const content = read(owner.config)
     if (content !== null && owner.worker === 'W02') {
-      const retainsProductionD1Default =
+      const retainsD1FallbackInitializer =
         content.includes('database: env.D1_01') ||
         (
           /(?:^|\n)\s*database\s*,/m.test(content) &&
           /database\s*:\s*BetterAuthDatabase\s*=\s*env\.D1_01(?:\s+as\s+BetterAuthDatabase)?/.test(content) &&
           /export\s+const\s+buildLuckReadAuth/.test(content)
         )
-      if (!retainsProductionD1Default) {
-        failures.push('W02 Better Auth must keep D1-01 as the runtime default; only isolated schema generation may inject another adapter')
+      if (!retainsD1FallbackInitializer) {
+        failures.push('W02 Better Auth must retain D1-01 as the explicit fallback initializer; production provider selection is controlled by W02_DATABASE_DRIVER')
       }
       addSource('W02', 'better-auth-config', owner.config, content)
     }

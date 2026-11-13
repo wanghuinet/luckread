@@ -13,6 +13,8 @@ export const STAGED_WORKERS = Object.freeze([
     binding: 'HYPERDRIVE',
     hyperdriveId: '0c53a1bb9bc0484bac146e8ae2d3158b',
     d1Bindings: ['D1'],
+    driver: 'PAYLOAD_DATABASE_DRIVER',
+    driverValue: 'neon',
   },
   {
     worker: 'W02',
@@ -22,6 +24,7 @@ export const STAGED_WORKERS = Object.freeze([
     hyperdriveId: '0c53a1bb9bc0484bac146e8ae2d3158b',
     d1Bindings: ['D1_01'],
     driver: 'W02_DATABASE_DRIVER',
+    driverValue: 'neon',
   },
   {
     worker: 'W03',
@@ -55,6 +58,7 @@ export const STAGED_WORKERS = Object.freeze([
     hyperdriveId: '0c53a1bb9bc0484bac146e8ae2d3158b',
     d1Bindings: ['D1_01'],
     driver: 'W08_DATABASE_DRIVER',
+    driverValue: 'd1',
   },
 ])
 
@@ -87,11 +91,12 @@ export function verifyWorkerConfig(config, expected) {
   assert.equal(matching[0].id, expected.hyperdriveId, `${expected.worker} Hyperdrive resource target drifted`)
 
   const vars = config.vars ?? {}
+  const configuredDriver = expected.driver ? (vars[expected.driver] ?? 'd1') : undefined
   if (expected.driver) {
     assert.equal(
-      vars[expected.driver] ?? 'd1',
-      'd1',
-      `${expected.worker} production database driver must remain D1 by default`,
+      configuredDriver,
+      expected.driverValue ?? 'd1',
+      `${expected.worker} production database driver must be ${expected.driverValue ?? 'd1'}`,
     )
   }
 
@@ -100,6 +105,7 @@ export function verifyWorkerConfig(config, expected) {
     script: config.name,
     binding: expected.binding,
     hyperdriveId: expected.hyperdriveId,
+    ...(expected.driver ? { configuredDriver } : {}),
     d1FallbackBindings: actualD1Bindings,
   }
 }

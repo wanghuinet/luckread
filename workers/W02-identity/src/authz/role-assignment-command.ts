@@ -177,8 +177,9 @@ async function grantCreatorBusinessRoleD1(
 }
 
 
-/** Keep the existing D1 implementation as the production default until W02's
- * identity, session, RoleAssignment and lifecycle stores are switched together.
+/** Keep the D1 implementation as an explicit rollback adapter.
+ * W02 selects one provider for identity, session, RoleAssignment and lifecycle
+ * stores together; do not mix providers within an active runtime.
  */
 export function createD1CreatorRoleGrantStore(db: D1Database): CreatorRoleGrantStore {
   return {
