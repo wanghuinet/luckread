@@ -1,7 +1,7 @@
 {
   "$schema": "../../node_modules/wrangler/config-schema.json",
   "name": "luckread-w03",
-  "main": "src/index.ts",
+  "main": "src/entry.ts",
   "compatibility_date": "2025-08-15",
   "services": [
     {
@@ -49,5 +49,11 @@
       "binding": "HYPERDRIVE_D1_02",
       "id": "c55183e1cc3446409c9c1075832c6615"
     }
-  ]
+  ],
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "vars": {
+    "W03_PUBLIC_MEDIA_REFERENCE_DRIVER": "d1"
+  }
 }

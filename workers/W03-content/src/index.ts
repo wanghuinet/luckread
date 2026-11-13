@@ -32,7 +32,10 @@ import {
   type ContentD1,
 } from './content-runtime.js'
 import { normalizePreflightInput, preflightContent } from './publish-preflight.js'
-import type { PublishedMediaReferenceReadStore } from './published-media-reference-read-store.js'
+import type {
+  PublishedMediaReferenceReadStore,
+  W03PublishedMediaReferenceRuntimeEnv,
+} from './published-media-reference-read-store.js'
 import {
   createContentRelationship,
   listContentRelationships,
@@ -70,8 +73,10 @@ import {
 
 type RateLimitBinding = { limit(input: { key: string }): Promise<{ success: boolean }> }
 
-interface Env {
+interface Env extends W03PublishedMediaReferenceRuntimeEnv {
   D1_02: D1Database
+  W03_PUBLIC_MEDIA_REFERENCE_DRIVER?: string
+  HYPERDRIVE_D1_02?: { connectionString?: string }
   W07_SUBSCRIPTION?: { fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> }
   CONTENT_PUBLIC_READ_LIMITER?: RateLimitBinding
   CONTENT_MUTATION_LIMITER?: RateLimitBinding
@@ -334,8 +339,12 @@ const getPath = (pathname: string): {id?: string; state?: boolean; preflight?: b
 }
 
 export type W03ContentWorkerDependencies = Readonly<{
-  /** Optional PostgreSQL-capable media-reference reader; D1 remains the default. */
+  /** Optional injected media-reference reader; primarily used by focused tests. */
   publishedMediaReferenceReadStore?: PublishedMediaReferenceReadStore
+  /** Runtime-only provider; the Worker entrypoint supplies the Hyperdrive implementation. */
+  publishedMediaReferenceReadStoreProvider?: (
+    env: W03PublishedMediaReferenceRuntimeEnv,
+  ) => PublishedMediaReferenceReadStore
 }>
 
 export function createW03ContentWorker(dependencies: W03ContentWorkerDependencies = {}) {
@@ -690,6 +699,9 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
           throw new ContentRuntimeError('VALIDATION_FAILED', 400)
         }
         const viewerUserId = request.headers.get('X-LuckRead-Principal-User-Id')?.trim() || null
+        const mediaReferenceReadStore =
+          dependencies.publishedMediaReferenceReadStore ??
+          dependencies.publishedMediaReferenceReadStoreProvider?.(env)
         const access = await resolvePublishedMediaReferenceAccess(
           env.D1_02,
           mediaUrl,
@@ -697,7 +709,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
           viewerUserId
             ? (creatorId) => resolveCreatorMembershipAccess(request, env, viewerUserId, creatorId)
             : undefined,
-          dependencies.publishedMediaReferenceReadStore,
+          mediaReferenceReadStore,
         )
         return json({ data: access, requestId: createRequestId() })
       }

@@ -6,6 +6,12 @@ export type PublishedMediaReferenceRecord = Readonly<{
   access_mode: 'PUBLIC' | 'MEMBERS_ONLY'
 }>
 
+export type W03PublishedMediaReferenceRuntimeEnv = Readonly<{
+  D1_02?: PublishedMediaReferenceD1Database
+  W03_PUBLIC_MEDIA_REFERENCE_DRIVER?: string
+  HYPERDRIVE_D1_02?: Readonly<{ connectionString?: string }>
+}>
+
 export interface PublishedMediaReferenceReadStore {
   listPublishedMediaReferences(
     candidates: readonly string[],
