@@ -8,7 +8,7 @@
     "global_fetch_strictly_public"
   ],
   "vars": {
-    "PAYLOAD_DATABASE_DRIVER": "d1"
+    "PAYLOAD_DATABASE_DRIVER": "neon"
   },
   "hyperdrive": [
     {

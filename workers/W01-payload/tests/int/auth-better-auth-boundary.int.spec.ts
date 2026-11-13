@@ -143,10 +143,11 @@ describe('W01 Better Auth boundary', () => {
       'utf8',
     )
 
-    // Borrow the plugin's initialize-once model while retaining W02-native D1.
+    // Borrow the plugin's initialize-once model while retaining the W02-native D1 fallback.
     expect(authConfig).toContain('const authInstances = new WeakMap')
-    expect(authConfig).toContain('authInstances.get(env.D1_01)')
-    expect(authConfig).toContain('authInstances.set(env.D1_01, auth)')
+    expect(authConfig).toContain('const database = env.D1_01 as object')
+    expect(authConfig).toContain('authInstances.get(database)')
+    expect(authConfig).toContain('authInstances.set(database, auth)')
     expect(principal).toContain('createLuckReadAuth(env)')
     expect(w02Index).toContain('resolveBetterAuthPrincipal(env, request)')
     expect(w02Index).toContain('createLuckReadAuth(env)')
