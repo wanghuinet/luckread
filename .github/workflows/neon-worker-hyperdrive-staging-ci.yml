@@ -1,0 +1,41 @@
+name: Neon Worker Hyperdrive Staging CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'workers/**/wrangler.jsonc'
+      - 'scripts/cloudflare/verify-neon-worker-hyperdrive-staging.mjs'
+      - 'scripts/cloudflare/verify-neon-worker-hyperdrive-staging.test.mjs'
+      - '.github/workflows/neon-worker-hyperdrive-staging-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'workers/**/wrangler.jsonc'
+      - 'scripts/cloudflare/verify-neon-worker-hyperdrive-staging.mjs'
+      - 'scripts/cloudflare/verify-neon-worker-hyperdrive-staging.test.mjs'
+      - '.github/workflows/neon-worker-hyperdrive-staging-ci.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: neon-worker-hyperdrive-staging-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-staged-bindings:
+    name: Verify staged Hyperdrive targets and D1 rollback bindings
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Syntax check and staging validation tests
+        run: |
+          set -euo pipefail
+          node --check scripts/cloudflare/verify-neon-worker-hyperdrive-staging.mjs
+          node --check scripts/cloudflare/verify-neon-worker-hyperdrive-staging.test.mjs
+          node --test scripts/cloudflare/verify-neon-worker-hyperdrive-staging.test.mjs
+          node scripts/cloudflare/verify-neon-worker-hyperdrive-staging.mjs
