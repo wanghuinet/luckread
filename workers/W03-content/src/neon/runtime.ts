@@ -18,8 +18,9 @@ const stores = new WeakMap<object, PublishedMediaReferenceReadStore>()
 const bookmarkedContentsStores = new WeakMap<object, PublishedContentsByIdsReadStore>()
 
 /**
- * This driver controls only the public-media-reference lookup. All other W03
- * content reads and writes continue to use D1_02 until separately admitted.
+ * The explicit D1-02 read driver controls only the PostgreSQL stores wired
+ * from the W03 entrypoint: public-media-reference lookup and bookmark-content
+ * batch projection. All other W03 content reads and writes remain on D1_02.
  * D1 is the safe default and unknown values fail closed.
  */
 export function resolveW03PublicMediaReferenceDriver(
