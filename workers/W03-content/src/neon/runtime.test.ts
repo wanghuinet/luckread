@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   getW03PublicMediaReferencePostgresPool,
   getW03PublishedMediaReferenceReadStore,
+  getW03PublishedContentsByIdsReadStore,
   resolveW03PublicMediaReferenceDriver,
 } from './runtime.js'
 
@@ -38,6 +39,22 @@ describe('W03 public media reference database driver', () => {
       W03_PUBLIC_MEDIA_REFERENCE_DRIVER: 'neon',
       HYPERDRIVE_D1_02: { connectionString: 'https://example.invalid/database' },
     })).toThrow('W03_HYPERDRIVE_D1_02_CONNECTION_STRING_INVALID')
+  })
+
+  it('reuses the same Hyperdrive pool for the separate bookmark-content read store', async () => {
+    const binding = {
+      connectionString: 'postgresql://postgres:postgres@127.0.0.1:5432/luckread',
+    }
+    const env = {
+      W03_PUBLIC_MEDIA_REFERENCE_DRIVER: 'neon',
+      HYPERDRIVE_D1_02: binding,
+    }
+    const pool = getW03PublicMediaReferencePostgresPool(env)
+    const store = getW03PublishedContentsByIdsReadStore(env)
+
+    expect(store).toBeDefined()
+    await expect(store?.list([])).resolves.toEqual([])
+    await pool.end()
   })
 
   it('reuses one lazy Pool and PostgreSQL read store for the same Hyperdrive binding', async () => {
