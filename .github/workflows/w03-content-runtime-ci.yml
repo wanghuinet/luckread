@@ -22,6 +22,22 @@ jobs:
   content-runtime:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      W03_POSTGRES_TEST_URL: postgresql://postgres:postgres@localhost:5432/luckread_w03_test
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: luckread_w03_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d luckread_w03_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -99,7 +115,7 @@ jobs:
         run: npx --yes wrangler@4.116.0 deploy --dry-run --config wrangler.jsonc
 
       - name: Run W03 content unit tests
-        run: npx --yes vitest@3.2.4 run workers/W03-content/src/content-runtime.test.ts workers/W03-content/src/neon/runtime.test.ts workers/W03-content/src/published-media-reference-read-store.test.ts workers/W03-content/src/published-contents-by-ids-read-store-postgres.test.ts workers/W03-content/src/content-relationships.test.ts workers/W03-content/src/content-snowflake-id.test.ts workers/W03-content/src/publish-preflight.test.ts workers/W03-content/src/d1-traffic-guard.test.ts workers/W03-content/src/following-feed.test.ts workers/W03-content/src/content-search.test.ts
+        run: npx --yes vitest@3.2.4 run workers/W03-content/src/content-runtime.test.ts workers/W03-content/src/neon/runtime.test.ts workers/W03-content/src/published-media-reference-read-store.test.ts workers/W03-content/src/published-contents-by-ids-read-store-postgres.test.ts workers/W03-content/src/content-relationships.test.ts workers/W03-content/src/content-snowflake-id.test.ts workers/W03-content/src/publish-preflight.test.ts workers/W03-content/src/d1-traffic-guard.test.ts workers/W03-content/src/following-feed.test.ts workers/W03-content/src/following-owner-contents-read-store-postgres.test.ts workers/W03-content/src/content-search.test.ts
 
       - name: Typecheck W03 content runtime
         run: >
