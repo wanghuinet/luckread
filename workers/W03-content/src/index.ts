@@ -17,6 +17,7 @@ import {
   searchPublishedContents,
   listFollowingOwnerContents,
   listPublishedContentsByIds,
+  type PublishedContentsByIdsReadStore,
   listCreatorContents,
   validateListFilters,
   toErrorResponse,
@@ -345,6 +346,10 @@ export type W03ContentWorkerDependencies = Readonly<{
   publishedMediaReferenceReadStoreProvider?: (
     env: W03PublishedMediaReferenceRuntimeEnv,
   ) => PublishedMediaReferenceReadStore
+  /** Optional D1-02 provider for the bounded bookmark-content batch read. */
+  publishedContentsByIdsReadStoreProvider?: (
+    env: W03PublishedMediaReferenceRuntimeEnv,
+  ) => PublishedContentsByIdsReadStore | undefined
 }>
 
 export function createW03ContentWorker(dependencies: W03ContentWorkerDependencies = {}) {
@@ -726,7 +731,11 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
         ) {
           throw new ContentRuntimeError('VALIDATION_FAILED', 400)
         }
-        const items = await listPublishedContentsByIds(env.D1_02, ids)
+        const items = await listPublishedContentsByIds(
+          env.D1_02,
+          ids,
+          dependencies.publishedContentsByIdsReadStoreProvider?.(env),
+        )
         return json({
           data: {
             items: items.map(item => {
