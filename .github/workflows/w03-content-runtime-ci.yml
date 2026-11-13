@@ -114,3 +114,4 @@ jobs:
           workers/W03-content/src/index.ts
           workers/W03-content/src/neon/runtime.ts
           workers/W03-content/src/neon/runtime.test.ts
+          workers/W03-content/src/entry.ts
