@@ -51,7 +51,7 @@ export function createPostgresFollowingOwnerContentsReadStore(
         '   )',
         ' ORDER BY c.created_at DESC, c.id DESC',
         ' LIMIT $4',
-      ].join('\\n')
+      ].join('\n')
 
       try {
         const result = await database.query<Record<string, unknown>>(sql, [
