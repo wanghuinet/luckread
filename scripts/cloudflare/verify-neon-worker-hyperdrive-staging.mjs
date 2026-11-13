@@ -40,14 +40,6 @@ export const STAGED_WORKERS = Object.freeze([
     d1Bindings: ['DB', 'D1_03'],
   },
   {
-    worker: 'W06',
-    script: 'luckread-w06',
-    configPath: 'workers/W06-governance/wrangler.jsonc',
-    binding: 'HYPERDRIVE_D1_03',
-    hyperdriveId: '7c8831416c18494faee04b96aa551cb9',
-    d1Bindings: ['D1_03'],
-  },
-  {
     worker: 'W07',
     script: 'luckread-w07',
     configPath: 'workers/W07-subscription-commerce/wrangler.jsonc',
