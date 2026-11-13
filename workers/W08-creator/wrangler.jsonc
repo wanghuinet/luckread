@@ -29,7 +29,7 @@
     }
   ],
   "vars": {
-    "W08_DATABASE_DRIVER": "d1"
+    "W08_DATABASE_DRIVER": "neon"
   },
   "hyperdrive": [
     {
