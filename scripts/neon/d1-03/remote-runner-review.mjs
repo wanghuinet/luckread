@@ -1,6 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { existsSync, readFileSync } from 'node:fs'
-import { createHash } from 'node:crypto'
+import { existsSync } from 'node:fs'
 import { isAbsolute, resolve, sep } from 'node:path'
 
 const SHA40 = /^[0-9a-f]{40}$/
@@ -9,29 +8,6 @@ const RUN_URL = /^https:\/\/github\.com\/wanghuinet\/luckread\/actions\/runs\/\d
 export const D103_REVIEW_REF = 'contracts/database/neon-d1-03-remote-runner-review.v1.json'
 
 const fail = (errors, message) => errors.push(message)
-
-const W06_WRANGLER_PATH = 'workers/W06-governance/wrangler.jsonc'
-const W06_STAGED_HYPERDRIVE_SUFFIX = ',\n  "hyperdrive": [\n    {\n      "binding": "HYPERDRIVE_D1_03",\n      "id": "7c8831416c18494faee04b96aa551cb9"\n    }\n  ]\n}\n'
-
-function gitBlobSha1(content) {
-  const bytes = Buffer.from(content, 'utf8')
-  return createHash('sha1')
-    .update(Buffer.from('blob ' + bytes.length + '\0', 'utf8'))
-    .update(bytes)
-    .digest('hex')
-}
-
-function hashCurrentReviewedSource({ root, relativePath, hashBlob }) {
-  if (relativePath !== W06_WRANGLER_PATH) return hashBlob(relativePath)
-  const source = readFileSync(resolve(root, relativePath), 'utf8')
-  if (!source.endsWith(W06_STAGED_HYPERDRIVE_SUFFIX)) return hashBlob(relativePath)
-
-  // The independent review remains pinned to the original W06 D1-03 source.
-  // Only this exact, source-config-only Hyperdrive addition is normalized away;
-  // any D1 binding, account target, service, cron or other edit still changes the hash.
-  const reviewedSource = source.slice(0, -W06_STAGED_HYPERDRIVE_SUFFIX.length) + '\n}\n'
-  return gitBlobSha1(reviewedSource)
-}
 
 export function validateD103RemoteRunnerReview({
   root = process.cwd(),
@@ -135,7 +111,7 @@ export function validateD103RemoteRunnerReview({
         continue
       }
       try {
-        if (hashCurrentReviewedSource({ root, relativePath: path, hashBlob }) !== item.gitBlobSha1) {
+        if (hashBlob(path) !== item.gitBlobSha1) {
           fail(errors, 'reviewed D1-03 source blob drift invalidates release: ' + path)
         }
         if (hashBlobAtCommit(validation.headSha, path) !== item.gitBlobSha1) {
