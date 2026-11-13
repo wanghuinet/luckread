@@ -3,8 +3,8 @@ import { Pool } from 'pg'
 import {
   createD1PublishedMediaReferenceReadStore,
   type PublishedMediaReferenceReadStore,
-  type PublishedContentsByIdsReadStore,
 } from '../published-media-reference-read-store.js'
+import type { PublishedContentsByIdsReadStore } from '../content-runtime.js'
 import { createPostgresPublishedMediaReferenceReadStore } from '../published-media-reference-read-store-postgres.js'
 import { createPostgresPublishedContentsByIdsReadStore } from '../published-contents-by-ids-read-store-postgres.js'
 import type { W03PublishedMediaReferenceRuntimeEnv } from '../published-media-reference-read-store.js'
