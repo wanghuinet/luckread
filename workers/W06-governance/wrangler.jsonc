@@ -50,11 +50,5 @@
     "crons": [
       "* * * * *"
     ]
-  },
-  "hyperdrive": [
-    {
-      "binding": "HYPERDRIVE_D1_03",
-      "id": "7c8831416c18494faee04b96aa551cb9"
-    }
-  ]
+  }
 }
