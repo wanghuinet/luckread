@@ -49,5 +49,11 @@
       "binding": "HYPERDRIVE_D1_02",
       "id": "c55183e1cc3446409c9c1075832c6615"
     }
-  ]
+  ],
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "vars": {
+    "W03_PUBLIC_MEDIA_REFERENCE_DRIVER": "d1"
+  }
 }
