@@ -59,6 +59,29 @@ jobs:
         working-directory: workers/W02-identity
         run: |
           node --input-type=module -e "import { readFile } from 'node:fs/promises'; const pkg = JSON.parse(await readFile('./node_modules/better-auth/package.json', 'utf8')); if (pkg.version !== '1.7.8') throw new Error('Expected better-auth 1.7.8, got ' + pkg.version); await import('better-auth'); console.log('better-auth ' + pkg.version + ' import: OK')"
+      - name: Verify Neon D1-01 runtime target and preserved D1 rollback binding
+        working-directory: workers/W02-identity
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs'
+          const config = JSON.parse(fs.readFileSync('wrangler.jsonc', 'utf8'))
+          if (config.name !== 'luckread-w02') throw new Error('W02 Worker identity mismatch')
+          if (config.vars?.W02_DATABASE_DRIVER !== 'neon') {
+            throw new Error('W02 production runtime must select Neon for D1-01')
+          }
+          const d1 = (config.d1_databases || []).find((item) => item.binding === 'D1_01')
+          if (!d1 || d1.database_name !== 'luckread' ||
+              d1.database_id !== '2f80471e-3756-49f9-8db1-7707a433ad64' ||
+              d1.migrations_dir !== 'migrations') {
+            throw new Error('W02 D1-01 rollback binding must be preserved')
+          }
+          const hyperdrive = (config.hyperdrive || []).find((item) => item.binding === 'HYPERDRIVE')
+          if (!hyperdrive || hyperdrive.id !== '0c53a1bb9bc0484bac146e8ae2d3158b') {
+            throw new Error('W02 must bind the verified D1-01 Neon Hyperdrive resource')
+          }
+          console.log('W02_PRODUCTION_DATABASE=NEON_D1_01; D1_ROLLBACK_BINDING=PRESERVED; HYPERDRIVE=VERIFIED')
+          NODE
       - name: Verify RoleAssignment migration artifacts
         run: |
           node scripts/generate-role-assignment-migration.mjs
