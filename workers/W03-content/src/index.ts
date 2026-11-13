@@ -33,6 +33,7 @@ import {
 } from './content-runtime.js'
 import { normalizePreflightInput, preflightContent } from './publish-preflight.js'
 import type { PublishedMediaReferenceReadStore } from './published-media-reference-read-store.js'
+import { getW03PublishedMediaReferenceReadStore } from './neon/runtime.js'
 import {
   createContentRelationship,
   listContentRelationships,
@@ -72,6 +73,8 @@ type RateLimitBinding = { limit(input: { key: string }): Promise<{ success: bool
 
 interface Env {
   D1_02: D1Database
+  W03_PUBLIC_MEDIA_REFERENCE_DRIVER?: string
+  HYPERDRIVE_D1_02?: { connectionString?: string }
   W07_SUBSCRIPTION?: { fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> }
   CONTENT_PUBLIC_READ_LIMITER?: RateLimitBinding
   CONTENT_MUTATION_LIMITER?: RateLimitBinding
@@ -690,6 +693,9 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
           throw new ContentRuntimeError('VALIDATION_FAILED', 400)
         }
         const viewerUserId = request.headers.get('X-LuckRead-Principal-User-Id')?.trim() || null
+        const mediaReferenceReadStore =
+          dependencies.publishedMediaReferenceReadStore ??
+          getW03PublishedMediaReferenceReadStore(env)
         const access = await resolvePublishedMediaReferenceAccess(
           env.D1_02,
           mediaUrl,
@@ -697,7 +703,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
           viewerUserId
             ? (creatorId) => resolveCreatorMembershipAccess(request, env, viewerUserId, creatorId)
             : undefined,
-          dependencies.publishedMediaReferenceReadStore,
+          mediaReferenceReadStore,
         )
         return json({ data: access, requestId: createRequestId() })
       }
