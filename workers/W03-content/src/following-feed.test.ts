@@ -77,6 +77,24 @@ describe('W03 Following content projection', () => {
     expect(sql).not.toContain('social_user_interactions')
   })
 
+  it('uses the injected Neon read store without issuing a D1 query', async () => {
+    const { db, prepare } = mockDb()
+    const list = vi.fn(async () => rows)
+    const store = { list }
+    const page = await listFollowingOwnerContents(
+      db,
+      'viewer-1',
+      ['creator-2', 'creator-1', 'creator-2'],
+      null,
+      1,
+      store,
+    )
+    expect(page.items).toHaveLength(1)
+    expect(page.items[0]?.id).toBe('content-1')
+    expect(list).toHaveBeenCalledWith(['creator-1', 'creator-2'], null, 2)
+    expect(prepare).not.toHaveBeenCalled()
+  })
+
   it('binds cursors to the viewer and followed-author scope', async () => {
     const { db } = mockDb()
     const page = await listFollowingOwnerContents(db, 'viewer-1', ['creator-1', 'creator-2'], null, 1)
