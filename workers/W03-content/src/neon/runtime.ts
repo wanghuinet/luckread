@@ -4,9 +4,13 @@ import {
   createD1PublishedMediaReferenceReadStore,
   type PublishedMediaReferenceReadStore,
 } from '../published-media-reference-read-store.js'
-import type { PublishedContentsByIdsReadStore } from '../content-runtime.js'
+import type {
+  FollowingOwnerContentsReadStore,
+  PublishedContentsByIdsReadStore,
+} from '../content-runtime.js'
 import { createPostgresPublishedMediaReferenceReadStore } from '../published-media-reference-read-store-postgres.js'
 import { createPostgresPublishedContentsByIdsReadStore } from '../published-contents-by-ids-read-store-postgres.js'
+import { createPostgresFollowingOwnerContentsReadStore } from '../following-owner-contents-read-store-postgres.js'
 import type { W03PublishedMediaReferenceRuntimeEnv } from '../published-media-reference-read-store.js'
 
 export type W03PublicMediaReferenceDriver = 'd1' | 'neon'
@@ -16,17 +20,19 @@ export type W03PublicMediaReferenceRuntimeEnv = W03PublishedMediaReferenceRuntim
 const pools = new WeakMap<object, Pool>()
 const stores = new WeakMap<object, PublishedMediaReferenceReadStore>()
 const bookmarkedContentsStores = new WeakMap<object, PublishedContentsByIdsReadStore>()
+const followingContentsStores = new WeakMap<object, FollowingOwnerContentsReadStore>()
 
 /**
- * The explicit D1-02 read driver controls only the PostgreSQL stores wired
- * from the W03 entrypoint: public-media-reference lookup and bookmark-content
- * batch projection. All other W03 content reads and writes remain on D1_02.
- * D1 is the safe default and unknown values fail closed.
+ * The explicit D1-02 content read driver controls only the PostgreSQL read
+ * projections wired from the W03 entrypoint: public media references, bookmark
+ * batch projection, and the W04-authorized following-feed content projection.
+ * Other W03 reads and every W03 mutation remain on D1_02. D1 is the safe
+ * default and unknown values fail closed.
  */
 export function resolveW03PublicMediaReferenceDriver(
   env: W03PublicMediaReferenceRuntimeEnv,
 ): W03PublicMediaReferenceDriver {
-  const configured = env.W03_PUBLIC_MEDIA_REFERENCE_DRIVER?.trim().toLowerCase() || 'd1'
+  const configured = (env.W03_CONTENT_READ_DRIVER ?? env.W03_PUBLIC_MEDIA_REFERENCE_DRIVER)?.trim().toLowerCase() || 'd1'
   if (configured === 'd1' || configured === 'neon') return configured
   throw new Error('W03_PUBLIC_MEDIA_REFERENCE_DRIVER_UNSUPPORTED')
 }
@@ -124,5 +130,25 @@ export function getW03PublishedContentsByIdsReadStore(
     getW03PublicMediaReferencePostgresPool(env),
   )
   bookmarkedContentsStores.set(binding, store)
+  return store
+}
+
+/** PostgreSQL provider for the bounded W04-authorized following-feed projection. */
+export function getW03FollowingOwnerContentsReadStore(
+  env: W03PublicMediaReferenceRuntimeEnv,
+): FollowingOwnerContentsReadStore | undefined {
+  if (resolveW03PublicMediaReferenceDriver(env) === 'd1') return undefined
+
+  const binding = env.HYPERDRIVE_D1_02
+  if (!binding || typeof binding !== 'object') {
+    throw new Error('W03_HYPERDRIVE_D1_02_BINDING_REQUIRED')
+  }
+  const cached = followingContentsStores.get(binding)
+  if (cached) return cached
+
+  const store = createPostgresFollowingOwnerContentsReadStore(
+    getW03PublicMediaReferencePostgresPool(env),
+  )
+  followingContentsStores.set(binding, store)
   return store
 }

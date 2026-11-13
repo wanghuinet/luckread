@@ -1,7 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 import { describe, expect, it, vi } from 'vitest'
 import { listFollowingOwnerContents } from './content-runtime.js'
-import worker from './index.js'
+import worker, { createW03ContentWorker } from './index.js'
 
 const rows = [
   {
@@ -77,6 +77,24 @@ describe('W03 Following content projection', () => {
     expect(sql).not.toContain('social_user_interactions')
   })
 
+  it('uses the injected Neon read store without issuing a D1 query', async () => {
+    const { db, prepare } = mockDb()
+    const list = vi.fn(async () => rows)
+    const store = { list }
+    const page = await listFollowingOwnerContents(
+      db,
+      'viewer-1',
+      ['creator-2', 'creator-1', 'creator-2'],
+      null,
+      1,
+      store,
+    )
+    expect(page.items).toHaveLength(1)
+    expect(page.items[0]?.id).toBe('content-1')
+    expect(list).toHaveBeenCalledWith(['creator-1', 'creator-2'], null, 2)
+    expect(prepare).not.toHaveBeenCalled()
+  })
+
   it('binds cursors to the viewer and followed-author scope', async () => {
     const { db } = mockDb()
     const page = await listFollowingOwnerContents(db, 'viewer-1', ['creator-1', 'creator-2'], null, 1)
@@ -130,6 +148,41 @@ describe('W03 private Following endpoint', () => {
       },
     })
     expect(String(prepare.mock.calls[0]?.[0] ?? '')).toContain("c.state = 'PUBLISHED'")
+  })
+
+  it('routes the authorized HTTP feed projection through the injected Neon store', async () => {
+    const prepare = vi.fn(() => {
+      throw new Error('D1 must not be queried when Neon provider is selected')
+    })
+    const list = vi.fn(async () => rows)
+    const neonWorker = createW03ContentWorker({
+      followingOwnerContentsReadStoreProvider: () => ({ list }),
+    })
+    const response = await neonWorker.fetch(
+      new Request('https://luckread-w03.internal/internal/content/following-feed', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'X-LuckRead-Caller': 'W04',
+          'X-LuckRead-Transport-Version': '1.0',
+          'X-LuckRead-Correlation-Id': 'w03-following-neon-test',
+          'X-LuckRead-Principal-User-Id': 'viewer-1',
+        },
+        body: JSON.stringify({ ownerUserIds: ['creator-1', 'creator-2'], limit: 1, cursor: null }),
+      }),
+      { D1_02: { prepare } as unknown as D1Database },
+    )
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      data: { items: [{ id: 'content-1' }], hasMore: true },
+    })
+    expect(list).toHaveBeenCalledWith(
+      expect.any(Array),
+      null,
+      2,
+    )
+    expect(prepare).not.toHaveBeenCalled()
   })
 
   it('rejects browser/spoofed callers and malformed author sets before querying D1', async () => {

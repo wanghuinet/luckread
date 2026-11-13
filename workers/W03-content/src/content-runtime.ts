@@ -119,6 +119,20 @@ export interface PublishedContentsByIdsReadStore {
   list(contentIds: readonly string[]): Promise<readonly ContentRow[]>
 }
 
+export type FollowingOwnerContentsCursor = Readonly<{
+  createdAt: string
+  id: string
+}>
+
+export interface FollowingOwnerContentsReadStore {
+  /** Return the published rows in stable descending feed order. */
+  list(
+    ownerIds: readonly string[],
+    cursor: FollowingOwnerContentsCursor | null,
+    limit: number,
+  ): Promise<readonly ContentRow[]>
+}
+
 
 interface ContentRevisionRow {
   id: string
@@ -1211,6 +1225,7 @@ export async function listFollowingOwnerContents(
   followedOwnerIdsInput: string[],
   cursorValue: string | null,
   limit: number,
+  readStore?: FollowingOwnerContentsReadStore,
 ): Promise<{ items: ContentRecord[]; nextCursor: string | null; hasMore: boolean }> {
   const viewerId = viewerUserId.trim()
   assertResourceId(viewerId)
@@ -1229,29 +1244,22 @@ export async function listFollowingOwnerContents(
     ownerIds,
   }))
   const cursor = decodeFollowingContentsCursor(cursorValue, viewerId, scopeHash)
-  const cursorClause = cursor
-    ? 'AND (c.created_at < ? OR (c.created_at = ? AND c.id < ?))'
-    : ''
-  const cursorBindings: unknown[] = cursor
-    ? [cursor.createdAt, cursor.createdAt, cursor.id]
-    : []
-  const ownerIdsJson = JSON.stringify(ownerIds)
-  const rows = await db.prepare(`
-    SELECT c.id, c.content_type, c.owner_user_id, c.creator_id, c.ip_id, c.state,
-           c.scheduled_at, c.access_mode, c.version, c.revision, c.slug, c.title, c.body_ref,
-           c.media_refs_json, c.cover_ref, c.media_warning, c.etag, c.created_at, c.updated_at
-      FROM contents c
-     WHERE c.state = 'PUBLISHED'
-       AND c.owner_user_id IN (SELECT value FROM json_each(?))
-       ${cursorClause}
-     ORDER BY c.created_at DESC, c.id DESC
-     LIMIT ?`).bind(
-       ownerIdsJson,
-       ...cursorBindings,
-       limit + 1,
-     ).all<ContentRow>()
-
-  const sourceRows = rows.results ?? []
+  const sourceRows = readStore
+    ? [...await readStore.list(ownerIds, cursor, limit + 1)]
+    : ((await db.prepare(`
+        SELECT c.id, c.content_type, c.owner_user_id, c.creator_id, c.ip_id, c.state,
+               c.scheduled_at, c.access_mode, c.version, c.revision, c.slug, c.title, c.body_ref,
+               c.media_refs_json, c.cover_ref, c.media_warning, c.etag, c.created_at, c.updated_at
+          FROM contents c
+         WHERE c.state = 'PUBLISHED'
+           AND c.owner_user_id IN (SELECT value FROM json_each(?))
+           ${cursor ? 'AND (c.created_at < ? OR (c.created_at = ? AND c.id < ?))' : ''}
+         ORDER BY c.created_at DESC, c.id DESC
+         LIMIT ?`).bind(
+           JSON.stringify(ownerIds),
+           ...(cursor ? [cursor.createdAt, cursor.createdAt, cursor.id] : []),
+           limit + 1,
+         ).all<ContentRow>()).results ?? [])
   const hasMore = sourceRows.length > limit
   const items = sourceRows.slice(0, limit).map(toContent)
   const last = items.at(-1)

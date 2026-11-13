@@ -2,6 +2,7 @@ import { createW03ContentWorker } from './index.js'
 import {
   getW03PublishedMediaReferenceReadStore,
   getW03PublishedContentsByIdsReadStore,
+  getW03FollowingOwnerContentsReadStore,
 } from './neon/runtime.js'
 
 /**
@@ -13,4 +14,6 @@ export default createW03ContentWorker({
     getW03PublishedMediaReferenceReadStore(env),
   publishedContentsByIdsReadStoreProvider: (env) =>
     getW03PublishedContentsByIdsReadStore(env),
+  followingOwnerContentsReadStoreProvider: (env) =>
+    getW03FollowingOwnerContentsReadStore(env),
 })

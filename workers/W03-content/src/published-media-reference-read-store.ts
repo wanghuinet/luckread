@@ -8,6 +8,8 @@ export type PublishedMediaReferenceRecord = Readonly<{
 
 export type W03PublishedMediaReferenceRuntimeEnv = Readonly<{
   D1_02?: PublishedMediaReferenceD1Database
+  /** Shared D1-02 read-driver switch; the legacy name remains supported. */
+  W03_CONTENT_READ_DRIVER?: string
   W03_PUBLIC_MEDIA_REFERENCE_DRIVER?: string
   HYPERDRIVE_D1_02?: Readonly<{ connectionString?: string }>
 }>
