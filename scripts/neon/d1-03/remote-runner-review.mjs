@@ -16,7 +16,7 @@ const W06_STAGED_HYPERDRIVE_SUFFIX = ',\n  "hyperdrive": [\n    {\n      "bindin
 function gitBlobSha1(content) {
   const bytes = Buffer.from(content, 'utf8')
   return createHash('sha1')
-    .update(Buffer.from('blob ' + bytes.length + '\\0', 'utf8'))
+    .update(Buffer.from('blob ' + bytes.length + '\0', 'utf8'))
     .update(bytes)
     .digest('hex')
 }
@@ -29,7 +29,7 @@ function hashCurrentReviewedSource({ root, relativePath, hashBlob }) {
   // The independent review remains pinned to the original W06 D1-03 source.
   // Only this exact, source-config-only Hyperdrive addition is normalized away;
   // any D1 binding, account target, service, cron or other edit still changes the hash.
-  const reviewedSource = source.slice(0, -W06_STAGED_HYPERDRIVE_SUFFIX.length) + '\\n}\\n'
+  const reviewedSource = source.slice(0, -W06_STAGED_HYPERDRIVE_SUFFIX.length) + '\n}\n'
   return gitBlobSha1(reviewedSource)
 }
 
