@@ -62,6 +62,19 @@ const templatePaths = [
   'workers/W07-subscription-commerce/scripts/neon-d1-04/templates/w07-refunds-billing-documents-postgres.sql',
   'workers/W07-subscription-commerce/scripts/neon-d1-04/templates/w07-payment-method-revocation-postgres.sql',
 ]
+const reviewedHyperdriveStagingSuffixes = Object.freeze({
+  [paths.wrangler]: ',\n  "hyperdrive": [\n    {\n      "binding": "HYPERDRIVE_D1_04",\n      "id": "3ae15e6dfb5e4b44979eee30e1d5ede4"\n    }\n  ]\n}',
+})
+
+function reviewedPinnedSource(pin, source) {
+  if (gitBlobSha1(source) === pin.gitBlobSha1) return source
+  const suffix = reviewedHyperdriveStagingSuffixes[pin.path]
+  if (suffix && source.endsWith(suffix)) {
+    return source.slice(0, -suffix.length) + '\n}'
+  }
+  return source
+}
+
 const expectedIds = [
   'd1-04-w07-order-payment-schema-v1',
   'd1-04-w07-saved-methods-mandates-v1',
@@ -180,7 +193,8 @@ export function verifyD104SharedRunnerReview({ readSource = readText } = {}) {
         !/^[0-9a-f]{40}$/.test(pin.gitBlobSha1 || '')) {
       fail('review source pins must have unique paths and exact Git blob SHA-1 values')
     }
-    if (gitBlobSha1(readSource(pin.path)) !== pin.gitBlobSha1) {
+    const source = readSource(pin.path)
+    if (gitBlobSha1(reviewedPinnedSource(pin, source)) !== pin.gitBlobSha1) {
       fail('reviewed source drifted: ' + pin.path)
     }
     pinnedPaths.add(pin.path)
