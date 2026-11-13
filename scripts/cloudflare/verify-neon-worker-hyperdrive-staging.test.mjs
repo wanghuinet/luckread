@@ -89,6 +89,7 @@ test('fails closed when a required Worker Wrangler file is missing', async () =>
     await mkdir(path.join(root, 'workers', 'W01-payload'), { recursive: true })
     await writeFile(path.join(root, 'workers', 'W01-payload', 'wrangler.jsonc'), JSON.stringify({
       name: 'luckread-w01-payload',
+      vars: { PAYLOAD_DATABASE_DRIVER: 'neon' },
       d1_databases: [{ binding: 'D1' }],
       hyperdrive: [{ binding: 'HYPERDRIVE', id: '0c53a1bb9bc0484bac146e8ae2d3158b' }],
     }))
