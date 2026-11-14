@@ -2691,3 +2691,4 @@ describe('W05 notification deep-link transport', () => {
     expect(statements[0]?.values).toEqual(['viewer-1', 'notification-1', 2])
   })
 })
+

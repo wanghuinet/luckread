@@ -21,6 +21,11 @@ import {
   NotificationEnqueueStoreError,
   type NotificationEnqueueStore,
 } from './notification-enqueue-store.js'
+import {
+  createD1SocialTokenSyncStore,
+  SocialTokenSyncStoreError,
+  type SocialTokenSyncStore,
+} from './social-token-sync-store.js'
 
 export class SocialClosureRuntimeError extends Error {
   constructor(readonly code: string, readonly status: number) { super(code) }
@@ -228,75 +233,81 @@ export const extractSocialTokens = (input: string): SocialToken[] => {
   return tokens
 }
 
-const assertTargetPublished = async (
-  db: D1Database,
-  targetValue: { targetType: SocialTargetType; targetId: string },
-  actorUserId: string,
-  contentContext?: PublishedContentSocialContext,
-): Promise<void> => {
-  if (targetValue.targetType === 'content') {
-    if (!contentContext) {
-      throw new SocialClosureRuntimeError('SERVICE_UNAVAILABLE', 503)
-    }
-    if (
-      contentContext.contentId !== targetValue.targetId ||
-      contentContext.state !== 'PUBLISHED'
-    ) {
-      throw new SocialClosureRuntimeError('NOT_FOUND', 404)
-    }
-    if (contentContext.ownerUserId !== actorUserId) {
-      throw new SocialClosureRuntimeError('PERMISSION_DENIED', 403)
-    }
-    return
-  }
+type SocialTokenSyncDataSource = D1Database | SocialTokenSyncStore
 
-  const row = await db.prepare(
-    'SELECT author_user_id, state FROM social_comments WHERE id = ? LIMIT 1',
-  ).bind(targetValue.targetId).first<{ author_user_id: string; state: string }>()
-  if (!row || row.state !== 'PUBLISHED') throw new SocialClosureRuntimeError('NOT_FOUND', 404)
-  if (row.author_user_id !== actorUserId) throw new SocialClosureRuntimeError('PERMISSION_DENIED', 403)
+function resolveSocialTokenSyncStore(source: SocialTokenSyncDataSource): SocialTokenSyncStore {
+  if (
+    typeof (source as SocialTokenSyncStore).getCommentContext === 'function' &&
+    typeof (source as SocialTokenSyncStore).listMentions === 'function'
+  ) return source as SocialTokenSyncStore
+  return createD1SocialTokenSyncStore(source as D1Database)
 }
 
 export type MentionTarget = { userId: string; handle: string }
 
 export async function syncSocialTokens(
-  db: D1Database,
+  source: SocialTokenSyncDataSource,
   actorUserIdValue: string,
   targetTypeValue: string,
   targetIdValue: string,
   textValue: string,
   mentions: MentionTarget[] = [],
   contentContext?: PublishedContentSocialContext,
+  notificationSource?: D1Database | NotificationEnqueueStore,
 ): Promise<{ topics: number; mentions: number }> {
   const actorUserId = id(actorUserIdValue, 'UNAUTHENTICATED')
   const targetValue = target(targetTypeValue, targetIdValue)
   const text = textValue.normalize('NFKC').trim()
   if (text.length > MAX_TEXT) throw new SocialClosureRuntimeError('VALIDATION_FAILED', 400)
 
-  await assertTargetPublished(db, targetValue, actorUserId, contentContext)
-  const relatedContent = targetValue.targetType === 'comment'
-    ? await db.prepare(
-        "SELECT content_id FROM social_comments WHERE id = ? AND state = 'PUBLISHED' LIMIT 1",
-      ).bind(targetValue.targetId).first<{ content_id: string }>()
-    : null
-  const relatedContentId = relatedContent?.content_id ?? null
+  const store = resolveSocialTokenSyncStore(source)
+  const isInjectedStore = typeof (source as SocialTokenSyncStore).getCommentContext === 'function'
+  let relatedContentId: string | null = null
+  if (targetValue.targetType === 'content') {
+    if (!contentContext) throw new SocialClosureRuntimeError('SERVICE_UNAVAILABLE', 503)
+    if (contentContext.contentId !== targetValue.targetId || contentContext.state !== 'PUBLISHED') {
+      throw new SocialClosureRuntimeError('NOT_FOUND', 404)
+    }
+    if (contentContext.ownerUserId !== actorUserId) {
+      throw new SocialClosureRuntimeError('PERMISSION_DENIED', 403)
+    }
+  } else {
+    let commentContext
+    try {
+      commentContext = await store.getCommentContext(targetValue.targetId)
+    } catch (error) {
+      if (error instanceof SocialTokenSyncStoreError) {
+        throw new SocialClosureRuntimeError(error.code, error.status)
+      }
+      throw error
+    }
+    if (!commentContext || commentContext.state !== 'PUBLISHED') {
+      throw new SocialClosureRuntimeError('NOT_FOUND', 404)
+    }
+    if (commentContext.author_user_id !== actorUserId) {
+      throw new SocialClosureRuntimeError('PERMISSION_DENIED', 403)
+    }
+    relatedContentId = commentContext.content_id
+  }
+
   const tokens = extractSocialTokens(text)
   const now = new Date().toISOString()
-  const previousMentions = await db.prepare(
-    `SELECT mention_id, mentioned_user_id, handle
-       FROM social_mentions
-      WHERE target_type = ? AND target_id = ?`,
-  ).bind(targetValue.targetType, targetValue.targetId).all<{
-    mention_id: string
-    mentioned_user_id: string
-    handle: string
-  }>()
+  let previousMentions
+  try {
+    previousMentions = await store.listMentions(targetValue.targetType, targetValue.targetId)
+  } catch (error) {
+    if (error instanceof SocialTokenSyncStoreError) {
+      throw new SocialClosureRuntimeError(error.code, error.status)
+    }
+    throw error
+  }
+
   const previousByHandle = new Map<string, MentionTarget | null>()
   const currentMentionHandles = new Set(
     tokens.filter((token) => token.kind === 'mention').map((token) => token.normalized),
   )
   const retainedMentionIds: string[] = []
-  for (const row of previousMentions.results ?? []) {
+  for (const row of previousMentions) {
     const normalizedHandle = row.handle.trim().replace(/^[@＠]/, '').normalize('NFKC').toLocaleLowerCase('en-US')
     if (!normalizedHandle) continue
     if (currentMentionHandles.has(normalizedHandle)) retainedMentionIds.push(row.mention_id)
@@ -311,49 +322,49 @@ export async function syncSocialTokens(
     }
   }
 
-  const deleteRemovedMentions = retainedMentionIds.length
-    ? db.prepare(
-        `DELETE FROM social_mentions
-          WHERE target_type = ? AND target_id = ?
-            AND mention_id NOT IN (${retainedMentionIds.map(() => '?').join(', ')})`,
-      ).bind(targetValue.targetType, targetValue.targetId, ...retainedMentionIds)
-    : db.prepare(
-        'DELETE FROM social_mentions WHERE target_type = ? AND target_id = ?',
-      ).bind(targetValue.targetType, targetValue.targetId)
-
-  // Preserve rows for handles that remain in the edited text. This makes the
-  // original identity durable even if later inserts or notification writes fail.
-  await db.batch([
-    db.prepare('DELETE FROM social_target_topics WHERE target_type = ? AND target_id = ?').bind(targetValue.targetType, targetValue.targetId),
-    deleteRemovedMentions,
-  ])
+  try {
+    await store.replaceTargetRelations({
+      targetType: targetValue.targetType,
+      targetId: targetValue.targetId,
+      retainedMentionIds,
+    })
+  } catch (error) {
+    if (error instanceof SocialTokenSyncStoreError) {
+      throw new SocialClosureRuntimeError(error.code, error.status)
+    }
+    throw error
+  }
 
   const topics = tokens.filter((token) => token.kind === 'hashtag')
   for (const token of topics) {
-    const topicId = 'topic_' + token.normalized
-    await db.prepare(
-      `INSERT INTO social_topics (topic_id, normalized_name, display_name, status, created_at, updated_at)
-       VALUES (?, ?, ?, 'ACTIVE', ?, ?)
-       ON CONFLICT(normalized_name)
-       DO UPDATE SET updated_at = excluded.updated_at`,
-    ).bind(topicId, token.normalized, token.normalized, now, now).run()
-
-    await db.prepare(
-      `INSERT OR IGNORE INTO social_target_topics
-        (relation_id, target_type, target_id, topic_id, token, created_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-    ).bind(crypto.randomUUID(), targetValue.targetType, targetValue.targetId, topicId, token.value, now).run()
+    try {
+      await store.upsertTopicAndAttach({
+        topicId: 'topic_' + token.normalized,
+        normalizedName: token.normalized,
+        displayName: token.normalized,
+        targetType: targetValue.targetType,
+        targetId: targetValue.targetId,
+        token: token.value,
+        relationId: crypto.randomUUID(),
+        now,
+      })
+    } catch (error) {
+      if (error instanceof SocialTokenSyncStoreError) {
+        throw new SocialClosureRuntimeError(error.code, error.status)
+      }
+      throw error
+    }
   }
 
   const resolved = new Map<string, MentionTarget>()
   for (const entry of mentions) {
     const handle = entry.handle.trim().replace(/^@/, '')
     if (!handle) continue
-    // Match the same NFKC + en-US lowercase normalization used by extracted tokens.
     const normalizedHandle = handle.normalize('NFKC').toLocaleLowerCase('en-US')
     resolved.set(normalizedHandle, { userId: id(entry.userId), handle })
   }
 
+  const notificationDataSource = notificationSource ?? (isInjectedStore ? undefined : source as D1Database)
   let mentionCount = 0
   for (const token of tokens.filter((item) => item.kind === 'mention')) {
     // An edit must not rebind an unchanged historical @handle to a new account
@@ -364,23 +375,26 @@ export async function syncSocialTokens(
     const entry = previous === undefined ? resolved.get(token.normalized) : previous ?? undefined
     if (!entry || entry.userId === actorUserId) continue
     if (!hadPreviousIdentity) {
-      await db.prepare(
-        `INSERT OR IGNORE INTO social_mentions
-          (mention_id, target_type, target_id, actor_user_id, mentioned_user_id, handle, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      ).bind(
-        crypto.randomUUID(),
-        targetValue.targetType,
-        targetValue.targetId,
-        actorUserId,
-        entry.userId,
-        entry.handle,
-        now,
-      ).run()
+      try {
+        await store.insertMention({
+          mentionId: crypto.randomUUID(),
+          targetType: targetValue.targetType,
+          targetId: targetValue.targetId,
+          actorUserId,
+          mentionedUserId: entry.userId,
+          handle: entry.handle,
+          now,
+        })
+      } catch (error) {
+        if (error instanceof SocialTokenSyncStoreError) {
+          throw new SocialClosureRuntimeError(error.code, error.status)
+        }
+        throw error
+      }
     }
 
-    if (!hadPreviousIdentity) {
-      await enqueueNotification(db, {
+    if (!hadPreviousIdentity && notificationDataSource) {
+      await enqueueNotification(notificationDataSource, {
         recipientUserId: entry.userId,
         actorUserId,
         type: 'MENTION',

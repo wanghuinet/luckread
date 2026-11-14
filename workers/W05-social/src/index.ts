@@ -59,11 +59,19 @@ import type { ContentLikerReadStore } from './like-list-read-store.js'
 import type { LikeStatusReadStore } from './like-status-read-store.js'
 import type { LikeTargetContextReadStore } from './like-target-context-read-store.js'
 import type { CommentListReadStore } from './comment-list-read-store.js'
+import type { CommentCreateStore } from './comment-create-store.js'
+import type { CommentMutationStore } from './comment-mutation-store.js'
+import type { CommentNotificationContextStore } from './comment-notification-context-store.js'
+import type { NotificationEnqueueStore } from './notification-enqueue-store.js'
+import type { SocialTargetsReadStore } from './social-targets-read-store.js'
+import type { SocialTokenSyncStore } from './social-token-sync-store.js'
 
 type RateLimitBinding = { limit(input: { key: string }): Promise<{ success: boolean }> }
 
 interface Env {
   DB: D1Database
+  W05_DATABASE_DRIVER?: string
+  HYPERDRIVE_D1_02?: { connectionString?: string }
   D1_03?: D1Database
   W03_CONTENT?: W03ContentBinding
   SOCIAL_READ_LIMITER?: RateLimitBinding
@@ -268,6 +276,18 @@ export type W05SocialWorkerDependencies = Readonly<{
   followingAuthorIdsReadStore?: FollowingAuthorIdsReadStore
   /** Optional PostgreSQL-capable comment page reader; D1 remains the deployed default. */
   commentListReadStore?: CommentListReadStore
+  /** Optional PostgreSQL-capable comment creation store; D1 remains the deployed default. */
+  commentCreateStore?: CommentCreateStore
+  /** Optional PostgreSQL-capable comment edit/delete store; D1 remains the deployed default. */
+  commentMutationStore?: CommentMutationStore
+  /** Optional PostgreSQL-capable comment-owned mention/topic synchronization store. */
+  socialTokenSyncStore?: SocialTokenSyncStore
+  /** Optional PostgreSQL-capable social-target read store for comment mentions/topics. */
+  socialTargetsReadStore?: SocialTargetsReadStore
+  /** Optional PostgreSQL-capable comment notification context reader. */
+  commentNotificationContextStore?: CommentNotificationContextStore
+  /** Optional PostgreSQL-capable notification inbox/outbox enqueue store. */
+  notificationEnqueueStore?: NotificationEnqueueStore
   /** Optional PostgreSQL-capable Block/Mute list reader; D1 remains the deployed default. */
   blockMuteListReadStore?: BlockMuteListReadStore
   /** Optional PostgreSQL-capable profile replies/likes reader; D1 remains the deployed default. */
@@ -500,13 +520,31 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
             throw new CommentRuntimeError('VALIDATION_FAILED', 400)
           }
 
-          const result = await updateComment(env.DB, env.W03_CONTENT, actorUserId, commentId, {
-            body: bodyValue,
-            ifMatch,
-          }, request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '')
+          const result = await updateComment(
+            env.DB,
+            env.W03_CONTENT,
+            actorUserId,
+            commentId,
+            { body: bodyValue, ifMatch },
+            request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '',
+            dependencies.commentMutationStore,
+          )
           const mentionTargets = rawMentions === undefined ? [] : rawMentions as Array<{ userId: string; handle: string }>
-          await syncSocialTokens(env.DB, actorUserId, 'comment', commentId, bodyValue, mentionTargets)
-          const persistedMentions = await getSocialTargets(env.DB, 'comment', commentId)
+          await syncSocialTokens(
+            dependencies.socialTokenSyncStore ?? env.DB,
+            actorUserId,
+            'comment',
+            commentId,
+            bodyValue,
+            mentionTargets,
+            undefined,
+            dependencies.notificationEnqueueStore ?? env.DB,
+          )
+          const persistedMentions = await getSocialTargets(
+            dependencies.socialTargetsReadStore ?? env.DB,
+            'comment',
+            commentId,
+          )
           const item = { ...result.item, mentions: persistedMentions.mentions }
           return Response.json(
             { data: item, requestId: createRequestId() },
@@ -529,6 +567,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
             actorUserId,
             commentId,
             request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '',
+            dependencies.commentMutationStore,
           )
           return new Response(null, {
             status: 204,
@@ -918,14 +957,30 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
           body: bodyValue,
           parentId: parentId ?? null,
           idempotencyKey,
-        }, actorVerified)
+        }, actorVerified, dependencies.commentCreateStore)
         const mentionTargets = rawMentions === undefined ? [] : rawMentions as Array<{ userId: string; handle: string }>
-        await syncSocialTokens(env.DB, viewerUserId, 'comment', comment.id, bodyValue, mentionTargets)
-        const persistedMentions = await getSocialTargets(env.DB, 'comment', comment.id)
+        await syncSocialTokens(
+          dependencies.socialTokenSyncStore ?? env.DB,
+          viewerUserId,
+          'comment',
+          comment.id,
+          bodyValue,
+          mentionTargets,
+          undefined,
+          dependencies.notificationEnqueueStore ?? env.DB,
+        )
+        const persistedMentions = await getSocialTargets(
+          dependencies.socialTargetsReadStore ?? env.DB,
+          'comment',
+          comment.id,
+        )
         if (parentId) {
-          const parent = await getPublishedCommentNotificationContext(env.DB, parentId)
+          const parent = await getPublishedCommentNotificationContext(
+            dependencies.commentNotificationContextStore ?? env.DB,
+            parentId,
+          )
           if (parent?.author_user_id) {
-            await enqueueNotification(env.DB, {
+            await enqueueNotification(dependencies.notificationEnqueueStore ?? env.DB, {
               recipientUserId: parent.author_user_id,
               actorUserId: viewerUserId,
               type: 'REPLY',
@@ -941,7 +996,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
             request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '',
           )
           if (contentOwnerUserId) {
-            await enqueueNotification(env.DB, {
+            await enqueueNotification(dependencies.notificationEnqueueStore ?? env.DB, {
               recipientUserId: contentOwnerUserId,
               actorUserId: viewerUserId,
               type: 'COMMENT',

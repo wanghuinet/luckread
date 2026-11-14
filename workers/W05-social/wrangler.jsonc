@@ -50,7 +50,8 @@
     }
   ],
   "vars": {
-    "PUSH_DELIVERY_ENABLED": "false"
+    "PUSH_DELIVERY_ENABLED": "false",
+    "W05_DATABASE_DRIVER": "d1"
   },
   "workflows": [
     {
