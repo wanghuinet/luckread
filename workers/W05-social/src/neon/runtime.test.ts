@@ -48,6 +48,7 @@ describe('W05 Neon runtime composition', () => {
     expect(first).toBe(second)
     expect(Object.keys(first).sort()).toEqual([
       'blockMuteListReadStore',
+      'blockMuteRelationStore',
       'commentCreateStore',
       'commentListReadStore',
       'commentMutationStore',

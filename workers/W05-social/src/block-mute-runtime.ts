@@ -31,7 +31,7 @@ const MAX_ID = 128
 
 const validateId = (value: string): string => {
   const normalized = value.trim()
-  if (!normalized || normalized.length > MAX_ID) {
+  if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(normalized) || normalized.length > MAX_ID) {
     throw new BlockMuteRuntimeError('VALIDATION_FAILED', 400)
   }
   return normalized
