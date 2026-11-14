@@ -197,7 +197,7 @@ export async function getFavoriteStatus(
     })
   } catch (error) {
     if (error instanceof FavoriteStatusReadStoreError) {
-      throw new FavoriteRuntimeError(error.code, error.status)
+      throw new FavoriteRuntimeError(error.code, error.status, error.message)
     }
     throw error
   }
@@ -296,7 +296,7 @@ export async function listFavorites(
     })
   } catch (error) {
     if (error instanceof FavoriteListReadStoreError) {
-      throw new FavoriteRuntimeError(error.code, error.status)
+      throw new FavoriteRuntimeError(error.code, error.status, error.message)
     }
     throw error
   }
