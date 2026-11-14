@@ -58,6 +58,7 @@ import type { FollowingAuthorIdsReadStore } from './following-author-ids-read-st
 import type { ContentLikerReadStore } from './like-list-read-store.js'
 import type { LikeStatusReadStore } from './like-status-read-store.js'
 import type { LikeTargetContextReadStore } from './like-target-context-read-store.js'
+import type { LikeMutationStore } from './like-mutation-store.js'
 import type { CommentListReadStore } from './comment-list-read-store.js'
 import type { CommentCreateStore } from './comment-create-store.js'
 import type { CommentMutationStore } from './comment-mutation-store.js'
@@ -181,7 +182,7 @@ const getPublishedContentOwnerUserId = async (
 }
 
 const getInteractionNotificationContext = async (
-  db: D1Database,
+  source: D1Database | CommentNotificationContextStore,
   targetType: string,
   targetId: string,
   w03Content: W03ContentBinding | undefined,
@@ -194,7 +195,7 @@ const getInteractionNotificationContext = async (
     }
   }
   if (targetType === 'comment') {
-    const row = await getPublishedCommentNotificationContext(db, targetId)
+    const row = await getPublishedCommentNotificationContext(source, targetId)
     return {
       recipientUserId: row?.author_user_id ?? null,
       contentId: row?.content_id ?? null,
@@ -300,6 +301,8 @@ export type W05SocialWorkerDependencies = Readonly<{
   likeStatusReadStore?: LikeStatusReadStore
   /** Optional PostgreSQL-capable like-target context and Block preflight reader; D1 remains the deployed default. */
   likeTargetContextReadStore?: LikeTargetContextReadStore
+  /** Optional PostgreSQL-capable Like/Unlike mutation store; D1 remains the deployed default. */
+  likeMutationStore?: LikeMutationStore
 }>
 
 export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies = {}) {
@@ -1107,18 +1110,18 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
           const publishedContentContext = target.targetType === 'content'
             ? await fetchPublishedContentSocialContext(env.W03_CONTENT, { contentId: target.targetId, correlationId })
             : undefined
-          const result = await like(env.DB, env.W03_CONTENT, viewerUserId, target, correlationId, publishedContentContext)
+          const result = await like(env.DB, env.W03_CONTENT, viewerUserId, target, correlationId, publishedContentContext, dependencies.likeMutationStore, dependencies.likeTargetContextReadStore)
           const notificationContext = publishedContentContext
             ? { recipientUserId: publishedContentContext.ownerUserId, contentId: null }
             : await getInteractionNotificationContext(
-                env.DB,
+                dependencies.commentNotificationContextStore ?? env.DB,
                 target.targetType,
                 target.targetId,
                 env.W03_CONTENT,
                 correlationId,
               )
           if (notificationContext.recipientUserId) {
-            await enqueueNotification(env.DB, {
+            await enqueueNotification(dependencies.notificationEnqueueStore ?? env.DB, {
               recipientUserId: notificationContext.recipientUserId,
               actorUserId: viewerUserId,
               type: 'LIKE',
@@ -1129,7 +1132,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
           }
           return json({ data: result, requestId: createRequestId() }, 200)
         }
-        await unlike(env.DB, viewerUserId, target)
+        await unlike(env.DB, viewerUserId, target, dependencies.likeMutationStore)
         return new Response(null, { status: 204 })
       }
 
