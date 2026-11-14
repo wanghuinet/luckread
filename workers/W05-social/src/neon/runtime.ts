@@ -7,6 +7,7 @@ import { createPostgresRelationshipGraphReadStore } from '../relationship-graph-
 import { createPostgresFollowingAuthorIdsReadStore } from '../following-author-ids-read-store-postgres.js'
 import { createPostgresCommentListReadStore } from '../comment-list-read-store-postgres.js'
 import { createPostgresBlockMuteListReadStore } from '../block-mute-list-read-store-postgres.js'
+import { createPostgresBlockMuteRelationStore } from '../block-mute-relation-store-postgres.js'
 import { createPostgresProfileChannelReadStore } from '../profile-channel-read-store-postgres.js'
 import { createPostgresContentLikerReadStore } from '../like-list-read-store-postgres.js'
 import { createPostgresFavoriteListReadStore } from '../favorite-list-read-store-postgres.js'
@@ -133,6 +134,9 @@ export function getW05SocialWorkerDependencies(
     ),
     blockMuteListReadStore: createPostgresBlockMuteListReadStore(
       asExecutor<Parameters<typeof createPostgresBlockMuteListReadStore>[0]>(pool),
+    ),
+    blockMuteRelationStore: createPostgresBlockMuteRelationStore(
+      asExecutor<Parameters<typeof createPostgresBlockMuteRelationStore>[0]>(pool),
     ),
     profileChannelReadStore: createPostgresProfileChannelReadStore(
       asExecutor<Parameters<typeof createPostgresProfileChannelReadStore>[0]>(pool),
