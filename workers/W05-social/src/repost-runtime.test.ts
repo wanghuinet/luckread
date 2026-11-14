@@ -18,7 +18,7 @@ const publishedBinding = (status = 200) => ({
     const request = input instanceof Request ? input : new Request(input, init)
     const contentId = new URL(request.url).pathname.split('/').filter(Boolean).at(-2)
     return Response.json(status === 200 ? {
-      data: { contentId, ownerUserId: 'owner-1', contentType: 'post', state: 'PUBLISHED' },
+      data: { contentId, ownerUserId: 'owner-1', contentType: 'post', state: 'PUBLISHED', updatedAt: '2026-11-14T00:00:00.000Z' },
     } : { error: 'NOT_FOUND' }, { status })
   }),
 }) as W03ContentBinding & { fetch: ReturnType<typeof vi.fn> }
