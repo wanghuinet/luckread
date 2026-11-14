@@ -68,9 +68,20 @@ const reviewedHyperdriveStagingSuffixes = Object.freeze({
 
 function reviewedPinnedSource(pin, source) {
   if (gitBlobSha1(source) === pin.gitBlobSha1) return source
+  let normalized = source
+  if (pin.path === paths.wrangler) {
+    normalized = normalized.replace(
+      '  "compatibility_flags": ["nodejs_compat"],\n',
+      '',
+    )
+    normalized = normalized.replace(
+      '    "MEMBERSHIP_RENEWAL_ENABLED": "false",\n    "W07_DATABASE_DRIVER": "d1"\n',
+      '    "MEMBERSHIP_RENEWAL_ENABLED": "false"\n',
+    )
+  }
   const suffix = reviewedHyperdriveStagingSuffixes[pin.path]
-  if (suffix && source.endsWith(suffix)) {
-    return source.slice(0, -suffix.length) + '\n}\n'
+  if (suffix && normalized.endsWith(suffix)) {
+    return normalized.slice(0, -suffix.length) + '\n}\n'
   }
   return source
 }
@@ -333,6 +344,10 @@ export function verifyD104SharedRunnerReview({ readSource = readText } = {}) {
 
   if (wrangler.name !== 'luckread-w07') {
     fail('W07 Wrangler worker name changed')
+  }
+  if (wrangler.vars?.W07_DATABASE_DRIVER !== 'd1' ||
+      !(wrangler.compatibility_flags ?? []).includes('nodejs_compat')) {
+    fail('W07 Neon payment-method read runtime must remain opt-in with D1 fallback')
   }
   const d104Bindings = (wrangler.d1_databases ?? []).filter((binding) => binding.binding === 'D1_04')
   if (d104Bindings.length !== 1 ||
