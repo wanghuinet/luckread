@@ -52,7 +52,7 @@ export function createPostgresPostThreadReadStore(
               ON previous_content.id = r.source_id
              AND previous_content.owner_user_id = a.owner_user_id
            WHERE a.depth < $2
-             AND POSITION('|' || r.source_id || '|' IN a.visited) = 0
+             AND STRPOS(a.visited, '|' || r.source_id || '|') = 0
         ),
         root(id, owner_user_id) AS (
           SELECT id, owner_user_id FROM ancestors ORDER BY depth DESC LIMIT 1
@@ -76,7 +76,7 @@ export function createPostgresPostThreadReadStore(
               ON next_content.id = r.target_id
              AND next_content.owner_user_id = t.owner_user_id
            WHERE t.position + 1 < $5
-             AND POSITION('|' || r.target_id || '|' IN t.visited) = 0
+             AND STRPOS(t.visited, '|' || r.target_id || '|') = 0
              AND (
                (next_content.state = 'PUBLISHED' AND next_content.access_mode = 'PUBLIC')
                OR ($6::text IS NOT NULL AND t.owner_user_id = $7::text AND next_content.state IN ('DRAFT', 'PUBLISHED'))
