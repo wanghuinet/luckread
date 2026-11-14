@@ -6,6 +6,8 @@ export default defineConfig({
     environment: 'node',
     include: [
       'src/neon/runtime.test.ts',
+      'src/profile-pin-neon-runtime.test.ts',
+      'src/profile-pin-store-postgres.test.ts',
       'src/notification-preferences-runtime.test.ts',
       'src/notification-preferences-store-postgres.test.ts',
       'src/block-mute-mutation-runtime.test.ts',

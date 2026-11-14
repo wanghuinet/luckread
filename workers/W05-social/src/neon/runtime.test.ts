@@ -66,6 +66,7 @@ describe('W05 Neon runtime composition', () => {
       'notificationEnqueueStore',
       'notificationPreferencesStore',
       'profileChannelReadStore',
+      'profilePinStore',
       'relationshipGraphReadStore',
       'socialTargetsReadStore',
       'socialTokenSyncStore',
