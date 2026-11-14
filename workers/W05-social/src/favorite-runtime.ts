@@ -20,7 +20,7 @@ import {
 import { fetchPublishedContentSocialContext, type W03ContentBinding } from './w03-content-context-client.js'
 
 export class FavoriteRuntimeError extends Error {
-  constructor(readonly code: string, readonly status: number) { super(code) }
+  constructor(readonly code: string, readonly status: number, message = code) { super(message) }
 }
 
 export type FavoriteTarget = {
@@ -107,7 +107,7 @@ function resolveFavoriteMutationStore(source: FavoriteMutationDataSource): Favor
 
 function mapFavoriteMutationStoreError(error: unknown): never {
   if (error instanceof FavoriteMutationStoreError) {
-    throw new FavoriteRuntimeError(error.code, error.status)
+    throw new FavoriteRuntimeError(error.code, error.status, error.message)
   }
   throw error
 }
