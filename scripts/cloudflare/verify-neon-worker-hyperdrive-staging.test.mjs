@@ -47,7 +47,7 @@ test('rejects removal or renaming of an existing D1 rollback binding', () => {
   )
 })
 
-test('requires W01 and W02 Neon mode while keeping W08 on D1 until its cutover slice', () => {
+test('requires W01, W02 and W08 Neon mode while preserving their D1 rollback bindings', () => {
   const w02 = STAGED_WORKERS.find((worker) => worker.worker === 'W02')
   const w02Config = {
     name: w02.script,
@@ -62,14 +62,16 @@ test('requires W01 and W02 Neon mode while keeping W08 on D1 until its cutover s
   )
 
   const w08 = STAGED_WORKERS.find((worker) => worker.worker === 'W08')
+  const w08Config = {
+    name: w08.script,
+    d1_databases: w08.d1Bindings.map((binding) => ({ binding })),
+    hyperdrive: [{ binding: w08.binding, id: w08.hyperdriveId }],
+    vars: { W08_DATABASE_DRIVER: 'neon' },
+  }
+  assert.doesNotThrow(() => verifyWorkerConfig(w08Config, w08))
   assert.throws(
-    () => verifyWorkerConfig({
-      name: w08.script,
-      d1_databases: w08.d1Bindings.map((binding) => ({ binding })),
-      hyperdrive: [{ binding: w08.binding, id: w08.hyperdriveId }],
-      vars: { W08_DATABASE_DRIVER: 'neon' },
-    }, w08),
-    /production database driver must be d1/,
+    () => verifyWorkerConfig({ ...w08Config, vars: { W08_DATABASE_DRIVER: 'd1' } }, w08),
+    /production database driver must be neon/,
   )
 })
 

@@ -73,7 +73,7 @@ jobs:
         working-directory: workers/W08-creator
         run: npm install --ignore-scripts --no-audit --no-fund --package-lock=false
 
-      - name: Verify W08 keeps D1 as default and reuses the existing D1-01 Hyperdrive
+      - name: Verify W08 selects Neon and preserves the D1-01 rollback binding
         working-directory: workers/W08-creator
         run: |
           node --input-type=module <<'NODE'
@@ -82,11 +82,11 @@ jobs:
           const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'))
           const d1 = (config.d1_databases ?? []).find((binding) => binding.binding === 'D1_01')
           const hyperdrive = (config.hyperdrive ?? []).find((binding) => binding.binding === 'HYPERDRIVE')
-          if (config.vars?.W08_DATABASE_DRIVER !== 'd1') throw new Error('W08 production default must remain D1')
+          if (config.vars?.W08_DATABASE_DRIVER !== 'neon') throw new Error('W08 production runtime must select Neon')
           if (d1?.database_id !== '2f80471e-3756-49f9-8db1-7707a433ad64') throw new Error('W08 D1-01 rollback binding changed')
           if (hyperdrive?.id !== '0c53a1bb9bc0484bac146e8ae2d3158b') throw new Error('W08 must reuse the existing D1-01 Hyperdrive')
           if (pkg.dependencies?.pg !== '8.20.0') throw new Error('W08 pg must be a pinned runtime dependency')
-          console.log('W08_D1_DEFAULT_ROLLBACK_AND_HYPERDRIVE_BINDING=PASS')
+          console.log('W08_NEON_RUNTIME_D1_ROLLBACK_AND_HYPERDRIVE_BINDING=PASS')
           NODE
 
       - name: Test W08 Neon runtime selection and PostgreSQL store transactions

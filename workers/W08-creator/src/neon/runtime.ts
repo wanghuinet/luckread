@@ -18,7 +18,7 @@ export type W08RuntimeEnv = Readonly<{
 const pools = new WeakMap<object, Pool>()
 const stores = new WeakMap<object, W08CreatorStore>()
 
-/** D1 remains the rollback-safe default; unknown modes never fall back silently. */
+/** Wrangler selects Neon for production; D1 remains an explicit rollback and local fallback. */
 export function resolveW08DatabaseDriver(env: W08RuntimeEnv): W08DatabaseDriver {
   const configured = env.W08_DATABASE_DRIVER?.trim().toLowerCase() || 'd1'
   if (configured === 'd1' || configured === 'neon') return configured
