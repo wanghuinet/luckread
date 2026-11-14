@@ -72,6 +72,7 @@ import type { SocialTokenSyncStore } from './social-token-sync-store.js'
 import type { NotificationPreferencesStore } from './notification-preferences-store.js'
 import type { ProfilePinStore } from './profile-pin-store.js'
 import type { RepostStore } from './repost-store.js'
+import type { ShareStore } from './share-store.js'
 
 type RateLimitBinding = { limit(input: { key: string }): Promise<{ success: boolean }> }
 
@@ -301,6 +302,8 @@ export type W05SocialWorkerDependencies = Readonly<{
   profilePinStore?: ProfilePinStore
   /** Optional PostgreSQL-capable Repost relation store; D1 remains the deployed default. */
   repostStore?: RepostStore
+  /** Optional PostgreSQL-capable idempotent Share link store; D1 remains the deployed default. */
+  shareStore?: ShareStore
   /** Optional PostgreSQL-capable Block/Mute list reader; D1 remains the deployed default. */
   blockMuteListReadStore?: BlockMuteListReadStore
   /** Optional PostgreSQL-capable Block/Mute relation reader and writer; D1 remains the deployed default. */
@@ -410,7 +413,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
         requireTransport(request)
         const shareId = decodePathPart(parts[3])
         if (shareId === null) throw new ShareRuntimeError('VALIDATION_FAILED', 400)
-        return json({ data: await resolveShare(env.DB, env.W03_CONTENT, shareId, request.headers.get('X-LuckRead-Correlation-Id') ?? ''), requestId: createRequestId() })
+        return json({ data: await resolveShare(env.DB, env.W03_CONTENT, shareId, request.headers.get('X-LuckRead-Correlation-Id') ?? '', dependencies.shareStore), requestId: createRequestId() })
       }
 
       if (url.pathname.startsWith('/internal/social/content/')) {
@@ -423,7 +426,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
         if (contentId === null) throw new ShareRuntimeError('VALIDATION_FAILED', 400)
         const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
         return json({
-          data: await createShare(env.DB, env.W03_CONTENT, actorUserId, contentId, idempotencyKey, request.headers.get('X-LuckRead-Correlation-Id') ?? ''),
+          data: await createShare(env.DB, env.W03_CONTENT, actorUserId, contentId, idempotencyKey, request.headers.get('X-LuckRead-Correlation-Id') ?? '', dependencies.shareStore),
           requestId: createRequestId(),
         }, 201)
       }

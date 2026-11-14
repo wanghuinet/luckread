@@ -69,6 +69,7 @@ describe('W05 Neon runtime composition', () => {
       'profilePinStore',
       'relationshipGraphReadStore',
       'repostStore',
+      'shareStore',
       'socialTargetsReadStore',
       'socialTokenSyncStore',
     ])
