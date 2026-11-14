@@ -158,3 +158,17 @@ test('fails closed on a reviewed source Git blob mismatch', () => {
     /reviewed source drifted/,
   )
 })
+
+
+test('keeps W07 Neon payment-method reads opt-in until D1-04 remote schema admission', () => {
+  const wranglerPath = 'workers/W07-subscription-commerce/wrangler.jsonc'
+  const source = overrideSource(wranglerPath, (text) => {
+    const wrangler = JSON.parse(text)
+    wrangler.vars.W07_DATABASE_DRIVER = 'neon'
+    return JSON.stringify(wrangler)
+  })
+  assert.throws(
+    () => verifyD104SharedRunnerReview({ readSource: source }),
+    /W07 Neon payment-method read runtime must remain opt-in with D1 fallback/,
+  )
+})

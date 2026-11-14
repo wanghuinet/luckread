@@ -16,6 +16,7 @@ import { createSubscriptionPlanUpgradeCheckout } from './subscription-plan-chang
 import { scheduleSubscriptionPlanDowngrade, scheduleSubscriptionBillingIntervalChange } from './subscription-plan-change-schedule.js'
 import { startSubscriptionTrial } from './subscription-trial-runtime.js'
 import { listOwnedSavedPaymentMethods, revokeOwnedSavedPaymentMethod, PaymentMethodRuntimeError } from './payment-method-runtime.js'
+import { getW07PaymentMethodReadStore } from './neon/payment-method-read-runtime.js'
 import { resolveDemoCommercePricing, resolveDemoRenewalPricing } from './demo-commerce-pricing-resolver.js'
 import { runRenewalScheduledBatch } from './renewal-scheduler.js'
 
@@ -23,6 +24,8 @@ interface RateLimitBinding { limit(input: { key: string }): Promise<{ success: b
 interface Env {
   D1_01: D1Database
   D1_04: D1Database
+  W07_DATABASE_DRIVER?: string
+  HYPERDRIVE_D1_04?: { connectionString?: string }
   W06_GOVERNANCE?: Fetcher
   MEMBERSHIP_RENEWAL_ENABLED?: string
   HYPERSWITCH_ENVIRONMENT?: string
@@ -266,7 +269,7 @@ export default {
       requireLayer(request)
       const paymentMethodPath = new URL(request.url).pathname
       if (request.method === 'GET' && paymentMethodPath === '/payment-methods') {
-        const docs = await listOwnedSavedPaymentMethods(env, principal)
+        const docs = await listOwnedSavedPaymentMethods(env, principal, getW07PaymentMethodReadStore(env))
         return json({ data: { docs }, requestId: crypto.randomUUID() })
       }
       const paymentMethodMatch = /^\/payment-methods\/(spm_[A-Za-z0-9]{26})$/.exec(paymentMethodPath)
