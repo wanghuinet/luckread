@@ -69,6 +69,7 @@ import type { CommentNotificationContextStore } from './comment-notification-con
 import type { NotificationEnqueueStore } from './notification-enqueue-store.js'
 import type { SocialTargetsReadStore } from './social-targets-read-store.js'
 import type { SocialTokenSyncStore } from './social-token-sync-store.js'
+import type { NotificationPreferencesStore } from './notification-preferences-store.js'
 
 type RateLimitBinding = { limit(input: { key: string }): Promise<{ success: boolean }> }
 
@@ -292,6 +293,8 @@ export type W05SocialWorkerDependencies = Readonly<{
   commentNotificationContextStore?: CommentNotificationContextStore
   /** Optional PostgreSQL-capable notification inbox/outbox enqueue store. */
   notificationEnqueueStore?: NotificationEnqueueStore
+  /** Optional PostgreSQL-capable per-user notification preferences store; D1 remains the deployed default. */
+  notificationPreferencesStore?: NotificationPreferencesStore
   /** Optional PostgreSQL-capable Block/Mute list reader; D1 remains the deployed default. */
   blockMuteListReadStore?: BlockMuteListReadStore
   /** Optional PostgreSQL-capable Block/Mute relation reader and writer; D1 remains the deployed default. */
@@ -747,7 +750,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
         const actorUserId = requirePrincipal(request)
         requireInteractionLayer(request)
         if (request.method === 'GET') {
-          return json({ data: await getNotificationPreferences(env.DB, actorUserId), requestId: crypto.randomUUID() })
+          return json({ data: await getNotificationPreferences(dependencies.notificationPreferencesStore ?? env.DB, actorUserId), requestId: crypto.randomUUID() })
         }
         if (request.method !== 'PATCH') return new Response(null, { status: 405, headers: { Allow: 'GET, PATCH' } })
         let body: unknown
@@ -764,7 +767,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
           if (typeof raw[key] !== 'boolean') throw new SocialClosureRuntimeError('VALIDATION_FAILED', 400)
           input[key] = raw[key]
         }
-        return json({ data: await setNotificationPreferences(env.DB, actorUserId, input), requestId: crypto.randomUUID() })
+        return json({ data: await setNotificationPreferences(dependencies.notificationPreferencesStore ?? env.DB, actorUserId, input), requestId: crypto.randomUUID() })
       }
 
       const pollVoteMatch = /^\/internal\/social\/contents\/([^/]+)\/poll\/votes$/.exec(url.pathname)
