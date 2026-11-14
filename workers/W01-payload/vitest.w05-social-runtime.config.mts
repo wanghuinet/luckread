@@ -6,6 +6,10 @@ export default defineConfig({
     environment: 'node',
     include: [
       'src/neon/runtime.test.ts',
+      'src/poll-vote-neon-runtime.test.ts',
+      'src/poll-runtime.test.ts',
+      'src/poll-read-store-postgres.test.ts',
+      'src/poll-vote-store-postgres.test.ts',
       'src/profile-pin-neon-runtime.test.ts',
       'src/profile-pin-store-postgres.test.ts',
       'src/repost-neon-runtime.test.ts',
