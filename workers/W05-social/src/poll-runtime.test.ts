@@ -151,7 +151,7 @@ describe('W05 poll runtime', () => {
       },
       poll: {
         poll_id: 'poll-1', content_id: 'content-1', owner_user_id: 'author-1',
-        duration_minutes: 1440, ends_at: '2026-10-18T04:00:00.000Z',
+        duration_minutes: 1440, ends_at: '2099-10-18T04:00:00.000Z',
         created_at: '2026-10-17T04:00:00.000Z', updated_at: '2026-10-17T04:00:00.000Z',
       },
       options: [

@@ -26,6 +26,8 @@ import { createPostgresNotificationEnqueueStore } from '../notification-enqueue-
 import { createPostgresNotificationPreferencesStore } from '../notification-preferences-store-postgres.js'
 import { createPostgresSocialTargetsReadStore } from '../social-targets-read-store-postgres.js'
 import { createPostgresSocialTokenSyncStore } from '../social-token-sync-store-postgres.js'
+import { createPostgresPollReadStore } from '../poll-read-store-postgres.js'
+import { createPostgresPollVoteStore } from '../poll-vote-store-postgres.js'
 
 export type W05SocialDatabaseDriver = 'd1' | 'neon'
 
@@ -195,6 +197,12 @@ export function getW05SocialWorkerDependencies(
     ),
     socialTokenSyncStore: createPostgresSocialTokenSyncStore(
       asExecutor<Parameters<typeof createPostgresSocialTokenSyncStore>[0]>(pool),
+    ),
+    pollReadStore: createPostgresPollReadStore(
+      asExecutor<Parameters<typeof createPostgresPollReadStore>[0]>(pool),
+    ),
+    pollVoteStore: createPostgresPollVoteStore(
+      asExecutor<Parameters<typeof createPostgresPollVoteStore>[0]>(pool),
     ),
   }
 
