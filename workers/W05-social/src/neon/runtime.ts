@@ -10,6 +10,8 @@ import { createPostgresBlockMuteListReadStore } from '../block-mute-list-read-st
 import { createPostgresProfileChannelReadStore } from '../profile-channel-read-store-postgres.js'
 import { createPostgresContentLikerReadStore } from '../like-list-read-store-postgres.js'
 import { createPostgresFavoriteListReadStore } from '../favorite-list-read-store-postgres.js'
+import { createPostgresFavoriteMutationStore } from '../favorite-mutation-store-postgres.js'
+import { createPostgresFavoriteStatusReadStore } from '../favorite-status-read-store-postgres.js'
 import { createPostgresLikeStatusReadStore } from '../like-status-read-store-postgres.js'
 import { createPostgresLikeMutationStore } from '../like-mutation-store-postgres.js'
 import { createPostgresLikeTargetContextReadStore } from '../like-target-context-read-store-postgres.js'
@@ -140,6 +142,12 @@ export function getW05SocialWorkerDependencies(
     ),
     favoriteListReadStore: createPostgresFavoriteListReadStore(
       asExecutor<Parameters<typeof createPostgresFavoriteListReadStore>[0]>(pool),
+    ),
+    favoriteMutationStore: createPostgresFavoriteMutationStore(
+      asExecutor<Parameters<typeof createPostgresFavoriteMutationStore>[0]>(pool),
+    ),
+    favoriteStatusReadStore: createPostgresFavoriteStatusReadStore(
+      asExecutor<Parameters<typeof createPostgresFavoriteStatusReadStore>[0]>(pool),
     ),
     likeStatusReadStore: createPostgresLikeStatusReadStore(
       asExecutor<Parameters<typeof createPostgresLikeStatusReadStore>[0]>(pool),
