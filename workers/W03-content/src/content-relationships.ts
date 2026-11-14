@@ -491,6 +491,27 @@ export interface PostThreadItem {
   createdAt: string;
 }
 
+export type PostThreadReadRow = Readonly<{
+  id: string;
+  slug: string;
+  position: number;
+  state: 'DRAFT' | 'PUBLISHED';
+  access_mode: 'PUBLIC';
+  title: string;
+  body_ref: string;
+  media_refs_json: string;
+  cover_ref: string | null;
+  created_at: string;
+}>;
+
+export interface PostThreadReadStore {
+  list(
+    contentId: string,
+    viewerUserId: string | null,
+    maxItems: number,
+  ): Promise<readonly PostThreadReadRow[]>;
+}
+
 interface AppendPostThreadQueryRow {
   source_id: string;
   source_owner_user_id: string;
@@ -743,13 +764,16 @@ export async function listPostThread(
   db: ContentD1,
   contentIdValue: string,
   viewerUserIdValue: string | null = null,
+  readStore?: PostThreadReadStore,
 ): Promise<{ rootContentId: string; items: PostThreadItem[] }> {
   const contentId = contentIdValue.trim();
   assertContentId(contentId);
   const viewerUserId = viewerUserIdValue?.trim() || null;
   if (viewerUserId) assertContentId(viewerUserId);
 
-  const rows = await db.prepare(`
+  const rows = readStore
+    ? { results: await readStore.list(contentId, viewerUserId, MAX_POST_THREAD_ITEMS) }
+    : await db.prepare(`
     WITH RECURSIVE
       ancestors(id, owner_user_id, depth, visited) AS (
         SELECT id, owner_user_id, 0, '|' || id || '|' FROM contents WHERE id = ?

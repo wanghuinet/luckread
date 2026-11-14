@@ -11,6 +11,8 @@ import type {
 import { createPostgresPublishedMediaReferenceReadStore } from '../published-media-reference-read-store-postgres.js'
 import { createPostgresPublishedContentsByIdsReadStore } from '../published-contents-by-ids-read-store-postgres.js'
 import { createPostgresFollowingOwnerContentsReadStore } from '../following-owner-contents-read-store-postgres.js'
+import { createPostgresPostThreadReadStore } from '../post-thread-read-store-postgres.js'
+import type { PostThreadReadStore } from '../content-relationships.js'
 import type { W03PublishedMediaReferenceRuntimeEnv } from '../published-media-reference-read-store.js'
 
 export type W03PublicMediaReferenceDriver = 'd1' | 'neon'
@@ -21,13 +23,14 @@ const pools = new WeakMap<object, Pool>()
 const stores = new WeakMap<object, PublishedMediaReferenceReadStore>()
 const bookmarkedContentsStores = new WeakMap<object, PublishedContentsByIdsReadStore>()
 const followingContentsStores = new WeakMap<object, FollowingOwnerContentsReadStore>()
+const postThreadStores = new WeakMap<object, PostThreadReadStore>()
 
 /**
  * The explicit D1-02 content read driver controls only the PostgreSQL read
  * projections wired from the W03 entrypoint: public media references, bookmark
- * batch projection, and the W04-authorized following-feed content projection.
- * Other W03 reads and every W03 mutation remain on D1_02. D1 is the safe
- * default and unknown values fail closed.
+ * batch projection, W04-authorized following-feed content, and native post-thread
+ * projection. Other W03 reads and every W03 mutation remain on D1_02. D1 is the
+ * safe default and unknown values fail closed.
  */
 export function resolveW03PublicMediaReferenceDriver(
   env: W03PublicMediaReferenceRuntimeEnv,
@@ -150,5 +153,26 @@ export function getW03FollowingOwnerContentsReadStore(
     getW03PublicMediaReferencePostgresPool(env),
   )
   followingContentsStores.set(binding, store)
+  return store
+}
+
+
+/** PostgreSQL provider for the native bounded post-thread projection only. */
+export function getW03PostThreadReadStore(
+  env: W03PublicMediaReferenceRuntimeEnv,
+): PostThreadReadStore | undefined {
+  if (resolveW03PublicMediaReferenceDriver(env) === 'd1') return undefined
+
+  const binding = env.HYPERDRIVE_D1_02
+  if (!binding || typeof binding !== 'object') {
+    throw new Error('W03_HYPERDRIVE_D1_02_BINDING_REQUIRED')
+  }
+  const cached = postThreadStores.get(binding)
+  if (cached) return cached
+
+  const store = createPostgresPostThreadReadStore(
+    getW03PublicMediaReferencePostgresPool(env),
+  )
+  postThreadStores.set(binding, store)
   return store
 }

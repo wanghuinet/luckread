@@ -3,6 +3,7 @@ import {
   getW03PublishedMediaReferenceReadStore,
   getW03PublishedContentsByIdsReadStore,
   getW03FollowingOwnerContentsReadStore,
+  getW03PostThreadReadStore,
 } from './neon/runtime.js'
 
 /**
@@ -16,4 +17,6 @@ export default createW03ContentWorker({
     getW03PublishedContentsByIdsReadStore(env),
   followingOwnerContentsReadStoreProvider: (env) =>
     getW03FollowingOwnerContentsReadStore(env),
+  postThreadReadStoreProvider: (env) =>
+    getW03PostThreadReadStore(env),
 })
