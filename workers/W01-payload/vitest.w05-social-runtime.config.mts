@@ -7,6 +7,7 @@ export default defineConfig({
     include: [
       'src/neon/runtime.test.ts',
       'src/favorite-mutation-runtime.test.ts',
+      'src/favorite-list-read-store-postgres.test.ts',
       'src/favorite-runtime.test.ts',
       'src/favorite-mutation-store-postgres.test.ts',
       'src/favorite-status-read-store-postgres.test.ts',
