@@ -25,6 +25,7 @@ const publishedContextBinding = (status = 200): W03ContentBinding & { fetch: Ret
         ownerUserId: 'owner-1',
         contentType: 'post',
         state: 'PUBLISHED',
+        updatedAt: '2026-11-14T00:00:00.000Z',
       },
     }
     return Response.json(status === 200 ? body : { error: 'NOT_FOUND' }, { status })
