@@ -45,6 +45,7 @@ import {
   appendPostThreadNext,
   listPostThread,
   type ContentRelationshipDirection,
+  type PostThreadReadStore,
 } from './content-relationships.js'
 import {
   createSeries,
@@ -355,6 +356,10 @@ export type W03ContentWorkerDependencies = Readonly<{
   followingOwnerContentsReadStoreProvider?: (
     env: W03PublishedMediaReferenceRuntimeEnv,
   ) => FollowingOwnerContentsReadStore | undefined
+  /** Optional D1-02 provider for the bounded native post-thread read. */
+  postThreadReadStoreProvider?: (
+    env: W03PublishedMediaReferenceRuntimeEnv,
+  ) => PostThreadReadStore | undefined
 }>
 
 export function createW03ContentWorker(dependencies: W03ContentWorkerDependencies = {}) {
@@ -1045,7 +1050,12 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
           // receives the owner-scoped draft visibility mode.
           if (hasSocialPostPermission(principal.layer)) viewerUserId = principal.userId
         }
-        const thread = await listPostThread(env.D1_02, path.id, viewerUserId)
+        const thread = await listPostThread(
+          env.D1_02,
+          path.id,
+          viewerUserId,
+          dependencies.postThreadReadStoreProvider?.(env),
+        )
         return json({ data: thread, schemaVersion: '1.0', requestId: createRequestId() })
       }
 
