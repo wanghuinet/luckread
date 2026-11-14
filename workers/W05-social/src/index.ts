@@ -71,6 +71,7 @@ import type { SocialTargetsReadStore } from './social-targets-read-store.js'
 import type { SocialTokenSyncStore } from './social-token-sync-store.js'
 import type { NotificationPreferencesStore } from './notification-preferences-store.js'
 import type { ProfilePinStore } from './profile-pin-store.js'
+import type { RepostStore } from './repost-store.js'
 
 type RateLimitBinding = { limit(input: { key: string }): Promise<{ success: boolean }> }
 
@@ -298,6 +299,8 @@ export type W05SocialWorkerDependencies = Readonly<{
   notificationPreferencesStore?: NotificationPreferencesStore
   /** Optional PostgreSQL-capable owner profile pin store; D1 remains the deployed default. */
   profilePinStore?: ProfilePinStore
+  /** Optional PostgreSQL-capable Repost relation store; D1 remains the deployed default. */
+  repostStore?: RepostStore
   /** Optional PostgreSQL-capable Block/Mute list reader; D1 remains the deployed default. */
   blockMuteListReadStore?: BlockMuteListReadStore
   /** Optional PostgreSQL-capable Block/Mute relation reader and writer; D1 remains the deployed default. */
@@ -341,11 +344,11 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
         if (idempotencyKey.length > 256) throw new RepostRuntimeError('VALIDATION_FAILED', 400)
         if (request.method === 'POST') {
           return json({
-            data: await createRepost(env.DB, env.W03_CONTENT, actorUserId, contentId, request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? ''),
+            data: await createRepost(env.DB, env.W03_CONTENT, actorUserId, contentId, request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '', dependencies.repostStore),
             requestId: createRequestId(),
           }, 201)
         }
-        await removeRepost(env.DB, actorUserId, contentId)
+        await removeRepost(env.DB, actorUserId, contentId, dependencies.repostStore)
         return new Response(null, { status: 204, headers: { 'cache-control': 'no-store' } })
       }
 
