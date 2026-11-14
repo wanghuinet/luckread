@@ -8,6 +8,7 @@ import {
   listContentRelationships,
   listPostThread,
 } from './content-relationships.js'
+import { createW03ContentWorker } from './index.js'
 import w03Worker from './index.js'
 
 describe('W03 content relationship foundation', () => {
@@ -355,3 +356,53 @@ describe('W03 native social post thread authority', () => {
     expect(deniedResponse.status).toBe(401);
   });
 });
+
+
+describe('W03 Neon post-thread read provider', () => {
+  it('routes the existing thread GET through the injected read store without touching D1', async () => {
+    const worker = createW03ContentWorker({
+      postThreadReadStoreProvider: () => ({
+        async list(contentId, viewerUserId, maxItems) {
+          expect(contentId).toBe('post_root')
+          expect(viewerUserId).toBeNull()
+          expect(maxItems).toBe(50)
+          return [{
+            id: 'post_root',
+            slug: 'root',
+            position: 0,
+            state: 'PUBLISHED',
+            access_mode: 'PUBLIC',
+            title: 'First post',
+            body_ref: 'https://img.luckread.com/body/1.txt',
+            media_refs_json: '[]',
+            cover_ref: null,
+            created_at: '2026-11-14T00:00:00.000Z',
+          }]
+        },
+      }),
+    })
+    const db = {
+      prepare() {
+        throw new Error('D1 must not be queried when the injected Neon read store is selected')
+      },
+    } as never
+    const response = await worker.fetch(
+      new Request('https://luckread-w03.internal/internal/content/contents/post_root/thread', {
+        headers: {
+          'X-LuckRead-Caller': 'W01',
+          'X-LuckRead-Transport-Version': '1.0',
+          'X-LuckRead-Correlation-Id': 'thread-neon-read',
+        },
+      }),
+      { D1_02: db },
+    )
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      data: {
+        rootContentId: 'post_root',
+        items: [{ id: 'post_root', title: 'First post', mediaRefs: [] }],
+      },
+    })
+  })
+})
