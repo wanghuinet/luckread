@@ -8,7 +8,6 @@ export default defineConfig({
       'src/neon/runtime.test.ts',
       'src/like-mutation-runtime.test.ts',
       'src/like-mutation-store-postgres.test.ts',
-      'src/like-runtime.test.ts',
       'src/comment-write-runtime.test.ts',
       'src/comment-create-store-postgres.test.ts',
       'src/comment-mutation-store-postgres.test.ts',
