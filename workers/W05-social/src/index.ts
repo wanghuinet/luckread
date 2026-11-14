@@ -18,6 +18,8 @@ import { ProfilePinRuntimeError, getProfilePinReference, pinProfileContent, unpi
 import { BlockMuteRuntimeError, listRelations, parseBlockMuteListLimit, removeRelation, setRelation } from './block-mute-runtime.js'
 import type { BlockMuteListReadStore } from './block-mute-list-read-store.js'
 import type { FavoriteListReadStore } from './favorite-list-read-store.js'
+import type { FavoriteMutationStore } from './favorite-mutation-store.js'
+import type { FavoriteStatusReadStore } from './favorite-status-read-store.js'
 import type { ProfileChannelReadStore } from './profile-channel-read-store.js'
 import { getRelationshipGraph, invalidateRelationshipGraph, RelationshipGraphRuntimeError } from './relationship-graph-runtime.js'
 import {
@@ -297,6 +299,10 @@ export type W05SocialWorkerDependencies = Readonly<{
   contentLikerReadStore?: ContentLikerReadStore
   /** Optional PostgreSQL-capable favorite list reader; D1 remains the deployed default. */
   favoriteListReadStore?: FavoriteListReadStore
+  /** Optional PostgreSQL-capable Favorite/Unfavorite writer; D1 remains the deployed default. */
+  favoriteMutationStore?: FavoriteMutationStore
+  /** Optional PostgreSQL-capable favorite status reader; D1 remains the deployed default. */
+  favoriteStatusReadStore?: FavoriteStatusReadStore
   /** Optional PostgreSQL-capable like-status reader; D1 remains the deployed default. */
   likeStatusReadStore?: LikeStatusReadStore
   /** Optional PostgreSQL-capable like-target context and Block preflight reader; D1 remains the deployed default. */
@@ -1059,19 +1065,19 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
 
         if (request.method === 'GET') {
           return json({
-            data: await getFavoriteStatus(env.DB, env.W03_CONTENT, viewerUserId, target, request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? ''),
+            data: await getFavoriteStatus(dependencies.favoriteStatusReadStore ?? env.DB, env.W03_CONTENT, viewerUserId, target, request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? ''),
             requestId: createRequestId(),
           })
         }
 
         if (request.method === 'POST') {
           return json({
-            data: await favorite(env.DB, env.W03_CONTENT, viewerUserId, target, request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? ''),
+            data: await favorite(dependencies.favoriteMutationStore ?? env.DB, env.W03_CONTENT, viewerUserId, target, request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? ''),
             requestId: createRequestId(),
           })
         }
 
-        await unfavorite(env.DB, viewerUserId, target)
+        await unfavorite(dependencies.favoriteMutationStore ?? env.DB, viewerUserId, target)
         return new Response(null, { status: 204 })
       }
 
