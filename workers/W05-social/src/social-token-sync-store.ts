@@ -60,13 +60,7 @@ export class SocialTokenSyncStoreError extends Error {
 }
 
 export interface SocialTokenSyncD1Database {
-  prepare(query: string): {
-    bind(...values: unknown[]): {
-      first<T>(): Promise<T | null>
-      all<T>(): Promise<{ results?: T[] | null }>
-      run(): Promise<unknown>
-    }
-  }
+  prepare(query: string): D1PreparedStatement
   batch(statements: D1PreparedStatement[]): Promise<D1Result<unknown>[]>
 }
 
