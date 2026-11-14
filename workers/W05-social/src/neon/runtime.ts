@@ -11,6 +11,7 @@ import { createPostgresBlockMuteRelationStore } from '../block-mute-relation-sto
 import { createPostgresProfileChannelReadStore } from '../profile-channel-read-store-postgres.js'
 import { createPostgresProfilePinStore } from '../profile-pin-store-postgres.js'
 import { createPostgresRepostStore } from '../repost-store-postgres.js'
+import { createPostgresShareStore } from '../share-store-postgres.js'
 import { createPostgresContentLikerReadStore } from '../like-list-read-store-postgres.js'
 import { createPostgresFavoriteListReadStore } from '../favorite-list-read-store-postgres.js'
 import { createPostgresFavoriteMutationStore } from '../favorite-mutation-store-postgres.js'
@@ -149,6 +150,9 @@ export function getW05SocialWorkerDependencies(
     ),
     repostStore: createPostgresRepostStore(
       asExecutor<Parameters<typeof createPostgresRepostStore>[0]>(pool),
+    ),
+    shareStore: createPostgresShareStore(
+      asExecutor<Parameters<typeof createPostgresShareStore>[0]>(pool),
     ),
     contentLikerReadStore: createPostgresContentLikerReadStore(
       asExecutor<Parameters<typeof createPostgresContentLikerReadStore>[0]>(pool),
