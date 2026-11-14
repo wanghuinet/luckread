@@ -6,6 +6,10 @@ export default defineConfig({
     environment: 'node',
     include: [
       'src/neon/runtime.test.ts',
+      'src/favorite-mutation-runtime.test.ts',
+      'src/favorite-runtime.test.ts',
+      'src/favorite-mutation-store-postgres.test.ts',
+      'src/favorite-status-read-store-postgres.test.ts',
       'src/like-mutation-runtime.test.ts',
       'src/like-mutation-store-postgres.test.ts',
       'src/comment-write-runtime.test.ts',
