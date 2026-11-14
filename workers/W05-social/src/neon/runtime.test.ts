@@ -54,6 +54,8 @@ describe('W05 Neon runtime composition', () => {
       'commentNotificationContextStore',
       'contentLikerReadStore',
       'favoriteListReadStore',
+      'favoriteMutationStore',
+      'favoriteStatusReadStore',
       'followListReadStore',
       'followStore',
       'followingAuthorIdsReadStore',
