@@ -48,7 +48,10 @@ describe('W05 Neon runtime composition', () => {
     expect(first).toBe(second)
     expect(Object.keys(first).sort()).toEqual([
       'blockMuteListReadStore',
+      'commentCreateStore',
       'commentListReadStore',
+      'commentMutationStore',
+      'commentNotificationContextStore',
       'contentLikerReadStore',
       'favoriteListReadStore',
       'followListReadStore',
@@ -56,8 +59,11 @@ describe('W05 Neon runtime composition', () => {
       'followingAuthorIdsReadStore',
       'likeStatusReadStore',
       'likeTargetContextReadStore',
+      'notificationEnqueueStore',
       'profileChannelReadStore',
       'relationshipGraphReadStore',
+      'socialTargetsReadStore',
+      'socialTokenSyncStore',
     ])
     expect(capturedConfig).toMatchObject({
       connectionString: binding.connectionString,

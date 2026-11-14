@@ -12,6 +12,12 @@ import { createPostgresContentLikerReadStore } from '../like-list-read-store-pos
 import { createPostgresFavoriteListReadStore } from '../favorite-list-read-store-postgres.js'
 import { createPostgresLikeStatusReadStore } from '../like-status-read-store-postgres.js'
 import { createPostgresLikeTargetContextReadStore } from '../like-target-context-read-store-postgres.js'
+import { createPostgresCommentCreateStore } from '../comment-create-store-postgres.js'
+import { createPostgresCommentMutationStore } from '../comment-mutation-store-postgres.js'
+import { createPostgresCommentNotificationContextStore } from '../comment-notification-context-store-postgres.js'
+import { createPostgresNotificationEnqueueStore } from '../notification-enqueue-store-postgres.js'
+import { createPostgresSocialTargetsReadStore } from '../social-targets-read-store-postgres.js'
+import { createPostgresSocialTokenSyncStore } from '../social-token-sync-store-postgres.js'
 
 export type W05SocialDatabaseDriver = 'd1' | 'neon'
 
@@ -139,6 +145,24 @@ export function getW05SocialWorkerDependencies(
     ),
     likeTargetContextReadStore: createPostgresLikeTargetContextReadStore(
       asExecutor<Parameters<typeof createPostgresLikeTargetContextReadStore>[0]>(pool),
+    ),
+    commentCreateStore: createPostgresCommentCreateStore(
+      asExecutor<Parameters<typeof createPostgresCommentCreateStore>[0]>(pool),
+    ),
+    commentMutationStore: createPostgresCommentMutationStore(
+      asExecutor<Parameters<typeof createPostgresCommentMutationStore>[0]>(pool),
+    ),
+    commentNotificationContextStore: createPostgresCommentNotificationContextStore(
+      asExecutor<Parameters<typeof createPostgresCommentNotificationContextStore>[0]>(pool),
+    ),
+    notificationEnqueueStore: createPostgresNotificationEnqueueStore(
+      asExecutor<Parameters<typeof createPostgresNotificationEnqueueStore>[0]>(pool),
+    ),
+    socialTargetsReadStore: createPostgresSocialTargetsReadStore(
+      asExecutor<Parameters<typeof createPostgresSocialTargetsReadStore>[0]>(pool),
+    ),
+    socialTokenSyncStore: createPostgresSocialTokenSyncStore(
+      asExecutor<Parameters<typeof createPostgresSocialTokenSyncStore>[0]>(pool),
     ),
   }
 
