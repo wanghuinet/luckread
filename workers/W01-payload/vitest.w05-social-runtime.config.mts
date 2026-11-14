@@ -8,6 +8,8 @@ export default defineConfig({
       'src/neon/runtime.test.ts',
       'src/notification-preferences-runtime.test.ts',
       'src/notification-preferences-store-postgres.test.ts',
+      'src/notification-preferences-runtime.test.ts',
+      'src/notification-preferences-store-postgres.test.ts',
       'src/block-mute-mutation-runtime.test.ts',
       'src/block-mute-runtime.test.ts',
       'src/block-mute-relation-store-postgres.test.ts',
