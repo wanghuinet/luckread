@@ -1,7 +1,8 @@
 /// <reference types="@cloudflare/workers-types" />
 import { describe, expect, it, vi } from 'vitest'
 
-import worker from './index.js'
+import worker, { createW05SocialWorker } from './index.js'
+import type { NotificationPreferencesStore } from './notification-preferences-store.js'
 import {
   getNotificationPreferences,
   setNotificationPreferences,
@@ -106,6 +107,32 @@ describe('W05 notification preferences runtime', () => {
     expect(statements[0]?.sql).toContain('COALESCE(?, social_notification_preferences.follow_enabled)')
     expect(statements[0]?.sql).toContain('RETURNING follow_enabled, like_enabled, comment_enabled, mention_enabled')
     expect(statements[0]?.values).toEqual(['viewer-1', null, 0, null, null, null, 0, null, null])
+  })
+
+  it('routes W05 notification preference GET/PATCH through the injected Neon store without D1 access', async () => {
+    const defaults = { follow: true, like: true, comment: true, mention: true }
+    const store: NotificationPreferencesStore = {
+      get: vi.fn(async () => defaults),
+      set: vi.fn(async (_userId, input) => ({ ...defaults, ...input })),
+    }
+    const prepare = vi.fn(() => {
+      throw new Error('D1 must not be accessed by the injected Neon notification-preferences path')
+    })
+    const neonWorker = createW05SocialWorker({ notificationPreferencesStore: store })
+    const env = { DB: { prepare } } as never
+
+    const getResponse = await neonWorker.fetch(requestFor('GET'), env, {} as never)
+    expect(getResponse.status).toBe(200)
+    await expect(getResponse.json()).resolves.toMatchObject({ data: defaults })
+    expect(store.get).toHaveBeenCalledWith('viewer-1')
+
+    const patchResponse = await neonWorker.fetch(requestFor('PATCH', { like: false, mention: false }), env, {} as never)
+    expect(patchResponse.status).toBe(200)
+    await expect(patchResponse.json()).resolves.toMatchObject({
+      data: { follow: true, like: false, comment: true, mention: false },
+    })
+    expect(store.set).toHaveBeenCalledWith('viewer-1', { like: false, mention: false })
+    expect(prepare).not.toHaveBeenCalled()
   })
 
   it('rejects empty, unknown, or non-boolean fields before touching D1', async () => {
