@@ -17,6 +17,7 @@ import { RepostRuntimeError, createRepost, removeRepost } from './repost-runtime
 import { ProfilePinRuntimeError, getProfilePinReference, pinProfileContent, unpinProfileContent } from './profile-pin-runtime.js'
 import { BlockMuteRuntimeError, listRelations, parseBlockMuteListLimit, removeRelation, setRelation } from './block-mute-runtime.js'
 import type { BlockMuteListReadStore } from './block-mute-list-read-store.js'
+import type { BlockMuteRelationStore } from './block-mute-relation-store.js'
 import type { FavoriteListReadStore } from './favorite-list-read-store.js'
 import type { FavoriteMutationStore } from './favorite-mutation-store.js'
 import type { FavoriteStatusReadStore } from './favorite-status-read-store.js'
@@ -293,6 +294,8 @@ export type W05SocialWorkerDependencies = Readonly<{
   notificationEnqueueStore?: NotificationEnqueueStore
   /** Optional PostgreSQL-capable Block/Mute list reader; D1 remains the deployed default. */
   blockMuteListReadStore?: BlockMuteListReadStore
+  /** Optional PostgreSQL-capable Block/Mute relation reader and writer; D1 remains the deployed default. */
+  blockMuteRelationStore?: BlockMuteRelationStore
   /** Optional PostgreSQL-capable profile replies/likes reader; D1 remains the deployed default. */
   profileChannelReadStore?: ProfileChannelReadStore
   /** Optional PostgreSQL-capable content-liker page reader; D1 remains the deployed default. */
@@ -455,7 +458,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
           if (typeof targetUserId !== 'string' || !targetUserId.trim()) {
             throw new BlockMuteRuntimeError('VALIDATION_FAILED', 400)
           }
-          const relation = await setRelation(env.DB, actorUserId, targetUserId, relationType)
+          const relation = await setRelation(dependencies.blockMuteRelationStore ?? env.DB, actorUserId, targetUserId, relationType)
           await invalidateRelationshipGraph(actorUserId, targetUserId)
           if (relationType === 'block') {
             await invalidateFollowListCountCache(actorUserId, targetUserId)
@@ -472,7 +475,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
           const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
           if (!idempotencyKey) throw new BlockMuteRuntimeError('PRECONDITION_REQUIRED', 428)
           if (idempotencyKey.length > 256) throw new BlockMuteRuntimeError('VALIDATION_FAILED', 400)
-          await removeRelation(env.DB, actorUserId, targetFromPath, relationType)
+          await removeRelation(dependencies.blockMuteRelationStore ?? env.DB, actorUserId, targetFromPath, relationType)
           await invalidateRelationshipGraph(actorUserId, targetFromPath)
           if (relationType === 'block') {
             await invalidateFollowListCountCache(actorUserId, targetFromPath)
