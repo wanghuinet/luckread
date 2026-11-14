@@ -198,7 +198,8 @@ describe('unified W05 social closure adapters', () => {
     const notifications = read('src/app/(twitter-clone)/notifications/page.tsx')
 
     expect(worker).toContain("payload: { contentId: commentContentId }")
-    expect(worker).toContain('getPublishedCommentNotificationContext(env.DB, parentId)')
+    expect(worker).toContain('dependencies.commentNotificationContextStore ?? env.DB')
+    expect(worker).toContain('getPublishedCommentNotificationContext(')
     expect(worker).toContain('getInteractionNotificationContext')
     expect(worker).toContain('notificationContext.contentId')
     expect(commentContextStore).toContain("state = 'PUBLISHED'")
@@ -207,12 +208,19 @@ describe('unified W05 social closure adapters', () => {
     expect(notifications).toContain('item.payload?.contentId')
   })
 
-  it('supports persisted topics and mentions in W05', () => {
+  it('supports persisted topics and mentions through the W05 token-sync store boundary', () => {
     const runtime = read('../../workers/W05-social/src/social-closure-runtime.ts')
+    const tokenSyncStore = read('../../workers/W05-social/src/social-token-sync-store.ts')
+    const postgresTokenSyncStore = read('../../workers/W05-social/src/social-token-sync-store-postgres.ts')
     const notificationEnqueueStore = read('../../workers/W05-social/src/notification-enqueue-store.ts')
     const migration = read('../../workers/W05-social/migrations/20261008_011_social_closure_v1.sql')
-    expect(runtime).toContain('social_topics')
-    expect(runtime).toContain('social_mentions')
+    expect(runtime).toContain('resolveSocialTokenSyncStore')
+    expect(runtime).toContain('store.upsertTopicAndAttach')
+    expect(runtime).toContain('store.insertMention')
+    expect(tokenSyncStore).toContain('social_topics')
+    expect(tokenSyncStore).toContain('social_mentions')
+    expect(postgresTokenSyncStore).toContain('social_target_topics')
+    expect(postgresTokenSyncStore).toContain('social_mentions')
     expect(notificationEnqueueStore).toContain('social_notifications')
     expect(migration).toContain("target_type IN ('content','comment')")
     expect(migration).toContain('social_topics')
