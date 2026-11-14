@@ -11,6 +11,7 @@ import { createPostgresProfileChannelReadStore } from '../profile-channel-read-s
 import { createPostgresContentLikerReadStore } from '../like-list-read-store-postgres.js'
 import { createPostgresFavoriteListReadStore } from '../favorite-list-read-store-postgres.js'
 import { createPostgresLikeStatusReadStore } from '../like-status-read-store-postgres.js'
+import { createPostgresLikeMutationStore } from '../like-mutation-store-postgres.js'
 import { createPostgresLikeTargetContextReadStore } from '../like-target-context-read-store-postgres.js'
 import { createPostgresCommentCreateStore } from '../comment-create-store-postgres.js'
 import { createPostgresCommentMutationStore } from '../comment-mutation-store-postgres.js'
@@ -145,6 +146,9 @@ export function getW05SocialWorkerDependencies(
     ),
     likeTargetContextReadStore: createPostgresLikeTargetContextReadStore(
       asExecutor<Parameters<typeof createPostgresLikeTargetContextReadStore>[0]>(pool),
+    ),
+    likeMutationStore: createPostgresLikeMutationStore(
+      asExecutor<Parameters<typeof createPostgresLikeMutationStore>[0]>(pool),
     ),
     commentCreateStore: createPostgresCommentCreateStore(
       asExecutor<Parameters<typeof createPostgresCommentCreateStore>[0]>(pool),
