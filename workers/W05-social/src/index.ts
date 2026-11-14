@@ -73,6 +73,8 @@ import type { NotificationPreferencesStore } from './notification-preferences-st
 import type { ProfilePinStore } from './profile-pin-store.js'
 import type { RepostStore } from './repost-store.js'
 import type { ShareStore } from './share-store.js'
+import type { PollReadStore } from './poll-read-store.js'
+import type { PollVoteStore } from './poll-vote-store.js'
 
 type RateLimitBinding = { limit(input: { key: string }): Promise<{ success: boolean }> }
 
@@ -304,6 +306,10 @@ export type W05SocialWorkerDependencies = Readonly<{
   repostStore?: RepostStore
   /** Optional PostgreSQL-capable idempotent Share link store; D1 remains the deployed default. */
   shareStore?: ShareStore
+  /** Optional PostgreSQL-capable Poll reader for voting; D1 remains the deployed default. */
+  pollReadStore?: PollReadStore
+  /** Optional PostgreSQL-capable atomic Poll vote store; D1 remains the deployed default. */
+  pollVoteStore?: PollVoteStore
   /** Optional PostgreSQL-capable Block/Mute list reader; D1 remains the deployed default. */
   blockMuteListReadStore?: BlockMuteListReadStore
   /** Optional PostgreSQL-capable Block/Mute relation reader and writer; D1 remains the deployed default. */
@@ -794,7 +800,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
         if (!body || typeof body !== 'object' || Array.isArray(body) || typeof (body as { optionId?: unknown }).optionId !== 'string') {
           throw new SocialPollError('VALIDATION_FAILED', 400)
         }
-        const poll = await castContentPollVote(env.DB, env.W03_CONTENT, actorUserId, contentId, (body as { optionId: string }).optionId, request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '')
+        const poll = await castContentPollVote(env.DB, env.W03_CONTENT, actorUserId, contentId, (body as { optionId: string }).optionId, request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '', dependencies.pollVoteStore, dependencies.pollReadStore)
         return json({ data: { poll }, requestId: createRequestId() }, 200)
       }
 
