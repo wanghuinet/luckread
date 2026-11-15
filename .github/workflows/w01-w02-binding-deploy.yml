@@ -8,13 +8,12 @@ on:
         required: true
         type: string
       confirm:
-        description: Choose whether to deploy W02/W01 only or include W08 Creator qualification
+        description: Type this to deploy the coordinated W02, W08 Creator and W01 Neon D1-01 runtime set
         required: true
         type: choice
         options:
-          - DEPLOY_BINDING
           - DEPLOY_BINDING_AND_W08_CREATOR
-        default: DEPLOY_BINDING
+        default: DEPLOY_BINDING_AND_W08_CREATOR
 
 permissions:
   actions: read
@@ -24,7 +23,7 @@ permissions:
 
 jobs:
   deploy:
-    if: ${{ (inputs.confirm == 'DEPLOY_BINDING' || inputs.confirm == 'DEPLOY_BINDING_AND_W08_CREATOR') && github.ref == 'refs/heads/main' && github.ref_protected == true }}
+    if: ${{ inputs.confirm == 'DEPLOY_BINDING_AND_W08_CREATOR' && github.ref == 'refs/heads/main' && github.ref_protected == true }}
     runs-on: ubuntu-latest
     environment: auth-mfa-rollout
     timeout-minutes: 25
@@ -79,6 +78,64 @@ jobs:
           else
             echo "W08 Creator deployment not requested; migration and deployment will be skipped."
           fi
+
+      - name: Verify coordinated D1-01 Neon runtime selectors and preserve D1 rollback bindings
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs'
+          const read = (path) => JSON.parse(fs.readFileSync(path, 'utf8'))
+          const w01 = read('workers/W01-payload/wrangler.jsonc')
+          const w02 = read('workers/W02-identity/wrangler.jsonc')
+          const w08 = read('workers/W08-creator/wrangler.jsonc')
+          const bootstrap = read('contracts/database/neon-five-domain-schema-bootstrap.v1.json')
+          const d101 = (bootstrap.domains || []).find((item) => item.domainId === 'D1-01')
+          if (d101?.databaseName !== 'luckread' ||
+              d101?.remoteSchemaApplied !== true ||
+              d101?.status !== 'D1_01_SCHEMA_ONLY_REMOTE_APPLIED_ALL_OWNER_POSTFLIGHT_PASSED_RUNTIME_CUTOVER_PENDING') {
+            throw new Error('D1-01 remote Neon schema and all-owner postflight admission must pass before runtime deployment')
+          }
+          const databaseId = '2f80471e-3756-49f9-8db1-7707a433ad64'
+          const hyperdriveId = '0c53a1bb9bc0484bac146e8ae2d3158b'
+          const assertBinding = (config, bindingName, worker) => {
+            const binding = (config.d1_databases || []).find((item) => item.binding === bindingName)
+            if (!binding || binding.database_name !== 'luckread' || binding.database_id !== databaseId) {
+              throw new Error(worker + ' D1-01 rollback binding mismatch')
+            }
+          }
+          const assertNeon = (config, worker, driverName) => {
+            if (config.vars?.[driverName] !== 'neon') {
+              throw new Error(worker + ' must select Neon for D1-01')
+            }
+            const hyperdrive = (config.hyperdrive || []).find((item) => item.binding === 'HYPERDRIVE')
+            if (!hyperdrive || hyperdrive.id !== hyperdriveId) {
+              throw new Error(worker + ' must bind the verified D1-01 Hyperdrive')
+            }
+            if (!(config.compatibility_flags || []).includes('nodejs_compat')) {
+              throw new Error(worker + ' requires nodejs_compat for PostgreSQL runtime')
+            }
+          }
+          if (w01.name !== 'luckread-w01-payload' || w02.name !== 'luckread-w02' || w08.name !== 'luckread-w08-creator') {
+            throw new Error('D1-01 Worker identities changed')
+          }
+          assertBinding(w01, 'D1', 'W01')
+          assertBinding(w02, 'D1_01', 'W02')
+          assertBinding(w08, 'D1_01', 'W08')
+          assertNeon(w01, 'W01', 'PAYLOAD_DATABASE_DRIVER')
+          assertNeon(w02, 'W02', 'W02_DATABASE_DRIVER')
+          assertNeon(w08, 'W08', 'W08_DATABASE_DRIVER')
+          if (!(w01.services || []).some(x => x.binding === 'W02_AUTH' && x.service === 'luckread-w02')) {
+            throw new Error('W01 W02_AUTH Service Binding mismatch')
+          }
+          if (!(w01.services || []).some(x => x.binding === 'W08_CREATOR' && x.service === 'luckread-w08-creator')) {
+            throw new Error('W01 W08_CREATOR Service Binding mismatch')
+          }
+          if (!(w08.services || []).some(x => x.binding === 'W02_AUTH' && x.service === 'luckread-w02')) {
+            throw new Error('W08 W02_AUTH Service Binding mismatch')
+          }
+          console.log('D1_01_W01_W02_W08_NEON_RUNTIME_CONFIG=PASS')
+          console.log('D1_01_D1_ROLLBACK_BINDINGS=PRESERVED')
+          NODE
 
 
       - name: Gate creator lifecycle QA accounts before any production mutation
@@ -251,9 +308,17 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
+          set -euo pipefail
           mkdir -p ../../artifacts/mapping-0
-          set -o pipefail
-          npx --yes wrangler@4.116.0 deploy --config wrangler.jsonc 2>&1 | tee ../../artifacts/mapping-0/w02-email-auth-deploy.log
+          npx --yes wrangler@4.156.0 deploy --config wrangler.jsonc 2>&1 | tee ../../artifacts/mapping-0/w02-email-auth-deploy.log
+          version_id="$(sed -n 's/.*Current Version ID: //p' ../../artifacts/mapping-0/w02-email-auth-deploy.log | tail -n 1)"
+          if [ -z "$version_id" ]; then
+            echo "Wrangler did not return a W02 Worker Version ID; refusing to report a deployment."
+            exit 1
+          fi
+          echo "W02_UPLOADED_VERSION_ID=$version_id"
+          npx --yes wrangler@4.156.0 versions deploy "$version_id@100%" --name luckread-w02 --config wrangler.jsonc --yes
+          npx --yes wrangler@4.156.0 deployments list --name luckread-w02 --config wrangler.jsonc
 
       - name: Deploy W08 Creator Worker
         if: ${{ inputs.confirm == 'DEPLOY_BINDING_AND_W08_CREATOR' }}
@@ -262,9 +327,17 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
+          set -euo pipefail
           mkdir -p ../../artifacts/mapping-0
-          set -o pipefail
-          npx --yes wrangler@4.116.0 deploy --config wrangler.jsonc 2>&1 | tee ../../artifacts/mapping-0/w08-creator-deploy.log
+          npx --yes wrangler@4.156.0 deploy --config wrangler.jsonc 2>&1 | tee ../../artifacts/mapping-0/w08-creator-deploy.log
+          version_id="$(sed -n 's/.*Current Version ID: //p' ../../artifacts/mapping-0/w08-creator-deploy.log | tail -n 1)"
+          if [ -z "$version_id" ]; then
+            echo "Wrangler did not return a W08 Worker Version ID; refusing to report a deployment."
+            exit 1
+          fi
+          echo "W08_UPLOADED_VERSION_ID=$version_id"
+          npx --yes wrangler@4.156.0 versions deploy "$version_id@100%" --name luckread-w08-creator --config wrangler.jsonc --yes
+          npx --yes wrangler@4.156.0 deployments list --name luckread-w08-creator --config wrangler.jsonc
 
       - name: Deploy W01 application with Service Binding
         working-directory: workers/W01-payload
@@ -272,9 +345,17 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
+          set -euo pipefail
           mkdir -p ../../artifacts/mapping-0
-          set -o pipefail
-          npx --yes wrangler@4.116.0 deploy --config wrangler.jsonc 2>&1 | tee ../../artifacts/mapping-0/w01-w02-binding-deploy.log
+          npx --yes wrangler@4.156.0 deploy --config wrangler.jsonc 2>&1 | tee ../../artifacts/mapping-0/w01-w02-binding-deploy.log
+          version_id="$(sed -n 's/.*Current Version ID: //p' ../../artifacts/mapping-0/w01-w02-binding-deploy.log | tail -n 1)"
+          if [ -z "$version_id" ]; then
+            echo "Wrangler did not return a W01 Worker Version ID; refusing to report a deployment."
+            exit 1
+          fi
+          echo "W01_UPLOADED_VERSION_ID=$version_id"
+          npx --yes wrangler@4.156.0 versions deploy "$version_id@100%" --name luckread-w01-payload --config wrangler.jsonc --yes
+          npx --yes wrangler@4.156.0 deployments list --name luckread-w01-payload --config wrangler.jsonc
 
       - name: Write deployment provenance
         env:
