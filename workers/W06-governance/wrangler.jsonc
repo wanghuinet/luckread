@@ -3,6 +3,7 @@
   "name": "luckread-w06",
   "main": "src/index.ts",
   "compatibility_date": "2025-08-15",
+  "compatibility_flags": ["nodejs_compat"],
   "workers_dev": false,
   "ratelimits": [
     {
@@ -44,6 +45,15 @@
     {
       "binding": "W03_CONTENT_MODERATION",
       "service": "luckread-w03"
+    }
+  ],
+  "vars": {
+    "W06_MODERATION_DATABASE_DRIVER": "d1"
+  },
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE_D1_03",
+      "id": "7c8831416c18494faee04b96aa551cb9"
     }
   ],
   "triggers": {
