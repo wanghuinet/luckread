@@ -198,17 +198,29 @@ try {
   runtimePassed = true
 } finally {
   try {
-    for (const table of tables) await client.query(`DROP TABLE IF EXISTS pg_temp.${table} CASCADE`)
-    await client.query('DROP FUNCTION IF EXISTS pg_temp.w06_skip_stale_case_update() CASCADE')
+    for (const table of tables) {
+      const exists = await client.query(
+        'SELECT to_regclass($1) IS NOT NULL AS present',
+        [`pg_temp.${table}`],
+      )
+      if (exists.rows[0]?.present === true) {
+        await client.query(`TRUNCATE TABLE pg_temp.${table}`)
+      }
+    }
     const residual = await client.query(
-      `SELECT
-        (SELECT count(*)::int FROM pg_temp.moderation_cases) AS cases,
-        (SELECT count(*)::int FROM pg_temp.moderation_decisions) AS decisions`,
-    ).catch(() => ({ rows: [{ cases: 0, decisions: 0 }] }))
-    const remainingCases = residual.rows[0]?.cases ?? 0
-    const remainingDecisions = residual.rows[0]?.decisions ?? 0
-    assert.equal(remainingCases, 0)
-    assert.equal(remainingDecisions, 0)
+      'SELECT count(*)::int AS remaining FROM pg_class WHERE relnamespace = pg_my_temp_schema() AND relname = ANY($1::text[])',
+      [tables],
+    )
+    for (const table of tables) {
+      await client.query(`DROP TABLE IF EXISTS pg_temp.${table} CASCADE`)
+    }
+    await client.query('DROP FUNCTION IF EXISTS pg_temp.w06_skip_stale_case_update() CASCADE')
+    const remainingTemporaryTables = await client.query(
+      'SELECT count(*)::int AS remaining FROM pg_class WHERE relnamespace = pg_my_temp_schema() AND relname = ANY($1::text[])',
+      [tables],
+    )
+    assert.equal(residual.rows[0]?.remaining ?? -1, 0, 'All temporary fixtures must be empty before drop')
+    assert.equal(remainingTemporaryTables.rows[0]?.remaining ?? -1, 0, 'All temporary fixture tables must be dropped')
     checks.cleanupVerified = true
 
     const report = {
