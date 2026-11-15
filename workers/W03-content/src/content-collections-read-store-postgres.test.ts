@@ -1,0 +1,72 @@
+import { describe, expect, it, vi } from 'vitest'
+
+import { ContentRuntimeError } from './content-runtime.js'
+import { createPostgresCollectionListReadStore } from './content-collections-read-store-postgres.js'
+
+describe('PostgreSQL creator-collection list read store', () => {
+  it('uses owner-scoped keyset pagination and maps PostgreSQL timestamps', async () => {
+    const query = vi.fn(async () => ({
+      rows: [{
+        id: 'collection_1',
+        owner_user_id: 'user_1',
+        creator_id: 'user_1',
+        state: 'DRAFT' as const,
+        version: 2,
+        title: 'Collection 1',
+        description: 'description',
+        cover_ref: null,
+        etag: 'W/"2"',
+        created_at: new Date('2026-10-07T00:00:00.000Z'),
+        updated_at: new Date('2026-10-08T00:00:00.000Z'),
+      }],
+    }))
+    const store = createPostgresCollectionListReadStore({ query })
+
+    const result = await store.listCreatorCollections(
+      'user_1',
+      { updatedAt: '2026-10-09T00:00:00.000Z', id: 'collection_9' },
+      21,
+    )
+
+    expect(query).toHaveBeenCalledTimes(1)
+    expect(query.mock.calls[0]?.[0]).toContain('owner_user_id = $1')
+    expect(query.mock.calls[0]?.[0]).toContain('(updated_at, id) < ($2::timestamptz, $3::text)')
+    expect(query.mock.calls[0]?.[0]).toContain('ORDER BY updated_at DESC, id DESC')
+    expect(query.mock.calls[0]?.[0]).toContain('LIMIT $4')
+    expect(query.mock.calls[0]?.[1]).toEqual([
+      'user_1',
+      '2026-10-09T00:00:00.000Z',
+      'collection_9',
+      21,
+    ])
+    expect(result).toEqual([{
+      id: 'collection_1',
+      ownerUserId: 'user_1',
+      creatorId: 'user_1',
+      state: 'DRAFT',
+      version: 2,
+      title: 'Collection 1',
+      description: 'description',
+      coverRef: null,
+      etag: 'W/"2"',
+      createdAt: '2026-10-07T00:00:00.000Z',
+      updatedAt: '2026-10-08T00:00:00.000Z',
+    }])
+  })
+
+  it('rejects an invalid page size before querying', async () => {
+    const query = vi.fn()
+    const store = createPostgresCollectionListReadStore({ query })
+    await expect(store.listCreatorCollections('user_1', null, 52))
+      .rejects.toMatchObject<Partial<ContentRuntimeError>>({ code: 'VALIDATION_FAILED', status: 400 })
+    expect(query).not.toHaveBeenCalled()
+  })
+
+  it('normalizes query failures without exposing database details', async () => {
+    const store = createPostgresCollectionListReadStore({
+      query: vi.fn(async () => { throw new Error('private connection detail') }),
+    })
+    await expect(store.listCreatorCollections('user_1', null, 11))
+      .rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE', status: 503 })
+  })
+})
