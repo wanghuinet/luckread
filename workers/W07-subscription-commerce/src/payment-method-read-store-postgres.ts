@@ -1,6 +1,7 @@
 import {
   PaymentMethodPersistenceError,
-  type PaymentMethodRevocationRequest,\n  type SavedPaymentMethodMandate,
+  type PaymentMethodRevocationRequest,
+  type SavedPaymentMethodMandate,
   type SavedPaymentMethodRecord,
 } from './payment-method-persistence.js'
 import type { PaymentMethodReadStore } from './payment-method-read-store.js'
