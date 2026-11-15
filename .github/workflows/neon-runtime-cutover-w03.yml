@@ -9,6 +9,8 @@ on:
       - 'workers/W03-content/wrangler.jsonc'
       - 'workers/W03-content/src/content-collections.ts'
       - 'workers/W03-content/src/content-collections-read-store-postgres.ts'
+      - 'workers/W03-content/src/content-series.ts'
+      - 'workers/W03-content/src/content-series-read-store-postgres.ts'
       - 'workers/W03-content/src/entry.ts'
       - 'workers/W03-content/src/neon/runtime.ts'
 
@@ -68,6 +70,7 @@ jobs:
             ['postThreadReadStoreProvider', 'getW03PostThreadReadStore'],
             ['contentContextReadStoreProvider', 'getW03ContentContextReadStore'],
             ['collectionListReadStoreProvider', 'getW03CollectionListReadStore'],
+            ['seriesReadStoreProvider', 'getW03SeriesReadStore'],
           ]
           for (const [provider, factory] of providers) {
             if (!entry.includes(provider) || !entry.includes(factory) || !runtime.includes(factory)) {
