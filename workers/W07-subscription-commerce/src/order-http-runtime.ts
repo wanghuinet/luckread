@@ -11,8 +11,12 @@ import {
 import { SubscriptionRuntimeError } from './subscription-runtime.js';
 import { validateCreateCommerceOrderRequest, validateOrderCreateIdempotencyKey } from './order-request-validation.js';
 import { issueInvoiceForOrder } from './billing-persistence.js';
+import {
+  getW07PaymentWebhookDatabase,
+  type W07PaymentMethodReadRuntimeEnv,
+} from './neon/payment-method-read-runtime.js';
 
-type OrderRuntimeEnv = Readonly<{
+type OrderRuntimeEnv = W07PaymentMethodReadRuntimeEnv & Readonly<{
   D1_01: D1Database;
   D1_04: D1Database;
 }>;
@@ -21,6 +25,7 @@ type OrderRuntimeDependencies = Readonly<{
   createOrder?: typeof createCommerceOrder;
   getOrder?: typeof getCommerceOrder;
   issueInvoice?: typeof issueInvoiceForOrder;
+  getReadDatabase?: (env: OrderRuntimeEnv) => D1Database | undefined;
   /** Must be an admitted pricing authority that returns immutable offer versions, discounts, and tax decisions. */
   resolvePricing?: (request: unknown) => Promise<AuthoritativelyPricedOrder>;
 }>;
@@ -189,8 +194,11 @@ export async function handleCommerceOrderRequest(
       );
     }
 
+    // Order detail is read-only and follows the selected D1-04 authority.
+    // Order creation and invoice issuance intentionally remain on the existing D1 path.
+    const database = (dependencies.getReadDatabase ?? getW07PaymentWebhookDatabase)(env) ?? env.D1_04;
     const getOrder = dependencies.getOrder ?? getCommerceOrder;
-    const order: CommerceOrderData = await getOrder(env.D1_04, customerId, route.orderId);
+    const order: CommerceOrderData = await getOrder(database, customerId, route.orderId);
     return Response.json(
       { data: order, requestId: 'req_' + crypto.randomUUID() },
       { status: 200, headers: { 'cache-control': 'no-store' } },
