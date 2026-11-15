@@ -132,12 +132,14 @@ const parseRegistration = (value: unknown): PushEndpointRegistrationInput => {
  * The authenticated principal is always supplied by W01 transport.
  */
 export async function upsertPushEndpoint(
-  db: PushEndpointDatabase | undefined,
+  db: D1Database | undefined,
   ownerUserIdValue: string,
   installationIdValue: string,
   rawInput: unknown,
+  postgres?: PushEndpointPostgresExecutor,
 ): Promise<Readonly<{ endpointId: string; status: 'ACTIVE' | 'DISABLED' }>> {
-  if (!db) throw new PushEndpointRuntimeError('SERVICE_UNAVAILABLE', 503)
+  if (!db && !postgres) throw new PushEndpointRuntimeError('SERVICE_UNAVAILABLE', 503)
+  const database: PushEndpointDatabase = postgres ?? db!
 
   const ownerUserId = validUserId(ownerUserIdValue)
   const installationId = validInstallationId(installationIdValue)
@@ -158,8 +160,8 @@ export async function upsertPushEndpoint(
       now,
       now,
     ]
-    const row = isPostgresExecutor(db)
-      ? (await db.query<PushEndpointRow>(
+    const row = isPostgresExecutor(database)
+      ? (await database.query<PushEndpointRow>(
           `INSERT INTO notification_push_endpoints
              (endpoint_id, installation_id, owner_user_id, provider, platform, push_token,
               permission_status, app_version, created_at, updated_at, last_seen_at)
@@ -177,7 +179,7 @@ export async function upsertPushEndpoint(
            RETURNING endpoint_id, permission_status`,
           values,
         )).rows[0] ?? null
-      : await db.prepare(
+      : await database.prepare(
           `INSERT INTO notification_push_endpoints
              (endpoint_id, installation_id, owner_user_id, provider, platform, push_token,
               permission_status, app_version, created_at, updated_at, last_seen_at)
@@ -219,13 +221,13 @@ export async function deletePushEndpoint(
   const installationId = validInstallationId(installationIdValue)
 
   try {
-    if (isPostgresExecutor(db)) {
-      await db.query(
+    if (isPostgresExecutor(database)) {
+      await database.query(
         'DELETE FROM notification_push_endpoints WHERE owner_user_id = $1 AND installation_id = $2',
         [ownerUserId, installationId],
       )
     } else {
-      await db.prepare(
+      await database.prepare(
         'DELETE FROM notification_push_endpoints WHERE owner_user_id = ? AND installation_id = ?',
       ).bind(ownerUserId, installationId).run()
     }
