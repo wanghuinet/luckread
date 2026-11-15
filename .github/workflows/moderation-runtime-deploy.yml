@@ -51,11 +51,20 @@ jobs:
           if (w01.name!=='luckread-w01-payload') throw new Error('W01 identity mismatch');
           if (w03.name!=='luckread-w03') throw new Error('W03 identity mismatch');
           if (w06.name!=='luckread-w06') throw new Error('W06 identity mismatch');
+          const bootstrap=JSON.parse(fs.readFileSync('contracts/database/neon-five-domain-schema-bootstrap.v1.json','utf8'));
+          const governance=(bootstrap.domains||[]).find(x=>x.domainId==='D1-03');
+          const w06Progress=governance?.schemaProgress?.W06;
+          const w09Progress=governance?.schemaProgress?.W09;
+          const requiredW06Tables=['moderation_cases','moderation_decisions','moderation_decision_idempotency','moderation_txn_guard','moderation_enforcement_outbox','moderation_reports','moderation_report_idempotency'];
           if (!(w01.services||[]).some(x=>x.binding==='W06_MODERATION'&&x.service==='luckread-w06')) throw new Error('W01→W06 binding missing');
           if (!(w06.services||[]).some(x=>x.binding==='W03_CONTENT_MODERATION'&&x.service==='luckread-w03')) throw new Error('W06→W03 binding missing');
-          if (!(w06.d1_databases||[]).some(x=>x.binding==='D1_03'&&x.database_id==='bda1d247-a371-4244-91ae-aef96034db7f')) throw new Error('D1-03 mismatch');
+          if (!(w06.d1_databases||[]).some(x=>x.binding==='D1_03'&&x.database_id==='bda1d247-a371-4244-91ae-aef96034db7f')) throw new Error('D1-03 rollback binding mismatch');
+          if (w06.vars?.W06_MODERATION_DATABASE_DRIVER!=='neon') throw new Error('W06 moderation driver must select Neon');
+          if (!(w06.hyperdrive||[]).some(x=>x.binding==='HYPERDRIVE_D1_03'&&x.id==='7c8831416c18494faee04b96aa551cb9')) throw new Error('W06 D1-03 Hyperdrive binding mismatch');
+          if (!(w06.compatibility_flags||[]).includes('nodejs_compat')) throw new Error('W06 nodejs_compat is required for pg runtime');
+          if (governance?.databaseName!=='luckread_governance'||governance?.partialRemoteSchemaApplied!==true||w06Progress?.admittedSliceRemoteApplied!==true||!requiredW06Tables.every(t=>w06Progress?.implementedTables?.includes(t))||w06Progress?.pendingEntities?.includes('Appeal')!==true||w09Progress?.admittedSliceRemoteApplied!==true||w09Progress?.entities?.includes('AuditEvent')!==true) throw new Error('D1-03 W06/W09 schema admission drifted or Appeal scope changed');
           if ((w03.d1_databases||[]).some(x=>x.database_id==='bda1d247-a371-4244-91ae-aef96034db7f')) throw new Error('Direct W03→D1-03 access detected');
-          console.log('MODERATION_BINDINGS=PASS');
+          console.log('MODERATION_BINDINGS_AND_W06_NEON_ADMISSION=PASS');
           NODE
 
       - name: Setup Node 24
