@@ -1,11 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { ContentRuntimeError } from './content-runtime.js'
-import { createPostgresCollectionListReadStore } from './content-collections-read-store-postgres.js'
+import { createPostgresCollectionListReadStore, type CollectionListPostgresQueryExecutor } from './content-collections-read-store-postgres.js'
 
 describe('PostgreSQL creator-collection list read store', () => {
   it('uses owner-scoped keyset pagination and maps PostgreSQL timestamps', async () => {
-    const query = vi.fn(async () => ({
+    const query = vi.fn(async (_sql: string, _values?: unknown[]) => ({
       rows: [{
         id: 'collection_1',
         owner_user_id: 'user_1',
@@ -20,7 +19,7 @@ describe('PostgreSQL creator-collection list read store', () => {
         updated_at: new Date('2026-10-08T00:00:00.000Z'),
       }],
     }))
-    const store = createPostgresCollectionListReadStore({ query })
+    const store = createPostgresCollectionListReadStore({ query } as unknown as CollectionListPostgresQueryExecutor)
 
     const result = await store.listCreatorCollections(
       'user_1',
@@ -55,17 +54,18 @@ describe('PostgreSQL creator-collection list read store', () => {
   })
 
   it('rejects an invalid page size before querying', async () => {
-    const query = vi.fn()
-    const store = createPostgresCollectionListReadStore({ query })
+    const query = vi.fn(async (_sql: string, _values?: unknown[]) => ({ rows: [] }))
+    const store = createPostgresCollectionListReadStore({ query } as unknown as CollectionListPostgresQueryExecutor)
     await expect(store.listCreatorCollections('user_1', null, 52))
-      .rejects.toMatchObject<Partial<ContentRuntimeError>>({ code: 'VALIDATION_FAILED', status: 400 })
+      .rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 })
     expect(query).not.toHaveBeenCalled()
   })
 
   it('normalizes query failures without exposing database details', async () => {
-    const store = createPostgresCollectionListReadStore({
-      query: vi.fn(async () => { throw new Error('private connection detail') }),
+    const query = vi.fn(async (_sql: string, _values?: unknown[]) => {
+      throw new Error('private connection detail')
     })
+    const store = createPostgresCollectionListReadStore({ query } as unknown as CollectionListPostgresQueryExecutor)
     await expect(store.listCreatorCollections('user_1', null, 11))
       .rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE', status: 503 })
   })
