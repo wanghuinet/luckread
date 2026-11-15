@@ -30,7 +30,7 @@ function createFixture() {
       return page;
     },
   };
-  const env = { D1_04: {} as D1Database };
+  const env: Parameters<typeof handleCommerceBillingReadRequest>[2] = { D1_04: {} as D1Database };
   return { calls, dependencies, env };
 }
 
