@@ -13,6 +13,7 @@ import type { W07WebhookPostgresPool } from '../payment-webhook-database-postgre
 export type W07PaymentMethodReadRuntimeEnv = Readonly<{
   W07_DATABASE_DRIVER?: string
   HYPERDRIVE_D1_04?: { connectionString?: string }
+  W07_MEMBERSHIP_DATABASE_DRIVER?: string
 }>
 
 type W07PoolFactory = (config: PoolConfig) => Pool
