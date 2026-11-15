@@ -311,10 +311,14 @@ export function buildCompletePaymentMethodRevocationOnMandateWebhook(
   customerId: string,
   paymentMethodId: string,
   nowInput: string,
+  databaseDialect: 'd1' | 'postgres' = 'd1',
 ): D1PreparedStatement {
+  const updatedAtExpression = databaseDialect === 'postgres'
+    ? "GREATEST(updated_at + INTERVAL '1 millisecond', ?::timestamptz)"
+    : "strftime('%Y-%m-%dT%H:%M:%fZ', MAX(julianday(updated_at) + (1.0 / 86400000.0), julianday(?)))";
   return db.prepare(
     "UPDATE payment_method_revocation_requests SET status = 'COMPLETED', version = version + 1, " +
-    "updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', MAX(julianday(updated_at) + (1.0 / 86400000.0), julianday(?))) " +
+    "updated_at = " + updatedAtExpression + " " +
     "WHERE provider = 'hyperswitch' AND merchant_id = ? AND customer_id = ? " +
     "AND status IN ('REQUESTED','PENDING_PROVIDER','RECONCILIATION_REQUIRED') AND provider_method_deleted_at IS NOT NULL " +
     'AND EXISTS (SELECT 1 FROM saved_payment_methods s WHERE s.saved_payment_method_id = payment_method_revocation_requests.saved_payment_method_id ' +

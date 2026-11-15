@@ -35,6 +35,7 @@ function fixture(options: {
   syncResult?: RenewalOutcomeSyncResult;
   pendingRecoveryResult?: Readonly<{ scanned: number; applied: number; reconciliationRequired: number; pendingRetry: number }>;
   purchaseFulfillmentResult?: PaidMembershipPurchaseFulfillmentResult;
+  webhookDatabase?: D1Database;
 } = {}) {
   const calls: Array<{ db: unknown; input: ReceiveHyperswitchWebhookInput }> = [];
   const syncCalls: Array<{ env: unknown; paymentId: string; merchantId: string }> = [];
@@ -83,7 +84,7 @@ function fixture(options: {
     HYPERSWITCH_WEBHOOK_SECRET: SECRET,
     HYPERSWITCH_MERCHANT_ID: MERCHANT,
   };
-  return { env, calls, syncCalls, pendingRecoveryCalls, purchaseFulfillmentCalls, receiptCalls, dependencies: { receive, syncRenewalOutcome, syncPendingOutcomes, fulfillPaidOrder, issueReceipt, expirePendingPlanUpgrade: async () => {} } };
+  return { env, calls, syncCalls, pendingRecoveryCalls, purchaseFulfillmentCalls, receiptCalls, dependencies: { receive, getWebhookDatabase: () => options.webhookDatabase, syncRenewalOutcome, syncPendingOutcomes, fulfillPaidOrder, issueReceipt, expirePendingPlanUpgrade: async () => {} } };
 }
 
 function request(options: {
@@ -449,4 +450,33 @@ describe('W07 Hyperswitch webhook HTTP receiver', () => {
     expect(response?.status).toBe(503);
     expect(f.calls).toHaveLength(0);
   });
+  it('uses the same Neon D1-04 bridge for the signed receipt and downstream W07 payment reads', async () => {
+    const neonDatabase = { marker: 'neon-d1-04' } as unknown as D1Database;
+    const f = fixture({
+      result: receipt('APPLIED'),
+      syncResult: { cycleId: '', outcome: 'NO_RENEWAL_CYCLE' },
+      purchaseFulfillmentResult: { outcome: 'APPLIED', fulfilledCount: 1 },
+      webhookDatabase: neonDatabase,
+    });
+    const paymentId = 'pay_' + 'g'.repeat(26);
+    const body = JSON.stringify({
+      event_id: 'evt_neon_01',
+      event_type: 'payment_succeeded',
+      merchant_id: MERCHANT,
+      content_type: 'payment_details',
+      resource: { payment_id: paymentId },
+    });
+    const response = await handleHyperswitchWebhookRequest(
+      request({ body, signature: 'signed-provider-event' }),
+      f.env,
+      f.dependencies,
+    );
+
+    expect(response?.status).toBe(200);
+    expect(f.calls[0]?.db).toBe(neonDatabase);
+    expect(f.receiptCalls[0]?.db).toBe(neonDatabase);
+    expect(f.syncCalls[0]?.env).toMatchObject({ D1_01: f.env.D1_01, D1_04: neonDatabase });
+    expect(f.purchaseFulfillmentCalls[0]?.env).toMatchObject({ D1_01: f.env.D1_01, D1_04: neonDatabase });
+  });
+
 });

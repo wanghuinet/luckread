@@ -17,8 +17,9 @@ import {
 } from './paid-membership-order-fulfillment.js';
 import { issueReceiptForPaidPayment } from './billing-persistence.js';
 import { expirePendingSubscriptionPlanUpgradeForPayment } from './subscription-plan-change-checkout.js';
+import { getW07PaymentWebhookDatabase, type W07PaymentMethodReadRuntimeEnv } from './neon/payment-method-read-runtime.js';
 
-type HyperswitchWebhookRuntimeEnv = Readonly<{
+type HyperswitchWebhookRuntimeEnv = W07PaymentMethodReadRuntimeEnv & Readonly<{
   D1_01: D1Database;
   D1_04: D1Database;
   W06_GOVERNANCE?: Fetcher;
@@ -35,6 +36,7 @@ type RenewalPendingRecoveryResult = Readonly<{
 
 type HyperswitchWebhookRuntimeDependencies = Readonly<{
   receive?: typeof receiveHyperswitchWebhook;
+  getWebhookDatabase?: (env: HyperswitchWebhookRuntimeEnv) => D1Database | undefined;
   syncRenewalOutcome?: (
     env: Readonly<{ D1_01: D1Database; D1_04: D1Database }>,
     paymentId: string,
@@ -179,15 +181,18 @@ export async function handleHyperswitchWebhookRequest(
 
   try {
     const receive = dependencies.receive ?? receiveHyperswitchWebhook;
-    const result = await receive(env.D1_04, {
+    const neonDatabase = (dependencies.getWebhookDatabase ?? getW07PaymentWebhookDatabase)(env);
+    const webhookDatabase = neonDatabase ?? env.D1_04;
+    const databaseDialect = neonDatabase ? 'postgres' : 'd1';
+    const result = await receive(webhookDatabase, {
       rawBody,
       signatureHeader: request.headers.get(SIGNATURE_HEADER),
       webhookSecret: env.HYPERSWITCH_WEBHOOK_SECRET,
       expectedMerchantId: env.HYPERSWITCH_MERCHANT_ID,
-    });
+    }, { databaseDialect });
 
     // receiveHyperswitchWebhook verifies the provider signature and durably
-    // commits the D1-04 event/payment/cycle outcome before this point. Only then
+    // commits the selected D1-04 event/payment/cycle outcome before this point. Only then
     // may the same signed payload identify a renewal cycle for D1-01 sync.
     let subscriptionSync: RenewalOutcomeSyncResult | undefined;
     let pendingRecovery: RenewalPendingRecoveryResult | undefined;
@@ -200,11 +205,11 @@ export async function handleHyperswitchWebhookRequest(
       // the raw HMAC signature and committed the successful Payment state.
       // Duplicate signed events safely retry a previously interrupted receipt.
       const issueReceipt = dependencies.issueReceipt ?? issueReceiptForPaidPayment;
-      await issueReceipt(env.D1_04, paymentId, env.HYPERSWITCH_MERCHANT_ID);
+      await issueReceipt(webhookDatabase, paymentId, env.HYPERSWITCH_MERCHANT_ID);
     }
     if (paymentId) {
       const sync = dependencies.syncRenewalOutcome ?? syncRenewalCycleOutcomeForPayment;
-      const renewalEnv = { D1_01: env.D1_01, D1_04: env.D1_04, W06_GOVERNANCE: env.W06_GOVERNANCE };
+      const renewalEnv = { D1_01: env.D1_01, D1_04: webhookDatabase, W06_GOVERNANCE: env.W06_GOVERNANCE };
       subscriptionSync = await sync(
         renewalEnv,
         paymentId,

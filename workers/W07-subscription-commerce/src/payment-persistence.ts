@@ -159,6 +159,8 @@ export type PaymentPersistenceDependencies = Readonly<{
   createSavedPaymentMethodId?: () => string;
   createPaymentMandateId?: () => string;
   paymentEnvironment?: 'sandbox' | 'production';
+  /** Internal SQL dialect selection for the W07 D1-04 webhook persistence bridge. */
+  databaseDialect?: 'd1' | 'postgres';
 }>;
 
 export type PaymentAttemptCreation = Readonly<{
@@ -1178,6 +1180,7 @@ async function receiveHyperswitchMandateWebhook(
   eventRowId: string,
   now: string,
   createConflictId: () => string,
+  databaseDialect: 'd1' | 'postgres' = 'd1',
 ): Promise<WebhookReceiptResult> {
   if (envelope.contentType !== 'mandate_details') {
     return persistNonApplicableWebhook(
@@ -1286,7 +1289,7 @@ async function receiveHyperswitchMandateWebhook(
   const statements: D1PreparedStatement[] = [insertEvent, reopenReceipt, updateMandate];
   if (expectedStatus === 'REVOKED') {
     statements.push(buildCompletePaymentMethodRevocationOnMandateWebhook(
-      db, envelope.merchantId, mandate.customer_id, paymentMethodId, now,
+      db, envelope.merchantId, mandate.customer_id, paymentMethodId, now, databaseDialect,
     ));
   }
 
@@ -1368,7 +1371,7 @@ async function receiveHyperswitchMandateWebhook(
 export async function receiveHyperswitchWebhook(
   db: D1Database,
   input: ReceiveHyperswitchWebhookInput,
-  dependencies: Pick<PaymentPersistenceDependencies, 'now' | 'createEventRowId' | 'createConflictId' | 'createSavedPaymentMethodId' | 'createPaymentMandateId'> = {},
+  dependencies: Pick<PaymentPersistenceDependencies, 'now' | 'createEventRowId' | 'createConflictId' | 'createSavedPaymentMethodId' | 'createPaymentMandateId' | 'databaseDialect'> = {},
 ): Promise<WebhookReceiptResult> {
   if (!(input.rawBody instanceof ArrayBuffer) || input.rawBody.byteLength > MAX_WEBHOOK_BODY_BYTES) {
     throw new PaymentPersistenceError('WEBHOOK_REJECTED', 400);
@@ -1419,6 +1422,7 @@ export async function receiveHyperswitchWebhook(
   if (envelope.eventType === 'mandate_active' || envelope.eventType === 'mandate_revoked') {
     return receiveHyperswitchMandateWebhook(
       db, envelope, payloadSha256, eventRowId, now, createConflictId,
+      dependencies.databaseDialect ?? 'd1',
     );
   }
 
