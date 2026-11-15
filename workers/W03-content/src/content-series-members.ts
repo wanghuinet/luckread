@@ -25,6 +25,21 @@ export interface SeriesMemberRecord {
   updatedAt: string
 }
 
+export type SeriesMemberListCursor = Readonly<{ position: number; id: string }>
+
+export interface SeriesMembersReadStore {
+  listSeriesMembers(
+    ownerUserId: string,
+    seriesId: string,
+    cursor: SeriesMemberListCursor | null,
+    limit: number,
+  ): Promise<{
+    items: readonly SeriesMemberRecord[]
+    seriesVersion: number
+    seriesEtag: string
+  }>
+}
+
 interface IdempotencyRow {
   idem_id: string | null
   idem_owner_user_id: string | null
@@ -414,6 +429,7 @@ export async function listSeriesMembers(
   seriesId: string,
   cursor: string | null,
   limit: number,
+  readStore?: SeriesMembersReadStore,
 ): Promise<{
   items: SeriesMemberRecord[]
   nextCursor: string | null
@@ -427,43 +443,56 @@ export async function listSeriesMembers(
 
   const decoded = cursor ? decodeSeriesMemberCursor(cursor, ownerUserId, seriesId) : null
 
-  const series = await db.prepare(
-    'SELECT id, version, etag FROM content_series WHERE id = ? AND owner_user_id = ?',
-  ).bind(seriesId, ownerUserId).first<{ id: string; version: number; etag: string }>()
-  if (!series) throw new ContentRuntimeError('NOT_FOUND', 404)
+  let rows: readonly SeriesMemberRecord[]
+  let seriesVersion: number
+  let seriesEtag: string
+  if (readStore) {
+    const result = await readStore.listSeriesMembers(ownerUserId, seriesId, decoded, pageSize + 1)
+    rows = result.items
+    seriesVersion = result.seriesVersion
+    seriesEtag = result.seriesEtag
+  } else {
+    const series = await db.prepare(
+      'SELECT id, version, etag FROM content_series WHERE id = ? AND owner_user_id = ?',
+    ).bind(seriesId, ownerUserId).first<{ id: string; version: number; etag: string }>()
+    if (!series) throw new ContentRuntimeError('NOT_FOUND', 404)
+    seriesVersion = series.version
+    seriesEtag = series.etag
 
-  const cursorClause = decoded
-    ? 'AND (r.position > ? OR (r.position = ? AND r.relationship_id > ?))'
-    : ''
-  const bindings: unknown[] = [seriesId]
-  if (decoded) bindings.push(decoded.position, decoded.position, decoded.id)
-  bindings.push(pageSize + 1)
+    const cursorClause = decoded
+      ? 'AND (r.position > ? OR (r.position = ? AND r.relationship_id > ?))'
+      : ''
+    const bindings: unknown[] = [seriesId]
+    if (decoded) bindings.push(decoded.position, decoded.position, decoded.id)
+    bindings.push(pageSize + 1)
 
-  const rows = await db.prepare(
-    'SELECT r.relationship_id, r.position, r.created_at, r.updated_at, ' +
-    'r.target_id AS series_id, c.id AS content_id, c.slug AS content_slug, ' +
-    'c.content_type, c.state AS content_state, c.title AS content_title ' +
-    'FROM content_relationships r ' +
-    'JOIN contents c ON c.id = r.source_id ' +
-    "WHERE r.source_type = 'content' AND r.target_type = 'series' AND r.relation_type = 'series-member' " +
-    "AND r.target_id = ? AND r.status = 'ACTIVE' " +
-    cursorClause +
-    'ORDER BY r.position ASC, r.relationship_id ASC LIMIT ?',
-  ).bind(...bindings).all<{
-    relationship_id: string
-    position: number
-    created_at: string
-    updated_at: string
-    series_id: string
-    content_id: string
-    content_slug: string
-    content_type: 'article' | 'post' | 'video'
-    content_state: string
-    content_title: string
-  }>()
+    const result = await db.prepare(
+      'SELECT r.relationship_id, r.position, r.created_at, r.updated_at, ' +
+      'r.target_id AS series_id, c.id AS content_id, c.slug AS content_slug, ' +
+      'c.content_type, c.state AS content_state, c.title AS content_title ' +
+      'FROM content_relationships r ' +
+      'JOIN contents c ON c.id = r.source_id ' +
+      "WHERE r.source_type = 'content' AND r.target_type = 'series' AND r.relation_type = 'series-member' " +
+      "AND r.target_id = ? AND r.status = 'ACTIVE' " +
+      cursorClause +
+      'ORDER BY r.position ASC, r.relationship_id ASC LIMIT ?',
+    ).bind(...bindings).all<{
+      relationship_id: string
+      position: number
+      created_at: string
+      updated_at: string
+      series_id: string
+      content_id: string
+      content_slug: string
+      content_type: 'article' | 'post' | 'video'
+      content_state: string
+      content_title: string
+    }>()
+    rows = result.results.map(toMember)
+  }
 
-  const hasMore = rows.results.length > pageSize
-  const page = rows.results.slice(0, pageSize).map(toMember)
+  const hasMore = rows.length > pageSize
+  const page = rows.slice(0, pageSize)
   const last = page.at(-1)
   return {
     items: page,
@@ -477,8 +506,8 @@ export async function listSeriesMembers(
           id: last.relationshipId,
         })
       : null,
-    seriesVersion: series.version,
-    seriesEtag: series.etag,
+    seriesVersion,
+    seriesEtag,
   }
 }
 
