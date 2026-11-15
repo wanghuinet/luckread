@@ -257,6 +257,21 @@ describe('W07 internal customer refund runtime', () => {
     expect(response?.headers.get('cache-control')).toBe('no-store');
   });
 
+  it('uses one selected Neon D1-04 database for ownership, idempotency, reservation and acknowledgement', async () => {
+    const fixture = createFixture({ env: { W07_DATABASE_DRIVER: 'neon' } });
+    const neonDatabase = {} as D1Database;
+    const dependencies = { ...fixture.dependencies, getDatabase: () => neonDatabase };
+    const response = await handleCommerceRefundRequest(
+      request({ idempotencyKey: IDEMPOTENCY_KEY, body: { paymentId: PAYMENT_ID, amountMinor: 300, currency: 'USD', reason: 'Customer request' } }),
+      CUSTOMER_ID, fixture.env, dependencies,
+    );
+    expect(response?.status).toBe(202);
+    expect(fixture.calls.resolvePayment[0]?.[0]).toBe(neonDatabase);
+    expect(fixture.calls.findExistingReservation[0]?.[0]).toBe(neonDatabase);
+    expect(fixture.calls.reserve[0]?.[0]).toBe(neonDatabase);
+    expect(fixture.calls.recordAcknowledgement[0]?.[0]).toBe(neonDatabase);
+  });
+
   it('does not reserve or call Hyperswitch when captured amount is absent or invalid', async () => {
     for (const amountCaptured of [null, undefined, 0, -1, 700.5, 1001]) {
       const invalidPayment = {

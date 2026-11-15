@@ -11,6 +11,11 @@ import {
   type PaymentAttemptCreation,
   type PaymentAttemptDto,
 } from './payment-persistence.js';
+import {
+  getW07SelectedD104Database,
+  resolveW07DatabaseDriver,
+  type W07PaymentMethodReadRuntimeEnv,
+} from './neon/payment-method-read-runtime.js';
 
 type ResolvedProviderConfig = Readonly<{
   environment: 'sandbox' | 'production';
@@ -18,7 +23,7 @@ type ResolvedProviderConfig = Readonly<{
   expectedMerchantId: string;
 }>;
 
-type PaymentIntentRuntimeEnv = Readonly<{
+type PaymentIntentRuntimeEnv = W07PaymentMethodReadRuntimeEnv & Readonly<{
   D1_04: D1Database;
   HYPERSWITCH_ENVIRONMENT?: string | null;
   HYPERSWITCH_API_KEY?: string | null;
@@ -29,6 +34,7 @@ type PaymentIntentRuntimeDependencies = Readonly<{
   createAttempt?: typeof createPaymentAttempt;
   createProviderIntent?: typeof createHyperswitchCustomerInitiatedSetupIntent;
   recordIntent?: typeof recordUnconfirmedHyperswitchIntent;
+  getDatabase?: (env: PaymentIntentRuntimeEnv) => D1Database;
 }>;
 
 const ORDER_ID_MAX_LENGTH = 255;
@@ -145,14 +151,15 @@ export async function handleCommercePaymentIntentRequest(
   }
 
   try {
+    const database = (dependencies.getDatabase ?? getW07SelectedD104Database)(env);
     const createAttempt = dependencies.createAttempt ?? createPaymentAttempt;
     const attempt: PaymentAttemptCreation = await createAttempt(
-      env.D1_04,
+      database,
       customerId,
       route.orderId,
       request.headers.get('Idempotency-Key'),
       providerConfig.expectedMerchantId,
-      { paymentEnvironment: providerConfig.environment },
+      { paymentEnvironment: providerConfig.environment, databaseDialect: resolveW07DatabaseDriver(env) },
     );
 
     if (!['INITIATING', 'requires_payment_method', 'requires_confirmation'].includes(attempt.payment.status)) {
@@ -174,7 +181,7 @@ export async function handleCommercePaymentIntentRequest(
 
     const recordIntent = dependencies.recordIntent ?? recordUnconfirmedHyperswitchIntent;
     const persisted: PaymentAttemptDto = await recordIntent(
-      env.D1_04,
+      database,
       customerId,
       attempt.payment.paymentId,
       providerConfig.expectedMerchantId,
