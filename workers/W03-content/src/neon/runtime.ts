@@ -61,9 +61,9 @@ const creatorContentsStores = new WeakMap<object, CreatorContentsReadStore>()
  * projections wired from the W03 entrypoint: public media references, bookmark
  * batch projection, W04-authorized following-feed content, native post-thread
  * projection, canonical content context and detail reads, creator-owned
- * series and collection reads, and the series/collection membership lists.
- * Other W03 reads and every W03 mutation remain on D1_02. D1 is the safe default
- * and unknown values fail closed.
+ * content lists, series and collection reads, and series/collection membership
+ * lists. Other W03 reads and every W03 mutation remain on D1_02. D1 is the safe
+ * default and unknown values fail closed.
  */
 export function resolveW03PublicMediaReferenceDriver(
   env: W03PublicMediaReferenceRuntimeEnv,
