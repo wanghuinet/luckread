@@ -5,6 +5,8 @@ import {
 } from '../payment-method-runtime.js'
 import { createPostgresPaymentMethodReadStore } from '../payment-method-read-store-postgres.js'
 import type { PaymentMethodReadStore } from '../payment-method-read-store.js'
+import { createPostgresWebhookD1Database } from '../payment-webhook-database-postgres.js'
+import type { W07WebhookPostgresPool } from '../payment-webhook-database-postgres.js'
 
 export type W07PaymentMethodReadRuntimeEnv = Readonly<{
   W07_DATABASE_DRIVER?: string
@@ -15,6 +17,7 @@ type W07PoolFactory = (config: PoolConfig) => Pool
 
 const pools = new WeakMap<object, Pool>()
 const stores = new WeakMap<object, PaymentMethodReadStore>()
+const webhookDatabases = new WeakMap<object, D1Database>()
 
 export function resolveW07DatabaseDriver(
   env: W07PaymentMethodReadRuntimeEnv,
@@ -44,16 +47,10 @@ function validateHyperdriveConnectionString(value: unknown): string {
   return value
 }
 
-/**
- * Read-only PAY-003 adapter composition. D1 remains the runtime default;
- * Neon uses only the existing D1-04 Hyperdrive connection and existing
- * payment-method read adapter. Mutation, provider-webhook and revocation
- * persistence are intentionally not composed here.
- */
-export function getW07PaymentMethodReadStore(
+function getW07PostgresPool(
   env: W07PaymentMethodReadRuntimeEnv,
-  poolFactory: W07PoolFactory = (config) => new Pool(config),
-): PaymentMethodReadStore | undefined {
+  poolFactory: W07PoolFactory,
+): Pool | undefined {
   if (resolveW07DatabaseDriver(env) === 'd1') return undefined
 
   const binding = env.HYPERDRIVE_D1_04
@@ -61,12 +58,9 @@ export function getW07PaymentMethodReadStore(
     throw new PaymentMethodRuntimeError('SERVICE_UNAVAILABLE', 503)
   }
 
-  const cachedStore = stores.get(binding)
-  if (cachedStore) return cachedStore
-
-  const connectionString = validateHyperdriveConnectionString(binding.connectionString)
   let pool = pools.get(binding)
   if (!pool) {
+    const connectionString = validateHyperdriveConnectionString(binding.connectionString)
     pool = poolFactory({
       connectionString,
       max: 5,
@@ -82,8 +76,55 @@ export function getW07PaymentMethodReadStore(
     })
     pools.set(binding, pool)
   }
+  return pool
+}
 
+/**
+ * Neon composition for the W07 D1-04 Hyperdrive binding. The same bounded
+ * pool is shared by the payment-method store and the signed-webhook database
+ * bridge. D1 remains the default when W07_DATABASE_DRIVER is unset.
+ */
+export function getW07PaymentMethodReadStore(
+  env: W07PaymentMethodReadRuntimeEnv,
+  poolFactory: W07PoolFactory = (config) => new Pool(config),
+): PaymentMethodReadStore | undefined {
+  if (resolveW07DatabaseDriver(env) === 'd1') return undefined
+
+  const binding = env.HYPERDRIVE_D1_04
+  if (!binding || typeof binding !== 'object') {
+    throw new PaymentMethodRuntimeError('SERVICE_UNAVAILABLE', 503)
+  }
+  const cachedStore = stores.get(binding)
+  if (cachedStore) return cachedStore
+
+  const pool = getW07PostgresPool(env, poolFactory)
+  if (!pool) throw new PaymentMethodRuntimeError('SERVICE_UNAVAILABLE', 503)
   const store = createPostgresPaymentMethodReadStore(pool)
   stores.set(binding, store)
   return store
+}
+
+/**
+ * Select the D1-04 webhook persistence database. In Neon mode this exposes
+ * the existing webhook business logic through a D1-compatible PostgreSQL
+ * adapter whose batch operation is one explicit PostgreSQL transaction.
+ */
+export function getW07PaymentWebhookDatabase(
+  env: W07PaymentMethodReadRuntimeEnv,
+  poolFactory: W07PoolFactory = (config) => new Pool(config),
+): D1Database | undefined {
+  if (resolveW07DatabaseDriver(env) === 'd1') return undefined
+
+  const binding = env.HYPERDRIVE_D1_04
+  if (!binding || typeof binding !== 'object') {
+    throw new PaymentMethodRuntimeError('SERVICE_UNAVAILABLE', 503)
+  }
+  const cachedDatabase = webhookDatabases.get(binding)
+  if (cachedDatabase) return cachedDatabase
+
+  const pool = getW07PostgresPool(env, poolFactory)
+  if (!pool) throw new PaymentMethodRuntimeError('SERVICE_UNAVAILABLE', 503)
+  const database = createPostgresWebhookD1Database(pool as unknown as W07WebhookPostgresPool)
+  webhookDatabases.set(binding, database)
+  return database
 }
