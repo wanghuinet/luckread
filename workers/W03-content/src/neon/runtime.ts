@@ -35,9 +35,10 @@ const collectionListStores = new WeakMap<object, CollectionListReadStore>()
 /**
  * The explicit D1-02 content read driver controls only the PostgreSQL read
  * projections wired from the W03 entrypoint: public media references, bookmark
- * batch projection, W04-authorized following-feed content, and native post-thread
- * projection. Other W03 reads and every W03 mutation remain on D1_02. D1 is the
- * safe default and unknown values fail closed.
+ * batch projection, W04-authorized following-feed content, native post-thread
+ * projection, canonical content context, and the creator-owned collection list.
+ * Other W03 reads and every W03 mutation remain on D1_02. D1 is the safe default
+ * and unknown values fail closed.
  */
 export function resolveW03PublicMediaReferenceDriver(
   env: W03PublicMediaReferenceRuntimeEnv,
