@@ -1,19 +1,17 @@
-name: Neon Runtime Cutover Deploy — W05 and W07
+name: Neon Runtime Cutover Deploy — W05 Social
 
 on:
   push:
     branches:
       - main
     paths:
-      - '.github/workflows/neon-runtime-cutover-deploy.yml'
       - 'workers/W05-social/wrangler.jsonc'
-      - 'workers/W07-subscription-commerce/wrangler.jsonc'
 
 permissions:
   contents: read
 
 concurrency:
-  group: neon-runtime-cutover-w05-w07
+  group: neon-runtime-cutover-w05
   cancel-in-progress: false
 
 jobs:
@@ -28,41 +26,27 @@ jobs:
           ref: main
           fetch-depth: 1
 
-      - name: Validate explicit Neon selectors and preserve rollback bindings
+      - name: Validate W05 Neon D1-02 runtime and preserve D1 rollback bindings
         run: |
           set -euo pipefail
           node <<'NODE'
           const fs = require('node:fs')
           const w05 = JSON.parse(fs.readFileSync('workers/W05-social/wrangler.jsonc', 'utf8'))
-          const w07 = JSON.parse(fs.readFileSync('workers/W07-subscription-commerce/wrangler.jsonc', 'utf8'))
           const bootstrap = JSON.parse(fs.readFileSync('contracts/database/neon-five-domain-schema-bootstrap.v1.json', 'utf8'))
           const d1 = (w05.d1_databases || []).find(x => x.binding === 'DB')
           const d103 = (w05.d1_databases || []).find(x => x.binding === 'D1_03')
-          const w05Hyperdrive = (w05.hyperdrive || []).find(x => x.binding === 'HYPERDRIVE_D1_02')
-          const w071 = (w07.d1_databases || []).find(x => x.binding === 'D1_01')
-          const w074 = (w07.d1_databases || []).find(x => x.binding === 'D1_04')
-          const w07Hyperdrive = (w07.hyperdrive || []).find(x => x.binding === 'HYPERDRIVE_D1_04')
-          const finance = (bootstrap.domains || []).find(x => x.domainId === 'D1-04')
+          const hyperdrive = (w05.hyperdrive || []).find(x => x.binding === 'HYPERDRIVE_D1_02')
+          const domain = (bootstrap.domains || []).find(x => x.domainId === 'D1-02')
           if (w05.vars?.W05_DATABASE_DRIVER !== 'neon' ||
               w05.vars?.PUSH_DELIVERY_ENABLED !== 'false' ||
               !d1 || d1.database_id !== '6c342634-97f6-4248-9f4a-85772af4f22c' ||
               !d103 || d103.database_id !== 'bda1d247-a371-4244-91ae-aef96034db7f' ||
-              !w05Hyperdrive || w05Hyperdrive.id !== 'c55183e1cc3446409c9c1075832c6615') {
-            throw new Error('W05 Neon selector, D1 rollback bindings, W09 D1-03 binding or Hyperdrive identity drifted')
+              !hyperdrive || hyperdrive.id !== 'c55183e1cc3446409c9c1075832c6615' ||
+              domain?.databaseName !== 'luckreadpro' ||
+              domain?.remoteSchemaApplied !== true) {
+            throw new Error('W05 Neon selector, D1 rollback bindings or D1-02 schema admission drifted')
           }
-          if (w07.vars?.W07_DATABASE_DRIVER !== 'neon' ||
-              w07.vars?.MEMBERSHIP_RENEWAL_ENABLED !== 'false' ||
-              !w071 || w071.database_id !== '2f80471e-3756-49f9-8db1-7707a433ad64' ||
-              !w074 || w074.database_id !== '9bfb89a5-fbb5-45b1-a2ee-eab674b0d736' ||
-              !w07Hyperdrive || w07Hyperdrive.id !== '3ae15e6dfb5e4b44979eee30e1d5ede4') {
-            throw new Error('W07 Neon selector, D1 rollback bindings, membership gate or Hyperdrive identity drifted')
-          }
-          if (finance?.databaseName !== 'luckread_finance' ||
-              finance?.remoteSchemaApplied !== true ||
-              !String(finance?.status ?? '').includes('SCHEMA_ONLY_REMOTE_APPLIED')) {
-            throw new Error('D1-04 Neon schema application is not recorded')
-          }
-          console.log('W05_W07_NEON_RUNTIME_CUTOVER_CONFIG=PASS')
+          console.log('W05_NEON_RUNTIME_CUTOVER_CONFIG=PASS')
           NODE
 
       - name: Setup Node 24
@@ -80,14 +64,3 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: npx --yes wrangler@4.116.0 deploy --config wrangler.jsonc
-
-      - name: Install W07 runtime dependencies
-        working-directory: workers/W07-subscription-commerce
-        run: npm ci --ignore-scripts --no-audit --fund=false
-
-      - name: Deploy W07 Finance on Neon D1-04
-        working-directory: workers/W07-subscription-commerce
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: npx --yes wrangler@4.156.0 deploy --config wrangler.jsonc

@@ -1,0 +1,84 @@
+name: Neon Runtime Cutover Deploy — W07 D1-01 Membership and D1-04 Finance
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/neon-runtime-cutover-w07-d101.yml'
+      - 'workers/W07-subscription-commerce/wrangler.jsonc'
+      - 'workers/W07-subscription-commerce/src/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: neon-runtime-cutover-w07
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact main deployment source
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+
+      - name: Validate both Neon domains and preserve D1 rollback bindings
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('node:fs')
+          const config = JSON.parse(fs.readFileSync('workers/W07-subscription-commerce/wrangler.jsonc', 'utf8'))
+          const bootstrap = JSON.parse(fs.readFileSync('contracts/database/neon-five-domain-schema-bootstrap.v1.json', 'utf8'))
+          const d101 = (config.d1_databases || []).find(x => x.binding === 'D1_01')
+          const d104 = (config.d1_databases || []).find(x => x.binding === 'D1_04')
+          const h101 = (config.hyperdrive || []).find(x => x.binding === 'HYPERDRIVE_D1_01')
+          const h104 = (config.hyperdrive || []).find(x => x.binding === 'HYPERDRIVE_D1_04')
+          const domain101 = (bootstrap.domains || []).find(x => x.domainId === 'D1-01')
+          const domain104 = (bootstrap.domains || []).find(x => x.domainId === 'D1-04')
+          const governance = (config.services || []).find(x => x.binding === 'W06_GOVERNANCE')
+          if (config.name !== 'luckread-w07' || config.main !== 'src/index.ts' || config.workers_dev !== false) {
+            throw new Error('W07 Worker identity, entrypoint or public exposure boundary changed')
+          }
+          if (config.vars?.W07_MEMBERSHIP_DATABASE_DRIVER !== 'neon' ||
+              config.vars?.W07_DATABASE_DRIVER !== 'neon' ||
+              config.vars?.MEMBERSHIP_RENEWAL_ENABLED !== 'false') {
+            throw new Error('W07 Neon selectors or disabled-renewal safety gate drifted')
+          }
+          if (!d101 || d101.database_id !== '2f80471e-3756-49f9-8db1-7707a433ad64' || d101.database_name !== 'luckread' ||
+              !d104 || d104.database_id !== '9bfb89a5-fbb5-45b1-a2ee-eab674b0d736') {
+            throw new Error('W07 D1-01/D1-04 rollback bindings must remain configured with admitted physical identities')
+          }
+          if (!h101 || h101.id !== '0c53a1bb9bc0484bac146e8ae2d3158b' ||
+              !h104 || h104.id !== '3ae15e6dfb5e4b44979eee30e1d5ede4') {
+            throw new Error('W07 must use the existing D1-01 and D1-04 Hyperdrive resources')
+          }
+          if (domain101?.databaseName !== 'luckread' || domain101?.remoteSchemaApplied !== true ||
+              domain104?.databaseName !== 'luckread_finance' || domain104?.remoteSchemaApplied !== true) {
+            throw new Error('W07 cannot select Neon before both owned remote schemas are recorded')
+          }
+          if (!governance || governance.service !== 'luckread-w06') {
+            throw new Error('Existing W07 to W06 governance Service Binding must be preserved')
+          }
+          console.log('W07_NEON_D1_01_D1_04_RUNTIME_CUTOVER_CONFIG=PASS')
+          NODE
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install W07 PostgreSQL runtime dependency from committed lockfile
+        run: npm ci --prefix workers/W07-subscription-commerce --ignore-scripts --no-audit --fund=false
+
+      - name: Deploy W07 membership and finance runtimes on existing Neon databases
+        working-directory: workers/W07-subscription-commerce
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx --yes wrangler@4.156.0 deploy --config wrangler.jsonc

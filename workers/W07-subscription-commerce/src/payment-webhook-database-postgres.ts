@@ -73,6 +73,10 @@ function normalizeRow<Row extends Record<string, unknown>>(row: Row): Row {
 
 /** Replace D1 positional markers without rewriting question marks inside SQL strings or comments. */
 export function toPostgresWebhookSql(sql: string): string {
+  const ignoreConflicts = /^\s*INSERT\s+OR\s+IGNORE\s+INTO\b/i.test(sql)
+  const sourceSql = ignoreConflicts
+    ? sql.replace(/^(\s*INSERT)\s+OR\s+IGNORE(\s+INTO\b)/i, '$1$2')
+    : sql
   let result = '';
   let position = 0;
   let parameter = 0;
@@ -81,9 +85,9 @@ export function toPostgresWebhookSql(sql: string): string {
   let lineComment = false;
   let blockComment = false;
 
-  while (position < sql.length) {
-    const char = sql[position]!;
-    const next = sql[position + 1];
+  while (position < sourceSql.length) {
+    const char = sourceSql[position]!;
+    const next = sourceSql[position + 1];
 
     if (lineComment) {
       result += char;
@@ -149,6 +153,11 @@ export function toPostgresWebhookSql(sql: string): string {
       position += 1;
     }
   }
+  if (ignoreConflicts) {
+    const hasTerminator = /;\s*$/.test(result)
+    const statement = result.replace(/;\s*$/, '')
+    result = statement + ' ON CONFLICT DO NOTHING' + (hasTerminator ? ';' : '')
+  }
   return result;
 }
 
@@ -173,7 +182,7 @@ function toD1Result<T>(rows: T[], changes: number): D1Result<T> {
  * Every D1 batch maps to exactly one PostgreSQL transaction; statement reads
  * and standalone writes retain their normal autocommit behavior.
  */
-export function createPostgresWebhookD1Database(pool: W07WebhookPostgresPool): D1Database {
+export function createPostgresD1Database(pool: W07WebhookPostgresPool): D1Database {
   function execute<Row extends Record<string, unknown>>(
     statement: BoundStatement,
   ): Promise<PostgresQueryResult<Row>> {
@@ -256,4 +265,10 @@ export function createPostgresWebhookD1Database(pool: W07WebhookPostgresPool): D
   };
 
   return database as unknown as D1Database;
+}
+
+
+/** Backward-compatible name retained for the D1-04 payment-webhook owner. */
+export function createPostgresWebhookD1Database(pool: W07WebhookPostgresPool): D1Database {
+  return createPostgresD1Database(pool)
 }

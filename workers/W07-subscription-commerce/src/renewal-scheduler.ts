@@ -99,7 +99,7 @@ export async function runRenewalScheduledBatch(
   let d1_04: Set<string>;
   try {
     [d1_01, d1_04] = await Promise.all([
-      getTableNames(env.D1_01, REQUIRED_D1_01_TABLES, 'd1'),
+      getTableNames(env.D1_01, REQUIRED_D1_01_TABLES, env.W07_MEMBERSHIP_DATABASE_DRIVER?.trim().toLowerCase() === 'neon' ? 'neon' : 'd1'),
       getTableNames(selectedD104, REQUIRED_D1_04_TABLES, databaseDialect),
     ]);
   } catch {

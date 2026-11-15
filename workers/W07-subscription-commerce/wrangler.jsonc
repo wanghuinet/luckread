@@ -9,7 +9,8 @@
   "workers_dev": false,
   "vars": {
     "MEMBERSHIP_RENEWAL_ENABLED": "false",
-    "W07_DATABASE_DRIVER": "neon"
+    "W07_DATABASE_DRIVER": "neon",
+    "W07_MEMBERSHIP_DATABASE_DRIVER": "neon"
   },
   "ratelimits": [
     {
@@ -61,6 +62,10 @@
     {
       "binding": "HYPERDRIVE_D1_04",
       "id": "3ae15e6dfb5e4b44979eee30e1d5ede4"
+    },
+    {
+      "binding": "HYPERDRIVE_D1_01",
+      "id": "0c53a1bb9bc0484bac146e8ae2d3158b"
     }
   ]
 }

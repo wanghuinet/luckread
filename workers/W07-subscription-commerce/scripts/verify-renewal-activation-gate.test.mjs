@@ -19,8 +19,8 @@ test('renewal scheduling runs only through the existing W10 durable Workflow', (
   assert.equal(w07Entry.includes('scheduled(controller:'), false, 'W07 must not expose a scheduled handler');
   assert.equal(w07Entry.includes('/internal/renewals/w10/scheduled-batch'), true);
   assert.equal(w07Entry.includes("requireTransport(request, 'W10')"), true);
-  assert.equal(w07Entry.includes("MEMBERSHIP_RENEWAL_ENABLED !== 'true'"), true);
-  assert.equal(w07Entry.includes('runRenewalScheduledBatch(env'), true);
+  assert.equal(w07Entry.includes("runtimeEnv.MEMBERSHIP_RENEWAL_ENABLED !== 'true'"), true);
+  assert.equal(w07Entry.includes('runRenewalScheduledBatch(runtimeEnv'), true);
 
   assert.equal(w10.name, 'luckread-w10', 'reuse the already-provisioned W10 Worker');
   assert.equal(w10.queues, undefined, 'the Workflow path must not create or reuse a Queue');
@@ -46,7 +46,7 @@ test('renewal scheduling runs only through the existing W10 durable Workflow', (
 test('W07 internal renewal entrypoint remains non-public and sandbox/demo-only', () => {
   assert.equal(w07.workers_dev, false);
   assert.equal(w07Entry.includes('HYPERSWITCH_ENVIRONMENT'), true);
-  assert.equal(w07Entry.includes('isDemoPricingEnabled(env.COMMERCE_PRICING_MODE, env.HYPERSWITCH_ENVIRONMENT)'), true);
+  assert.equal(w07Entry.includes('isDemoPricingEnabled(runtimeEnv.COMMERCE_PRICING_MODE, runtimeEnv.HYPERSWITCH_ENVIRONMENT)'), true);
   assert.equal(w07Entry.includes('taxjar-sandbox'), true);
   assert.equal(w07Entry.includes('synthetic'), true);
   assert.equal(workflowRuntime.includes('https://luckread-w07.internal/internal/renewals/w10/scheduled-batch'), true);
