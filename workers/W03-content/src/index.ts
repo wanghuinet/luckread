@@ -19,6 +19,7 @@ import {
   listPublishedContentsByIds,
   type PublishedContentsByIdsReadStore,
   type FollowingOwnerContentsReadStore,
+  type ContentDetailReadStore,
   listCreatorContents,
   validateListFilters,
   toErrorResponse,
@@ -353,6 +354,10 @@ export type W03ContentWorkerDependencies = Readonly<{
   publishedMediaReferenceReadStoreProvider?: (
     env: W03PublishedMediaReferenceRuntimeEnv,
   ) => PublishedMediaReferenceReadStore
+  /** Optional D1-02 provider for canonical content detail reads. */
+  contentDetailReadStoreProvider?: (
+    env: W03PublishedMediaReferenceRuntimeEnv,
+  ) => ContentDetailReadStore | undefined
   /** Optional D1-02 provider for the bounded bookmark-content batch read. */
   publishedContentsByIdsReadStoreProvider?: (
     env: W03PublishedMediaReferenceRuntimeEnv,
@@ -1498,6 +1503,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
           path.id,
           principalUserId,
           resolveMembership,
+          dependencies.contentDetailReadStoreProvider?.(env),
         )
         if (url.searchParams.get('bodyContext') === '1') {
           // A body object can be referenced by more than one content record.
