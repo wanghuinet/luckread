@@ -1,3 +1,4 @@
+import { strictlyAfterCanonicalUtcTimestamp } from './canonical-utc-timestamp.js'
 import {
   PaymentMethodPersistenceError,
   type PaymentMethodRevocationRequest,
@@ -17,6 +18,15 @@ export interface PaymentMethodPostgresQueryExecutor {
     sql: string,
     values?: unknown[],
   ): Promise<QueryResult<Row>>
+  connect?: () => Promise<PaymentMethodPostgresTransactionClient>
+}
+
+export interface PaymentMethodPostgresTransactionClient {
+  query<Row extends Record<string, unknown> = Record<string, unknown>>(
+    sql: string,
+    values?: unknown[],
+  ): Promise<QueryResult<Row>>
+  release(): void
 }
 
 type SavedPaymentMethodRow = {
