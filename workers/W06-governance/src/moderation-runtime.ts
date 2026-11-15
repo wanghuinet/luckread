@@ -597,6 +597,7 @@ export async function decideModerationCase(
     requestId: input.requestId,
   }
   const expiresAt = new Date(Date.now() + IDEMPOTENCY_TTL_MS).toISOString()
+  const outboxId = crypto.randomUUID()
   const actor: AuditActor = {
     actorId: input.reviewerId,
     actorType: 'user',
@@ -657,7 +658,7 @@ export async function decideModerationCase(
         policy_version,idempotency_key,status,attempts,next_attempt_at,last_error,created_at,delivered_at
       ) VALUES (?,?,?,?,?,?,?,?,?,'PENDING',0,?,NULL,?,NULL)`,
     ).bind(
-      crypto.randomUUID(),decisionId,row.case_id,row.target_type,row.target_id,row.target_version,
+      outboxId,decisionId,row.case_id,row.target_type,row.target_id,row.target_version,
       input.decision,input.policyVersion,input.idempotencyKey,now,now,
     ),
     db.prepare(
@@ -692,7 +693,7 @@ export async function decideModerationCase(
 
   try {
     await deliverModerationOutbox(db,w03,{
-      outboxId: JSON.parse(JSON.stringify(response)).decisionId ? decisionId : decisionId,
+      outboxId,
       decisionId,
       caseId: row.case_id,
       targetId: row.target_id,

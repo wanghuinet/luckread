@@ -41,6 +41,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Install W06 PostgreSQL runtime type dependencies
+        working-directory: workers/W06-governance
+        run: npm install --ignore-scripts --no-audit --no-fund --package-lock=false
+
       - name: Typecheck W06 source
         run: npx tsc --noEmit --target ES2022 --module ESNext --moduleResolution Bundler --strict --skipLibCheck --types @cloudflare/workers-types workers/W06-governance/src/audit-event.ts workers/W06-governance/src/audit-event-persistence.ts workers/W06-governance/src/mfa-audit-queue-consumer.ts workers/W06-governance/src/session-revocation-audit-queue-consumer.ts
 

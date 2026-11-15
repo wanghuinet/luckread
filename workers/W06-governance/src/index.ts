@@ -15,9 +15,14 @@ import {
   listModerationQueue,
 } from './moderation-runtime'
 import { createReport, ReportRuntimeError } from './report-runtime'
+import {
+  getW06ModerationDatabase,
+  getW06ModerationQueueReadStore,
+  type W06ModerationDatabaseRuntimeEnv,
+} from './neon/moderation-database-runtime.js'
 
 interface RateLimitBinding { limit(input: { key: string }): Promise<{ success: boolean }> }
-interface Env {
+interface Env extends W06ModerationDatabaseRuntimeEnv {
   D1_03: D1Database
   W03_CONTENT_MODERATION: Fetcher
   GOVERNANCE_ORIGIN_GLOBAL_LIMITER?: RateLimitBinding
@@ -941,6 +946,25 @@ function parseMembershipPlanPublishRequestAuditInput(value: unknown): Membership
   return body as MembershipPlanPublishRequestAuditInput
 }
 
+function canonicalAuditJson(value: unknown): string {
+  if (Array.isArray(value)) {
+    return '[' + value.map(canonicalAuditJson).join(',') + ']'
+  }
+  if (value && typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>).sort(([left], [right]) => left.localeCompare(right))
+    return '{' + entries.map(([key, entry]) => JSON.stringify(key) + ':' + canonicalAuditJson(entry)).join(',') + '}'
+  }
+  return JSON.stringify(value)
+}
+
+function matchesAuditJsonText(actual: string, expected: unknown): boolean {
+  try {
+    return canonicalAuditJson(JSON.parse(actual)) === canonicalAuditJson(expected)
+  } catch {
+    return false
+  }
+}
+
 function matchesMembershipPlanMutationRequestAudit(existing: StoredAuditEvent, expected: AuditEvent): boolean {
   try {
     const storedActor = JSON.parse(existing.actor_json) as Record<string, unknown>
@@ -952,8 +976,8 @@ function matchesMembershipPlanMutationRequestAudit(existing: StoredAuditEvent, e
       existing.action === expected.action &&
       existing.target_type === expected.targetType &&
       existing.target_id === expected.targetId &&
-      existing.before_json === JSON.stringify(expected.before) &&
-      existing.after_json === JSON.stringify(expected.after)
+      matchesAuditJsonText(existing.before_json, expected.before) &&
+      matchesAuditJsonText(existing.after_json, expected.after)
   } catch {
     return false
   }
@@ -967,7 +991,7 @@ function matchesMembershipPlanMutationRequestAudit(existing: StoredAuditEvent, e
 async function persistMembershipPlanMutationRequestAudit(env: Env, event: AuditEvent): Promise<Response> {
   let existing: StoredAuditEvent | null
   try {
-    existing = await findAuditEvent(env.D1_03, event.eventId)
+    existing = await findAuditEvent(getW06ModerationDatabase(env), event.eventId)
   } catch {
     return json({ error: 'AUDIT_EVENT_LOOKUP_FAILED' }, 503)
   }
@@ -976,11 +1000,11 @@ async function persistMembershipPlanMutationRequestAudit(env: Env, event: AuditE
     return json({ eventId: event.eventId, action: event.action, targetType: event.targetType, targetId: event.targetId, replayed: true }, 200)
   }
   try {
-    await persistAuditEvent(env.D1_03, event)
+    await persistAuditEvent(getW06ModerationDatabase(env), event)
     return json({ eventId: event.eventId, action: event.action, targetType: event.targetType, targetId: event.targetId, replayed: false }, 201)
   } catch {
     try {
-      const raced = await findAuditEvent(env.D1_03, event.eventId)
+      const raced = await findAuditEvent(getW06ModerationDatabase(env), event.eventId)
       if (raced && matchesMembershipPlanMutationRequestAudit(raced, event)) {
         return json({ eventId: event.eventId, action: event.action, targetType: event.targetType, targetId: event.targetId, replayed: true }, 200)
       }
@@ -1009,8 +1033,8 @@ function matchesImmutableAuditEvent(existing: StoredAuditEvent, expected: AuditE
       existing.action === expected.action &&
       existing.target_type === expected.targetType &&
       existing.target_id === expected.targetId &&
-      existing.before_json === JSON.stringify(expected.before) &&
-      existing.after_json === JSON.stringify(expected.after) &&
+      matchesAuditJsonText(existing.before_json, expected.before) &&
+      matchesAuditJsonText(existing.after_json, expected.after) &&
       existing.occurred_at === expected.occurredAt
   } catch {
     return false
@@ -1020,7 +1044,7 @@ function matchesImmutableAuditEvent(existing: StoredAuditEvent, expected: AuditE
 async function persistImmutableAuditEvent(env: Env, event: AuditEvent): Promise<Response> {
   let existing: StoredAuditEvent | null
   try {
-    existing = await findAuditEvent(env.D1_03, event.eventId)
+    existing = await findAuditEvent(getW06ModerationDatabase(env), event.eventId)
   } catch {
     return json({ error: 'AUDIT_EVENT_LOOKUP_FAILED' }, 503)
   }
@@ -1030,13 +1054,13 @@ async function persistImmutableAuditEvent(env: Env, event: AuditEvent): Promise<
   }
 
   try {
-    await persistAuditEvent(env.D1_03, event)
+    await persistAuditEvent(getW06ModerationDatabase(env), event)
     return json({ eventId: event.eventId, action: event.action, targetType: event.targetType, targetId: event.targetId, replayed: false }, 201)
   } catch {
     // A concurrent retry may have won the unique event_id insert. Confirm the
     // durable row before treating this request as an idempotent success.
     try {
-      const raced = await findAuditEvent(env.D1_03, event.eventId)
+      const raced = await findAuditEvent(getW06ModerationDatabase(env), event.eventId)
       if (raced && matchesImmutableAuditEvent(raced, event)) {
         return json({ eventId: event.eventId, action: event.action, targetType: event.targetType, targetId: event.targetId, replayed: true }, 200)
       }
@@ -1058,7 +1082,7 @@ async function persistIdempotentSubscriptionPlanChangeRequestAudit(
 ): Promise<Response> {
   let existing: StoredAuditEvent | null
   try {
-    existing = await findAuditEvent(env.D1_03, event.eventId)
+    existing = await findAuditEvent(getW06ModerationDatabase(env), event.eventId)
   } catch {
     return json({ error: 'AUDIT_EVENT_LOOKUP_FAILED' }, 503)
   }
@@ -1117,7 +1141,7 @@ export default {
           (description !== undefined && typeof description !== 'string') ||
           (evidenceRefs !== undefined && (!Array.isArray(evidenceRefs) || evidenceRefs.some((value) => typeof value !== 'string')))
         ) throw new ReportRuntimeError('VALIDATION_FAILED', 400)
-        const result = await createReport(env.D1_03, {
+        const result = await createReport(getW06ModerationDatabase(env), {
           actorUserId: principal.userId,
           targetType,
           targetId,
@@ -1140,7 +1164,7 @@ export default {
         requireModerationPermission('listModerationQueue', principal, request)
         return json({
           ...(await listModerationQueue(
-            env.D1_03,
+            getW06ModerationQueueReadStore(env) ?? getW06ModerationDatabase(env),
             principal.userId,
             url.searchParams.get('cursor'),
             url.searchParams.get('limit') ? Number(url.searchParams.get('limit')) : null,
@@ -1158,7 +1182,7 @@ export default {
         const principal = requireW01Transport(request)
         requireModerationPermission('getModerationCase', principal, request)
         return json({
-          ...(await getModerationCase(env.D1_03, principal.userId, decodeURIComponent(caseMatch[1]))),
+          ...(await getModerationCase(getW06ModerationDatabase(env), principal.userId, decodeURIComponent(caseMatch[1]))),
           requestId: principal.requestId,
         })
       } catch (error) {
@@ -1172,7 +1196,7 @@ export default {
         const principal = requireW01Transport(request)
         requireModerationPermission('decideModerationCase', principal, request)
         const body = parseDecision(await request.json())
-        const result = await decideModerationCase(env.D1_03, env.W03_CONTENT_MODERATION, {
+        const result = await decideModerationCase(getW06ModerationDatabase(env), env.W03_CONTENT_MODERATION, {
           reviewerId: principal.userId,
           reviewerLayer: principal.layer,
           caseId: decodeURIComponent(decisionMatch[1]),
@@ -1756,7 +1780,7 @@ export default {
       catch { return json({ error: 'INVALID_AUDIT_EVENT' }, 400) }
       try {
         const event = buildAccountStateChangedAuditEvent(input)
-        await persistAuditEvent(env.D1_03, event)
+        await persistAuditEvent(getW06ModerationDatabase(env), event)
         return json({ eventId: event.eventId, action: event.action, targetType: event.targetType, targetId: event.targetId }, 201)
       } catch (error) {
         if (error instanceof Error && error.message.startsWith('INVALID_AUDIT_EVENT:')) return json({ error: 'INVALID_AUDIT_EVENT' }, 400)
@@ -1769,7 +1793,7 @@ export default {
 
   async scheduled(_controller: ScheduledController, env: Env): Promise<void> {
     try {
-      await drainModerationOutbox(env.D1_03, env.W03_CONTENT_MODERATION, 10)
+      await drainModerationOutbox(getW06ModerationDatabase(env), env.W03_CONTENT_MODERATION, 10)
     } catch {
       // The next scheduled run retries durable outbox records.
     }
@@ -1783,11 +1807,11 @@ export default {
           ? raw as Record<string, unknown>
           : null
         if (body?.eventType === 'user.session.revoked') {
-          await consumeSessionRevokedAuditEvent(env.D1_03, raw)
+          await consumeSessionRevokedAuditEvent(getW06ModerationDatabase(env), raw)
         } else if (typeof body?.eventType === 'string' && body.eventType.startsWith('auth.mfa.')) {
-          await consumeMfaAuditEvent(env.D1_03, raw)
+          await consumeMfaAuditEvent(getW06ModerationDatabase(env), raw)
         } else {
-          await consumeAccountStateChanged(env.D1_03, raw)
+          await consumeAccountStateChanged(getW06ModerationDatabase(env), raw)
         }
       } catch (error) {
         if (error instanceof Error &&
