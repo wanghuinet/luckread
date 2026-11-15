@@ -280,6 +280,7 @@ export default {
         }
         const result = await revokeOwnedSavedPaymentMethod(
           env, principal, paymentMethodMatch[1], request.headers.get('Idempotency-Key'),
+          getW07PaymentMethodReadStore(env),
         )
         return json({ data: result, requestId: crypto.randomUUID() }, result.status === 'REMOVED' ? 200 : 202)
       }
