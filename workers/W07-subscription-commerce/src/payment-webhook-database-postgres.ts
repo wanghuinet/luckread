@@ -73,9 +73,9 @@ function normalizeRow<Row extends Record<string, unknown>>(row: Row): Row {
 
 /** Replace D1 positional markers without rewriting question marks inside SQL strings or comments. */
 export function toPostgresWebhookSql(sql: string): string {
-  const ignoreConflicts = /^\\s*INSERT\\s+OR\\s+IGNORE\\s+INTO\\b/i.test(sql)
+  const ignoreConflicts = /^\s*INSERT\s+OR\s+IGNORE\s+INTO\b/i.test(sql)
   const sourceSql = ignoreConflicts
-    ? sql.replace(/^(\\s*INSERT)\\s+OR\\s+IGNORE(\\s+INTO\\b)/i, '$1$2')
+    ? sql.replace(/^(\s*INSERT)\s+OR\s+IGNORE(\s+INTO\b)/i, '$1$2')
     : sql
   let result = '';
   let position = 0;
@@ -154,8 +154,8 @@ export function toPostgresWebhookSql(sql: string): string {
     }
   }
   if (ignoreConflicts) {
-    const hasTerminator = /;\\s*$/.test(result)
-    const statement = result.replace(/;\\s*$/, '')
+    const hasTerminator = /;\s*$/.test(result)
+    const statement = result.replace(/;\s*$/, '')
     result = statement + ' ON CONFLICT DO NOTHING' + (hasTerminator ? ';' : '')
   }
   return result;
