@@ -740,11 +740,11 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
           try { body = await request.json() } catch {
             throw new PushEndpointRuntimeError('VALIDATION_FAILED', 422)
           }
-          const data = await upsertPushEndpoint(dependencies.pushEndpointDatabase ?? env.D1_03, actorUserId, installationId, body)
+          const data = await upsertPushEndpoint(env.D1_03, actorUserId, installationId, body, dependencies.pushEndpointDatabase)
           return json({ data, requestId: createRequestId() })
         }
         if (request.method === 'DELETE') {
-          await deletePushEndpoint(dependencies.pushEndpointDatabase ?? env.D1_03, actorUserId, installationId)
+          await deletePushEndpoint(env.D1_03, actorUserId, installationId, dependencies.pushEndpointDatabase)
           return new Response(null, { status: 204 })
         }
         return new Response(null, { status: 405, headers: { Allow: 'PUT, DELETE' } })
