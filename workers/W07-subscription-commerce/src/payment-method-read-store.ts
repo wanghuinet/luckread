@@ -47,12 +47,7 @@ export interface PaymentMethodReadStore {
     now: string,
   ): Promise<PaymentMethodRevocationRequest>
 
-  completePaymentMethodRevocationOnMandateWebhook(
-    merchantId: string,
-    customerId: string,
-    paymentMethodId: string,
-    now: string,
-  ): Promise<void>
+
 }
 
 /** D1 remains the production adapter until a separate reviewed cutover. */
@@ -69,19 +64,6 @@ export function createD1PaymentMethodReadStore(db: D1Database): PaymentMethodRea
     ),
     markPaymentMethodProviderDeleted: (input, now) =>
       markPaymentMethodProviderDeleted(db, input, now),
-    async completePaymentMethodRevocationOnMandateWebhook(
-      merchantId, customerId, paymentMethodId, now,
-    ) {
-      await db.prepare(
-        "UPDATE payment_method_revocation_requests SET status = 'COMPLETED', version = version + 1, " +
-        "updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', MAX(julianday(updated_at) + (1.0 / 86400000.0), julianday(?))) " +
-        "WHERE provider = 'hyperswitch' AND merchant_id = ? AND customer_id = ? " +
-        "AND status IN ('REQUESTED','PENDING_PROVIDER','RECONCILIATION_REQUIRED') AND provider_method_deleted_at IS NOT NULL " +
-        'AND EXISTS (SELECT 1 FROM saved_payment_methods s WHERE s.saved_payment_method_id = payment_method_revocation_requests.saved_payment_method_id ' +
-        'AND s.provider = ? AND s.merchant_id = ? AND s.customer_id = ? AND s.payment_method_id = ?) ' +
-        "AND NOT EXISTS (SELECT 1 FROM payment_mandates m JOIN saved_payment_methods s ON s.provider = m.provider AND s.merchant_id = m.merchant_id AND s.customer_id = m.customer_id AND s.payment_method_id = m.payment_method_id " +
-        "WHERE s.saved_payment_method_id = payment_method_revocation_requests.saved_payment_method_id AND m.status NOT IN ('REVOKED','FAILED','EXPIRED'))",
-      ).bind(now, merchantId, customerId, 'hyperswitch', merchantId, customerId, paymentMethodId).run()
-    },
+
   }
 }
