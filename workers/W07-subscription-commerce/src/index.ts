@@ -192,12 +192,12 @@ export default {
         if (request.headers.has('Authorization') || request.headers.has('Cookie')) {
           throw new SubscriptionRuntimeError('PERMISSION_DENIED', 403)
         }
-        if (env.MEMBERSHIP_RENEWAL_ENABLED !== 'true' ||
-            !isDemoPricingEnabled(env.COMMERCE_PRICING_MODE, env.HYPERSWITCH_ENVIRONMENT) ||
+        if (runtimeEnv.MEMBERSHIP_RENEWAL_ENABLED !== 'true' ||
+            !isDemoPricingEnabled(runtimeEnv.COMMERCE_PRICING_MODE, runtimeEnv.HYPERSWITCH_ENVIRONMENT) ||
             !['synthetic', 'taxjar-sandbox'].includes(runtimeEnv.COMMERCE_DEMO_TAX_PROVIDER ?? '')) {
           throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
         }
-        const originLimiter = env.SUBSCRIPTION_ORIGIN_GLOBAL_LIMITER
+        const originLimiter = runtimeEnv.SUBSCRIPTION_ORIGIN_GLOBAL_LIMITER
         if (!originLimiter) throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
         await applyRateLimit(originLimiter, 'origin:renewal')
         const input = await readJsonBody(request)
@@ -207,7 +207,7 @@ export default {
         }
         const result = await runRenewalScheduledBatch(runtimeEnv, {
           maxCyclesPerBatch: 1,
-          resolvePricing: (pricingInput) => resolveDemoRenewalPricing(env, pricingInput),
+          resolvePricing: (pricingInput) => resolveDemoRenewalPricing(runtimeEnv, pricingInput),
         })
         return json({ data: result, requestId: crypto.randomUUID() })
       }
@@ -216,7 +216,7 @@ export default {
       // limiter and validate the private W01 transport before normal principal
       // and layer checks; do not introduce a new rate-limit namespace.
       if (new URL(request.url).pathname === '/internal/webhooks/hyperswitch') {
-        const originLimiter = env.SUBSCRIPTION_ORIGIN_GLOBAL_LIMITER
+        const originLimiter = runtimeEnv.SUBSCRIPTION_ORIGIN_GLOBAL_LIMITER
         if (!originLimiter) throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
         await applyRateLimit(originLimiter, 'origin:webhook')
         const webhookResponse = await handleHyperswitchWebhookRequest(request, runtimeEnv)
@@ -224,7 +224,7 @@ export default {
       }
 
       if (new URL(request.url).pathname === '/internal/webhooks/revenuecat') {
-        const originLimiter = env.SUBSCRIPTION_ORIGIN_GLOBAL_LIMITER
+        const originLimiter = runtimeEnv.SUBSCRIPTION_ORIGIN_GLOBAL_LIMITER
         if (!originLimiter) throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
         await applyRateLimit(originLimiter, 'origin:webhook')
         const webhookResponse = await handleRevenueCatWebhookRequest(request, runtimeEnv)
@@ -233,7 +233,7 @@ export default {
 
       if (new URL(request.url).pathname === '/internal/subscriptions/reconcile-revenuecat') {
         if (request.method !== 'POST') return new Response(null, { status: 405, headers: { Allow: 'POST' } })
-        await enforceRateLimit(request, env, 'read')
+        await enforceRateLimit(request, runtimeEnv, 'read')
         requireTransport(request, 'W01')
         if (request.headers.has('Authorization') || request.headers.has('Cookie')) {
           throw new SubscriptionRuntimeError('PERMISSION_DENIED', 403)
@@ -248,7 +248,7 @@ export default {
       // returns subscription, plan, payment, order, or financial records.
       if (new URL(request.url).pathname === '/internal/entitlements/check-creator-membership') {
         if (request.method !== 'POST') return new Response(null, { status: 405, headers: { Allow: 'POST' } })
-        await enforceRateLimit(request, env, 'read')
+        await enforceRateLimit(request, runtimeEnv, 'read')
         requireTransport(request, 'W03')
         if (request.headers.has('Authorization') || request.headers.has('Cookie')) {
           throw new SubscriptionRuntimeError('PERMISSION_DENIED', 403)
@@ -270,13 +270,13 @@ export default {
         })
       }
 
-      await enforceRateLimit(request, env)
+      await enforceRateLimit(request, runtimeEnv)
       requireTransport(request)
       const principal = requirePrincipal(request)
       requireLayer(request)
       const paymentMethodPath = new URL(request.url).pathname
       if (request.method === 'GET' && paymentMethodPath === '/payment-methods') {
-        const docs = await listOwnedSavedPaymentMethods(env, principal, getW07PaymentMethodReadStore(runtimeEnv))
+        const docs = await listOwnedSavedPaymentMethods(runtimeEnv, principal, getW07PaymentMethodReadStore(runtimeEnv))
         return json({ data: { docs }, requestId: crypto.randomUUID() })
       }
       const paymentMethodMatch = /^\/payment-methods\/(spm_[A-Za-z0-9]{26})$/.exec(paymentMethodPath)
@@ -298,8 +298,8 @@ export default {
       if (billingReadResponse) return billingReadResponse
       const refundResponse = await handleCommerceRefundRequest(request, principal, runtimeEnv)
       if (refundResponse) return refundResponse
-      const orderDependencies = isDemoPricingEnabled(env.COMMERCE_PRICING_MODE, env.HYPERSWITCH_ENVIRONMENT)
-        ? { resolvePricing: (input: unknown) => resolveDemoCommercePricing(env, input) }
+      const orderDependencies = isDemoPricingEnabled(runtimeEnv.COMMERCE_PRICING_MODE, runtimeEnv.HYPERSWITCH_ENVIRONMENT)
+        ? { resolvePricing: (input: unknown) => resolveDemoCommercePricing(runtimeEnv, input) }
         : undefined
       const commerceOrderResponse = await handleCommerceOrderRequest(request, principal, runtimeEnv, orderDependencies)
       if (commerceOrderResponse) return commerceOrderResponse
