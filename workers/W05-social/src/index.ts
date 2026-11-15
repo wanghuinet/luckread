@@ -650,7 +650,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
             contentId,
             correlationId: request.headers.get('X-LuckRead-Correlation-Id') ?? '',
           })
-          return json({ data: await getSocialTargets(env.DB, 'content', contentId), requestId: crypto.randomUUID() })
+          return json({ data: await getSocialTargets(dependencies.socialTargetsReadStore ?? env.DB, 'content', contentId), requestId: crypto.randomUUID() })
         }
         if (request.method !== 'POST') return new Response(null, { status: 405, headers: { Allow: 'GET, POST' } })
         const actorUserId = requirePrincipal(request)
@@ -670,7 +670,16 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
           contentId,
           correlationId: request.headers.get('X-LuckRead-Correlation-Id') ?? '',
         })
-        const result = await syncSocialTokens(env.DB, actorUserId, 'content', contentId, rawText, mentions, contentContext)
+        const result = await syncSocialTokens(
+          dependencies.socialTokenSyncStore ?? env.DB,
+          actorUserId,
+          'content',
+          contentId,
+          rawText,
+          mentions,
+          contentContext,
+          dependencies.notificationEnqueueStore ?? env.DB,
+        )
         return json({ data: result, requestId: crypto.randomUUID() })
       }
 
