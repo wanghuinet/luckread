@@ -11,6 +11,7 @@ export default defineConfig({
       'src/poll-delete-neon-runtime.test.ts',
       'src/poll-read-neon-runtime.test.ts',
       'src/follow-neon-runtime.test.ts',
+      'src/notification-inbox-neon-runtime.test.ts',
       'src/poll-runtime.test.ts',
       'src/poll-read-store-postgres.test.ts',
       'src/poll-vote-store-postgres.test.ts',

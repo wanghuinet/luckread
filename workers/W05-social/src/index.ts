@@ -68,6 +68,7 @@ import type { CommentMutationStore } from './comment-mutation-store.js'
 import type { CommentNotificationContextStore } from './comment-notification-context-store.js'
 import type { NotificationEnqueueStore } from './notification-enqueue-store.js'
 import type { SocialTargetsReadStore } from './social-targets-read-store.js'
+import type { SocialClosureReadStore } from './social-closure-read-store.js'
 import type { SocialTokenSyncStore } from './social-token-sync-store.js'
 import type { NotificationPreferencesStore } from './notification-preferences-store.js'
 import type { ProfilePinStore } from './profile-pin-store.js'
@@ -296,6 +297,8 @@ export type W05SocialWorkerDependencies = Readonly<{
   socialTokenSyncStore?: SocialTokenSyncStore
   /** Optional PostgreSQL-capable social-target read store for comment mentions/topics. */
   socialTargetsReadStore?: SocialTargetsReadStore
+  /** Optional PostgreSQL-capable notification inbox reader/writer; D1 remains the deployed default. */
+  socialClosureReadStore?: SocialClosureReadStore
   /** Optional PostgreSQL-capable comment notification context reader. */
   commentNotificationContextStore?: CommentNotificationContextStore
   /** Optional PostgreSQL-capable notification inbox/outbox enqueue store. */
@@ -737,7 +740,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
         const url = new URL(request.url)
         return json({
           data: await listNotifications(
-            env.DB,
+            dependencies.socialClosureReadStore ?? env.DB,
             actorUserId,
             url.searchParams.get('cursor'),
             url.searchParams.get('limit'),
@@ -755,7 +758,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
         requireInteractionLayer(request)
         const notificationId = decodePathPart(notificationReadMatch[1])
         if (notificationId === null) throw new SocialClosureRuntimeError('VALIDATION_FAILED', 400)
-        await markNotificationRead(env.DB, actorUserId, notificationId)
+        await markNotificationRead(dependencies.socialClosureReadStore ?? env.DB, actorUserId, notificationId)
         return new Response(null, { status: 204 })
       }
 
@@ -763,7 +766,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
         if (request.method !== 'POST') return new Response(null, { status: 405, headers: { Allow: 'POST' } })
         const actorUserId = requirePrincipal(request)
         requireInteractionLayer(request)
-        await markAllNotificationsRead(env.DB, actorUserId)
+        await markAllNotificationsRead(dependencies.socialClosureReadStore ?? env.DB, actorUserId)
         return new Response(null, { status: 204 })
       }
 
