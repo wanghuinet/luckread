@@ -252,9 +252,10 @@ async function markProviderDeleted(
     const updated = await client.query<RevocationRequestRow>(
       'UPDATE payment_method_revocation_requests r SET ' +
       'provider_method_deleted_at = COALESCE(r.provider_method_deleted_at, $1::timestamptz), ' +
-      "status = CASE WHEN NOT EXISTS (SELECT 1 FROM payment_mandates m WHERE m.provider = r.provider " +
-      'AND m.merchant_id = r.merchant_id AND m.customer_id = r.customer_id ' +
-      "AND m.payment_method_id = r.payment_method_id AND m.status NOT IN ('REVOKED','FAILED','EXPIRED')) " +
+      "status = CASE WHEN NOT EXISTS (SELECT 1 FROM payment_mandates m JOIN saved_payment_methods s " +
+      "ON s.provider = m.provider AND s.merchant_id = m.merchant_id AND s.customer_id = m.customer_id " +
+      "AND s.payment_method_id = m.payment_method_id WHERE s.saved_payment_method_id = r.saved_payment_method_id " +
+      "AND m.status NOT IN ('REVOKED','FAILED','EXPIRED')) " +
       "THEN 'COMPLETED' ELSE 'PENDING_PROVIDER' END, " +
       'version = r.version + 1, updated_at = $2::timestamptz ' +
       'WHERE r.revocation_request_id = $3 AND r.customer_id = $4 AND r.version = $5 ' +
