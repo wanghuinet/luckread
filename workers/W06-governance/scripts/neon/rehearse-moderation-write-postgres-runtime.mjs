@@ -263,8 +263,8 @@ try {
       'SELECT count(*)::int AS remaining FROM pg_class WHERE relnamespace = pg_my_temp_schema() AND relname = ANY($1::text[])',
       [tables],
     )
-    assert.equal(residual.rows[0]?.remaining ?? -1, 0, 'All temporary fixtures must be empty before drop')
-    assert.equal(remainingTemporaryTables.rows[0]?.remaining ?? -1, 0, 'All temporary fixture tables must be dropped')
+    assert.equal(Number(residual.rows[0]?.remaining ?? -1), 0, 'All temporary fixtures must be empty before drop')
+    assert.equal(Number(remainingTemporaryTables.rows[0]?.remaining ?? -1), 0, 'All temporary fixture tables must be dropped')
     checks.cleanupVerified = true
 
     const report = {
