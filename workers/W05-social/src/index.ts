@@ -634,7 +634,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
           contentId,
           correlationId: request.headers.get('X-LuckRead-Correlation-Id') ?? '',
         })
-        return json({ data: await getContentSocialSummary(env.DB, contentId, contentContext, viewerUserId), requestId: crypto.randomUUID() })
+        return json({ data: await getContentSocialSummary(dependencies.socialClosureReadStore ?? env.DB, contentId, contentContext, viewerUserId), requestId: crypto.randomUUID() })
       }
 
       if (url.pathname.match(/^\/internal\/social\/contents\/[^/]+\/tokens$/)) {
@@ -686,7 +686,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
           throw new SocialClosureRuntimeError('VALIDATION_FAILED', 400)
         }
         return json({
-          data: await listDiscoveryTopics(env.DB, env.W03_CONTENT, request.headers.get('X-LuckRead-Correlation-Id') ?? '', discoveryUrl.searchParams.get('limit'), discoveryUrl.searchParams.get('cursor')),
+          data: await listDiscoveryTopics(dependencies.socialClosureReadStore ?? env.DB, env.W03_CONTENT, request.headers.get('X-LuckRead-Correlation-Id') ?? '', discoveryUrl.searchParams.get('limit'), discoveryUrl.searchParams.get('cursor')),
           requestId: createRequestId(),
         })
       }
@@ -701,7 +701,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
         const topicUrl = new URL(request.url)
         return json({
           data: await getTopicPage(
-            env.DB,
+            dependencies.socialClosureReadStore ?? env.DB,
             env.W03_CONTENT,
             topicName,
             topicUrl.searchParams.get('limit'),
