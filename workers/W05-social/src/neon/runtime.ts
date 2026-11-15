@@ -37,12 +37,16 @@ import { createPostgresNotificationPushDeliveryClaimStore } from '../notificatio
 import { createPostgresNotificationPushSendResultStore } from '../notification-push-send-result-store-postgres.js'
 import { createPostgresNotificationPushReceiptStore } from '../notification-push-receipt-store-postgres.js'
 import type { NotificationPushDeliveryRuntimeDependencies } from '../notification-push-delivery-runtime.js'
+import { createPostgresNotificationPushEndpointAccessStore } from '../notification-push-endpoint-access-store-postgres.js'
+import type { PushEndpointPostgresExecutor } from '../push-endpoint-runtime.js'
 
 export type W05SocialDatabaseDriver = 'd1' | 'neon'
 
 export interface W05SocialRuntimeEnv {
   W05_DATABASE_DRIVER?: string
   HYPERDRIVE_D1_02?: { connectionString?: string }
+  W05_PUSH_ENDPOINT_DATABASE_DRIVER?: string
+  HYPERDRIVE_D1_03?: { connectionString?: string }
 }
 
 type W05PoolFactory = (config: PoolConfig) => Pool
@@ -52,6 +56,60 @@ const compositions = new WeakMap<object, W05SocialWorkerDependencies>()
 const pushCompositions = new WeakMap<object, NotificationPushDeliveryRuntimeDependencies>()
 const EMPTY_DEPENDENCIES: W05SocialWorkerDependencies = Object.freeze({})
 const EMPTY_PUSH_DEPENDENCIES: NotificationPushDeliveryRuntimeDependencies = Object.freeze({})
+
+export function resolveW05PushEndpointDatabaseDriver(
+  env: W05SocialRuntimeEnv,
+): W05SocialDatabaseDriver {
+  const configured = env.W05_PUSH_ENDPOINT_DATABASE_DRIVER?.trim().toLowerCase() || 'd1'
+  if (configured === 'd1' || configured === 'neon') return configured
+  throw new Error('W05_PUSH_ENDPOINT_DATABASE_DRIVER_UNSUPPORTED')
+}
+
+function validateD103HyperdriveConnectionString(value: unknown): string {
+  if (typeof value !== 'string' || value.length === 0 || value.length > 4096) {
+    throw new Error('W05_HYPERDRIVE_D1_03_CONNECTION_STRING_REQUIRED')
+  }
+  let target: URL
+  try {
+    target = new URL(value)
+  } catch {
+    throw new Error('W05_HYPERDRIVE_D1_03_CONNECTION_STRING_INVALID')
+  }
+  let databaseName = ''
+  try {
+    databaseName = decodeURIComponent(target.pathname.replace(/^\\/+/, ''))
+  } catch {
+    throw new Error('W05_HYPERDRIVE_D1_03_CONNECTION_STRING_INVALID')
+  }
+  if (
+    !['postgres:', 'postgresql:'].includes(target.protocol) ||
+    !target.hostname ||
+    databaseName !== 'luckread_governance'
+  ) {
+    throw new Error('W05_HYPERDRIVE_D1_03_CONNECTION_STRING_INVALID')
+  }
+  return value
+}
+
+/**
+ * W05 is only a delegated writer for W09's endpoint registry in D1-03.
+ * This pool is cached separately by its own Hyperdrive binding and never
+ * reuses the D1-02 social pool.
+ */
+export function getW05PushEndpointPostgresDatabase(
+  env: W05SocialRuntimeEnv,
+  poolFactory: W05PoolFactory = (config) => new Pool(config),
+): PushEndpointPostgresExecutor | undefined {
+  if (resolveW05PushEndpointDatabaseDriver(env) === 'd1') return undefined
+
+  const binding = env.HYPERDRIVE_D1_03
+  if (!binding || typeof binding !== 'object') {
+    throw new Error('W05_HYPERDRIVE_D1_03_BINDING_REQUIRED')
+  }
+  const connectionString = validateD103HyperdriveConnectionString(binding.connectionString)
+  const pool = getPool(binding, connectionString, poolFactory)
+  return asExecutor<PushEndpointPostgresExecutor>(pool)
+}
 
 export function resolveW05SocialDatabaseDriver(
   env: W05SocialRuntimeEnv,
@@ -251,7 +309,11 @@ export function getW05NotificationPushDeliveryDependencies(
 
   const connectionString = validateHyperdriveConnectionString(binding.connectionString)
   const pool = getPool(binding, connectionString, poolFactory)
+  const endpointDatabase = getW05PushEndpointPostgresDatabase(env, poolFactory)
   const dependencies: NotificationPushDeliveryRuntimeDependencies = {
+    ...(endpointDatabase
+      ? { endpointAccessStore: createPostgresNotificationPushEndpointAccessStore(endpointDatabase) }
+      : {}),
     fanoutStore: createPostgresNotificationPushFanoutStore(
       asExecutor<Parameters<typeof createPostgresNotificationPushFanoutStore>[0]>(pool),
     ),
