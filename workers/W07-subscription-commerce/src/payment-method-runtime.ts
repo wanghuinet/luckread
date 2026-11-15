@@ -9,8 +9,6 @@ import {
   type HyperswitchClientConfig,
 } from './hyperswitch-client.js';
 import {
-  createPaymentMethodRevocationRequest,
-  markPaymentMethodProviderDeleted,
   PaymentMethodPersistenceError,
   type PaymentMethodRevocationRequest,
   type SavedPaymentMethodRecord,
@@ -186,10 +184,9 @@ export async function revokeOwnedSavedPaymentMethod(
     throw new PaymentMethodRuntimeError(key ? 'VALIDATION_FAILED' : 'PRECONDITION_REQUIRED', key ? 400 : 428);
   }
 
-  let started: Awaited<ReturnType<typeof createPaymentMethodRevocationRequest>>;
+  let started: Awaited<ReturnType<PaymentMethodReadStore['createPaymentMethodRevocationRequest']>>;
   try {
-    started = await createPaymentMethodRevocationRequest(
-      env.D1_04,
+    started = await readStore.createPaymentMethodRevocationRequest(
       customerId,
       String(config.expectedMerchantId),
       savedPaymentMethodId,
@@ -252,12 +249,10 @@ export async function revokeOwnedSavedPaymentMethod(
     }
   }
 
-  // The persistence update derives finality inside its D1-04 CAS statement.
+  // The selected store derives finality in its D1-04 CAS/transactional update.
   // This avoids racing a just-arrived signed mandate_revoked webhook.
   try {
-    const updated = await markPaymentMethodProviderDeleted(
-      env.D1_04, request, nowIso(),
-    );
+    const updated = await readStore.markPaymentMethodProviderDeleted(request, nowIso());
     return {
       savedPaymentMethodId,
       status: updated.status === 'COMPLETED' ? 'REMOVED' : 'REVOCATION_PENDING',
