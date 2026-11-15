@@ -51,11 +51,10 @@ describe('W06 moderation database runtime admission', () => {
       HYPERDRIVE_D1_03: binding,
     }
 
-    const pool = getW06ModerationPostgresPool(env)
-    expect(getW06ModerationPostgresPool(env)).toBe(pool)
+    const poolAdapter = getW06ModerationPostgresPool(env)
+    expect(getW06ModerationPostgresPool(env)).toBe(poolAdapter)
     expect(getW06ModerationDatabase(env)).toBe(getW06ModerationDatabase(env))
     expect(getW06ModerationQueueReadStore(env)).toBe(getW06ModerationQueueReadStore(env))
     expect(getW06ModerationQueueReadStore(env)).toBeDefined()
-    await pool.end()
   })
 })
