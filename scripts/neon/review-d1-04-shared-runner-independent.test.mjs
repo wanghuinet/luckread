@@ -160,6 +160,21 @@ test('fails closed on a reviewed source Git blob mismatch', () => {
 })
 
 
+test('ignores additive W07 D1-01 membership runtime fields when pinning the D1-04 owner config', () => {
+  const wranglerPath = 'workers/W07-subscription-commerce/wrangler.jsonc'
+  const source = overrideSource(wranglerPath, (text) => {
+    const wrangler = JSON.parse(text)
+    wrangler.vars.W07_MEMBERSHIP_DATABASE_DRIVER = 'neon'
+    wrangler.hyperdrive.push({
+      binding: 'HYPERDRIVE_D1_01',
+      id: '0c53a1bb9bc0484bac146e8ae2d3158b',
+    })
+    return JSON.stringify(wrangler, null, 2) + '\n'
+  }, false)
+  const result = verifyD104SharedRunnerReview({ readSource: source })
+  assert.equal(result.status, 'D1_04_SHARED_RUNNER_INDEPENDENT_LOCAL_REVIEW_PASS')
+})
+
 test('admits W07 Neon runtime selection after D1-04 remote schema application', () => {
   const wranglerPath = 'workers/W07-subscription-commerce/wrangler.jsonc'
   const source = overrideSource(wranglerPath, (text) => {
