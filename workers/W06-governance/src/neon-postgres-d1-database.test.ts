@@ -56,14 +56,14 @@ describe('W06 PostgreSQL moderation D1 bridge', () => {
     ])
 
     expect(clientCalls[1]?.sql).toBe(
-      'INSERT INTO moderation_reports(report_id) VALUES ($1)\\nON CONFLICT DO NOTHING',
+      'INSERT INTO moderation_reports(report_id) VALUES ($1)\nON CONFLICT DO NOTHING',
     )
     expect(clientCalls[2]).toEqual({
       sql: 'INSERT INTO audit_events(event_id) SELECT $1 WHERE $2 = 1',
       values: ['audit_1', 1],
     })
     expect(clientCalls[3]?.sql).toBe(
-      'INSERT INTO moderation_report_idempotency(id) VALUES ($1)\\nON CONFLICT DO NOTHING',
+      'INSERT INTO moderation_report_idempotency(id) VALUES ($1)\nON CONFLICT DO NOTHING',
     )
     expect(results.every((result) => result.success)).toBe(true)
   })
