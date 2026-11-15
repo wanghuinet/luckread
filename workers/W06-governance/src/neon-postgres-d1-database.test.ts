@@ -46,6 +46,28 @@ describe('W06 PostgreSQL moderation D1 bridge', () => {
     )).toBe("SELECT '?' AS literal, value FROM t WHERE a = $1 -- ?\nAND b = $2 /* ? */")
   })
 
+  it('translates D1 INSERT OR IGNORE and binds changes() from the preceding batch statement', async () => {
+    const { pool, clientCalls } = fakePool({ rowCounts: [1, 1, 1] })
+    const db = createPostgresModerationD1Database(pool)
+    const results = await db.batch([
+      db.prepare('INSERT OR IGNORE INTO moderation_reports(report_id) VALUES (?)').bind('report_1'),
+      db.prepare("INSERT INTO audit_events(event_id) SELECT ? WHERE changes() = 1").bind('audit_1'),
+      db.prepare('INSERT OR IGNORE INTO moderation_report_idempotency(id) VALUES (?)').bind('idem_1'),
+    ])
+
+    expect(clientCalls[1]?.sql).toBe(
+      'INSERT INTO moderation_reports(report_id) VALUES ($1)\\nON CONFLICT DO NOTHING',
+    )
+    expect(clientCalls[2]).toEqual({
+      sql: 'INSERT INTO audit_events(event_id) SELECT $1 WHERE $2 = 1',
+      values: ['audit_1', 1],
+    })
+    expect(clientCalls[3]?.sql).toBe(
+      'INSERT INTO moderation_report_idempotency(id) VALUES ($1)\\nON CONFLICT DO NOTHING',
+    )
+    expect(results.every((result) => result.success)).toBe(true)
+  })
+
   it('runs the moderation decision batch in one transaction and binds the previous CAS update count into its guard', async () => {
     const { pool, clientCalls, client } = fakePool({ rowCounts: [1, 1, 1, 1, 1, 1, 1] })
     const db = createPostgresModerationD1Database(pool)
@@ -121,10 +143,11 @@ describe('W06 PostgreSQL moderation D1 bridge', () => {
       },
     }
     const row = await createPostgresModerationD1Database(pool)
-      .prepare('SELECT created_at FROM moderation_cases WHERE case_id = ?')
-      .bind('case_1')
-      .first<{ created_at: string }>()
+      .prepare('SELECT created_at, actor_json FROM audit_events WHERE event_id = ?')
+      .bind('event_1')
+      .first<{ created_at: string; actor_json: string }>()
 
     expect(row?.created_at).toBe('2026-11-15T12:00:00.123Z')
+    expect(row?.actor_json).toBe(undefined)
   })
 })
