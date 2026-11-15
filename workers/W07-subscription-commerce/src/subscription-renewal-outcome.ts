@@ -1,6 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import { strictlyAfterCanonicalUtcTimestamp } from './canonical-utc-timestamp.js';
+import { getW07SelectedD104Database, type W07PaymentMethodReadRuntimeEnv } from './neon/payment-method-read-runtime.js';
 import {
   readScheduledSubscriptionPlanDowngradeForPeriod,
   readScheduledDowngradeTargetPlan,
@@ -50,8 +51,11 @@ export type RenewalOutcomeSyncResult = Readonly<{
   reasonCode?: string;
 }>;
 
-export type RenewalOutcomeSyncDependencies = Readonly<{ now?: () => Date }>;
-type OutcomeSyncEnv = Readonly<{ D1_01: D1Database; D1_04: D1Database; W06_GOVERNANCE?: Fetcher }>;
+export type RenewalOutcomeSyncDependencies = Readonly<{
+  now?: () => Date;
+  getDatabase?: (env: OutcomeSyncEnv) => D1Database;
+}>;
+type OutcomeSyncEnv = W07PaymentMethodReadRuntimeEnv & Readonly<{ D1_01: D1Database; D1_04: D1Database; W06_GOVERNANCE?: Fetcher }>; 
 
 const PROVIDER = 'hyperswitch';
 const MAX_PAGE_SIZE = 50;
@@ -397,6 +401,7 @@ async function applySubscriptionUpdate(
 export async function syncTerminalRenewalCycleToSubscription(
   env: OutcomeSyncEnv, cycleIdInput: string, dependencies: RenewalOutcomeSyncDependencies = {},
 ): Promise<RenewalOutcomeSyncResult> {
+  env = { ...env, D1_04: (dependencies.getDatabase ?? getW07SelectedD104Database)(env) };
   if (!CYCLE_ID_PATTERN.test(cycleIdInput)) throw new RenewalOutcomeSyncError('VALIDATION_FAILED', 400);
   const now = nowIso(dependencies.now ?? (() => new Date()));
   const cycle = await readCycleById(env.D1_04, cycleIdInput);
@@ -580,6 +585,7 @@ export async function syncRenewalCycleOutcomeForPayment(
   env: OutcomeSyncEnv, paymentIdInput: string, expectedMerchantIdInput: string,
   dependencies: RenewalOutcomeSyncDependencies = {},
 ): Promise<RenewalOutcomeSyncResult> {
+  env = { ...env, D1_04: (dependencies.getDatabase ?? getW07SelectedD104Database)(env) };
   if (!PAYMENT_ID_PATTERN.test(paymentIdInput) || !isBoundedId(expectedMerchantIdInput)) {
     throw new RenewalOutcomeSyncError('VALIDATION_FAILED', 400);
   }
@@ -593,7 +599,7 @@ export async function syncRenewalCycleOutcomeForPayment(
     // Before candidate migration 0004 is applied there can be no renewal-cycle
     // rows. Ordinary customer-present payments must still receive a normal
     // webhook acknowledgement; only non-missing-table D1 failures are retried.
-    if (/no such table:\s*subscription_renewal_cycles/i.test(message)) {
+    if (/no such table:\s*subscription_renewal_cycles/i.test(message) || message.toLowerCase().includes('relation "subscription_renewal_cycles" does not exist')) {
       return { cycleId: '', outcome: 'NO_RENEWAL_CYCLE' };
     }
     throw new RenewalOutcomeSyncError('SERVICE_UNAVAILABLE', 503);
@@ -606,6 +612,7 @@ export async function syncPendingRenewalOutcomes(
   env: OutcomeSyncEnv, options: Readonly<{ limit?: number }> = {},
   dependencies: RenewalOutcomeSyncDependencies = {},
 ): Promise<Readonly<{ scanned: number; applied: number; reconciliationRequired: number; pendingRetry: number }>> {
+  env = { ...env, D1_04: (dependencies.getDatabase ?? getW07SelectedD104Database)(env) };
   const limit = Number.isSafeInteger(options.limit) ? Math.min(Math.max(options.limit ?? 20, 1), MAX_PAGE_SIZE) : 20;
   let cycles: Array<{ cycle_id: string }>;
   try {
