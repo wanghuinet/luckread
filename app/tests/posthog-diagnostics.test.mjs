@@ -111,6 +111,10 @@ test('keeps native symbol upload disabled until the private CI CLI credential ex
 });
 
 test('uploads matching Hermes source maps for each published Expo OTA update', () => {
+  expect(otaUpdateWorkflow).toContain(
+    'EXPO_PUBLIC_POSTHOG_API_KEY: ${{ vars.EXPO_PUBLIC_POSTHOG_API_KEY || secrets.EXPO_PUBLIC_POSTHOG_API_KEY }}',
+  );
+  expect(otaUpdateWorkflow).toContain('EXPO_PUBLIC_POSTHOG_HOST: "https://us.i.posthog.com"');
   expect(otaUpdateWorkflow).toContain('POSTHOG_CLI_API_KEY: ${{ secrets.POSTHOG_CLI_API_KEY }}');
   expect(otaUpdateWorkflow).toContain('POSTHOG_CLI_PROJECT_ID: "715723"');
   expect(otaUpdateWorkflow).toContain('npm install --global @posthog/cli@0.19.0');
@@ -126,7 +130,15 @@ test('documents and wires the separate private PostHog CLI credentials for nativ
   expect(envExample).toContain('POSTHOG_CLI_PROJECT_ID=715723');
   expect(envExample).toContain('POSTHOG_CLI_HOST=https://us.posthog.com');
   expect(envExample).toContain('Configure POSTHOG_CLI_API_KEY as a GitHub Actions repository secret');
-  expect(androidBetaWorkflow).toContain('EXPO_PUBLIC_POSTHOG_API_KEY: ${{ secrets.EXPO_PUBLIC_POSTHOG_API_KEY }}');
+  const publicIngestionKeyBinding =
+    'EXPO_PUBLIC_POSTHOG_API_KEY: ${{ vars.EXPO_PUBLIC_POSTHOG_API_KEY || secrets.EXPO_PUBLIC_POSTHOG_API_KEY }}';
+  expect(androidBetaWorkflow.split(publicIngestionKeyBinding)).toHaveLength(4);
+  expect(androidBetaWorkflow).not.toContain(
+    'EXPO_PUBLIC_POSTHOG_API_KEY: ${{ secrets.EXPO_PUBLIC_POSTHOG_API_KEY }}',
+  );
+  expect(androidBetaWorkflow).toContain(
+    'EXPO_PUBLIC_POSTHOG_API_KEY is missing from GitHub Actions Variables and Secrets',
+  );
   expect(androidBetaWorkflow).toContain('Verify PostHog project ingestion key is available');
   expect(androidBetaWorkflow).toContain('POSTHOG_CLI_API_KEY: ${{ secrets.POSTHOG_CLI_API_KEY }}');
   expect(androidBetaWorkflow).toContain('POSTHOG_CLI_PROJECT_ID: "715723"');
