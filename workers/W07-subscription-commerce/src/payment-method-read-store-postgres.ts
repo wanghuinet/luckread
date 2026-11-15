@@ -268,37 +268,6 @@ async function markProviderDeleted(
   })
 }
 
-async function completeRevocationOnMandateWebhook(
-  db: PaymentMethodPostgresQueryExecutor,
-  merchantId: string,
-  customerId: string,
-  paymentMethodId: string,
-  now: string,
-): Promise<void> {
-  const timestamp = Date.parse(now)
-  if (!Number.isFinite(timestamp) || new Date(timestamp).toISOString() !== now) {
-    throw new PaymentMethodPersistenceError('VALIDATION_FAILED', 400)
-  }
-  try {
-    await db.query(
-      "UPDATE payment_method_revocation_requests r SET status = 'COMPLETED', version = version + 1, " +
-      "updated_at = GREATEST(r.updated_at + interval '1 millisecond', $1::timestamptz) " +
-      "WHERE r.provider = $2 AND r.merchant_id = $3 AND r.customer_id = $4 " +
-      "AND r.status IN ('REQUESTED','PENDING_PROVIDER','RECONCILIATION_REQUIRED') " +
-      'AND r.provider_method_deleted_at IS NOT NULL ' +
-      'AND EXISTS (SELECT 1 FROM saved_payment_methods s WHERE s.saved_payment_method_id = r.saved_payment_method_id ' +
-      'AND s.provider = r.provider AND s.merchant_id = r.merchant_id AND s.customer_id = r.customer_id ' +
-      'AND s.payment_method_id = $5) ' +
-      "AND NOT EXISTS (SELECT 1 FROM payment_mandates m WHERE m.provider = r.provider " +
-      'AND m.merchant_id = r.merchant_id AND m.customer_id = r.customer_id ' +
-      "AND m.payment_method_id = r.payment_method_id AND m.status NOT IN ('REVOKED','FAILED','EXPIRED'))",
-      [now, PROVIDER, merchantId, customerId, paymentMethodId],
-    )
-  } catch (error) {
-    throw mapQueryError(error)
-  }
-}
-
 export function createPostgresPaymentMethodReadStore(
   db: PaymentMethodPostgresQueryExecutor,
 ): PaymentMethodReadStore {
@@ -389,10 +358,6 @@ export function createPostgresPaymentMethodReadStore(
 
     markPaymentMethodProviderDeleted(input, now) {
       return markProviderDeleted(db, input, now)
-    },
-
-    completePaymentMethodRevocationOnMandateWebhook(merchantId, customerId, paymentMethodId, now) {
-      return completeRevocationOnMandateWebhook(db, merchantId, customerId, paymentMethodId, now)
     },
 
     async getSavedPaymentMethodMandates(customerIdInput, merchantIdInput, savedPaymentMethodId) {
