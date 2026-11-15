@@ -46,6 +46,12 @@ describe('W07 PostgreSQL webhook D1 bridge', () => {
         payment_id: 'pay_12345678901234567890123456',
         amount_minor: '1499',
         refunded_minor: '199',
+        captured_amount_minor: '700',
+        payment_amount_minor: '1499',
+        previously_refunded_minor: '199',
+        plan_version: '7',
+        attempt_number: '3',
+        event_timestamp_ms: '1794744000123',
         unit_amount_minor: '1200',
         line_subtotal_minor: '1200',
         line_discount_minor: '0',
@@ -57,10 +63,16 @@ describe('W07 PostgreSQL webhook D1 bridge', () => {
     })
     const database = createPostgresWebhookD1Database(pool)
     const row = await database.prepare(
-      "SELECT payment_id, amount_minor, refunded_minor, unit_amount_minor, line_subtotal_minor, line_discount_minor, line_tax_minor, line_total_minor, version, created_at FROM payments WHERE payment_id = ? AND note = '?'",
+      "SELECT payment_id, amount_minor, refunded_minor, captured_amount_minor, payment_amount_minor, previously_refunded_minor, plan_version, attempt_number, event_timestamp_ms, unit_amount_minor, line_subtotal_minor, line_discount_minor, line_tax_minor, line_total_minor, version, created_at FROM payments WHERE payment_id = ? AND note = '?'",
     ).bind('pay_12345678901234567890123456').first<{
       amount_minor: number
       refunded_minor: number
+      captured_amount_minor: number
+      payment_amount_minor: number
+      previously_refunded_minor: number
+      plan_version: number
+      attempt_number: number
+      event_timestamp_ms: number
       unit_amount_minor: number
       line_subtotal_minor: number
       line_discount_minor: number
@@ -75,6 +87,12 @@ describe('W07 PostgreSQL webhook D1 bridge', () => {
     expect(row).toMatchObject({
       amount_minor: 1499,
       refunded_minor: 199,
+      captured_amount_minor: 700,
+      payment_amount_minor: 1499,
+      previously_refunded_minor: 199,
+      plan_version: 7,
+      attempt_number: 3,
+      event_timestamp_ms: 1794744000123,
       unit_amount_minor: 1200,
       line_subtotal_minor: 1200,
       line_discount_minor: 0,

@@ -12,7 +12,8 @@ import { SubscriptionRuntimeError } from './subscription-runtime.js';
 import { validateCreateCommerceOrderRequest, validateOrderCreateIdempotencyKey } from './order-request-validation.js';
 import { issueInvoiceForOrder } from './billing-persistence.js';
 import {
-  getW07PaymentWebhookDatabase,
+  getW07OrderCreatePersistenceStore,
+  getW07SelectedD104Database,
   type W07PaymentMethodReadRuntimeEnv,
 } from './neon/payment-method-read-runtime.js';
 
@@ -25,7 +26,8 @@ type OrderRuntimeDependencies = Readonly<{
   createOrder?: typeof createCommerceOrder;
   getOrder?: typeof getCommerceOrder;
   issueInvoice?: typeof issueInvoiceForOrder;
-  getReadDatabase?: (env: OrderRuntimeEnv) => D1Database | undefined;
+  getReadDatabase?: (env: OrderRuntimeEnv) => D1Database;
+  getOrderCreateStore?: (env: OrderRuntimeEnv) => import('./order-persistence.js').OrderCreatePersistenceStore | undefined;
   /** Must be an admitted pricing authority that returns immutable offer versions, discounts, and tax decisions. */
   resolvePricing?: (request: unknown) => Promise<AuthoritativelyPricedOrder>;
 }>;
@@ -175,9 +177,11 @@ export async function handleCommerceOrderRequest(
         return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Order creation is disabled until the authoritative pricing and tax decision is admitted');
       }
 
+      const database = (dependencies.getReadDatabase ?? getW07SelectedD104Database)(env);
+      const orderCreateStore = (dependencies.getOrderCreateStore ?? getW07OrderCreatePersistenceStore)(env);
       const createOrder = dependencies.createOrder ?? createCommerceOrder;
       const result: CreateOrderResult = await createOrder(
-        env.D1_04,
+        orderCreateStore ?? database,
         customerId,
         request.headers.get('Idempotency-Key'),
         body,
@@ -187,7 +191,7 @@ export async function handleCommerceOrderRequest(
       // repair the invoice if the previous request persisted its Order but
       // the document write was interrupted.
       const issueInvoice = dependencies.issueInvoice ?? issueInvoiceForOrder;
-      await issueInvoice(env.D1_04, customerId, result.data.orderId);
+      await issueInvoice(database, customerId, result.data.orderId);
       return Response.json(
         { data: result.data, requestId: 'req_' + crypto.randomUUID() },
         { status: result.status, headers: { 'cache-control': 'no-store' } },
@@ -196,7 +200,7 @@ export async function handleCommerceOrderRequest(
 
     // Order detail is read-only and follows the selected D1-04 authority.
     // Order creation and invoice issuance intentionally remain on the existing D1 path.
-    const database = (dependencies.getReadDatabase ?? getW07PaymentWebhookDatabase)(env) ?? env.D1_04;
+    const database = (dependencies.getReadDatabase ?? getW07SelectedD104Database)(env);
     const getOrder = dependencies.getOrder ?? getCommerceOrder;
     const order: CommerceOrderData = await getOrder(database, customerId, route.orderId);
     return Response.json(

@@ -81,6 +81,11 @@ describe('private W07 commerce order HTTP handler', () => {
     let captured: Parameters<typeof createCommerceOrder> | undefined;
     let invoiceCall: Parameters<typeof issueInvoiceForOrder> | undefined;
     let readDatabaseSelections = 0;
+    const neonDatabase = {} as D1Database;
+    const postgresOrderStore = {
+      readIdempotencyRow: async () => null,
+      persistNewOrder: async () => ({ statementCount: 4, expireChanges: 0, claimChanges: 1, completionChanges: 1, orderChanges: 1, lineChanges: [1] }),
+    } as import('./order-persistence.js').OrderCreatePersistenceStore;
     const mockCreate = (async (...args: Parameters<typeof createCommerceOrder>) => {
       captured = args;
       return createResult;
@@ -97,21 +102,22 @@ describe('private W07 commerce order HTTP handler', () => {
       'user_42',
       { ...env, W07_DATABASE_DRIVER: 'neon' },
       {
+        getReadDatabase: () => { readDatabaseSelections += 1; return neonDatabase; },
+        getOrderCreateStore: () => postgresOrderStore,
         createOrder: mockCreate,
         issueInvoice: mockInvoice,
         resolvePricing: async () => explicitTestPricing,
-        getReadDatabase: () => { readDatabaseSelections += 1; return {} as D1Database; },
       },
     );
 
     expect(response?.status).toBe(201);
-    expect(captured?.[0]).toBe(env.D1_04);
+    expect(captured?.[0]).toBe(postgresOrderStore);
     expect(captured?.[1]).toBe('user_42');
     expect(captured?.[2]).toBe('purchase_attempt_01');
     expect(captured?.[3]).toEqual({ items: [{ itemRef: 'plan_' + 'a'.repeat(64), quantity: 1 }] })
-    expect(invoiceCall?.slice(0, 2)).toEqual([env.D1_04, 'user_42'])
+    expect(invoiceCall?.slice(0, 2)).toEqual([neonDatabase, 'user_42'])
     expect(invoiceCall?.[2]).toBe(orderData.orderId);
-    expect(readDatabaseSelections).toBe(0);
+    expect(readDatabaseSelections).toBe(1);
     const envelope = await parseResponse(response!);
     expect(envelope.data).toEqual(orderData);
     expect(envelope.requestId).toMatch(/^req_/);
