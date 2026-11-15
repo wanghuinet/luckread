@@ -72,7 +72,10 @@ describe('W07 PostgreSQL webhook D1 bridge', () => {
     const fakeDatabase = {
       prepare(sql: string) {
         statements.push(sql)
-        return {} as D1PreparedStatement
+        const statement = {
+          bind() { return statement },
+        }
+        return statement as unknown as D1PreparedStatement
       },
     } as unknown as D1Database
 
