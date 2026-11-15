@@ -115,6 +115,43 @@ describe('W07 customer billing and payment history reads', () => {
     }
   });
 
+  it('routes billing documents, payment history and refund history through the selected Neon D1-04 database', async () => {
+    const f = createFixture();
+    const neonDatabase = {} as D1Database;
+    const d1Database = {
+      prepare() { throw new Error('D1 must not be used while Neon is selected'); },
+    } as unknown as D1Database;
+    f.env.D1_04 = d1Database;
+    f.env.W07_DATABASE_DRIVER = 'neon';
+    f.dependencies.getReadDatabase = () => neonDatabase;
+
+    const responses = await Promise.all([
+      handleCommerceBillingReadRequest(
+        new Request('https://luckread-w07.internal/commerce/billing/documents'),
+        CUSTOMER_ID,
+        f.env,
+        f.dependencies,
+      ),
+      handleCommerceBillingReadRequest(
+        new Request('https://luckread-w07.internal/commerce/payments/history'),
+        CUSTOMER_ID,
+        f.env,
+        f.dependencies,
+      ),
+      handleCommerceBillingReadRequest(
+        new Request('https://luckread-w07.internal/commerce/payments/refunds'),
+        CUSTOMER_ID,
+        f.env,
+        f.dependencies,
+      ),
+    ]);
+
+    expect(responses.map((response) => response?.status)).toEqual([200, 200, 200]);
+    expect(f.calls.documents[0]?.[0]).toBe(neonDatabase);
+    expect(f.calls.payments[0]?.[0]).toBe(neonDatabase);
+    expect(f.calls.refunds[0]?.[0]).toBe(neonDatabase);
+  });
+
   it('maps persistence validation failures to sanitized responses', async () => {
     const f = createFixture();
     f.dependencies.listRefundHistory = async () => {
