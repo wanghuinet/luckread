@@ -6,6 +6,8 @@ import {
   HYPERDRIVE_TARGETS,
   ensureAllFiveNeonHyperdrive,
   ensureD1_01Hyperdrive,
+  ensureD1_03Hyperdrive,
+  D1_03_HYPERDRIVE_TARGET,
   parseNeonConnectionString,
 } from './create-neon-hyperdrive.mjs'
 
@@ -243,3 +245,60 @@ test('creates one guarded, cache-disabled Hyperdrive resource for each of the fi
   assert.ok(createBodies.every((body) => body.caching.disabled === true))
   assert.ok(createBodies.every((body) => !JSON.stringify(body).includes('channel_binding')))
 })
+
+test('creates or reuses only the registered D1-03 governance Hyperdrive target', async () => {
+  const d103Connection =
+    'postgresql://lr_hyperdrive:governance%40pass@ep-governance.us-east-2.aws.neon.tech:5432/luckread_governance?sslmode=require&channel_binding=require'
+  let createBody
+  const result = await ensureD1_03Hyperdrive({
+    accountId: 'account-id',
+    apiToken: 'api-token',
+    connectionString: d103Connection,
+    fetchImpl: async (_url, init = {}) => {
+      if (init.method === 'GET') {
+        return jsonResponse({ success: true, result: [], result_info: { total_pages: 1 } })
+      }
+      createBody = JSON.parse(init.body)
+      return jsonResponse({
+        success: true,
+        result: {
+          id: 'd103-hyperdrive-id',
+          name: D1_03_HYPERDRIVE_TARGET.configName,
+          origin: {
+            host: createBody.origin.host,
+            database: createBody.origin.database,
+            user: createBody.origin.user,
+            port: createBody.origin.port,
+            scheme: createBody.origin.scheme,
+          },
+          caching: { disabled: true },
+        },
+      })
+    },
+  })
+
+  assert.deepEqual(result, {
+    created: true,
+    id: 'd103-hyperdrive-id',
+    name: 'luckread-governance-d1-03-neon',
+  })
+  assert.equal(D1_03_HYPERDRIVE_TARGET.database, 'luckread_governance')
+  assert.equal(createBody?.origin.database, 'luckread_governance')
+  assert.equal(createBody?.caching.disabled, true)
+  assert.equal(JSON.stringify(createBody).includes('channel_binding'), false)
+})
+
+test('rejects a D1-03 Hyperdrive connection string aimed at a different Neon database', async () => {
+  await assert.rejects(
+    ensureD1_03Hyperdrive({
+      accountId: 'account-id',
+      apiToken: 'api-token',
+      connectionString: 'postgresql://user:password@ep-governance.us-east-2.aws.neon.tech:5432/luckread?sslmode=require',
+      fetchImpl: async () => {
+        throw new Error('Cloudflare API must not be called for an invalid target')
+      },
+    }),
+    /exactly luckread_governance/,
+  )
+})
+
