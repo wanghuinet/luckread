@@ -10,7 +10,6 @@ import {
 } from './hyperswitch-client.js';
 import {
   PaymentMethodPersistenceError,
-  type PaymentMethodRevocationRequest,
   type SavedPaymentMethodRecord,
 } from './payment-method-persistence.js';
 import {
