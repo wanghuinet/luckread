@@ -77,7 +77,7 @@ function validateD103HyperdriveConnectionString(value: unknown): string {
   }
   let databaseName = ''
   try {
-    databaseName = decodeURIComponent(target.pathname.replace(/^\\/+/, ''))
+    databaseName = decodeURIComponent(target.pathname.replace(/^\/+/, ''))
   } catch {
     throw new Error('W05_HYPERDRIVE_D1_03_CONNECTION_STRING_INVALID')
   }
