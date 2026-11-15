@@ -947,6 +947,25 @@ function parseMembershipPlanPublishRequestAuditInput(value: unknown): Membership
   return body as MembershipPlanPublishRequestAuditInput
 }
 
+function canonicalAuditJson(value: unknown): string {
+  if (Array.isArray(value)) {
+    return '[' + value.map(canonicalAuditJson).join(',') + ']'
+  }
+  if (value && typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>).sort(([left], [right]) => left.localeCompare(right))
+    return '{' + entries.map(([key, entry]) => JSON.stringify(key) + ':' + canonicalAuditJson(entry)).join(',') + '}'
+  }
+  return JSON.stringify(value)
+}
+
+function matchesAuditJsonText(actual: string, expected: unknown): boolean {
+  try {
+    return canonicalAuditJson(JSON.parse(actual)) === canonicalAuditJson(expected)
+  } catch {
+    return false
+  }
+}
+
 function matchesMembershipPlanMutationRequestAudit(existing: StoredAuditEvent, expected: AuditEvent): boolean {
   try {
     const storedActor = JSON.parse(existing.actor_json) as Record<string, unknown>
@@ -958,8 +977,8 @@ function matchesMembershipPlanMutationRequestAudit(existing: StoredAuditEvent, e
       existing.action === expected.action &&
       existing.target_type === expected.targetType &&
       existing.target_id === expected.targetId &&
-      existing.before_json === JSON.stringify(expected.before) &&
-      existing.after_json === JSON.stringify(expected.after)
+      matchesAuditJsonText(existing.before_json, expected.before) &&
+      matchesAuditJsonText(existing.after_json, expected.after)
   } catch {
     return false
   }
@@ -1015,8 +1034,8 @@ function matchesImmutableAuditEvent(existing: StoredAuditEvent, expected: AuditE
       existing.action === expected.action &&
       existing.target_type === expected.targetType &&
       existing.target_id === expected.targetId &&
-      existing.before_json === JSON.stringify(expected.before) &&
-      existing.after_json === JSON.stringify(expected.after) &&
+      matchesAuditJsonText(existing.before_json, expected.before) &&
+      matchesAuditJsonText(existing.after_json, expected.after) &&
       existing.occurred_at === expected.occurredAt
   } catch {
     return false
