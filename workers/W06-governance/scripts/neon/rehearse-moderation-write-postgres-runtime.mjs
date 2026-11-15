@@ -198,6 +198,7 @@ try {
   runtimePassed = true
 } finally {
   try {
+    const existingTables = []
     for (const table of tables) {
       const exists = await client.query(
         'SELECT to_regclass($1) IS NOT NULL AS present',
@@ -205,12 +206,13 @@ try {
       )
       if (exists.rows[0]?.present === true) {
         await client.query(`TRUNCATE TABLE pg_temp.${table}`)
+        existingTables.push(table)
       }
     }
-    const residual = await client.query(
-      'SELECT count(*)::int AS remaining FROM pg_class WHERE relnamespace = pg_my_temp_schema() AND relname = ANY($1::text[])',
-      [tables],
-    )
+    const residualSql = existingTables.length
+      ? 'SELECT ' + existingTables.map((table) => `(SELECT count(*) FROM pg_temp.${table})`).join(' + ') + ' AS remaining'
+      : 'SELECT 0::bigint AS remaining'
+    const residual = await client.query(residualSql)
     for (const table of tables) {
       await client.query(`DROP TABLE IF EXISTS pg_temp.${table} CASCADE`)
     }
