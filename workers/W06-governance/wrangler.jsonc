@@ -8,17 +8,26 @@
     {
       "name": "GOVERNANCE_ORIGIN_GLOBAL_LIMITER",
       "namespace_id": "2026100316",
-      "simple": { "limit": 3000, "period": 60 }
+      "simple": {
+        "limit": 3000,
+        "period": 60
+      }
     },
     {
       "name": "GOVERNANCE_READ_LIMITER",
       "namespace_id": "2026100317",
-      "simple": { "limit": 120, "period": 60 }
+      "simple": {
+        "limit": 120,
+        "period": 60
+      }
     },
     {
       "name": "GOVERNANCE_WRITE_LIMITER",
       "namespace_id": "2026100318",
-      "simple": { "limit": 30, "period": 60 }
+      "simple": {
+        "limit": 30,
+        "period": 60
+      }
     }
   ],
   "queues": {
@@ -50,5 +59,17 @@
     "crons": [
       "* * * * *"
     ]
-  }
+  },
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "vars": {
+    "W06_MODERATION_DATABASE_DRIVER": "neon"
+  },
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE_D1_03",
+      "id": "7c8831416c18494faee04b96aa551cb9"
+    }
+  ]
 }
