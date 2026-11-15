@@ -4,6 +4,7 @@ import { getLikeStatus, like, LikeRuntimeError, unlike } from './like-runtime.js
 import { CommentRuntimeError, createComment, deleteComment, listComments, parseCommentLimit, parseCommentSort, updateComment } from './comment-runtime.js'
 import { listProfileLikedContents, listProfileReplies, ProfileChannelRuntimeError } from './profile-channel-runtime.js'
 import { getContentReplyAudience, ReplyAudienceRuntimeError, setContentReplyAudience } from './reply-audience-runtime.js'
+import type { ReplyAudienceStore } from './reply-audience-store.js'
 import { fetchOwnedPostContext, fetchPublishedContentSocialContext, fetchPublishedOwnerPostContext, type W03ContentBinding } from './w03-content-context-client.js'
 import {
   FavoriteRuntimeError,
@@ -303,6 +304,8 @@ export type W05SocialWorkerDependencies = Readonly<{
   commentNotificationContextStore?: CommentNotificationContextStore
   /** Optional PostgreSQL-capable notification inbox/outbox enqueue store. */
   notificationEnqueueStore?: NotificationEnqueueStore
+  /** Optional PostgreSQL-capable owner reply-audience policy store; D1 remains the default. */
+  replyAudienceStore?: ReplyAudienceStore
   /** Optional PostgreSQL-capable per-user notification preferences store; D1 remains the deployed default. */
   notificationPreferencesStore?: NotificationPreferencesStore
   /** Optional PostgreSQL-capable owner profile pin store; D1 remains the deployed default. */
@@ -927,7 +930,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
             correlationId: request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '',
           })
           return json({
-            data: await getContentReplyAudience(env.DB, actorUserId, contentId, context),
+            data: await getContentReplyAudience(env.DB, actorUserId, contentId, context, dependencies.replyAudienceStore),
             requestId: createRequestId(),
           })
         }
@@ -957,6 +960,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
           raw.replyAudience,
           raw.mentionedUserIds,
           context,
+          dependencies.replyAudienceStore,
         )
         return json({ data: policy, requestId: createRequestId() })
       }

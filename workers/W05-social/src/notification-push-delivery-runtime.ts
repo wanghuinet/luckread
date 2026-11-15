@@ -35,6 +35,8 @@ function resolveNotificationPushEndpointAccessStore(
 export interface NotificationPushDeliveryEnv {
   readonly DB: D1Database
   readonly D1_03?: D1Database
+  readonly W05_DATABASE_DRIVER?: string
+  readonly HYPERDRIVE_D1_02?: { connectionString?: string }
   readonly PUSH_DELIVERY_ENABLED?: string
   readonly EXPO_ACCESS_TOKEN?: string
 }

@@ -274,7 +274,7 @@ describe('W05 durable Expo push delivery runtime', () => {
     const token = 'ExponentPushToken[private-token-value]'
     const endpointDb = {
       prepare: vi.fn(() => ({bind: (..._values: unknown[]) => ({
-        first: async () => ({endpoint_id:'endpoint-1',owner_user_id:'recipient-1',push_token:token}),
+        first: async () => ({endpoint_id:'endpoint-1',owner_user_id:'recipient-1',push_token:token,permission_status:'granted'}),
       })})),
     } as unknown as D1Database
 

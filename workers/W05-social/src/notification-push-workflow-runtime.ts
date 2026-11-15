@@ -2,6 +2,7 @@ import {
   runNotificationPushBatch,
   type NotificationPushBatchResult,
   type NotificationPushDeliveryEnv,
+  type NotificationPushDeliveryRuntimeDependencies,
 } from './notification-push-delivery-runtime.js'
 
 export type NotificationPushSchedule = Readonly<{ cron: string; scheduledTime: number }>
@@ -15,8 +16,9 @@ export async function runScheduledNotificationPush(
   env: NotificationPushDeliveryEnv,
   schedule: NotificationPushSchedule | undefined,
   runStep: NotificationPushStepRunner,
+  dependencies: NotificationPushDeliveryRuntimeDependencies = {},
 ): Promise<NotificationPushBatchResult> {
-  if (env.PUSH_DELIVERY_ENABLED !== 'true') return runNotificationPushBatch(env)
+  if (env.PUSH_DELIVERY_ENABLED !== 'true') return runNotificationPushBatch(env, new Date(), dependencies)
   if (!schedule || !Number.isSafeInteger(schedule.scheduledTime) || schedule.scheduledTime < 0 ||
       typeof schedule.cron !== 'string' || !schedule.cron.trim() || schedule.cron.length > 128) {
     throw new Error('W05_PUSH_DELIVERY_SCHEDULE_REQUIRED')
@@ -24,6 +26,6 @@ export async function runScheduledNotificationPush(
   return runStep(
     'process-w05-notification-push-batch',
     { retries: { limit: 3, delay: '5 seconds', backoff: 'exponential' } },
-    () => runNotificationPushBatch(env),
+    () => runNotificationPushBatch(env, new Date(), dependencies),
   )
 }
