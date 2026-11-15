@@ -46,6 +46,8 @@ const tables = [
   'moderation_cases',
   'moderation_decisions',
   'moderation_decision_idempotency',
+  'moderation_reports',
+  'moderation_report_idempotency',
   'moderation_txn_guard',
   'moderation_enforcement_outbox',
   'audit_events',
