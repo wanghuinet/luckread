@@ -10,6 +10,7 @@ const paths = {
   manifest: 'contracts/database/neon-d1-04-shared-migration-manifest.v1.json',
   accessBoundary: 'contracts/transport/worker-d1-access-boundary.v1.json',
   wrangler: 'workers/W07-subscription-commerce/wrangler.jsonc',
+  fiveDomainBootstrap: 'contracts/database/neon-five-domain-schema-bootstrap.v1.json',
   sharedRunner: 'scripts/neon/shared-domain-schema-runner.mjs',
   orderContract: 'contracts/database/neon-d1-04-w07-order-payment-schema.v1.json',
 }
@@ -75,7 +76,7 @@ function reviewedPinnedSource(pin, source) {
       '',
     )
     normalized = normalized.replace(
-      '    "MEMBERSHIP_RENEWAL_ENABLED": "false",\n    "W07_DATABASE_DRIVER": "d1"\n',
+      /    "MEMBERSHIP_RENEWAL_ENABLED": "false",\n    "W07_DATABASE_DRIVER": "(?:d1|neon)"\n/,
       '    "MEMBERSHIP_RENEWAL_ENABLED": "false"\n',
     )
   }
@@ -172,6 +173,7 @@ export function verifyD104SharedRunnerReview({ readSource = readText } = {}) {
   const manifest = readJson(paths.manifest,readSource)
   const accessBoundary = readJson(paths.accessBoundary,readSource)
   const wrangler = readJson(paths.wrangler,readSource)
+  const fiveDomainBootstrap = readJson(paths.fiveDomainBootstrap,readSource)
   const contracts = contractPaths.map((path) => readJson(path,readSource))
   const runner = readSource(paths.sharedRunner)
 
@@ -345,9 +347,17 @@ export function verifyD104SharedRunnerReview({ readSource = readText } = {}) {
   if (wrangler.name !== 'luckread-w07') {
     fail('W07 Wrangler worker name changed')
   }
-  if (wrangler.vars?.W07_DATABASE_DRIVER !== 'd1' ||
+  const w07Driver = wrangler.vars?.W07_DATABASE_DRIVER ?? 'd1'
+  if (!['d1', 'neon'].includes(w07Driver) ||
       !(wrangler.compatibility_flags ?? []).includes('nodejs_compat')) {
-    fail('W07 Neon payment-method read runtime must remain opt-in with D1 fallback')
+    fail('W07 D1-04 database driver must be explicitly d1 or neon with nodejs_compat')
+  }
+  const financeDomain = (fiveDomainBootstrap.domains ?? []).find((domain) => domain.domainId === 'D1-04')
+  if (w07Driver === 'neon' && (
+      financeDomain?.databaseName !== 'luckread_finance' ||
+      financeDomain?.remoteSchemaApplied !== true ||
+      !String(financeDomain?.status ?? '').includes('SCHEMA_ONLY_REMOTE_APPLIED'))) {
+    fail('W07 Neon runtime cannot be selected before D1-04 remote schema application is recorded')
   }
   const d104Bindings = (wrangler.d1_databases ?? []).filter((binding) => binding.binding === 'D1_04')
   if (d104Bindings.length !== 1 ||
