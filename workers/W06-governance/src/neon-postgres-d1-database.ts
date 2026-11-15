@@ -47,9 +47,9 @@ function translatePostgresModerationStatement(
   previousChanges?: number,
 ): Readonly<{ sql: string; extraValues: unknown[] }> {
   let sql = sourceSql
-  const insertIgnore = /^(\\s*)INSERT\\s+OR\\s+IGNORE\\s+INTO\\b/i
+  const insertIgnore = /^(\s*)INSERT\s+OR\s+IGNORE\s+INTO\b/i
   if (insertIgnore.test(sql)) {
-    sql = sql.replace(insertIgnore, '$1INSERT INTO').trimEnd() + '\\nON CONFLICT DO NOTHING'
+    sql = sql.replace(insertIgnore, '$1INSERT INTO').trimEnd() + '\nON CONFLICT DO NOTHING'
   }
 
   let result = ''
@@ -68,7 +68,7 @@ function translatePostgresModerationStatement(
     if (lineComment) {
       result += char
       position += 1
-      if (char === '\\n') lineComment = false
+      if (char === '\n') lineComment = false
       continue
     }
     if (blockComment) {
@@ -104,7 +104,7 @@ function translatePostgresModerationStatement(
       continue
     }
 
-    const changesMatch = /^changes\\s*\\(\\s*\\)/i.exec(sql.slice(position))
+    const changesMatch = /^changes\s*\(\s*\)/i.exec(sql.slice(position))
     if (changesMatch) {
       if (previousChanges === undefined) {
         throw new Error('W06_SQLITE_CHANGES_REQUIRES_BATCH_CONTEXT')
