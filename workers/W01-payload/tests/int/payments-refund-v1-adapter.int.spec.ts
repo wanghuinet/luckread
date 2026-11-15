@@ -50,8 +50,10 @@ describe('public customer payment refund adapter', () => {
   it('makes W07 re-check payment ownership and captured amount before reserving a refund', () => {
     const ownership = w07Runtime.indexOf('resolveRefundPaymentReference')
     const providerRead = w07Runtime.indexOf('retrievePayment(config, input.paymentId)')
-    const reserve = w07Runtime.indexOf('reserve(env.D1_04')
+    const selectedDatabase = w07Runtime.indexOf('getW07SelectedD104Database')
+    const reserve = w07Runtime.indexOf('reserve(database')
     const providerCreate = w07Runtime.indexOf('create(config, {')
+    expect(selectedDatabase).toBeGreaterThan(-1)
     expect(ownership).toBeGreaterThan(-1)
     expect(ownership).toBeLessThan(providerRead)
     expect(providerRead).toBeLessThan(reserve)

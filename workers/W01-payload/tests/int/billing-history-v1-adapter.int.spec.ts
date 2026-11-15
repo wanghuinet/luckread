@@ -84,7 +84,7 @@ describe('public customer payment and billing history adapters', () => {
 
   it('creates invoice snapshots from D1-04 orders and receipts only after signed successful payment state', () => {
     expect(orderRuntime).toContain('issueInvoiceForOrder')
-    expect(orderRuntime).toContain('await issueInvoice(env.D1_04, customerId, result.data.orderId)')
+    expect(orderRuntime).toContain('await issueInvoice(database, customerId, result.data.orderId)')
     expect(webhookRuntime).toContain('isSignedPaymentSucceededEvent(rawBody)')
     expect(webhookRuntime).toContain('issueReceiptForPaidPayment')
     expect(webhookRuntime).toContain('const webhookDatabase = neonDatabase ?? env.D1_04')
