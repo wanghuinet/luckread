@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-import { listCreatorCollections } from './content-collections.js'
+import { getCollection, listCreatorCollections } from './content-collections.js'
 
 describe('W03 collection foundation', () => {
   it('defines authoritative collection persistence and lifecycle event triggers', () => {
@@ -94,6 +94,36 @@ describe('W03 collection foundation', () => {
       hasMore: false,
       nextCursor: null,
     })
+  })
+
+  it('uses the injected Neon reader for owner-scoped collection detail reads', async () => {
+    const collection = {
+      id: 'collection_1',
+      ownerUserId: 'user_1',
+      creatorId: 'user_1',
+      state: 'DRAFT' as const,
+      version: 3,
+      title: 'Collection 1',
+      description: 'description',
+      coverRef: null,
+      etag: 'W/"3"',
+      createdAt: '2026-10-07T00:00:00.000Z',
+      updatedAt: '2026-10-08T00:00:00.000Z',
+    }
+    const calls: unknown[][] = []
+    const readStore = {
+      async getCollection(ownerUserId: string, collectionId: string) {
+        calls.push([ownerUserId, collectionId])
+        return ownerUserId === 'user_1' && collectionId === 'collection_1' ? collection : null
+      },
+      async listCreatorCollections() { return [] },
+    }
+    const db = { prepare() { throw new Error('Neon reader must be used instead of D1') } } as never
+
+    await expect(getCollection(db, 'user_1', 'collection_1', readStore)).resolves.toEqual(collection)
+    await expect(getCollection(db, 'user_2', 'collection_1', readStore))
+      .rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 })
+    expect(calls).toEqual([['user_1', 'collection_1'], ['user_2', 'collection_1']])
   })
 
   it('uses the injected Neon reader for the bounded creator collection list', async () => {
