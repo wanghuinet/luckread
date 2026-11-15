@@ -118,8 +118,11 @@ describe('W05 Neon notification push composition', () => {
     const endpointBinding = {
       connectionString: 'postgresql://user:secret@governance.example:5432/luckread_governance?sslmode=require',
     }
-    const pool = fakePool()
-    const poolFactory = vi.fn(() => pool)
+    const socialPool = fakePool()
+    const endpointPool = fakePool()
+    const poolFactory = vi.fn((config: PoolConfig) =>
+      config.connectionString === endpointBinding.connectionString ? endpointPool : socialPool,
+    )
     const env = {
       W05_DATABASE_DRIVER: 'neon',
       HYPERDRIVE_D1_02: socialBinding,
@@ -128,17 +131,18 @@ describe('W05 Neon notification push composition', () => {
     }
 
     expect(resolveW05PushEndpointDatabaseDriver(env)).toBe('neon')
-    expect(getW05PushEndpointPostgresDatabase(env, poolFactory)).toBe(pool)
+    expect(getW05PushEndpointPostgresDatabase(env, poolFactory)).toBe(endpointPool)
     const dependencies = getW05NotificationPushDeliveryDependencies(env, poolFactory)
 
     expect(dependencies.endpointAccessStore).toBeDefined()
     await expect(dependencies.endpointAccessStore?.listActiveForRecipient('recipient-1', 10))
       .resolves.toEqual([])
     expect(poolFactory).toHaveBeenCalledTimes(2)
-    expect(pool.query).toHaveBeenCalledWith(
+    expect(endpointPool.query).toHaveBeenCalledWith(
       expect.stringContaining('FROM notification_push_endpoints'),
       ['recipient-1', 10],
     )
+    expect(socialPool.query).not.toHaveBeenCalled()
   })
 
   it('fails closed when Neon is selected for D1-03 but its binding or database identity is invalid', () => {
