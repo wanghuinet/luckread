@@ -38,6 +38,7 @@ import { createPostgresNotificationPushSendResultStore } from '../notification-p
 import { createPostgresNotificationPushReceiptStore } from '../notification-push-receipt-store-postgres.js'
 import type { NotificationPushDeliveryRuntimeDependencies } from '../notification-push-delivery-runtime.js'
 import { createPostgresNotificationPushEndpointAccessStore } from '../notification-push-endpoint-access-store-postgres.js'
+import type { NotificationPushEndpointAccessStore } from '../notification-push-endpoint-access-store.js'
 import type { PushEndpointPostgresExecutor } from '../push-endpoint-runtime.js'
 
 export type W05SocialDatabaseDriver = 'd1' | 'neon'
@@ -54,6 +55,7 @@ type W05PoolFactory = (config: PoolConfig) => Pool
 const pools = new WeakMap<object, Pool>()
 const compositions = new WeakMap<object, W05SocialWorkerDependencies>()
 const pushCompositions = new WeakMap<object, NotificationPushDeliveryRuntimeDependencies>()
+const pushEndpointAccessStores = new WeakMap<object, NotificationPushEndpointAccessStore>()
 const EMPTY_DEPENDENCIES: W05SocialWorkerDependencies = Object.freeze({})
 const EMPTY_PUSH_DEPENDENCIES: NotificationPushDeliveryRuntimeDependencies = Object.freeze({})
 
@@ -297,36 +299,48 @@ export function getW05NotificationPushDeliveryDependencies(
   env: W05SocialRuntimeEnv,
   poolFactory: W05PoolFactory = (config) => new Pool(config),
 ): NotificationPushDeliveryRuntimeDependencies {
-  if (resolveW05SocialDatabaseDriver(env) === 'd1') return EMPTY_PUSH_DEPENDENCIES
+  let dependencies: NotificationPushDeliveryRuntimeDependencies = EMPTY_PUSH_DEPENDENCIES
 
-  const binding = env.HYPERDRIVE_D1_02
-  if (!binding || typeof binding !== 'object') {
-    throw new Error('W05_HYPERDRIVE_D1_02_BINDING_REQUIRED')
+  if (resolveW05SocialDatabaseDriver(env) === 'neon') {
+    const binding = env.HYPERDRIVE_D1_02
+    if (!binding || typeof binding !== 'object') {
+      throw new Error('W05_HYPERDRIVE_D1_02_BINDING_REQUIRED')
+    }
+
+    const cached = pushCompositions.get(binding)
+    if (cached) {
+      dependencies = cached
+    } else {
+      const connectionString = validateHyperdriveConnectionString(binding.connectionString)
+      const pool = getPool(binding, connectionString, poolFactory)
+      dependencies = {
+        fanoutStore: createPostgresNotificationPushFanoutStore(
+          asExecutor<Parameters<typeof createPostgresNotificationPushFanoutStore>[0]>(pool),
+        ),
+        deliveryClaimStore: createPostgresNotificationPushDeliveryClaimStore(
+          asExecutor<Parameters<typeof createPostgresNotificationPushDeliveryClaimStore>[0]>(pool),
+        ),
+        sendResultStore: createPostgresNotificationPushSendResultStore(
+          asExecutor<Parameters<typeof createPostgresNotificationPushSendResultStore>[0]>(pool),
+        ),
+        receiptStore: createPostgresNotificationPushReceiptStore(
+          asExecutor<Parameters<typeof createPostgresNotificationPushReceiptStore>[0]>(pool),
+        ),
+      }
+      pushCompositions.set(binding, dependencies)
+    }
   }
 
-  const cached = pushCompositions.get(binding)
-  if (cached) return cached
-
-  const connectionString = validateHyperdriveConnectionString(binding.connectionString)
-  const pool = getPool(binding, connectionString, poolFactory)
   const endpointDatabase = getW05PushEndpointPostgresDatabase(env, poolFactory)
-  const dependencies: NotificationPushDeliveryRuntimeDependencies = {
-    ...(endpointDatabase
-      ? { endpointAccessStore: createPostgresNotificationPushEndpointAccessStore(endpointDatabase) }
-      : {}),
-    fanoutStore: createPostgresNotificationPushFanoutStore(
-      asExecutor<Parameters<typeof createPostgresNotificationPushFanoutStore>[0]>(pool),
-    ),
-    deliveryClaimStore: createPostgresNotificationPushDeliveryClaimStore(
-      asExecutor<Parameters<typeof createPostgresNotificationPushDeliveryClaimStore>[0]>(pool),
-    ),
-    sendResultStore: createPostgresNotificationPushSendResultStore(
-      asExecutor<Parameters<typeof createPostgresNotificationPushSendResultStore>[0]>(pool),
-    ),
-    receiptStore: createPostgresNotificationPushReceiptStore(
-      asExecutor<Parameters<typeof createPostgresNotificationPushReceiptStore>[0]>(pool),
-    ),
+  if (endpointDatabase) {
+    const binding = env.HYPERDRIVE_D1_03!
+    let endpointAccessStore = pushEndpointAccessStores.get(binding)
+    if (!endpointAccessStore) {
+      endpointAccessStore = createPostgresNotificationPushEndpointAccessStore(endpointDatabase)
+      pushEndpointAccessStores.set(binding, endpointAccessStore)
+    }
+    return { ...dependencies, endpointAccessStore }
   }
-  pushCompositions.set(binding, dependencies)
+
   return dependencies
 }
