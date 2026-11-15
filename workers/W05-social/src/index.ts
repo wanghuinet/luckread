@@ -73,6 +73,7 @@ import type { NotificationPreferencesStore } from './notification-preferences-st
 import type { ProfilePinStore } from './profile-pin-store.js'
 import type { RepostStore } from './repost-store.js'
 import type { ShareStore } from './share-store.js'
+import type { PollConfigurationStore } from './poll-configuration-store.js'
 import type { PollReadStore } from './poll-read-store.js'
 import type { PollVoteStore } from './poll-vote-store.js'
 
@@ -306,7 +307,9 @@ export type W05SocialWorkerDependencies = Readonly<{
   repostStore?: RepostStore
   /** Optional PostgreSQL-capable idempotent Share link store; D1 remains the deployed default. */
   shareStore?: ShareStore
-  /** Optional PostgreSQL-capable poll reader for voting; D1 remains the deployed default. */
+  /** Optional PostgreSQL-capable poll configuration writer; D1 remains the deployed default. */
+  pollConfigurationStore?: PollConfigurationStore
+  /** Optional PostgreSQL-capable poll reader; D1 remains the deployed default. */
   pollReadStore?: PollReadStore
   /** Optional PostgreSQL-capable poll vote writer; D1 remains the deployed default. */
   pollVoteStore?: PollVoteStore
@@ -862,7 +865,16 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
             contentId,
             correlationId: request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '',
           })
-          const poll = await configureContentPoll(env.DB, actorUserId, contentId, raw.options, durationInput, contentContext)
+          const poll = await configureContentPoll(
+            env.DB,
+            actorUserId,
+            contentId,
+            raw.options,
+            durationInput,
+            contentContext,
+            dependencies.pollConfigurationStore,
+            dependencies.pollReadStore,
+          )
           return json({ data: { poll }, requestId: createRequestId() }, 200)
         }
         if (request.method === 'DELETE') {
