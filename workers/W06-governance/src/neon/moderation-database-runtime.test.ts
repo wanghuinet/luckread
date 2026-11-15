@@ -10,7 +10,7 @@ import {
 
 describe('W06 moderation database runtime admission', () => {
   it('selects the existing D1-03 Neon Hyperdrive and preserves D1 rollback plus existing bindings', () => {
-    const config = JSON.parse(readFileSync(new URL('../../wrangler.jsonc', import.meta.url), 'utf8'))
+    const config = JSON.parse(readFileSync(new URL('../../wrangler.neon.jsonc', import.meta.url), 'utf8'))
     const d1 = (config.d1_databases ?? []).find((binding: { binding?: string }) => binding.binding === 'D1_03')
     const hyperdrive = (config.hyperdrive ?? []).find((binding: { binding?: string }) => binding.binding === 'HYPERDRIVE_D1_03')
 

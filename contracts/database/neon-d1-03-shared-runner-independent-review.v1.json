@@ -6,7 +6,7 @@
   "status": "LOCAL_SHARED_SCHEMA_REVIEW_PASSED_REMOTE_APPLY_BLOCKED",
   "review": {
     "reviewKind": "AUTOMATED_INDEPENDENT_READ_ONLY_CODE_PATH_REVIEW",
-    "description": "A separate schema-only verifier reviews the D1-03 manifest, ownership/transport boundaries, source schema contracts, the retained W06 D1 rollback binding, W09/W10/W11 physical bindings and shared-runner local-only restrictions. W06's Neon runtime selector and Hyperdrive connection are governed by the separate W06 runtime deployment change. This review is not a remote-apply approval or production release.",
+    "description": "A separate verifier reviews the D1-03 manifest, ownership/transport boundaries, source schema contracts, W06/W09/W10 artifacts, runtime bindings and shared-runner local-only restrictions. This is not a remote-apply approval or production release.",
     "reviewedMainCommit": "4ed51dd2c105b38c15ca94fce496485facd83c58",
     "sharedExecutorPullRequest": 1660,
     "sharedExecutorHeadCommit": "5e8bfaf7bd26fe8669c08de1e062d998c4f4c6de",
@@ -72,6 +72,10 @@
       {
         "path": "contracts/transport/W05-W09-notification-push-delivery.v1.json",
         "gitBlobSha1": "0e0f9f92b6f6aee11e693e7501892f7527e49feb"
+      },
+      {
+        "path": "workers/W06-governance/wrangler.jsonc",
+        "gitBlobSha1": "2c4120ded4078feba776cad1c265c401647e47db"
       },
       {
         "path": "workers/W09-platform/wrangler.d1-03-migrations.jsonc",
