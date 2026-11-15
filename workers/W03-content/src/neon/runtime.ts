@@ -7,6 +7,7 @@ import {
 import type {
   FollowingOwnerContentsReadStore,
   ContentDetailReadStore,
+  CreatorContentsReadStore,
   PublishedContentsByIdsReadStore,
 } from '../content-runtime.js'
 import { createPostgresPublishedMediaReferenceReadStore } from '../published-media-reference-read-store-postgres.js'
@@ -27,6 +28,7 @@ import {
   createPostgresMembersReadStore,
 } from '../content-members-read-store-postgres.js'
 import { createPostgresContentDetailReadStore } from '../content-detail-read-store-postgres.js'
+import { createPostgresCreatorContentsReadStore } from '../creator-contents-read-store-postgres.js'
 import type {
   SeriesMembersReadStore,
 } from '../content-series-members.js'
@@ -52,6 +54,7 @@ const membersStores = new WeakMap<object, {
   collections: CollectionMembersReadStore
 }>()
 const contentDetailStores = new WeakMap<object, ContentDetailReadStore>()
+const creatorContentsStores = new WeakMap<object, CreatorContentsReadStore>()
 
 /**
  * The explicit D1-02 content read driver controls only the PostgreSQL read
@@ -308,5 +311,25 @@ export function getW03ContentDetailReadStore(
     getW03PublicMediaReferencePostgresPool(env),
   )
   contentDetailStores.set(binding, store)
+  return store
+}
+
+/** PostgreSQL provider for owner-scoped creator content lists with optional filters. */
+export function getW03CreatorContentsReadStore(
+  env: W03PublicMediaReferenceRuntimeEnv,
+): CreatorContentsReadStore | undefined {
+  if (resolveW03PublicMediaReferenceDriver(env) === 'd1') return undefined
+
+  const binding = env.HYPERDRIVE_D1_02
+  if (!binding || typeof binding !== 'object') {
+    throw new Error('W03_HYPERDRIVE_D1_02_BINDING_REQUIRED')
+  }
+  const cached = creatorContentsStores.get(binding)
+  if (cached) return cached
+
+  const store = createPostgresCreatorContentsReadStore(
+    getW03PublicMediaReferencePostgresPool(env),
+  )
+  creatorContentsStores.set(binding, store)
   return store
 }
