@@ -7,13 +7,18 @@ import {
   listRefundHistoryForCustomer,
 } from './billing-persistence.js';
 import { parseBoundedPositiveInt } from './subscription-runtime.js';
+import {
+  getW07PaymentWebhookDatabase,
+  type W07PaymentMethodReadRuntimeEnv,
+} from './neon/payment-method-read-runtime.js';
 
-type BillingReadEnv = Readonly<{ D1_04: D1Database }>;
+type BillingReadEnv = W07PaymentMethodReadRuntimeEnv & Readonly<{ D1_04: D1Database }>;
 
 type BillingReadDependencies = Readonly<{
   listBillingDocuments?: typeof listBillingDocumentsForCustomer;
   listPaymentHistory?: typeof listPaymentHistoryForCustomer;
   listRefundHistory?: typeof listRefundHistoryForCustomer;
+  getReadDatabase?: (env: BillingReadEnv) => D1Database | undefined;
 }>;
 
 const ROUTES = new Map<string, 'documents' | 'payments' | 'refunds'>([
@@ -77,11 +82,15 @@ export async function handleCommerceBillingReadRequest(
   }
 
   try {
+    // All D1-04 billing history reads share the selected database authority.
+    // The existing PostgreSQL D1 bridge reuses the same bounded Hyperdrive pool
+    // as signed provider webhooks; D1 remains the default and fallback.
+    const database = (dependencies.getReadDatabase ?? getW07PaymentWebhookDatabase)(env) ?? env.D1_04;
     const result = kind === 'documents'
-      ? await (dependencies.listBillingDocuments ?? listBillingDocumentsForCustomer)(env.D1_04, customerId, limit, cursor)
+      ? await (dependencies.listBillingDocuments ?? listBillingDocumentsForCustomer)(database, customerId, limit, cursor)
       : kind === 'payments'
-        ? await (dependencies.listPaymentHistory ?? listPaymentHistoryForCustomer)(env.D1_04, customerId, limit, cursor)
-        : await (dependencies.listRefundHistory ?? listRefundHistoryForCustomer)(env.D1_04, customerId, limit, cursor);
+        ? await (dependencies.listPaymentHistory ?? listPaymentHistoryForCustomer)(database, customerId, limit, cursor)
+        : await (dependencies.listRefundHistory ?? listRefundHistoryForCustomer)(database, customerId, limit, cursor);
     return Response.json(
       { data: result, requestId: 'req_' + crypto.randomUUID() },
       { status: 200, headers: { 'cache-control': 'no-store' } },
