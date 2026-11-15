@@ -101,35 +101,80 @@ jobs:
           # not part of this Worker deployment and must not invalidate the W06
           # source admission. Authority-sensitive W06 paths are checked below by
           # the source CI and physical binding assertions.
-      - name: Verify W06 physical binding configuration
+      - name: Verify W06 Neon D1-03 runtime and preserve existing topology
         working-directory: workers/W06-governance
         run: |
-          test -f wrangler.jsonc
-          node - <<'NODE'
-          const fs = require('fs')
-          const text = fs.readFileSync('wrangler.jsonc', 'utf8')
-          const required = [
-            '"name": "luckread-w06"',
-            '"binding": "D1_03"',
-            '"database_id": "bda1d247-a371-4244-91ae-aef96034db7f"'
-          ]
-          for (const value of required) {
-            if (!text.includes(value)) throw new Error(`Missing required binding assertion: ${value}`)
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs'
+          const config = JSON.parse(fs.readFileSync('wrangler.jsonc', 'utf8'))
+          const d1 = (config.d1_databases || []).find((item) => item.binding === 'D1_03')
+          const hyperdrive = (config.hyperdrive || []).find((item) => item.binding === 'HYPERDRIVE_D1_03')
+          const service = (config.services || []).find((item) => item.binding === 'W03_CONTENT_MODERATION')
+          const queue = (config.queues?.consumers || []).find((item) => item.queue === 'luckread-auth013-account-state')
+          const bootstrap = JSON.parse(fs.readFileSync('../../contracts/database/neon-five-domain-schema-bootstrap.v1.json', 'utf8'))
+          const d103 = (bootstrap.domains || []).find((item) => item.domainId === 'D1-03')
+          const w06Admission = d103?.schemaProgress?.W06
+
+          if (config.name !== 'luckread-w06' || config.main !== 'src/index.ts') {
+            throw new Error('W06 worker identity or entrypoint changed')
           }
+          if (config.vars?.W06_MODERATION_DATABASE_DRIVER !== 'neon') {
+            throw new Error('W06 must explicitly select Neon for its admitted D1-03 tables')
+          }
+          if (!d1 || d1.database_name !== 'secondary' ||
+              d1.database_id !== 'bda1d247-a371-4244-91ae-aef96034db7f') {
+            throw new Error('W06 existing D1-03 rollback binding must remain unchanged')
+          }
+          if (!hyperdrive || hyperdrive.id !== '7c8831416c18494faee04b96aa551cb9') {
+            throw new Error('W06 must reuse the existing D1-03 Hyperdrive resource')
+          }
+          if (!(config.compatibility_flags || []).includes('nodejs_compat')) {
+            throw new Error('W06 PostgreSQL runtime requires nodejs_compat')
+          }
+          if (!service || service.service !== 'luckread-w03') {
+            throw new Error('W06 W03_CONTENT_MODERATION Service Binding must remain unchanged')
+          }
+          if (!queue || queue.dead_letter_queue !== 'luckread-auth013-account-state-dlq') {
+            throw new Error('W06 AUTH013 Queue consumer and DLQ must remain unchanged')
+          }
+          if (d103?.databaseName !== 'luckread_governance' ||
+              w06Admission?.admittedSliceRemoteApplied !== true) {
+            throw new Error('W06 admitted D1-03 Neon schema must be remotely applied before deployment')
+          }
+          console.log('W06_NEON_D1_03_RUNTIME_CONFIG=PASS')
+          console.log('W06_D1_03_ROLLBACK_BINDING=PRESERVED')
+          console.log('W06_EXISTING_QUEUE_SERVICE_BINDINGS=PRESERVED')
+          console.log('W06_REMOTE_SCHEMA_ADMISSION=PASS')
           NODE
 
       - name: Install repository dependencies
         run: npm ci
 
+      - name: Install W06 PostgreSQL Worker runtime dependency
+        working-directory: workers/W06-governance
+        run: npm install --ignore-scripts --no-audit --no-fund --package-lock=false
+
       - name: TypeScript verification
         run: npx tsc --noEmit --target ES2022 --module ESNext --moduleResolution Bundler --strict --skipLibCheck --types @cloudflare/workers-types workers/W06-governance/src/index.ts
 
-      - name: Deploy W06 with pinned Wrangler
+      - name: Deploy W06 Neon runtime and promote the exact Worker version
         working-directory: workers/W06-governance
         env:
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        run: npx --yes wrangler@4.116.0 deploy --config wrangler.jsonc
+          CLOUDFLARE_ACCOUNT_ID: \${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: \${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4.156.0 deploy --config wrangler.jsonc 2>&1 | tee "$RUNNER_TEMP/w06-neon-deploy.log"
+          version_id="$(sed -n 's/.*Current Version ID: //p' "$RUNNER_TEMP/w06-neon-deploy.log" | tail -n 1)"
+          if [ -z "$version_id" ]; then
+            echo "Wrangler did not return a W06 Worker Version ID; refusing to report a deployment."
+            exit 1
+          fi
+          echo "W06_UPLOADED_VERSION_ID=$version_id" >> "$GITHUB_ENV"
+          echo "W06_UPLOADED_VERSION_ID=$version_id"
+          npx --yes wrangler@4.156.0 versions deploy "$version_id@100%" --name luckread-w06 --config wrangler.jsonc --yes
+          npx --yes wrangler@4.156.0 deployments list --name luckread-w06 --config wrangler.jsonc
 
       - name: Capture exact W06 deployment provenance
         run: |
@@ -141,9 +186,14 @@ jobs:
           run_attempt=$GITHUB_RUN_ATTEMPT
           source_sha=${{ inputs.source_sha }}
           worker=luckread-w06
-          d1_binding=D1_03
+          database_driver=neon
+          hyperdrive_binding=HYPERDRIVE_D1_03
+          hyperdrive_id=7c8831416c18494faee04b96aa551cb9
+          d1_rollback_binding=D1_03
           d1_database_uuid=bda1d247-a371-4244-91ae-aef96034db7f
-          wrangler_version=4.116.0
+          worker_version_id=$W06_UPLOADED_VERSION_ID
+          traffic_percent=100
+          wrangler_version=4.156.0
           deployed_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
           EOF
           cat artifacts/mapping-0/moderation-runtime-deployment/provenance.txt
