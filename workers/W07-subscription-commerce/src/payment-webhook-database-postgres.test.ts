@@ -46,16 +46,26 @@ describe('W07 PostgreSQL webhook D1 bridge', () => {
         payment_id: 'pay_12345678901234567890123456',
         amount_minor: '1499',
         refunded_minor: '199',
+        unit_amount_minor: '1200',
+        line_subtotal_minor: '1200',
+        line_discount_minor: '0',
+        line_tax_minor: '0',
+        line_total_minor: '1200',
         version: '3',
         created_at: createdAt,
       }],
     })
     const database = createPostgresWebhookD1Database(pool)
     const row = await database.prepare(
-      "SELECT payment_id, amount_minor, refunded_minor, version, created_at FROM payments WHERE payment_id = ? AND note = '?'",
+      "SELECT payment_id, amount_minor, refunded_minor, unit_amount_minor, line_subtotal_minor, line_discount_minor, line_tax_minor, line_total_minor, version, created_at FROM payments WHERE payment_id = ? AND note = '?'",
     ).bind('pay_12345678901234567890123456').first<{
       amount_minor: number
       refunded_minor: number
+      unit_amount_minor: number
+      line_subtotal_minor: number
+      line_discount_minor: number
+      line_tax_minor: number
+      line_total_minor: number
       version: number
       created_at: string
     }>()
@@ -65,6 +75,11 @@ describe('W07 PostgreSQL webhook D1 bridge', () => {
     expect(row).toMatchObject({
       amount_minor: 1499,
       refunded_minor: 199,
+      unit_amount_minor: 1200,
+      line_subtotal_minor: 1200,
+      line_discount_minor: 0,
+      line_tax_minor: 0,
+      line_total_minor: 1200,
       version: 3,
       created_at: '2026-11-15T12:00:00.123Z',
     })
