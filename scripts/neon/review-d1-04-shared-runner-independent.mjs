@@ -72,7 +72,7 @@ function reviewedPinnedSource(pin, source) {
   let normalized = source
   if (pin.path === paths.wrangler) {
     normalized = normalized.replace(
-      '  "compatibility_flags": ["nodejs_compat"],\n',
+      /  "compatibility_flags":\s*\[\s*"nodejs_compat"\s*\],\r?\n/,
       '',
     )
     normalized = normalized.replace(
