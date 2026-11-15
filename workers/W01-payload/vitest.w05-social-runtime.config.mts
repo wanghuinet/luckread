@@ -9,6 +9,7 @@ export default defineConfig({
       'src/poll-vote-neon-runtime.test.ts',
       'src/poll-configuration-neon-runtime.test.ts',
       'src/poll-delete-neon-runtime.test.ts',
+      'src/poll-read-neon-runtime.test.ts',
       'src/poll-runtime.test.ts',
       'src/poll-read-store-postgres.test.ts',
       'src/poll-vote-store-postgres.test.ts',

@@ -841,7 +841,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
               correlationId: request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '',
             })
           }
-          const poll = await getContentPoll(env.DB, contentId, viewerUserId, contentContext)
+          const poll = await getContentPoll(env.DB, contentId, viewerUserId, contentContext, dependencies.pollReadStore)
           return json({ data: { poll }, requestId: createRequestId() })
         }
         if (request.method === 'POST') {
