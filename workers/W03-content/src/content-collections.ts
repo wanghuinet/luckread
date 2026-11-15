@@ -32,6 +32,7 @@ export type CollectionListCursor = Readonly<{
 }>
 
 export interface CollectionListReadStore {
+  getCollection(ownerUserId: string, collectionId: string): Promise<CollectionRecord | null>
   listCreatorCollections(
     ownerUserId: string,
     cursor: CollectionListCursor | null,
@@ -364,9 +365,15 @@ export async function getCollection(
   db: ContentD1,
   principalUserId: string,
   collectionId: string,
+  readStore?: CollectionListReadStore,
 ): Promise<CollectionRecord> {
   assertResourceId(principalUserId)
   assertResourceId(collectionId)
+  if (readStore) {
+    const collection = await readStore.getCollection(principalUserId, collectionId)
+    if (!collection) throw new ContentRuntimeError('NOT_FOUND', 404)
+    return collection
+  }
   const row = await db.prepare(
     'SELECT id, owner_user_id, creator_id, state, version, title, description, ' +
     'cover_ref, etag, created_at, updated_at FROM content_collections WHERE id = ? AND owner_user_id = ?',

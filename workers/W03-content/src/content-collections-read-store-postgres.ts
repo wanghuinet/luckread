@@ -47,14 +47,28 @@ const toCollectionRecord = (row: CollectionListRow): CollectionRecord => ({
 })
 
 /**
- * PostgreSQL equivalent of the bounded creator-owned collection list.
- * Collection writes and single-item reads remain on D1 until their own slices
- * are admitted; cursor scope and encoding stay in content-collections.ts.
+ * PostgreSQL reader for creator-owned collection detail and bounded lists.
+ * Collection writes remain on D1; cursor scope and encoding stay in
+ * content-collections.ts.
  */
 export function createPostgresCollectionListReadStore(
   database: CollectionListPostgresQueryExecutor,
 ): CollectionListReadStore {
   return {
+    async getCollection(ownerUserId, collectionId): Promise<CollectionRecord | null> {
+      try {
+        const result = await database.query<CollectionListRow>(
+          'SELECT id, owner_user_id, creator_id, state, version, title, description, ' +
+          'cover_ref, etag, created_at, updated_at FROM content_collections ' +
+          'WHERE owner_user_id = $1 AND id = $2 LIMIT 1',
+          [ownerUserId, collectionId],
+        )
+        return result.rows[0] ? toCollectionRecord(result.rows[0]) : null
+      } catch {
+        throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
+      }
+    },
+
     async listCreatorCollections(
       ownerUserId: string,
       cursor: CollectionListCursor | null,

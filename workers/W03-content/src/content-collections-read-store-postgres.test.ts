@@ -2,7 +2,43 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { createPostgresCollectionListReadStore, type CollectionListPostgresQueryExecutor } from './content-collections-read-store-postgres.js'
 
-describe('PostgreSQL creator-collection list read store', () => {
+describe('PostgreSQL creator-collection read store', () => {
+  it('uses an owner-scoped parameterized detail query and maps timestamps', async () => {
+    const query = vi.fn(async (_sql: string, _values?: unknown[]) => ({
+      rows: [{
+        id: 'collection_1',
+        owner_user_id: 'user_1',
+        creator_id: 'user_1',
+        state: 'DRAFT' as const,
+        version: 3,
+        title: 'Collection 1',
+        description: 'description',
+        cover_ref: null,
+        etag: 'W/"3"',
+        created_at: new Date('2026-10-07T00:00:00.000Z'),
+        updated_at: new Date('2026-10-08T00:00:00.000Z'),
+      }],
+    }))
+    const store = createPostgresCollectionListReadStore({ query } as unknown as CollectionListPostgresQueryExecutor)
+
+    await expect(store.getCollection('user_1', 'collection_1')).resolves.toEqual({
+      id: 'collection_1',
+      ownerUserId: 'user_1',
+      creatorId: 'user_1',
+      state: 'DRAFT',
+      version: 3,
+      title: 'Collection 1',
+      description: 'description',
+      coverRef: null,
+      etag: 'W/"3"',
+      createdAt: '2026-10-07T00:00:00.000Z',
+      updatedAt: '2026-10-08T00:00:00.000Z',
+    })
+    expect(query).toHaveBeenCalledTimes(1)
+    expect(query.mock.calls[0]?.[0]).toContain('WHERE owner_user_id = $1 AND id = $2 LIMIT 1')
+    expect(query.mock.calls[0]?.[1]).toEqual(['user_1', 'collection_1'])
+  })
+
   it('uses owner-scoped keyset pagination and maps PostgreSQL timestamps', async () => {
     const query = vi.fn(async (_sql: string, _values?: unknown[]) => ({
       rows: [{
@@ -51,6 +87,12 @@ describe('PostgreSQL creator-collection list read store', () => {
       createdAt: '2026-10-07T00:00:00.000Z',
       updatedAt: '2026-10-08T00:00:00.000Z',
     }])
+  })
+
+  it('returns null for an absent owner-scoped detail record', async () => {
+    const query = vi.fn(async (_sql: string, _values?: unknown[]) => ({ rows: [] }))
+    const store = createPostgresCollectionListReadStore({ query } as unknown as CollectionListPostgresQueryExecutor)
+    await expect(store.getCollection('user_2', 'collection_1')).resolves.toBeNull()
   })
 
   it('rejects an invalid page size before querying', async () => {

@@ -926,7 +926,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
 
       if (path && path.collections && path.id && request.method === 'GET') {
         const principal = requiredCreatorPrincipal(request)
-        return json({ data: await getCollection(env.D1_02, principal.userId, path.id), schemaVersion: '1.0', requestId: createRequestId() })
+        return json({ data: await getCollection(env.D1_02, principal.userId, path.id, dependencies.collectionListReadStoreProvider?.(env)), schemaVersion: '1.0', requestId: createRequestId() })
       }
 
       if (path && path.collections && path.id && request.method === 'PATCH') {
