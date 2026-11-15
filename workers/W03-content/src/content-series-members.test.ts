@@ -102,6 +102,43 @@ describe('W03 series membership / ordering', () => {
     expect(prepareCalls).toBe(2)
   })
 
+  it('uses the injected Neon membership reader and preserves owner-scoped cursor output', async () => {
+    const member = {
+      relationshipId: 'rel_1',
+      seriesId: 'series_1',
+      contentId: 'content_1',
+      contentSlug: 'episode-1',
+      contentType: 'article' as const,
+      contentState: 'PUBLISHED',
+      title: 'Episode 1',
+      position: 1,
+      createdAt: '2026-10-07T00:00:00.000Z',
+      updatedAt: '2026-10-07T00:00:00.000Z',
+    }
+    const db = { prepare() { throw new Error('Neon reader must be used instead of D1') } } as never
+    const calls: unknown[][] = []
+    const readStore = {
+      async listSeriesMembers(ownerUserId: string, seriesId: string, cursor: { position: number; id: string } | null, limit: number) {
+        calls.push([ownerUserId, seriesId, cursor, limit])
+        return {
+          items: [member, { ...member, relationshipId: 'rel_2', position: 2 }],
+          seriesVersion: 9,
+          seriesEtag: 'W/"9"',
+        }
+      },
+    }
+
+    const result = await listSeriesMembers(db, 'user_1', 'series_1', null, 1, readStore)
+    expect(calls).toEqual([['user_1', 'series_1', null, 2]])
+    expect(result).toMatchObject({
+      items: [member],
+      hasMore: true,
+      seriesVersion: 9,
+      seriesEtag: 'W/"9"',
+    })
+    expect(result.nextCursor).toEqual(expect.any(String))
+  })
+
   it('keeps mutation runtime behind idempotency, optimistic concurrency and series scope', () => {
     const runtime = readFileSync(
       resolve(process.cwd(), 'workers/W03-content/src/content-series-members.ts'),

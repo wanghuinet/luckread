@@ -69,12 +69,14 @@ import {
   listSeriesMembers,
   removeSeriesMember,
   reorderSeriesMember,
+  type SeriesMembersReadStore,
 } from './content-series-members.js'
 import {
   attachCollectionMember,
   listCollectionMembers,
   removeCollectionMember,
   reorderCollectionMember,
+  type CollectionMembersReadStore,
 } from './content-collection-members.js'
 
 type RateLimitBinding = { limit(input: { key: string }): Promise<{ success: boolean }> }
@@ -371,6 +373,13 @@ export type W03ContentWorkerDependencies = Readonly<{
   collectionListReadStoreProvider?: (
     env: W03PublishedMediaReferenceRuntimeEnv,
   ) => CollectionListReadStore | undefined
+  /** Optional D1-02 provider for bounded series and collection member reads. */
+  membersReadStoreProvider?: (
+    env: W03PublishedMediaReferenceRuntimeEnv,
+  ) => {
+    series: SeriesMembersReadStore
+    collections: CollectionMembersReadStore
+  } | undefined
   /** Optional D1-02 provider for W01/W05 canonical content-context projections. */
   contentContextReadStoreProvider?: (
     env: W03PublishedMediaReferenceRuntimeEnv,
@@ -834,6 +843,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
           path.id,
           cursor,
           parseListLimit(url.searchParams.get('limit')),
+          dependencies.membersReadStoreProvider?.(env)?.collections,
         )
         return json({ data: page, schemaVersion: '1.0', requestId: createRequestId() })
       }
@@ -968,6 +978,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
           path.id,
           cursor,
           parseListLimit(url.searchParams.get('limit')),
+          dependencies.membersReadStoreProvider?.(env)?.series,
         )
         return json({ data: page, schemaVersion: '1.0', requestId: createRequestId() })
       }
