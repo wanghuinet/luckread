@@ -18,6 +18,28 @@ type PushEndpointRow = Readonly<{
   permission_status: string
 }>
 
+/** D1-03 scoped PostgreSQL executor; supplied from the dedicated Hyperdrive binding. */
+export interface PushEndpointPostgresExecutor {
+  query<Row extends Record<string, unknown> = Record<string, unknown>>(
+    sql: string,
+    values?: unknown[],
+  ): Promise<Readonly<{ rows: Row[] }>>
+}
+
+type PushEndpointDatabase = D1Database | PushEndpointPostgresExecutor
+
+function isPostgresExecutor(db: PushEndpointDatabase): db is PushEndpointPostgresExecutor {
+  return typeof (db as PushEndpointPostgresExecutor).query === 'function'
+}
+
+function isUniquePushTokenConflict(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false
+  if ('code' in error && error.code === '23505') return true
+  return error instanceof Error && error.message.includes(
+    'UNIQUE constraint failed: notification_push_endpoints.provider, notification_push_endpoints.push_token',
+  )
+}
+
 const MAX_USER_ID = 128
 const MAX_APP_VERSION = 64
 const MAX_PUSH_TOKEN = 512
@@ -103,13 +125,6 @@ const parseRegistration = (value: unknown): PushEndpointRegistrationInput => {
   }
 }
 
-const isUniquePushTokenConflict = (error: unknown): boolean => {
-  if (!(error instanceof Error)) return false
-  return error.message.includes(
-    'UNIQUE constraint failed: notification_push_endpoints.provider, notification_push_endpoints.push_token',
-  )
-}
-
 /**
  * W09 owns this D1-03 platform runtime entity. W05 is only the explicitly
  * delegated T14 writer for self-service Expo endpoint registration/deletion.
@@ -121,8 +136,10 @@ export async function upsertPushEndpoint(
   ownerUserIdValue: string,
   installationIdValue: string,
   rawInput: unknown,
+  postgres?: PushEndpointPostgresExecutor,
 ): Promise<Readonly<{ endpointId: string; status: 'ACTIVE' | 'DISABLED' }>> {
-  if (!db) throw new PushEndpointRuntimeError('SERVICE_UNAVAILABLE', 503)
+  if (!db && !postgres) throw new PushEndpointRuntimeError('SERVICE_UNAVAILABLE', 503)
+  const database: PushEndpointDatabase = postgres ?? db!
 
   const ownerUserId = validUserId(ownerUserIdValue)
   const installationId = validInstallationId(installationIdValue)
@@ -131,23 +148,7 @@ export async function upsertPushEndpoint(
   const endpointId = crypto.randomUUID()
 
   try {
-    const row = await db.prepare(
-      `INSERT INTO notification_push_endpoints
-         (endpoint_id, installation_id, owner_user_id, provider, platform, push_token,
-          permission_status, app_version, created_at, updated_at, last_seen_at)
-       VALUES (?, ?, ?, 'expo', ?, ?, ?, ?, ?, ?, ?)
-       ON CONFLICT(installation_id) DO UPDATE SET
-         owner_user_id = excluded.owner_user_id,
-         provider = excluded.provider,
-         platform = excluded.platform,
-         push_token = excluded.push_token,
-         permission_status = excluded.permission_status,
-         app_version = excluded.app_version,
-         updated_at = excluded.updated_at,
-         last_seen_at = excluded.last_seen_at
-       WHERE notification_push_endpoints.owner_user_id = excluded.owner_user_id
-       RETURNING endpoint_id, permission_status`,
-    ).bind(
+    const values = [
       endpointId,
       installationId,
       ownerUserId,
@@ -158,7 +159,43 @@ export async function upsertPushEndpoint(
       now,
       now,
       now,
-    ).first<PushEndpointRow>()
+    ]
+    const row = isPostgresExecutor(database)
+      ? (await database.query<PushEndpointRow>(
+          `INSERT INTO notification_push_endpoints
+             (endpoint_id, installation_id, owner_user_id, provider, platform, push_token,
+              permission_status, app_version, created_at, updated_at, last_seen_at)
+           VALUES ($1, $2, $3, 'expo', $4, $5, $6, $7, $8::timestamptz, $9::timestamptz, $10::timestamptz)
+           ON CONFLICT (installation_id) DO UPDATE SET
+             owner_user_id = EXCLUDED.owner_user_id,
+             provider = EXCLUDED.provider,
+             platform = EXCLUDED.platform,
+             push_token = EXCLUDED.push_token,
+             permission_status = EXCLUDED.permission_status,
+             app_version = EXCLUDED.app_version,
+             updated_at = EXCLUDED.updated_at,
+             last_seen_at = EXCLUDED.last_seen_at
+           WHERE notification_push_endpoints.owner_user_id = EXCLUDED.owner_user_id
+           RETURNING endpoint_id, permission_status`,
+          values,
+        )).rows[0] ?? null
+      : await database.prepare(
+          `INSERT INTO notification_push_endpoints
+             (endpoint_id, installation_id, owner_user_id, provider, platform, push_token,
+              permission_status, app_version, created_at, updated_at, last_seen_at)
+           VALUES (?, ?, ?, 'expo', ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(installation_id) DO UPDATE SET
+             owner_user_id = excluded.owner_user_id,
+             provider = excluded.provider,
+             platform = excluded.platform,
+             push_token = excluded.push_token,
+             permission_status = excluded.permission_status,
+             app_version = excluded.app_version,
+             updated_at = excluded.updated_at,
+             last_seen_at = excluded.last_seen_at
+           WHERE notification_push_endpoints.owner_user_id = excluded.owner_user_id
+           RETURNING endpoint_id, permission_status`,
+        ).bind(...values).first<PushEndpointRow>()
 
     if (!row?.endpoint_id) throw new PushEndpointRuntimeError('CONFLICT', 409)
     return {
@@ -178,15 +215,24 @@ export async function deletePushEndpoint(
   db: D1Database | undefined,
   ownerUserIdValue: string,
   installationIdValue: string,
+  postgres?: PushEndpointPostgresExecutor,
 ): Promise<void> {
-  if (!db) throw new PushEndpointRuntimeError('SERVICE_UNAVAILABLE', 503)
+  if (!db && !postgres) throw new PushEndpointRuntimeError('SERVICE_UNAVAILABLE', 503)
+  const database: PushEndpointDatabase = postgres ?? db!
   const ownerUserId = validUserId(ownerUserIdValue)
   const installationId = validInstallationId(installationIdValue)
 
   try {
-    await db.prepare(
-      'DELETE FROM notification_push_endpoints WHERE owner_user_id = ? AND installation_id = ?',
-    ).bind(ownerUserId, installationId).run()
+    if (isPostgresExecutor(database)) {
+      await database.query(
+        'DELETE FROM notification_push_endpoints WHERE owner_user_id = $1 AND installation_id = $2',
+        [ownerUserId, installationId],
+      )
+    } else {
+      await database.prepare(
+        'DELETE FROM notification_push_endpoints WHERE owner_user_id = ? AND installation_id = ?',
+      ).bind(ownerUserId, installationId).run()
+    }
   } catch {
     throw new PushEndpointRuntimeError('SERVICE_UNAVAILABLE', 503)
   }

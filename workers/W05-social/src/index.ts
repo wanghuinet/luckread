@@ -42,6 +42,7 @@ import {
   PushEndpointRuntimeError,
   deletePushEndpoint,
   upsertPushEndpoint,
+  type PushEndpointPostgresExecutor,
 } from './push-endpoint-runtime.js'
 import { castContentPollVote, configureContentPoll, deleteContentPoll, getContentPoll, SocialPollError } from './poll-runtime.js'
 import { CommentNotificationContextRuntimeError, getPublishedCommentNotificationContext } from './comment-notification-context-runtime.js'
@@ -86,6 +87,8 @@ interface Env {
   DB: D1Database
   W05_DATABASE_DRIVER?: string
   HYPERDRIVE_D1_02?: { connectionString?: string }
+  W05_PUSH_ENDPOINT_DATABASE_DRIVER?: string
+  HYPERDRIVE_D1_03?: { connectionString?: string }
   D1_03?: D1Database
   W03_CONTENT?: W03ContentBinding
   SOCIAL_READ_LIMITER?: RateLimitBinding
@@ -280,6 +283,8 @@ const parseProfileChannelPath = (pathname: string): { userId: string; kind: 'rep
 }
 
 export type W05SocialWorkerDependencies = Readonly<{
+  /** W09-owned D1-03 endpoint mutations use the separately scoped Neon connection when enabled. */
+  pushEndpointDatabase?: PushEndpointPostgresExecutor
   /** Optional internal adapter injection; D1 remains the deployed default. */
   followListReadStore?: FollowListReadStore
   /** Optional PostgreSQL-capable Follow/Unfollow writer; D1 remains the deployed default. */
@@ -735,11 +740,11 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
           try { body = await request.json() } catch {
             throw new PushEndpointRuntimeError('VALIDATION_FAILED', 422)
           }
-          const data = await upsertPushEndpoint(env.D1_03, actorUserId, installationId, body)
+          const data = await upsertPushEndpoint(env.D1_03, actorUserId, installationId, body, dependencies.pushEndpointDatabase)
           return json({ data, requestId: createRequestId() })
         }
         if (request.method === 'DELETE') {
-          await deletePushEndpoint(env.D1_03, actorUserId, installationId)
+          await deletePushEndpoint(env.D1_03, actorUserId, installationId, dependencies.pushEndpointDatabase)
           return new Response(null, { status: 204 })
         }
         return new Response(null, { status: 405, headers: { Allow: 'PUT, DELETE' } })

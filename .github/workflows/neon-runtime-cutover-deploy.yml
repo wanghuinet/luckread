@@ -26,7 +26,7 @@ jobs:
           ref: main
           fetch-depth: 1
 
-      - name: Validate W05 Neon D1-02 runtime and preserve D1 rollback bindings
+      - name: Validate W05 Neon D1-02 and delegated D1-03 runtimes while preserving D1 rollback bindings
         run: |
           set -euo pipefail
           node <<'NODE'
@@ -36,17 +36,25 @@ jobs:
           const d1 = (w05.d1_databases || []).find(x => x.binding === 'DB')
           const d103 = (w05.d1_databases || []).find(x => x.binding === 'D1_03')
           const hyperdrive = (w05.hyperdrive || []).find(x => x.binding === 'HYPERDRIVE_D1_02')
+          const governanceHyperdrive = (w05.hyperdrive || []).find(x => x.binding === 'HYPERDRIVE_D1_03')
           const domain = (bootstrap.domains || []).find(x => x.domainId === 'D1-02')
+          const governance = (bootstrap.domains || []).find(x => x.domainId === 'D1-03')
           if (w05.vars?.W05_DATABASE_DRIVER !== 'neon' ||
               w05.vars?.PUSH_DELIVERY_ENABLED !== 'false' ||
+              w05.vars?.W05_PUSH_ENDPOINT_DATABASE_DRIVER !== 'neon' ||
               !d1 || d1.database_id !== '6c342634-97f6-4248-9f4a-85772af4f22c' ||
               !d103 || d103.database_id !== 'bda1d247-a371-4244-91ae-aef96034db7f' ||
               !hyperdrive || hyperdrive.id !== 'c55183e1cc3446409c9c1075832c6615' ||
+              !governanceHyperdrive || governanceHyperdrive.id !== '7c8831416c18494faee04b96aa551cb9' ||
               domain?.databaseName !== 'luckreadpro' ||
-              domain?.remoteSchemaApplied !== true) {
-            throw new Error('W05 Neon selector, D1 rollback bindings or D1-02 schema admission drifted')
+              domain?.remoteSchemaApplied !== true ||
+              governance?.databaseName !== 'luckread_governance' ||
+              governance?.partialRemoteSchemaApplied !== true ||
+              governance?.schemaProgress?.W09?.admittedSliceRemoteApplied !== true ||
+              governance?.schemaProgress?.W09?.entities?.includes('NotificationPushEndpoint') !== true) {
+            throw new Error('W05 Neon selectors, D1 rollback bindings or D1-02/D1-03 schema admission drifted')
           }
-          console.log('W05_NEON_RUNTIME_CUTOVER_CONFIG=PASS')
+          console.log('W05_NEON_D1_02_AND_DELEGATED_D1_03_RUNTIME_CUTOVER_CONFIG=PASS')
           NODE
 
       - name: Setup Node 24
@@ -58,9 +66,20 @@ jobs:
         working-directory: workers/W05-social
         run: npm ci --ignore-scripts --no-audit --fund=false
 
-      - name: Deploy W05 Social on Neon D1-02
+      - name: Deploy and explicitly promote the W05 Neon version to 100 percent
         working-directory: workers/W05-social
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: npx --yes wrangler@4.116.0 deploy --config wrangler.jsonc
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4.156.0 deploy --config wrangler.jsonc 2>&1 | tee "$RUNNER_TEMP/w05-neon-deploy.log"
+          version_id="$(sed -n 's/.*Current Version ID: //p' "$RUNNER_TEMP/w05-neon-deploy.log" | tail -n 1)"
+          if [ -z "$version_id" ]; then
+            echo "Wrangler did not return a W05 Worker Version ID; refusing to report a deployment."
+            exit 1
+          fi
+          echo "W05_UPLOADED_VERSION_ID=$version_id"
+          npx --yes wrangler@4.156.0 versions deploy "$version_id@100%" --name luckread-w05 --config wrangler.jsonc --yes
+          npx --yes wrangler@4.156.0 deployments list --name luckread-w05 --config wrangler.jsonc

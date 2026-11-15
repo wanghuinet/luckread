@@ -1,5 +1,8 @@
 import { createW05SocialWorker } from './index.js'
-import { getW05SocialWorkerDependencies } from './neon/runtime.js'
+import {
+  getW05PushEndpointPostgresDatabase,
+  getW05SocialWorkerDependencies,
+} from './neon/runtime.js'
 import { NotificationPushWorkflow } from './notification-push-workflow.js'
 
 // Keep Cloudflare's virtual Workflow runtime module in the deploy entry only.
@@ -16,7 +19,10 @@ function getWorker(env: W05Env): W05Worker {
   const cached = workers.get(key)
   if (cached) return cached
 
-  const worker = createW05SocialWorker(getW05SocialWorkerDependencies(env))
+  const worker = createW05SocialWorker({
+    ...getW05SocialWorkerDependencies(env),
+    pushEndpointDatabase: getW05PushEndpointPostgresDatabase(env),
+  })
   workers.set(key, worker)
   return worker
 }
