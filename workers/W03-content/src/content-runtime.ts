@@ -133,6 +133,11 @@ export interface FollowingOwnerContentsReadStore {
   ): Promise<readonly ContentRow[]>
 }
 
+export interface ContentDetailReadStore {
+  /** Resolve published content by ID or slug, or unpublished content owned by the principal. */
+  getContent(contentIdOrSlug: string, principalUserId: string | null): Promise<ContentRow | null>
+}
+
 
 interface ContentRevisionRow {
   id: string
@@ -671,15 +676,18 @@ export async function getContent(
   contentId: string,
   principalUserId: string | null,
   resolveCreatorMembershipAccess?: CreatorMembershipAccessResolver,
+  readStore?: ContentDetailReadStore,
 ): Promise<ContentRecord> {
   assertContentReference(contentId)
-  const row = await db.prepare(
-    `SELECT id, content_type, owner_user_id, creator_id, ip_id, state, scheduled_at, access_mode, version, revision,
-            slug, title, body_ref, media_refs_json, cover_ref, media_warning, etag, created_at, updated_at
-       FROM contents
-      WHERE (id = ? OR slug = ?)
-        AND (state = 'PUBLISHED' OR owner_user_id = ?)`,
-  ).bind(contentId, contentId, principalUserId ?? '').first<ContentRow>()
+  const row = readStore
+    ? await readStore.getContent(contentId, principalUserId)
+    : await db.prepare(
+        `SELECT id, content_type, owner_user_id, creator_id, ip_id, state, scheduled_at, access_mode, version, revision,
+                slug, title, body_ref, media_refs_json, cover_ref, media_warning, etag, created_at, updated_at
+           FROM contents
+          WHERE (id = ? OR slug = ?)
+            AND (state = 'PUBLISHED' OR owner_user_id = ?)`,
+      ).bind(contentId, contentId, principalUserId ?? '').first<ContentRow>()
   if (!row) throw new ContentRuntimeError('NOT_FOUND', 404)
   const content = toContent(row)
   if (content.accessMode !== 'MEMBERS_ONLY' ||

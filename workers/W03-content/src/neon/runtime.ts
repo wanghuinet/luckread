@@ -6,6 +6,7 @@ import {
 } from '../published-media-reference-read-store.js'
 import type {
   FollowingOwnerContentsReadStore,
+  ContentDetailReadStore,
   PublishedContentsByIdsReadStore,
 } from '../content-runtime.js'
 import { createPostgresPublishedMediaReferenceReadStore } from '../published-media-reference-read-store-postgres.js'
@@ -25,6 +26,7 @@ import type { SeriesReadStore } from '../content-series.js'
 import {
   createPostgresMembersReadStore,
 } from '../content-members-read-store-postgres.js'
+import { createPostgresContentDetailReadStore } from '../content-detail-read-store-postgres.js'
 import type {
   SeriesMembersReadStore,
 } from '../content-series-members.js'
@@ -49,14 +51,16 @@ const membersStores = new WeakMap<object, {
   series: SeriesMembersReadStore
   collections: CollectionMembersReadStore
 }>()
+const contentDetailStores = new WeakMap<object, ContentDetailReadStore>()
 
 /**
  * The explicit D1-02 content read driver controls only the PostgreSQL read
  * projections wired from the W03 entrypoint: public media references, bookmark
  * batch projection, W04-authorized following-feed content, native post-thread
- * projection, canonical content context, creator-owned series and collection
- * reads, and the series/collection membership lists. Other W03 reads and every
- * W03 mutation remain on D1_02. D1 is the safe default and unknown values fail closed.
+ * projection, canonical content context and detail reads, creator-owned
+ * series and collection reads, and the series/collection membership lists.
+ * Other W03 reads and every W03 mutation remain on D1_02. D1 is the safe default
+ * and unknown values fail closed.
  */
 export function resolveW03PublicMediaReferenceDriver(
   env: W03PublicMediaReferenceRuntimeEnv,
@@ -284,5 +288,25 @@ export function getW03MembersReadStore(
     getW03PublicMediaReferencePostgresPool(env),
   )
   membersStores.set(binding, store)
+  return store
+}
+
+/** PostgreSQL provider for canonical content detail reads; W07 checks stay in W03. */
+export function getW03ContentDetailReadStore(
+  env: W03PublicMediaReferenceRuntimeEnv,
+): ContentDetailReadStore | undefined {
+  if (resolveW03PublicMediaReferenceDriver(env) === 'd1') return undefined
+
+  const binding = env.HYPERDRIVE_D1_02
+  if (!binding || typeof binding !== 'object') {
+    throw new Error('W03_HYPERDRIVE_D1_02_BINDING_REQUIRED')
+  }
+  const cached = contentDetailStores.get(binding)
+  if (cached) return cached
+
+  const store = createPostgresContentDetailReadStore(
+    getW03PublicMediaReferencePostgresPool(env),
+  )
+  contentDetailStores.set(binding, store)
   return store
 }
