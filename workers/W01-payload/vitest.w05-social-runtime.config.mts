@@ -7,6 +7,7 @@ export default defineConfig({
     include: [
       'src/neon/runtime.test.ts',
       'src/poll-vote-neon-runtime.test.ts',
+      'src/poll-configuration-neon-runtime.test.ts',
       'src/poll-runtime.test.ts',
       'src/poll-read-store-postgres.test.ts',
       'src/poll-vote-store-postgres.test.ts',
