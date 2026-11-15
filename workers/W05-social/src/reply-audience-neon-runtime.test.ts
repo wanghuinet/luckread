@@ -1,7 +1,11 @@
 /// <reference types="@cloudflare/workers-types" />
 import { describe, expect, it, vi } from 'vitest'
 import { createW05SocialWorker } from './index.js'
-import type { ReplyAudienceStore, StoredReplyAudiencePolicy } from './reply-audience-store.js'
+import type {
+  ReplyAudienceStore,
+  StoredReplyAudiencePolicy,
+  WriteReplyAudiencePolicy,
+} from './reply-audience-store.js'
 
 const headers = {
   'X-LuckRead-Caller': 'W01',
@@ -21,9 +25,9 @@ describe('W05 reply-audience Neon HTTP runtime', () => {
       updatedAt: '2026-11-15T00:00:00.000Z',
     }
     const store: ReplyAudienceStore = {
-      get: vi.fn(async (contentId, ownerUserId) =>
+      get: vi.fn(async (contentId: string, ownerUserId: string) =>
         contentId === saved.contentId && ownerUserId === saved.ownerUserId ? saved : null),
-      set: vi.fn(async (input) => {
+      set: vi.fn(async (input: WriteReplyAudiencePolicy) => {
         saved = {
           contentId: input.contentId,
           ownerUserId: input.ownerUserId,
