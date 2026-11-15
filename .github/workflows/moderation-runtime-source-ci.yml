@@ -124,7 +124,28 @@ jobs:
           const w06m = w06.services?.find(x => x.binding === 'W03_CONTENT_MODERATION');
           if (!w01m || w01m.service !== 'luckread-w06') throw new Error('W01 W06_MODERATION binding mismatch');
           if (!w06m || w06m.service !== 'luckread-w03') throw new Error('W06 W03_CONTENT_MODERATION binding mismatch');
-          if (!w06.d1_databases?.some(x => x.binding === 'D1_03' && x.database_id === 'bda1d247-a371-4244-91ae-aef96034db7f')) throw new Error('W06 D1-03 binding mismatch');
+          if (!w06.d1_databases?.some(x => x.binding === 'D1_03' && x.database_id === 'bda1d247-a371-4244-91ae-aef96034db7f')) throw new Error('W06 D1-03 rollback binding mismatch');
+          if (w06.vars?.W06_MODERATION_DATABASE_DRIVER !== 'neon') throw new Error('W06 moderation runtime must select Neon');
+          if (!w06.hyperdrive?.some(x => x.binding === 'HYPERDRIVE_D1_03' && x.id === '7c8831416c18494faee04b96aa551cb9')) throw new Error('W06 D1-03 Hyperdrive binding mismatch');
+          if (!w06.compatibility_flags?.includes('nodejs_compat')) throw new Error('W06 nodejs_compat is required for pg runtime');
+                    const bootstrap = JSON.parse(fs.readFileSync('contracts/database/neon-five-domain-schema-bootstrap.v1.json','utf8'));
+          const governance = (bootstrap.domains || []).find(x => x.domainId === 'D1-03');
+          const w06Progress = governance?.schemaProgress?.W06;
+          const w09Progress = governance?.schemaProgress?.W09;
+          const requiredW06Tables = [
+            'moderation_cases', 'moderation_decisions', 'moderation_decision_idempotency',
+            'moderation_txn_guard', 'moderation_enforcement_outbox', 'moderation_reports',
+            'moderation_report_idempotency'
+          ];
+          if (governance?.databaseName !== 'luckread_governance' ||
+              governance?.partialRemoteSchemaApplied !== true ||
+              w06Progress?.admittedSliceRemoteApplied !== true ||
+              !requiredW06Tables.every(table => w06Progress?.implementedTables?.includes(table)) ||
+              w06Progress?.pendingEntities?.includes('Appeal') !== true ||
+              w09Progress?.admittedSliceRemoteApplied !== true ||
+              w09Progress?.entities?.includes('AuditEvent') !== true) {
+            throw new Error('D1-03 W06/W09 admitted schema evidence drifted or Appeal scope was changed');
+          }
           if (!w03.d1_databases?.some(x => x.binding === 'D1_02' && x.database_id === '6c342634-97f6-4248-9f4a-85772af4f22c')) throw new Error('W03 D1-02 binding mismatch');
-          console.log('MODERATION_TOPOLOGY=PASS');
+          console.log('MODERATION_TOPOLOGY_AND_W06_NEON_ADMISSION=PASS');
           NODE
