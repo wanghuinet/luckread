@@ -134,7 +134,7 @@ describe('W06 PostgreSQL moderation D1 bridge', () => {
     const pool: W06ModerationPostgresPool = {
       async query<Row extends Record<string, unknown> = Record<string, unknown>>(sql: string, values?: unknown[]) {
         return {
-          rows: [{ created_at: new Date('2026-11-15T12:00:00.123Z'), actor_json: { actorId: 'user_1', actorType: 'user' } }] as Row[],
+          rows: [{ created_at: new Date('2026-11-15T12:00:00.123Z'), eventid: 'evt_1', actorjson: { actorId: 'user_1', actorType: 'user' } }] as Row[],
           rowCount: 1,
         }
       },
@@ -145,9 +145,10 @@ describe('W06 PostgreSQL moderation D1 bridge', () => {
     const row = await createPostgresModerationD1Database(pool)
       .prepare('SELECT created_at, actor_json FROM audit_events WHERE event_id = ?')
       .bind('event_1')
-      .first<{ created_at: string; actor_json: string }>()
+      .first<{ created_at: string; eventId: string; actorJson: string }>()
 
     expect(row?.created_at).toBe('2026-11-15T12:00:00.123Z')
-    expect(row?.actor_json).toBe(JSON.stringify({ actorId: 'user_1', actorType: 'user' }))
+    expect(row?.eventId).toBe('evt_1')
+    expect(row?.actorJson).toBe(JSON.stringify({ actorId: 'user_1', actorType: 'user' }))
   })
 })
