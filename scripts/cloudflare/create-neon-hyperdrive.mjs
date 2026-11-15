@@ -9,6 +9,7 @@ export const HYPERDRIVE_TARGETS = Object.freeze([
 ])
 export const HYPERDRIVE_CONFIG_NAME = HYPERDRIVE_TARGETS[0].configName
 export const HYPERDRIVE_DATABASE_NAME = HYPERDRIVE_TARGETS[0].database
+export const D1_03_HYPERDRIVE_TARGET = HYPERDRIVE_TARGETS[2]
 
 const API_BASE = 'https://api.cloudflare.com/client/v4'
 
@@ -218,6 +219,13 @@ export async function ensureD1_01Hyperdrive(options) {
   })
 }
 
+export async function ensureD1_03Hyperdrive(options) {
+  return ensureHyperdriveConfig({
+    ...options,
+    target: D1_03_HYPERDRIVE_TARGET,
+  })
+}
+
 export async function ensureAllFiveNeonHyperdrive({
   accountId,
   apiToken,
@@ -257,17 +265,23 @@ export async function ensureAllFiveNeonHyperdrive({
 }
 
 async function main() {
-  const allowedTargets = [
+  const allowedDispatchTargets = [
     'CREATE_D1_01_NEON_HYPERDRIVE',
+    'CREATE_D1_03_NEON_HYPERDRIVE',
     'CREATE_ALL_FIVE_NEON_HYPERDRIVE',
   ]
+  const confirmedDispatch =
+    process.env.GITHUB_EVENT_NAME === 'workflow_dispatch' &&
+    allowedDispatchTargets.includes(process.env.CONFIRM_TARGET)
+  const confirmedD103ProvisioningPush =
+    process.env.GITHUB_EVENT_NAME === 'push' &&
+    process.env.CONFIRM_TARGET === 'CREATE_D1_03_NEON_HYPERDRIVE'
   if (
     process.env.GITHUB_ACTIONS !== 'true' ||
-    process.env.GITHUB_EVENT_NAME !== 'workflow_dispatch' ||
     process.env.GITHUB_REF !== 'refs/heads/main' ||
-    !allowedTargets.includes(process.env.CONFIRM_TARGET)
+    !(confirmedDispatch || confirmedD103ProvisioningPush)
   ) {
-    throw new Error('Hyperdrive provisioning is restricted to a confirmed workflow_dispatch on main')
+    throw new Error('Hyperdrive provisioning is restricted to an explicitly confirmed main workflow')
   }
 
   let results
@@ -278,6 +292,17 @@ async function main() {
       connectionString: process.env.NEON_DATABASE_URL_LUCKREAD,
     })
     results = [{ domainId: 'D1-01', database: 'luckread', ...result }]
+  } else if (process.env.CONFIRM_TARGET === 'CREATE_D1_03_NEON_HYPERDRIVE') {
+    const result = await ensureD1_03Hyperdrive({
+      accountId: process.env.CF_ACCOUNT_ID,
+      apiToken: process.env.CF_API_TOKEN,
+      connectionString: process.env.NEON_DATABASE_URL_GOVERNANCE,
+    })
+    results = [{
+      domainId: D1_03_HYPERDRIVE_TARGET.domainId,
+      database: D1_03_HYPERDRIVE_TARGET.database,
+      ...result,
+    }]
   } else {
     results = await ensureAllFiveNeonHyperdrive({
       accountId: process.env.CF_ACCOUNT_ID,
@@ -298,6 +323,9 @@ async function main() {
       `hyperdrive_summary<<HYPERDRIVE_SUMMARY\n${summary}\nHYPERDRIVE_SUMMARY\n`,
       'utf8',
     )
+    if (results.length === 1) {
+      await appendFile(process.env.GITHUB_OUTPUT, `hyperdrive_id=${results[0].id}\n`, 'utf8')
+    }
   }
 
   console.log(summary)
