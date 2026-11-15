@@ -66,14 +66,14 @@ describe('W05 notification push endpoint runtime', () => {
     const prepare = vi.fn()
     const db = { prepare } as unknown as D1Database
 
-    await expect(upsertPushEndpoint(undefined, 'identity-user-1', installationId, {
+    await expect(upsertPushEndpoint(db, 'identity-user-1', installationId, {
       ownerUserId: 'attacker',
       platform: 'ios',
       permissionStatus: 'granted',
       expoPushToken: pushToken,
     })).rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 422 })
 
-    await expect(upsertPushEndpoint(undefined, 'identity-user-1', installationId, {
+    await expect(upsertPushEndpoint(db, 'identity-user-1', installationId, {
       platform: 'ios',
       permissionStatus: 'granted',
       expoPushToken: 'not-an-expo-token',
@@ -137,7 +137,7 @@ describe('W05 notification push endpoint runtime', () => {
       }),
     } as unknown as D1Database
 
-    await expect(deletePushEndpoint(undefined, 'identity-user-1', installationId, db)).resolves.toBeUndefined()
+    await expect(deletePushEndpoint(db, 'identity-user-1', installationId)).resolves.toBeUndefined()
     expect(sql).toBe('DELETE FROM notification_push_endpoints WHERE owner_user_id = ? AND installation_id = ?')
     expect(bindings).toEqual(['identity-user-1', installationId])
   })
@@ -148,7 +148,7 @@ describe('W05 notification push endpoint runtime', () => {
     }))
     const db = { query } as never
 
-    await expect(upsertPushEndpoint(db, 'identity-user-1', installationId, {
+    await expect(upsertPushEndpoint(undefined, 'identity-user-1', installationId, {
       platform: 'ios',
       permissionStatus: 'granted',
       expoPushToken: pushToken,
@@ -181,7 +181,7 @@ describe('W05 notification push endpoint runtime', () => {
       },
     } as never
 
-    await expect(upsertPushEndpoint(db, 'identity-user-1', installationId, {
+    await expect(upsertPushEndpoint(undefined, 'identity-user-1', installationId, {
       platform: 'ios',
       permissionStatus: 'granted',
       expoPushToken: pushToken,
@@ -196,7 +196,7 @@ describe('W05 notification push endpoint runtime', () => {
     const query = vi.fn(async (_sql: string, _values?: unknown[]) => ({ rows: [] }))
     const db = { query } as never
 
-    await expect(deletePushEndpoint(db, 'identity-user-1', installationId)).resolves.toBeUndefined()
+    await expect(deletePushEndpoint(undefined, 'identity-user-1', installationId, db)).resolves.toBeUndefined()
     expect(query).toHaveBeenCalledOnce()
     expect(query.mock.calls[0]?.[0]).toBe(
       'DELETE FROM notification_push_endpoints WHERE owner_user_id = $1 AND installation_id = $2',
