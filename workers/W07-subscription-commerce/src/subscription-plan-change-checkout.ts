@@ -7,8 +7,14 @@ import {
   OrderPersistenceError,
   type AuthoritativelyPricedOrder,
   type CommerceOrderData,
+  type OrderCreatePersistenceStore,
 } from './order-persistence.js';
 import { issueInvoiceForOrder } from './billing-persistence.js';
+import {
+  getW07OrderCreatePersistenceStore,
+  getW07SelectedD104Database,
+  type W07PaymentMethodReadRuntimeEnv,
+} from './neon/payment-method-read-runtime.js';
 import {
   etagForVersion,
   SubscriptionRuntimeError,
@@ -80,7 +86,7 @@ export type SubscriptionPlanUpgradeCheckoutResult = Readonly<{
   replayed: boolean;
 }>;
 
-export type SubscriptionPlanUpgradeCheckoutEnv = Readonly<{
+export type SubscriptionPlanUpgradeCheckoutEnv = W07PaymentMethodReadRuntimeEnv & Readonly<{
   D1_01: D1Database;
   D1_04: D1Database;
 }>;
@@ -91,6 +97,8 @@ export type SubscriptionPlanUpgradeCheckoutDependencies = Readonly<{
   createOrder?: typeof createCommerceOrder;
   getOrder?: typeof getCommerceOrder;
   issueInvoice?: typeof issueInvoiceForOrder;
+  getDatabase?: (env: SubscriptionPlanUpgradeCheckoutEnv) => D1Database;
+  getOrderCreateStore?: (env: SubscriptionPlanUpgradeCheckoutEnv) => OrderCreatePersistenceStore | undefined;
 }>;
 
 const PLAN_ID_PATTERN = /^plan_[a-f0-9]{64}$/;
@@ -280,14 +288,16 @@ async function createOrReadOrder(
   replayed: boolean,
 ): Promise<SubscriptionPlanUpgradeCheckoutResult> {
   const attempt = toAttempt(row);
+  const database = (dependencies.getDatabase ?? getW07SelectedD104Database)(env);
+  const orderCreateStore = (dependencies.getOrderCreateStore ?? getW07OrderCreatePersistenceStore)(env);
   let order: CommerceOrderData;
   try {
     if (row.order_id) {
-      order = await (dependencies.getOrder ?? getCommerceOrder)(env.D1_04, subscriberId, row.order_id);
+      order = await (dependencies.getOrder ?? getCommerceOrder)(database, subscriberId, row.order_id);
     } else {
       const orderKey = 'plan-upgrade-' + row.attempt_id;
       const created = await (dependencies.createOrder ?? createCommerceOrder)(
-        env.D1_04,
+        orderCreateStore ?? database,
         subscriberId,
         orderKey,
         { items: [{ itemRef: row.target_plan_id, quantity: 1 }] },
@@ -319,7 +329,7 @@ async function createOrReadOrder(
     }
 
     const issueInvoice = dependencies.issueInvoice ?? issueInvoiceForOrder;
-    await issueInvoice(env.D1_04, subscriberId, order.orderId);
+    await issueInvoice(database, subscriberId, order.orderId);
   } catch (error) {
     if (error instanceof SubscriptionRuntimeError) throw error;
     if (error instanceof OrderPersistenceError) {
@@ -351,6 +361,7 @@ export async function createSubscriptionPlanUpgradeCheckout(
   ifMatchInput: string | null,
   dependencies: SubscriptionPlanUpgradeCheckoutDependencies,
 ): Promise<SubscriptionPlanUpgradeCheckoutResult> {
+  env = { ...env, D1_04: (dependencies.getDatabase ?? getW07SelectedD104Database)(env) };
   const subscriberId = validatePrincipal(subscriberIdInput);
   const subscriptionId = subscriptionIdInput.trim();
   if (!isBoundedText(subscriptionId)) throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400);
@@ -525,12 +536,13 @@ export async function expirePendingSubscriptionPlanUpgradeForPayment(
   paymentId: string,
   merchantId: string,
 ): Promise<void> {
+  const database = getW07SelectedD104Database(env);
   if (!/^pay_[A-Za-z0-9]{26}$/.test(paymentId) || !isBoundedText(merchantId)) {
     throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400);
   }
   let payment: { order_id: string; status: string } | null;
   try {
-    payment = await env.D1_04.prepare(
+    payment = await database.prepare(
       "SELECT order_id, status FROM payments WHERE provider = 'hyperswitch' AND merchant_id = ? AND payment_id = ? LIMIT 1",
     ).bind(merchantId, paymentId).first<{ order_id: string; status: string }>();
   } catch {
@@ -540,7 +552,7 @@ export async function expirePendingSubscriptionPlanUpgradeForPayment(
       !['failed', 'cancelled', 'expired'].includes(payment.status)) return;
   let lines: { item_snapshot_json: string }[]
   try {
-    const result = await env.D1_04.prepare(
+    const result = await database.prepare(
       "SELECT item_snapshot_json FROM order_lines WHERE order_id = ? AND item_type = 'MEMBERSHIP_PLAN' LIMIT 2",
     ).bind(payment.order_id).all<{ item_snapshot_json: string }>()
     lines = result.results ?? []

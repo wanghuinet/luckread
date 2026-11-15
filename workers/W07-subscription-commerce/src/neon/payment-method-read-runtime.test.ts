@@ -2,8 +2,10 @@ import { describe, expect, it, vi } from 'vitest'
 import type { Pool } from 'pg'
 
 import {
+  getW07OrderCreatePersistenceStore,
   getW07PaymentMethodReadStore,
   getW07PaymentWebhookDatabase,
+  getW07SelectedD104Database,
   resolveW07DatabaseDriver,
 } from './payment-method-read-runtime.js'
 
@@ -45,6 +47,11 @@ describe('W07 payment-method Neon read runtime', () => {
     const second = getW07PaymentMethodReadStore(env, poolFactory)
     const webhookDatabase = getW07PaymentWebhookDatabase(env, poolFactory)
     const secondWebhookDatabase = getW07PaymentWebhookDatabase(env, poolFactory)
+    const orderCreateStore = getW07OrderCreatePersistenceStore(env, poolFactory)
+    const secondOrderCreateStore = getW07OrderCreatePersistenceStore(env, poolFactory)
+    expect(getW07SelectedD104Database({ ...env, D1_04: {} as D1Database }, poolFactory)).toBe(webhookDatabase)
+    expect(orderCreateStore).toBeDefined()
+    expect(orderCreateStore).toBe(secondOrderCreateStore)
     expect(first).toBeDefined()
     expect(first).toBe(second)
     expect(webhookDatabase).toBeDefined()

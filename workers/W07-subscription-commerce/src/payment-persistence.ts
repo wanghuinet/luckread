@@ -400,8 +400,10 @@ export async function createPaymentAttempt(
   try {
     order = await db.prepare(
       'SELECT order_id, customer_id, status, currency, total_minor, ' +
-      "CASE WHEN EXISTS (SELECT 1 FROM order_lines AS demo_lines WHERE demo_lines.order_id = orders.order_id " +
-      "AND json_valid(demo_lines.item_snapshot_json) AND json_extract(demo_lines.item_snapshot_json, '$.luckreadPricing.mode') = 'demo') " +
+      "CASE WHEN EXISTS (SELECT 1 FROM order_lines AS demo_lines WHERE demo_lines.order_id = orders.order_id AND " +
+      (dependencies.databaseDialect === 'postgres'
+        ? "(demo_lines.item_snapshot_json::jsonb #>> '{luckreadPricing,mode}') = 'demo') "
+        : "json_valid(demo_lines.item_snapshot_json) AND json_extract(demo_lines.item_snapshot_json, '$.luckreadPricing.mode') = 'demo') ") +
       'THEN 1 ELSE 0 END AS has_demo_pricing ' +
       'FROM orders WHERE order_id = ? AND customer_id = ? LIMIT 1',
     ).bind(orderIdInput, customerIdInput).first<OrderRow>();

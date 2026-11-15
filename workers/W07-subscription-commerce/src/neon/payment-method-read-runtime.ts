@@ -4,6 +4,8 @@ import {
   PaymentMethodRuntimeError,
 } from '../payment-method-runtime.js'
 import { createPostgresPaymentMethodReadStore } from '../payment-method-read-store-postgres.js'
+import { createPostgresOrderCreateStore, type OrderPersistencePostgresPool } from '../order-create-store-postgres.js'
+import type { OrderCreatePersistenceStore } from '../order-persistence.js'
 import type { PaymentMethodReadStore } from '../payment-method-read-store.js'
 import { createPostgresWebhookD1Database } from '../payment-webhook-database-postgres.js'
 import type { W07WebhookPostgresPool } from '../payment-webhook-database-postgres.js'
@@ -18,6 +20,7 @@ type W07PoolFactory = (config: PoolConfig) => Pool
 const pools = new WeakMap<object, Pool>()
 const stores = new WeakMap<object, PaymentMethodReadStore>()
 const webhookDatabases = new WeakMap<object, D1Database>()
+const orderCreateStores = new WeakMap<object, OrderCreatePersistenceStore>()
 
 export function resolveW07DatabaseDriver(
   env: W07PaymentMethodReadRuntimeEnv,
@@ -127,4 +130,32 @@ export function getW07PaymentWebhookDatabase(
   const database = createPostgresWebhookD1Database(pool as unknown as W07WebhookPostgresPool)
   webhookDatabases.set(binding, database)
   return database
+}
+
+
+/** Resolve the one selected D1-04 finance database for W07 business paths. */
+export function getW07SelectedD104Database(
+  env: W07PaymentMethodReadRuntimeEnv & Readonly<{ D1_04: D1Database }>,
+  poolFactory: W07PoolFactory = (config) => new Pool(config),
+): D1Database {
+  return getW07PaymentWebhookDatabase(env, poolFactory) ?? env.D1_04
+}
+
+/** Reuse the existing atomic order-create adapter over the shared bounded Hyperdrive pool. */
+export function getW07OrderCreatePersistenceStore(
+  env: W07PaymentMethodReadRuntimeEnv,
+  poolFactory: W07PoolFactory = (config) => new Pool(config),
+): OrderCreatePersistenceStore | undefined {
+  if (resolveW07DatabaseDriver(env) === 'd1') return undefined
+  const binding = env.HYPERDRIVE_D1_04
+  if (!binding || typeof binding !== 'object') {
+    throw new PaymentMethodRuntimeError('SERVICE_UNAVAILABLE', 503)
+  }
+  const cached = orderCreateStores.get(binding)
+  if (cached) return cached
+  const pool = getW07PostgresPool(env, poolFactory)
+  if (!pool) throw new PaymentMethodRuntimeError('SERVICE_UNAVAILABLE', 503)
+  const store = createPostgresOrderCreateStore(pool as unknown as OrderPersistencePostgresPool)
+  orderCreateStores.set(binding, store)
+  return store
 }

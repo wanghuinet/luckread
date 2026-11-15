@@ -16,8 +16,12 @@ import {
   type RefundDto,
   type RefundReservation,
 } from './refund-persistence.js';
+import {
+  getW07SelectedD104Database,
+  type W07PaymentMethodReadRuntimeEnv,
+} from './neon/payment-method-read-runtime.js';
 
-type RefundRuntimeEnv = Readonly<{
+type RefundRuntimeEnv = W07PaymentMethodReadRuntimeEnv & Readonly<{
   D1_04: D1Database;
   HYPERSWITCH_ENVIRONMENT?: string | null;
   HYPERSWITCH_API_KEY?: string | null;
@@ -32,6 +36,7 @@ type RefundRuntimeDependencies = Readonly<{
   retrieveProviderRefund?: typeof retrieveHyperswitchRefund;
   createProviderRefund?: typeof createHyperswitchRefund;
   recordAcknowledgement?: typeof recordHyperswitchRefundAcknowledgement;
+  getDatabase?: (env: RefundRuntimeEnv) => D1Database;
 }>;
 
 const REFUND_PATH = '/commerce/payments/refunds';
@@ -177,6 +182,7 @@ export async function handleCommerceRefundRequest(
   }
 
   try {
+    const database = (dependencies.getDatabase ?? getW07SelectedD104Database)(env);
     const input = await readBody(request);
     if (
       !isRecord(input) ||
@@ -201,7 +207,7 @@ export async function handleCommerceRefundRequest(
 
     const resolvePayment = dependencies.resolvePayment ?? resolveRefundPaymentReference;
     const paymentReference = await resolvePayment(
-      env.D1_04, customerId, input.paymentId, config.expectedMerchantId as string,
+      database, customerId, input.paymentId, config.expectedMerchantId as string,
     );
     if (paymentReference.currency !== input.currency) {
       return errorResponse(409, 'CONFLICT', 'Refund currency does not match the original payment');
@@ -221,7 +227,7 @@ export async function handleCommerceRefundRequest(
     // can return the accepted state during provider downtime; REQUESTED retries
     // reuse the same refund_id without re-reading the original Payment.
     const findExisting = dependencies.findExistingReservation ?? findExistingRefundReservation;
-    let reservation: RefundReservation | null = await findExisting(env.D1_04, idempotencyInput);
+    let reservation: RefundReservation | null = await findExisting(database, idempotencyInput);
     let reconcileProviderBeforeCreate = reservation !== null;
 
     if (!reservation) {
@@ -244,7 +250,7 @@ export async function handleCommerceRefundRequest(
       }
 
       const reserve = dependencies.reserve ?? createRefundReservation;
-      reservation = await reserve(env.D1_04, {
+      reservation = await reserve(database, {
         ...idempotencyInput,
         capturedAmountMinor: providerPayment.amountCaptured,
       });
@@ -282,7 +288,7 @@ export async function handleCommerceRefundRequest(
 
     if (providerRefund) {
       const record = dependencies.recordAcknowledgement ?? recordHyperswitchRefundAcknowledgement;
-      const persisted = await record(env.D1_04, providerRefund);
+      const persisted = await record(database, providerRefund);
       return refundResponse(persisted, reservation.replayed);
     }
 
@@ -293,7 +299,7 @@ export async function handleCommerceRefundRequest(
     });
 
     const record = dependencies.recordAcknowledgement ?? recordHyperswitchRefundAcknowledgement;
-    const persisted = await record(env.D1_04, createdRefund);
+    const persisted = await record(database, createdRefund);
     return refundResponse(persisted, reservation.replayed);
   } catch (error) {
     if (error instanceof RefundPersistenceError) return mapPersistenceError(error);

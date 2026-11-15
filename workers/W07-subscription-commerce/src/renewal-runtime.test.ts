@@ -428,9 +428,9 @@ describe('W07 scheduled renewal batch', () => {
     const result = await runRenewalScheduledBatch(f.env, f.dependencies);
     expect(result).toMatchObject({ status: 'COMPLETED', processed: 2, processFailures: 0 });
     expect(f.syncPending).toHaveBeenCalledTimes(2);
-    expect(f.syncPending).toHaveBeenNthCalledWith(1, f.env, { limit: 10 });
-    expect(f.syncPending).toHaveBeenNthCalledWith(2, f.env, { limit: 10 });
-    expect(f.scanDue).toHaveBeenCalledWith(f.env, { limit: 5 });
+    expect(f.syncPending).toHaveBeenNthCalledWith(1, f.env, { limit: 10 }, { getDatabase: expect.any(Function) });
+    expect(f.syncPending).toHaveBeenNthCalledWith(2, f.env, { limit: 10 }, { getDatabase: expect.any(Function) });
+    expect(f.scanDue).toHaveBeenCalledWith(f.env, { limit: 5 }, { getDatabase: expect.any(Function) });
     expect(f.processCycle).toHaveBeenCalledTimes(2);
   });
 
@@ -446,19 +446,19 @@ describe('W07 scheduled renewal batch', () => {
     expect(f.scanDue).toHaveBeenCalledWith(
       f.env,
       { limit: 5 },
-      { resolvePricing },
+      { resolvePricing, getDatabase: expect.any(Function) },
     );
     expect(f.processCycle).toHaveBeenNthCalledWith(
       1,
       f.env,
       'rcy_' + 'a'.repeat(26),
-      { resolvePricing },
+      { resolvePricing, getDatabase: expect.any(Function) },
     );
     expect(f.processCycle).toHaveBeenNthCalledWith(
       2,
       f.env,
       'rcy_' + 'b'.repeat(26),
-      { resolvePricing },
+      { resolvePricing, getDatabase: expect.any(Function) },
     );
   });
 

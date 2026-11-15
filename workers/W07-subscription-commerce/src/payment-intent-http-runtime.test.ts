@@ -149,7 +149,7 @@ describe('W07 internal payment-intent runtime', () => {
       ORDER_ID,
       CLIENT_IDEMPOTENCY_KEY,
       MERCHANT_ID,
-      { paymentEnvironment: 'sandbox' },
+      { paymentEnvironment: 'sandbox', databaseDialect: 'd1' },
     ]);
     expect(fixture.calls.createProviderIntent).toHaveLength(1);
     expect(fixture.calls.createProviderIntent[0]?.[0]).toEqual({
@@ -180,6 +180,19 @@ describe('W07 internal payment-intent runtime', () => {
     expect(body.data).not.toHaveProperty('apiKey');
     expect(body.data).not.toHaveProperty('merchantId');
     expect(body.requestId).toMatch(/^req_/);
+  });
+
+  it('uses the selected Neon D1-04 database for payment-attempt creation and intent persistence', async () => {
+    const fixture = createFixture({ env: { W07_DATABASE_DRIVER: 'neon' } });
+    const neonDatabase = {} as D1Database;
+    const dependencies = { ...fixture.dependencies, getDatabase: () => neonDatabase };
+    const response = await handleCommercePaymentIntentRequest(
+      request({ idempotencyKey: CLIENT_IDEMPOTENCY_KEY }), CUSTOMER_ID, fixture.env, dependencies,
+    );
+    expect(response?.status).toBe(201);
+    expect(fixture.calls.createAttempt[0]?.[0]).toBe(neonDatabase);
+    expect(fixture.calls.createAttempt[0]?.[5]).toMatchObject({ databaseDialect: 'postgres' });
+    expect(fixture.calls.recordIntent[0]?.[0]).toBe(neonDatabase);
   });
 
   it('uses the same provider idempotency key on a client retry and returns HTTP 200 for replay', async () => {

@@ -12,6 +12,7 @@ import {
   syncPendingRenewalOutcomes,
   type RenewalOutcomeSyncResult,
 } from './subscription-renewal-outcome.js';
+import { getW07SelectedD104Database, resolveW07DatabaseDriver } from './neon/payment-method-read-runtime.js';
 
 const MAX_CYCLES_PER_TICK = 5;
 const MAX_OUTCOMES_PER_TICK = 10;
@@ -57,7 +58,8 @@ export type RenewalScheduledBatchResult =
     }>;
 
 export type RenewalScheduledDependencies = Readonly<{
-  readTableNames?: (db: D1Database, expected: readonly string[]) => Promise<Set<string>>;
+  readTableNames?: (db: D1Database, expected: readonly string[], dialect?: 'd1' | 'neon') => Promise<Set<string>>;
+  getDatabase?: (env: RenewalRuntimeEnv) => D1Database;
   syncPending?: typeof syncPendingRenewalOutcomes;
   scanDue?: typeof scanDueSubscriptionRenewals;
   processCycle?: typeof processSubscriptionRenewalCycle;
@@ -67,11 +69,12 @@ export type RenewalScheduledDependencies = Readonly<{
   maxCyclesPerBatch?: number;
 }>;
 
-async function readTableNames(db: D1Database, expected: readonly string[]): Promise<Set<string>> {
+async function readTableNames(db: D1Database, expected: readonly string[], dialect: 'd1' | 'neon' = 'd1'): Promise<Set<string>> {
   const placeholders = expected.map(() => '?').join(', ');
-  const result = await db.prepare(
-    "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN (" + placeholders + ')',
-  ).bind(...expected).all<{ name: string }>();
+  const sql = dialect === 'neon'
+    ? "SELECT table_name AS name FROM information_schema.tables WHERE table_schema = current_schema() AND table_type = 'BASE TABLE' AND table_name IN (" + placeholders + ')'
+    : "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN (" + placeholders + ')';
+  const result = await db.prepare(sql).bind(...expected).all<{ name: string }>();
   return new Set((result.results ?? []).map((row) => row.name));
 }
 
@@ -88,12 +91,16 @@ export async function runRenewalScheduledBatch(
   dependencies: RenewalScheduledDependencies = {},
 ): Promise<RenewalScheduledBatchResult> {
   const getTableNames = dependencies.readTableNames ?? readTableNames;
+  const databaseDialect = resolveW07DatabaseDriver(env);
+  const selectedD104 = (dependencies.getDatabase ?? getW07SelectedD104Database)(env);
+  const selectedEnv: RenewalRuntimeEnv = { ...env, D1_04: selectedD104 };
+  const getSelectedDatabase = () => selectedD104;
   let d1_01: Set<string>;
   let d1_04: Set<string>;
   try {
     [d1_01, d1_04] = await Promise.all([
-      getTableNames(env.D1_01, REQUIRED_D1_01_TABLES),
-      getTableNames(env.D1_04, REQUIRED_D1_04_TABLES),
+      getTableNames(env.D1_01, REQUIRED_D1_01_TABLES, 'd1'),
+      getTableNames(selectedD104, REQUIRED_D1_04_TABLES, databaseDialect),
     ]);
   } catch {
     return { status: 'SCHEMA_NOT_READY', reason: 'SCHEMA_PROBE_FAILED', missingTables: [] };
@@ -116,7 +123,7 @@ export async function runRenewalScheduledBatch(
 
   let beforeRecovery: OutcomeBatch;
   try {
-    beforeRecovery = await syncPending(env, { limit: MAX_OUTCOMES_PER_TICK });
+    beforeRecovery = await syncPending(selectedEnv, { limit: MAX_OUTCOMES_PER_TICK }, { getDatabase: getSelectedDatabase });
   } catch {
     // Do not start new provider-side work when prior cross-D1 outcome recovery
     // is failing. The next Cron tick can retry the bounded reconciliation.
@@ -137,8 +144,8 @@ export async function runRenewalScheduledBatch(
   let dueScan: RenewalScanResult;
   try {
     dueScan = dependencies.resolvePricing
-      ? await scanDue(env, { limit: maxCycles }, { resolvePricing: dependencies.resolvePricing })
-      : await scanDue(env, { limit: maxCycles });
+      ? await scanDue(selectedEnv, { limit: maxCycles }, { resolvePricing: dependencies.resolvePricing, getDatabase: getSelectedDatabase })
+      : await scanDue(selectedEnv, { limit: maxCycles }, { getDatabase: getSelectedDatabase });
   } catch {
     return { status: 'PARTIAL', phase: 'DUE_SCAN' };
   }
@@ -148,8 +155,8 @@ export async function runRenewalScheduledBatch(
   for (const cycleId of dueScan.cycleIds.slice(0, maxCycles)) {
     try {
       cycleResults.push(dependencies.resolvePricing
-        ? await processCycle(env, cycleId, { resolvePricing: dependencies.resolvePricing })
-        : await processCycle(env, cycleId));
+        ? await processCycle(selectedEnv, cycleId, { resolvePricing: dependencies.resolvePricing, getDatabase: getSelectedDatabase })
+        : await processCycle(selectedEnv, cycleId, { getDatabase: getSelectedDatabase }));
     } catch (error) {
       processFailures += 1;
       console.error(JSON.stringify({
@@ -162,7 +169,7 @@ export async function runRenewalScheduledBatch(
 
   let afterRecovery: OutcomeBatch;
   try {
-    afterRecovery = await syncPending(env, { limit: MAX_OUTCOMES_PER_TICK });
+    afterRecovery = await syncPending(selectedEnv, { limit: MAX_OUTCOMES_PER_TICK }, { getDatabase: getSelectedDatabase });
   } catch {
     return { status: 'PARTIAL', phase: 'OUTCOME_SYNC_AFTER' };
   }

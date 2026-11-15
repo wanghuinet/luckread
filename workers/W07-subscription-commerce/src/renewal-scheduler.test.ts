@@ -47,6 +47,27 @@ function dependencies(options: TestOptions = {}): RenewalScheduledDependencies {
 }
 
 describe('W07 renewal scheduler completion status', () => {
+  it('uses selected Neon D1-04 and PostgreSQL schema catalogue during preflight', async () => {
+    const neonDatabase = {} as D1Database;
+    let seenDb: D1Database | undefined;
+    let seenDialect: 'd1' | 'neon' | undefined;
+    const result = await runRenewalScheduledBatch(
+      { ...env, W07_DATABASE_DRIVER: 'neon' },
+      {
+        ...dependencies(),
+        getDatabase: () => neonDatabase,
+        readTableNames: async (db, expected, dialect) => {
+          seenDb = db;
+          seenDialect = dialect;
+          return new Set(expected);
+        },
+      },
+    );
+    expect(result.status).toBe('COMPLETED');
+    expect(seenDb).toBe(neonDatabase);
+    expect(seenDialect).toBe('neon');
+  });
+
   it('reports COMPLETED when processing and both outcome-sync passes are clear', async () => {
     const result = await runRenewalScheduledBatch(env, dependencies());
 

@@ -29,6 +29,13 @@ import {
   type HyperswitchPaymentStatus,
 } from './hyperswitch-client.js';
 import type { CreateCommerceOrderRequest } from './order-request-validation.js';
+import {
+  getW07OrderCreatePersistenceStore,
+  getW07SelectedD104Database,
+  resolveW07DatabaseDriver,
+  type W07PaymentMethodReadRuntimeEnv,
+} from './neon/payment-method-read-runtime.js';
+import type { OrderCreatePersistenceStore } from './order-persistence.js';
 
 export type RenewalCycleState =
   | 'AWAITING_PRICING'
@@ -48,7 +55,7 @@ export class RenewalRuntimeError extends Error {
   }
 }
 
-export type RenewalRuntimeEnv = Readonly<{
+export type RenewalRuntimeEnv = W07PaymentMethodReadRuntimeEnv & Readonly<{
   D1_01: D1Database;
   D1_04: D1Database;
   HYPERSWITCH_ENVIRONMENT?: string | null;
@@ -146,6 +153,8 @@ export type RenewalRuntimeDependencies = Readonly<{
   createPaymentAttempt?: typeof createPaymentAttempt;
   createProviderCharge?: typeof createHyperswitchMerchantInitiatedPayment;
   recordProviderSubmission?: typeof recordHyperswitchMerchantInitiatedSubmission;
+  getDatabase?: (env: RenewalRuntimeEnv) => D1Database;
+  getOrderCreateStore?: (env: RenewalRuntimeEnv) => OrderCreatePersistenceStore | undefined;
 }>;
 
 export type RenewalScanResult = Readonly<{
@@ -620,6 +629,7 @@ export async function scanDueSubscriptionRenewals(
   options: Readonly<{ limit?: number }> = {},
   dependencies: RenewalRuntimeDependencies = {},
 ): Promise<RenewalScanResult> {
+  env = { ...env, D1_04: (dependencies.getDatabase ?? getW07SelectedD104Database)(env) };
   const now = nowIso(dependencies.now ?? (() => new Date()));
   const config = resolveHyperswitchConfig(env);
   const limit = Number.isSafeInteger(options.limit) ? Math.min(Math.max(options.limit!, 1), MAX_PAGE_SIZE) : 20;
@@ -1016,8 +1026,9 @@ async function prepareFailedCycleRetry(
 export async function prepareFailedRenewalCycleRetry(
   env: RenewalRuntimeEnv,
   cycleIdInput: string,
-  dependencies: Pick<RenewalRuntimeDependencies, 'now'> = {},
+  dependencies: Pick<RenewalRuntimeDependencies, 'now' | 'getDatabase'> = {},
 ): Promise<RenewalProcessResult> {
+  env = { ...env, D1_04: (dependencies.getDatabase ?? getW07SelectedD104Database)(env) };
   if (!/^rcy_[A-Za-z0-9]{26}$/.test(cycleIdInput)) {
     throw new RenewalRuntimeError('VALIDATION_FAILED', 400);
   }
@@ -1052,6 +1063,8 @@ export async function processSubscriptionRenewalCycle(
   cycleId: string,
   dependencies: RenewalRuntimeDependencies = {},
 ): Promise<RenewalProcessResult> {
+  env = { ...env, D1_04: (dependencies.getDatabase ?? getW07SelectedD104Database)(env) };
+  const orderCreateStore = (dependencies.getOrderCreateStore ?? getW07OrderCreatePersistenceStore)(env);
   const nowFn = dependencies.now ?? (() => new Date());
   let now = nowIso(nowFn);
   let cycle = await readCycleById(env.D1_04, cycleId);
@@ -1118,7 +1131,7 @@ export async function processSubscriptionRenewalCycle(
     if (!cycle.order_id) {
       const createOrder = dependencies.createOrder ?? createCommerceOrder;
       const order = await createOrder(
-        env.D1_04,
+        orderCreateStore ?? env.D1_04,
         cycle.subscriber_id,
         'renew_' + cycle.cycle_id,
         rawRequest,
@@ -1151,7 +1164,7 @@ export async function processSubscriptionRenewalCycle(
         cycle.order_id!,
         'renew_' + cycle.cycle_id + '_' + String(attemptNumber),
         cycle.merchant_id,
-        { now: nowFn },
+        { now: nowFn, databaseDialect: resolveW07DatabaseDriver(env) === 'neon' ? 'postgres' : 'd1' },
       );
       cycle = await storePaymentReference(env, cycle, attempt.payment, attemptNumber, now);
       if (cycle.payment_id !== attempt.payment.paymentId || cycle.attempt_number !== attemptNumber) {
