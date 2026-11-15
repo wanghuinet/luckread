@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-import { canTransitionContentState, ContentRuntimeError, type ContentRecord, createContent, createRequestId, deleteContent, decodeContentListCursor, decodeCursor, decodeScopedCursor, encodeContentListCursor, encodeCursor, encodeScopedCursor, isState, listContents, listPublishedContentsByIds, listContentRevisions, listCreatorContents, listDueScheduledContentCandidates, publishAuthorizedScheduledContents, publicContent, toErrorResponse, transitionContentState, updateContent, validateInput, validateListFilters } from './content-runtime.js'
+import { canTransitionContentState, ContentRuntimeError, type ContentRecord, createContent, createRequestId, deleteContent, getContent, decodeContentListCursor, decodeCursor, decodeScopedCursor, encodeContentListCursor, encodeCursor, encodeScopedCursor, isState, listContents, listPublishedContentsByIds, listContentRevisions, listCreatorContents, listDueScheduledContentCandidates, publishAuthorizedScheduledContents, publicContent, toErrorResponse, transitionContentState, updateContent, validateInput, validateListFilters } from './content-runtime.js'
 import w03Worker, { hasCreatorContentPermission, hasSocialPostPermission, parseListLimit } from './index.js'
 
 describe('W03 content contract core', () => {
@@ -3073,5 +3073,107 @@ describe('creator-selected sensitive media warning', () => {
     expect(migration).toContain('ALTER TABLE contents')
     expect(migration).toContain('ALTER TABLE content_revisions')
     expect(migration).toContain("'NUDITY', 'VIOLENCE', 'SENSITIVE'")
+  })
+})
+
+
+describe('W03 Neon canonical content detail access behavior', () => {
+  it('keeps W07 membership checks and member-only body redaction after Neon lookup', async () => {
+    const row = {
+      id: 'content_member_1',
+      content_type: 'article' as const,
+      owner_user_id: 'owner_1',
+      creator_id: 'creator_1',
+      ip_id: null,
+      state: 'PUBLISHED' as const,
+      scheduled_at: null,
+      access_mode: 'MEMBERS_ONLY' as const,
+      version: 1,
+      revision: 1,
+      slug: 'member-article',
+      title: 'Private article title',
+      body_ref: 'private-body-ref',
+      media_refs_json: '["private-media-ref"]',
+      cover_ref: 'private-cover-ref',
+      media_warning: null,
+      etag: 'W/"1"',
+      created_at: '2026-10-30T00:00:00.000Z',
+      updated_at: '2026-11-01T00:00:00.000Z',
+    }
+    const calls: unknown[][] = []
+    const readStore = {
+      async getContent(contentIdOrSlug: string, principalUserId: string | null) {
+        calls.push([contentIdOrSlug, principalUserId])
+        return row
+      },
+    }
+    const db = {
+      prepare() { throw new Error('Neon detail reader must be used instead of D1') },
+    } as never
+
+    const denied = await getContent(db, 'member-article', 'reader_1', async creatorId => {
+      expect(creatorId).toBe('creator_1')
+      return false
+    }, readStore)
+    expect(denied).toMatchObject({
+      accessGranted: false,
+      accessMode: 'MEMBERS_ONLY',
+      title: '会员专享内容',
+      bodyRef: '',
+      mediaRefs: [],
+      coverRef: null,
+    })
+
+    const entitled = await getContent(db, 'member-article', 'reader_1', async creatorId => {
+      expect(creatorId).toBe('creator_1')
+      return true
+    }, readStore)
+    expect(entitled).toMatchObject({
+      accessGranted: true,
+      accessMode: 'MEMBERS_ONLY',
+      title: 'Private article title',
+      bodyRef: 'private-body-ref',
+      mediaRefs: ['private-media-ref'],
+      coverRef: 'private-cover-ref',
+    })
+    expect(calls).toEqual([
+      ['member-article', 'reader_1'],
+      ['member-article', 'reader_1'],
+    ])
+  })
+
+  it('keeps anonymous and owner principals explicit at the reader boundary', async () => {
+    const principals: Array<string | null> = []
+    const row = {
+      id: 'content_public_1',
+      content_type: 'post' as const,
+      owner_user_id: 'owner_1',
+      creator_id: 'owner_1',
+      ip_id: null,
+      state: 'PUBLISHED' as const,
+      scheduled_at: null,
+      access_mode: 'PUBLIC' as const,
+      version: 1,
+      revision: 1,
+      slug: 'public-post',
+      title: 'Public post',
+      body_ref: 'body',
+      media_refs_json: '[]',
+      cover_ref: null,
+      media_warning: null,
+      etag: 'W/"1"',
+      created_at: '2026-10-30T00:00:00.000Z',
+      updated_at: '2026-11-01T00:00:00.000Z',
+    }
+    const readStore = {
+      async getContent(_contentIdOrSlug: string, principalUserId: string | null) {
+        principals.push(principalUserId)
+        return row
+      },
+    }
+    const db = { prepare() { throw new Error('Neon reader must be used instead of D1') } } as never
+    await getContent(db, 'public-post', null, undefined, readStore)
+    await getContent(db, 'public-post', 'owner_1', undefined, readStore)
+    expect(principals).toEqual([null, 'owner_1'])
   })
 })
