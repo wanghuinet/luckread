@@ -165,7 +165,9 @@ test('ignores additive W07 D1-01 membership runtime fields when pinning the D1-0
   const source = overrideSource(wranglerPath, (text) => {
     const wrangler = JSON.parse(text)
     wrangler.vars.W07_MEMBERSHIP_DATABASE_DRIVER = 'neon'
-    wrangler.hyperdrive.push({
+    const d101 = wrangler.hyperdrive.find((binding) => binding.binding === 'HYPERDRIVE_D1_01')
+    if (d101) d101.id = '0c53a1bb9bc0484bac146e8ae2d3158b'
+    else wrangler.hyperdrive.push({
       binding: 'HYPERDRIVE_D1_01',
       id: '0c53a1bb9bc0484bac146e8ae2d3158b',
     })
