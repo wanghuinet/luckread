@@ -45,15 +45,17 @@ describe('W07 PostgreSQL webhook D1 bridge', () => {
       queryRows: [{
         payment_id: 'pay_12345678901234567890123456',
         amount_minor: '1499',
+        refunded_minor: '199',
         version: '3',
         created_at: createdAt,
       }],
     })
     const database = createPostgresWebhookD1Database(pool)
     const row = await database.prepare(
-      "SELECT payment_id, amount_minor, version, created_at FROM payments WHERE payment_id = ? AND note = '?'",
+      "SELECT payment_id, amount_minor, refunded_minor, version, created_at FROM payments WHERE payment_id = ? AND note = '?'",
     ).bind('pay_12345678901234567890123456').first<{
       amount_minor: number
+      refunded_minor: number
       version: number
       created_at: string
     }>()
@@ -62,6 +64,7 @@ describe('W07 PostgreSQL webhook D1 bridge', () => {
     expect(directCalls[0]?.sql).toContain("note = '?'")
     expect(row).toMatchObject({
       amount_minor: 1499,
+      refunded_minor: 199,
       version: 3,
       created_at: '2026-11-15T12:00:00.123Z',
     })

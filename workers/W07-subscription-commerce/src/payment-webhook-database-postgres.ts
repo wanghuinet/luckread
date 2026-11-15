@@ -33,6 +33,7 @@ const BIGINT_COLUMNS = new Set([
   'total_minor',
   'version',
   'occurrence_count',
+  'refunded_minor',
   'attempt_count',
   'cycle_number',
   'quantity',
