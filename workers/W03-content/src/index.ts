@@ -54,6 +54,7 @@ import {
   getSeries,
   listCreatorSeries,
   updateSeries,
+  type SeriesReadStore,
 } from './content-series.js'
 import {
   createCollection,
@@ -362,6 +363,10 @@ export type W03ContentWorkerDependencies = Readonly<{
   postThreadReadStoreProvider?: (
     env: W03PublishedMediaReferenceRuntimeEnv,
   ) => PostThreadReadStore | undefined
+  /** Optional D1-02 provider for the bounded creator-series reads. */
+  seriesReadStoreProvider?: (
+    env: W03PublishedMediaReferenceRuntimeEnv,
+  ) => SeriesReadStore | undefined
   /** Optional D1-02 provider for the bounded creator-collection list read. */
   collectionListReadStoreProvider?: (
     env: W03PublishedMediaReferenceRuntimeEnv,
@@ -1029,13 +1034,14 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
           principal.userId,
           cursor,
           parseListLimit(url.searchParams.get('limit')),
+          dependencies.seriesReadStoreProvider?.(env),
         )
         return json({ data: page, schemaVersion: '1.0', requestId: createRequestId() })
       }
 
       if (path && path.series && path.id && request.method === 'GET') {
         const principal = requiredCreatorPrincipal(request)
-        return json({ data: await getSeries(env.D1_02, principal.userId, path.id), schemaVersion: '1.0', requestId: createRequestId() })
+        return json({ data: await getSeries(env.D1_02, principal.userId, path.id, dependencies.seriesReadStoreProvider?.(env)), schemaVersion: '1.0', requestId: createRequestId() })
       }
 
       if (path && path.series && path.id && request.method === 'PATCH') {

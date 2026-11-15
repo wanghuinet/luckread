@@ -18,6 +18,10 @@ import {
   createPostgresCollectionListReadStore,
 } from '../content-collections-read-store-postgres.js'
 import type { CollectionListReadStore } from '../content-collections.js'
+import {
+  createPostgresSeriesReadStore,
+} from '../content-series-read-store-postgres.js'
+import type { SeriesReadStore } from '../content-series.js'
 import type { W03PublishedMediaReferenceRuntimeEnv } from '../published-media-reference-read-store.js'
 
 export type W03PublicMediaReferenceDriver = 'd1' | 'neon'
@@ -31,14 +35,15 @@ const followingContentsStores = new WeakMap<object, FollowingOwnerContentsReadSt
 const postThreadStores = new WeakMap<object, PostThreadReadStore>()
 const contentContextStores = new WeakMap<object, ContentContextReadStore>()
 const collectionListStores = new WeakMap<object, CollectionListReadStore>()
+const seriesStores = new WeakMap<object, SeriesReadStore>()
 
 /**
  * The explicit D1-02 content read driver controls only the PostgreSQL read
  * projections wired from the W03 entrypoint: public media references, bookmark
  * batch projection, W04-authorized following-feed content, native post-thread
- * projection, canonical content context, and the creator-owned collection list.
- * Other W03 reads and every W03 mutation remain on D1_02. D1 is the safe default
- * and unknown values fail closed.
+ * projection, canonical content context, and creator-owned series and collection
+ * reads. Other W03 reads and every W03 mutation remain on D1_02. D1 is the safe
+ * default and unknown values fail closed.
  */
 export function resolveW03PublicMediaReferenceDriver(
   env: W03PublicMediaReferenceRuntimeEnv,
@@ -223,5 +228,25 @@ export function getW03CollectionListReadStore(
     getW03PublicMediaReferencePostgresPool(env),
   )
   collectionListStores.set(binding, store)
+  return store
+}
+
+/** PostgreSQL provider for creator-owned series reads only. */
+export function getW03SeriesReadStore(
+  env: W03PublicMediaReferenceRuntimeEnv,
+): SeriesReadStore | undefined {
+  if (resolveW03PublicMediaReferenceDriver(env) === 'd1') return undefined
+
+  const binding = env.HYPERDRIVE_D1_02
+  if (!binding || typeof binding !== 'object') {
+    throw new Error('W03_HYPERDRIVE_D1_02_BINDING_REQUIRED')
+  }
+  const cached = seriesStores.get(binding)
+  if (cached) return cached
+
+  const store = createPostgresSeriesReadStore(
+    getW03PublicMediaReferencePostgresPool(env),
+  )
+  seriesStores.set(binding, store)
   return store
 }
