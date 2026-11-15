@@ -37,6 +37,8 @@ export interface NotificationPushDeliveryEnv {
   readonly D1_03?: D1Database
   readonly W05_DATABASE_DRIVER?: string
   readonly HYPERDRIVE_D1_02?: { connectionString?: string }
+  readonly W05_PUSH_ENDPOINT_DATABASE_DRIVER?: string
+  readonly HYPERDRIVE_D1_03?: { connectionString?: string }
   readonly PUSH_DELIVERY_ENABLED?: string
   readonly EXPO_ACCESS_TOKEN?: string
 }
