@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { Pool, PoolConfig } from 'pg'
 import {
   getW05SocialWorkerDependencies,
+  getW05NotificationPushDeliveryDependencies,
   resolveW05SocialDatabaseDriver,
 } from './runtime.js'
 
@@ -72,6 +73,7 @@ describe('W05 Neon runtime composition', () => {
       'profileChannelReadStore',
       'profilePinStore',
       'relationshipGraphReadStore',
+      'replyAudienceStore',
       'repostStore',
       'shareStore',
       'socialClosureReadStore',
@@ -85,5 +87,33 @@ describe('W05 Neon runtime composition', () => {
       idleTimeoutMillis: 30_000,
       keepAlive: true,
     })
+  })
+})
+
+describe('W05 Neon notification push composition', () => {
+  it('composes only W05-owned push stores on the shared D1-02 pool and caches them', () => {
+    const binding = { connectionString: 'postgresql://user:secret@hyperdrive.example/db?sslmode=require' }
+    const pool = fakePool()
+    const poolFactory = vi.fn(() => pool)
+    const env = { W05_DATABASE_DRIVER: 'neon', HYPERDRIVE_D1_02: binding }
+
+    const first = getW05NotificationPushDeliveryDependencies(env, poolFactory)
+    const second = getW05NotificationPushDeliveryDependencies(env, poolFactory)
+
+    expect(first).toBe(second)
+    expect(Object.keys(first).sort()).toEqual([
+      'deliveryClaimStore',
+      'fanoutStore',
+      'receiptStore',
+      'sendResultStore',
+    ])
+    expect(poolFactory).toHaveBeenCalledTimes(1)
+    expect(first).not.toHaveProperty('endpointAccessStore')
+  })
+
+  it('keeps D1 as the safe default for scheduled push delivery', () => {
+    const poolFactory = vi.fn(() => fakePool())
+    expect(getW05NotificationPushDeliveryDependencies({}, poolFactory)).toEqual({})
+    expect(poolFactory).not.toHaveBeenCalled()
   })
 })

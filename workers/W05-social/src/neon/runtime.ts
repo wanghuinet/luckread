@@ -3,6 +3,7 @@ import { Pool, type PoolConfig } from 'pg'
 import type { W05SocialWorkerDependencies } from '../index.js'
 import { createPostgresFollowListReadStore } from '../follow-list-read-store-postgres.js'
 import { createPostgresFollowStore } from '../follow-store-postgres.js'
+import { createPostgresReplyAudienceStore } from '../reply-audience-store-postgres.js'
 import { createPostgresRelationshipGraphReadStore } from '../relationship-graph-store-postgres.js'
 import { createPostgresFollowingAuthorIdsReadStore } from '../following-author-ids-read-store-postgres.js'
 import { createPostgresCommentListReadStore } from '../comment-list-read-store-postgres.js'
@@ -31,6 +32,11 @@ import { createPostgresPollConfigurationStore } from '../poll-configuration-stor
 import { createPostgresPollDeleteStore } from '../poll-delete-store-postgres.js'
 import { createPostgresPollReadStore } from '../poll-read-store-postgres.js'
 import { createPostgresPollVoteStore } from '../poll-vote-store-postgres.js'
+import { createPostgresNotificationPushFanoutStore } from '../notification-push-fanout-store-postgres.js'
+import { createPostgresNotificationPushDeliveryClaimStore } from '../notification-push-delivery-claim-store-postgres.js'
+import { createPostgresNotificationPushSendResultStore } from '../notification-push-send-result-store-postgres.js'
+import { createPostgresNotificationPushReceiptStore } from '../notification-push-receipt-store-postgres.js'
+import type { NotificationPushDeliveryRuntimeDependencies } from '../notification-push-delivery-runtime.js'
 
 export type W05SocialDatabaseDriver = 'd1' | 'neon'
 
@@ -43,7 +49,9 @@ type W05PoolFactory = (config: PoolConfig) => Pool
 
 const pools = new WeakMap<object, Pool>()
 const compositions = new WeakMap<object, W05SocialWorkerDependencies>()
+const pushCompositions = new WeakMap<object, NotificationPushDeliveryRuntimeDependencies>()
 const EMPTY_DEPENDENCIES: W05SocialWorkerDependencies = Object.freeze({})
+const EMPTY_PUSH_DEPENDENCIES: NotificationPushDeliveryRuntimeDependencies = Object.freeze({})
 
 export function resolveW05SocialDatabaseDriver(
   env: W05SocialRuntimeEnv,
@@ -132,6 +140,9 @@ export function getW05SocialWorkerDependencies(
     followStore: createPostgresFollowStore(
       asExecutor<Parameters<typeof createPostgresFollowStore>[0]>(pool),
     ),
+    replyAudienceStore: createPostgresReplyAudienceStore(
+      asExecutor<Parameters<typeof createPostgresReplyAudienceStore>[0]>(pool),
+    ),
     relationshipGraphReadStore: createPostgresRelationshipGraphReadStore(
       asExecutor<Parameters<typeof createPostgresRelationshipGraphReadStore>[0]>(pool),
     ),
@@ -219,5 +230,42 @@ export function getW05SocialWorkerDependencies(
   }
 
   compositions.set(binding, dependencies)
+  return dependencies
+}
+
+// Compose only W05-owned push delivery state over D1-02. The endpoint registry
+// remains W09-owned in D1-03 and is deliberately supplied by the scoped
+// D1_03 binding at execution time; it must never use the D1-02 pool.
+export function getW05NotificationPushDeliveryDependencies(
+  env: W05SocialRuntimeEnv,
+  poolFactory: W05PoolFactory = (config) => new Pool(config),
+): NotificationPushDeliveryRuntimeDependencies {
+  if (resolveW05SocialDatabaseDriver(env) === 'd1') return EMPTY_PUSH_DEPENDENCIES
+
+  const binding = env.HYPERDRIVE_D1_02
+  if (!binding || typeof binding !== 'object') {
+    throw new Error('W05_HYPERDRIVE_D1_02_BINDING_REQUIRED')
+  }
+
+  const cached = pushCompositions.get(binding)
+  if (cached) return cached
+
+  const connectionString = validateHyperdriveConnectionString(binding.connectionString)
+  const pool = getPool(binding, connectionString, poolFactory)
+  const dependencies: NotificationPushDeliveryRuntimeDependencies = {
+    fanoutStore: createPostgresNotificationPushFanoutStore(
+      asExecutor<Parameters<typeof createPostgresNotificationPushFanoutStore>[0]>(pool),
+    ),
+    deliveryClaimStore: createPostgresNotificationPushDeliveryClaimStore(
+      asExecutor<Parameters<typeof createPostgresNotificationPushDeliveryClaimStore>[0]>(pool),
+    ),
+    sendResultStore: createPostgresNotificationPushSendResultStore(
+      asExecutor<Parameters<typeof createPostgresNotificationPushSendResultStore>[0]>(pool),
+    ),
+    receiptStore: createPostgresNotificationPushReceiptStore(
+      asExecutor<Parameters<typeof createPostgresNotificationPushReceiptStore>[0]>(pool),
+    ),
+  }
+  pushCompositions.set(binding, dependencies)
   return dependencies
 }
