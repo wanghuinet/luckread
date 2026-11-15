@@ -66,6 +66,7 @@ describe('W05 Neon runtime composition', () => {
       'notificationEnqueueStore',
       'notificationPreferencesStore',
       'pollConfigurationStore',
+      'pollDeleteStore',
       'pollReadStore',
       'pollVoteStore',
       'profileChannelReadStore',
