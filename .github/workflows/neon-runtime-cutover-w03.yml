@@ -7,6 +7,10 @@ on:
     paths:
       - '.github/workflows/neon-runtime-cutover-w03.yml'
       - 'workers/W03-content/wrangler.jsonc'
+      - 'workers/W03-content/src/content-collections.ts'
+      - 'workers/W03-content/src/content-collections-read-store-postgres.ts'
+      - 'workers/W03-content/src/entry.ts'
+      - 'workers/W03-content/src/neon/runtime.ts'
 
 permissions:
   contents: read
@@ -63,6 +67,7 @@ jobs:
             ['followingOwnerContentsReadStoreProvider', 'getW03FollowingOwnerContentsReadStore'],
             ['postThreadReadStoreProvider', 'getW03PostThreadReadStore'],
             ['contentContextReadStoreProvider', 'getW03ContentContextReadStore'],
+            ['collectionListReadStoreProvider', 'getW03CollectionListReadStore'],
           ]
           for (const [provider, factory] of providers) {
             if (!entry.includes(provider) || !entry.includes(factory) || !runtime.includes(factory)) {
