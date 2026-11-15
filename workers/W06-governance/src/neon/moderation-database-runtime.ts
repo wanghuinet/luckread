@@ -43,7 +43,7 @@ function validateHyperdriveConnectionString(value: unknown): string {
     !['postgres:', 'postgresql:'].includes(parsed.protocol) ||
     !parsed.hostname ||
     parsed.pathname.length < 2 ||
-    decodeURIComponent(parsed.pathname.replace(/^\\/+/, '')) !== 'luckread_governance'
+    decodeURIComponent(parsed.pathname.replace(/^\/+/, '')) !== 'luckread_governance'
   ) {
     throw new Error('W06_HYPERDRIVE_D1_03_CONNECTION_STRING_INVALID')
   }
