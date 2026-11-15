@@ -21,6 +21,10 @@ on:
       - 'workers/W06-governance/src/moderation-runtime.ts'
       - 'workers/W06-governance/src/moderation-runtime.test.ts'
       - 'workers/W06-governance/src/moderation-queue-read-store*.ts'
+      - 'workers/W06-governance/src/neon-postgres-d1-database.ts'
+      - 'workers/W06-governance/src/neon-postgres-d1-database.test.ts'
+      - 'workers/W06-governance/scripts/neon/rehearse-moderation-write-postgres-runtime.mjs'
+      - 'workers/W09-platform/src/neon-postgres-migrations/**'
       - 'workers/W06-governance/scripts/neon/rehearse-moderation-queue-postgres-runtime.mjs'
   push:
     branches: [main]
@@ -85,6 +89,7 @@ jobs:
           set -euo pipefail
           node --check workers/W06-governance/scripts/neon/generate-d1-03-w06-postgres-migration.mjs
           node --check workers/W06-governance/scripts/neon/rehearse-moderation-queue-postgres-runtime.mjs
+          node --check workers/W06-governance/scripts/neon/rehearse-moderation-write-postgres-runtime.mjs
           node --test workers/W06-governance/scripts/neon/generate-d1-03-w06-postgres-migration.test.mjs
           node workers/W06-governance/scripts/neon/generate-d1-03-w06-postgres-migration.mjs
           git diff --exit-code -- workers/W06-governance/src/neon-postgres-migrations/0001_w06_d1_03_moderation_schema.sql
@@ -109,6 +114,15 @@ jobs:
             --file workers/W06-governance/scripts/neon/verify-d1-03-w06-postgres-schema.sql \
             | tee artifacts/neon/d1-03-w06-moderation-postflight.txt
 
+      - name: Apply the W09-owned AuditEvent schema to the shared D1-03 rehearsal database
+        env:
+          D1_03_W06_LOCAL_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_d1_03_w06_rehearsal
+        run: |
+          set -euo pipefail
+          psql "$D1_03_W06_LOCAL_DATABASE_URL" \
+            --set ON_ERROR_STOP=1 --no-psqlrc --single-transaction \
+            --file workers/W09-platform/src/neon-postgres-migrations/0001_w09_d1_03_platform_schema.sql
+
       - name: Install pinned W02 PostgreSQL driver and TypeScript runner
         working-directory: workers/W02-identity
         run: npm install --ignore-scripts --no-audit --no-fund
@@ -120,6 +134,13 @@ jobs:
           D1_03_W06_QUEUE_POSTGRES_REPORT: ../../artifacts/neon/d1-03-w06-moderation-queue-postgres-runtime-postflight.json
         run: node --import=tsx/esm ../../workers/W06-governance/scripts/neon/rehearse-moderation-queue-postgres-runtime.mjs
 
+      - name: Rehearse atomic W06 decisions, W09 AuditEvent and W06 outbox on PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          D1_03_W06_LOCAL_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_d1_03_w06_rehearsal
+          D1_03_W06_WRITE_POSTGRES_REPORT: ../../artifacts/neon/d1-03-w06-moderation-write-postgres-runtime-postflight.json
+        run: node --import=tsx/esm ../../workers/W06-governance/scripts/neon/rehearse-moderation-write-postgres-runtime.mjs
+
       - name: Upload W06 D1-03 PostgreSQL 18 rehearsal evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -128,5 +149,6 @@ jobs:
           path: |
             artifacts/neon/d1-03-w06-moderation-postflight.txt
             artifacts/neon/d1-03-w06-moderation-queue-postgres-runtime-postflight.json
+            artifacts/neon/d1-03-w06-moderation-write-postgres-runtime-postflight.json
           if-no-files-found: error
           retention-days: 90
