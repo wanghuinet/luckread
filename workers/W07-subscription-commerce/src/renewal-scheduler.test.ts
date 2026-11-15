@@ -68,7 +68,7 @@ describe('W07 renewal scheduler completion status', () => {
     expect(seenDialect).toBe('neon');
   });
 
-  it('reports COMPLETED when processing and both outcome-sync passes are clear', async () => {}
+  it('reports COMPLETED when processing and both outcome-sync passes are clear', async () => {
     const result = await runRenewalScheduledBatch(env, dependencies());
 
     expect(result.status).toBe('COMPLETED');
