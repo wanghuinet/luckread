@@ -142,6 +142,68 @@ describe('W05 notification push endpoint runtime', () => {
     expect(bindings).toEqual(['identity-user-1', installationId])
   })
 
+  it('upserts Expo endpoints through the D1-03 PostgreSQL executor with owner-scoped conflict protection', async () => {
+    const query = vi.fn(async () => ({
+      rows: [{ endpoint_id: 'pg-endpoint-1', permission_status: 'granted' }],
+    }))
+    const db = { query } as never
+
+    await expect(upsertPushEndpoint(db, 'identity-user-1', installationId, {
+      platform: 'ios',
+      permissionStatus: 'granted',
+      expoPushToken: pushToken,
+      appVersion: '1.0.0',
+    })).resolves.toEqual({ endpointId: 'pg-endpoint-1', status: 'ACTIVE' })
+
+    const [sql, values] = query.mock.calls[0]!
+    expect(sql).toContain('INSERT INTO notification_push_endpoints')
+    expect(sql).toContain('ON CONFLICT (installation_id) DO UPDATE')
+    expect(sql).toContain('WHERE notification_push_endpoints.owner_user_id = EXCLUDED.owner_user_id')
+    expect(sql).toContain('RETURNING endpoint_id, permission_status')
+    expect(values).toEqual([
+      expect.any(String),
+      installationId,
+      'identity-user-1',
+      'ios',
+      pushToken,
+      'granted',
+      '1.0.0',
+      expect.any(String),
+      expect.any(String),
+      expect.any(String),
+    ])
+  })
+
+  it('maps PostgreSQL unique token conflicts to a sanitized 409', async () => {
+    const db = {
+      query: async () => {
+        throw Object.assign(new Error('duplicate key value violates unique constraint'), { code: '23505' })
+      },
+    } as never
+
+    await expect(upsertPushEndpoint(db, 'identity-user-1', installationId, {
+      platform: 'ios',
+      permissionStatus: 'granted',
+      expoPushToken: pushToken,
+    })).rejects.toMatchObject({
+      code: 'CONFLICT',
+      status: 409,
+      message: 'CONFLICT',
+    })
+  })
+
+  it('deletes a push endpoint using only the authenticated owner and installation in PostgreSQL', async () => {
+    const query = vi.fn(async () => ({ rows: [] }))
+    const db = { query } as never
+
+    await expect(deletePushEndpoint(db, 'identity-user-1', installationId)).resolves.toBeUndefined()
+    expect(query).toHaveBeenCalledOnce()
+    expect(query.mock.calls[0]?.[0]).toBe(
+      'DELETE FROM notification_push_endpoints WHERE owner_user_id = $1 AND installation_id = $2',
+    )
+    expect(query.mock.calls[0]?.[1]).toEqual(['identity-user-1', installationId])
+  })
+
   it('fails closed if the W05 scoped D1-03 binding is missing', async () => {
     await expect(upsertPushEndpoint(undefined, 'identity-user-1', installationId, {
       platform: 'ios',
