@@ -15,9 +15,14 @@ import {
   listModerationQueue,
 } from './moderation-runtime'
 import { createReport, ReportRuntimeError } from './report-runtime'
+import {
+  getW06ModerationDatabase,
+  getW06ModerationQueueReadStore,
+  type W06ModerationDatabaseRuntimeEnv,
+} from './neon/moderation-database-runtime.js'
 
 interface RateLimitBinding { limit(input: { key: string }): Promise<{ success: boolean }> }
-interface Env {
+interface Env extends W06ModerationDatabaseRuntimeEnv {
   D1_03: D1Database
   W03_CONTENT_MODERATION: Fetcher
   GOVERNANCE_ORIGIN_GLOBAL_LIMITER?: RateLimitBinding
@@ -1140,7 +1145,7 @@ export default {
         requireModerationPermission('listModerationQueue', principal, request)
         return json({
           ...(await listModerationQueue(
-            env.D1_03,
+            getW06ModerationQueueReadStore(env) ?? getW06ModerationDatabase(env),
             principal.userId,
             url.searchParams.get('cursor'),
             url.searchParams.get('limit') ? Number(url.searchParams.get('limit')) : null,
@@ -1158,7 +1163,7 @@ export default {
         const principal = requireW01Transport(request)
         requireModerationPermission('getModerationCase', principal, request)
         return json({
-          ...(await getModerationCase(env.D1_03, principal.userId, decodeURIComponent(caseMatch[1]))),
+          ...(await getModerationCase(getW06ModerationDatabase(env), principal.userId, decodeURIComponent(caseMatch[1]))),
           requestId: principal.requestId,
         })
       } catch (error) {
@@ -1172,7 +1177,7 @@ export default {
         const principal = requireW01Transport(request)
         requireModerationPermission('decideModerationCase', principal, request)
         const body = parseDecision(await request.json())
-        const result = await decideModerationCase(env.D1_03, env.W03_CONTENT_MODERATION, {
+        const result = await decideModerationCase(getW06ModerationDatabase(env), env.W03_CONTENT_MODERATION, {
           reviewerId: principal.userId,
           reviewerLayer: principal.layer,
           caseId: decodeURIComponent(decisionMatch[1]),
@@ -1769,7 +1774,7 @@ export default {
 
   async scheduled(_controller: ScheduledController, env: Env): Promise<void> {
     try {
-      await drainModerationOutbox(env.D1_03, env.W03_CONTENT_MODERATION, 10)
+      await drainModerationOutbox(getW06ModerationDatabase(env), env.W03_CONTENT_MODERATION, 10)
     } catch {
       // The next scheduled run retries durable outbox records.
     }
