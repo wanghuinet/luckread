@@ -70,8 +70,13 @@ describe('AUTH-007 protected-ref admission contract', () => {
     assert.match(workflow, /environment:\s*auth-mfa-rollout/)
     assert.match(workflow, /GITHUB_REF_PROTECTED:\s*\$\{\{\s*github\.ref_protected\s*\}\}/)
     const admission = workflow.indexOf('run: node scripts/verify-auth-007-rollout-admission.mjs')
-    const deploy = workflow.indexOf('run: npx --yes wrangler@4.116.0 deploy --config wrangler.jsonc')
-    assert.ok(admission >= 0 && deploy > admission, 'AUTH-007 admission must run before W06 deployment')
+    const deployStep = workflow.indexOf('name: Deploy W06 Neon runtime and promote the exact Worker version')
+    const deploy = workflow.indexOf('npx --yes wrangler@4.156.0 deploy --config wrangler.jsonc')
+    const promote = workflow.indexOf('npx --yes wrangler@4.156.0 versions deploy "$version_id@100%"')
+    assert.ok(
+      admission >= 0 && deployStep > admission && deploy > deployStep && promote > deploy,
+      'AUTH-007 admission must run before W06 Neon deployment and exact-version 100% promotion',
+    )
   })
  
   it('accepts exactly the two named mutual approvers with least-privilege role checks', () => {
