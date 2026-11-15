@@ -19,19 +19,34 @@ export interface W06ModerationPostgresPool {
 type BoundStatement = Readonly<{ sql: string; values: unknown[] }>
 const boundStatements = new WeakMap<object, BoundStatement>()
 
-const JSON_TEXT_COLUMNS = new Set(['actor_json', 'before_json', 'after_json', 'evidence_refs_json'])
+const JSON_TEXT_COLUMNS = new Set([
+  'actor_json', 'before_json', 'after_json', 'evidence_refs_json',
+  'actorjson', 'beforejson', 'afterjson',
+])
+const PG_CAMEL_CASE_COLUMNS: Readonly<Record<string, string>> = {
+  eventid: 'eventId',
+  requestid: 'requestId',
+  traceid: 'traceId',
+  actorjson: 'actorJson',
+  targettype: 'targetType',
+  targetid: 'targetId',
+  beforejson: 'beforeJson',
+  afterjson: 'afterJson',
+  occurredat: 'occurredAt',
+}
 
 function normalizeRow<Row extends Record<string, unknown>>(row: Row): Row {
   const normalized: Record<string, unknown> = {}
   for (const [key, value] of Object.entries(row)) {
+    const normalizedKey = PG_CAMEL_CASE_COLUMNS[key.toLowerCase()] ?? key
     if (value instanceof Date && Number.isFinite(value.getTime())) {
-      normalized[key] = value.toISOString()
-    } else if (JSON_TEXT_COLUMNS.has(key) && value !== null && typeof value === 'object') {
+      normalized[normalizedKey] = value.toISOString()
+    } else if (JSON_TEXT_COLUMNS.has(key.toLowerCase()) && value !== null && typeof value === 'object') {
       // The existing W06 AuditEvent/Report contracts expose JSON as serialized text.
       // node-postgres parses JSONB to objects, so restore the D1-compatible shape.
-      normalized[key] = JSON.stringify(value)
+      normalized[normalizedKey] = JSON.stringify(value)
     } else {
-      normalized[key] = value
+      normalized[normalizedKey] = value
     }
   }
   return normalized as Row
