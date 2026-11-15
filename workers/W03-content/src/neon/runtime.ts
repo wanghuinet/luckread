@@ -12,6 +12,7 @@ import { createPostgresPublishedMediaReferenceReadStore } from '../published-med
 import { createPostgresPublishedContentsByIdsReadStore } from '../published-contents-by-ids-read-store-postgres.js'
 import { createPostgresFollowingOwnerContentsReadStore } from '../following-owner-contents-read-store-postgres.js'
 import { createPostgresPostThreadReadStore } from '../post-thread-read-store-postgres.js'
+import { createPostgresContentContextReadStore, type ContentContextReadStore } from '../content-context-read-store-postgres.js'
 import type { PostThreadReadStore } from '../content-relationships.js'
 import type { W03PublishedMediaReferenceRuntimeEnv } from '../published-media-reference-read-store.js'
 
@@ -24,6 +25,7 @@ const stores = new WeakMap<object, PublishedMediaReferenceReadStore>()
 const bookmarkedContentsStores = new WeakMap<object, PublishedContentsByIdsReadStore>()
 const followingContentsStores = new WeakMap<object, FollowingOwnerContentsReadStore>()
 const postThreadStores = new WeakMap<object, PostThreadReadStore>()
+const contentContextStores = new WeakMap<object, ContentContextReadStore>()
 
 /**
  * The explicit D1-02 content read driver controls only the PostgreSQL read
@@ -174,5 +176,26 @@ export function getW03PostThreadReadStore(
     getW03PublicMediaReferencePostgresPool(env),
   )
   postThreadStores.set(binding, store)
+  return store
+}
+
+
+/** PostgreSQL provider for the W01/W05 canonical content-context projections. */
+export function getW03ContentContextReadStore(
+  env: W03PublicMediaReferenceRuntimeEnv,
+): ContentContextReadStore | undefined {
+  if (resolveW03PublicMediaReferenceDriver(env) === 'd1') return undefined
+
+  const binding = env.HYPERDRIVE_D1_02
+  if (!binding || typeof binding !== 'object') {
+    throw new Error('W03_HYPERDRIVE_D1_02_BINDING_REQUIRED')
+  }
+  const cached = contentContextStores.get(binding)
+  if (cached) return cached
+
+  const store = createPostgresContentContextReadStore(
+    getW03PublicMediaReferencePostgresPool(env),
+  )
+  contentContextStores.set(binding, store)
   return store
 }

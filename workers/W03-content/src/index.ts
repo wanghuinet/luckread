@@ -38,6 +38,7 @@ import type {
   PublishedMediaReferenceReadStore,
   W03PublishedMediaReferenceRuntimeEnv,
 } from './published-media-reference-read-store.js'
+import type { ContentContextReadStore } from './content-context-read-store-postgres.js'
 import {
   createContentRelationship,
   listContentRelationships,
@@ -360,6 +361,10 @@ export type W03ContentWorkerDependencies = Readonly<{
   postThreadReadStoreProvider?: (
     env: W03PublishedMediaReferenceRuntimeEnv,
   ) => PostThreadReadStore | undefined
+  /** Optional D1-02 provider for W01/W05 canonical content-context projections. */
+  contentContextReadStoreProvider?: (
+    env: W03PublishedMediaReferenceRuntimeEnv,
+  ) => ContentContextReadStore | undefined
 }>
 
 export function createW03ContentWorker(dependencies: W03ContentWorkerDependencies = {}) {
@@ -394,10 +399,11 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
         ) {
           throw new ContentRuntimeError('VALIDATION_FAILED', 400)
         }
-        const items = await getPublishedContentSocialContexts(
-          env.D1_02,
-          (body as { contentIds: string[] }).contentIds,
-        )
+        const contentIds = (body as { contentIds: string[] }).contentIds
+        const contextReadStore = dependencies.contentContextReadStoreProvider?.(env)
+        const items = contextReadStore
+          ? await contextReadStore.getPublishedContentSocialContexts(contentIds)
+          : await getPublishedContentSocialContexts(env.D1_02, contentIds)
         return json({ data: { items }, requestId: createRequestId() })
       }
 
@@ -417,7 +423,10 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
         }
         if (url.search !== '') throw new ContentRuntimeError('VALIDATION_FAILED', 400)
         const contentId = decodePathSegment(publishedSocialContextMatch[1] ?? '')
-        const context = await getPublishedContentSocialContext(env.D1_02, contentId)
+        const contextReadStore = dependencies.contentContextReadStoreProvider?.(env)
+        const context = contextReadStore
+          ? await contextReadStore.getPublishedContentSocialContext(contentId)
+          : await getPublishedContentSocialContext(env.D1_02, contentId)
         return json({ data: context, requestId: createRequestId() })
       }
 
@@ -438,7 +447,10 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
         if (url.search !== '') throw new ContentRuntimeError('VALIDATION_FAILED', 400)
         const contentId = decodePathSegment(publicPostContextMatch[1] ?? '')
         const ownerUserId = decodePathSegment(publicPostContextMatch[2] ?? '')
-        const context = await getPublishedOwnerPostContext(env.D1_02, contentId, ownerUserId)
+        const contextReadStore = dependencies.contentContextReadStoreProvider?.(env)
+        const context = contextReadStore
+          ? await contextReadStore.getPublishedOwnerPostContext(contentId, ownerUserId)
+          : await getPublishedOwnerPostContext(env.D1_02, contentId, ownerUserId)
         return json({ data: context, requestId: createRequestId() })
       }
 
@@ -462,7 +474,10 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
           throw new ContentRuntimeError('PERMISSION_DENIED', 403)
         }
         const contentId = decodePathSegment(ownedPostContextMatch[1] ?? '')
-        const context = await getOwnedPostContext(env.D1_02, contentId, principal.userId)
+        const contextReadStore = dependencies.contentContextReadStoreProvider?.(env)
+        const context = contextReadStore
+          ? await contextReadStore.getOwnedPostContext(contentId, principal.userId)
+          : await getOwnedPostContext(env.D1_02, contentId, principal.userId)
         return json({ data: context, requestId: createRequestId() })
       }
 
@@ -790,7 +805,10 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
         }
         if (url.search !== '') throw new ContentRuntimeError('VALIDATION_FAILED', 400)
         const contentId = decodePathSegment(publicAuthorContextMatch[1] ?? '')
-        const context = await getPublishedContentAuthorContext(env.D1_02, contentId)
+        const contextReadStore = dependencies.contentContextReadStoreProvider?.(env)
+        const context = contextReadStore
+          ? await contextReadStore.getPublishedContentAuthorContext(contentId)
+          : await getPublishedContentAuthorContext(env.D1_02, contentId)
         return json({ data: context, requestId: createRequestId() })
       }
 
