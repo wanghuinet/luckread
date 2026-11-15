@@ -5,6 +5,7 @@ import {
   type W07WebhookPostgresClient,
   type W07WebhookPostgresPool,
 } from './payment-webhook-database-postgres.js'
+import { buildCompletePaymentMethodRevocationOnMandateWebhook } from './payment-method-persistence.js'
 
 function fakePool(options: {
   queryRows?: Record<string, unknown>[]
@@ -64,6 +65,24 @@ describe('W07 PostgreSQL webhook D1 bridge', () => {
       version: 3,
       created_at: '2026-11-15T12:00:00.123Z',
     })
+  })
+
+  it('uses PostgreSQL-native monotonic timestamp arithmetic for Mandate revocation completion', () => {
+    const statements: string[] = []
+    const fakeDatabase = {
+      prepare(sql: string) {
+        statements.push(sql)
+        return {} as D1PreparedStatement
+      },
+    } as unknown as D1Database
+
+    buildCompletePaymentMethodRevocationOnMandateWebhook(
+      fakeDatabase, 'merchant_01', 'customer_01', 'pm_01', '2026-11-15T12:00:00.000Z', 'postgres',
+    )
+
+    expect(statements[0]).toContain("GREATEST(updated_at + INTERVAL '1 millisecond', ?::timestamptz)")
+    expect(statements[0]).not.toContain('strftime')
+    expect(statements[0]).not.toContain('julianday')
   })
 
   it('executes every D1 batch statement in one PostgreSQL transaction and returns change counts', async () => {
