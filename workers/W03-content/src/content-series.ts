@@ -27,6 +27,20 @@ export interface SeriesRecord {
   updatedAt: string
 }
 
+export type SeriesListCursor = Readonly<{
+  updatedAt: string
+  id: string
+}>
+
+export interface SeriesReadStore {
+  getSeries(ownerUserId: string, seriesId: string): Promise<SeriesRecord | null>
+  listCreatorSeries(
+    ownerUserId: string,
+    cursor: SeriesListCursor | null,
+    limit: number,
+  ): Promise<readonly SeriesRecord[]>
+}
+
 interface SeriesRow {
   id: string
   owner_user_id: string
@@ -355,9 +369,15 @@ export async function getSeries(
   db: ContentD1,
   principalUserId: string,
   seriesId: string,
+  readStore?: SeriesReadStore,
 ): Promise<SeriesRecord> {
   assertResourceId(principalUserId)
   assertResourceId(seriesId)
+  if (readStore) {
+    const series = await readStore.getSeries(principalUserId, seriesId)
+    if (!series) throw new ContentRuntimeError('NOT_FOUND', 404)
+    return series
+  }
   const row = await db.prepare(
     'SELECT id, owner_user_id, creator_id, ip_id, state, version, title, description, ' +
     'cover_ref, etag, created_at, updated_at FROM content_series WHERE id = ? AND owner_user_id = ?',
@@ -371,23 +391,30 @@ export async function listCreatorSeries(
   ownerUserId: string,
   cursor: string | null,
   limit: number,
+  readStore?: SeriesReadStore,
 ): Promise<{ items: SeriesRecord[]; nextCursor: string | null; hasMore: boolean }> {
   assertResourceId(ownerUserId)
   const pageSize = listPageSize(limit)
   const cursorScope = JSON.stringify({ type: 'creator-series', ownerUserId })
   const decoded = cursor ? decodeScopedCursor(cursor, cursorScope) : null
-  const cursorClause = decoded ? 'AND (updated_at < ? OR (updated_at = ? AND id < ?))' : ''
-  const bindings: unknown[] = [ownerUserId]
-  if (decoded) bindings.push(decoded.updatedAt, decoded.updatedAt, decoded.id)
-  bindings.push(pageSize + 1)
-  const rows = await db.prepare(
-    'SELECT id, owner_user_id, creator_id, ip_id, state, version, title, description, ' +
-    'cover_ref, etag, created_at, updated_at FROM content_series ' +
-    'WHERE owner_user_id = ? ' + cursorClause +
-    ' ORDER BY updated_at DESC, id DESC LIMIT ?',
-  ).bind(...bindings).all<SeriesRow>()
-  const hasMore = rows.results.length > pageSize
-  const page = rows.results.slice(0, pageSize).map(toSeries)
+  let rows: readonly SeriesRecord[]
+  if (readStore) {
+    rows = await readStore.listCreatorSeries(ownerUserId, decoded, pageSize + 1)
+  } else {
+    const cursorClause = decoded ? 'AND (updated_at < ? OR (updated_at = ? AND id < ?))' : ''
+    const bindings: unknown[] = [ownerUserId]
+    if (decoded) bindings.push(decoded.updatedAt, decoded.updatedAt, decoded.id)
+    bindings.push(pageSize + 1)
+    const result = await db.prepare(
+      'SELECT id, owner_user_id, creator_id, ip_id, state, version, title, description, ' +
+      'cover_ref, etag, created_at, updated_at FROM content_series ' +
+      'WHERE owner_user_id = ? ' + cursorClause +
+      ' ORDER BY updated_at DESC, id DESC LIMIT ?',
+    ).bind(...bindings).all<SeriesRow>()
+    rows = result.results.map(toSeries)
+  }
+  const hasMore = rows.length > pageSize
+  const page = rows.slice(0, pageSize)
   const last = page.at(-1)
   return {
     items: page,
