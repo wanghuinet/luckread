@@ -171,7 +171,8 @@ export function createPostgresWebhookD1Database(pool: W07WebhookPostgresPool): D
   const database = {
     prepare(sql: string): D1PreparedStatement {
       const state: { sql: string; values: unknown[] } = { sql, values: [] };
-      const statement = {
+      let statement: D1PreparedStatement;
+      const prepared = {
         bind(...values: unknown[]) {
           state.values = values;
           return statement;
@@ -202,7 +203,8 @@ export function createPostgresWebhookD1Database(pool: W07WebhookPostgresPool): D
           }
           return rows.map((row) => Object.values(row)) as T[];
         },
-      } as unknown as D1PreparedStatement;
+      };
+      statement = prepared as unknown as D1PreparedStatement;
       boundStatements.set(statement as object, state);
       return statement;
     },
