@@ -144,6 +144,8 @@ describe('W07 PostgreSQL payment-method persistence', () => {
     expect(result.version).toBe(2)
     const update = calls.find((call) => call.sql.startsWith('UPDATE payment_method_revocation_requests'))
     expect(update?.sql).toContain('r.version = $5')
+    expect(update?.sql).toContain('JOIN saved_payment_methods s')
+    expect(update?.sql).toContain('s.saved_payment_method_id = r.saved_payment_method_id')
     expect(update?.sql).toContain("m.status NOT IN ('REVOKED','FAILED','EXPIRED')")
     expect(release).toHaveBeenCalledOnce()
   })
