@@ -10,7 +10,7 @@ import {
 import { handleCommerceOrderRequest } from './order-http-runtime.js';
 import { issueInvoiceForOrder } from './billing-persistence.js';
 
-const env = {
+const env: Parameters<typeof handleCommerceOrderRequest>[2] = {
   D1_01: {} as D1Database,
   D1_04: {} as D1Database,
 };
@@ -80,6 +80,7 @@ describe('private W07 commerce order HTTP handler', () => {
   it('creates an order using the authenticated principal, bounded request body, and forwarded idempotency key', async () => {
     let captured: Parameters<typeof createCommerceOrder> | undefined;
     let invoiceCall: Parameters<typeof issueInvoiceForOrder> | undefined;
+    let readDatabaseSelections = 0;
     const mockCreate = (async (...args: Parameters<typeof createCommerceOrder>) => {
       captured = args;
       return createResult;
@@ -94,16 +95,23 @@ describe('private W07 commerce order HTTP handler', () => {
         'Idempotency-Key': 'purchase_attempt_01',
       }),
       'user_42',
-      env,
-      { createOrder: mockCreate, issueInvoice: mockInvoice, resolvePricing: async () => explicitTestPricing },
+      { ...env, W07_DATABASE_DRIVER: 'neon' },
+      {
+        createOrder: mockCreate,
+        issueInvoice: mockInvoice,
+        resolvePricing: async () => explicitTestPricing,
+        getReadDatabase: () => { readDatabaseSelections += 1; return {} as D1Database; },
+      },
     );
 
     expect(response?.status).toBe(201);
+    expect(captured?.[0]).toBe(env.D1_04);
     expect(captured?.[1]).toBe('user_42');
     expect(captured?.[2]).toBe('purchase_attempt_01');
     expect(captured?.[3]).toEqual({ items: [{ itemRef: 'plan_' + 'a'.repeat(64), quantity: 1 }] })
     expect(invoiceCall?.slice(0, 2)).toEqual([env.D1_04, 'user_42'])
     expect(invoiceCall?.[2]).toBe(orderData.orderId);
+    expect(readDatabaseSelections).toBe(0);
     const envelope = await parseResponse(response!);
     expect(envelope.data).toEqual(orderData);
     expect(envelope.requestId).toMatch(/^req_/);
@@ -196,12 +204,37 @@ describe('private W07 commerce order HTTP handler', () => {
     );
 
     expect(response?.status).toBe(200);
+    expect(captured?.[0]).toBe(env.D1_04);
     expect(captured?.[1]).toBe('user_42');
     expect(captured?.[2]).toBe('ord_test_1');
     const envelope = await parseResponse(response!);
     expect(envelope.data).toEqual(orderData);
     expect(JSON.stringify(envelope)).not.toContain('customer_id');
     expect(JSON.stringify(envelope)).not.toContain('item_snapshot_json');
+  });
+
+  it('routes owner-scoped order detail reads through the selected Neon D1-04 database without touching D1', async () => {
+    let captured: Parameters<typeof getCommerceOrder> | undefined;
+    const neonDatabase = {} as D1Database;
+    const d1Database = {
+      prepare() { throw new Error('D1 must not be used while Neon is selected'); },
+    } as unknown as D1Database;
+    const mockGet = (async (...args: Parameters<typeof getCommerceOrder>) => {
+      captured = args;
+      return orderData;
+    }) as typeof getCommerceOrder;
+    const response = await handleCommerceOrderRequest(
+      new Request('https://luckread-w07.internal/commerce/orders/ord_test_1'),
+      'user_42',
+      { ...env, D1_04: d1Database, W07_DATABASE_DRIVER: 'neon' },
+      { getOrder: mockGet, getReadDatabase: () => neonDatabase },
+    );
+
+    expect(response?.status).toBe(200);
+    expect(captured?.[0]).toBe(neonDatabase);
+    expect(captured?.[1]).toBe('user_42');
+    expect(captured?.[2]).toBe('ord_test_1');
+    expect((await parseResponse(response!)).data).toEqual(orderData);
   });
 
   it('maps owner-scoped not-found without leaking whether another user owns the order', async () => {
