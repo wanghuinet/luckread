@@ -13,6 +13,7 @@ export default defineConfig({
       'src/follow-neon-runtime.test.ts',
       'src/notification-inbox-neon-runtime.test.ts',
       'src/social-closure-reads-neon-runtime.test.ts',
+      'src/content-tokens-neon-runtime.test.ts',
       'src/poll-runtime.test.ts',
       'src/poll-read-store-postgres.test.ts',
       'src/poll-vote-store-postgres.test.ts',
