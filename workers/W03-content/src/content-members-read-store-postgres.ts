@@ -23,13 +23,11 @@ interface ParentRow {
   etag: string
 }
 
-interface MemberRow {
+interface MemberRowBase {
   relationship_id: string
   position: number
   created_at: Date | string
   updated_at: Date | string
-  series_id?: string
-  collection_id?: string
   content_id: string
   content_slug: string
   content_type: 'article' | 'post' | 'video'
@@ -37,15 +35,18 @@ interface MemberRow {
   content_title: string
 }
 
+type SeriesMemberRow = MemberRowBase & { series_id: string }
+type CollectionMemberRow = MemberRowBase & { collection_id: string }
+
 const timestampString = (value: unknown): string => {
   if (value instanceof Date && Number.isFinite(value.getTime())) return value.toISOString()
   if (typeof value === 'string' && value.length > 0) return value
   throw new Error('W03_POSTGRES_MEMBER_TIMESTAMP_INVALID')
 }
 
-const toSeriesMember = (row: MemberRow): SeriesMemberRecord => ({
+const toSeriesMember = (row: SeriesMemberRow): SeriesMemberRecord => ({
   relationshipId: row.relationship_id,
-  seriesId: row.series_id ?? '',
+  seriesId: row.series_id,
   contentId: row.content_id,
   contentSlug: row.content_slug,
   contentType: row.content_type,
@@ -56,9 +57,9 @@ const toSeriesMember = (row: MemberRow): SeriesMemberRecord => ({
   updatedAt: timestampString(row.updated_at),
 })
 
-const toCollectionMember = (row: MemberRow): CollectionMemberRecord => ({
+const toCollectionMember = (row: CollectionMemberRow): CollectionMemberRecord => ({
   relationshipId: row.relationship_id,
-  collectionId: row.collection_id ?? '',
+  collectionId: row.collection_id,
   contentId: row.content_id,
   contentSlug: row.content_slug,
   contentType: row.content_type,
@@ -109,7 +110,7 @@ export function createPostgresMembersReadStore(
         if (!parent) throw new ContentRuntimeError('NOT_FOUND', 404)
 
         try {
-          const result = await database.query<MemberRow>(
+          const result = await database.query<SeriesMemberRow>(
             'SELECT r.relationship_id, r.position, r.created_at, r.updated_at, ' +
             'r.target_id AS series_id, c.id AS content_id, c.slug AS content_slug, ' +
             'c.content_type, c.state AS content_state, c.title AS content_title ' +
@@ -154,7 +155,7 @@ export function createPostgresMembersReadStore(
         if (!parent) throw new ContentRuntimeError('NOT_FOUND', 404)
 
         try {
-          const result = await database.query<MemberRow>(
+          const result = await database.query<CollectionMemberRow>(
             'SELECT r.relationship_id, r.position, r.created_at, r.updated_at, ' +
             'r.target_id AS collection_id, c.id AS content_id, c.slug AS content_slug, ' +
             'c.content_type, c.state AS content_state, c.title AS content_title ' +
