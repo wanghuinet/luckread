@@ -18,7 +18,6 @@ import { createReport, ReportRuntimeError } from './report-runtime'
 import {
   getW06ModerationDatabase,
   getW06ModerationQueueReadStore,
-  resolveW06ModerationDatabaseDriver,
   type W06ModerationDatabaseRuntimeEnv,
 } from './neon/moderation-database-runtime.js'
 
@@ -1114,7 +1113,7 @@ export default {
     const url = new URL(request.url)
 
     if (url.pathname === '/health' && request.method === 'GET') {
-      return json({ service: 'W06', status: 'ok', auditPersistence: 'enabled', d1Binding: Boolean(env.D1_03), databaseDriver: resolveW06ModerationDatabaseDriver(env), moderationRuntime: 'enabled' })
+      return json({ service: 'W06', status: 'ok', auditPersistence: 'enabled', d1Binding: Boolean(env.D1_03), moderationRuntime: 'enabled' })
     }
 
     if (request.method === 'POST' && url.pathname === '/reports') {
