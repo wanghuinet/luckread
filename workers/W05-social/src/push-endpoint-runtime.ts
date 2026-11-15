@@ -215,8 +215,10 @@ export async function deletePushEndpoint(
   db: D1Database | undefined,
   ownerUserIdValue: string,
   installationIdValue: string,
+  postgres?: PushEndpointPostgresExecutor,
 ): Promise<void> {
-  if (!db) throw new PushEndpointRuntimeError('SERVICE_UNAVAILABLE', 503)
+  if (!db && !postgres) throw new PushEndpointRuntimeError('SERVICE_UNAVAILABLE', 503)
+  const database: PushEndpointDatabase = postgres ?? db!
   const ownerUserId = validUserId(ownerUserIdValue)
   const installationId = validInstallationId(installationIdValue)
 
