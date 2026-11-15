@@ -66,14 +66,14 @@ describe('W05 notification push endpoint runtime', () => {
     const prepare = vi.fn()
     const db = { prepare } as unknown as D1Database
 
-    await expect(upsertPushEndpoint(db, 'identity-user-1', installationId, {
+    await expect(upsertPushEndpoint(undefined, 'identity-user-1', installationId, {
       ownerUserId: 'attacker',
       platform: 'ios',
       permissionStatus: 'granted',
       expoPushToken: pushToken,
     })).rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 422 })
 
-    await expect(upsertPushEndpoint(db, 'identity-user-1', installationId, {
+    await expect(upsertPushEndpoint(undefined, 'identity-user-1', installationId, {
       platform: 'ios',
       permissionStatus: 'granted',
       expoPushToken: 'not-an-expo-token',
@@ -137,7 +137,7 @@ describe('W05 notification push endpoint runtime', () => {
       }),
     } as unknown as D1Database
 
-    await expect(deletePushEndpoint(db, 'identity-user-1', installationId)).resolves.toBeUndefined()
+    await expect(deletePushEndpoint(undefined, 'identity-user-1', installationId, db)).resolves.toBeUndefined()
     expect(sql).toBe('DELETE FROM notification_push_endpoints WHERE owner_user_id = ? AND installation_id = ?')
     expect(bindings).toEqual(['identity-user-1', installationId])
   })
@@ -153,7 +153,7 @@ describe('W05 notification push endpoint runtime', () => {
       permissionStatus: 'granted',
       expoPushToken: pushToken,
       appVersion: '1.0.0',
-    })).resolves.toEqual({ endpointId: 'pg-endpoint-1', status: 'ACTIVE' })
+    }, db)).resolves.toEqual({ endpointId: 'pg-endpoint-1', status: 'ACTIVE' })
 
     const [sql, values] = query.mock.calls[0]!
     expect(sql).toContain('INSERT INTO notification_push_endpoints')
@@ -185,7 +185,7 @@ describe('W05 notification push endpoint runtime', () => {
       platform: 'ios',
       permissionStatus: 'granted',
       expoPushToken: pushToken,
-    })).rejects.toMatchObject({
+    }, db)).rejects.toMatchObject({
       code: 'CONFLICT',
       status: 409,
       message: 'CONFLICT',
