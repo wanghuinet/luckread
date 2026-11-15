@@ -110,11 +110,10 @@ function getPool(
 const asExecutor = <T>(pool: Pool): T => pool as unknown as T
 
 /**
- * Compose the W05 PostgreSQL Stores that have explicit worker injection ports,
- * including the full comment write path and its topic/mention/notification
- * side effects. Other W05 routes not yet adapted and the W09-owned D1-03 push
- * endpoint state remain on their existing D1/service-binding paths. D1 remains
- * the default; Neon is opt-in and requires the existing D1-02 Hyperdrive binding.
+ * Compose all W05 social-route PostgreSQL Stores with explicit injection ports,
+ * including reply-audience policy and the full comment write/notification path.
+ * W09-owned D1-03 push endpoint state remains on its separately scoped binding.
+ * D1 remains the default; Neon is opt-in through the existing D1-02 Hyperdrive.
  */
 export function getW05SocialWorkerDependencies(
   env: W05SocialRuntimeEnv,
