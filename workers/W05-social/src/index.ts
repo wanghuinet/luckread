@@ -74,6 +74,7 @@ import type { ProfilePinStore } from './profile-pin-store.js'
 import type { RepostStore } from './repost-store.js'
 import type { ShareStore } from './share-store.js'
 import type { PollConfigurationStore } from './poll-configuration-store.js'
+import type { PollDeleteStore } from './poll-delete-store.js'
 import type { PollReadStore } from './poll-read-store.js'
 import type { PollVoteStore } from './poll-vote-store.js'
 
@@ -309,6 +310,8 @@ export type W05SocialWorkerDependencies = Readonly<{
   shareStore?: ShareStore
   /** Optional PostgreSQL-capable poll configuration writer; D1 remains the deployed default. */
   pollConfigurationStore?: PollConfigurationStore
+  /** Optional PostgreSQL-capable draft poll deletion store; D1 remains the deployed default. */
+  pollDeleteStore?: PollDeleteStore
   /** Optional PostgreSQL-capable poll reader; D1 remains the deployed default. */
   pollReadStore?: PollReadStore
   /** Optional PostgreSQL-capable poll vote writer; D1 remains the deployed default. */
@@ -889,7 +892,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
             contentId,
             correlationId: request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '',
           })
-          await deleteContentPoll(env.DB, actorUserId, contentId, contentContext)
+          await deleteContentPoll(env.DB, actorUserId, contentId, contentContext, dependencies.pollDeleteStore)
           return new Response(null, { status: 204 })
         }
         return new Response(null, { status: 405, headers: { Allow: 'GET, POST, DELETE' } })

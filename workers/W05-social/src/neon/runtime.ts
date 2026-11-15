@@ -27,6 +27,7 @@ import { createPostgresNotificationPreferencesStore } from '../notification-pref
 import { createPostgresSocialTargetsReadStore } from '../social-targets-read-store-postgres.js'
 import { createPostgresSocialTokenSyncStore } from '../social-token-sync-store-postgres.js'
 import { createPostgresPollConfigurationStore } from '../poll-configuration-store-postgres.js'
+import { createPostgresPollDeleteStore } from '../poll-delete-store-postgres.js'
 import { createPostgresPollReadStore } from '../poll-read-store-postgres.js'
 import { createPostgresPollVoteStore } from '../poll-vote-store-postgres.js'
 
@@ -201,6 +202,9 @@ export function getW05SocialWorkerDependencies(
     ),
     pollConfigurationStore: createPostgresPollConfigurationStore(
       asExecutor<Parameters<typeof createPostgresPollConfigurationStore>[0]>(pool),
+    ),
+    pollDeleteStore: createPostgresPollDeleteStore(
+      asExecutor<Parameters<typeof createPostgresPollDeleteStore>[0]>(pool),
     ),
     pollReadStore: createPostgresPollReadStore(
       asExecutor<Parameters<typeof createPostgresPollReadStore>[0]>(pool),
