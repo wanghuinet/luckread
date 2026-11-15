@@ -3,6 +3,7 @@ import type { Pool } from 'pg'
 
 import {
   getW07PaymentMethodReadStore,
+  getW07PaymentWebhookDatabase,
   resolveW07DatabaseDriver,
 } from './payment-method-read-runtime.js'
 
@@ -42,15 +43,22 @@ describe('W07 payment-method Neon read runtime', () => {
 
     const first = getW07PaymentMethodReadStore(env, poolFactory)
     const second = getW07PaymentMethodReadStore(env, poolFactory)
+    const webhookDatabase = getW07PaymentWebhookDatabase(env, poolFactory)
+    const secondWebhookDatabase = getW07PaymentWebhookDatabase(env, poolFactory)
     expect(first).toBeDefined()
     expect(first).toBe(second)
+    expect(webhookDatabase).toBeDefined()
+    expect(webhookDatabase).toBe(secondWebhookDatabase)
     expect(poolFactory).toHaveBeenCalledTimes(1)
     expect(pool.on).toHaveBeenCalledTimes(1)
 
     await first!.listSavedPaymentMethodRecords('customer_01', 'merchant_01')
-    expect(calls).toHaveLength(1)
+    await webhookDatabase!.prepare('SELECT event_id FROM payment_provider_events WHERE event_id = ?').bind('evt_01').first()
+    expect(calls).toHaveLength(2)
     expect(calls[0]?.values).toEqual(['hyperswitch', 'merchant_01', 'customer_01'])
     expect(calls[0]?.sql).toContain('s.customer_id = $3')
     expect(calls[0]?.sql).toContain('LIMIT 100')
+    expect(calls[1]?.values).toEqual(['evt_01'])
+    expect(calls[1]?.sql).toContain('event_id = $1')
   })
 })
