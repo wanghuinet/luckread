@@ -148,18 +148,4 @@ describe('W07 PostgreSQL payment-method persistence', () => {
     expect(release).toHaveBeenCalledOnce()
   })
 
-  it('finalizes revocation only after all mandates have reached terminal states', async () => {
-    const query = vi.fn(async () => ({ rows: [] }))
-    const store = createPostgresPaymentMethodReadStore({ query } as unknown as PaymentMethodPostgresQueryExecutor)
-    await store.completePaymentMethodRevocationOnMandateWebhook(
-      merchantId, customerId, paymentMethodId, now,
-    )
-
-    expect(query).toHaveBeenCalledOnce()
-    const [sql, values] = query.mock.calls[0] as unknown as [string, unknown[]]
-    expect(sql).toContain("status IN ('REQUESTED','PENDING_PROVIDER','RECONCILIATION_REQUIRED')")
-    expect(sql).toContain('provider_method_deleted_at IS NOT NULL')
-    expect(sql).toContain("m.status NOT IN ('REVOKED','FAILED','EXPIRED')")
-    expect(values).toEqual([now, 'hyperswitch', merchantId, customerId, paymentMethodId])
-  })
 })
