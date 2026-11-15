@@ -88,6 +88,13 @@ jobs:
           const w01 = read('workers/W01-payload/wrangler.jsonc')
           const w02 = read('workers/W02-identity/wrangler.jsonc')
           const w08 = read('workers/W08-creator/wrangler.jsonc')
+          const bootstrap = read('contracts/database/neon-five-domain-schema-bootstrap.v1.json')
+          const d101 = (bootstrap.domains || []).find((item) => item.domainId === 'D1-01')
+          if (d101?.databaseName !== 'luckread' ||
+              d101?.remoteSchemaApplied !== true ||
+              d101?.status !== 'D1_01_SCHEMA_ONLY_REMOTE_APPLIED_ALL_OWNER_POSTFLIGHT_PASSED_RUNTIME_CUTOVER_PENDING') {
+            throw new Error('D1-01 remote Neon schema and all-owner postflight admission must pass before runtime deployment')
+          }
           const databaseId = '2f80471e-3756-49f9-8db1-7707a433ad64'
           const hyperdriveId = '0c53a1bb9bc0484bac146e8ae2d3158b'
           const assertBinding = (config, bindingName, worker) => {
