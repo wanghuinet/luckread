@@ -143,7 +143,7 @@ describe('W05 notification push endpoint runtime', () => {
   })
 
   it('upserts Expo endpoints through the D1-03 PostgreSQL executor with owner-scoped conflict protection', async () => {
-    const query = vi.fn(async () => ({
+    const query = vi.fn(async (_sql: string, _values?: unknown[]) => ({
       rows: [{ endpoint_id: 'pg-endpoint-1', permission_status: 'granted' }],
     }))
     const db = { query } as never
@@ -193,7 +193,7 @@ describe('W05 notification push endpoint runtime', () => {
   })
 
   it('deletes a push endpoint using only the authenticated owner and installation in PostgreSQL', async () => {
-    const query = vi.fn(async () => ({ rows: [] }))
+    const query = vi.fn(async (_sql: string, _values?: unknown[]) => ({ rows: [] }))
     const db = { query } as never
 
     await expect(deletePushEndpoint(db, 'identity-user-1', installationId)).resolves.toBeUndefined()
