@@ -19,12 +19,20 @@ export interface W06ModerationPostgresPool {
 type BoundStatement = Readonly<{ sql: string; values: unknown[] }>
 const boundStatements = new WeakMap<object, BoundStatement>()
 
+const JSON_TEXT_COLUMNS = new Set(['actor_json', 'before_json', 'after_json', 'evidence_refs_json'])
+
 function normalizeRow<Row extends Record<string, unknown>>(row: Row): Row {
   const normalized: Record<string, unknown> = {}
   for (const [key, value] of Object.entries(row)) {
-    normalized[key] = value instanceof Date && Number.isFinite(value.getTime())
-      ? value.toISOString()
-      : value
+    if (value instanceof Date && Number.isFinite(value.getTime())) {
+      normalized[key] = value.toISOString()
+    } else if (JSON_TEXT_COLUMNS.has(key) && value !== null && typeof value === 'object') {
+      // The existing W06 AuditEvent/Report contracts expose JSON as serialized text.
+      // node-postgres parses JSONB to objects, so restore the D1-compatible shape.
+      normalized[key] = JSON.stringify(value)
+    } else {
+      normalized[key] = value
+    }
   }
   return normalized as Row
 }
@@ -34,41 +42,51 @@ function normalizeRows<Row extends Record<string, unknown>>(rows: Row[]): Row[] 
 }
 
 /** Replace D1 positional markers without rewriting question marks in strings or SQL comments. */
-export function toPostgresModerationSql(sql: string): string {
+function translatePostgresModerationStatement(
+  sourceSql: string,
+  previousChanges?: number,
+): Readonly<{ sql: string; extraValues: unknown[] }> {
+  let sql = sourceSql
+  const insertIgnore = /^(\\s*)INSERT\\s+OR\\s+IGNORE\\s+INTO\\b/i
+  if (insertIgnore.test(sql)) {
+    sql = sql.replace(insertIgnore, '$1INSERT INTO').trimEnd() + '\\nON CONFLICT DO NOTHING'
+  }
+
   let result = ''
-  let index = 0
+  let position = 0
   let parameter = 0
   let singleQuoted = false
   let doubleQuoted = false
   let lineComment = false
   let blockComment = false
+  const extraValues: unknown[] = []
 
-  while (index < sql.length) {
-    const char = sql[index]!
-    const next = sql[index + 1]
+  while (position < sql.length) {
+    const char = sql[position]!
+    const next = sql[position + 1]
 
     if (lineComment) {
       result += char
-      index += 1
-      if (char === '\n') lineComment = false
+      position += 1
+      if (char === '\\n') lineComment = false
       continue
     }
     if (blockComment) {
       result += char
-      index += 1
+      position += 1
       if (char === '*' && next === '/') {
         result += '/'
-        index += 1
+        position += 1
         blockComment = false
       }
       continue
     }
     if (singleQuoted) {
       result += char
-      index += 1
+      position += 1
       if (char === "'" && next === "'") {
         result += next
-        index += 1
+        position += 1
       } else if (char === "'") {
         singleQuoted = false
       }
@@ -76,43 +94,57 @@ export function toPostgresModerationSql(sql: string): string {
     }
     if (doubleQuoted) {
       result += char
-      index += 1
+      position += 1
       if (char === '"' && next === '"') {
         result += next
-        index += 1
+        position += 1
       } else if (char === '"') {
         doubleQuoted = false
       }
       continue
     }
 
-    if (char === '-' && next === '-') {
+    const changesMatch = /^changes\\s*\\(\\s*\\)/i.exec(sql.slice(position))
+    if (changesMatch) {
+      if (previousChanges === undefined) {
+        throw new Error('W06_SQLITE_CHANGES_REQUIRES_BATCH_CONTEXT')
+      }
+      parameter += 1
+      result += '$' + parameter
+      extraValues.push(previousChanges)
+      position += changesMatch[0].length
+    } else if (char === '-' && next === '-') {
       result += '--'
-      index += 2
+      position += 2
       lineComment = true
     } else if (char === '/' && next === '*') {
       result += '/*'
-      index += 2
+      position += 2
       blockComment = true
     } else if (char === "'") {
       result += char
-      index += 1
+      position += 1
       singleQuoted = true
     } else if (char === '"') {
       result += char
-      index += 1
+      position += 1
       doubleQuoted = true
     } else if (char === '?') {
       parameter += 1
       result += '$' + parameter
-      index += 1
+      position += 1
     } else {
       result += char
-      index += 1
+      position += 1
     }
   }
 
-  return result
+  return { sql: result, extraValues }
+}
+
+/** Replace D1 positional markers while preserving SQL literals/comments and D1 batch changes(). */
+export function toPostgresModerationSql(sql: string): string {
+  return translatePostgresModerationStatement(sql).sql
 }
 
 function isModerationChangeGuard(sql: string): boolean {
@@ -155,7 +187,8 @@ export function createPostgresModerationD1Database(pool: W06ModerationPostgresPo
     statement: BoundStatement,
   ): Promise<{ rows: Row[]; rowCount: number | null }> {
     try {
-      return await pool.query<Row>(toPostgresModerationSql(statement.sql), statement.values)
+      const translated = translatePostgresModerationStatement(statement.sql)
+      return await pool.query<Row>(translated.sql, [...statement.values, ...translated.extraValues])
     } catch (error) {
       throw normalizeDatabaseError(error)
     }
@@ -219,10 +252,15 @@ export function createPostgresModerationD1Database(pool: W06ModerationPostgresPo
           }
 
           const guard = isModerationChangeGuard(bound.sql)
+          const translated = guard
+            ? null
+            : translatePostgresModerationStatement(bound.sql, previousChanges)
           const sql = guard
             ? 'INSERT INTO moderation_txn_guard (id, successful) VALUES (1, $1) ON CONFLICT (id) DO UPDATE SET successful = EXCLUDED.successful'
-            : toPostgresModerationSql(bound.sql)
-          const values = guard ? [previousChanges] : bound.values
+            : translated!.sql
+          const values = guard
+            ? [previousChanges]
+            : [...bound.values, ...translated!.extraValues]
 
           let result: { rows: Record<string, unknown>[]; rowCount: number | null }
           try {
