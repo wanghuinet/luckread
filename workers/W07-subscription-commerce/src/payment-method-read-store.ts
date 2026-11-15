@@ -46,8 +46,6 @@ export interface PaymentMethodReadStore {
     input: PaymentMethodRevocationRequest,
     now: string,
   ): Promise<PaymentMethodRevocationRequest>
-
-
 }
 
 /** D1 remains the production adapter until a separate reviewed cutover. */
@@ -64,6 +62,5 @@ export function createD1PaymentMethodReadStore(db: D1Database): PaymentMethodRea
     ),
     markPaymentMethodProviderDeleted: (input, now) =>
       markPaymentMethodProviderDeleted(db, input, now),
-
   }
 }
