@@ -22,6 +22,15 @@ import {
   createPostgresSeriesReadStore,
 } from '../content-series-read-store-postgres.js'
 import type { SeriesReadStore } from '../content-series.js'
+import {
+  createPostgresMembersReadStore,
+} from '../content-members-read-store-postgres.js'
+import type {
+  SeriesMembersReadStore,
+} from '../content-series-members.js'
+import type {
+  CollectionMembersReadStore,
+} from '../content-collection-members.js'
 import type { W03PublishedMediaReferenceRuntimeEnv } from '../published-media-reference-read-store.js'
 
 export type W03PublicMediaReferenceDriver = 'd1' | 'neon'
@@ -36,6 +45,10 @@ const postThreadStores = new WeakMap<object, PostThreadReadStore>()
 const contentContextStores = new WeakMap<object, ContentContextReadStore>()
 const collectionListStores = new WeakMap<object, CollectionListReadStore>()
 const seriesStores = new WeakMap<object, SeriesReadStore>()
+const membersStores = new WeakMap<object, {
+  series: SeriesMembersReadStore
+  collections: CollectionMembersReadStore
+}>()
 
 /**
  * The explicit D1-02 content read driver controls only the PostgreSQL read
@@ -248,5 +261,28 @@ export function getW03SeriesReadStore(
     getW03PublicMediaReferencePostgresPool(env),
   )
   seriesStores.set(binding, store)
+  return store
+}
+
+/** PostgreSQL providers for read-only series and collection membership lists. */
+export function getW03MembersReadStore(
+  env: W03PublicMediaReferenceRuntimeEnv,
+): {
+  series: SeriesMembersReadStore
+  collections: CollectionMembersReadStore
+} | undefined {
+  if (resolveW03PublicMediaReferenceDriver(env) === 'd1') return undefined
+
+  const binding = env.HYPERDRIVE_D1_02
+  if (!binding || typeof binding !== 'object') {
+    throw new Error('W03_HYPERDRIVE_D1_02_BINDING_REQUIRED')
+  }
+  const cached = membersStores.get(binding)
+  if (cached) return cached
+
+  const store = createPostgresMembersReadStore(
+    getW03PublicMediaReferencePostgresPool(env),
+  )
+  membersStores.set(binding, store)
   return store
 }
