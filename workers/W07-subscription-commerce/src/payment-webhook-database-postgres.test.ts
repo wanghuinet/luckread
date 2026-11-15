@@ -14,21 +14,21 @@ function fakePool(options: {
   const clientCalls: string[] = []
   let batchQuery = 0
   const client: W07WebhookPostgresClient = {
-    async query(sql: string, values?: unknown[]) {
+    async query<Row extends Record<string, unknown> = Record<string, unknown>>(sql: string, values?: unknown[]): Promise<{ rows: Row[]; rowCount: number | null }> {
       clientCalls.push(sql)
       if (sql === 'BEGIN' || sql === 'COMMIT' || sql === 'ROLLBACK') {
-        return { rows: [], rowCount: 0 }
+        return { rows: [] as Row[], rowCount: 0 }
       }
       batchQuery += 1
       if (options.failAtBatchQuery === batchQuery) throw new Error('simulated PostgreSQL failure')
-      return { rows: [], rowCount: 1 }
+      return { rows: [] as Row[], rowCount: 1 }
     },
     release: vi.fn(),
   }
   const pool: W07WebhookPostgresPool = {
-    async query(sql: string, values?: unknown[]) {
+    async query<Row extends Record<string, unknown> = Record<string, unknown>>(sql: string, values?: unknown[]): Promise<{ rows: Row[]; rowCount: number | null }> {
       directCalls.push({ sql, values })
-      return { rows: options.queryRows ?? [], rowCount: options.queryRows?.length ?? 0 }
+      return { rows: (options.queryRows ?? []) as Row[], rowCount: options.queryRows?.length ?? 0 }
     },
     async connect() {
       return client
