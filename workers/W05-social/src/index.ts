@@ -1255,7 +1255,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
           if (idempotencyKey.length > 256) throw new FollowRuntimeError('VALIDATION_FAILED', 400)
           const row = await follow(dependencies.followStore ?? env.DB, viewerUserId, path.userId)
           await invalidateRelationshipGraph(viewerUserId, path.userId)
-          await enqueueNotification(env.DB, {
+          await enqueueNotification(dependencies.notificationEnqueueStore ?? env.DB, {
             recipientUserId: path.userId,
             actorUserId: viewerUserId,
             type: 'FOLLOW',
