@@ -111,6 +111,10 @@ test('keeps native symbol upload disabled until the private CI CLI credential ex
 });
 
 test('uploads matching Hermes source maps for each published Expo OTA update', () => {
+  expect(otaUpdateWorkflow).toContain(
+    'EXPO_PUBLIC_POSTHOG_API_KEY: ${{ vars.EXPO_PUBLIC_POSTHOG_API_KEY || secrets.EXPO_PUBLIC_POSTHOG_API_KEY }}',
+  );
+  expect(otaUpdateWorkflow).toContain('EXPO_PUBLIC_POSTHOG_HOST: "https://us.i.posthog.com"');
   expect(otaUpdateWorkflow).toContain('POSTHOG_CLI_API_KEY: ${{ secrets.POSTHOG_CLI_API_KEY }}');
   expect(otaUpdateWorkflow).toContain('POSTHOG_CLI_PROJECT_ID: "715723"');
   expect(otaUpdateWorkflow).toContain('npm install --global @posthog/cli@0.19.0');
