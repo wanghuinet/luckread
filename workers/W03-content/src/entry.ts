@@ -8,6 +8,7 @@ import {
   getW03CollectionListReadStore,
   getW03SeriesReadStore,
   getW03MembersReadStore,
+  getW03ContentDetailReadStore,
 } from './neon/runtime.js'
 
 /**
@@ -31,4 +32,6 @@ export default createW03ContentWorker({
     getW03SeriesReadStore(env),
   membersReadStoreProvider: (env) =>
     getW03MembersReadStore(env),
+  contentDetailReadStoreProvider: (env) =>
+    getW03ContentDetailReadStore(env),
 })
