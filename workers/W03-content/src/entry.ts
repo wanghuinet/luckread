@@ -5,6 +5,7 @@ import {
   getW03FollowingOwnerContentsReadStore,
   getW03PostThreadReadStore,
   getW03ContentContextReadStore,
+  getW03CollectionListReadStore,
 } from './neon/runtime.js'
 
 /**
@@ -22,4 +23,6 @@ export default createW03ContentWorker({
     getW03PostThreadReadStore(env),
   contentContextReadStoreProvider: (env) =>
     getW03ContentContextReadStore(env),
+  collectionListReadStoreProvider: (env) =>
+    getW03CollectionListReadStore(env),
 })

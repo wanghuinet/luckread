@@ -61,6 +61,7 @@ import {
   getCollection,
   listCreatorCollections,
   updateCollection,
+  type CollectionListReadStore,
 } from './content-collections.js'
 import {
   attachSeriesMember,
@@ -361,6 +362,10 @@ export type W03ContentWorkerDependencies = Readonly<{
   postThreadReadStoreProvider?: (
     env: W03PublishedMediaReferenceRuntimeEnv,
   ) => PostThreadReadStore | undefined
+  /** Optional D1-02 provider for the bounded creator-collection list read. */
+  collectionListReadStoreProvider?: (
+    env: W03PublishedMediaReferenceRuntimeEnv,
+  ) => CollectionListReadStore | undefined
   /** Optional D1-02 provider for W01/W05 canonical content-context projections. */
   contentContextReadStoreProvider?: (
     env: W03PublishedMediaReferenceRuntimeEnv,
@@ -899,6 +904,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
           principal.userId,
           cursor,
           parseListLimit(url.searchParams.get('limit')),
+          dependencies.collectionListReadStoreProvider?.(env),
         )
         return json({ data: page, schemaVersion: '1.0', requestId: createRequestId() })
       }

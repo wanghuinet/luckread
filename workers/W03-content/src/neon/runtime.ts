@@ -14,6 +14,10 @@ import { createPostgresFollowingOwnerContentsReadStore } from '../following-owne
 import { createPostgresPostThreadReadStore } from '../post-thread-read-store-postgres.js'
 import { createPostgresContentContextReadStore, type ContentContextReadStore } from '../content-context-read-store-postgres.js'
 import type { PostThreadReadStore } from '../content-relationships.js'
+import {
+  createPostgresCollectionListReadStore,
+} from '../content-collections-read-store-postgres.js'
+import type { CollectionListReadStore } from '../content-collections.js'
 import type { W03PublishedMediaReferenceRuntimeEnv } from '../published-media-reference-read-store.js'
 
 export type W03PublicMediaReferenceDriver = 'd1' | 'neon'
@@ -26,13 +30,15 @@ const bookmarkedContentsStores = new WeakMap<object, PublishedContentsByIdsReadS
 const followingContentsStores = new WeakMap<object, FollowingOwnerContentsReadStore>()
 const postThreadStores = new WeakMap<object, PostThreadReadStore>()
 const contentContextStores = new WeakMap<object, ContentContextReadStore>()
+const collectionListStores = new WeakMap<object, CollectionListReadStore>()
 
 /**
  * The explicit D1-02 content read driver controls only the PostgreSQL read
  * projections wired from the W03 entrypoint: public media references, bookmark
- * batch projection, W04-authorized following-feed content, and native post-thread
- * projection. Other W03 reads and every W03 mutation remain on D1_02. D1 is the
- * safe default and unknown values fail closed.
+ * batch projection, W04-authorized following-feed content, native post-thread
+ * projection, canonical content context, and the creator-owned collection list.
+ * Other W03 reads and every W03 mutation remain on D1_02. D1 is the safe default
+ * and unknown values fail closed.
  */
 export function resolveW03PublicMediaReferenceDriver(
   env: W03PublicMediaReferenceRuntimeEnv,
@@ -197,5 +203,25 @@ export function getW03ContentContextReadStore(
     getW03PublicMediaReferencePostgresPool(env),
   )
   contentContextStores.set(binding, store)
+  return store
+}
+
+/** PostgreSQL provider for the bounded creator-owned collection list only. */
+export function getW03CollectionListReadStore(
+  env: W03PublicMediaReferenceRuntimeEnv,
+): CollectionListReadStore | undefined {
+  if (resolveW03PublicMediaReferenceDriver(env) === 'd1') return undefined
+
+  const binding = env.HYPERDRIVE_D1_02
+  if (!binding || typeof binding !== 'object') {
+    throw new Error('W03_HYPERDRIVE_D1_02_BINDING_REQUIRED')
+  }
+  const cached = collectionListStores.get(binding)
+  if (cached) return cached
+
+  const store = createPostgresCollectionListReadStore(
+    getW03PublicMediaReferencePostgresPool(env),
+  )
+  collectionListStores.set(binding, store)
   return store
 }
