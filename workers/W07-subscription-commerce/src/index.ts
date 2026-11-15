@@ -17,6 +17,7 @@ import { scheduleSubscriptionPlanDowngrade, scheduleSubscriptionBillingIntervalC
 import { startSubscriptionTrial } from './subscription-trial-runtime.js'
 import { listOwnedSavedPaymentMethods, revokeOwnedSavedPaymentMethod, PaymentMethodRuntimeError } from './payment-method-runtime.js'
 import { getW07PaymentMethodReadStore } from './neon/payment-method-read-runtime.js'
+import { getW07SelectedD101Database } from './neon/membership-database-runtime.js'
 import { resolveDemoCommercePricing, resolveDemoRenewalPricing } from './demo-commerce-pricing-resolver.js'
 import { runRenewalScheduledBatch } from './renewal-scheduler.js'
 
@@ -26,6 +27,8 @@ interface Env {
   D1_04: D1Database
   W07_DATABASE_DRIVER?: string
   HYPERDRIVE_D1_04?: { connectionString?: string }
+  W07_MEMBERSHIP_DATABASE_DRIVER?: string
+  HYPERDRIVE_D1_01?: { connectionString?: string }
   W06_GOVERNANCE?: Fetcher
   MEMBERSHIP_RENEWAL_ENABLED?: string
   HYPERSWITCH_ENVIRONMENT?: string
@@ -175,6 +178,10 @@ const toOperation = (method: string, segments: string[]): Operation | null => {
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     try {
+      const runtimeEnv: Env = {
+        ...env,
+        D1_01: getW07SelectedD101Database(env),
+      }
       // W10 is the only admitted scheduler. This private service-binding
       // endpoint delegates all commerce and membership writes back to W07.
       if (new URL(request.url).pathname === '/internal/renewals/w10/scheduled-batch') {
@@ -187,7 +194,7 @@ export default {
         }
         if (env.MEMBERSHIP_RENEWAL_ENABLED !== 'true' ||
             !isDemoPricingEnabled(env.COMMERCE_PRICING_MODE, env.HYPERSWITCH_ENVIRONMENT) ||
-            !['synthetic', 'taxjar-sandbox'].includes(env.COMMERCE_DEMO_TAX_PROVIDER ?? '')) {
+            !['synthetic', 'taxjar-sandbox'].includes(runtimeEnv.COMMERCE_DEMO_TAX_PROVIDER ?? '')) {
           throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
         }
         const originLimiter = env.SUBSCRIPTION_ORIGIN_GLOBAL_LIMITER
@@ -198,7 +205,7 @@ export default {
             Object.keys(input as Record<string, unknown>).length !== 0) {
           throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
         }
-        const result = await runRenewalScheduledBatch(env, {
+        const result = await runRenewalScheduledBatch(runtimeEnv, {
           maxCyclesPerBatch: 1,
           resolvePricing: (pricingInput) => resolveDemoRenewalPricing(env, pricingInput),
         })
@@ -212,7 +219,7 @@ export default {
         const originLimiter = env.SUBSCRIPTION_ORIGIN_GLOBAL_LIMITER
         if (!originLimiter) throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
         await applyRateLimit(originLimiter, 'origin:webhook')
-        const webhookResponse = await handleHyperswitchWebhookRequest(request, env)
+        const webhookResponse = await handleHyperswitchWebhookRequest(request, runtimeEnv)
         if (webhookResponse) return webhookResponse
       }
 
@@ -220,7 +227,7 @@ export default {
         const originLimiter = env.SUBSCRIPTION_ORIGIN_GLOBAL_LIMITER
         if (!originLimiter) throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
         await applyRateLimit(originLimiter, 'origin:webhook')
-        const webhookResponse = await handleRevenueCatWebhookRequest(request, env)
+        const webhookResponse = await handleRevenueCatWebhookRequest(request, runtimeEnv)
         if (webhookResponse) return webhookResponse
       }
 
@@ -233,7 +240,7 @@ export default {
         }
         requirePrincipal(request)
         requireLayer(request)
-        const reconciliationResponse = await handleRevenueCatSubscriberReconciliationRequest(request, env)
+        const reconciliationResponse = await handleRevenueCatSubscriberReconciliationRequest(request, runtimeEnv)
         if (reconciliationResponse) return reconciliationResponse
       }
 
@@ -256,7 +263,7 @@ export default {
           throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
         }
         const creatorId = validatePrincipal((input as { creatorId: string }).creatorId)
-        const allowed = await hasActiveCreatorMembership(env.D1_01, subscriberId, creatorId)
+        const allowed = await hasActiveCreatorMembership(runtimeEnv.D1_01, subscriberId, creatorId)
         return json({
           data: { allowed, reason: allowed ? 'ACTIVE_CREATOR_MEMBERSHIP' : 'MEMBERSHIP_REQUIRED' },
           requestId: crypto.randomUUID(),
@@ -269,7 +276,7 @@ export default {
       requireLayer(request)
       const paymentMethodPath = new URL(request.url).pathname
       if (request.method === 'GET' && paymentMethodPath === '/payment-methods') {
-        const docs = await listOwnedSavedPaymentMethods(env, principal, getW07PaymentMethodReadStore(env))
+        const docs = await listOwnedSavedPaymentMethods(env, principal, getW07PaymentMethodReadStore(runtimeEnv))
         return json({ data: { docs }, requestId: crypto.randomUUID() })
       }
       const paymentMethodMatch = /^\/payment-methods\/(spm_[A-Za-z0-9]{26})$/.exec(paymentMethodPath)
@@ -279,29 +286,29 @@ export default {
           throw new PaymentMethodRuntimeError('VALIDATION_FAILED', 400)
         }
         const result = await revokeOwnedSavedPaymentMethod(
-          env, principal, paymentMethodMatch[1], request.headers.get('Idempotency-Key'),
-          getW07PaymentMethodReadStore(env),
+          runtimeEnv, principal, paymentMethodMatch[1], request.headers.get('Idempotency-Key'),
+          getW07PaymentMethodReadStore(runtimeEnv),
         )
         return json({ data: result, requestId: crypto.randomUUID() }, result.status === 'REMOVED' ? 200 : 202)
       }
 
-      const paymentIntentResponse = await handleCommercePaymentIntentRequest(request, principal, env)
+      const paymentIntentResponse = await handleCommercePaymentIntentRequest(request, principal, runtimeEnv)
       if (paymentIntentResponse) return paymentIntentResponse
-      const billingReadResponse = await handleCommerceBillingReadRequest(request, principal, env)
+      const billingReadResponse = await handleCommerceBillingReadRequest(request, principal, runtimeEnv)
       if (billingReadResponse) return billingReadResponse
-      const refundResponse = await handleCommerceRefundRequest(request, principal, env)
+      const refundResponse = await handleCommerceRefundRequest(request, principal, runtimeEnv)
       if (refundResponse) return refundResponse
       const orderDependencies = isDemoPricingEnabled(env.COMMERCE_PRICING_MODE, env.HYPERSWITCH_ENVIRONMENT)
         ? { resolvePricing: (input: unknown) => resolveDemoCommercePricing(env, input) }
         : undefined
-      const commerceOrderResponse = await handleCommerceOrderRequest(request, principal, env, orderDependencies)
+      const commerceOrderResponse = await handleCommerceOrderRequest(request, principal, runtimeEnv, orderDependencies)
       if (commerceOrderResponse) return commerceOrderResponse
       const pathname = new URL(request.url).pathname
       const operation = toOperation(request.method, parseSegments(pathname))
       if (operation?.operation === 'trialStart') {
         requireLayer(request)
         const result = await startSubscriptionTrial(
-          env,
+          runtimeEnv,
           principal,
           await readJsonBody(request),
           request.headers.get('Idempotency-Key'),
@@ -312,14 +319,14 @@ export default {
         const targetPlanId = new URL(request.url).searchParams.get('targetPlanId')
         if (!targetPlanId) throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
         const result = await previewSubscriptionPlanChange(
-          env.D1_01, principal, operation.subscriptionId, targetPlanId,
+          runtimeEnv.D1_01, principal, operation.subscriptionId, targetPlanId,
         )
         return json({ data: result, requestId: crypto.randomUUID() }, 200, result.etag)
       }
       if (operation?.operation === 'planDowngradeSchedule') {
         requireLayer(request)
         const scheduled = await scheduleSubscriptionPlanDowngrade(
-          env,
+          runtimeEnv,
           principal,
           operation.subscriptionId,
           await readJsonBody(request),
@@ -331,7 +338,7 @@ export default {
       if (operation?.operation === 'planBillingIntervalSchedule') {
         requireLayer(request)
         const scheduled = await scheduleSubscriptionBillingIntervalChange(
-          env,
+          runtimeEnv,
           principal,
           operation.subscriptionId,
           await readJsonBody(request),
@@ -343,7 +350,7 @@ export default {
       if (operation?.operation === 'planUpgradeCheckout') {
         requireLayer(request)
         const checkout = await createSubscriptionPlanUpgradeCheckout(
-          env,
+          runtimeEnv,
           principal,
           operation.subscriptionId,
           await readJsonBody(request),
@@ -351,7 +358,7 @@ export default {
           request.headers.get('If-Match'),
           {
             resolvePricing: async ({ preview, attempt }) => {
-              const resolved = await resolveCommerceOrderItems(env.D1_01, {
+              const resolved = await resolveCommerceOrderItems(runtimeEnv.D1_01, {
                 items: [{ itemRef: preview.targetPlan.planId, quantity: 1 }],
               })
               const item = resolved.items[0]
@@ -403,25 +410,25 @@ export default {
                   itemSnapshotJson,
                 }],
               }
-              if (isDemoPricingEnabled(env.COMMERCE_PRICING_MODE, env.HYPERSWITCH_ENVIRONMENT)) {
-                if (env.COMMERCE_DEMO_TAX_PROVIDER === 'synthetic') {
+              if (isDemoPricingEnabled(runtimeEnv.COMMERCE_PRICING_MODE, runtimeEnv.HYPERSWITCH_ENVIRONMENT)) {
+                if (runtimeEnv.COMMERCE_DEMO_TAX_PROVIDER === 'synthetic') {
                   return applyDemoTaxPricing(adjusted)
                 }
-                if (env.COMMERCE_DEMO_TAX_PROVIDER === 'taxjar-sandbox') {
+                if (runtimeEnv.COMMERCE_DEMO_TAX_PROVIDER === 'taxjar-sandbox') {
                   try {
                     return await applyTaxJarSandboxPricing(adjusted, {
-                      apiKey: env.TAXJAR_SANDBOX_API_KEY,
+                      apiKey: runtimeEnv.TAXJAR_SANDBOX_API_KEY,
                       fromAddress: {
-                        street: env.TAXJAR_DEMO_FROM_STREET ?? '',
-                        city: env.TAXJAR_DEMO_FROM_CITY ?? '',
-                        state: env.TAXJAR_DEMO_FROM_STATE ?? '',
-                        zip: env.TAXJAR_DEMO_FROM_ZIP ?? '',
+                        street: runtimeEnv.TAXJAR_DEMO_FROM_STREET ?? '',
+                        city: runtimeEnv.TAXJAR_DEMO_FROM_CITY ?? '',
+                        state: runtimeEnv.TAXJAR_DEMO_FROM_STATE ?? '',
+                        zip: runtimeEnv.TAXJAR_DEMO_FROM_ZIP ?? '',
                       },
                       toAddress: {
-                        street: env.TAXJAR_DEMO_TO_STREET ?? '',
-                        city: env.TAXJAR_DEMO_TO_CITY ?? '',
-                        state: env.TAXJAR_DEMO_TO_STATE ?? '',
-                        zip: env.TAXJAR_DEMO_TO_ZIP ?? '',
+                        street: runtimeEnv.TAXJAR_DEMO_TO_STREET ?? '',
+                        city: runtimeEnv.TAXJAR_DEMO_TO_CITY ?? '',
+                        state: runtimeEnv.TAXJAR_DEMO_TO_STATE ?? '',
+                        zip: runtimeEnv.TAXJAR_DEMO_TO_ZIP ?? '',
                       },
                     })
                   } catch {
@@ -448,7 +455,7 @@ export default {
         }
         requireCreatorLayer(request)
         const creatorId = requireVerifiedCreatorId(request)
-        const result = await publishMembershipPlan(env.D1_01, creatorId, segments[2]!, request.headers.get('If-Match'))
+        const result = await publishMembershipPlan(runtimeEnv.D1_01, creatorId, segments[2]!, request.headers.get('If-Match'))
         return json({ data: result, requestId: crypto.randomUUID() }, 200, result.etag)
       }
       const planRevisionMatch = /^\/membership\/plans\/([^/]+)$/.exec(pathname)
@@ -461,7 +468,7 @@ export default {
         const creatorId = requireVerifiedCreatorId(request)
         const input = await readJsonBody(request)
         const result = await reviseMembershipPlan(
-          env.D1_01, creatorId, segments[2]!, request.headers.get('If-Match'), input,
+          runtimeEnv.D1_01, creatorId, segments[2]!, request.headers.get('If-Match'), input,
         )
         return json({ data: result, requestId: crypto.randomUUID() }, 200, result.etag)
       }
@@ -481,7 +488,7 @@ export default {
           throw new SubscriptionRuntimeError('VALIDATION_FAILED', 400)
         }
         const result = await transitionMembershipPlanLifecycle(
-          env.D1_01, creatorId, segments[2]!, request.headers.get('If-Match'),
+          runtimeEnv.D1_01, creatorId, segments[2]!, request.headers.get('If-Match'),
           (value as { action: 'pause' | 'resume' | 'retire' }).action,
         )
         return json({ data: result, requestId: crypto.randomUUID() }, 200, result.etag)
@@ -501,7 +508,7 @@ export default {
         requireCreatorLayer(request)
         const creatorId = requireVerifiedCreatorId(request)
         const result = await createMembershipPlanDraft(
-          env.D1_01,
+          runtimeEnv.D1_01,
           principal,
           creatorId,
           await readJsonBody(request),
@@ -514,7 +521,7 @@ export default {
         const creatorId = requireVerifiedCreatorId(request)
         const url = new URL(request.url)
         const requestedLimit = parseBoundedPositiveInt(url.searchParams.get('limit'), 20, 50)
-        const result = await listCreatorMembershipPlans(env.D1_01, creatorId, requestedLimit, url.searchParams.get('cursor'))
+        const result = await listCreatorMembershipPlans(runtimeEnv.D1_01, creatorId, requestedLimit, url.searchParams.get('cursor'))
         return json({ data: result, requestId: crypto.randomUUID() })
       }
       if (operation.operation === 'listPlans') {
@@ -522,7 +529,7 @@ export default {
         const requestedLimit = parseBoundedPositiveInt(url.searchParams.get('limit'), 20, 50)
         const creatorId = url.searchParams.get('creatorId')
         const result = await listActiveMembershipPlans(
-          env.D1_01,
+          runtimeEnv.D1_01,
           requestedLimit,
           url.searchParams.get('cursor'),
           creatorId,
@@ -533,10 +540,10 @@ export default {
         const url = new URL(request.url)
         const requestedLimit = parseBoundedPositiveInt(url.searchParams.get('limit'), 20, 50)
         const requestedPage = parseBoundedPositiveInt(url.searchParams.get('page'), 1, 10000)
-        const result = await listSubscriptions(env.D1_01, principal, requestedLimit, requestedPage)
+        const result = await listSubscriptions(runtimeEnv.D1_01, principal, requestedLimit, requestedPage)
         return json({ data: result, requestId: crypto.randomUUID() })
       }
-      const result = await getSubscription(env.D1_01, principal, operation.subscriptionId)
+      const result = await getSubscription(runtimeEnv.D1_01, principal, operation.subscriptionId)
       return json({ data: result, requestId: crypto.randomUUID() }, 200, result.etag)
     } catch (error) {
       if (error instanceof PaymentMethodRuntimeError) {
