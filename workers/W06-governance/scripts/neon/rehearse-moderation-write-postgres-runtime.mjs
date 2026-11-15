@@ -5,6 +5,7 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 
 import { decideModerationCase, getModerationCase } from '../../src/moderation-runtime.ts'
+import { createReport } from '../../src/report-runtime.ts'
 import { createPostgresModerationD1Database } from '../../src/neon-postgres-d1-database.ts'
 
 const requireFromW02 = createRequire(new URL('../../../W02-identity/package.json', import.meta.url))
@@ -35,6 +36,8 @@ const checks = {
   auditEventWrittenWithDecision: false,
   enforcementOutboxDelivered: false,
   sameKeyReplayReturnedStoredDecision: false,
+  moderationReportWrittenWithAudit: false,
+  moderationReportReplayReturnedStoredResponse: false,
   staleVersionGuardRolledBackAllWrites: false,
   cleanupVerified: false,
 }
@@ -149,6 +152,43 @@ try {
   ).bind(successfulCaseId).first()
   assert.equal(Number(decisionCount?.count), 1)
   checks.sameKeyReplayReturnedStoredDecision = true
+
+  const reportInput = {
+    actorUserId: reviewerId,
+    targetType: 'content',
+    targetId: successfulTargetId,
+    reasonCode: 'SPAM',
+    description: 'PostgreSQL moderation rehearsal fixture',
+    evidenceRefs: ['evidence://w06-postgres-rehearsal'],
+    idempotencyKey: marker + '-report-idempotency',
+    requestId: 'req_' + randomUUID().replaceAll('-', ''),
+    correlationId: marker + '-report-correlation',
+  }
+  const report = await createReport(db, reportInput)
+  assert.equal(report.status, 'CREATED')
+  const storedReport = await db.prepare(
+    'SELECT report_id,target_type,target_id,reason_code FROM moderation_reports WHERE report_id = ?',
+  ).bind(report.reportId).first()
+  assert.ok(storedReport)
+  assert.equal(storedReport.target_type, 'content')
+  const reportAudit = await db.prepare(
+    'SELECT event_id,action FROM audit_events WHERE target_id = ?',
+  ).bind(report.reportId).first()
+  assert.ok(reportAudit)
+  assert.equal(reportAudit.action, 'moderation.report.created')
+  checks.moderationReportWrittenWithAudit = true
+
+  const reportReplay = await createReport(db, reportInput)
+  assert.deepEqual(reportReplay, report)
+  const reportRows = await db.prepare(
+    'SELECT count(*) AS count FROM moderation_reports WHERE report_id = ?',
+  ).bind(report.reportId).first()
+  const reportAuditRows = await db.prepare(
+    "SELECT count(*) AS count FROM audit_events WHERE target_id = ? AND action = 'moderation.report.created'",
+  ).bind(report.reportId).first()
+  assert.equal(Number(reportRows?.count), 1)
+  assert.equal(Number(reportAuditRows?.count), 1)
+  checks.moderationReportReplayReturnedStoredResponse = true
 
   // Simulate a concurrent version change that causes the CAS UPDATE to affect 0 rows.
   await client.query(`
