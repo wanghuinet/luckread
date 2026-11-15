@@ -50,9 +50,11 @@ function createHarness() {
     throw new Error('D1 must not be accessed by the injected Neon Poll Configuration path')
   })
 
+  const forwardedRequests: Request[] = []
   const w03Content: W03ContentBinding = {
     fetch: vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const request = input instanceof Request ? input : new Request(input, init)
+      forwardedRequests.push(request)
       return Response.json({
         data: {
           contentId,
@@ -78,6 +80,7 @@ function createHarness() {
     configurationStore,
     readStore,
     w03Content,
+    forwardedRequests,
   }
 }
 
@@ -118,7 +121,7 @@ describe('W05 Neon Poll Configuration route composition', () => {
     })
 
     expect(h.w03Content.fetch).toHaveBeenCalledTimes(1)
-    const forwarded = (h.w03Content.fetch as ReturnType<typeof vi.fn>).mock.calls[0]?.[0] as Request
+    const forwarded = h.forwardedRequests[0] as Request
     expect(forwarded.url).toContain(`/internal/content/contents/${contentId}/owned-post-context`)
     expect(forwarded.headers.get('X-LuckRead-Caller')).toBe('W05')
     expect(forwarded.headers.get('X-LuckRead-Principal-User-Id')).toBe(ownerUserId)
