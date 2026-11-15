@@ -134,7 +134,7 @@ describe('W06 PostgreSQL moderation D1 bridge', () => {
     const pool: W06ModerationPostgresPool = {
       async query<Row extends Record<string, unknown> = Record<string, unknown>>(sql: string, values?: unknown[]) {
         return {
-          rows: [{ created_at: new Date('2026-11-15T12:00:00.123Z'), eventid: 'evt_1', actorjson: { actorId: 'user_1', actorType: 'user' } }] as Row[],
+          rows: [{ created_at: new Date('2026-11-15T12:00:00.123Z'), eventid: 'evt_1', actorjson: { actorId: 'user_1', actorType: 'user' } }] as unknown as Row[],
           rowCount: 1,
         }
       },
