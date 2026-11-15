@@ -25,6 +25,21 @@ export interface CollectionMemberRecord {
   updatedAt: string
 }
 
+export type CollectionMemberListCursor = Readonly<{ position: number; id: string }>
+
+export interface CollectionMembersReadStore {
+  listCollectionMembers(
+    ownerUserId: string,
+    collectionId: string,
+    cursor: CollectionMemberListCursor | null,
+    limit: number,
+  ): Promise<{
+    items: readonly CollectionMemberRecord[]
+    collectionVersion: number
+    collectionEtag: string
+  }>
+}
+
 interface IdempotencyRow {
   idem_id: string | null
   idem_owner_user_id: string | null
@@ -414,6 +429,7 @@ export async function listCollectionMembers(
   collectionId: string,
   cursor: string | null,
   limit: number,
+  readStore?: CollectionMembersReadStore,
 ): Promise<{
   items: CollectionMemberRecord[]
   nextCursor: string | null
@@ -427,43 +443,56 @@ export async function listCollectionMembers(
 
   const decoded = cursor ? decodeCollectionMemberCursor(cursor, ownerUserId, collectionId) : null
 
-  const collection = await db.prepare(
-    'SELECT id, version, etag FROM content_collections WHERE id = ? AND owner_user_id = ?',
-  ).bind(collectionId, ownerUserId).first<{ id: string; version: number; etag: string }>()
-  if (!collection) throw new ContentRuntimeError('NOT_FOUND', 404)
+  let rows: readonly CollectionMemberRecord[]
+  let collectionVersion: number
+  let collectionEtag: string
+  if (readStore) {
+    const result = await readStore.listCollectionMembers(ownerUserId, collectionId, decoded, pageSize + 1)
+    rows = result.items
+    collectionVersion = result.collectionVersion
+    collectionEtag = result.collectionEtag
+  } else {
+    const collection = await db.prepare(
+      'SELECT id, version, etag FROM content_collections WHERE id = ? AND owner_user_id = ?',
+    ).bind(collectionId, ownerUserId).first<{ id: string; version: number; etag: string }>()
+    if (!collection) throw new ContentRuntimeError('NOT_FOUND', 404)
+    collectionVersion = collection.version
+    collectionEtag = collection.etag
 
-  const cursorClause = decoded
-    ? 'AND (r.position > ? OR (r.position = ? AND r.relationship_id > ?))'
-    : ''
-  const bindings: unknown[] = [collectionId]
-  if (decoded) bindings.push(decoded.position, decoded.position, decoded.id)
-  bindings.push(pageSize + 1)
+    const cursorClause = decoded
+      ? 'AND (r.position > ? OR (r.position = ? AND r.relationship_id > ?))'
+      : ''
+    const bindings: unknown[] = [collectionId]
+    if (decoded) bindings.push(decoded.position, decoded.position, decoded.id)
+    bindings.push(pageSize + 1)
 
-  const rows = await db.prepare(
-    'SELECT r.relationship_id, r.position, r.created_at, r.updated_at, ' +
-    'r.target_id AS collection_id, c.id AS content_id, c.slug AS content_slug, ' +
-    'c.content_type, c.state AS content_state, c.title AS content_title ' +
-    'FROM content_relationships r ' +
-    'JOIN contents c ON c.id = r.source_id ' +
-    "WHERE r.source_type = 'content' AND r.target_type = 'collection' AND r.relation_type = 'collection-member' " +
-    "AND r.target_id = ? AND r.status = 'ACTIVE' " +
-    cursorClause +
-    'ORDER BY r.position ASC, r.relationship_id ASC LIMIT ?',
-  ).bind(...bindings).all<{
-    relationship_id: string
-    position: number
-    created_at: string
-    updated_at: string
-    collection_id: string
-    content_id: string
-    content_slug: string
-    content_type: 'article' | 'post' | 'video'
-    content_state: string
-    content_title: string
-  }>()
+    const result = await db.prepare(
+      'SELECT r.relationship_id, r.position, r.created_at, r.updated_at, ' +
+      'r.target_id AS collection_id, c.id AS content_id, c.slug AS content_slug, ' +
+      'c.content_type, c.state AS content_state, c.title AS content_title ' +
+      'FROM content_relationships r ' +
+      'JOIN contents c ON c.id = r.source_id ' +
+      "WHERE r.source_type = 'content' AND r.target_type = 'collection' AND r.relation_type = 'collection-member' " +
+      "AND r.target_id = ? AND r.status = 'ACTIVE' " +
+      cursorClause +
+      'ORDER BY r.position ASC, r.relationship_id ASC LIMIT ?',
+    ).bind(...bindings).all<{
+      relationship_id: string
+      position: number
+      created_at: string
+      updated_at: string
+      collection_id: string
+      content_id: string
+      content_slug: string
+      content_type: 'article' | 'post' | 'video'
+      content_state: string
+      content_title: string
+    }>()
+    rows = result.results.map(toMember)
+  }
 
-  const hasMore = rows.results.length > pageSize
-  const page = rows.results.slice(0, pageSize).map(toMember)
+  const hasMore = rows.length > pageSize
+  const page = rows.slice(0, pageSize)
   const last = page.at(-1)
   return {
     items: page,
@@ -477,8 +506,8 @@ export async function listCollectionMembers(
           id: last.relationshipId,
         })
       : null,
-    collectionVersion: collection.version,
-    collectionEtag: collection.etag,
+    collectionVersion,
+    collectionEtag,
   }
 }
 
