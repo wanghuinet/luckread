@@ -72,7 +72,7 @@ export function createPostgresCollectionListReadStore(
         '   AND ($2::timestamptz IS NULL OR (updated_at, id) < ($2::timestamptz, $3::text))',
         ' ORDER BY updated_at DESC, id DESC',
         ' LIMIT $4',
-      ].join('\\n')
+      ].join('\n')
 
       try {
         const result = await database.query<CollectionListRow>(sql, [
