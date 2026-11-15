@@ -76,8 +76,12 @@ function reviewedPinnedSource(pin, source) {
       '',
     )
     normalized = normalized.replace(
-      /    "MEMBERSHIP_RENEWAL_ENABLED": "false",\n    "W07_DATABASE_DRIVER": "(?:d1|neon)"\n/,
+      /    "MEMBERSHIP_RENEWAL_ENABLED": "false",\r?\n    "W07_DATABASE_DRIVER": "(?:d1|neon)",?\r?\n    "W07_MEMBERSHIP_DATABASE_DRIVER": "neon"\r?\n/,
       '    "MEMBERSHIP_RENEWAL_ENABLED": "false"\n',
+    )
+    normalized = normalized.replace(
+      /,\r?\n    \{\r?\n      "binding": "HYPERDRIVE_D1_01",\r?\n      "id": "0c53a1bb9bc0484bac146e8ae2d3158b"\r?\n    \}(?=\r?\n  \]\r?\n\}\r?\n$)/,
+      '',
     )
   }
   const suffix = reviewedHyperdriveStagingSuffixes[pin.path]
