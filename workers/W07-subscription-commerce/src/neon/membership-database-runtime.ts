@@ -34,7 +34,7 @@ function validateD101HyperdriveConnectionString(value: unknown): string {
   }
   let databaseName = ''
   try {
-    databaseName = decodeURIComponent(target.pathname.replace(/^\\/+/, ''))
+    databaseName = decodeURIComponent(target.pathname.replace(/^\/+/, ''))
   } catch {
     throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
   }
