@@ -16,6 +16,7 @@ on:
       - 'workers/W03-content/src/content-members-read-store-postgres.ts'
       - 'workers/W03-content/src/content-runtime.ts'
       - 'workers/W03-content/src/content-detail-read-store-postgres.ts'
+      - 'workers/W03-content/src/creator-contents-read-store-postgres.ts'
       - 'workers/W03-content/src/entry.ts'
       - 'workers/W03-content/src/neon/runtime.ts'
 
@@ -78,6 +79,7 @@ jobs:
             ['seriesReadStoreProvider', 'getW03SeriesReadStore'],
             ['membersReadStoreProvider', 'getW03MembersReadStore'],
             ['contentDetailReadStoreProvider', 'getW03ContentDetailReadStore'],
+            ['creatorContentsReadStoreProvider', 'getW03CreatorContentsReadStore'],
           ]
           for (const [provider, factory] of providers) {
             if (!entry.includes(provider) || !entry.includes(factory) || !runtime.includes(factory)) {
