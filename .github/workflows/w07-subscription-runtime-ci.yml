@@ -149,6 +149,8 @@ jobs:
         run: LUCKREAD_VITEST_SCOPE=w07-unit pnpm exec vitest run --config workers/W01-payload/vitest.config.mts --root ../..
       - name: Run W07 Neon D1-01 membership bridge regression tests
         working-directory: workers/W01-payload
+        env:
+          LUCKREAD_VITEST_SCOPE: w07-unit
         run: pnpm exec vitest run --config workers/W01-payload/vitest.config.mts --root ../.. workers/W07-subscription-commerce/src/payment-webhook-database-postgres.test.ts workers/W07-subscription-commerce/src/neon/membership-database-runtime.test.ts
       - name: Run W01 commerce/subscription/payment adapter integration tests
         working-directory: workers/W01-payload
