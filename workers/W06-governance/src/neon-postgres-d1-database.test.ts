@@ -108,7 +108,7 @@ describe('W06 PostgreSQL moderation D1 bridge', () => {
       db.prepare('INSERT OR REPLACE INTO moderation_txn_guard(id,successful) VALUES (1, changes())'),
     ])).rejects.toMatchObject({ code: '23514' })
 
-    expect(clientCalls[3]).toEqual({ sql: 'ROLLBACK', values: undefined })
+    expect(clientCalls[4]).toEqual({ sql: 'ROLLBACK', values: undefined })
     expect(client.release).toHaveBeenCalledOnce()
   })
 
