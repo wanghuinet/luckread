@@ -34,6 +34,7 @@ on:
       - 'workers/W01-payload/wrangler.jsonc'
       - 'workers/W06-governance/src/**'
       - 'workers/W06-governance/wrangler.jsonc'
+      - 'workers/W06-governance/package.json'
       - 'workers/W06-governance/migrations/**'
       - 'workers/W03-content/src/content-runtime.ts'
       - 'workers/W03-content/src/index.ts'
@@ -124,6 +125,10 @@ jobs:
           if (!w01m || w01m.service !== 'luckread-w06') throw new Error('W01 W06_MODERATION binding mismatch');
           if (!w06m || w06m.service !== 'luckread-w03') throw new Error('W06 W03_CONTENT_MODERATION binding mismatch');
           if (!w06.d1_databases?.some(x => x.binding === 'D1_03' && x.database_id === 'bda1d247-a371-4244-91ae-aef96034db7f')) throw new Error('W06 D1-03 binding mismatch');
+          const w06Hyperdrive = w06.hyperdrive?.find(x => x.binding === 'HYPERDRIVE_D1_03');
+          if (!w06Hyperdrive || w06Hyperdrive.id !== '7c8831416c18494faee04b96aa551cb9') throw new Error('W06 D1-03 Hyperdrive binding mismatch');
+          if (w06.vars?.W06_MODERATION_DATABASE_DRIVER !== 'd1') throw new Error('W06 D1-03 driver must remain D1 by default');
+          if (!w06.compatibility_flags?.includes('nodejs_compat')) throw new Error('W06 PostgreSQL runtime requires nodejs_compat');
           if (!w03.d1_databases?.some(x => x.binding === 'D1_02' && x.database_id === '6c342634-97f6-4248-9f4a-85772af4f22c')) throw new Error('W03 D1-02 binding mismatch');
           console.log('MODERATION_TOPOLOGY=PASS');
           NODE
