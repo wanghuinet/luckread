@@ -6,6 +6,8 @@ export default defineConfig({
     environment: 'node',
     include: [
       'src/neon/runtime.test.ts',
+      'src/push-endpoint-runtime.test.ts',
+      'src/notification-push-endpoint-access-store-postgres.test.ts',
       'src/reply-audience-neon-runtime.test.ts',
       'src/notification-push-neon-runtime.test.ts',
       'src/reply-audience-runtime.test.ts',
