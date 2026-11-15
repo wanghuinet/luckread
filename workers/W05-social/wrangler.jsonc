@@ -51,7 +51,7 @@
   ],
   "vars": {
     "PUSH_DELIVERY_ENABLED": "false",
-    "W05_DATABASE_DRIVER": "d1"
+    "W05_DATABASE_DRIVER": "neon"
   },
   "workflows": [
     {
