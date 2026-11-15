@@ -87,6 +87,8 @@ interface Env {
   DB: D1Database
   W05_DATABASE_DRIVER?: string
   HYPERDRIVE_D1_02?: { connectionString?: string }
+  W05_PUSH_ENDPOINT_DATABASE_DRIVER?: string
+  HYPERDRIVE_D1_03?: { connectionString?: string }
   D1_03?: D1Database
   W03_CONTENT?: W03ContentBinding
   SOCIAL_READ_LIMITER?: RateLimitBinding
