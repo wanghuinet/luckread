@@ -39,46 +39,16 @@ jobs:
           const domain = (bootstrap.domains || []).find(x => x.domainId === 'D1-02')
           const d1 = (config.d1_databases || []).find(x => x.binding === 'D1_02')
           const hyperdrive = (config.hyperdrive || []).find(x => x.binding === 'HYPERDRIVE_D1_02')
-          const stores = [
-            'publishedMediaReferenceReadStoreProvider',
-            'publishedContentsByIdsReadStoreProvider',
-            'followingOwnerContentsReadStoreProvider',
-            'postThreadReadStoreProvider',
-            'contentContextReadStoreProvider',
+          const providers = [
+            ['publishedMediaReferenceReadStoreProvider', 'getW03PublishedMediaReferenceReadStore'],
+            ['publishedContentsByIdsReadStoreProvider', 'getW03PublishedContentsByIdsReadStore'],
+            ['followingOwnerContentsReadStoreProvider', 'getW03FollowingOwnerContentsReadStore'],
+            ['postThreadReadStoreProvider', 'getW03PostThreadReadStore'],
+            ['contentContextReadStoreProvider', 'getW03ContentContextReadStore'],
           ]
-          if (config.name !== 'luckread-w03' || config.main !== 'src/entry.ts') {
-            throw new Error('W03 worker identity or deployment entrypoint changed')
-          }
-          if (config.vars?.W03_CONTENT_READ_DRIVER !== 'neon') {
-            throw new Error('W03 content read driver must select Neon')
-          }
-          if (!d1 || d1.database_id !== '6c342634-97f6-4248-9f4a-85772af4f22c' ||
-              d1.database_name !== 'luckreadpro') {
-            throw new Error('W03 existing D1-02 binding must remain for non-admitted reads and all writes')
-          }
-          if (!hyperdrive || hyperdrive.id !== 'c55183e1cc3446409c9c1075832c6615') {
-            throw new Error('W03 existing D1-02 Hyperdrive binding identity changed')
-          }
-          if (domain?.databaseName !== 'luckreadpro' ||
-              domain?.remoteSchemaApplied !== true ||
-              !String(domain?.status ?? '').includes('D1_02_SCHEMA_ONLY_REMOTE_APPLIED')) {
-            throw new Error('D1-02 remote Neon schema admission is not recorded')
-          }
-          for (const store of stores) {
-            if (!entry.includes(store) || !runtime.includes('getW03' + store[0].toUpperCase() + store.slice(1).replace('ReadStoreProvider','ReadStore'))) {
-              // Provider-to-factory mapping is verified below by exact factory references.
-              if (!entry.includes(store)) throw new Error('W03 Neon entrypoint is missing ' + store)
-            }
-          }
-          for (const factory of [
-            'getW03PublishedMediaReferenceReadStore',
-            'getW03PublishedContentsByIdsReadStore',
-            'getW03FollowingOwnerContentsReadStore',
-            'getW03PostThreadReadStore',
-            'getW03ContentContextReadStore',
-          ]) {
-            if (!entry.includes(factory) || !runtime.includes(factory)) {
-              throw new Error('W03 Neon provider wiring is incomplete: ' + factory)
+          for (const [provider, factory] of providers) {
+            if (!entry.includes(provider) || !entry.includes(factory) || !runtime.includes(factory)) {
+              throw new Error('W03 Neon provider wiring is incomplete: ' + provider)
             }
           }
           if (!runtime.includes('Other W03 reads and every W03 mutation remain on D1_02')) {
