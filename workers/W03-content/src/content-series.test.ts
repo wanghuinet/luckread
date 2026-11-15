@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-import { listCreatorSeries } from './content-series.js'
+import { getSeries, listCreatorSeries } from './content-series.js'
 
 describe('W03 series foundation', () => {
   it('defines authoritative series persistence and lifecycle event triggers', () => {
@@ -49,6 +49,66 @@ describe('W03 series foundation', () => {
       status: 400,
     })
     expect(prepareCalls).toBe(1)
+  })
+
+  it('uses the injected Neon reader for owner-scoped series detail reads', async () => {
+    const series = {
+      id: 'series_1',
+      ownerUserId: 'user_1',
+      creatorId: 'user_1',
+      ipId: null,
+      state: 'DRAFT' as const,
+      version: 1,
+      title: 'Series 1',
+      description: 'desc',
+      coverRef: null,
+      etag: 'W/"1"',
+      createdAt: '2026-10-07T00:00:00.000Z',
+      updatedAt: '2026-10-07T00:00:00.000Z',
+    }
+    const db = { prepare() { throw new Error('Neon reader must be used instead of D1') } } as never
+    const readStore = { async getSeries(ownerUserId: string, seriesId: string) {
+      expect(ownerUserId).toBe('user_1')
+      expect(seriesId).toBe('series_1')
+      return series
+    }, async listCreatorSeries() { return [] } }
+
+    await expect(getSeries(db, 'user_1', 'series_1', readStore)).resolves.toEqual(series)
+    await expect(getSeries(db, 'user_2', 'series_1', {
+      ...readStore, async getSeries() { return null },
+    })).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 })
+  })
+
+  it('uses the injected Neon reader for the bounded creator series list', async () => {
+    const calls: unknown[][] = []
+    const series = {
+      id: 'series_1',
+      ownerUserId: 'user_1',
+      creatorId: 'user_1',
+      ipId: null,
+      state: 'DRAFT' as const,
+      version: 1,
+      title: 'Series 1',
+      description: 'desc',
+      coverRef: null,
+      etag: 'W/"1"',
+      createdAt: '2026-10-07T00:00:00.000Z',
+      updatedAt: '2026-10-07T00:00:00.000Z',
+    }
+    const db = { prepare() { throw new Error('Neon reader must be used instead of D1') } } as never
+    const readStore = {
+      async getSeries() { return null },
+      async listCreatorSeries(ownerUserId: string, cursor: { updatedAt: string; id: string } | null, limit: number) {
+        calls.push([ownerUserId, cursor, limit])
+        return [series, { ...series, id: 'series_2' }]
+      },
+    }
+
+    const result = await listCreatorSeries(db, 'user_1', null, 1, readStore)
+    expect(calls).toEqual([['user_1', null, 2]])
+    expect(result.items).toEqual([series])
+    expect(result.hasMore).toBe(true)
+    expect(result.nextCursor).toEqual(expect.any(String))
   })
 
   it('lists creator-owned series with one bounded D1 read and cursor pagination', async () => {
