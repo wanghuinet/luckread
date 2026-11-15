@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import {
+  createPostgresD1Database,
   createPostgresWebhookD1Database,
   type W07WebhookPostgresClient,
   type W07WebhookPostgresPool,
@@ -159,4 +160,30 @@ describe('W07 PostgreSQL webhook D1 bridge', () => {
     ])
     expect(client.release).toHaveBeenCalledOnce()
   })
+  it('translates D1 INSERT OR IGNORE into PostgreSQL ON CONFLICT DO NOTHING for membership writes', async () => {
+    const { pool, directCalls, clientCalls } = fakePool()
+    const database = createPostgresD1Database(pool)
+
+    await database.prepare(
+      'INSERT OR IGNORE INTO membership_plans (plan_id, owner_id) VALUES (?, ?)',
+    ).bind('plan_01', 'creator_01').run()
+
+    await database.batch([
+      database.prepare(
+        'INSERT OR IGNORE INTO membership_plan_versions (plan_id, plan_version) ' +
+        'SELECT ?, ? WHERE EXISTS (SELECT 1 FROM membership_plans WHERE plan_id = ?)',
+      ).bind('plan_01', 1, 'plan_01'),
+    ])
+
+    expect(directCalls[0]?.sql).toBe(
+      'INSERT INTO membership_plans (plan_id, owner_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+    )
+    expect(clientCalls).toEqual([
+      'BEGIN',
+      'INSERT INTO membership_plan_versions (plan_id, plan_version) ' +
+      'SELECT $1, $2 WHERE EXISTS (SELECT 1 FROM membership_plans WHERE plan_id = $3) ON CONFLICT DO NOTHING',
+      'COMMIT',
+    ])
+  })
+
 })
