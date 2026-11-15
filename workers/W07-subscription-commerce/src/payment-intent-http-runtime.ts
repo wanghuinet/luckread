@@ -159,7 +159,7 @@ export async function handleCommercePaymentIntentRequest(
       route.orderId,
       request.headers.get('Idempotency-Key'),
       providerConfig.expectedMerchantId,
-      { paymentEnvironment: providerConfig.environment, databaseDialect: resolveW07DatabaseDriver(env) },
+      { paymentEnvironment: providerConfig.environment, databaseDialect: resolveW07DatabaseDriver(env) === 'neon' ? 'postgres' : 'd1' },
     );
 
     if (!['INITIATING', 'requires_payment_method', 'requires_confirmation'].includes(attempt.payment.status)) {

@@ -1164,7 +1164,7 @@ export async function processSubscriptionRenewalCycle(
         cycle.order_id!,
         'renew_' + cycle.cycle_id + '_' + String(attemptNumber),
         cycle.merchant_id,
-        { now: nowFn, databaseDialect: resolveW07DatabaseDriver(env) },
+        { now: nowFn, databaseDialect: resolveW07DatabaseDriver(env) === 'neon' ? 'postgres' : 'd1' },
       );
       cycle = await storePaymentReference(env, cycle, attempt.payment, attemptNumber, now);
       if (cycle.payment_id !== attempt.payment.paymentId || cycle.attempt_number !== attemptNumber) {
