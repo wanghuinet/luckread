@@ -11,6 +11,7 @@ import {
   getW03SeriesReadStore,
   getW03MembersReadStore,
   getW03ContentDetailReadStore,
+  getW03CreatorContentsReadStore,
   resolveW03PublicMediaReferenceDriver,
 } from './runtime.js'
 
@@ -198,6 +199,26 @@ describe('W03 public media reference database driver', () => {
     }
     const first = getW03ContentDetailReadStore(env)
     const second = getW03ContentDetailReadStore(env)
+
+    expect(first).toBeDefined()
+    expect(first).toBe(second)
+    await getW03PublicMediaReferencePostgresPool(env).end()
+  })
+
+  it('provides and caches the Neon creator-content list reader while keeping D1 as default', async () => {
+    expect(getW03CreatorContentsReadStore({
+      D1_02: { prepare() { throw new Error('D1 should not be queried') } },
+    })).toBeUndefined()
+
+    const binding = {
+      connectionString: 'postgresql://postgres:postgres@127.0.0.1:5432/luckread',
+    }
+    const env = {
+      W03_CONTENT_READ_DRIVER: 'neon',
+      HYPERDRIVE_D1_02: binding,
+    }
+    const first = getW03CreatorContentsReadStore(env)
+    const second = getW03CreatorContentsReadStore(env)
 
     expect(first).toBeDefined()
     expect(first).toBe(second)

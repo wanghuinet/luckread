@@ -3177,3 +3177,75 @@ describe('W03 Neon canonical content detail access behavior', () => {
     expect(principals).toEqual([null, 'owner_1'])
   })
 })
+
+
+describe('W03 Neon creator content list pagination', () => {
+  it('uses the injected owner-scoped read store for every creator filter path', async () => {
+    const row = {
+      id: 'content_1',
+      content_type: 'video' as const,
+      owner_user_id: 'owner_1',
+      creator_id: 'creator_1',
+      ip_id: null,
+      state: 'SCHEDULED' as const,
+      scheduled_at: '2026-11-18T12:00:00.000Z',
+      access_mode: 'MEMBERS_ONLY' as const,
+      version: 4,
+      revision: 3,
+      slug: 'scheduled-video',
+      title: 'Scheduled video',
+      body_ref: 'body-ref',
+      media_refs_json: '["media-ref"]',
+      cover_ref: 'cover-ref',
+      media_warning: 'SENSITIVE' as const,
+      etag: 'W/"4"',
+      created_at: '2026-11-10T10:00:00.000Z',
+      updated_at: '2026-11-11T11:00:00.000Z',
+    }
+    const calls: unknown[][] = []
+    const readStore = {
+      async list(ownerUserId: string, cursor: { updatedAt: string; id: string } | null, limit: number, filters: { status?: string; contentType?: string }) {
+        calls.push([ownerUserId, cursor, limit, filters])
+        return [row, { ...row, id: 'content_2', updated_at: '2026-11-10T10:00:00.000Z' }]
+      },
+    }
+    const db = {
+      prepare() {
+        throw new Error('Neon creator contents reader must be used instead of D1')
+      },
+    } as never
+
+    const result = await listCreatorContents(
+      db,
+      'owner_1',
+      null,
+      1,
+      { status: 'SCHEDULED', contentType: 'video' },
+      readStore,
+    )
+
+    expect(calls).toEqual([['owner_1', null, 2, { status: 'SCHEDULED', contentType: 'video' }]])
+    expect(result).toMatchObject({
+      items: [{
+        id: 'content_1',
+        ownerUserId: 'owner_1',
+        contentType: 'video',
+        state: 'SCHEDULED',
+        scheduledAt: '2026-11-18T12:00:00.000Z',
+        accessMode: 'MEMBERS_ONLY',
+        mediaWarning: 'SENSITIVE',
+        mediaRefs: ['media-ref'],
+      }],
+      hasMore: true,
+    })
+    expect(decodeScopedCursor(
+      result.nextCursor!,
+      JSON.stringify({
+        type: 'creator-contents',
+        ownerUserId: 'owner_1',
+        status: 'SCHEDULED',
+        contentType: 'video',
+      }),
+    )).toEqual({ updatedAt: '2026-11-11T11:00:00.000Z', id: 'content_1' })
+  })
+})

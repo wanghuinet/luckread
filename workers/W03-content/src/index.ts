@@ -20,6 +20,7 @@ import {
   type PublishedContentsByIdsReadStore,
   type FollowingOwnerContentsReadStore,
   type ContentDetailReadStore,
+  type CreatorContentsReadStore,
   listCreatorContents,
   validateListFilters,
   toErrorResponse,
@@ -358,6 +359,10 @@ export type W03ContentWorkerDependencies = Readonly<{
   contentDetailReadStoreProvider?: (
     env: W03PublishedMediaReferenceRuntimeEnv,
   ) => ContentDetailReadStore | undefined
+  /** Optional D1-02 provider for owner-scoped, filterable creator content lists. */
+  creatorContentsReadStoreProvider?: (
+    env: W03PublishedMediaReferenceRuntimeEnv,
+  ) => CreatorContentsReadStore | undefined
   /** Optional D1-02 provider for the bounded bookmark-content batch read. */
   publishedContentsByIdsReadStoreProvider?: (
     env: W03PublishedMediaReferenceRuntimeEnv,
@@ -1240,7 +1245,14 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
         const limit = parseListLimit(limitParam)
         if (cursor && cursor.length > 2048) throw new ContentRuntimeError('INVALID_CURSOR', 400)
         const filters = validateListFilters(url.searchParams.get('status'), url.searchParams.get('type'))
-        const page = await listCreatorContents(env.D1_02, principal.userId, cursor, limit, filters)
+        const page = await listCreatorContents(
+          env.D1_02,
+          principal.userId,
+          cursor,
+          limit,
+          filters,
+          dependencies.creatorContentsReadStoreProvider?.(env),
+        )
         return json({
           data: {
             items: page.items.map(item => ({
@@ -1284,10 +1296,14 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
           if (status === 'DRAFT') {
             // L2+ authors may read only their own social post drafts.
             const principal = requiredSocialPostPrincipal(request)
-            const page = await listCreatorContents(env.D1_02, principal.userId, cursor, limit, {
-              status: 'DRAFT',
-              contentType: 'post',
-            })
+            const page = await listCreatorContents(
+              env.D1_02,
+              principal.userId,
+              cursor,
+              limit,
+              { status: 'DRAFT', contentType: 'post' },
+              dependencies.creatorContentsReadStoreProvider?.(env),
+            )
             return json({
               data: {
                 items: page.items.map(item => ({
@@ -1315,10 +1331,14 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
             // Scheduled publication is a Creator-only capability. W03 applies
             // L3/L4 and owner scope before returning any edit/cancel preconditions.
             const principal = requiredCreatorPrincipal(request)
-            const page = await listCreatorContents(env.D1_02, principal.userId, cursor, limit, {
-              status: 'SCHEDULED',
-              contentType: 'post',
-            })
+            const page = await listCreatorContents(
+              env.D1_02,
+              principal.userId,
+              cursor,
+              limit,
+              { status: 'SCHEDULED', contentType: 'post' },
+              dependencies.creatorContentsReadStoreProvider?.(env),
+            )
             return json({
               data: {
                 items: page.items.map(item => ({

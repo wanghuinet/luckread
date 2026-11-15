@@ -138,6 +138,25 @@ export interface ContentDetailReadStore {
   getContent(contentIdOrSlug: string, principalUserId: string | null): Promise<ContentRow | null>
 }
 
+export type CreatorContentsCursor = Readonly<{
+  updatedAt: string
+  id: string
+}>
+
+export type CreatorContentsFilters = Readonly<{
+  status?: ContentState
+  contentType?: ContentType
+}>
+
+export interface CreatorContentsReadStore {
+  list(
+    ownerUserId: string,
+    cursor: CreatorContentsCursor | null,
+    limit: number,
+    filters: CreatorContentsFilters,
+  ): Promise<readonly ContentRow[]>
+}
+
 
 interface ContentRevisionRow {
   id: string
@@ -997,6 +1016,7 @@ export async function listCreatorContents(
   cursor: string | null,
   limit: number,
   filters: { status?: ContentState; contentType?: ContentType } = {},
+  readStore?: CreatorContentsReadStore,
 ): Promise<{ items: ContentRecord[]; nextCursor: string | null; hasMore: boolean }> {
   assertResourceId(ownerUserId)
   const pageSize = Math.min(Math.max(Number.isSafeInteger(limit) ? limit : 20, 1), 50)
@@ -1007,30 +1027,36 @@ export async function listCreatorContents(
     contentType: filters.contentType ?? null,
   })
   const decoded = cursor ? decodeScopedCursor(cursor, cursorScope) : null
-  const conditions = ['owner_user_id = ?']
-  const bindings: unknown[] = [ownerUserId]
-  if (filters.status) {
-    conditions.push('state = ?')
-    bindings.push(filters.status)
+  let rows: readonly ContentRow[]
+  if (readStore) {
+    rows = await readStore.list(ownerUserId, decoded, pageSize + 1, filters)
+  } else {
+    const conditions = ['owner_user_id = ?']
+    const bindings: unknown[] = [ownerUserId]
+    if (filters.status) {
+      conditions.push('state = ?')
+      bindings.push(filters.status)
+    }
+    if (filters.contentType) {
+      conditions.push('content_type = ?')
+      bindings.push(filters.contentType)
+    }
+    if (decoded) {
+      conditions.push('(updated_at < ? OR (updated_at = ? AND id < ?))')
+      bindings.push(decoded.updatedAt, decoded.updatedAt, decoded.id)
+    }
+    const result = await db.prepare(
+      `SELECT id, content_type, owner_user_id, creator_id, ip_id, state, scheduled_at, access_mode, version, revision,
+              slug, title, body_ref, media_refs_json, cover_ref, media_warning, etag, created_at, updated_at
+         FROM contents
+        WHERE ${conditions.join(' AND ')}
+        ORDER BY updated_at DESC, id DESC
+        LIMIT ?`,
+    ).bind(...bindings, pageSize + 1).all<ContentRow>()
+    rows = result.results
   }
-  if (filters.contentType) {
-    conditions.push('content_type = ?')
-    bindings.push(filters.contentType)
-  }
-  if (decoded) {
-    conditions.push('(updated_at < ? OR (updated_at = ? AND id < ?))')
-    bindings.push(decoded.updatedAt, decoded.updatedAt, decoded.id)
-  }
-  const rows = await db.prepare(
-    `SELECT id, content_type, owner_user_id, creator_id, ip_id, state, scheduled_at, access_mode, version, revision,
-            slug, title, body_ref, media_refs_json, cover_ref, media_warning, etag, created_at, updated_at
-       FROM contents
-      WHERE ${conditions.join(' AND ')}
-      ORDER BY updated_at DESC, id DESC
-      LIMIT ?`,
-  ).bind(...bindings, pageSize + 1).all<ContentRow>()
-  const hasMore = rows.results.length > pageSize
-  const page = rows.results.slice(0, pageSize).map(toContent)
+  const hasMore = rows.length > pageSize
+  const page = rows.slice(0, pageSize).map(toContent)
   const last = page.at(-1)
   return {
     items: page,
