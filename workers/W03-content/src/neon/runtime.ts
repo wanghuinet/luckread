@@ -6,6 +6,7 @@ import {
 } from '../published-media-reference-read-store.js'
 import type {
   FollowingOwnerContentsReadStore,
+  ContentDetailReadStore,
   PublishedContentsByIdsReadStore,
 } from '../content-runtime.js'
 import { createPostgresPublishedMediaReferenceReadStore } from '../published-media-reference-read-store-postgres.js'
@@ -49,6 +50,7 @@ const membersStores = new WeakMap<object, {
   series: SeriesMembersReadStore
   collections: CollectionMembersReadStore
 }>()
+const contentDetailStores = new WeakMap<object, ContentDetailReadStore>()
 
 /**
  * The explicit D1-02 content read driver controls only the PostgreSQL read
@@ -284,5 +286,25 @@ export function getW03MembersReadStore(
     getW03PublicMediaReferencePostgresPool(env),
   )
   membersStores.set(binding, store)
+  return store
+}
+
+/** PostgreSQL provider for canonical content detail reads; W07 checks stay in W03. */
+export function getW03ContentDetailReadStore(
+  env: W03PublicMediaReferenceRuntimeEnv,
+): ContentDetailReadStore | undefined {
+  if (resolveW03PublicMediaReferenceDriver(env) === 'd1') return undefined
+
+  const binding = env.HYPERDRIVE_D1_02
+  if (!binding || typeof binding !== 'object') {
+    throw new Error('W03_HYPERDRIVE_D1_02_BINDING_REQUIRED')
+  }
+  const cached = contentDetailStores.get(binding)
+  if (cached) return cached
+
+  const store = createPostgresContentDetailReadStore(
+    getW03PublicMediaReferencePostgresPool(env),
+  )
+  contentDetailStores.set(binding, store)
   return store
 }
