@@ -160,15 +160,35 @@ test('fails closed on a reviewed source Git blob mismatch', () => {
 })
 
 
-test('keeps W07 Neon payment-method reads opt-in until D1-04 remote schema admission', () => {
+test('admits W07 Neon runtime selection after D1-04 remote schema application', () => {
   const wranglerPath = 'workers/W07-subscription-commerce/wrangler.jsonc'
   const source = overrideSource(wranglerPath, (text) => {
     const wrangler = JSON.parse(text)
     wrangler.vars.W07_DATABASE_DRIVER = 'neon'
     return JSON.stringify(wrangler)
   })
+  const result = verifyD104SharedRunnerReview({ readSource: source })
+  assert.equal(result.status, 'D1_04_SHARED_RUNNER_INDEPENDENT_LOCAL_REVIEW_PASS')
+})
+
+test('fails closed if W07 Neon runtime is selected before D1-04 remote schema application', () => {
+  const wranglerPath = 'workers/W07-subscription-commerce/wrangler.jsonc'
+  const bootstrapPath = 'contracts/database/neon-five-domain-schema-bootstrap.v1.json'
+  const withNeon = overrideSource(wranglerPath, (text) => {
+    const wrangler = JSON.parse(text)
+    wrangler.vars.W07_DATABASE_DRIVER = 'neon'
+    return JSON.stringify(wrangler)
+  })
+  const source = (relativePath) => {
+    if (relativePath !== bootstrapPath) return withNeon(relativePath)
+    const bootstrap = JSON.parse(readSource(bootstrapPath))
+    const finance = bootstrap.domains.find((domain) => domain.domainId === 'D1-04')
+    finance.remoteSchemaApplied = false
+    finance.status = 'D1_04_SCHEMA_NOT_APPLIED'
+    return JSON.stringify(bootstrap)
+  }
   assert.throws(
     () => verifyD104SharedRunnerReview({ readSource: source }),
-    /W07 Neon payment-method read runtime must remain opt-in with D1 fallback/,
+    /W07 Neon runtime cannot be selected before D1-04 remote schema application is recorded/,
   )
 })
