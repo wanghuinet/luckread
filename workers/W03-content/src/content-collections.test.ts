@@ -95,4 +95,39 @@ describe('W03 collection foundation', () => {
       nextCursor: null,
     })
   })
+
+  it('uses the injected Neon reader for the bounded creator collection list', async () => {
+    const calls: unknown[][] = []
+    const collection = {
+      id: 'collection_1',
+      ownerUserId: 'user_1',
+      creatorId: 'user_1',
+      state: 'DRAFT' as const,
+      version: 1,
+      title: 'Collection 1',
+      description: 'desc',
+      coverRef: null,
+      etag: 'W/"1"',
+      createdAt: '2026-10-07T00:00:00.000Z',
+      updatedAt: '2026-10-07T00:00:00.000Z',
+    }
+    const readStore = {
+      async listCreatorCollections(ownerUserId: string, cursor: { updatedAt: string; id: string } | null, limit: number) {
+        calls.push([ownerUserId, cursor, limit])
+        return [collection, { ...collection, id: 'collection_2' }]
+      },
+    }
+    const db = {
+      prepare() {
+        throw new Error('Neon reader must be used instead of D1')
+      },
+    } as never
+
+    const result = await listCreatorCollections(db, 'user_1', null, 1, readStore)
+
+    expect(calls).toEqual([['user_1', null, 2]])
+    expect(result.items).toEqual([collection])
+    expect(result.hasMore).toBe(true)
+    expect(result.nextCursor).toEqual(expect.any(String))
+  })
 })
