@@ -2,6 +2,10 @@
 
 import { sha256BytesToHex } from '../../W10-async/src/canonical-json-idempotency.js';
 import { addBillingPeriod } from './subscription-runtime.js';
+import {
+  getW07SelectedD104Database,
+  type W07PaymentMethodReadRuntimeEnv,
+} from './neon/payment-method-read-runtime.js';
 
 type PaidOrderRow = Readonly<{
   payment_id: string;
@@ -68,7 +72,7 @@ export class PaidMembershipPurchaseFulfillmentError extends Error {
   }
 }
 
-type FulfillmentEnv = Readonly<{ D1_01: D1Database; D1_04: D1Database; W06_GOVERNANCE?: Fetcher }>;
+type FulfillmentEnv = W07PaymentMethodReadRuntimeEnv & Readonly<{ D1_01: D1Database; D1_04: D1Database; W06_GOVERNANCE?: Fetcher }>;
 type SubscriptionPlanUpgradeSnapshot = Readonly<{
   kind: 'PLAN_UPGRADE';
   attemptId: string;
@@ -754,8 +758,9 @@ export async function fulfillPaidMembershipOrder(
     throw new PaidMembershipPurchaseFulfillmentError('VALIDATION_FAILED', 400);
   }
 
-  const order = await readPaidOrder(env.D1_04, paymentId, merchantId);
-  const lines = await readOrderLines(env.D1_04, order.order_id);
+  const financeDatabase = getW07SelectedD104Database(env);
+  const order = await readPaidOrder(financeDatabase, paymentId, merchantId);
+  const lines = await readOrderLines(financeDatabase, order.order_id);
   if (lines.length === 0) return failClosed();
 
   let total = 0;
