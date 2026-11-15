@@ -2,6 +2,10 @@
 
 import { readBoundedProviderWebhookBody } from './provider-webhook-body.js'
 import {
+  getW07PaymentWebhookDatabase,
+  type W07PaymentMethodReadRuntimeEnv,
+} from './neon/payment-method-read-runtime.js'
+import {
   parseRevenueCatWebhookEnvelope,
   RevenueCatWebhookValidationError,
   verifyRevenueCatAuthorization,
@@ -13,7 +17,7 @@ import {
   type RevenueCatWebhookReceiptResult,
 } from './revenuecat-webhook-persistence.js';
 
-type RevenueCatWebhookRuntimeEnv = Readonly<{
+type RevenueCatWebhookRuntimeEnv = W07PaymentMethodReadRuntimeEnv & Readonly<{
   D1_04: D1Database;
   REVENUECAT_WEBHOOK_AUTHORIZATION?: string | null;
   REVENUECAT_WEBHOOK_SIGNING_SECRET?: string | null;
@@ -22,6 +26,7 @@ type RevenueCatWebhookRuntimeEnv = Readonly<{
 
 type RevenueCatWebhookRuntimeDependencies = Readonly<{
   receive?: typeof recordRevenueCatWebhookEvent;
+  getWebhookDatabase?: (env: RevenueCatWebhookRuntimeEnv) => D1Database | undefined;
   nowMs?: () => number;
 }>;
 
@@ -153,7 +158,9 @@ export async function handleRevenueCatWebhookRequest(
       );
     }
     const receive = dependencies.receive ?? recordRevenueCatWebhookEvent;
-    const result = await receive(env.D1_04, event, rawBody);
+    const neonDatabase = (dependencies.getWebhookDatabase ?? getW07PaymentWebhookDatabase)(env);
+    const receiptDatabase = neonDatabase ?? env.D1_04;
+    const result = await receive(receiptDatabase, event, rawBody);
     return receiptResponse(result);
   } catch (error) {
     if (error instanceof RevenueCatWebhookValidationError) {

@@ -71,6 +71,30 @@ const receipt = {
 }
 
 describe('RevenueCat private W07 webhook receiver', () => {
+  it('uses the selected Neon D1-04 receipt database and never falls back to D1', async () => {
+    const body = makeBody()
+    const neonDatabase = {} as D1Database
+    const d1Database = {
+      prepare: vi.fn(() => { throw new Error('D1 must not be used in Neon mode') }),
+    } as unknown as D1Database
+    const getWebhookDatabase = vi.fn(() => neonDatabase)
+    const receive = vi.fn(async (database: D1Database) => {
+      expect(database).toBe(neonDatabase)
+      return receipt
+    })
+
+    const response = await handleRevenueCatWebhookRequest(
+      request(body),
+      { ...envBase, D1_04: d1Database, W07_DATABASE_DRIVER: 'neon' },
+      { receive, getWebhookDatabase, nowMs: () => NOW_MS },
+    )
+
+    expect(response?.status).toBe(200)
+    expect(getWebhookDatabase).toHaveBeenCalledOnce()
+    expect(receive).toHaveBeenCalledOnce()
+    expect(d1Database.prepare).not.toHaveBeenCalled()
+  })
+
   it('always checks dashboard Authorization and persists before acknowledging', async () => {
     const body = makeBody()
     const receive = vi.fn(async (_db, event, rawBody) => {
