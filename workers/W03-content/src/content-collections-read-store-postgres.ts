@@ -47,9 +47,9 @@ const toCollectionRecord = (row: CollectionListRow): CollectionRecord => ({
 })
 
 /**
- * PostgreSQL equivalent of the bounded creator-owned collection list.
- * Collection writes and single-item reads remain on D1 until their own slices
- * are admitted; cursor scope and encoding stay in content-collections.ts.
+ * PostgreSQL reader for creator-owned collection detail and bounded lists.
+ * Collection writes remain on D1; cursor scope and encoding stay in
+ * content-collections.ts.
  */
 export function createPostgresCollectionListReadStore(
   database: CollectionListPostgresQueryExecutor,
