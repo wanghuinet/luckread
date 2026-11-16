@@ -78,9 +78,9 @@ function getW07MembershipPostgresPool(
 }
 
 /**
- * Selects the D1-01 membership database. The existing W07 D1_01 business logic
- * runs through the PostgreSQL compatibility bridge when Neon is explicitly
- * selected; D1 remains the default and rollback binding.
+ * Selects the W07 membership store provider. Production uses the Neon D1-01
+ * Hyperdrive bridge; the historical D1 adapter is available only to explicit
+ * local/test profiles and is not declared by wrangler.neon.jsonc.
  */
 export function getW07SelectedD101Database(
   env: W07MembershipDatabaseRuntimeEnv,
