@@ -79,7 +79,7 @@ test('generator rejects Cloudflare D1 bindings reintroduced into the W05 Neon pr
     relativePath === configPath ? JSON.stringify(invalidConfig) : readSource(relativePath)
   assert.throws(
     () => buildW05PostgresMigration({ inventory, socialContract, readSource: readWithInvalidConfig, template }),
-    /Wrangler production config must be D1-free/
+    /production Wrangler must be D1-free/
   )
 })
 
@@ -89,7 +89,7 @@ test('generator rejects a W05 source inventory that imports D1-03 governance tab
   owner.physicalBindings.find((item) => item.binding === 'D1_03').included = true
   assert.throws(
     () => buildW05PostgresMigration({ inventory: invalid, socialContract, readSource, template }),
-    /D1-03 governance binding must remain excluded/
+    /D1-02 schema source provenance must retain/
   )
 })
 
@@ -110,7 +110,13 @@ test('generator rejects foreign keys, SQLite syntax and source inventory drift',
   )
   assert.throws(
     () => buildW05PostgresMigration({
-      inventory, socialContract, readSource: () => null, template
+      inventory,
+      socialContract,
+      readSource: (relativePath) =>
+        relativePath.startsWith(inventory.owners.find((item) => item.worker === 'W05').migrationDirectory + '/')
+          ? null
+          : readSource(relativePath),
+      template,
     }),
     /Missing source migration/
   )
