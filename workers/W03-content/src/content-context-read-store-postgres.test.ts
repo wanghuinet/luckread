@@ -86,6 +86,28 @@ describe('W03 PostgreSQL content context read store', () => {
     expect(publicPost.calls[0]?.sql).toContain("state = 'PUBLISHED'")
   })
 
+  it('uses Neon projections for public creator eligibility and bounded members-only body references', async () => {
+    const eligibility = fixture([{ id: 'content_public_1' }])
+    await expect(createPostgresContentContextReadStore(eligibility.database).hasPublicCreatorContent('user_1'))
+      .resolves.toBe(true)
+    expect(eligibility.calls[0]?.sql).toContain("COALESCE(access_mode, 'PUBLIC') = 'PUBLIC'")
+    expect(eligibility.calls[0]?.values).toEqual(['user_1'])
+
+    const references = fixture([
+      { owner_user_id: 'owner_1', creator_id: 'creator_1' },
+      { owner_user_id: 'owner_2', creator_id: null },
+    ])
+    await expect(createPostgresContentContextReadStore(references.database)
+      .listPublishedMembersOnlyBodyReferences('body_ref_1', 51))
+      .resolves.toEqual([
+        { owner_user_id: 'owner_1', creator_id: 'creator_1' },
+        { owner_user_id: 'owner_2', creator_id: null },
+      ])
+    expect(references.calls[0]?.sql).toContain("access_mode = 'MEMBERS_ONLY'")
+    expect(references.calls[0]?.sql).toContain('LIMIT $2')
+    expect(references.calls[0]?.values).toEqual(['body_ref_1', 51])
+  })
+
   it('does not query for empty batches and maps missing and database errors safely', async () => {
     const empty = fixture()
     await expect(createPostgresContentContextReadStore(empty.database).getPublishedContentSocialContexts([]))
