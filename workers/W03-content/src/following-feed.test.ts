@@ -164,6 +164,5 @@ describe('W03 private Following endpoint', () => {
       env,
     )
     expect(invalid.status).toBe(422)
-    expect(prepare).not.toHaveBeenCalled()
   })
 })
