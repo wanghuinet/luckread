@@ -1,5 +1,5 @@
 /// <reference types="@cloudflare/workers-types" />
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { listFollowingOwnerContents } from './content-runtime.js'
 import { createW03ContentWorker } from './index.js'
 
