@@ -64,8 +64,8 @@ for (const dir of dirs) {
 
   if (configExists) {
     checkedConfigs += 1
-    const config = jsonc(wranglerPath)
-    for (const entry of config.d1_databases ?? []) {
+    const config = configExists ? jsonc(wranglerPath) : null
+    if (config) for (const entry of config.d1_databases ?? []) {
       const domain = domainById[entry.database_id]
       if (!domain) {
         throw new Error(`${workerId}: unregistered D1 id ${String(entry.database_id)}`)
@@ -80,6 +80,16 @@ for (const dir of dirs) {
         throw new Error(`${workerId}: D1 ${domain} is outside its allowed domain set`)
       }
     }
+  }
+
+  const productionNeon = workerPolicy.productionRuntime?.provider === 'neon' &&
+    config?.d1_databases?.length === 0 &&
+    Object.entries(workerPolicy.productionRuntime.driverVars ?? {}).every(([name, expected]) =>
+      config.vars?.[name] === expected) &&
+    Object.entries(workerPolicy.productionRuntime.hyperdrive ?? {}).every(([binding, expectedId]) =>
+      (config.hyperdrive ?? []).some((entry) => entry.binding === binding && entry.id === expectedId))
+  if (workerPolicy.productionRuntime?.provider === 'neon' && !productionNeon) {
+    throw new Error(`${workerId}: production Neon-only config does not match the D1 compatibility exception contract`)
   }
 
   const files = []
@@ -104,6 +114,9 @@ for (const dir of dirs) {
         (configExists ? (jsonc(wranglerPath).d1_databases ?? []) : []).map((x) => x.binding),
       )
       if (!declaredBindings.has(binding)) {
+        const compatibilityOnly = productionNeon &&
+          (workerPolicy.nonProductionCompatibilityBindings ?? []).includes(binding)
+        if (compatibilityOnly) continue
         const relative = path.slice(root.length + 1)
         throw new Error(`${workerId}: raw D1 binding ${binding} used by ${relative} but not declared in wrangler.jsonc`)
       }
