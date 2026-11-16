@@ -185,8 +185,12 @@ export default {
     try {
       const runtimeEnv: W07SelectedRuntimeEnv = {
         ...env,
-        D1_01: getW07SelectedD101Database(env),
-        D1_04: getW07SelectedD104Database(env),
+        get D1_01() {
+          return getW07SelectedD101Database(env)
+        },
+        get D1_04() {
+          return getW07SelectedD104Database(env)
+        },
       }
       // W10 is the only admitted scheduler. This private service-binding
       // endpoint delegates all commerce and membership writes back to W07.
