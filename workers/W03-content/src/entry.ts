@@ -11,6 +11,7 @@ import {
   getW03CollectionDeleteStore,
   getW03SeriesReadStore,
   getW03SeriesCreateStore,
+  getW03SeriesUpdateStore,
   getW03MembersReadStore,
   getW03ContentDetailReadStore,
   getW03CreatorContentsReadStore,
@@ -43,6 +44,8 @@ export default createW03ContentWorker({
     getW03SeriesReadStore(env),
   seriesCreateStoreProvider: (env) =>
     getW03SeriesCreateStore(env),
+  seriesUpdateStoreProvider: (env) =>
+    getW03SeriesUpdateStore(env),
   membersReadStoreProvider: (env) =>
     getW03MembersReadStore(env),
   contentDetailReadStoreProvider: (env) =>
