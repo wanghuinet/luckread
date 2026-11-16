@@ -58,6 +58,7 @@ import {
   updateSeries,
   type SeriesReadStore,
   type SeriesCreateStore,
+  type SeriesUpdateStore,
 } from './content-series.js'
 import {
   createCollection,
@@ -387,6 +388,10 @@ export type W03ContentWorkerDependencies = Readonly<{
   seriesCreateStoreProvider?: (
     env: W03PublishedMediaReferenceRuntimeEnv,
   ) => SeriesCreateStore | undefined
+  /** Optional D1-02 provider for the atomic creator-series update mutation. */
+  seriesUpdateStoreProvider?: (
+    env: W03PublishedMediaReferenceRuntimeEnv,
+  ) => SeriesUpdateStore | undefined
   /** Optional D1-02 provider for the bounded creator-collection list read. */
   collectionListReadStoreProvider?: (
     env: W03PublishedMediaReferenceRuntimeEnv,
@@ -1103,6 +1108,8 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
             await parseBody(request),
             requireIfMatch(request),
             requireIdempotency(request),
+            new Date(),
+            dependencies.seriesUpdateStoreProvider?.(env),
           ),
           schemaVersion: '1.0',
           requestId: createRequestId(),
