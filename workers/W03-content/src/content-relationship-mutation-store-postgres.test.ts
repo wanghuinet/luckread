@@ -425,6 +425,7 @@ describe('W03 Neon content relationship mutation store', () => {
     expect(sql[5]).toContain('WITH RECURSIVE descendants')
     expect(sql[5]).toContain('ancestors')
     expect(sql[5]).toContain('NOT EXISTS (SELECT 1 FROM descendants WHERE id = s.id)')
+    expect(sql[5]).toContain('s.id <> t.id')
     expect(sql[5]).toContain("relation_type = 'thread-next'")
     expect(sql[5]).toContain('RETURNING relationship_id')
     expect(sql[6]).toBe('COMMIT')
