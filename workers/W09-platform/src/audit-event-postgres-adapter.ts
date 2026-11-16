@@ -8,10 +8,10 @@
 
 function normalizeForPolicy(sql: string): string {
   return sql
+    // Strip literal payload values first so comment markers inside strings remain data.
+    .replace(/'(?:''|[^'])*'/g, "''")
     .replace(/--[^\n]*/g, ' ')
     .replace(/\/\*[\s\S]*?\*\//g, ' ')
-    // Literal payload text is data, not an SQL operation or table reference.
-    .replace(/'(?:''|[^'])*'/g, "''")
     .trim()
 }
 
