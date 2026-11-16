@@ -57,7 +57,7 @@ jobs:
           ref: main
           fetch-depth: 1
 
-      - name: Validate W03 Neon read-only cutover and preserve D1 writes
+      - name: Validate W03 Neon cutover boundaries and preserve D1 fallback
         run: |
           set -euo pipefail
           node <<'NODE'
@@ -79,7 +79,7 @@ jobs:
           }
           if (!d1 || d1.database_id !== '6c342634-97f6-4248-9f4a-85772af4f22c' ||
               d1.database_name !== 'luckreadpro') {
-            throw new Error('W03 existing D1-02 binding must remain for non-admitted reads and all writes')
+            throw new Error('W03 existing D1-02 binding must remain for non-admitted reads and fallback writes')
           }
           if (!hyperdrive || hyperdrive.id !== 'c55183e1cc3446409c9c1075832c6615') {
             throw new Error('W03 existing D1-02 Hyperdrive binding identity changed')
