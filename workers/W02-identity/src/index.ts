@@ -60,6 +60,9 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
+    // Do not preflight the legacy D1 binding here: internal service-boundary
+    // authorization must run first. Neon production has no D1 binding, and
+    // any remaining D1-only operation fails closed at its own store access.
     let postgres: ReturnType<typeof getW02PostgresRuntime> | undefined
     try {
       if (isW02NeonRuntime(env)) postgres = getW02PostgresRuntime(env)
