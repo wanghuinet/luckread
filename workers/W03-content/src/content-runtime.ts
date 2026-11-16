@@ -157,6 +157,26 @@ export interface CreatorContentsReadStore {
   ): Promise<readonly ContentRow[]>
 }
 
+export type ContentRevisionCursor = Readonly<{
+  updatedAt: string
+  id: string
+}>
+
+/** Owner-scoped PostgreSQL reader for the content revision history endpoints. */
+export interface ContentRevisionReadStore {
+  list(
+    principalUserId: string,
+    contentId: string,
+    cursor: ContentRevisionCursor | null,
+    limit: number,
+  ): Promise<readonly ContentRevision[]>
+  get(
+    principalUserId: string,
+    contentId: string,
+    revisionId: string,
+  ): Promise<ContentRevision | null>
+}
+
 
 interface ContentRevisionRow {
   id: string
@@ -1063,25 +1083,36 @@ export async function listContentRevisions(
   contentId: string,
   cursor: string | null,
   limit: number,
+  readStore?: ContentRevisionReadStore,
 ): Promise<{ items: ContentRevision[]; nextCursor: string | null; hasMore: boolean }> {
   assertResourceId(principalUserId)
   assertResourceId(contentId)
   const pageSize = revisionPageSize(limit)
   const cursorScope = JSON.stringify({ type: 'content-revisions', principalUserId, contentId })
   const decoded = cursor ? decodeScopedCursor(cursor, cursorScope) : null
-  const cursorClause = decoded ? 'AND (r.created_at < ? OR (r.created_at = ? AND r.id < ?))' : ''
-  const cursorBindings = decoded ? [decoded.updatedAt, decoded.updatedAt, decoded.id] : []
-  const rows = await db.prepare(`
-    SELECT r.id, r.content_id, r.revision, r.content_version, r.actor_user_id,
-           r.source_revision, r.operation, r.state, r.access_mode, r.slug, r.title, r.body_ref,
-           r.media_refs_json, r.cover_ref, r.media_warning, r.etag, r.reason, r.correlation_id, r.created_at
-      FROM content_revisions r
-      JOIN contents c ON c.id = r.content_id
-     WHERE r.content_id = ? AND c.owner_user_id = ? ${cursorClause}
-     ORDER BY r.created_at DESC, r.id DESC
-     LIMIT ?`).bind(contentId, principalUserId, ...cursorBindings, pageSize + 1).all<ContentRevisionRow>()
-  const hasMore = rows.results.length > pageSize
-  const page = rows.results.slice(0, pageSize).map(toRevision)
+
+  let page: ContentRevision[]
+  let hasMore: boolean
+  if (readStore) {
+    const rows = await readStore.list(principalUserId, contentId, decoded, pageSize + 1)
+    hasMore = rows.length > pageSize
+    page = rows.slice(0, pageSize)
+  } else {
+    const cursorClause = decoded ? 'AND (r.created_at < ? OR (r.created_at = ? AND r.id < ?))' : ''
+    const cursorBindings = decoded ? [decoded.updatedAt, decoded.updatedAt, decoded.id] : []
+    const rows = await db.prepare(`
+      SELECT r.id, r.content_id, r.revision, r.content_version, r.actor_user_id,
+             r.source_revision, r.operation, r.state, r.access_mode, r.slug, r.title, r.body_ref,
+             r.media_refs_json, r.cover_ref, r.media_warning, r.etag, r.reason, r.correlation_id, r.created_at
+        FROM content_revisions r
+        JOIN contents c ON c.id = r.content_id
+       WHERE r.content_id = ? AND c.owner_user_id = ? ${cursorClause}
+       ORDER BY r.created_at DESC, r.id DESC
+       LIMIT ?`).bind(contentId, principalUserId, ...cursorBindings, pageSize + 1).all<ContentRevisionRow>()
+    hasMore = rows.results.length > pageSize
+    page = rows.results.slice(0, pageSize).map(toRevision)
+  }
+
   const last = page.at(-1)
   return { items: page, hasMore, nextCursor: hasMore && last ? encodeScopedCursor(last.createdAt, last.id, cursorScope) : null }
 }
@@ -1091,10 +1122,16 @@ export async function getContentRevision(
   principalUserId: string,
   contentId: string,
   revisionId: string,
+  readStore?: ContentRevisionReadStore,
 ): Promise<ContentRevision> {
   assertResourceId(principalUserId)
   assertResourceId(contentId)
   assertResourceId(revisionId)
+  if (readStore) {
+    const revision = await readStore.get(principalUserId, contentId, revisionId)
+    if (!revision) throw new ContentRuntimeError('NOT_FOUND', 404)
+    return revision
+  }
   const row = await db.prepare(`
     SELECT r.id, r.content_id, r.revision, r.content_version, r.actor_user_id,
            r.source_revision, r.operation, r.state, r.access_mode, r.slug, r.title, r.body_ref,
