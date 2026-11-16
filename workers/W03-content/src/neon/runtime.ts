@@ -20,8 +20,13 @@ import { createPostgresPublicContentListReadStore } from '../public-content-list
 import { createPostgresFollowingOwnerContentsReadStore } from '../following-owner-contents-read-store-postgres.js'
 import { createPostgresPostThreadReadStore } from '../post-thread-read-store-postgres.js'
 import { createPostgresContentContextReadStore, type ContentContextReadStore } from '../content-context-read-store-postgres.js'
-import type { ContentRelationshipMutationStore, PostThreadReadStore } from '../content-relationships.js'
+import type {
+  ContentRelationshipMutationStore,
+  ContentRelationshipReadStore,
+  PostThreadReadStore,
+} from '../content-relationships.js'
 import { createPostgresContentRelationshipMutationStore, type ContentRelationshipPostgresDatabase } from '../content-relationship-mutation-store-postgres.js'
+import { createPostgresContentRelationshipListReadStore } from '../content-relationship-list-read-store-postgres.js'
 import {
   createPostgresCollectionListReadStore,
 } from '../content-collections-read-store-postgres.js'
@@ -84,6 +89,7 @@ const publicContentListStores = new WeakMap<object, PublicContentListReadStore>(
 const followingContentsStores = new WeakMap<object, FollowingOwnerContentsReadStore>()
 const postThreadStores = new WeakMap<object, PostThreadReadStore>()
 const contentRelationshipMutationStores = new WeakMap<object, ContentRelationshipMutationStore>()
+const contentRelationshipReadStores = new WeakMap<object, ContentRelationshipReadStore>()
 const contentContextStores = new WeakMap<object, ContentContextReadStore>()
 const collectionListStores = new WeakMap<object, CollectionListReadStore>()
 const collectionCreateStores = new WeakMap<object, CollectionCreateStore>()
@@ -719,5 +725,27 @@ export function getW03ContentRevisionReadStore(
     getW03PublicMediaReferencePostgresPool(env),
   )
   contentRevisionStores.set(binding, store)
+  return store
+}
+
+
+
+/** PostgreSQL provider for bounded public reference relationship lists. */
+export function getW03ContentRelationshipReadStore(
+  env: W03PublicMediaReferenceRuntimeEnv,
+): ContentRelationshipReadStore | undefined {
+  if (resolveW03PublicMediaReferenceDriver(env) === 'd1') return undefined
+
+  const binding = env.HYPERDRIVE_D1_02
+  if (!binding || typeof binding !== 'object') {
+    throw new Error('W03_HYPERDRIVE_D1_02_BINDING_REQUIRED')
+  }
+  const cached = contentRelationshipReadStores.get(binding)
+  if (cached) return cached
+
+  const store = createPostgresContentRelationshipListReadStore(
+    getW03PublicMediaReferencePostgresPool(env),
+  )
+  contentRelationshipReadStores.set(binding, store)
   return store
 }
