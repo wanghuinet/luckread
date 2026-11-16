@@ -12,6 +12,10 @@ on:
       - 'workers/W03-content/src/content-create-postgres.test.ts'
       - 'workers/W03-content/src/content-mutation-store-postgres.ts'
       - 'workers/W03-content/src/content-mutation-postgres.test.ts'
+      - 'workers/W03-content/src/content-relationship-mutation-store-postgres.ts'
+      - 'workers/W03-content/src/content-relationship-mutation-store-postgres.test.ts'
+      - 'workers/W03-content/src/content-relationships.ts'
+      - 'workers/W03-content/src/neon/runtime.test.ts'
       - 'workers/W03-content/src/content-collections-read-store-postgres.ts'
       - 'workers/W03-content/src/content-collections-create-store-postgres.ts'
       - 'workers/W03-content/src/content-collections-update-store-postgres.ts'
@@ -67,6 +71,7 @@ jobs:
           const runtime = fs.readFileSync('workers/W03-content/src/neon/runtime.ts', 'utf8')
           const contentRuntime = fs.readFileSync('workers/W03-content/src/content-runtime.ts', 'utf8')
           const router = fs.readFileSync('workers/W03-content/src/index.ts', 'utf8')
+          const relationships = fs.readFileSync('workers/W03-content/src/content-relationships.ts', 'utf8')
           const bootstrap = JSON.parse(fs.readFileSync('contracts/database/neon-five-domain-schema-bootstrap.v1.json', 'utf8'))
           const domain = (bootstrap.domains || []).find(x => x.domainId === 'D1-02')
           const d1 = (config.d1_databases || []).find(x => x.binding === 'D1_02')
@@ -94,6 +99,7 @@ jobs:
             ['publishedContentsByIdsReadStoreProvider', 'getW03PublishedContentsByIdsReadStore'],
             ['followingOwnerContentsReadStoreProvider', 'getW03FollowingOwnerContentsReadStore'],
             ['postThreadReadStoreProvider', 'getW03PostThreadReadStore'],
+            ['contentRelationshipMutationStoreProvider', 'getW03ContentRelationshipMutationStore'],
             ['contentContextReadStoreProvider', 'getW03ContentContextReadStore'],
             ['collectionListReadStoreProvider', 'getW03CollectionListReadStore'],
             ['contentCreateStoreProvider', 'getW03ContentCreateStore'],
@@ -119,7 +125,7 @@ jobs:
               throw new Error('W03 Neon provider wiring is incomplete: ' + provider)
             }
           }
-          if (!runtime.includes('Content creation, update, delete, owner-authorized state transitions, W06 moderation decisions, owner-authorized revision rollback, and scheduled publication candidate reads/commits plus Collection creation, update, delete, member attachment, member removal, and member reorder plus Series creation, update, delete, member attachment, and member removal are the only Neon-backed mutations in these slices; all other W03 reads and mutations remain on D1_02')) {
+          if (!runtime.includes('Content creation, update, delete, owner-authorized state transitions, W06 moderation decisions, owner-authorized revision rollback, scheduled publication candidate reads/commits, and content reference create/revoke plus Collection creation, update, delete, member attachment, member removal, and member reorder plus Series creation, update, delete, member attachment, and member removal are the only Neon-backed mutations in these slices; all other W03 reads and mutations remain on D1_02')) {
             throw new Error('W03 Neon mutation boundary declaration is missing')
           }
           if (!contentRuntime.includes('mutationStore.transition({') ||
@@ -134,6 +140,11 @@ jobs:
               !router.includes('dependencies.contentMutationStoreProvider?.(env),')) {
             throw new Error('W03 Neon revision rollback wiring is incomplete')
           }
+          if (!relationships.includes('mutationStore.create({') ||
+              !relationships.includes('mutationStore.revoke({') ||
+              !router.includes('dependencies.contentRelationshipMutationStoreProvider?.(env),')) {
+            throw new Error('W03 Neon content relationship create/revoke wiring is incomplete')
+          }
           if (!contentRuntime.includes('mutationStore.listDueScheduled(nowIso, limit)') ||
               !contentRuntime.includes('mutationStore.publishScheduled(authorizedCandidates, nowIso)')) {
             throw new Error('W03 Neon scheduled publication read/commit wiring is incomplete')
@@ -141,6 +152,7 @@ jobs:
           console.log('W03_NEON_SCHEDULED_PUBLICATION_CUTOVER=PASS')
           console.log('W03_NEON_MODERATION_TRANSITION_CUTOVER=PASS')
           console.log('W03_NEON_REVISION_ROLLBACK_CUTOVER=PASS')
+          console.log('W03_NEON_CONTENT_RELATIONSHIP_CUTOVER=PASS')
           console.log('W03_NEON_CONTENT_STATE_TRANSITION_CUTOVER=PASS')
           console.log('W03_NEON_READ_PROJECTION_CUTOVER_CONFIG=PASS')
           NODE
