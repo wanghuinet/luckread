@@ -79,6 +79,23 @@ export function validateWorkerBindings(config, owner) {
   const actual = Array.isArray(config?.d1_databases) ? config.d1_databases : []
   const expected = Array.isArray(owner?.physicalBindings) ? owner.physicalBindings : []
 
+  if (owner?.runtimeProvider === 'neon') {
+    if (actual.length !== 0) errors.push(owner.worker + ' Neon production config must have zero D1 bindings')
+    const expectedDrivers = owner.neonBindings ?? []
+    const hyperdrive = config?.hyperdrive ?? []
+    const vars = config?.vars ?? {}
+    if (vars.W05_DATABASE_DRIVER !== 'neon' || vars.W05_PUSH_ENDPOINT_DATABASE_DRIVER !== 'neon') {
+      errors.push(owner.worker + ' must select Neon for both D1-02 and delegated D1-03 runtime data')
+    }
+    for (const binding of expectedDrivers) {
+      if (!hyperdrive.some((item) => item.binding === binding.binding && item.id === binding.id)) {
+        errors.push(owner.worker + ' Hyperdrive binding mismatch: ' + binding.binding)
+      }
+    }
+    if (expected.length !== 0) errors.push(owner.worker + ' Neon production owner must not declare physical D1 bindings')
+    return errors
+  }
+
   const actualNames = actual.map((binding) => binding.binding).sort()
   const expectedNames = expected.map((binding) => binding.binding).sort()
   const drift = compareFileSets(expectedNames, actualNames)
@@ -208,6 +225,7 @@ export function buildD1_02Inventory({ contract, readSource, listSqlFiles }) {
     },
     ownerSummaries: contract.owners.map((owner) => ({
       worker: owner.worker,
+      runtimeProvider: owner.runtimeProvider ?? 'cloudflare-d1',
       migrationDirectory: owner.migrationDirectory,
       migrationCount: owner.sqlMigrations.length,
       includedBindings: owner.physicalBindings.filter((item) => item.included).map((item) => item.binding),
