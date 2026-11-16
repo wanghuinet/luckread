@@ -55,7 +55,23 @@
       "role": "Authoritative social graph, interactions, discussions, notifications and push-delivery schema",
       "wrangler": "workers/W05-social/wrangler.jsonc",
       "migrationDirectory": "workers/W05-social/migrations",
-      "physicalBindings": [],
+      "physicalBindings": [
+        {
+          "binding": "DB",
+          "logicalDomain": "D1-02",
+          "databaseName": "luckreadpro",
+          "databaseUuid": "6c342634-97f6-4248-9f4a-85772af4f22c",
+          "included": true
+        },
+        {
+          "binding": "D1_03",
+          "logicalDomain": "D1-03",
+          "databaseName": "secondary",
+          "databaseUuid": "bda1d247-a371-4244-91ae-aef96034db7f",
+          "included": false,
+          "reason": "Separate governance/platform domain; explicitly excluded from the D1-02 source and migration inventory."
+        }
+      ],
       "referenceContracts": [
         "contracts/persistence/SOCIAL-001-follow-relationship-migration-contract.v1.json"
       ],
@@ -75,20 +91,6 @@
         "20261022_016_social_discovery_scan_idx.sql",
         "20261104_017_notification_push_delivery_v1.sql",
         "20261105_018_social_poll_duration_minutes.sql"
-      ],
-      "runtimeProvider": "neon",
-      "neonBindings": [
-        {
-          "binding": "HYPERDRIVE_D1_02",
-          "logicalDomain": "D1-02",
-          "id": "c55183e1cc3446409c9c1075832c6615"
-        },
-        {
-          "binding": "HYPERDRIVE_D1_03",
-          "logicalDomain": "D1-03",
-          "id": "7c8831416c18494faee04b96aa551cb9",
-          "delegatedOwner": "W09"
-        }
       ]
     }
   ],
