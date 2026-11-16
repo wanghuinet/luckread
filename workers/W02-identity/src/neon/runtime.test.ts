@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 import {
@@ -37,5 +38,23 @@ describe('W02 database driver selection', () => {
     const second = getW02PostgresPool(env)
     expect(first).toBe(second)
     await first.end()
+  })
+})
+
+
+describe('W02 production Neon Wrangler config', () => {
+  it('declares zero production D1 bindings and retains the existing D1-01 Hyperdrive', () => {
+    const config = JSON.parse(readFileSync(new URL('../../wrangler.neon.jsonc', import.meta.url), 'utf8'))
+    expect(config.name).toBe('luckread-w02')
+    expect(config.vars?.W02_DATABASE_DRIVER).toBe('neon')
+    expect(config.d1_databases ?? []).toEqual([])
+    expect(config.hyperdrive).toContainEqual({
+      binding: 'HYPERDRIVE',
+      id: '0c53a1bb9bc0484bac146e8ae2d3158b',
+    })
+    expect(config.queues?.producers).toEqual(expect.arrayContaining([
+      { binding: 'AUTH013_QUEUE', queue: 'luckread-auth013-account-state' },
+      { binding: 'AUTH013_PROJECTION_QUEUE', queue: 'luckread-auth013-account-state-projection' },
+    ]))
   })
 })
