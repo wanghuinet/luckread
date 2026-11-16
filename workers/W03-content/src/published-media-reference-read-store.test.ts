@@ -112,13 +112,7 @@ describe('W03 published media reference read store', () => {
         return rows
       },
     }
-    const db = {
-      prepare() {
-        throw new Error('injected store must not use D1')
-      },
-    }
     const result = await resolvePublishedMediaReferenceAccess(
-      db as never,
       'https://img.luckread.com/media/photo.png',
       null,
       undefined,
