@@ -22,6 +22,7 @@ on:
       - 'workers/W01-payload/src/app/api/v1/reports/**'
       - 'workers/W06-governance/migrations/0003_moderation_report_v1.sql'
       - 'workers/W06-governance/wrangler.jsonc'
+      - 'workers/W06-governance/wrangler.neon.jsonc'
       - 'workers/W06-governance/package.json'
       - 'workers/W06-governance/migrations/**'
       - 'workers/W03-content/src/content-runtime.ts'
@@ -42,6 +43,7 @@ on:
       - 'workers/W09-platform/src/audit-event-postgres-adapter.ts'
       - 'workers/W09-platform/src/audit-event-postgres-adapter.test.ts'
       - 'workers/W06-governance/wrangler.jsonc'
+      - 'workers/W06-governance/wrangler.neon.jsonc'
       - 'workers/W06-governance/package.json'
       - 'workers/W06-governance/migrations/**'
       - 'workers/W03-content/src/content-runtime.ts'
@@ -81,7 +83,7 @@ jobs:
 
       - name: Bundle W06 Worker with Hyperdrive PostgreSQL runtime dependency
         working-directory: workers/W06-governance
-        run: npx --yes wrangler@4.116.0 deploy --dry-run --config wrangler.jsonc --compatibility-flags nodejs_compat
+        run: npx --yes wrangler@4.116.0 deploy --dry-run --config wrangler.neon.jsonc --compatibility-flags nodejs_compat
 
       - name: Typecheck W06 moderation runtime
         run: npx tsc --noEmit --target ES2022 --module ESNext --moduleResolution Bundler --strict --skipLibCheck --types @cloudflare/workers-types workers/W06-governance/src/moderation-runtime.ts workers/W06-governance/src/moderation-queue-read-store-postgres.ts workers/W06-governance/src/neon-postgres-d1-database.ts workers/W06-governance/src/neon-postgres-d1-database.test.ts workers/W09-platform/src/audit-event-postgres-adapter.ts workers/W09-platform/src/audit-event-postgres-adapter.test.ts workers/W06-governance/src/neon/moderation-database-runtime.ts workers/W06-governance/src/neon/moderation-database-runtime.test.ts workers/W06-governance/src/index.ts
@@ -126,13 +128,18 @@ jobs:
           node - <<'NODE'
           const fs = require('node:fs');
           const w01 = JSON.parse(fs.readFileSync('workers/W01-payload/wrangler.jsonc','utf8'));
-          const w06 = JSON.parse(fs.readFileSync('workers/W06-governance/wrangler.jsonc','utf8'));
+          const w06Source = JSON.parse(fs.readFileSync('workers/W06-governance/wrangler.jsonc','utf8'));
+          const w06 = JSON.parse(fs.readFileSync('workers/W06-governance/wrangler.neon.jsonc','utf8'));
           const w03 = JSON.parse(fs.readFileSync('workers/W03-content/wrangler.jsonc','utf8'));
           const w01m = w01.services?.find(x => x.binding === 'W06_MODERATION');
           const w06m = w06.services?.find(x => x.binding === 'W03_CONTENT_MODERATION');
+          const sourceD1 = w06Source.d1_databases?.find(x => x.binding === 'D1_03');
+          const hyperdrive = w06.hyperdrive?.find(x => x.binding === 'HYPERDRIVE_D1_03');
           if (!w01m || w01m.service !== 'luckread-w06') throw new Error('W01 W06_MODERATION binding mismatch');
           if (!w06m || w06m.service !== 'luckread-w03') throw new Error('W06 W03_CONTENT_MODERATION binding mismatch');
-          if (!w06.d1_databases?.some(x => x.binding === 'D1_03' && x.database_id === 'bda1d247-a371-4244-91ae-aef96034db7f')) throw new Error('W06 D1-03 binding mismatch');
+          if (!sourceD1 || sourceD1.database_id !== 'bda1d247-a371-4244-91ae-aef96034db7f') throw new Error('W06 historical D1-03 schema source mapping mismatch');
+          if ((w06.d1_databases || []).length !== 0 || w06.vars?.W06_MODERATION_DATABASE_DRIVER !== 'neon') throw new Error('W06 production must be Neon-only');
+          if (!hyperdrive || hyperdrive.id !== '7c8831416c18494faee04b96aa551cb9') throw new Error('W06 D1-03 Hyperdrive binding mismatch');
           if (!w03.d1_databases?.some(x => x.binding === 'D1_02' && x.database_id === '6c342634-97f6-4248-9f4a-85772af4f22c')) throw new Error('W03 D1-02 binding mismatch');
-          console.log('MODERATION_TOPOLOGY=PASS');
+          console.log('MODERATION_TOPOLOGY=PASS; W06_PRODUCTION_D1_BINDINGS=NONE');
           NODE
