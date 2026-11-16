@@ -101,16 +101,24 @@ import {
 type RateLimitBinding = { limit(input: { key: string }): Promise<{ success: boolean }> }
 
 interface Env extends W03PublishedMediaReferenceRuntimeEnv {
-  HYPERDRIVE_D1_02?: { connectionString?: string }
+  HYPERDRIVE_CONTENT_PG?: { connectionString?: string }
   W07_SUBSCRIPTION?: { fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> }
   CONTENT_PUBLIC_READ_LIMITER?: RateLimitBinding
   CONTENT_MUTATION_LIMITER?: RateLimitBinding
   CONTENT_ORIGIN_GLOBAL_LIMITER?: RateLimitBinding
 }
 
-// The deployment entrypoint injects the Neon stores for every data operation.
-// No D1 binding is exposed to the W03 Worker runtime; missing stores fail closed.
-const NO_LEGACY_DATABASE_HANDLE = undefined as never
+// Compatibility helpers still accept the old ContentD1 interface internally,
+// but production never has a D1 binding. Fail closed with a typed service error
+// rather than allowing undefined.prepare() to turn a missing Neon store into a 500.
+const NO_LEGACY_DATABASE_HANDLE: ContentD1 = {
+  prepare(_query: string) {
+    throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
+  },
+  batch(_statements: D1PreparedStatement[]) {
+    throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
+  },
+}
 
 const getRateKey = (request: Request): string => {
   const supplied = request.headers.get('X-LuckRead-Rate-Key')?.trim()
