@@ -87,6 +87,7 @@ import {
   removeCollectionMember,
   reorderCollectionMember,
   type CollectionMembersReadStore,
+  type CollectionMemberAttachStore,
 } from './content-collection-members.js'
 
 type RateLimitBinding = { limit(input: { key: string }): Promise<{ success: boolean }> }
@@ -415,6 +416,10 @@ export type W03ContentWorkerDependencies = Readonly<{
   collectionDeleteStoreProvider?: (
     env: W03PublishedMediaReferenceRuntimeEnv,
   ) => CollectionDeleteStore | undefined
+  /** Optional D1-02 provider for the atomic Collection member attachment mutation. */
+  collectionMemberAttachStoreProvider?: (
+    env: W03PublishedMediaReferenceRuntimeEnv,
+  ) => CollectionMemberAttachStore | undefined
   /** Optional D1-02 provider for the atomic Series member attachment mutation. */
   seriesMemberAttachStoreProvider?: (
     env: W03PublishedMediaReferenceRuntimeEnv,
@@ -908,6 +913,8 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
             await parseBody(request),
             requireIfMatch(request),
             requireIdempotency(request),
+            new Date(),
+            dependencies.collectionMemberAttachStoreProvider?.(env),
           ),
           schemaVersion: '1.0',
           requestId: createRequestId(),

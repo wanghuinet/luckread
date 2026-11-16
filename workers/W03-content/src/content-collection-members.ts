@@ -50,7 +50,7 @@ interface IdempotencyRow {
   idem_expires_at: string | null
 }
 
-interface MutationRow {
+export interface CollectionMemberMutationRow {
   collection_id: string
   collection_owner_user_id: string
   collection_state: CollectionState
@@ -74,6 +74,33 @@ interface MutationRow {
   membership_created_at: string | null
   membership_updated_at: string | null
   next_position: number
+}
+
+export interface CollectionMemberAttachStore {
+  loadMutation(
+    ownerUserId: string,
+    collectionId: string,
+    contentId: string,
+    operationId: string,
+    idempotencyKey: string,
+  ): Promise<CollectionMemberMutationRow | null>
+  attach(input: Readonly<{
+    ownerUserId: string
+    operationId: string
+    idempotencyKey: string
+    requestHash: string
+    responseJson: string
+    nowIso: string
+    expiresAt: string
+    collectionId: string
+    contentId: string
+    relationshipId: string
+    position: number
+    nextVersion: number
+    collectionEtag: string
+    expectedVersion: number
+    expectedEtag: string
+  }>): Promise<void>
 }
 
 const IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000
@@ -215,7 +242,7 @@ const loadMutation = async (
   contentId: string,
   operationId: string,
   idempotencyKey: string,
-): Promise<MutationRow | null> =>
+): Promise<CollectionMemberMutationRow | null> =>
   db.prepare(
     'SELECT ' +
     'coll.id AS collection_id, coll.owner_user_id AS collection_owner_user_id, coll.state AS collection_state, coll.version AS collection_version, coll.etag AS collection_etag, ' +
@@ -245,7 +272,7 @@ const loadMutation = async (
     idempotencyKey,
     collectionId,
     ownerUserId,
-  ).first<MutationRow>()
+  ).first<CollectionMemberMutationRow>()
 
 const assertCollectionEditable = (state: CollectionState): void => {
   if (!EDITABLE_COLLECTION_STATES.has(state)) {
@@ -285,6 +312,7 @@ export async function attachCollectionMember(
   ifMatch: string,
   idempotencyKey: string,
   now = new Date(),
+  mutationStore?: CollectionMemberAttachStore,
 ): Promise<{ member: CollectionMemberRecord; collectionVersion: number; collectionEtag: string }> {
   assertResourceId(ownerUserId)
   assertResourceId(collectionId)
@@ -303,7 +331,9 @@ export async function attachCollectionMember(
     contentId,
     ifMatch: normalizeEtag(ifMatch),
   })
-  const row = await loadMutation(db, ownerUserId, collectionId, contentId, operationId, idempotencyKey)
+  const row = mutationStore
+    ? await mutationStore.loadMutation(ownerUserId, collectionId, contentId, operationId, idempotencyKey)
+    : await loadMutation(db, ownerUserId, collectionId, contentId, operationId, idempotencyKey)
   if (!row) throw new ContentRuntimeError('NOT_FOUND', 404)
 
   const replay = inspectIdempotency(row, ownerUserId, hash, now)
@@ -314,7 +344,7 @@ export async function attachCollectionMember(
 
   if (row.collection_owner_user_id !== ownerUserId) throw new ContentRuntimeError('PERMISSION_DENIED', 403)
   if (row.content_owner_user_id !== row.collection_owner_user_id) throw new ContentRuntimeError('PERMISSION_DENIED', 403)
-    if (row.idem_owner_user_id && row.idem_owner_user_id !== ownerUserId) {
+  if (row.idem_owner_user_id && row.idem_owner_user_id !== ownerUserId) {
     throw new ContentRuntimeError('IDEMPOTENCY_KEY_REUSE_CONFLICT', 422)
   }
   assertCollectionEditable(row.collection_state)
@@ -343,46 +373,66 @@ export async function attachCollectionMember(
   const response = { member, collectionVersion: nextVersion, collectionEtag }
   const expiresAt = new Date(now.getTime() + IDEMPOTENCY_TTL_MS).toISOString()
 
-  await batchMutation(db, [
-    expireIdempotency(db, ownerUserId, operationId, idempotencyKey, nowIso),
-    insertIdempotency(
-      db,
+  if (mutationStore) {
+    await mutationStore.attach({
       ownerUserId,
       operationId,
       idempotencyKey,
-      hash,
-      200,
-      JSON.stringify(response),
+      requestHash: hash,
+      responseJson: JSON.stringify(response),
       nowIso,
       expiresAt,
-    ),
-    db.prepare(
-      'UPDATE content_collections SET version = ?, etag = ?, updated_at = ? ' +
-      'WHERE id = ? AND owner_user_id = ? AND version = ? AND etag = ?',
-    ).bind(
+      collectionId,
+      contentId,
+      relationshipId: member.relationshipId,
+      position: member.position,
       nextVersion,
       collectionEtag,
-      nowIso,
-      collectionId,
-      ownerUserId,
-      row.collection_version,
-      row.collection_etag,
-    ),
-    atomicGuard(db),
-    db.prepare(
-      'INSERT INTO content_relationships ' +
-      '(relationship_id, source_type, source_id, target_type, target_id, relation_type, position, schema_version, status, actor_id, provenance_ref, authorization_ref, created_at, updated_at) ' +
-      "VALUES (?, 'content', ?, 'collection', ?, 'collection-member', ?, 1, 'ACTIVE', ?, NULL, NULL, ?, ?)",
-    ).bind(
-      member.relationshipId,
-      contentId,
-      collectionId,
-      member.position,
-      ownerUserId,
-      nowIso,
-      nowIso,
-    ),
-  ])
+      expectedVersion: row.collection_version,
+      expectedEtag: row.collection_etag,
+    })
+  } else {
+    await batchMutation(db, [
+      expireIdempotency(db, ownerUserId, operationId, idempotencyKey, nowIso),
+      insertIdempotency(
+        db,
+        ownerUserId,
+        operationId,
+        idempotencyKey,
+        hash,
+        200,
+        JSON.stringify(response),
+        nowIso,
+        expiresAt,
+      ),
+      db.prepare(
+        'UPDATE content_collections SET version = ?, etag = ?, updated_at = ? ' +
+        'WHERE id = ? AND owner_user_id = ? AND version = ? AND etag = ?',
+      ).bind(
+        nextVersion,
+        collectionEtag,
+        nowIso,
+        collectionId,
+        ownerUserId,
+        row.collection_version,
+        row.collection_etag,
+      ),
+      atomicGuard(db),
+      db.prepare(
+        'INSERT INTO content_relationships ' +
+        '(relationship_id, source_type, source_id, target_type, target_id, relation_type, position, schema_version, status, actor_id, provenance_ref, authorization_ref, created_at, updated_at) ' +
+        "VALUES (?, 'content', ?, 'collection', ?, 'collection-member', ?, 1, 'ACTIVE', ?, NULL, NULL, ?, ?)",
+      ).bind(
+        member.relationshipId,
+        contentId,
+        collectionId,
+        member.position,
+        ownerUserId,
+        nowIso,
+        nowIso,
+      ),
+    ])
+  }
 
   return response
 }
