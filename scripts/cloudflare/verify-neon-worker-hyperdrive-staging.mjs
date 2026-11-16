@@ -30,7 +30,7 @@ export const STAGED_WORKERS = Object.freeze([
     worker: 'W03',
     script: 'luckread-w03',
     configPath: 'workers/W03-content/wrangler.jsonc',
-    binding: 'HYPERDRIVE_D1_02',
+    binding: 'HYPERDRIVE_CONTENT_PG',
     hyperdriveId: 'c55183e1cc3446409c9c1075832c6615',
     d1Bindings: [],
     driver: 'W03_CONTENT_READ_DRIVER',
