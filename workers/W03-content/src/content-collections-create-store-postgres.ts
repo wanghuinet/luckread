@@ -1,7 +1,6 @@
 import { ContentRuntimeError } from './content-runtime.js'
 import type {
   CollectionCreateStore,
-  CollectionRecord,
   IdempotencyRow,
 } from './content-collections.js'
 
@@ -138,5 +137,3 @@ export function createPostgresCollectionCreateStore(
     },
   }
 }
-
-export type { CollectionRecord }
