@@ -19,6 +19,7 @@ import {
   getW03CollectionMemberRemoveStore,
   getW03CollectionMemberReorderStore,
   getW03SeriesMemberRemoveStore,
+  getW03SeriesMemberReorderStore,
   getW03SeriesReadStore,
   getW03MembersReadStore,
   getW03ContentDetailReadStore,
@@ -455,6 +456,20 @@ it('provides and caches the Neon Collection member-reorder writer while keeping 
   const env = { W03_CONTENT_READ_DRIVER: 'neon', HYPERDRIVE_D1_02: binding }
   const first = getW03CollectionMemberReorderStore(env)
   const second = getW03CollectionMemberReorderStore(env)
+  expect(first).toBeDefined()
+  expect(first).toBe(second)
+  await getW03PublicMediaReferencePostgresPool(env).end()
+})
+
+
+it('provides and caches the Neon Series member-reorder writer while keeping D1 as default', async () => {
+  expect(getW03SeriesMemberReorderStore({
+    D1_02: { prepare() { throw new Error('D1 should not be queried') } },
+  })).toBeUndefined()
+  const binding = { connectionString: 'postgresql://postgres:postgres@127.0.0.1:5432/luckread' }
+  const env = { W03_CONTENT_READ_DRIVER: 'neon', HYPERDRIVE_D1_02: binding }
+  const first = getW03SeriesMemberReorderStore(env)
+  const second = getW03SeriesMemberReorderStore(env)
   expect(first).toBeDefined()
   expect(first).toBe(second)
   await getW03PublicMediaReferencePostgresPool(env).end()
