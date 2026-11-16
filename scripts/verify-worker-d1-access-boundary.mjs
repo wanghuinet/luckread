@@ -62,10 +62,11 @@ for (const dir of dirs) {
     try { return statSync(wranglerPath).isFile() } catch { return false }
   })()
 
+  let config = null
   if (configExists) {
     checkedConfigs += 1
-    const config = configExists ? jsonc(wranglerPath) : null
-    if (config) for (const entry of config.d1_databases ?? []) {
+    config = jsonc(wranglerPath)
+    for (const entry of config.d1_databases ?? []) {
       const domain = domainById[entry.database_id]
       if (!domain) {
         throw new Error(`${workerId}: unregistered D1 id ${String(entry.database_id)}`)
