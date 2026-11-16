@@ -477,7 +477,7 @@ if (blockers.length === 0) {
       /GITHUB_REF_PROTECTED:\s*\$\{\{\s*github\.ref_protected\s*\}\}/.test(w06DeployWorkflow) &&
       /verify-auth-007-rollout-admission\.mjs/.test(w06DeployWorkflow) &&
       w06DeployWorkflow.indexOf('verify-auth-007-rollout-admission.mjs') >= 0 &&
-      w06DeployWorkflow.indexOf('verify-auth-007-rollout-admission.mjs') < w06DeployWorkflow.indexOf('run: npx --yes wrangler@4.156.0 deploy --config wrangler.neon.jsonc'),
+      w06DeployWorkflow.indexOf('verify-auth-007-rollout-admission.mjs') < w06DeployWorkflow.indexOf('npx --yes wrangler@4.156.0 deploy --config wrangler.neon.jsonc'),
     allRolloutWorkflowCallSitesRequireProtectedMain: protectedRefCallSitesConfigured,
     allMutationWorkflowJobsRequireProtectedMain: protectedMutationWorkflowJobsConfigured,
     readOnlyEnvironmentPreflightCannotMutateProduction:
