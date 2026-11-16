@@ -3,10 +3,9 @@
 import { contentSlugFor, isContentSlug } from './content-slug.js'
 import { allocateContentSnowflakeId } from './content-snowflake-id.js'
 import { normalizePreflightInput, preflightContent } from './publish-preflight.js'
-import {
-  createD1PublishedMediaReferenceReadStore,
-  type PublishedMediaReferenceReadStore,
-  type PublishedMediaReferenceRecord,
+import type {
+  PublishedMediaReferenceReadStore,
+  PublishedMediaReferenceRecord,
 } from './published-media-reference-read-store.js'
 
 export type ContentState =
@@ -500,11 +499,10 @@ export type PublishedMediaReferenceAccess = Readonly<{
  * because the same object is also referenced by a public post.
  */
 export async function resolvePublishedMediaReferenceAccess(
-  db: ContentD1,
   mediaUrlValue: string,
   viewerUserId: string | null,
-  hasCreatorMembership?: CreatorMembershipAccessResolver,
-  readStore?: PublishedMediaReferenceReadStore,
+  hasCreatorMembership: CreatorMembershipAccessResolver | undefined,
+  readStore: PublishedMediaReferenceReadStore,
 ): Promise<PublishedMediaReferenceAccess> {
   const candidates = publicPostMediaReferenceCandidates(mediaUrlValue)
   if (candidates.length === 0) {
@@ -512,8 +510,7 @@ export async function resolvePublishedMediaReferenceAccess(
   }
   let rows: readonly PublishedMediaReferenceRecord[]
   try {
-    rows = await (readStore ?? createD1PublishedMediaReferenceReadStore(db))
-      .listPublishedMediaReferences(candidates, 51)
+    rows = await readStore.listPublishedMediaReferences(candidates, 51)
   } catch {
     throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
   }
