@@ -36,6 +36,7 @@ import {
   updateContent,
   type ContentState,
   type ContentD1,
+  type PublicContentListReadStore,
 } from './content-runtime.js'
 import { normalizePreflightInput, preflightContent } from './publish-preflight.js'
 import type {
@@ -370,6 +371,10 @@ export type W03ContentWorkerDependencies = Readonly<{
   publishedMediaReferenceReadStoreProvider?: (
     env: W03PublishedMediaReferenceRuntimeEnv,
   ) => PublishedMediaReferenceReadStore
+  /** Optional D1-02 provider for public canonical content search and list reads. */
+  publicContentListReadStoreProvider?: (
+    env: W03PublishedMediaReferenceRuntimeEnv,
+  ) => PublicContentListReadStore | undefined
   /** Optional D1-02 provider for canonical content detail reads. */
   contentDetailReadStoreProvider?: (
     env: W03PublishedMediaReferenceRuntimeEnv,
@@ -707,6 +712,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
           query,
           cursor,
           parseListLimit(body.limit === undefined ? null : String(body.limit)),
+          dependencies.publicContentListReadStoreProvider?.(env),
         )
         return json({
           data: {
@@ -1494,6 +1500,8 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
           limit,
           creatorId,
           contentType as 'article' | 'post' | 'video' | null,
+          null,
+          dependencies.publicContentListReadStoreProvider?.(env),
         )
         return json({
           data: {

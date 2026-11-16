@@ -5,6 +5,7 @@ import {
   type PublishedMediaReferenceReadStore,
 } from '../published-media-reference-read-store.js'
 import type {
+  PublicContentListReadStore,
   FollowingOwnerContentsReadStore,
   ContentDetailReadStore,
   CreatorContentsReadStore,
@@ -14,6 +15,7 @@ import type {
 } from '../content-runtime.js'
 import { createPostgresPublishedMediaReferenceReadStore } from '../published-media-reference-read-store-postgres.js'
 import { createPostgresPublishedContentsByIdsReadStore } from '../published-contents-by-ids-read-store-postgres.js'
+import { createPostgresPublicContentListReadStore } from '../public-content-list-read-store-postgres.js'
 import { createPostgresFollowingOwnerContentsReadStore } from '../following-owner-contents-read-store-postgres.js'
 import { createPostgresPostThreadReadStore } from '../post-thread-read-store-postgres.js'
 import { createPostgresContentContextReadStore, type ContentContextReadStore } from '../content-context-read-store-postgres.js'
@@ -76,6 +78,7 @@ export type W03PublicMediaReferenceRuntimeEnv = W03PublishedMediaReferenceRuntim
 const pools = new WeakMap<object, Pool>()
 const stores = new WeakMap<object, PublishedMediaReferenceReadStore>()
 const bookmarkedContentsStores = new WeakMap<object, PublishedContentsByIdsReadStore>()
+const publicContentListStores = new WeakMap<object, PublicContentListReadStore>()
 const followingContentsStores = new WeakMap<object, FollowingOwnerContentsReadStore>()
 const postThreadStores = new WeakMap<object, PostThreadReadStore>()
 const contentRelationshipMutationStores = new WeakMap<object, ContentRelationshipMutationStore>()
@@ -670,5 +673,26 @@ export function getW03CreatorContentsReadStore(
     getW03PublicMediaReferencePostgresPool(env),
   )
   creatorContentsStores.set(binding, store)
+  return store
+}
+
+
+/** PostgreSQL provider for canonical public content search and list reads. */
+export function getW03PublicContentListReadStore(
+  env: W03PublicMediaReferenceRuntimeEnv,
+): PublicContentListReadStore | undefined {
+  if (resolveW03PublicMediaReferenceDriver(env) === 'd1') return undefined
+
+  const binding = env.HYPERDRIVE_D1_02
+  if (!binding || typeof binding !== 'object') {
+    throw new Error('W03_HYPERDRIVE_D1_02_BINDING_REQUIRED')
+  }
+  const cached = publicContentListStores.get(binding)
+  if (cached) return cached
+
+  const store = createPostgresPublicContentListReadStore(
+    getW03PublicMediaReferencePostgresPool(env),
+  )
+  publicContentListStores.set(binding, store)
   return store
 }
