@@ -5,6 +5,8 @@ import {
   deleteContent,
   updateContent,
   transitionContentState,
+  listDueScheduledContentCandidates,
+  publishAuthorizedScheduledContents,
   type ContentMutationStore,
   type ContentRecord,
   type ContentMutationSnapshot,
@@ -94,6 +96,15 @@ function fixture(options: { casMiss?: boolean; idempotencyConflict?: boolean } =
     async query<Row>(sql: string, values?: unknown[]) {
       directQueries.push({ sql, values })
       if (sql.includes('FROM contents c LEFT JOIN LATERAL')) return { rows: [pgRow] as Row[] }
+      if (sql.includes("FROM contents WHERE state = 'SCHEDULED'")) {
+        return { rows: [{
+          id: snapshotContent.id,
+          owner_user_id: 'user_123',
+          creator_id: 'creator_456',
+          version: 4,
+          scheduled_at: new Date('2026-11-16T11:00:00.000Z'),
+        }] as Row[] }
+      }
       return { rows: [] as Row[] }
     },
     async connect() { return client },
@@ -331,6 +342,62 @@ describe('W03 Neon content mutation store', () => {
     expect(fake.released()).toBe(true)
   })
 
+  it('loads only due scheduled candidates from Neon in stable scheduled-time order', async () => {
+    const fake = fixture()
+    const store = createPostgresContentMutationStore(fake.database)
+
+    await expect(store.listDueScheduled(nowIso, 25)).resolves.toEqual([{
+      contentId: snapshotContent.id,
+      ownerUserId: 'user_123',
+      creatorId: 'creator_456',
+      version: 4,
+      scheduledAt: '2026-11-16T11:00:00.000Z',
+    }])
+
+    expect(fake.directQueries[0]?.sql).toContain("state = 'SCHEDULED'")
+    expect(fake.directQueries[0]?.sql).toContain('scheduled_at <= $1::timestamptz')
+    expect(fake.directQueries[0]?.sql).toContain('ORDER BY scheduled_at ASC, id ASC LIMIT $2')
+    expect(fake.directQueries[0]?.values).toEqual([nowIso, 25])
+  })
+
+  it('publishes W08-authorized scheduled candidates with final owner, Creator, due-time and version CAS in one transaction', async () => {
+    const fake = fixture()
+    const store = createPostgresContentMutationStore(fake.database)
+    const candidate = {
+      contentId: snapshotContent.id,
+      ownerUserId: 'user_123',
+      expectedCreatorId: null,
+      creatorId: 'creator_456',
+      version: 4,
+      scheduledAt: '2026-11-16T11:00:00.000Z',
+      authorization: {
+        decision: 'ALLOW' as const,
+        policyVersion: 'casl-l0-l8-v1' as const,
+        layer: 'L3' as const,
+        action: 'content.publish.own' as const,
+        resourceType: 'Content' as const,
+        ownerUserId: 'user_123',
+        creatorId: 'creator_456',
+      },
+    }
+
+    await expect(store.publishScheduled([candidate], nowIso)).resolves.toBe(1)
+
+    const sql = fake.transactionQueries.map(item => item.sql)
+    expect(sql[0]).toBe('BEGIN')
+    expect(sql[1]).toContain("SET state = 'PUBLISHED', scheduled_at = NULL")
+    expect(sql[1]).toContain('creator_id IS NOT DISTINCT FROM $7')
+    expect(sql[1]).toContain("state = 'SCHEDULED'")
+    expect(sql[1]).toContain('scheduled_at = $8::timestamptz')
+    expect(sql[1]).toContain('scheduled_at <= $9::timestamptz AND version = $10')
+    expect(sql[2]).toBe('COMMIT')
+    expect(fake.transactionQueries[1]?.values).toEqual([
+      'creator_456', 5, 'W/"5"', nowIso, snapshotContent.id, 'user_123',
+      null, candidate.scheduledAt, nowIso, 4,
+    ])
+    expect(fake.released()).toBe(true)
+  })
+
   it('rolls back a duplicate delete idempotency key', async () => {
     const fake = fixture({ idempotencyConflict: true })
     const store = createPostgresContentMutationStore(fake.database)
@@ -363,6 +430,8 @@ describe('W03 Neon content mutation store', () => {
       async update() {},
       async delete() {},
       async transition(input) { transitionInput = input },
+      async listDueScheduled() { return [] },
+      async publishScheduled() { return 0 },
     }
     const d1 = {
       prepare() { throw new Error('D1 must not be queried in Neon mode') },
@@ -399,6 +468,54 @@ describe('W03 Neon content mutation store', () => {
     expect(transitionInput?.responseJson).toBe(JSON.stringify(result))
   })
 
+  it('routes scheduled candidate reads and W08-authorized publish commits through Neon without touching D1', async () => {
+    const dueCandidate = {
+      contentId: snapshotContent.id,
+      ownerUserId: 'user_123',
+      creatorId: 'creator_456',
+      version: 4,
+      scheduledAt: '2026-11-16T11:00:00.000Z',
+    }
+    let publishedCandidates: readonly unknown[] = []
+    const store: ContentMutationStore = {
+      async loadMutation() { return { content: null, idempotency: emptyIdempotency } },
+      async update() {},
+      async delete() {},
+      async transition() {},
+      async listDueScheduled(nowValue, limit) {
+        expect(nowValue).toBe(nowIso)
+        expect(limit).toBe(10)
+        return [dueCandidate]
+      },
+      async publishScheduled(candidates) {
+        publishedCandidates = candidates
+        return 1
+      },
+    }
+    const d1 = {
+      prepare() { throw new Error('D1 must not be queried in Neon mode') },
+      batch() { throw new Error('D1 must not be written in Neon mode') },
+    }
+    const due = await listDueScheduledContentCandidates(d1 as never, now, 10, store)
+    const result = await publishAuthorizedScheduledContents(d1 as never, [{
+      ...dueCandidate,
+      expectedCreatorId: null,
+      authorization: {
+        decision: 'ALLOW',
+        policyVersion: 'casl-l0-l8-v1',
+        layer: 'L3',
+        action: 'content.publish.own',
+        resourceType: 'Content',
+        ownerUserId: 'user_123',
+        creatorId: 'creator_456',
+      },
+    }], now, store)
+
+    expect(due).toEqual([dueCandidate])
+    expect(result).toEqual({ scanned: 1, authorized: 1, published: 1, rejected: 0 })
+    expect(publishedCandidates).toHaveLength(1)
+  })
+
   it('injects Neon-backed update and delete stores without issuing a D1 statement', async () => {
     let currentContent = snapshotContent
     let updateInput: Parameters<ContentMutationStore['update']>[0] | undefined
@@ -413,6 +530,8 @@ describe('W03 Neon content mutation store', () => {
       },
       async delete(input) { deleteInput = input },
       async transition() {},
+      async listDueScheduled() { return [] },
+      async publishScheduled() { return 0 },
     }
     const d1 = {
       prepare() { throw new Error('D1 must not be queried in Neon mode') },
