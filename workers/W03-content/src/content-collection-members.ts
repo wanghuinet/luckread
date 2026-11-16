@@ -344,7 +344,7 @@ export async function attachCollectionMember(
 
   if (row.collection_owner_user_id !== ownerUserId) throw new ContentRuntimeError('PERMISSION_DENIED', 403)
   if (row.content_owner_user_id !== row.collection_owner_user_id) throw new ContentRuntimeError('PERMISSION_DENIED', 403)
-    if (row.idem_owner_user_id && row.idem_owner_user_id !== ownerUserId) {
+  if (row.idem_owner_user_id && row.idem_owner_user_id !== ownerUserId) {
     throw new ContentRuntimeError('IDEMPOTENCY_KEY_REUSE_CONFLICT', 422)
   }
   assertCollectionEditable(row.collection_state)

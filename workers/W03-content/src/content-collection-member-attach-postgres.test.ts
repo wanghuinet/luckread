@@ -141,7 +141,7 @@ describe('W03 Neon Collection member attachment', () => {
       collectionEtag: 'W/"5"',
     })
     expect(batchStatements).toHaveLength(5)
-    expect(preparedSql.some(sql => sql.includes('FROM content_collections s'))).toBe(true)
+    expect(preparedSql.some(sql => sql.includes('FROM content_collections coll'))).toBe(true)
     expect(preparedSql.some(sql => sql.includes('INSERT INTO content_relationships'))).toBe(true)
     expect(preparedSql.some(sql => sql.includes('content_txn_guard'))).toBe(true)
   })
