@@ -11,6 +11,7 @@ import { createPostgresWebhookD1Database } from '../payment-webhook-database-pos
 import type { W07WebhookPostgresPool } from '../payment-webhook-database-postgres.js'
 
 export type W07PaymentMethodReadRuntimeEnv = Readonly<{
+  D1_04?: D1Database
   W07_DATABASE_DRIVER?: string
   HYPERDRIVE_D1_04?: { connectionString?: string }
   W07_MEMBERSHIP_DATABASE_DRIVER?: string
@@ -136,10 +137,13 @@ export function getW07PaymentWebhookDatabase(
 
 /** Resolve the one selected D1-04 finance database for W07 business paths. */
 export function getW07SelectedD104Database(
-  env: W07PaymentMethodReadRuntimeEnv & Readonly<{ D1_04: D1Database }>,
+  env: W07PaymentMethodReadRuntimeEnv,
   poolFactory: W07PoolFactory = (config) => new Pool(config),
 ): D1Database {
-  return getW07PaymentWebhookDatabase(env, poolFactory) ?? env.D1_04
+  const selected = getW07PaymentWebhookDatabase(env, poolFactory)
+  if (selected) return selected
+  if (!env.D1_04) throw new PaymentMethodRuntimeError('SERVICE_UNAVAILABLE', 503)
+  return env.D1_04
 }
 
 /** Reuse the existing atomic order-create adapter over the shared bounded Hyperdrive pool. */
