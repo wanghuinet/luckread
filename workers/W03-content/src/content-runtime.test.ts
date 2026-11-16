@@ -2483,10 +2483,17 @@ describe('1.1 content revision history', () => {
     expect(updateRevisionWrite).toBeGreaterThan(updateGuard)
 
     const rollbackIndex = runtime.indexOf('export async function rollbackContentRevision')
-    expect(runtime.indexOf('UPDATE contents', rollbackIndex)).toBeGreaterThanOrEqual(rollbackIndex)
-    expect(runtime.indexOf("operation: 'ROLLBACK'", rollbackIndex)).toBeGreaterThan(
-      runtime.indexOf('atomicGuard(db)', rollbackIndex),
-    )
+    const rollbackUpdate = runtime.indexOf('UPDATE contents', rollbackIndex)
+    const rollbackGuard = runtime.indexOf('atomicGuard(db)', rollbackIndex)
+    const rollbackRevisionIndex = runtime.indexOf('const rollbackRevision: ContentRevision = {', rollbackIndex)
+    const rollbackOperation = runtime.indexOf("operation: 'ROLLBACK'", rollbackRevisionIndex)
+    const rollbackRevisionWrite = runtime.indexOf('insertRevision(db, rollbackRevision)', rollbackGuard)
+    expect(rollbackUpdate).toBeGreaterThanOrEqual(rollbackIndex)
+    expect(rollbackGuard).toBeGreaterThan(rollbackUpdate)
+    // Build the immutable revision payload before the transaction, then persist it only after the CAS guard.
+    expect(rollbackRevisionIndex).toBeGreaterThanOrEqual(rollbackIndex)
+    expect(rollbackOperation).toBeGreaterThan(rollbackRevisionIndex)
+    expect(rollbackRevisionWrite).toBeGreaterThan(rollbackGuard)
     expect(runtime).toContain("sourceAccessMode !== currentAccessMode")
     expect(runtime).toContain("verifiedCreatorId !== content.creatorId")
   })
