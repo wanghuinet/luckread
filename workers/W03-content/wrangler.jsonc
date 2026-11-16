@@ -38,7 +38,7 @@
   ],
   "hyperdrive": [
     {
-      "binding": "HYPERDRIVE_D1_02",
+      "binding": "HYPERDRIVE_CONTENT_PG",
       "id": "c55183e1cc3446409c9c1075832c6615"
     }
   ],
