@@ -11,11 +11,12 @@ import {
   verifyWorkerConfig,
 } from './verify-neon-worker-hyperdrive-staging.mjs'
 
-test('all six admitted Worker configs target the matching existing Neon Hyperdrive and retain D1 fallbacks', async () => {
+test('all six admitted Worker configs target the matching Neon Hyperdrive and match each expected D1 binding state', async () => {
   const result = await inspectNeonWorkerHyperdriveStaging()
   assert.equal(result.status, 'SOURCE_CONFIG_STAGED_ONLY')
   assert.equal(result.stagedWorkerCount, 6)
-  assert.equal(result.d1FallbacksPreserved, true)
+  assert.equal(result.expectedD1BindingSetsVerified, true)
+  assert.deepEqual(result.workers.find((worker) => worker.worker === 'W05')?.d1FallbackBindings, [])
   assert.equal(result.runtimeDriversEnabled, false)
   assert.equal(result.productionDeployPerformed, false)
   assert.equal(result.productionCutoverPerformed, false)
@@ -35,7 +36,7 @@ test('rejects a Hyperdrive resource id that does not match the authoritative dom
   )
 })
 
-test('rejects removal or renaming of an existing D1 rollback binding', () => {
+test('continues to require W07 rollback bindings while W05 is production D1-free', () => {
   const expected = STAGED_WORKERS.find((worker) => worker.worker === 'W07')
   assert.throws(
     () => verifyWorkerConfig({
@@ -43,7 +44,7 @@ test('rejects removal or renaming of an existing D1 rollback binding', () => {
       d1_databases: [{ binding: 'D1_04' }],
       hyperdrive: [{ binding: expected.binding, id: expected.hyperdriveId }],
     }, expected),
-    /D1 fallback bindings must remain unchanged/,
+    /production D1 binding set does not match the expected cutover state/,
   )
 })
 

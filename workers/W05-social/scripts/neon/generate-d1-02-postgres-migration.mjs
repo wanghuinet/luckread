@@ -39,7 +39,27 @@ export function buildW05PostgresMigration({ inventory, socialContract, readSourc
       includedBindings[0].databaseUuid !== '6c342634-97f6-4248-9f4a-85772af4f22c' ||
       excludedGovernanceBindings.length !== 1 ||
       excludedGovernanceBindings[0].databaseName !== 'secondary') {
-    fail('W05 DB must map only to D1-02; W05 D1_03 governance binding must remain excluded')
+    fail('W05 D1-02 schema source provenance must retain the admitted DB source and separate D1-03 governance domain')
+  }
+
+  const wranglerSource = readSource(owner.wrangler)
+  if (typeof wranglerSource !== 'string') fail('Missing W05 production Wrangler config')
+  let wrangler
+  try { wrangler = JSON.parse(wranglerSource) } catch { fail('W05 production Wrangler config is invalid JSON') }
+  const hyperdrive = wrangler.hyperdrive ?? []
+  const socialBinding = hyperdrive.find((item) =>
+    item.binding === 'HYPERDRIVE_D1_02' && item.id === 'c55183e1cc3446409c9c1075832c6615')
+  const delegatedGovernanceBinding = hyperdrive.find((item) =>
+    item.binding === 'HYPERDRIVE_D1_03' && item.id === '7c8831416c18494faee04b96aa551cb9')
+  if (
+    wrangler.name !== 'luckread-w05' ||
+    (wrangler.d1_databases ?? []).length !== 0 ||
+    wrangler.vars?.W05_DATABASE_DRIVER !== 'neon' ||
+    wrangler.vars?.W05_PUSH_ENDPOINT_DATABASE_DRIVER !== 'neon' ||
+    !socialBinding ||
+    !delegatedGovernanceBinding
+  ) {
+    fail('W05 production Wrangler must be D1-free and use both reviewed Neon Hyperdrive bindings')
   }
 
   if (socialContract?.authoritativeDomain !== 'D1-02' ||

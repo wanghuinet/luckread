@@ -653,14 +653,12 @@ jobs:
           config = json.loads(Path('workers/W05-social/wrangler.jsonc').read_text())
           assert config['name'] == 'luckread-w05'
           assert 'nodejs_compat' in config.get('compatibility_flags', [])
-          bindings = {item['binding']: item for item in config['d1_databases']}
-          assert set(bindings) == {'DB', 'D1_03'}
-          assert bindings['DB']['database_id'] == '6c342634-97f6-4248-9f4a-85772af4f22c'
-          assert bindings['DB']['database_name'] == 'luckreadpro'
-          assert bindings['DB']['migrations_dir'] == 'migrations'
-          assert bindings['D1_03']['database_id'] == 'bda1d247-a371-4244-91ae-aef96034db7f'
-          assert bindings['D1_03']['database_name'] == 'secondary'
-          assert bindings['D1_03'].get('migrations_dir') is None
+          assert config.get('d1_databases', []) == []
+          assert config.get('vars', {}).get('W05_DATABASE_DRIVER') == 'neon'
+          assert config.get('vars', {}).get('W05_PUSH_ENDPOINT_DATABASE_DRIVER') == 'neon'
+          hyperdrive = {item['binding']: item for item in config.get('hyperdrive', [])}
+          assert hyperdrive['HYPERDRIVE_D1_02']['id'] == 'c55183e1cc3446409c9c1075832c6615'
+          assert hyperdrive['HYPERDRIVE_D1_03']['id'] == '7c8831416c18494faee04b96aa551cb9'
           owner_config = json.loads(Path('workers/W09-platform/wrangler.d1-03-migrations.jsonc').read_text())
           assert owner_config['name'] == 'luckread-w09'
           owner_bindings = owner_config['d1_databases']

@@ -13,7 +13,23 @@ function readSource(relativePath) {
   try { return readFileSync(path.join(root, relativePath), 'utf8') } catch { return null }
 }
 
-test('W05 source authority is pinned to D1-02 luckreadpro and excludes D1-03', () => {
+test('W05 schema source provenance remains pinned while the production runtime uses Neon-only bindings', () => {
+  const owner = inventory.owners.find((item) => item.worker === 'W05')
+  const d102Source = owner.physicalBindings.find((item) => item.binding === 'DB')
+  const d103Source = owner.physicalBindings.find((item) => item.binding === 'D1_03')
+  assert.equal(d102Source?.logicalDomain, 'D1-02')
+  assert.equal(d102Source?.included, true)
+  assert.equal(d103Source?.logicalDomain, 'D1-03')
+  assert.equal(d103Source?.included, false)
+  assert.equal(d103Source?.reason?.includes('Separate governance/platform domain'), true)
+
+  const config = JSON.parse(readSource(owner.wrangler))
+  assert.equal(config.d1_databases?.length ?? 0, 0)
+  assert.equal(config.vars?.W05_DATABASE_DRIVER, 'neon')
+  assert.equal(config.vars?.W05_PUSH_ENDPOINT_DATABASE_DRIVER, 'neon')
+  assert.ok(config.hyperdrive.some((item) => item.binding === 'HYPERDRIVE_D1_02' && item.id === 'c55183e1cc3446409c9c1075832c6615'))
+  assert.ok(config.hyperdrive.some((item) => item.binding === 'HYPERDRIVE_D1_03' && item.id === '7c8831416c18494faee04b96aa551cb9'))
+
   const { sourceReport } = buildW05PostgresMigration({ inventory, socialContract, readSource, template })
   assert.equal(sourceReport.targetDatabase, 'luckreadpro')
   assert.equal(sourceReport.sourceOwner, 'W05')
@@ -52,13 +68,28 @@ test('W05 notification push delivery retains atomic D1-02 outbox semantics and n
   assert.doesNotMatch(artifact, /bda1d247-a371-4244-91ae-aef96034db7f|notification_push_endpoints/)
 })
 
-test('generator rejects a W05 D1-03 binding accidentally marked as included', () => {
+test('generator rejects Cloudflare D1 bindings reintroduced into the W05 Neon production config', () => {
+  const configPath = inventory.owners.find((item) => item.worker === 'W05').wrangler
+  const original = JSON.parse(readSource(configPath))
+  const invalidConfig = {
+    ...original,
+    d1_databases: [{ binding: 'DB', database_name: 'luckreadpro', database_id: '6c342634-97f6-4248-9f4a-85772af4f22c' }],
+  }
+  const readWithInvalidConfig = (relativePath) =>
+    relativePath === configPath ? JSON.stringify(invalidConfig) : readSource(relativePath)
+  assert.throws(
+    () => buildW05PostgresMigration({ inventory, socialContract, readSource: readWithInvalidConfig, template }),
+    /production Wrangler must be D1-free/
+  )
+})
+
+test('generator rejects a W05 source inventory that imports D1-03 governance tables', () => {
   const invalid = structuredClone(inventory)
   const owner = invalid.owners.find((item) => item.worker === 'W05')
   owner.physicalBindings.find((item) => item.binding === 'D1_03').included = true
   assert.throws(
     () => buildW05PostgresMigration({ inventory: invalid, socialContract, readSource, template }),
-    /D1_03 governance binding must remain excluded/
+    /D1-02 schema source provenance must retain/
   )
 })
 
@@ -79,7 +110,13 @@ test('generator rejects foreign keys, SQLite syntax and source inventory drift',
   )
   assert.throws(
     () => buildW05PostgresMigration({
-      inventory, socialContract, readSource: () => null, template
+      inventory,
+      socialContract,
+      readSource: (relativePath) =>
+        relativePath.startsWith(inventory.owners.find((item) => item.worker === 'W05').migrationDirectory + '/')
+          ? null
+          : readSource(relativePath),
+      template,
     }),
     /Missing source migration/
   )

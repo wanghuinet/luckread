@@ -62,9 +62,10 @@ for (const dir of dirs) {
     try { return statSync(wranglerPath).isFile() } catch { return false }
   })()
 
+  let config = null
   if (configExists) {
     checkedConfigs += 1
-    const config = jsonc(wranglerPath)
+    config = jsonc(wranglerPath)
     for (const entry of config.d1_databases ?? []) {
       const domain = domainById[entry.database_id]
       if (!domain) {
@@ -80,6 +81,22 @@ for (const dir of dirs) {
         throw new Error(`${workerId}: D1 ${domain} is outside its allowed domain set`)
       }
     }
+  }
+
+  // W05 retains old D1 store adapters for local/unit-test compatibility only.
+  // Its production entrypoint injects all Neon-backed stores; therefore the production
+  // Wrangler config must be D1-free and pin both existing Neon Hyperdrive resources.
+  const w05NeonProduction = workerId === 'W05' &&
+    config?.name === 'luckread-w05' &&
+    (config?.d1_databases ?? []).length === 0 &&
+    config.vars?.W05_DATABASE_DRIVER === 'neon' &&
+    config.vars?.W05_PUSH_ENDPOINT_DATABASE_DRIVER === 'neon' &&
+    (config.hyperdrive ?? []).some((entry) =>
+      entry.binding === 'HYPERDRIVE_D1_02' && entry.id === 'c55183e1cc3446409c9c1075832c6615') &&
+    (config.hyperdrive ?? []).some((entry) =>
+      entry.binding === 'HYPERDRIVE_D1_03' && entry.id === '7c8831416c18494faee04b96aa551cb9')
+  if (workerId === 'W05' && !w05NeonProduction) {
+    throw new Error('W05 production must use both approved Neon Hyperdrive resources and no D1 bindings')
   }
 
   const files = []
@@ -104,6 +121,8 @@ for (const dir of dirs) {
         (configExists ? (jsonc(wranglerPath).d1_databases ?? []) : []).map((x) => x.binding),
       )
       if (!declaredBindings.has(binding)) {
+        const compatibilityOnly = w05NeonProduction && ['DB', 'D1_03'].includes(binding)
+        if (compatibilityOnly) continue
         const relative = path.slice(root.length + 1)
         throw new Error(`${workerId}: raw D1 binding ${binding} used by ${relative} but not declared in wrangler.jsonc`)
       }
