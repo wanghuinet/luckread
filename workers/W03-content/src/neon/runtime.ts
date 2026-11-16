@@ -12,6 +12,7 @@ import type {
   PublishedContentsByIdsReadStore,
   ContentCreateStore,
   ContentMutationStore,
+  ContentRevisionReadStore,
 } from '../content-runtime.js'
 import { createPostgresPublishedMediaReferenceReadStore } from '../published-media-reference-read-store-postgres.js'
 import { createPostgresPublishedContentsByIdsReadStore } from '../published-contents-by-ids-read-store-postgres.js'
@@ -45,6 +46,7 @@ import {
 } from '../content-members-read-store-postgres.js'
 import { createPostgresContentDetailReadStore } from '../content-detail-read-store-postgres.js'
 import { createPostgresCreatorContentsReadStore } from '../creator-contents-read-store-postgres.js'
+import { createPostgresContentRevisionReadStore } from '../content-revision-read-store-postgres.js'
 import type {
   SeriesMembersReadStore,
   SeriesMemberAttachStore,
@@ -105,14 +107,16 @@ const membersStores = new WeakMap<object, {
 }>()
 const contentDetailStores = new WeakMap<object, ContentDetailReadStore>()
 const creatorContentsStores = new WeakMap<object, CreatorContentsReadStore>()
+const contentRevisionStores = new WeakMap<object, ContentRevisionReadStore>()
 
 /**
  * The explicit D1-02 content read driver controls only the PostgreSQL read
  * projections wired from the W03 entrypoint: public media references, bookmark
  * batch projection, W04-authorized following-feed content, native post-thread
  * projection, canonical content context and detail reads, creator-owned
- * content lists, series and collection reads, and series/collection membership
- * lists. Content creation, update, delete, owner-authorized state transitions, W06 moderation decisions, owner-authorized revision rollback, scheduled publication candidate reads/commits, content reference create/revoke, native post-thread append, plus Collection creation, update, delete, member attachment, member removal, and member reorder plus Series creation, update, delete, member attachment, member removal, and member reorder are the only Neon-backed mutations in these slices; all other W03 reads and mutations remain on D1_02. D1 is the safe
+ * content lists, series and collection reads, series/collection membership
+ * lists, and owner-scoped content revision history reads. Content creation,
+ * update, delete, owner-authorized state transitions, W06 moderation decisions, owner-authorized revision rollback, scheduled publication candidate reads/commits, content reference create/revoke, native post-thread append, plus Collection creation, update, delete, member attachment, member removal, and member reorder plus Series creation, update, delete, member attachment, member removal, and member reorder are the only Neon-backed mutations in these slices; all other W03 reads and mutations remain on D1_02. D1 is the safe
  * default and unknown values fail closed.
  */
 export function resolveW03PublicMediaReferenceDriver(
@@ -694,5 +698,26 @@ export function getW03PublicContentListReadStore(
     getW03PublicMediaReferencePostgresPool(env),
   )
   publicContentListStores.set(binding, store)
+  return store
+}
+
+
+/** PostgreSQL provider for owner-scoped content revision history reads. */
+export function getW03ContentRevisionReadStore(
+  env: W03PublicMediaReferenceRuntimeEnv,
+): ContentRevisionReadStore | undefined {
+  if (resolveW03PublicMediaReferenceDriver(env) === 'd1') return undefined
+
+  const binding = env.HYPERDRIVE_D1_02
+  if (!binding || typeof binding !== 'object') {
+    throw new Error('W03_HYPERDRIVE_D1_02_BINDING_REQUIRED')
+  }
+  const cached = contentRevisionStores.get(binding)
+  if (cached) return cached
+
+  const store = createPostgresContentRevisionReadStore(
+    getW03PublicMediaReferencePostgresPool(env),
+  )
+  contentRevisionStores.set(binding, store)
   return store
 }
