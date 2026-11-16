@@ -149,7 +149,7 @@ describe('W03 Neon-only content database driver', () => {
     await getW03PublicMediaReferencePostgresPool(env).end()
   })
 
-  it('requires the existing D1-02 Hyperdrive binding for explicit Neon thread reads', () => {
+  it('requires the existing content PostgreSQL Hyperdrive binding for explicit Neon thread reads', () => {
     expect(() => getW03PostThreadReadStore({ W03_CONTENT_READ_DRIVER: 'neon' }))
       .toThrow('W03_HYPERDRIVE_CONTENT_PG_BINDING_REQUIRED')
   })
@@ -298,7 +298,7 @@ describe('W03 Neon-only content database driver', () => {
     await getW03PublicMediaReferencePostgresPool(env).end()
   })
 
-  it('reuses the shared D1-02 Hyperdrive pool for W01/W05 content context reads', async () => {
+  it('reuses the shared content PostgreSQL Hyperdrive pool for W01/W05 content context reads', async () => {
     expect(() => getW03ContentContextReadStore({})).toThrow('W03_NEON_DRIVER_REQUIRED')
 
     const binding = {
@@ -463,7 +463,7 @@ it('provides and caches the Neon Collection member-reorder writer with Neon-only
 })
 
 
-it('provides and caches the Neon content-create writer on the existing D1-02 Hyperdrive pool', async () => {
+it('provides and caches the Neon content-create writer on the existing content PostgreSQL Hyperdrive pool', async () => {
   expect(() => getW03ContentCreateStore({})).toThrow('W03_NEON_DRIVER_REQUIRED')
 
   const binding = {
@@ -494,7 +494,7 @@ it('provides and caches the Neon Series member-reorder writer with Neon-only run
 
 
 
-it('provides and caches the Neon owner-scoped content revision reader on D1-02 Hyperdrive', async () => {
+it('provides and caches the Neon owner-scoped content revision reader on content PostgreSQL Hyperdrive', async () => {
   expect(() => getW03ContentRevisionReadStore({})).toThrow('W03_NEON_DRIVER_REQUIRED')
 
   const binding = {
