@@ -40,15 +40,15 @@ describe('W03 Neon-only content database driver', () => {
 
   it('rejects unknown driver values and legacy D1 mode', () => {
     expect(() => resolveW03PublicMediaReferenceDriver({
-      W03_PUBLIC_MEDIA_REFERENCE_DRIVER: 'postgres',
+      W03_CONTENT_READ_DRIVER: 'postgres',
     })).toThrow('W03_NEON_DRIVER_REQUIRED')
     expect(() => resolveW03PublicMediaReferenceDriver({
       W03_CONTENT_READ_DRIVER: 'd1',
     })).toThrow('W03_NEON_DRIVER_REQUIRED')
   })
 
-  it('requires the existing D1-02 Hyperdrive binding', () => {
-    const env = { W03_PUBLIC_MEDIA_REFERENCE_DRIVER: 'neon' }
+  it('requires the existing content PostgreSQL Hyperdrive binding', () => {
+    const env = { W03_CONTENT_READ_DRIVER: 'neon' }
     expect(resolveW03PublicMediaReferenceDriver(env)).toBe('neon')
     expect(() => getW03PublishedMediaReferenceReadStore(env))
       .toThrow('W03_HYPERDRIVE_CONTENT_PG_BINDING_REQUIRED')
@@ -83,7 +83,7 @@ describe('W03 Neon-only content database driver', () => {
       connectionString: 'postgresql://postgres:postgres@127.0.0.1:5432/luckread',
     }
     const env = {
-      W03_PUBLIC_MEDIA_REFERENCE_DRIVER: 'neon',
+      W03_CONTENT_READ_DRIVER: 'neon',
       HYPERDRIVE_CONTENT_PG: binding,
     }
     const pool = getW03PublicMediaReferencePostgresPool(env)
@@ -117,7 +117,7 @@ describe('W03 Neon-only content database driver', () => {
       connectionString: 'postgresql://postgres:postgres@127.0.0.1:5432/luckread',
     }
     const env = {
-      W03_PUBLIC_MEDIA_REFERENCE_DRIVER: 'neon',
+      W03_CONTENT_READ_DRIVER: 'neon',
       HYPERDRIVE_CONTENT_PG: binding,
     }
 
