@@ -79,8 +79,9 @@ if ((w08.d1_databases ?? []).length !== 0 || w08.vars?.W08_DATABASE_DRIVER !== '
 if (service(w03, 'W01') || service(w06, 'W01')) {
   throw new Error('Business Worker must not bind back to W01 by default')
 }
-if (!Array.isArray(w03.d1_databases) || !w03.d1_databases.some((x) => x.binding === 'D1_02')) {
-  throw new Error('W03 D1-02 binding missing')
+if ((w03.d1_databases ?? []).length !== 0 || w03.vars?.W03_CONTENT_READ_DRIVER !== 'neon' ||
+    !(w03.hyperdrive ?? []).some((x) => x.binding === 'HYPERDRIVE_D1_02' && x.id === 'c55183e1cc3446409c9c1075832c6615')) {
+  throw new Error('W03 content authority must use the existing Neon D1-02 Hyperdrive with no D1 binding')
 }
 
 console.log('WORKER_TERMINAL_ROUTING=PASS')
@@ -98,5 +99,7 @@ console.log(JSON.stringify({
     W08_W02_AUTH: service(w08, 'W02_AUTH')?.service,
     W02_DATABASE_DRIVER: w02.vars?.W02_DATABASE_DRIVER,
     W02_PRODUCTION_D1_BINDINGS: (w02.d1_databases ?? []).length,
+    W03_DATABASE_DRIVER: w03.vars?.W03_CONTENT_READ_DRIVER,
+    W03_PRODUCTION_D1_BINDINGS: (w03.d1_databases ?? []).length,
   },
 }, null, 2))
