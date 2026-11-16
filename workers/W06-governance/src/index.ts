@@ -23,7 +23,6 @@ import {
 
 interface RateLimitBinding { limit(input: { key: string }): Promise<{ success: boolean }> }
 interface Env extends W06ModerationDatabaseRuntimeEnv {
-  D1_03: D1Database
   W03_CONTENT_MODERATION: Fetcher
   GOVERNANCE_ORIGIN_GLOBAL_LIMITER?: RateLimitBinding
   GOVERNANCE_READ_LIMITER?: RateLimitBinding

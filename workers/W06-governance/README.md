@@ -2,9 +2,11 @@
 
 Canonical Worker identity: **W06**  
 Canonical responsibility: **Rights / Trust & Safety / Governance**  
-Primary D1: **D1-03**
+Primary persistence domain: **D1-03** (historical migration source; production runtime uses the existing Neon Hyperdrive)
 
 This directory is the canonical source-implementation boundary for the frozen W06 Worker.
+
+Production deploys with `wrangler.neon.jsonc`, which declares no Cloudflare D1 binding and uses the existing D1-03 Neon Hyperdrive. The original `wrangler.jsonc` and D1 migrations remain as historical schema-source/local-test compatibility only.
 
 Important governance constraints:
 
@@ -13,7 +15,7 @@ Important governance constraints:
 - W09 is the frozen D1-03 primary owner for AuditEvent. W06 retains the existing Cloudflare D1 compatibility write path only until a separate runtime-adapter slice moves publication/persistence to the W09 owner boundary.
 - AUTH-013 source implementation may consume W02 transition results but may not take ownership of D1-01 account-state mutation.
 - No ad-hoc AuditEvent table may be created in W02.
-- Physical Cloudflare Worker name and D1-03 UUID are not yet admitted in the current repository; deployment remains blocked until explicit physical-binding evidence exists.
+- The existing physical D1-03 UUID remains recorded in the historical source config for migration provenance; the deployed W06 Worker uses the already admitted Neon `luckread_governance` schema and existing Hyperdrive binding.
 
 Current source slice:
 
@@ -30,4 +32,4 @@ No remote D1 mutation or production deployment is implied by this source directo
 - The generated PostgreSQL artifact is workers/W06-governance/src/neon-postgres-migrations/0001_w06_d1_03_moderation_schema.sql; its source contract and disposable PostgreSQL 18 rehearsal are maintained under contracts/database/neon-d1-03-w06-moderation-schema.v1.json and .github/workflows/neon-d1-03-w06-moderation-postgres-rehearsal.yml.
 - Appeal remains a W06-owned logical capability but is not included as a physical table: the API/domain contract describes it, while the system contract still marks its implementation pending and no admitted W06 migration defines Appeal persistence.
 - AuditEvent remains W09-owned. This schema does not create a duplicate audit_events table or change the existing W06 Cloudflare D1 compatibility path.
-- This is a staged schema source only. It does not run remote Neon DDL, change D1 bindings, import business data, deploy a Worker, or authorize production cutover.
+- The PostgreSQL schema and owner postflight are already admitted for the W06 moderation runtime. This README describes schema ownership; it does not authorize a new production deployment or any business-data import.
