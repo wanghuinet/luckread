@@ -51,7 +51,17 @@ test('rejects reintroducing W07 production D1 while W05 remains D1-free', () => 
   )
 })
 
-test('requires W01/W02/W08 Neon mode with their approved production D1 binding sets', () => {
+test('requires W01/W02/W08 Neon mode with D1-free production deployment configs', () => {
+  const w01 = STAGED_WORKERS.find((worker) => worker.worker === 'W01')
+  const w01Config = {
+    name: w01.script,
+    d1_databases: [],
+    hyperdrive: [{ binding: w01.binding, id: w01.hyperdriveId }],
+    vars: { PAYLOAD_DATABASE_DRIVER: 'neon' },
+  }
+  assert.doesNotThrow(() => verifyWorkerConfig(w01Config, w01))
+  assert.deepEqual(verifyWorkerConfig(w01Config, w01).d1FallbackBindings, [])
+
   const w02 = STAGED_WORKERS.find((worker) => worker.worker === 'W02')
   const w02Config = {
     name: w02.script,
@@ -99,7 +109,7 @@ test('fails closed when a required Worker Wrangler file is missing', async () =>
   const root = await mkdtemp(path.join(os.tmpdir(), 'luckread-neon-hyperdrive-'))
   try {
     await mkdir(path.join(root, 'workers', 'W01-payload'), { recursive: true })
-    await writeFile(path.join(root, 'workers', 'W01-payload', 'wrangler.jsonc'), JSON.stringify({
+    await writeFile(path.join(root, 'workers', 'W01-payload', 'wrangler.neon.jsonc'), JSON.stringify({
       name: 'luckread-w01-payload',
       vars: { PAYLOAD_DATABASE_DRIVER: 'neon' },
       d1_databases: [],
