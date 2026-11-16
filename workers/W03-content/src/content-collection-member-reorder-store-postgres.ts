@@ -66,7 +66,7 @@ const toOrderRow = (row: PostgresOrderRow): CollectionMemberOrderRow => ({
  * Neon writer for Collection member reordering only. The Collection version/ETag
  * compare-and-swap and all relationship position changes commit with the
  * idempotency receipt in one transaction. Existing PostgreSQL triggers publish
- * the Collection and member-order outbox events.
+ * the Collection and relationship outbox events.
  */
 export function createPostgresCollectionMemberReorderStore(
   database: CollectionMemberReorderPostgresDatabase,
