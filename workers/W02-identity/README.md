@@ -5,7 +5,7 @@ Canonical Worker role: **Identity / Account**.
 Project authority has selected this repository path as the physical source location for canonical W02:
 `workers/W02-identity`
 
-The directory name `W02-identity` is the canonical physical path for W02; Worker authority remains defined by the Worker Master. Canonical W02 owns T01/T02 and D1-01 identity/account state under the amended Worker Master.
+The directory name `W02-identity` is the canonical physical path for W02; Worker authority remains defined by the Worker Master. Canonical W02 owns T01/T02 and D1-01 identity/account state under the amended Worker Master. Production uses the D1-free `wrangler.neon.jsonc` and the existing D1-01 Neon Hyperdrive; the original `wrangler.jsonc` is retained only as historical D1 migration-source configuration and for isolated local/test compatibility.
 
 Deployment and inter-Worker transport are governed by:
 `docs/change-control/CC-MAPPING-0-E6-W02-DEPLOYMENT-TRANSPORT-DECISION-2026-09-22.md`
