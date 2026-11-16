@@ -28,18 +28,39 @@ export function buildW05PostgresMigration({ inventory, socialContract, readSourc
     fail('W05 must own exactly the frozen fifteen D1-02 source migrations')
   }
 
-  const includedBindings = owner.physicalBindings?.filter((item) => item.included === true) ?? []
-  const excludedGovernanceBindings = owner.physicalBindings?.filter(
-    (item) => item.binding === 'D1_03' && item.logicalDomain === 'D1-03' && item.included === false
-  ) ?? []
-  if (includedBindings.length !== 1 ||
-      includedBindings[0].binding !== 'DB' ||
-      includedBindings[0].logicalDomain !== 'D1-02' ||
-      includedBindings[0].databaseName !== 'luckreadpro' ||
-      includedBindings[0].databaseUuid !== '6c342634-97f6-4248-9f4a-85772af4f22c' ||
-      excludedGovernanceBindings.length !== 1 ||
-      excludedGovernanceBindings[0].databaseName !== 'secondary') {
-    fail('W05 DB must map only to D1-02; W05 D1_03 governance binding must remain excluded')
+  if (owner.runtimeProvider !== 'neon' ||
+      !Array.isArray(owner.physicalBindings) || owner.physicalBindings.length !== 0) {
+    fail('W05 D1-02 production runtime must use Neon and declare no Cloudflare D1 bindings')
+  }
+
+  const neonBindings = owner.neonBindings ?? []
+  const socialBinding = neonBindings.find((item) => item.binding === 'HYPERDRIVE_D1_02')
+  const delegatedGovernanceBinding = neonBindings.find((item) => item.binding === 'HYPERDRIVE_D1_03')
+  if (
+    neonBindings.length !== 2 ||
+    socialBinding?.logicalDomain !== 'D1-02' ||
+    socialBinding?.id !== 'c55183e1cc3446409c9c1075832c6615' ||
+    delegatedGovernanceBinding?.logicalDomain !== 'D1-03' ||
+    delegatedGovernanceBinding?.id !== '7c8831416c18494faee04b96aa551cb9' ||
+    delegatedGovernanceBinding?.delegatedOwner !== 'W09'
+  ) {
+    fail('W05 must retain the exact D1-02 social and W09-delegated D1-03 Neon Hyperdrive targets')
+  }
+
+  const wranglerSource = readSource(owner.wrangler)
+  if (typeof wranglerSource !== 'string') fail('Missing W05 production Wrangler config')
+  let wrangler
+  try { wrangler = JSON.parse(wranglerSource) } catch { fail('W05 production Wrangler config is invalid JSON') }
+  const hyperdrive = wrangler.hyperdrive ?? []
+  if (
+    wrangler.name !== 'luckread-w05' ||
+    (wrangler.d1_databases ?? []).length !== 0 ||
+    wrangler.vars?.W05_DATABASE_DRIVER !== 'neon' ||
+    wrangler.vars?.W05_PUSH_ENDPOINT_DATABASE_DRIVER !== 'neon' ||
+    !hyperdrive.some((item) => item.binding === socialBinding.binding && item.id === socialBinding.id) ||
+    !hyperdrive.some((item) => item.binding === delegatedGovernanceBinding.binding && item.id === delegatedGovernanceBinding.id)
+  ) {
+    fail('W05 Wrangler production config must be D1-free and use both reviewed Neon Hyperdrive bindings')
   }
 
   if (socialContract?.authoritativeDomain !== 'D1-02' ||
@@ -150,7 +171,7 @@ export function buildW05PostgresMigration({ inventory, socialContract, readSourc
     '-- GENERATED FILE. Do not hand-edit.',
     '-- Regenerate with workers/W05-social/scripts/neon/generate-d1-02-postgres-migration.mjs.',
     '-- Template: workers/W05-social/scripts/neon/templates/d1-02-social-postgres.sql.',
-    '-- Source authority: W05 / D1-02; Cloudflare D1 remains the current runtime authority.',
+    '-- Schema source: W05's fifteen D1-origin D1-02 migrations; production runtime uses Neon D1-02, with W09-owned push endpoints on Neon D1-03.',
     ''
   ].join('\n')
 
