@@ -8,7 +8,6 @@ export type PublishedMediaReferenceRecord = Readonly<{
 
 export type W03PublishedMediaReferenceRuntimeEnv = Readonly<{
   W03_CONTENT_READ_DRIVER?: string
-  W03_PUBLIC_MEDIA_REFERENCE_DRIVER?: string
   HYPERDRIVE_D1_02?: Readonly<{ connectionString?: string }>
 }>
 
