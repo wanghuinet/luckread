@@ -34,7 +34,6 @@ function fakePostgres(options: { rows?: typeof rows; fail?: boolean } = {}) {
 describe('W03 published media reference read store', () => {
   it('routes media authorization through the injected Neon store', async () => {
     let storeCalls = 0
-    let d1Calls = 0
     const mediaUrl = 'https://img.luckread.com/media/neon-read-only.png'
     const store = {
       async listPublishedMediaReferences(candidates: readonly string[], limit: number) {
@@ -53,14 +52,7 @@ describe('W03 published media reference read store', () => {
           'X-LuckRead-Correlation-Id': 'w03-postgres-media-route-injection',
         },
       }),
-      {
-        D1_02: {
-          prepare() {
-            d1Calls += 1
-            throw new Error('injected PostgreSQL store must not touch D1')
-          },
-        },
-      } as never,
+      {} as never,
     )
 
     expect(response.status).toBe(200)
@@ -68,7 +60,6 @@ describe('W03 published media reference read store', () => {
       data: { isPublic: true, isMemberContent: false, allowed: true },
     })
     expect(storeCalls).toBe(1)
-    expect(d1Calls).toBe(0)
   })
 
   it('uses PostgreSQL array matching for scalar and JSON-text media references', async () => {
