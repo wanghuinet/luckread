@@ -15,6 +15,7 @@ on:
       - 'workers/W03-content/src/content-relationship-mutation-store-postgres.ts'
       - 'workers/W03-content/src/content-relationship-mutation-store-postgres.test.ts'
       - 'workers/W03-content/src/content-relationships.ts'
+      - 'workers/W03-content/src/index.ts'
       - 'workers/W03-content/src/neon/runtime.test.ts'
       - 'workers/W03-content/src/content-collections-read-store-postgres.ts'
       - 'workers/W03-content/src/content-collections-create-store-postgres.ts'
