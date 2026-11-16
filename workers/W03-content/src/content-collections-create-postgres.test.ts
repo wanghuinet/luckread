@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { createW03ContentWorker } from './index.js'
 import { createPostgresCollectionCreateStore, type CollectionCreatePostgresDatabase } from './content-collections-create-store-postgres.js'
-import type { CollectionCreateStore, CollectionRecord } from './content-collections.js'
+import { createCollection, type CollectionCreateStore, type CollectionRecord } from './content-collections.js'
 
 const collection: CollectionRecord = {
   id: 'collection_1',
@@ -71,6 +71,41 @@ function createDatabase(options: { duplicateIdempotency?: boolean } = {}) {
 }
 
 describe('W03 Neon Collection creation', () => {
+  it('preserves the original D1 batch implementation as the default', async () => {
+    const preparedSql: string[] = []
+    let batchStatements: unknown[] = []
+    const database = {
+      prepare(sql: string) {
+        preparedSql.push(sql)
+        return {
+          bind() {
+            return {
+              async first() { return null },
+            }
+          },
+        }
+      },
+      async batch(statements: unknown[]) {
+        batchStatements = statements
+        return []
+      },
+    }
+
+    const created = await createCollection(
+      database as never,
+      'creator_1',
+      { title: 'My collection', description: 'A short description' },
+      'd1-idem-key',
+      new Date('2026-11-16T00:00:00.000Z'),
+    )
+
+    expect(created).toMatchObject({ ownerUserId: 'creator_1', state: 'DRAFT', title: 'My collection' })
+    expect(batchStatements).toHaveLength(4)
+    expect(preparedSql.some(sql => sql.includes('FROM content_mutation_idempotency'))).toBe(true)
+    expect(preparedSql.some(sql => sql.startsWith('INSERT INTO content_collections'))).toBe(true)
+    expect(preparedSql.some(sql => sql.includes('content_txn_guard'))).toBe(true)
+  })
+
   it('reads the existing D1-02 idempotency record from PostgreSQL with normalized UTC expiry', async () => {
     const fixture = createDatabase()
     const store = createPostgresCollectionCreateStore(fixture.database)
