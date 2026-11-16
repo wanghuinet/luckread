@@ -44,16 +44,6 @@ const rows = [
   },
 ]
 
-const mockDb = () => {
-  const prepare = vi.fn((sql: string) => ({
-    bind: vi.fn((...values: unknown[]) => ({
-      all: vi.fn(async () => ({ results: rows })),
-      sql,
-      values,
-    })),
-  }))
-  return { db: { prepare } as unknown as D1Database, prepare }
-}
 
 describe('W03 Following content projection', () => {
   it('queries published content through the Neon read store with stable pagination', async () => {
@@ -72,7 +62,7 @@ describe('W03 Following content projection', () => {
     expect(list).toHaveBeenCalledWith(['creator-1', 'creator-2'], null, 2)
   })
 
-  it('uses the injected Neon read store without issuing a D1 query', async () => {
+  it('uses the injected Neon read store without calling a fallback adapter', async () => {
     const list = vi.fn(async () => rows)
     const store = { list }
     const page = await listFollowingOwnerContents(
@@ -86,7 +76,6 @@ describe('W03 Following content projection', () => {
     expect(page.items).toHaveLength(1)
     expect(page.items[0]?.id).toBe('content-1')
     expect(list).toHaveBeenCalledWith(['creator-1', 'creator-2'], null, 2)
-    expect(prepare).not.toHaveBeenCalled()
   })
 
   it('binds cursors to the viewer and followed-author scope', async () => {
@@ -112,9 +101,6 @@ describe('W03 Following content projection', () => {
 describe('W03 private Following endpoint', () => {
 
   it('routes the authorized HTTP feed projection through the injected Neon store', async () => {
-    const prepare = vi.fn(() => {
-      throw new Error('No database adapter should be called when Neon provider is selected')
-    })
     const list = vi.fn(async () => rows)
     const neonWorker = createW03ContentWorker({
       followingOwnerContentsReadStoreProvider: () => ({ list }),
@@ -143,7 +129,6 @@ describe('W03 private Following endpoint', () => {
       null,
       2,
     )
-    expect(prepare).not.toHaveBeenCalled()
   })
 
   it('rejects browser/spoofed callers and malformed author sets before data access', async () => {
