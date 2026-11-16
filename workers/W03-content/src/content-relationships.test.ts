@@ -162,7 +162,12 @@ describe('W03 content relationship foundation', () => {
         }
       },
     } as never
-    const response = await w03Worker.fetch(
+    const neonWorker = createW03ContentWorker({
+      contentRelationshipMutationStoreProvider: () => ({
+        list: async () => ({ items: [], nextCursor: null, hasMore: false }),
+      } as never),
+    })
+    const response = await neonWorker.fetch(
       new Request('https://luckread-w03.internal/internal/content/contents/content_1/relationships?direction=both&limit=10', {
         headers: {
           'X-LuckRead-Caller': 'W01',
@@ -170,7 +175,7 @@ describe('W03 content relationship foundation', () => {
           'X-LuckRead-Correlation-Id': 'relationship-public',
         },
       }),
-      { D1_02: db },
+      {} as never,
     )
     expect(response.status).toBe(200)
     await expect(response.json()).resolves.toMatchObject({
@@ -321,19 +326,35 @@ describe('W03 native social post thread authority', () => {
       },
       batch: async () => [],
     } as never;
+    const neonWorker = createW03ContentWorker({
+      postThreadReadStoreProvider: () => ({
+        list: async () => [{
+          id: 'post_root',
+          slug: 'root',
+          position: 0,
+          state: 'PUBLISHED',
+          access_mode: 'PUBLIC',
+          title: 'First post',
+          body_ref: 'https://img.luckread.com/body/1.txt',
+          media_refs_json: '[]',
+          cover_ref: null,
+          created_at: '2026-11-05T00:00:00.000Z',
+        }],
+      }),
+    })
     const headers = {
       'X-LuckRead-Caller': 'W01',
       'X-LuckRead-Transport-Version': '1.0',
       'X-LuckRead-Correlation-Id': 'thread-route-test',
     };
-    const publicResponse = await w03Worker.fetch(
+    const publicResponse = await neonWorker.fetch(
       new Request('https://luckread-w03.internal/internal/content/contents/post_root/thread', { headers }),
-      { D1_02: db },
+      {} as never,
     );
     expect(publicResponse.status).toBe(200);
     await expect(publicResponse.json()).resolves.toMatchObject({ data: { rootContentId: 'post_root' } });
 
-    const lowLayerResponse = await w03Worker.fetch(
+    const lowLayerResponse = await neonWorker.fetch(
       new Request('https://luckread-w03.internal/internal/content/contents/post_root/thread', {
         headers: {
           ...headers,
@@ -341,17 +362,17 @@ describe('W03 native social post thread authority', () => {
           'X-LuckRead-Principal-Layer': 'L1',
         },
       }),
-      { D1_02: db },
+      {} as never,
     );
     expect(lowLayerResponse.status).toBe(200);
 
-    const deniedResponse = await w03Worker.fetch(
+    const deniedResponse = await neonWorker.fetch(
       new Request('https://luckread-w03.internal/internal/content/contents/post_root/thread', {
         method: 'POST',
         headers: { ...headers, 'content-type': 'application/json', 'Idempotency-Key': 'thread-link' },
         body: JSON.stringify({ nextContentId: 'post_next' }),
       }),
-      { D1_02: db },
+      {} as never,
     );
     expect(deniedResponse.status).toBe(401);
   });
