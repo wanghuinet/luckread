@@ -225,6 +225,32 @@ for (const owner of contract.owners.slice(1)) {
                !wrangler.includes('"database_id": "2f80471e-3756-49f9-8db1-7707a433ad64"')) {
       failures.push(`${owner.worker} Wrangler D1-01 database mapping drifted from the admitted physical source`)
     }
+    if (owner.worker === 'W02') {
+      const productionPath = 'workers/W02-identity/wrangler.neon.jsonc'
+      const productionText = read(productionPath)
+      if (productionText === null) {
+        failures.push('W02 Neon-only production Wrangler config is missing')
+      } else {
+        let production
+        try { production = JSON.parse(productionText) } catch {
+          failures.push('W02 Neon-only production Wrangler config is invalid JSON')
+        }
+        if (production && (
+          production.name !== 'luckread-w02' ||
+          (production.d1_databases ?? []).length !== 0 ||
+          production.vars?.W02_DATABASE_DRIVER !== 'neon' ||
+          !(production.hyperdrive ?? []).some((binding) =>
+            binding.binding === 'HYPERDRIVE' && binding.id === '0c53a1bb9bc0484bac146e8ae2d3158b') ||
+          !(production.queues?.producers ?? []).some((binding) =>
+            binding.binding === 'AUTH013_QUEUE' && binding.queue === 'luckread-auth013-account-state') ||
+          !(production.queues?.producers ?? []).some((binding) =>
+            binding.binding === 'AUTH013_PROJECTION_QUEUE' && binding.queue === 'luckread-auth013-account-state-projection')
+        )) {
+          failures.push('W02 production Wrangler must be D1-free and preserve its Neon Hyperdrive and AUTH-013 queues')
+        }
+        addSource('W02', 'neon-production-wrangler', productionPath, productionText)
+      }
+    }
     addSource(owner.worker, 'wrangler-database-mapping', owner.wrangler, wrangler)
   }
 }
