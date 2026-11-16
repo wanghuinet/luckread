@@ -47,11 +47,14 @@ import type {
   SeriesMembersReadStore,
   SeriesMemberAttachStore,
   SeriesMemberRemoveStore,
+  SeriesMemberReorderStore,
 } from '../content-series-members.js'
 import { createPostgresSeriesMemberAttachStore } from '../content-series-member-attach-store-postgres.js'
 import type { SeriesMemberAttachPostgresDatabase } from '../content-series-member-attach-store-postgres.js'
 import { createPostgresSeriesMemberRemoveStore } from '../content-series-member-remove-store-postgres.js'
 import type { SeriesMemberRemovePostgresDatabase } from '../content-series-member-remove-store-postgres.js'
+import { createPostgresSeriesMemberReorderStore } from '../content-series-member-reorder-store-postgres.js'
+import type { SeriesMemberReorderPostgresDatabase } from '../content-series-member-reorder-store-postgres.js'
 import type {
   CollectionMemberAttachStore,
   CollectionMemberRemoveStore,
@@ -89,6 +92,7 @@ const seriesUpdateStores = new WeakMap<object, SeriesUpdateStore>()
 const seriesDeleteStores = new WeakMap<object, SeriesDeleteStore>()
 const seriesMemberAttachStores = new WeakMap<object, SeriesMemberAttachStore>()
 const seriesMemberRemoveStores = new WeakMap<object, SeriesMemberRemoveStore>()
+const seriesMemberReorderStores = new WeakMap<object, SeriesMemberReorderStore>()
 const collectionMemberAttachStores = new WeakMap<object, CollectionMemberAttachStore>()
 const collectionMemberRemoveStores = new WeakMap<object, CollectionMemberRemoveStore>()
 const collectionMemberReorderStores = new WeakMap<object, CollectionMemberReorderStore>()
@@ -105,7 +109,7 @@ const creatorContentsStores = new WeakMap<object, CreatorContentsReadStore>()
  * batch projection, W04-authorized following-feed content, native post-thread
  * projection, canonical content context and detail reads, creator-owned
  * content lists, series and collection reads, and series/collection membership
- * lists. Content creation, update, delete, owner-authorized state transitions, W06 moderation decisions, owner-authorized revision rollback, scheduled publication candidate reads/commits, content reference create/revoke, and native post-thread append plus Collection creation, update, delete, member attachment, member removal, and member reorder plus Series creation, update, delete, member attachment, and member removal are the only Neon-backed mutations in these slices; all other W03 reads and mutations remain on D1_02. D1 is the safe
+ * lists. Content creation, update, delete, owner-authorized state transitions, W06 moderation decisions, owner-authorized revision rollback, scheduled publication candidate reads/commits, content reference create/revoke, native post-thread append, plus Collection creation, update, delete, member attachment, member removal, and member reorder plus Series creation, update, delete, member attachment, member removal, and member reorder are the only Neon-backed mutations in these slices; all other W03 reads and mutations remain on D1_02. D1 is the safe
  * default and unknown values fail closed.
  */
 export function resolveW03PublicMediaReferenceDriver(
@@ -526,6 +530,26 @@ export function getW03SeriesMemberRemoveStore(
     getW03PublicMediaReferencePostgresPool(env) as unknown as SeriesMemberRemovePostgresDatabase,
   )
   seriesMemberRemoveStores.set(binding, store)
+  return store
+}
+
+/** PostgreSQL writer for reordering a creator-owned Series member. */
+export function getW03SeriesMemberReorderStore(
+  env: W03PublicMediaReferenceRuntimeEnv,
+): SeriesMemberReorderStore | undefined {
+  if (resolveW03PublicMediaReferenceDriver(env) === 'd1') return undefined
+
+  const binding = env.HYPERDRIVE_D1_02
+  if (!binding || typeof binding !== 'object') {
+    throw new Error('W03_HYPERDRIVE_D1_02_BINDING_REQUIRED')
+  }
+  const cached = seriesMemberReorderStores.get(binding)
+  if (cached) return cached
+
+  const store = createPostgresSeriesMemberReorderStore(
+    getW03PublicMediaReferencePostgresPool(env) as unknown as SeriesMemberReorderPostgresDatabase,
+  )
+  seriesMemberReorderStores.set(binding, store)
   return store
 }
 

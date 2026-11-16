@@ -93,6 +93,34 @@ export interface SeriesMemberRemoveStore {
   }>): Promise<void>
 }
 
+export type SeriesMemberOrderRow = Readonly<{
+  relationship_id: string
+  source_id: string
+  position: number
+  created_at: string
+  updated_at: string
+}>
+
+export interface SeriesMemberReorderStore {
+  loadMutation(ownerUserId: string, seriesId: string, contentId: string, operationId: string, idempotencyKey: string): Promise<SeriesMemberMutationRow | null>
+  listMembers(ownerUserId: string, seriesId: string): Promise<readonly SeriesMemberOrderRow[]>
+  reorder(input: Readonly<{
+    ownerUserId: string
+    operationId: string
+    idempotencyKey: string
+    requestHash: string
+    responseJson: string
+    nowIso: string
+    expiresAt: string
+    seriesId: string
+    nextVersion: number
+    seriesEtag: string
+    expectedVersion: number
+    expectedEtag: string
+    members: readonly Readonly<{ relationshipId: string; position: number }>[]
+  }>): Promise<void>
+}
+
 interface IdempotencyRow {
   idem_id: string | null
   idem_owner_user_id: string | null
@@ -688,6 +716,7 @@ export async function reorderSeriesMember(
   ifMatch: string,
   idempotencyKey: string,
   now = new Date(),
+  mutationStore?: SeriesMemberReorderStore,
 ): Promise<{ member: SeriesMemberRecord; seriesVersion: number; seriesEtag: string }> {
   assertResourceId(ownerUserId)
   assertResourceId(seriesId)
@@ -704,7 +733,9 @@ export async function reorderSeriesMember(
     position,
     ifMatch: normalizeEtag(ifMatch),
   })
-  const row = await loadMutation(db, ownerUserId, seriesId, contentId, operationId, idempotencyKey)
+  const row = mutationStore
+    ? await mutationStore.loadMutation(ownerUserId, seriesId, contentId, operationId, idempotencyKey)
+    : await loadMutation(db, ownerUserId, seriesId, contentId, operationId, idempotencyKey)
   if (!row) throw new ContentRuntimeError('NOT_FOUND', 404)
 
   const replay = inspectIdempotency(row, ownerUserId, hash, now)
@@ -719,20 +750,14 @@ export async function reorderSeriesMember(
   assertSeriesEditable(row.series_state)
   assertEtag(row.series_etag, ifMatch)
 
-  const rows = await db.prepare(
-    'SELECT relationship_id, source_id, position, created_at, updated_at ' +
-    'FROM content_relationships ' +
-    "WHERE target_type = 'series' AND target_id = ? AND relation_type = 'series-member' AND status = 'ACTIVE' " +
-    'ORDER BY position ASC, relationship_id ASC',
-  ).bind(seriesId).all<{
-    relationship_id: string
-    source_id: string
-    position: number
-    created_at: string
-    updated_at: string
-  }>()
-
-  const members = rows.results
+  const members: readonly SeriesMemberOrderRow[] = mutationStore
+    ? await mutationStore.listMembers(ownerUserId, seriesId)
+    : (await db.prepare(
+        'SELECT relationship_id, source_id, position, created_at, updated_at ' +
+        'FROM content_relationships ' +
+        "WHERE target_type = 'series' AND target_id = ? AND relation_type = 'series-member' AND status = 'ACTIVE' " +
+        'ORDER BY position ASC, relationship_id ASC',
+      ).bind(seriesId).all<SeriesMemberOrderRow>()).results
   const currentIndex = members.findIndex(item => item.source_id === contentId)
   if (currentIndex < 0) throw new ContentRuntimeError('NOT_FOUND', 404)
   if (position >= members.length) throw new ContentRuntimeError('VALIDATION_FAILED', 400)
@@ -779,34 +804,49 @@ export async function reorderSeriesMember(
   const expiresAt = new Date(now.getTime() + IDEMPOTENCY_TTL_MS).toISOString()
   const tempOffset = members.length + 1
 
-  const mutations: D1PreparedStatement[] = [
-    expireIdempotency(db, ownerUserId, operationId, idempotencyKey, nowIso),
-    insertIdempotency(db, ownerUserId, operationId, idempotencyKey, hash, 200, JSON.stringify(response), nowIso, expiresAt),
-    db.prepare(
-      'UPDATE content_series SET version = ?, etag = ?, updated_at = ? ' +
-      'WHERE id = ? AND owner_user_id = ? AND version = ? AND etag = ?',
-    ).bind(nextVersion, seriesEtag, nowIso, seriesId, ownerUserId, row.series_version, row.series_etag),
-    atomicGuard(db),
-    db.prepare(
-      'UPDATE content_relationships SET position = position + ? ' +
-      "WHERE target_type = 'series' AND target_id = ? AND relation_type = 'series-member' AND status = 'ACTIVE'",
-    ).bind(tempOffset, seriesId),
-  ]
-
-  for (const item of members) {
+  const memberPositions = members.map(item => {
     const nextPosition = newPositions.get(item.relationship_id)
     if (nextPosition === undefined) throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
-    mutations.push(
+    return { relationshipId: item.relationship_id, position: nextPosition }
+  })
+
+  if (mutationStore) {
+    await mutationStore.reorder({
+      ownerUserId,
+      operationId,
+      idempotencyKey,
+      requestHash: hash,
+      responseJson: JSON.stringify(response),
+      nowIso,
+      expiresAt,
+      seriesId,
+      nextVersion,
+      seriesEtag,
+      expectedVersion: row.series_version,
+      expectedEtag: row.series_etag,
+      members: memberPositions,
+    })
+  } else {
+    const mutations: D1PreparedStatement[] = [
+      expireIdempotency(db, ownerUserId, operationId, idempotencyKey, nowIso),
+      insertIdempotency(db, ownerUserId, operationId, idempotencyKey, hash, 200, JSON.stringify(response), nowIso, expiresAt),
       db.prepare(
+        'UPDATE content_series SET version = ?, etag = ?, updated_at = ? ' +
+        'WHERE id = ? AND owner_user_id = ? AND version = ? AND etag = ?',
+      ).bind(nextVersion, seriesEtag, nowIso, seriesId, ownerUserId, row.series_version, row.series_etag),
+      atomicGuard(db),
+      db.prepare(
+        'UPDATE content_relationships SET position = position + ? ' +
+        "WHERE target_type = 'series' AND target_id = ? AND relation_type = 'series-member' AND status = 'ACTIVE'",
+      ).bind(tempOffset, seriesId),
+    ]
+    for (const item of memberPositions) {
+      mutations.push(db.prepare(
         'UPDATE content_relationships SET position = ?, updated_at = ? WHERE relationship_id = ?',
-      ).bind(nextPosition, nowIso, item.relationship_id),
-    )
+      ).bind(item.position, nowIso, item.relationshipId))
+    }
+    mutations.push(atomicGuard(db))
+    await batchMutation(db, mutations)
   }
-
-  mutations.push(
-    atomicGuard(db),
-  )
-
-  await batchMutation(db, mutations)
   return response
 }
