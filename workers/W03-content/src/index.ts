@@ -784,7 +784,12 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
           throw new ContentRuntimeError('VALIDATION_FAILED', 400)
         }
         const limit = parseListLimit(url.searchParams.get('limit') ?? '50')
-        const items = await listDueScheduledContentCandidates(env.D1_02, new Date(), limit)
+        const items = await listDueScheduledContentCandidates(
+          env.D1_02,
+          new Date(),
+          limit,
+          dependencies.contentMutationStoreProvider?.(env),
+        )
         return json({ data: { items }, requestId: createRequestId() })
       }
 
@@ -802,7 +807,12 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
         ) {
           throw new ContentRuntimeError('VALIDATION_FAILED', 400)
         }
-        const result = await publishAuthorizedScheduledContents(env.D1_02, body.items, new Date())
+        const result = await publishAuthorizedScheduledContents(
+          env.D1_02,
+          body.items,
+          new Date(),
+          dependencies.contentMutationStoreProvider?.(env),
+        )
         return json({ data: result, requestId: createRequestId() })
       }
 
