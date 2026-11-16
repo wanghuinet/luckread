@@ -171,7 +171,7 @@ export function buildW05PostgresMigration({ inventory, socialContract, readSourc
     '-- GENERATED FILE. Do not hand-edit.',
     '-- Regenerate with workers/W05-social/scripts/neon/generate-d1-02-postgres-migration.mjs.',
     '-- Template: workers/W05-social/scripts/neon/templates/d1-02-social-postgres.sql.',
-    '-- Schema source: W05's fifteen D1-origin D1-02 migrations; production runtime uses Neon D1-02, with W09-owned push endpoints on Neon D1-03.',
+    "-- Schema source: W05's fifteen D1-origin D1-02 migrations; production runtime uses Neon D1-02, with W09-owned push endpoints on Neon D1-03.",
     ''
   ].join('\n')
 
