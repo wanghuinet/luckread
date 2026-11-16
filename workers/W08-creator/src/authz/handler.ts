@@ -6,9 +6,14 @@ import {
   type LayerId,
   type ScopedRoleAssignment,
 } from './casl-policy.js'
-import { resolvePermissionContext } from './role-layer.js'
+import { resolvePermissionContext, resolvePermissionContextPostgres, type RoleAssignmentRow } from './role-layer.js'
+import { getW08PostgresPool, resolveW08DatabaseDriver, type W08RuntimeEnv } from '../neon/runtime.js'
+import type { Pool } from 'pg'
 
-type Env = { D1_01: D1Database; W02_AUTH: Fetcher }
+type Env = W08RuntimeEnv & { W02_AUTH: Fetcher }
+type PermissionCheckDependencies = Readonly<{
+  getPostgresPool?: (env: W08RuntimeEnv) => Pool
+}>
 type PermissionRequest = {
   action?: unknown
   resourceType?: unknown
@@ -87,7 +92,11 @@ async function resolveSubjectFromW02Session(
  * subjectId, layer, account state, or scoped-role facts. Resource attributes
  * must be loaded server-side by the owning domain before this endpoint is used.
  */
-export async function handlePermissionCheck(request: Request, env: Env): Promise<Response> {
+export async function handlePermissionCheck(
+  request: Request,
+  env: Env,
+  dependencies: PermissionCheckDependencies = {},
+): Promise<Response> {
   const url = new URL(request.url)
   if (request.method !== 'POST' || url.pathname !== '/internal/authz/check-permission') {
     return new Response(null, { status: 404, headers: { 'cache-control': 'no-store' } })
@@ -124,17 +133,33 @@ export async function handlePermissionCheck(request: Request, env: Env): Promise
       context = { layer: 'L0', scopedRoleAssignments: [] }
       accountState = null
     } else {
-      const account = await env.D1_01
-        .prepare('SELECT account_state AS accountState FROM "user" WHERE id = ? LIMIT 1')
-        .bind(subjectId)
-        .first<{ accountState: string }>()
+      const useNeon = resolveW08DatabaseDriver(env) === 'neon'
+      const pool = useNeon
+        ? (dependencies.getPostgresPool ?? getW08PostgresPool)(env)
+        : undefined
+      const db = useNeon ? undefined : env.D1_01
+      if (!pool && !db) throw new Error('W08_AUTHORIZATION_DATABASE_UNAVAILABLE')
+
+      const account = pool
+        ? (await pool.query<{ accountState: string }>(
+            'SELECT account_state AS "accountState" FROM "user" WHERE id = $1 LIMIT 1',
+            [subjectId],
+          )).rows[0] ?? null
+        : await db!.prepare('SELECT account_state AS accountState FROM "user" WHERE id = ? LIMIT 1')
+            .bind(subjectId)
+            .first<{ accountState: string }>()
       if (!account) return deny('SUBJECT_NOT_FOUND')
 
       accountState = account.accountState
       if (accountState === 'RESTRICTED' || accountState === 'FROZEN') {
         context = { layer: 'L1', scopedRoleAssignments: [] }
       } else if (accountState === 'ACTIVE' || accountState === 'PENDING_VERIFICATION') {
-        const resolved = await resolvePermissionContext(env.D1_01, subjectId)
+        const resolved = pool
+          ? await resolvePermissionContextPostgres(
+              async (sql, values) => (await pool.query(sql, values)).rows as RoleAssignmentRow[],
+              subjectId,
+            )
+          : await resolvePermissionContext(db!, subjectId)
         if (!resolved) return deny('LAYER_RESOLUTION_DENIED')
         context = resolved
       } else {
