@@ -9,6 +9,14 @@ on:
       - 'workers/W07-subscription-commerce/wrangler.jsonc'
       - 'workers/W07-subscription-commerce/wrangler.neon.jsonc'
       - 'workers/W07-subscription-commerce/src/**'
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: Type DEPLOY_W07_NEON_ONLY to deploy the D1-free W07 Neon production config
+        required: true
+        type: choice
+        options:
+          - DEPLOY_W07_NEON_ONLY
 
 permissions:
   contents: read
@@ -19,7 +27,7 @@ concurrency:
 
 jobs:
   deploy:
-    if: ${{ github.ref == 'refs/heads/main' }}
+    if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.confirm == 'DEPLOY_W07_NEON_ONLY' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
