@@ -28,6 +28,7 @@ import {
   getW03ContentDetailReadStore,
   getW03CreatorContentsReadStore,
   getW03PublicContentListReadStore,
+  getW03ContentRevisionReadStore,
   resolveW03PublicMediaReferenceDriver,
 } from './runtime.js'
 
@@ -534,6 +535,25 @@ it('provides and caches the Neon Series member-reorder writer while keeping D1 a
   const env = { W03_CONTENT_READ_DRIVER: 'neon', HYPERDRIVE_D1_02: binding }
   const first = getW03SeriesMemberReorderStore(env)
   const second = getW03SeriesMemberReorderStore(env)
+  expect(first).toBeDefined()
+  expect(first).toBe(second)
+  await getW03PublicMediaReferencePostgresPool(env).end()
+})
+
+
+
+it('provides and caches the Neon owner-scoped content revision reader on D1-02 Hyperdrive', async () => {
+  expect(getW03ContentRevisionReadStore({
+    D1_02: { prepare() { throw new Error('D1 should not be queried') } },
+  })).toBeUndefined()
+
+  const binding = {
+    connectionString: 'postgresql://postgres:postgres@127.0.0.1:5432/luckread',
+  }
+  const env = { W03_CONTENT_READ_DRIVER: 'neon', HYPERDRIVE_D1_02: binding }
+  const first = getW03ContentRevisionReadStore(env)
+  const second = getW03ContentRevisionReadStore(env)
+
   expect(first).toBeDefined()
   expect(first).toBe(second)
   await getW03PublicMediaReferencePostgresPool(env).end()
