@@ -1,6 +1,6 @@
+import { createContent, ContentRuntimeError, type ContentCreateStore } from './content-runtime.js'
 import { describe, expect, it } from 'vitest'
 
-import { ContentRuntimeError } from './content-runtime.js'
 import {
   CONTENT_SNOWFLAKE_EPOCH_MS,
   encodeContentSnowflakeId,
@@ -113,6 +113,37 @@ const revision = {
 }
 
 describe('W03 Neon content creation store', () => {
+
+  it('routes the public createContent operation through the Neon store without touching D1', async () => {
+    let created: Parameters<ContentCreateStore['create']>[0] | undefined
+    const store: ContentCreateStore = {
+      async loadIdempotency() { return null },
+      async allocateContentId() { return encodeContentSnowflakeId(nowMs, 1) },
+      async create(input) { created = input },
+    }
+    const d1 = {
+      prepare() { throw new Error('D1 must not be queried in Neon mode') },
+      batch() { throw new Error('D1 must not be written in Neon mode') },
+    }
+
+    const result = await createContent(
+      d1 as never,
+      'user_123',
+      { contentType: 'post', title: 'Neon post', bodyRef: 'body:neon-post', mediaRefs: [], coverRef: null },
+      'neon-create-key',
+      new Date(nowMs),
+      'neon-create-test',
+      undefined,
+      store,
+    )
+
+    expect(result.id).toBe(encodeContentSnowflakeId(nowMs, 1))
+    expect(created?.content.id).toBe(result.id)
+    expect(created?.revision.contentId).toBe(result.id)
+    expect(created?.operationId).toBe('createContent')
+    expect(created?.requestHash).toMatch(/^[a-f0-9]{64}$/)
+  })
+
   it('loads idempotency state from PostgreSQL and maps database timestamps', async () => {
     const fake = fixture()
     const store = createPostgresContentCreateStore(fake.database)
