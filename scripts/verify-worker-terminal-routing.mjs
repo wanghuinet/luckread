@@ -80,7 +80,7 @@ if (service(w03, 'W01') || service(w06, 'W01')) {
   throw new Error('Business Worker must not bind back to W01 by default')
 }
 if ((w03.d1_databases ?? []).length !== 0 || w03.vars?.W03_CONTENT_READ_DRIVER !== 'neon' ||
-    !(w03.hyperdrive ?? []).some((x) => x.binding === 'HYPERDRIVE_D1_02' && x.id === 'c55183e1cc3446409c9c1075832c6615')) {
+    !(w03.hyperdrive ?? []).some((x) => x.binding === 'HYPERDRIVE_CONTENT_PG' && x.id === 'c55183e1cc3446409c9c1075832c6615')) {
   throw new Error('W03 content authority must use the existing Neon D1-02 Hyperdrive with no D1 binding')
 }
 
