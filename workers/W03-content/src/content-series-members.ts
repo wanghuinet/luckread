@@ -67,6 +67,32 @@ export interface SeriesMemberAttachStore {
   }>): Promise<void>
 }
 
+export interface SeriesMemberRemoveStore {
+  loadMutation(
+    ownerUserId: string,
+    seriesId: string,
+    contentId: string,
+    operationId: string,
+    idempotencyKey: string,
+  ): Promise<SeriesMemberMutationRow | null>
+  remove(input: Readonly<{
+    ownerUserId: string
+    operationId: string
+    idempotencyKey: string
+    requestHash: string
+    responseJson: string
+    nowIso: string
+    expiresAt: string
+    seriesId: string
+    contentId: string
+    relationshipId: string
+    nextVersion: number
+    seriesEtag: string
+    expectedVersion: number
+    expectedEtag: string
+  }>): Promise<void>
+}
+
 interface IdempotencyRow {
   idem_id: string | null
   idem_owner_user_id: string | null
@@ -569,6 +595,7 @@ export async function removeSeriesMember(
   ifMatch: string,
   idempotencyKey: string,
   now = new Date(),
+  mutationStore?: SeriesMemberRemoveStore,
 ): Promise<{ member: SeriesMemberRecord; seriesVersion: number; seriesEtag: string }> {
   assertResourceId(ownerUserId)
   assertResourceId(seriesId)
@@ -581,7 +608,9 @@ export async function removeSeriesMember(
     contentId,
     ifMatch: normalizeEtag(ifMatch),
   })
-  const row = await loadMutation(db, ownerUserId, seriesId, contentId, operationId, idempotencyKey)
+  const row = mutationStore
+    ? await mutationStore.loadMutation(ownerUserId, seriesId, contentId, operationId, idempotencyKey)
+    : await loadMutation(db, ownerUserId, seriesId, contentId, operationId, idempotencyKey)
   if (!row) throw new ContentRuntimeError('NOT_FOUND', 404)
 
   const replay = inspectIdempotency(row, ownerUserId, hash, now)
@@ -614,19 +643,38 @@ export async function removeSeriesMember(
   const response = { member, seriesVersion: nextVersion, seriesEtag }
   const expiresAt = new Date(now.getTime() + IDEMPOTENCY_TTL_MS).toISOString()
 
-  await batchMutation(db, [
-    expireIdempotency(db, ownerUserId, operationId, idempotencyKey, nowIso),
-    insertIdempotency(db, ownerUserId, operationId, idempotencyKey, hash, 200, JSON.stringify(response), nowIso, expiresAt),
-    db.prepare(
-      'UPDATE content_series SET version = ?, etag = ?, updated_at = ? ' +
-      'WHERE id = ? AND owner_user_id = ? AND version = ? AND etag = ?',
-    ).bind(nextVersion, seriesEtag, nowIso, seriesId, ownerUserId, row.series_version, row.series_etag),
-    atomicGuard(db),
-    db.prepare(
-      "UPDATE content_relationships SET status = 'REVOKED', updated_at = ? WHERE relationship_id = ? AND status = 'ACTIVE'",
-    ).bind(nowIso, row.membership_relationship_id),
-    atomicGuard(db),
-  ])
+  if (mutationStore) {
+    await mutationStore.remove({
+      ownerUserId,
+      operationId,
+      idempotencyKey,
+      requestHash: hash,
+      responseJson: JSON.stringify(response),
+      nowIso,
+      expiresAt,
+      seriesId,
+      contentId,
+      relationshipId: row.membership_relationship_id,
+      nextVersion,
+      seriesEtag,
+      expectedVersion: row.series_version,
+      expectedEtag: row.series_etag,
+    })
+  } else {
+    await batchMutation(db, [
+      expireIdempotency(db, ownerUserId, operationId, idempotencyKey, nowIso),
+      insertIdempotency(db, ownerUserId, operationId, idempotencyKey, hash, 200, JSON.stringify(response), nowIso, expiresAt),
+      db.prepare(
+        'UPDATE content_series SET version = ?, etag = ?, updated_at = ? ' +
+        'WHERE id = ? AND owner_user_id = ? AND version = ? AND etag = ?',
+      ).bind(nextVersion, seriesEtag, nowIso, seriesId, ownerUserId, row.series_version, row.series_etag),
+      atomicGuard(db),
+      db.prepare(
+        "UPDATE content_relationships SET status = 'REVOKED', updated_at = ? WHERE relationship_id = ? AND status = 'ACTIVE'",
+      ).bind(nowIso, row.membership_relationship_id),
+      atomicGuard(db),
+    ])
+  }
 
   return response
 }
