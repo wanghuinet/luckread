@@ -265,6 +265,11 @@ export interface ContentMutationStore {
     nextVersion: number
     nextEtag: string
   }>): Promise<void>
+  listDueScheduled(now: string, limit: number): Promise<DueScheduledContentCandidate[]>
+  publishScheduled(
+    candidates: readonly AuthorizedScheduledPublishCandidate[],
+    now: string,
+  ): Promise<number>
 }
 
 interface ContentWithIdempotencyRow extends ContentRow, IdempotencyRow {}
@@ -2148,11 +2153,13 @@ export async function listDueScheduledContentCandidates(
   db: ContentD1,
   now = new Date(),
   limit = 50,
+  mutationStore?: ContentMutationStore,
 ): Promise<DueScheduledContentCandidate[]> {
   if (!Number.isSafeInteger(limit) || limit < 1 || limit > 50) {
     throw new ContentRuntimeError('VALIDATION_FAILED', 400)
   }
   const nowIso = now.toISOString()
+  if (mutationStore) return mutationStore.listDueScheduled(nowIso, limit)
   const rows = await db.prepare(
     `SELECT id, owner_user_id, creator_id, version, scheduled_at
        FROM contents
@@ -2179,6 +2186,7 @@ export async function publishAuthorizedScheduledContents(
   db: ContentD1,
   candidatesValue: unknown,
   now = new Date(),
+  mutationStore?: ContentMutationStore,
 ): Promise<{ scanned: number; authorized: number; published: number; rejected: number }> {
   if (!Array.isArray(candidatesValue) || candidatesValue.length > 50) {
     throw new ContentRuntimeError('VALIDATION_FAILED', 400)
@@ -2186,6 +2194,7 @@ export async function publishAuthorizedScheduledContents(
 
   const nowIso = now.toISOString()
   const statements: D1PreparedStatement[] = []
+  const authorizedCandidates: AuthorizedScheduledPublishCandidate[] = []
   let authorized = 0
   let rejected = 0
 
@@ -2233,33 +2242,49 @@ export async function publishAuthorizedScheduledContents(
     }
 
     authorized++
-    const nextVersion = Number(version) + 1
-    statements.push(db.prepare(
-      `UPDATE contents
-          SET state = 'PUBLISHED', scheduled_at = NULL, creator_id = ?, version = ?, etag = ?, updated_at = ?
-        WHERE id = ?
-          AND owner_user_id = ?
-          AND creator_id IS ?
-          AND state = 'SCHEDULED'
-          AND scheduled_at = ?
-          AND scheduled_at <= ?
-          AND version = ?`,
-    ).bind(
-      creatorId,
-      nextVersion,
-      etagForVersion(nextVersion),
-      nowIso,
-      contentId,
-      ownerUserId,
-      candidate.expectedCreatorId,
-      scheduledAt,
-      nowIso,
-      version,
-    ))
+    const accepted: AuthorizedScheduledPublishCandidate = {
+      contentId: contentId as string,
+      ownerUserId: ownerUserId as string,
+      expectedCreatorId: candidate.expectedCreatorId as string | null,
+      creatorId: creatorId as string,
+      version: Number(version),
+      scheduledAt: scheduledAt as string,
+      authorization: authorization as unknown as ScheduledPublishAuthorization,
+    }
+    authorizedCandidates.push(accepted)
+    if (!mutationStore) {
+      const nextVersion = Number(version) + 1
+      statements.push(db.prepare(
+        `UPDATE contents
+            SET state = 'PUBLISHED', scheduled_at = NULL, creator_id = ?, version = ?, etag = ?, updated_at = ?
+          WHERE id = ?
+            AND owner_user_id = ?
+            AND creator_id IS ?
+            AND state = 'SCHEDULED'
+            AND scheduled_at = ?
+            AND scheduled_at <= ?
+            AND version = ?`,
+      ).bind(
+        creatorId,
+        nextVersion,
+        etagForVersion(nextVersion),
+        nowIso,
+        contentId,
+        ownerUserId,
+        candidate.expectedCreatorId,
+        scheduledAt,
+        nowIso,
+        version,
+      ))
+    }
   }
 
-  if (statements.length === 0) {
+  if (authorizedCandidates.length === 0) {
     return { scanned: candidatesValue.length, authorized, published: 0, rejected }
+  }
+  if (mutationStore) {
+    const published = await mutationStore.publishScheduled(authorizedCandidates, nowIso)
+    return { scanned: candidatesValue.length, authorized, published, rejected }
   }
 
   const results = await db.batch(statements)
