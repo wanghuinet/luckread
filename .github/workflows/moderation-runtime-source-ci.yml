@@ -8,6 +8,8 @@ on:
       - 'workers/W01-payload/src/moderation/**'
       - 'workers/W01-payload/wrangler.jsonc'
       - 'workers/W06-governance/src/**'
+      - 'workers/W09-platform/src/audit-event-postgres-adapter.ts'
+      - 'workers/W09-platform/src/audit-event-postgres-adapter.test.ts'
       - '.github/workflows/report-appeal-d1-03-migration.yml'
       - 'workers/W01-payload/tests/int/content-detail.int.spec.ts'
       - 'workers/W01-payload/tests/int/social-report-v1-adapter.int.spec.ts'
@@ -76,7 +78,7 @@ jobs:
         run: npx --yes wrangler@4.116.0 deploy --dry-run --config wrangler.jsonc --compatibility-flags nodejs_compat
 
       - name: Typecheck W06 moderation runtime
-        run: npx tsc --noEmit --target ES2022 --module ESNext --moduleResolution Bundler --strict --skipLibCheck --types @cloudflare/workers-types workers/W06-governance/src/moderation-runtime.ts workers/W06-governance/src/moderation-queue-read-store-postgres.ts workers/W06-governance/src/neon-postgres-d1-database.ts workers/W06-governance/src/neon-postgres-d1-database.test.ts workers/W06-governance/src/neon/moderation-database-runtime.ts workers/W06-governance/src/neon/moderation-database-runtime.test.ts workers/W06-governance/src/index.ts
+        run: npx tsc --noEmit --target ES2022 --module ESNext --moduleResolution Bundler --strict --skipLibCheck --types @cloudflare/workers-types workers/W06-governance/src/moderation-runtime.ts workers/W06-governance/src/moderation-queue-read-store-postgres.ts workers/W06-governance/src/neon-postgres-d1-database.ts workers/W06-governance/src/neon-postgres-d1-database.test.ts workers/W09-platform/src/audit-event-postgres-adapter.ts workers/W09-platform/src/audit-event-postgres-adapter.test.ts workers/W06-governance/src/neon/moderation-database-runtime.ts workers/W06-governance/src/neon/moderation-database-runtime.test.ts workers/W06-governance/src/index.ts
 
       - name: Typecheck W03 moderation boundary
         run: npx tsc --noEmit --target ES2022 --module ESNext --moduleResolution Bundler --strict --skipLibCheck --types @cloudflare/workers-types workers/W03-content/src/content-runtime.ts workers/W03-content/src/index.ts
@@ -96,7 +98,7 @@ jobs:
         run: pnpm exec tsc --noEmit --project tsconfig.json --pretty false
 
       - name: Run W06 moderation tests
-        run: npx vitest@3.2.4 run workers/W06-governance/src/moderation-runtime.test.ts workers/W06-governance/src/neon-postgres-d1-database.test.ts workers/W06-governance/src/neon/moderation-database-runtime.test.ts workers/W06-governance/src/d1-traffic-guard.test.ts
+        run: npx vitest@3.2.4 run workers/W06-governance/src/moderation-runtime.test.ts workers/W06-governance/src/neon-postgres-d1-database.test.ts workers/W09-platform/src/audit-event-postgres-adapter.test.ts workers/W06-governance/src/neon/moderation-database-runtime.test.ts workers/W06-governance/src/d1-traffic-guard.test.ts
 
       - name: Validate migration locally
         working-directory: workers/W06-governance
