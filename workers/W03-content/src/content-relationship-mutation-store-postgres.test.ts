@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
 import { ContentRuntimeError } from './content-runtime.js'
-import type { ContentRelationship } from './content-relationships.js'
+import {
+  createContentRelationship,
+  revokeContentRelationship,
+  type ContentRelationship,
+  type ContentRelationshipMutationStore,
+} from './content-relationships.js'
 import {
   createPostgresContentRelationshipMutationStore,
   type ContentRelationshipPostgresDatabase,
@@ -218,6 +223,92 @@ describe('W03 Neon content relationship mutation store', () => {
       nowIso, relationship.relationshipId, relationship.sourceId,
     ])
     expect(fake.released()).toBe(true)
+  })
+
+  it('routes reference create and revoke through Neon without issuing D1 statements', async () => {
+    const createSnapshot = {
+      ...createRow,
+      source_id: 'content_source',
+      owner_user_id: 'user_123',
+      target_id: 'content_target',
+      active_relationship_id: null,
+    }
+    const revokeSnapshot = {
+      relationship_id: relationship.relationshipId,
+      source_type: 'content' as const,
+      source_id: relationship.sourceId,
+      target_type: 'content' as const,
+      target_id: relationship.targetId,
+      relation_type: 'reference' as const,
+      schema_version: 1,
+      status: 'ACTIVE' as const,
+      actor_id: 'user_123',
+      provenance_ref: relationship.provenanceRef,
+      authorization_ref: relationship.authorizationRef,
+      created_at: nowIso,
+      updated_at: nowIso,
+      owner_user_id: 'user_123',
+      idem_id: null,
+      idem_owner_user_id: null,
+      idem_request_hash: null,
+      idem_status: null,
+      idem_response_json: null,
+      idem_expires_at: null,
+    }
+    let createInput: Parameters<ContentRelationshipMutationStore['create']>[0] | undefined
+    let revokeInput: Parameters<ContentRelationshipMutationStore['revoke']>[0] | undefined
+    const store: ContentRelationshipMutationStore = {
+      async loadCreate(input) {
+        expect(input.sourceContentId).toBe('content_source')
+        return createSnapshot
+      },
+      async create(input) { createInput = input },
+      async loadRevoke(input) {
+        expect(input.relationshipId).toBe(relationship.relationshipId)
+        return revokeSnapshot
+      },
+      async revoke(input) { revokeInput = input },
+    }
+    const d1 = {
+      prepare() { throw new Error('D1 must not be queried in Neon mode') },
+      batch() { throw new Error('D1 must not be written in Neon mode') },
+    }
+
+    const created = await createContentRelationship(
+      d1 as never,
+      'user_123',
+      'content_source',
+      {
+        targetContentId: 'content_target',
+        relationType: 'reference',
+        provenanceRef: 'source citation',
+        authorizationRef: 'authorization evidence',
+      },
+      'neon-create-reference-key',
+      now,
+      store,
+    )
+    const revoked = await revokeContentRelationship(
+      d1 as never,
+      'user_123',
+      'content_source',
+      relationship.relationshipId,
+      'neon-revoke-reference-key',
+      now,
+      store,
+    )
+
+    expect(created).toMatchObject({
+      sourceId: 'content_source',
+      targetId: 'content_target',
+      relationType: 'reference',
+      status: 'ACTIVE',
+    })
+    expect(createInput?.relationship).toEqual(created)
+    expect(createInput?.responseJson).toBe(JSON.stringify(created))
+    expect(revoked).toMatchObject({ relationshipId: created.relationshipId, status: 'REVOKED' })
+    expect(revokeInput?.sourceContentId).toBe('content_source')
+    expect(revokeInput?.responseJson).toBe(JSON.stringify(revoked))
   })
 
   it('maps concurrent active-reference uniqueness conflicts to the existing 409 contract', async () => {
