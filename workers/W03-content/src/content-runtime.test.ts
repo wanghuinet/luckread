@@ -2596,26 +2596,21 @@ describe('1.1 content lifecycle idempotency', () => {
 
 describe('W03 username redirect eligibility', () => {
   it('uses only W03-owned published public content and accepts only the W01 service caller', async () => {
-    let query = ''
-    let bindings: unknown[] = []
-    let row: { id: string } | null = { id: 'public_post_1' }
-    let databaseReads = 0
+    let eligibleValue = true
+    const contextCalls: string[] = []
     const allowLimiter = { limit: async () => ({ success: true }) }
+    const neonWorker = createW03ContentWorker({
+      contentContextReadStoreProvider: () => ({
+        hasPublicCreatorContent: async (ownerUserId: string) => {
+          contextCalls.push(ownerUserId)
+          return eligibleValue
+        },
+      } as never),
+    })
     const env = {
       CONTENT_ORIGIN_GLOBAL_LIMITER: allowLimiter,
       CONTENT_PUBLIC_READ_LIMITER: allowLimiter,
       CONTENT_MUTATION_LIMITER: allowLimiter,
-      D1_02: {
-        prepare(sql: string) {
-          query = sql
-          return {
-            bind(...values: unknown[]) {
-              bindings = values
-              return { first: async () => { databaseReads += 1; return row } }
-            },
-          }
-        },
-      },
     } as never
     const request = (caller = 'W01', owner = 'user_123', extra: Record<string, string> = {}) =>
       new Request('https://luckread-w03.internal/internal/content/username-redirect-eligibility/' + owner, {
@@ -2626,24 +2621,19 @@ describe('W03 username redirect eligibility', () => {
           ...extra,
         },
       })
-    const eligible = await w03Worker.fetch(request(), env, {} as never)
-    expect(eligible.status).toBe(200)
-    await expect(eligible.json()).resolves.toMatchObject({ data: { eligible: true } })
-    expect(bindings).toEqual(['user_123'])
-    expect(query).toContain('owner_user_id = ?')
-    expect(query).toContain("state = 'PUBLISHED'")
-    expect(query).toContain("content_type IN ('article', 'post', 'video')")
-    expect(query).toContain("COALESCE(access_mode, 'PUBLIC') = 'PUBLIC'")
-    row = null
-    const empty = await w03Worker.fetch(request(), env, {} as never)
+    const response = await neonWorker.fetch(request(), env, {} as never)
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({ data: { eligible: true } })
+    expect(contextCalls).toEqual(['user_123'])
+    eligibleValue = false
+    const empty = await neonWorker.fetch(request(), env, {} as never)
     await expect(empty.json()).resolves.toMatchObject({ data: { eligible: false } })
-    const readsBeforeReject = databaseReads
-    const wrongCaller = await w03Worker.fetch(request('W05'), env, {} as never)
+    const readsBeforeReject = contextCalls.length
+    const wrongCaller = await neonWorker.fetch(request('W05'), env, {} as never)
     expect(wrongCaller.status).toBe(403)
-    expect(databaseReads).toBe(readsBeforeReject)
-    const forwardedCookie = await w03Worker.fetch(request('W01', 'user_123', { Cookie: 'session=secret' }), env, {} as never)
+    const forwardedCookie = await neonWorker.fetch(request('W01', 'user_123', { Cookie: 'session=secret' }), env, {} as never)
     expect(forwardedCookie.status).toBe(403)
-    expect(databaseReads).toBe(readsBeforeReject)
+    expect(contextCalls).toHaveLength(readsBeforeReject)
   })
 
   it('exposes published owner identity only through the W01 internal author context', async () => {
@@ -2668,27 +2658,28 @@ describe('W03 username redirect eligibility', () => {
       updated_at: '2026-11-01T00:00:00.000Z',
     }
     let row: typeof contentRow | null = { ...contentRow }
-    let query = ''
-    let bindings: unknown[] = []
-    let databaseReads = 0
+    let contextReads = 0
+    let detailReads = 0
     const allowLimiter = { limit: async () => ({ success: true }) }
-    const env = {
-      D1_02: {
-        prepare(sql: string) {
-          query = sql
-          return {
-            bind(...values: unknown[]) {
-              bindings = values
-              return {
-                first: async () => {
-                  databaseReads += 1
-                  return row ? { ...row } : null
-                },
-              }
-            },
-          }
+    const neonWorker = createW03ContentWorker({
+      contentContextReadStoreProvider: () => ({
+        getPublishedContentAuthorContext: async (reference: string) => {
+          contextReads += 1
+          if (!row) throw new ContentRuntimeError('NOT_FOUND', 404)
+          expect(reference).toBe('content_public_123')
+          return { contentId: row.id, ownerUserId: row.owner_user_id }
         },
-      },
+      } as never),
+      contentDetailReadStoreProvider: () => ({
+        getContent: async (reference: string, principalUserId: string | null) => {
+          detailReads += 1
+          expect(reference).toBe('content_public_123')
+          expect(principalUserId).toBeNull()
+          return row
+        },
+      } as never),
+    })
+    const env = {
       CONTENT_ORIGIN_GLOBAL_LIMITER: allowLimiter,
       CONTENT_PUBLIC_READ_LIMITER: allowLimiter,
       CONTENT_MUTATION_LIMITER: allowLimiter,
@@ -2710,54 +2701,37 @@ describe('W03 username redirect eligibility', () => {
     })
 
     const authorPath = '/internal/content/contents/content_public_123/public-author-context'
-    const authorResponse = await w03Worker.fetch(makeRequest(authorPath), env, {} as never)
+    const authorResponse = await neonWorker.fetch(makeRequest(authorPath), env, {} as never)
     expect(authorResponse.status).toBe(200)
     await expect(authorResponse.json()).resolves.toMatchObject({
-      data: {
-        contentId: 'content_public_123',
-        ownerUserId: 'w02-user-123',
-      },
+      data: { contentId: 'content_public_123', ownerUserId: 'w02-user-123' },
     })
-    expect(query).toContain("state = 'PUBLISHED'")
-    expect(bindings).toEqual(['content_public_123', 'content_public_123'])
-    expect(databaseReads).toBe(1)
+    expect(contextReads).toBe(1)
 
-    const publicDetail = await w03Worker.fetch(
-      makeRequest('/internal/content/contents/content_public_123'),
-      env,
-      {} as never,
-    )
+    const publicDetail = await neonWorker.fetch(makeRequest('/internal/content/contents/content_public_123'), env, {} as never)
     expect(publicDetail.status).toBe(200)
     const publicDetailBody = await publicDetail.json() as Record<string, unknown>
     expect(publicDetailBody).not.toHaveProperty('ownerUserId')
-    expect(databaseReads).toBe(2)
+    expect(detailReads).toBe(1)
 
-    const readsBeforeReject = databaseReads
-    const wrongCaller = await w03Worker.fetch(makeRequest(authorPath, 'W05'), env, {} as never)
+    const readsBeforeReject = contextReads
+    const wrongCaller = await neonWorker.fetch(makeRequest(authorPath, 'W05'), env, {} as never)
     expect(wrongCaller.status).toBe(403)
-    const forwardedCookie = await w03Worker.fetch(
-      makeRequest(authorPath, 'W01', 'GET', { Cookie: 'session=must-not-cross-service-binding' }),
-      env,
-      {} as never,
-    )
+    const forwardedCookie = await neonWorker.fetch(
+      makeRequest(authorPath, 'W01', 'GET', { Cookie: 'session=must-not-cross-service-binding' }), env, {} as never)
     expect(forwardedCookie.status).toBe(403)
-    const forwardedPrincipal = await w03Worker.fetch(
-      makeRequest(authorPath, 'W01', 'GET', { 'X-LuckRead-Principal-User-Id': 'spoofed-user' }),
-      env,
-      {} as never,
-    )
+    const forwardedPrincipal = await neonWorker.fetch(
+      makeRequest(authorPath, 'W01', 'GET', { 'X-LuckRead-Principal-User-Id': 'spoofed-user' }), env, {} as never)
     expect(forwardedPrincipal.status).toBe(403)
-    const wrongMethod = await w03Worker.fetch(makeRequest(authorPath, 'W01', 'POST'), env, {} as never)
+    const wrongMethod = await neonWorker.fetch(makeRequest(authorPath, 'W01', 'POST'), env, {} as never)
     expect(wrongMethod.status).toBe(405)
-    expect(databaseReads).toBe(readsBeforeReject)
+    expect(contextReads).toBe(readsBeforeReject)
 
     row = null
-    const unpublishedOrMissing = await w03Worker.fetch(makeRequest(authorPath), env, {} as never)
+    const unpublishedOrMissing = await neonWorker.fetch(makeRequest(authorPath), env, {} as never)
     expect(unpublishedOrMissing.status).toBe(404)
   })
-
 })
-
 
 describe('creator-selected sensitive media warning', () => {
   const base = {
