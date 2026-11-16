@@ -81,7 +81,7 @@ if (service(w03, 'W01') || service(w06, 'W01')) {
 }
 if ((w03.d1_databases ?? []).length !== 0 || w03.vars?.W03_CONTENT_READ_DRIVER !== 'neon' ||
     !(w03.hyperdrive ?? []).some((x) => x.binding === 'HYPERDRIVE_CONTENT_PG' && x.id === 'c55183e1cc3446409c9c1075832c6615')) {
-  throw new Error('W03 content authority must use the existing Neon D1-02 Hyperdrive with no D1 binding')
+  throw new Error('W03 content authority must use the existing PostgreSQL Hyperdrive with no D1 binding')
 }
 
 console.log('WORKER_TERMINAL_ROUTING=PASS')
