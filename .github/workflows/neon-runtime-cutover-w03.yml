@@ -119,18 +119,23 @@ jobs:
               throw new Error('W03 Neon provider wiring is incomplete: ' + provider)
             }
           }
-          if (!runtime.includes('Content creation, update, delete, owner-authorized state transitions, and scheduled publication candidate reads/commits plus Collection creation, update, delete, member attachment, member removal, and member reorder plus Series creation, update, delete, member attachment, and member removal are the only Neon-backed mutations in these slices; all other W03 reads and mutations remain on D1_02')) {
+          if (!runtime.includes('Content creation, update, delete, owner-authorized state transitions, W06 moderation decisions, and scheduled publication candidate reads/commits plus Collection creation, update, delete, member attachment, member removal, and member reorder plus Series creation, update, delete, member attachment, and member removal are the only Neon-backed mutations in these slices; all other W03 reads and mutations remain on D1_02')) {
             throw new Error('W03 Neon mutation boundary declaration is missing')
           }
           if (!contentRuntime.includes('mutationStore.transition({') ||
               !router.includes('dependencies.contentMutationStoreProvider?.(env),')) {
             throw new Error('W03 Neon owner-authorized content state transition wiring is incomplete')
           }
+          if (!contentRuntime.includes('mutationStore.moderationTransition({') ||
+              !router.includes('applyModerationContentTransition(env.D1_02')) {
+            throw new Error('W03 Neon W06 moderation transition wiring is incomplete')
+          }
           if (!contentRuntime.includes('mutationStore.listDueScheduled(nowIso, limit)') ||
               !contentRuntime.includes('mutationStore.publishScheduled(authorizedCandidates, nowIso)')) {
             throw new Error('W03 Neon scheduled publication read/commit wiring is incomplete')
           }
           console.log('W03_NEON_SCHEDULED_PUBLICATION_CUTOVER=PASS')
+          console.log('W03_NEON_MODERATION_TRANSITION_CUTOVER=PASS')
           console.log('W03_NEON_CONTENT_STATE_TRANSITION_CUTOVER=PASS')
           console.log('W03_NEON_READ_PROJECTION_CUTOVER_CONFIG=PASS')
           NODE
