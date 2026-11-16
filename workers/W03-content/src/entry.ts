@@ -7,6 +7,7 @@ import {
   getW03ContentContextReadStore,
   getW03CollectionListReadStore,
   getW03CollectionCreateStore,
+  getW03ContentCreateStore,
   getW03CollectionUpdateStore,
   getW03CollectionDeleteStore,
   getW03SeriesReadStore,
@@ -28,6 +29,8 @@ import {
  * Workers' contract/type checks do not need W03 runtime dependencies installed.
  */
 export default createW03ContentWorker({
+  contentCreateStoreProvider: (env) =>
+    getW03ContentCreateStore(env),
   publishedMediaReferenceReadStoreProvider: (env) =>
     getW03PublishedMediaReferenceReadStore(env),
   publishedContentsByIdsReadStoreProvider: (env) =>
