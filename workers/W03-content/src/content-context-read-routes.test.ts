@@ -51,16 +51,7 @@ function fixture() {
   const worker = createW03ContentWorker({
     contentContextReadStoreProvider: () => store,
   })
-  const env = {
-    D1_02: {
-      prepare() {
-        throw new Error('D1 must not be queried when a Neon context store is selected')
-      },
-      batch() {
-        throw new Error('D1 must not be queried when a Neon context store is selected')
-      },
-    },
-  }
+  const env = {}
   return { store, worker, env }
 }
 
