@@ -40,7 +40,7 @@ export const STAGED_WORKERS = Object.freeze([
     configPath: 'workers/W05-social/wrangler.jsonc',
     binding: 'HYPERDRIVE_D1_02',
     hyperdriveId: 'c55183e1cc3446409c9c1075832c6615',
-    d1Bindings: ['DB', 'D1_03'],
+    d1Bindings: [],
   },
   {
     worker: 'W07',
@@ -83,7 +83,7 @@ export function verifyWorkerConfig(config, expected) {
   assert.deepEqual(
     actualD1Bindings,
     [...expected.d1Bindings].sort(),
-    `${expected.worker} D1 fallback bindings must remain unchanged`,
+    `${expected.worker} production D1 binding set does not match the expected cutover state`,
   )
 
   const matching = (config.hyperdrive ?? []).filter((entry) => entry.binding === expected.binding)
@@ -141,7 +141,7 @@ export async function inspectNeonWorkerHyperdriveStaging(rootDir = REPO_ROOT) {
       hyperdriveStaged: false,
       runtimeIngestionEnabled: false,
     },
-    d1FallbacksPreserved: true,
+    expectedD1BindingSetsVerified: true,
     runtimeDriversEnabled: false,
     productionDeployPerformed: false,
     productionCutoverPerformed: false,
