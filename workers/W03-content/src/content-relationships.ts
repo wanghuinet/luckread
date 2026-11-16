@@ -822,73 +822,73 @@ export async function appendPostThreadNext(
     })
   } else {
     await relationshipMutationBatch(db, [
-    db.prepare(
-      'DELETE FROM content_mutation_idempotency WHERE owner_user_id = ? AND operation_id = ? AND idempotency_key = ? AND expires_at <= ?',
-    ).bind(ownerUserId, operationId, idempotencyKey, createdAt),
-    db.prepare(`
-      INSERT INTO content_mutation_idempotency
-        (id, owner_user_id, operation_id, idempotency_key, request_hash, status, response_status, response_json, created_at, expires_at)
-      VALUES (?, ?, ?, ?, ?, 'COMPLETED', 201, ?, ?, ?)
-    `).bind(
-      crypto.randomUUID(), ownerUserId, operationId, idempotencyKey, hash,
-      JSON.stringify(relationship), createdAt, expiresAt,
-    ),
-    db.prepare(`
-      WITH RECURSIVE
-        descendants(id, depth, visited) AS (
-          SELECT ?, 0, '|' || ? || '|'
-          UNION ALL
-          SELECT r.target_id, d.depth + 1, d.visited || r.target_id || '|'
-            FROM descendants d
-            JOIN content_relationships r
-              ON r.source_id = d.id
-             AND r.relation_type = 'thread-next'
-             AND r.status = 'ACTIVE'
-           WHERE d.depth < ?
-             AND instr(d.visited, '|' || r.target_id || '|') = 0
-        ),
-        ancestors(id, depth, visited) AS (
-          SELECT ?, 0, '|' || ? || '|'
-          UNION ALL
-          SELECT r.source_id, a.depth + 1, a.visited || r.source_id || '|'
-            FROM ancestors a
-            JOIN content_relationships r
-              ON r.target_id = a.id
-             AND r.relation_type = 'thread-next'
-             AND r.status = 'ACTIVE'
-           WHERE a.depth < ?
-             AND instr(a.visited, '|' || r.source_id || '|') = 0
-        )
-      INSERT INTO content_relationships
-        (relationship_id, source_type, source_id, target_type, target_id, relation_type,
-         position, schema_version, status, actor_id, provenance_ref, authorization_ref, created_at, updated_at)
-      SELECT ?, 'content', s.id, 'content', t.id, 'thread-next',
-             NULL, 1, 'ACTIVE', ?, NULL, NULL, ?, ?
-        FROM contents s
-        JOIN contents t ON t.id = ?
-       WHERE s.id = ? AND s.owner_user_id = ? AND t.owner_user_id = ?
-         AND s.content_type = 'post' AND t.content_type = 'post'
-         AND s.state IN ('DRAFT', 'PUBLISHED') AND t.state IN ('DRAFT', 'PUBLISHED')
-         AND s.access_mode = 'PUBLIC' AND t.access_mode = 'PUBLIC'
-         AND NOT EXISTS (
-           SELECT 1 FROM content_relationships r
-            WHERE r.source_id = s.id AND r.relation_type = 'thread-next' AND r.status = 'ACTIVE'
-         )
-         AND NOT EXISTS (
-           SELECT 1 FROM content_relationships r
-            WHERE r.target_id = t.id AND r.relation_type = 'thread-next' AND r.status = 'ACTIVE'
-         )
-         AND NOT EXISTS (SELECT 1 FROM descendants WHERE id = s.id)
-         AND (SELECT COUNT(*) FROM descendants) +
-             (SELECT COUNT(*) FROM ancestors) <= ?
-    `).bind(
-      targetContentId, targetContentId, MAX_POST_THREAD_ITEMS,
-      sourceContentId, sourceContentId, MAX_POST_THREAD_ITEMS,
-      relationship.relationshipId, ownerUserId, createdAt, createdAt,
-      targetContentId, sourceContentId, ownerUserId, ownerUserId,
-      MAX_POST_THREAD_ITEMS,
-    ),
-    db.prepare('INSERT OR REPLACE INTO content_txn_guard(id, successful) VALUES (1, changes())'),
+      db.prepare(
+        'DELETE FROM content_mutation_idempotency WHERE owner_user_id = ? AND operation_id = ? AND idempotency_key = ? AND expires_at <= ?',
+      ).bind(ownerUserId, operationId, idempotencyKey, createdAt),
+      db.prepare(`
+        INSERT INTO content_mutation_idempotency
+          (id, owner_user_id, operation_id, idempotency_key, request_hash, status, response_status, response_json, created_at, expires_at)
+        VALUES (?, ?, ?, ?, ?, 'COMPLETED', 201, ?, ?, ?)
+      `).bind(
+        crypto.randomUUID(), ownerUserId, operationId, idempotencyKey, hash,
+        JSON.stringify(relationship), createdAt, expiresAt,
+      ),
+      db.prepare(`
+        WITH RECURSIVE
+          descendants(id, depth, visited) AS (
+            SELECT ?, 0, '|' || ? || '|'
+            UNION ALL
+            SELECT r.target_id, d.depth + 1, d.visited || r.target_id || '|'
+              FROM descendants d
+              JOIN content_relationships r
+                ON r.source_id = d.id
+               AND r.relation_type = 'thread-next'
+               AND r.status = 'ACTIVE'
+             WHERE d.depth < ?
+               AND instr(d.visited, '|' || r.target_id || '|') = 0
+          ),
+          ancestors(id, depth, visited) AS (
+            SELECT ?, 0, '|' || ? || '|'
+            UNION ALL
+            SELECT r.source_id, a.depth + 1, a.visited || r.source_id || '|'
+              FROM ancestors a
+              JOIN content_relationships r
+                ON r.target_id = a.id
+               AND r.relation_type = 'thread-next'
+               AND r.status = 'ACTIVE'
+             WHERE a.depth < ?
+               AND instr(a.visited, '|' || r.source_id || '|') = 0
+          )
+        INSERT INTO content_relationships
+          (relationship_id, source_type, source_id, target_type, target_id, relation_type,
+           position, schema_version, status, actor_id, provenance_ref, authorization_ref, created_at, updated_at)
+        SELECT ?, 'content', s.id, 'content', t.id, 'thread-next',
+               NULL, 1, 'ACTIVE', ?, NULL, NULL, ?, ?
+          FROM contents s
+          JOIN contents t ON t.id = ?
+         WHERE s.id = ? AND s.owner_user_id = ? AND t.owner_user_id = ?
+           AND s.content_type = 'post' AND t.content_type = 'post'
+           AND s.state IN ('DRAFT', 'PUBLISHED') AND t.state IN ('DRAFT', 'PUBLISHED')
+           AND s.access_mode = 'PUBLIC' AND t.access_mode = 'PUBLIC'
+           AND NOT EXISTS (
+             SELECT 1 FROM content_relationships r
+              WHERE r.source_id = s.id AND r.relation_type = 'thread-next' AND r.status = 'ACTIVE'
+           )
+           AND NOT EXISTS (
+             SELECT 1 FROM content_relationships r
+              WHERE r.target_id = t.id AND r.relation_type = 'thread-next' AND r.status = 'ACTIVE'
+           )
+           AND NOT EXISTS (SELECT 1 FROM descendants WHERE id = s.id)
+           AND (SELECT COUNT(*) FROM descendants) +
+               (SELECT COUNT(*) FROM ancestors) <= ?
+      `).bind(
+        targetContentId, targetContentId, MAX_POST_THREAD_ITEMS,
+        sourceContentId, sourceContentId, MAX_POST_THREAD_ITEMS,
+        relationship.relationshipId, ownerUserId, createdAt, createdAt,
+        targetContentId, sourceContentId, ownerUserId, ownerUserId,
+        MAX_POST_THREAD_ITEMS,
+      ),
+      db.prepare('INSERT OR REPLACE INTO content_txn_guard(id, successful) VALUES (1, changes())'),
   ]);
   }
 
