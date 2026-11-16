@@ -11,11 +11,13 @@ import {
   verifyWorkerConfig,
 } from './verify-neon-worker-hyperdrive-staging.mjs'
 
-test('all six admitted Worker configs target the matching Neon Hyperdrive and match each expected D1 binding state', async () => {
+test('all six admitted Worker configs target Neon Hyperdrive and match their expected D1 binding state', async () => {
   const result = await inspectNeonWorkerHyperdriveStaging()
   assert.equal(result.status, 'SOURCE_CONFIG_STAGED_ONLY')
   assert.equal(result.stagedWorkerCount, 6)
   assert.equal(result.expectedD1BindingSetsVerified, true)
+  assert.deepEqual(result.workers.find((worker) => worker.worker === 'W03')?.d1FallbackBindings, [])
+  assert.equal(result.workers.find((worker) => worker.worker === 'W03')?.configuredDriver, 'neon')
   assert.deepEqual(result.workers.find((worker) => worker.worker === 'W05')?.d1FallbackBindings, [])
   assert.deepEqual(result.workers.find((worker) => worker.worker === 'W08')?.d1FallbackBindings, [])
   assert.equal(result.runtimeDriversEnabled, false)
