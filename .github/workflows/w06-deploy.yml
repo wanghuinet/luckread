@@ -101,14 +101,14 @@ jobs:
           # endpoint, service binding, or independent deployment. Repository history
           # may contain unrelated changes; authority-sensitive W06 paths are still
           # checked below by source CI and physical binding assertions.
-      - name: Verify W06 Neon D1-03 runtime and preserve existing topology
+      - name: Verify W06 Neon-only database binding and preserve existing topology
         working-directory: workers/W06-governance
         run: |
           set -euo pipefail
           node --input-type=module <<'NODE'
           import fs from 'node:fs'
           const config = JSON.parse(fs.readFileSync('wrangler.neon.jsonc', 'utf8'))
-          const d1 = (config.d1_databases || []).find((item) => item.binding === 'D1_03')
+          if ((config.d1_databases || []).length !== 0) throw new Error('W06 production Neon config must not bind Cloudflare D1')
           const hyperdrive = (config.hyperdrive || []).find((item) => item.binding === 'HYPERDRIVE_D1_03')
           const service = (config.services || []).find((item) => item.binding === 'W03_CONTENT_MODERATION')
           const queue = (config.queues?.consumers || []).find((item) => item.queue === 'luckread-auth013-account-state')
@@ -121,10 +121,6 @@ jobs:
           }
           if (config.vars?.W06_MODERATION_DATABASE_DRIVER !== 'neon') {
             throw new Error('W06 must explicitly select Neon for its admitted D1-03 tables')
-          }
-          if (!d1 || d1.database_name !== 'secondary' ||
-              d1.database_id !== 'bda1d247-a371-4244-91ae-aef96034db7f') {
-            throw new Error('W06 existing D1-03 rollback binding must remain unchanged')
           }
           if (!hyperdrive || hyperdrive.id !== '7c8831416c18494faee04b96aa551cb9') {
             throw new Error('W06 must reuse the existing D1-03 Hyperdrive resource')
@@ -143,7 +139,7 @@ jobs:
             throw new Error('W06 admitted D1-03 Neon schema must be remotely applied before deployment')
           }
           console.log('W06_NEON_D1_03_RUNTIME_CONFIG=PASS')
-          console.log('W06_D1_03_ROLLBACK_BINDING=PRESERVED')
+          console.log('W06_PRODUCTION_D1_BINDINGS=NONE')
           console.log('W06_EXISTING_QUEUE_SERVICE_BINDINGS=PRESERVED')
           console.log('W06_REMOTE_SCHEMA_ADMISSION=PASS')
           NODE
@@ -189,8 +185,7 @@ jobs:
           database_driver=neon
           hyperdrive_binding=HYPERDRIVE_D1_03
           hyperdrive_id=7c8831416c18494faee04b96aa551cb9
-          d1_rollback_binding=D1_03
-          d1_database_uuid=bda1d247-a371-4244-91ae-aef96034db7f
+          d1_bindings=none
           worker_version_id=$W06_UPLOADED_VERSION_ID
           traffic_percent=100
           wrangler_version=4.156.0
