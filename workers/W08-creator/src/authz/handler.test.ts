@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import type { Pool } from 'pg'
 import { handlePermissionCheck } from './handler.js'
 
 type UserFixture = {
@@ -142,5 +143,34 @@ describe('W08 internal CASL permission endpoint', () => {
       resourceAttributes: { visibility: 'public', state: 'published' },
     }, false), env(db, null))
     expect(await response.json()).toMatchObject({ decision: 'ALLOW' })
+  })
+})
+
+
+describe('W08 internal CASL permission endpoint on Neon', () => {
+  it('loads account and effective role facts from the existing Neon database without a D1 binding', async () => {
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes('FROM "user"')) return { rows: [{ accountState: 'ACTIVE' }] }
+      if (sql.includes('FROM role_assignments')) {
+        return { rows: [{ roleId: 'verified_user', scopeType: 'global', scopeId: null }] }
+      }
+      throw new Error('Unexpected authorization query')
+    })
+    const pool = { query } as unknown as Pool
+    const response = await handlePermissionCheck(post({
+      action: 'creator.application.apply',
+      resourceType: 'CreatorApplication',
+      resourceAttributes: { ownerId: 'verified-neon' },
+    }), {
+      W08_DATABASE_DRIVER: 'neon',
+      HYPERDRIVE: { connectionString: 'postgresql://user:secret@hyperdrive.local:5432/luckread' },
+      W02_AUTH: fakeW02({ userId: 'verified-neon', accountState: 'ACTIVE', layer: 'L2' }),
+    }, { getPostgresPool: () => pool })
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({ decision: 'ALLOW', action: 'creator.application.apply' })
+    expect(query).toHaveBeenCalledTimes(2)
+    expect(query.mock.calls[0]?.[0]).toContain('FROM "user"')
+    expect(query.mock.calls[1]?.[0]).toContain('FROM role_assignments')
   })
 })
