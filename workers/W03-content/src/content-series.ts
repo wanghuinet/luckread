@@ -84,6 +84,32 @@ export interface SeriesCreateStore {
   }>): Promise<void>
 }
 
+export interface SeriesMutationSnapshot {
+  series: SeriesRecord | null
+  idempotency: IdempotencyRow | null
+}
+
+export interface SeriesUpdateStore {
+  loadMutation(
+    ownerUserId: string,
+    seriesId: string,
+    operationId: string,
+    idempotencyKey: string,
+  ): Promise<SeriesMutationSnapshot>
+  update(input: Readonly<{
+    ownerUserId: string
+    operationId: string
+    idempotencyKey: string
+    requestHash: string
+    responseJson: string
+    updatedAt: string
+    expiresAt: string
+    series: SeriesRecord
+    expectedVersion: number
+    expectedEtag: string
+  }>): Promise<void>
+}
+
 interface SeriesWithIdempotencyRow extends SeriesRow {
   idem_id: string | null
   idem_owner_user_id: string | null
@@ -467,6 +493,7 @@ export async function updateSeries(
   ifMatch: string,
   idempotencyKey: string,
   now = new Date(),
+  updateStore?: SeriesUpdateStore,
 ): Promise<SeriesRecord> {
   assertResourceId(principalUserId)
   assertResourceId(seriesId)
@@ -478,7 +505,9 @@ export async function updateSeries(
     input: normalized,
     ifMatch: normalizeEtag(ifMatch),
   })
-  const loaded = await loadSeriesMutation(db, principalUserId, seriesId, operationId, idempotencyKey)
+  const loaded = updateStore
+    ? await updateStore.loadMutation(principalUserId, seriesId, operationId, idempotencyKey)
+    : await loadSeriesMutation(db, principalUserId, seriesId, operationId, idempotencyKey)
   const replay = activeIdempotency(loaded.idempotency && {
     idem_id: loaded.idempotency.id,
     idem_owner_user_id: loaded.idempotency.owner_user_id,
@@ -508,18 +537,33 @@ export async function updateSeries(
     updatedAt,
   }
   const expiresAt = new Date(now.getTime() + IDEMPOTENCY_TTL_MS).toISOString()
-  await batchMutation(db, [
-    expireIdempotency(db, principalUserId, operationId, idempotencyKey, updatedAt),
-    insertIdempotency(db, principalUserId, operationId, idempotencyKey, hash, 200, JSON.stringify(updated), updatedAt, expiresAt),
-    db.prepare(
-      'UPDATE content_series SET title = ?, description = ?, cover_ref = ?, version = ?, etag = ?, updated_at = ? ' +
-      'WHERE id = ? AND owner_user_id = ? AND version = ? AND etag = ?',
-    ).bind(
-      updated.title, updated.description, updated.coverRef, updated.version, updated.etag,
-      updatedAt, series.id, principalUserId, series.version, series.etag,
-    ),
-    atomicGuard(db),
-  ])
+  if (updateStore) {
+    await updateStore.update({
+      ownerUserId: principalUserId,
+      operationId,
+      idempotencyKey,
+      requestHash: hash,
+      responseJson: JSON.stringify(updated),
+      updatedAt,
+      expiresAt,
+      series: updated,
+      expectedVersion: series.version,
+      expectedEtag: series.etag,
+    })
+  } else {
+    await batchMutation(db, [
+      expireIdempotency(db, principalUserId, operationId, idempotencyKey, updatedAt),
+      insertIdempotency(db, principalUserId, operationId, idempotencyKey, hash, 200, JSON.stringify(updated), updatedAt, expiresAt),
+      db.prepare(
+        'UPDATE content_series SET title = ?, description = ?, cover_ref = ?, version = ?, etag = ?, updated_at = ? ' +
+        'WHERE id = ? AND owner_user_id = ? AND version = ? AND etag = ?',
+      ).bind(
+        updated.title, updated.description, updated.coverRef, updated.version, updated.etag,
+        updatedAt, series.id, principalUserId, series.version, series.etag,
+      ),
+      atomicGuard(db),
+    ])
+  }
   return updated
 }
 
