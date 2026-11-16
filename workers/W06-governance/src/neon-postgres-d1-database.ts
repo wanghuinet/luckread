@@ -1,5 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import { translateW09AuditEventD1Statement } from '../../W09-platform/src/audit-event-postgres-adapter.js'
+
 export interface W06ModerationPostgresClient {
   query<Row extends Record<string, unknown> = Record<string, unknown>>(
     sql: string,
@@ -61,6 +63,9 @@ function translatePostgresModerationStatement(
   sourceSql: string,
   previousChanges?: number,
 ): Readonly<{ sql: string; extraValues: unknown[] }> {
+  const w09AuditStatement = translateW09AuditEventD1Statement(sourceSql, previousChanges)
+  if (w09AuditStatement) return w09AuditStatement
+
   let sql = sourceSql
   const insertIgnore = /^(\s*)INSERT\s+OR\s+IGNORE\s+INTO\b/i
   if (insertIgnore.test(sql)) {
