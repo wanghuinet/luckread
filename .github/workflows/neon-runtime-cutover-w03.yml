@@ -65,6 +65,8 @@ jobs:
           const config = JSON.parse(fs.readFileSync('workers/W03-content/wrangler.jsonc', 'utf8'))
           const entry = fs.readFileSync('workers/W03-content/src/entry.ts', 'utf8')
           const runtime = fs.readFileSync('workers/W03-content/src/neon/runtime.ts', 'utf8')
+          const contentRuntime = fs.readFileSync('workers/W03-content/src/content-runtime.ts', 'utf8')
+          const router = fs.readFileSync('workers/W03-content/src/index.ts', 'utf8')
           const bootstrap = JSON.parse(fs.readFileSync('contracts/database/neon-five-domain-schema-bootstrap.v1.json', 'utf8'))
           const domain = (bootstrap.domains || []).find(x => x.domainId === 'D1-02')
           const d1 = (config.d1_databases || []).find(x => x.binding === 'D1_02')
@@ -117,9 +119,14 @@ jobs:
               throw new Error('W03 Neon provider wiring is incomplete: ' + provider)
             }
           }
-          if (!runtime.includes('Content creation, update, and delete plus Collection creation, update, delete, member attachment, member removal, and member reorder plus Series creation, update, delete, member attachment, and member removal are the only Neon-backed mutations in these slices; all other W03 reads and mutations remain on D1_02')) {
-            throw new Error('W03 Neon collection mutation boundary declaration is missing')
+          if (!runtime.includes('Content creation, update, delete, and owner-authorized state transitions plus Collection creation, update, delete, member attachment, member removal, and member reorder plus Series creation, update, delete, member attachment, and member removal are the only Neon-backed mutations in these slices; all other W03 reads and mutations remain on D1_02')) {
+            throw new Error('W03 Neon mutation boundary declaration is missing')
           }
+          if (!contentRuntime.includes('mutationStore.transition({') ||
+              !router.includes('dependencies.contentMutationStoreProvider?.(env),')) {
+            throw new Error('W03 Neon owner-authorized content state transition wiring is incomplete')
+          }
+          console.log('W03_NEON_CONTENT_STATE_TRANSITION_CUTOVER=PASS')
           console.log('W03_NEON_READ_PROJECTION_CUTOVER_CONFIG=PASS')
           NODE
 
