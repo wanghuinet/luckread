@@ -137,6 +137,12 @@ export interface ContentRelationshipMutationStore {
     maxItems: number
     relationship: ContentRelationship
   }>): Promise<void>
+  list?(input: Readonly<{
+    contentId: string
+    direction: ContentRelationshipDirection
+    cursor: string | null
+    limit: number
+  }>): Promise<{ items: PublicContentRelationship[]; nextCursor: string | null; hasMore: boolean }>
 }
 
 const MAX_REF_LENGTH = 2048
