@@ -319,10 +319,10 @@ export function createPostgresContentRelationshipMutationStore(
 
     async appendThread(input) {
       await withTransaction(database, async (client) => {
-        // One transaction-scoped lock serializes all Neon thread appends. The
-        // final INSERT below re-evaluates the graph, so preflight reads are hints
-        // only and cannot authorize a stale graph snapshot.
-        await client.query('SELECT pg_advisory_xact_lock($1, $2)', [74031, 50])
+        // A transaction-scoped per-owner lock serializes edits to one author's
+        // thread graph while allowing unrelated owners to append concurrently.
+        // The final INSERT re-evaluates the graph; preflight reads are hints only.
+        await client.query('SELECT pg_advisory_xact_lock(74031, hashtext($1))', [input.ownerUserId])
         await client.query(
           'SELECT id FROM contents WHERE id = ANY($1::text[]) ORDER BY id FOR UPDATE',
           [[input.relationship.sourceId, input.relationship.targetId]],
