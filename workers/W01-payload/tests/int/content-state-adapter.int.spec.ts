@@ -246,8 +246,8 @@ describe('1.1 content lifecycle closeout', () => {
     const publicRoutes = read('src/app/(frontend)/content/PublicContentRoutes.tsx')
     const detailClient = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
 
-    expect(runtime).toContain(
-      "WHERE (id = ? OR slug = ?)\n        AND (state = 'PUBLISHED' OR owner_user_id = ?)",
+    expect(runtime).toMatch(
+      /WHERE \(id = \? OR slug = \?\)\s+AND \(state = 'PUBLISHED' OR owner_user_id = \?\)/,
     )
     expect(detailPage).toContain('renderLegacyContentRoute(contentId)')
     expect(publicRoutes).toContain("if (!content || content.state !== 'PUBLISHED') notFound()")
