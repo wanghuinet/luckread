@@ -35,7 +35,7 @@ test('accepts the admitted historical source UUID while runtime config remains N
 test('rejects a missing or different registered UUID', () => {
   assert.throws(() => verifyW07D1_04Binding({
     databaseList: inventory,
-    wranglerConfig: config,
+    sourceContract,
     boundaryContract: { physicalD1Registry: { 'D1-04': null } },
   }), /canonical D1-04 registry UUID/)
 })
@@ -61,10 +61,10 @@ test('rejects when the admitted database is absent from current inventory', () =
   }), /exactly one resource/)
 })
 
-test('rejects stale display-name configuration even when the UUID exists', () => {
+test('rejects stale historical source display-name metadata even when the UUID exists', () => {
   assert.throws(() => verifyW07D1_04Binding({
     databaseList: [{ name: 'renamed-resource', uuid: ADMITTED_D1_04_UUID }],
-    wranglerConfig: config,
+    sourceContract,
     boundaryContract: contract,
   }), /does not match the current resource name/)
 })
@@ -72,7 +72,7 @@ test('rejects stale display-name configuration even when the UUID exists', () =>
 test('rejects duplicate inventory entries for the same physical UUID', () => {
   assert.throws(() => verifyW07D1_04Binding({
     databaseList: [...inventory, { name: 'duplicate', uuid: ADMITTED_D1_04_UUID }],
-    wranglerConfig: config,
+    sourceContract,
     boundaryContract: contract,
   }), /exactly one resource/)
 })
