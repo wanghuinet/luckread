@@ -289,15 +289,17 @@ describe('W03 Neon content mutation store', () => {
   })
 
   it('injects Neon-backed update and delete stores without issuing a D1 statement', async () => {
-    const snapshot: ContentMutationSnapshot = {
-      content: snapshotContent,
-      idempotency: emptyIdempotency,
-    }
+    let currentContent = snapshotContent
     let updateInput: Parameters<ContentMutationStore['update']>[0] | undefined
     let deleteInput: Parameters<ContentMutationStore['delete']>[0] | undefined
     const store: ContentMutationStore = {
-      async loadMutation() { return snapshot },
-      async update(input) { updateInput = input },
+      async loadMutation() {
+        return { content: currentContent, idempotency: emptyIdempotency }
+      },
+      async update(input) {
+        updateInput = input
+        currentContent = input.content
+      },
       async delete(input) { deleteInput = input },
     }
     const d1 = {
@@ -331,7 +333,7 @@ describe('W03 Neon content mutation store', () => {
 
     expect(updateInput?.content.id).toBe(snapshotContent.id)
     expect(updateInput?.expectedVersion).toBe(4)
-    expect(deleteInput?.expectedVersion).toBe(4)
-    expect(deleteInput?.nextVersion).toBe(5)
+    expect(deleteInput?.expectedVersion).toBe(5)
+    expect(deleteInput?.nextVersion).toBe(6)
   })
 })
