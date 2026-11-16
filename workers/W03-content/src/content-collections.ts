@@ -108,6 +108,28 @@ export interface CollectionUpdateStore {
   }>): Promise<void>
 }
 
+export interface CollectionDeleteStore {
+  loadMutation(
+    ownerUserId: string,
+    collectionId: string,
+    operationId: string,
+    idempotencyKey: string,
+  ): Promise<CollectionMutationSnapshot>
+  delete(input: Readonly<{
+    ownerUserId: string
+    operationId: string
+    idempotencyKey: string
+    requestHash: string
+    deletedAt: string
+    expiresAt: string
+    collectionId: string
+    expectedVersion: number
+    expectedEtag: string
+    nextVersion: number
+    nextEtag: string
+  }>): Promise<void>
+}
+
 interface CollectionWithIdempotencyRow extends CollectionRow {
   idem_id: string | null
   idem_owner_user_id: string | null
@@ -563,6 +585,7 @@ export async function updateCollection(
   return updated
 }
 
+
 export async function deleteCollection(
   db: ContentD1,
   principalUserId: string,
@@ -570,13 +593,16 @@ export async function deleteCollection(
   ifMatch: string,
   idempotencyKey: string,
   now = new Date(),
+  deleteStore?: CollectionDeleteStore,
 ): Promise<void> {
   assertResourceId(principalUserId)
   assertResourceId(collectionId)
   if (!ifMatch || !idempotencyKey) throw new ContentRuntimeError('PRECONDITION_REQUIRED', 428)
   const operationId = 'deleteCollection'
   const hash = await requestHash(operationId, { collectionId, ifMatch: normalizeEtag(ifMatch) })
-  const loaded = await loadCollectionMutation(db, principalUserId, collectionId, operationId, idempotencyKey)
+  const loaded = deleteStore
+    ? await deleteStore.loadMutation(principalUserId, collectionId, operationId, idempotencyKey)
+    : await loadCollectionMutation(db, principalUserId, collectionId, operationId, idempotencyKey)
   const replay = activeIdempotency(loaded.idempotency && {
     idem_id: loaded.idempotency.id,
     idem_owner_user_id: loaded.idempotency.owner_user_id,
@@ -593,19 +619,37 @@ export async function deleteCollection(
   if (!['DRAFT', 'PUBLISHED', 'UNPUBLISHED', 'ARCHIVED'].includes(collection.state)) {
     throw new ContentRuntimeError('INVALID_STATE', 409)
   }
-  const updatedAt = now.toISOString()
+  const deletedAt = now.toISOString()
   const nextVersion = collection.version + 1
+  const nextEtag = etagForVersion(nextVersion)
   const expiresAt = new Date(now.getTime() + IDEMPOTENCY_TTL_MS).toISOString()
+  if (deleteStore) {
+    await deleteStore.delete({
+      ownerUserId: principalUserId,
+      operationId,
+      idempotencyKey,
+      requestHash: hash,
+      deletedAt,
+      expiresAt,
+      collectionId: collection.id,
+      expectedVersion: collection.version,
+      expectedEtag: collection.etag,
+      nextVersion,
+      nextEtag,
+    })
+    return
+  }
   await batchMutation(db, [
-    expireIdempotency(db, principalUserId, operationId, idempotencyKey, updatedAt),
-    insertIdempotency(db, principalUserId, operationId, idempotencyKey, hash, 204, '', updatedAt, expiresAt),
+    expireIdempotency(db, principalUserId, operationId, idempotencyKey, deletedAt),
+    insertIdempotency(db, principalUserId, operationId, idempotencyKey, hash, 204, '', deletedAt, expiresAt),
     db.prepare(
       "UPDATE content_collections SET state = 'DELETED', version = ?, etag = ?, updated_at = ? " +
       'WHERE id = ? AND owner_user_id = ? AND version = ? AND etag = ?',
     ).bind(
-      nextVersion, etagForVersion(nextVersion), updatedAt,
+      nextVersion, nextEtag, deletedAt,
       collection.id, principalUserId, collection.version, collection.etag,
     ),
     atomicGuard(db),
   ])
 }
+

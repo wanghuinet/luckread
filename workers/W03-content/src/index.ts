@@ -67,6 +67,7 @@ import {
   type CollectionListReadStore,
   type CollectionCreateStore,
   type CollectionUpdateStore,
+  type CollectionDeleteStore,
 } from './content-collections.js'
 import {
   attachSeriesMember,
@@ -393,6 +394,10 @@ export type W03ContentWorkerDependencies = Readonly<{
   collectionUpdateStoreProvider?: (
     env: W03PublishedMediaReferenceRuntimeEnv,
   ) => CollectionUpdateStore | undefined
+  /** Optional D1-02 provider for the atomic collection-delete mutation. */
+  collectionDeleteStoreProvider?: (
+    env: W03PublishedMediaReferenceRuntimeEnv,
+  ) => CollectionDeleteStore | undefined
   /** Optional D1-02 provider for bounded series and collection member reads. */
   membersReadStoreProvider?: (
     env: W03PublishedMediaReferenceRuntimeEnv,
@@ -977,6 +982,8 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
           path.id,
           requireIfMatch(request),
           requireIdempotency(request),
+          new Date(),
+          dependencies.collectionDeleteStoreProvider?.(env),
         )
         return new Response(null, { status: 204 })
       }
