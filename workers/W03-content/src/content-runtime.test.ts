@@ -2207,18 +2207,11 @@ describe('W03 content contract core', () => {
       updated_at: '2026-10-01T12:01:00.000Z',
     }
 
-    const db = {
-      prepare(query: string) {
-        expect(query).toContain("AND (state = 'PUBLISHED' OR owner_user_id = ?)")
-        return {
-          bind: () => ({
-            first: async () => row,
-          }),
-        }
-      },
-    } as never
+    const neonWorker = createW03ContentWorker({
+      contentDetailReadStoreProvider: () => ({ getContent: async () => row } as never),
+    })
 
-    const response = await w03Worker.fetch(
+    const response = await neonWorker.fetch(
       new Request('https://luckread-w03.internal/internal/content/contents/content_public_123', {
         headers: {
           'X-LuckRead-Caller': 'W01',
@@ -2226,7 +2219,7 @@ describe('W03 content contract core', () => {
           'X-LuckRead-Correlation-Id': 'test-correlation-public',
         },
       }),
-      { D1_02: db },
+      {} as never,
     )
 
     expect(response.status).toBe(200)
@@ -2238,7 +2231,7 @@ describe('W03 content contract core', () => {
     })
   })
 
-  it('resolves a published content request by stable slug in one D1 read', async () => {
+  it('resolves a published content request by stable slug through Neon', async () => {
     const slug = '中文文章-1234567890abcdef1234567890abcdef'
     const row = {
       id: 'content_slug_123',
@@ -2258,22 +2251,14 @@ describe('W03 content contract core', () => {
       created_at: '2026-10-01T12:00:00.000Z',
       updated_at: '2026-10-03T12:01:00.000Z',
     }
-    const queries: string[] = []
-    const db = {
-      prepare(query: string) {
-        queries.push(query)
-        return {
-          bind: (...bindings: unknown[]) => ({
-            first: async () => {
-              expect(bindings).toEqual([slug, slug, ''])
-              return row
-            },
-          }),
-        }
-      },
-    } as never
+    let requestedContent: string | null = null
+    const neonWorker = createW03ContentWorker({
+      contentDetailReadStoreProvider: () => ({
+        getContent: async (contentIdOrSlug: string) => { requestedContent = contentIdOrSlug; return row },
+      } as never),
+    })
 
-    const response = await w03Worker.fetch(
+    const response = await neonWorker.fetch(
       new Request('https://luckread-w03.internal/internal/content/contents/' + encodeURIComponent(slug), {
         headers: {
           'X-LuckRead-Caller': 'W01',
@@ -2281,11 +2266,11 @@ describe('W03 content contract core', () => {
           'X-LuckRead-Correlation-Id': 'test-correlation-slug',
         },
       }),
-      { D1_02: db },
+      {} as never,
     )
 
     expect(response.status).toBe(200)
-    expect(queries[0]).toContain('WHERE (id = ? OR slug = ?)')
+    expect(requestedContent).toBe(slug)
     await expect(response.json()).resolves.toMatchObject({
       id: row.id,
       slug,
@@ -2294,18 +2279,11 @@ describe('W03 content contract core', () => {
   })
 
   it('does not expose non-published content to an anonymous detail request', async () => {
-    const db = {
-      prepare(query: string) {
-        expect(query).toContain("AND (state = 'PUBLISHED' OR owner_user_id = ?)")
-        return {
-          bind: () => ({
-            first: async () => undefined,
-          }),
-        }
-      },
-    } as never
+    const neonWorker = createW03ContentWorker({
+      contentDetailReadStoreProvider: () => ({ getContent: async () => null } as never),
+    })
 
-    const response = await w03Worker.fetch(
+    const response = await neonWorker.fetch(
       new Request('https://luckread-w03.internal/internal/content/contents/content_private_123', {
         headers: {
           'X-LuckRead-Caller': 'W01',
@@ -2313,7 +2291,7 @@ describe('W03 content contract core', () => {
           'X-LuckRead-Correlation-Id': 'test-correlation-private',
         },
       }),
-      { D1_02: db },
+      {} as never,
     )
 
     expect(response.status).toBe(404)
