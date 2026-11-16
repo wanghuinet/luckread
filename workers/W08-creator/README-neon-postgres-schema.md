@@ -11,7 +11,7 @@ This is the PostgreSQL 18 translation and staged runtime adapter for the canonic
 - No cross-domain foreign keys are introduced. The source D1 migration declares no foreign keys or table triggers.
 - W07 membership/subscription tables, W01 Payload tables and D1-04 financial tables are not included.
 - No existing application, creator, identity or audit business rows are imported or seeded.
-- W08 has a provider-selected store for these three tables. The production Wrangler config now selects `W08_DATABASE_DRIVER=neon` through the existing D1-01 Hyperdrive binding; the original D1-01 binding remains available for explicit rollback. W02 identity and RoleAssignment writes remain behind the existing W02 Service Binding.
+- W08's three creator tables and its read-only creator authorization lookups use the existing Neon D1-01 database through the W08 Hyperdrive binding. W02 identity and RoleAssignment writes remain behind the existing W02 Service Binding. The production Wrangler config has no Cloudflare D1 binding.
 - The remote D1-01 schema was applied by GitHub Actions run `42558978832` on 2026-11-09. The shared runner reported `D1_01_SHARED_REMOTE_SCHEMA_RUNNER_PASS`; W08's owner-specific schema probe then completed successfully. This runtime cutover change does not deploy the Worker or switch production traffic.
 
 ## Source mapping
@@ -26,4 +26,4 @@ The dedicated GitHub Actions workflow applies the generated schema only to a dis
 
 The remote D1-01 application was performed separately by the reviewed workflow run linked above, after the shared migration runner release gate and TLS target validation passed. Its W08 postflight probe ran against the Neon `luckread` target and the workflow uploaded the owner-specific evidence artifact. The dedicated W08 schema workflow and full local rehearsal remain disposable-PostgreSQL-only checks.
 
-The W08 source configuration selects Neon, while the live Worker remains unchanged until a separately controlled Worker deployment. No business rows were imported; no production Worker deployment or traffic cutover was performed as part of this change.
+The W08 production source selects Neon without a Cloudflare D1 connection. Removing the D1 Wrangler binding does not delete the historical Cloudflare resource or alter the separate W02 authority. No business rows were imported; no production Worker deployment or traffic cutover was performed as part of this change.
