@@ -1821,21 +1821,14 @@ describe('W03 content contract core', () => {
       idem_response_json: null,
       idem_expires_at: null,
     };
-    const statements: Array<{ query: string; bindings: unknown[] }> = [];
-    const db = {
-      prepare(query: string) {
-        return {
-          bind: (...bindings: unknown[]) => ({
-            all: async () => {
-              statements.push({ query, bindings });
-              return { results: [row] };
-            },
-          }),
-        };
-      },
-    } as never;
+    const storeCalls: unknown[][] = []
+    const neonWorker = createW03ContentWorker({
+      creatorContentsReadStoreProvider: () => ({
+        list: async (...args: unknown[]) => { storeCalls.push(args); return [row] },
+      } as never),
+    })
 
-    const response = await w03Worker.fetch(
+    const response = await neonWorker.fetch(
       new Request('https://luckread-w03.internal/internal/content/contents?status=DRAFT&type=post&limit=20', {
         headers: {
           'X-LuckRead-Caller': 'W01',
@@ -1845,7 +1838,7 @@ describe('W03 content contract core', () => {
           'X-LuckRead-Principal-Layer': 'L2',
         },
       }),
-      { D1_02: db },
+      {} as never,
       {} as never,
     );
 
@@ -1865,11 +1858,8 @@ describe('W03 content contract core', () => {
         nextCursor: null,
       },
     });
-    expect(statements).toHaveLength(1);
-    expect(statements[0]?.query).toContain('owner_user_id = ?');
-    expect(statements[0]?.query).toContain('state = ?');
-    expect(statements[0]?.query).toContain('content_type = ?');
-    expect(statements[0]?.bindings.slice(0, 3)).toEqual(['user_draft_owner', 'DRAFT', 'post']);
+    expect(storeCalls).toHaveLength(1)
+    expect(storeCalls[0]?.slice(0, 4)).toEqual(['user_draft_owner', null, 21, { status: 'DRAFT', contentType: 'post' }])
 
     const denied = await w03Worker.fetch(
       new Request('https://luckread-w03.internal/internal/content/contents?status=DRAFT&type=post', {
@@ -1885,11 +1875,11 @@ describe('W03 content contract core', () => {
       {} as never,
     );
     expect(denied.status).toBe(403);
-    expect(statements).toHaveLength(1);
+    expect(storeCalls).toHaveLength(1);
   });
 
   it('lists only the authenticated Creator\'s scheduled social posts and returns edit preconditions', async () => {
-    const statements: Array<{ query: string; bindings: unknown[] }> = []
+    const storeCalls: unknown[][] = []
     const row = {
       id: 'scheduled_post_123',
       content_type: 'post',
@@ -1910,18 +1900,11 @@ describe('W03 content contract core', () => {
       created_at: '2026-11-05T10:00:00.000Z',
       updated_at: '2026-11-05T10:05:00.000Z',
     }
-    const db = {
-      prepare(query: string) {
-        return {
-          bind: (...bindings: unknown[]) => ({
-            all: async () => {
-              statements.push({ query, bindings })
-              return { results: [row] }
-            },
-          }),
-        }
-      },
-    } as never
+    const neonWorker = createW03ContentWorker({
+      creatorContentsReadStoreProvider: () => ({
+        list: async (...args: unknown[]) => { storeCalls.push(args); return [row] },
+      } as never),
+    })
     const makeRequest = (layer = 'L3', query = '?status=SCHEDULED&type=post&limit=20') =>
       new Request('https://luckread-w03.internal/internal/content/contents' + query, {
         headers: {
@@ -1933,7 +1916,7 @@ describe('W03 content contract core', () => {
         },
       })
 
-    const response = await w03Worker.fetch(makeRequest(), { D1_02: db }, {} as never)
+    const response = await neonWorker.fetch(makeRequest(), {} as never, {} as never)
     expect(response.status).toBe(200)
     await expect(response.json()).resolves.toMatchObject({
       data: {
@@ -1952,18 +1935,15 @@ describe('W03 content contract core', () => {
         nextCursor: null,
       },
     })
-    expect(statements).toHaveLength(1)
-    expect(statements[0]?.query).toContain('owner_user_id = ?')
-    expect(statements[0]?.query).toContain('state = ?')
-    expect(statements[0]?.query).toContain('content_type = ?')
-    expect(statements[0]?.bindings.slice(0, 3)).toEqual(['creator_owner_123', 'SCHEDULED', 'post'])
+    expect(storeCalls).toHaveLength(1)
+    expect(storeCalls[0]?.slice(0, 4)).toEqual(['creator_owner_123', null, 21, { status: 'SCHEDULED', contentType: 'post' }])
 
-    const readsBeforeDeny = statements.length
-    const l2Denied = await w03Worker.fetch(makeRequest('L2'), { D1_02: db }, {} as never)
+    const readsBeforeDeny = storeCalls.length
+    const l2Denied = await neonWorker.fetch(makeRequest('L2'), {} as never, {} as never)
     expect(l2Denied.status).toBe(403)
-    const wrongType = await w03Worker.fetch(makeRequest('L3', '?status=SCHEDULED&type=article'), { D1_02: db }, {} as never)
+    const wrongType = await neonWorker.fetch(makeRequest('L3', '?status=SCHEDULED&type=article'), {} as never, {} as never)
     expect(wrongType.status).toBe(422)
-    expect(statements).toHaveLength(readsBeforeDeny)
+    expect(storeCalls).toHaveLength(readsBeforeDeny)
   })
 
   it('returns the canonical error envelope for an unmatched internal route', async () => {
