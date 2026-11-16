@@ -6,6 +6,7 @@ import {
   getW03PublishedContentsByIdsReadStore,
   getW03FollowingOwnerContentsReadStore,
   getW03PostThreadReadStore,
+  getW03ContentRelationshipMutationStore,
   getW03ContentContextReadStore,
   getW03CollectionListReadStore,
   getW03CollectionCreateStore,
@@ -93,6 +94,26 @@ describe('W03 public media reference database driver', () => {
     expect(store).toBeDefined()
     await expect(store?.list([])).resolves.toEqual([])
     await pool.end()
+  })
+
+  it('provides and caches the Neon reference relationship writer while keeping D1 as default', async () => {
+    expect(getW03ContentRelationshipMutationStore({
+      D1_02: { prepare() { throw new Error('D1 should not be queried') } },
+    })).toBeUndefined()
+
+    const binding = {
+      connectionString: 'postgresql://postgres:postgres@127.0.0.1:5432/luckread',
+    }
+    const env = {
+      W03_CONTENT_READ_DRIVER: 'neon',
+      HYPERDRIVE_D1_02: binding,
+    }
+    const first = getW03ContentRelationshipMutationStore(env)
+    const second = getW03ContentRelationshipMutationStore(env)
+
+    expect(first).toBeDefined()
+    expect(first).toBe(second)
+    await getW03PublicMediaReferencePostgresPool(env).end()
   })
 
   it('reuses one lazy Pool and PostgreSQL read store for the same Hyperdrive binding', async () => {
