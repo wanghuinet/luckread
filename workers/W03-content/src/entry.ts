@@ -25,6 +25,7 @@ import {
   getW03MembersReadStore,
   getW03ContentDetailReadStore,
   getW03CreatorContentsReadStore,
+  getW03PublicContentListReadStore,
 } from './neon/runtime.js'
 
 /**
@@ -32,6 +33,8 @@ import {
  * Workers' contract/type checks do not need W03 runtime dependencies installed.
  */
 export default createW03ContentWorker({
+  publicContentListReadStoreProvider: (env) =>
+    getW03PublicContentListReadStore(env),
   contentCreateStoreProvider: (env) =>
     getW03ContentCreateStore(env),
   contentMutationStoreProvider: (env) =>
