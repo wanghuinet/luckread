@@ -38,26 +38,19 @@ describe('W03 content contract core', () => {
   it('classifies published public-post media and protects member-only media with W07 entitlement', async () => {
     const publicUrl = 'https://img.luckread.com/media/photo%20(1).png'
     const historicalUrl = 'https://cdn.luckread.com/media/photo%20(1).png'
-    let query = ''
-    let bindings: unknown[] = []
     let matchingRows: Array<Record<string, unknown>> = []
-    const d1 = {
-      prepare(sql: string) {
-        query = sql
-        return {
-          bind(...values: unknown[]) {
-            bindings = values
-            return {
-              all: async () => ({ results: matchingRows }),
-            }
-          },
-        }
+    const lookups: Array<{ candidates: readonly string[]; limit: number }> = []
+    const neonWorker = createW03ContentWorker({
+      publishedMediaReferenceReadStore: {
+        async listPublishedMediaReferences(candidates, limit) {
+          lookups.push({ candidates, limit })
+          return matchingRows as never
+        },
       },
-    }
+    })
     let w07Calls = 0
     let w07Request: Request | null = null
     const env = {
-      D1_02: d1,
       W07_SUBSCRIPTION: {
         fetch: async (input: RequestInfo | URL, init?: RequestInit) => {
           w07Calls += 1
@@ -100,25 +93,14 @@ describe('W03 content contract core', () => {
     }
 
     matchingRows = [publicPost]
-    const publicResponse = await w03Worker.fetch(request(publicUrl), env, {} as never)
+    const publicResponse = await neonWorker.fetch(request(publicUrl), env, {} as never)
     expect(publicResponse.status).toBe(200)
     await expect(publicResponse.json()).resolves.toMatchObject({
       data: { isPublic: true, isMemberContent: false, allowed: true },
     })
-    expect(query).toContain("state = 'PUBLISHED'")
-    expect(query).toContain('access_mode')
-    expect(query).toContain('body_ref IN (')
-    expect(query).toContain('cover_ref IN (')
-    expect(query).toContain('json_each(contents.media_refs_json)')
-    expect(query).toContain('media_ref.value IN (')
-    const candidatesPerColumn = ((query.match(/\?/g) ?? []).length - 1) / 3
-    expect(candidatesPerColumn).toBe(1)
-    expect(bindings.length).toBe(candidatesPerColumn * 3 + 1)
-    expect(bindings[0]).toBe(publicUrl)
-    expect(bindings[candidatesPerColumn]).toBe(publicUrl)
-    expect(bindings[candidatesPerColumn * 2]).toBe(publicUrl)
-    expect(bindings.at(-1)).toBe(51)
-    expect(bindings).not.toContain(historicalUrl)
+    expect(lookups.at(-1)?.limit).toBe(51)
+    expect(lookups.at(-1)?.candidates).toContain(publicUrl)
+    expect(lookups.at(-1)?.candidates).not.toContain(historicalUrl)
     expect(w07Calls).toBe(0)
 
     matchingRows = [memberPost]
