@@ -53,6 +53,7 @@ import {
   listPostThread,
   type ContentRelationshipDirection,
   type ContentRelationshipMutationStore,
+  type ContentRelationshipReadStore,
   type PostThreadReadStore,
 } from './content-relationships.js'
 import {
@@ -460,6 +461,10 @@ export type W03ContentWorkerDependencies = Readonly<{
   contentRelationshipMutationStoreProvider?: (
     env: W03PublishedMediaReferenceRuntimeEnv,
   ) => ContentRelationshipMutationStore | undefined
+  /** Optional D1-02 provider for public reference relationship lists. */
+  contentRelationshipReadStoreProvider?: (
+    env: W03PublishedMediaReferenceRuntimeEnv,
+  ) => ContentRelationshipReadStore | undefined
   /** Optional D1-02 provider for bounded series and collection member reads. */
   membersReadStoreProvider?: (
     env: W03PublishedMediaReferenceRuntimeEnv,
@@ -1260,6 +1265,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
           directionParam as ContentRelationshipDirection,
           cursor,
           parseListLimit(url.searchParams.get('limit')),
+          dependencies.contentRelationshipReadStoreProvider?.(env),
         )
         return json({
           data: {
