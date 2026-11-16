@@ -294,7 +294,7 @@ export function getW03CollectionListReadStore(
 
 /** PostgreSQL writer for the existing creator-owned collection create operation. */
 /** PostgreSQL writer for canonical W03 content creation. */
-/** PostgreSQL writer for canonical content update and soft-delete mutations. */
+/** PostgreSQL writer for canonical content update, soft-delete, and state-transition mutations. */
 export function getW03ContentMutationStore(
   env: W03PublicMediaReferenceRuntimeEnv,
 ): ContentMutationStore | undefined {
