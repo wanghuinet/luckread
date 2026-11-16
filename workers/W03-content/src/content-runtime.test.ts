@@ -108,7 +108,7 @@ describe('W03 content contract core', () => {
       'X-LuckRead-Principal-User-Id': 'user_subscriber',
       'X-LuckRead-Principal-Layer': 'L2',
     })
-    const memberResponse = await w03Worker.fetch(memberRequest, env, {} as never)
+    const memberResponse = await neonWorker.fetch(memberRequest, env, {} as never)
     expect(memberResponse.status).toBe(200)
     await expect(memberResponse.json()).resolves.toMatchObject({
       data: { isPublic: false, isMemberContent: true, allowed: true },
@@ -122,7 +122,7 @@ describe('W03 content contract core', () => {
 
     // Without a logged-in member, a member-only reference must not be exposed as public.
     w07Calls = 0
-    const anonymousMemberResponse = await w03Worker.fetch(request(publicUrl), env, {} as never)
+    const anonymousMemberResponse = await neonWorker.fetch(request(publicUrl), env, {} as never)
     expect(anonymousMemberResponse.status).toBe(200)
     await expect(anonymousMemberResponse.json()).resolves.toMatchObject({
       data: { isPublic: false, isMemberContent: true, allowed: false },
@@ -132,13 +132,13 @@ describe('W03 content contract core', () => {
     // If a URL appears in both public and member-only content, membership wins:
     // it cannot become anonymous-public through the second reference.
     matchingRows = [publicPost, memberPost]
-    const mixedReferenceResponse = await w03Worker.fetch(request(publicUrl), env, {} as never)
+    const mixedReferenceResponse = await neonWorker.fetch(request(publicUrl), env, {} as never)
     await expect(mixedReferenceResponse.json()).resolves.toMatchObject({
       data: { isPublic: false, isMemberContent: true, allowed: false },
     })
 
     matchingRows = []
-    const unpublishedResponse = await w03Worker.fetch(
+    const unpublishedResponse = await neonWorker.fetch(
       request('https://img.luckread.com/media/draft-only.png'),
       env,
       {} as never,
@@ -148,7 +148,7 @@ describe('W03 content contract core', () => {
       data: { isPublic: false, isMemberContent: false, allowed: false },
     })
 
-    const unsupportedHostResponse = await w03Worker.fetch(
+    const unsupportedHostResponse = await neonWorker.fetch(
       request('https://attacker.example/media/photo.png'),
       env,
       {} as never,
@@ -158,10 +158,10 @@ describe('W03 content contract core', () => {
       data: { isPublic: false, isMemberContent: false, allowed: false },
     })
 
-    const untrustedCaller = await w03Worker.fetch(request(publicUrl, 'W04'), env, {} as never)
+    const untrustedCaller = await neonWorker.fetch(request(publicUrl, 'W04'), env, {} as never)
     expect(untrustedCaller.status).toBe(403)
 
-    const forwardedCredential = await w03Worker.fetch(
+    const forwardedCredential = await neonWorker.fetch(
       request(publicUrl, 'W01', { Cookie: 'session=must-not-cross-service-boundary' }),
       env,
       {} as never,
@@ -242,7 +242,7 @@ describe('W03 content contract core', () => {
     expect(providerCalls).toBe(1);
 
     allowed = true;
-    const entitled = await w03Worker.fetch(makeRequest(), env, {} as never);
+    const entitled = await neonWorker.fetch(makeRequest(), env, {} as never);
     expect(entitled.status).toBe(200);
     await expect(entitled.json()).resolves.toMatchObject({
       creatorId: 'creator_1',
@@ -255,7 +255,7 @@ describe('W03 content contract core', () => {
     expect(providerCalls).toBe(2);
 
     reasonOverride = 'MEMBERSHIP_REQUIRED';
-    const contradictory = await w03Worker.fetch(makeRequest(), env, {} as never);
+    const contradictory = await neonWorker.fetch(makeRequest(), env, {} as never);
     expect(contradictory.status).toBe(503);
     await expect(contradictory.json()).resolves.toMatchObject({
       error: { code: 'SERVICE_UNAVAILABLE' },
@@ -264,7 +264,7 @@ describe('W03 content contract core', () => {
 
     reasonOverride = null;
     providerStatus = 503;
-    const unavailable = await w03Worker.fetch(makeRequest(), env, {} as never);
+    const unavailable = await neonWorker.fetch(makeRequest(), env, {} as never);
     expect(unavailable.status).toBe(503);
     await expect(unavailable.json()).resolves.toMatchObject({
       error: { code: 'SERVICE_UNAVAILABLE' },
@@ -357,7 +357,7 @@ describe('W03 content contract core', () => {
     expect(contextLookups).toEqual([{ bodyRef, limit: 51 }])
 
     allowed = true
-    const entitled = await w03Worker.fetch(makeRequest(), env, {} as never)
+    const entitled = await neonWorker.fetch(makeRequest(), env, {} as never)
     expect(entitled.status).toBe(200)
     await expect(entitled.json()).resolves.toMatchObject({
       contentId: 'content_public_1',
@@ -408,7 +408,7 @@ describe('W03 content contract core', () => {
       data: { items: [{ id: 'content_1', title: 'Post 1' }] },
     })
     expect(storeCalls).toBe(1)
-    const denied = await w03Worker.fetch(
+    const denied = await neonWorker.fetch(
       new Request('https://luckread-w03.internal/internal/content/bookmarked-items', {
         method: 'POST',
         headers: {
