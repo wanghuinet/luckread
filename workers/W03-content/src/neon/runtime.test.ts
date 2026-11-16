@@ -10,6 +10,7 @@ import {
   getW03CollectionListReadStore,
   getW03CollectionCreateStore,
   getW03ContentCreateStore,
+  getW03ContentMutationStore,
   getW03CollectionUpdateStore,
   getW03CollectionDeleteStore,
   getW03SeriesCreateStore,
