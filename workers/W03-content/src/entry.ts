@@ -4,6 +4,7 @@ import {
   getW03PublishedContentsByIdsReadStore,
   getW03FollowingOwnerContentsReadStore,
   getW03PostThreadReadStore,
+  getW03ContentRelationshipMutationStore,
   getW03ContentContextReadStore,
   getW03CollectionListReadStore,
   getW03CollectionCreateStore,
@@ -42,6 +43,8 @@ export default createW03ContentWorker({
     getW03FollowingOwnerContentsReadStore(env),
   postThreadReadStoreProvider: (env) =>
     getW03PostThreadReadStore(env),
+  contentRelationshipMutationStoreProvider: (env) =>
+    getW03ContentRelationshipMutationStore(env),
   contentContextReadStoreProvider: (env) =>
     getW03ContentContextReadStore(env),
   collectionListReadStoreProvider: (env) =>
