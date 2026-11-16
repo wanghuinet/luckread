@@ -103,7 +103,7 @@ const creatorContentsStores = new WeakMap<object, CreatorContentsReadStore>()
  * batch projection, W04-authorized following-feed content, native post-thread
  * projection, canonical content context and detail reads, creator-owned
  * content lists, series and collection reads, and series/collection membership
- * lists. Content creation, update, and delete plus Collection creation, update, delete, member attachment, member removal, and member reorder plus Series creation, update, delete, member attachment, and member removal are the only Neon-backed mutations in these slices; all other W03 reads and mutations remain on D1_02. D1 is the safe
+ * lists. Content creation, update, delete, and owner-authorized state transitions plus Collection creation, update, delete, member attachment, member removal, and member reorder plus Series creation, update, delete, member attachment, and member removal are the only Neon-backed mutations in these slices; all other W03 reads and mutations remain on D1_02. D1 is the safe
  * default and unknown values fail closed.
  */
 export function resolveW03PublicMediaReferenceDriver(
@@ -294,7 +294,7 @@ export function getW03CollectionListReadStore(
 
 /** PostgreSQL writer for the existing creator-owned collection create operation. */
 /** PostgreSQL writer for canonical W03 content creation. */
-/** PostgreSQL writer for canonical content update and soft-delete mutations. */
+/** PostgreSQL writer for canonical content update, soft-delete, and state-transition mutations. */
 export function getW03ContentMutationStore(
   env: W03PublicMediaReferenceRuntimeEnv,
 ): ContentMutationStore | undefined {

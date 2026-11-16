@@ -330,5 +330,41 @@ export function createPostgresContentMutationStore(
         // contents_after_update_outbox emits content.deleted within this transaction.
       })
     },
+    async transition(input) {
+      await withTransaction(database, async (client) => {
+        await insertIdempotency(client, {
+          ownerUserId: input.ownerUserId,
+          operationId: input.operationId,
+          idempotencyKey: input.idempotencyKey,
+          requestHash: input.requestHash,
+          responseStatus: 200,
+          responseJson: input.responseJson,
+          now: input.updatedAt,
+          expiresAt: input.expiresAt,
+        })
+        const updated = await client.query<{ id: string }>(
+          'UPDATE contents SET state = $1, scheduled_at = $2::timestamptz, creator_id = $3, ' +
+          'version = $4, etag = $5, updated_at = $6::timestamptz ' +
+          'WHERE id = $7 AND owner_user_id = $8 AND version = $9 AND etag = $10 RETURNING id',
+          [
+            input.nextState,
+            input.scheduledAt,
+            input.nextCreatorId,
+            input.nextVersion,
+            input.nextEtag,
+            input.updatedAt,
+            input.contentId,
+            input.ownerUserId,
+            input.expectedVersion,
+            input.expectedEtag,
+          ],
+        )
+        if (updated.rows.length !== 1) {
+          throw new ContentRuntimeError('PRECONDITION_FAILED', 412)
+        }
+        // The existing contents_after_update_outbox trigger records lifecycle state changes in this transaction.
+      })
+    },
+
   }
 }

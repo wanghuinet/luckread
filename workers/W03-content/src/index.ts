@@ -451,7 +451,7 @@ export type W03ContentWorkerDependencies = Readonly<{
   contentCreateStoreProvider?: (
     env: W03PublishedMediaReferenceRuntimeEnv,
   ) => ContentCreateStore | undefined
-  /** Optional D1-02 provider for canonical content update and delete mutations. */
+  /** Optional D1-02 provider for canonical content update, delete, and owner-authorized state transitions. */
   contentMutationStoreProvider?: (
     env: W03PublishedMediaReferenceRuntimeEnv,
   ) => ContentMutationStore | undefined
@@ -1549,6 +1549,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
           requireIdempotency(request),
           new Date(),
           { scheduledAt: requestedScheduledAt, preflight: body.preflight, verifiedCreatorId },
+          dependencies.contentMutationStoreProvider?.(env),
         )
         return json({ ...result, requestId: createRequestId() })
       }

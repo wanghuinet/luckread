@@ -4,6 +4,7 @@ import {
   ContentRuntimeError,
   deleteContent,
   updateContent,
+  transitionContentState,
   type ContentMutationStore,
   type ContentRecord,
   type ContentMutationSnapshot,
@@ -266,6 +267,70 @@ describe('W03 Neon content mutation store', () => {
     expect(fake.released()).toBe(true)
   })
 
+  it('commits a state transition, schedule, creator identity and idempotency in one transaction', async () => {
+    const fake = fixture()
+    const store = createPostgresContentMutationStore(fake.database)
+    const scheduledAt = '2026-11-17T12:00:00.000Z'
+
+    await store.transition({
+      ownerUserId: 'user_123',
+      operationId: 'transitionContentState',
+      idempotencyKey: 'transition-key',
+      requestHash: 'transition-hash',
+      responseJson: JSON.stringify({ from: 'DRAFT', to: 'SCHEDULED', version: 5, etag: 'W/"5"', scheduledAt }),
+      updatedAt: nowIso,
+      expiresAt: new Date(now.getTime() + 86_400_000).toISOString(),
+      contentId: snapshotContent.id,
+      expectedVersion: 4,
+      expectedEtag: 'W/"4"',
+      nextState: 'SCHEDULED',
+      scheduledAt,
+      nextCreatorId: 'creator_456',
+      nextVersion: 5,
+      nextEtag: 'W/"5"',
+    })
+
+    const sql = fake.transactionQueries.map(item => item.sql)
+    expect(sql[0]).toBe('BEGIN')
+    expect(sql[1]).toContain('DELETE FROM content_mutation_idempotency')
+    expect(sql[2]).toContain('INSERT INTO content_mutation_idempotency')
+    expect(sql[3]).toContain('UPDATE contents SET state = $1, scheduled_at = $2::timestamptz')
+    expect(sql[3]).toContain('owner_user_id = $8 AND version = $9 AND etag = $10')
+    expect(sql[4]).toBe('COMMIT')
+    expect(fake.transactionQueries[3]?.values).toEqual([
+      'SCHEDULED', scheduledAt, 'creator_456', 5, 'W/"5"', nowIso,
+      snapshotContent.id, 'user_123', 4, 'W/"4"',
+    ])
+    expect(fake.transactionQueries[2]?.values?.[5]).toBe(200)
+    expect(fake.released()).toBe(true)
+  })
+
+  it('rolls back a state transition when its authoritative version and ETag CAS misses', async () => {
+    const fake = fixture({ casMiss: true })
+    const store = createPostgresContentMutationStore(fake.database)
+
+    await expect(store.transition({
+      ownerUserId: 'user_123',
+      operationId: 'transitionContentState',
+      idempotencyKey: 'stale-transition-key',
+      requestHash: 'transition-hash',
+      responseJson: '{}',
+      updatedAt: nowIso,
+      expiresAt: new Date(now.getTime() + 86_400_000).toISOString(),
+      contentId: snapshotContent.id,
+      expectedVersion: 4,
+      expectedEtag: 'W/"4"',
+      nextState: 'UNPUBLISHED',
+      scheduledAt: null,
+      nextCreatorId: 'user_123',
+      nextVersion: 5,
+      nextEtag: 'W/"5"',
+    })).rejects.toMatchObject({ code: 'PRECONDITION_FAILED', status: 412 })
+
+    expect(fake.transactionQueries.at(-1)?.sql).toBe('ROLLBACK')
+    expect(fake.released()).toBe(true)
+  })
+
   it('rolls back a duplicate delete idempotency key', async () => {
     const fake = fixture({ idempotencyConflict: true })
     const store = createPostgresContentMutationStore(fake.database)
@@ -288,6 +353,52 @@ describe('W03 Neon content mutation store', () => {
     expect(fake.released()).toBe(true)
   })
 
+  it('routes owner-authorized state transitions through Neon without issuing a D1 statement', async () => {
+    const publishedContent = { ...snapshotContent, state: 'PUBLISHED' as const }
+    let transitionInput: Parameters<ContentMutationStore['transition']>[0] | undefined
+    const store: ContentMutationStore = {
+      async loadMutation() {
+        return { content: publishedContent, idempotency: emptyIdempotency }
+      },
+      async update() {},
+      async delete() {},
+      async transition(input) { transitionInput = input },
+    }
+    const d1 = {
+      prepare() { throw new Error('D1 must not be queried in Neon mode') },
+      batch() { throw new Error('D1 must not be written in Neon mode') },
+    }
+
+    const result = await transitionContentState(
+      d1 as never,
+      'user_123',
+      'L2',
+      snapshotContent.id,
+      'UNPUBLISHED',
+      undefined,
+      'W/"4"',
+      'neon-transition-key',
+      now,
+      {},
+      store,
+    )
+
+    expect(result).toMatchObject({ from: 'PUBLISHED', to: 'UNPUBLISHED', version: 5, etag: 'W/"5"', scheduledAt: null })
+    expect(transitionInput).toMatchObject({
+      ownerUserId: 'user_123',
+      operationId: 'transitionContentState',
+      contentId: snapshotContent.id,
+      expectedVersion: 4,
+      expectedEtag: 'W/"4"',
+      nextState: 'UNPUBLISHED',
+      scheduledAt: null,
+      nextCreatorId: 'user_123',
+      nextVersion: 5,
+      nextEtag: 'W/"5"',
+    })
+    expect(transitionInput?.responseJson).toBe(JSON.stringify(result))
+  })
+
   it('injects Neon-backed update and delete stores without issuing a D1 statement', async () => {
     let currentContent = snapshotContent
     let updateInput: Parameters<ContentMutationStore['update']>[0] | undefined
@@ -301,6 +412,7 @@ describe('W03 Neon content mutation store', () => {
         currentContent = input.content
       },
       async delete(input) { deleteInput = input },
+      async transition() {},
     }
     const d1 = {
       prepare() { throw new Error('D1 must not be queried in Neon mode') },
