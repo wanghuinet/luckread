@@ -1,5 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import { assertW09AuditEventStatement } from '../../W09-platform/src/audit-event-postgres-adapter.js'
+
 export interface W06ModerationPostgresClient {
   query<Row extends Record<string, unknown> = Record<string, unknown>>(
     sql: string,
@@ -61,6 +63,10 @@ function translatePostgresModerationStatement(
   sourceSql: string,
   previousChanges?: number,
 ): Readonly<{ sql: string; extraValues: unknown[] }> {
+  // W09 owns the append-only policy; W06 keeps the single tested D1-to-PG
+  // placeholder/changes() translator and the caller-owned transaction.
+  assertW09AuditEventStatement(sourceSql)
+
   let sql = sourceSql
   const insertIgnore = /^(\s*)INSERT\s+OR\s+IGNORE\s+INTO\b/i
   if (insertIgnore.test(sql)) {

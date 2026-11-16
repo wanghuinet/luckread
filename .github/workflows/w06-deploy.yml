@@ -86,7 +86,7 @@ jobs:
           # Blueprint, Entity, and non-W06 authority-sensitive changes remain
           # rejected by the explicit allowlist below.
           changed_from_admitted="$(gh api "repos/$GITHUB_REPOSITORY/compare/$PREVIOUS_ADMITTED_SOURCE_SHA...$SOURCE_SHA" --jq '.files[]?.filename // empty')"
-          w06_delta="$(printf '%s\n' "$changed_from_admitted" | grep -E '^workers/W06-governance/|^\.github/workflows/w06-|^docs/change-control/CC-1\.8-MODERATION-IDEMPOTENCY-REPLAY-ORDER-2026-10-01\.md|^docs/change-control/CC-MAPPING-0-AUTH-013-W06-|^docs/MAPPING-0-CLOSURE-LEDGER\.md|^artifacts/mapping-0/w06-' || true)"
+          w06_delta="$(printf '%s\n' "$changed_from_admitted" | grep -E '^workers/W06-governance/|^workers/W09-platform/src/audit-event-postgres-adapter\.ts$|^\.github/workflows/w06-|^docs/change-control/CC-1\.8-MODERATION-IDEMPOTENCY-REPLAY-ORDER-2026-10-01\.md|^docs/change-control/CC-MAPPING-0-AUTH-013-W06-|^docs/MAPPING-0-CLOSURE-LEDGER\.md|^artifacts/mapping-0/w06-' || true)"
           test -n "$w06_delta" || {
             echo "No admitted W06 implementation/governance delta found between $PREVIOUS_ADMITTED_SOURCE_SHA and $SOURCE_SHA"
             exit 1
@@ -96,11 +96,11 @@ jobs:
 
           carry_forward_workflow auth-013-persistence-schema-evidence.yml "$PREVIOUS_PERSISTENCE_EVIDENCE_SOURCE_SHA"
 
-          # The source SHA is deployed only from workers/W06-governance. Repository
-          # history may contain unrelated main-branch changes; those changes are
-          # not part of this Worker deployment and must not invalidate the W06
-          # source admission. Authority-sensitive W06 paths are checked below by
-          # the source CI and physical binding assertions.
+          # W06 remains the deployed Worker entry. The one admitted W09 source file
+          # is an imported D1-03 AuditEvent SQL boundary, not a new Worker,
+          # endpoint, service binding, or independent deployment. Repository history
+          # may contain unrelated changes; authority-sensitive W06 paths are still
+          # checked below by source CI and physical binding assertions.
       - name: Verify W06 Neon D1-03 runtime and preserve existing topology
         working-directory: workers/W06-governance
         run: |

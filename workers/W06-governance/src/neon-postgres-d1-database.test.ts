@@ -46,6 +46,26 @@ describe('W06 PostgreSQL moderation D1 bridge', () => {
     )).toBe("SELECT '?' AS literal, value FROM t WHERE a = $1 -- ?\nAND b = $2 /* ? */")
   })
 
+  it('routes W09-owned AuditEvent reads and inserts through the append-only adapter', () => {
+    expect(toPostgresModerationSql(
+      'SELECT event_id FROM audit_events WHERE event_id = ? LIMIT 1',
+    )).toBe('SELECT event_id FROM audit_events WHERE event_id = $1 LIMIT 1')
+    expect(toPostgresModerationSql(
+      'INSERT INTO audit_events(event_id) VALUES (?)',
+    )).toBe('INSERT INTO audit_events(event_id) VALUES ($1)')
+  })
+
+  it.each([
+    'UPDATE audit_events SET action = ? WHERE event_id = ?',
+    'DELETE FROM audit_events WHERE event_id = ?',
+    'TRUNCATE TABLE audit_events',
+    'INSERT INTO audit_events(event_id) VALUES (?) ON CONFLICT (event_id) DO UPDATE SET action = EXCLUDED.action',
+  ])('rejects mutations outside the W09 AuditEvent append-only contract: %s', (sql) => {
+    expect(() => toPostgresModerationSql(sql)).toThrow(
+      'W09_AUDIT_EVENT_APPEND_ONLY_STATEMENT_REQUIRED',
+    )
+  })
+
   it('translates D1 INSERT OR IGNORE and binds changes() from the preceding batch statement', async () => {
     const { pool, clientCalls } = fakePool({ rowCounts: [1, 1, 1] })
     const db = createPostgresModerationD1Database(pool)
