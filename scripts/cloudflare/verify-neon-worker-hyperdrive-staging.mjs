@@ -56,7 +56,7 @@ export const STAGED_WORKERS = Object.freeze([
     configPath: 'workers/W08-creator/wrangler.jsonc',
     binding: 'HYPERDRIVE',
     hyperdriveId: '0c53a1bb9bc0484bac146e8ae2d3158b',
-    d1Bindings: ['D1_01'],
+    d1Bindings: [],
     driver: 'W08_DATABASE_DRIVER',
     driverValue: 'neon',
   },
