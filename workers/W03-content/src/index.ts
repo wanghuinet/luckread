@@ -21,6 +21,7 @@ import {
   type FollowingOwnerContentsReadStore,
   type ContentDetailReadStore,
   type CreatorContentsReadStore,
+  type ContentRevisionReadStore,
   type ContentCreateStore,
   type ContentMutationStore,
   listCreatorContents,
@@ -378,6 +379,10 @@ export type W03ContentWorkerDependencies = Readonly<{
   creatorContentsReadStoreProvider?: (
     env: W03PublishedMediaReferenceRuntimeEnv,
   ) => CreatorContentsReadStore | undefined
+  /** Optional D1-02 provider for owner-scoped content revision history reads. */
+  contentRevisionReadStoreProvider?: (
+    env: W03PublishedMediaReferenceRuntimeEnv,
+  ) => ContentRevisionReadStore | undefined
   /** Optional D1-02 provider for the bounded bookmark-content batch read. */
   publishedContentsByIdsReadStoreProvider?: (
     env: W03PublishedMediaReferenceRuntimeEnv,
@@ -1295,7 +1300,14 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
         const cursor = url.searchParams.get('cursor')
         const limit = parseRevisionListLimit(url.searchParams.get('limit'))
         if (cursor && cursor.length > 2048) throw new ContentRuntimeError('INVALID_CURSOR', 400)
-        const page = await listContentRevisions(env.D1_02, principal.userId, path.id, cursor, limit)
+        const page = await listContentRevisions(
+          env.D1_02,
+          principal.userId,
+          path.id,
+          cursor,
+          limit,
+          dependencies.contentRevisionReadStoreProvider?.(env),
+        )
         return json({
           data: {
             items: page.items,
@@ -1309,7 +1321,13 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
       if (path && path.revisions && path.id && path.revisionId && request.method === 'GET' && !path.rollback) {
         const principal = requiredCreatorPrincipal(request)
         return json({
-          data: await getContentRevision(env.D1_02, principal.userId, path.id, path.revisionId),
+          data: await getContentRevision(
+            env.D1_02,
+            principal.userId,
+            path.id,
+            path.revisionId,
+            dependencies.contentRevisionReadStoreProvider?.(env),
+          ),
           requestId: createRequestId(),
         })
       }
