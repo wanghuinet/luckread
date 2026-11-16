@@ -55,9 +55,16 @@ test('D1-02 contract freezes the two owner source sets and excludes D1-03', () =
   )
 })
 
-test('W03 Wrangler binding is pinned to the admitted D1-02 database', () => {
-  const config = JSON.parse(readSource(contract.owners[0].wrangler))
-  assert.deepEqual(validateWorkerBindings(config, contract.owners[0]), [])
+test('W03 production runtime is Neon while its D1-02 migration source remains pinned', () => {
+  const owner = contract.owners[0]
+  assert.ok(owner.physicalBindings.some((item) =>
+    item.binding === 'D1_02' && item.logicalDomain === 'D1-02' && item.included === true))
+  const config = JSON.parse(readSource(owner.wrangler))
+  assert.equal(config.d1_databases?.length ?? 0, 0)
+  assert.equal(config.vars?.W03_CONTENT_READ_DRIVER, 'neon')
+  assert.ok(config.hyperdrive?.some((item) =>
+    item.binding === 'HYPERDRIVE_D1_02' && item.id === 'c55183e1cc3446409c9c1075832c6615'))
+  assert.deepEqual(validateWorkerBindings(config, owner), [])
 })
 
 test('W05 historical schema source remains pinned while the production Worker uses Neon only', () => {
@@ -77,28 +84,25 @@ test('W05 historical schema source remains pinned while the production Worker us
   assert.deepEqual(validateWorkerBindings(config, owner), [])
 })
 
-test('binding validators reject historical D1 target drift and any W05 production D1 reintroduction', () => {
+test('binding validators reject Neon target drift and any W05 production D1 reintroduction', () => {
   const w03Owner = contract.owners[0]
   const w03Config = JSON.parse(readSource(w03Owner.wrangler))
-  const wrongTarget = {
+  const wrongW03Target = {
     ...w03Config,
-    d1_databases: w03Config.d1_databases.map((item) =>
-      item.binding === 'D1_02' ? { ...item, database_id: 'wrong-target' } : item),
+    hyperdrive: w03Config.hyperdrive.map((item) =>
+      item.binding === 'HYPERDRIVE_D1_02' ? { ...item, id: 'wrong-target' } : item),
   }
-  assert.ok(validateWorkerBindings(wrongTarget, w03Owner).some((error) => error.includes('database_id mismatch')))
+  assert.ok(validateWorkerBindings(wrongW03Target, w03Owner).some((error) => error.includes('HYPERDRIVE_D1_02 target mismatch')))
+  const w03D1Reintroduced = { ...w03Config, d1_databases: [{ binding: 'D1_02' }] }
+  assert.ok(validateWorkerBindings(w03D1Reintroduced, w03Owner).some((error) => error.includes('zero D1 bindings')))
 
   const w05Owner = contract.owners[1]
   const w05Config = JSON.parse(readSource(w05Owner.wrangler))
   const extraBinding = {
     ...w05Config,
-    d1_databases: [{
-      binding: 'UNREVIEWED_DB',
-      database_name: 'unexpected',
-      database_id: 'unexpected',
-    }],
+    d1_databases: [{ binding: 'UNREVIEWED_DB', database_name: 'unexpected', database_id: 'unexpected' }],
   }
   assert.ok(validateWorkerBindings(extraBinding, w05Owner).some((error) => error.includes('zero D1 bindings')))
-
   const wrongHyperdrive = {
     ...w05Config,
     hyperdrive: w05Config.hyperdrive.map((item) =>
@@ -144,4 +148,5 @@ test('repository inventory resolves exactly 30 current D1-02 migration sources w
   assert.equal(result.report.safety.neonConnectionAttempted, false)
   assert.equal(result.report.safety.remoteDdlExecuted, false)
   assert.equal(result.report.safety.productionD1Touched, false)
+  assert.equal(result.report.safety.workerRuntimeOrBindingChanged, true)
 })
