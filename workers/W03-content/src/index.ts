@@ -869,8 +869,8 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
         const mediaReferenceReadStore =
           dependencies.publishedMediaReferenceReadStore ??
           dependencies.publishedMediaReferenceReadStoreProvider?.(env)
+        if (!mediaReferenceReadStore) throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
         const access = await resolvePublishedMediaReferenceAccess(
-          NO_LEGACY_DATABASE_HANDLE,
           mediaUrl,
           viewerUserId,
           viewerUserId
