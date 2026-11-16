@@ -367,6 +367,141 @@ export function createPostgresContentMutationStore(
         // The existing contents_after_update_outbox trigger records lifecycle state changes in this transaction.
       })
     },
+    async loadRevision(contentId, revisionId): Promise<ContentRevision | null> {
+      try {
+        const result = await database.query<{
+          id: string
+          content_id: string
+          revision: number
+          content_version: number
+          actor_user_id: string
+          source_revision: number | null
+          operation: ContentRevision['operation']
+          state: ContentRevision['state']
+          access_mode: string | null
+          slug: string
+          title: string
+          body_ref: string
+          media_refs_json: string
+          cover_ref: string | null
+          media_warning: ContentRevision['mediaWarning']
+          etag: string
+          reason: string | null
+          correlation_id: string
+          created_at: Date | string
+        }>(
+          'SELECT id, content_id, revision, content_version, actor_user_id, source_revision, operation, ' +
+          'state, access_mode, slug, title, body_ref, media_refs_json, cover_ref, media_warning, etag, ' +
+          'reason, correlation_id, created_at FROM content_revisions WHERE id = $1 AND content_id = $2',
+          [revisionId, contentId],
+        )
+        const row = result.rows[0]
+        if (!row) return null
+        return {
+          id: row.id,
+          contentId: row.content_id,
+          revision: row.revision,
+          contentVersion: row.content_version,
+          actorUserId: row.actor_user_id,
+          sourceRevision: row.source_revision,
+          operation: row.operation,
+          state: row.state,
+          accessMode: row.access_mode === 'MEMBERS_ONLY' ? 'MEMBERS_ONLY' : 'PUBLIC',
+          slug: row.slug,
+          title: row.title,
+          bodyRef: row.body_ref,
+          mediaRefs: JSON.parse(row.media_refs_json || '[]') as string[],
+          coverRef: row.cover_ref,
+          mediaWarning: row.media_warning ?? null,
+          etag: row.etag,
+          reason: row.reason,
+          correlationId: row.correlation_id,
+          createdAt: timestampString(row.created_at) as string,
+        }
+      } catch {
+        throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
+      }
+    },
+    async rollback(input) {
+      await withTransaction(database, async (client) => {
+        await insertIdempotency(client, {
+          ownerUserId: input.ownerUserId,
+          operationId: input.operationId,
+          idempotencyKey: input.idempotencyKey,
+          requestHash: input.requestHash,
+          responseStatus: 200,
+          responseJson: input.responseJson,
+          now: input.updatedAt,
+          expiresAt: input.expiresAt,
+        })
+        const content = input.content
+        const updated = await client.query<{ id: string }>(
+          'UPDATE contents SET title = $1, body_ref = $2, media_refs_json = $3, cover_ref = $4, ' +
+          'media_warning = $5, access_mode = $6, version = $7, revision = $8, etag = $9, ' +
+          'updated_at = $10::timestamptz ' +
+          'WHERE id = $11 AND owner_user_id = $12 AND version = $13 AND etag = $14 RETURNING id',
+          [
+            content.title,
+            content.bodyRef,
+            JSON.stringify(content.mediaRefs),
+            content.coverRef,
+            content.mediaWarning ?? null,
+            content.accessMode ?? 'PUBLIC',
+            content.version,
+            content.revision,
+            content.etag,
+            input.updatedAt,
+            content.id,
+            input.ownerUserId,
+            input.expectedVersion,
+            input.expectedEtag,
+          ],
+        )
+        if (updated.rows.length !== 1) {
+          throw new ContentRuntimeError('PRECONDITION_FAILED', 412)
+        }
+        const revision = input.revision
+        await client.query(
+          'INSERT INTO content_revisions ' +
+          '(id, content_id, revision, content_version, actor_user_id, source_revision, operation, state, access_mode, slug, title, body_ref, media_refs_json, cover_ref, media_warning, etag, reason, correlation_id, created_at) ' +
+          'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19::timestamptz)',
+          [
+            revision.id,
+            revision.contentId,
+            revision.revision,
+            revision.contentVersion,
+            revision.actorUserId,
+            revision.sourceRevision,
+            revision.operation,
+            revision.state,
+            revision.accessMode ?? 'PUBLIC',
+            revision.slug,
+            revision.title,
+            revision.bodyRef,
+            JSON.stringify(revision.mediaRefs),
+            revision.coverRef,
+            revision.mediaWarning ?? null,
+            revision.etag,
+            revision.reason,
+            revision.correlationId,
+            revision.createdAt,
+          ],
+        )
+        await client.query(
+          "INSERT INTO content_outbox_events " +
+          "(event_id, operation_id, event_type, content_id, aggregate_version, payload_json, created_at, published_at) " +
+          "VALUES ($1, 'rollbackContentRevision', 'content.revision.rolled_back', $2, $3, $4, $5::timestamptz, NULL)",
+          [
+            crypto.randomUUID(),
+            content.id,
+            content.version,
+            input.outboxEventPayloadJson,
+            input.updatedAt,
+          ],
+        )
+        // contents_after_update_outbox emits the content.updated event in the same transaction.
+      })
+    },
     async moderationTransition(input) {
       await withTransaction(database, async (client) => {
         await insertIdempotency(client, {
