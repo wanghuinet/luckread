@@ -110,6 +110,28 @@ export interface SeriesUpdateStore {
   }>): Promise<void>
 }
 
+export interface SeriesDeleteStore {
+  loadMutation(
+    ownerUserId: string,
+    seriesId: string,
+    operationId: string,
+    idempotencyKey: string,
+  ): Promise<SeriesMutationSnapshot>
+  delete(input: Readonly<{
+    ownerUserId: string
+    operationId: string
+    idempotencyKey: string
+    requestHash: string
+    deletedAt: string
+    expiresAt: string
+    seriesId: string
+    nextVersion: number
+    nextEtag: string
+    expectedVersion: number
+    expectedEtag: string
+  }>): Promise<void>
+}
+
 interface SeriesWithIdempotencyRow extends SeriesRow {
   idem_id: string | null
   idem_owner_user_id: string | null
@@ -574,13 +596,16 @@ export async function deleteSeries(
   ifMatch: string,
   idempotencyKey: string,
   now = new Date(),
+  deleteStore?: SeriesDeleteStore,
 ): Promise<void> {
   assertResourceId(principalUserId)
   assertResourceId(seriesId)
   if (!ifMatch || !idempotencyKey) throw new ContentRuntimeError('PRECONDITION_REQUIRED', 428)
   const operationId = 'deleteSeries'
   const hash = await requestHash(operationId, { seriesId, ifMatch: normalizeEtag(ifMatch) })
-  const loaded = await loadSeriesMutation(db, principalUserId, seriesId, operationId, idempotencyKey)
+  const loaded = deleteStore
+    ? await deleteStore.loadMutation(principalUserId, seriesId, operationId, idempotencyKey)
+    : await loadSeriesMutation(db, principalUserId, seriesId, operationId, idempotencyKey)
   const replay = activeIdempotency(loaded.idempotency && {
     idem_id: loaded.idempotency.id,
     idem_owner_user_id: loaded.idempotency.owner_user_id,
@@ -597,19 +622,36 @@ export async function deleteSeries(
   if (!['DRAFT', 'PUBLISHED', 'UNPUBLISHED', 'ARCHIVED'].includes(series.state)) {
     throw new ContentRuntimeError('INVALID_STATE', 409)
   }
-  const updatedAt = now.toISOString()
+  const deletedAt = now.toISOString()
   const nextVersion = series.version + 1
+  const nextEtag = etagForVersion(nextVersion)
   const expiresAt = new Date(now.getTime() + IDEMPOTENCY_TTL_MS).toISOString()
-  await batchMutation(db, [
-    expireIdempotency(db, principalUserId, operationId, idempotencyKey, updatedAt),
-    insertIdempotency(db, principalUserId, operationId, idempotencyKey, hash, 204, '', updatedAt, expiresAt),
-    db.prepare(
-      "UPDATE content_series SET state = 'DELETED', version = ?, etag = ?, updated_at = ? " +
-      'WHERE id = ? AND owner_user_id = ? AND version = ? AND etag = ?',
-    ).bind(
-      nextVersion, etagForVersion(nextVersion), updatedAt,
-      series.id, principalUserId, series.version, series.etag,
-    ),
-    atomicGuard(db),
-  ])
+  if (deleteStore) {
+    await deleteStore.delete({
+      ownerUserId: principalUserId,
+      operationId,
+      idempotencyKey,
+      requestHash: hash,
+      deletedAt,
+      expiresAt,
+      seriesId: series.id,
+      nextVersion,
+      nextEtag,
+      expectedVersion: series.version,
+      expectedEtag: series.etag,
+    })
+  } else {
+    await batchMutation(db, [
+      expireIdempotency(db, principalUserId, operationId, idempotencyKey, deletedAt),
+      insertIdempotency(db, principalUserId, operationId, idempotencyKey, hash, 204, '', deletedAt, expiresAt),
+      db.prepare(
+        "UPDATE content_series SET state = 'DELETED', version = ?, etag = ?, updated_at = ? " +
+        'WHERE id = ? AND owner_user_id = ? AND version = ? AND etag = ?',
+      ).bind(
+        nextVersion, nextEtag, deletedAt,
+        series.id, principalUserId, series.version, series.etag,
+      ),
+      atomicGuard(db),
+    ])
+  }
 }
