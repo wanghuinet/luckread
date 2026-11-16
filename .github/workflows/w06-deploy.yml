@@ -86,7 +86,7 @@ jobs:
           # Blueprint, Entity, and non-W06 authority-sensitive changes remain
           # rejected by the explicit allowlist below.
           changed_from_admitted="$(gh api "repos/$GITHUB_REPOSITORY/compare/$PREVIOUS_ADMITTED_SOURCE_SHA...$SOURCE_SHA" --jq '.files[]?.filename // empty')"
-          w06_delta="$(printf '%s\n' "$changed_from_admitted" | grep -E '^workers/W06-governance/|^\.github/workflows/w06-|^docs/change-control/CC-1\.8-MODERATION-IDEMPOTENCY-REPLAY-ORDER-2026-10-01\.md|^docs/change-control/CC-MAPPING-0-AUTH-013-W06-|^docs/MAPPING-0-CLOSURE-LEDGER\.md|^artifacts/mapping-0/w06-' || true)"
+          w06_delta="$(printf '%s\n' "$changed_from_admitted" | grep -E '^workers/W06-governance/|^workers/W09-platform/src/audit-event-postgres-adapter\.ts$|^\.github/workflows/w06-|^docs/change-control/CC-1\.8-MODERATION-IDEMPOTENCY-REPLAY-ORDER-2026-10-01\.md|^docs/change-control/CC-MAPPING-0-AUTH-013-W06-|^docs/MAPPING-0-CLOSURE-LEDGER\.md|^artifacts/mapping-0/w06-' || true)"
           test -n "$w06_delta" || {
             echo "No admitted W06 implementation/governance delta found between $PREVIOUS_ADMITTED_SOURCE_SHA and $SOURCE_SHA"
             exit 1
