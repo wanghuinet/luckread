@@ -22,6 +22,15 @@ describe('W09 AuditEvent PostgreSQL runtime boundary', () => {
     )).toBe(true)
   })
 
+  it('does not treat SQL comment markers inside quoted AuditEvent payloads as comments', () => {
+    expect(assertAuditSql(
+      "INSERT INTO audit_events(event_id, reason) VALUES (?, 'value -- FROM moderation_cases')",
+    )).toBe(true)
+    expect(assertAuditSql(
+      "INSERT INTO audit_events(event_id, reason) VALUES (?, 'value /* UPDATE moderation_cases */')",
+    )).toBe(true)
+  })
+
   it.each([
     'UPDATE audit_events SET action = ? WHERE event_id = ?',
     'DELETE FROM audit_events WHERE event_id = ?',
