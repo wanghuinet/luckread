@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 import {
@@ -8,6 +9,31 @@ import {
 } from './moderation-database-runtime.js'
 
 describe('W06 moderation database runtime admission', () => {
+  it('selects the existing D1-03 Neon Hyperdrive and preserves D1 rollback plus existing bindings', () => {
+    const config = JSON.parse(readFileSync(new URL('../../wrangler.neon.jsonc', import.meta.url), 'utf8'))
+    const d1 = (config.d1_databases ?? []).find((binding: { binding?: string }) => binding.binding === 'D1_03')
+    const hyperdrive = (config.hyperdrive ?? []).find((binding: { binding?: string }) => binding.binding === 'HYPERDRIVE_D1_03')
+
+    expect(config.vars?.W06_MODERATION_DATABASE_DRIVER).toBe('neon')
+    expect(d1).toMatchObject({
+      database_name: 'secondary',
+      database_id: 'bda1d247-a371-4244-91ae-aef96034db7f',
+    })
+    expect(hyperdrive).toEqual({
+      binding: 'HYPERDRIVE_D1_03',
+      id: '7c8831416c18494faee04b96aa551cb9',
+    })
+    expect(config.compatibility_flags).toContain('nodejs_compat')
+    expect(config.services).toContainEqual({
+      binding: 'W03_CONTENT_MODERATION',
+      service: 'luckread-w03',
+    })
+    expect(config.queues?.consumers).toContainEqual(expect.objectContaining({
+      queue: 'luckread-auth013-account-state',
+      dead_letter_queue: 'luckread-auth013-account-state-dlq',
+    }))
+  })
+
   it('keeps D1 as the default and selects the existing D1 moderation database', () => {
     const d1 = { prepare() {}, batch() {} } as unknown as D1Database
     const env = { D1_03: d1 }
