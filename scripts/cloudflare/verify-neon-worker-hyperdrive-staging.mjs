@@ -25,8 +25,6 @@ export const STAGED_WORKERS = Object.freeze([
     d1Bindings: [],
     driver: 'W02_DATABASE_DRIVER',
     driverValue: 'neon',
-    driver: 'W02_DATABASE_DRIVER',
-    driverValue: 'neon',
   },
   {
     worker: 'W03',
