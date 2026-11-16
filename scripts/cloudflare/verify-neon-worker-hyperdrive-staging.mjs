@@ -12,7 +12,7 @@ export const STAGED_WORKERS = Object.freeze([
     configPath: 'workers/W01-payload/wrangler.jsonc',
     binding: 'HYPERDRIVE',
     hyperdriveId: '0c53a1bb9bc0484bac146e8ae2d3158b',
-    d1Bindings: ['D1'],
+    d1Bindings: [],
     driver: 'PAYLOAD_DATABASE_DRIVER',
     driverValue: 'neon',
   },
@@ -50,7 +50,7 @@ export const STAGED_WORKERS = Object.freeze([
     configPath: 'workers/W07-subscription-commerce/wrangler.jsonc',
     binding: 'HYPERDRIVE_D1_04',
     hyperdriveId: '3ae15e6dfb5e4b44979eee30e1d5ede4',
-    d1Bindings: ['D1_01', 'D1_04'],
+    d1Bindings: [],
   },
   {
     worker: 'W08',
