@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { resolvePermissionContext, resolvePermissionContextPostgres } from './role-layer.js'
+import type { W08D1Database } from '../creator-store.js'
 import { vi } from 'vitest'
 
 type RoleAssignmentRow = {
@@ -56,7 +57,7 @@ describe('W08 persisted authorization context', () => {
       { roleId: 'unknown_scoped_role', scopeType: 'organization', scopeId: 'org-10' },
     ])
 
-    await expect(resolvePermissionContext(db as unknown as D1Database, 'user-1', NOW)).resolves.toEqual({
+    await expect(resolvePermissionContext(db as unknown as W08D1Database, 'user-1', NOW)).resolves.toEqual({
       layer: 'L3',
       scopedRoleAssignments: [
         { roleId: 'ip_principal', scopeType: 'ip', scopeId: 'ip-17' },
@@ -81,7 +82,7 @@ describe('W08 persisted authorization context', () => {
       { roleId: 'root_override', scopeType: 'global', scopeId: null },
     ])
 
-    await expect(resolvePermissionContext(db as unknown as D1Database, 'user-1', NOW)).resolves.toBeNull()
+    await expect(resolvePermissionContext(db as unknown as W08D1Database, 'user-1', NOW)).resolves.toBeNull()
   })
 
   it('does not infer a global layer from scoped assignments alone', async () => {
@@ -90,7 +91,7 @@ describe('W08 persisted authorization context', () => {
       { roleId: 'mcn_admin', scopeType: 'organization', scopeId: 'org-8' },
     ])
 
-    await expect(resolvePermissionContext(db as unknown as D1Database, 'user-1', NOW)).resolves.toBeNull()
+    await expect(resolvePermissionContext(db as unknown as W08D1Database, 'user-1', NOW)).resolves.toBeNull()
   })
 
   it('rejects missing subjects and invalid timestamps before querying D1', async () => {
@@ -98,8 +99,8 @@ describe('W08 persisted authorization context', () => {
       { roleId: 'creator', scopeType: 'global', scopeId: null },
     ])
 
-    await expect(resolvePermissionContext(db as unknown as D1Database, '', NOW)).resolves.toBeNull()
-    await expect(resolvePermissionContext(db as unknown as D1Database, 'user-1', 'not-a-date')).resolves.toBeNull()
+    await expect(resolvePermissionContext(db as unknown as W08D1Database, '', NOW)).resolves.toBeNull()
+    await expect(resolvePermissionContext(db as unknown as W08D1Database, 'user-1', 'not-a-date')).resolves.toBeNull()
     expect(db.statements).toHaveLength(0)
     expect(db.readCalls).toBe(0)
   })
