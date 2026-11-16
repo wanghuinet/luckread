@@ -1,7 +1,7 @@
 -- W05 / D1-02 PostgreSQL 18 schema-only bootstrap.
 -- Source authority: W05 / D1-02 social graph, interactions and notification delivery state.
 -- Endpoint state remains owned by W09 / D1-03 and is intentionally not created here.
--- Existing runtime authority remains Cloudflare D1; this artifact is for an empty Neon schema rehearsal.
+-- The empty-schema artifact is generated from historical D1-origin migrations; production W05 runtime uses the existing Neon D1-02 and delegated Neon D1-03 Hyperdrive connections.
 BEGIN;
 
 CREATE TABLE social_follow_relationships (
