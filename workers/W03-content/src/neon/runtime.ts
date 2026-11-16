@@ -121,20 +121,20 @@ export function resolveW03PublicMediaReferenceDriver(
 
 function validateHyperdriveConnectionString(value: unknown): string {
   if (typeof value !== 'string' || value.length === 0 || value.length > 4096) {
-    throw new Error('W03_HYPERDRIVE_D1_02_CONNECTION_STRING_REQUIRED')
+    throw new Error('W03_HYPERDRIVE_CONTENT_PG_CONNECTION_STRING_REQUIRED')
   }
   let target: URL
   try {
     target = new URL(value)
   } catch {
-    throw new Error('W03_HYPERDRIVE_D1_02_CONNECTION_STRING_INVALID')
+    throw new Error('W03_HYPERDRIVE_CONTENT_PG_CONNECTION_STRING_INVALID')
   }
   if (
     !['postgres:', 'postgresql:'].includes(target.protocol) ||
     !target.hostname ||
     target.pathname.length < 2
   ) {
-    throw new Error('W03_HYPERDRIVE_D1_02_CONNECTION_STRING_INVALID')
+    throw new Error('W03_HYPERDRIVE_CONTENT_PG_CONNECTION_STRING_INVALID')
   }
   return value
 }
@@ -145,9 +145,9 @@ export function getW03PublicMediaReferencePostgresPool(
   if (resolveW03PublicMediaReferenceDriver(env) !== 'neon') {
     throw new Error('W03_POSTGRES_POOL_REQUIRES_NEON_DRIVER')
   }
-  const binding = env.HYPERDRIVE_D1_02
+  const binding = env.HYPERDRIVE_CONTENT_PG
   if (!binding || typeof binding !== 'object') {
-    throw new Error('W03_HYPERDRIVE_D1_02_BINDING_REQUIRED')
+    throw new Error('W03_HYPERDRIVE_CONTENT_PG_BINDING_REQUIRED')
   }
   const cached = pools.get(binding)
   if (cached) return cached
@@ -173,9 +173,9 @@ export function getW03PublishedMediaReferenceReadStore(
   env: W03PublicMediaReferenceRuntimeEnv,
 ): PublishedMediaReferenceReadStore {
   resolveW03PublicMediaReferenceDriver(env)
-  const binding = env.HYPERDRIVE_D1_02
+  const binding = env.HYPERDRIVE_CONTENT_PG
   if (!binding || typeof binding !== 'object') {
-    throw new Error('W03_HYPERDRIVE_D1_02_BINDING_REQUIRED')
+    throw new Error('W03_HYPERDRIVE_CONTENT_PG_BINDING_REQUIRED')
   }
   const cached = stores.get(binding)
   if (cached) return cached
@@ -196,9 +196,9 @@ export function getW03PublishedContentsByIdsReadStore(
 ): PublishedContentsByIdsReadStore | undefined {
   resolveW03PublicMediaReferenceDriver(env)
 
-  const binding = env.HYPERDRIVE_D1_02
+  const binding = env.HYPERDRIVE_CONTENT_PG
   if (!binding || typeof binding !== 'object') {
-    throw new Error('W03_HYPERDRIVE_D1_02_BINDING_REQUIRED')
+    throw new Error('W03_HYPERDRIVE_CONTENT_PG_BINDING_REQUIRED')
   }
   const cached = bookmarkedContentsStores.get(binding)
   if (cached) return cached
@@ -216,9 +216,9 @@ export function getW03FollowingOwnerContentsReadStore(
 ): FollowingOwnerContentsReadStore | undefined {
   resolveW03PublicMediaReferenceDriver(env)
 
-  const binding = env.HYPERDRIVE_D1_02
+  const binding = env.HYPERDRIVE_CONTENT_PG
   if (!binding || typeof binding !== 'object') {
-    throw new Error('W03_HYPERDRIVE_D1_02_BINDING_REQUIRED')
+    throw new Error('W03_HYPERDRIVE_CONTENT_PG_BINDING_REQUIRED')
   }
   const cached = followingContentsStores.get(binding)
   if (cached) return cached
@@ -237,9 +237,9 @@ export function getW03ContentRelationshipMutationStore(
 ): ContentRelationshipMutationStore | undefined {
   resolveW03PublicMediaReferenceDriver(env)
 
-  const binding = env.HYPERDRIVE_D1_02
+  const binding = env.HYPERDRIVE_CONTENT_PG
   if (!binding || typeof binding !== 'object') {
-    throw new Error('W03_HYPERDRIVE_D1_02_BINDING_REQUIRED')
+    throw new Error('W03_HYPERDRIVE_CONTENT_PG_BINDING_REQUIRED')
   }
   const cached = contentRelationshipMutationStores.get(binding)
   if (cached) return cached
@@ -256,9 +256,9 @@ export function getW03PostThreadReadStore(
 ): PostThreadReadStore | undefined {
   resolveW03PublicMediaReferenceDriver(env)
 
-  const binding = env.HYPERDRIVE_D1_02
+  const binding = env.HYPERDRIVE_CONTENT_PG
   if (!binding || typeof binding !== 'object') {
-    throw new Error('W03_HYPERDRIVE_D1_02_BINDING_REQUIRED')
+    throw new Error('W03_HYPERDRIVE_CONTENT_PG_BINDING_REQUIRED')
   }
   const cached = postThreadStores.get(binding)
   if (cached) return cached
@@ -277,9 +277,9 @@ export function getW03ContentContextReadStore(
 ): ContentContextReadStore | undefined {
   resolveW03PublicMediaReferenceDriver(env)
 
-  const binding = env.HYPERDRIVE_D1_02
+  const binding = env.HYPERDRIVE_CONTENT_PG
   if (!binding || typeof binding !== 'object') {
-    throw new Error('W03_HYPERDRIVE_D1_02_BINDING_REQUIRED')
+    throw new Error('W03_HYPERDRIVE_CONTENT_PG_BINDING_REQUIRED')
   }
   const cached = contentContextStores.get(binding)
   if (cached) return cached
@@ -297,9 +297,9 @@ export function getW03CollectionListReadStore(
 ): CollectionListReadStore | undefined {
   resolveW03PublicMediaReferenceDriver(env)
 
-  const binding = env.HYPERDRIVE_D1_02
+  const binding = env.HYPERDRIVE_CONTENT_PG
   if (!binding || typeof binding !== 'object') {
-    throw new Error('W03_HYPERDRIVE_D1_02_BINDING_REQUIRED')
+    throw new Error('W03_HYPERDRIVE_CONTENT_PG_BINDING_REQUIRED')
   }
   const cached = collectionListStores.get(binding)
   if (cached) return cached
@@ -318,9 +318,9 @@ export function getW03ContentMutationStore(
   env: W03PublicMediaReferenceRuntimeEnv,
 ): ContentMutationStore | undefined {
   if (resolveW03PublicMediaReferenceDriver(env) === 'd1') return undefined
-  const binding = env.HYPERDRIVE_D1_02
+  const binding = env.HYPERDRIVE_CONTENT_PG
   if (!binding || typeof binding !== 'object') {
-    throw new Error('W03_HYPERDRIVE_D1_02_BINDING_REQUIRED')
+    throw new Error('W03_HYPERDRIVE_CONTENT_PG_BINDING_REQUIRED')
   }
   const cached = contentMutationStores.get(binding)
   if (cached) return cached
@@ -335,9 +335,9 @@ export function getW03ContentCreateStore(
   env: W03PublicMediaReferenceRuntimeEnv,
 ): ContentCreateStore | undefined {
   if (resolveW03PublicMediaReferenceDriver(env) === 'd1') return undefined
-  const binding = env.HYPERDRIVE_D1_02
+  const binding = env.HYPERDRIVE_CONTENT_PG
   if (!binding || typeof binding !== 'object') {
-    throw new Error('W03_HYPERDRIVE_D1_02_BINDING_REQUIRED')
+    throw new Error('W03_HYPERDRIVE_CONTENT_PG_BINDING_REQUIRED')
   }
   const cached = contentCreateStores.get(binding)
   if (cached) return cached
@@ -353,9 +353,9 @@ export function getW03CollectionCreateStore(
 ): CollectionCreateStore | undefined {
   resolveW03PublicMediaReferenceDriver(env)
 
-  const binding = env.HYPERDRIVE_D1_02
+  const binding = env.HYPERDRIVE_CONTENT_PG
   if (!binding || typeof binding !== 'object') {
-    throw new Error('W03_HYPERDRIVE_D1_02_BINDING_REQUIRED')
+    throw new Error('W03_HYPERDRIVE_CONTENT_PG_BINDING_REQUIRED')
   }
   const cached = collectionCreateStores.get(binding)
   if (cached) return cached
@@ -373,9 +373,9 @@ export function getW03CollectionUpdateStore(
 ): CollectionUpdateStore | undefined {
   resolveW03PublicMediaReferenceDriver(env)
 
-  const binding = env.HYPERDRIVE_D1_02
+  const binding = env.HYPERDRIVE_CONTENT_PG
   if (!binding || typeof binding !== 'object') {
-    throw new Error('W03_HYPERDRIVE_D1_02_BINDING_REQUIRED')
+    throw new Error('W03_HYPERDRIVE_CONTENT_PG_BINDING_REQUIRED')
   }
   const cached = collectionUpdateStores.get(binding)
   if (cached) return cached
@@ -393,9 +393,9 @@ export function getW03CollectionDeleteStore(
 ): CollectionDeleteStore | undefined {
   resolveW03PublicMediaReferenceDriver(env)
 
-  const binding = env.HYPERDRIVE_D1_02
+  const binding = env.HYPERDRIVE_CONTENT_PG
   if (!binding || typeof binding !== 'object') {
-    throw new Error('W03_HYPERDRIVE_D1_02_BINDING_REQUIRED')
+    throw new Error('W03_HYPERDRIVE_CONTENT_PG_BINDING_REQUIRED')
   }
   const cached = collectionDeleteStores.get(binding)
   if (cached) return cached
@@ -413,9 +413,9 @@ export function getW03SeriesReadStore(
 ): SeriesReadStore | undefined {
   resolveW03PublicMediaReferenceDriver(env)
 
-  const binding = env.HYPERDRIVE_D1_02
+  const binding = env.HYPERDRIVE_CONTENT_PG
   if (!binding || typeof binding !== 'object') {
-    throw new Error('W03_HYPERDRIVE_D1_02_BINDING_REQUIRED')
+    throw new Error('W03_HYPERDRIVE_CONTENT_PG_BINDING_REQUIRED')
   }
   const cached = seriesStores.get(binding)
   if (cached) return cached
@@ -433,9 +433,9 @@ export function getW03SeriesCreateStore(
 ): SeriesCreateStore | undefined {
   resolveW03PublicMediaReferenceDriver(env)
 
-  const binding = env.HYPERDRIVE_D1_02
+  const binding = env.HYPERDRIVE_CONTENT_PG
   if (!binding || typeof binding !== 'object') {
-    throw new Error('W03_HYPERDRIVE_D1_02_BINDING_REQUIRED')
+    throw new Error('W03_HYPERDRIVE_CONTENT_PG_BINDING_REQUIRED')
   }
   const cached = seriesCreateStores.get(binding)
   if (cached) return cached
@@ -453,9 +453,9 @@ export function getW03SeriesUpdateStore(
 ): SeriesUpdateStore | undefined {
   resolveW03PublicMediaReferenceDriver(env)
 
-  const binding = env.HYPERDRIVE_D1_02
+  const binding = env.HYPERDRIVE_CONTENT_PG
   if (!binding || typeof binding !== 'object') {
-    throw new Error('W03_HYPERDRIVE_D1_02_BINDING_REQUIRED')
+    throw new Error('W03_HYPERDRIVE_CONTENT_PG_BINDING_REQUIRED')
   }
   const cached = seriesUpdateStores.get(binding)
   if (cached) return cached
@@ -473,9 +473,9 @@ export function getW03SeriesDeleteStore(
 ): SeriesDeleteStore | undefined {
   resolveW03PublicMediaReferenceDriver(env)
 
-  const binding = env.HYPERDRIVE_D1_02
+  const binding = env.HYPERDRIVE_CONTENT_PG
   if (!binding || typeof binding !== 'object') {
-    throw new Error('W03_HYPERDRIVE_D1_02_BINDING_REQUIRED')
+    throw new Error('W03_HYPERDRIVE_CONTENT_PG_BINDING_REQUIRED')
   }
   const cached = seriesDeleteStores.get(binding)
   if (cached) return cached
@@ -493,9 +493,9 @@ export function getW03SeriesMemberAttachStore(
 ): SeriesMemberAttachStore | undefined {
   resolveW03PublicMediaReferenceDriver(env)
 
-  const binding = env.HYPERDRIVE_D1_02
+  const binding = env.HYPERDRIVE_CONTENT_PG
   if (!binding || typeof binding !== 'object') {
-    throw new Error('W03_HYPERDRIVE_D1_02_BINDING_REQUIRED')
+    throw new Error('W03_HYPERDRIVE_CONTENT_PG_BINDING_REQUIRED')
   }
   const cached = seriesMemberAttachStores.get(binding)
   if (cached) return cached
@@ -513,9 +513,9 @@ export function getW03SeriesMemberRemoveStore(
 ): SeriesMemberRemoveStore | undefined {
   resolveW03PublicMediaReferenceDriver(env)
 
-  const binding = env.HYPERDRIVE_D1_02
+  const binding = env.HYPERDRIVE_CONTENT_PG
   if (!binding || typeof binding !== 'object') {
-    throw new Error('W03_HYPERDRIVE_D1_02_BINDING_REQUIRED')
+    throw new Error('W03_HYPERDRIVE_CONTENT_PG_BINDING_REQUIRED')
   }
   const cached = seriesMemberRemoveStores.get(binding)
   if (cached) return cached
@@ -533,9 +533,9 @@ export function getW03SeriesMemberReorderStore(
 ): SeriesMemberReorderStore | undefined {
   resolveW03PublicMediaReferenceDriver(env)
 
-  const binding = env.HYPERDRIVE_D1_02
+  const binding = env.HYPERDRIVE_CONTENT_PG
   if (!binding || typeof binding !== 'object') {
-    throw new Error('W03_HYPERDRIVE_D1_02_BINDING_REQUIRED')
+    throw new Error('W03_HYPERDRIVE_CONTENT_PG_BINDING_REQUIRED')
   }
   const cached = seriesMemberReorderStores.get(binding)
   if (cached) return cached
@@ -553,9 +553,9 @@ export function getW03CollectionMemberAttachStore(
 ): CollectionMemberAttachStore | undefined {
   resolveW03PublicMediaReferenceDriver(env)
 
-  const binding = env.HYPERDRIVE_D1_02
+  const binding = env.HYPERDRIVE_CONTENT_PG
   if (!binding || typeof binding !== 'object') {
-    throw new Error('W03_HYPERDRIVE_D1_02_BINDING_REQUIRED')
+    throw new Error('W03_HYPERDRIVE_CONTENT_PG_BINDING_REQUIRED')
   }
   const cached = collectionMemberAttachStores.get(binding)
   if (cached) return cached
@@ -573,9 +573,9 @@ export function getW03CollectionMemberRemoveStore(
 ): CollectionMemberRemoveStore | undefined {
   resolveW03PublicMediaReferenceDriver(env)
 
-  const binding = env.HYPERDRIVE_D1_02
+  const binding = env.HYPERDRIVE_CONTENT_PG
   if (!binding || typeof binding !== 'object') {
-    throw new Error('W03_HYPERDRIVE_D1_02_BINDING_REQUIRED')
+    throw new Error('W03_HYPERDRIVE_CONTENT_PG_BINDING_REQUIRED')
   }
   const cached = collectionMemberRemoveStores.get(binding)
   if (cached) return cached
@@ -593,8 +593,8 @@ export function getW03CollectionMemberReorderStore(
   env: W03PublicMediaReferenceRuntimeEnv,
 ): CollectionMemberReorderStore | undefined {
   if (resolveW03PublicMediaReferenceDriver(env) === 'd1') return undefined
-  const binding = env.HYPERDRIVE_D1_02
-  if (!binding || typeof binding !== 'object') throw new Error('W03_HYPERDRIVE_D1_02_BINDING_REQUIRED')
+  const binding = env.HYPERDRIVE_CONTENT_PG
+  if (!binding || typeof binding !== 'object') throw new Error('W03_HYPERDRIVE_CONTENT_PG_BINDING_REQUIRED')
   const cached = collectionMemberReorderStores.get(binding)
   if (cached) return cached
   const store = createPostgresCollectionMemberReorderStore(
@@ -613,9 +613,9 @@ export function getW03MembersReadStore(
 } | undefined {
   resolveW03PublicMediaReferenceDriver(env)
 
-  const binding = env.HYPERDRIVE_D1_02
+  const binding = env.HYPERDRIVE_CONTENT_PG
   if (!binding || typeof binding !== 'object') {
-    throw new Error('W03_HYPERDRIVE_D1_02_BINDING_REQUIRED')
+    throw new Error('W03_HYPERDRIVE_CONTENT_PG_BINDING_REQUIRED')
   }
   const cached = membersStores.get(binding)
   if (cached) return cached
@@ -633,9 +633,9 @@ export function getW03ContentDetailReadStore(
 ): ContentDetailReadStore | undefined {
   resolveW03PublicMediaReferenceDriver(env)
 
-  const binding = env.HYPERDRIVE_D1_02
+  const binding = env.HYPERDRIVE_CONTENT_PG
   if (!binding || typeof binding !== 'object') {
-    throw new Error('W03_HYPERDRIVE_D1_02_BINDING_REQUIRED')
+    throw new Error('W03_HYPERDRIVE_CONTENT_PG_BINDING_REQUIRED')
   }
   const cached = contentDetailStores.get(binding)
   if (cached) return cached
@@ -653,9 +653,9 @@ export function getW03CreatorContentsReadStore(
 ): CreatorContentsReadStore | undefined {
   resolveW03PublicMediaReferenceDriver(env)
 
-  const binding = env.HYPERDRIVE_D1_02
+  const binding = env.HYPERDRIVE_CONTENT_PG
   if (!binding || typeof binding !== 'object') {
-    throw new Error('W03_HYPERDRIVE_D1_02_BINDING_REQUIRED')
+    throw new Error('W03_HYPERDRIVE_CONTENT_PG_BINDING_REQUIRED')
   }
   const cached = creatorContentsStores.get(binding)
   if (cached) return cached
@@ -674,9 +674,9 @@ export function getW03PublicContentListReadStore(
 ): PublicContentListReadStore | undefined {
   resolveW03PublicMediaReferenceDriver(env)
 
-  const binding = env.HYPERDRIVE_D1_02
+  const binding = env.HYPERDRIVE_CONTENT_PG
   if (!binding || typeof binding !== 'object') {
-    throw new Error('W03_HYPERDRIVE_D1_02_BINDING_REQUIRED')
+    throw new Error('W03_HYPERDRIVE_CONTENT_PG_BINDING_REQUIRED')
   }
   const cached = publicContentListStores.get(binding)
   if (cached) return cached
@@ -695,9 +695,9 @@ export function getW03ContentRevisionReadStore(
 ): ContentRevisionReadStore | undefined {
   resolveW03PublicMediaReferenceDriver(env)
 
-  const binding = env.HYPERDRIVE_D1_02
+  const binding = env.HYPERDRIVE_CONTENT_PG
   if (!binding || typeof binding !== 'object') {
-    throw new Error('W03_HYPERDRIVE_D1_02_BINDING_REQUIRED')
+    throw new Error('W03_HYPERDRIVE_CONTENT_PG_BINDING_REQUIRED')
   }
   const cached = contentRevisionStores.get(binding)
   if (cached) return cached
