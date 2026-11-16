@@ -7,12 +7,10 @@ on:
         description: Exact W03 source commit to deploy
         required: true
         type: string
-        default: 386669f9f20d018523ff390d61c54e79b956224a
       confirm:
         description: Type DEPLOY_W03 to permit this controlled deployment
         required: true
         type: string
-        default: DEPLOY_W03
 
 permissions:
   contents: read
@@ -37,7 +35,13 @@ jobs:
         run: |
           set -euo pipefail
           test -f workers/W03-content/src/index.ts
+          test -f workers/W03-content/src/entry.ts
           test -f workers/W03-content/src/content-runtime.ts
+          grep -q 'contentMutationStoreProvider' workers/W03-content/src/entry.ts
+          grep -q 'getW03ContentMutationStore' workers/W03-content/src/entry.ts
+          grep -q 'contentContextReadStoreProvider' workers/W03-content/src/entry.ts
+          grep -q 'getW03ContentContextReadStore' workers/W03-content/src/entry.ts
+          grep -q 'HYPERDRIVE_CONTENT_PG' workers/W03-content/src/neon/runtime.ts
           grep -q 'applyModerationContentTransition' workers/W03-content/src/content-runtime.ts
           grep -q 'X-LuckRead-Caller.*W06' workers/W03-content/src/index.ts
           echo W03_MODERATION_ADAPTER_SOURCE=PASS
