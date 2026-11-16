@@ -118,7 +118,9 @@ jobs:
               !deployWorkflow.includes('pnpm run deploy:app') ||
               !pkg.scripts?.['deploy:app']?.includes('--config=wrangler.neon.jsonc') ||
               !pkg.scripts?.deploy?.includes('deploy:app') ||
-              pkg.scripts?.deploy?.includes('deploy:database')) {
+              pkg.scripts?.deploy?.includes('deploy:database') ||
+              pkg.scripts?.['legacy:deploy:d1-database'] ||
+              pkg.scripts?.['predeploy:database']) {
             throw new Error('W01 production deploy must use the D1-free Neon config and must not run the legacy D1 migration script')
           }
           console.log('W01_POSTGRES_ADAPTER_BUNDLED_AND_PG_RUNTIME_DEPENDENCY=PASS')
