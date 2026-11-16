@@ -107,7 +107,14 @@ jobs:
           set -euo pipefail
           node --input-type=module <<'NODE'
           import fs from 'node:fs'
+          const source = JSON.parse(fs.readFileSync('wrangler.jsonc', 'utf8'))
           const config = JSON.parse(fs.readFileSync('wrangler.neon.jsonc', 'utf8'))
+          const sourceD1 = (source.d1_databases || []).find((item) => item.binding === 'D1_03')
+          if (!sourceD1 || sourceD1.database_name !== 'secondary' ||
+              sourceD1.database_id !== 'bda1d247-a371-4244-91ae-aef96034db7f' ||
+              sourceD1.migrations_dir !== 'migrations') {
+            throw new Error('W06 historical D1-03 migration source mapping drifted')
+          }
           if ((config.d1_databases || []).length !== 0) throw new Error('W06 production Neon config must not bind Cloudflare D1')
           const hyperdrive = (config.hyperdrive || []).find((item) => item.binding === 'HYPERDRIVE_D1_03')
           const service = (config.services || []).find((item) => item.binding === 'W03_CONTENT_MODERATION')
