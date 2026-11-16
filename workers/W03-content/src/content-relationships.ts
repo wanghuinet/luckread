@@ -38,7 +38,7 @@ export interface PublicContentRelationship {
   createdAt: string
 }
 
-interface RelationshipRow {
+export interface RelationshipRow {
   relationship_id: string
   source_type: 'content'
   source_id: string
@@ -54,7 +54,7 @@ interface RelationshipRow {
   updated_at: string
 }
 
-interface CreateRelationshipQueryRow {
+export interface CreateRelationshipQueryRow {
   source_id: string
   owner_user_id: string
   source_version: number
@@ -68,7 +68,7 @@ interface CreateRelationshipQueryRow {
   active_relationship_id: string | null
 }
 
-interface RevokeRelationshipQueryRow extends RelationshipRow {
+export interface RevokeRelationshipQueryRow extends RelationshipRow {
   owner_user_id: string
   idem_id: string | null
   idem_owner_user_id: string | null
@@ -76,6 +76,44 @@ interface RevokeRelationshipQueryRow extends RelationshipRow {
   idem_status: 'IN_PROGRESS' | 'COMPLETED' | null
   idem_response_json: string | null
   idem_expires_at: string | null
+}
+
+export interface ContentRelationshipMutationStore {
+  loadCreate(input: Readonly<{
+    targetContentId: string
+    ownerUserId: string
+    operationId: string
+    idempotencyKey: string
+    sourceContentId: string
+  }>): Promise<CreateRelationshipQueryRow | null>
+  create(input: Readonly<{
+    ownerUserId: string
+    operationId: string
+    idempotencyKey: string
+    requestHash: string
+    responseJson: string
+    createdAt: string
+    expiresAt: string
+    relationship: ContentRelationship
+  }>): Promise<void>
+  loadRevoke(input: Readonly<{
+    ownerUserId: string
+    operationId: string
+    idempotencyKey: string
+    relationshipId: string
+    sourceContentId: string
+  }>): Promise<RevokeRelationshipQueryRow | null>
+  revoke(input: Readonly<{
+    ownerUserId: string
+    operationId: string
+    idempotencyKey: string
+    requestHash: string
+    responseJson: string
+    updatedAt: string
+    expiresAt: string
+    relationshipId: string
+    sourceContentId: string
+  }>): Promise<void>
 }
 
 const MAX_REF_LENGTH = 2048
@@ -226,6 +264,7 @@ export async function createContentRelationship(
   input: unknown,
   idempotencyKey: string,
   now = new Date(),
+  mutationStore?: ContentRelationshipMutationStore,
 ): Promise<ContentRelationship> {
   assertContentId(ownerUserId)
   assertContentId(sourceContentId)
@@ -255,9 +294,17 @@ export async function createContentRelationship(
     authorizationRef,
   })
 
-  const row = await db.prepare(contentAndIdempotencyQuery(operationId))
-    .bind(targetContentId, ownerUserId, operationId, idempotencyKey, sourceContentId)
-    .first<CreateRelationshipQueryRow>()
+  const row = mutationStore
+    ? await mutationStore.loadCreate({
+        targetContentId,
+        ownerUserId,
+        operationId,
+        idempotencyKey,
+        sourceContentId,
+      })
+    : await db.prepare(contentAndIdempotencyQuery(operationId))
+        .bind(targetContentId, ownerUserId, operationId, idempotencyKey, sourceContentId)
+        .first<CreateRelationshipQueryRow>()
 
   if (!row) throw new ContentRuntimeError('NOT_FOUND', 404)
 
@@ -286,32 +333,45 @@ export async function createContentRelationship(
   }
   const expiresAt = new Date(now.getTime() + IDEMPOTENCY_TTL_MS).toISOString()
 
-  await relationshipMutationBatch(db, [
-    db.prepare(
-      'DELETE FROM content_mutation_idempotency WHERE owner_user_id = ? AND operation_id = ? AND idempotency_key = ? AND expires_at <= ?',
-    ).bind(ownerUserId, operationId, idempotencyKey, createdAt),
-    db.prepare(
-      `INSERT INTO content_mutation_idempotency
-        (id, owner_user_id, operation_id, idempotency_key, request_hash, status, response_status, response_json, created_at, expires_at)
-       VALUES (?, ?, ?, ?, ?, 'COMPLETED', 201, ?, ?, ?)`,
-    ).bind(crypto.randomUUID(), ownerUserId, operationId, idempotencyKey, hash, JSON.stringify(relationship), createdAt, expiresAt),
-    db.prepare(
-      `INSERT INTO content_relationships
-        (relationship_id, source_type, source_id, target_type, target_id, relation_type,
-         schema_version, status, actor_id, provenance_ref, authorization_ref, created_at, updated_at)
-       VALUES (?, 'content', ?, 'content', ?, 'reference', 1, 'ACTIVE', ?, ?, ?, ?, ?)`,
-    ).bind(
-      relationship.relationshipId,
-      relationship.sourceId,
-      relationship.targetId,
-      relationship.actorId,
-      relationship.provenanceRef,
-      relationship.authorizationRef,
-      relationship.createdAt,
-      relationship.updatedAt,
-    ),
-    db.prepare('INSERT OR REPLACE INTO content_txn_guard(id, successful) VALUES (1, changes())'),
-  ])
+  if (mutationStore) {
+    await mutationStore.create({
+      ownerUserId,
+      operationId,
+      idempotencyKey,
+      requestHash: hash,
+      responseJson: JSON.stringify(relationship),
+      createdAt,
+      expiresAt,
+      relationship,
+    })
+  } else {
+    await relationshipMutationBatch(db, [
+      db.prepare(
+        'DELETE FROM content_mutation_idempotency WHERE owner_user_id = ? AND operation_id = ? AND idempotency_key = ? AND expires_at <= ?',
+      ).bind(ownerUserId, operationId, idempotencyKey, createdAt),
+      db.prepare(
+        `INSERT INTO content_mutation_idempotency
+          (id, owner_user_id, operation_id, idempotency_key, request_hash, status, response_status, response_json, created_at, expires_at)
+         VALUES (?, ?, ?, ?, ?, 'COMPLETED', 201, ?, ?, ?)`,
+      ).bind(crypto.randomUUID(), ownerUserId, operationId, idempotencyKey, hash, JSON.stringify(relationship), createdAt, expiresAt),
+      db.prepare(
+        `INSERT INTO content_relationships
+          (relationship_id, source_type, source_id, target_type, target_id, relation_type,
+           schema_version, status, actor_id, provenance_ref, authorization_ref, created_at, updated_at)
+         VALUES (?, 'content', ?, 'content', ?, 'reference', 1, 'ACTIVE', ?, ?, ?, ?, ?)`,
+      ).bind(
+        relationship.relationshipId,
+        relationship.sourceId,
+        relationship.targetId,
+        relationship.actorId,
+        relationship.provenanceRef,
+        relationship.authorizationRef,
+        relationship.createdAt,
+        relationship.updatedAt,
+      ),
+      db.prepare('INSERT OR REPLACE INTO content_txn_guard(id, successful) VALUES (1, changes())'),
+    ])
+  }
 
   return relationship
 }
@@ -407,6 +467,7 @@ export async function revokeContentRelationship(
   relationshipId: string,
   idempotencyKey: string,
   now = new Date(),
+  mutationStore?: ContentRelationshipMutationStore,
 ): Promise<ContentRelationship> {
   assertContentId(ownerUserId)
   assertContentId(sourceContentId)
@@ -416,29 +477,37 @@ export async function revokeContentRelationship(
   }
 
   const operationId = 'revokeContentRelationship'
-  const row = await db.prepare(
-    `SELECT
-       r.relationship_id, r.source_type, r.source_id, r.target_type, r.target_id,
-       r.relation_type, r.schema_version, r.status, r.actor_id,
-       r.provenance_ref, r.authorization_ref, r.created_at, r.updated_at,
-       c.owner_user_id,
-       i.id AS idem_id,
-       i.owner_user_id AS idem_owner_user_id,
-       i.request_hash AS idem_request_hash,
-       i.status AS idem_status,
-       i.response_json AS idem_response_json,
-       i.expires_at AS idem_expires_at
-      FROM content_relationships r
-      JOIN contents c ON c.id = r.source_id
-      LEFT JOIN (
-        SELECT id, owner_user_id, request_hash, status, response_json, expires_at
-          FROM content_mutation_idempotency
-         WHERE owner_user_id = ? AND operation_id = ? AND idempotency_key = ?
-         ORDER BY created_at DESC
-         LIMIT 1
-      ) i ON 1 = 1
-     WHERE r.relationship_id = ? AND r.source_id = ?`,
-  ).bind(ownerUserId, operationId, idempotencyKey, relationshipId, sourceContentId).first<RevokeRelationshipQueryRow>()
+  const row = mutationStore
+    ? await mutationStore.loadRevoke({
+        ownerUserId,
+        operationId,
+        idempotencyKey,
+        relationshipId,
+        sourceContentId,
+      })
+    : await db.prepare(
+        `SELECT
+           r.relationship_id, r.source_type, r.source_id, r.target_type, r.target_id,
+           r.relation_type, r.schema_version, r.status, r.actor_id,
+           r.provenance_ref, r.authorization_ref, r.created_at, r.updated_at,
+           c.owner_user_id,
+           i.id AS idem_id,
+           i.owner_user_id AS idem_owner_user_id,
+           i.request_hash AS idem_request_hash,
+           i.status AS idem_status,
+           i.response_json AS idem_response_json,
+           i.expires_at AS idem_expires_at
+          FROM content_relationships r
+          JOIN contents c ON c.id = r.source_id
+          LEFT JOIN (
+            SELECT id, owner_user_id, request_hash, status, response_json, expires_at
+              FROM content_mutation_idempotency
+             WHERE owner_user_id = ? AND operation_id = ? AND idempotency_key = ?
+             ORDER BY created_at DESC
+             LIMIT 1
+          ) i ON 1 = 1
+         WHERE r.relationship_id = ? AND r.source_id = ?`,
+      ).bind(ownerUserId, operationId, idempotencyKey, relationshipId, sourceContentId).first<RevokeRelationshipQueryRow>()
 
   if (!row) throw new ContentRuntimeError('NOT_FOUND', 404)
 
@@ -454,22 +523,36 @@ export async function revokeContentRelationship(
   const response: ContentRelationship = { ...source, status: 'REVOKED', updatedAt }
   const expiresAt = new Date(now.getTime() + IDEMPOTENCY_TTL_MS).toISOString()
 
-  await relationshipMutationBatch(db, [
-    db.prepare(
-      'DELETE FROM content_mutation_idempotency WHERE owner_user_id = ? AND operation_id = ? AND idempotency_key = ? AND expires_at <= ?',
-    ).bind(ownerUserId, operationId, idempotencyKey, updatedAt),
-    db.prepare(
-      `INSERT INTO content_mutation_idempotency
-        (id, owner_user_id, operation_id, idempotency_key, request_hash, status, response_status, response_json, created_at, expires_at)
-       VALUES (?, ?, ?, ?, ?, 'COMPLETED', 200, ?, ?, ?)`,
-    ).bind(crypto.randomUUID(), ownerUserId, operationId, idempotencyKey, hash, JSON.stringify(response), updatedAt, expiresAt),
-    db.prepare(
-      `UPDATE content_relationships
-          SET status = 'REVOKED', updated_at = ?
-        WHERE relationship_id = ? AND status = 'ACTIVE'`,
-    ).bind(updatedAt, relationshipId),
-    db.prepare('INSERT OR REPLACE INTO content_txn_guard(id, successful) VALUES (1, changes())'),
-  ])
+  if (mutationStore) {
+    await mutationStore.revoke({
+      ownerUserId,
+      operationId,
+      idempotencyKey,
+      requestHash: hash,
+      responseJson: JSON.stringify(response),
+      updatedAt,
+      expiresAt,
+      relationshipId,
+      sourceContentId,
+    })
+  } else {
+    await relationshipMutationBatch(db, [
+      db.prepare(
+        'DELETE FROM content_mutation_idempotency WHERE owner_user_id = ? AND operation_id = ? AND idempotency_key = ? AND expires_at <= ?',
+      ).bind(ownerUserId, operationId, idempotencyKey, updatedAt),
+      db.prepare(
+        `INSERT INTO content_mutation_idempotency
+          (id, owner_user_id, operation_id, idempotency_key, request_hash, status, response_status, response_json, created_at, expires_at)
+         VALUES (?, ?, ?, ?, ?, 'COMPLETED', 200, ?, ?, ?)`,
+      ).bind(crypto.randomUUID(), ownerUserId, operationId, idempotencyKey, hash, JSON.stringify(response), updatedAt, expiresAt),
+      db.prepare(
+        `UPDATE content_relationships
+            SET status = 'REVOKED', updated_at = ?
+          WHERE relationship_id = ? AND status = 'ACTIVE'`,
+      ).bind(updatedAt, relationshipId),
+      db.prepare('INSERT OR REPLACE INTO content_txn_guard(id, successful) VALUES (1, changes())'),
+    ])
+  }
 
   return response
 }

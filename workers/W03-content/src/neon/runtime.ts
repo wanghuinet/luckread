@@ -17,7 +17,8 @@ import { createPostgresPublishedContentsByIdsReadStore } from '../published-cont
 import { createPostgresFollowingOwnerContentsReadStore } from '../following-owner-contents-read-store-postgres.js'
 import { createPostgresPostThreadReadStore } from '../post-thread-read-store-postgres.js'
 import { createPostgresContentContextReadStore, type ContentContextReadStore } from '../content-context-read-store-postgres.js'
-import type { PostThreadReadStore } from '../content-relationships.js'
+import type { ContentRelationshipMutationStore, PostThreadReadStore } from '../content-relationships.js'
+import { createPostgresContentRelationshipMutationStore, type ContentRelationshipPostgresDatabase } from '../content-relationship-mutation-store-postgres.js'
 import {
   createPostgresCollectionListReadStore,
 } from '../content-collections-read-store-postgres.js'
@@ -74,6 +75,7 @@ const stores = new WeakMap<object, PublishedMediaReferenceReadStore>()
 const bookmarkedContentsStores = new WeakMap<object, PublishedContentsByIdsReadStore>()
 const followingContentsStores = new WeakMap<object, FollowingOwnerContentsReadStore>()
 const postThreadStores = new WeakMap<object, PostThreadReadStore>()
+const contentRelationshipMutationStores = new WeakMap<object, ContentRelationshipMutationStore>()
 const contentContextStores = new WeakMap<object, ContentContextReadStore>()
 const collectionListStores = new WeakMap<object, CollectionListReadStore>()
 const collectionCreateStores = new WeakMap<object, CollectionCreateStore>()
@@ -103,7 +105,7 @@ const creatorContentsStores = new WeakMap<object, CreatorContentsReadStore>()
  * batch projection, W04-authorized following-feed content, native post-thread
  * projection, canonical content context and detail reads, creator-owned
  * content lists, series and collection reads, and series/collection membership
- * lists. Content creation, update, delete, owner-authorized state transitions, W06 moderation decisions, owner-authorized revision rollback, and scheduled publication candidate reads/commits plus Collection creation, update, delete, member attachment, member removal, and member reorder plus Series creation, update, delete, member attachment, and member removal are the only Neon-backed mutations in these slices; all other W03 reads and mutations remain on D1_02. D1 is the safe
+ * lists. Content creation, update, delete, owner-authorized state transitions, W06 moderation decisions, owner-authorized revision rollback, scheduled publication candidate reads/commits, and content reference create/revoke plus Collection creation, update, delete, member attachment, member removal, and member reorder plus Series creation, update, delete, member attachment, and member removal are the only Neon-backed mutations in these slices; all other W03 reads and mutations remain on D1_02. D1 is the safe
  * default and unknown values fail closed.
  */
 export function resolveW03PublicMediaReferenceDriver(
@@ -230,6 +232,25 @@ export function getW03FollowingOwnerContentsReadStore(
   return store
 }
 
+
+/** PostgreSQL provider for content reference create and revoke mutations. */
+export function getW03ContentRelationshipMutationStore(
+  env: W03PublicMediaReferenceRuntimeEnv,
+): ContentRelationshipMutationStore | undefined {
+  if (resolveW03PublicMediaReferenceDriver(env) === 'd1') return undefined
+
+  const binding = env.HYPERDRIVE_D1_02
+  if (!binding || typeof binding !== 'object') {
+    throw new Error('W03_HYPERDRIVE_D1_02_BINDING_REQUIRED')
+  }
+  const cached = contentRelationshipMutationStores.get(binding)
+  if (cached) return cached
+  const store = createPostgresContentRelationshipMutationStore(
+    getW03PublicMediaReferencePostgresPool(env) as unknown as ContentRelationshipPostgresDatabase,
+  )
+  contentRelationshipMutationStores.set(binding, store)
+  return store
+}
 
 /** PostgreSQL provider for the native bounded post-thread projection only. */
 export function getW03PostThreadReadStore(
