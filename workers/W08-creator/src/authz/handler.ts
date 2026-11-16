@@ -88,7 +88,7 @@ async function resolveSubjectFromW02Session(
 
 /**
  * Internal-only permission endpoint. Actor identity comes from a W02 session,
- * and current account/role/scope facts come from D1-01. Callers cannot submit
+ * and current account/role/scope facts come from the selected Neon database in production. Callers cannot submit
  * subjectId, layer, account state, or scoped-role facts. Resource attributes
  * must be loaded server-side by the owning domain before this endpoint is used.
  */
@@ -156,7 +156,7 @@ export async function handlePermissionCheck(
       } else if (accountState === 'ACTIVE' || accountState === 'PENDING_VERIFICATION') {
         const resolved = pool
           ? await resolvePermissionContextPostgres(
-              async (sql, values) => (await pool.query(sql, values)).rows as RoleAssignmentRow[],
+              async (sql, values) => (await pool.query(sql, values as never)).rows as RoleAssignmentRow[],
               subjectId,
             )
           : await resolvePermissionContext(db!, subjectId)
