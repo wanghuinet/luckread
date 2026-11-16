@@ -470,7 +470,9 @@ describe('W03 Neon content relationship mutation store', () => {
     const store: ContentRelationshipMutationStore = {
       async loadCreate() { return createRow },
       async create() {},
-      async loadRevoke() { return revokeRow },
+      async loadRevoke() {
+        return { ...revokeRow, created_at: nowIso, updated_at: nowIso }
+      },
       async revoke() {},
       async loadAppend() { return appendRow },
       async loadAppendStats() { return appendStats },
