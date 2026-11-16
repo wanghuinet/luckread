@@ -13,7 +13,12 @@ function readSource(relativePath) {
   try { return readFileSync(path.join(root, relativePath), 'utf8') } catch { return null }
 }
 
-test('W05 source authority is pinned to D1-02 luckreadpro and excludes D1-03', () => {
+test('W05 D1-02 logical source is pinned while production runtime uses Neon and excludes D1-03 schema', () => {
+  const owner = inventory.owners.find((item) => item.worker === 'W05')
+  assert.equal(owner.runtimeProvider, 'neon')
+  assert.deepEqual(owner.physicalBindings, [])
+  assert.deepEqual(owner.neonBindings.map((item) => item.logicalDomain), ['D1-02', 'D1-03'])
+  assert.equal(owner.neonBindings[1].delegatedOwner, 'W09')
   const { sourceReport } = buildW05PostgresMigration({ inventory, socialContract, readSource, template })
   assert.equal(sourceReport.targetDatabase, 'luckreadpro')
   assert.equal(sourceReport.sourceOwner, 'W05')
@@ -52,13 +57,28 @@ test('W05 notification push delivery retains atomic D1-02 outbox semantics and n
   assert.doesNotMatch(artifact, /bda1d247-a371-4244-91ae-aef96034db7f|notification_push_endpoints/)
 })
 
-test('generator rejects a W05 D1-03 binding accidentally marked as included', () => {
+test('generator rejects Cloudflare D1 bindings reintroduced into the W05 Neon production config', () => {
+  const configPath = inventory.owners.find((item) => item.worker === 'W05').wrangler
+  const original = JSON.parse(readSource(configPath))
+  const invalidConfig = {
+    ...original,
+    d1_databases: [{ binding: 'DB', database_name: 'luckreadpro', database_id: '6c342634-97f6-4248-9f4a-85772af4f22c' }],
+  }
+  const readWithInvalidConfig = (relativePath) =>
+    relativePath === configPath ? JSON.stringify(invalidConfig) : readSource(relativePath)
+  assert.throws(
+    () => buildW05PostgresMigration({ inventory, socialContract, readSource: readWithInvalidConfig, template }),
+    /Wrangler production config must be D1-free/
+  )
+})
+
+test('generator rejects a changed W09-delegated D1-03 Neon Hyperdrive target', () => {
   const invalid = structuredClone(inventory)
   const owner = invalid.owners.find((item) => item.worker === 'W05')
-  owner.physicalBindings.find((item) => item.binding === 'D1_03').included = true
+  owner.neonBindings.find((item) => item.logicalDomain === 'D1-03').delegatedOwner = 'W05'
   assert.throws(
     () => buildW05PostgresMigration({ inventory: invalid, socialContract, readSource, template }),
-    /D1_03 governance binding must remain excluded/
+    /W09-delegated D1-03 Neon Hyperdrive targets/
   )
 })
 
