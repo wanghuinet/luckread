@@ -51,14 +51,14 @@ describe('W03 Neon-only content database driver', () => {
     const env = { W03_PUBLIC_MEDIA_REFERENCE_DRIVER: 'neon' }
     expect(resolveW03PublicMediaReferenceDriver(env)).toBe('neon')
     expect(() => getW03PublishedMediaReferenceReadStore(env))
-      .toThrow('W03_HYPERDRIVE_D1_02_BINDING_REQUIRED')
+      .toThrow('W03_HYPERDRIVE_CONTENT_PG_BINDING_REQUIRED')
   })
 
   it('rejects invalid Hyperdrive connection strings', () => {
     expect(() => getW03PublicMediaReferencePostgresPool({
       W03_CONTENT_READ_DRIVER: 'neon',
-      HYPERDRIVE_D1_02: { connectionString: 'https://example.invalid/database' },
-    })).toThrow('W03_HYPERDRIVE_D1_02_CONNECTION_STRING_INVALID')
+      HYPERDRIVE_CONTENT_PG: { connectionString: 'https://example.invalid/database' },
+    })).toThrow('W03_HYPERDRIVE_CONTENT_PG_CONNECTION_STRING_INVALID')
   })
 
   it('caches the Neon following-feed read store on the shared Hyperdrive pool', async () => {
@@ -67,7 +67,7 @@ describe('W03 Neon-only content database driver', () => {
     }
     const env = {
       W03_CONTENT_READ_DRIVER: 'neon',
-      HYPERDRIVE_D1_02: binding,
+      HYPERDRIVE_CONTENT_PG: binding,
     }
     const first = getW03FollowingOwnerContentsReadStore(env)
     const second = getW03FollowingOwnerContentsReadStore(env)
@@ -84,7 +84,7 @@ describe('W03 Neon-only content database driver', () => {
     }
     const env = {
       W03_PUBLIC_MEDIA_REFERENCE_DRIVER: 'neon',
-      HYPERDRIVE_D1_02: binding,
+      HYPERDRIVE_CONTENT_PG: binding,
     }
     const pool = getW03PublicMediaReferencePostgresPool(env)
     const store = getW03PublishedContentsByIdsReadStore(env)
@@ -102,7 +102,7 @@ describe('W03 Neon-only content database driver', () => {
     }
     const env = {
       W03_CONTENT_READ_DRIVER: 'neon',
-      HYPERDRIVE_D1_02: binding,
+      HYPERDRIVE_CONTENT_PG: binding,
     }
     const first = getW03ContentRelationshipMutationStore(env)
     const second = getW03ContentRelationshipMutationStore(env)
@@ -118,7 +118,7 @@ describe('W03 Neon-only content database driver', () => {
     }
     const env = {
       W03_PUBLIC_MEDIA_REFERENCE_DRIVER: 'neon',
-      HYPERDRIVE_D1_02: binding,
+      HYPERDRIVE_CONTENT_PG: binding,
     }
 
     const firstPool = getW03PublicMediaReferencePostgresPool(env)
@@ -139,7 +139,7 @@ describe('W03 Neon-only content database driver', () => {
     }
     const env = {
       W03_CONTENT_READ_DRIVER: 'neon',
-      HYPERDRIVE_D1_02: binding,
+      HYPERDRIVE_CONTENT_PG: binding,
     }
     const first = getW03PublicContentListReadStore(env)
     const second = getW03PublicContentListReadStore(env)
@@ -151,7 +151,7 @@ describe('W03 Neon-only content database driver', () => {
 
   it('requires the existing D1-02 Hyperdrive binding for explicit Neon thread reads', () => {
     expect(() => getW03PostThreadReadStore({ W03_CONTENT_READ_DRIVER: 'neon' }))
-      .toThrow('W03_HYPERDRIVE_D1_02_BINDING_REQUIRED')
+      .toThrow('W03_HYPERDRIVE_CONTENT_PG_BINDING_REQUIRED')
   })
 
   it('caches the Neon post-thread reader on the shared Neon pool with Neon-only runtime', async () => {
@@ -162,7 +162,7 @@ describe('W03 Neon-only content database driver', () => {
     }
     const env = {
       W03_CONTENT_READ_DRIVER: 'neon',
-      HYPERDRIVE_D1_02: binding,
+      HYPERDRIVE_CONTENT_PG: binding,
     }
     const first = getW03PostThreadReadStore(env)
     const second = getW03PostThreadReadStore(env)
@@ -180,7 +180,7 @@ describe('W03 Neon-only content database driver', () => {
     }
     const env = {
       W03_CONTENT_READ_DRIVER: 'neon',
-      HYPERDRIVE_D1_02: binding,
+      HYPERDRIVE_CONTENT_PG: binding,
     }
     const first = getW03CollectionListReadStore(env)
     const second = getW03CollectionListReadStore(env)
@@ -198,7 +198,7 @@ describe('W03 Neon-only content database driver', () => {
     }
     const env = {
       W03_CONTENT_READ_DRIVER: 'neon',
-      HYPERDRIVE_D1_02: binding,
+      HYPERDRIVE_CONTENT_PG: binding,
     }
     const first = getW03CollectionCreateStore(env)
     const second = getW03CollectionCreateStore(env)
@@ -216,7 +216,7 @@ describe('W03 Neon-only content database driver', () => {
     }
     const env = {
       W03_CONTENT_READ_DRIVER: 'neon',
-      HYPERDRIVE_D1_02: binding,
+      HYPERDRIVE_CONTENT_PG: binding,
     }
     const first = getW03CollectionUpdateStore(env)
     const second = getW03CollectionUpdateStore(env)
@@ -234,7 +234,7 @@ describe('W03 Neon-only content database driver', () => {
     }
     const env = {
       W03_CONTENT_READ_DRIVER: 'neon',
-      HYPERDRIVE_D1_02: binding,
+      HYPERDRIVE_CONTENT_PG: binding,
     }
     const first = getW03SeriesReadStore(env)
     const second = getW03SeriesReadStore(env)
@@ -252,7 +252,7 @@ describe('W03 Neon-only content database driver', () => {
     }
     const env = {
       W03_CONTENT_READ_DRIVER: 'neon',
-      HYPERDRIVE_D1_02: binding,
+      HYPERDRIVE_CONTENT_PG: binding,
     }
     const first = getW03MembersReadStore(env)
     const second = getW03MembersReadStore(env)
@@ -270,7 +270,7 @@ describe('W03 Neon-only content database driver', () => {
     }
     const env = {
       W03_CONTENT_READ_DRIVER: 'neon',
-      HYPERDRIVE_D1_02: binding,
+      HYPERDRIVE_CONTENT_PG: binding,
     }
     const first = getW03ContentDetailReadStore(env)
     const second = getW03ContentDetailReadStore(env)
@@ -288,7 +288,7 @@ describe('W03 Neon-only content database driver', () => {
     }
     const env = {
       W03_CONTENT_READ_DRIVER: 'neon',
-      HYPERDRIVE_D1_02: binding,
+      HYPERDRIVE_CONTENT_PG: binding,
     }
     const first = getW03CreatorContentsReadStore(env)
     const second = getW03CreatorContentsReadStore(env)
@@ -306,7 +306,7 @@ describe('W03 Neon-only content database driver', () => {
     }
     const env = {
       W03_CONTENT_READ_DRIVER: 'neon',
-      HYPERDRIVE_D1_02: binding,
+      HYPERDRIVE_CONTENT_PG: binding,
     }
     const first = getW03ContentContextReadStore(env)
     const second = getW03ContentContextReadStore(env)
@@ -323,7 +323,7 @@ describe('W03 Neon-only content database driver', () => {
     }
     const env = {
       W03_CONTENT_READ_DRIVER: 'neon',
-      HYPERDRIVE_D1_02: binding,
+      HYPERDRIVE_CONTENT_PG: binding,
     }
     const first = getW03CollectionDeleteStore(env)
     const second = getW03CollectionDeleteStore(env)
@@ -341,7 +341,7 @@ describe('W03 Neon-only content database driver', () => {
     }
     const env = {
       W03_CONTENT_READ_DRIVER: 'neon',
-      HYPERDRIVE_D1_02: binding,
+      HYPERDRIVE_CONTENT_PG: binding,
     }
     const first = getW03SeriesCreateStore(env)
     const second = getW03SeriesCreateStore(env)
@@ -359,7 +359,7 @@ describe('W03 Neon-only content database driver', () => {
     }
     const env = {
       W03_CONTENT_READ_DRIVER: 'neon',
-      HYPERDRIVE_D1_02: binding,
+      HYPERDRIVE_CONTENT_PG: binding,
     }
     const first = getW03SeriesUpdateStore(env)
     const second = getW03SeriesUpdateStore(env)
@@ -377,7 +377,7 @@ describe('W03 Neon-only content database driver', () => {
     }
     const env = {
       W03_CONTENT_READ_DRIVER: 'neon',
-      HYPERDRIVE_D1_02: binding,
+      HYPERDRIVE_CONTENT_PG: binding,
     }
     const first = getW03SeriesDeleteStore(env)
     const second = getW03SeriesDeleteStore(env)
@@ -395,7 +395,7 @@ describe('W03 Neon-only content database driver', () => {
     }
     const env = {
       W03_CONTENT_READ_DRIVER: 'neon',
-      HYPERDRIVE_D1_02: binding,
+      HYPERDRIVE_CONTENT_PG: binding,
     }
     const first = getW03SeriesMemberAttachStore(env)
     const second = getW03SeriesMemberAttachStore(env)
@@ -413,7 +413,7 @@ it('provides and caches the Neon Series member removal writer with Neon-only run
   const binding = {
     connectionString: 'postgresql://postgres:postgres@127.0.0.1:5432/luckread',
   }
-  const env = { W03_CONTENT_READ_DRIVER: 'neon', HYPERDRIVE_D1_02: binding }
+  const env = { W03_CONTENT_READ_DRIVER: 'neon', HYPERDRIVE_CONTENT_PG: binding }
   const first = getW03SeriesMemberRemoveStore(env)
   const second = getW03SeriesMemberRemoveStore(env)
 
@@ -429,7 +429,7 @@ it('provides and caches the Neon Collection member-attach writer with Neon-only 
   const binding = {
     connectionString: 'postgresql://postgres:postgres@127.0.0.1:5432/luckread',
   }
-  const env = { W03_CONTENT_READ_DRIVER: 'neon', HYPERDRIVE_D1_02: binding }
+  const env = { W03_CONTENT_READ_DRIVER: 'neon', HYPERDRIVE_CONTENT_PG: binding }
   const first = getW03CollectionMemberAttachStore(env)
   const second = getW03CollectionMemberAttachStore(env)
 
@@ -442,7 +442,7 @@ it('provides and caches the Neon Collection member-attach writer with Neon-only 
 it('provides and caches the Neon Collection member-remove writer with Neon-only runtime', async () => {
   expect(() => getW03CollectionMemberRemoveStore({})).toThrow('W03_NEON_DRIVER_REQUIRED')
   const binding = { connectionString: 'postgresql://postgres:postgres@127.0.0.1:5432/luckread' }
-  const env = { W03_CONTENT_READ_DRIVER: 'neon', HYPERDRIVE_D1_02: binding }
+  const env = { W03_CONTENT_READ_DRIVER: 'neon', HYPERDRIVE_CONTENT_PG: binding }
   const first = getW03CollectionMemberRemoveStore(env)
   const second = getW03CollectionMemberRemoveStore(env)
   expect(first).toBeDefined()
@@ -454,7 +454,7 @@ it('provides and caches the Neon Collection member-remove writer with Neon-only 
 it('provides and caches the Neon Collection member-reorder writer with Neon-only runtime', async () => {
   expect(() => getW03CollectionMemberReorderStore({})).toThrow('W03_NEON_DRIVER_REQUIRED')
   const binding = { connectionString: 'postgresql://postgres:postgres@127.0.0.1:5432/luckread' }
-  const env = { W03_CONTENT_READ_DRIVER: 'neon', HYPERDRIVE_D1_02: binding }
+  const env = { W03_CONTENT_READ_DRIVER: 'neon', HYPERDRIVE_CONTENT_PG: binding }
   const first = getW03CollectionMemberReorderStore(env)
   const second = getW03CollectionMemberReorderStore(env)
   expect(first).toBeDefined()
@@ -471,7 +471,7 @@ it('provides and caches the Neon content-create writer on the existing D1-02 Hyp
   }
   const env = {
     W03_CONTENT_READ_DRIVER: 'neon',
-    HYPERDRIVE_D1_02: binding,
+    HYPERDRIVE_CONTENT_PG: binding,
   }
   const first = getW03ContentCreateStore(env)
   const second = getW03ContentCreateStore(env)
@@ -484,7 +484,7 @@ it('provides and caches the Neon content-create writer on the existing D1-02 Hyp
 it('provides and caches the Neon Series member-reorder writer with Neon-only runtime', async () => {
   expect(() => getW03SeriesMemberReorderStore({})).toThrow('W03_NEON_DRIVER_REQUIRED')
   const binding = { connectionString: 'postgresql://postgres:postgres@127.0.0.1:5432/luckread' }
-  const env = { W03_CONTENT_READ_DRIVER: 'neon', HYPERDRIVE_D1_02: binding }
+  const env = { W03_CONTENT_READ_DRIVER: 'neon', HYPERDRIVE_CONTENT_PG: binding }
   const first = getW03SeriesMemberReorderStore(env)
   const second = getW03SeriesMemberReorderStore(env)
   expect(first).toBeDefined()
@@ -500,7 +500,7 @@ it('provides and caches the Neon owner-scoped content revision reader on D1-02 H
   const binding = {
     connectionString: 'postgresql://postgres:postgres@127.0.0.1:5432/luckread',
   }
-  const env = { W03_CONTENT_READ_DRIVER: 'neon', HYPERDRIVE_D1_02: binding }
+  const env = { W03_CONTENT_READ_DRIVER: 'neon', HYPERDRIVE_CONTENT_PG: binding }
   const first = getW03ContentRevisionReadStore(env)
   const second = getW03ContentRevisionReadStore(env)
 
