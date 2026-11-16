@@ -66,6 +66,14 @@ jobs:
       - name: Install repository dependencies
         run: npm ci
 
+      - name: Install W03 PostgreSQL Worker runtime dependency
+        working-directory: workers/W03-content
+        run: npm install --ignore-scripts --no-audit --no-fund --package-lock=false
+
+      - name: Validate W03 Neon bundle without deployment
+        working-directory: workers/W03-content
+        run: npx --yes wrangler@4.116.0 deploy --dry-run --config wrangler.jsonc --outdir /tmp/w03-neon-runtime-dry-run
+
       - name: Typecheck and unit-test W03
         run: |
           npx --no-install tsc --noEmit --strict --skipLibCheck             --target ES2022 --module ESNext --moduleResolution Bundler             --lib ES2022,DOM --types @cloudflare/workers-types             workers/W03-content/src/content-runtime.ts             workers/W03-content/src/publish-preflight.ts             workers/W03-content/src/index.ts
