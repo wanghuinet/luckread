@@ -6,6 +6,7 @@ describe('W07 D1 traffic guard', () => {
     const prepare = vi.fn()
     const env = {
       D1_01: { prepare } as unknown as D1Database,
+      D1_04: {} as D1Database,
       SUBSCRIPTION_ORIGIN_GLOBAL_LIMITER: { limit: vi.fn(async () => ({ success: false })) },
     }
 
@@ -35,6 +36,7 @@ describe('W07 D1 traffic guard', () => {
       new Request('https://luckread-w07.internal/memberships/subscriptions', { method: 'GET' }),
       {
         D1_01: { prepare } as unknown as D1Database,
+        D1_04: {} as D1Database,
         SUBSCRIPTION_ORIGIN_GLOBAL_LIMITER: { limit: vi.fn(async () => ({ success: true })) },
       },
     )
@@ -48,6 +50,7 @@ describe('W07 D1 traffic guard', () => {
       new Request('https://luckread-w07.internal/memberships/subscriptions', { method: 'GET' }),
       {
         D1_01: { prepare } as unknown as D1Database,
+        D1_04: {} as D1Database,
         SUBSCRIPTION_ORIGIN_GLOBAL_LIMITER: { limit: vi.fn(async () => { throw new Error('limiter unavailable') }) },
         SUBSCRIPTION_READ_LIMITER: { limit: vi.fn(async () => ({ success: true })) },
       },
@@ -65,6 +68,7 @@ describe('W07 D1 traffic guard', () => {
       new Request('https://luckread-w07.internal/memberships/subscriptions', { method: 'GET' }),
       {
         D1_01: { prepare } as unknown as D1Database,
+        D1_04: {} as D1Database,
         SUBSCRIPTION_ORIGIN_GLOBAL_LIMITER: { limit: vi.fn(async () => ({ success: true })) },
         SUBSCRIPTION_READ_LIMITER: { limit: vi.fn(async () => { throw new Error('actor limiter unavailable') }) },
       },

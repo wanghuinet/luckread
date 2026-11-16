@@ -11,10 +11,6 @@ on:
         description: Type DEPLOY_W07_SUBSCRIPTION to permit W07 and W10 runtime deployment
         required: true
         type: string
-      migration_confirm:
-        description: Type APPLY_W07_SUBSCRIPTION_MIGRATION to permit D1-01 migration
-        required: true
-        type: string
       renewal_confirm:
         description: Type DEPLOY_W07_W10_RENEWAL_RUNTIME to deploy the gated W07 and W10 renewal runtime
         required: true
@@ -25,7 +21,7 @@ permissions:
 
 jobs:
   deploy:
-    if: ${{ inputs.confirm == 'DEPLOY_W07_SUBSCRIPTION' && inputs.migration_confirm == 'APPLY_W07_SUBSCRIPTION_MIGRATION' && inputs.renewal_confirm == 'DEPLOY_W07_W10_RENEWAL_RUNTIME' }}
+    if: ${{ inputs.confirm == 'DEPLOY_W07_SUBSCRIPTION' && inputs.renewal_confirm == 'DEPLOY_W07_W10_RENEWAL_RUNTIME' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -38,7 +34,6 @@ jobs:
         env:
           SOURCE_SHA: ${{ inputs.source_sha }}
           DEPLOY_CONFIRM: ${{ inputs.confirm }}
-          MIGRATION_CONFIRM: ${{ inputs.migration_confirm }}
           RENEWAL_CONFIRM: ${{ inputs.renewal_confirm }}
         run: |
           set -euo pipefail
@@ -47,7 +42,6 @@ jobs:
           MAIN_SHA="$(git rev-parse origin/main)"
           [[ "$SOURCE_SHA" == "$GITHUB_SHA" && "$SOURCE_SHA" == "$MAIN_SHA" ]]
           [[ "$DEPLOY_CONFIRM" == "DEPLOY_W07_SUBSCRIPTION" ]]
-          [[ "$MIGRATION_CONFIRM" == "APPLY_W07_SUBSCRIPTION_MIGRATION" ]]
           [[ "$RENEWAL_CONFIRM" == "DEPLOY_W07_W10_RENEWAL_RUNTIME" ]]
           git cat-file -e "$SOURCE_SHA^{commit}"
           git merge-base --is-ancestor "$SOURCE_SHA" origin/main
@@ -66,23 +60,30 @@ jobs:
         run: npm ci --prefix workers/W07-subscription-commerce --ignore-scripts --no-audit --fund=false
       - name: Install pinned W10 Expo SDK dependency
         run: npm ci --prefix workers/W10-async --ignore-scripts --no-audit --fund=false
-      - name: Verify W07 physical binding and migration source
+      - name: Verify Neon-only W07 production config and preserved migration source records
         working-directory: workers/W07-subscription-commerce
         run: |
           set -euo pipefail
-          node - <<'NODE'
-          const fs = require('fs')
-          const c = JSON.parse(fs.readFileSync('wrangler.jsonc','utf8'))
-          if (c.name !== 'luckread-w07') throw new Error('W07 worker name mismatch')
-          if (c.main !== 'src/index.ts') throw new Error('W07 entrypoint mismatch')
-          const registry = JSON.parse(fs.readFileSync('../../contracts/transport/worker-d1-access-boundary.v1.json','utf8'))
-          const d1 = (c.d1_databases || []).find(x => x.binding === 'D1_01')
-          if (!d1 || d1.database_id !== '2f80471e-3756-49f9-8db1-7707a433ad64' || d1.database_name !== 'luckread') throw new Error('D1-01 physical binding mismatch')
-          const d104 = (c.d1_databases || []).find(x => x.binding === 'D1_04')
-          const expectedD104 = registry.physicalD1Registry?.['D1-04']
-          if (!expectedD104 || expectedD104 !== '9bfb89a5-fbb5-45b1-a2ee-eab674b0d736') throw new Error('D1-04 physical identity is not admitted in the canonical registry')
-          if (!d104 || d104.database_id !== expectedD104 || typeof d104.database_name !== 'string' || !d104.database_name.trim()) throw new Error('D1-04 physical binding mismatch')
-          console.log(JSON.stringify({worker:c.name, main:c.main, d1Bindings:{D1_01:d1,D1_04:d104}}))
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs'
+          const production = JSON.parse(fs.readFileSync('wrangler.neon.jsonc', 'utf8'))
+          const source = JSON.parse(fs.readFileSync('wrangler.jsonc', 'utf8'))
+          const bootstrap = JSON.parse(fs.readFileSync('../../contracts/database/neon-five-domain-schema-bootstrap.v1.json', 'utf8'))
+          const d101 = (bootstrap.domains || []).find((item) => item.domainId === 'D1-01')
+          const d104 = (bootstrap.domains || []).find((item) => item.domainId === 'D1-04')
+          const h101 = (production.hyperdrive || []).find((item) => item.binding === 'HYPERDRIVE_D1_01')
+          const h104 = (production.hyperdrive || []).find((item) => item.binding === 'HYPERDRIVE_D1_04')
+          const source101 = (source.d1_databases || []).find((item) => item.binding === 'D1_01')
+          const source104 = (source.d1_databases || []).find((item) => item.binding === 'D1_04')
+          if (production.name !== 'luckread-w07' || production.main !== 'src/index.ts') throw new Error('W07 production Worker identity/entrypoint mismatch')
+          if ((production.d1_databases || []).length !== 0) throw new Error('W07 Neon production config must not declare Cloudflare D1 bindings')
+          if (production.vars?.W07_DATABASE_DRIVER !== 'neon' || production.vars?.W07_MEMBERSHIP_DATABASE_DRIVER !== 'neon') throw new Error('W07 membership and finance database drivers must both select Neon')
+          if (production.vars?.MEMBERSHIP_RENEWAL_ENABLED !== 'false') throw new Error('W07 renewal activation must remain disabled')
+          if (!h101 || h101.id !== '0c53a1bb9bc0484bac146e8ae2d3158b' || !h104 || h104.id !== '3ae15e6dfb5e4b44979eee30e1d5ede4') throw new Error('W07 Neon Hyperdrive targets mismatch')
+          if (!source101 || source101.database_id !== '2f80471e-3756-49f9-8db1-7707a433ad64' || !source104 || source104.database_id !== '9bfb89a5-fbb5-45b1-a2ee-eab674b0d736') throw new Error('W07 historical D1 schema-source identity records changed')
+          if (d101?.databaseName !== 'luckread' || d101?.remoteSchemaApplied !== true || d104?.databaseName !== 'luckread_finance' || d104?.remoteSchemaApplied !== true) throw new Error('Both W07-owned Neon schemas must already be recorded as remotely applied')
+          if (!(production.services || []).some((item) => item.binding === 'W06_GOVERNANCE' && item.service === 'luckread-w06')) throw new Error('W07 governance Service Binding mismatch')
+          console.log('W07_NEON_ONLY_MEMBERSHIP_AND_FINANCE_CONFIG=PASS')
           NODE
           test -f migrations/0001_membership_subscriptions.sql
           test -f migrations/0002_subscription_version_cas.sql
@@ -93,7 +94,7 @@ jobs:
           test -f src/subscription-runtime.ts
       - name: Typecheck W07
         run: npx tsc --noEmit --strict --skipLibCheck --target ES2022 --module ESNext --moduleResolution Bundler --lib ES2022,DOM,DOM.Iterable --types @cloudflare/workers-types workers/W07-subscription-commerce/src/subscription-runtime.ts workers/W07-subscription-commerce/src/index.ts
-      - name: Test D1-04 binding preflight
+      - name: Test historical D1-04 schema-source inventory
         run: node --test workers/W07-subscription-commerce/scripts/verify-d1-04-binding.test.mjs
       - name: Run W07 tests
         run: npx vitest@3.2.4 run workers/W07-subscription-commerce/src/subscription-runtime.test.ts
@@ -102,7 +103,7 @@ jobs:
         run: |
           node - <<'NODE'
           const fs=require('fs')
-          const c=JSON.parse(fs.readFileSync('wrangler.jsonc','utf8'))
+          const c=JSON.parse(fs.readFileSync('wrangler.neon.jsonc','utf8'))
           const required=['SUBSCRIPTION_ORIGIN_GLOBAL_LIMITER','SUBSCRIPTION_READ_LIMITER','SUBSCRIPTION_WRITE_LIMITER']
           const names=new Set((c.ratelimits||[]).map(x=>x.name))
           for(const name of required) if(!names.has(name)) throw new Error('missing rate limiter: '+name)
@@ -124,7 +125,7 @@ jobs:
           if (c.triggers?.crons) throw new Error('W10 must use Workflow schedules, not Worker Cron')
           if (!(c.services || []).some(x => x.binding === 'W07_COMMERCE' && x.service === 'luckread-w07')) throw new Error('W10 to W07 Service Binding mismatch')
           if (!(c.workflows || []).some(x => x.name === 'luckread-membership-renewal' && x.binding === 'MEMBERSHIP_RENEWAL_WORKFLOW' && x.class_name === 'MembershipRenewalWorkflow' && (x.schedules || []).includes('* * * * *'))) throw new Error('W10 durable renewal Workflow schedule missing')
-          const w07 = JSON.parse(fs.readFileSync('../W07-subscription-commerce/wrangler.jsonc', 'utf8'))
+          const w07 = JSON.parse(fs.readFileSync('../W07-subscription-commerce/wrangler.neon.jsonc', 'utf8'))
           if (w07.vars?.MEMBERSHIP_RENEWAL_ENABLED !== 'false') throw new Error('W07 renewal activation must remain disabled during deployment')
           if (!(w07.services || []).some(x => x.binding === 'W06_GOVERNANCE' && x.service === 'luckread-w06')) throw new Error('W07 governance Service Binding must be restored by deployment')
           console.log(JSON.stringify({worker:c.name,workflow:'luckread-membership-renewal',schedule:'* * * * *',service:'luckread-w07',activation:'disabled',topology:{newWorkers:0,newD1:0,newQueues:0}}))
@@ -158,130 +159,31 @@ jobs:
           --config wrangler.jsonc
           --outdir /tmp/w10-renewal-workflow-dry-run
 
-      - name: Read-only D1-01 migration and schema preflight
-        id: d1_preflight
+      - name: Require both Neon schemas and the D1-free W07 production binding before deployment
         working-directory: workers/W07-subscription-commerce
-        env:
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
           set -euo pipefail
-          npx --yes wrangler@4.156.0 d1 list --json --config wrangler.jsonc > /tmp/w07-d1-list.json
-          node scripts/verify-d1-04-binding.mjs /tmp/w07-d1-list.json
-          npx --yes wrangler@4.156.0 d1 execute luckread --remote --config wrangler.jsonc --command="SELECT name FROM d1_migrations WHERE name IN ('0001_membership_subscriptions.sql','0002_subscription_version_cas.sql','0003_membership_plans.sql') ORDER BY name" --json > /tmp/w07-d1-migrations.json
-          npx --yes wrangler@4.156.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA table_info("membership_subscriptions")' --json > /tmp/w07-subscription-schema.json
-          npx --yes wrangler@4.156.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA index_list("membership_subscriptions")' --json > /tmp/w07-subscription-indexes.json
-          npx --yes wrangler@4.156.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA foreign_key_list("membership_subscriptions")' --json > /tmp/w07-subscription-foreign-keys.json
-          npx --yes wrangler@4.156.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA table_info("membership_plans")' --json > /tmp/w07-plan-schema.json
-          npx --yes wrangler@4.156.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA table_info("membership_plan_versions")' --json > /tmp/w07-plan-version-schema.json
-          npx --yes wrangler@4.156.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA index_list("membership_plans")' --json > /tmp/w07-plan-indexes.json
-          npx --yes wrangler@4.156.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA index_list("membership_plan_versions")' --json > /tmp/w07-plan-version-indexes.json
-          npx --yes wrangler@4.156.0 d1 execute luckread --remote --config wrangler.jsonc --command="SELECT name FROM sqlite_master WHERE type = 'trigger' AND tbl_name IN ('membership_plans','membership_plan_versions') ORDER BY name" --json > /tmp/w07-plan-triggers.json
-          node scripts/verify-remote-preflight.mjs preflight \
-            /tmp/w07-d1-list.json \
-            /tmp/w07-d1-migrations.json \
-            /tmp/w07-subscription-schema.json \
-            /tmp/w07-subscription-indexes.json \
-            /tmp/w07-subscription-foreign-keys.json \
-            /tmp/w07-plan-schema.json \
-            /tmp/w07-plan-version-schema.json \
-            /tmp/w07-plan-indexes.json \
-            /tmp/w07-plan-version-indexes.json \
-            /tmp/w07-plan-triggers.json
-
-      - name: Require D1-04 commerce, billing, and saved-method migration readiness
-        id: d1_04_deploy_preflight
-        working-directory: workers/W07-subscription-commerce
-        env:
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        run: |
-          set -euo pipefail
-          test -n "$CLOUDFLARE_ACCOUNT_ID"
-          test -n "$CLOUDFLARE_API_TOKEN"
-          test -s /tmp/w07-d1-list.json
-          test -f migrations-d1-04/0007_payment_method_revocation_requests.sql
-
-          D1_04_NAME="$(node --input-type=commonjs - <<'NODE'
-          const fs = require('node:fs')
-          const config = JSON.parse(fs.readFileSync('wrangler.jsonc', 'utf8'))
-          const d1 = (config.d1_databases || []).find((entry) => entry.binding === 'D1_04')
-          if (!d1 || typeof d1.database_name !== 'string' ||
-              !/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/.test(d1.database_name)) {
-            throw new Error('D1_04 database name is invalid')
-          }
-          process.stdout.write(d1.database_name)
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs'
+          const production = JSON.parse(fs.readFileSync('wrangler.neon.jsonc', 'utf8'))
+          const bootstrap = JSON.parse(fs.readFileSync('../../contracts/database/neon-five-domain-schema-bootstrap.v1.json', 'utf8'))
+          const d101 = (bootstrap.domains || []).find((item) => item.domainId === 'D1-01')
+          const d104 = (bootstrap.domains || []).find((item) => item.domainId === 'D1-04')
+          const bindings = production.hyperdrive || []
+          if ((production.d1_databases || []).length !== 0) throw new Error('Refusing a W07 production config with D1 bindings')
+          if (production.vars?.W07_DATABASE_DRIVER !== 'neon' || production.vars?.W07_MEMBERSHIP_DATABASE_DRIVER !== 'neon') throw new Error('Both W07 data domains must use Neon')
+          if (!bindings.some((item) => item.binding === 'HYPERDRIVE_D1_01' && item.id === '0c53a1bb9bc0484bac146e8ae2d3158b')) throw new Error('W07 D1-01 Neon Hyperdrive missing')
+          if (!bindings.some((item) => item.binding === 'HYPERDRIVE_D1_04' && item.id === '3ae15e6dfb5e4b44979eee30e1d5ede4')) throw new Error('W07 D1-04 Neon Hyperdrive missing')
+          if (d101?.remoteSchemaApplied !== true || d104?.remoteSchemaApplied !== true) throw new Error('W07 Neon schema applications are not both recorded as complete')
+          console.log('W07_NEON_SCHEMA_AND_RUNTIME_PREFLIGHT=PASS')
           NODE
-          )"
-
-          npx --yes wrangler@4.156.0 d1 execute "$D1_04_NAME" --remote --config wrangler.jsonc --command="SELECT type, name, tbl_name, sql FROM sqlite_master WHERE type IN ('table', 'view', 'index', 'trigger') AND name NOT LIKE 'sqlite_%' ORDER BY type, name" --json > /tmp/w07-d1-04-deploy-schema.json
-          HAS_MIGRATION_TABLE="$(node scripts/verify-d1-04-order-migration.mjs has-migration-table /tmp/w07-d1-04-deploy-schema.json)"
-          if [[ "$HAS_MIGRATION_TABLE" == "true" ]]; then
-            npx --yes wrangler@4.156.0 d1 execute "$D1_04_NAME" --remote --config wrangler.jsonc --command="SELECT name FROM d1_migrations ORDER BY name" --json > /tmp/w07-d1-04-deploy-migrations.json
-          else
-            printf '{"querySkipped":"d1_migrations table not present"}\n' > /tmp/w07-d1-04-deploy-migrations.json
-          fi
-
-          node scripts/verify-d1-04-order-migration.mjs preflight \
-            /tmp/w07-d1-04-deploy-schema.json \
-            /tmp/w07-d1-04-deploy-migrations.json \
-            /tmp/w07-d1-04-deploy-report.json
-
-          ACTION="$(node -p "require('/tmp/w07-d1-04-deploy-report.json').action")"
-          if [[ "$ACTION" != "VERIFY_ONLY" ]]; then
-            echo "::error::D1-04 commerce, billing, or saved-payment-method migrations are pending or inconsistent. Complete the separate explicit D1-04 migration workflow and postflight before deploying W07."
-            node -e "const r=require('/tmp/w07-d1-04-deploy-report.json'); console.error('Pending migrations:', (r.pendingMigrationIds || []).join(', '))"
-            exit 1
-          fi
-          echo "D1-04 deployment preflight passed: all reviewed commerce, billing, and saved-payment-method migrations and schema objects are already present."
-
-      - name: Apply D1-01 Subscription migration
-        if: steps.d1_preflight.outputs.migration_action == 'apply'
-        working-directory: workers/W07-subscription-commerce
-        env:
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        run: npx --yes wrangler@4.156.0 d1 migrations apply luckread --remote --config wrangler.jsonc
-      - name: Read-only D1-01 schema and version postflight
-        working-directory: workers/W07-subscription-commerce
-        env:
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        run: |
-          set -euo pipefail
-          npx --yes wrangler@4.156.0 d1 list --json --config wrangler.jsonc > /tmp/w07-post-d1-list.json
-          node scripts/verify-d1-04-binding.mjs /tmp/w07-post-d1-list.json
-          npx --yes wrangler@4.156.0 d1 execute luckread --remote --config wrangler.jsonc --command="SELECT name FROM d1_migrations WHERE name IN ('0001_membership_subscriptions.sql','0002_subscription_version_cas.sql','0003_membership_plans.sql') ORDER BY name" --json > /tmp/w07-post-d1-migrations.json
-          npx --yes wrangler@4.156.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA table_info("membership_subscriptions")' --json > /tmp/w07-post-subscription-schema.json
-          npx --yes wrangler@4.156.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA index_list("membership_subscriptions")' --json > /tmp/w07-post-subscription-indexes.json
-          npx --yes wrangler@4.156.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA foreign_key_list("membership_subscriptions")' --json > /tmp/w07-post-subscription-foreign-keys.json
-          npx --yes wrangler@4.156.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA table_info("membership_plans")' --json > /tmp/w07-post-plan-schema.json
-          npx --yes wrangler@4.156.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA table_info("membership_plan_versions")' --json > /tmp/w07-post-plan-version-schema.json
-          npx --yes wrangler@4.156.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA index_list("membership_plans")' --json > /tmp/w07-post-plan-indexes.json
-          npx --yes wrangler@4.156.0 d1 execute luckread --remote --config wrangler.jsonc --command='PRAGMA index_list("membership_plan_versions")' --json > /tmp/w07-post-plan-version-indexes.json
-          npx --yes wrangler@4.156.0 d1 execute luckread --remote --config wrangler.jsonc --command="SELECT name FROM sqlite_master WHERE type = 'trigger' AND tbl_name IN ('membership_plans','membership_plan_versions') ORDER BY name" --json > /tmp/w07-post-plan-triggers.json
-          npx --yes wrangler@4.156.0 d1 execute luckread --remote --config wrangler.jsonc --command="SELECT COUNT(*) AS invalid_versions FROM membership_subscriptions WHERE version IS NULL OR version < 1 OR typeof(version) <> 'integer'" --json > /tmp/w07-post-subscription-version-integrity.json
-          npx --yes wrangler@4.156.0 d1 execute luckread --remote --config wrangler.jsonc --command="SELECT COUNT(*) AS invalid_current_plan_versions FROM membership_plans p LEFT JOIN membership_plan_versions pv ON pv.plan_id = p.plan_id AND pv.plan_version = p.current_version WHERE pv.plan_id IS NULL OR p.current_version < 1 OR typeof(p.current_version) <> 'integer'" --json > /tmp/w07-post-plan-integrity.json
-          node scripts/verify-remote-preflight.mjs postflight \
-            /tmp/w07-post-d1-list.json \
-            /tmp/w07-post-d1-migrations.json \
-            /tmp/w07-post-subscription-schema.json \
-            /tmp/w07-post-subscription-indexes.json \
-            /tmp/w07-post-subscription-foreign-keys.json \
-            /tmp/w07-post-plan-schema.json \
-            /tmp/w07-post-plan-version-schema.json \
-            /tmp/w07-post-plan-indexes.json \
-            /tmp/w07-post-plan-version-indexes.json \
-            /tmp/w07-post-plan-triggers.json \
-            /tmp/w07-post-subscription-version-integrity.json \
-            /tmp/w07-post-plan-integrity.json
 
       - name: Deploy W07
         working-directory: workers/W07-subscription-commerce
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        run: npx --yes wrangler@4.156.0 deploy --config wrangler.jsonc
+        run: npx --yes wrangler@4.156.0 deploy --config wrangler.neon.jsonc
       - name: Deploy W10 durable renewal Workflow
         working-directory: workers/W10-async
         env:
@@ -308,8 +210,6 @@ jobs:
       - name: Write deployment provenance
         env:
           SOURCE_SHA: ${{ inputs.source_sha }}
-          MIGRATION_ACTION: ${{ steps.d1_preflight.outputs.migration_action }}
-          REMOTE_MIGRATION: ${{ steps.d1_preflight.outputs.migration_action == 'apply' }}
         run: |
           set -euo pipefail
           mkdir -p artifacts/w07-subscription artifacts/w10-renewal
@@ -320,17 +220,13 @@ jobs:
             "runAttempt": "$GITHUB_RUN_ATTEMPT",
             "sourceSha": "$SOURCE_SHA",
             "worker": "luckread-w07",
-            "databaseUuid": "2f80471e-3756-49f9-8db1-7707a433ad64",
-            "databaseName": "luckread",
-            "additionalVerifiedBinding": {
-              "domain": "D1-04",
-              "databaseUuid": "9bfb89a5-fbb5-45b1-a2ee-eab674b0d736"
-            },
-            "migrations": ["0001_membership_subscriptions", "0002_subscription_version_cas", "0003_membership_plans"],
-            "migrationAction": "$MIGRATION_ACTION",
-            "remoteMigration": $REMOTE_MIGRATION,
-            "confirmation": "DEPLOY_W07_SUBSCRIPTION",
-            "migrationConfirmation": "APPLY_W07_SUBSCRIPTION_MIGRATION"
+            "databaseProvider": "Neon PostgreSQL",
+            "databaseDomains": ["D1-01/luckread", "D1-04/luckread_finance"],
+            "productionD1Bindings": [],
+            "historicalD1MigrationSourcesRetained": true,
+            "remoteSchemaApplied": true,
+            "databaseMutation": false,
+            "confirmation": "DEPLOY_W07_SUBSCRIPTION"
           }
           EOF
           cat artifacts/w07-subscription/provenance.json

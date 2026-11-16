@@ -16,15 +16,15 @@ import { createSubscriptionPlanUpgradeCheckout } from './subscription-plan-chang
 import { scheduleSubscriptionPlanDowngrade, scheduleSubscriptionBillingIntervalChange } from './subscription-plan-change-schedule.js'
 import { startSubscriptionTrial } from './subscription-trial-runtime.js'
 import { listOwnedSavedPaymentMethods, revokeOwnedSavedPaymentMethod, PaymentMethodRuntimeError } from './payment-method-runtime.js'
-import { getW07PaymentMethodReadStore } from './neon/payment-method-read-runtime.js'
+import { getW07PaymentMethodReadStore, getW07SelectedD104Database } from './neon/payment-method-read-runtime.js'
 import { getW07SelectedD101Database } from './neon/membership-database-runtime.js'
 import { resolveDemoCommercePricing, resolveDemoRenewalPricing } from './demo-commerce-pricing-resolver.js'
 import { runRenewalScheduledBatch } from './renewal-scheduler.js'
 
 interface RateLimitBinding { limit(input: { key: string }): Promise<{ success: boolean }> }
 interface Env {
-  D1_01: D1Database
-  D1_04: D1Database
+  D1_01?: D1Database
+  D1_04?: D1Database
   W07_DATABASE_DRIVER?: string
   HYPERDRIVE_D1_04?: { connectionString?: string }
   W07_MEMBERSHIP_DATABASE_DRIVER?: string
@@ -54,6 +54,11 @@ interface Env {
   SUBSCRIPTION_READ_LIMITER?: RateLimitBinding
   SUBSCRIPTION_WRITE_LIMITER?: RateLimitBinding
 }
+
+type W07SelectedRuntimeEnv = Omit<Env, 'D1_01' | 'D1_04'> & Readonly<{
+  D1_01: D1Database
+  D1_04: D1Database
+}>
 
 const getRateKey = (request: Request): string => {
   const principal = request.headers.get('X-LuckRead-Principal-User-Id')?.trim() ?? ''
@@ -178,9 +183,14 @@ const toOperation = (method: string, segments: string[]): Operation | null => {
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     try {
-      const runtimeEnv: Env = {
+      const runtimeEnv: W07SelectedRuntimeEnv = {
         ...env,
-        D1_01: getW07SelectedD101Database(env),
+        get D1_01() {
+          return getW07SelectedD101Database(env)
+        },
+        get D1_04() {
+          return getW07SelectedD104Database(env)
+        },
       }
       // W10 is the only admitted scheduler. This private service-binding
       // endpoint delegates all commerce and membership writes back to W07.

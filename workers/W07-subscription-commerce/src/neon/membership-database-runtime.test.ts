@@ -24,11 +24,12 @@ describe('W07 D1-01 Neon membership runtime', () => {
       W07_MEMBERSHIP_DATABASE_DRIVER: 'postgres',
     })).toThrow('SERVICE_UNAVAILABLE')
     expect(() => getW07SelectedD101Database({
-      D1_01: d1,
+      W07_MEMBERSHIP_DATABASE_DRIVER: 'd1',
+    })).toThrow('SERVICE_UNAVAILABLE')
+    expect(() => getW07SelectedD101Database({
       W07_MEMBERSHIP_DATABASE_DRIVER: 'neon',
     })).toThrow('SERVICE_UNAVAILABLE')
     expect(() => getW07SelectedD101Database({
-      D1_01: d1,
       W07_MEMBERSHIP_DATABASE_DRIVER: 'neon',
       HYPERDRIVE_D1_01: { connectionString: 'postgresql://user:password@localhost:5432/luckread_finance' },
     })).toThrow('SERVICE_UNAVAILABLE')
@@ -58,7 +59,6 @@ describe('W07 D1-01 Neon membership runtime', () => {
       connectionString: 'postgresql://user:password@localhost:5432/luckread',
     }
     const env = {
-      D1_01: {} as D1Database,
       W07_MEMBERSHIP_DATABASE_DRIVER: 'neon',
       HYPERDRIVE_D1_01: binding,
     }
@@ -66,7 +66,7 @@ describe('W07 D1-01 Neon membership runtime', () => {
     const first = getW07SelectedD101Database(env, poolFactory)
     const second = getW07SelectedD101Database(env, poolFactory)
     expect(first).toBe(second)
-    expect(first).not.toBe(env.D1_01)
+    expect(first).toBeDefined()
     expect(poolFactory).toHaveBeenCalledTimes(1)
     expect(pool.on).toHaveBeenCalledOnce()
 

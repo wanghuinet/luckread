@@ -4,7 +4,7 @@ import { createPostgresD1Database, type W07WebhookPostgresPool } from '../paymen
 import { SubscriptionRuntimeError } from '../subscription-runtime.js'
 
 export type W07MembershipDatabaseRuntimeEnv = Readonly<{
-  D1_01: D1Database
+  D1_01?: D1Database
   W07_MEMBERSHIP_DATABASE_DRIVER?: string
   HYPERDRIVE_D1_01?: Readonly<{ connectionString?: string }>
 }>
@@ -78,15 +78,18 @@ function getW07MembershipPostgresPool(
 }
 
 /**
- * Selects the D1-01 membership database. The existing W07 D1_01 business logic
- * runs through the PostgreSQL compatibility bridge when Neon is explicitly
- * selected; D1 remains the default and rollback binding.
+ * Selects the W07 membership store provider. Production uses the Neon D1-01
+ * Hyperdrive bridge; the historical D1 adapter is available only to explicit
+ * local/test profiles and is not declared by wrangler.neon.jsonc.
  */
 export function getW07SelectedD101Database(
   env: W07MembershipDatabaseRuntimeEnv,
   poolFactory: W07MembershipPoolFactory = (config) => new Pool(config),
 ): D1Database {
-  if (resolveW07MembershipDatabaseDriver(env) === 'd1') return env.D1_01
+  if (resolveW07MembershipDatabaseDriver(env) === 'd1') {
+    if (!env.D1_01) throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
+    return env.D1_01
+  }
 
   const binding = env.HYPERDRIVE_D1_01
   if (!binding || typeof binding !== 'object') {

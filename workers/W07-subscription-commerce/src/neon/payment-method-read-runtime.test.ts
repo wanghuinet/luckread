@@ -20,6 +20,8 @@ describe('W07 payment-method Neon read runtime', () => {
   it('fails closed on unsupported driver, missing Hyperdrive or invalid connection string', () => {
     expect(() => resolveW07DatabaseDriver({ W07_DATABASE_DRIVER: 'postgres' }))
       .toThrow('SERVICE_UNAVAILABLE')
+    expect(() => getW07SelectedD104Database({ W07_DATABASE_DRIVER: 'd1' }))
+      .toThrow('SERVICE_UNAVAILABLE')
     expect(() => getW07PaymentMethodReadStore({ W07_DATABASE_DRIVER: 'neon' }))
       .toThrow('SERVICE_UNAVAILABLE')
     expect(() => getW07PaymentMethodReadStore({
@@ -49,7 +51,7 @@ describe('W07 payment-method Neon read runtime', () => {
     const secondWebhookDatabase = getW07PaymentWebhookDatabase(env, poolFactory)
     const orderCreateStore = getW07OrderCreatePersistenceStore(env, poolFactory)
     const secondOrderCreateStore = getW07OrderCreatePersistenceStore(env, poolFactory)
-    expect(getW07SelectedD104Database({ ...env, D1_04: {} as D1Database }, poolFactory)).toBe(webhookDatabase)
+    expect(getW07SelectedD104Database(env, poolFactory)).toBe(webhookDatabase)
     expect(orderCreateStore).toBeDefined()
     expect(orderCreateStore).toBe(secondOrderCreateStore)
     expect(first).toBeDefined()
