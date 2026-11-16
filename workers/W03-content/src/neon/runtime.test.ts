@@ -12,6 +12,7 @@ import {
   getW03CollectionUpdateStore,
   getW03CollectionDeleteStore,
   getW03SeriesCreateStore,
+  getW03SeriesUpdateStore,
   getW03SeriesReadStore,
   getW03MembersReadStore,
   getW03ContentDetailReadStore,
@@ -322,6 +323,26 @@ describe('W03 public media reference database driver', () => {
     }
     const first = getW03SeriesCreateStore(env)
     const second = getW03SeriesCreateStore(env)
+
+    expect(first).toBeDefined()
+    expect(first).toBe(second)
+    await getW03PublicMediaReferencePostgresPool(env).end()
+  })
+
+  it('provides and caches the Neon series-update writer while keeping D1 as default', async () => {
+    expect(getW03SeriesUpdateStore({
+      D1_02: { prepare() { throw new Error('D1 should not be queried') } },
+    })).toBeUndefined()
+
+    const binding = {
+      connectionString: 'postgresql://postgres:postgres@127.0.0.1:5432/luckread',
+    }
+    const env = {
+      W03_CONTENT_READ_DRIVER: 'neon',
+      HYPERDRIVE_D1_02: binding,
+    }
+    const first = getW03SeriesUpdateStore(env)
+    const second = getW03SeriesUpdateStore(env)
 
     expect(first).toBeDefined()
     expect(first).toBe(second)
