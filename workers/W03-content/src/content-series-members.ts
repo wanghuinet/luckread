@@ -1,6 +1,6 @@
 import { ContentRuntimeError, type ContentD1 } from './content-runtime.js'
 
-type SeriesState =
+export type SeriesState =
   | 'DRAFT'
   | 'PENDING_REVIEW'
   | 'REJECTED'
@@ -40,6 +40,33 @@ export interface SeriesMembersReadStore {
   }>
 }
 
+export interface SeriesMemberAttachStore {
+  loadMutation(
+    ownerUserId: string,
+    seriesId: string,
+    contentId: string,
+    operationId: string,
+    idempotencyKey: string,
+  ): Promise<SeriesMemberMutationRow | null>
+  attach(input: Readonly<{
+    ownerUserId: string
+    operationId: string
+    idempotencyKey: string
+    requestHash: string
+    responseJson: string
+    nowIso: string
+    expiresAt: string
+    seriesId: string
+    contentId: string
+    relationshipId: string
+    position: number
+    nextVersion: number
+    seriesEtag: string
+    expectedVersion: number
+    expectedEtag: string
+  }>): Promise<void>
+}
+
 interface IdempotencyRow {
   idem_id: string | null
   idem_owner_user_id: string | null
@@ -50,7 +77,7 @@ interface IdempotencyRow {
   idem_expires_at: string | null
 }
 
-interface MutationRow {
+export interface SeriesMemberMutationRow {
   series_id: string
   series_owner_user_id: string
   series_state: SeriesState
@@ -215,7 +242,7 @@ const loadMutation = async (
   contentId: string,
   operationId: string,
   idempotencyKey: string,
-): Promise<MutationRow | null> =>
+): Promise<SeriesMemberMutationRow | null> =>
   db.prepare(
     'SELECT ' +
     's.id AS series_id, s.owner_user_id AS series_owner_user_id, s.state AS series_state, s.version AS series_version, s.etag AS series_etag, ' +
@@ -245,7 +272,7 @@ const loadMutation = async (
     idempotencyKey,
     seriesId,
     ownerUserId,
-  ).first<MutationRow>()
+  ).first<SeriesMemberMutationRow>()
 
 const assertSeriesEditable = (state: SeriesState): void => {
   if (!EDITABLE_SERIES_STATES.has(state)) {
@@ -285,6 +312,7 @@ export async function attachSeriesMember(
   ifMatch: string,
   idempotencyKey: string,
   now = new Date(),
+  mutationStore?: SeriesMemberAttachStore,
 ): Promise<{ member: SeriesMemberRecord; seriesVersion: number; seriesEtag: string }> {
   assertResourceId(ownerUserId)
   assertResourceId(seriesId)
@@ -303,7 +331,9 @@ export async function attachSeriesMember(
     contentId,
     ifMatch: normalizeEtag(ifMatch),
   })
-  const row = await loadMutation(db, ownerUserId, seriesId, contentId, operationId, idempotencyKey)
+  const row = mutationStore
+    ? await mutationStore.loadMutation(ownerUserId, seriesId, contentId, operationId, idempotencyKey)
+    : await loadMutation(db, ownerUserId, seriesId, contentId, operationId, idempotencyKey)
   if (!row) throw new ContentRuntimeError('NOT_FOUND', 404)
 
   const replay = inspectIdempotency(row, ownerUserId, hash, now)
@@ -343,46 +373,66 @@ export async function attachSeriesMember(
   const response = { member, seriesVersion: nextVersion, seriesEtag }
   const expiresAt = new Date(now.getTime() + IDEMPOTENCY_TTL_MS).toISOString()
 
-  await batchMutation(db, [
-    expireIdempotency(db, ownerUserId, operationId, idempotencyKey, nowIso),
-    insertIdempotency(
-      db,
+  if (mutationStore) {
+    await mutationStore.attach({
       ownerUserId,
       operationId,
       idempotencyKey,
-      hash,
-      200,
-      JSON.stringify(response),
+      requestHash: hash,
+      responseJson: JSON.stringify(response),
       nowIso,
       expiresAt,
-    ),
-    db.prepare(
-      'UPDATE content_series SET version = ?, etag = ?, updated_at = ? ' +
-      'WHERE id = ? AND owner_user_id = ? AND version = ? AND etag = ?',
-    ).bind(
+      seriesId,
+      contentId,
+      relationshipId: member.relationshipId,
+      position: member.position,
       nextVersion,
       seriesEtag,
-      nowIso,
-      seriesId,
-      ownerUserId,
-      row.series_version,
-      row.series_etag,
-    ),
-    atomicGuard(db),
-    db.prepare(
-      'INSERT INTO content_relationships ' +
-      '(relationship_id, source_type, source_id, target_type, target_id, relation_type, position, schema_version, status, actor_id, provenance_ref, authorization_ref, created_at, updated_at) ' +
-      "VALUES (?, 'content', ?, 'series', ?, 'series-member', ?, 1, 'ACTIVE', ?, NULL, NULL, ?, ?)",
-    ).bind(
-      member.relationshipId,
-      contentId,
-      seriesId,
-      member.position,
-      ownerUserId,
-      nowIso,
-      nowIso,
-    ),
-  ])
+      expectedVersion: row.series_version,
+      expectedEtag: row.series_etag,
+    })
+  } else {
+    await batchMutation(db, [
+      expireIdempotency(db, ownerUserId, operationId, idempotencyKey, nowIso),
+      insertIdempotency(
+        db,
+        ownerUserId,
+        operationId,
+        idempotencyKey,
+        hash,
+        200,
+        JSON.stringify(response),
+        nowIso,
+        expiresAt,
+      ),
+      db.prepare(
+        'UPDATE content_series SET version = ?, etag = ?, updated_at = ? ' +
+        'WHERE id = ? AND owner_user_id = ? AND version = ? AND etag = ?',
+      ).bind(
+        nextVersion,
+        seriesEtag,
+        nowIso,
+        seriesId,
+        ownerUserId,
+        row.series_version,
+        row.series_etag,
+      ),
+      atomicGuard(db),
+      db.prepare(
+        'INSERT INTO content_relationships ' +
+        '(relationship_id, source_type, source_id, target_type, target_id, relation_type, position, schema_version, status, actor_id, provenance_ref, authorization_ref, created_at, updated_at) ' +
+        "VALUES (?, 'content', ?, 'series', ?, 'series-member', ?, 1, 'ACTIVE', ?, NULL, NULL, ?, ?)",
+      ).bind(
+        member.relationshipId,
+        contentId,
+        seriesId,
+        member.position,
+        ownerUserId,
+        nowIso,
+        nowIso,
+      ),
+    ])
+  }
 
   return response
 }
