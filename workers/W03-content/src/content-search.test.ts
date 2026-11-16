@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import worker from './index.js'
+import { createW03ContentWorker } from './index.js'
 import { decodeScopedCursor, searchPublishedContents } from './content-runtime.js'
 
 const contentRow = (overrides: Record<string, unknown> = {}) => ({
@@ -88,7 +88,13 @@ describe('W03 published content search', () => {
 
   it('allows only authenticated W04 transport to use the internal search route', async () => {
     const mock = mockDb([contentRow()])
-    const env = { D1_02: mock.db }
+    const neonWorker = createW03ContentWorker({
+      publicContentListReadStoreProvider: () => ({
+        list: async () => [contentRow()],
+        search: async () => [contentRow()],
+      }),
+    })
+    const env = {}
     const request = (headers: Record<string, string>) => new Request(
       'https://luckread-w03.internal/internal/content/search',
       {
@@ -97,7 +103,7 @@ describe('W03 published content search', () => {
         body: JSON.stringify({ q: 'LuckRead', cursor: null, limit: 20 }),
       },
     )
-    const untrusted = await worker.fetch(request({
+    const untrusted = await neonWorker.fetch(request({
       'X-LuckRead-Caller': 'browser',
       'X-LuckRead-Transport-Version': '1.0',
       'X-LuckRead-Correlation-Id': 'search-denied',
@@ -130,13 +136,13 @@ describe('W03 published content search', () => {
       Authorization: 'Bearer untrusted',
       'content-type': 'application/json',
     }
-    const denied = await worker.fetch(new Request(
+    const denied = await neonWorker.fetch(new Request(
       'https://luckread-w03.internal/internal/content/search',
       { method: 'POST', headers, body: JSON.stringify({ q: 'LuckRead', limit: 20 }) },
-    ), { D1_02: mock.db } as never)
+    ), env as never)
     expect(denied.status).toBe(403)
 
-    const invalid = await worker.fetch(new Request(
+    const invalid = await neonWorker.fetch(new Request(
       'https://luckread-w03.internal/internal/content/search',
       {
         method: 'POST',
