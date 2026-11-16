@@ -49,10 +49,13 @@ import { createPostgresSeriesMemberRemoveStore } from '../content-series-member-
 import type { SeriesMemberRemovePostgresDatabase } from '../content-series-member-remove-store-postgres.js'
 import type {
   CollectionMemberAttachStore,
+  CollectionMemberRemoveStore,
   CollectionMembersReadStore,
 } from '../content-collection-members.js'
 import { createPostgresCollectionMemberAttachStore } from '../content-collection-member-attach-store-postgres.js'
 import type { CollectionMemberAttachPostgresDatabase } from '../content-collection-member-attach-store-postgres.js'
+import { createPostgresCollectionMemberRemoveStore } from '../content-collection-member-remove-store-postgres.js'
+import type { CollectionMemberRemovePostgresDatabase } from '../content-collection-member-remove-store-postgres.js'
 import type { W03PublishedMediaReferenceRuntimeEnv } from '../published-media-reference-read-store.js'
 
 export type W03PublicMediaReferenceDriver = 'd1' | 'neon'
@@ -76,6 +79,7 @@ const seriesDeleteStores = new WeakMap<object, SeriesDeleteStore>()
 const seriesMemberAttachStores = new WeakMap<object, SeriesMemberAttachStore>()
 const seriesMemberRemoveStores = new WeakMap<object, SeriesMemberRemoveStore>()
 const collectionMemberAttachStores = new WeakMap<object, CollectionMemberAttachStore>()
+const collectionMemberRemoveStores = new WeakMap<object, CollectionMemberRemoveStore>()
 const membersStores = new WeakMap<object, {
   series: SeriesMembersReadStore
   collections: CollectionMembersReadStore
@@ -89,7 +93,7 @@ const creatorContentsStores = new WeakMap<object, CreatorContentsReadStore>()
  * batch projection, W04-authorized following-feed content, native post-thread
  * projection, canonical content context and detail reads, creator-owned
  * content lists, series and collection reads, and series/collection membership
- * lists. Collection creation, update, delete, and member attachment plus Series creation, update, delete, member attachment, and member removal are the only Neon-backed mutations in these slices; all other W03 reads and mutations remain on D1_02. D1 is the safe
+ * lists. Collection creation, update, delete, member attachment, and member removal plus Series creation, update, delete, member attachment, and member removal are the only Neon-backed mutations in these slices; all other W03 reads and mutations remain on D1_02. D1 is the safe
  * default and unknown values fail closed.
  */
 export function resolveW03PublicMediaReferenceDriver(
@@ -475,6 +479,26 @@ export function getW03CollectionMemberAttachStore(
     getW03PublicMediaReferencePostgresPool(env) as unknown as CollectionMemberAttachPostgresDatabase,
   )
   collectionMemberAttachStores.set(binding, store)
+  return store
+}
+
+/** PostgreSQL writer for removing a creator-owned Collection member. */
+export function getW03CollectionMemberRemoveStore(
+  env: W03PublicMediaReferenceRuntimeEnv,
+): CollectionMemberRemoveStore | undefined {
+  if (resolveW03PublicMediaReferenceDriver(env) === 'd1') return undefined
+
+  const binding = env.HYPERDRIVE_D1_02
+  if (!binding || typeof binding !== 'object') {
+    throw new Error('W03_HYPERDRIVE_D1_02_BINDING_REQUIRED')
+  }
+  const cached = collectionMemberRemoveStores.get(binding)
+  if (cached) return cached
+
+  const store = createPostgresCollectionMemberRemoveStore(
+    getW03PublicMediaReferencePostgresPool(env) as unknown as CollectionMemberRemovePostgresDatabase,
+  )
+  collectionMemberRemoveStores.set(binding, store)
   return store
 }
 
