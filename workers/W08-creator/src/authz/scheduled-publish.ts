@@ -141,7 +141,7 @@ export async function handleScheduledPublishPermission(
 
     const context = pool
       ? await resolvePermissionContextPostgres(
-          async (sql, values) => (await pool.query(sql, values)).rows as RoleAssignmentRow[],
+          async (sql, values) => (await pool.query(sql, values as never)).rows as RoleAssignmentRow[],
           creator.userId,
         )
       : await resolvePermissionContext(db!, creator.userId)
