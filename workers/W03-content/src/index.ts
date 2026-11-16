@@ -59,6 +59,7 @@ import {
   type SeriesReadStore,
   type SeriesCreateStore,
   type SeriesUpdateStore,
+  type SeriesDeleteStore,
 } from './content-series.js'
 import {
   createCollection,
@@ -392,6 +393,10 @@ export type W03ContentWorkerDependencies = Readonly<{
   seriesUpdateStoreProvider?: (
     env: W03PublishedMediaReferenceRuntimeEnv,
   ) => SeriesUpdateStore | undefined
+  /** Optional D1-02 provider for the atomic creator-series soft-delete mutation. */
+  seriesDeleteStoreProvider?: (
+    env: W03PublishedMediaReferenceRuntimeEnv,
+  ) => SeriesDeleteStore | undefined
   /** Optional D1-02 provider for the bounded creator-collection list read. */
   collectionListReadStoreProvider?: (
     env: W03PublishedMediaReferenceRuntimeEnv,
@@ -1124,6 +1129,8 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
           path.id,
           requireIfMatch(request),
           requireIdempotency(request),
+          new Date(),
+          dependencies.seriesDeleteStoreProvider?.(env),
         )
         return new Response(null, { status: 204 })
       }

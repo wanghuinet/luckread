@@ -14,6 +14,7 @@ on:
       - 'workers/W03-content/src/content-collections-delete-store-postgres.ts'
       - 'workers/W03-content/src/content-series-create-store-postgres.ts'
       - 'workers/W03-content/src/content-series-update-store-postgres.ts'
+      - 'workers/W03-content/src/content-series-delete-store-postgres.ts'
       - 'workers/W03-content/src/content-series.ts'
       - 'workers/W03-content/src/content-series-read-store-postgres.ts'
       - 'workers/W03-content/src/content-series-members.ts'
@@ -87,6 +88,7 @@ jobs:
             ['seriesReadStoreProvider', 'getW03SeriesReadStore'],
             ['seriesCreateStoreProvider', 'getW03SeriesCreateStore'],
             ['seriesUpdateStoreProvider', 'getW03SeriesUpdateStore'],
+            ['seriesDeleteStoreProvider', 'getW03SeriesDeleteStore'],
             ['membersReadStoreProvider', 'getW03MembersReadStore'],
             ['contentDetailReadStoreProvider', 'getW03ContentDetailReadStore'],
             ['creatorContentsReadStoreProvider', 'getW03CreatorContentsReadStore'],
@@ -96,7 +98,7 @@ jobs:
               throw new Error('W03 Neon provider wiring is incomplete: ' + provider)
             }
           }
-          if (!runtime.includes('Collection creation, update, and delete plus Series creation and update are the only Neon-backed mutations in these slices; all other W03 reads and mutations remain on D1_02')) {
+          if (!runtime.includes('Collection creation, update, and delete plus Series creation, update, and delete are the only Neon-backed mutations in these slices; all other W03 reads and mutations remain on D1_02')) {
             throw new Error('W03 Neon collection mutation boundary declaration is missing')
           }
           console.log('W03_NEON_READ_PROJECTION_CUTOVER_CONFIG=PASS')
