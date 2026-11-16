@@ -1,0 +1,284 @@
+import { describe, expect, it, vi } from 'vitest'
+
+import { createW03ContentWorker } from './index.js'
+import {
+  createPostgresCollectionMemberReorderStore,
+  type CollectionMemberReorderPostgresDatabase,
+} from './content-collection-member-reorder-store-postgres.js'
+import {
+  reorderCollectionMember,
+  type CollectionMemberMutationRow,
+  type CollectionMemberReorderStore,
+  type CollectionMemberOrderRow,
+} from './content-collection-members.js'
+
+const snapshot: CollectionMemberMutationRow = {
+  collection_id: 'collection_1',
+  collection_owner_user_id: 'creator_1',
+  collection_state: 'DRAFT',
+  collection_version: 4,
+  collection_etag: 'W/"4"',
+  content_id: 'content_3',
+  content_owner_user_id: 'creator_1',
+  content_slug: 'episode-3',
+  content_type: 'article',
+  content_state: 'PUBLISHED',
+  content_title: 'Episode 3',
+  idem_id: null,
+  idem_owner_user_id: null,
+  idem_request_hash: null,
+  idem_status: null,
+  idem_response_status: null,
+  idem_response_json: null,
+  idem_expires_at: null,
+  membership_relationship_id: 'rel_3',
+  membership_position: 2,
+  membership_created_at: '2026-11-16T02:00:00.000Z',
+  membership_updated_at: '2026-11-16T02:00:00.000Z',
+  next_position: 3,
+}
+
+const members: readonly CollectionMemberOrderRow[] = [
+  { relationship_id: 'rel_1', source_id: 'content_1', position: 0, created_at: '2026-11-16T01:00:00.000Z', updated_at: '2026-11-16T01:00:00.000Z' },
+  { relationship_id: 'rel_2', source_id: 'content_2', position: 1, created_at: '2026-11-16T01:01:00.000Z', updated_at: '2026-11-16T01:01:00.000Z' },
+  { relationship_id: 'rel_3', source_id: 'content_3', position: 2, created_at: '2026-11-16T01:02:00.000Z', updated_at: '2026-11-16T01:02:00.000Z' },
+]
+
+function createDatabase(options: {
+  parentNoMatch?: boolean
+  shiftedCount?: number
+  missingRelationshipId?: string
+  duplicateIdempotency?: boolean
+} = {}) {
+  const directQueries: Array<{ sql: string; values?: unknown[] }> = []
+  const transactionQueries: Array<{ sql: string; values?: unknown[] }> = []
+  let released = false
+
+  const client = {
+    async query<Row>(sql: string, values?: unknown[]) {
+      transactionQueries.push({ sql, values })
+      if (options.duplicateIdempotency &&
+          sql.startsWith('INSERT INTO content_mutation_idempotency')) {
+        throw Object.assign(new Error('duplicate idempotency key'), {
+          code: '23505',
+          constraint: 'content_mutation_idempotency_owner_user_id_operation_id_idempotency_key_key',
+        })
+      }
+      if (options.parentNoMatch && sql.startsWith('UPDATE content_collections')) {
+        return { rows: [] as Row[] }
+      }
+      if (sql.includes('position = position +')) {
+        const count = options.shiftedCount ?? members.length
+        return { rows: members.slice(0, count).map(item => ({ relationship_id: item.relationship_id })) as Row[] }
+      }
+      if (sql.includes('SET position = $1')) {
+        const relationshipId = String(values?.[2] ?? '')
+        if (relationshipId === options.missingRelationshipId) return { rows: [] as Row[] }
+        return { rows: [{ relationship_id: relationshipId }] as Row[] }
+      }
+      if (sql.startsWith('UPDATE content_collections')) return { rows: [{ id: 'collection_1' }] as Row[] }
+      return { rows: [] as Row[] }
+    },
+    release() { released = true },
+  }
+
+  const database: CollectionMemberReorderPostgresDatabase = {
+    async query<Row>(sql: string, values?: unknown[]) {
+      directQueries.push({ sql, values })
+      if (sql.includes('FROM content_collections coll')) return { rows: [snapshot] as Row[] }
+      if (sql.includes('FROM content_relationships r')) return { rows: members as Row[] }
+      return { rows: [] as Row[] }
+    },
+    async connect() { return client },
+  }
+
+  return { database, directQueries, transactionQueries, isReleased: () => released }
+}
+
+describe('W03 Neon Collection member reorder', () => {
+  it('loads the owner-scoped snapshot and active member order', async () => {
+    const fixture = createDatabase()
+    const store = createPostgresCollectionMemberReorderStore(fixture.database)
+
+    await expect(store.loadMutation(
+      'creator_1', 'collection_1', 'content_3', 'reorderCollectionMember', 'reorder-key',
+    )).resolves.toMatchObject({
+      collection_owner_user_id: 'creator_1',
+      membership_relationship_id: 'rel_3',
+      membership_position: 2,
+      collection_version: 4,
+    })
+    await expect(store.listMembers('creator_1', 'collection_1')).resolves.toEqual(members)
+    expect(fixture.directQueries[0]?.sql).toContain('coll.owner_user_id = $6')
+    expect(fixture.directQueries[0]?.sql).toContain('LEFT JOIN LATERAL')
+    expect(fixture.directQueries[1]?.sql).toContain('coll.owner_user_id = $2')
+    expect(fixture.directQueries[1]?.sql).toContain('ORDER BY r.position ASC, r.relationship_id ASC')
+  })
+
+  it('commits idempotency, Collection CAS and all positions in one transaction', async () => {
+    const fixture = createDatabase()
+    const store = createPostgresCollectionMemberReorderStore(fixture.database)
+
+    await store.reorder({
+      ownerUserId: 'creator_1',
+      operationId: 'reorderCollectionMember',
+      idempotencyKey: 'reorder-key',
+      requestHash: 'request-hash',
+      responseJson: '{"member":{"position":0}}',
+      nowIso: '2026-11-16T02:00:00.000Z',
+      expiresAt: '2026-11-17T02:00:00.000Z',
+      collectionId: 'collection_1',
+      nextVersion: 5,
+      collectionEtag: 'W/"5"',
+      expectedVersion: 4,
+      expectedEtag: 'W/"4"',
+      members: [
+        { relationshipId: 'rel_1', position: 1 },
+        { relationshipId: 'rel_2', position: 2 },
+        { relationshipId: 'rel_3', position: 0 },
+      ],
+    })
+
+    const sql = fixture.transactionQueries.map(item => item.sql)
+    expect(sql[0]).toBe('BEGIN')
+    expect(sql[1]).toContain('DELETE FROM content_mutation_idempotency')
+    expect(sql[2]).toContain('INSERT INTO content_mutation_idempotency')
+    expect(sql[3]).toContain('UPDATE content_collections')
+    expect(sql[4]).toContain('position = position + $1')
+    expect(sql.slice(5, 8).every(statement => statement.includes('SET position = $1'))).toBe(true)
+    expect(sql[8]).toBe('COMMIT')
+    expect(fixture.transactionQueries[3]?.values).toEqual([5, 'W/"5"', '2026-11-16T02:00:00.000Z', 'collection_1', 'creator_1', 4, 'W/"4"'])
+    expect(fixture.transactionQueries[4]?.values).toEqual([4, 'collection_1'])
+    expect(fixture.transactionQueries.slice(5, 8).map(item => item.values)).toEqual([
+      [1, '2026-11-16T02:00:00.000Z', 'rel_1', 'collection_1'],
+      [2, '2026-11-16T02:00:00.000Z', 'rel_2', 'collection_1'],
+      [0, '2026-11-16T02:00:00.000Z', 'rel_3', 'collection_1'],
+    ])
+    expect(fixture.isReleased()).toBe(true)
+  })
+
+  it('rolls back when the Collection CAS or active membership set changed', async () => {
+    for (const options of [{ parentNoMatch: true }, { shiftedCount: 2 }, { missingRelationshipId: 'rel_2' }]) {
+      const fixture = createDatabase(options)
+      const store = createPostgresCollectionMemberReorderStore(fixture.database)
+      await expect(store.reorder({
+        ownerUserId: 'creator_1',
+        operationId: 'reorderCollectionMember',
+        idempotencyKey: 'reorder-key',
+        requestHash: 'request-hash',
+        responseJson: '{}',
+        nowIso: '2026-11-16T02:00:00.000Z',
+        expiresAt: '2026-11-17T02:00:00.000Z',
+        collectionId: 'collection_1',
+        nextVersion: 5,
+        collectionEtag: 'W/"5"',
+        expectedVersion: 4,
+        expectedEtag: 'W/"4"',
+        members: [
+          { relationshipId: 'rel_1', position: 1 },
+          { relationshipId: 'rel_2', position: 2 },
+          { relationshipId: 'rel_3', position: 0 },
+        ],
+      })).rejects.toMatchObject({ code: 'PRECONDITION_FAILED', status: 412 })
+      expect(fixture.transactionQueries.at(-1)?.sql).toBe('ROLLBACK')
+      expect(fixture.isReleased()).toBe(true)
+    }
+  })
+
+  it('maps duplicate idempotency keys to 409', async () => {
+    const fixture = createDatabase({ duplicateIdempotency: true })
+    const store = createPostgresCollectionMemberReorderStore(fixture.database)
+    await expect(store.reorder({
+      ownerUserId: 'creator_1',
+      operationId: 'reorderCollectionMember',
+      idempotencyKey: 'reorder-key',
+      requestHash: 'request-hash',
+      responseJson: '{}',
+      nowIso: '2026-11-16T02:00:00.000Z',
+      expiresAt: '2026-11-17T02:00:00.000Z',
+      collectionId: 'collection_1',
+      nextVersion: 5,
+      collectionEtag: 'W/"5"',
+      expectedVersion: 4,
+      expectedEtag: 'W/"4"',
+      members: [{ relationshipId: 'rel_1', position: 0 }],
+    })).rejects.toMatchObject({ code: 'IDEMPOTENCY_IN_PROGRESS', status: 409 })
+    expect(fixture.transactionQueries.at(-1)?.sql).toBe('ROLLBACK')
+  })
+
+  it('routes the Collection member PATCH through Neon without touching D1', async () => {
+    const reorder = vi.fn(async () => undefined)
+    const store: CollectionMemberReorderStore = {
+      loadMutation: vi.fn(async () => snapshot),
+      listMembers: vi.fn(async () => members),
+      reorder,
+    }
+    const worker = createW03ContentWorker({ collectionMemberReorderStoreProvider: () => store })
+    const response = await worker.fetch(
+      new Request('https://luckread-w03.internal/internal/content/collections/collection_1/members/content_3', {
+        method: 'PATCH',
+        headers: {
+          'content-type': 'application/json',
+          'X-LuckRead-Caller': 'W01',
+          'X-LuckRead-Transport-Version': '1.0',
+          'X-LuckRead-Correlation-Id': 'collection-member-reorder-neon-test',
+          'X-LuckRead-Principal-User-Id': 'creator_1',
+          'X-LuckRead-Principal-Layer': 'L3',
+          'If-Match': 'W/"4"',
+          'Idempotency-Key': 'collection-member-reorder-neon-key',
+        },
+        body: JSON.stringify({ position: 0 }),
+      }),
+      { D1_02: {
+        prepare() { throw new Error('D1 must not be queried for Neon Collection member reorder') },
+        batch() { throw new Error('D1 must not be used for Neon Collection member reorder') },
+      } } as never,
+    )
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({
+      data: { member: { contentId: 'content_3', position: 0 }, collectionVersion: 5 },
+    })
+    expect(store.loadMutation).toHaveBeenCalledOnce()
+    expect(store.listMembers).toHaveBeenCalledOnce()
+    expect(reorder).toHaveBeenCalledOnce()
+  })
+
+  it('calculates the requested order and passes the complete position set to the Neon store', async () => {
+    const reorder = vi.fn(async () => undefined)
+    const store: CollectionMemberReorderStore = {
+      loadMutation: vi.fn(async () => snapshot),
+      listMembers: vi.fn(async () => members),
+      reorder,
+    }
+
+    const result = await reorderCollectionMember(
+      {} as never,
+      'creator_1',
+      'collection_1',
+      'content_3',
+      0,
+      'W/"4"',
+      'reorder-key',
+      new Date('2026-11-16T02:00:00.000Z'),
+      store,
+    )
+
+    expect(result).toMatchObject({
+      member: { relationshipId: 'rel_3', contentId: 'content_3', position: 0 },
+      collectionVersion: 5,
+      collectionEtag: 'W/"5"',
+    })
+    expect(reorder).toHaveBeenCalledWith(expect.objectContaining({
+      ownerUserId: 'creator_1',
+      operationId: 'reorderCollectionMember',
+      expectedVersion: 4,
+      expectedEtag: 'W/"4"',
+      members: [
+        { relationshipId: 'rel_1', position: 1 },
+        { relationshipId: 'rel_2', position: 2 },
+        { relationshipId: 'rel_3', position: 0 },
+      ],
+    }))
+  })
+})
