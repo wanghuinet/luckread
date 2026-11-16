@@ -84,6 +84,7 @@ import type { PollVoteStore } from './poll-vote-store.js'
 type RateLimitBinding = { limit(input: { key: string }): Promise<{ success: boolean }> }
 
 interface Env {
+  /** Legacy D1 test/local adapter only; production entry injects Neon stores and has no DB binding. */
   DB: D1Database
   W05_DATABASE_DRIVER?: string
   HYPERDRIVE_D1_02?: { connectionString?: string }
