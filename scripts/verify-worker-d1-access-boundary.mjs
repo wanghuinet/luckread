@@ -98,6 +98,15 @@ for (const dir of dirs) {
   if (workerId === 'W05' && !w05NeonProduction) {
     throw new Error('W05 production must use both approved Neon Hyperdrive resources and no D1 bindings')
   }
+  const w08NeonProduction = workerId === 'W08' &&
+    config?.name === 'luckread-w08-creator' &&
+    (config?.d1_databases ?? []).length === 0 &&
+    config.vars?.W08_DATABASE_DRIVER === 'neon' &&
+    (config.hyperdrive ?? []).some((entry) =>
+      entry.binding === 'HYPERDRIVE' && entry.id === '0c53a1bb9bc0484bac146e8ae2d3158b')
+  if (workerId === 'W08' && !w08NeonProduction) {
+    throw new Error('W08 production must use the approved Neon D1-01 Hyperdrive and no D1 bindings')
+  }
 
   const files = []
   const walk = (dirPath) => {
@@ -121,7 +130,7 @@ for (const dir of dirs) {
         (configExists ? (jsonc(wranglerPath).d1_databases ?? []) : []).map((x) => x.binding),
       )
       if (!declaredBindings.has(binding)) {
-        const compatibilityOnly = w05NeonProduction && ['DB', 'D1_03'].includes(binding)
+        const compatibilityOnly = (w05NeonProduction && ['DB', 'D1_03'].includes(binding)) || (w08NeonProduction && binding === 'D1_01')
         if (compatibilityOnly) continue
         const relative = path.slice(root.length + 1)
         throw new Error(`${workerId}: raw D1 binding ${binding} used by ${relative} but not declared in wrangler.jsonc`)
