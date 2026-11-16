@@ -87,7 +87,7 @@ for (const match of w08Casl.matchAll(/\bgrant\('([^']+)'/g)) {
   if (!canonicalPermissionNames.has(match[1])) failures.push('CASL action missing from canonical permission catalog: '+match[1])
 }
 requireText('shared authorization context must resolve persisted role assignments', w08RoleLayer, /FROM role_assignments/)
-requireText('Neon authorization role reads must use PostgreSQL positional parameters and active validity windows', w08RoleLayer, /resolvePermissionContextPostgres[\\s\\S]*FROM role_assignments[\\s\\S]*valid_from <= \\$2[\\s\\S]*valid_until[\\s\\S]*ORDER BY role_id ASC, id ASC/)
+requireText('Neon authorization role reads must use PostgreSQL positional parameters and active validity windows', w08RoleLayer, /resolvePermissionContextPostgres[\s\S]*FROM role_assignments[\s\S]*valid_from <= \$2[\s\S]*valid_until[\s\S]*ORDER BY role_id ASC, id ASC/)
 requireText('internal CASL endpoint must reject caller-supplied layer or state', w08AuthzHandler, /CALLER_SUPPLIED_AUTHORIZATION_CONTEXT/)
 if (!w08AuthzHandler.includes('/internal/auth/principal')) failures.push('internal CASL endpoint must resolve actor identity through W02 session binding')
 if (!w08AuthzHandler.includes("new Set(['action', 'resourceType', 'resourceAttributes'])")) failures.push('internal CASL endpoint must not accept body-supplied subjectId')
