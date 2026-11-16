@@ -116,39 +116,6 @@ describe('W03 Following content projection', () => {
 })
 
 describe('W03 private Following endpoint', () => {
-  it('accepts only W04 service transport and projects published content', async () => {
-    const prepare = vi.fn((sql: string) => ({
-      bind: vi.fn((...values: unknown[]) => ({
-        all: vi.fn(async () => ({ results: rows })),
-        sql,
-        values,
-      })),
-    }))
-    const env = { D1_02: { prepare } as unknown as D1Database }
-    const response = await worker.fetch(
-      new Request('https://luckread-w03.internal/internal/content/following-feed', {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          'X-LuckRead-Caller': 'W04',
-          'X-LuckRead-Transport-Version': '1.0',
-          'X-LuckRead-Correlation-Id': 'w03-following-test',
-          'X-LuckRead-Principal-User-Id': 'viewer-1',
-        },
-        body: JSON.stringify({ ownerUserIds: ['creator-1', 'creator-2'], limit: 1, cursor: null }),
-      }),
-      env,
-    )
-    expect(response.status).toBe(200)
-    expect(response.headers.get('cache-control')).toBe('no-store')
-    await expect(response.json()).resolves.toMatchObject({
-      data: {
-        items: [{ id: 'content-1', creatorId: 'creator-1' }],
-        hasMore: true,
-      },
-    })
-    expect(String(prepare.mock.calls[0]?.[0] ?? '')).toContain("c.state = 'PUBLISHED'")
-  })
 
   it('routes the authorized HTTP feed projection through the injected Neon store', async () => {
     const prepare = vi.fn(() => {
@@ -170,7 +137,7 @@ describe('W03 private Following endpoint', () => {
         },
         body: JSON.stringify({ ownerUserIds: ['creator-1', 'creator-2'], limit: 1, cursor: null }),
       }),
-      { D1_02: { prepare } as unknown as D1Database },
+      {} as never,
     )
 
     expect(response.status).toBe(200)
@@ -185,9 +152,9 @@ describe('W03 private Following endpoint', () => {
     expect(prepare).not.toHaveBeenCalled()
   })
 
-  it('rejects browser/spoofed callers and malformed author sets before querying D1', async () => {
+  it('rejects browser/spoofed callers and malformed author sets before data access', async () => {
     const prepare = vi.fn()
-    const env = { D1_02: { prepare } as unknown as D1Database }
+    const env = {} as never
     const denied = await worker.fetch(
       new Request('https://luckread-w03.internal/internal/content/following-feed', {
         method: 'POST',
