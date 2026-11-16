@@ -4,6 +4,12 @@ import { fileURLToPath } from 'node:url'
 import worker from '../index.js'
 
 const env = {} as never
+const neonProductionEnv = {
+  W02_DATABASE_DRIVER: 'neon',
+  HYPERDRIVE: {
+    connectionString: 'postgresql://test:test@localhost:5432/luckread',
+  },
+} as never
 
 describe('W02 L8 genesis bootstrap service-boundary gate', () => {
   it('rejects direct write-route calls without trusted W01 service headers', async () => {
@@ -18,7 +24,7 @@ describe('W02 L8 genesis bootstrap service-boundary gate', () => {
           mfaVerified: true,
         }),
       },
-    ), env)
+    ), neonProductionEnv)
     expect(response.status).toBe(403)
     await expect(response.json()).resolves.toMatchObject({
       error: { code: 'FORBIDDEN' },
