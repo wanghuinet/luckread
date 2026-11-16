@@ -43,6 +43,10 @@ function fixture() {
       state: 'PUBLISHED' as const,
       updatedAt: '2026-11-15T12:00:00.000Z',
     })),
+    hasPublicCreatorContent: vi.fn(async () => true),
+    listPublishedMembersOnlyBodyReferences: vi.fn(async () => [
+      { owner_user_id: 'user_1', creator_id: 'creator_1' },
+    ]),
   }
   const worker = createW03ContentWorker({
     contentContextReadStoreProvider: () => store,
@@ -126,4 +130,25 @@ describe('W03 selected content-context read store routing', () => {
     expect(response.status).toBe(200)
     expect(f.store.getPublishedContentAuthorContext).toHaveBeenCalledWith('post_1')
   })
+  it('routes username redirect eligibility through the Neon context store', async () => {
+    const f = fixture()
+    const response = await f.worker.fetch(new Request(
+      'https://w03.internal/internal/content/username-redirect-eligibility/user_1',
+      { headers: { ...baseHeaders, 'X-LuckRead-Caller': 'W01' } },
+    ), f.env as never)
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({ data: { eligible: true } })
+    expect(f.store.hasPublicCreatorContent).toHaveBeenCalledWith('user_1')
+  })
+
+  it('routes protected-body reference scans through the Neon context store', async () => {
+    const f = fixture()
+    const response = await f.worker.fetch(new Request(
+      'https://w03.internal/internal/content/public-media-reference?url=' + encodeURIComponent('https://img.luckread.com/member/body.png'),
+      { headers: { ...baseHeaders, 'X-LuckRead-Caller': 'W01' } },
+    ), f.env as never)
+    expect(response.status).toBe(200)
+    expect(f.store.listPublishedMembersOnlyBodyReferences).toHaveBeenCalledWith('https://img.luckread.com/member/body.png', 51)
+  })
+
 })
