@@ -1,5 +1,6 @@
 import layers from '../../../../contracts/authz/layers.json'
 import type { LayerId, ScopedRoleAssignment } from './casl-policy.js'
+import type { W08D1Database } from '../creator-store.js'
 
 export type RoleAssignmentRow = {
   roleId: string
@@ -65,7 +66,7 @@ function validPermissionLookup(subjectId: string, now: string): boolean {
  * This adapter is retained for isolated local/unit-test compatibility.
  */
 export async function resolvePermissionContext(
-  db: D1Database,
+  db: W08D1Database,
   subjectId: string,
   now = new Date().toISOString(),
 ): Promise<PermissionContext | null> {
