@@ -50,6 +50,7 @@ import {
   appendPostThreadNext,
   listPostThread,
   type ContentRelationshipDirection,
+  type ContentRelationshipMutationStore,
   type PostThreadReadStore,
 } from './content-relationships.js'
 import {
@@ -440,6 +441,10 @@ export type W03ContentWorkerDependencies = Readonly<{
   seriesMemberRemoveStoreProvider?: (
     env: W03PublishedMediaReferenceRuntimeEnv,
   ) => SeriesMemberRemoveStore | undefined
+  /** Optional D1-02 provider for Neon-backed reference relationship create/revoke mutations. */
+  contentRelationshipMutationStoreProvider?: (
+    env: W03PublishedMediaReferenceRuntimeEnv,
+  ) => ContentRelationshipMutationStore | undefined
   /** Optional D1-02 provider for bounded series and collection member reads. */
   membersReadStoreProvider?: (
     env: W03PublishedMediaReferenceRuntimeEnv,
@@ -1255,6 +1260,8 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
           path.id,
           body,
           requireIdempotency(request),
+          new Date(),
+          dependencies.contentRelationshipMutationStoreProvider?.(env),
         )
         return json({ data: relationship, requestId: createRequestId() }, 201)
       }
@@ -1268,6 +1275,8 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
           path.id,
           relationshipId,
           requireIdempotency(request),
+          new Date(),
+          dependencies.contentRelationshipMutationStoreProvider?.(env),
         )
         return json({ data: relationship, requestId: createRequestId() })
       }
