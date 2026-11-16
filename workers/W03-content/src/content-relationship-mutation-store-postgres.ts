@@ -360,7 +360,7 @@ export function createPostgresContentRelationshipMutationStore(
           "SELECT $4, 'content', s.id, 'content', t.id, 'thread-next', NULL, 1, 'ACTIVE', $5, NULL, NULL, " +
           '$6::timestamptz, $6::timestamptz ' +
           'FROM contents s JOIN contents t ON t.id = $7 ' +
-          'WHERE s.id = $2 AND s.owner_user_id = $5 AND t.owner_user_id = $5 ' +
+          'WHERE s.id = $2 AND s.id <> t.id AND s.owner_user_id = $5 AND t.owner_user_id = $5 ' +
           "AND s.content_type = 'post' AND t.content_type = 'post' " +
           "AND s.state IN ('DRAFT', 'PUBLISHED') AND t.state IN ('DRAFT', 'PUBLISHED') " +
           "AND s.access_mode = 'PUBLIC' AND t.access_mode = 'PUBLIC' " +
