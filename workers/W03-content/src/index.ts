@@ -451,7 +451,7 @@ export type W03ContentWorkerDependencies = Readonly<{
   contentCreateStoreProvider?: (
     env: W03PublishedMediaReferenceRuntimeEnv,
   ) => ContentCreateStore | undefined
-  /** Optional D1-02 provider for canonical content update and delete mutations. */
+  /** Optional D1-02 provider for canonical content update, delete, and owner-authorized state transitions. */
   contentMutationStoreProvider?: (
     env: W03PublishedMediaReferenceRuntimeEnv,
   ) => ContentMutationStore | undefined
