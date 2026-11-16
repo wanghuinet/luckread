@@ -197,6 +197,9 @@ describe('W03 revision runtime injection', () => {
     })
     const env = { D1_02: { prepare } } as never
     const headers = {
+      'X-LuckRead-Caller': 'W01',
+      'X-LuckRead-Transport-Version': '1.0',
+      'X-LuckRead-Correlation-Id': 'content-revision-read-store-test',
       'X-LuckRead-Principal-User-Id': 'owner-1',
       'X-LuckRead-Principal-Layer': 'L3',
     }
