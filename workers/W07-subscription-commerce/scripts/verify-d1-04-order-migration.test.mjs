@@ -314,20 +314,18 @@ test('workflow is manual-only, gates exact SHA/name/confirmation, and never depl
 })
 
 
-test('W07 deployment fails closed until all D1-04 commerce migrations are already applied', () => {
+test('W07 production deployment requires both Neon schemas and zero D1 bindings', () => {
   const workflow = fs.readFileSync(new URL('../../../.github/workflows/w07-subscription-runtime-deploy.yml', import.meta.url), 'utf8')
-  const bindingPreflight = workflow.indexOf('node scripts/verify-d1-04-binding.mjs /tmp/w07-d1-list.json')
-  const d1_04Gate = workflow.indexOf('name: Require D1-04 commerce, billing, and saved-method migration readiness')
-  const d1_01Migration = workflow.indexOf('name: Apply D1-01 Subscription migration')
+  const preflight = workflow.indexOf('name: Verify Neon-only W07 production config and preserved migration source records')
+  const schemaGate = workflow.indexOf('name: Require both Neon schemas and the D1-free W07 production binding before deployment')
   const workerDeploy = workflow.indexOf('name: Deploy W07')
 
-  assert.ok(bindingPreflight >= 0, 'deployment must verify the live D1-04 binding')
-  assert.ok(d1_04Gate > bindingPreflight, 'D1-04 schema admission must follow live binding verification')
-  assert.ok(d1_04Gate < d1_01Migration, 'D1-04 schema admission must run before any D1-01 migration write')
-  assert.ok(d1_01Migration < workerDeploy, 'D1-04 schema admission must run before Worker deployment')
-  assert.match(workflow, /test -f migrations-d1-04\/0006_refunds_billing_documents\.sql/)
-  assert.match(workflow, /verify-d1-04-order-migration\.mjs preflight/)
-  assert.match(workflow, /\[\[ "\$ACTION" != "VERIFY_ONLY" \]\]/)
-  assert.match(workflow, /D1-04 commerce, billing, or saved-payment-method migrations are pending or inconsistent/)
-  assert.match(workflow, /--remote/)
+  assert.ok(preflight >= 0, 'deployment must read the D1-free Neon production config')
+  assert.ok(schemaGate > preflight, 'Neon schema admission must follow production binding validation')
+  assert.ok(schemaGate < workerDeploy, 'both Neon schemas must be admitted before Worker deployment')
+  assert.match(workflow, /wrangler\.neon\.jsonc/)
+  assert.match(workflow, /productionD1Bindings/)
+  assert.doesNotMatch(workflow, /wrangler d1 migrations apply/)
+  assert.doesNotMatch(workflow, /wrangler d1 list/)
+  assert.doesNotMatch(workflow, /--remote/)
 })
