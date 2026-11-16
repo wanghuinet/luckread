@@ -49,12 +49,14 @@ jobs:
           const fs = require('fs');
           const c = JSON.parse(fs.readFileSync('wrangler.jsonc','utf8'));
           if (c.name !== 'luckread-w03') throw new Error('W03 worker name mismatch');
-          if (c.main !== 'src/index.ts') throw new Error('W03 entrypoint mismatch');
-          const d1 = (c.d1_databases || []).find(x => x.binding === 'D1_02');
-          if (!d1 || d1.database_id !== '6c342634-97f6-4248-9f4a-85772af4f22c') {
-            throw new Error('D1_02 physical binding mismatch');
+          if (c.main !== 'src/entry.ts') throw new Error('W03 entrypoint mismatch');
+          if ((c.d1_databases || []).length !== 0) throw new Error('W03 production config must not declare D1');
+          const postgres = (c.hyperdrive || []).find(x => x.binding === 'HYPERDRIVE_D1_02');
+          if (!postgres || postgres.id !== 'c55183e1cc3446409c9c1075832c6615') {
+            throw new Error('Existing Neon Hyperdrive binding mismatch');
           }
-          console.log(JSON.stringify({worker:c.name, main:c.main, d1Binding:d1}));
+          if (c.vars?.W03_CONTENT_READ_DRIVER !== 'neon') throw new Error('W03 must use the Neon runtime driver');
+          console.log(JSON.stringify({worker:c.name, main:c.main, d1BindingCount:0, hyperdriveBinding:postgres.binding}));
           NODE
 
       - name: Install repository dependencies
@@ -94,8 +96,9 @@ jobs:
           source_sha=${{ inputs.source_sha }}
           confirmation=DEPLOY_W03
           worker=luckread-w03
-          d1_binding=D1_02
-          d1_database_id=6c342634-97f6-4248-9f4a-85772af4f22c
+          database_driver=neon
+          d1_binding_count=0
+          hyperdrive_binding=HYPERDRIVE_D1_02
           migration_execution=false
           EOF
 
