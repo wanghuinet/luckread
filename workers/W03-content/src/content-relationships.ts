@@ -38,6 +38,21 @@ export interface PublicContentRelationship {
   createdAt: string
 }
 
+export type ContentRelationshipReadCursor = Readonly<{
+  createdAt: string
+  relationshipId: string
+}>
+
+/** PostgreSQL read adapter for public reference relationship lists. */
+export interface ContentRelationshipReadStore {
+  list(
+    contentId: string,
+    direction: ContentRelationshipDirection,
+    cursor: ContentRelationshipReadCursor | null,
+    limit: number,
+  ): Promise<readonly PublicContentRelationship[]>
+}
+
 export interface RelationshipRow {
   relationship_id: string
   source_type: 'content'
@@ -405,6 +420,7 @@ export async function listContentRelationships(
   direction: ContentRelationshipDirection = 'out',
   cursor: string | null = null,
   limit = 20,
+  readStore?: ContentRelationshipReadStore,
 ): Promise<{ items: PublicContentRelationship[]; nextCursor: string | null; hasMore: boolean }> {
   assertContentId(contentId)
   if (!['out', 'in', 'both'].includes(direction)) {
@@ -414,6 +430,25 @@ export async function listContentRelationships(
   const pageSize = relationLimit(limit)
   const cursorScope = JSON.stringify({ type: 'content-relationships', contentId, direction })
   const decoded = cursor ? decodeScopedCursor(cursor, cursorScope) : null
+  if (readStore) {
+    const rows = await readStore.list(
+      contentId,
+      direction,
+      decoded ? { createdAt: decoded.updatedAt, relationshipId: decoded.id } : null,
+      pageSize + 1,
+    )
+    const page = rows.slice(0, pageSize)
+    const last = page.at(-1)
+    const hasMore = rows.length > pageSize
+    return {
+      items: page,
+      hasMore,
+      nextCursor: hasMore && last
+        ? encodeScopedCursor(last.createdAt, last.relationshipId, cursorScope)
+        : null,
+    }
+  }
+
   const cursorClause = decoded
     ? 'AND (r.created_at < ? OR (r.created_at = ? AND r.relationship_id < ?))'
     : ''
