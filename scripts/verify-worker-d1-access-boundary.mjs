@@ -105,7 +105,7 @@ for (const dir of dirs) {
     (config.hyperdrive ?? []).some((entry) =>
       entry.binding === 'HYPERDRIVE_CONTENT_PG' && entry.id === 'c55183e1cc3446409c9c1075832c6615')
   if (workerId === 'W03' && !w03NeonProduction) {
-    throw new Error('W03 production must use the approved Neon D1-02 Hyperdrive and no D1 bindings')
+    throw new Error('W03 production must use the approved Neon content PostgreSQL Hyperdrive and no D1 bindings')
   }
   const w08NeonProduction = workerId === 'W08' &&
     config?.name === 'luckread-w08-creator' &&
