@@ -50,6 +50,15 @@ function fixture() {
   }
   const worker = createW03ContentWorker({
     contentContextReadStoreProvider: () => store,
+    publishedMediaReferenceReadStoreProvider: () => ({
+      listPublishedMediaReferences: async () => [{
+        id: 'member_media_1',
+        owner_user_id: 'user_1',
+        creator_id: 'creator_1',
+        content_type: 'post',
+        access_mode: 'MEMBERS_ONLY',
+      }],
+    }),
   })
   const env = {}
   return { store, worker, env }
