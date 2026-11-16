@@ -1,11 +1,11 @@
 -- GENERATED FILE. Do not hand-edit.
 -- Regenerate with workers/W05-social/scripts/neon/generate-d1-02-postgres-migration.mjs.
 -- Template: workers/W05-social/scripts/neon/templates/d1-02-social-postgres.sql.
--- Schema source: W05's fifteen D1-origin D1-02 migrations; production runtime uses Neon D1-02, with W09-owned push endpoints on Neon D1-03.
+-- Source authority: W05 / D1-02; Cloudflare D1 remains the current runtime authority.
 -- W05 / D1-02 PostgreSQL 18 schema-only bootstrap.
 -- Source authority: W05 / D1-02 social graph, interactions and notification delivery state.
 -- Endpoint state remains owned by W09 / D1-03 and is intentionally not created here.
--- The empty-schema artifact is generated from historical D1-origin migrations; production W05 runtime uses the existing Neon D1-02 and delegated Neon D1-03 Hyperdrive connections.
+-- Existing runtime authority remains Cloudflare D1; this artifact is for an empty Neon schema rehearsal.
 BEGIN;
 
 CREATE TABLE social_follow_relationships (
