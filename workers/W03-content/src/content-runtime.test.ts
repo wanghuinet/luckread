@@ -189,24 +189,17 @@ describe('W03 content contract core', () => {
       created_at: '2026-10-29T00:00:00.000Z',
       updated_at: '2026-10-29T00:00:00.000Z',
     };
-    const db = {
-      prepare() {
-        return {
-          bind() {
-            return {
-              first: async () => ({ ...contentRow }),
-            };
-          },
-        };
-      },
-    };
+    const neonWorker = createW03ContentWorker({
+      contentDetailReadStoreProvider: () => ({
+        getContent: async () => ({ ...contentRow }),
+      } as never),
+    })
     let providerStatus = 200;
     let allowed = false;
     let reasonOverride: string | null = null;
     let providerCalls = 0;
     const allowLimiter = { limit: async () => ({ success: true }) };
     const env = {
-      D1_02: db,
       W07_SUBSCRIPTION: {
         fetch: async (input: RequestInfo | URL, init?: RequestInit) => {
           providerCalls += 1;
@@ -234,7 +227,7 @@ describe('W03 content contract core', () => {
       },
     });
 
-    const denied = await w03Worker.fetch(makeRequest(), env, {} as never);
+    const denied = await neonWorker.fetch(makeRequest(), env, {} as never);
     expect(denied.status).toBe(200);
     await expect(denied.json()).resolves.toMatchObject({
       id: 'content_member_1',
@@ -304,25 +297,22 @@ describe('W03 content contract core', () => {
     const memberReferenceRows = [
       { owner_user_id: 'private_owner', creator_id: 'private_creator' },
     ]
-    const queries: string[] = []
-    const db = {
-      prepare(sql: string) {
-        queries.push(sql)
-        return {
-          bind() {
-            return {
-              first: async () => ({ ...publicContentRow }),
-              all: async () => ({ results: memberReferenceRows.map((row) => ({ ...row })) }),
-            }
-          },
-        }
-      },
-    }
+    const contextLookups: Array<{ bodyRef: string; limit: number }> = []
+    const neonWorker = createW03ContentWorker({
+      contentDetailReadStoreProvider: () => ({
+        getContent: async () => ({ ...publicContentRow }),
+      } as never),
+      contentContextReadStoreProvider: () => ({
+        listPublishedMembersOnlyBodyReferences: async (value: string, limit: number) => {
+          contextLookups.push({ bodyRef: value, limit })
+          return memberReferenceRows
+        },
+      } as never),
+    })
     let allowed = false
     let entitlementChecks = 0
     const allowLimiter = { limit: async () => ({ success: true }) }
     const env = {
-      D1_02: db,
       W07_SUBSCRIPTION: {
         fetch: async (input: RequestInfo | URL, init?: RequestInit) => {
           entitlementChecks += 1
@@ -355,7 +345,7 @@ describe('W03 content contract core', () => {
       },
     )
 
-    const denied = await w03Worker.fetch(makeRequest(), env, {} as never)
+    const denied = await neonWorker.fetch(makeRequest(), env, {} as never)
     expect(denied.status).toBe(200)
     await expect(denied.json()).resolves.toMatchObject({
       contentId: 'content_public_1',
@@ -364,12 +354,7 @@ describe('W03 content contract core', () => {
       bodyRef: '',
     })
     expect(entitlementChecks).toBe(1)
-    expect(queries.some((sql) =>
-      sql.includes("state = 'PUBLISHED' AND access_mode = 'MEMBERS_ONLY'"),
-    )).toBe(true)
-    expect(queries.some((sql) =>
-      sql.includes("access_mode = 'MEMBERS_ONLY'") && !sql.includes("state = 'PUBLISHED'"),
-    )).toBe(false)
+    expect(contextLookups).toEqual([{ bodyRef, limit: 51 }])
 
     allowed = true
     const entitled = await w03Worker.fetch(makeRequest(), env, {} as never)
@@ -1564,7 +1549,7 @@ describe('W03 content contract core', () => {
             'X-LuckRead-Correlation-Id': 'test-correlation-' + limit,
           },
         }),
-        { D1_02: db },
+        {} as never,
       )
 
       expect(response.status).toBe(422)
