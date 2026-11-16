@@ -84,7 +84,7 @@ for (const dir of dirs) {
   }
 
   const productionNeon = workerPolicy.productionRuntime?.provider === 'neon' &&
-    config?.d1_databases?.length === 0 &&
+    (config?.d1_databases ?? []).length === 0 &&
     Object.entries(workerPolicy.productionRuntime.driverVars ?? {}).every(([name, expected]) =>
       config.vars?.[name] === expected) &&
     Object.entries(workerPolicy.productionRuntime.hyperdrive ?? {}).every(([binding, expectedId]) =>
