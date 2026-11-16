@@ -248,7 +248,6 @@ for (const owner of contract.owners.slice(1)) {
         )) {
           failures.push('W02 production Wrangler must be D1-free and preserve its Neon Hyperdrive and AUTH-013 queues')
         }
-        addSource('W02', 'neon-production-wrangler', productionPath, productionText)
       }
     }
     addSource(owner.worker, 'wrangler-database-mapping', owner.wrangler, wrangler)
