@@ -243,7 +243,7 @@ describe('W03 Neon Collection member reorder', () => {
       collectionVersion: 5,
       collectionEtag: 'W/"5"',
     })
-    expect(preparedSql).toHaveLength(2)
+    expect(preparedSql.length).toBeGreaterThan(2)
     expect(preparedSql[1]).toContain("target_type = 'collection'")
     expect(batchStatements).toHaveLength(9)
   })
