@@ -1630,7 +1630,7 @@ describe('W03 content contract core', () => {
     expect(storeCalls).toHaveLength(1)
     expect(storeCalls[0]?.slice(0, 4)).toEqual(['user_draft_owner', null, 21, { status: 'DRAFT', contentType: 'post' }])
 
-    const denied = await w03Worker.fetch(
+    const denied = await neonWorker.fetch(
       new Request('https://luckread-w03.internal/internal/content/contents?status=DRAFT&type=post', {
         headers: {
           'X-LuckRead-Caller': 'W01',
@@ -1640,7 +1640,7 @@ describe('W03 content contract core', () => {
           'X-LuckRead-Principal-Layer': 'L1',
         },
       }),
-      { D1_02: db },
+      {} as never,
       {} as never,
     );
     expect(denied.status).toBe(403);
@@ -1716,11 +1716,6 @@ describe('W03 content contract core', () => {
   })
 
   it('returns the canonical error envelope for an unmatched internal route', async () => {
-    const db = {
-      prepare() {
-        throw new Error('database should not be reached for an unmatched route')
-      },
-    } as never
     const response = await w03Worker.fetch(
       new Request('https://luckread-w03.internal/internal/content/unmatched-route', {
         headers: {
@@ -1729,7 +1724,7 @@ describe('W03 content contract core', () => {
           'X-LuckRead-Correlation-Id': 'test-unmatched-route',
         },
       }),
-      { D1_02: db },
+      {} as never,
     )
     expect(response.status).toBe(404)
     await expect(response.json()).resolves.toMatchObject({
