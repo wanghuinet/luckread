@@ -7,8 +7,8 @@ import { text } from '@payloadcms/db-postgres/drizzle/pg-core'
 const dirname = path.dirname(fileURLToPath(import.meta.url))
 
 /**
- * Shared W01 PostgreSQL adapter for both schema generation and the optional
- * Hyperdrive runtime. D1 remains selected by default in payload.config.ts.
+ * Shared W01 PostgreSQL adapter for schema generation and the production
+ * Hyperdrive runtime. The D1 adapter is confined to local/test compatibility.
  */
 export function createW01NeonPostgresAdapter(connectionString: string) {
   if (typeof connectionString !== 'string' || connectionString.trim() === '') {
