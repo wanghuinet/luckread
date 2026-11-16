@@ -114,6 +114,29 @@ export interface ContentRelationshipMutationStore {
     relationshipId: string
     sourceContentId: string
   }>): Promise<void>
+  loadAppend(input: Readonly<{
+    targetContentId: string
+    ownerUserId: string
+    operationId: string
+    idempotencyKey: string
+    sourceContentId: string
+  }>): Promise<AppendPostThreadQueryRow | null>
+  loadAppendStats(input: Readonly<{
+    sourceContentId: string
+    targetContentId: string
+    maxItems: number
+  }>): Promise<PostThreadChainStats | null>
+  appendThread(input: Readonly<{
+    ownerUserId: string
+    operationId: string
+    idempotencyKey: string
+    requestHash: string
+    responseJson: string
+    createdAt: string
+    expiresAt: string
+    maxItems: number
+    relationship: ContentRelationship
+  }>): Promise<void>
 }
 
 const MAX_REF_LENGTH = 2048
@@ -595,7 +618,7 @@ export interface PostThreadReadStore {
   ): Promise<readonly PostThreadReadRow[]>;
 }
 
-interface AppendPostThreadQueryRow {
+export interface AppendPostThreadQueryRow {
   source_id: string;
   source_owner_user_id: string;
   source_content_type: string;
@@ -614,7 +637,7 @@ interface AppendPostThreadQueryRow {
   idem_expires_at: string | null;
 }
 
-interface PostThreadChainStats {
+export interface PostThreadChainStats {
   previous_count: number;
   next_count: number;
   would_cycle: number;
@@ -634,6 +657,7 @@ export async function appendPostThreadNext(
   targetContentIdValue: string,
   idempotencyKey: string,
   now = new Date(),
+  mutationStore?: ContentRelationshipMutationStore,
 ): Promise<ContentRelationship> {
   const ownerUserId = ownerUserIdValue.trim();
   const sourceContentId = sourceContentIdValue.trim();
@@ -648,36 +672,44 @@ export async function appendPostThreadNext(
 
   const operationId = 'appendPostThreadNext';
   const hash = await relationshipHash(operationId, { ownerUserId, sourceContentId, targetContentId });
-  const row = await db.prepare(`
-    SELECT
-      s.id AS source_id,
-      s.owner_user_id AS source_owner_user_id,
-      s.content_type AS source_content_type,
-      s.state AS source_state,
-      s.access_mode AS source_access_mode,
-      t.id AS target_id,
-      t.owner_user_id AS target_owner_user_id,
-      t.content_type AS target_content_type,
-      t.state AS target_state,
-      t.access_mode AS target_access_mode,
-      i.id AS idem_id,
-      i.owner_user_id AS idem_owner_user_id,
-      i.request_hash AS idem_request_hash,
-      i.status AS idem_status,
-      i.response_json AS idem_response_json,
-      i.expires_at AS idem_expires_at
-    FROM contents s
-    LEFT JOIN contents t ON t.id = ?
-    LEFT JOIN (
-      SELECT id, owner_user_id, request_hash, status, response_json, expires_at
-        FROM content_mutation_idempotency
-       WHERE owner_user_id = ? AND operation_id = ? AND idempotency_key = ?
-       ORDER BY created_at DESC
-       LIMIT 1
-    ) i ON 1 = 1
-    WHERE s.id = ?
-  `).bind(targetContentId, ownerUserId, operationId, idempotencyKey, sourceContentId)
-    .first<AppendPostThreadQueryRow>();
+  const row = mutationStore
+    ? await mutationStore.loadAppend({
+        targetContentId,
+        ownerUserId,
+        operationId,
+        idempotencyKey,
+        sourceContentId,
+      })
+    : await db.prepare(`
+        SELECT
+          s.id AS source_id,
+          s.owner_user_id AS source_owner_user_id,
+          s.content_type AS source_content_type,
+          s.state AS source_state,
+          s.access_mode AS source_access_mode,
+          t.id AS target_id,
+          t.owner_user_id AS target_owner_user_id,
+          t.content_type AS target_content_type,
+          t.state AS target_state,
+          t.access_mode AS target_access_mode,
+          i.id AS idem_id,
+          i.owner_user_id AS idem_owner_user_id,
+          i.request_hash AS idem_request_hash,
+          i.status AS idem_status,
+          i.response_json AS idem_response_json,
+          i.expires_at AS idem_expires_at
+        FROM contents s
+        LEFT JOIN contents t ON t.id = ?
+        LEFT JOIN (
+          SELECT id, owner_user_id, request_hash, status, response_json, expires_at
+            FROM content_mutation_idempotency
+           WHERE owner_user_id = ? AND operation_id = ? AND idempotency_key = ?
+           ORDER BY created_at DESC
+           LIMIT 1
+        ) i ON 1 = 1
+        WHERE s.id = ?
+      `).bind(targetContentId, ownerUserId, operationId, idempotencyKey, sourceContentId)
+        .first<AppendPostThreadQueryRow>();
 
   if (!row) throw new ContentRuntimeError('NOT_FOUND', 404);
   const replay = assertIdempotencyReplay(row, ownerUserId, hash, now);
@@ -701,49 +733,55 @@ export async function appendPostThreadNext(
 
   // The edge joins the tail of one chain to the head of another. This prevents
   // forks/merges and checks the combined chain length and cycle condition.
-  const stats = await db.prepare(`
-    WITH RECURSIVE
-      previous(id, depth, visited) AS (
-        SELECT ?, 0, '|' || ? || '|'
-        UNION ALL
-        SELECT r.source_id, p.depth + 1, p.visited || r.source_id || '|'
-          FROM previous p
-          JOIN content_relationships r
-            ON r.target_id = p.id
-           AND r.relation_type = 'thread-next'
-           AND r.status = 'ACTIVE'
-         WHERE p.depth < ?
-           AND instr(p.visited, '|' || r.source_id || '|') = 0
-      ),
-      next(id, depth, visited) AS (
-        SELECT ?, 0, '|' || ? || '|'
-        UNION ALL
-        SELECT r.target_id, n.depth + 1, n.visited || r.target_id || '|'
-          FROM next n
-          JOIN content_relationships r
-            ON r.source_id = n.id
-           AND r.relation_type = 'thread-next'
-           AND r.status = 'ACTIVE'
-         WHERE n.depth < ?
-           AND instr(n.visited, '|' || r.target_id || '|') = 0
-      )
-    SELECT
-      (SELECT COUNT(*) FROM previous) AS previous_count,
-      (SELECT COUNT(*) FROM next) AS next_count,
-      EXISTS(SELECT 1 FROM next WHERE id = ?) AS would_cycle,
-      EXISTS(
-        SELECT 1 FROM content_relationships
-         WHERE source_id = ? AND relation_type = 'thread-next' AND status = 'ACTIVE'
-      ) AS source_has_next,
-      EXISTS(
-        SELECT 1 FROM content_relationships
-         WHERE target_id = ? AND relation_type = 'thread-next' AND status = 'ACTIVE'
-      ) AS target_has_previous
-  `).bind(
-    sourceContentId, sourceContentId, MAX_POST_THREAD_ITEMS,
-    targetContentId, targetContentId, MAX_POST_THREAD_ITEMS,
-    sourceContentId, sourceContentId, targetContentId,
-  ).first<PostThreadChainStats>();
+  const stats = mutationStore
+    ? await mutationStore.loadAppendStats({
+        sourceContentId,
+        targetContentId,
+        maxItems: MAX_POST_THREAD_ITEMS,
+      })
+    : await db.prepare(`
+        WITH RECURSIVE
+          previous(id, depth, visited) AS (
+            SELECT ?, 0, '|' || ? || '|'
+            UNION ALL
+            SELECT r.source_id, p.depth + 1, p.visited || r.source_id || '|'
+              FROM previous p
+              JOIN content_relationships r
+                ON r.target_id = p.id
+               AND r.relation_type = 'thread-next'
+               AND r.status = 'ACTIVE'
+             WHERE p.depth < ?
+               AND instr(p.visited, '|' || r.source_id || '|') = 0
+          ),
+          next(id, depth, visited) AS (
+            SELECT ?, 0, '|' || ? || '|'
+            UNION ALL
+            SELECT r.target_id, n.depth + 1, n.visited || r.target_id || '|'
+              FROM next n
+              JOIN content_relationships r
+                ON r.source_id = n.id
+               AND r.relation_type = 'thread-next'
+               AND r.status = 'ACTIVE'
+             WHERE n.depth < ?
+               AND instr(n.visited, '|' || r.target_id || '|') = 0
+          )
+        SELECT
+          (SELECT COUNT(*) FROM previous) AS previous_count,
+          (SELECT COUNT(*) FROM next) AS next_count,
+          EXISTS(SELECT 1 FROM next WHERE id = ?) AS would_cycle,
+          EXISTS(
+            SELECT 1 FROM content_relationships
+             WHERE source_id = ? AND relation_type = 'thread-next' AND status = 'ACTIVE'
+          ) AS source_has_next,
+          EXISTS(
+            SELECT 1 FROM content_relationships
+             WHERE target_id = ? AND relation_type = 'thread-next' AND status = 'ACTIVE'
+          ) AS target_has_previous
+      `).bind(
+        sourceContentId, sourceContentId, MAX_POST_THREAD_ITEMS,
+        targetContentId, targetContentId, MAX_POST_THREAD_ITEMS,
+        sourceContentId, sourceContentId, targetContentId,
+      ).first<PostThreadChainStats>();
 
   if (!stats) throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503);
   if (stats.source_has_next || stats.target_has_previous) throw new ContentRuntimeError('CONFLICT', 409);
@@ -770,75 +808,89 @@ export async function appendPostThreadNext(
     updatedAt: createdAt,
   };
 
-  await relationshipMutationBatch(db, [
-    db.prepare(
-      'DELETE FROM content_mutation_idempotency WHERE owner_user_id = ? AND operation_id = ? AND idempotency_key = ? AND expires_at <= ?',
-    ).bind(ownerUserId, operationId, idempotencyKey, createdAt),
-    db.prepare(`
-      INSERT INTO content_mutation_idempotency
-        (id, owner_user_id, operation_id, idempotency_key, request_hash, status, response_status, response_json, created_at, expires_at)
-      VALUES (?, ?, ?, ?, ?, 'COMPLETED', 201, ?, ?, ?)
-    `).bind(
-      crypto.randomUUID(), ownerUserId, operationId, idempotencyKey, hash,
-      JSON.stringify(relationship), createdAt, expiresAt,
-    ),
-    db.prepare(`
-      WITH RECURSIVE
-        descendants(id, depth, visited) AS (
-          SELECT ?, 0, '|' || ? || '|'
-          UNION ALL
-          SELECT r.target_id, d.depth + 1, d.visited || r.target_id || '|'
-            FROM descendants d
-            JOIN content_relationships r
-              ON r.source_id = d.id
-             AND r.relation_type = 'thread-next'
-             AND r.status = 'ACTIVE'
-           WHERE d.depth < ?
-             AND instr(d.visited, '|' || r.target_id || '|') = 0
-        ),
-        ancestors(id, depth, visited) AS (
-          SELECT ?, 0, '|' || ? || '|'
-          UNION ALL
-          SELECT r.source_id, a.depth + 1, a.visited || r.source_id || '|'
-            FROM ancestors a
-            JOIN content_relationships r
-              ON r.target_id = a.id
-             AND r.relation_type = 'thread-next'
-             AND r.status = 'ACTIVE'
-           WHERE a.depth < ?
-             AND instr(a.visited, '|' || r.source_id || '|') = 0
-        )
-      INSERT INTO content_relationships
-        (relationship_id, source_type, source_id, target_type, target_id, relation_type,
-         position, schema_version, status, actor_id, provenance_ref, authorization_ref, created_at, updated_at)
-      SELECT ?, 'content', s.id, 'content', t.id, 'thread-next',
-             NULL, 1, 'ACTIVE', ?, NULL, NULL, ?, ?
-        FROM contents s
-        JOIN contents t ON t.id = ?
-       WHERE s.id = ? AND s.owner_user_id = ? AND t.owner_user_id = ?
-         AND s.content_type = 'post' AND t.content_type = 'post'
-         AND s.state IN ('DRAFT', 'PUBLISHED') AND t.state IN ('DRAFT', 'PUBLISHED')
-         AND s.access_mode = 'PUBLIC' AND t.access_mode = 'PUBLIC'
-         AND NOT EXISTS (
-           SELECT 1 FROM content_relationships r
-            WHERE r.source_id = s.id AND r.relation_type = 'thread-next' AND r.status = 'ACTIVE'
-         )
-         AND NOT EXISTS (
-           SELECT 1 FROM content_relationships r
-            WHERE r.target_id = t.id AND r.relation_type = 'thread-next' AND r.status = 'ACTIVE'
-         )
-         AND NOT EXISTS (SELECT 1 FROM descendants WHERE id = s.id)
-         AND (SELECT COUNT(*) FROM descendants) +
-             (SELECT COUNT(*) FROM ancestors) <= ?
-    `).bind(
-      targetContentId, targetContentId, MAX_POST_THREAD_ITEMS,
-      sourceContentId, sourceContentId, MAX_POST_THREAD_ITEMS,
-      relationship.relationshipId, ownerUserId, createdAt, createdAt,
-      targetContentId, sourceContentId, ownerUserId, ownerUserId,
-      MAX_POST_THREAD_ITEMS,
-    ),
-    db.prepare('INSERT OR REPLACE INTO content_txn_guard(id, successful) VALUES (1, changes())'),
-  ]);
+  if (mutationStore) {
+    await mutationStore.appendThread({
+      ownerUserId,
+      operationId,
+      idempotencyKey,
+      requestHash: hash,
+      responseJson: JSON.stringify(relationship),
+      createdAt,
+      expiresAt,
+      maxItems: MAX_POST_THREAD_ITEMS,
+      relationship,
+    })
+  } else {
+    await relationshipMutationBatch(db, [
+      db.prepare(
+        'DELETE FROM content_mutation_idempotency WHERE owner_user_id = ? AND operation_id = ? AND idempotency_key = ? AND expires_at <= ?',
+      ).bind(ownerUserId, operationId, idempotencyKey, createdAt),
+      db.prepare(`
+        INSERT INTO content_mutation_idempotency
+          (id, owner_user_id, operation_id, idempotency_key, request_hash, status, response_status, response_json, created_at, expires_at)
+        VALUES (?, ?, ?, ?, ?, 'COMPLETED', 201, ?, ?, ?)
+      `).bind(
+        crypto.randomUUID(), ownerUserId, operationId, idempotencyKey, hash,
+        JSON.stringify(relationship), createdAt, expiresAt,
+      ),
+      db.prepare(`
+        WITH RECURSIVE
+          descendants(id, depth, visited) AS (
+            SELECT ?, 0, '|' || ? || '|'
+            UNION ALL
+            SELECT r.target_id, d.depth + 1, d.visited || r.target_id || '|'
+              FROM descendants d
+              JOIN content_relationships r
+                ON r.source_id = d.id
+               AND r.relation_type = 'thread-next'
+               AND r.status = 'ACTIVE'
+             WHERE d.depth < ?
+               AND instr(d.visited, '|' || r.target_id || '|') = 0
+          ),
+          ancestors(id, depth, visited) AS (
+            SELECT ?, 0, '|' || ? || '|'
+            UNION ALL
+            SELECT r.source_id, a.depth + 1, a.visited || r.source_id || '|'
+              FROM ancestors a
+              JOIN content_relationships r
+                ON r.target_id = a.id
+               AND r.relation_type = 'thread-next'
+               AND r.status = 'ACTIVE'
+             WHERE a.depth < ?
+               AND instr(a.visited, '|' || r.source_id || '|') = 0
+          )
+        INSERT INTO content_relationships
+          (relationship_id, source_type, source_id, target_type, target_id, relation_type,
+           position, schema_version, status, actor_id, provenance_ref, authorization_ref, created_at, updated_at)
+        SELECT ?, 'content', s.id, 'content', t.id, 'thread-next',
+               NULL, 1, 'ACTIVE', ?, NULL, NULL, ?, ?
+          FROM contents s
+          JOIN contents t ON t.id = ?
+         WHERE s.id = ? AND s.owner_user_id = ? AND t.owner_user_id = ?
+           AND s.content_type = 'post' AND t.content_type = 'post'
+           AND s.state IN ('DRAFT', 'PUBLISHED') AND t.state IN ('DRAFT', 'PUBLISHED')
+           AND s.access_mode = 'PUBLIC' AND t.access_mode = 'PUBLIC'
+           AND NOT EXISTS (
+             SELECT 1 FROM content_relationships r
+              WHERE r.source_id = s.id AND r.relation_type = 'thread-next' AND r.status = 'ACTIVE'
+           )
+           AND NOT EXISTS (
+             SELECT 1 FROM content_relationships r
+              WHERE r.target_id = t.id AND r.relation_type = 'thread-next' AND r.status = 'ACTIVE'
+           )
+           AND NOT EXISTS (SELECT 1 FROM descendants WHERE id = s.id)
+           AND (SELECT COUNT(*) FROM descendants) +
+               (SELECT COUNT(*) FROM ancestors) <= ?
+      `).bind(
+        targetContentId, targetContentId, MAX_POST_THREAD_ITEMS,
+        sourceContentId, sourceContentId, MAX_POST_THREAD_ITEMS,
+        relationship.relationshipId, ownerUserId, createdAt, createdAt,
+        targetContentId, sourceContentId, ownerUserId, ownerUserId,
+        MAX_POST_THREAD_ITEMS,
+      ),
+      db.prepare('INSERT OR REPLACE INTO content_txn_guard(id, successful) VALUES (1, changes())'),
+    ]);
+  }
 
   return relationship;
 }

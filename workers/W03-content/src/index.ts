@@ -1223,6 +1223,8 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
           path.id,
           nextContentId,
           requireIdempotency(request),
+          new Date(),
+          dependencies.contentRelationshipMutationStoreProvider?.(env),
         )
         return json({ data: relationship, schemaVersion: '1.0', requestId: createRequestId() }, 201)
       }

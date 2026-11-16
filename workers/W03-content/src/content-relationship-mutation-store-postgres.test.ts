@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { ContentRuntimeError } from './content-runtime.js'
 import {
+  appendPostThreadNext,
   createContentRelationship,
   revokeContentRelationship,
   type ContentRelationship,
@@ -44,6 +45,33 @@ const createRow = {
   active_relationship_id: null,
 }
 
+const appendRow = {
+  source_id: 'content_source',
+  source_owner_user_id: 'user_123',
+  source_content_type: 'post',
+  source_state: 'DRAFT',
+  source_access_mode: 'PUBLIC',
+  target_id: 'content_target',
+  target_owner_user_id: 'user_123',
+  target_content_type: 'post',
+  target_state: 'PUBLISHED',
+  target_access_mode: 'PUBLIC',
+  idem_id: null,
+  idem_owner_user_id: null,
+  idem_request_hash: null,
+  idem_status: null,
+  idem_response_json: null,
+  idem_expires_at: null,
+}
+
+const appendStats = {
+  previous_count: 1,
+  next_count: 1,
+  would_cycle: 0,
+  source_has_next: 0,
+  target_has_previous: 0,
+}
+
 const revokeRow = {
   relationship_id: relationship.relationshipId,
   source_type: 'content' as const,
@@ -67,7 +95,7 @@ const revokeRow = {
   idem_expires_at: null,
 }
 
-function fixture(options: { revokeMiss?: boolean; uniqueConflict?: boolean } = {}) {
+function fixture(options: { revokeMiss?: boolean; uniqueConflict?: boolean; appendInsertMiss?: boolean } = {}) {
   const directQueries: Array<{ sql: string; values?: unknown[] }> = []
   const transactionQueries: Array<{ sql: string; values?: unknown[] }> = []
   let released = false
@@ -75,16 +103,19 @@ function fixture(options: { revokeMiss?: boolean; uniqueConflict?: boolean } = {
   const client = {
     async query<Row>(sql: string, values?: unknown[]) {
       transactionQueries.push({ sql, values })
-      if (options.uniqueConflict && sql.startsWith('INSERT INTO content_relationships')) {
+      if (options.uniqueConflict && sql.includes('INSERT INTO content_relationships')) {
         throw Object.assign(new Error('duplicate active relationship'), {
           code: '23505',
-          constraint: 'content_relationships_active_unique_idx',
+          constraint: 'content_relationships_thread_next_unique_idx',
         })
+      }
+      if (options.appendInsertMiss && sql.includes('INSERT INTO content_relationships') && sql.includes('WITH RECURSIVE')) {
+        return { rows: [] as Row[] }
       }
       if (options.revokeMiss && sql.startsWith('UPDATE content_relationships')) {
         return { rows: [] as Row[] }
       }
-      if (sql.startsWith('INSERT INTO content_relationships')) {
+      if (sql.includes('INSERT INTO content_relationships')) {
         return { rows: [{ relationship_id: relationship.relationshipId }] as Row[] }
       }
       if (sql.startsWith('UPDATE content_relationships')) {
@@ -98,6 +129,12 @@ function fixture(options: { revokeMiss?: boolean; uniqueConflict?: boolean } = {
   const database: ContentRelationshipPostgresDatabase = {
     async query<Row>(sql: string, values?: unknown[]) {
       directQueries.push({ sql, values })
+      if (sql.includes('source_content_type')) {
+        return { rows: [appendRow] as Row[] }
+      }
+      if (sql.includes('WITH RECURSIVE previous(id')) {
+        return { rows: [appendStats] as Row[] }
+      }
       if (sql.includes('FROM contents s LEFT JOIN contents t')) {
         return { rows: [createRow] as Row[] }
       }
@@ -270,6 +307,9 @@ describe('W03 Neon content relationship mutation store', () => {
         }
       },
       async revoke(input) { revokeInput = input },
+      async loadAppend() { return appendRow },
+      async loadAppendStats() { return appendStats },
+      async appendThread() {},
     }
     const d1 = {
       prepare() { throw new Error('D1 must not be queried in Neon mode') },
@@ -311,6 +351,163 @@ describe('W03 Neon content relationship mutation store', () => {
     expect(revoked).toMatchObject({ relationshipId: created.relationshipId, status: 'REVOKED' })
     expect(revokeInput?.sourceContentId).toBe('content_source')
     expect(revokeInput?.responseJson).toBe(JSON.stringify(revoked))
+  })
+
+  it('loads the thread append content and idempotency snapshot from PostgreSQL', async () => {
+    const fake = fixture()
+    const store = createPostgresContentRelationshipMutationStore(fake.database)
+
+    await expect(store.loadAppend({
+      targetContentId: 'content_target',
+      ownerUserId: 'user_123',
+      operationId: 'appendPostThreadNext',
+      idempotencyKey: 'thread-append-key',
+      sourceContentId: 'content_source',
+    })).resolves.toEqual(appendRow)
+
+    expect(fake.directQueries[0]?.sql).toContain('LEFT JOIN LATERAL')
+    expect(fake.directQueries[0]?.sql).toContain('source_content_type')
+    expect(fake.directQueries[0]?.values).toEqual([
+      'content_target', 'user_123', 'appendPostThreadNext', 'thread-append-key', 'content_source',
+    ])
+  })
+
+  it('loads previous/next thread graph statistics with a PostgreSQL recursive CTE', async () => {
+    const fake = fixture()
+    const store = createPostgresContentRelationshipMutationStore(fake.database)
+
+    await expect(store.loadAppendStats({
+      sourceContentId: 'content_source',
+      targetContentId: 'content_target',
+      maxItems: 50,
+    })).resolves.toEqual(appendStats)
+
+    expect(fake.directQueries[0]?.sql).toContain('WITH RECURSIVE previous')
+    expect(fake.directQueries[0]?.sql).toContain('next_chain')
+    expect(fake.directQueries[0]?.sql).toContain("relation_type = 'thread-next'")
+    expect(fake.directQueries[0]?.values).toEqual([
+      'content_source', 'content_target', 50,
+    ])
+  })
+
+  it('serializes graph appends and commits idempotency plus final no-fork/no-merge/no-cycle insertion atomically', async () => {
+    const fake = fixture()
+    const store = createPostgresContentRelationshipMutationStore(fake.database)
+    const threadRelationship: ContentRelationship = {
+      ...relationship,
+      relationshipId: 'thread_relationship_123',
+      sourceId: 'content_source',
+      targetId: 'content_target',
+      relationType: 'thread-next',
+      provenanceRef: null,
+      authorizationRef: null,
+    }
+
+    await store.appendThread({
+      ownerUserId: 'user_123',
+      operationId: 'appendPostThreadNext',
+      idempotencyKey: 'thread-append-key',
+      requestHash: 'thread-hash',
+      responseJson: JSON.stringify(threadRelationship),
+      createdAt: nowIso,
+      expiresAt: new Date(now.getTime() + 86_400_000).toISOString(),
+      maxItems: 50,
+      relationship: threadRelationship,
+    })
+
+    const sql = fake.transactionQueries.map(item => item.sql)
+    expect(sql[0]).toBe('BEGIN')
+    expect(sql[1]).toContain('pg_advisory_xact_lock(74031, hashtext($1))')
+    expect(fake.transactionQueries[1]?.values).toEqual(['user_123'])
+    expect(sql[2]).toContain('ORDER BY id FOR UPDATE')
+    expect(sql[3]).toContain('DELETE FROM content_mutation_idempotency')
+    expect(sql[4]).toContain('INSERT INTO content_mutation_idempotency')
+    expect(sql[5]).toContain('WITH RECURSIVE descendants')
+    expect(sql[5]).toContain('ancestors')
+    expect(sql[5]).toContain('NOT EXISTS (SELECT 1 FROM descendants WHERE id = s.id)')
+    expect(sql[5]).toContain('s.id <> t.id')
+    expect(sql[5]).toContain("relation_type = 'thread-next'")
+    expect(sql[5]).toContain('RETURNING relationship_id')
+    expect(sql[6]).toBe('COMMIT')
+    expect(fake.transactionQueries[2]?.values).toEqual([['content_source', 'content_target']])
+    expect(fake.transactionQueries[4]?.values?.[5]).toBe(201)
+    expect(fake.transactionQueries[5]?.values).toEqual([
+      'content_target', 'content_source', 50, 'thread_relationship_123',
+      'user_123', nowIso, 'content_target', 50,
+    ])
+    expect(fake.released()).toBe(true)
+  })
+
+  it('rolls back a thread append when the final PostgreSQL graph recheck no longer permits the edge', async () => {
+    const fake = fixture({ appendInsertMiss: true })
+    const store = createPostgresContentRelationshipMutationStore(fake.database)
+    const threadRelationship: ContentRelationship = {
+      ...relationship,
+      relationshipId: 'thread_relationship_rollback',
+      relationType: 'thread-next',
+      provenanceRef: null,
+      authorizationRef: null,
+    }
+
+    await expect(store.appendThread({
+      ownerUserId: 'user_123',
+      operationId: 'appendPostThreadNext',
+      idempotencyKey: 'stale-thread-append-key',
+      requestHash: 'thread-hash',
+      responseJson: JSON.stringify(threadRelationship),
+      createdAt: nowIso,
+      expiresAt: new Date(now.getTime() + 86_400_000).toISOString(),
+      maxItems: 50,
+      relationship: threadRelationship,
+    })).rejects.toMatchObject({ code: 'CONFLICT', status: 409 })
+
+    expect(fake.transactionQueries.at(-1)?.sql).toBe('ROLLBACK')
+    expect(fake.released()).toBe(true)
+  })
+
+  it('routes native post-thread append through Neon without issuing D1 statements', async () => {
+    let appendInput: Parameters<ContentRelationshipMutationStore['appendThread']>[0] | undefined
+    const store: ContentRelationshipMutationStore = {
+      async loadCreate() { return createRow },
+      async create() {},
+      async loadRevoke() {
+        return { ...revokeRow, created_at: nowIso, updated_at: nowIso }
+      },
+      async revoke() {},
+      async loadAppend() { return appendRow },
+      async loadAppendStats() { return appendStats },
+      async appendThread(input) { appendInput = input },
+    }
+    const d1 = {
+      prepare() { throw new Error('D1 must not be queried in Neon mode') },
+      batch() { throw new Error('D1 must not be written in Neon mode') },
+    }
+
+    const created = await appendPostThreadNext(
+      d1 as never,
+      'user_123',
+      'content_source',
+      'content_target',
+      'neon-thread-append-key',
+      now,
+      store,
+    )
+
+    expect(created).toMatchObject({
+      sourceId: 'content_source',
+      targetId: 'content_target',
+      relationType: 'thread-next',
+      status: 'ACTIVE',
+      actorId: 'user_123',
+    })
+    expect(appendInput).toMatchObject({
+      ownerUserId: 'user_123',
+      operationId: 'appendPostThreadNext',
+      idempotencyKey: 'neon-thread-append-key',
+      maxItems: 50,
+      relationship: created,
+      responseJson: JSON.stringify(created),
+    })
   })
 
   it('maps concurrent active-reference uniqueness conflicts to the existing 409 contract', async () => {
