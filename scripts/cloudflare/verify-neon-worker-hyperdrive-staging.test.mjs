@@ -49,15 +49,20 @@ test('continues to require W07 rollback bindings while W05 is production D1-free
   )
 })
 
-test('requires W01/W02 Neon mode and a D1-free W08 production config', () => {
+test('requires W01/W02/W08 Neon mode with their approved production D1 binding sets', () => {
   const w02 = STAGED_WORKERS.find((worker) => worker.worker === 'W02')
   const w02Config = {
     name: w02.script,
-    d1_databases: w02.d1Bindings.map((binding) => ({ binding })),
+    d1_databases: [],
     hyperdrive: [{ binding: w02.binding, id: w02.hyperdriveId }],
     vars: { W02_DATABASE_DRIVER: 'neon' },
   }
   assert.doesNotThrow(() => verifyWorkerConfig(w02Config, w02))
+  assert.deepEqual(verifyWorkerConfig(w02Config, w02).d1FallbackBindings, [])
+  assert.throws(
+    () => verifyWorkerConfig({ ...w02Config, d1_databases: [{ binding: 'D1_01' }] }, w02),
+    /production D1 binding set does not match the expected cutover state/,
+  )
   assert.throws(
     () => verifyWorkerConfig({ ...w02Config, vars: { W02_DATABASE_DRIVER: 'd1' } }, w02),
     /production database driver must be neon/,
