@@ -1310,6 +1310,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
           request.headers.get('X-LuckRead-Correlation-Id')?.trim() || 'runtime',
           new Date(),
           request.headers.get('X-LuckRead-Verified-Creator-Id')?.trim() || undefined,
+          dependencies.contentMutationStoreProvider?.(env),
         )
         return json({
           ...result,
