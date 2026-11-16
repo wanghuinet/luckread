@@ -101,7 +101,6 @@ import {
 type RateLimitBinding = { limit(input: { key: string }): Promise<{ success: boolean }> }
 
 interface Env extends W03PublishedMediaReferenceRuntimeEnv {
-  D1_02: D1Database
   W03_PUBLIC_MEDIA_REFERENCE_DRIVER?: string
   HYPERDRIVE_D1_02?: { connectionString?: string }
   W07_SUBSCRIPTION?: { fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> }
@@ -109,6 +108,10 @@ interface Env extends W03PublishedMediaReferenceRuntimeEnv {
   CONTENT_MUTATION_LIMITER?: RateLimitBinding
   CONTENT_ORIGIN_GLOBAL_LIMITER?: RateLimitBinding
 }
+
+// The deployment entrypoint injects the Neon stores for every data operation.
+// No D1 binding is exposed to the W03 Worker runtime; missing stores fail closed.
+const NO_D1_RUNTIME_BINDING = undefined as never
 
 const getRateKey = (request: Request): string => {
   const supplied = request.headers.get('X-LuckRead-Rate-Key')?.trim()
@@ -517,7 +520,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
         const contextReadStore = dependencies.contentContextReadStoreProvider?.(env)
         const items = contextReadStore
           ? await contextReadStore.getPublishedContentSocialContexts(contentIds)
-          : await getPublishedContentSocialContexts(env.D1_02, contentIds)
+          : await getPublishedContentSocialContexts(NO_D1_RUNTIME_BINDING, contentIds)
         return json({ data: { items }, requestId: createRequestId() })
       }
 
@@ -540,7 +543,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
         const contextReadStore = dependencies.contentContextReadStoreProvider?.(env)
         const context = contextReadStore
           ? await contextReadStore.getPublishedContentSocialContext(contentId)
-          : await getPublishedContentSocialContext(env.D1_02, contentId)
+          : await getPublishedContentSocialContext(NO_D1_RUNTIME_BINDING, contentId)
         return json({ data: context, requestId: createRequestId() })
       }
 
@@ -564,7 +567,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
         const contextReadStore = dependencies.contentContextReadStoreProvider?.(env)
         const context = contextReadStore
           ? await contextReadStore.getPublishedOwnerPostContext(contentId, ownerUserId)
-          : await getPublishedOwnerPostContext(env.D1_02, contentId, ownerUserId)
+          : await getPublishedOwnerPostContext(NO_D1_RUNTIME_BINDING, contentId, ownerUserId)
         return json({ data: context, requestId: createRequestId() })
       }
 
@@ -591,7 +594,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
         const contextReadStore = dependencies.contentContextReadStoreProvider?.(env)
         const context = contextReadStore
           ? await contextReadStore.getOwnedPostContext(contentId, principal.userId)
-          : await getOwnedPostContext(env.D1_02, contentId, principal.userId)
+          : await getOwnedPostContext(NO_D1_RUNTIME_BINDING, contentId, principal.userId)
         return json({ data: context, requestId: createRequestId() })
       }
 
@@ -644,7 +647,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
           throw new ContentRuntimeError('VALIDATION_FAILED', 400)
         }
         const page = await listFollowingOwnerContents(
-          env.D1_02,
+          NO_D1_RUNTIME_BINDING,
           viewerUserId,
           ownerUserIds as string[],
           cursor,
@@ -713,7 +716,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
         }
 
         const page = await searchPublishedContents(
-          env.D1_02,
+          NO_D1_RUNTIME_BINDING,
           query,
           cursor,
           parseListLimit(body.limit === undefined ? null : String(body.limit)),
@@ -777,7 +780,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
         }
         const parts = url.pathname.split('/').filter(Boolean)
         return json({
-          ...await applyModerationContentTransition(env.D1_02, {
+          ...await applyModerationContentTransition(NO_D1_RUNTIME_BINDING, {
             contentId: decodeURIComponent(parts[3]),
             decisionId,
             policyVersion,
@@ -807,7 +810,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
         }
         const limit = parseListLimit(url.searchParams.get('limit') ?? '50')
         const items = await listDueScheduledContentCandidates(
-          env.D1_02,
+          NO_D1_RUNTIME_BINDING,
           new Date(),
           limit,
           dependencies.contentMutationStoreProvider?.(env),
@@ -830,7 +833,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
           throw new ContentRuntimeError('VALIDATION_FAILED', 400)
         }
         const result = await publishAuthorizedScheduledContents(
-          env.D1_02,
+          NO_D1_RUNTIME_BINDING,
           body.items,
           new Date(),
           dependencies.contentMutationStoreProvider?.(env),
@@ -860,7 +863,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
           dependencies.publishedMediaReferenceReadStore ??
           dependencies.publishedMediaReferenceReadStoreProvider?.(env)
         const access = await resolvePublishedMediaReferenceAccess(
-          env.D1_02,
+          NO_D1_RUNTIME_BINDING,
           mediaUrl,
           viewerUserId,
           viewerUserId
@@ -884,7 +887,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
           throw new ContentRuntimeError('VALIDATION_FAILED', 400)
         }
         const items = await listPublishedContentsByIds(
-          env.D1_02,
+          NO_D1_RUNTIME_BINDING,
           ids,
           dependencies.publishedContentsByIdsReadStoreProvider?.(env),
         )
@@ -934,7 +937,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
         const contextReadStore = dependencies.contentContextReadStoreProvider?.(env)
         const context = contextReadStore
           ? await contextReadStore.getPublishedContentAuthorContext(contentId)
-          : await getPublishedContentAuthorContext(env.D1_02, contentId)
+          : await getPublishedContentAuthorContext(NO_D1_RUNTIME_BINDING, contentId)
         return json({ data: context, requestId: createRequestId() })
       }
 
@@ -945,7 +948,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
         const cursor = url.searchParams.get('cursor')
         if (cursor && cursor.length > 2048) throw new ContentRuntimeError('INVALID_CURSOR', 400)
         const page = await listCollectionMembers(
-          env.D1_02,
+          NO_D1_RUNTIME_BINDING,
           principal.userId,
           path.id,
           cursor,
@@ -959,7 +962,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
         const principal = requiredCreatorPrincipal(request)
         return json({
           data: await attachCollectionMember(
-            env.D1_02,
+            NO_D1_RUNTIME_BINDING,
             principal.userId,
             path.id,
             await parseBody(request),
@@ -977,7 +980,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
         const principal = requiredCreatorPrincipal(request)
         return json({
           data: await removeCollectionMember(
-            env.D1_02,
+            NO_D1_RUNTIME_BINDING,
             principal.userId,
             path.id,
             path.collectionMemberContentId,
@@ -997,7 +1000,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
         if (!Number.isSafeInteger(body.position)) throw new ContentRuntimeError('VALIDATION_FAILED', 400)
         return json({
           data: await reorderCollectionMember(
-            env.D1_02,
+            NO_D1_RUNTIME_BINDING,
             principal.userId,
             path.id,
             path.collectionMemberContentId,
@@ -1015,7 +1018,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
       if (path && path.collections && request.method === 'POST' && path.id === undefined) {
         const principal = requiredCreatorPrincipal(request)
         const collection = await createCollection(
-          env.D1_02,
+          NO_D1_RUNTIME_BINDING,
           principal.userId,
           await parseBody(request),
           requireIdempotency(request),
@@ -1030,7 +1033,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
         const cursor = url.searchParams.get('cursor')
         if (cursor && cursor.length > 2048) throw new ContentRuntimeError('INVALID_CURSOR', 400)
         const page = await listCreatorCollections(
-          env.D1_02,
+          NO_D1_RUNTIME_BINDING,
           principal.userId,
           cursor,
           parseListLimit(url.searchParams.get('limit')),
@@ -1041,14 +1044,14 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
 
       if (path && path.collections && path.id && request.method === 'GET') {
         const principal = requiredCreatorPrincipal(request)
-        return json({ data: await getCollection(env.D1_02, principal.userId, path.id, dependencies.collectionListReadStoreProvider?.(env)), schemaVersion: '1.0', requestId: createRequestId() })
+        return json({ data: await getCollection(NO_D1_RUNTIME_BINDING, principal.userId, path.id, dependencies.collectionListReadStoreProvider?.(env)), schemaVersion: '1.0', requestId: createRequestId() })
       }
 
       if (path && path.collections && path.id && request.method === 'PATCH') {
         const principal = requiredCreatorPrincipal(request)
         return json({
           data: await updateCollection(
-            env.D1_02,
+            NO_D1_RUNTIME_BINDING,
             principal.userId,
             path.id,
             await parseBody(request),
@@ -1065,7 +1068,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
       if (path && path.collections && path.id && request.method === 'DELETE') {
         const principal = requiredCreatorPrincipal(request)
         await deleteCollection(
-          env.D1_02,
+          NO_D1_RUNTIME_BINDING,
           principal.userId,
           path.id,
           requireIfMatch(request),
@@ -1079,7 +1082,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
       if (path && path.series && request.method === 'POST' && path.id === undefined) {
         const principal = requiredCreatorPrincipal(request)
         const series = await createSeries(
-          env.D1_02,
+          NO_D1_RUNTIME_BINDING,
           principal.userId,
           await parseBody(request),
           requireIdempotency(request),
@@ -1094,7 +1097,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
         const cursor = url.searchParams.get('cursor')
         if (cursor && cursor.length > 2048) throw new ContentRuntimeError('INVALID_CURSOR', 400)
         const page = await listSeriesMembers(
-          env.D1_02,
+          NO_D1_RUNTIME_BINDING,
           principal.userId,
           path.id,
           cursor,
@@ -1108,7 +1111,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
         const principal = requiredCreatorPrincipal(request)
         return json({
           data: await attachSeriesMember(
-            env.D1_02,
+            NO_D1_RUNTIME_BINDING,
             principal.userId,
             path.id,
             await parseBody(request),
@@ -1126,7 +1129,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
         const principal = requiredCreatorPrincipal(request)
         return json({
           data: await removeSeriesMember(
-            env.D1_02,
+            NO_D1_RUNTIME_BINDING,
             principal.userId,
             path.id,
             path.seriesMemberContentId,
@@ -1148,7 +1151,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
         }
         return json({
           data: await reorderSeriesMember(
-            env.D1_02,
+            NO_D1_RUNTIME_BINDING,
             principal.userId,
             path.id,
             path.seriesMemberContentId,
@@ -1168,7 +1171,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
         const cursor = url.searchParams.get('cursor')
         if (cursor && cursor.length > 2048) throw new ContentRuntimeError('INVALID_CURSOR', 400)
         const page = await listCreatorSeries(
-          env.D1_02,
+          NO_D1_RUNTIME_BINDING,
           principal.userId,
           cursor,
           parseListLimit(url.searchParams.get('limit')),
@@ -1179,14 +1182,14 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
 
       if (path && path.series && path.id && request.method === 'GET') {
         const principal = requiredCreatorPrincipal(request)
-        return json({ data: await getSeries(env.D1_02, principal.userId, path.id, dependencies.seriesReadStoreProvider?.(env)), schemaVersion: '1.0', requestId: createRequestId() })
+        return json({ data: await getSeries(NO_D1_RUNTIME_BINDING, principal.userId, path.id, dependencies.seriesReadStoreProvider?.(env)), schemaVersion: '1.0', requestId: createRequestId() })
       }
 
       if (path && path.series && path.id && request.method === 'PATCH') {
         const principal = requiredCreatorPrincipal(request)
         return json({
           data: await updateSeries(
-            env.D1_02,
+            NO_D1_RUNTIME_BINDING,
             principal.userId,
             path.id,
             await parseBody(request),
@@ -1203,7 +1206,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
       if (path && path.series && path.id && request.method === 'DELETE') {
         const principal = requiredCreatorPrincipal(request)
         await deleteSeries(
-          env.D1_02,
+          NO_D1_RUNTIME_BINDING,
           principal.userId,
           path.id,
           requireIfMatch(request),
@@ -1223,7 +1226,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
           if (hasSocialPostPermission(principal.layer)) viewerUserId = principal.userId
         }
         const thread = await listPostThread(
-          env.D1_02,
+          NO_D1_RUNTIME_BINDING,
           path.id,
           viewerUserId,
           dependencies.postThreadReadStoreProvider?.(env),
@@ -1236,7 +1239,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
         const body = await parseBody(request)
         const nextContentId = typeof body.nextContentId === 'string' ? body.nextContentId.trim() : ''
         const relationship = await appendPostThreadNext(
-          env.D1_02,
+          NO_D1_RUNTIME_BINDING,
           principal.userId,
           path.id,
           nextContentId,
@@ -1255,11 +1258,10 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
         const cursor = url.searchParams.get('cursor')
         if (cursor && cursor.length > 2048) throw new ContentRuntimeError('INVALID_CURSOR', 400)
         const relationshipStore = dependencies.contentRelationshipMutationStoreProvider?.(env)
+        if (!relationshipStore?.list) throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
         const direction = directionParam as ContentRelationshipDirection
         const limit = parseListLimit(url.searchParams.get('limit'))
-        const page = relationshipStore?.list
-          ? await relationshipStore.list({ contentId: path.id, direction, cursor, limit })
-          : await listContentRelationships(env.D1_02, path.id, direction, cursor, limit)
+        const page = await relationshipStore.list({ contentId: path.id, direction, cursor, limit })
         return json({
           data: {
             items: page.items,
@@ -1274,7 +1276,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
         const principal = requiredCreatorPrincipal(request)
         const body = await parseBody(request)
         const relationship = await createContentRelationship(
-          env.D1_02,
+          NO_D1_RUNTIME_BINDING,
           principal.userId,
           path.id,
           body,
@@ -1289,7 +1291,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
         const principal = requiredCreatorPrincipal(request)
         const relationshipId = path.relationshipId
         const relationship = await revokeContentRelationship(
-          env.D1_02,
+          NO_D1_RUNTIME_BINDING,
           principal.userId,
           path.id,
           relationshipId,
@@ -1306,7 +1308,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
         const limit = parseRevisionListLimit(url.searchParams.get('limit'))
         if (cursor && cursor.length > 2048) throw new ContentRuntimeError('INVALID_CURSOR', 400)
         const page = await listContentRevisions(
-          env.D1_02,
+          NO_D1_RUNTIME_BINDING,
           principal.userId,
           path.id,
           cursor,
@@ -1327,7 +1329,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
         const principal = requiredCreatorPrincipal(request)
         return json({
           data: await getContentRevision(
-            env.D1_02,
+            NO_D1_RUNTIME_BINDING,
             principal.userId,
             path.id,
             path.revisionId,
@@ -1341,7 +1343,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
         const principal = requiredCreatorPrincipal(request)
         const body = await parseBody(request)
         const result = await rollbackContentRevision(
-          env.D1_02,
+          NO_D1_RUNTIME_BINDING,
           principal.userId,
           path.id,
           path.revisionId,
@@ -1373,11 +1375,8 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
         if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(ownerUserId)) throw new ContentRuntimeError('VALIDATION_FAILED', 400)
         // W03 remains the authority; production uses the Neon context read store.
         const contextReadStore = dependencies.contentContextReadStoreProvider?.(env)
-        const eligible = contextReadStore
-          ? await contextReadStore.hasPublicCreatorContent(ownerUserId)
-          : Boolean(await env.D1_02.prepare(
-              "SELECT id FROM contents WHERE owner_user_id = ? AND state = 'PUBLISHED' AND content_type IN ('article', 'post', 'video') AND COALESCE(access_mode, 'PUBLIC') = 'PUBLIC' LIMIT 1",
-            ).bind(ownerUserId).first<{ id: string }>())
+        if (!contextReadStore) throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
+        const eligible = await contextReadStore.hasPublicCreatorContent(ownerUserId)
         return json({ data: { eligible }, requestId: createRequestId() })
       }
 
@@ -1389,7 +1388,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
         if (cursor && cursor.length > 2048) throw new ContentRuntimeError('INVALID_CURSOR', 400)
         const filters = validateListFilters(url.searchParams.get('status'), url.searchParams.get('type'))
         const page = await listCreatorContents(
-          env.D1_02,
+          NO_D1_RUNTIME_BINDING,
           principal.userId,
           cursor,
           limit,
@@ -1440,7 +1439,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
             // L2+ authors may read only their own social post drafts.
             const principal = requiredSocialPostPrincipal(request)
             const page = await listCreatorContents(
-              env.D1_02,
+              NO_D1_RUNTIME_BINDING,
               principal.userId,
               cursor,
               limit,
@@ -1475,7 +1474,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
             // L3/L4 and owner scope before returning any edit/cancel preconditions.
             const principal = requiredCreatorPrincipal(request)
             const page = await listCreatorContents(
-              env.D1_02,
+              NO_D1_RUNTIME_BINDING,
               principal.userId,
               cursor,
               limit,
@@ -1515,7 +1514,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
           throw new ContentRuntimeError('VALIDATION_FAILED', 400)
         }
         const page = await listContents(
-          env.D1_02,
+          NO_D1_RUNTIME_BINDING,
           cursor,
           limit,
           creatorId,
@@ -1597,7 +1596,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
           ? requireVerifiedCreatorId(request)
           : undefined
         const result = await transitionContentState(
-          env.D1_02,
+          NO_D1_RUNTIME_BINDING,
           principal.userId,
           principal.layer,
           path.id,
@@ -1622,7 +1621,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
             : requiredCreatorPrincipal(request)
         const verifiedCreatorId = membersOnly ? requireVerifiedCreatorId(request) : undefined
         const content = await createContent(
-          env.D1_02,
+          NO_D1_RUNTIME_BINDING,
           principal.userId,
           body,
           requireIdempotency(request),
@@ -1666,7 +1665,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
           }
           : undefined
         const content = await getContent(
-          env.D1_02,
+          NO_D1_RUNTIME_BINDING,
           path.id,
           principalUserId,
           resolveMembership,
@@ -1680,11 +1679,8 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
           let bodyReferenceAllowed = true
           if (content.bodyRef) {
             const contextReadStore = dependencies.contentContextReadStoreProvider?.(env)
-            const rows = contextReadStore
-              ? await contextReadStore.listPublishedMembersOnlyBodyReferences(content.bodyRef, 51)
-              : (await env.D1_02.prepare(
-                  "SELECT owner_user_id, creator_id FROM contents WHERE body_ref = ? AND state = 'PUBLISHED' AND access_mode = 'MEMBERS_ONLY' LIMIT 51",
-                ).bind(content.bodyRef).all<{ owner_user_id: string; creator_id: string | null }>()).results ?? [])
+            if (!contextReadStore) throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
+            const rows = await contextReadStore.listPublishedMembersOnlyBodyReferences(content.bodyRef, 51)
             if (rows.length > 50) throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
             for (const row of rows) {
               if (principalUserId && principalUserId === row.owner_user_id) continue
@@ -1738,7 +1734,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
             : requiredCreatorPrincipal(request)
         const verifiedCreatorId = explicitlyChangesAccessMode ? requireVerifiedCreatorId(request) : undefined
         const content = await updateContent(
-          env.D1_02,
+          NO_D1_RUNTIME_BINDING,
           principal.userId,
           path.id,
           body,
@@ -1771,7 +1767,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
       if (request.method === 'DELETE' && path.id) {
         const principal = requiredSocialPostPrincipal(request)
         await deleteContent(
-          env.D1_02,
+          NO_D1_RUNTIME_BINDING,
           principal.userId,
           path.id,
           requireIfMatch(request),
