@@ -63,7 +63,6 @@ export default {
     let postgres: ReturnType<typeof getW02PostgresRuntime> | undefined
     try {
       if (isW02NeonRuntime(env)) postgres = getW02PostgresRuntime(env)
-      else if (!env.D1_01) return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'identity service unavailable' } }, 503)
     } catch {
       return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'identity service unavailable' } }, 503)
     }
