@@ -51,26 +51,27 @@ for (const path of [w05ConfigPath, w09MigrationConfigPath, w05SourcePath, pushRu
 
 const w05Config = JSON.parse(readFileSync(w05ConfigPath, 'utf8'))
 const w05D1Bindings = w05Config.d1_databases ?? []
-const w05D1ByBinding = new Map(w05D1Bindings.map((binding) => [binding.binding, binding]))
-const w05D1_02 = w05D1ByBinding.get('DB')
-const w05D1_03 = w05D1ByBinding.get('D1_03')
+const w05Hyperdrive = w05Config.hyperdrive ?? []
 if (
   w05Config.name !== 'luckread-w05' ||
-  w05D1Bindings.length !== 2 ||
-  !w05D1_02 ||
-  w05D1_02.database_id !== '6c342634-97f6-4248-9f4a-85772af4f22c' ||
-  w05D1_02.database_name !== 'luckreadpro' ||
-  w05D1_02.migrations_dir !== 'migrations' ||
-  !w05D1_03 ||
-  w05D1_03.database_id !== 'bda1d247-a371-4244-91ae-aef96034db7f' ||
-  w05D1_03.database_name !== 'secondary' ||
-  w05D1_03.migrations_dir !== undefined ||
+  w05D1Bindings.length !== 0 ||
+  w05Config.vars?.W05_DATABASE_DRIVER !== 'neon' ||
+  w05Config.vars?.W05_PUSH_ENDPOINT_DATABASE_DRIVER !== 'neon' ||
+  !w05Hyperdrive.some((item) => item.binding === 'HYPERDRIVE_D1_02' && item.id === 'c55183e1cc3446409c9c1075832c6615') ||
+  !w05Hyperdrive.some((item) => item.binding === 'HYPERDRIVE_D1_03' && item.id === '7c8831416c18494faee04b96aa551cb9') ||
   existsSync(resolve(root, 'workers/W05-social/migrations-d1-03'))
 ) {
-  throw new Error('W05 must retain only D1-02 DB plus runtime-only D1_03; all D1-03 schema migrations belong to W09')
+  throw new Error('W05 must use both existing Neon Hyperdrive databases with no production D1 bindings; all D1-03 schema migrations belong to W09')
 }
 
 const w05Source = readFileSync(w05SourcePath, 'utf8')
+const w05Entry = readFileSync(resolve(root, 'workers/W05-social/src/entry.ts'), 'utf8')
+if (
+  !w05Entry.includes('getW05SocialWorkerDependencies(env)') ||
+  !w05Entry.includes('getW05PushEndpointPostgresDatabase(env)')
+) {
+  throw new Error('W05 production entry must inject the Neon social stores and W09-owned endpoint PostgreSQL executor')
+}
 const d1_03References = w05Source.match(/env\.D1_03/g) ?? []
 if (
   d1_03References.length !== 2 ||
