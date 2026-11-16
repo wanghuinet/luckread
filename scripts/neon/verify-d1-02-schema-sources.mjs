@@ -79,20 +79,28 @@ export function validateWorkerBindings(config, owner) {
   const actual = Array.isArray(config?.d1_databases) ? config.d1_databases : []
   const expected = Array.isArray(owner?.physicalBindings) ? owner.physicalBindings : []
 
-  if (owner?.runtimeProvider === 'neon') {
-    if (actual.length !== 0) errors.push(owner.worker + ' Neon production config must have zero D1 bindings')
-    const expectedDrivers = owner.neonBindings ?? []
+  if (owner?.worker === 'W05') {
+    const sourceIncluded = expected.some((item) =>
+      item.binding === 'DB' && item.logicalDomain === 'D1-02' && item.databaseName === 'luckreadpro' &&
+      item.databaseUuid === '6c342634-97f6-4248-9f4a-85772af4f22c' && item.included === true)
+    const governanceExcluded = expected.some((item) =>
+      item.binding === 'D1_03' && item.logicalDomain === 'D1-03' && item.databaseName === 'secondary' &&
+      item.databaseUuid === 'bda1d247-a371-4244-91ae-aef96034db7f' && item.included === false)
+    if (!sourceIncluded || !governanceExcluded) {
+      errors.push('W05 D1-02 schema source provenance must retain the admitted D1-02 source and separately excluded D1-03 domain')
+    }
+    if (actual.length !== 0) errors.push('W05 Neon production config must have zero D1 bindings')
     const hyperdrive = config?.hyperdrive ?? []
     const vars = config?.vars ?? {}
     if (vars.W05_DATABASE_DRIVER !== 'neon' || vars.W05_PUSH_ENDPOINT_DATABASE_DRIVER !== 'neon') {
-      errors.push(owner.worker + ' must select Neon for both D1-02 and delegated D1-03 runtime data')
+      errors.push('W05 must select Neon for both D1-02 and delegated D1-03 runtime data')
     }
-    for (const binding of expectedDrivers) {
-      if (!hyperdrive.some((item) => item.binding === binding.binding && item.id === binding.id)) {
-        errors.push(owner.worker + ' Hyperdrive binding mismatch: ' + binding.binding)
-      }
+    if (!hyperdrive.some((item) => item.binding === 'HYPERDRIVE_D1_02' && item.id === 'c55183e1cc3446409c9c1075832c6615')) {
+      errors.push('W05 HYPERDRIVE_D1_02 target mismatch')
     }
-    if (expected.length !== 0) errors.push(owner.worker + ' Neon production owner must not declare physical D1 bindings')
+    if (!hyperdrive.some((item) => item.binding === 'HYPERDRIVE_D1_03' && item.id === '7c8831416c18494faee04b96aa551cb9')) {
+      errors.push('W05 delegated HYPERDRIVE_D1_03 target mismatch')
+    }
     return errors
   }
 
@@ -225,7 +233,7 @@ export function buildD1_02Inventory({ contract, readSource, listSqlFiles }) {
     },
     ownerSummaries: contract.owners.map((owner) => ({
       worker: owner.worker,
-      runtimeProvider: owner.runtimeProvider ?? 'cloudflare-d1',
+      runtimeProvider: owner.worker === 'W05' ? 'neon' : 'cloudflare-d1',
       migrationDirectory: owner.migrationDirectory,
       migrationCount: owner.sqlMigrations.length,
       includedBindings: owner.physicalBindings.filter((item) => item.included).map((item) => item.binding),
