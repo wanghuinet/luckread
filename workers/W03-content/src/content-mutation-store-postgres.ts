@@ -1,10 +1,12 @@
 import { ContentRuntimeError } from './content-runtime.js'
 import type {
+  AuthorizedScheduledPublishCandidate,
   ContentMutationSnapshot,
   ContentMutationStore,
   ContentRecord,
   ContentRevision,
   ContentRow,
+  DueScheduledContentCandidate,
   IdempotencyRow,
 } from './content-runtime.js'
 
@@ -364,6 +366,65 @@ export function createPostgresContentMutationStore(
         }
         // The existing contents_after_update_outbox trigger records lifecycle state changes in this transaction.
       })
+    },
+    async listDueScheduled(now, limit): Promise<DueScheduledContentCandidate[]> {
+      try {
+        const result = await database.query<{
+          id: string
+          owner_user_id: string
+          creator_id: string | null
+          version: number
+          scheduled_at: Date | string
+        }>(
+          "SELECT id, owner_user_id, creator_id, version, scheduled_at " +
+          "FROM contents WHERE state = 'SCHEDULED' AND scheduled_at IS NOT NULL " +
+          "AND scheduled_at <= $1::timestamptz " +
+          "ORDER BY scheduled_at ASC, id ASC LIMIT $2",
+          [now, limit],
+        )
+        return result.rows.map((row) => ({
+          contentId: row.id,
+          ownerUserId: row.owner_user_id,
+          creatorId: row.creator_id,
+          version: row.version,
+          scheduledAt: timestampString(row.scheduled_at) as string,
+        }))
+      } catch {
+        throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
+      }
+    },
+    async publishScheduled(
+      candidates: readonly AuthorizedScheduledPublishCandidate[],
+      now,
+    ): Promise<number> {
+      let published = 0
+      await withTransaction(database, async (client) => {
+        for (const candidate of candidates) {
+          const nextVersion = candidate.version + 1
+          const result = await client.query<{ id: string }>(
+            "UPDATE contents SET state = 'PUBLISHED', scheduled_at = NULL, creator_id = $1, " +
+            'version = $2, etag = $3, updated_at = $4::timestamptz ' +
+            'WHERE id = $5 AND owner_user_id = $6 AND creator_id IS NOT DISTINCT FROM $7 ' +
+            "AND state = 'SCHEDULED' AND scheduled_at = $8::timestamptz " +
+            'AND scheduled_at <= $9::timestamptz AND version = $10 RETURNING id',
+            [
+              candidate.creatorId,
+              nextVersion,
+              'W/"' + nextVersion + '"',
+              now,
+              candidate.contentId,
+              candidate.ownerUserId,
+              candidate.expectedCreatorId,
+              candidate.scheduledAt,
+              now,
+              candidate.version,
+            ],
+          )
+          published += result.rows.length
+        }
+        // The existing contents_after_update_outbox trigger records content.published in this transaction.
+      })
+      return published
     },
 
   }
