@@ -23,19 +23,20 @@ function fail(message) {
  * canonical registry, W07's binding, and the current read-only Cloudflare
  * database inventory. This function never writes to D1 or changes bindings.
  */
-export function verifyW07D1_04Binding({ databaseList, wranglerConfig, boundaryContract }) {
+export function verifyW07D1_04Binding({ databaseList, sourceContract, boundaryContract }) {
   const registryId = boundaryContract?.physicalD1Registry?.['D1-04']
   if (registryId !== ADMITTED_D1_04_UUID) {
     fail('canonical D1-04 registry UUID does not match the admitted physical identity')
   }
 
-  const bindings = Array.isArray(wranglerConfig?.d1_databases) ? wranglerConfig.d1_databases : []
-  const binding = bindings.find((entry) => entry?.binding === 'D1_04')
-  if (!binding || binding.database_id !== registryId) {
-    fail('W07 D1_04 binding is missing or does not match the canonical registry')
+  const sourceTarget = sourceContract?.target
+  if (sourceTarget?.domainId !== 'D1-04' || sourceTarget?.cloudflareD1DatabaseUuid !== registryId ||
+      sourceTarget?.binding !== 'D1_04') {
+    fail('historical D1-04 source identity is missing or does not match the canonical registry')
   }
-  if (typeof binding.database_name !== 'string' || binding.database_name.trim() !== binding.database_name || !binding.database_name) {
-    fail('W07 D1_04 database_name is missing or malformed')
+  const sourceName = sourceTarget.cloudflareD1DatabaseName
+  if (typeof sourceName !== 'string' || sourceName.length === 0) {
+    fail('historical D1-04 source database name is missing')
   }
 
   const matches = collectObjects(databaseList).filter((entry) =>
@@ -48,8 +49,8 @@ export function verifyW07D1_04Binding({ databaseList, wranglerConfig, boundaryCo
   if (typeof remoteName !== 'string' || remoteName.length === 0) {
     fail('current Cloudflare inventory omitted the D1-04 display name required by Wrangler')
   }
-  if (remoteName !== binding.database_name) {
-    fail('W07 D1_04 database_name does not match the current resource name for the admitted UUID')
+  if (remoteName !== sourceName) {
+    fail('historical D1-04 source name does not match the current resource name for the admitted UUID')
   }
 
   return {
@@ -71,7 +72,7 @@ function main() {
   const readJson = (filePath) => JSON.parse(fs.readFileSync(filePath, 'utf8'))
   const report = verifyW07D1_04Binding({
     databaseList: readJson(path.resolve(inventoryPath)),
-    wranglerConfig: readJson(path.join(repoRoot, 'workers/W07-subscription-commerce/wrangler.jsonc')),
+    sourceContract: readJson(path.join(repoRoot, 'contracts/database/neon-d1-04-w07-order-payment-schema.v1.json')),
     boundaryContract: readJson(path.join(repoRoot, 'contracts/transport/worker-d1-access-boundary.v1.json')),
   })
   console.log('W07_D1_04_BINDING_PREFLIGHT=PASS')
