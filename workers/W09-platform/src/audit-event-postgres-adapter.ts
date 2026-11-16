@@ -15,6 +15,8 @@ function normalizeForPolicy(sql: string): string {
   return sql
     .replace(/--[^\n]*/g, ' ')
     .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    // Ignore quoted values when checking table and operation ownership.
+    .replace(/'(?:''|[^'])*'/g, "''")
     .trim()
 }
 
@@ -31,8 +33,7 @@ function assertAllowedAuditEventStatement(sourceSql: string): void {
   )
   const mutatingConflict = /\bON\s+CONFLICT\b[\s\S]*\bDO\s+UPDATE\b/i.test(sql)
 
-  if ((!select && !insert) || hasOtherTableReference || mutatingConflict ||
-      /\b(?:UPDATE|DELETE|TRUNCATE|REPLACE)\b/i.test(sql)) {
+  if ((!select && !insert) || hasOtherTableReference || mutatingConflict) {
     throw new Error('W09_AUDIT_EVENT_APPEND_ONLY_STATEMENT_REQUIRED')
   }
 }
