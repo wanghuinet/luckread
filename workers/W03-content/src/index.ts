@@ -763,7 +763,8 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
             outcome: outcome as 'APPROVED' | 'REJECTED',
             ifMatch,
             idempotencyKey,
-          }),
+          }, new Date(), dependencies.contentMutationStoreProvider?.(env)),
+
           requestId: createRequestId(),
         })
       }
