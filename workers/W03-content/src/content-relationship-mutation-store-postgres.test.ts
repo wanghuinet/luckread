@@ -170,7 +170,7 @@ describe('W03 Neon content relationship mutation store', () => {
       async connect() { throw new Error('list reads must not open a transaction') },
     }
     const store = createPostgresContentRelationshipMutationStore(database)
-    const first = await store.list({ contentId: 'content_source', direction: 'both', cursor: null, limit: 1 })
+    const first = await store.list!({ contentId: 'content_source', direction: 'both', cursor: null, limit: 1 })
     expect(first.items).toEqual([{
       relationshipId: 'relationship_2', relationType: 'reference', direction: 'out',
       relatedContent: { id: 'content_2', slug: 'two', contentType: 'post', title: 'Two' },
@@ -184,7 +184,7 @@ describe('W03 Neon content relationship mutation store', () => {
     expect(calls[0]?.sql).toContain('ORDER BY r.created_at DESC, r.relationship_id DESC')
     expect(calls[0]?.values).toEqual(['content_source', 2])
 
-    const second = await store.list({ contentId: 'content_source', direction: 'both', cursor: first.nextCursor, limit: 1 })
+    const second = await store.list!({ contentId: 'content_source', direction: 'both', cursor: first.nextCursor, limit: 1 })
     expect(second.items[0]?.relationshipId).toBe('relationship_1')
     expect(second.hasMore).toBe(false)
     expect(second.nextCursor).toBeNull()
