@@ -54,7 +54,7 @@ interface CollectionRow {
   updated_at: string
 }
 
-interface IdempotencyRow {
+export interface IdempotencyRow {
   id: string
   owner_user_id: string
   request_hash: string
@@ -62,6 +62,24 @@ interface IdempotencyRow {
   response_status: number | null
   response_json: string | null
   expires_at: string
+}
+
+export interface CollectionCreateStore {
+  loadIdempotency(
+    ownerUserId: string,
+    operationId: string,
+    idempotencyKey: string,
+  ): Promise<IdempotencyRow | null>
+  create(input: Readonly<{
+    ownerUserId: string
+    operationId: string
+    idempotencyKey: string
+    requestHash: string
+    responseJson: string
+    createdAt: string
+    expiresAt: string
+    collection: CollectionRecord
+  }>): Promise<void>
 }
 
 interface CollectionWithIdempotencyRow extends CollectionRow {
@@ -307,6 +325,7 @@ export async function createCollection(
   input: unknown,
   idempotencyKey: string,
   now = new Date(),
+  createStore?: CollectionCreateStore,
 ): Promise<CollectionRecord> {
   assertResourceId(ownerUserId)
   if (!idempotencyKey || idempotencyKey.length > 256) {
@@ -315,7 +334,9 @@ export async function createCollection(
   const normalized = normalizeInput(input)
   const operationId = 'createCollection'
   const hash = await requestHash(operationId, { ownerUserId, input: normalized })
-  const existing = await loadIdempotency(db, ownerUserId, operationId, idempotencyKey)
+  const existing = createStore
+    ? await createStore.loadIdempotency(ownerUserId, operationId, idempotencyKey)
+    : await loadIdempotency(db, ownerUserId, operationId, idempotencyKey)
   const replay = activeIdempotency(existing && {
     idem_id: existing.id,
     idem_owner_user_id: existing.owner_user_id,
@@ -345,19 +366,32 @@ export async function createCollection(
     updatedAt: createdAt,
   }
   const expiresAt = new Date(now.getTime() + IDEMPOTENCY_TTL_MS).toISOString()
-  await batchMutation(db, [
-    expireIdempotency(db, ownerUserId, operationId, idempotencyKey, createdAt),
-    insertIdempotency(db, ownerUserId, operationId, idempotencyKey, hash, 201, JSON.stringify(collection), createdAt, expiresAt),
-    db.prepare(
-      'INSERT INTO content_collections ' +
-      '(id, owner_user_id, creator_id, state, version, title, description, cover_ref, etag, created_at, updated_at) ' +
-      "VALUES (?, ?, ?, 'DRAFT', 1, ?, ?, ?, ?, ?, ?)",
-    ).bind(
-      collectionId, ownerUserId, ownerUserId, normalized.title, normalized.description,
-      normalized.coverRef, collection.etag, createdAt, createdAt,
-    ),
-    atomicGuard(db),
-  ])
+  if (createStore) {
+    await createStore.create({
+      ownerUserId,
+      operationId,
+      idempotencyKey,
+      requestHash: hash,
+      responseJson: JSON.stringify(collection),
+      createdAt,
+      expiresAt,
+      collection,
+    })
+  } else {
+    await batchMutation(db, [
+      expireIdempotency(db, ownerUserId, operationId, idempotencyKey, createdAt),
+      insertIdempotency(db, ownerUserId, operationId, idempotencyKey, hash, 201, JSON.stringify(collection), createdAt, expiresAt),
+      db.prepare(
+        'INSERT INTO content_collections ' +
+        '(id, owner_user_id, creator_id, state, version, title, description, cover_ref, etag, created_at, updated_at) ' +
+        "VALUES (?, ?, ?, 'DRAFT', 1, ?, ?, ?, ?, ?, ?)",
+      ).bind(
+        collectionId, ownerUserId, ownerUserId, normalized.title, normalized.description,
+        normalized.coverRef, collection.etag, createdAt, createdAt,
+      ),
+      atomicGuard(db),
+    ])
+  }
   return collection
 }
 

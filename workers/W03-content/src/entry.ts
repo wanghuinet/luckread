@@ -6,6 +6,7 @@ import {
   getW03PostThreadReadStore,
   getW03ContentContextReadStore,
   getW03CollectionListReadStore,
+  getW03CollectionCreateStore,
   getW03SeriesReadStore,
   getW03MembersReadStore,
   getW03ContentDetailReadStore,
@@ -29,6 +30,8 @@ export default createW03ContentWorker({
     getW03ContentContextReadStore(env),
   collectionListReadStoreProvider: (env) =>
     getW03CollectionListReadStore(env),
+  collectionCreateStoreProvider: (env) =>
+    getW03CollectionCreateStore(env),
   seriesReadStoreProvider: (env) =>
     getW03SeriesReadStore(env),
   membersReadStoreProvider: (env) =>
