@@ -3,7 +3,6 @@ import type {
   AppendPostThreadQueryRow,
   ContentRelationship,
   ContentRelationshipMutationStore,
-  ContentRelationshipDirection,
   PublicContentRelationship,
   CreateRelationshipQueryRow,
   PostThreadChainStats,
@@ -150,13 +149,13 @@ export function createPostgresContentRelationshipMutationStore(
       let projection: string
       if (input.direction === 'out') {
         predicate = 'r.source_id = $1'
-        projection = `t.id AS related_id, t.slug AS related_slug, t.content_type AS related_type, t.title AS related_title, 'out' AS relation_direction`
+        projection = "t.id AS related_id, t.slug AS related_slug, t.content_type AS related_type, t.title AS related_title, 'out' AS relation_direction"
       } else if (input.direction === 'in') {
         predicate = 'r.target_id = $1'
-        projection = `s.id AS related_id, s.slug AS related_slug, s.content_type AS related_type, s.title AS related_title, 'in' AS relation_direction`
+        projection = "s.id AS related_id, s.slug AS related_slug, s.content_type AS related_type, s.title AS related_title, 'in' AS relation_direction"
       } else {
         predicate = '(r.source_id = $1 OR r.target_id = $1)'
-        projection = `CASE WHEN r.source_id = $1 THEN t.id ELSE s.id END AS related_id, CASE WHEN r.source_id = $1 THEN t.slug ELSE s.slug END AS related_slug, CASE WHEN r.source_id = $1 THEN t.content_type ELSE s.content_type END AS related_type, CASE WHEN r.source_id = $1 THEN t.title ELSE s.title END AS related_title, CASE WHEN r.source_id = $1 THEN 'out' ELSE 'in' END AS relation_direction`
+        projection = "CASE WHEN r.source_id = $1 THEN t.id ELSE s.id END AS related_id, CASE WHEN r.source_id = $1 THEN t.slug ELSE s.slug END AS related_slug, CASE WHEN r.source_id = $1 THEN t.content_type ELSE s.content_type END AS related_type, CASE WHEN r.source_id = $1 THEN t.title ELSE s.title END AS related_title, CASE WHEN r.source_id = $1 THEN 'out' ELSE 'in' END AS relation_direction"
       }
       try {
         const result = await database.query<{
@@ -173,7 +172,7 @@ export function createPostgresContentRelationshipMutationStore(
           ' FROM content_relationships r' +
           ' JOIN contents s ON s.id = r.source_id' +
           ' JOIN contents t ON t.id = r.target_id' +
-          \" WHERE r.status = 'ACTIVE' AND s.state = 'PUBLISHED' AND t.state = 'PUBLISHED' AND r.relation_type = 'reference' AND \" +
+          " WHERE r.status = 'ACTIVE' AND s.state = 'PUBLISHED' AND t.state = 'PUBLISHED' AND r.relation_type = 'reference' AND " +
           predicate + ' ' + cursorClause +
           ' ORDER BY r.created_at DESC, r.relationship_id DESC LIMIT 
       try {
