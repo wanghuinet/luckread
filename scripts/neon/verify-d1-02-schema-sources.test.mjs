@@ -63,7 +63,7 @@ test('W03 production runtime is Neon while its D1-02 migration source remains pi
   assert.equal(config.d1_databases?.length ?? 0, 0)
   assert.equal(config.vars?.W03_CONTENT_READ_DRIVER, 'neon')
   assert.ok(config.hyperdrive?.some((item) =>
-    item.binding === 'HYPERDRIVE_D1_02' && item.id === 'c55183e1cc3446409c9c1075832c6615'))
+    item.binding === 'HYPERDRIVE_CONTENT_PG' && item.id === 'c55183e1cc3446409c9c1075832c6615'))
   assert.deepEqual(validateWorkerBindings(config, owner), [])
 })
 
@@ -90,9 +90,9 @@ test('binding validators reject Neon target drift and any W05 production D1 rein
   const wrongW03Target = {
     ...w03Config,
     hyperdrive: w03Config.hyperdrive.map((item) =>
-      item.binding === 'HYPERDRIVE_D1_02' ? { ...item, id: 'wrong-target' } : item),
+      item.binding === 'HYPERDRIVE_CONTENT_PG' ? { ...item, id: 'wrong-target' } : item),
   }
-  assert.ok(validateWorkerBindings(wrongW03Target, w03Owner).some((error) => error.includes('HYPERDRIVE_D1_02 target mismatch')))
+  assert.ok(validateWorkerBindings(wrongW03Target, w03Owner).some((error) => error.includes('HYPERDRIVE_CONTENT_PG target mismatch')))
   const w03D1Reintroduced = { ...w03Config, d1_databases: [{ binding: 'D1_02' }] }
   assert.ok(validateWorkerBindings(w03D1Reintroduced, w03Owner).some((error) => error.includes('zero D1 bindings')))
 
