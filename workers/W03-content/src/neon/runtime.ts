@@ -1,9 +1,6 @@
 import { Pool } from 'pg'
 
-import {
-  createD1PublishedMediaReferenceReadStore,
-  type PublishedMediaReferenceReadStore,
-} from '../published-media-reference-read-store.js'
+import type { PublishedMediaReferenceReadStore } from '../published-media-reference-read-store.js'
 import type {
   PublicContentListReadStore,
   FollowingOwnerContentsReadStore,
@@ -73,7 +70,7 @@ import { createPostgresCollectionMemberReorderStore } from '../content-collectio
 import type { CollectionMemberReorderPostgresDatabase } from '../content-collection-member-reorder-store-postgres.js'
 import type { W03PublishedMediaReferenceRuntimeEnv } from '../published-media-reference-read-store.js'
 
-export type W03PublicMediaReferenceDriver = 'd1' | 'neon'
+export type W03PublicMediaReferenceDriver = 'neon'
 
 export type W03PublicMediaReferenceRuntimeEnv = W03PublishedMediaReferenceRuntimeEnv
 
@@ -110,21 +107,16 @@ const creatorContentsStores = new WeakMap<object, CreatorContentsReadStore>()
 const contentRevisionStores = new WeakMap<object, ContentRevisionReadStore>()
 
 /**
- * The explicit D1-02 content read driver controls only the PostgreSQL read
- * projections wired from the W03 entrypoint: public media references, bookmark
- * batch projection, W04-authorized following-feed content, native post-thread
- * projection, canonical content context and detail reads, creator-owned
- * content lists, series and collection reads, series/collection membership
- * lists, and owner-scoped content revision history reads. Content creation,
- * update, delete, owner-authorized state transitions, W06 moderation decisions, owner-authorized revision rollback, scheduled publication candidate reads/commits, content reference create/revoke, native post-thread append, plus Collection creation, update, delete, member attachment, member removal, and member reorder plus Series creation, update, delete, member attachment, member removal, and member reorder are the only Neon-backed mutations in these slices; all other W03 reads and mutations remain on D1_02. D1 is the safe
- * default and unknown values fail closed.
+ * W03 is Neon-only. The existing D1-02 Hyperdrive is the PostgreSQL transport
+ * for every content read/write store constructed by this module. Missing or
+ * invalid driver configuration fails closed; there is no D1 fallback.
  */
 export function resolveW03PublicMediaReferenceDriver(
   env: W03PublicMediaReferenceRuntimeEnv,
 ): W03PublicMediaReferenceDriver {
-  const configured = (env.W03_CONTENT_READ_DRIVER ?? env.W03_PUBLIC_MEDIA_REFERENCE_DRIVER)?.trim().toLowerCase() || 'd1'
-  if (configured === 'd1' || configured === 'neon') return configured
-  throw new Error('W03_PUBLIC_MEDIA_REFERENCE_DRIVER_UNSUPPORTED')
+  const configured = (env.W03_CONTENT_READ_DRIVER ?? env.W03_PUBLIC_MEDIA_REFERENCE_DRIVER)?.trim().toLowerCase()
+  if (configured === 'neon') return 'neon'
+  throw new Error('W03_NEON_DRIVER_REQUIRED')
 }
 
 function validateHyperdriveConnectionString(value: unknown): string {
@@ -180,12 +172,7 @@ export function getW03PublicMediaReferencePostgresPool(
 export function getW03PublishedMediaReferenceReadStore(
   env: W03PublicMediaReferenceRuntimeEnv,
 ): PublishedMediaReferenceReadStore {
-  const driver = resolveW03PublicMediaReferenceDriver(env)
-  if (driver === 'd1') {
-    if (!env.D1_02) throw new Error('W03_D1_02_BINDING_REQUIRED')
-    return createD1PublishedMediaReferenceReadStore(env.D1_02)
-  }
-
+  resolveW03PublicMediaReferenceDriver(env)
   const binding = env.HYPERDRIVE_D1_02
   if (!binding || typeof binding !== 'object') {
     throw new Error('W03_HYPERDRIVE_D1_02_BINDING_REQUIRED')
@@ -207,7 +194,7 @@ export function getW03PublishedMediaReferenceReadStore(
 export function getW03PublishedContentsByIdsReadStore(
   env: W03PublicMediaReferenceRuntimeEnv,
 ): PublishedContentsByIdsReadStore | undefined {
-  if (resolveW03PublicMediaReferenceDriver(env) === 'd1') return undefined
+  resolveW03PublicMediaReferenceDriver(env)
 
   const binding = env.HYPERDRIVE_D1_02
   if (!binding || typeof binding !== 'object') {
@@ -227,7 +214,7 @@ export function getW03PublishedContentsByIdsReadStore(
 export function getW03FollowingOwnerContentsReadStore(
   env: W03PublicMediaReferenceRuntimeEnv,
 ): FollowingOwnerContentsReadStore | undefined {
-  if (resolveW03PublicMediaReferenceDriver(env) === 'd1') return undefined
+  resolveW03PublicMediaReferenceDriver(env)
 
   const binding = env.HYPERDRIVE_D1_02
   if (!binding || typeof binding !== 'object') {
@@ -248,7 +235,7 @@ export function getW03FollowingOwnerContentsReadStore(
 export function getW03ContentRelationshipMutationStore(
   env: W03PublicMediaReferenceRuntimeEnv,
 ): ContentRelationshipMutationStore | undefined {
-  if (resolveW03PublicMediaReferenceDriver(env) === 'd1') return undefined
+  resolveW03PublicMediaReferenceDriver(env)
 
   const binding = env.HYPERDRIVE_D1_02
   if (!binding || typeof binding !== 'object') {
@@ -267,7 +254,7 @@ export function getW03ContentRelationshipMutationStore(
 export function getW03PostThreadReadStore(
   env: W03PublicMediaReferenceRuntimeEnv,
 ): PostThreadReadStore | undefined {
-  if (resolveW03PublicMediaReferenceDriver(env) === 'd1') return undefined
+  resolveW03PublicMediaReferenceDriver(env)
 
   const binding = env.HYPERDRIVE_D1_02
   if (!binding || typeof binding !== 'object') {
@@ -288,7 +275,7 @@ export function getW03PostThreadReadStore(
 export function getW03ContentContextReadStore(
   env: W03PublicMediaReferenceRuntimeEnv,
 ): ContentContextReadStore | undefined {
-  if (resolveW03PublicMediaReferenceDriver(env) === 'd1') return undefined
+  resolveW03PublicMediaReferenceDriver(env)
 
   const binding = env.HYPERDRIVE_D1_02
   if (!binding || typeof binding !== 'object') {
@@ -308,7 +295,7 @@ export function getW03ContentContextReadStore(
 export function getW03CollectionListReadStore(
   env: W03PublicMediaReferenceRuntimeEnv,
 ): CollectionListReadStore | undefined {
-  if (resolveW03PublicMediaReferenceDriver(env) === 'd1') return undefined
+  resolveW03PublicMediaReferenceDriver(env)
 
   const binding = env.HYPERDRIVE_D1_02
   if (!binding || typeof binding !== 'object') {
@@ -364,7 +351,7 @@ export function getW03ContentCreateStore(
 export function getW03CollectionCreateStore(
   env: W03PublicMediaReferenceRuntimeEnv,
 ): CollectionCreateStore | undefined {
-  if (resolveW03PublicMediaReferenceDriver(env) === 'd1') return undefined
+  resolveW03PublicMediaReferenceDriver(env)
 
   const binding = env.HYPERDRIVE_D1_02
   if (!binding || typeof binding !== 'object') {
@@ -384,7 +371,7 @@ export function getW03CollectionCreateStore(
 export function getW03CollectionUpdateStore(
   env: W03PublicMediaReferenceRuntimeEnv,
 ): CollectionUpdateStore | undefined {
-  if (resolveW03PublicMediaReferenceDriver(env) === 'd1') return undefined
+  resolveW03PublicMediaReferenceDriver(env)
 
   const binding = env.HYPERDRIVE_D1_02
   if (!binding || typeof binding !== 'object') {
@@ -404,7 +391,7 @@ export function getW03CollectionUpdateStore(
 export function getW03CollectionDeleteStore(
   env: W03PublicMediaReferenceRuntimeEnv,
 ): CollectionDeleteStore | undefined {
-  if (resolveW03PublicMediaReferenceDriver(env) === 'd1') return undefined
+  resolveW03PublicMediaReferenceDriver(env)
 
   const binding = env.HYPERDRIVE_D1_02
   if (!binding || typeof binding !== 'object') {
@@ -424,7 +411,7 @@ export function getW03CollectionDeleteStore(
 export function getW03SeriesReadStore(
   env: W03PublicMediaReferenceRuntimeEnv,
 ): SeriesReadStore | undefined {
-  if (resolveW03PublicMediaReferenceDriver(env) === 'd1') return undefined
+  resolveW03PublicMediaReferenceDriver(env)
 
   const binding = env.HYPERDRIVE_D1_02
   if (!binding || typeof binding !== 'object') {
@@ -444,7 +431,7 @@ export function getW03SeriesReadStore(
 export function getW03SeriesCreateStore(
   env: W03PublicMediaReferenceRuntimeEnv,
 ): SeriesCreateStore | undefined {
-  if (resolveW03PublicMediaReferenceDriver(env) === 'd1') return undefined
+  resolveW03PublicMediaReferenceDriver(env)
 
   const binding = env.HYPERDRIVE_D1_02
   if (!binding || typeof binding !== 'object') {
@@ -464,7 +451,7 @@ export function getW03SeriesCreateStore(
 export function getW03SeriesUpdateStore(
   env: W03PublicMediaReferenceRuntimeEnv,
 ): SeriesUpdateStore | undefined {
-  if (resolveW03PublicMediaReferenceDriver(env) === 'd1') return undefined
+  resolveW03PublicMediaReferenceDriver(env)
 
   const binding = env.HYPERDRIVE_D1_02
   if (!binding || typeof binding !== 'object') {
@@ -484,7 +471,7 @@ export function getW03SeriesUpdateStore(
 export function getW03SeriesDeleteStore(
   env: W03PublicMediaReferenceRuntimeEnv,
 ): SeriesDeleteStore | undefined {
-  if (resolveW03PublicMediaReferenceDriver(env) === 'd1') return undefined
+  resolveW03PublicMediaReferenceDriver(env)
 
   const binding = env.HYPERDRIVE_D1_02
   if (!binding || typeof binding !== 'object') {
@@ -504,7 +491,7 @@ export function getW03SeriesDeleteStore(
 export function getW03SeriesMemberAttachStore(
   env: W03PublicMediaReferenceRuntimeEnv,
 ): SeriesMemberAttachStore | undefined {
-  if (resolveW03PublicMediaReferenceDriver(env) === 'd1') return undefined
+  resolveW03PublicMediaReferenceDriver(env)
 
   const binding = env.HYPERDRIVE_D1_02
   if (!binding || typeof binding !== 'object') {
@@ -524,7 +511,7 @@ export function getW03SeriesMemberAttachStore(
 export function getW03SeriesMemberRemoveStore(
   env: W03PublicMediaReferenceRuntimeEnv,
 ): SeriesMemberRemoveStore | undefined {
-  if (resolveW03PublicMediaReferenceDriver(env) === 'd1') return undefined
+  resolveW03PublicMediaReferenceDriver(env)
 
   const binding = env.HYPERDRIVE_D1_02
   if (!binding || typeof binding !== 'object') {
@@ -544,7 +531,7 @@ export function getW03SeriesMemberRemoveStore(
 export function getW03SeriesMemberReorderStore(
   env: W03PublicMediaReferenceRuntimeEnv,
 ): SeriesMemberReorderStore | undefined {
-  if (resolveW03PublicMediaReferenceDriver(env) === 'd1') return undefined
+  resolveW03PublicMediaReferenceDriver(env)
 
   const binding = env.HYPERDRIVE_D1_02
   if (!binding || typeof binding !== 'object') {
@@ -564,7 +551,7 @@ export function getW03SeriesMemberReorderStore(
 export function getW03CollectionMemberAttachStore(
   env: W03PublicMediaReferenceRuntimeEnv,
 ): CollectionMemberAttachStore | undefined {
-  if (resolveW03PublicMediaReferenceDriver(env) === 'd1') return undefined
+  resolveW03PublicMediaReferenceDriver(env)
 
   const binding = env.HYPERDRIVE_D1_02
   if (!binding || typeof binding !== 'object') {
@@ -584,7 +571,7 @@ export function getW03CollectionMemberAttachStore(
 export function getW03CollectionMemberRemoveStore(
   env: W03PublicMediaReferenceRuntimeEnv,
 ): CollectionMemberRemoveStore | undefined {
-  if (resolveW03PublicMediaReferenceDriver(env) === 'd1') return undefined
+  resolveW03PublicMediaReferenceDriver(env)
 
   const binding = env.HYPERDRIVE_D1_02
   if (!binding || typeof binding !== 'object') {
@@ -624,7 +611,7 @@ export function getW03MembersReadStore(
   series: SeriesMembersReadStore
   collections: CollectionMembersReadStore
 } | undefined {
-  if (resolveW03PublicMediaReferenceDriver(env) === 'd1') return undefined
+  resolveW03PublicMediaReferenceDriver(env)
 
   const binding = env.HYPERDRIVE_D1_02
   if (!binding || typeof binding !== 'object') {
@@ -644,7 +631,7 @@ export function getW03MembersReadStore(
 export function getW03ContentDetailReadStore(
   env: W03PublicMediaReferenceRuntimeEnv,
 ): ContentDetailReadStore | undefined {
-  if (resolveW03PublicMediaReferenceDriver(env) === 'd1') return undefined
+  resolveW03PublicMediaReferenceDriver(env)
 
   const binding = env.HYPERDRIVE_D1_02
   if (!binding || typeof binding !== 'object') {
@@ -664,7 +651,7 @@ export function getW03ContentDetailReadStore(
 export function getW03CreatorContentsReadStore(
   env: W03PublicMediaReferenceRuntimeEnv,
 ): CreatorContentsReadStore | undefined {
-  if (resolveW03PublicMediaReferenceDriver(env) === 'd1') return undefined
+  resolveW03PublicMediaReferenceDriver(env)
 
   const binding = env.HYPERDRIVE_D1_02
   if (!binding || typeof binding !== 'object') {
@@ -685,7 +672,7 @@ export function getW03CreatorContentsReadStore(
 export function getW03PublicContentListReadStore(
   env: W03PublicMediaReferenceRuntimeEnv,
 ): PublicContentListReadStore | undefined {
-  if (resolveW03PublicMediaReferenceDriver(env) === 'd1') return undefined
+  resolveW03PublicMediaReferenceDriver(env)
 
   const binding = env.HYPERDRIVE_D1_02
   if (!binding || typeof binding !== 'object') {
@@ -706,7 +693,7 @@ export function getW03PublicContentListReadStore(
 export function getW03ContentRevisionReadStore(
   env: W03PublicMediaReferenceRuntimeEnv,
 ): ContentRevisionReadStore | undefined {
-  if (resolveW03PublicMediaReferenceDriver(env) === 'd1') return undefined
+  resolveW03PublicMediaReferenceDriver(env)
 
   const binding = env.HYPERDRIVE_D1_02
   if (!binding || typeof binding !== 'object') {
