@@ -7,7 +7,6 @@ import { getW08CreatorStore, type W08RuntimeEnv } from './neon/runtime.js'
 import type { CreatorApplicationRow, W08CreatorStore } from './creator-store.js'
 
 interface Env extends W08RuntimeEnv {
-  D1_01: D1Database
   W02_AUTH: Fetcher
 }
 
