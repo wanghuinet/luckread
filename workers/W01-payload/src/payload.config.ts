@@ -57,8 +57,9 @@ const cloudflare = isWorkerRuntime
   ? await getCloudflareContext({ async: true })
   : await getCloudflareContextFromWrangler()
 
-// A missing flag deliberately preserves the current D1 runtime. Neon is used
-// only when the deployed Worker explicitly sets PAYLOAD_DATABASE_DRIVER=neon.
+// The Neon-only production Wrangler config explicitly selects PostgreSQL.
+// The legacy D1 adapter is available only when a local/test config provides
+// an actual D1 binding; a D1-free config cannot silently fall back to SQLite.
 const databaseSelection = resolveW01PayloadDatabaseDriver(
   cloudflare.env as unknown as W01PayloadDatabaseEnvironment,
 )
