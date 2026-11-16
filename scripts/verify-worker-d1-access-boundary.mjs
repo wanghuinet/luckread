@@ -92,7 +92,7 @@ for (const dir of dirs) {
     config.vars?.W05_DATABASE_DRIVER === 'neon' &&
     config.vars?.W05_PUSH_ENDPOINT_DATABASE_DRIVER === 'neon' &&
     (config.hyperdrive ?? []).some((entry) =>
-      entry.binding === 'HYPERDRIVE_D1_02' && entry.id === 'c55183e1cc3446409c9c1075832c6615') &&
+      entry.binding === 'HYPERDRIVE_CONTENT_PG' && entry.id === 'c55183e1cc3446409c9c1075832c6615') &&
     (config.hyperdrive ?? []).some((entry) =>
       entry.binding === 'HYPERDRIVE_D1_03' && entry.id === '7c8831416c18494faee04b96aa551cb9')
   if (workerId === 'W05' && !w05NeonProduction) {
