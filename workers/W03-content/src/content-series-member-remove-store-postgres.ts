@@ -145,7 +145,7 @@ export function createPostgresSeriesMemberRemoveStore(
           "UPDATE content_relationships SET status = 'REVOKED', updated_at = $1::timestamptz " +
           "WHERE relationship_id = $2 AND source_type = 'content' AND source_id = $3 " +
           "AND target_type = 'series' AND target_id = $4 AND relation_type = 'series-member' " +
-          "AND status = 'ACTIVE' RETURNING relationship_id',
+          "AND status = 'ACTIVE' RETURNING relationship_id",
           [
             input.nowIso,
             input.relationshipId,
