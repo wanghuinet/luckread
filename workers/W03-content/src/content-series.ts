@@ -56,7 +56,7 @@ interface SeriesRow {
   updated_at: string
 }
 
-interface IdempotencyRow {
+export interface IdempotencyRow {
   id: string
   owner_user_id: string
   request_hash: string
@@ -64,6 +64,24 @@ interface IdempotencyRow {
   response_status: number | null
   response_json: string | null
   expires_at: string
+}
+
+export interface SeriesCreateStore {
+  loadIdempotency(
+    ownerUserId: string,
+    operationId: string,
+    idempotencyKey: string,
+  ): Promise<IdempotencyRow | null>
+  create(input: Readonly<{
+    ownerUserId: string
+    operationId: string
+    idempotencyKey: string
+    requestHash: string
+    responseJson: string
+    createdAt: string
+    expiresAt: string
+    series: SeriesRecord
+  }>): Promise<void>
 }
 
 interface SeriesWithIdempotencyRow extends SeriesRow {
@@ -310,6 +328,7 @@ export async function createSeries(
   input: unknown,
   idempotencyKey: string,
   now = new Date(),
+  createStore?: SeriesCreateStore,
 ): Promise<SeriesRecord> {
   assertResourceId(ownerUserId)
   if (!idempotencyKey || idempotencyKey.length > 256) {
@@ -318,7 +337,9 @@ export async function createSeries(
   const normalized = normalizeInput(input)
   const operationId = 'createSeries'
   const hash = await requestHash(operationId, { ownerUserId, input: normalized })
-  const existing = await loadIdempotency(db, ownerUserId, operationId, idempotencyKey)
+  const existing = createStore
+    ? await createStore.loadIdempotency(ownerUserId, operationId, idempotencyKey)
+    : await loadIdempotency(db, ownerUserId, operationId, idempotencyKey)
   const replay = activeIdempotency(existing && {
     idem_id: existing.id,
     idem_owner_user_id: existing.owner_user_id,
@@ -349,19 +370,32 @@ export async function createSeries(
     updatedAt: createdAt,
   }
   const expiresAt = new Date(now.getTime() + IDEMPOTENCY_TTL_MS).toISOString()
-  await batchMutation(db, [
-    expireIdempotency(db, ownerUserId, operationId, idempotencyKey, createdAt),
-    insertIdempotency(db, ownerUserId, operationId, idempotencyKey, hash, 201, JSON.stringify(series), createdAt, expiresAt),
-    db.prepare(
-      'INSERT INTO content_series ' +
-      '(id, owner_user_id, creator_id, ip_id, state, version, title, description, cover_ref, etag, created_at, updated_at) ' +
-      "VALUES (?, ?, ?, NULL, 'DRAFT', 1, ?, ?, ?, ?, ?, ?)",
-    ).bind(
-      seriesId, ownerUserId, ownerUserId, normalized.title, normalized.description,
-      normalized.coverRef, series.etag, createdAt, createdAt,
-    ),
-    atomicGuard(db),
-  ])
+  if (createStore) {
+    await createStore.create({
+      ownerUserId,
+      operationId,
+      idempotencyKey,
+      requestHash: hash,
+      responseJson: JSON.stringify(series),
+      createdAt,
+      expiresAt,
+      series,
+    })
+  } else {
+    await batchMutation(db, [
+      expireIdempotency(db, ownerUserId, operationId, idempotencyKey, createdAt),
+      insertIdempotency(db, ownerUserId, operationId, idempotencyKey, hash, 201, JSON.stringify(series), createdAt, expiresAt),
+      db.prepare(
+        'INSERT INTO content_series ' +
+        '(id, owner_user_id, creator_id, ip_id, state, version, title, description, cover_ref, etag, created_at, updated_at) ' +
+        "VALUES (?, ?, ?, NULL, 'DRAFT', 1, ?, ?, ?, ?, ?, ?)",
+      ).bind(
+        seriesId, ownerUserId, ownerUserId, normalized.title, normalized.description,
+        normalized.coverRef, series.etag, createdAt, createdAt,
+      ),
+      atomicGuard(db),
+    ])
+  }
   return series
 }
 
