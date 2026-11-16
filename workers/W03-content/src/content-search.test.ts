@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import worker from './index.js'
+import { describe, expect, it, vi } from 'vitest'
+import { createW03ContentWorker } from './index.js'
 import { decodeScopedCursor, searchPublishedContents } from './content-runtime.js'
 
 const contentRow = (overrides: Record<string, unknown> = {}) => ({
@@ -23,26 +23,6 @@ const contentRow = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 })
 
-function mockDb(rows: Record<string, unknown>[]) {
-  let query = ''
-  let bindings: unknown[] = []
-  const db = {
-    prepare(sql: string) {
-      query = sql
-      return {
-        bind(...values: unknown[]) {
-          bindings = values
-          return { all: async () => ({ results: rows }) }
-        },
-      }
-    },
-  }
-  return {
-    db: db as never,
-    readQuery: () => query,
-    readBindings: () => bindings,
-  }
-}
 
 describe('W03 published content search', () => {
   it('searches only published title/slug metadata and binds pagination to the query', async () => {
@@ -55,18 +35,18 @@ describe('W03 published content search', () => {
         created_at: '2026-10-19T00:00:00.000Z',
       }),
     ]
-    const mock = mockDb(rows)
-    const firstPage = await searchPublishedContents(mock.db, 'LuckRead', null, 1)
+    const search = vi.fn(async (input: { query: string; cursor: { createdAt: string; id: string } | null; limit: number }) => {
+      expect(input).toMatchObject({ query: 'LuckRead', cursor: null, limit: 2 })
+      return rows.slice(0, input.limit)
+    })
+    const store = { list: async () => rows, search }
+    const firstPage = await searchPublishedContents({} as never, 'LuckRead', null, 1, store)
 
     expect(firstPage.items).toHaveLength(1)
     expect(firstPage.items[0]?.id).toBe('content_1')
     expect(firstPage.hasMore).toBe(true)
     expect(firstPage.nextCursor).toEqual(expect.any(String))
-    expect(mock.readQuery()).toContain("state = 'PUBLISHED'")
-    expect(mock.readQuery()).toContain('instr(lower(title), lower(?))')
-    expect(mock.readQuery()).toContain('instr(lower(slug), lower(?))')
-    expect(mock.readQuery()).toContain('ORDER BY created_at DESC, id DESC')
-    expect(mock.readBindings()).toEqual(['LuckRead', 'LuckRead', 2])
+    expect(search).toHaveBeenCalledWith(expect.objectContaining({ query: 'LuckRead', limit: 2 }))
 
     const cursor = decodeScopedCursor(
       firstPage.nextCursor!,
@@ -74,21 +54,26 @@ describe('W03 published content search', () => {
     )
     expect(cursor).toEqual({ updatedAt: '2026-10-20T00:00:00.000Z', id: 'content_1' })
 
-    await expect(searchPublishedContents(mock.db, 'other query', firstPage.nextCursor, 1))
+    await expect(searchPublishedContents({} as never, 'other query', firstPage.nextCursor, 1, store))
       .rejects.toMatchObject({ code: 'INVALID_CURSOR', status: 400 })
   })
 
   it('rejects an empty or oversized query', async () => {
-    const mock = mockDb([])
-    await expect(searchPublishedContents(mock.db, '   ', null, 20))
+    const store = { list: async () => [], search: async () => [] }
+    await expect(searchPublishedContents({} as never, '   ', null, 20, store))
       .rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 })
-    await expect(searchPublishedContents(mock.db, 'x'.repeat(257), null, 20))
+    await expect(searchPublishedContents({} as never, 'x'.repeat(257), null, 20, store))
       .rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 })
   })
 
   it('allows only authenticated W04 transport to use the internal search route', async () => {
-    const mock = mockDb([contentRow()])
-    const env = { D1_02: mock.db }
+    const neonWorker = createW03ContentWorker({
+      publicContentListReadStoreProvider: () => ({
+        list: async () => [contentRow()],
+        search: async () => [contentRow()],
+      }),
+    })
+    const env = {} as never
     const request = (headers: Record<string, string>) => new Request(
       'https://luckread-w03.internal/internal/content/search',
       {
@@ -97,14 +82,14 @@ describe('W03 published content search', () => {
         body: JSON.stringify({ q: 'LuckRead', cursor: null, limit: 20 }),
       },
     )
-    const untrusted = await worker.fetch(request({
+    const untrusted = await neonWorker.fetch(request({
       'X-LuckRead-Caller': 'browser',
       'X-LuckRead-Transport-Version': '1.0',
       'X-LuckRead-Correlation-Id': 'search-denied',
     }), env as never)
     expect(untrusted.status).toBe(403)
 
-    const allowed = await worker.fetch(request({
+    const allowed = await neonWorker.fetch(request({
       'X-LuckRead-Caller': 'W04',
       'X-LuckRead-Transport-Version': '1.0',
       'X-LuckRead-Correlation-Id': 'search-allowed',
@@ -122,7 +107,10 @@ describe('W03 published content search', () => {
   })
 
   it('does not forward credential-bearing requests or accept extra body fields', async () => {
-    const mock = mockDb([contentRow()])
+    const neonWorker = createW03ContentWorker({
+      publicContentListReadStoreProvider: () => ({ list: async () => [contentRow()], search: async () => [contentRow()] }),
+    })
+    const env = {} as never
     const headers = {
       'X-LuckRead-Caller': 'W04',
       'X-LuckRead-Transport-Version': '1.0',
@@ -130,13 +118,13 @@ describe('W03 published content search', () => {
       Authorization: 'Bearer untrusted',
       'content-type': 'application/json',
     }
-    const denied = await worker.fetch(new Request(
+    const denied = await neonWorker.fetch(new Request(
       'https://luckread-w03.internal/internal/content/search',
       { method: 'POST', headers, body: JSON.stringify({ q: 'LuckRead', limit: 20 }) },
-    ), { D1_02: mock.db } as never)
+    ), env)
     expect(denied.status).toBe(403)
 
-    const invalid = await worker.fetch(new Request(
+    const invalid = await neonWorker.fetch(new Request(
       'https://luckread-w03.internal/internal/content/search',
       {
         method: 'POST',
@@ -148,7 +136,7 @@ describe('W03 published content search', () => {
         },
         body: JSON.stringify({ q: 'LuckRead', limit: 20, includeDrafts: true }),
       },
-    ), { D1_02: mock.db } as never)
+    ), env)
     expect(invalid.status).toBe(422)
   })
 })

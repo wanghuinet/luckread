@@ -131,6 +131,10 @@ jobs:
           const w06Source = JSON.parse(fs.readFileSync('workers/W06-governance/wrangler.jsonc','utf8'));
           const w06 = JSON.parse(fs.readFileSync('workers/W06-governance/wrangler.neon.jsonc','utf8'));
           const w03 = JSON.parse(fs.readFileSync('workers/W03-content/wrangler.jsonc','utf8'));
+          const d102Inventory = JSON.parse(fs.readFileSync('contracts/database/neon-d1-02-schema-sources.v1.json','utf8'));
+          const w03Source = d102Inventory.owners?.find(x => x.worker === 'W03');
+          const w03D1Source = w03Source?.physicalBindings?.find(x =>
+            x.binding === 'D1_02' && x.databaseUuid === '6c342634-97f6-4248-9f4a-85772af4f22c' && x.included === true);
           const w01m = w01.services?.find(x => x.binding === 'W06_MODERATION');
           const w06m = w06.services?.find(x => x.binding === 'W03_CONTENT_MODERATION');
           const sourceD1 = w06Source.d1_databases?.find(x => x.binding === 'D1_03');
@@ -140,6 +144,10 @@ jobs:
           if (!sourceD1 || sourceD1.database_id !== 'bda1d247-a371-4244-91ae-aef96034db7f') throw new Error('W06 historical D1-03 schema source mapping mismatch');
           if ((w06.d1_databases || []).length !== 0 || w06.vars?.W06_MODERATION_DATABASE_DRIVER !== 'neon') throw new Error('W06 production must be Neon-only');
           if (!hyperdrive || hyperdrive.id !== '7c8831416c18494faee04b96aa551cb9') throw new Error('W06 D1-03 Hyperdrive binding mismatch');
-          if (!w03.d1_databases?.some(x => x.binding === 'D1_02' && x.database_id === '6c342634-97f6-4248-9f4a-85772af4f22c')) throw new Error('W03 D1-02 binding mismatch');
-          console.log('MODERATION_TOPOLOGY=PASS; W06_PRODUCTION_D1_BINDINGS=NONE');
+          if ((w03.d1_databases || []).length !== 0 || w03.vars?.W03_CONTENT_READ_DRIVER !== 'neon' ||
+              !w03.hyperdrive?.some(x => x.binding === 'HYPERDRIVE_CONTENT_PG' && x.id === 'c55183e1cc3446409c9c1075832c6615')) {
+            throw new Error('W03 content production must use Neon with no D1 bindings');
+          }
+          if (!w03D1Source) throw new Error('W03 historical D1-02 schema source identity mismatch');
+          console.log('MODERATION_TOPOLOGY=PASS; W03_W06_PRODUCTION_D1_BINDINGS=NONE');
           NODE

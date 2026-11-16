@@ -150,6 +150,48 @@ function fixture(options: { revokeMiss?: boolean; uniqueConflict?: boolean; appe
 }
 
 describe('W03 Neon content relationship mutation store', () => {
+  it('lists published reference relationships with stable bounded cursor pagination', async () => {
+    const calls: Array<{ sql: string; values?: unknown[] }> = []
+    const rows = [
+      [
+        { relationship_id: 'relationship_2', relation_type: 'reference' as const, created_at: new Date('2026-11-16T12:00:00.000Z'), related_id: 'content_2', related_slug: 'two', related_type: 'post' as const, related_title: 'Two', relation_direction: 'out' as const },
+        { relationship_id: 'relationship_1', relation_type: 'reference' as const, created_at: new Date('2026-11-16T11:00:00.000Z'), related_id: 'content_1', related_slug: 'one', related_type: 'article' as const, related_title: 'One', relation_direction: 'in' as const },
+      ],
+      [
+        { relationship_id: 'relationship_1', relation_type: 'reference' as const, created_at: new Date('2026-11-16T11:00:00.000Z'), related_id: 'content_1', related_slug: 'one', related_type: 'article' as const, related_title: 'One', relation_direction: 'in' as const },
+      ],
+    ]
+    let callIndex = 0
+    const database: ContentRelationshipPostgresDatabase = {
+      async query<Row>(sql: string, values?: unknown[]) {
+        calls.push({ sql, values })
+        return { rows: (rows[callIndex++] ?? []) as Row[] }
+      },
+      async connect() { throw new Error('list reads must not open a transaction') },
+    }
+    const store = createPostgresContentRelationshipMutationStore(database)
+    const first = await store.list!({ contentId: 'content_source', direction: 'both', cursor: null, limit: 1 })
+    expect(first.items).toEqual([{
+      relationshipId: 'relationship_2', relationType: 'reference', direction: 'out',
+      relatedContent: { id: 'content_2', slug: 'two', contentType: 'post', title: 'Two' },
+      createdAt: '2026-11-16T12:00:00.000Z',
+    }])
+    expect(first.hasMore).toBe(true)
+    expect(first.nextCursor).toBeTruthy()
+    expect(calls[0]?.sql).toContain("r.relation_type = 'reference'")
+    expect(calls[0]?.sql).toContain("s.state = 'PUBLISHED'")
+    expect(calls[0]?.sql).toContain("t.state = 'PUBLISHED'")
+    expect(calls[0]?.sql).toContain('ORDER BY r.created_at DESC, r.relationship_id DESC')
+    expect(calls[0]?.values).toEqual(['content_source', 2])
+
+    const second = await store.list!({ contentId: 'content_source', direction: 'both', cursor: first.nextCursor, limit: 1 })
+    expect(second.items[0]?.relationshipId).toBe('relationship_1')
+    expect(second.hasMore).toBe(false)
+    expect(second.nextCursor).toBeNull()
+    expect(calls[1]?.sql).toContain('r.created_at < $2::timestamptz')
+    expect(calls[1]?.values).toEqual(['content_source', '2026-11-16T12:00:00.000Z', 'relationship_2', 2])
+  })
+
   it('loads source/target ownership, active reference and idempotency from PostgreSQL', async () => {
     const fake = fixture()
     const store = createPostgresContentRelationshipMutationStore(fake.database)

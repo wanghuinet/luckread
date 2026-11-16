@@ -21,6 +21,11 @@ export interface ContentContextReadStore {
   getPublishedContentSocialContext(contentId: string): Promise<PublishedContentSocialContext>
   getPublishedContentSocialContexts(contentIds: string[]): Promise<PublishedContentSocialSummaryContext[]>
   getPublishedOwnerPostContext(contentId: string, ownerUserId: string): Promise<OwnedPostContext>
+  hasPublicCreatorContent(ownerUserId: string): Promise<boolean>
+  listPublishedMembersOnlyBodyReferences(
+    bodyRef: string,
+    limit: number,
+  ): Promise<readonly { owner_user_id: string; creator_id: string | null }[]>
 }
 
 type ContextRow = Record<string, unknown> & {
@@ -211,6 +216,46 @@ export function createPostgresContentContextReadStore(
         state: 'PUBLISHED',
         updatedAt: timestampString(row.updated_at),
       }
+    },
+
+    async hasPublicCreatorContent(ownerUserIdValue) {
+      const ownerUserId = ownerUserIdValue.trim()
+      assertResourceId(ownerUserId)
+      const rows = await queryRows<{ id: string }>(
+        database,
+        `SELECT id
+           FROM contents
+          WHERE owner_user_id = $1
+            AND state = 'PUBLISHED'
+            AND content_type IN ('article', 'post', 'video')
+            AND COALESCE(access_mode, 'PUBLIC') = 'PUBLIC'
+          LIMIT 1`,
+        [ownerUserId],
+      )
+      return rows.length > 0
+    },
+
+    async listPublishedMembersOnlyBodyReferences(bodyRefValue, limit) {
+      if (typeof bodyRefValue !== 'string' || bodyRefValue.length === 0 ||
+          bodyRefValue.length > 2048 || /[\u0000-\u001f\u007f]/u.test(bodyRefValue) ||
+          !Number.isSafeInteger(limit) || limit < 1 || limit > 51) {
+        throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+      }
+      const rows = await queryRows<{ owner_user_id: string; creator_id: string | null }>(
+        database,
+        `SELECT owner_user_id, creator_id
+           FROM contents
+          WHERE body_ref = $1
+            AND state = 'PUBLISHED'
+            AND access_mode = 'MEMBERS_ONLY'
+          LIMIT $2`,
+        [bodyRefValue, limit],
+      )
+      if (rows.some(row => typeof row.owner_user_id !== 'string' || !row.owner_user_id ||
+          (row.creator_id !== null && typeof row.creator_id !== 'string'))) {
+        throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
+      }
+      return rows
     },
   }
 }

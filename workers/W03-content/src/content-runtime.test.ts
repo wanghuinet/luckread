@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 import { canTransitionContentState, ContentRuntimeError, type ContentRecord, createContent, createRequestId, deleteContent, getContent, decodeContentListCursor, decodeCursor, decodeScopedCursor, encodeContentListCursor, encodeCursor, encodeScopedCursor, isState, listContents, listPublishedContentsByIds, listContentRevisions, listCreatorContents, listDueScheduledContentCandidates, publishAuthorizedScheduledContents, publicContent, toErrorResponse, transitionContentState, updateContent, validateInput, validateListFilters } from './content-runtime.js'
-import w03Worker, { hasCreatorContentPermission, hasSocialPostPermission, parseListLimit } from './index.js'
+import w03Worker, { createW03ContentWorker, hasCreatorContentPermission, hasSocialPostPermission, parseListLimit } from './index.js'
 
 describe('W03 content contract core', () => {
 
@@ -38,26 +38,19 @@ describe('W03 content contract core', () => {
   it('classifies published public-post media and protects member-only media with W07 entitlement', async () => {
     const publicUrl = 'https://img.luckread.com/media/photo%20(1).png'
     const historicalUrl = 'https://cdn.luckread.com/media/photo%20(1).png'
-    let query = ''
-    let bindings: unknown[] = []
     let matchingRows: Array<Record<string, unknown>> = []
-    const d1 = {
-      prepare(sql: string) {
-        query = sql
-        return {
-          bind(...values: unknown[]) {
-            bindings = values
-            return {
-              all: async () => ({ results: matchingRows }),
-            }
-          },
-        }
+    const lookups: Array<{ candidates: readonly string[]; limit: number }> = []
+    const neonWorker = createW03ContentWorker({
+      publishedMediaReferenceReadStore: {
+        async listPublishedMediaReferences(candidates, limit) {
+          lookups.push({ candidates, limit })
+          return matchingRows as never
+        },
       },
-    }
+    })
     let w07Calls = 0
     let w07Request: Request | null = null
     const env = {
-      D1_02: d1,
       W07_SUBSCRIPTION: {
         fetch: async (input: RequestInfo | URL, init?: RequestInit) => {
           w07Calls += 1
@@ -100,25 +93,14 @@ describe('W03 content contract core', () => {
     }
 
     matchingRows = [publicPost]
-    const publicResponse = await w03Worker.fetch(request(publicUrl), env, {} as never)
+    const publicResponse = await neonWorker.fetch(request(publicUrl), env, {} as never)
     expect(publicResponse.status).toBe(200)
     await expect(publicResponse.json()).resolves.toMatchObject({
       data: { isPublic: true, isMemberContent: false, allowed: true },
     })
-    expect(query).toContain("state = 'PUBLISHED'")
-    expect(query).toContain('access_mode')
-    expect(query).toContain('body_ref IN (')
-    expect(query).toContain('cover_ref IN (')
-    expect(query).toContain('json_each(contents.media_refs_json)')
-    expect(query).toContain('media_ref.value IN (')
-    const candidatesPerColumn = ((query.match(/\?/g) ?? []).length - 1) / 3
-    expect(candidatesPerColumn).toBe(1)
-    expect(bindings.length).toBe(candidatesPerColumn * 3 + 1)
-    expect(bindings[0]).toBe(publicUrl)
-    expect(bindings[candidatesPerColumn]).toBe(publicUrl)
-    expect(bindings[candidatesPerColumn * 2]).toBe(publicUrl)
-    expect(bindings.at(-1)).toBe(51)
-    expect(bindings).not.toContain(historicalUrl)
+    expect(lookups.at(-1)?.limit).toBe(51)
+    expect(lookups.at(-1)?.candidates).toContain(publicUrl)
+    expect(lookups.at(-1)?.candidates).not.toContain(historicalUrl)
     expect(w07Calls).toBe(0)
 
     matchingRows = [memberPost]
@@ -126,7 +108,7 @@ describe('W03 content contract core', () => {
       'X-LuckRead-Principal-User-Id': 'user_subscriber',
       'X-LuckRead-Principal-Layer': 'L2',
     })
-    const memberResponse = await w03Worker.fetch(memberRequest, env, {} as never)
+    const memberResponse = await neonWorker.fetch(memberRequest, env, {} as never)
     expect(memberResponse.status).toBe(200)
     await expect(memberResponse.json()).resolves.toMatchObject({
       data: { isPublic: false, isMemberContent: true, allowed: true },
@@ -140,7 +122,7 @@ describe('W03 content contract core', () => {
 
     // Without a logged-in member, a member-only reference must not be exposed as public.
     w07Calls = 0
-    const anonymousMemberResponse = await w03Worker.fetch(request(publicUrl), env, {} as never)
+    const anonymousMemberResponse = await neonWorker.fetch(request(publicUrl), env, {} as never)
     expect(anonymousMemberResponse.status).toBe(200)
     await expect(anonymousMemberResponse.json()).resolves.toMatchObject({
       data: { isPublic: false, isMemberContent: true, allowed: false },
@@ -150,13 +132,13 @@ describe('W03 content contract core', () => {
     // If a URL appears in both public and member-only content, membership wins:
     // it cannot become anonymous-public through the second reference.
     matchingRows = [publicPost, memberPost]
-    const mixedReferenceResponse = await w03Worker.fetch(request(publicUrl), env, {} as never)
+    const mixedReferenceResponse = await neonWorker.fetch(request(publicUrl), env, {} as never)
     await expect(mixedReferenceResponse.json()).resolves.toMatchObject({
       data: { isPublic: false, isMemberContent: true, allowed: false },
     })
 
     matchingRows = []
-    const unpublishedResponse = await w03Worker.fetch(
+    const unpublishedResponse = await neonWorker.fetch(
       request('https://img.luckread.com/media/draft-only.png'),
       env,
       {} as never,
@@ -166,7 +148,7 @@ describe('W03 content contract core', () => {
       data: { isPublic: false, isMemberContent: false, allowed: false },
     })
 
-    const unsupportedHostResponse = await w03Worker.fetch(
+    const unsupportedHostResponse = await neonWorker.fetch(
       request('https://attacker.example/media/photo.png'),
       env,
       {} as never,
@@ -176,10 +158,10 @@ describe('W03 content contract core', () => {
       data: { isPublic: false, isMemberContent: false, allowed: false },
     })
 
-    const untrustedCaller = await w03Worker.fetch(request(publicUrl, 'W04'), env, {} as never)
+    const untrustedCaller = await neonWorker.fetch(request(publicUrl, 'W04'), env, {} as never)
     expect(untrustedCaller.status).toBe(403)
 
-    const forwardedCredential = await w03Worker.fetch(
+    const forwardedCredential = await neonWorker.fetch(
       request(publicUrl, 'W01', { Cookie: 'session=must-not-cross-service-boundary' }),
       env,
       {} as never,
@@ -207,24 +189,17 @@ describe('W03 content contract core', () => {
       created_at: '2026-10-29T00:00:00.000Z',
       updated_at: '2026-10-29T00:00:00.000Z',
     };
-    const db = {
-      prepare() {
-        return {
-          bind() {
-            return {
-              first: async () => ({ ...contentRow }),
-            };
-          },
-        };
-      },
-    };
+    const neonWorker = createW03ContentWorker({
+      contentDetailReadStoreProvider: () => ({
+        getContent: async () => ({ ...contentRow }),
+      } as never),
+    })
     let providerStatus = 200;
     let allowed = false;
     let reasonOverride: string | null = null;
     let providerCalls = 0;
     const allowLimiter = { limit: async () => ({ success: true }) };
     const env = {
-      D1_02: db,
       W07_SUBSCRIPTION: {
         fetch: async (input: RequestInfo | URL, init?: RequestInit) => {
           providerCalls += 1;
@@ -252,7 +227,7 @@ describe('W03 content contract core', () => {
       },
     });
 
-    const denied = await w03Worker.fetch(makeRequest(), env, {} as never);
+    const denied = await neonWorker.fetch(makeRequest(), env, {} as never);
     expect(denied.status).toBe(200);
     await expect(denied.json()).resolves.toMatchObject({
       id: 'content_member_1',
@@ -267,7 +242,7 @@ describe('W03 content contract core', () => {
     expect(providerCalls).toBe(1);
 
     allowed = true;
-    const entitled = await w03Worker.fetch(makeRequest(), env, {} as never);
+    const entitled = await neonWorker.fetch(makeRequest(), env, {} as never);
     expect(entitled.status).toBe(200);
     await expect(entitled.json()).resolves.toMatchObject({
       creatorId: 'creator_1',
@@ -280,7 +255,7 @@ describe('W03 content contract core', () => {
     expect(providerCalls).toBe(2);
 
     reasonOverride = 'MEMBERSHIP_REQUIRED';
-    const contradictory = await w03Worker.fetch(makeRequest(), env, {} as never);
+    const contradictory = await neonWorker.fetch(makeRequest(), env, {} as never);
     expect(contradictory.status).toBe(503);
     await expect(contradictory.json()).resolves.toMatchObject({
       error: { code: 'SERVICE_UNAVAILABLE' },
@@ -289,7 +264,7 @@ describe('W03 content contract core', () => {
 
     reasonOverride = null;
     providerStatus = 503;
-    const unavailable = await w03Worker.fetch(makeRequest(), env, {} as never);
+    const unavailable = await neonWorker.fetch(makeRequest(), env, {} as never);
     expect(unavailable.status).toBe(503);
     await expect(unavailable.json()).resolves.toMatchObject({
       error: { code: 'SERVICE_UNAVAILABLE' },
@@ -322,25 +297,22 @@ describe('W03 content contract core', () => {
     const memberReferenceRows = [
       { owner_user_id: 'private_owner', creator_id: 'private_creator' },
     ]
-    const queries: string[] = []
-    const db = {
-      prepare(sql: string) {
-        queries.push(sql)
-        return {
-          bind() {
-            return {
-              first: async () => ({ ...publicContentRow }),
-              all: async () => ({ results: memberReferenceRows.map((row) => ({ ...row })) }),
-            }
-          },
-        }
-      },
-    }
+    const contextLookups: Array<{ bodyRef: string; limit: number }> = []
+    const neonWorker = createW03ContentWorker({
+      contentDetailReadStoreProvider: () => ({
+        getContent: async () => ({ ...publicContentRow }),
+      } as never),
+      contentContextReadStoreProvider: () => ({
+        listPublishedMembersOnlyBodyReferences: async (value: string, limit: number) => {
+          contextLookups.push({ bodyRef: value, limit })
+          return memberReferenceRows
+        },
+      } as never),
+    })
     let allowed = false
     let entitlementChecks = 0
     const allowLimiter = { limit: async () => ({ success: true }) }
     const env = {
-      D1_02: db,
       W07_SUBSCRIPTION: {
         fetch: async (input: RequestInfo | URL, init?: RequestInit) => {
           entitlementChecks += 1
@@ -373,7 +345,7 @@ describe('W03 content contract core', () => {
       },
     )
 
-    const denied = await w03Worker.fetch(makeRequest(), env, {} as never)
+    const denied = await neonWorker.fetch(makeRequest(), env, {} as never)
     expect(denied.status).toBe(200)
     await expect(denied.json()).resolves.toMatchObject({
       contentId: 'content_public_1',
@@ -382,15 +354,10 @@ describe('W03 content contract core', () => {
       bodyRef: '',
     })
     expect(entitlementChecks).toBe(1)
-    expect(queries.some((sql) =>
-      sql.includes("state = 'PUBLISHED' AND access_mode = 'MEMBERS_ONLY'"),
-    )).toBe(true)
-    expect(queries.some((sql) =>
-      sql.includes("access_mode = 'MEMBERS_ONLY'") && !sql.includes("state = 'PUBLISHED'"),
-    )).toBe(false)
+    expect(contextLookups).toEqual([{ bodyRef, limit: 51 }])
 
     allowed = true
-    const entitled = await w03Worker.fetch(makeRequest(), env, {} as never)
+    const entitled = await neonWorker.fetch(makeRequest(), env, {} as never)
     expect(entitled.status).toBe(200)
     await expect(entitled.json()).resolves.toMatchObject({
       contentId: 'content_public_1',
@@ -409,16 +376,18 @@ describe('W03 content contract core', () => {
       cover_ref: null, etag: 'W/"1"', created_at: '2026-10-02T00:00:00.000Z',
       updated_at: '2026-10-02T00:00:00.000Z',
     }
-    let query = ''
-    const env = {
-      D1_02: {
-        prepare(value: string) {
-          query = value
-          return { bind: () => ({ all: async () => ({ results: [row] }) }) }
+    let storeCalls = 0
+    const neonWorker = createW03ContentWorker({
+      publishedContentsByIdsReadStoreProvider: () => ({
+        list: async (ids: readonly string[]) => {
+          storeCalls += 1
+          expect(ids).toEqual(['content_1'])
+          return [row]
         },
-      },
-    } as never
-    const response = await w03Worker.fetch(
+      }),
+    })
+    const env = {} as never
+    const response = await neonWorker.fetch(
       new Request('https://luckread-w03.internal/internal/content/bookmarked-items', {
         method: 'POST',
         headers: {
@@ -438,8 +407,8 @@ describe('W03 content contract core', () => {
     await expect(response.json()).resolves.toMatchObject({
       data: { items: [{ id: 'content_1', title: 'Post 1' }] },
     })
-    expect(query).toContain("WHERE c.state = 'PUBLISHED'")
-    const denied = await w03Worker.fetch(
+    expect(storeCalls).toBe(1)
+    const denied = await neonWorker.fetch(
       new Request('https://luckread-w03.internal/internal/content/bookmarked-items', {
         method: 'POST',
         headers: {
@@ -453,212 +422,12 @@ describe('W03 content contract core', () => {
       {} as never,
     )
     expect(denied.status).toBe(403)
+    expect(storeCalls).toBe(1)
   })
 
 
-  it('serves owner-scoped owned-post context only over the W05 internal binding', async () => {
-    let query = ''
-    let bindings: unknown[] = []
-    const row = {
-      id: 'content_1',
-      owner_user_id: 'user_1',
-      content_type: 'post',
-      state: 'DRAFT',
-      updated_at: '2026-10-20T00:00:00.000Z',
-    }
-    const env = {
-      D1_02: {
-        prepare(sql: string) {
-          query = sql
-          return { bind: (...values: unknown[]) => {
-            bindings = values
-            return { first: async () => row }
-          } }
-        },
-      },
-    } as never
-    const request = (caller: string, userId = 'user_1') => new Request(
-      'https://luckread-w03.internal/internal/content/contents/content_1/owned-post-context',
-      {
-        headers: {
-          'X-LuckRead-Caller': caller,
-          'X-LuckRead-Transport-Version': '1.0',
-          'X-LuckRead-Correlation-Id': 'owned-post-context-test',
-          'X-LuckRead-Principal-User-Id': userId,
-          'X-LuckRead-Principal-Layer': 'L2',
-        },
-      },
-    )
-    const response = await w03Worker.fetch(request('W05'), env, {} as never)
-    expect(response.status).toBe(200)
-    await expect(response.json()).resolves.toMatchObject({
-      data: {
-        contentId: 'content_1',
-        ownerUserId: 'user_1',
-        contentType: 'post',
-        state: 'DRAFT',
-      },
-    })
-    expect(query).toContain('owner_user_id = ?')
-    expect(query).toContain("content_type = 'post'")
-    expect(bindings).toEqual(['content_1', 'user_1'])
-    const denied = await w03Worker.fetch(request('W01'), env, {} as never)
-    expect(denied.status).toBe(403)
-    expect(query).toContain('owner_user_id = ?')
-  })
+  // Social-context route coverage uses the Neon context store in content-context-read-routes.test.ts.
 
-  it('serves public profile-pin context only for the matching published post owner', async () => {
-    let query = ''
-    let bindings: unknown[] = []
-    const row = {
-      id: 'content_1',
-      owner_user_id: 'user_1',
-      content_type: 'post',
-      state: 'PUBLISHED',
-      updated_at: '2026-10-20T00:00:00.000Z',
-    }
-    const env = {
-      D1_02: {
-        prepare(sql: string) {
-          query = sql
-          return { bind: (...values: unknown[]) => {
-            bindings = values
-            return { first: async () => values[1] === 'user_1' ? row : null }
-          } }
-        },
-      },
-    } as never
-    const request = (ownerUserId = 'user_1', caller = 'W05', extraHeaders: Record<string, string> = {}) =>
-      new Request(
-        `https://luckread-w03.internal/internal/content/contents/content_1/public-post-context/${ownerUserId}`,
-        {
-          headers: {
-            'X-LuckRead-Caller': caller,
-            'X-LuckRead-Transport-Version': '1.0',
-            'X-LuckRead-Correlation-Id': 'public-profile-pin-context',
-            ...extraHeaders,
-          },
-        },
-      )
-
-    const response = await w03Worker.fetch(request(), env, {} as never)
-    expect(response.status).toBe(200)
-    await expect(response.json()).resolves.toMatchObject({
-      data: { contentId: 'content_1', ownerUserId: 'user_1', contentType: 'post', state: 'PUBLISHED' },
-    })
-    expect(query).toContain('owner_user_id = ?')
-    expect(query).toContain("content_type = 'post'")
-    expect(query).toContain("state = 'PUBLISHED'")
-    expect(bindings).toEqual(['content_1', 'user_1'])
-
-    const wrongOwner = await w03Worker.fetch(request('user_2'), env, {} as never)
-    expect(wrongOwner.status).toBe(404)
-    const wrongCaller = await w03Worker.fetch(request('user_1', 'W01'), env, {} as never)
-    expect(wrongCaller.status).toBe(403)
-    const forwardedCredentials = await w03Worker.fetch(
-      request('user_1', 'W05', { Authorization: 'Bearer should-not-be-forwarded' }),
-      env,
-      {} as never,
-    )
-    expect(forwardedCredentials.status).toBe(403)
-  })
-
-  it('serves only minimal published content social context through the W05 internal binding', async () => {
-    let query = ''
-    let bindings: unknown[] = []
-    const row = {
-      id: 'content_1',
-      owner_user_id: 'owner_1',
-      content_type: 'article',
-      state: 'PUBLISHED',
-      updated_at: '2026-10-17T04:00:00.000Z',
-    }
-    const env = {
-      D1_02: {
-        prepare(sql: string) {
-          query = sql
-          return { bind: (...values: unknown[]) => {
-            bindings = values
-            return { first: async () => values[0] === 'missing_content' ? null : row }
-          } }
-        },
-      },
-    } as never
-    const request = (caller = 'W05', extraHeaders: Record<string, string> = {}, contentId = 'content_1') =>
-      new Request(
-        `https://luckread-w03.internal/internal/content/contents/${contentId}/published-social-context`,
-        {
-          headers: {
-            'X-LuckRead-Caller': caller,
-            'X-LuckRead-Transport-Version': '1.0',
-            'X-LuckRead-Correlation-Id': 'published-social-context-test',
-            ...extraHeaders,
-          },
-        },
-      )
-    const response = await w03Worker.fetch(request(), env, {} as never)
-    expect(response.status).toBe(200)
-    await expect(response.json()).resolves.toMatchObject({
-      data: { contentId: 'content_1', ownerUserId: 'owner_1', contentType: 'article', state: 'PUBLISHED', updatedAt: '2026-10-17T04:00:00.000Z' },
-    })
-    expect(query).toContain("state = 'PUBLISHED'")
-    expect(query).toContain('updated_at')
-    expect(bindings).toEqual(['content_1'])
-
-    expect((await w03Worker.fetch(request('W01'), env, {} as never)).status).toBe(403)
-    expect((await w03Worker.fetch(request('W05', { Authorization: 'Bearer not-forwarded' }), env, {} as never)).status).toBe(403)
-    expect((await w03Worker.fetch(request('W05', {}, 'missing_content'), env, {} as never)).status).toBe(404)
-  })
-
-  it('serves a bounded batch of published social contexts only through the W05 internal transport', async () => {
-    const rows = [
-      { id: 'content_1', owner_user_id: 'owner_1', content_type: 'post', title: '第一篇', updated_at: '2026-10-17T04:00:00.000Z' },
-      { id: 'content_2', owner_user_id: 'owner_2', content_type: 'article', title: '第二篇', updated_at: '2026-10-18T04:00:00.000Z' },
-    ]
-    let query = ''
-    let bindings: unknown[] = []
-    const env = {
-      D1_02: {
-        prepare(sql: string) {
-          query = sql
-          return {
-            bind(...values: unknown[]) {
-              bindings = values
-              return { all: async () => ({ results: rows.filter(row => values.includes(row.id)) }) }
-            },
-          }
-        },
-      },
-    } as never
-    const request = (caller = 'W05', headers: Record<string, string> = {}) => new Request(
-      'https://luckread-w03.internal/internal/content/published-social-context-batch',
-      {
-        method: 'POST',
-        headers: {
-          'X-LuckRead-Caller': caller,
-          'X-LuckRead-Transport-Version': '1.0',
-          'X-LuckRead-Correlation-Id': 'context-batch-test',
-          'content-type': 'application/json',
-          ...headers,
-        },
-        body: JSON.stringify({ contentIds: ['content_1', 'content_2'] }),
-      },
-    )
-    const response = await w03Worker.fetch(request(), env, {} as never)
-    expect(response.status).toBe(200)
-    await expect(response.json()).resolves.toMatchObject({
-      data: { items: [
-        { contentId: 'content_1', ownerUserId: 'owner_1', contentType: 'post', state: 'PUBLISHED', title: '第一篇', updatedAt: '2026-10-17T04:00:00.000Z' },
-        { contentId: 'content_2', ownerUserId: 'owner_2', contentType: 'article', state: 'PUBLISHED', title: '第二篇', updatedAt: '2026-10-18T04:00:00.000Z' },
-      ] },
-    })
-    expect(query).toContain("state = 'PUBLISHED'")
-    expect(query).toContain('id IN (?, ?)')
-    expect(query).toContain('title')
-    expect(bindings).toEqual(['content_1', 'content_2'])
-    expect((await w03Worker.fetch(request('W01'), env, {} as never)).status).toBe(403)
-    expect((await w03Worker.fetch(request('W05', { Cookie: 'must-not-be-forwarded' }), env, {} as never)).status).toBe(403)
-  })
 
   it('loads a bounded list of published content IDs in bookmark order', async () => {
     const rows = [
@@ -1631,30 +1400,17 @@ describe('W03 content contract core', () => {
   })
 
   it('serves scheduled due candidates only to the credential-free W01 background transport', async () => {
-    let query = ''
-    let databaseReads = 0
-    const db = {
-      prepare(sql: string) {
-        query = sql
-        return {
-          bind: () => ({
-            all: async () => {
-              databaseReads++
-              return { results: [{
-                id: 'scheduled_route_1',
-                owner_user_id: 'owner_1',
-                creator_id: 'creator_1',
-                version: 3,
-                scheduled_at: '2026-10-08T12:00:00.000Z',
-              }] }
-            },
-          }),
-        }
-      },
-    }
+    let storeReads = 0
+    const neonWorker = createW03ContentWorker({
+      contentMutationStoreProvider: () => ({
+        listDueScheduled: async () => {
+          storeReads += 1
+          return [{ contentId: 'scheduled_route_1', ownerUserId: 'owner_1', creatorId: 'creator_1', version: 3, scheduledAt: '2026-10-08T12:00:00.000Z' }]
+        },
+      } as never),
+    })
     const limiter = { limit: async () => ({ success: true }) }
     const env = {
-      D1_02: db,
       CONTENT_ORIGIN_GLOBAL_LIMITER: limiter,
       CONTENT_PUBLIC_READ_LIMITER: limiter,
       CONTENT_MUTATION_LIMITER: limiter,
@@ -1666,7 +1422,7 @@ describe('W03 content contract core', () => {
       'X-LuckRead-Rate-Key': 'scheduled-publish',
     }
 
-    const response = await w03Worker.fetch(
+    const response = await neonWorker.fetch(
       new Request('https://luckread-w03.internal/internal/content/scheduled-due?limit=50', { headers }),
       env,
     )
@@ -1681,8 +1437,7 @@ describe('W03 content contract core', () => {
         }],
       },
     })
-    expect(query).toContain("state = 'SCHEDULED'")
-    expect(databaseReads).toBe(1)
+    expect(storeReads).toBe(1)
 
     const denied = await w03Worker.fetch(
       new Request('https://luckread-w03.internal/internal/content/scheduled-due?limit=50', {
@@ -1691,31 +1446,26 @@ describe('W03 content contract core', () => {
       env,
     )
     expect(denied.status).toBe(403)
-    expect(databaseReads).toBe(1)
+    expect(storeReads).toBe(1)
   })
 
   it('routes W08 authorization evidence to the final W03 compare-and-set', async () => {
-    const updates: Array<{ sql: string; bindings: unknown[] }> = []
-    const db = {
-      prepare(sql: string) {
-        return {
-          bind(...bindings: unknown[]) {
-            updates.push({ sql, bindings })
-            return { sql, bindings }
-          },
-        }
-      },
-      batch: async (statements: Array<{ sql: string }>) =>
-        statements.map(() => ({ meta: { changes: 1 } })),
-    }
+    const published: unknown[] = []
+    const neonWorker = createW03ContentWorker({
+      contentMutationStoreProvider: () => ({
+        publishScheduled: async (candidates: readonly unknown[]) => {
+          published.push(...candidates)
+          return candidates.length
+        },
+      } as never),
+    })
     const limiter = { limit: async () => ({ success: true }) }
     const env = {
-      D1_02: db,
       CONTENT_ORIGIN_GLOBAL_LIMITER: limiter,
       CONTENT_PUBLIC_READ_LIMITER: limiter,
       CONTENT_MUTATION_LIMITER: limiter,
     } as never
-    const response = await w03Worker.fetch(
+    const response = await neonWorker.fetch(
       new Request('https://luckread-w03.internal/internal/content/scheduled-publish/commit', {
         method: 'POST',
         headers: {
@@ -1751,11 +1501,8 @@ describe('W03 content contract core', () => {
     await expect(response.json()).resolves.toMatchObject({
       data: { scanned: 1, authorized: 1, published: 1, rejected: 0 },
     })
-    expect(updates).toHaveLength(1)
-    expect(updates[0]?.sql).toContain('owner_user_id = ?')
-    expect(updates[0]?.sql).toContain('creator_id = ?')
-    expect(updates[0]?.sql).toContain("state = 'SCHEDULED'")
-    expect(updates[0]?.sql).toContain('version = ?')
+    expect(published).toHaveLength(1)
+    expect(published[0]).toMatchObject({ contentId: 'scheduled_route_2', ownerUserId: 'owner_2', creatorId: 'creator_2', version: 2 })
   })
 
   it('requires at least one media reference for video content', () => {
@@ -1802,7 +1549,7 @@ describe('W03 content contract core', () => {
             'X-LuckRead-Correlation-Id': 'test-correlation-' + limit,
           },
         }),
-        { D1_02: db },
+        {} as never,
       )
 
       expect(response.status).toBe(422)
@@ -1843,21 +1590,14 @@ describe('W03 content contract core', () => {
       idem_response_json: null,
       idem_expires_at: null,
     };
-    const statements: Array<{ query: string; bindings: unknown[] }> = [];
-    const db = {
-      prepare(query: string) {
-        return {
-          bind: (...bindings: unknown[]) => ({
-            all: async () => {
-              statements.push({ query, bindings });
-              return { results: [row] };
-            },
-          }),
-        };
-      },
-    } as never;
+    const storeCalls: unknown[][] = []
+    const neonWorker = createW03ContentWorker({
+      creatorContentsReadStoreProvider: () => ({
+        list: async (...args: unknown[]) => { storeCalls.push(args); return [row] },
+      } as never),
+    })
 
-    const response = await w03Worker.fetch(
+    const response = await neonWorker.fetch(
       new Request('https://luckread-w03.internal/internal/content/contents?status=DRAFT&type=post&limit=20', {
         headers: {
           'X-LuckRead-Caller': 'W01',
@@ -1867,7 +1607,7 @@ describe('W03 content contract core', () => {
           'X-LuckRead-Principal-Layer': 'L2',
         },
       }),
-      { D1_02: db },
+      {} as never,
       {} as never,
     );
 
@@ -1887,13 +1627,10 @@ describe('W03 content contract core', () => {
         nextCursor: null,
       },
     });
-    expect(statements).toHaveLength(1);
-    expect(statements[0]?.query).toContain('owner_user_id = ?');
-    expect(statements[0]?.query).toContain('state = ?');
-    expect(statements[0]?.query).toContain('content_type = ?');
-    expect(statements[0]?.bindings.slice(0, 3)).toEqual(['user_draft_owner', 'DRAFT', 'post']);
+    expect(storeCalls).toHaveLength(1)
+    expect(storeCalls[0]?.slice(0, 4)).toEqual(['user_draft_owner', null, 21, { status: 'DRAFT', contentType: 'post' }])
 
-    const denied = await w03Worker.fetch(
+    const denied = await neonWorker.fetch(
       new Request('https://luckread-w03.internal/internal/content/contents?status=DRAFT&type=post', {
         headers: {
           'X-LuckRead-Caller': 'W01',
@@ -1903,15 +1640,15 @@ describe('W03 content contract core', () => {
           'X-LuckRead-Principal-Layer': 'L1',
         },
       }),
-      { D1_02: db },
+      {} as never,
       {} as never,
     );
     expect(denied.status).toBe(403);
-    expect(statements).toHaveLength(1);
+    expect(storeCalls).toHaveLength(1);
   });
 
   it('lists only the authenticated Creator\'s scheduled social posts and returns edit preconditions', async () => {
-    const statements: Array<{ query: string; bindings: unknown[] }> = []
+    const storeCalls: unknown[][] = []
     const row = {
       id: 'scheduled_post_123',
       content_type: 'post',
@@ -1932,18 +1669,11 @@ describe('W03 content contract core', () => {
       created_at: '2026-11-05T10:00:00.000Z',
       updated_at: '2026-11-05T10:05:00.000Z',
     }
-    const db = {
-      prepare(query: string) {
-        return {
-          bind: (...bindings: unknown[]) => ({
-            all: async () => {
-              statements.push({ query, bindings })
-              return { results: [row] }
-            },
-          }),
-        }
-      },
-    } as never
+    const neonWorker = createW03ContentWorker({
+      creatorContentsReadStoreProvider: () => ({
+        list: async (...args: unknown[]) => { storeCalls.push(args); return [row] },
+      } as never),
+    })
     const makeRequest = (layer = 'L3', query = '?status=SCHEDULED&type=post&limit=20') =>
       new Request('https://luckread-w03.internal/internal/content/contents' + query, {
         headers: {
@@ -1955,7 +1685,7 @@ describe('W03 content contract core', () => {
         },
       })
 
-    const response = await w03Worker.fetch(makeRequest(), { D1_02: db }, {} as never)
+    const response = await neonWorker.fetch(makeRequest(), {} as never, {} as never)
     expect(response.status).toBe(200)
     await expect(response.json()).resolves.toMatchObject({
       data: {
@@ -1974,26 +1704,18 @@ describe('W03 content contract core', () => {
         nextCursor: null,
       },
     })
-    expect(statements).toHaveLength(1)
-    expect(statements[0]?.query).toContain('owner_user_id = ?')
-    expect(statements[0]?.query).toContain('state = ?')
-    expect(statements[0]?.query).toContain('content_type = ?')
-    expect(statements[0]?.bindings.slice(0, 3)).toEqual(['creator_owner_123', 'SCHEDULED', 'post'])
+    expect(storeCalls).toHaveLength(1)
+    expect(storeCalls[0]?.slice(0, 4)).toEqual(['creator_owner_123', null, 21, { status: 'SCHEDULED', contentType: 'post' }])
 
-    const readsBeforeDeny = statements.length
-    const l2Denied = await w03Worker.fetch(makeRequest('L2'), { D1_02: db }, {} as never)
+    const readsBeforeDeny = storeCalls.length
+    const l2Denied = await neonWorker.fetch(makeRequest('L2'), {} as never, {} as never)
     expect(l2Denied.status).toBe(403)
-    const wrongType = await w03Worker.fetch(makeRequest('L3', '?status=SCHEDULED&type=article'), { D1_02: db }, {} as never)
+    const wrongType = await neonWorker.fetch(makeRequest('L3', '?status=SCHEDULED&type=article'), {} as never, {} as never)
     expect(wrongType.status).toBe(422)
-    expect(statements).toHaveLength(readsBeforeDeny)
+    expect(storeCalls).toHaveLength(readsBeforeDeny)
   })
 
   it('returns the canonical error envelope for an unmatched internal route', async () => {
-    const db = {
-      prepare() {
-        throw new Error('database should not be reached for an unmatched route')
-      },
-    } as never
     const response = await w03Worker.fetch(
       new Request('https://luckread-w03.internal/internal/content/unmatched-route', {
         headers: {
@@ -2002,7 +1724,7 @@ describe('W03 content contract core', () => {
           'X-LuckRead-Correlation-Id': 'test-unmatched-route',
         },
       }),
-      { D1_02: db },
+      {} as never,
     )
     expect(response.status).toBe(404)
     await expect(response.json()).resolves.toMatchObject({
@@ -2249,18 +1971,11 @@ describe('W03 content contract core', () => {
       updated_at: '2026-10-01T12:01:00.000Z',
     }
 
-    const db = {
-      prepare(query: string) {
-        expect(query).toContain("AND (state = 'PUBLISHED' OR owner_user_id = ?)")
-        return {
-          bind: () => ({
-            first: async () => row,
-          }),
-        }
-      },
-    } as never
+    const neonWorker = createW03ContentWorker({
+      contentDetailReadStoreProvider: () => ({ getContent: async () => row } as never),
+    })
 
-    const response = await w03Worker.fetch(
+    const response = await neonWorker.fetch(
       new Request('https://luckread-w03.internal/internal/content/contents/content_public_123', {
         headers: {
           'X-LuckRead-Caller': 'W01',
@@ -2268,7 +1983,7 @@ describe('W03 content contract core', () => {
           'X-LuckRead-Correlation-Id': 'test-correlation-public',
         },
       }),
-      { D1_02: db },
+      {} as never,
     )
 
     expect(response.status).toBe(200)
@@ -2280,7 +1995,7 @@ describe('W03 content contract core', () => {
     })
   })
 
-  it('resolves a published content request by stable slug in one D1 read', async () => {
+  it('resolves a published content request by stable slug through Neon', async () => {
     const slug = '中文文章-1234567890abcdef1234567890abcdef'
     const row = {
       id: 'content_slug_123',
@@ -2300,22 +2015,14 @@ describe('W03 content contract core', () => {
       created_at: '2026-10-01T12:00:00.000Z',
       updated_at: '2026-10-03T12:01:00.000Z',
     }
-    const queries: string[] = []
-    const db = {
-      prepare(query: string) {
-        queries.push(query)
-        return {
-          bind: (...bindings: unknown[]) => ({
-            first: async () => {
-              expect(bindings).toEqual([slug, slug, ''])
-              return row
-            },
-          }),
-        }
-      },
-    } as never
+    let requestedContent: string | null = null
+    const neonWorker = createW03ContentWorker({
+      contentDetailReadStoreProvider: () => ({
+        getContent: async (contentIdOrSlug: string) => { requestedContent = contentIdOrSlug; return row },
+      } as never),
+    })
 
-    const response = await w03Worker.fetch(
+    const response = await neonWorker.fetch(
       new Request('https://luckread-w03.internal/internal/content/contents/' + encodeURIComponent(slug), {
         headers: {
           'X-LuckRead-Caller': 'W01',
@@ -2323,11 +2030,11 @@ describe('W03 content contract core', () => {
           'X-LuckRead-Correlation-Id': 'test-correlation-slug',
         },
       }),
-      { D1_02: db },
+      {} as never,
     )
 
     expect(response.status).toBe(200)
-    expect(queries[0]).toContain('WHERE (id = ? OR slug = ?)')
+    expect(requestedContent).toBe(slug)
     await expect(response.json()).resolves.toMatchObject({
       id: row.id,
       slug,
@@ -2336,18 +2043,11 @@ describe('W03 content contract core', () => {
   })
 
   it('does not expose non-published content to an anonymous detail request', async () => {
-    const db = {
-      prepare(query: string) {
-        expect(query).toContain("AND (state = 'PUBLISHED' OR owner_user_id = ?)")
-        return {
-          bind: () => ({
-            first: async () => undefined,
-          }),
-        }
-      },
-    } as never
+    const neonWorker = createW03ContentWorker({
+      contentDetailReadStoreProvider: () => ({ getContent: async () => null } as never),
+    })
 
-    const response = await w03Worker.fetch(
+    const response = await neonWorker.fetch(
       new Request('https://luckread-w03.internal/internal/content/contents/content_private_123', {
         headers: {
           'X-LuckRead-Caller': 'W01',
@@ -2355,7 +2055,7 @@ describe('W03 content contract core', () => {
           'X-LuckRead-Correlation-Id': 'test-correlation-private',
         },
       }),
-      { D1_02: db },
+      {} as never,
     )
 
     expect(response.status).toBe(404)
@@ -2858,26 +2558,21 @@ describe('1.1 content lifecycle idempotency', () => {
 
 describe('W03 username redirect eligibility', () => {
   it('uses only W03-owned published public content and accepts only the W01 service caller', async () => {
-    let query = ''
-    let bindings: unknown[] = []
-    let row: { id: string } | null = { id: 'public_post_1' }
-    let databaseReads = 0
+    let eligibleValue = true
+    const contextCalls: string[] = []
     const allowLimiter = { limit: async () => ({ success: true }) }
+    const neonWorker = createW03ContentWorker({
+      contentContextReadStoreProvider: () => ({
+        hasPublicCreatorContent: async (ownerUserId: string) => {
+          contextCalls.push(ownerUserId)
+          return eligibleValue
+        },
+      } as never),
+    })
     const env = {
       CONTENT_ORIGIN_GLOBAL_LIMITER: allowLimiter,
       CONTENT_PUBLIC_READ_LIMITER: allowLimiter,
       CONTENT_MUTATION_LIMITER: allowLimiter,
-      D1_02: {
-        prepare(sql: string) {
-          query = sql
-          return {
-            bind(...values: unknown[]) {
-              bindings = values
-              return { first: async () => { databaseReads += 1; return row } }
-            },
-          }
-        },
-      },
     } as never
     const request = (caller = 'W01', owner = 'user_123', extra: Record<string, string> = {}) =>
       new Request('https://luckread-w03.internal/internal/content/username-redirect-eligibility/' + owner, {
@@ -2888,24 +2583,19 @@ describe('W03 username redirect eligibility', () => {
           ...extra,
         },
       })
-    const eligible = await w03Worker.fetch(request(), env, {} as never)
-    expect(eligible.status).toBe(200)
-    await expect(eligible.json()).resolves.toMatchObject({ data: { eligible: true } })
-    expect(bindings).toEqual(['user_123'])
-    expect(query).toContain('owner_user_id = ?')
-    expect(query).toContain("state = 'PUBLISHED'")
-    expect(query).toContain("content_type IN ('article', 'post', 'video')")
-    expect(query).toContain("COALESCE(access_mode, 'PUBLIC') = 'PUBLIC'")
-    row = null
-    const empty = await w03Worker.fetch(request(), env, {} as never)
+    const response = await neonWorker.fetch(request(), env, {} as never)
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({ data: { eligible: true } })
+    expect(contextCalls).toEqual(['user_123'])
+    eligibleValue = false
+    const empty = await neonWorker.fetch(request(), env, {} as never)
     await expect(empty.json()).resolves.toMatchObject({ data: { eligible: false } })
-    const readsBeforeReject = databaseReads
-    const wrongCaller = await w03Worker.fetch(request('W05'), env, {} as never)
+    const readsBeforeReject = contextCalls.length
+    const wrongCaller = await neonWorker.fetch(request('W05'), env, {} as never)
     expect(wrongCaller.status).toBe(403)
-    expect(databaseReads).toBe(readsBeforeReject)
-    const forwardedCookie = await w03Worker.fetch(request('W01', 'user_123', { Cookie: 'session=secret' }), env, {} as never)
+    const forwardedCookie = await neonWorker.fetch(request('W01', 'user_123', { Cookie: 'session=secret' }), env, {} as never)
     expect(forwardedCookie.status).toBe(403)
-    expect(databaseReads).toBe(readsBeforeReject)
+    expect(contextCalls).toHaveLength(readsBeforeReject)
   })
 
   it('exposes published owner identity only through the W01 internal author context', async () => {
@@ -2930,27 +2620,28 @@ describe('W03 username redirect eligibility', () => {
       updated_at: '2026-11-01T00:00:00.000Z',
     }
     let row: typeof contentRow | null = { ...contentRow }
-    let query = ''
-    let bindings: unknown[] = []
-    let databaseReads = 0
+    let contextReads = 0
+    let detailReads = 0
     const allowLimiter = { limit: async () => ({ success: true }) }
-    const env = {
-      D1_02: {
-        prepare(sql: string) {
-          query = sql
-          return {
-            bind(...values: unknown[]) {
-              bindings = values
-              return {
-                first: async () => {
-                  databaseReads += 1
-                  return row ? { ...row } : null
-                },
-              }
-            },
-          }
+    const neonWorker = createW03ContentWorker({
+      contentContextReadStoreProvider: () => ({
+        getPublishedContentAuthorContext: async (reference: string) => {
+          contextReads += 1
+          if (!row) throw new ContentRuntimeError('NOT_FOUND', 404)
+          expect(reference).toBe('content_public_123')
+          return { contentId: row.id, ownerUserId: row.owner_user_id }
         },
-      },
+      } as never),
+      contentDetailReadStoreProvider: () => ({
+        getContent: async (reference: string, principalUserId: string | null) => {
+          detailReads += 1
+          expect(reference).toBe('content_public_123')
+          expect(principalUserId).toBeNull()
+          return row
+        },
+      } as never),
+    })
+    const env = {
       CONTENT_ORIGIN_GLOBAL_LIMITER: allowLimiter,
       CONTENT_PUBLIC_READ_LIMITER: allowLimiter,
       CONTENT_MUTATION_LIMITER: allowLimiter,
@@ -2972,54 +2663,37 @@ describe('W03 username redirect eligibility', () => {
     })
 
     const authorPath = '/internal/content/contents/content_public_123/public-author-context'
-    const authorResponse = await w03Worker.fetch(makeRequest(authorPath), env, {} as never)
+    const authorResponse = await neonWorker.fetch(makeRequest(authorPath), env, {} as never)
     expect(authorResponse.status).toBe(200)
     await expect(authorResponse.json()).resolves.toMatchObject({
-      data: {
-        contentId: 'content_public_123',
-        ownerUserId: 'w02-user-123',
-      },
+      data: { contentId: 'content_public_123', ownerUserId: 'w02-user-123' },
     })
-    expect(query).toContain("state = 'PUBLISHED'")
-    expect(bindings).toEqual(['content_public_123', 'content_public_123'])
-    expect(databaseReads).toBe(1)
+    expect(contextReads).toBe(1)
 
-    const publicDetail = await w03Worker.fetch(
-      makeRequest('/internal/content/contents/content_public_123'),
-      env,
-      {} as never,
-    )
+    const publicDetail = await neonWorker.fetch(makeRequest('/internal/content/contents/content_public_123'), env, {} as never)
     expect(publicDetail.status).toBe(200)
     const publicDetailBody = await publicDetail.json() as Record<string, unknown>
     expect(publicDetailBody).not.toHaveProperty('ownerUserId')
-    expect(databaseReads).toBe(2)
+    expect(detailReads).toBe(1)
 
-    const readsBeforeReject = databaseReads
-    const wrongCaller = await w03Worker.fetch(makeRequest(authorPath, 'W05'), env, {} as never)
+    const readsBeforeReject = contextReads
+    const wrongCaller = await neonWorker.fetch(makeRequest(authorPath, 'W05'), env, {} as never)
     expect(wrongCaller.status).toBe(403)
-    const forwardedCookie = await w03Worker.fetch(
-      makeRequest(authorPath, 'W01', 'GET', { Cookie: 'session=must-not-cross-service-binding' }),
-      env,
-      {} as never,
-    )
+    const forwardedCookie = await neonWorker.fetch(
+      makeRequest(authorPath, 'W01', 'GET', { Cookie: 'session=must-not-cross-service-binding' }), env, {} as never)
     expect(forwardedCookie.status).toBe(403)
-    const forwardedPrincipal = await w03Worker.fetch(
-      makeRequest(authorPath, 'W01', 'GET', { 'X-LuckRead-Principal-User-Id': 'spoofed-user' }),
-      env,
-      {} as never,
-    )
+    const forwardedPrincipal = await neonWorker.fetch(
+      makeRequest(authorPath, 'W01', 'GET', { 'X-LuckRead-Principal-User-Id': 'spoofed-user' }), env, {} as never)
     expect(forwardedPrincipal.status).toBe(403)
-    const wrongMethod = await w03Worker.fetch(makeRequest(authorPath, 'W01', 'POST'), env, {} as never)
+    const wrongMethod = await neonWorker.fetch(makeRequest(authorPath, 'W01', 'POST'), env, {} as never)
     expect(wrongMethod.status).toBe(405)
-    expect(databaseReads).toBe(readsBeforeReject)
+    expect(contextReads).toBe(readsBeforeReject)
 
     row = null
-    const unpublishedOrMissing = await w03Worker.fetch(makeRequest(authorPath), env, {} as never)
+    const unpublishedOrMissing = await neonWorker.fetch(makeRequest(authorPath), env, {} as never)
     expect(unpublishedOrMissing.status).toBe(404)
   })
-
 })
-
 
 describe('creator-selected sensitive media warning', () => {
   const base = {

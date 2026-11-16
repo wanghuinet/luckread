@@ -1,10 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { resolvePublishedMediaReferenceAccess } from './content-runtime.js'
-import {
-  createD1PublishedMediaReferenceReadStore,
-  PublishedMediaReferenceReadStoreError,
-} from './published-media-reference-read-store.js'
+import { PublishedMediaReferenceReadStoreError } from './published-media-reference-read-store.js'
 import { createPostgresPublishedMediaReferenceReadStore } from './published-media-reference-read-store-postgres.js'
 import { createW03ContentWorker } from './index.js'
 
@@ -21,26 +18,6 @@ const rows = [{
   access_mode: 'PUBLIC' as const,
 }]
 
-function fakeD1(options: { rows?: typeof rows; fail?: boolean } = {}) {
-  const calls: Array<{ sql: string; values: unknown[] }> = []
-  const db = {
-    prepare(sql: string) {
-      const call = { sql, values: [] as unknown[] }
-      calls.push(call)
-      return {
-        bind(...values: unknown[]) {
-          call.values = values
-          return this
-        },
-        async all<T>() {
-          if (options.fail) throw new Error('D1 unavailable')
-          return { results: (options.rows ?? rows) as unknown as T[] }
-        },
-      }
-    },
-  }
-  return { db, calls }
-}
 
 function fakePostgres(options: { rows?: typeof rows; fail?: boolean } = {}) {
   const calls: Array<{ sql: string; values: unknown[] }> = []
@@ -55,9 +32,8 @@ function fakePostgres(options: { rows?: typeof rows; fail?: boolean } = {}) {
 }
 
 describe('W03 published media reference read store', () => {
-  it('routes media authorization through the injected PostgreSQL-capable store without touching D1', async () => {
+  it('routes media authorization through the injected Neon store', async () => {
     let storeCalls = 0
-    let d1Calls = 0
     const mediaUrl = 'https://img.luckread.com/media/neon-read-only.png'
     const store = {
       async listPublishedMediaReferences(candidates: readonly string[], limit: number) {
@@ -76,14 +52,7 @@ describe('W03 published media reference read store', () => {
           'X-LuckRead-Correlation-Id': 'w03-postgres-media-route-injection',
         },
       }),
-      {
-        D1_02: {
-          prepare() {
-            d1Calls += 1
-            throw new Error('injected PostgreSQL store must not touch D1')
-          },
-        },
-      } as never,
+      {} as never,
     )
 
     expect(response.status).toBe(200)
@@ -91,40 +60,6 @@ describe('W03 published media reference read store', () => {
       data: { isPublic: true, isMemberContent: false, allowed: true },
     })
     expect(storeCalls).toBe(1)
-    expect(d1Calls).toBe(0)
-  })
-
-  it('preserves the D1 JSON1 lookup, deterministic ordering and row bound', async () => {
-    const { db, calls } = fakeD1()
-    const result = await createD1PublishedMediaReferenceReadStore(db as never)
-      .listPublishedMediaReferences(candidates, 51)
-
-    expect(result).toEqual(rows)
-    expect(calls).toHaveLength(1)
-    expect(calls[0]?.sql).toContain("state = 'PUBLISHED'")
-    expect(calls[0]?.sql).toContain('json_each(contents.media_refs_json)')
-    expect(calls[0]?.sql).toContain('ORDER BY id ASC')
-    expect(calls[0]?.sql).toContain('LIMIT ?')
-    expect(calls[0]?.values).toEqual([
-      ...candidates,
-      ...candidates,
-      ...candidates,
-      51,
-    ])
-  })
-
-  it('returns no D1 rows without querying for an empty candidate list', async () => {
-    const { db, calls } = fakeD1()
-    await expect(createD1PublishedMediaReferenceReadStore(db as never)
-      .listPublishedMediaReferences([], 51)).resolves.toEqual([])
-    expect(calls).toHaveLength(0)
-  })
-
-  it('wraps D1 query failures without leaking driver errors', async () => {
-    const { db } = fakeD1({ fail: true })
-    await expect(createD1PublishedMediaReferenceReadStore(db as never)
-      .listPublishedMediaReferences(candidates, 51))
-      .rejects.toMatchObject({ code: 'QUERY_FAILED' })
   })
 
   it('uses PostgreSQL array matching for scalar and JSON-text media references', async () => {
@@ -177,13 +112,7 @@ describe('W03 published media reference read store', () => {
         return rows
       },
     }
-    const db = {
-      prepare() {
-        throw new Error('injected store must not use D1')
-      },
-    }
     const result = await resolvePublishedMediaReferenceAccess(
-      db as never,
       'https://img.luckread.com/media/photo.png',
       null,
       undefined,

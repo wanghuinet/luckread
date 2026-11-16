@@ -32,38 +32,33 @@ import {
   resolveW03PublicMediaReferenceDriver,
 } from './runtime.js'
 
-describe('W03 public media reference database driver', () => {
-  it('keeps D1 as the default and requires no Hyperdrive binding', async () => {
-    const d1 = {
-      prepare() {
-        throw new Error('empty candidate lookup must not query D1')
-      },
-    }
-    const env = { D1_02: d1 }
-
-    expect(resolveW03PublicMediaReferenceDriver(env)).toBe('d1')
-    const store = getW03PublishedMediaReferenceReadStore(env)
-    await expect(store.listPublishedMediaReferences([], 51)).resolves.toEqual([])
+describe('W03 Neon-only content database driver', () => {
+  it('requires the Neon driver instead of defaulting to D1', () => {
+    expect(() => resolveW03PublicMediaReferenceDriver({})).toThrow('W03_NEON_DRIVER_REQUIRED')
+    expect(resolveW03PublicMediaReferenceDriver({ W03_CONTENT_READ_DRIVER: 'neon' })).toBe('neon')
   })
 
-  it('rejects unknown driver values instead of silently falling back to D1', () => {
+  it('rejects unknown driver values and legacy D1 mode', () => {
     expect(() => resolveW03PublicMediaReferenceDriver({
-      W03_PUBLIC_MEDIA_REFERENCE_DRIVER: 'postgres',
-    })).toThrow('W03_PUBLIC_MEDIA_REFERENCE_DRIVER_UNSUPPORTED')
+      W03_CONTENT_READ_DRIVER: 'postgres',
+    })).toThrow('W03_NEON_DRIVER_REQUIRED')
+    expect(() => resolveW03PublicMediaReferenceDriver({
+      W03_CONTENT_READ_DRIVER: 'd1',
+    })).toThrow('W03_NEON_DRIVER_REQUIRED')
   })
 
-  it('requires the D1-02 Hyperdrive binding when Neon is explicitly selected', () => {
-    const env = { W03_PUBLIC_MEDIA_REFERENCE_DRIVER: 'neon' }
+  it('requires the existing content PostgreSQL Hyperdrive binding', () => {
+    const env = { W03_CONTENT_READ_DRIVER: 'neon' }
     expect(resolveW03PublicMediaReferenceDriver(env)).toBe('neon')
     expect(() => getW03PublishedMediaReferenceReadStore(env))
-      .toThrow('W03_HYPERDRIVE_D1_02_BINDING_REQUIRED')
+      .toThrow('W03_HYPERDRIVE_CONTENT_PG_BINDING_REQUIRED')
   })
 
   it('rejects invalid Hyperdrive connection strings', () => {
     expect(() => getW03PublicMediaReferencePostgresPool({
-      W03_PUBLIC_MEDIA_REFERENCE_DRIVER: 'neon',
-      HYPERDRIVE_D1_02: { connectionString: 'https://example.invalid/database' },
-    })).toThrow('W03_HYPERDRIVE_D1_02_CONNECTION_STRING_INVALID')
+      W03_CONTENT_READ_DRIVER: 'neon',
+      HYPERDRIVE_CONTENT_PG: { connectionString: 'https://example.invalid/database' },
+    })).toThrow('W03_HYPERDRIVE_CONTENT_PG_CONNECTION_STRING_INVALID')
   })
 
   it('caches the Neon following-feed read store on the shared Hyperdrive pool', async () => {
@@ -72,7 +67,7 @@ describe('W03 public media reference database driver', () => {
     }
     const env = {
       W03_CONTENT_READ_DRIVER: 'neon',
-      HYPERDRIVE_D1_02: binding,
+      HYPERDRIVE_CONTENT_PG: binding,
     }
     const first = getW03FollowingOwnerContentsReadStore(env)
     const second = getW03FollowingOwnerContentsReadStore(env)
@@ -88,8 +83,8 @@ describe('W03 public media reference database driver', () => {
       connectionString: 'postgresql://postgres:postgres@127.0.0.1:5432/luckread',
     }
     const env = {
-      W03_PUBLIC_MEDIA_REFERENCE_DRIVER: 'neon',
-      HYPERDRIVE_D1_02: binding,
+      W03_CONTENT_READ_DRIVER: 'neon',
+      HYPERDRIVE_CONTENT_PG: binding,
     }
     const pool = getW03PublicMediaReferencePostgresPool(env)
     const store = getW03PublishedContentsByIdsReadStore(env)
@@ -99,17 +94,15 @@ describe('W03 public media reference database driver', () => {
     await pool.end()
   })
 
-  it('provides and caches the Neon reference relationship writer while keeping D1 as default', async () => {
-    expect(getW03ContentRelationshipMutationStore({
-      D1_02: { prepare() { throw new Error('D1 should not be queried') } },
-    })).toBeUndefined()
+  it('provides and caches the Neon reference relationship writer on Neon-only runtime', async () => {
+    expect(() => getW03ContentRelationshipMutationStore({})).toThrow('W03_NEON_DRIVER_REQUIRED')
 
     const binding = {
       connectionString: 'postgresql://postgres:postgres@127.0.0.1:5432/luckread',
     }
     const env = {
       W03_CONTENT_READ_DRIVER: 'neon',
-      HYPERDRIVE_D1_02: binding,
+      HYPERDRIVE_CONTENT_PG: binding,
     }
     const first = getW03ContentRelationshipMutationStore(env)
     const second = getW03ContentRelationshipMutationStore(env)
@@ -124,8 +117,8 @@ describe('W03 public media reference database driver', () => {
       connectionString: 'postgresql://postgres:postgres@127.0.0.1:5432/luckread',
     }
     const env = {
-      W03_PUBLIC_MEDIA_REFERENCE_DRIVER: 'neon',
-      HYPERDRIVE_D1_02: binding,
+      W03_CONTENT_READ_DRIVER: 'neon',
+      HYPERDRIVE_CONTENT_PG: binding,
     }
 
     const firstPool = getW03PublicMediaReferencePostgresPool(env)
@@ -139,16 +132,14 @@ describe('W03 public media reference database driver', () => {
     await firstPool.end()
   })
   it('caches the Neon public content search/list read store on the shared Hyperdrive pool', async () => {
-    expect(getW03PublicContentListReadStore({
-      D1_02: { prepare() { throw new Error('D1 should not be queried') } },
-    })).toBeUndefined()
+    expect(() => getW03PublicContentListReadStore({})).toThrow('W03_NEON_DRIVER_REQUIRED')
 
     const binding = {
       connectionString: 'postgresql://postgres:postgres@127.0.0.1:5432/luckread',
     }
     const env = {
       W03_CONTENT_READ_DRIVER: 'neon',
-      HYPERDRIVE_D1_02: binding,
+      HYPERDRIVE_CONTENT_PG: binding,
     }
     const first = getW03PublicContentListReadStore(env)
     const second = getW03PublicContentListReadStore(env)
@@ -158,21 +149,20 @@ describe('W03 public media reference database driver', () => {
     await getW03PublicMediaReferencePostgresPool(env).end()
   })
 
-  it('requires the existing D1-02 Hyperdrive binding for explicit Neon thread reads', () => {
+  it('requires the existing content PostgreSQL Hyperdrive binding for explicit Neon thread reads', () => {
     expect(() => getW03PostThreadReadStore({ W03_CONTENT_READ_DRIVER: 'neon' }))
-      .toThrow('W03_HYPERDRIVE_D1_02_BINDING_REQUIRED')
+      .toThrow('W03_HYPERDRIVE_CONTENT_PG_BINDING_REQUIRED')
   })
 
-  it('caches the Neon post-thread reader on the shared D1-02 pool while keeping D1 as default', async () => {
-    expect(getW03PostThreadReadStore({ D1_02: { prepare() { throw new Error('D1 should not be queried') } } }))
-      .toBeUndefined()
+  it('caches the Neon post-thread reader on the shared Neon pool with Neon-only runtime', async () => {
+    expect(() => getW03PostThreadReadStore({})).toThrow('W03_NEON_DRIVER_REQUIRED')
 
     const binding = {
       connectionString: 'postgresql://postgres:postgres@127.0.0.1:5432/luckread',
     }
     const env = {
       W03_CONTENT_READ_DRIVER: 'neon',
-      HYPERDRIVE_D1_02: binding,
+      HYPERDRIVE_CONTENT_PG: binding,
     }
     const first = getW03PostThreadReadStore(env)
     const second = getW03PostThreadReadStore(env)
@@ -182,17 +172,15 @@ describe('W03 public media reference database driver', () => {
     await getW03PublicMediaReferencePostgresPool(env).end()
   })
 
-  it('provides and caches the Neon creator-collection list reader while keeping D1 as default', async () => {
-    expect(getW03CollectionListReadStore({
-      D1_02: { prepare() { throw new Error('D1 should not be queried') } },
-    })).toBeUndefined()
+  it('provides and caches the Neon creator-collection list reader with Neon-only runtime', async () => {
+    expect(() => getW03CollectionListReadStore({})).toThrow('W03_NEON_DRIVER_REQUIRED')
 
     const binding = {
       connectionString: 'postgresql://postgres:postgres@127.0.0.1:5432/luckread',
     }
     const env = {
       W03_CONTENT_READ_DRIVER: 'neon',
-      HYPERDRIVE_D1_02: binding,
+      HYPERDRIVE_CONTENT_PG: binding,
     }
     const first = getW03CollectionListReadStore(env)
     const second = getW03CollectionListReadStore(env)
@@ -202,17 +190,15 @@ describe('W03 public media reference database driver', () => {
     await getW03PublicMediaReferencePostgresPool(env).end()
   })
 
-  it('provides and caches the Neon collection-create writer while keeping D1 as default', async () => {
-    expect(getW03CollectionCreateStore({
-      D1_02: { prepare() { throw new Error('D1 should not be queried') } },
-    })).toBeUndefined()
+  it('provides and caches the Neon collection-create writer with Neon-only runtime', async () => {
+    expect(() => getW03CollectionCreateStore({})).toThrow('W03_NEON_DRIVER_REQUIRED')
 
     const binding = {
       connectionString: 'postgresql://postgres:postgres@127.0.0.1:5432/luckread',
     }
     const env = {
       W03_CONTENT_READ_DRIVER: 'neon',
-      HYPERDRIVE_D1_02: binding,
+      HYPERDRIVE_CONTENT_PG: binding,
     }
     const first = getW03CollectionCreateStore(env)
     const second = getW03CollectionCreateStore(env)
@@ -222,17 +208,15 @@ describe('W03 public media reference database driver', () => {
     await getW03PublicMediaReferencePostgresPool(env).end()
   })
 
-  it('provides and caches the Neon collection-update writer while keeping D1 as default', async () => {
-    expect(getW03CollectionUpdateStore({
-      D1_02: { prepare() { throw new Error('D1 should not be queried') } },
-    })).toBeUndefined()
+  it('provides and caches the Neon collection-update writer with Neon-only runtime', async () => {
+    expect(() => getW03CollectionUpdateStore({})).toThrow('W03_NEON_DRIVER_REQUIRED')
 
     const binding = {
       connectionString: 'postgresql://postgres:postgres@127.0.0.1:5432/luckread',
     }
     const env = {
       W03_CONTENT_READ_DRIVER: 'neon',
-      HYPERDRIVE_D1_02: binding,
+      HYPERDRIVE_CONTENT_PG: binding,
     }
     const first = getW03CollectionUpdateStore(env)
     const second = getW03CollectionUpdateStore(env)
@@ -242,17 +226,15 @@ describe('W03 public media reference database driver', () => {
     await getW03PublicMediaReferencePostgresPool(env).end()
   })
 
-  it('provides and caches the Neon creator-series reader while keeping D1 as default', async () => {
-    expect(getW03SeriesReadStore({
-      D1_02: { prepare() { throw new Error('D1 should not be queried') } },
-    })).toBeUndefined()
+  it('provides and caches the Neon creator-series reader with Neon-only runtime', async () => {
+    expect(() => getW03SeriesReadStore({})).toThrow('W03_NEON_DRIVER_REQUIRED')
 
     const binding = {
       connectionString: 'postgresql://postgres:postgres@127.0.0.1:5432/luckread',
     }
     const env = {
       W03_CONTENT_READ_DRIVER: 'neon',
-      HYPERDRIVE_D1_02: binding,
+      HYPERDRIVE_CONTENT_PG: binding,
     }
     const first = getW03SeriesReadStore(env)
     const second = getW03SeriesReadStore(env)
@@ -262,17 +244,15 @@ describe('W03 public media reference database driver', () => {
     await getW03PublicMediaReferencePostgresPool(env).end()
   })
 
-  it('provides and caches Neon membership list readers while keeping D1 as default', async () => {
-    expect(getW03MembersReadStore({
-      D1_02: { prepare() { throw new Error('D1 should not be queried') } },
-    })).toBeUndefined()
+  it('provides and caches Neon membership list readers with Neon-only runtime', async () => {
+    expect(() => getW03MembersReadStore({})).toThrow('W03_NEON_DRIVER_REQUIRED')
 
     const binding = {
       connectionString: 'postgresql://postgres:postgres@127.0.0.1:5432/luckread',
     }
     const env = {
       W03_CONTENT_READ_DRIVER: 'neon',
-      HYPERDRIVE_D1_02: binding,
+      HYPERDRIVE_CONTENT_PG: binding,
     }
     const first = getW03MembersReadStore(env)
     const second = getW03MembersReadStore(env)
@@ -282,17 +262,15 @@ describe('W03 public media reference database driver', () => {
     await getW03PublicMediaReferencePostgresPool(env).end()
   })
 
-  it('provides and caches the Neon content-detail reader while keeping D1 as default', async () => {
-    expect(getW03ContentDetailReadStore({
-      D1_02: { prepare() { throw new Error('D1 should not be queried') } },
-    })).toBeUndefined()
+  it('provides and caches the Neon content-detail reader with Neon-only runtime', async () => {
+    expect(() => getW03ContentDetailReadStore({})).toThrow('W03_NEON_DRIVER_REQUIRED')
 
     const binding = {
       connectionString: 'postgresql://postgres:postgres@127.0.0.1:5432/luckread',
     }
     const env = {
       W03_CONTENT_READ_DRIVER: 'neon',
-      HYPERDRIVE_D1_02: binding,
+      HYPERDRIVE_CONTENT_PG: binding,
     }
     const first = getW03ContentDetailReadStore(env)
     const second = getW03ContentDetailReadStore(env)
@@ -302,17 +280,15 @@ describe('W03 public media reference database driver', () => {
     await getW03PublicMediaReferencePostgresPool(env).end()
   })
 
-  it('provides and caches the Neon creator-content list reader while keeping D1 as default', async () => {
-    expect(getW03CreatorContentsReadStore({
-      D1_02: { prepare() { throw new Error('D1 should not be queried') } },
-    })).toBeUndefined()
+  it('provides and caches the Neon creator-content list reader with Neon-only runtime', async () => {
+    expect(() => getW03CreatorContentsReadStore({})).toThrow('W03_NEON_DRIVER_REQUIRED')
 
     const binding = {
       connectionString: 'postgresql://postgres:postgres@127.0.0.1:5432/luckread',
     }
     const env = {
       W03_CONTENT_READ_DRIVER: 'neon',
-      HYPERDRIVE_D1_02: binding,
+      HYPERDRIVE_CONTENT_PG: binding,
     }
     const first = getW03CreatorContentsReadStore(env)
     const second = getW03CreatorContentsReadStore(env)
@@ -322,17 +298,15 @@ describe('W03 public media reference database driver', () => {
     await getW03PublicMediaReferencePostgresPool(env).end()
   })
 
-  it('reuses the shared D1-02 Hyperdrive pool for W01/W05 content context reads and keeps D1 as default', async () => {
-    expect(getW03ContentContextReadStore({
-      D1_02: { prepare() { throw new Error('D1 should not be queried') } },
-    })).toBeUndefined()
+  it('reuses the shared content PostgreSQL Hyperdrive pool for W01/W05 content context reads', async () => {
+    expect(() => getW03ContentContextReadStore({})).toThrow('W03_NEON_DRIVER_REQUIRED')
 
     const binding = {
       connectionString: 'postgresql://postgres:postgres@127.0.0.1:5432/luckread',
     }
     const env = {
       W03_CONTENT_READ_DRIVER: 'neon',
-      HYPERDRIVE_D1_02: binding,
+      HYPERDRIVE_CONTENT_PG: binding,
     }
     const first = getW03ContentContextReadStore(env)
     const second = getW03ContentContextReadStore(env)
@@ -341,17 +315,15 @@ describe('W03 public media reference database driver', () => {
     expect(first).toBe(second)
     await getW03PublicMediaReferencePostgresPool(env).end()
   })
-  it('provides and caches the Neon collection-delete writer while keeping D1 as default', async () => {
-    expect(getW03CollectionDeleteStore({
-      D1_02: { prepare() { throw new Error('D1 should not be queried') } },
-    })).toBeUndefined()
+  it('provides and caches the Neon collection-delete writer with Neon-only runtime', async () => {
+    expect(() => getW03CollectionDeleteStore({})).toThrow('W03_NEON_DRIVER_REQUIRED')
 
     const binding = {
       connectionString: 'postgresql://postgres:postgres@127.0.0.1:5432/luckread',
     }
     const env = {
       W03_CONTENT_READ_DRIVER: 'neon',
-      HYPERDRIVE_D1_02: binding,
+      HYPERDRIVE_CONTENT_PG: binding,
     }
     const first = getW03CollectionDeleteStore(env)
     const second = getW03CollectionDeleteStore(env)
@@ -361,17 +333,15 @@ describe('W03 public media reference database driver', () => {
     await getW03PublicMediaReferencePostgresPool(env).end()
   })
 
-  it('provides and caches the Neon series-create writer while keeping D1 as default', async () => {
-    expect(getW03SeriesCreateStore({
-      D1_02: { prepare() { throw new Error('D1 should not be queried') } },
-    })).toBeUndefined()
+  it('provides and caches the Neon series-create writer with Neon-only runtime', async () => {
+    expect(() => getW03SeriesCreateStore({})).toThrow('W03_NEON_DRIVER_REQUIRED')
 
     const binding = {
       connectionString: 'postgresql://postgres:postgres@127.0.0.1:5432/luckread',
     }
     const env = {
       W03_CONTENT_READ_DRIVER: 'neon',
-      HYPERDRIVE_D1_02: binding,
+      HYPERDRIVE_CONTENT_PG: binding,
     }
     const first = getW03SeriesCreateStore(env)
     const second = getW03SeriesCreateStore(env)
@@ -381,17 +351,15 @@ describe('W03 public media reference database driver', () => {
     await getW03PublicMediaReferencePostgresPool(env).end()
   })
 
-  it('provides and caches the Neon series-update writer while keeping D1 as default', async () => {
-    expect(getW03SeriesUpdateStore({
-      D1_02: { prepare() { throw new Error('D1 should not be queried') } },
-    })).toBeUndefined()
+  it('provides and caches the Neon series-update writer with Neon-only runtime', async () => {
+    expect(() => getW03SeriesUpdateStore({})).toThrow('W03_NEON_DRIVER_REQUIRED')
 
     const binding = {
       connectionString: 'postgresql://postgres:postgres@127.0.0.1:5432/luckread',
     }
     const env = {
       W03_CONTENT_READ_DRIVER: 'neon',
-      HYPERDRIVE_D1_02: binding,
+      HYPERDRIVE_CONTENT_PG: binding,
     }
     const first = getW03SeriesUpdateStore(env)
     const second = getW03SeriesUpdateStore(env)
@@ -401,17 +369,15 @@ describe('W03 public media reference database driver', () => {
     await getW03PublicMediaReferencePostgresPool(env).end()
   })
 
-  it('provides and caches the Neon series-delete writer while keeping D1 as default', async () => {
-    expect(getW03SeriesDeleteStore({
-      D1_02: { prepare() { throw new Error('D1 should not be queried') } },
-    })).toBeUndefined()
+  it('provides and caches the Neon series-delete writer with Neon-only runtime', async () => {
+    expect(() => getW03SeriesDeleteStore({})).toThrow('W03_NEON_DRIVER_REQUIRED')
 
     const binding = {
       connectionString: 'postgresql://postgres:postgres@127.0.0.1:5432/luckread',
     }
     const env = {
       W03_CONTENT_READ_DRIVER: 'neon',
-      HYPERDRIVE_D1_02: binding,
+      HYPERDRIVE_CONTENT_PG: binding,
     }
     const first = getW03SeriesDeleteStore(env)
     const second = getW03SeriesDeleteStore(env)
@@ -421,17 +387,15 @@ describe('W03 public media reference database driver', () => {
     await getW03PublicMediaReferencePostgresPool(env).end()
   })
 
-  it('provides and caches the Neon Series member-attach writer while keeping D1 as default', async () => {
-    expect(getW03SeriesMemberAttachStore({
-      D1_02: { prepare() { throw new Error('D1 should not be queried') } },
-    })).toBeUndefined()
+  it('provides and caches the Neon Series member-attach writer with Neon-only runtime', async () => {
+    expect(() => getW03SeriesMemberAttachStore({})).toThrow('W03_NEON_DRIVER_REQUIRED')
 
     const binding = {
       connectionString: 'postgresql://postgres:postgres@127.0.0.1:5432/luckread',
     }
     const env = {
       W03_CONTENT_READ_DRIVER: 'neon',
-      HYPERDRIVE_D1_02: binding,
+      HYPERDRIVE_CONTENT_PG: binding,
     }
     const first = getW03SeriesMemberAttachStore(env)
     const second = getW03SeriesMemberAttachStore(env)
@@ -443,15 +407,13 @@ describe('W03 public media reference database driver', () => {
 
 })
 
-it('provides and caches the Neon Series member removal writer while keeping D1 as default', async () => {
-  expect(getW03SeriesMemberRemoveStore({
-    D1_02: { prepare() { throw new Error('D1 should not be queried') } },
-  })).toBeUndefined()
+it('provides and caches the Neon Series member removal writer with Neon-only runtime', async () => {
+  expect(() => getW03SeriesMemberRemoveStore({})).toThrow('W03_NEON_DRIVER_REQUIRED')
 
   const binding = {
     connectionString: 'postgresql://postgres:postgres@127.0.0.1:5432/luckread',
   }
-  const env = { W03_CONTENT_READ_DRIVER: 'neon', HYPERDRIVE_D1_02: binding }
+  const env = { W03_CONTENT_READ_DRIVER: 'neon', HYPERDRIVE_CONTENT_PG: binding }
   const first = getW03SeriesMemberRemoveStore(env)
   const second = getW03SeriesMemberRemoveStore(env)
 
@@ -461,15 +423,13 @@ it('provides and caches the Neon Series member removal writer while keeping D1 a
 })
 
 
-it('provides and caches the Neon Collection member-attach writer while keeping D1 as default', async () => {
-  expect(getW03CollectionMemberAttachStore({
-    D1_02: { prepare() { throw new Error('D1 should not be queried') } },
-  })).toBeUndefined()
+it('provides and caches the Neon Collection member-attach writer with Neon-only runtime', async () => {
+  expect(() => getW03CollectionMemberAttachStore({})).toThrow('W03_NEON_DRIVER_REQUIRED')
 
   const binding = {
     connectionString: 'postgresql://postgres:postgres@127.0.0.1:5432/luckread',
   }
-  const env = { W03_CONTENT_READ_DRIVER: 'neon', HYPERDRIVE_D1_02: binding }
+  const env = { W03_CONTENT_READ_DRIVER: 'neon', HYPERDRIVE_CONTENT_PG: binding }
   const first = getW03CollectionMemberAttachStore(env)
   const second = getW03CollectionMemberAttachStore(env)
 
@@ -479,12 +439,10 @@ it('provides and caches the Neon Collection member-attach writer while keeping D
 })
 
 
-it('provides and caches the Neon Collection member-remove writer while keeping D1 as default', async () => {
-  expect(getW03CollectionMemberRemoveStore({
-    D1_02: { prepare() { throw new Error('D1 should not be queried') } },
-  })).toBeUndefined()
+it('provides and caches the Neon Collection member-remove writer with Neon-only runtime', async () => {
+  expect(() => getW03CollectionMemberRemoveStore({})).toThrow('W03_NEON_DRIVER_REQUIRED')
   const binding = { connectionString: 'postgresql://postgres:postgres@127.0.0.1:5432/luckread' }
-  const env = { W03_CONTENT_READ_DRIVER: 'neon', HYPERDRIVE_D1_02: binding }
+  const env = { W03_CONTENT_READ_DRIVER: 'neon', HYPERDRIVE_CONTENT_PG: binding }
   const first = getW03CollectionMemberRemoveStore(env)
   const second = getW03CollectionMemberRemoveStore(env)
   expect(first).toBeDefined()
@@ -493,12 +451,10 @@ it('provides and caches the Neon Collection member-remove writer while keeping D
 })
 
 
-it('provides and caches the Neon Collection member-reorder writer while keeping D1 as default', async () => {
-  expect(getW03CollectionMemberReorderStore({
-    D1_02: { prepare() { throw new Error('D1 should not be queried') } },
-  })).toBeUndefined()
+it('provides and caches the Neon Collection member-reorder writer with Neon-only runtime', async () => {
+  expect(() => getW03CollectionMemberReorderStore({})).toThrow('W03_NEON_DRIVER_REQUIRED')
   const binding = { connectionString: 'postgresql://postgres:postgres@127.0.0.1:5432/luckread' }
-  const env = { W03_CONTENT_READ_DRIVER: 'neon', HYPERDRIVE_D1_02: binding }
+  const env = { W03_CONTENT_READ_DRIVER: 'neon', HYPERDRIVE_CONTENT_PG: binding }
   const first = getW03CollectionMemberReorderStore(env)
   const second = getW03CollectionMemberReorderStore(env)
   expect(first).toBeDefined()
@@ -507,17 +463,15 @@ it('provides and caches the Neon Collection member-reorder writer while keeping 
 })
 
 
-it('provides and caches the Neon content-create writer on the existing D1-02 Hyperdrive pool', async () => {
-  expect(getW03ContentCreateStore({
-    D1_02: { prepare() { throw new Error('D1 should not be queried') } },
-  })).toBeUndefined()
+it('provides and caches the Neon content-create writer on the existing content PostgreSQL Hyperdrive pool', async () => {
+  expect(() => getW03ContentCreateStore({})).toThrow('W03_NEON_DRIVER_REQUIRED')
 
   const binding = {
     connectionString: 'postgresql://postgres:postgres@127.0.0.1:5432/luckread',
   }
   const env = {
     W03_CONTENT_READ_DRIVER: 'neon',
-    HYPERDRIVE_D1_02: binding,
+    HYPERDRIVE_CONTENT_PG: binding,
   }
   const first = getW03ContentCreateStore(env)
   const second = getW03ContentCreateStore(env)
@@ -527,12 +481,10 @@ it('provides and caches the Neon content-create writer on the existing D1-02 Hyp
   await getW03PublicMediaReferencePostgresPool(env).end()
 })
 
-it('provides and caches the Neon Series member-reorder writer while keeping D1 as default', async () => {
-  expect(getW03SeriesMemberReorderStore({
-    D1_02: { prepare() { throw new Error('D1 should not be queried') } },
-  })).toBeUndefined()
+it('provides and caches the Neon Series member-reorder writer with Neon-only runtime', async () => {
+  expect(() => getW03SeriesMemberReorderStore({})).toThrow('W03_NEON_DRIVER_REQUIRED')
   const binding = { connectionString: 'postgresql://postgres:postgres@127.0.0.1:5432/luckread' }
-  const env = { W03_CONTENT_READ_DRIVER: 'neon', HYPERDRIVE_D1_02: binding }
+  const env = { W03_CONTENT_READ_DRIVER: 'neon', HYPERDRIVE_CONTENT_PG: binding }
   const first = getW03SeriesMemberReorderStore(env)
   const second = getW03SeriesMemberReorderStore(env)
   expect(first).toBeDefined()
@@ -542,15 +494,13 @@ it('provides and caches the Neon Series member-reorder writer while keeping D1 a
 
 
 
-it('provides and caches the Neon owner-scoped content revision reader on D1-02 Hyperdrive', async () => {
-  expect(getW03ContentRevisionReadStore({
-    D1_02: { prepare() { throw new Error('D1 should not be queried') } },
-  })).toBeUndefined()
+it('provides and caches the Neon owner-scoped content revision reader on content PostgreSQL Hyperdrive', async () => {
+  expect(() => getW03ContentRevisionReadStore({})).toThrow('W03_NEON_DRIVER_REQUIRED')
 
   const binding = {
     connectionString: 'postgresql://postgres:postgres@127.0.0.1:5432/luckread',
   }
-  const env = { W03_CONTENT_READ_DRIVER: 'neon', HYPERDRIVE_D1_02: binding }
+  const env = { W03_CONTENT_READ_DRIVER: 'neon', HYPERDRIVE_CONTENT_PG: binding }
   const first = getW03ContentRevisionReadStore(env)
   const second = getW03ContentRevisionReadStore(env)
 

@@ -98,6 +98,15 @@ for (const dir of dirs) {
   if (workerId === 'W05' && !w05NeonProduction) {
     throw new Error('W05 production must use both approved Neon Hyperdrive resources and no D1 bindings')
   }
+  const w03NeonProduction = workerId === 'W03' &&
+    config?.name === 'luckread-w03' &&
+    (config?.d1_databases ?? []).length === 0 &&
+    config.vars?.W03_CONTENT_READ_DRIVER === 'neon' &&
+    (config.hyperdrive ?? []).some((entry) =>
+      entry.binding === 'HYPERDRIVE_CONTENT_PG' && entry.id === 'c55183e1cc3446409c9c1075832c6615')
+  if (workerId === 'W03' && !w03NeonProduction) {
+    throw new Error('W03 production must use the approved Neon content PostgreSQL Hyperdrive and no D1 bindings')
+  }
   const w08NeonProduction = workerId === 'W08' &&
     config?.name === 'luckread-w08-creator' &&
     (config?.d1_databases ?? []).length === 0 &&

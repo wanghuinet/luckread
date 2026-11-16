@@ -11,11 +11,13 @@ import {
   verifyWorkerConfig,
 } from './verify-neon-worker-hyperdrive-staging.mjs'
 
-test('all six admitted Worker configs target the matching Neon Hyperdrive and match each expected D1 binding state', async () => {
+test('all six admitted Worker configs target Neon Hyperdrive and have the expected zero-D1 production bindings', async () => {
   const result = await inspectNeonWorkerHyperdriveStaging()
   assert.equal(result.status, 'SOURCE_CONFIG_STAGED_ONLY')
   assert.equal(result.stagedWorkerCount, 6)
   assert.equal(result.expectedD1BindingSetsVerified, true)
+  assert.deepEqual(result.workers.find((worker) => worker.worker === 'W03')?.d1FallbackBindings, [])
+  assert.equal(result.workers.find((worker) => worker.worker === 'W03')?.configuredDriver, 'neon')
   assert.deepEqual(result.workers.find((worker) => worker.worker === 'W05')?.d1FallbackBindings, [])
   assert.deepEqual(result.workers.find((worker) => worker.worker === 'W08')?.d1FallbackBindings, [])
   assert.equal(result.runtimeDriversEnabled, false)
@@ -37,7 +39,7 @@ test('rejects a Hyperdrive resource id that does not match the authoritative dom
   )
 })
 
-test('continues to require W07 rollback bindings while W05 is production D1-free', () => {
+test('rejects reintroducing W07 production D1 while W05 remains D1-free', () => {
   const expected = STAGED_WORKERS.find((worker) => worker.worker === 'W07')
   assert.throws(
     () => verifyWorkerConfig({
@@ -49,7 +51,17 @@ test('continues to require W07 rollback bindings while W05 is production D1-free
   )
 })
 
-test('requires W01/W02/W08 Neon mode with their approved production D1 binding sets', () => {
+test('requires W01/W02/W08 Neon mode with D1-free production deployment configs', () => {
+  const w01 = STAGED_WORKERS.find((worker) => worker.worker === 'W01')
+  const w01Config = {
+    name: w01.script,
+    d1_databases: [],
+    hyperdrive: [{ binding: w01.binding, id: w01.hyperdriveId }],
+    vars: { PAYLOAD_DATABASE_DRIVER: 'neon' },
+  }
+  assert.doesNotThrow(() => verifyWorkerConfig(w01Config, w01))
+  assert.deepEqual(verifyWorkerConfig(w01Config, w01).d1FallbackBindings, [])
+
   const w02 = STAGED_WORKERS.find((worker) => worker.worker === 'W02')
   const w02Config = {
     name: w02.script,
@@ -97,10 +109,10 @@ test('fails closed when a required Worker Wrangler file is missing', async () =>
   const root = await mkdtemp(path.join(os.tmpdir(), 'luckread-neon-hyperdrive-'))
   try {
     await mkdir(path.join(root, 'workers', 'W01-payload'), { recursive: true })
-    await writeFile(path.join(root, 'workers', 'W01-payload', 'wrangler.jsonc'), JSON.stringify({
+    await writeFile(path.join(root, 'workers', 'W01-payload', 'wrangler.neon.jsonc'), JSON.stringify({
       name: 'luckread-w01-payload',
       vars: { PAYLOAD_DATABASE_DRIVER: 'neon' },
-      d1_databases: [{ binding: 'D1' }],
+      d1_databases: [],
       hyperdrive: [{ binding: 'HYPERDRIVE', id: '0c53a1bb9bc0484bac146e8ae2d3158b' }],
     }))
     await assert.rejects(inspectNeonWorkerHyperdriveStaging(root), /ENOENT/)

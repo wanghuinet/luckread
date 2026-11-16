@@ -43,21 +43,26 @@ function fixture() {
       state: 'PUBLISHED' as const,
       updatedAt: '2026-11-15T12:00:00.000Z',
     })),
+    hasPublicCreatorContent: vi.fn(async () => true),
+    listPublishedMembersOnlyBodyReferences: vi.fn(async () => [
+      { owner_user_id: 'user_1', creator_id: 'creator_1' },
+    ]),
+  }
+  const mediaReadStore = {
+    listPublishedMediaReferences: vi.fn(async () => [{
+      id: 'member_media_1',
+      owner_user_id: 'user_1',
+      creator_id: 'creator_1',
+      content_type: 'post' as const,
+      access_mode: 'MEMBERS_ONLY' as const,
+    }]),
   }
   const worker = createW03ContentWorker({
     contentContextReadStoreProvider: () => store,
+    publishedMediaReferenceReadStoreProvider: () => mediaReadStore,
   })
-  const env = {
-    D1_02: {
-      prepare() {
-        throw new Error('D1 must not be queried when a Neon context store is selected')
-      },
-      batch() {
-        throw new Error('D1 must not be queried when a Neon context store is selected')
-      },
-    },
-  }
-  return { store, worker, env }
+  const env = {}
+  return { store, mediaReadStore, worker, env }
 }
 
 describe('W03 selected content-context read store routing', () => {
@@ -126,4 +131,28 @@ describe('W03 selected content-context read store routing', () => {
     expect(response.status).toBe(200)
     expect(f.store.getPublishedContentAuthorContext).toHaveBeenCalledWith('post_1')
   })
+  it('routes username redirect eligibility through the Neon context store', async () => {
+    const f = fixture()
+    const response = await f.worker.fetch(new Request(
+      'https://w03.internal/internal/content/username-redirect-eligibility/user_1',
+      { headers: { ...baseHeaders, 'X-LuckRead-Caller': 'W01' } },
+    ), f.env as never)
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({ data: { eligible: true } })
+    expect(f.store.hasPublicCreatorContent).toHaveBeenCalledWith('user_1')
+  })
+
+  it('routes published media reference checks through the Neon media store', async () => {
+    const f = fixture()
+    const response = await f.worker.fetch(new Request(
+      'https://w03.internal/internal/content/public-media-reference?url=' + encodeURIComponent('https://img.luckread.com/member/body.png'),
+      { headers: { ...baseHeaders, 'X-LuckRead-Caller': 'W01' } },
+    ), f.env as never)
+    expect(response.status).toBe(200)
+    expect(f.mediaReadStore.listPublishedMediaReferences).toHaveBeenCalledWith(['https://img.luckread.com/member/body.png'], 51)
+    await expect(response.json()).resolves.toMatchObject({
+      data: { isPublic: false, isMemberContent: true, allowed: false },
+    })
+  })
+
 })

@@ -7,11 +7,8 @@ export type PublishedMediaReferenceRecord = Readonly<{
 }>
 
 export type W03PublishedMediaReferenceRuntimeEnv = Readonly<{
-  D1_02?: PublishedMediaReferenceD1Database
-  /** Shared D1-02 read-driver switch; the legacy name remains supported. */
   W03_CONTENT_READ_DRIVER?: string
-  W03_PUBLIC_MEDIA_REFERENCE_DRIVER?: string
-  HYPERDRIVE_D1_02?: Readonly<{ connectionString?: string }>
+  HYPERDRIVE_CONTENT_PG?: Readonly<{ connectionString?: string }>
 }>
 
 export interface PublishedMediaReferenceReadStore {
@@ -54,52 +51,4 @@ export function normalizePublishedMediaReferenceLookup(
     return candidate.trim()
   }))]
   return { candidates: normalized, limit }
-}
-
-export interface PublishedMediaReferenceD1Database {
-  prepare(query: string): {
-    bind(...values: unknown[]): {
-      all<T>(): Promise<{ results?: T[] | null }>
-    }
-  }
-}
-
-/**
- * Production adapter. W03 remains on D1-02 until a separately approved
- * runtime cutover; this store preserves the existing D1 JSON1 lookup.
- */
-export function createD1PublishedMediaReferenceReadStore(
-  db: PublishedMediaReferenceD1Database,
-): PublishedMediaReferenceReadStore {
-  return {
-    async listPublishedMediaReferences(rawCandidates, rawLimit) {
-      const { candidates, limit } = normalizePublishedMediaReferenceLookup(rawCandidates, rawLimit)
-      if (candidates.length === 0) return []
-      const placeholders = candidates.map(() => '?').join(', ')
-      const sql = [
-        'SELECT id, owner_user_id, creator_id, content_type, access_mode',
-        'FROM contents',
-        "WHERE state = 'PUBLISHED'",
-        '  AND (',
-        '    body_ref IN (' + placeholders + ')',
-        '    OR cover_ref IN (' + placeholders + ')',
-        '    OR EXISTS (',
-        '      SELECT 1',
-        '      FROM json_each(contents.media_refs_json) AS media_ref',
-        '      WHERE media_ref.value IN (' + placeholders + ')',
-        '    )',
-        '  )',
-        'ORDER BY id ASC',
-        'LIMIT ?',
-      ].join('\n')
-      try {
-        const result = await db.prepare(sql)
-          .bind(...candidates, ...candidates, ...candidates, limit)
-          .all<PublishedMediaReferenceRecord>()
-        return result.results ?? []
-      } catch {
-        throw new PublishedMediaReferenceReadStoreError('QUERY_FAILED')
-      }
-    },
-  }
 }

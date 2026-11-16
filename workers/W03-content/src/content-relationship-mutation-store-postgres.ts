@@ -1,8 +1,10 @@
-import { ContentRuntimeError } from './content-runtime.js'
+import { ContentRuntimeError, decodeScopedCursor, encodeScopedCursor } from './content-runtime.js'
 import type {
   AppendPostThreadQueryRow,
   ContentRelationship,
   ContentRelationshipMutationStore,
+  ContentRelationshipDirection,
+  PublicContentRelationship,
   CreateRelationshipQueryRow,
   PostThreadChainStats,
   RevokeRelationshipQueryRow,
@@ -124,10 +126,91 @@ const withTransaction = async (
 }
 
 /** PostgreSQL persistence for creator-owned reference relationship mutations. */
+
+async function listNeonContentRelationships(
+  database: ContentRelationshipPostgresDatabase,
+  input: {
+    contentId: string
+    direction: ContentRelationshipDirection
+    cursor: string | null
+    limit: number
+  },
+): Promise<{ items: PublicContentRelationship[]; nextCursor: string | null; hasMore: boolean }> {
+  const contentId = input.contentId.trim()
+  if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(contentId) ||
+      !['out', 'in', 'both'].includes(input.direction) ||
+      !Number.isSafeInteger(input.limit) || input.limit < 1 || input.limit > 50) {
+    throw new ContentRuntimeError('VALIDATION_FAILED', 400)
+  }
+  const scope = JSON.stringify({ type: 'content-relationships', contentId, direction: input.direction })
+  const cursor = input.cursor ? decodeScopedCursor(input.cursor, scope) : null
+  const predicate = input.direction === 'out'
+    ? 'r.source_id = $1'
+    : input.direction === 'in'
+      ? 'r.target_id = $1'
+      : '(r.source_id = $1 OR r.target_id = $1)'
+  const projection = input.direction === 'out'
+    ? "t.id AS related_id, t.slug AS related_slug, t.content_type AS related_type, t.title AS related_title, 'out' AS relation_direction"
+    : input.direction === 'in'
+      ? "s.id AS related_id, s.slug AS related_slug, s.content_type AS related_type, s.title AS related_title, 'in' AS relation_direction"
+      : "CASE WHEN r.source_id = $1 THEN t.id ELSE s.id END AS related_id, CASE WHEN r.source_id = $1 THEN t.slug ELSE s.slug END AS related_slug, CASE WHEN r.source_id = $1 THEN t.content_type ELSE s.content_type END AS related_type, CASE WHEN r.source_id = $1 THEN t.title ELSE s.title END AS related_title, CASE WHEN r.source_id = $1 THEN 'out' ELSE 'in' END AS relation_direction"
+  const values: unknown[] = [contentId]
+  const cursorClause = cursor
+    ? 'AND (r.created_at < $2::timestamptz OR (r.created_at = $2::timestamptz AND r.relationship_id < $3))'
+    : ''
+  if (cursor) values.push(cursor.updatedAt, cursor.id)
+  const limitParameter = values.length + 1
+  values.push(input.limit + 1)
+  try {
+    const result = await database.query<{
+      relationship_id: string
+      relation_type: 'reference'
+      created_at: Date | string
+      related_id: string
+      related_slug: string
+      related_type: 'article' | 'post' | 'video'
+      related_title: string
+      relation_direction: 'out' | 'in'
+    }>(
+      'SELECT r.relationship_id, r.relation_type, r.created_at, ' + projection +
+      ' FROM content_relationships r JOIN contents s ON s.id = r.source_id JOIN contents t ON t.id = r.target_id' +
+      " WHERE r.status = 'ACTIVE' AND s.state = 'PUBLISHED' AND t.state = 'PUBLISHED' AND r.relation_type = 'reference' AND " +
+      predicate + ' ' + cursorClause +
+      ' ORDER BY r.created_at DESC, r.relationship_id DESC LIMIT $' + limitParameter,
+      values,
+    )
+    const page = result.rows.slice(0, input.limit)
+    const last = page.at(-1)
+    return {
+      items: page.map(row => ({
+        relationshipId: row.relationship_id,
+        relationType: row.relation_type,
+        direction: row.relation_direction,
+        relatedContent: {
+          id: row.related_id,
+          slug: row.related_slug,
+          contentType: row.related_type,
+          title: row.related_title,
+        },
+        createdAt: timestampString(row.created_at) as string,
+      })),
+      hasMore: result.rows.length > input.limit,
+      nextCursor: result.rows.length > input.limit && last
+        ? encodeScopedCursor(timestampString(last.created_at) as string, last.relationship_id, scope)
+        : null,
+    }
+  } catch (error) {
+    return mapFailure(error)
+  }
+}
+
 export function createPostgresContentRelationshipMutationStore(
   database: ContentRelationshipPostgresDatabase,
 ): ContentRelationshipMutationStore {
   return {
+    async list(input) {
+      return listNeonContentRelationships(database, input)
+    },
     async loadCreate(input) {
       try {
         const result = await database.query<PostgresCreateRelationshipRow>(
