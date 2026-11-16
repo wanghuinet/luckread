@@ -85,9 +85,9 @@ function getW07PostgresPool(
 }
 
 /**
- * Neon composition for the W07 D1-04 Hyperdrive binding. The same bounded
- * pool is shared by the payment-method store and the signed-webhook database
- * bridge. D1 remains the default when W07_DATABASE_DRIVER is unset.
+ * Neon composition for the W07 D1-04 domain. The same bounded Hyperdrive pool
+ * is shared by payment-method reads, order creation and signed-webhook writes.
+ * D1 compatibility is available only for explicit local/test profiles.
  */
 export function getW07PaymentMethodReadStore(
   env: W07PaymentMethodReadRuntimeEnv,
