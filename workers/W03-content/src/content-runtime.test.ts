@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 import { canTransitionContentState, ContentRuntimeError, type ContentRecord, createContent, createRequestId, deleteContent, getContent, decodeContentListCursor, decodeCursor, decodeScopedCursor, encodeContentListCursor, encodeCursor, encodeScopedCursor, isState, listContents, listPublishedContentsByIds, listContentRevisions, listCreatorContents, listDueScheduledContentCandidates, publishAuthorizedScheduledContents, publicContent, toErrorResponse, transitionContentState, updateContent, validateInput, validateListFilters } from './content-runtime.js'
-import w03Worker, { hasCreatorContentPermission, hasSocialPostPermission, parseListLimit } from './index.js'
+import w03Worker, { createW03ContentWorker, hasCreatorContentPermission, hasSocialPostPermission, parseListLimit } from './index.js'
 
 describe('W03 content contract core', () => {
 
@@ -1631,30 +1631,17 @@ describe('W03 content contract core', () => {
   })
 
   it('serves scheduled due candidates only to the credential-free W01 background transport', async () => {
-    let query = ''
-    let databaseReads = 0
-    const db = {
-      prepare(sql: string) {
-        query = sql
-        return {
-          bind: () => ({
-            all: async () => {
-              databaseReads++
-              return { results: [{
-                id: 'scheduled_route_1',
-                owner_user_id: 'owner_1',
-                creator_id: 'creator_1',
-                version: 3,
-                scheduled_at: '2026-10-08T12:00:00.000Z',
-              }] }
-            },
-          }),
-        }
-      },
-    }
+    let storeReads = 0
+    const neonWorker = createW03ContentWorker({
+      contentMutationStoreProvider: () => ({
+        listDueScheduled: async () => {
+          storeReads += 1
+          return [{ contentId: 'scheduled_route_1', ownerUserId: 'owner_1', creatorId: 'creator_1', version: 3, scheduledAt: '2026-10-08T12:00:00.000Z' }]
+        },
+      } as never),
+    })
     const limiter = { limit: async () => ({ success: true }) }
     const env = {
-      D1_02: db,
       CONTENT_ORIGIN_GLOBAL_LIMITER: limiter,
       CONTENT_PUBLIC_READ_LIMITER: limiter,
       CONTENT_MUTATION_LIMITER: limiter,
@@ -1666,7 +1653,7 @@ describe('W03 content contract core', () => {
       'X-LuckRead-Rate-Key': 'scheduled-publish',
     }
 
-    const response = await w03Worker.fetch(
+    const response = await neonWorker.fetch(
       new Request('https://luckread-w03.internal/internal/content/scheduled-due?limit=50', { headers }),
       env,
     )
@@ -1681,8 +1668,7 @@ describe('W03 content contract core', () => {
         }],
       },
     })
-    expect(query).toContain("state = 'SCHEDULED'")
-    expect(databaseReads).toBe(1)
+    expect(storeReads).toBe(1)
 
     const denied = await w03Worker.fetch(
       new Request('https://luckread-w03.internal/internal/content/scheduled-due?limit=50', {
@@ -1691,31 +1677,26 @@ describe('W03 content contract core', () => {
       env,
     )
     expect(denied.status).toBe(403)
-    expect(databaseReads).toBe(1)
+    expect(storeReads).toBe(1)
   })
 
   it('routes W08 authorization evidence to the final W03 compare-and-set', async () => {
-    const updates: Array<{ sql: string; bindings: unknown[] }> = []
-    const db = {
-      prepare(sql: string) {
-        return {
-          bind(...bindings: unknown[]) {
-            updates.push({ sql, bindings })
-            return { sql, bindings }
-          },
-        }
-      },
-      batch: async (statements: Array<{ sql: string }>) =>
-        statements.map(() => ({ meta: { changes: 1 } })),
-    }
+    const published: unknown[] = []
+    const neonWorker = createW03ContentWorker({
+      contentMutationStoreProvider: () => ({
+        publishScheduled: async (candidates: readonly unknown[]) => {
+          published.push(...candidates)
+          return candidates.length
+        },
+      } as never),
+    })
     const limiter = { limit: async () => ({ success: true }) }
     const env = {
-      D1_02: db,
       CONTENT_ORIGIN_GLOBAL_LIMITER: limiter,
       CONTENT_PUBLIC_READ_LIMITER: limiter,
       CONTENT_MUTATION_LIMITER: limiter,
     } as never
-    const response = await w03Worker.fetch(
+    const response = await neonWorker.fetch(
       new Request('https://luckread-w03.internal/internal/content/scheduled-publish/commit', {
         method: 'POST',
         headers: {
@@ -1751,11 +1732,8 @@ describe('W03 content contract core', () => {
     await expect(response.json()).resolves.toMatchObject({
       data: { scanned: 1, authorized: 1, published: 1, rejected: 0 },
     })
-    expect(updates).toHaveLength(1)
-    expect(updates[0]?.sql).toContain('owner_user_id = ?')
-    expect(updates[0]?.sql).toContain('creator_id = ?')
-    expect(updates[0]?.sql).toContain("state = 'SCHEDULED'")
-    expect(updates[0]?.sql).toContain('version = ?')
+    expect(published).toHaveLength(1)
+    expect(published[0]).toMatchObject({ contentId: 'scheduled_route_2', ownerUserId: 'owner_2', creatorId: 'creator_2', version: 2 })
   })
 
   it('requires at least one media reference for video content', () => {
