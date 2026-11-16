@@ -675,7 +675,7 @@ export function getW03CreatorContentsReadStore(
   creatorContentsStores.set(binding, store)
   return store
 }
- 
+
 /** PostgreSQL provider for owner-scoped content revision history reads. */
 export function getW03ContentRevisionReadStore(
   env: W03PublicMediaReferenceRuntimeEnv,
