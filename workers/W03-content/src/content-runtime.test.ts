@@ -2470,10 +2470,17 @@ describe('1.1 content revision history', () => {
 
     const updateIndex = runtime.indexOf('UPDATE contents')
     const updateGuard = runtime.indexOf('atomicGuard(db)', updateIndex)
-    const updateRevision = runtime.indexOf("operation: 'UPDATE'", updateIndex)
+    const updateRevision = runtime.indexOf('const revision: ContentRevision = {')
+    const updateRevisionOperation = runtime.indexOf("operation: 'UPDATE'", updateRevision)
+    const updateRevisionWrite = runtime.indexOf('insertRevision(db, revision)', updateGuard)
     expect(updateIndex).toBeGreaterThanOrEqual(0)
     expect(updateGuard).toBeGreaterThan(updateIndex)
-    expect(updateRevision).toBeGreaterThan(updateGuard)
+    // The immutable revision payload is prepared before the write, but D1 persists it
+    // after the CAS guard in the same atomic batch. The Neon store persists the same
+    // payload in its own CAS + idempotency + revision transaction.
+    expect(updateRevision).toBeGreaterThanOrEqual(0)
+    expect(updateRevisionOperation).toBeGreaterThan(updateRevision)
+    expect(updateRevisionWrite).toBeGreaterThan(updateGuard)
 
     const rollbackIndex = runtime.indexOf('export async function rollbackContentRevision')
     expect(runtime.indexOf('UPDATE contents', rollbackIndex)).toBeGreaterThanOrEqual(rollbackIndex)
