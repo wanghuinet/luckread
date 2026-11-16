@@ -9,16 +9,12 @@ import {
 } from './moderation-database-runtime.js'
 
 describe('W06 moderation database runtime admission', () => {
-  it('selects the existing D1-03 Neon Hyperdrive and preserves D1 rollback plus existing bindings', () => {
+  it('selects the Neon Hyperdrive with no production D1 binding and preserves existing service/queue bindings', () => {
     const config = JSON.parse(readFileSync(new URL('../../wrangler.neon.jsonc', import.meta.url), 'utf8'))
-    const d1 = (config.d1_databases ?? []).find((binding: { binding?: string }) => binding.binding === 'D1_03')
+    expect(config.d1_databases ?? []).toEqual([])
     const hyperdrive = (config.hyperdrive ?? []).find((binding: { binding?: string }) => binding.binding === 'HYPERDRIVE_D1_03')
 
     expect(config.vars?.W06_MODERATION_DATABASE_DRIVER).toBe('neon')
-    expect(d1).toMatchObject({
-      database_name: 'secondary',
-      database_id: 'bda1d247-a371-4244-91ae-aef96034db7f',
-    })
     expect(hyperdrive).toEqual({
       binding: 'HYPERDRIVE_D1_03',
       id: '7c8831416c18494faee04b96aa551cb9',
