@@ -18,6 +18,21 @@ describe('W09 AuditEvent PostgreSQL adapter', () => {
     })
   })
 
+  it('does not confuse AuditEvent text values with SQL mutation keywords or table references', () => {
+    expect(translate(
+      "INSERT INTO audit_events (event_id, action) VALUES (?, 'UPDATE a different table')",
+    )).toEqual({
+      sql: "INSERT INTO audit_events (event_id, action) VALUES ($1, 'UPDATE a different table')",
+      extraValues: [],
+    })
+    expect(translate(
+      "SELECT event_id FROM audit_events WHERE reason = 'FROM moderation_cases' AND event_id = ?",
+    )).toEqual({
+      sql: "SELECT event_id FROM audit_events WHERE reason = 'FROM moderation_cases' AND event_id = $1",
+      extraValues: [],
+    })
+  })
+
   it('translates direct AuditEvent INSERT placeholders without changing append-only semantics', () => {
     const result = translate(
       'INSERT INTO audit_events (event_id, action, target_type) VALUES (?, ?, ?)',
