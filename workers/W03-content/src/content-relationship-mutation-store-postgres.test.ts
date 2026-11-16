@@ -294,7 +294,7 @@ describe('W03 Neon content relationship mutation store', () => {
       d1 as never,
       'user_123',
       'content_source',
-      relationship.relationshipId,
+      created.relationshipId,
       'neon-revoke-reference-key',
       now,
       store,
