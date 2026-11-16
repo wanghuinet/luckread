@@ -350,7 +350,6 @@ describe('subscription runtime', () => {
     })
     const response = await w07.fetch(request, {
       D1_01: fakeDb([], [
-      D1_04: {} as D1Database,
         activePlan('plan_creator_one', { owner_id: 'creator_one' }),
         activePlan('plan_creator_two', { owner_id: 'creator_two' }),
         activePlan('plan_creator_two_private', {
@@ -359,6 +358,7 @@ describe('subscription runtime', () => {
           visibility: 'PRIVATE',
         }),
       ]),
+      D1_04: {} as D1Database,
       SUBSCRIPTION_ORIGIN_GLOBAL_LIMITER: allowLimiter,
       SUBSCRIPTION_READ_LIMITER: allowLimiter,
       SUBSCRIPTION_WRITE_LIMITER: allowLimiter,
