@@ -12,6 +12,7 @@ on:
       - 'workers/W02-identity/package.json'
       - 'workers/W02-identity/wrangler.jsonc'
       - 'workers/W02-identity/wrangler.neon.jsonc'
+      - 'workers/W02-identity/wrangler.neon.jsonc'
       - 'workers/W02-identity/migrations/0006_better_auth_two_factor.sql'
       - 'workers/W02-identity/migrations/0007_l8_genesis_bootstrap_audit.sql'
       - 'workers/W02-identity/migrations/0008_auth_007_mfa_publication_journal.sql'
@@ -60,6 +61,7 @@ on:
       - 'workers/W02-identity/src/neon/**'
       - 'workers/W02-identity/package.json'
       - 'workers/W02-identity/wrangler.jsonc'
+      - 'workers/W02-identity/wrangler.neon.jsonc'
       - 'workers/W02-identity/wrangler.neon.jsonc'
       - 'workers/W02-identity/migrations/0008_auth_007_mfa_publication_journal.sql'
       - 'workers/W02-identity/migrations/0009_auth_007_mfa_operation_receipts.sql'
@@ -118,7 +120,7 @@ jobs:
         run: |
           node --input-type=module <<'NODE'
           import fs from 'node:fs'
-          const config = JSON.parse(fs.readFileSync('workers/W02-identity/wrangler.jsonc', 'utf8'))
+          const config = JSON.parse(fs.readFileSync('workers/W02-identity/wrangler.neon.jsonc', 'utf8'))
           const actual = new Map((config.ratelimits ?? []).map(binding => [binding.name, binding]))
           const expected = [
             ['AUTH_SESSION_READ_LIMITER', '2026100312', 300],
