@@ -20,6 +20,8 @@ import {
   createPostgresCollectionListReadStore,
 } from '../content-collections-read-store-postgres.js'
 import type { CollectionListReadStore } from '../content-collections.js'
+import { createPostgresCollectionCreateStore, type CollectionCreatePostgresDatabase } from '../content-collections-create-store-postgres.js'
+import type { CollectionCreateStore } from '../content-collections.js'
 import {
   createPostgresSeriesReadStore,
 } from '../content-series-read-store-postgres.js'
@@ -48,6 +50,7 @@ const followingContentsStores = new WeakMap<object, FollowingOwnerContentsReadSt
 const postThreadStores = new WeakMap<object, PostThreadReadStore>()
 const contentContextStores = new WeakMap<object, ContentContextReadStore>()
 const collectionListStores = new WeakMap<object, CollectionListReadStore>()
+const collectionCreateStores = new WeakMap<object, CollectionCreateStore>()
 const seriesStores = new WeakMap<object, SeriesReadStore>()
 const membersStores = new WeakMap<object, {
   series: SeriesMembersReadStore
@@ -248,6 +251,26 @@ export function getW03CollectionListReadStore(
     getW03PublicMediaReferencePostgresPool(env),
   )
   collectionListStores.set(binding, store)
+  return store
+}
+
+/** PostgreSQL writer for the existing creator-owned collection create operation. */
+export function getW03CollectionCreateStore(
+  env: W03PublicMediaReferenceRuntimeEnv,
+): CollectionCreateStore | undefined {
+  if (resolveW03PublicMediaReferenceDriver(env) === 'd1') return undefined
+
+  const binding = env.HYPERDRIVE_D1_02
+  if (!binding || typeof binding !== 'object') {
+    throw new Error('W03_HYPERDRIVE_D1_02_BINDING_REQUIRED')
+  }
+  const cached = collectionCreateStores.get(binding)
+  if (cached) return cached
+
+  const store = createPostgresCollectionCreateStore(
+    getW03PublicMediaReferencePostgresPool(env) as unknown as CollectionCreatePostgresDatabase,
+  )
+  collectionCreateStores.set(binding, store)
   return store
 }
 
