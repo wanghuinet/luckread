@@ -114,6 +114,26 @@ export interface ContentRow {
   updated_at: string
 }
 
+export type PublicContentKeysetCursor = Readonly<{
+  createdAt: string
+  id: string
+}>
+
+export interface PublicContentListReadStore {
+  list(input: Readonly<{
+    cursor: PublicContentKeysetCursor | null
+    limit: number
+    creatorId: string | null
+    ownerUserId: string | null
+    contentType: ContentType | null
+  }>): Promise<readonly ContentRow[]>
+  search(input: Readonly<{
+    query: string
+    cursor: PublicContentKeysetCursor | null
+    limit: number
+  }>): Promise<readonly ContentRow[]>
+}
+
 export interface PublishedContentsByIdsReadStore {
   /** Return the published rows in the same order as the supplied IDs. */
   list(contentIds: readonly string[]): Promise<readonly ContentRow[]>
@@ -1215,6 +1235,7 @@ export async function listContents(
   creatorId: string | null = null,
   contentType: ContentType | null = null,
   ownerUserId: string | null = null,
+  readStore?: PublicContentListReadStore,
 ): Promise<{ items: ContentRecord[]; nextCursor: string | null; hasMore: boolean }> {
   const pageSize = Math.min(Math.max(Number.isSafeInteger(limit) ? limit : 20, 1), 50)
   if (creatorId) assertResourceId(creatorId)
@@ -1245,17 +1266,25 @@ export async function listContents(
     bindings.push(decoded.createdAt, decoded.createdAt, decoded.id)
   }
 
-  const rows = await db.prepare(
-    `SELECT id, content_type, owner_user_id, creator_id, ip_id, state, scheduled_at, access_mode, version, revision,
-            slug, title, body_ref, media_refs_json, cover_ref, media_warning, etag, created_at, updated_at
-       FROM contents
-      WHERE ${conditions.join(' AND ')}
-      ORDER BY created_at DESC, id DESC
-      LIMIT ?`,
-  ).bind(...bindings, pageSize + 1).all<ContentRow>()
+  const rows = readStore
+    ? await readStore.list({
+      cursor: decoded,
+      limit: pageSize + 1,
+      creatorId,
+      ownerUserId,
+      contentType,
+    })
+    : (await db.prepare(
+      `SELECT id, content_type, owner_user_id, creator_id, ip_id, state, scheduled_at, access_mode, version, revision,
+              slug, title, body_ref, media_refs_json, cover_ref, media_warning, etag, created_at, updated_at
+         FROM contents
+        WHERE ${conditions.join(' AND ')}
+        ORDER BY created_at DESC, id DESC
+        LIMIT ?`,
+    ).bind(...bindings, pageSize + 1).all<ContentRow>()).results
 
-  const hasMore = rows.results.length > pageSize
-  const page = rows.results.slice(0, pageSize).map(toContent)
+  const hasMore = rows.length > pageSize
+  const page = rows.slice(0, pageSize).map(toContent)
   const last = page.at(-1)
   return {
     items: page,
@@ -1275,6 +1304,7 @@ export async function searchPublishedContents(
   queryValue: string,
   cursorValue: string | null,
   limit: number,
+  readStore?: PublicContentListReadStore,
 ): Promise<{ items: ContentRecord[]; nextCursor: string | null; hasMore: boolean }> {
   const query = queryValue.normalize('NFKC').trim()
   if (!query || query.length > 256) {
@@ -1294,19 +1324,25 @@ export async function searchPublishedContents(
     ? [decoded.updatedAt, decoded.updatedAt, decoded.id]
     : []
 
-  const rows = await db.prepare(`
-    SELECT id, content_type, owner_user_id, creator_id, ip_id, state, scheduled_at, access_mode,
-           version, revision, slug, title, body_ref, media_refs_json, cover_ref, media_warning,
-           etag, created_at, updated_at
-      FROM contents
-     WHERE state = 'PUBLISHED'
-       AND (instr(lower(title), lower(?)) > 0 OR instr(lower(slug), lower(?)) > 0)
-       ${cursorClause}
-     ORDER BY created_at DESC, id DESC
-     LIMIT ?`).bind(query, query, ...cursorBindings, pageSize + 1).all<ContentRow>()
+  const rows = readStore
+    ? await readStore.search({
+      query,
+      cursor: decoded ? { createdAt: decoded.updatedAt, id: decoded.id } : null,
+      limit: pageSize + 1,
+    })
+    : (await db.prepare(`
+      SELECT id, content_type, owner_user_id, creator_id, ip_id, state, scheduled_at, access_mode,
+             version, revision, slug, title, body_ref, media_refs_json, cover_ref, media_warning,
+             etag, created_at, updated_at
+        FROM contents
+       WHERE state = 'PUBLISHED'
+         AND (instr(lower(title), lower(?)) > 0 OR instr(lower(slug), lower(?)) > 0)
+         ${cursorClause}
+       ORDER BY created_at DESC, id DESC
+       LIMIT ?`).bind(query, query, ...cursorBindings, pageSize + 1).all<ContentRow>()).results
 
-  const hasMore = rows.results.length > pageSize
-  const items = rows.results.slice(0, pageSize).map(toContent)
+  const hasMore = rows.length > pageSize
+  const items = rows.slice(0, pageSize).map(toContent)
   const last = items.at(-1)
   return {
     items,
