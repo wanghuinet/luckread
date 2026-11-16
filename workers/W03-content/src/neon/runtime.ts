@@ -11,6 +11,7 @@ import type {
   PublishedContentsByIdsReadStore,
   ContentCreateStore,
   ContentMutationStore,
+  ContentRevisionReadStore,
 } from '../content-runtime.js'
 import { createPostgresPublishedMediaReferenceReadStore } from '../published-media-reference-read-store-postgres.js'
 import { createPostgresPublishedContentsByIdsReadStore } from '../published-contents-by-ids-read-store-postgres.js'
@@ -43,6 +44,7 @@ import {
 } from '../content-members-read-store-postgres.js'
 import { createPostgresContentDetailReadStore } from '../content-detail-read-store-postgres.js'
 import { createPostgresCreatorContentsReadStore } from '../creator-contents-read-store-postgres.js'
+import { createPostgresContentRevisionReadStore } from '../content-revision-read-store-postgres.js'
 import type {
   SeriesMembersReadStore,
   SeriesMemberAttachStore,
@@ -102,6 +104,7 @@ const membersStores = new WeakMap<object, {
 }>()
 const contentDetailStores = new WeakMap<object, ContentDetailReadStore>()
 const creatorContentsStores = new WeakMap<object, CreatorContentsReadStore>()
+const contentRevisionStores = new WeakMap<object, ContentRevisionReadStore>()
 
 /**
  * The explicit D1-02 content read driver controls only the PostgreSQL read
@@ -672,3 +675,24 @@ export function getW03CreatorContentsReadStore(
   creatorContentsStores.set(binding, store)
   return store
 }
+ 
+/** PostgreSQL provider for owner-scoped content revision history reads. */
+export function getW03ContentRevisionReadStore(
+  env: W03PublicMediaReferenceRuntimeEnv,
+): ContentRevisionReadStore | undefined {
+  if (resolveW03PublicMediaReferenceDriver(env) === 'd1') return undefined
+
+  const binding = env.HYPERDRIVE_D1_02
+  if (!binding || typeof binding !== 'object') {
+    throw new Error('W03_HYPERDRIVE_D1_02_BINDING_REQUIRED')
+  }
+  const cached = contentRevisionStores.get(binding)
+  if (cached) return cached
+
+  const store = createPostgresContentRevisionReadStore(
+    getW03PublicMediaReferencePostgresPool(env),
+  )
+  contentRevisionStores.set(binding, store)
+  return store
+}
+
