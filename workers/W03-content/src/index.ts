@@ -1549,6 +1549,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
           requireIdempotency(request),
           new Date(),
           { scheduledAt: requestedScheduledAt, preflight: body.preflight, verifiedCreatorId },
+          dependencies.contentMutationStoreProvider?.(env),
         )
         return json({ ...result, requestId: createRequestId() })
       }
