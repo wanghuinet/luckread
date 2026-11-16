@@ -86,7 +86,8 @@ jobs:
           import fs from 'node:fs'
           const read = (path) => JSON.parse(fs.readFileSync(path, 'utf8'))
           const w01 = read('workers/W01-payload/wrangler.jsonc')
-          const w02 = read('workers/W02-identity/wrangler.jsonc')
+          const w02Source = read('workers/W02-identity/wrangler.jsonc')
+          const w02 = read('workers/W02-identity/wrangler.neon.jsonc')
           const w08 = read('workers/W08-creator/wrangler.jsonc')
           const bootstrap = read('contracts/database/neon-five-domain-schema-bootstrap.v1.json')
           const d101 = (bootstrap.domains || []).find((item) => item.domainId === 'D1-01')
@@ -119,7 +120,11 @@ jobs:
             throw new Error('D1-01 Worker identities changed')
           }
           assertBinding(w01, 'D1', 'W01')
-          assertBinding(w02, 'D1_01', 'W02')
+          const w02HistoricalD1 = (w02Source.d1_databases || []).find((item) => item.binding === 'D1_01')
+          if (!w02HistoricalD1 || w02HistoricalD1.database_name !== 'luckread' || w02HistoricalD1.database_id !== databaseId) {
+            throw new Error('W02 historical D1-01 migration source mapping drifted')
+          }
+          if ((w02.d1_databases || []).length !== 0) throw new Error('W02 production config must not bind Cloudflare D1')
           if ((w08.d1_databases || []).length !== 0) throw new Error('W08 production config must not bind D1')
           assertNeon(w01, 'W01', 'PAYLOAD_DATABASE_DRIVER')
           assertNeon(w02, 'W02', 'W02_DATABASE_DRIVER')
@@ -134,7 +139,7 @@ jobs:
             throw new Error('W08 W02_AUTH Service Binding mismatch')
           }
           console.log('D1_01_W01_W02_W08_NEON_RUNTIME_CONFIG=PASS')
-          console.log('W01_W02_D1_ROLLBACK_BINDINGS=PRESERVED; W08_PRODUCTION_D1_BINDINGS=NONE')
+          console.log('W01_D1_SOURCE_BINDING=PRESERVED; W02_PRODUCTION_D1_BINDINGS=NONE; W08_PRODUCTION_D1_BINDINGS=NONE')
           NODE
 
 
@@ -302,15 +307,15 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p ../../artifacts/mapping-0
-          npx --yes wrangler@4.156.0 deploy --config wrangler.jsonc 2>&1 | tee ../../artifacts/mapping-0/w02-email-auth-deploy.log
+          npx --yes wrangler@4.156.0 deploy --config wrangler.neon.jsonc 2>&1 | tee ../../artifacts/mapping-0/w02-email-auth-deploy.log
           version_id="$(sed -n 's/.*Current Version ID: //p' ../../artifacts/mapping-0/w02-email-auth-deploy.log | tail -n 1)"
           if [ -z "$version_id" ]; then
             echo "Wrangler did not return a W02 Worker Version ID; refusing to report a deployment."
             exit 1
           fi
           echo "W02_UPLOADED_VERSION_ID=$version_id"
-          npx --yes wrangler@4.156.0 versions deploy "$version_id@100%" --name luckread-w02 --config wrangler.jsonc --yes
-          npx --yes wrangler@4.156.0 deployments list --name luckread-w02 --config wrangler.jsonc
+          npx --yes wrangler@4.156.0 versions deploy "$version_id@100%" --name luckread-w02 --config wrangler.neon.jsonc --yes
+          npx --yes wrangler@4.156.0 deployments list --name luckread-w02 --config wrangler.neon.jsonc
 
       - name: Deploy W08 Creator Worker
         if: ${{ inputs.confirm == 'DEPLOY_BINDING_AND_W08_CREATOR' }}
