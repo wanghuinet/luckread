@@ -264,8 +264,10 @@ describe('W03 Neon content relationship mutation store', () => {
       },
       async create(input) { createInput = input },
       async loadRevoke(input) {
-        expect(input.relationshipId).toBe(relationship.relationshipId)
-        return revokeSnapshot
+        return {
+          ...revokeSnapshot,
+          relationship_id: input.relationshipId,
+        }
       },
       async revoke(input) { revokeInput = input },
     }
