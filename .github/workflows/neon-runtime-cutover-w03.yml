@@ -10,6 +10,8 @@ on:
       - 'workers/W03-content/src/content-collections.ts'
       - 'workers/W03-content/src/content-create-store-postgres.ts'
       - 'workers/W03-content/src/content-create-postgres.test.ts'
+      - 'workers/W03-content/src/content-mutation-store-postgres.ts'
+      - 'workers/W03-content/src/content-mutation-postgres.test.ts'
       - 'workers/W03-content/src/content-collections-read-store-postgres.ts'
       - 'workers/W03-content/src/content-collections-create-store-postgres.ts'
       - 'workers/W03-content/src/content-collections-update-store-postgres.ts'
@@ -93,6 +95,7 @@ jobs:
             ['contentContextReadStoreProvider', 'getW03ContentContextReadStore'],
             ['collectionListReadStoreProvider', 'getW03CollectionListReadStore'],
             ['contentCreateStoreProvider', 'getW03ContentCreateStore'],
+            ['contentMutationStoreProvider', 'getW03ContentMutationStore'],
             ['collectionCreateStoreProvider', 'getW03CollectionCreateStore'],
             ['collectionUpdateStoreProvider', 'getW03CollectionUpdateStore'],
             ['collectionDeleteStoreProvider', 'getW03CollectionDeleteStore'],
@@ -114,7 +117,7 @@ jobs:
               throw new Error('W03 Neon provider wiring is incomplete: ' + provider)
             }
           }
-          if (!runtime.includes('Content creation plus Collection creation, update, delete, member attachment, member removal, and member reorder plus Series creation, update, delete, member attachment, and member removal are the only Neon-backed mutations in these slices; all other W03 reads and mutations remain on D1_02')) {
+          if (!runtime.includes('Content creation, update, and delete plus Collection creation, update, delete, member attachment, member removal, and member reorder plus Series creation, update, delete, member attachment, and member removal are the only Neon-backed mutations in these slices; all other W03 reads and mutations remain on D1_02')) {
             throw new Error('W03 Neon collection mutation boundary declaration is missing')
           }
           console.log('W03_NEON_READ_PROJECTION_CUTOVER_CONFIG=PASS')
