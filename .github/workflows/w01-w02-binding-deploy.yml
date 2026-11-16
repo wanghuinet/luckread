@@ -74,12 +74,12 @@ jobs:
               echo "W08 Creator deployment was confirmed, but source_sha does not contain W08 Creator files."
               exit 1
             fi
-            node --input-type=module -e 'import fs from "node:fs"; const w01=JSON.parse(fs.readFileSync("workers/W01-payload/wrangler.jsonc","utf8")); const w08=JSON.parse(fs.readFileSync("workers/W08-creator/wrangler.jsonc","utf8")); const binding=(w08.d1_databases||[]).find((x)=>x.binding==="D1_01"); const ingress=(w01.services||[]).find((x)=>x.binding==="W08_CREATOR"); if(w08.name!=="luckread-w08-creator") throw new Error("W08 worker identity mismatch"); if(!binding||binding.database_name!=="luckread"||binding.database_id!=="2f80471e-3756-49f9-8db1-7707a433ad64") throw new Error("W08 must reuse existing D1-01"); if(!ingress||ingress.service!=="luckread-w08-creator") throw new Error("W01 W08_CREATOR binding mismatch"); if(!fs.existsSync("workers/W08-creator/migrations/0001_creator_authorization.sql")) throw new Error("W08 migration missing"); console.log("W08_D1_01_REUSE=PASS"); console.log("W01_W08_BINDING=PASS");'
+            node --input-type=module -e 'import fs from "node:fs"; const w01=JSON.parse(fs.readFileSync("workers/W01-payload/wrangler.jsonc","utf8")); const w08=JSON.parse(fs.readFileSync("workers/W08-creator/wrangler.jsonc","utf8")); const ingress=(w01.services||[]).find((x)=>x.binding==="W08_CREATOR"); const hyperdrive=(w08.hyperdrive||[]).find((x)=>x.binding==="HYPERDRIVE"); if(w08.name!=="luckread-w08-creator") throw new Error("W08 worker identity mismatch"); if((w08.d1_databases||[]).length!==0||w08.vars?.W08_DATABASE_DRIVER!=="neon") throw new Error("W08 production must be Neon-only"); if(!hyperdrive||hyperdrive.id!=="0c53a1bb9bc0484bac146e8ae2d3158b") throw new Error("W08 Neon Hyperdrive mismatch"); if(!ingress||ingress.service!=="luckread-w08-creator") throw new Error("W01 W08_CREATOR binding mismatch"); if(!fs.existsSync("workers/W08-creator/migrations/0001_creator_authorization.sql")) throw new Error("W08 source migration evidence missing"); console.log("W08_NEON_ONLY_RUNTIME=PASS"); console.log("W01_W08_BINDING=PASS");'
           else
             echo "W08 Creator deployment not requested; migration and deployment will be skipped."
           fi
 
-      - name: Verify coordinated D1-01 Neon runtime selectors and preserve D1 rollback bindings
+      - name: Verify coordinated D1-01 Neon runtime selectors and the W08 D1-free production config
         run: |
           set -euo pipefail
           node --input-type=module <<'NODE'
@@ -120,7 +120,7 @@ jobs:
           }
           assertBinding(w01, 'D1', 'W01')
           assertBinding(w02, 'D1_01', 'W02')
-          assertBinding(w08, 'D1_01', 'W08')
+          if ((w08.d1_databases || []).length !== 0) throw new Error('W08 production config must not bind D1')
           assertNeon(w01, 'W01', 'PAYLOAD_DATABASE_DRIVER')
           assertNeon(w02, 'W02', 'W02_DATABASE_DRIVER')
           assertNeon(w08, 'W08', 'W08_DATABASE_DRIVER')
@@ -134,7 +134,7 @@ jobs:
             throw new Error('W08 W02_AUTH Service Binding mismatch')
           }
           console.log('D1_01_W01_W02_W08_NEON_RUNTIME_CONFIG=PASS')
-          console.log('D1_01_D1_ROLLBACK_BINDINGS=PRESERVED')
+          console.log('W01_W02_D1_ROLLBACK_BINDINGS=PRESERVED; W08_PRODUCTION_D1_BINDINGS=NONE')
           NODE
 
 
@@ -294,14 +294,6 @@ jobs:
           git diff --exit-code -- workers/W02-identity/migrations/0001_role_assignments.sql
           git diff --exit-code -- workers/W02-identity/migrations/0003_role_authorization_versions.sql
 
-      - name: Apply W08 additive migration on existing D1-01
-        if: ${{ inputs.confirm == 'DEPLOY_BINDING_AND_W08_CREATOR' }}
-        working-directory: workers/W08-creator
-        env:
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        run: npx --yes wrangler@4.116.0 d1 migrations apply "luckread" --remote --config wrangler.jsonc
-
       - name: Deploy W02 first with pinned Wrangler
         working-directory: workers/W02-identity
         env:
@@ -362,7 +354,7 @@ jobs:
           CONFIRM: ${{ inputs.confirm }}
           SOURCE_SHA: ${{ inputs.source_sha }}
         run: |
-          node -e 'const fs=require("node:fs"); const creator=process.env.CONFIRM==="DEPLOY_BINDING_AND_W08_CREATOR"; const values=["workflow=W01 W02 Auth Binding Deploy","source_sha="+process.env.SOURCE_SHA,"confirmation="+process.env.CONFIRM,"creator_confirmation="+(creator?"DEPLOY_W08_CREATOR":"not_requested"),"workers="+(creator?"luckread-w02,luckread-w08-creator,luckread-w01-payload":"luckread-w02,luckread-w01-payload"),"deployment_order="+(creator?"W08 additive migration, W02 then W08 then W01":"W02 then W01"),"binding=W02_AUTH","creator_binding=W08_CREATOR","target=luckread-w02","database_mutation="+creator,"creator_migration="+(creator?"workers/W08-creator/migrations/0001_creator_authorization.sql":"not_applied"),"new_worker=false","new_database=false"]; fs.writeFileSync("artifacts/mapping-0/w01-w02-binding-deploy-provenance.txt",values.join("\n")+"\n");'
+          node -e 'const fs=require("node:fs"); const creator=process.env.CONFIRM==="DEPLOY_BINDING_AND_W08_CREATOR"; const values=["workflow=W01 W02 Auth Binding Deploy","source_sha="+process.env.SOURCE_SHA,"confirmation="+process.env.CONFIRM,"creator_confirmation="+(creator?"DEPLOY_W08_CREATOR":"not_requested"),"workers="+(creator?"luckread-w02,luckread-w08-creator,luckread-w01-payload":"luckread-w02,luckread-w01-payload"),"deployment_order="+(creator?"W02 then W08 then W01":"W02 then W01"),"binding=W02_AUTH","creator_binding=W08_CREATOR","target=luckread-w02","database_mutation=false","creator_migration="+(creator?"already_applied_to_neon_luckread;schema_postflight_run=42558978832":"not_applied"),"new_worker=false","new_database=false"]; fs.writeFileSync("artifacts/mapping-0/w01-w02-binding-deploy-provenance.txt",values.join("\n")+"\n");'
           cat artifacts/mapping-0/w01-w02-binding-deploy-provenance.txt
 
       - name: Upload deployment evidence
