@@ -40,7 +40,9 @@ for (const [role, layer] of [['user','L1'],['verified_user','L2'],['creator','L3
 }
 if (!(w01Config.services ?? []).some((x) => x.binding === 'W08_CREATOR' && x.service === 'luckread-w08-creator')) failures.push('W01 W08 service binding missing')
 if (w08Config.name !== 'luckread-w08-creator') failures.push('W08 worker name mismatch')
-if ((w08Config.d1_databases ?? []).length !== 1 || !(w08Config.d1_databases ?? []).some((x) => x.binding === 'D1_01')) failures.push('W08 must use only existing D1-01')
+if ((w08Config.d1_databases ?? []).length !== 0) failures.push('W08 production must not bind Cloudflare D1')
+if (w08Config.vars?.W08_DATABASE_DRIVER !== 'neon') failures.push('W08 production must select Neon')
+if (!(w08Config.hyperdrive ?? []).some((x) => x.binding === 'HYPERDRIVE' && x.id === '0c53a1bb9bc0484bac146e8ae2d3158b')) failures.push('W08 must use the existing D1-01 Neon Hyperdrive')
 if ((w08Config.services ?? []).some((x) => x.binding === 'W01' || x.service === 'luckread-w01-payload')) failures.push('W08 must not bind back to W01')
 if (publicBinding.callee.logicalWorker !== 'W08' || publicBinding.transport.binding !== 'W08_CREATOR') failures.push('W01-W08 contract target mismatch')
 if (grantBinding.caller.logicalWorker !== 'W08' || grantBinding.callee.logicalWorker !== 'W02') failures.push('W08-W02 contract target mismatch')
@@ -84,7 +86,8 @@ const canonicalPermissionNames = new Set((authzPermissions['x-permissions'] ?? [
 for (const match of w08Casl.matchAll(/\bgrant\('([^']+)'/g)) {
   if (!canonicalPermissionNames.has(match[1])) failures.push('CASL action missing from canonical permission catalog: '+match[1])
 }
-requireText('shared authorization context must resolve persisted D1 role assignments', w08RoleLayer, /FROM role_assignments/)
+requireText('shared authorization context must resolve persisted role assignments', w08RoleLayer, /FROM role_assignments/)
+requireText('Neon authorization role reads must use PostgreSQL positional parameters and active validity windows', w08RoleLayer, /resolvePermissionContextPostgres[\s\S]*FROM role_assignments[\s\S]*valid_from <= \$2[\s\S]*valid_until[\s\S]*ORDER BY role_id ASC, id ASC/)
 requireText('internal CASL endpoint must reject caller-supplied layer or state', w08AuthzHandler, /CALLER_SUPPLIED_AUTHORIZATION_CONTEXT/)
 if (!w08AuthzHandler.includes('/internal/auth/principal')) failures.push('internal CASL endpoint must resolve actor identity through W02 session binding')
 if (!w08AuthzHandler.includes("new Set(['action', 'resourceType', 'resourceAttributes'])")) failures.push('internal CASL endpoint must not accept body-supplied subjectId')
