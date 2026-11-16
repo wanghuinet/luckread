@@ -142,8 +142,9 @@ jobs:
           }
           if (!relationships.includes('mutationStore.create({') ||
               !relationships.includes('mutationStore.revoke({') ||
+              !relationships.includes('mutationStore.appendThread({') ||
               !router.includes('dependencies.contentRelationshipMutationStoreProvider?.(env),')) {
-            throw new Error('W03 Neon content relationship create/revoke wiring is incomplete')
+            throw new Error('W03 Neon content relationship and post-thread mutation wiring is incomplete')
           }
           if (!contentRuntime.includes('mutationStore.listDueScheduled(nowIso, limit)') ||
               !contentRuntime.includes('mutationStore.publishScheduled(authorizedCandidates, nowIso)')) {
@@ -153,6 +154,7 @@ jobs:
           console.log('W03_NEON_MODERATION_TRANSITION_CUTOVER=PASS')
           console.log('W03_NEON_REVISION_ROLLBACK_CUTOVER=PASS')
           console.log('W03_NEON_CONTENT_RELATIONSHIP_CUTOVER=PASS')
+          console.log('W03_NEON_POST_THREAD_APPEND_CUTOVER=PASS')
           console.log('W03_NEON_CONTENT_STATE_TRANSITION_CUTOVER=PASS')
           console.log('W03_NEON_READ_PROJECTION_CUTOVER_CONFIG=PASS')
           NODE
