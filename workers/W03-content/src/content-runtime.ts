@@ -1802,59 +1802,79 @@ export async function rollbackContentRevision(
   }
   const result = { content: updated, sourceRevision: source.revision, resultingRevision: nextRevision }
   const expiresAt = new Date(now.getTime() + IDEMPOTENCY_TTL_MS).toISOString()
-  await batchMutation(db, [
-    expireMutationRow(db, principalUserId, operationId, idempotencyKey, updatedAt),
-    insertCompletedIdempotency(db, principalUserId, operationId, idempotencyKey, hash, 200, JSON.stringify(result), updatedAt, expiresAt),
-    db.prepare(`UPDATE contents
+  const rollbackRevision: ContentRevision = {
+    id: crypto.randomUUID(),
+    contentId: content.id,
+    revision: nextRevision,
+    contentVersion: nextVersion,
+    actorUserId: principalUserId,
+    sourceRevision: source.revision,
+    operation: 'ROLLBACK',
+    state: content.state,
+    accessMode: updated.accessMode,
+    slug: updated.slug,
+    title: updated.title,
+    bodyRef: updated.bodyRef,
+    mediaRefs: updated.mediaRefs,
+    coverRef: updated.coverRef,
+    mediaWarning: updated.mediaWarning,
+    etag: updated.etag,
+    reason: reason?.trim() || null,
+    correlationId: normalizedCorrelationId,
+    createdAt: updatedAt,
+  }
+  const outboxEventPayloadJson = JSON.stringify({
+    schemaVersion: '1.0',
+    producer: 'W03',
+    contentId: content.id,
+    sourceRevision: source.revision,
+    resultingRevision: nextRevision,
+    contentVersion: nextVersion,
+    actorUserId: principalUserId,
+    reason: reason?.trim() || null,
+    correlationId: normalizedCorrelationId,
+    idempotencyKey,
+  })
+
+  if (mutationStore) {
+    await mutationStore.rollback({
+      ownerUserId: principalUserId,
+      operationId,
+      idempotencyKey,
+      requestHash: hash,
+      responseJson: JSON.stringify(result),
+      updatedAt,
+      expiresAt,
+      expectedVersion: content.version,
+      expectedEtag: content.etag,
+      content: updated,
+      revision: rollbackRevision,
+      outboxEventPayloadJson,
+    })
+  } else {
+    await batchMutation(db, [
+      expireMutationRow(db, principalUserId, operationId, idempotencyKey, updatedAt),
+      insertCompletedIdempotency(db, principalUserId, operationId, idempotencyKey, hash, 200, JSON.stringify(result), updatedAt, expiresAt),
+      db.prepare(`UPDATE contents
    SET title = ?, body_ref = ?, media_refs_json = ?, cover_ref = ?, media_warning = ?, access_mode = ?, version = ?, revision = ?, etag = ?, updated_at = ?
  WHERE id = ? AND owner_user_id = ? AND version = ? AND etag = ?`).bind(
-      updated.title, updated.bodyRef, JSON.stringify(updated.mediaRefs), updated.coverRef, updated.mediaWarning ?? null, updated.accessMode ?? 'PUBLIC',
-      nextVersion, nextRevision, updated.etag, updatedAt,
-      content.id, principalUserId, content.version, content.etag,
-    ),
-    atomicGuard(db),
-    insertRevision(db, {
-      id: crypto.randomUUID(),
-      contentId: content.id,
-      revision: nextRevision,
-      contentVersion: nextVersion,
-      actorUserId: principalUserId,
-      sourceRevision: source.revision,
-      operation: 'ROLLBACK',
-      state: content.state,
-      accessMode: updated.accessMode,
-      slug: updated.slug,
-      title: updated.title,
-      bodyRef: updated.bodyRef,
-      mediaRefs: updated.mediaRefs,
-      coverRef: updated.coverRef,
-      mediaWarning: updated.mediaWarning,
-      etag: updated.etag,
-      reason: reason?.trim() || null,
-      correlationId: normalizedCorrelationId,
-      createdAt: updatedAt,
-    }),
-    db.prepare(`INSERT INTO content_outbox_events
-      (event_id, operation_id, event_type, content_id, aggregate_version, payload_json, created_at, published_at)
-     VALUES (?, 'rollbackContentRevision', 'content.revision.rolled_back', ?, ?, ?, ?, NULL)`).bind(
-      crypto.randomUUID(),
-      content.id,
-      nextVersion,
-      JSON.stringify({
-        schemaVersion: '1.0',
-        producer: 'W03',
-        contentId: content.id,
-        sourceRevision: source.revision,
-        resultingRevision: nextRevision,
-        contentVersion: nextVersion,
-        actorUserId: principalUserId,
-        reason: reason?.trim() || null,
-        correlationId: normalizedCorrelationId,
-        idempotencyKey,
-      }),
-      updatedAt,
-    ),
-  ])
+        updated.title, updated.bodyRef, JSON.stringify(updated.mediaRefs), updated.coverRef, updated.mediaWarning ?? null, updated.accessMode ?? 'PUBLIC',
+        nextVersion, nextRevision, updated.etag, updatedAt,
+        content.id, principalUserId, content.version, content.etag,
+      ),
+      atomicGuard(db),
+      insertRevision(db, rollbackRevision),
+      db.prepare(`INSERT INTO content_outbox_events
+        (event_id, operation_id, event_type, content_id, aggregate_version, payload_json, created_at, published_at)
+       VALUES (?, 'rollbackContentRevision', 'content.revision.rolled_back', ?, ?, ?, ?, NULL)`).bind(
+        crypto.randomUUID(),
+        content.id,
+        nextVersion,
+        outboxEventPayloadJson,
+        updatedAt,
+      ),
+    ])
+  }
   return result
 }
 
