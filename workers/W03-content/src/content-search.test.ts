@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createW03ContentWorker } from './index.js'
 import { decodeScopedCursor, searchPublishedContents } from './content-runtime.js'
 
@@ -35,10 +35,10 @@ describe('W03 published content search', () => {
         created_at: '2026-10-19T00:00:00.000Z',
       }),
     ]
-    const search = async (input: { query: string; cursor: { createdAt: string; id: string } | null; limit: number }) => {
+    const search = vi.fn(async (input: { query: string; cursor: { createdAt: string; id: string } | null; limit: number }) => {
       expect(input).toMatchObject({ query: 'LuckRead', cursor: null, limit: 2 })
       return rows.slice(0, input.limit)
-    }
+    })
     const store = { list: async () => rows, search }
     const firstPage = await searchPublishedContents({} as never, 'LuckRead', null, 1, store)
 
