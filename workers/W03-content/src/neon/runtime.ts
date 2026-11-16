@@ -114,7 +114,7 @@ const contentRevisionStores = new WeakMap<object, ContentRevisionReadStore>()
 export function resolveW03PublicMediaReferenceDriver(
   env: W03PublicMediaReferenceRuntimeEnv,
 ): W03PublicMediaReferenceDriver {
-  const configured = (env.W03_CONTENT_READ_DRIVER ?? env.W03_PUBLIC_MEDIA_REFERENCE_DRIVER)?.trim().toLowerCase()
+  const configured = env.W03_CONTENT_READ_DRIVER?.trim().toLowerCase()
   if (configured === 'neon') return 'neon'
   throw new Error('W03_NEON_DRIVER_REQUIRED')
 }
