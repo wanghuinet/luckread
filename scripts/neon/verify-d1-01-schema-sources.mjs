@@ -207,7 +207,22 @@ for (const owner of contract.owners.slice(1)) {
   }
   const wrangler = read(owner.wrangler)
   if (wrangler !== null) {
-    if (!wrangler.includes('"database_name": "luckread"') || !wrangler.includes('"database_id": "2f80471e-3756-49f9-8db1-7707a433ad64"')) {
+    if (owner.worker === 'W08') {
+      let config
+      try { config = JSON.parse(wrangler) } catch {
+        failures.push('W08 Wrangler production config is invalid JSON')
+      }
+      if (config && (
+        config.name !== 'luckread-w08-creator' ||
+        (config.d1_databases ?? []).length !== 0 ||
+        config.vars?.W08_DATABASE_DRIVER !== 'neon' ||
+        !(config.hyperdrive ?? []).some((binding) =>
+          binding.binding === 'HYPERDRIVE' && binding.id === '0c53a1bb9bc0484bac146e8ae2d3158b')
+      )) {
+        failures.push('W08 production Wrangler must be D1-free and select the admitted Neon D1-01 Hyperdrive')
+      }
+    } else if (!wrangler.includes('"database_name": "luckread"') ||
+               !wrangler.includes('"database_id": "2f80471e-3756-49f9-8db1-7707a433ad64"')) {
       failures.push(`${owner.worker} Wrangler D1-01 database mapping drifted from the admitted physical source`)
     }
     addSource(owner.worker, 'wrangler-database-mapping', owner.wrangler, wrangler)

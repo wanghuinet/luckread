@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import type { Pool } from 'pg'
 import worker from '../worker.js'
 import { handleScheduledPublishPermission } from './scheduled-publish.js'
 
@@ -249,6 +250,55 @@ describe('W08 background scheduled-publish permission', () => {
     const { db, env } = setup()
     db.fail = true
     const response = await handleScheduledPublishPermission(makeRequest(), env)
+
+    expect(response.status).toBe(503)
+    await expect(response.json()).resolves.toMatchObject({
+      decision: 'DENY',
+      reasonCode: 'AUTHORIZATION_INPUT_UNAVAILABLE',
+    })
+  })
+})
+
+
+describe('W08 scheduled-publish Neon authorization', () => {
+  it('resolves ACTIVE Creator, account and role facts through Neon without a D1 binding', async () => {
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes('FROM creators')) {
+        return { rows: [{ creatorId: 'creator-123', userId: 'creator-user-1' }] }
+      }
+      if (sql.includes('FROM "user"')) return { rows: [{ accountState: 'ACTIVE' }] }
+      if (sql.includes('FROM role_assignments')) {
+        return { rows: [{ roleId: 'creator', scopeType: 'global', scopeId: null }] }
+      }
+      throw new Error('Unexpected authorization query')
+    })
+    const pool = { query } as unknown as Pool
+    const response = await handleScheduledPublishPermission(makeRequest(), {
+      W08_DATABASE_DRIVER: 'neon',
+      HYPERDRIVE: { connectionString: 'postgresql://user:secret@hyperdrive.local:5432/luckread' },
+    }, { getPostgresPool: () => pool })
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      decision: 'ALLOW',
+      layer: 'L3',
+      ownerUserId: 'creator-user-1',
+      creatorId: 'creator-123',
+    })
+    expect(query).toHaveBeenCalledTimes(3)
+    expect(query.mock.calls[0]?.[0]).toContain('FROM creators')
+    expect(query.mock.calls[1]?.[0]).toContain('FROM "user"')
+    expect(query.mock.calls[2]?.[0]).toContain('FROM role_assignments')
+  })
+
+  it('fails closed when Neon authorization lookup fails', async () => {
+    const pool = {
+      query: vi.fn(async () => { throw new Error('Neon unavailable') }),
+    } as unknown as Pool
+    const response = await handleScheduledPublishPermission(makeRequest(), {
+      W08_DATABASE_DRIVER: 'neon',
+      HYPERDRIVE: { connectionString: 'postgresql://user:secret@hyperdrive.local:5432/luckread' },
+    }, { getPostgresPool: () => pool })
 
     expect(response.status).toBe(503)
     await expect(response.json()).resolves.toMatchObject({

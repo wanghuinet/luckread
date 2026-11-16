@@ -20,14 +20,6 @@
       "service": "luckread-w02"
     }
   ],
-  "d1_databases": [
-    {
-      "binding": "D1_01",
-      "database_name": "luckread",
-      "database_id": "2f80471e-3756-49f9-8db1-7707a433ad64",
-      "migrations_dir": "migrations"
-    }
-  ],
   "vars": {
     "W08_DATABASE_DRIVER": "neon"
   },
