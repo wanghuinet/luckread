@@ -317,6 +317,7 @@ export function getW03CollectionListReadStore(
 export function getW03ContentMutationStore(
   env: W03PublicMediaReferenceRuntimeEnv,
 ): ContentMutationStore | undefined {
+  resolveW03PublicMediaReferenceDriver(env)
   const binding = env.HYPERDRIVE_CONTENT_PG
   if (!binding || typeof binding !== 'object') {
     throw new Error('W03_HYPERDRIVE_CONTENT_PG_BINDING_REQUIRED')
@@ -333,6 +334,7 @@ export function getW03ContentMutationStore(
 export function getW03ContentCreateStore(
   env: W03PublicMediaReferenceRuntimeEnv,
 ): ContentCreateStore | undefined {
+  resolveW03PublicMediaReferenceDriver(env)
   const binding = env.HYPERDRIVE_CONTENT_PG
   if (!binding || typeof binding !== 'object') {
     throw new Error('W03_HYPERDRIVE_CONTENT_PG_BINDING_REQUIRED')
@@ -590,6 +592,7 @@ export function getW03CollectionMemberRemoveStore(
 export function getW03CollectionMemberReorderStore(
   env: W03PublicMediaReferenceRuntimeEnv,
 ): CollectionMemberReorderStore | undefined {
+  resolveW03PublicMediaReferenceDriver(env)
   const binding = env.HYPERDRIVE_CONTENT_PG
   if (!binding || typeof binding !== 'object') throw new Error('W03_HYPERDRIVE_CONTENT_PG_BINDING_REQUIRED')
   const cached = collectionMemberReorderStores.get(binding)
