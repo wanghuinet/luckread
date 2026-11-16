@@ -1,7 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 import { describe, expect, it, vi } from 'vitest'
 import { listFollowingOwnerContents } from './content-runtime.js'
-import worker, { createW03ContentWorker } from './index.js'
+import { createW03ContentWorker } from './index.js'
 
 const rows = [
   {
@@ -56,9 +56,9 @@ const mockDb = () => {
 }
 
 describe('W03 Following content projection', () => {
-  it('queries only published content for the W04-authorized owner set and returns stable pagination', async () => {
-    const { db, prepare } = mockDb()
-    const page = await listFollowingOwnerContents(db, 'viewer-1', ['creator-2', 'creator-1'], null, 1)
+  it('queries published content through the Neon read store with stable pagination', async () => {
+    const list = vi.fn(async () => rows)
+    const page = await listFollowingOwnerContents({} as never, 'viewer-1', ['creator-2', 'creator-1'], null, 1, { list })
     expect(page.items).toHaveLength(1)
     expect(page.items[0]).toMatchObject({
       id: 'content-1',
@@ -69,20 +69,14 @@ describe('W03 Following content projection', () => {
     })
     expect(page.hasMore).toBe(true)
     expect(page.nextCursor).toBeTruthy()
-    const sql = String(prepare.mock.calls[0]?.[0] ?? '')
-    expect(sql).toContain("c.state = 'PUBLISHED'")
-    expect(sql).toContain('c.owner_user_id IN (SELECT value FROM json_each(?))')
-    expect(sql).not.toContain('c.creator_id IN (SELECT value FROM json_each(?))')
-    expect(sql).not.toContain('social_follow_relationships')
-    expect(sql).not.toContain('social_user_interactions')
+    expect(list).toHaveBeenCalledWith(['creator-1', 'creator-2'], null, 2)
   })
 
   it('uses the injected Neon read store without issuing a D1 query', async () => {
-    const { db, prepare } = mockDb()
     const list = vi.fn(async () => rows)
     const store = { list }
     const page = await listFollowingOwnerContents(
-      db,
+      {} as never,
       'viewer-1',
       ['creator-2', 'creator-1', 'creator-2'],
       null,
@@ -96,21 +90,21 @@ describe('W03 Following content projection', () => {
   })
 
   it('binds cursors to the viewer and followed-author scope', async () => {
-    const { db } = mockDb()
-    const page = await listFollowingOwnerContents(db, 'viewer-1', ['creator-1', 'creator-2'], null, 1)
+    const store = { list: async () => rows }
+    const page = await listFollowingOwnerContents({} as never, 'viewer-1', ['creator-1', 'creator-2'], null, 1, store)
     await expect(
-      listFollowingOwnerContents(db, 'viewer-2', ['creator-1', 'creator-2'], page.nextCursor, 1),
+      listFollowingOwnerContents({} as never, 'viewer-2', ['creator-1', 'creator-2'], page.nextCursor, 1, store),
     ).rejects.toMatchObject({ code: 'INVALID_CURSOR' })
     await expect(
-      listFollowingOwnerContents(db, 'viewer-1', ['creator-1'], page.nextCursor, 1),
+      listFollowingOwnerContents({} as never, 'viewer-1', ['creator-1'], page.nextCursor, 1, store),
     ).rejects.toMatchObject({ code: 'INVALID_CURSOR' })
   })
 
   it('rejects an empty or overlarge author set', async () => {
-    const { db } = mockDb()
-    await expect(listFollowingOwnerContents(db, 'viewer-1', [], null, 6))
+    const store = { list: async () => rows }
+    await expect(listFollowingOwnerContents({} as never, 'viewer-1', [], null, 6, store))
       .rejects.toMatchObject({ code: 'VALIDATION_FAILED' })
-    await expect(listFollowingOwnerContents(db, 'viewer-1', Array.from({ length: 501 }, (_, i) => 'creator-' + i), null, 6))
+    await expect(listFollowingOwnerContents({} as never, 'viewer-1', Array.from({ length: 501 }, (_, i) => 'creator-' + i), null, 6, store))
       .rejects.toMatchObject({ code: 'VALIDATION_FAILED' })
   })
 })
@@ -119,7 +113,7 @@ describe('W03 private Following endpoint', () => {
 
   it('routes the authorized HTTP feed projection through the injected Neon store', async () => {
     const prepare = vi.fn(() => {
-      throw new Error('D1 must not be queried when Neon provider is selected')
+      throw new Error('No database adapter should be called when Neon provider is selected')
     })
     const list = vi.fn(async () => rows)
     const neonWorker = createW03ContentWorker({
@@ -153,9 +147,8 @@ describe('W03 private Following endpoint', () => {
   })
 
   it('rejects browser/spoofed callers and malformed author sets before data access', async () => {
-    const prepare = vi.fn()
     const env = {} as never
-    const denied = await worker.fetch(
+    const denied = await createW03ContentWorker().fetch(
       new Request('https://luckread-w03.internal/internal/content/following-feed', {
         method: 'POST',
         headers: {
@@ -171,7 +164,7 @@ describe('W03 private Following endpoint', () => {
     )
     expect(denied.status).toBe(403)
 
-    const invalid = await worker.fetch(
+    const invalid = await createW03ContentWorker().fetch(
       new Request('https://luckread-w03.internal/internal/content/following-feed', {
         method: 'POST',
         headers: {
