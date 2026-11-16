@@ -107,6 +107,19 @@ for (const dir of dirs) {
   if (workerId === 'W08' && !w08NeonProduction) {
     throw new Error('W08 production must use the approved Neon D1-01 Hyperdrive and no D1 bindings')
   }
+  const w02ProductionPath = join(workerDir, 'wrangler.neon.jsonc')
+  const w02NeonProduction = workerId === 'W02' && existsSync(w02ProductionPath) &&
+    (() => {
+      const production = jsonc(w02ProductionPath)
+      return production?.name === 'luckread-w02' &&
+        (production.d1_databases ?? []).length === 0 &&
+        production.vars?.W02_DATABASE_DRIVER === 'neon' &&
+        (production.hyperdrive ?? []).some((entry) =>
+          entry.binding === 'HYPERDRIVE' && entry.id === '0c53a1bb9bc0484bac146e8ae2d3158b')
+    })()
+  if (workerId === 'W02' && !w02NeonProduction) {
+    throw new Error('W02 production must use the approved Neon D1-01 Hyperdrive and no D1 bindings')
+  }
 
   const files = []
   const walk = (dirPath) => {
