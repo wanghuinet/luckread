@@ -152,6 +152,53 @@ describe('W03 content relationship foundation', () => {
     expect(response.status).toBe(403)
   })
 
+  it('uses the injected Neon relationship reader without touching D1', async () => {
+    const relationship = {
+      relationshipId: 'relationship_neon_1',
+      relationType: 'reference' as const,
+      direction: 'out' as const,
+      relatedContent: {
+        id: 'content_2',
+        slug: 'related-content',
+        contentType: 'article' as const,
+        title: 'Related content',
+      },
+      createdAt: '2026-11-16T12:00:00.000Z',
+    }
+    const readStore = {
+      list: async (contentId: string, direction: string, cursor: unknown, limit: number) => {
+        expect(contentId).toBe('content_1')
+        expect(direction).toBe('both')
+        expect(cursor).toBeNull()
+        expect(limit).toBe(11)
+        return [relationship]
+      },
+    }
+    const worker = createW03ContentWorker({
+      contentRelationshipReadStoreProvider: () => readStore,
+    })
+    const db = {
+      prepare() {
+        throw new Error('D1 must not be queried for Neon relationship listing')
+      },
+    } as never
+    const response = await worker.fetch(
+      new Request('https://luckread-w03.internal/internal/content/contents/content_1/relationships?direction=both&limit=10', {
+        headers: {
+          'X-LuckRead-Caller': 'W01',
+          'X-LuckRead-Transport-Version': '1.0',
+          'X-LuckRead-Correlation-Id': 'relationship-neon-read',
+        },
+      }),
+      { D1_02: db },
+    )
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      data: { items: [relationship], hasMore: false, nextCursor: null },
+    })
+  })
+
   it('routes public relationship reads without requiring a creator principal', async () => {
     const db = {
       prepare() {
