@@ -6,6 +6,7 @@ import {
   updateContent,
   transitionContentState,
   applyModerationContentTransition,
+  rollbackContentRevision,
   listDueScheduledContentCandidates,
   publishAuthorizedScheduledContents,
   type ContentMutationStore,
@@ -70,6 +71,28 @@ const pgRow = {
   idem_expires_at: null,
 }
 
+const pgRevisionRow = {
+  id: 'revision_3',
+  content_id: snapshotContent.id,
+  revision: 3,
+  content_version: 4,
+  actor_user_id: 'user_123',
+  source_revision: 2,
+  operation: 'UPDATE',
+  state: 'DRAFT',
+  access_mode: 'PUBLIC',
+  slug: 'revision-three',
+  title: 'Revision three title',
+  body_ref: 'body:revision-three',
+  media_refs_json: '[]',
+  cover_ref: null,
+  media_warning: null,
+  etag: 'W/"4"',
+  reason: null,
+  correlation_id: 'revision-three-correlation',
+  created_at: new Date('2026-11-15T09:00:00.000Z'),
+}
+
 function fixture(options: { casMiss?: boolean; idempotencyConflict?: boolean } = {}) {
   const directQueries: Array<{ sql: string; values?: unknown[] }> = []
   const transactionQueries: Array<{ sql: string; values?: unknown[] }> = []
@@ -97,6 +120,9 @@ function fixture(options: { casMiss?: boolean; idempotencyConflict?: boolean } =
     async query<Row>(sql: string, values?: unknown[]) {
       directQueries.push({ sql, values })
       if (sql.includes('FROM contents c LEFT JOIN LATERAL')) return { rows: [pgRow] as Row[] }
+      if (sql.includes('FROM content_revisions WHERE id = $1 AND content_id = $2')) {
+        return { rows: [pgRevisionRow] as Row[] }
+      }
       if (sql.includes("FROM contents WHERE state = 'SCHEDULED'")) {
         return { rows: [{
           id: snapshotContent.id,
@@ -407,6 +433,8 @@ describe('W03 Neon content mutation store', () => {
       async loadMutation() {
         return { content: pendingContent, idempotency: emptyIdempotency }
       },
+      async loadRevision() { return null },
+      async rollback() {},
       async update() {},
       async delete() {},
       async transition() {},
@@ -445,6 +473,208 @@ describe('W03 Neon content mutation store', () => {
       nextEtag: 'W/"5"',
     })
     expect(moderationInput?.responseJson).toBe(JSON.stringify(result))
+  })
+
+  it('loads the requested source revision from PostgreSQL and maps it to the canonical revision shape', async () => {
+    const fake = fixture()
+    const store = createPostgresContentMutationStore(fake.database)
+
+    await expect(store.loadRevision(snapshotContent.id, 'revision_3')).resolves.toMatchObject({
+      id: 'revision_3',
+      contentId: snapshotContent.id,
+      revision: 3,
+      contentVersion: 4,
+      actorUserId: 'user_123',
+      sourceRevision: 2,
+      operation: 'UPDATE',
+      state: 'DRAFT',
+      accessMode: 'PUBLIC',
+      slug: 'revision-three',
+      title: 'Revision three title',
+      bodyRef: 'body:revision-three',
+      mediaRefs: [],
+      createdAt: '2026-11-15T09:00:00.000Z',
+    })
+    expect(fake.directQueries[0]?.sql).toContain('FROM content_revisions WHERE id = $1 AND content_id = $2')
+    expect(fake.directQueries[0]?.values).toEqual(['revision_3', snapshotContent.id])
+  })
+
+  it('commits rollback content CAS, immutable revision history and rollback outbox in one Neon transaction', async () => {
+    const fake = fixture()
+    const store = createPostgresContentMutationStore(fake.database)
+    const updated: ContentRecord = {
+      ...snapshotContent,
+      title: 'Restored from revision',
+      bodyRef: 'body:revision-three',
+      version: 5,
+      revision: 4,
+      etag: 'W/"5"',
+      updatedAt: nowIso,
+    }
+    const revision = {
+      id: 'rollback_revision_4',
+      contentId: updated.id,
+      revision: 4,
+      contentVersion: 5,
+      actorUserId: 'user_123',
+      sourceRevision: 2,
+      operation: 'ROLLBACK' as const,
+      state: 'DRAFT' as const,
+      accessMode: 'PUBLIC' as const,
+      slug: updated.slug,
+      title: updated.title,
+      bodyRef: updated.bodyRef,
+      mediaRefs: [],
+      coverRef: null,
+      mediaWarning: null,
+      etag: updated.etag,
+      reason: 'restore previous content',
+      correlationId: 'rollback-correlation',
+      createdAt: nowIso,
+    }
+    const eventPayload = JSON.stringify({ contentId: updated.id, sourceRevision: 2, resultingRevision: 4 })
+
+    await store.rollback({
+      ownerUserId: 'user_123',
+      operationId: 'rollbackContentRevision',
+      idempotencyKey: 'rollback-key',
+      requestHash: 'rollback-hash',
+      responseJson: JSON.stringify({ content: updated, sourceRevision: 2, resultingRevision: 4 }),
+      updatedAt: nowIso,
+      expiresAt: new Date(now.getTime() + 86_400_000).toISOString(),
+      expectedVersion: 4,
+      expectedEtag: 'W/"4"',
+      content: updated,
+      revision,
+      outboxEventPayloadJson: eventPayload,
+    })
+
+    const sql = fake.transactionQueries.map(item => item.sql)
+    expect(sql[0]).toBe('BEGIN')
+    expect(sql[1]).toContain('DELETE FROM content_mutation_idempotency')
+    expect(sql[2]).toContain('INSERT INTO content_mutation_idempotency')
+    expect(sql[3]).toContain('UPDATE contents SET title = $1')
+    expect(sql[3]).toContain('WHERE id = $11 AND owner_user_id = $12 AND version = $13 AND etag = $14')
+    expect(sql[4]).toContain('INSERT INTO content_revisions')
+    expect(sql[5]).toContain("content.revision.rolled_back")
+    expect(sql[6]).toBe('COMMIT')
+    expect(fake.transactionQueries[3]?.values?.slice(-4)).toEqual([
+      updated.id, 'user_123', 4, 'W/"4"',
+    ])
+    expect(fake.transactionQueries[5]?.values?.[3]).toBe(eventPayload)
+    expect(fake.released()).toBe(true)
+  })
+
+  it('rolls back a revision restore when the content version and ETag CAS misses', async () => {
+    const fake = fixture({ casMiss: true })
+    const store = createPostgresContentMutationStore(fake.database)
+    const updated = { ...snapshotContent, version: 5, revision: 4, etag: 'W/"5"', updatedAt: nowIso }
+
+    await expect(store.rollback({
+      ownerUserId: 'user_123',
+      operationId: 'rollbackContentRevision',
+      idempotencyKey: 'stale-rollback-key',
+      requestHash: 'rollback-hash',
+      responseJson: '{}',
+      updatedAt: nowIso,
+      expiresAt: new Date(now.getTime() + 86_400_000).toISOString(),
+      expectedVersion: 4,
+      expectedEtag: 'W/"4"',
+      content: updated,
+      revision: {
+        id: 'rollback_revision_4',
+        contentId: updated.id,
+        revision: 4,
+        contentVersion: 5,
+        actorUserId: 'user_123',
+        sourceRevision: 2,
+        operation: 'ROLLBACK',
+        state: 'DRAFT',
+        accessMode: 'PUBLIC',
+        slug: updated.slug,
+        title: updated.title,
+        bodyRef: updated.bodyRef,
+        mediaRefs: [],
+        coverRef: null,
+        etag: updated.etag,
+        reason: null,
+        correlationId: 'rollback-correlation',
+        createdAt: nowIso,
+      },
+      outboxEventPayloadJson: '{}',
+    })).rejects.toMatchObject({ code: 'PRECONDITION_FAILED', status: 412 })
+
+    expect(fake.transactionQueries.at(-1)?.sql).toBe('ROLLBACK')
+    expect(fake.released()).toBe(true)
+  })
+
+  it('routes revision rollback through Neon without issuing a D1 statement', async () => {
+    const source: import('./content-runtime.js').ContentRevision = {
+      id: 'revision_3',
+      contentId: snapshotContent.id,
+      revision: 3,
+      contentVersion: 4,
+      actorUserId: 'user_123',
+      sourceRevision: 2,
+      operation: 'UPDATE',
+      state: 'DRAFT',
+      accessMode: 'PUBLIC',
+      slug: 'revision-three',
+      title: 'Revision three title',
+      bodyRef: 'body:revision-three',
+      mediaRefs: [],
+      coverRef: null,
+      mediaWarning: null,
+      etag: 'W/"4"',
+      reason: null,
+      correlationId: 'revision-three-correlation',
+      createdAt: '2026-11-15T09:00:00.000Z',
+    }
+    let rollbackInput: Parameters<ContentMutationStore['rollback']>[0] | undefined
+    const store: ContentMutationStore = {
+      async loadMutation() { return { content: snapshotContent, idempotency: emptyIdempotency } },
+      async loadRevision() { return source },
+      async rollback(input) { rollbackInput = input },
+      async update() {},
+      async delete() {},
+      async transition() {},
+      async moderationTransition() {},
+      async listDueScheduled() { return [] },
+      async publishScheduled() { return 0 },
+    }
+    const d1 = {
+      prepare() { throw new Error('D1 must not be queried in Neon mode') },
+      batch() { throw new Error('D1 must not be written in Neon mode') },
+    }
+
+    const result = await rollbackContentRevision(
+      d1 as never,
+      'user_123',
+      snapshotContent.id,
+      source.id,
+      'W/"4"',
+      'neon-rollback-key',
+      'restore previous content',
+      'rollback-correlation',
+      now,
+      undefined,
+      store,
+    )
+
+    expect(result).toMatchObject({
+      content: { title: source.title, bodyRef: source.bodyRef, version: 5, revision: 4 },
+      sourceRevision: 3,
+      resultingRevision: 4,
+    })
+    expect(rollbackInput).toMatchObject({
+      ownerUserId: 'user_123',
+      operationId: 'rollbackContentRevision',
+      expectedVersion: 4,
+      expectedEtag: 'W/"4"',
+      content: { title: source.title, bodyRef: source.bodyRef },
+      revision: { operation: 'ROLLBACK', sourceRevision: 3 },
+    })
+    expect(rollbackInput?.outboxEventPayloadJson).toContain('"sourceRevision":3')
   })
 
   it('loads only due scheduled candidates from Neon in stable scheduled-time order', async () => {
@@ -532,6 +762,8 @@ describe('W03 Neon content mutation store', () => {
       async loadMutation() {
         return { content: publishedContent, idempotency: emptyIdempotency }
       },
+      async loadRevision() { return null },
+      async rollback() {},
       async update() {},
       async delete() {},
       async transition(input) { transitionInput = input },
@@ -585,6 +817,8 @@ describe('W03 Neon content mutation store', () => {
     let publishedCandidates: readonly unknown[] = []
     const store: ContentMutationStore = {
       async loadMutation() { return { content: null, idempotency: emptyIdempotency } },
+      async loadRevision() { return null },
+      async rollback() {},
       async update() {},
       async delete() {},
       async transition() {},
@@ -631,6 +865,8 @@ describe('W03 Neon content mutation store', () => {
       async loadMutation() {
         return { content: currentContent, idempotency: emptyIdempotency }
       },
+      async loadRevision() { return null },
+      async rollback() {},
       async update(input) {
         updateInput = input
         currentContent = input.content
