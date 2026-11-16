@@ -1,14 +1,6 @@
 name: Neon Runtime Cutover Deploy — W07 D1-01 Membership and D1-04 Finance
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - '.github/workflows/neon-runtime-cutover-w07-d101.yml'
-      - 'workers/W07-subscription-commerce/wrangler.jsonc'
-      - 'workers/W07-subscription-commerce/wrangler.neon.jsonc'
-      - 'workers/W07-subscription-commerce/src/**'
   workflow_dispatch:
     inputs:
       confirm:
@@ -37,7 +29,7 @@ jobs:
           ref: main
           fetch-depth: 1
 
-      - name: Validate both Neon domains and preserve D1 rollback bindings
+      - name: Validate both Neon domains and historical D1 source identities
         run: |
           set -euo pipefail
           node <<'NODE'
