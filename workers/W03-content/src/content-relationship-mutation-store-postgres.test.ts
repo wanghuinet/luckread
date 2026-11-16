@@ -417,7 +417,8 @@ describe('W03 Neon content relationship mutation store', () => {
 
     const sql = fake.transactionQueries.map(item => item.sql)
     expect(sql[0]).toBe('BEGIN')
-    expect(sql[1]).toContain('pg_advisory_xact_lock')
+    expect(sql[1]).toContain('pg_advisory_xact_lock(74031, hashtext($1))')
+    expect(fake.transactionQueries[1]?.values).toEqual(['user_123'])
     expect(sql[2]).toContain('ORDER BY id FOR UPDATE')
     expect(sql[3]).toContain('DELETE FROM content_mutation_idempotency')
     expect(sql[4]).toContain('INSERT INTO content_mutation_idempotency')
@@ -427,7 +428,6 @@ describe('W03 Neon content relationship mutation store', () => {
     expect(sql[5]).toContain("relation_type = 'thread-next'")
     expect(sql[5]).toContain('RETURNING relationship_id')
     expect(sql[6]).toBe('COMMIT')
-    expect(fake.transactionQueries[1]?.values).toEqual([74031, 50])
     expect(fake.transactionQueries[2]?.values).toEqual([['content_source', 'content_target']])
     expect(fake.transactionQueries[4]?.values?.[5]).toBe(201)
     expect(fake.transactionQueries[5]?.values).toEqual([
