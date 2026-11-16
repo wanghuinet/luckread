@@ -367,6 +367,37 @@ export function createPostgresContentMutationStore(
         // The existing contents_after_update_outbox trigger records lifecycle state changes in this transaction.
       })
     },
+    async moderationTransition(input) {
+      await withTransaction(database, async (client) => {
+        await insertIdempotency(client, {
+          ownerUserId: input.idempotencyOwnerUserId,
+          operationId: input.operationId,
+          idempotencyKey: input.idempotencyKey,
+          requestHash: input.requestHash,
+          responseStatus: 200,
+          responseJson: input.responseJson,
+          now: input.updatedAt,
+          expiresAt: input.expiresAt,
+        })
+        const updated = await client.query<{ id: string }>(
+          'UPDATE contents SET state = $1, version = $2, etag = $3, updated_at = $4::timestamptz ' +
+          "WHERE id = $5 AND state = 'PENDING_REVIEW' AND version = $6 AND etag = $7 RETURNING id",
+          [
+            input.nextState,
+            input.nextVersion,
+            input.nextEtag,
+            input.updatedAt,
+            input.contentId,
+            input.expectedVersion,
+            input.expectedEtag,
+          ],
+        )
+        if (updated.rows.length !== 1) {
+          throw new ContentRuntimeError('PRECONDITION_FAILED', 412)
+        }
+        // The existing contents_after_update_outbox trigger records moderation state changes in this transaction.
+      })
+    },
     async listDueScheduled(now, limit): Promise<DueScheduledContentCandidate[]> {
       try {
         const result = await database.query<{
