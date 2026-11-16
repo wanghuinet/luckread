@@ -44,15 +44,11 @@ test('D1-02 contract freezes the two owner source sets and excludes D1-03', () =
   assert.equal(contract.owners[1].worker, 'W05')
   assert.equal(contract.owners[1].sqlMigrations.length, 15)
 
-  const w05Bindings = contract.owners[1].physicalBindings
-  assert.deepEqual(
-    w05Bindings.filter((item) => item.included).map((item) => item.logicalDomain),
-    ['D1-02'],
-  )
-  assert.deepEqual(
-    w05Bindings.filter((item) => !item.included).map((item) => item.logicalDomain),
-    ['D1-03'],
-  )
+  const w05Owner = contract.owners[1]
+  assert.equal(w05Owner.runtimeProvider, 'neon')
+  assert.deepEqual(w05Owner.physicalBindings, [])
+  assert.deepEqual(w05Owner.neonBindings.map((item) => item.logicalDomain), ['D1-02', 'D1-03'])
+  assert.equal(w05Owner.neonBindings[1].delegatedOwner, 'W09')
 })
 
 test('W03 Wrangler binding is pinned to the admitted D1-02 database', () => {
@@ -60,18 +56,19 @@ test('W03 Wrangler binding is pinned to the admitted D1-02 database', () => {
   assert.deepEqual(validateWorkerBindings(config, contract.owners[0]), [])
 })
 
-test('W05 D1-02 binding is included while its D1-03 binding stays separately excluded', () => {
+test('W05 social logical source inventory uses Neon with no production D1 bindings', () => {
   const config = JSON.parse(readSource(contract.owners[1].wrangler))
+  assert.equal(config.d1_databases?.length ?? 0, 0)
   assert.deepEqual(validateWorkerBindings(config, contract.owners[1]), [])
 })
 
 test('binding validator rejects UUID drift and an unreviewed extra database binding', () => {
-  const owner = contract.owners[1]
+  const owner = contract.owners[0]
   const correct = JSON.parse(readSource(owner.wrangler))
   const wrongTarget = {
     ...correct,
     d1_databases: correct.d1_databases.map((item) =>
-      item.binding === 'DB' ? { ...item, database_id: 'wrong-target' } : item),
+      item.binding === 'D1_02' ? { ...item, database_id: 'wrong-target' } : item),
   }
   assert.ok(validateWorkerBindings(wrongTarget, owner).some((error) => error.includes('database_id mismatch')))
 
