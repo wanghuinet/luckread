@@ -464,45 +464,6 @@ describe('W03 Neon content relationship mutation store', () => {
     expect(fake.released()).toBe(true)
   })
 
-  it('routes native thread append through Neon without issuing D1 statements', async () => {
-    let appendInput: Parameters<ContentRelationshipMutationStore['appendThread']>[0] | undefined
-    const store: ContentRelationshipMutationStore = {
-      async loadCreate() { return createRow },
-      async create() {},
-      async loadRevoke() { return revokeRow },
-      async revoke() {},
-      async loadAppend() { return appendRow },
-      async loadAppendStats() { return appendStats },
-      async appendThread(input) { appendInput = input },
-    }
-    const d1 = {
-      prepare() { throw new Error('D1 must not be queried in Neon mode') },
-      batch() { throw new Error('D1 must not be written in Neon mode') },
-    }
-
-    const result = await appendPostThreadNext(
-      d1 as never,
-      'user_123',
-      'content_source',
-      'content_target',
-      'neon-thread-append-key',
-      now,
-      store,
-    )
-
-    expect(result).toMatchObject({
-      sourceId: 'content_source',
-      targetId: 'content_target',
-      relationType: 'thread-next',
-      status: 'ACTIVE',
-      actorId: 'user_123',
-    })
-    expect(appendInput?.operationId).toBe('appendPostThreadNext')
-    expect(appendInput?.relationship).toEqual(result)
-    expect(appendInput?.responseJson).toBe(JSON.stringify(result))
-    expect(appendInput?.maxItems).toBe(50)
-  })
-
   it('routes native post-thread append through Neon without issuing D1 statements', async () => {
     let appendInput: Parameters<ContentRelationshipMutationStore['appendThread']>[0] | undefined
     const store: ContentRelationshipMutationStore = {
