@@ -237,7 +237,7 @@ export function createPostgresContentContextReadStore(
 
     async listPublishedMembersOnlyBodyReferences(bodyRefValue, limit) {
       if (typeof bodyRefValue !== 'string' || bodyRefValue.length === 0 ||
-          bodyRefValue.length > 2048 || /[\\u0000-\\u001f\\u007f]/u.test(bodyRefValue) ||
+          bodyRefValue.length > 2048 || /[\u0000-\u001f\u007f]/u.test(bodyRefValue) ||
           !Number.isSafeInteger(limit) || limit < 1 || limit > 51) {
         throw new ContentRuntimeError('VALIDATION_FAILED', 400)
       }
