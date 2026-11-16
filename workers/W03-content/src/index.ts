@@ -21,6 +21,7 @@ import {
   type FollowingOwnerContentsReadStore,
   type ContentDetailReadStore,
   type CreatorContentsReadStore,
+  type ContentCreateStore,
   listCreatorContents,
   validateListFilters,
   toErrorResponse,
@@ -445,6 +446,10 @@ export type W03ContentWorkerDependencies = Readonly<{
     series: SeriesMembersReadStore
     collections: CollectionMembersReadStore
   } | undefined
+  /** Optional D1-02 provider for Neon-backed canonical content creation. */
+  contentCreateStoreProvider?: (
+    env: W03PublishedMediaReferenceRuntimeEnv,
+  ) => ContentCreateStore | undefined
   /** Optional D1-02 provider for W01/W05 canonical content-context projections. */
   contentContextReadStoreProvider?: (
     env: W03PublishedMediaReferenceRuntimeEnv,
@@ -1560,6 +1565,7 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
           new Date(),
           request.headers.get('X-LuckRead-Correlation-Id')?.trim() || 'runtime',
           verifiedCreatorId,
+          dependencies.contentCreateStoreProvider?.(env),
         )
         return json({
           id: content.id,
