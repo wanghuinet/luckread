@@ -41,9 +41,12 @@ import { createPostgresCreatorContentsReadStore } from '../creator-contents-read
 import type {
   SeriesMembersReadStore,
   SeriesMemberAttachStore,
+  SeriesMemberRemoveStore,
 } from '../content-series-members.js'
 import { createPostgresSeriesMemberAttachStore } from '../content-series-member-attach-store-postgres.js'
 import type { SeriesMemberAttachPostgresDatabase } from '../content-series-member-attach-store-postgres.js'
+import { createPostgresSeriesMemberRemoveStore } from '../content-series-member-remove-store-postgres.js'
+import type { SeriesMemberRemovePostgresDatabase } from '../content-series-member-remove-store-postgres.js'
 import type {
   CollectionMembersReadStore,
 } from '../content-collection-members.js'
@@ -68,6 +71,7 @@ const seriesCreateStores = new WeakMap<object, SeriesCreateStore>()
 const seriesUpdateStores = new WeakMap<object, SeriesUpdateStore>()
 const seriesDeleteStores = new WeakMap<object, SeriesDeleteStore>()
 const seriesMemberAttachStores = new WeakMap<object, SeriesMemberAttachStore>()
+const seriesMemberRemoveStores = new WeakMap<object, SeriesMemberRemoveStore>()
 const membersStores = new WeakMap<object, {
   series: SeriesMembersReadStore
   collections: CollectionMembersReadStore
@@ -81,7 +85,7 @@ const creatorContentsStores = new WeakMap<object, CreatorContentsReadStore>()
  * batch projection, W04-authorized following-feed content, native post-thread
  * projection, canonical content context and detail reads, creator-owned
  * content lists, series and collection reads, and series/collection membership
- * lists. Collection creation, update, and delete plus Series creation, update, delete, and member attachment are the only Neon-backed mutations in these slices; all other W03 reads and mutations remain on D1_02. D1 is the safe
+ * lists. Collection creation, update, and delete plus Series creation, update, delete, member attachment, and member removal are the only Neon-backed mutations in these slices; all other W03 reads and mutations remain on D1_02. D1 is the safe
  * default and unknown values fail closed.
  */
 export function resolveW03PublicMediaReferenceDriver(
@@ -427,6 +431,26 @@ export function getW03SeriesMemberAttachStore(
     getW03PublicMediaReferencePostgresPool(env) as unknown as SeriesMemberAttachPostgresDatabase,
   )
   seriesMemberAttachStores.set(binding, store)
+  return store
+}
+
+/** PostgreSQL writer for removing a creator-owned Series member. */
+export function getW03SeriesMemberRemoveStore(
+  env: W03PublicMediaReferenceRuntimeEnv,
+): SeriesMemberRemoveStore | undefined {
+  if (resolveW03PublicMediaReferenceDriver(env) === 'd1') return undefined
+
+  const binding = env.HYPERDRIVE_D1_02
+  if (!binding || typeof binding !== 'object') {
+    throw new Error('W03_HYPERDRIVE_D1_02_BINDING_REQUIRED')
+  }
+  const cached = seriesMemberRemoveStores.get(binding)
+  if (cached) return cached
+
+  const store = createPostgresSeriesMemberRemoveStore(
+    getW03PublicMediaReferencePostgresPool(env) as unknown as SeriesMemberRemovePostgresDatabase,
+  )
+  seriesMemberRemoveStores.set(binding, store)
   return store
 }
 
