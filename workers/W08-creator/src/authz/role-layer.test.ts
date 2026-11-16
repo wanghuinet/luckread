@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { resolvePermissionContext } from './role-layer.js'
+import { resolvePermissionContext, resolvePermissionContextPostgres } from './role-layer.js'
+import type { W08D1Database } from '../creator-store.js'
+import { vi } from 'vitest'
 
 type RoleAssignmentRow = {
   roleId: string
@@ -55,7 +57,7 @@ describe('W08 persisted authorization context', () => {
       { roleId: 'unknown_scoped_role', scopeType: 'organization', scopeId: 'org-10' },
     ])
 
-    await expect(resolvePermissionContext(db as unknown as D1Database, 'user-1', NOW)).resolves.toEqual({
+    await expect(resolvePermissionContext(db as unknown as W08D1Database, 'user-1', NOW)).resolves.toEqual({
       layer: 'L3',
       scopedRoleAssignments: [
         { roleId: 'ip_principal', scopeType: 'ip', scopeId: 'ip-17' },
@@ -80,7 +82,7 @@ describe('W08 persisted authorization context', () => {
       { roleId: 'root_override', scopeType: 'global', scopeId: null },
     ])
 
-    await expect(resolvePermissionContext(db as unknown as D1Database, 'user-1', NOW)).resolves.toBeNull()
+    await expect(resolvePermissionContext(db as unknown as W08D1Database, 'user-1', NOW)).resolves.toBeNull()
   })
 
   it('does not infer a global layer from scoped assignments alone', async () => {
@@ -89,7 +91,7 @@ describe('W08 persisted authorization context', () => {
       { roleId: 'mcn_admin', scopeType: 'organization', scopeId: 'org-8' },
     ])
 
-    await expect(resolvePermissionContext(db as unknown as D1Database, 'user-1', NOW)).resolves.toBeNull()
+    await expect(resolvePermissionContext(db as unknown as W08D1Database, 'user-1', NOW)).resolves.toBeNull()
   })
 
   it('rejects missing subjects and invalid timestamps before querying D1', async () => {
@@ -97,9 +99,53 @@ describe('W08 persisted authorization context', () => {
       { roleId: 'creator', scopeType: 'global', scopeId: null },
     ])
 
-    await expect(resolvePermissionContext(db as unknown as D1Database, '', NOW)).resolves.toBeNull()
-    await expect(resolvePermissionContext(db as unknown as D1Database, 'user-1', 'not-a-date')).resolves.toBeNull()
+    await expect(resolvePermissionContext(db as unknown as W08D1Database, '', NOW)).resolves.toBeNull()
+    await expect(resolvePermissionContext(db as unknown as W08D1Database, 'user-1', 'not-a-date')).resolves.toBeNull()
     expect(db.statements).toHaveLength(0)
     expect(db.readCalls).toBe(0)
+  })
+})
+
+
+describe('W08 Neon PostgreSQL role context adapter', () => {
+  it('uses the same active/time-valid role facts, deterministic order and scoped role mapping', async () => {
+    const query = vi.fn(async (sql: string, values: unknown[]) => {
+      expect(sql).toContain('FROM role_assignments')
+      expect(sql).toContain("status = 'ACTIVE'")
+      expect(sql).toContain('valid_from <= $2')
+      expect(sql).toContain('(valid_until IS NULL OR $3 < valid_until)')
+      expect(sql).toContain('ORDER BY role_id ASC, id ASC')
+      expect(sql).not.toMatch(/\\b(INSERT|UPDATE|DELETE|REPLACE)\\b/i)
+      expect(values).toEqual(['user-1', NOW, NOW])
+      return [
+        { roleId: 'verified_user', scopeType: 'global', scopeId: null },
+        { roleId: 'creator', scopeType: 'global', scopeId: null },
+        { roleId: 'ip_principal', scopeType: 'ip', scopeId: 'ip-17' },
+        { roleId: 'mcn_admin', scopeType: 'organization', scopeId: 'org-8' },
+        { roleId: 'ignored_scoped_role', scopeType: 'organization', scopeId: 'org-9' },
+      ]
+    })
+
+    await expect(resolvePermissionContextPostgres(query, 'user-1', NOW)).resolves.toEqual({
+      layer: 'L3',
+      scopedRoleAssignments: [
+        { roleId: 'ip_principal', scopeType: 'ip', scopeId: 'ip-17' },
+        { roleId: 'mcn_admin', scopeType: 'organization', scopeId: 'org-8' },
+      ],
+    })
+    expect(query).toHaveBeenCalledTimes(1)
+  })
+
+  it('fails closed for unknown global roles and invalid lookups without a SQL query', async () => {
+    const query = vi.fn(async () => [
+      { roleId: 'root_override', scopeType: 'global', scopeId: null },
+    ])
+    await expect(resolvePermissionContextPostgres(query, 'user-1', NOW)).resolves.toBeNull()
+    expect(query).toHaveBeenCalledTimes(1)
+
+    const invalidQuery = vi.fn()
+    await expect(resolvePermissionContextPostgres(invalidQuery, '', NOW)).resolves.toBeNull()
+    await expect(resolvePermissionContextPostgres(invalidQuery, 'user-1', 'invalid-time')).resolves.toBeNull()
+    expect(invalidQuery).not.toHaveBeenCalled()
   })
 })
