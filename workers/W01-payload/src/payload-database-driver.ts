@@ -1,6 +1,7 @@
 export type W01PayloadDatabaseEnvironment = Readonly<{
   PAYLOAD_DATABASE_DRIVER?: string
   HYPERDRIVE?: Readonly<{ connectionString?: string }>
+  D1?: unknown
 }>
 
 export type W01PayloadDatabaseSelection =
@@ -8,16 +9,20 @@ export type W01PayloadDatabaseSelection =
   | Readonly<{ kind: 'neon'; connectionString: string }>
 
 /**
- * D1 is the safe default. Neon is selected only by an explicit runtime flag
- * and must have the matching Hyperdrive binding; configuration errors fail
- * closed instead of silently falling back to a different database.
+ * Neon is selected explicitly in the production Wrangler config and requires
+ * its Hyperdrive binding. The legacy D1 adapter is available only when the
+ * provider flag is omitted or set to "d1" AND a real local/test D1 binding
+ * exists. A D1-free production config can never fall back to SQLite/D1.
  */
 export function resolveW01PayloadDatabaseDriver(
   env: W01PayloadDatabaseEnvironment,
 ): W01PayloadDatabaseSelection {
-  const configured = env.PAYLOAD_DATABASE_DRIVER?.trim().toLowerCase() || 'd1'
+  const configured = env.PAYLOAD_DATABASE_DRIVER?.trim().toLowerCase()
 
-  if (configured === 'd1') return Object.freeze({ kind: 'd1' })
+  if (!configured || configured === 'd1') {
+    if (!env.D1) throw new Error('W01_D1_BINDING_REQUIRED')
+    return Object.freeze({ kind: 'd1' })
+  }
   if (configured !== 'neon') {
     throw new Error('W01_UNSUPPORTED_PAYLOAD_DATABASE_DRIVER')
   }

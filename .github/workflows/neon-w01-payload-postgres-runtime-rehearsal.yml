@@ -14,6 +14,7 @@ on:
       - 'workers/W01-payload/package.json'
       - 'workers/W01-payload/pnpm-lock.yaml'
       - 'workers/W01-payload/wrangler.jsonc'
+      - 'workers/W01-payload/wrangler.neon.jsonc'
       - '.github/workflows/neon-w01-payload-postgres-runtime-rehearsal.yml'
   push:
     branches: [main]
@@ -29,6 +30,7 @@ on:
       - 'workers/W01-payload/package.json'
       - 'workers/W01-payload/pnpm-lock.yaml'
       - 'workers/W01-payload/wrangler.jsonc'
+      - 'workers/W01-payload/wrangler.neon.jsonc'
       - '.github/workflows/neon-w01-payload-postgres-runtime-rehearsal.yml'
 
 permissions:
@@ -76,23 +78,20 @@ jobs:
         working-directory: workers/W01-payload
         run: pnpm install --frozen-lockfile --ignore-scripts
 
-      - name: Verify Neon is selected and W01 retains D1-01 rollback binding
+      - name: Verify Neon is selected and the production Worker has zero D1 bindings
         working-directory: workers/W01-payload
         run: |
           node --input-type=module <<'NODE'
           import fs from 'node:fs'
-          const config = JSON.parse(fs.readFileSync('wrangler.jsonc', 'utf8'))
+          const config = JSON.parse(fs.readFileSync('wrangler.neon.jsonc', 'utf8'))
           if (config.name !== 'luckread-w01-payload') throw new Error('W01 Worker identity mismatch')
           if (config.vars?.PAYLOAD_DATABASE_DRIVER !== 'neon') throw new Error('W01 production database driver must be Neon')
-          const d1 = (config.d1_databases || []).find((item) => item.binding === 'D1')
-          if (!d1 || d1.database_name !== 'luckread' || d1.database_id !== '2f80471e-3756-49f9-8db1-7707a433ad64') {
-            throw new Error('W01 D1-01 compatibility binding must be preserved')
-          }
+          if ((config.d1_databases || []).length !== 0) throw new Error('W01 production config must not declare Cloudflare D1 bindings')
           const hyperdrive = (config.hyperdrive || []).find((item) => item.binding === 'HYPERDRIVE')
           if (!hyperdrive || hyperdrive.id !== '0c53a1bb9bc0484bac146e8ae2d3158b') {
             throw new Error('W01 must bind the verified D1-01 Neon Hyperdrive resource')
           }
-          console.log('W01_RUNTIME_BINDINGS=PASS; PAYLOAD_DATABASE_DRIVER=neon; D1_01 rollback preserved; Hyperdrive verified')
+          console.log('W01_RUNTIME_BINDINGS=PASS; PAYLOAD_DATABASE_DRIVER=neon; PRODUCTION_D1_BINDINGS=NONE; HYPERDRIVE=VERIFIED')
           NODE
 
       - name: Verify PostgreSQL adapter is bundled and node-postgres is a runtime dependency
@@ -116,8 +115,13 @@ jobs:
           }
           if (!deployWorkflow.includes('pnpm install --frozen-lockfile --ignore-scripts') ||
               deployWorkflow.includes('pnpm install --prod') ||
-              !deployWorkflow.includes('pnpm run deploy:app')) {
-            throw new Error('W01 production deploy must install build dependencies and bundle the application')
+              !deployWorkflow.includes('pnpm run deploy:app') ||
+              !pkg.scripts?.['deploy:app']?.includes('--config=wrangler.neon.jsonc') ||
+              !pkg.scripts?.deploy?.includes('deploy:app') ||
+              pkg.scripts?.deploy?.includes('deploy:database') ||
+              pkg.scripts?.['legacy:deploy:d1-database'] ||
+              pkg.scripts?.['predeploy:database']) {
+            throw new Error('W01 production deploy must use the D1-free Neon config and must not run the legacy D1 migration script')
           }
           console.log('W01_POSTGRES_ADAPTER_BUNDLED_AND_PG_RUNTIME_DEPENDENCY=PASS')
           NODE
