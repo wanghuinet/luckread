@@ -79,6 +79,20 @@ export function validateWorkerBindings(config, owner) {
   const actual = Array.isArray(config?.d1_databases) ? config.d1_databases : []
   const expected = Array.isArray(owner?.physicalBindings) ? owner.physicalBindings : []
 
+  if (owner?.worker === 'W03') {
+    const sourceIncluded = expected.some((item) =>
+      item.binding === 'D1_02' && item.logicalDomain === 'D1-02' && item.databaseName === 'luckreadpro' &&
+      item.databaseUuid === '6c342634-97f6-4248-9f4a-85772af4f22c' && item.included === true)
+    if (!sourceIncluded) errors.push('W03 migration provenance must remain pinned to the admitted D1-02 source')
+    if (actual.length !== 0) errors.push('W03 Neon production config must have zero D1 bindings')
+    if (config?.vars?.W03_CONTENT_READ_DRIVER !== 'neon') errors.push('W03 must select Neon for all content runtime stores')
+    if (!(config?.hyperdrive ?? []).some((item) =>
+      item.binding === 'HYPERDRIVE_D1_02' && item.id === 'c55183e1cc3446409c9c1075832c6615')) {
+      errors.push('W03 HYPERDRIVE_D1_02 target mismatch')
+    }
+    return errors
+  }
+
   if (owner?.worker === 'W05') {
     const sourceIncluded = expected.some((item) =>
       item.binding === 'DB' && item.logicalDomain === 'D1-02' && item.databaseName === 'luckreadpro' &&
@@ -227,13 +241,13 @@ export function buildD1_02Inventory({ contract, readSource, listSqlFiles }) {
       neonConnectionAttempted: false,
       remoteDdlExecuted: false,
       productionD1Touched: false,
-      workerRuntimeOrBindingChanged: false,
+      workerRuntimeOrBindingChanged: contract.owners.some((owner) => owner.worker === 'W03'),
       businessDataImported: false,
       productionCutoverAuthorized: false,
     },
     ownerSummaries: contract.owners.map((owner) => ({
       worker: owner.worker,
-      runtimeProvider: owner.worker === 'W05' ? 'neon' : 'cloudflare-d1',
+      runtimeProvider: ['W03', 'W05'].includes(owner.worker) ? 'neon' : 'cloudflare-d1',
       migrationDirectory: owner.migrationDirectory,
       migrationCount: owner.sqlMigrations.length,
       includedBindings: owner.physicalBindings.filter((item) => item.included).map((item) => item.binding),
