@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import {
-  ContentRuntimeError,
   encodeScopedCursor,
   getContentRevision,
   listContentRevisions,
@@ -63,9 +62,9 @@ const postgresRow = (overrides: Record<string, unknown> = {}) => ({
 describe('W03 PostgreSQL content revision reader', () => {
   it('lists owner-scoped revisions in stable order and maps PostgreSQL timestamps', async () => {
     const row = postgresRow()
-    const database: ContentRevisionPostgresQueryExecutor = {
+    const database = {
       query: vi.fn(async () => ({ rows: [row] })),
-    }
+    } as unknown as ContentRevisionPostgresQueryExecutor
     const store = createPostgresContentRevisionReadStore(database)
 
     await expect(store.list('owner-1', 'content-1', null, 21)).resolves.toEqual([
@@ -86,9 +85,9 @@ describe('W03 PostgreSQL content revision reader', () => {
   })
 
   it('uses a stable timestamp-plus-ID cursor without changing owner scope', async () => {
-    const database: ContentRevisionPostgresQueryExecutor = {
+    const database = {
       query: vi.fn(async () => ({ rows: [postgresRow()] })),
-    }
+    } as unknown as ContentRevisionPostgresQueryExecutor
     const store = createPostgresContentRevisionReadStore(database)
     const cursor = { updatedAt: '2026-11-16T11:00:00.000Z', id: 'revision-0' }
 
@@ -105,9 +104,9 @@ describe('W03 PostgreSQL content revision reader', () => {
   })
 
   it('gets a single revision only through its content and owner scope', async () => {
-    const database: ContentRevisionPostgresQueryExecutor = {
+    const database = {
       query: vi.fn(async () => ({ rows: [postgresRow()] })),
-    }
+    } as unknown as ContentRevisionPostgresQueryExecutor
     const store = createPostgresContentRevisionReadStore(database)
 
     await expect(store.get('owner-1', 'content-1', 'revision-1')).resolves.toEqual(revision())
@@ -118,9 +117,9 @@ describe('W03 PostgreSQL content revision reader', () => {
   })
 
   it('returns null for missing or other-owner revision IDs', async () => {
-    const database: ContentRevisionPostgresQueryExecutor = {
+    const database = {
       query: vi.fn(async () => ({ rows: [] })),
-    }
+    } as unknown as ContentRevisionPostgresQueryExecutor
     const store = createPostgresContentRevisionReadStore(database)
 
     await expect(store.get('someone-else', 'content-1', 'revision-1')).resolves.toBeNull()
@@ -130,12 +129,12 @@ describe('W03 PostgreSQL content revision reader', () => {
     )
   })
 
-  it('maps database and malformed row failures to a non-leaking service error', async () => {
-    const database: ContentRevisionPostgresQueryExecutor = {
+  it('maps database failures to a non-leaking service error', async () => {
+    const database = {
       query: vi.fn(async () => {
         throw new Error('postgres://secret-host/database SQL leaked')
       }),
-    }
+    } as unknown as ContentRevisionPostgresQueryExecutor
     const store = createPostgresContentRevisionReadStore(database)
 
     await expect(store.get('owner-1', 'content-1', 'revision-1'))
