@@ -43,6 +43,7 @@ on:
       - 'workers/W03-content/src/content-detail-read-store-postgres.ts'
       - 'workers/W03-content/src/creator-contents-read-store-postgres.ts'
       - 'workers/W03-content/src/content-revision-read-store-postgres.ts'
+      - 'workers/W03-content/src/content-relationship-list-read-store-postgres.ts'
       - 'workers/W03-content/src/entry.ts'
       - 'workers/W03-content/src/neon/runtime.ts'
 
@@ -125,6 +126,7 @@ jobs:
             ['contentDetailReadStoreProvider', 'getW03ContentDetailReadStore'],
             ['creatorContentsReadStoreProvider', 'getW03CreatorContentsReadStore'],
             ['contentRevisionReadStoreProvider', 'getW03ContentRevisionReadStore'],
+            ['contentRelationshipReadStoreProvider', 'getW03ContentRelationshipReadStore'],
           ]
           for (const [provider, factory] of providers) {
             if (!entry.includes(provider) || !entry.includes(factory) || !runtime.includes(factory)) {
@@ -140,6 +142,12 @@ jobs:
               !contentRuntime.includes('readStore.list(principalUserId, contentId, decoded, pageSize + 1)') ||
               !contentRuntime.includes('const revision = await readStore.get(principalUserId, contentId, revisionId)')) {
             throw new Error('W03 Neon content revision history read wiring is incomplete')
+          }
+          if (!entry.includes('contentRelationshipReadStoreProvider') ||
+              !runtime.includes('getW03ContentRelationshipReadStore') ||
+              !router.includes('dependencies.contentRelationshipReadStoreProvider?.(env)') ||
+              !relationships.includes('readStore.list(')) {
+            throw new Error('W03 Neon public relationship list read wiring is incomplete')
           }
           if (!contentRuntime.includes('mutationStore.transition({') ||
               !router.includes('dependencies.contentMutationStoreProvider?.(env),')) {
