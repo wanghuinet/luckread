@@ -11,7 +11,7 @@ import {
   verifyWorkerConfig,
 } from './verify-neon-worker-hyperdrive-staging.mjs'
 
-test('all six admitted Worker configs target Neon Hyperdrive and match their expected D1 binding state', async () => {
+test('all six admitted Worker configs target Neon Hyperdrive and have the expected zero-D1 production bindings', async () => {
   const result = await inspectNeonWorkerHyperdriveStaging()
   assert.equal(result.status, 'SOURCE_CONFIG_STAGED_ONLY')
   assert.equal(result.stagedWorkerCount, 6)
@@ -39,7 +39,7 @@ test('rejects a Hyperdrive resource id that does not match the authoritative dom
   )
 })
 
-test('continues to require W07 rollback bindings while W05 is production D1-free', () => {
+test('rejects reintroducing W07 production D1 while W05 remains D1-free', () => {
   const expected = STAGED_WORKERS.find((worker) => worker.worker === 'W07')
   assert.throws(
     () => verifyWorkerConfig({
@@ -102,7 +102,7 @@ test('fails closed when a required Worker Wrangler file is missing', async () =>
     await writeFile(path.join(root, 'workers', 'W01-payload', 'wrangler.jsonc'), JSON.stringify({
       name: 'luckread-w01-payload',
       vars: { PAYLOAD_DATABASE_DRIVER: 'neon' },
-      d1_databases: [{ binding: 'D1' }],
+      d1_databases: [],
       hyperdrive: [{ binding: 'HYPERDRIVE', id: '0c53a1bb9bc0484bac146e8ae2d3158b' }],
     }))
     await assert.rejects(inspectNeonWorkerHyperdriveStaging(root), /ENOENT/)
