@@ -66,8 +66,9 @@ if (service(w08, 'W02_AUTH')?.service !== 'luckread-w02') {
 if (service(w08, 'W01')) {
   throw new Error('Creator business Worker must not bind back to W01')
 }
-if (!Array.isArray(w08.d1_databases) || !w08.d1_databases.some((x) => x.binding === 'D1_01' && x.database_id === '2f80471e-3756-49f9-8db1-7707a433ad64')) {
-  throw new Error('W08 D1-01 binding missing or mismatched')
+if ((w08.d1_databases ?? []).length !== 0 || w08.vars?.W08_DATABASE_DRIVER !== 'neon' ||
+    !(w08.hyperdrive ?? []).some((x) => x.binding === 'HYPERDRIVE' && x.id === '0c53a1bb9bc0484bac146e8ae2d3158b')) {
+  throw new Error('W08 must use the existing Neon D1-01 database with no production D1 binding')
 }
 if (service(w03, 'W01') || service(w06, 'W01')) {
   throw new Error('Business Worker must not bind back to W01 by default')
