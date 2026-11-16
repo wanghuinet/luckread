@@ -15,6 +15,7 @@ import {
   getW03SeriesUpdateStore,
   getW03SeriesDeleteStore,
   getW03SeriesMemberAttachStore,
+  getW03CollectionMemberAttachStore,
   getW03SeriesMemberRemoveStore,
   getW03SeriesReadStore,
   getW03MembersReadStore,
@@ -405,6 +406,24 @@ it('provides and caches the Neon Series member removal writer while keeping D1 a
   const env = { W03_CONTENT_READ_DRIVER: 'neon', HYPERDRIVE_D1_02: binding }
   const first = getW03SeriesMemberRemoveStore(env)
   const second = getW03SeriesMemberRemoveStore(env)
+
+  expect(first).toBeDefined()
+  expect(first).toBe(second)
+  await getW03PublicMediaReferencePostgresPool(env).end()
+})
+
+
+it('provides and caches the Neon Collection member-attach writer while keeping D1 as default', async () => {
+  expect(getW03CollectionMemberAttachStore({
+    D1_02: { prepare() { throw new Error('D1 should not be queried') } },
+  })).toBeUndefined()
+
+  const binding = {
+    connectionString: 'postgresql://postgres:postgres@127.0.0.1:5432/luckread',
+  }
+  const env = { W03_CONTENT_READ_DRIVER: 'neon', HYPERDRIVE_D1_02: binding }
+  const first = getW03CollectionMemberAttachStore(env)
+  const second = getW03CollectionMemberAttachStore(env)
 
   expect(first).toBeDefined()
   expect(first).toBe(second)
