@@ -1,4 +1,8 @@
-import { ContentRuntimeError, type ContentRevision, type ContentRevisionCursor, type ContentRevisionReadStore } from './content-runtime.js'
+import {
+  ContentRuntimeError,
+  type ContentRevision,
+  type ContentRevisionReadStore,
+} from './content-runtime.js'
 
 type RevisionPostgresRow = Readonly<{
   id: string
