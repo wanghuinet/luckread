@@ -196,12 +196,14 @@ describe('W03 Neon Series delete', () => {
       expect.stringContaining('UPDATE content_series'),
       'COMMIT',
     ])
+    expect(fixture.transactionQueries[2]?.sql).toContain("'COMPLETED', 204, ''")
     expect(fixture.transactionQueries[2]?.values).toEqual(expect.arrayContaining([
       'creator_1',
       'deleteSeries',
       'delete-key',
       'delete-hash',
-      '',
+      '2026-11-16T01:00:00.000Z',
+      '2026-11-17T01:00:00.000Z',
     ]))
     expect(fixture.transactionQueries[3]?.sql).toContain("SET state = 'DELETED'")
     expect(fixture.transactionQueries[3]?.sql).toContain(
