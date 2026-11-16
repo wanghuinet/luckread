@@ -200,7 +200,7 @@ async function listNeonContentRelationships(
         : null,
     }
   } catch (error) {
-    mapFailure(error)
+    return mapFailure(error)
   }
 }
 
