@@ -9,7 +9,7 @@ export const STAGED_WORKERS = Object.freeze([
   {
     worker: 'W01',
     script: 'luckread-w01-payload',
-    configPath: 'workers/W01-payload/wrangler.jsonc',
+    configPath: 'workers/W01-payload/wrangler.neon.jsonc',
     binding: 'HYPERDRIVE',
     hyperdriveId: '0c53a1bb9bc0484bac146e8ae2d3158b',
     d1Bindings: [],
@@ -47,7 +47,7 @@ export const STAGED_WORKERS = Object.freeze([
   {
     worker: 'W07',
     script: 'luckread-w07',
-    configPath: 'workers/W07-subscription-commerce/wrangler.jsonc',
+    configPath: 'workers/W07-subscription-commerce/wrangler.neon.jsonc',
     binding: 'HYPERDRIVE_D1_04',
     hyperdriveId: '3ae15e6dfb5e4b44979eee30e1d5ede4',
     d1Bindings: [],
