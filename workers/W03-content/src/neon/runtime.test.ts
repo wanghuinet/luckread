@@ -27,6 +27,7 @@ import {
   getW03MembersReadStore,
   getW03ContentDetailReadStore,
   getW03CreatorContentsReadStore,
+  getW03PublicContentListReadStore,
   resolveW03PublicMediaReferenceDriver,
 } from './runtime.js'
 
@@ -136,6 +137,26 @@ describe('W03 public media reference database driver', () => {
     await expect(firstStore.listPublishedMediaReferences([], 51)).resolves.toEqual([])
     await firstPool.end()
   })
+  it('caches the Neon public content search/list read store on the shared Hyperdrive pool', async () => {
+    expect(getW03PublicContentListReadStore({
+      D1_02: { prepare() { throw new Error('D1 should not be queried') } },
+    })).toBeUndefined()
+
+    const binding = {
+      connectionString: 'postgresql://postgres:postgres@127.0.0.1:5432/luckread',
+    }
+    const env = {
+      W03_CONTENT_READ_DRIVER: 'neon',
+      HYPERDRIVE_D1_02: binding,
+    }
+    const first = getW03PublicContentListReadStore(env)
+    const second = getW03PublicContentListReadStore(env)
+
+    expect(first).toBeDefined()
+    expect(first).toBe(second)
+    await getW03PublicMediaReferencePostgresPool(env).end()
+  })
+
   it('requires the existing D1-02 Hyperdrive binding for explicit Neon thread reads', () => {
     expect(() => getW03PostThreadReadStore({ W03_CONTENT_READ_DRIVER: 'neon' }))
       .toThrow('W03_HYPERDRIVE_D1_02_BINDING_REQUIRED')
