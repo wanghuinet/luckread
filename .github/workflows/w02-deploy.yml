@@ -59,28 +59,30 @@ jobs:
         working-directory: workers/W02-identity
         run: |
           node --input-type=module -e "import { readFile } from 'node:fs/promises'; const pkg = JSON.parse(await readFile('./node_modules/better-auth/package.json', 'utf8')); if (pkg.version !== '1.7.8') throw new Error('Expected better-auth 1.7.8, got ' + pkg.version); await import('better-auth'); console.log('better-auth ' + pkg.version + ' import: OK')"
-      - name: Verify Neon D1-01 runtime target and preserved D1 rollback binding
+      - name: Verify W02 Neon-only production config and historical D1 migration source
         working-directory: workers/W02-identity
         run: |
           set -euo pipefail
           node --input-type=module <<'NODE'
           import fs from 'node:fs'
-          const config = JSON.parse(fs.readFileSync('wrangler.jsonc', 'utf8'))
-          if (config.name !== 'luckread-w02') throw new Error('W02 Worker identity mismatch')
-          if (config.vars?.W02_DATABASE_DRIVER !== 'neon') {
-            throw new Error('W02 production runtime must select Neon for D1-01')
-          }
-          const d1 = (config.d1_databases || []).find((item) => item.binding === 'D1_01')
-          if (!d1 || d1.database_name !== 'luckread' ||
-              d1.database_id !== '2f80471e-3756-49f9-8db1-7707a433ad64' ||
-              d1.migrations_dir !== 'migrations') {
-            throw new Error('W02 D1-01 rollback binding must be preserved')
-          }
+          const source = JSON.parse(fs.readFileSync('wrangler.jsonc', 'utf8'))
+          const config = JSON.parse(fs.readFileSync('wrangler.neon.jsonc', 'utf8'))
+          const sourceD1 = (source.d1_databases || []).find((item) => item.binding === 'D1_01')
           const hyperdrive = (config.hyperdrive || []).find((item) => item.binding === 'HYPERDRIVE')
-          if (!hyperdrive || hyperdrive.id !== '0c53a1bb9bc0484bac146e8ae2d3158b') {
-            throw new Error('W02 must bind the verified D1-01 Neon Hyperdrive resource')
+          if (source.name !== 'luckread-w02' || !sourceD1 ||
+              sourceD1.database_name !== 'luckread' ||
+              sourceD1.database_id !== '2f80471e-3756-49f9-8db1-7707a433ad64' ||
+              sourceD1.migrations_dir !== 'migrations') {
+            throw new Error('W02 historical D1-01 migration-source identity drifted')
           }
-          console.log('W02_PRODUCTION_DATABASE=NEON_D1_01; D1_ROLLBACK_BINDING=PRESERVED; HYPERDRIVE=VERIFIED')
+          if (config.name !== 'luckread-w02' || config.main !== 'src/index.ts') throw new Error('W02 production Worker identity/entrypoint mismatch')
+          if ((config.d1_databases || []).length !== 0) throw new Error('W02 production Neon config must not bind Cloudflare D1')
+          if (config.vars?.W02_DATABASE_DRIVER !== 'neon') throw new Error('W02 production must select Neon')
+          if (!hyperdrive || hyperdrive.id !== '0c53a1bb9bc0484bac146e8ae2d3158b') throw new Error('W02 Neon Hyperdrive target mismatch')
+          if (!(config.compatibility_flags || []).includes('nodejs_compat')) throw new Error('W02 PostgreSQL runtime requires nodejs_compat')
+          if (!(config.queues?.producers || []).some((item) => item.binding === 'AUTH013_QUEUE' && item.queue === 'luckread-auth013-account-state')) throw new Error('W02 AUTH013_QUEUE producer mismatch')
+          if (!(config.queues?.producers || []).some((item) => item.binding === 'AUTH013_PROJECTION_QUEUE' && item.queue === 'luckread-auth013-account-state-projection')) throw new Error('W02 AUTH013_PROJECTION_QUEUE producer mismatch')
+          console.log('W02_PRODUCTION_DATABASE=NEON_D1_01; PRODUCTION_D1_BINDINGS=NONE; HYPERDRIVE=VERIFIED')
           NODE
       - name: Verify RoleAssignment migration artifacts
         run: |
@@ -102,46 +104,38 @@ jobs:
           SOURCE_SHA: ${{ inputs.source_sha }}
         run: node scripts/verify-auth-007-rollout-admission.mjs
 
-      - name: Verify AUTH-007 operation-receipt schema before runtime deployment (read-only)
+      - name: Verify applied Neon D1-01 schema evidence before runtime deployment
         working-directory: workers/W02-identity
-        env:
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          DATABASE_NAME: luckread
-          EXPECTED_D1_01_ID: "2f80471e-3756-49f9-8db1-7707a433ad64"
         run: |
           set -euo pipefail
           node --input-type=module <<'NODE'
           import fs from 'node:fs'
-          const config = JSON.parse(fs.readFileSync('wrangler.jsonc', 'utf8'))
-          const target = config.d1_databases?.find((item) => item.binding === 'D1_01')
-          if (!target) throw new Error('D1_01 binding missing; deployment stopped')
-          if (target.database_name !== process.env.DATABASE_NAME) throw new Error('D1_01 database name mismatch; deployment stopped')
-          if (target.database_id !== process.env.EXPECTED_D1_01_ID) throw new Error('D1_01 database UUID mismatch; deployment stopped')
-          console.log(JSON.stringify({ binding: target.binding, database_name: target.database_name, database_id: target.database_id, mode: 'READONLY_PREDEPLOY' }))
-          NODE
-          npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote --config wrangler.jsonc \
-            --command "SELECT name FROM d1_migrations WHERE name LIKE '%0009_auth_007_mfa_operation_receipts.sql' OR name LIKE '%0010_auth_username_change_state.sql';" \
-            > /tmp/auth007-mfa-receipt-migration-ledger.txt
-          grep -q '0009_auth_007_mfa_operation_receipts.sql' /tmp/auth007-mfa-receipt-migration-ledger.txt && grep -q '0010_auth_username_change_state.sql' /tmp/auth007-mfa-receipt-migration-ledger.txt || {
-            echo "Required D1-01 migrations 0009 and 0010 are not recorded; refusing to deploy W02 runtime."
-            exit 1
+          const bootstrap = JSON.parse(fs.readFileSync('../../contracts/database/neon-five-domain-schema-bootstrap.v1.json', 'utf8'))
+          const domain = (bootstrap.domains || []).find((item) => item.domainId === 'D1-01')
+          const owners = domain?.completedSchemaOwners || []
+          const expectedOwners = ['W01-Payload', 'W02-Better-Auth-and-custom-identity', 'W07-D1-01-subscriptions', 'W08-Creator']
+          if (domain?.databaseName !== 'luckread' || domain?.remoteSchemaApplied !== true ||
+              domain?.status !== 'D1_01_SCHEMA_ONLY_REMOTE_APPLIED_ALL_OWNER_POSTFLIGHT_PASSED_RUNTIME_CUTOVER_PENDING') {
+            throw new Error('W02 deployment requires the already applied Neon D1-01 shared schema')
           }
-          npx --yes wrangler@4.116.0 d1 execute "$DATABASE_NAME" --remote --config wrangler.jsonc \
-            --command "SELECT type, name, sql FROM sqlite_master WHERE name IN ('auth_007_mfa_operation_receipts', 'auth_007_mfa_operation_receipts_status_next_attempt_idx', 'auth_username_change_state', 'auth_username_change_state_previous_name_idx', 'auth_username_change_state_last_changed_idx', 'auth_user_username_normalized_lookup_idx', 'auth_username_identity_projection_sync', 'auth_user_previous_username_reservation_guard_insert', 'auth_user_previous_username_reservation_guard_update') ORDER BY type, name;" \
-            > /tmp/auth007-mfa-receipt-schema.txt
-          for expected in auth_007_mfa_operation_receipts auth_007_mfa_operation_receipts_status_next_attempt_idx auth_username_change_state auth_username_change_state_previous_name_idx auth_username_change_state_last_changed_idx auth_user_username_normalized_lookup_idx auth_username_identity_projection_sync auth_user_previous_username_reservation_guard_insert auth_user_previous_username_reservation_guard_update; do
-            grep -q "$expected" /tmp/auth007-mfa-receipt-schema.txt || {
-              echo "Required D1-01 schema object $expected is missing; refusing to deploy W02 runtime."
-              exit 1
-            }
-          done
+          for (const owner of expectedOwners) if (!owners.includes(owner)) {
+            throw new Error('Neon D1-01 schema owner postflight is missing: ' + owner)
+          }
+          if (domain?.ownerPostflight?.W02?.status !== 'BETTER_AUTH_CORE_AND_ALL_CUSTOM_POSTFLIGHTS_PASS') {
+            throw new Error('W02 Better Auth and custom PostgreSQL schema postflight must already pass')
+          }
+          const config = JSON.parse(fs.readFileSync('wrangler.neon.jsonc', 'utf8'))
+          if ((config.d1_databases || []).length !== 0 || config.vars?.W02_DATABASE_DRIVER !== 'neon') {
+            throw new Error('W02 runtime config must be Neon-only before deployment')
+          }
+          console.log('W02_NEON_D1_01_SCHEMA_EVIDENCE=PASS; CLOUDFLARE_D1_CONNECTIONS=NONE')
+          NODE
 
       - name: Deploy W02 with pinned Wrangler
         working-directory: workers/W02-identity
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        run: npx --yes wrangler@4.116.0 deploy --config wrangler.jsonc
+        run: npx --yes wrangler@4.116.0 deploy --config wrangler.neon.jsonc
 
 # Workflow dispatch index refresh: no runtime or architecture change.
