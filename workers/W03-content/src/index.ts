@@ -1254,13 +1254,12 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
         }
         const cursor = url.searchParams.get('cursor')
         if (cursor && cursor.length > 2048) throw new ContentRuntimeError('INVALID_CURSOR', 400)
-        const page = await listContentRelationships(
-          env.D1_02,
-          path.id,
-          directionParam as ContentRelationshipDirection,
-          cursor,
-          parseListLimit(url.searchParams.get('limit')),
-        )
+        const relationshipStore = dependencies.contentRelationshipMutationStoreProvider?.(env)
+        const direction = directionParam as ContentRelationshipDirection
+        const limit = parseListLimit(url.searchParams.get('limit'))
+        const page = relationshipStore?.list
+          ? await relationshipStore.list({ contentId: path.id, direction, cursor, limit })
+          : await listContentRelationships(env.D1_02, path.id, direction, cursor, limit)
         return json({
           data: {
             items: page.items,
@@ -1372,11 +1371,14 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
         if (url.search !== '') throw new ContentRuntimeError('VALIDATION_FAILED', 400)
         const ownerUserId = decodePathSegment(usernameRedirectEligibilityMatch[1] ?? '')
         if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(ownerUserId)) throw new ContentRuntimeError('VALIDATION_FAILED', 400)
-        // W03/D1-02 is the only authority for published, publicly accessible content.
-        const eligible = await env.D1_02.prepare(
-          "SELECT id FROM contents WHERE owner_user_id = ? AND state = 'PUBLISHED' AND content_type IN ('article', 'post', 'video') AND COALESCE(access_mode, 'PUBLIC') = 'PUBLIC' LIMIT 1",
-        ).bind(ownerUserId).first<{ id: string }>()
-        return json({ data: { eligible: Boolean(eligible) }, requestId: createRequestId() })
+        // W03 remains the authority; production uses the Neon context read store.
+        const contextReadStore = dependencies.contentContextReadStoreProvider?.(env)
+        const eligible = contextReadStore
+          ? await contextReadStore.hasPublicCreatorContent(ownerUserId)
+          : Boolean(await env.D1_02.prepare(
+              "SELECT id FROM contents WHERE owner_user_id = ? AND state = 'PUBLISHED' AND content_type IN ('article', 'post', 'video') AND COALESCE(access_mode, 'PUBLIC') = 'PUBLIC' LIMIT 1",
+            ).bind(ownerUserId).first<{ id: string }>())
+        return json({ data: { eligible }, requestId: createRequestId() })
       }
 
       if (request.method === 'GET' && url.pathname === '/internal/content/creator-contents') {
@@ -1677,10 +1679,12 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
           // record become a side door around a MEMBERS_ONLY article.
           let bodyReferenceAllowed = true
           if (content.bodyRef) {
-            const protectedReferences = await env.D1_02.prepare(
-              "SELECT owner_user_id, creator_id FROM contents WHERE body_ref = ? AND state = 'PUBLISHED' AND access_mode = 'MEMBERS_ONLY' LIMIT 51",
-            ).bind(content.bodyRef).all<{ owner_user_id: string; creator_id: string | null }>()
-            const rows = protectedReferences.results ?? []
+            const contextReadStore = dependencies.contentContextReadStoreProvider?.(env)
+            const rows = contextReadStore
+              ? await contextReadStore.listPublishedMembersOnlyBodyReferences(content.bodyRef, 51)
+              : (await env.D1_02.prepare(
+                  "SELECT owner_user_id, creator_id FROM contents WHERE body_ref = ? AND state = 'PUBLISHED' AND access_mode = 'MEMBERS_ONLY' LIMIT 51",
+                ).bind(content.bodyRef).all<{ owner_user_id: string; creator_id: string | null }>()).results ?? [])
             if (rows.length > 50) throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
             for (const row of rows) {
               if (principalUserId && principalUserId === row.owner_user_id) continue
