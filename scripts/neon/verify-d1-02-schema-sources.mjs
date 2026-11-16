@@ -87,8 +87,8 @@ export function validateWorkerBindings(config, owner) {
     if (actual.length !== 0) errors.push('W03 Neon production config must have zero D1 bindings')
     if (config?.vars?.W03_CONTENT_READ_DRIVER !== 'neon') errors.push('W03 must select Neon for all content runtime stores')
     if (!(config?.hyperdrive ?? []).some((item) =>
-      item.binding === 'HYPERDRIVE_D1_02' && item.id === 'c55183e1cc3446409c9c1075832c6615')) {
-      errors.push('W03 HYPERDRIVE_D1_02 target mismatch')
+      item.binding === 'HYPERDRIVE_CONTENT_PG' && item.id === 'c55183e1cc3446409c9c1075832c6615')) {
+      errors.push('W03 HYPERDRIVE_CONTENT_PG target mismatch')
     }
     return errors
   }
