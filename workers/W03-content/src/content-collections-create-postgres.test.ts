@@ -153,7 +153,7 @@ describe('W03 Neon Collection creation', () => {
   })
 
   it('routes collection creation through the injected Neon store without touching D1', async () => {
-    const create = vi.fn(async () => undefined)
+    const create = vi.fn(async (_input: Parameters<CollectionCreateStore['create']>[0]) => undefined)
     const store: CollectionCreateStore = {
       loadIdempotency: vi.fn(async () => null),
       create,
