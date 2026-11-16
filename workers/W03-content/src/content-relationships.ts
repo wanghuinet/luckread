@@ -889,7 +889,7 @@ export async function appendPostThreadNext(
         MAX_POST_THREAD_ITEMS,
       ),
       db.prepare('INSERT OR REPLACE INTO content_txn_guard(id, successful) VALUES (1, changes())'),
-  ]);
+    ]);
   }
 
   return relationship;
