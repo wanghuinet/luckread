@@ -5,11 +5,7 @@
   "version": "1.0.0",
   "status": "CONTRACTED_PARTIAL",
   "purpose": "Make the existing Worker-to-D1 scoping mechanically checkable without introducing a D1 proxy or rewriting business logic.",
-  "topology": {
-    "workerCount": 12,
-    "d1Count": 5,
-    "taskCount": 25
-  },
+  "topology": { "workerCount": 12, "d1Count": 5, "taskCount": 25 },
   "physicalD1Registry": {
     "D1-01": "2f80471e-3756-49f9-8db1-7707a433ad64",
     "D1-02": "6c342634-97f6-4248-9f4a-85772af4f22c",
@@ -21,82 +17,18 @@
     "D1-05": "allluck"
   },
   "workers": {
-    "W01": {
-      "allowedDomains": [
-        "D1-01"
-      ],
-      "notes": "Bounded Payload-native execution substrate; not general D1 business authority."
-    },
-    "W02": {
-      "allowedDomains": [
-        "D1-01"
-      ]
-    },
-    "W03": {
-      "allowedDomains": [
-        "D1-02"
-      ]
-    },
-    "W04": {
-      "allowedDomains": []
-    },
-    "W05": {
-      "allowedDomains": [
-        "D1-02",
-        "D1-03"
-      ],
-      "nonProductionCompatibilityBindings": [
-        "DB",
-        "D1_03"
-      ],
-      "productionRuntime": {
-        "provider": "neon",
-        "driverVars": {
-          "W05_DATABASE_DRIVER": "neon",
-          "W05_PUSH_ENDPOINT_DATABASE_DRIVER": "neon"
-        },
-        "hyperdrive": {
-          "HYPERDRIVE_D1_02": "c55183e1cc3446409c9c1075832c6615",
-          "HYPERDRIVE_D1_03": "7c8831416c18494faee04b96aa551cb9"
-        },
-        "note": "Legacy DB/D1_03 fallback references are retained only for local/unit-test adapters. Production entry injects all W05 social stores and the W09-owned endpoint Neon executor; Wrangler has no D1 bindings."
-      }
-    },
-    "W06": {
-      "allowedDomains": [
-        "D1-03"
-      ]
-    },
-    "W07": {
-      "allowedDomains": [
-        "D1-01",
-        "D1-04"
-      ]
-    },
-    "W08": {
-      "allowedDomains": [
-        "D1-01"
-      ]
-    },
-    "W09": {
-      "allowedDomains": [
-        "D1-03"
-      ]
-    },
-    "W10": {
-      "allowedDomains": [
-        "D1-03"
-      ]
-    },
-    "W11": {
-      "allowedDomains": [
-        "D1-03",
-        "D1-05"
-      ]
-    },
-    "W12": {
-      "allowedDomains": []
-    }
+    "W01": { "allowedDomains": ["D1-01"], "notes": "Bounded Payload-native execution substrate; not general D1 business authority." },
+    "W02": { "allowedDomains": ["D1-01"] },
+    "W03": { "allowedDomains": ["D1-02"] },
+    "W04": { "allowedDomains": [] },
+    "W05": { "allowedDomains": ["D1-02", "D1-03"] },
+    "W06": { "allowedDomains": ["D1-03"] },
+    "W07": { "allowedDomains": ["D1-01", "D1-04"] },
+    "W08": { "allowedDomains": ["D1-01"] },
+    "W09": { "allowedDomains": ["D1-03"] },
+    "W10": { "allowedDomains": ["D1-03"] },
+    "W11": { "allowedDomains": ["D1-03", "D1-05"] },
+    "W12": { "allowedDomains": [] }
   },
   "rules": {
     "unknownD1Id": "FAIL",
