@@ -9,6 +9,7 @@ import type {
   ContentDetailReadStore,
   CreatorContentsReadStore,
   PublishedContentsByIdsReadStore,
+  ContentCreateStore,
 } from '../content-runtime.js'
 import { createPostgresPublishedMediaReferenceReadStore } from '../published-media-reference-read-store-postgres.js'
 import { createPostgresPublishedContentsByIdsReadStore } from '../published-contents-by-ids-read-store-postgres.js'
@@ -21,6 +22,7 @@ import {
 } from '../content-collections-read-store-postgres.js'
 import type { CollectionListReadStore } from '../content-collections.js'
 import { createPostgresCollectionCreateStore, type CollectionCreatePostgresDatabase } from '../content-collections-create-store-postgres.js'
+import { createPostgresContentCreateStore, type ContentCreatePostgresDatabase } from '../content-create-store-postgres.js'
 import { createPostgresCollectionUpdateStore, type CollectionUpdatePostgresDatabase } from '../content-collections-update-store-postgres.js'
 import { createPostgresCollectionDeleteStore } from '../content-collections-delete-store-postgres.js'
 import type { CollectionCreateStore, CollectionUpdateStore, CollectionDeleteStore } from '../content-collections.js'
@@ -73,6 +75,7 @@ const postThreadStores = new WeakMap<object, PostThreadReadStore>()
 const contentContextStores = new WeakMap<object, ContentContextReadStore>()
 const collectionListStores = new WeakMap<object, CollectionListReadStore>()
 const collectionCreateStores = new WeakMap<object, CollectionCreateStore>()
+const contentCreateStores = new WeakMap<object, ContentCreateStore>()
 const collectionUpdateStores = new WeakMap<object, CollectionUpdateStore>()
 const collectionDeleteStores = new WeakMap<object, CollectionDeleteStore>()
 const seriesStores = new WeakMap<object, SeriesReadStore>()
@@ -287,6 +290,24 @@ export function getW03CollectionListReadStore(
 }
 
 /** PostgreSQL writer for the existing creator-owned collection create operation. */
+/** PostgreSQL writer for canonical W03 content creation. */
+export function getW03ContentCreateStore(
+  env: W03PublicMediaReferenceRuntimeEnv,
+): ContentCreateStore | undefined {
+  if (resolveW03PublicMediaReferenceDriver(env) === 'd1') return undefined
+  const binding = env.HYPERDRIVE_D1_02
+  if (!binding || typeof binding !== 'object') {
+    throw new Error('W03_HYPERDRIVE_D1_02_BINDING_REQUIRED')
+  }
+  const cached = contentCreateStores.get(binding)
+  if (cached) return cached
+  const store = createPostgresContentCreateStore(
+    getW03PublicMediaReferencePostgresPool(env) as unknown as ContentCreatePostgresDatabase,
+  )
+  contentCreateStores.set(binding, store)
+  return store
+}
+
 export function getW03CollectionCreateStore(
   env: W03PublicMediaReferenceRuntimeEnv,
 ): CollectionCreateStore | undefined {
