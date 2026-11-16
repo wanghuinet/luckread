@@ -1959,7 +1959,7 @@ export async function transitionContentState(
   if (!kind) throw new ContentRuntimeError('PERMISSION_DENIED', 403)
   // Social authors can publish drafts directly, and can edit their own published
   // posts only through the explicit PUBLISHED -> UNPUBLISHED -> DRAFT path.
-  // Reject unrelated targets before D1; resource ownership and source state are
+  // Reject unrelated targets before the database call; ownership and source state are
   // re-checked against the authoritative row below.
   if (kind === 'SOCIAL_AUTHOR' && !['PUBLISHED', 'UNPUBLISHED', 'DRAFT'].includes(to)) {
     throw new ContentRuntimeError('PERMISSION_DENIED', 403)
