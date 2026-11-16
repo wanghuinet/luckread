@@ -32,6 +32,8 @@ on:
       - 'workers/W03-content/src/content-collection-member-reorder-postgres.test.ts'
       - 'workers/W03-content/src/content-series-member-attach-store-postgres.ts'
       - 'workers/W03-content/src/content-series-member-remove-store-postgres.ts'
+      - 'workers/W03-content/src/content-series-member-reorder-store-postgres.ts'
+      - 'workers/W03-content/src/content-series-member-reorder-postgres.test.ts'
       - 'workers/W03-content/src/content-series.ts'
       - 'workers/W03-content/src/content-series-read-store-postgres.ts'
       - 'workers/W03-content/src/content-series-members.ts'
@@ -117,6 +119,7 @@ jobs:
             ['collectionMemberReorderStoreProvider', 'getW03CollectionMemberReorderStore'],
             ['seriesMemberAttachStoreProvider', 'getW03SeriesMemberAttachStore'],
             ['seriesMemberRemoveStoreProvider', 'getW03SeriesMemberRemoveStore'],
+            ['seriesMemberReorderStoreProvider', 'getW03SeriesMemberReorderStore'],
             ['membersReadStoreProvider', 'getW03MembersReadStore'],
             ['contentDetailReadStoreProvider', 'getW03ContentDetailReadStore'],
             ['creatorContentsReadStoreProvider', 'getW03CreatorContentsReadStore'],
@@ -126,7 +129,7 @@ jobs:
               throw new Error('W03 Neon provider wiring is incomplete: ' + provider)
             }
           }
-          if (!runtime.includes('Content creation, update, delete, owner-authorized state transitions, W06 moderation decisions, owner-authorized revision rollback, scheduled publication candidate reads/commits, content reference create/revoke, and native post-thread append plus Collection creation, update, delete, member attachment, member removal, and member reorder plus Series creation, update, delete, member attachment, and member removal are the only Neon-backed mutations in these slices; all other W03 reads and mutations remain on D1_02')) {
+          if (!runtime.includes('Content creation, update, delete, owner-authorized state transitions, W06 moderation decisions, owner-authorized revision rollback, scheduled publication candidate reads/commits, content reference create/revoke, and native post-thread append plus Collection creation, update, delete, member attachment, member removal, and member reorder plus Series creation, update, delete, member attachment, member removal, and member reorder are the only Neon-backed mutations in these slices; all other W03 reads and mutations remain on D1_02')) {
             throw new Error('W03 Neon mutation boundary declaration is missing')
           }
           if (!contentRuntime.includes('mutationStore.transition({') ||
