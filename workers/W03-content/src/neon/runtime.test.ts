@@ -154,7 +154,7 @@ describe('W03 Neon-only content database driver', () => {
       .toThrow('W03_HYPERDRIVE_D1_02_BINDING_REQUIRED')
   })
 
-  it('caches the Neon post-thread reader on the shared D1-02 pool while keeping D1 as default', async () => {
+  it('caches the Neon post-thread reader on the shared Neon pool with Neon-only runtime', async () => {
     expect(() => getW03PostThreadReadStore({})).toThrow('W03_NEON_DRIVER_REQUIRED')
 
     const binding = {
@@ -172,7 +172,7 @@ describe('W03 Neon-only content database driver', () => {
     await getW03PublicMediaReferencePostgresPool(env).end()
   })
 
-  it('provides and caches the Neon creator-collection list reader while keeping D1 as default', async () => {
+  it('provides and caches the Neon creator-collection list reader with Neon-only runtime', async () => {
     expect(() => getW03CollectionListReadStore({})).toThrow('W03_NEON_DRIVER_REQUIRED')
 
     const binding = {
@@ -190,7 +190,7 @@ describe('W03 Neon-only content database driver', () => {
     await getW03PublicMediaReferencePostgresPool(env).end()
   })
 
-  it('provides and caches the Neon collection-create writer while keeping D1 as default', async () => {
+  it('provides and caches the Neon collection-create writer with Neon-only runtime', async () => {
     expect(() => getW03CollectionCreateStore({})).toThrow('W03_NEON_DRIVER_REQUIRED')
 
     const binding = {
@@ -208,7 +208,7 @@ describe('W03 Neon-only content database driver', () => {
     await getW03PublicMediaReferencePostgresPool(env).end()
   })
 
-  it('provides and caches the Neon collection-update writer while keeping D1 as default', async () => {
+  it('provides and caches the Neon collection-update writer with Neon-only runtime', async () => {
     expect(() => getW03CollectionUpdateStore({})).toThrow('W03_NEON_DRIVER_REQUIRED')
 
     const binding = {
@@ -226,7 +226,7 @@ describe('W03 Neon-only content database driver', () => {
     await getW03PublicMediaReferencePostgresPool(env).end()
   })
 
-  it('provides and caches the Neon creator-series reader while keeping D1 as default', async () => {
+  it('provides and caches the Neon creator-series reader with Neon-only runtime', async () => {
     expect(() => getW03SeriesReadStore({})).toThrow('W03_NEON_DRIVER_REQUIRED')
 
     const binding = {
@@ -244,7 +244,7 @@ describe('W03 Neon-only content database driver', () => {
     await getW03PublicMediaReferencePostgresPool(env).end()
   })
 
-  it('provides and caches Neon membership list readers while keeping D1 as default', async () => {
+  it('provides and caches Neon membership list readers with Neon-only runtime', async () => {
     expect(() => getW03MembersReadStore({})).toThrow('W03_NEON_DRIVER_REQUIRED')
 
     const binding = {
@@ -262,7 +262,7 @@ describe('W03 Neon-only content database driver', () => {
     await getW03PublicMediaReferencePostgresPool(env).end()
   })
 
-  it('provides and caches the Neon content-detail reader while keeping D1 as default', async () => {
+  it('provides and caches the Neon content-detail reader with Neon-only runtime', async () => {
     expect(() => getW03ContentDetailReadStore({})).toThrow('W03_NEON_DRIVER_REQUIRED')
 
     const binding = {
@@ -280,7 +280,7 @@ describe('W03 Neon-only content database driver', () => {
     await getW03PublicMediaReferencePostgresPool(env).end()
   })
 
-  it('provides and caches the Neon creator-content list reader while keeping D1 as default', async () => {
+  it('provides and caches the Neon creator-content list reader with Neon-only runtime', async () => {
     expect(() => getW03CreatorContentsReadStore({})).toThrow('W03_NEON_DRIVER_REQUIRED')
 
     const binding = {
@@ -298,7 +298,7 @@ describe('W03 Neon-only content database driver', () => {
     await getW03PublicMediaReferencePostgresPool(env).end()
   })
 
-  it('reuses the shared D1-02 Hyperdrive pool for W01/W05 content context reads and keeps D1 as default', async () => {
+  it('reuses the shared D1-02 Hyperdrive pool for W01/W05 content context reads', async () => {
     expect(() => getW03ContentContextReadStore({})).toThrow('W03_NEON_DRIVER_REQUIRED')
 
     const binding = {
@@ -315,7 +315,7 @@ describe('W03 Neon-only content database driver', () => {
     expect(first).toBe(second)
     await getW03PublicMediaReferencePostgresPool(env).end()
   })
-  it('provides and caches the Neon collection-delete writer while keeping D1 as default', async () => {
+  it('provides and caches the Neon collection-delete writer with Neon-only runtime', async () => {
     expect(() => getW03CollectionDeleteStore({})).toThrow('W03_NEON_DRIVER_REQUIRED')
 
     const binding = {
@@ -333,7 +333,7 @@ describe('W03 Neon-only content database driver', () => {
     await getW03PublicMediaReferencePostgresPool(env).end()
   })
 
-  it('provides and caches the Neon series-create writer while keeping D1 as default', async () => {
+  it('provides and caches the Neon series-create writer with Neon-only runtime', async () => {
     expect(() => getW03SeriesCreateStore({})).toThrow('W03_NEON_DRIVER_REQUIRED')
 
     const binding = {
@@ -351,7 +351,7 @@ describe('W03 Neon-only content database driver', () => {
     await getW03PublicMediaReferencePostgresPool(env).end()
   })
 
-  it('provides and caches the Neon series-update writer while keeping D1 as default', async () => {
+  it('provides and caches the Neon series-update writer with Neon-only runtime', async () => {
     expect(() => getW03SeriesUpdateStore({})).toThrow('W03_NEON_DRIVER_REQUIRED')
 
     const binding = {
@@ -369,7 +369,7 @@ describe('W03 Neon-only content database driver', () => {
     await getW03PublicMediaReferencePostgresPool(env).end()
   })
 
-  it('provides and caches the Neon series-delete writer while keeping D1 as default', async () => {
+  it('provides and caches the Neon series-delete writer with Neon-only runtime', async () => {
     expect(() => getW03SeriesDeleteStore({})).toThrow('W03_NEON_DRIVER_REQUIRED')
 
     const binding = {
@@ -387,7 +387,7 @@ describe('W03 Neon-only content database driver', () => {
     await getW03PublicMediaReferencePostgresPool(env).end()
   })
 
-  it('provides and caches the Neon Series member-attach writer while keeping D1 as default', async () => {
+  it('provides and caches the Neon Series member-attach writer with Neon-only runtime', async () => {
     expect(() => getW03SeriesMemberAttachStore({})).toThrow('W03_NEON_DRIVER_REQUIRED')
 
     const binding = {
@@ -407,7 +407,7 @@ describe('W03 Neon-only content database driver', () => {
 
 })
 
-it('provides and caches the Neon Series member removal writer while keeping D1 as default', async () => {
+it('provides and caches the Neon Series member removal writer with Neon-only runtime', async () => {
   expect(() => getW03SeriesMemberRemoveStore({})).toThrow('W03_NEON_DRIVER_REQUIRED')
 
   const binding = {
@@ -423,7 +423,7 @@ it('provides and caches the Neon Series member removal writer while keeping D1 a
 })
 
 
-it('provides and caches the Neon Collection member-attach writer while keeping D1 as default', async () => {
+it('provides and caches the Neon Collection member-attach writer with Neon-only runtime', async () => {
   expect(() => getW03CollectionMemberAttachStore({})).toThrow('W03_NEON_DRIVER_REQUIRED')
 
   const binding = {
@@ -439,7 +439,7 @@ it('provides and caches the Neon Collection member-attach writer while keeping D
 })
 
 
-it('provides and caches the Neon Collection member-remove writer while keeping D1 as default', async () => {
+it('provides and caches the Neon Collection member-remove writer with Neon-only runtime', async () => {
   expect(() => getW03CollectionMemberRemoveStore({})).toThrow('W03_NEON_DRIVER_REQUIRED')
   const binding = { connectionString: 'postgresql://postgres:postgres@127.0.0.1:5432/luckread' }
   const env = { W03_CONTENT_READ_DRIVER: 'neon', HYPERDRIVE_D1_02: binding }
@@ -451,7 +451,7 @@ it('provides and caches the Neon Collection member-remove writer while keeping D
 })
 
 
-it('provides and caches the Neon Collection member-reorder writer while keeping D1 as default', async () => {
+it('provides and caches the Neon Collection member-reorder writer with Neon-only runtime', async () => {
   expect(() => getW03CollectionMemberReorderStore({})).toThrow('W03_NEON_DRIVER_REQUIRED')
   const binding = { connectionString: 'postgresql://postgres:postgres@127.0.0.1:5432/luckread' }
   const env = { W03_CONTENT_READ_DRIVER: 'neon', HYPERDRIVE_D1_02: binding }
@@ -481,7 +481,7 @@ it('provides and caches the Neon content-create writer on the existing D1-02 Hyp
   await getW03PublicMediaReferencePostgresPool(env).end()
 })
 
-it('provides and caches the Neon Series member-reorder writer while keeping D1 as default', async () => {
+it('provides and caches the Neon Series member-reorder writer with Neon-only runtime', async () => {
   expect(() => getW03SeriesMemberReorderStore({})).toThrow('W03_NEON_DRIVER_REQUIRED')
   const binding = { connectionString: 'postgresql://postgres:postgres@127.0.0.1:5432/luckread' }
   const env = { W03_CONTENT_READ_DRIVER: 'neon', HYPERDRIVE_D1_02: binding }
