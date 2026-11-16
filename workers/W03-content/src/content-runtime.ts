@@ -248,6 +248,23 @@ export interface ContentMutationStore {
     nextVersion: number
     nextEtag: string
   }>): Promise<void>
+  transition(input: Readonly<{
+    ownerUserId: string
+    operationId: string
+    idempotencyKey: string
+    requestHash: string
+    responseJson: string
+    updatedAt: string
+    expiresAt: string
+    contentId: string
+    expectedVersion: number
+    expectedEtag: string
+    nextState: ContentState
+    scheduledAt: string | null
+    nextCreatorId: string | null
+    nextVersion: number
+    nextEtag: string
+  }>): Promise<void>
 }
 
 interface ContentWithIdempotencyRow extends ContentRow, IdempotencyRow {}
@@ -1930,6 +1947,7 @@ export async function transitionContentState(
   idempotencyKey: string,
   now = new Date(),
   options: { scheduledAt?: string | null; preflight?: unknown; verifiedCreatorId?: string } = {},
+  mutationStore?: ContentMutationStore,
 ): Promise<{ from: ContentState; to: ContentState; version: number; etag: string; scheduledAt?: string | null }> {
   assertResourceId(principalUserId)
   assertResourceId(contentId)
@@ -1957,7 +1975,10 @@ export async function transitionContentState(
     ...(to === 'SCHEDULED' ? { scheduledAt: normalizedRequestedScheduledAt } : {}),
   }
   const hash = await requestHash(operationId, hashInput)
-  const { content, idempotency } = await loadMutationRow(db, contentId, operationId, idempotencyKey, principalUserId)
+  const snapshot = mutationStore
+    ? await mutationStore.loadMutation(principalUserId, contentId, operationId, idempotencyKey)
+    : await loadMutationRow(db, contentId, operationId, idempotencyKey, principalUserId)
+  const { content, idempotency } = snapshot
   const replay = inspectIdempotency(idempotency, principalUserId, hash, now)
   if (replay.replayed) {
     if (!replay.body) throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
@@ -2042,25 +2063,45 @@ export async function transitionContentState(
   const result = { from: content.state, to, version: nextVersion, etag: etagForVersion(nextVersion), scheduledAt }
   const expiresAt = new Date(now.getTime() + IDEMPOTENCY_TTL_MS).toISOString()
 
-  await batchMutation(db, [
-    expireMutationRow(db, principalUserId, operationId, idempotencyKey, updatedAt),
-    insertCompletedIdempotency(db, principalUserId, operationId, idempotencyKey, hash, 200, JSON.stringify(result), updatedAt, expiresAt),
-    db.prepare(
-      `UPDATE contents SET state=?, scheduled_at=?, creator_id=?, version=?, etag=?, updated_at=?
-        WHERE id=? AND version=? AND etag=?`,
-    ).bind(
-      to,
-      scheduledAt,
-      to === 'SCHEDULED' ? options.verifiedCreatorId : content.creatorId,
-      nextVersion,
-      result.etag,
+  if (mutationStore) {
+    await mutationStore.transition({
+      ownerUserId: principalUserId,
+      operationId,
+      idempotencyKey,
+      requestHash: hash,
+      responseJson: JSON.stringify(result),
       updatedAt,
-      content.id,
-      content.version,
-      content.etag,
-    ),
-    atomicGuard(db),
-  ])
+      expiresAt,
+      contentId: content.id,
+      expectedVersion: content.version,
+      expectedEtag: content.etag,
+      nextState: to,
+      scheduledAt,
+      nextCreatorId: to === 'SCHEDULED' ? options.verifiedCreatorId ?? null : content.creatorId,
+      nextVersion,
+      nextEtag: result.etag,
+    })
+  } else {
+    await batchMutation(db, [
+      expireMutationRow(db, principalUserId, operationId, idempotencyKey, updatedAt),
+      insertCompletedIdempotency(db, principalUserId, operationId, idempotencyKey, hash, 200, JSON.stringify(result), updatedAt, expiresAt),
+      db.prepare(
+        `UPDATE contents SET state=?, scheduled_at=?, creator_id=?, version=?, etag=?, updated_at=?
+          WHERE id=? AND version=? AND etag=?`,
+      ).bind(
+        to,
+        scheduledAt,
+        to === 'SCHEDULED' ? options.verifiedCreatorId : content.creatorId,
+        nextVersion,
+        result.etag,
+        updatedAt,
+        content.id,
+        content.version,
+        content.etag,
+      ),
+      atomicGuard(db),
+    ])
+  }
 
   return result
 }
