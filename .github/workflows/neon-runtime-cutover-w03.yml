@@ -9,6 +9,7 @@ on:
       - 'workers/W03-content/wrangler.jsonc'
       - 'workers/W03-content/src/content-collections.ts'
       - 'workers/W03-content/src/content-collections-read-store-postgres.ts'
+      - 'workers/W03-content/src/content-collections-create-store-postgres.ts'
       - 'workers/W03-content/src/content-series.ts'
       - 'workers/W03-content/src/content-series-read-store-postgres.ts'
       - 'workers/W03-content/src/content-series-members.ts'
@@ -76,6 +77,7 @@ jobs:
             ['postThreadReadStoreProvider', 'getW03PostThreadReadStore'],
             ['contentContextReadStoreProvider', 'getW03ContentContextReadStore'],
             ['collectionListReadStoreProvider', 'getW03CollectionListReadStore'],
+            ['collectionCreateStoreProvider', 'getW03CollectionCreateStore'],
             ['seriesReadStoreProvider', 'getW03SeriesReadStore'],
             ['membersReadStoreProvider', 'getW03MembersReadStore'],
             ['contentDetailReadStoreProvider', 'getW03ContentDetailReadStore'],
@@ -86,8 +88,8 @@ jobs:
               throw new Error('W03 Neon provider wiring is incomplete: ' + provider)
             }
           }
-          if (!runtime.includes('Other W03 reads and every W03 mutation remain on D1_02')) {
-            throw new Error('W03 read-only cutover boundary declaration is missing')
+          if (!runtime.includes('Collection creation is the only Neon-backed mutation in this slice; all other W03 reads and mutations remain on D1_02')) {
+            throw new Error('W03 Neon collection-create boundary declaration is missing')
           }
           console.log('W03_NEON_READ_PROJECTION_CUTOVER_CONFIG=PASS')
           NODE
