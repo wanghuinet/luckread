@@ -11,7 +11,7 @@ import type { ModerationQueueReadStore } from '../moderation-queue-read-store.js
 export type W06ModerationDatabaseDriver = 'd1' | 'neon'
 
 export type W06ModerationDatabaseRuntimeEnv = Readonly<{
-  D1_03: D1Database
+  D1_03?: D1Database
   W06_MODERATION_DATABASE_DRIVER?: string
   HYPERDRIVE_D1_03?: Readonly<{ connectionString?: string }>
 }>
