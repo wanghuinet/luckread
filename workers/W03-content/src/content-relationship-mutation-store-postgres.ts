@@ -369,7 +369,7 @@ export function createPostgresContentRelationshipMutationStore(
           'AND NOT EXISTS (SELECT 1 FROM content_relationships r WHERE r.target_id = t.id ' +
           "AND r.relation_type = 'thread-next' AND r.status = 'ACTIVE') " +
           'AND NOT EXISTS (SELECT 1 FROM descendants WHERE id = s.id) ' +
-          '(AND (SELECT COUNT(*) FROM descendants) + (SELECT COUNT(*) FROM ancestors) <= $8) ' +
+          'AND (SELECT COUNT(*) FROM descendants) + (SELECT COUNT(*) FROM ancestors) <= $8 ' +
           'RETURNING relationship_id',
           [
             relationship.targetId,
