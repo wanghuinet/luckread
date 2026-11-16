@@ -32,7 +32,9 @@ export const STAGED_WORKERS = Object.freeze([
     configPath: 'workers/W03-content/wrangler.jsonc',
     binding: 'HYPERDRIVE_D1_02',
     hyperdriveId: 'c55183e1cc3446409c9c1075832c6615',
-    d1Bindings: ['D1_02'],
+    d1Bindings: [],
+    driver: 'W03_CONTENT_READ_DRIVER',
+    driverValue: 'neon',
   },
   {
     worker: 'W05',
