@@ -82,6 +82,32 @@ export interface CollectionCreateStore {
   }>): Promise<void>
 }
 
+export interface CollectionMutationSnapshot {
+  collection: CollectionRecord | null
+  idempotency: IdempotencyRow | null
+}
+
+export interface CollectionUpdateStore {
+  loadMutation(
+    ownerUserId: string,
+    collectionId: string,
+    operationId: string,
+    idempotencyKey: string,
+  ): Promise<CollectionMutationSnapshot>
+  update(input: Readonly<{
+    ownerUserId: string
+    operationId: string
+    idempotencyKey: string
+    requestHash: string
+    responseJson: string
+    updatedAt: string
+    expiresAt: string
+    expectedVersion: number
+    expectedEtag: string
+    collection: CollectionRecord
+  }>): Promise<void>
+}
+
 interface CollectionWithIdempotencyRow extends CollectionRow {
   idem_id: string | null
   idem_owner_user_id: string | null
@@ -287,7 +313,7 @@ const loadCollectionMutation = async (
   collectionId: string,
   operationId: string,
   idempotencyKey: string,
-): Promise<{ collection: CollectionRecord | null; idempotency: IdempotencyRow | null }> => {
+): Promise<CollectionMutationSnapshot> => {
   const row = await db.prepare(
     'SELECT ' +
     's.id, s.owner_user_id, s.creator_id, s.state, s.version, s.title, s.description, ' +
@@ -463,6 +489,7 @@ export async function updateCollection(
   ifMatch: string,
   idempotencyKey: string,
   now = new Date(),
+  updateStore?: CollectionUpdateStore,
 ): Promise<CollectionRecord> {
   assertResourceId(principalUserId)
   assertResourceId(collectionId)
@@ -474,7 +501,9 @@ export async function updateCollection(
     input: normalized,
     ifMatch: normalizeEtag(ifMatch),
   })
-  const loaded = await loadCollectionMutation(db, principalUserId, collectionId, operationId, idempotencyKey)
+  const loaded = updateStore
+    ? await updateStore.loadMutation(principalUserId, collectionId, operationId, idempotencyKey)
+    : await loadCollectionMutation(db, principalUserId, collectionId, operationId, idempotencyKey)
   const replay = activeIdempotency(loaded.idempotency && {
     idem_id: loaded.idempotency.id,
     idem_owner_user_id: loaded.idempotency.owner_user_id,
@@ -504,18 +533,33 @@ export async function updateCollection(
     updatedAt,
   }
   const expiresAt = new Date(now.getTime() + IDEMPOTENCY_TTL_MS).toISOString()
-  await batchMutation(db, [
-    expireIdempotency(db, principalUserId, operationId, idempotencyKey, updatedAt),
-    insertIdempotency(db, principalUserId, operationId, idempotencyKey, hash, 200, JSON.stringify(updated), updatedAt, expiresAt),
-    db.prepare(
-      'UPDATE content_collections SET title = ?, description = ?, cover_ref = ?, version = ?, etag = ?, updated_at = ? ' +
-      'WHERE id = ? AND owner_user_id = ? AND version = ? AND etag = ?',
-    ).bind(
-      updated.title, updated.description, updated.coverRef, updated.version, updated.etag,
-      updatedAt, collection.id, principalUserId, collection.version, collection.etag,
-    ),
-    atomicGuard(db),
-  ])
+  if (updateStore) {
+    await updateStore.update({
+      ownerUserId: principalUserId,
+      operationId,
+      idempotencyKey,
+      requestHash: hash,
+      responseJson: JSON.stringify(updated),
+      updatedAt,
+      expiresAt,
+      expectedVersion: collection.version,
+      expectedEtag: collection.etag,
+      collection: updated,
+    })
+  } else {
+    await batchMutation(db, [
+      expireIdempotency(db, principalUserId, operationId, idempotencyKey, updatedAt),
+      insertIdempotency(db, principalUserId, operationId, idempotencyKey, hash, 200, JSON.stringify(updated), updatedAt, expiresAt),
+      db.prepare(
+        'UPDATE content_collections SET title = ?, description = ?, cover_ref = ?, version = ?, etag = ?, updated_at = ? ' +
+        'WHERE id = ? AND owner_user_id = ? AND version = ? AND etag = ?',
+      ).bind(
+        updated.title, updated.description, updated.coverRef, updated.version, updated.etag,
+        updatedAt, collection.id, principalUserId, collection.version, collection.etag,
+      ),
+      atomicGuard(db),
+    ])
+  }
   return updated
 }
 
