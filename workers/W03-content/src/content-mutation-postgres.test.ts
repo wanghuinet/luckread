@@ -5,6 +5,7 @@ import {
   deleteContent,
   updateContent,
   transitionContentState,
+  applyModerationContentTransition,
   listDueScheduledContentCandidates,
   publishAuthorizedScheduledContents,
   type ContentMutationStore,
@@ -342,6 +343,110 @@ describe('W03 Neon content mutation store', () => {
     expect(fake.released()).toBe(true)
   })
 
+  it('commits W06 moderation idempotency and APPROVED/REJECTED state CAS in one Neon transaction', async () => {
+    const fake = fixture()
+    const store = createPostgresContentMutationStore(fake.database)
+
+    await store.moderationTransition({
+      idempotencyOwnerUserId: 'W06',
+      operationId: 'transitionContentState',
+      idempotencyKey: 'moderation-key',
+      requestHash: 'moderation-hash',
+      responseJson: JSON.stringify({ from: 'PENDING_REVIEW', to: 'APPROVED', version: 5, etag: 'W/"5"' }),
+      updatedAt: nowIso,
+      expiresAt: new Date(now.getTime() + 86_400_000).toISOString(),
+      contentId: snapshotContent.id,
+      expectedVersion: 4,
+      expectedEtag: 'W/"4"',
+      nextState: 'APPROVED',
+      nextVersion: 5,
+      nextEtag: 'W/"5"',
+    })
+
+    const sql = fake.transactionQueries.map(item => item.sql)
+    expect(sql[0]).toBe('BEGIN')
+    expect(sql[1]).toContain('DELETE FROM content_mutation_idempotency')
+    expect(sql[2]).toContain('INSERT INTO content_mutation_idempotency')
+    expect(sql[3]).toContain("state = 'PENDING_REVIEW' AND version = $6 AND etag = $7")
+    expect(sql[4]).toBe('COMMIT')
+    expect(fake.transactionQueries[2]?.values?.[1]).toBe('W06')
+    expect(fake.transactionQueries[3]?.values).toEqual([
+      'APPROVED', 5, 'W/"5"', nowIso, snapshotContent.id, 4, 'W/"4"',
+    ])
+    expect(fake.released()).toBe(true)
+  })
+
+  it('rolls back a stale W06 moderation decision when the content CAS misses', async () => {
+    const fake = fixture({ casMiss: true })
+    const store = createPostgresContentMutationStore(fake.database)
+
+    await expect(store.moderationTransition({
+      idempotencyOwnerUserId: 'W06',
+      operationId: 'transitionContentState',
+      idempotencyKey: 'stale-moderation-key',
+      requestHash: 'moderation-hash',
+      responseJson: '{}',
+      updatedAt: nowIso,
+      expiresAt: new Date(now.getTime() + 86_400_000).toISOString(),
+      contentId: snapshotContent.id,
+      expectedVersion: 4,
+      expectedEtag: 'W/"4"',
+      nextState: 'REJECTED',
+      nextVersion: 5,
+      nextEtag: 'W/"5"',
+    })).rejects.toMatchObject({ code: 'PRECONDITION_FAILED', status: 412 })
+
+    expect(fake.transactionQueries.at(-1)?.sql).toBe('ROLLBACK')
+    expect(fake.released()).toBe(true)
+  })
+
+  it('routes W06 moderation decisions through Neon without issuing a D1 statement', async () => {
+    const pendingContent = { ...snapshotContent, state: 'PENDING_REVIEW' as const }
+    let moderationInput: Parameters<ContentMutationStore['moderationTransition']>[0] | undefined
+    const store: ContentMutationStore = {
+      async loadMutation() {
+        return { content: pendingContent, idempotency: emptyIdempotency }
+      },
+      async update() {},
+      async delete() {},
+      async transition() {},
+      async moderationTransition(input) { moderationInput = input },
+      async listDueScheduled() { return [] },
+      async publishScheduled() { return 0 },
+    }
+    const d1 = {
+      prepare() { throw new Error('D1 must not be queried in Neon mode') },
+      batch() { throw new Error('D1 must not be written in Neon mode') },
+    }
+
+    const result = await applyModerationContentTransition(
+      d1 as never,
+      {
+        contentId: snapshotContent.id,
+        decisionId: 'decision_123',
+        policyVersion: 'moderation-v1',
+        outcome: 'APPROVED',
+        ifMatch: 'W/"4"',
+        idempotencyKey: 'neon-moderation-key',
+      },
+      now,
+      store,
+    )
+
+    expect(result).toMatchObject({ from: 'PENDING_REVIEW', to: 'APPROVED', version: 5, etag: 'W/"5"' })
+    expect(moderationInput).toMatchObject({
+      idempotencyOwnerUserId: 'W06',
+      operationId: 'transitionContentState',
+      contentId: snapshotContent.id,
+      expectedVersion: 4,
+      expectedEtag: 'W/"4"',
+      nextState: 'APPROVED',
+      nextVersion: 5,
+      nextEtag: 'W/"5"',
+    })
+    expect(moderationInput?.responseJson).toBe(JSON.stringify(result))
+  })
+
   it('loads only due scheduled candidates from Neon in stable scheduled-time order', async () => {
     const fake = fixture()
     const store = createPostgresContentMutationStore(fake.database)
@@ -430,6 +535,7 @@ describe('W03 Neon content mutation store', () => {
       async update() {},
       async delete() {},
       async transition(input) { transitionInput = input },
+      async moderationTransition() {},
       async listDueScheduled() { return [] },
       async publishScheduled() { return 0 },
     }
@@ -482,6 +588,7 @@ describe('W03 Neon content mutation store', () => {
       async update() {},
       async delete() {},
       async transition() {},
+      async moderationTransition() {},
       async listDueScheduled(nowValue, limit) {
         expect(nowValue).toBe(nowIso)
         expect(limit).toBe(10)
@@ -530,6 +637,7 @@ describe('W03 Neon content mutation store', () => {
       },
       async delete(input) { deleteInput = input },
       async transition() {},
+      async moderationTransition() {},
       async listDueScheduled() { return [] },
       async publishScheduled() { return 0 },
     }
