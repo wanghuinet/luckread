@@ -187,17 +187,12 @@ for (const file of [
   if (file === payload.wrangler) {
     let config
     try { config = JSON.parse(content) } catch {
-      failures.push('W01 default Wrangler config is invalid JSON')
+      failures.push('W01 historical Wrangler source config is invalid JSON')
     }
-    if (config && (
-      config.name !== 'luckread-w01-payload' ||
-      (config.d1_databases ?? []).length !== 0 ||
-      config.vars?.PAYLOAD_DATABASE_DRIVER !== 'neon' ||
-      !(config.hyperdrive ?? []).some((binding) =>
-        binding.binding === 'HYPERDRIVE' && binding.id === '0c53a1bb9bc0484bac146e8ae2d3158b') ||
-      boundaryContract.physicalD1Registry?.['D1-01'] !== '2f80471e-3756-49f9-8db1-7707a433ad64'
-    )) {
-      failures.push('W01 runtime config must be Neon-only while D1-01 source identity stays in the canonical registry')
+    const sourceBinding = (config?.d1_databases ?? []).find((binding) =>
+      binding.binding === 'D1' && binding.database_id === '2f80471e-3756-49f9-8db1-7707a433ad64')
+    if (!sourceBinding || boundaryContract.physicalD1Registry?.['D1-01'] !== '2f80471e-3756-49f9-8db1-7707a433ad64') {
+      failures.push('W01 historical D1-01 source identity must remain pinned to the canonical registry')
     }
   }
   addSource('W01', file.endsWith('.json') ? 'sqlite-schema-snapshot' : file.includes('/collections/') ? 'payload-collection' : 'payload-config-or-wrangler', file, content, extra)
@@ -213,76 +208,100 @@ for (const owner of contract.owners.slice(1)) {
       addSource('W02', 'better-auth-config', owner.config, content)
     }
   }
+
   const wrangler = read(owner.wrangler)
   if (wrangler !== null) {
-    let config
-    try { config = JSON.parse(wrangler) } catch {
-      failures.push(`${owner.worker} default Wrangler config is invalid JSON`)
+    let sourceConfig
+    try { sourceConfig = JSON.parse(wrangler) } catch {
+      failures.push(`${owner.worker} historical Wrangler source config is invalid JSON`)
     }
-    if (config) {
-      const commonNeon = (config.d1_databases ?? []).length === 0
-      if (owner.worker === 'W02' && (
-        config.name !== 'luckread-w02' || !commonNeon ||
-        config.vars?.W02_DATABASE_DRIVER !== 'neon' ||
-        !(config.hyperdrive ?? []).some((binding) =>
-          binding.binding === 'HYPERDRIVE' && binding.id === '0c53a1bb9bc0484bac146e8ae2d3158b') ||
-        !(config.queues?.producers ?? []).some((binding) =>
-          binding.binding === 'AUTH013_QUEUE' && binding.queue === 'luckread-auth013-account-state') ||
-        !(config.queues?.producers ?? []).some((binding) =>
-          binding.binding === 'AUTH013_PROJECTION_QUEUE' && binding.queue === 'luckread-auth013-account-state-projection')
-      )) {
-        failures.push('W02 runtime config must be Neon-only and preserve its Hyperdrive and AUTH-013 queues')
-      }
-      if (owner.worker === 'W07' && (
-        config.name !== 'luckread-w07' || !commonNeon ||
-        config.vars?.W07_DATABASE_DRIVER !== 'neon' ||
-        config.vars?.W07_MEMBERSHIP_DATABASE_DRIVER !== 'neon' ||
-        !(config.hyperdrive ?? []).some((binding) =>
-          binding.binding === 'HYPERDRIVE_D1_01' && binding.id === '0c53a1bb9bc0484bac146e8ae2d3158b') ||
-        !(config.hyperdrive ?? []).some((binding) =>
-          binding.binding === 'HYPERDRIVE_D1_04' && binding.id === '3ae15e6dfb5e4b44979eee30e1d5ede4') ||
-        boundaryContract.physicalD1Registry?.['D1-01'] !== '2f80471e-3756-49f9-8db1-7707a433ad64' ||
-        financeSourceContract.target?.cloudflareD1DatabaseUuid !== '9bfb89a5-fbb5-45b1-a2ee-eab674b0d736'
-      )) {
-        failures.push('W07 runtime config must use both Neon Hyperdrive domains and keep source UUIDs in their migration contracts')
-      }
-      if (owner.worker === 'W08' && (
-        config.name !== 'luckread-w08-creator' || !commonNeon ||
-        config.vars?.W08_DATABASE_DRIVER !== 'neon' ||
-        !(config.hyperdrive ?? []).some((binding) =>
-          binding.binding === 'HYPERDRIVE' && binding.id === '0c53a1bb9bc0484bac146e8ae2d3158b')
-      )) {
-        failures.push('W08 production Wrangler must be D1-free and select the admitted Neon D1-01 Hyperdrive')
+    if (sourceConfig && owner.worker === 'W02') {
+      const sourceBinding = (sourceConfig.d1_databases ?? []).find((binding) =>
+        binding.binding === 'D1_01' && binding.database_id === '2f80471e-3756-49f9-8db1-7707a433ad64')
+      if (!sourceBinding || boundaryContract.physicalD1Registry?.['D1-01'] !== '2f80471e-3756-49f9-8db1-7707a433ad64') {
+        failures.push('W02 historical D1-01 source identity must remain pinned to the canonical registry')
       }
     }
-    if (owner.worker === 'W02') {
-      const productionPath = 'workers/W02-identity/wrangler.neon.jsonc'
-      const productionText = read(productionPath)
-      if (productionText === null) {
-        failures.push('W02 Neon-only production Wrangler config is missing')
-      } else {
-        let production
-        try { production = JSON.parse(productionText) } catch {
-          failures.push('W02 Neon-only production Wrangler config is invalid JSON')
-        }
-        if (production && (
-          production.name !== 'luckread-w02' ||
-          (production.d1_databases ?? []).length !== 0 ||
-          production.vars?.W02_DATABASE_DRIVER !== 'neon' ||
-          !(production.hyperdrive ?? []).some((binding) =>
-            binding.binding === 'HYPERDRIVE' && binding.id === '0c53a1bb9bc0484bac146e8ae2d3158b') ||
-          !(production.queues?.producers ?? []).some((binding) =>
-            binding.binding === 'AUTH013_QUEUE' && binding.queue === 'luckread-auth013-account-state') ||
-          !(production.queues?.producers ?? []).some((binding) =>
-            binding.binding === 'AUTH013_PROJECTION_QUEUE' && binding.queue === 'luckread-auth013-account-state-projection')
-        )) {
-          failures.push('W02 production Wrangler must be D1-free and preserve its Neon Hyperdrive and AUTH-013 queues')
-        }
+    if (sourceConfig && owner.worker === 'W07') {
+      const sourceMembership = (sourceConfig.d1_databases ?? []).find((binding) =>
+        binding.binding === 'D1_01' && binding.database_id === '2f80471e-3756-49f9-8db1-7707a433ad64')
+      const sourceFinance = (sourceConfig.d1_databases ?? []).find((binding) =>
+        binding.binding === 'D1_04' && binding.database_id === '9bfb89a5-fbb5-45b1-a2ee-eab674b0d736')
+      if (!sourceMembership || !sourceFinance ||
+          boundaryContract.physicalD1Registry?.['D1-01'] !== '2f80471e-3756-49f9-8db1-7707a433ad64' ||
+          financeSourceContract.target?.cloudflareD1DatabaseUuid !== '9bfb89a5-fbb5-45b1-a2ee-eab674b0d736') {
+        failures.push('W07 historical D1-01/D1-04 source identities must remain pinned to their migration contracts')
       }
     }
-    addSource(owner.worker, 'wrangler-runtime-database-mapping', owner.wrangler, wrangler)
+    addSource(owner.worker, 'wrangler-historical-source-mapping', owner.wrangler, wrangler)
   }
 }
+
+
+function validateNeonProductionConfig(worker, relativePath, expected) {
+  const content = read(relativePath)
+  if (content === null) return
+  let config
+  try { config = JSON.parse(content) } catch {
+    failures.push(`${worker} Neon production Wrangler config is invalid JSON`)
+    return
+  }
+  const validBase = config.name === expected.name &&
+    (config.d1_databases ?? []).length === 0 &&
+    config.vars?.[expected.driver] === 'neon' &&
+    (config.hyperdrive ?? []).some((binding) =>
+      binding.binding === expected.binding && binding.id === expected.hyperdriveId)
+  let validTopology = true
+  if (worker === 'W02') {
+    validTopology =
+      (config.queues?.producers ?? []).some((binding) =>
+        binding.binding === 'AUTH013_QUEUE' && binding.queue === 'luckread-auth013-account-state') &&
+      (config.queues?.producers ?? []).some((binding) =>
+        binding.binding === 'AUTH013_PROJECTION_QUEUE' && binding.queue === 'luckread-auth013-account-state-projection')
+  }
+  if (worker === 'W07') {
+    validTopology =
+      config.vars?.W07_MEMBERSHIP_DATABASE_DRIVER === 'neon' &&
+      (config.hyperdrive ?? []).some((binding) =>
+        binding.binding === 'HYPERDRIVE_D1_01' && binding.id === '0c53a1bb9bc0484bac146e8ae2d3158b') &&
+      (config.hyperdrive ?? []).some((binding) =>
+        binding.binding === 'HYPERDRIVE_D1_04' && binding.id === '3ae15e6dfb5e4b44979eee30e1d5ede4') &&
+      (config.services ?? []).some((binding) =>
+        binding.binding === 'W06_GOVERNANCE' && binding.service === 'luckread-w06')
+  }
+  if (!validBase || !validTopology) {
+    failures.push(`${worker} production config must be D1-free and preserve its approved Neon Hyperdrive/Worker topology`)
+  }
+  addSource(worker, 'wrangler-neon-production-runtime', relativePath, content, {
+    productionD1BindingCount: (config.d1_databases ?? []).length,
+    databaseDriver: config.vars?.[expected.driver] ?? null,
+  })
+}
+
+validateNeonProductionConfig('W01', 'workers/W01-payload/wrangler.neon.jsonc', {
+  name: 'luckread-w01-payload',
+  driver: 'PAYLOAD_DATABASE_DRIVER',
+  binding: 'HYPERDRIVE',
+  hyperdriveId: '0c53a1bb9bc0484bac146e8ae2d3158b',
+})
+validateNeonProductionConfig('W02', 'workers/W02-identity/wrangler.neon.jsonc', {
+  name: 'luckread-w02',
+  driver: 'W02_DATABASE_DRIVER',
+  binding: 'HYPERDRIVE',
+  hyperdriveId: '0c53a1bb9bc0484bac146e8ae2d3158b',
+})
+validateNeonProductionConfig('W07', 'workers/W07-subscription-commerce/wrangler.neon.jsonc', {
+  name: 'luckread-w07',
+  driver: 'W07_DATABASE_DRIVER',
+  binding: 'HYPERDRIVE_D1_01',
+  hyperdriveId: '0c53a1bb9bc0484bac146e8ae2d3158b',
+})
+validateNeonProductionConfig('W08', 'workers/W08-creator/wrangler.jsonc', {
+  name: 'luckread-w08-creator',
+  driver: 'W08_DATABASE_DRIVER',
+  binding: 'HYPERDRIVE',
+  hyperdriveId: '0c53a1bb9bc0484bac146e8ae2d3158b',
+})
 
 // Audit application files that contain direct D1 operations. This does not port
 // runtime code; it prevents schema-only work from being mistaken for adapter completion.
