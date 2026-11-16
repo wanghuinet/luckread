@@ -42,6 +42,7 @@ on:
       - 'workers/W03-content/src/content-runtime.ts'
       - 'workers/W03-content/src/content-detail-read-store-postgres.ts'
       - 'workers/W03-content/src/creator-contents-read-store-postgres.ts'
+      - 'workers/W03-content/src/content-revision-read-store-postgres.ts'
       - 'workers/W03-content/src/entry.ts'
       - 'workers/W03-content/src/neon/runtime.ts'
 
@@ -123,6 +124,7 @@ jobs:
             ['membersReadStoreProvider', 'getW03MembersReadStore'],
             ['contentDetailReadStoreProvider', 'getW03ContentDetailReadStore'],
             ['creatorContentsReadStoreProvider', 'getW03CreatorContentsReadStore'],
+            ['contentRevisionReadStoreProvider', 'getW03ContentRevisionReadStore'],
           ]
           for (const [provider, factory] of providers) {
             if (!entry.includes(provider) || !entry.includes(factory) || !runtime.includes(factory)) {
@@ -131,6 +133,13 @@ jobs:
           }
           if (!runtime.includes('Content creation, update, delete, owner-authorized state transitions, W06 moderation decisions, owner-authorized revision rollback, scheduled publication candidate reads/commits, content reference create/revoke, native post-thread append, plus Collection creation, update, delete, member attachment, member removal, and member reorder plus Series creation, update, delete, member attachment, member removal, and member reorder are the only Neon-backed mutations in these slices; all other W03 reads and mutations remain on D1_02')) {
             throw new Error('W03 Neon mutation boundary declaration is missing')
+          }
+          if (!entry.includes('contentRevisionReadStoreProvider') ||
+              !runtime.includes('getW03ContentRevisionReadStore') ||
+              !router.includes('dependencies.contentRevisionReadStoreProvider?.(env),') ||
+              !contentRuntime.includes('readStore.list(principalUserId, contentId, decoded, pageSize + 1)') ||
+              !contentRuntime.includes('const revision = await readStore.get(principalUserId, contentId, revisionId)')) {
+            throw new Error('W03 Neon content revision history read wiring is incomplete')
           }
           if (!contentRuntime.includes('mutationStore.transition({') ||
               !router.includes('dependencies.contentMutationStoreProvider?.(env),')) {
