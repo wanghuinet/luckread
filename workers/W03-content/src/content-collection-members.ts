@@ -103,6 +103,26 @@ export interface CollectionMemberAttachStore {
   }>): Promise<void>
 }
 
+export interface CollectionMemberRemoveStore {
+  loadMutation(ownerUserId: string, collectionId: string, contentId: string, operationId: string, idempotencyKey: string): Promise<CollectionMemberMutationRow | null>
+  remove(input: Readonly<{
+    ownerUserId: string
+    operationId: string
+    idempotencyKey: string
+    requestHash: string
+    responseJson: string
+    nowIso: string
+    expiresAt: string
+    collectionId: string
+    contentId: string
+    relationshipId: string
+    nextVersion: number
+    collectionEtag: string
+    expectedVersion: number
+    expectedEtag: string
+  }>): Promise<void>
+}
+
 const IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000
 const EDITABLE_COLLECTION_STATES = new Set<CollectionState>([
   'DRAFT',
@@ -569,6 +589,7 @@ export async function removeCollectionMember(
   ifMatch: string,
   idempotencyKey: string,
   now = new Date(),
+  mutationStore?: CollectionMemberRemoveStore,
 ): Promise<{ member: CollectionMemberRecord; collectionVersion: number; collectionEtag: string }> {
   assertResourceId(ownerUserId)
   assertResourceId(collectionId)
@@ -581,7 +602,9 @@ export async function removeCollectionMember(
     contentId,
     ifMatch: normalizeEtag(ifMatch),
   })
-  const row = await loadMutation(db, ownerUserId, collectionId, contentId, operationId, idempotencyKey)
+  const row = mutationStore
+    ? await mutationStore.loadMutation(ownerUserId, collectionId, contentId, operationId, idempotencyKey)
+    : await loadMutation(db, ownerUserId, collectionId, contentId, operationId, idempotencyKey)
   if (!row) throw new ContentRuntimeError('NOT_FOUND', 404)
 
   const replay = inspectIdempotency(row, ownerUserId, hash, now)
@@ -614,19 +637,38 @@ export async function removeCollectionMember(
   const response = { member, collectionVersion: nextVersion, collectionEtag }
   const expiresAt = new Date(now.getTime() + IDEMPOTENCY_TTL_MS).toISOString()
 
-  await batchMutation(db, [
-    expireIdempotency(db, ownerUserId, operationId, idempotencyKey, nowIso),
-    insertIdempotency(db, ownerUserId, operationId, idempotencyKey, hash, 200, JSON.stringify(response), nowIso, expiresAt),
-    db.prepare(
-      'UPDATE content_collections SET version = ?, etag = ?, updated_at = ? ' +
-      'WHERE id = ? AND owner_user_id = ? AND version = ? AND etag = ?',
-    ).bind(nextVersion, collectionEtag, nowIso, collectionId, ownerUserId, row.collection_version, row.collection_etag),
-    atomicGuard(db),
-    db.prepare(
-      "UPDATE content_relationships SET status = 'REVOKED', updated_at = ? WHERE relationship_id = ? AND status = 'ACTIVE'",
-    ).bind(nowIso, row.membership_relationship_id),
-    atomicGuard(db),
-  ])
+  if (mutationStore) {
+    await mutationStore.remove({
+      ownerUserId,
+      operationId,
+      idempotencyKey,
+      requestHash: hash,
+      responseJson: JSON.stringify(response),
+      nowIso,
+      expiresAt,
+      collectionId,
+      contentId,
+      relationshipId: row.membership_relationship_id,
+      nextVersion,
+      collectionEtag,
+      expectedVersion: row.collection_version,
+      expectedEtag: row.collection_etag,
+    })
+  } else {
+    await batchMutation(db, [
+      expireIdempotency(db, ownerUserId, operationId, idempotencyKey, nowIso),
+      insertIdempotency(db, ownerUserId, operationId, idempotencyKey, hash, 200, JSON.stringify(response), nowIso, expiresAt),
+      db.prepare(
+        'UPDATE content_collections SET version = ?, etag = ?, updated_at = ? ' +
+        'WHERE id = ? AND owner_user_id = ? AND version = ? AND etag = ?',
+      ).bind(nextVersion, collectionEtag, nowIso, collectionId, ownerUserId, row.collection_version, row.collection_etag),
+      atomicGuard(db),
+      db.prepare(
+        "UPDATE content_relationships SET status = 'REVOKED', updated_at = ? WHERE relationship_id = ? AND status = 'ACTIVE'",
+      ).bind(nowIso, row.membership_relationship_id),
+      atomicGuard(db),
+    ])
+  }
 
   return response
 }
