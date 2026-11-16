@@ -31,6 +31,7 @@ export interface RateLimitBinding {
 }
 
 export interface BetterAuthEnv {
+  /** Legacy local/test provider only; createLuckReadAuth selects PostgreSQL in production. */
   D1_01: D1Database
   W02_DATABASE_DRIVER?: string
   HYPERDRIVE?: { connectionString: string }
@@ -697,8 +698,8 @@ export const buildLuckReadAuth = (
 const authInstances = new WeakMap<object, ReturnType<typeof buildLuckReadAuth>>()
 
 // Each isolate keeps one Better Auth instance per selected persistence binding.
-// Neon mode composes all core identity stores from the same Hyperdrive pool;
-// D1 remains the default until an explicit worker variable selects Neon.
+// Neon mode composes all core identity stores from the same Hyperdrive pool.
+// The D1 adapter is retained only for explicit local/test compatibility.
 export const createLuckReadAuth = (env: BetterAuthEnv) => {
   if (isW02NeonRuntime(env)) {
     const runtime = getW02PostgresRuntime(env)
