@@ -30,8 +30,10 @@ const pools = new WeakMap<object, Pool>()
 const runtimes = new WeakMap<object, ReturnType<typeof buildW02PostgresRuntime>>()
 
 /**
- * D1 is the fail-safe default. Neon is opt-in and requires the already
- * provisioned D1-01 Hyperdrive binding; unknown values never fall back.
+ * Neon is selected explicitly by the production Wrangler config and requires
+ * the existing D1-01 Hyperdrive binding. The D1 provider is retained only for
+ * local/test environments that actually provide the legacy D1 binding.
+ * Unknown values fail closed and never fall back to another provider.
  */
 export function resolveW02DatabaseDriver(env: W02RuntimeEnv): W02DatabaseDriver {
   const configured = env.W02_DATABASE_DRIVER?.trim().toLowerCase() || 'd1'

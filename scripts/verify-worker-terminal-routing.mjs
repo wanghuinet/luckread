@@ -9,6 +9,7 @@ const w03Path = resolve(root, 'workers/W03-content/wrangler.jsonc')
 const w06Path = resolve(root, 'workers/W06-governance/wrangler.jsonc')
 const w05Path = resolve(root, 'workers/W05-social/wrangler.jsonc')
 const w08Path = resolve(root, 'workers/W08-creator/wrangler.jsonc')
+const w02Path = resolve(root, 'workers/W02-identity/wrangler.neon.jsonc')
 
 const contract = JSON.parse(readFileSync(contractPath, 'utf8'))
 const w01 = JSON.parse(readFileSync(w01Path, 'utf8'))
@@ -16,6 +17,7 @@ const w03 = JSON.parse(readFileSync(w03Path, 'utf8'))
 const w06 = JSON.parse(readFileSync(w06Path, 'utf8'))
 const w05 = JSON.parse(readFileSync(w05Path, 'utf8'))
 const w08 = JSON.parse(readFileSync(w08Path, 'utf8'))
+const w02 = JSON.parse(readFileSync(w02Path, 'utf8'))
 
 const route = (family) => contract.routes.find((x) => x.operationIdFamily === family)
 const content = route('content')
@@ -63,6 +65,10 @@ if (service(w01, 'W07_SUBSCRIPTION')?.service !== 'luckread-w07') {
 if (service(w08, 'W02_AUTH')?.service !== 'luckread-w02') {
   throw new Error('W08 W02_AUTH binding mismatch')
 }
+if ((w02.d1_databases ?? []).length !== 0 || w02.vars?.W02_DATABASE_DRIVER !== 'neon' ||
+    !(w02.hyperdrive ?? []).some((x) => x.binding === 'HYPERDRIVE' && x.id === '0c53a1bb9bc0484bac146e8ae2d3158b')) {
+  throw new Error('W02 must use the existing Neon D1-01 database with no production D1 binding')
+}
 if (service(w08, 'W01')) {
   throw new Error('Creator business Worker must not bind back to W01')
 }
@@ -90,5 +96,7 @@ console.log(JSON.stringify({
     W08_CREATOR: service(w01, 'W08_CREATOR')?.service,
     W07_SUBSCRIPTION: service(w01, 'W07_SUBSCRIPTION')?.service,
     W08_W02_AUTH: service(w08, 'W02_AUTH')?.service,
+    W02_DATABASE_DRIVER: w02.vars?.W02_DATABASE_DRIVER,
+    W02_PRODUCTION_D1_BINDINGS: (w02.d1_databases ?? []).length,
   },
 }, null, 2))

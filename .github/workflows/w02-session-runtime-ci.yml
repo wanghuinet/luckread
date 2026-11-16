@@ -11,6 +11,8 @@ on:
       - 'workers/W02-identity/src/neon/**'
       - 'workers/W02-identity/package.json'
       - 'workers/W02-identity/wrangler.jsonc'
+      - 'workers/W02-identity/wrangler.neon.jsonc'
+      - 'workers/W02-identity/wrangler.neon.jsonc'
       - 'workers/W02-identity/migrations/0006_better_auth_two_factor.sql'
       - 'workers/W02-identity/migrations/0007_l8_genesis_bootstrap_audit.sql'
       - 'workers/W02-identity/migrations/0008_auth_007_mfa_publication_journal.sql'
@@ -59,6 +61,8 @@ on:
       - 'workers/W02-identity/src/neon/**'
       - 'workers/W02-identity/package.json'
       - 'workers/W02-identity/wrangler.jsonc'
+      - 'workers/W02-identity/wrangler.neon.jsonc'
+      - 'workers/W02-identity/wrangler.neon.jsonc'
       - 'workers/W02-identity/migrations/0008_auth_007_mfa_publication_journal.sql'
       - 'workers/W02-identity/migrations/0009_auth_007_mfa_operation_receipts.sql'
       - 'workers/W02-identity/migrations/0010_auth_username_change_history.sql'
@@ -116,7 +120,7 @@ jobs:
         run: |
           node --input-type=module <<'NODE'
           import fs from 'node:fs'
-          const config = JSON.parse(fs.readFileSync('workers/W02-identity/wrangler.jsonc', 'utf8'))
+          const config = JSON.parse(fs.readFileSync('workers/W02-identity/wrangler.neon.jsonc', 'utf8'))
           const actual = new Map((config.ratelimits ?? []).map(binding => [binding.name, binding]))
           const expected = [
             ['AUTH_SESSION_READ_LIMITER', '2026100312', 300],
@@ -138,33 +142,29 @@ jobs:
         run: npm install --ignore-scripts --no-audit --no-fund --package-lock=false
       - name: Test W02 D1 default and Neon Hyperdrive runtime selection
         run: npx vitest@3.2.4 run workers/W02-identity/src/neon/runtime.test.ts
-      - name: Verify W02 selects Neon and retains the D1-01 rollback binding
+      - name: Verify W02 uses Neon-only production bindings and preserves historical D1 source identity
         working-directory: workers/W02-identity
         run: |
           node --input-type=module <<'NODE'
           import fs from 'node:fs'
-          const config = JSON.parse(fs.readFileSync('wrangler.jsonc', 'utf8'))
-          const d1 = (config.d1_databases ?? []).find((binding) => binding.binding === 'D1_01')
+          const source = JSON.parse(fs.readFileSync('wrangler.jsonc', 'utf8'))
+          const config = JSON.parse(fs.readFileSync('wrangler.neon.jsonc', 'utf8'))
+          const sourceD1 = (source.d1_databases ?? []).find((binding) => binding.binding === 'D1_01')
           const hyperdrive = (config.hyperdrive ?? []).find((binding) => binding.binding === 'HYPERDRIVE')
-          if (config.name !== 'luckread-w02') {
-            throw new Error('W02 Worker identity mismatch')
+          if (sourceD1?.database_name !== 'luckread' ||
+              sourceD1?.database_id !== '2f80471e-3756-49f9-8db1-7707a433ad64' ||
+              sourceD1?.migrations_dir !== 'migrations') {
+            throw new Error('W02 historical D1-01 migration source identity must remain unchanged')
           }
-          if (config.vars?.W02_DATABASE_DRIVER !== 'neon') {
-            throw new Error('W02 production runtime must select Neon for D1-01')
-          }
-          if (d1?.database_name !== 'luckread' ||
-              d1?.database_id !== '2f80471e-3756-49f9-8db1-7707a433ad64' ||
-              d1?.migrations_dir !== 'migrations') {
-            throw new Error('W02 D1_01 rollback binding must remain unchanged')
-          }
-          if (hyperdrive?.id !== '0c53a1bb9bc0484bac146e8ae2d3158b') {
-            throw new Error('W02 must reuse the existing D1-01 Hyperdrive resource')
-          }
-          console.log('W02 Neon runtime target, D1 rollback binding and existing Hyperdrive binding: PASS')
+          if (config.name !== 'luckread-w02') throw new Error('W02 Worker identity mismatch')
+          if ((config.d1_databases ?? []).length !== 0) throw new Error('W02 production config must not declare Cloudflare D1 bindings')
+          if (config.vars?.W02_DATABASE_DRIVER !== 'neon') throw new Error('W02 production runtime must select Neon')
+          if (hyperdrive?.id !== '0c53a1bb9bc0484bac146e8ae2d3158b') throw new Error('W02 must reuse the existing D1-01 Hyperdrive resource')
+          console.log('W02 Neon runtime target, zero production D1 bindings and historical migration source: PASS')
           NODE
       - name: Bundle W02 Worker with the PostgreSQL runtime dependency
         working-directory: workers/W02-identity
-        run: npx --yes wrangler@4.116.0 deploy --dry-run --config wrangler.jsonc
+        run: npx --yes wrangler@4.116.0 deploy --dry-run --config wrangler.neon.jsonc
       - name: Run W02 username change authority tests
         run: npx vitest@3.2.4 run workers/W02-identity/src/auth/username-change.test.ts
       - name: Audit W02 username history migration with local SQLite only

@@ -29,6 +29,7 @@ import { checkL8BootstrapReadiness, L8BootstrapReadinessError } from './authz/l8
 import { bootstrapSuperAdminPostgres, checkL8BootstrapReadinessPostgres } from './neon/l8-genesis-bootstrap-postgres.js'
 
 interface Env {
+  /** Legacy local/test D1 compatibility only; the production wrangler.neon.jsonc does not bind D1. */
   D1_01: D1Database
   AUTH_SESSION_READ_LIMITER: RateLimitBinding
   AUTH_SESSION_WRITE_LIMITER: RateLimitBinding
@@ -59,6 +60,9 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
+    // Do not preflight the legacy D1 binding here: internal service-boundary
+    // authorization must run first. Neon production has no D1 binding, and
+    // any remaining D1-only operation fails closed at its own store access.
     let postgres: ReturnType<typeof getW02PostgresRuntime> | undefined
     try {
       if (isW02NeonRuntime(env)) postgres = getW02PostgresRuntime(env)
@@ -549,6 +553,7 @@ export default {
       return
     }
 
+    if (!env.D1_01) throw new Error('W02_D1_BINDING_REQUIRED')
     await runScheduledPublicationTicks([
       { name: 'account-state', publish: () => publishPendingAccountStateEvents(env) },
       { name: 'session-audit', publish: () => publishPendingSessionRevocationEvents(env) },
