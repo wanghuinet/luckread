@@ -13,12 +13,23 @@ function readSource(relativePath) {
   try { return readFileSync(path.join(root, relativePath), 'utf8') } catch { return null }
 }
 
-test('W05 D1-02 logical source is pinned while production runtime uses Neon and excludes D1-03 schema', () => {
+test('W05 schema source provenance remains pinned while the production runtime uses Neon-only bindings', () => {
   const owner = inventory.owners.find((item) => item.worker === 'W05')
-  assert.equal(owner.runtimeProvider, 'neon')
-  assert.deepEqual(owner.physicalBindings, [])
-  assert.deepEqual(owner.neonBindings.map((item) => item.logicalDomain), ['D1-02', 'D1-03'])
-  assert.equal(owner.neonBindings[1].delegatedOwner, 'W09')
+  const d102Source = owner.physicalBindings.find((item) => item.binding === 'DB')
+  const d103Source = owner.physicalBindings.find((item) => item.binding === 'D1_03')
+  assert.equal(d102Source?.logicalDomain, 'D1-02')
+  assert.equal(d102Source?.included, true)
+  assert.equal(d103Source?.logicalDomain, 'D1-03')
+  assert.equal(d103Source?.included, false)
+  assert.equal(d103Source?.reason?.includes('Separate governance/platform domain'), true)
+
+  const config = JSON.parse(readSource(owner.wrangler))
+  assert.equal(config.d1_databases?.length ?? 0, 0)
+  assert.equal(config.vars?.W05_DATABASE_DRIVER, 'neon')
+  assert.equal(config.vars?.W05_PUSH_ENDPOINT_DATABASE_DRIVER, 'neon')
+  assert.ok(config.hyperdrive.some((item) => item.binding === 'HYPERDRIVE_D1_02' && item.id === 'c55183e1cc3446409c9c1075832c6615'))
+  assert.ok(config.hyperdrive.some((item) => item.binding === 'HYPERDRIVE_D1_03' && item.id === '7c8831416c18494faee04b96aa551cb9'))
+
   const { sourceReport } = buildW05PostgresMigration({ inventory, socialContract, readSource, template })
   assert.equal(sourceReport.targetDatabase, 'luckreadpro')
   assert.equal(sourceReport.sourceOwner, 'W05')
@@ -72,13 +83,13 @@ test('generator rejects Cloudflare D1 bindings reintroduced into the W05 Neon pr
   )
 })
 
-test('generator rejects a changed W09-delegated D1-03 Neon Hyperdrive target', () => {
+test('generator rejects a W05 source inventory that imports D1-03 governance tables', () => {
   const invalid = structuredClone(inventory)
   const owner = invalid.owners.find((item) => item.worker === 'W05')
-  owner.neonBindings.find((item) => item.logicalDomain === 'D1-03').delegatedOwner = 'W05'
+  owner.physicalBindings.find((item) => item.binding === 'D1_03').included = true
   assert.throws(
     () => buildW05PostgresMigration({ inventory: invalid, socialContract, readSource, template }),
-    /W09-delegated D1-03 Neon Hyperdrive targets/
+    /D1-03 governance binding must remain excluded/
   )
 })
 
