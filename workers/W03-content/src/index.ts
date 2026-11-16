@@ -80,6 +80,7 @@ import {
   type SeriesMembersReadStore,
   type SeriesMemberAttachStore,
   type SeriesMemberRemoveStore,
+  type SeriesMemberReorderStore,
 } from './content-series-members.js'
 import {
   attachCollectionMember,
@@ -438,6 +439,10 @@ export type W03ContentWorkerDependencies = Readonly<{
   seriesMemberRemoveStoreProvider?: (
     env: W03PublishedMediaReferenceRuntimeEnv,
   ) => SeriesMemberRemoveStore | undefined
+  /** Optional D1-02 provider for the atomic Series member reorder mutation. */
+  seriesMemberReorderStoreProvider?: (
+    env: W03PublishedMediaReferenceRuntimeEnv,
+  ) => SeriesMemberReorderStore | undefined
   /** Optional D1-02 provider for bounded series and collection member reads. */
   membersReadStoreProvider?: (
     env: W03PublishedMediaReferenceRuntimeEnv,
@@ -1113,6 +1118,8 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
             Number(body.position),
             requireIfMatch(request),
             requireIdempotency(request),
+            new Date(),
+            dependencies.seriesMemberReorderStoreProvider?.(env),
           ),
           schemaVersion: '1.0',
           requestId: createRequestId(),
