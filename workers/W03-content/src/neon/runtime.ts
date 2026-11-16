@@ -27,7 +27,9 @@ import type { CollectionCreateStore, CollectionUpdateStore, CollectionDeleteStor
 import {
   createPostgresSeriesReadStore,
 } from '../content-series-read-store-postgres.js'
-import type { SeriesReadStore } from '../content-series.js'
+import { createPostgresSeriesCreateStore } from '../content-series-create-store-postgres.js'
+import type { SeriesCreatePostgresDatabase } from '../content-series-create-store-postgres.js'
+import type { SeriesReadStore, SeriesCreateStore } from '../content-series.js'
 import {
   createPostgresMembersReadStore,
 } from '../content-members-read-store-postgres.js'
@@ -56,6 +58,7 @@ const collectionCreateStores = new WeakMap<object, CollectionCreateStore>()
 const collectionUpdateStores = new WeakMap<object, CollectionUpdateStore>()
 const collectionDeleteStores = new WeakMap<object, CollectionDeleteStore>()
 const seriesStores = new WeakMap<object, SeriesReadStore>()
+const seriesCreateStores = new WeakMap<object, SeriesCreateStore>()
 const membersStores = new WeakMap<object, {
   series: SeriesMembersReadStore
   collections: CollectionMembersReadStore
@@ -69,7 +72,7 @@ const creatorContentsStores = new WeakMap<object, CreatorContentsReadStore>()
  * batch projection, W04-authorized following-feed content, native post-thread
  * projection, canonical content context and detail reads, creator-owned
  * content lists, series and collection reads, and series/collection membership
- * lists. Collection creation, update, and delete are the only Neon-backed mutations in these slices; all other W03 reads and mutations remain on D1_02. D1 is the safe
+ * lists. Collection creation, update, and delete plus Series creation are the only Neon-backed mutations in these slices; all other W03 reads and mutations remain on D1_02. D1 is the safe
  * default and unknown values fail closed.
  */
 export function resolveW03PublicMediaReferenceDriver(
@@ -335,6 +338,26 @@ export function getW03SeriesReadStore(
     getW03PublicMediaReferencePostgresPool(env),
   )
   seriesStores.set(binding, store)
+  return store
+}
+
+/** PostgreSQL writer for the existing creator-owned series create operation. */
+export function getW03SeriesCreateStore(
+  env: W03PublicMediaReferenceRuntimeEnv,
+): SeriesCreateStore | undefined {
+  if (resolveW03PublicMediaReferenceDriver(env) === 'd1') return undefined
+
+  const binding = env.HYPERDRIVE_D1_02
+  if (!binding || typeof binding !== 'object') {
+    throw new Error('W03_HYPERDRIVE_D1_02_BINDING_REQUIRED')
+  }
+  const cached = seriesCreateStores.get(binding)
+  if (cached) return cached
+
+  const store = createPostgresSeriesCreateStore(
+    getW03PublicMediaReferencePostgresPool(env) as unknown as SeriesCreatePostgresDatabase,
+  )
+  seriesCreateStores.set(binding, store)
   return store
 }
 
