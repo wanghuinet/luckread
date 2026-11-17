@@ -152,12 +152,11 @@ describe('W03 revision runtime injection', () => {
     }
     const prepare = vi.fn(() => { throw new Error('D1 must not be queried by Neon revision reads') })
     const page = await listContentRevisions(
-      { prepare } as never,
+      store,
       'owner-1',
       'content-1',
       null,
       1,
-      store,
     )
 
     expect(prepare).not.toHaveBeenCalled()
@@ -176,12 +175,51 @@ describe('W03 revision runtime injection', () => {
     const prepare = vi.fn(() => { throw new Error('D1 must not be queried by Neon revision reads') })
 
     await expect(getContentRevision(
-      { prepare } as never,
+      store,
       'owner-1',
       'content-1',
       'revision-1',
-      store,
     )).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 })
+    expect(prepare).not.toHaveBeenCalled()
+  })
+
+  it('fails closed when Neon revision readers or the restore store are unavailable', async () => {
+    const prepare = vi.fn(() => { throw new Error('D1 revision fallback must not be queried') })
+    const worker = createW03ContentWorker()
+    const env = { D1_02: { prepare } } as never
+    const headers = {
+      'X-LuckRead-Caller': 'W01',
+      'X-LuckRead-Transport-Version': '1.0',
+      'X-LuckRead-Correlation-Id': 'content-revision-store-unavailable',
+      'X-LuckRead-Principal-User-Id': 'owner-1',
+      'X-LuckRead-Principal-Layer': 'L3',
+    }
+
+    const listResponse = await worker.fetch(
+      new Request('https://w03.internal/internal/content/contents/content-1/revisions?limit=10', { headers }),
+      env,
+    )
+    const detailResponse = await worker.fetch(
+      new Request('https://w03.internal/internal/content/contents/content-1/revisions/revision-1', { headers }),
+      env,
+    )
+    const rollbackResponse = await worker.fetch(
+      new Request('https://w03.internal/internal/content/contents/content-1/revisions/revision-1/rollback', {
+        method: 'POST',
+        headers: {
+          ...headers,
+          'If-Match': 'W/"2"',
+          'Idempotency-Key': 'revision-restore-unavailable',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ reason: 'restore previous revision' }),
+      }),
+      env,
+    )
+
+    expect(listResponse.status).toBe(503)
+    expect(detailResponse.status).toBe(503)
+    expect(rollbackResponse.status).toBe(503)
     expect(prepare).not.toHaveBeenCalled()
   })
 
