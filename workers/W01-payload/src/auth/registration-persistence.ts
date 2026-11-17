@@ -13,12 +13,6 @@ export type RegistrationEnvelope = Readonly<{
   expiresAt: string
 }>
 
-export type RegistrationIdentity = Readonly<{
-  id: string
-  email: string
-  username: string | null
-}>
-
 export type RegistrationReservation = Readonly<{
   reservationId: string
   idempotencyKey: string
