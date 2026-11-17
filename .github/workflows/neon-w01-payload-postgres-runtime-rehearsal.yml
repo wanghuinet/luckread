@@ -82,6 +82,10 @@ jobs:
         working-directory: workers/W01-payload
         run: pnpm install --frozen-lockfile --ignore-scripts
 
+      - name: Type-check W01 Payload and AUTH-001 Neon registration persistence
+        working-directory: workers/W01-payload
+        run: pnpm exec tsc --noEmit --incremental false
+
       - name: Verify Neon is selected and the production Worker has zero D1 bindings
         working-directory: workers/W01-payload
         run: |
