@@ -7,11 +7,13 @@ import {
 } from './membership-database-runtime.js'
 
 describe('W07 D1-01 Neon membership runtime', () => {
-  it('keeps D1 as the default and does not allocate a PostgreSQL pool', () => {
+  it('requires an explicit provider and keeps legacy D1 only for explicit test selection', () => {
     const d1 = {} as D1Database
     const poolFactory = vi.fn()
-    const env = { D1_01: d1 }
 
+    expect(() => resolveW07MembershipDatabaseDriver({ D1_01: d1 })).toThrow('SERVICE_UNAVAILABLE')
+
+    const env = { D1_01: d1, W07_MEMBERSHIP_DATABASE_DRIVER: 'd1' }
     expect(resolveW07MembershipDatabaseDriver(env)).toBe('d1')
     expect(getW07SelectedD101Database(env, poolFactory)).toBe(d1)
     expect(poolFactory).not.toHaveBeenCalled()
