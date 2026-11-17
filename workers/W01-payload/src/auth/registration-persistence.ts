@@ -359,7 +359,7 @@ function createPostgresRegistrationPersistenceStore(pool: Pool): RegistrationPer
             [input.committedResponse, input.now, input.reservationId],
           )
           if (updated.rowCount !== 1) throw new Error('AUTH001_COMMIT_BATCH_INCOMPLETE')
-          const row = await client.query<{ committed_response: string }>(
+          const row = await client.query<{ committed_response: string } & Record<string, unknown>>(
             'SELECT committed_response FROM auth_registration_envelopes WHERE id = $1 LIMIT 1',
             [input.reservationId],
           )
