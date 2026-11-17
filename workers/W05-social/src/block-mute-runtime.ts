@@ -1,12 +1,8 @@
-/// <reference types="@cloudflare/workers-types" />
-
 import {
-  createD1BlockMuteListReadStore,
   BlockMuteListReadStoreError,
   type BlockMuteListReadStore,
 } from './block-mute-list-read-store.js'
 import {
-  createD1BlockMuteRelationStore,
   BlockMuteRelationStoreError,
   type BlockMuteRelationRow,
   type BlockMuteRelationStore,
@@ -54,17 +50,9 @@ const validateTarget = (actorUserId: string, targetUserId: string): [string, str
   return [actor, target]
 }
 
-type BlockMuteRelationDataSource = D1Database | BlockMuteRelationStore
-
-function resolveBlockMuteRelationStore(source: BlockMuteRelationDataSource): BlockMuteRelationStore {
-  if (
-    typeof (source as BlockMuteRelationStore).get === 'function' &&
-    typeof (source as BlockMuteRelationStore).set === 'function' &&
-    typeof (source as BlockMuteRelationStore).remove === 'function'
-  ) {
-    return source as BlockMuteRelationStore
-  }
-  return createD1BlockMuteRelationStore(source as D1Database)
+function requireBlockMuteRelationStore(source: BlockMuteRelationStore | undefined): BlockMuteRelationStore {
+  if (!source) throw new BlockMuteRuntimeError('SERVICE_UNAVAILABLE', 503)
+  return source
 }
 
 function mapBlockMuteRelationStoreError(error: unknown): never {
@@ -91,14 +79,14 @@ const toBlockMuteRecord = (row: {
 })
 
 export async function getRelation(
-  source: BlockMuteRelationDataSource,
+  source: BlockMuteRelationStore | undefined,
   actorUserId: string,
   targetUserId: string,
   relationType: BlockMuteType,
 ): Promise<BlockMuteRecord | null> {
   const [actor, target] = validateTarget(actorUserId, targetUserId)
   try {
-    const row = await resolveBlockMuteRelationStore(source).get({
+    const row = await requireBlockMuteRelationStore(source).get({
       actorUserId: actor,
       targetUserId: target,
       relationType,
@@ -110,7 +98,7 @@ export async function getRelation(
 }
 
 export async function setRelation(
-  source: BlockMuteRelationDataSource,
+  source: BlockMuteRelationStore | undefined,
   actorUserId: string,
   targetUserId: string,
   relationType: BlockMuteType,
@@ -119,7 +107,7 @@ export async function setRelation(
   const now = new Date().toISOString()
   let row: BlockMuteRelationRow | null
   try {
-    row = await resolveBlockMuteRelationStore(source).set({
+    row = await requireBlockMuteRelationStore(source).set({
       relationshipId: crypto.randomUUID(),
       actorUserId: actor,
       targetUserId: target,
@@ -135,14 +123,14 @@ export async function setRelation(
 }
 
 export async function removeRelation(
-  source: BlockMuteRelationDataSource,
+  source: BlockMuteRelationStore | undefined,
   actorUserId: string,
   targetUserId: string,
   relationType: BlockMuteType,
 ): Promise<void> {
   const [actor, target] = validateTarget(actorUserId, targetUserId)
   try {
-    await resolveBlockMuteRelationStore(source).remove({
+    await requireBlockMuteRelationStore(source).remove({
       actorUserId: actor,
       targetUserId: target,
       relationType,
@@ -224,22 +212,17 @@ export const parseBlockMuteListLimit = (value: string | null): number => {
   return Math.min(Number(normalized), MAX_RELATION_LIST_LIMIT)
 }
 
-type BlockMuteListDataSource = D1Database | BlockMuteListReadStore
-
-function resolveBlockMuteListReadStore(source: BlockMuteListDataSource): BlockMuteListReadStore {
-  if (typeof (source as BlockMuteListReadStore).list === 'function') {
-    return source as BlockMuteListReadStore
-  }
-  return createD1BlockMuteListReadStore(source as D1Database)
+function requireBlockMuteListReadStore(source: BlockMuteListReadStore | undefined): BlockMuteListReadStore {
+  if (!source) throw new BlockMuteRuntimeError('SERVICE_UNAVAILABLE', 503)
+  return source
 }
 
 /**
  * Lists a viewer's own Block or Mute relationships. The cursor is bound to the
- * actor and relation type; D1 remains the default authority while PostgreSQL
- * can be injected for isolated rehearsal.
+ * actor and relation type; runtime uses only the composed PostgreSQL Store.
  */
 export async function listRelations(
-  source: BlockMuteListDataSource,
+  source: BlockMuteListReadStore | undefined,
   actorUserId: string,
   relationType: BlockMuteType,
   cursorValue: string | null,
@@ -253,7 +236,7 @@ export async function listRelations(
 
   let rows
   try {
-    rows = await resolveBlockMuteListReadStore(source).list({
+    rows = await requireBlockMuteListReadStore(source).list({
       actorUserId: actor,
       relationType,
       cursor: cursor ? {
