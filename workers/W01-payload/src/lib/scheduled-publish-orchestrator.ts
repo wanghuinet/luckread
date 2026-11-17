@@ -204,7 +204,7 @@ export async function runAuthorizedScheduledPublish(
   if (candidates.length === 0) return summary
 
   const authorized: AuthorizedCandidate[] = []
-  // Bound W08 fan-out to avoid opening 50 concurrent D1-01 authorization reads.
+  // Bound W08 fan-out to keep Neon authorization connections bounded.
   const concurrency = 8
   for (let offset = 0; offset < candidates.length; offset += concurrency) {
     const group = candidates.slice(offset, offset + concurrency)
