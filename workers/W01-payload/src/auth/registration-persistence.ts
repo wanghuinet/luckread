@@ -324,7 +324,7 @@ function createPostgresRegistrationPersistenceStore(pool: Pool): RegistrationPer
     },
 
     async findIdentityByEmail(email) {
-      const result = await pool.query<{ id: string }>(
+      const result = await pool.query<{ id: string } & Record<string, unknown>>(
         'SELECT id FROM "user" WHERE email = $1 LIMIT 1',
         [email],
       )
