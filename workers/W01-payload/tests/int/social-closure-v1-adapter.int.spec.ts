@@ -197,12 +197,13 @@ describe('unified W05 social closure adapters', () => {
 
   it('preserves containing-content IDs for reply, comment-like, and comment-mention notifications', () => {
     const worker = read('../../workers/W05-social/src/index.ts')
-    const commentContextStore = read('../../workers/W05-social/src/comment-notification-context-store.ts')
+    const commentContextStore = read('../../workers/W05-social/src/comment-notification-context-store-postgres.ts')
     const runtime = read('../../workers/W05-social/src/social-closure-runtime.ts')
     const notifications = read('src/app/(twitter-clone)/notifications/page.tsx')
 
     expect(worker).toContain("payload: { contentId: commentContentId }")
-    expect(worker).toContain('dependencies.commentNotificationContextStore ?? env.DB')
+    expect(worker).toContain('requireCommentNotificationContextStore(dependencies.commentNotificationContextStore)')
+    expect(worker).not.toContain('commentNotificationContextStore ?? env.DB')
     expect(worker).toContain('getPublishedCommentNotificationContext(')
     expect(worker).toContain('getInteractionNotificationContext')
     expect(worker).toContain('notificationContext.contentId')
