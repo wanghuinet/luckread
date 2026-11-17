@@ -10,7 +10,13 @@ const mocks = vi.hoisted(() => ({
   reconcileReceipts: vi.fn(),
 }))
 
-vi.mock('./better-auth.js', () => ({ createLuckReadAuth: mocks.createAuth }))
+vi.mock('./better-auth.js', () => ({
+  createLuckReadAuth: mocks.createAuth,
+  requireLegacyW02D1Database: (env: { D1_01?: D1Database }) => {
+    if (!env.D1_01) throw new Error('W02_D1_TEST_BINDING_REQUIRED')
+    return env.D1_01
+  },
+}))
 vi.mock('./principal.js', () => ({ resolveBetterAuthPrincipal: mocks.resolvePrincipal }))
 vi.mock('./mfa-status.js', () => ({
   readAuthoritativeMfaStatus: mocks.readStatus,
