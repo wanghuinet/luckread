@@ -1,7 +1,7 @@
-name: Neon Runtime Cutover Deploy — W03 Content Read Projections
+name: W03 Neon Runtime Validation and Controlled Deployment
 
 on:
-  push:
+  pull_request:
     branches:
       - main
     paths:
@@ -45,6 +45,17 @@ on:
       - 'workers/W03-content/src/content-revision-read-store-postgres.ts'
       - 'workers/W03-content/src/entry.ts'
       - 'workers/W03-content/src/neon/runtime.ts'
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact W03 source commit to deploy from protected main
+        required: true
+        type: string
+      confirm:
+        description: Type DEPLOY to permit the controlled W03 Neon deployment
+        required: true
+        default: NO
+        type: string
 
 permissions:
   contents: read
@@ -54,18 +65,31 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy:
-    if: ${{ github.ref == 'refs/heads/main' }}
+  w03-neon-runtime:
+    if: ${{ github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.confirm == 'DEPLOY' && github.ref == 'refs/heads/main' && github.ref_protected == true) }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - name: Checkout exact main deployment source
+      - name: Checkout exact validation or deployment source
         uses: actions/checkout@v4
         with:
-          ref: main
-          fetch-depth: 1
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.source_sha || github.sha }}
+          fetch-depth: 0
 
-      - name: Validate W03 Neon cutover boundaries and preserve D1 fallback
+      - name: Require the dispatched source SHA to belong to protected main
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/heads/main"
+          test "$GITHUB_REF_PROTECTED" = "true"
+          git fetch origin main --no-tags
+          git cat-file -e "$SOURCE_SHA^{commit}"
+          git merge-base --is-ancestor "$SOURCE_SHA" origin/main
+          echo "W03_DEPLOY_SOURCE_IS_PROTECTED_MAIN=PASS"
+
+      - name: Validate W03 Neon-only runtime and admitted provider wiring
         run: |
           set -euo pipefail
           node <<'NODE'
@@ -78,17 +102,15 @@ jobs:
           const relationships = fs.readFileSync('workers/W03-content/src/content-relationships.ts', 'utf8')
           const bootstrap = JSON.parse(fs.readFileSync('contracts/database/neon-five-domain-schema-bootstrap.v1.json', 'utf8'))
           const domain = (bootstrap.domains || []).find(x => x.domainId === 'D1-02')
-          const d1 = (config.d1_databases || []).find(x => x.binding === 'D1_02')
-          const hyperdrive = (config.hyperdrive || []).find(x => x.binding === 'HYPERDRIVE_D1_02')
+          const hyperdrive = (config.hyperdrive || []).find(x => x.binding === 'HYPERDRIVE_CONTENT_PG')
           if (config.name !== 'luckread-w03' || config.main !== 'src/entry.ts') {
             throw new Error('W03 worker identity or deployment entrypoint changed')
           }
           if (config.vars?.W03_CONTENT_READ_DRIVER !== 'neon') {
             throw new Error('W03 content read driver must select Neon')
           }
-          if (!d1 || d1.database_id !== '6c342634-97f6-4248-9f4a-85772af4f22c' ||
-              d1.database_name !== 'luckreadpro') {
-            throw new Error('W03 existing D1-02 binding must remain for non-admitted reads and fallback writes')
+          if ((config.d1_databases || []).length !== 0) {
+            throw new Error('W03 Neon production config must not declare any Cloudflare D1 runtime binding')
           }
           if (!hyperdrive || hyperdrive.id !== 'c55183e1cc3446409c9c1075832c6615') {
             throw new Error('W03 existing D1-02 Hyperdrive binding identity changed')
@@ -131,8 +153,9 @@ jobs:
               throw new Error('W03 Neon provider wiring is incomplete: ' + provider)
             }
           }
-          if (!runtime.includes('Content creation, update, delete, owner-authorized state transitions, W06 moderation decisions, owner-authorized revision rollback, scheduled publication candidate reads/commits, content reference create/revoke, native post-thread append, plus Collection creation, update, delete, member attachment, member removal, and member reorder plus Series creation, update, delete, member attachment, member removal, and member reorder are the only Neon-backed mutations in these slices; all other W03 reads and mutations remain on D1_02')) {
-            throw new Error('W03 Neon mutation boundary declaration is missing')
+          const productionRuntime = [entry, runtime, contentRuntime, router, relationships].join('\n')
+          if (/\b(?:env|context\.env)\.D1_02\b/.test(productionRuntime)) {
+            throw new Error('W03 production entrypoint still directly accesses the removed D1_02 binding')
           }
           if (!entry.includes('contentRevisionReadStoreProvider') ||
               !runtime.includes('getW03ContentRevisionReadStore') ||
@@ -146,7 +169,8 @@ jobs:
             throw new Error('W03 Neon owner-authorized content state transition wiring is incomplete')
           }
           if (!contentRuntime.includes('mutationStore.moderationTransition({') ||
-              !router.includes('applyModerationContentTransition(env.D1_02')) {
+              !router.includes('dependencies.contentMutationStoreProvider?.(env),') ||
+              !runtime.includes('getW03ContentMutationStore')) {
             throw new Error('W03 Neon W06 moderation transition wiring is incomplete')
           }
           if (!contentRuntime.includes('mutationStore.rollback({') ||
@@ -184,7 +208,8 @@ jobs:
         working-directory: workers/W03-content
         run: npm install --ignore-scripts --no-audit --no-fund --package-lock=false
 
-      - name: Deploy W03 Content with Neon read projections
+      - name: Deploy W03 Content with the exact reviewed Neon source
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.confirm == 'DEPLOY' && github.ref == 'refs/heads/main' && github.ref_protected == true }}
         working-directory: workers/W03-content
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
