@@ -56,8 +56,8 @@ const d1Json = (command, options = {}) => {
       const busy = /SQLITE_BUSY|database is locked/i.test(message)
       if (!retryBusy || !busy || attempt >= maxRetries) throw error
 
-      // W01 and W02 local Workers share one SQLite persistence directory.
-      // Retry only read-only CLI queries while workerd briefly holds its lock.
+      // W01 uses a local D1 persistence directory only for the Payload projection fixture.
+      // Retry only read-only W01 CLI queries while workerd briefly holds its lock.
       // Writes/DDL are never replayed because their commit outcome may be unknown.
       const delayMs = Math.min(250 * (2 ** attempt), 3_000)
       Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, delayMs)
