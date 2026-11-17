@@ -112,7 +112,7 @@ async function rollbackRegistration(
   return { rolledBack: true }
 }
 
-/** PostgreSQL counterpart for disposable PG18 rehearsal; not a production binding. */
+/** Production Neon PostgreSQL adapter for W02 registration identity confirmation and rollback. */
 export function createPostgresRegistrationRollbackStore(pool: Pool): RegistrationRollbackStore {
   return {
     async confirmIdentity(rawCommand): Promise<RegistrationIdentityConfirmation> {
