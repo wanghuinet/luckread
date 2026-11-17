@@ -1,4 +1,4 @@
-import { createLuckReadAuth, type BetterAuthEnv } from './better-auth.js'
+import { createLuckReadAuth, requireLegacyW02D1Database, type BetterAuthEnv } from './better-auth.js'
 import { buildMfaAuditEvent } from './mfa-audit-events.js'
 import {
   createD1MfaEnrollmentStartStore,
@@ -97,7 +97,7 @@ export async function handleMfaEnrollmentStartRequest(
     reasonCode: 'USER_INITIATED',
     factorState: 'PENDING_VERIFICATION',
   })
-  const store = dependencies.store ?? createD1MfaEnrollmentStartStore(env.D1_01)
+  const store = dependencies.store ?? createD1MfaEnrollmentStartStore(requireLegacyW02D1Database(env))
   let reserved = false
   try {
     reserved = await store.reserve({
