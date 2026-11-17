@@ -194,7 +194,49 @@ export default {
       }
     }
 
+    if (request.method === 'POST' && url.pathname === '/internal/auth/registration/identity-confirmation') {
+      if (
+        request.headers.get('X-LuckRead-Caller') !== 'W01' ||
+        request.headers.get('X-LuckRead-Transport-Version') !== '1.0'
+      ) {
+        return json({ error: { code: 'FORBIDDEN', message: 'authorized W01 service boundary required' } }, 403)
+      }
+
+      const body = await readJsonBody<{ userId?: unknown; email?: unknown }>(request)
+      if (
+        !body ||
+        typeof body.userId !== 'string' ||
+        body.userId.length < 1 ||
+        body.userId.length > 128 ||
+        typeof body.email !== 'string' ||
+        body.email.trim().length < 3 ||
+        body.email.trim().length > 254
+      ) {
+        return json({ error: { code: 'VALIDATION_FAILED', message: 'invalid registration identity confirmation request' } }, 400)
+      }
+
+      try {
+        const confirmation = await postgres.registrationRollbackStore.confirmIdentity({
+          userId: body.userId,
+          email: body.email,
+        })
+        return json(confirmation)
+      } catch (error) {
+        if (error instanceof RegistrationRollbackStoreError && error.code === 'INVALID_INPUT') {
+          return json({ error: { code: 'VALIDATION_FAILED', message: 'invalid registration identity confirmation request' } }, 400)
+        }
+        return json({ error: { code: 'SERVICE_UNAVAILABLE', message: 'registration identity confirmation unavailable' } }, 503)
+      }
+    }
+
     if (request.method === 'POST' && url.pathname === '/internal/auth/registration/rollback') {
+      if (
+        request.headers.get('X-LuckRead-Caller') !== 'W01' ||
+        request.headers.get('X-LuckRead-Transport-Version') !== '1.0'
+      ) {
+        return json({ error: { code: 'FORBIDDEN', message: 'authorized W01 service boundary required' } }, 403)
+      }
+
       const body = await readJsonBody<{ userId?: unknown; email?: unknown; username?: unknown }>(request)
       if (!body || typeof body.userId !== 'string' || body.userId.length === 0 || body.userId.length > 128 ||
           typeof body.email !== 'string' || body.email.length === 0 || typeof body.username !== 'string' || body.username.length === 0) {
