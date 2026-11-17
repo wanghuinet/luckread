@@ -1,6 +1,10 @@
 import { execFileSync } from 'node:child_process'
+import { createRequire } from 'node:module'
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
+
+const requireW02 = createRequire(new URL('../../W02-identity/package.json', import.meta.url))
+const { Client: PostgresClient } = requireW02('pg')
 
 const baseUrl = process.env.AUTH001_BASE_URL || 'http://127.0.0.1:8787'
 const artifactDir = new URL('../../../artifacts/mapping-0/auth-001-runtime-local/', import.meta.url)
@@ -8,6 +12,15 @@ mkdirSync(artifactDir, { recursive: true })
 const runId = process.env.GITHUB_RUN_ID || 'local'
 const sourceSha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
 const policy = JSON.parse(readFileSync(new URL('../../../artifacts/mapping-0/priv004-approved-policy-instance-2026-09-27.json', import.meta.url), 'utf8'))
+const w02DatabaseUrl = process.env.AUTH001_W02_DATABASE_URL
+if (!w02DatabaseUrl) throw new Error('AUTH001_W02_DATABASE_URL is required for the Neon-backed W02 runtime evidence')
+const w02DatabaseTarget = new URL(w02DatabaseUrl)
+if (!new Set(['127.0.0.1', 'localhost']).has(w02DatabaseTarget.hostname) ||
+    w02DatabaseTarget.port !== '5432' || w02DatabaseTarget.pathname !== '/luckread_schema') {
+  throw new Error('Refusing AUTH-001 W02 runtime evidence outside disposable local luckread_schema PostgreSQL')
+}
+const w02Database = new PostgresClient({ connectionString: w02DatabaseUrl })
+let w02DatabaseConnected = false
 if (policy.policyVersion !== 'DEV-2026-09-28.1') throw new Error('Unexpected development PRIV-004 policy version')
 
 const escapeSql = (value) => "'" + String(value).replaceAll("'", "''") + "'"
@@ -104,6 +117,8 @@ const cleanup = async () => {
 }
 
 try {
+  await w02Database.connect()
+  w02DatabaseConnected = true
   const health = await fetch(baseUrl + '/')
   if (health.status >= 500) throw new Error('Local W01 did not start cleanly: HTTP ' + health.status)
 
@@ -121,10 +136,11 @@ try {
     if (Number(legacySession?.c || 0) !== 0) throw new Error('Legacy Payload session row was created for Better Auth registration')
   }
 
-  const pendingIdentity = await scalar(
-    'SELECT email_verified AS emailVerified, account_state AS accountState, account_state_version AS accountStateVersion FROM "user" WHERE id = ? LIMIT 1',
-    first.userId,
+  const pendingIdentityResult = await w02Database.query(
+    'SELECT email_verified AS "emailVerified", account_state AS "accountState", account_state_version AS "accountStateVersion" FROM "user" WHERE id = $1 LIMIT 1',
+    [first.userId],
   )
+  const pendingIdentity = pendingIdentityResult.rows[0] ?? null
   if (
     Number(pendingIdentity?.emailVerified) !== 0 ||
     pendingIdentity?.accountState !== 'PENDING_VERIFICATION' ||
@@ -201,12 +217,16 @@ try {
   const result = {
     status: 'PASS',
     evidenceType: 'AUTH-001_BETTER_AUTH_REGISTRATION_W01_BOUNDARY_LOCAL_RUNTIME',
-    runId, sourceSha, environment: 'CONTROLLED_LOCAL_D1_SHARED_W02_W01_OPENNEXT_WORKERS',
+    runId, sourceSha, environment: 'CONTROLLED_LOCAL_D1_W01_NEON_W02_OPENNEXT_WORKERS',
     assertions: { successfulRegistration: true, betterAuthIdentityCreated: true, w01ProfileProjectionBoundByIdentityId: true, payloadNativePasswordNotPersisted: true, payloadNativeSessionNotCreated: true, responseDigestMatchesCommitment: true, idempotentReplay: true, idempotencyReuseConflict: true, downstreamRollbackRemovesBetterAuthIdentity: true, concurrentDuplicateIdentitySingleWinner: true, concurrentSameKeySingleWinner: true },
     observed: { userId: String(first.userId), accountState: first.accountState, concurrentStatuses: statuses, sameKeyStatuses },
   }
   writeFileSync(new URL('./runtime-result.json', artifactDir), JSON.stringify(result, null, 2) + '\n')
   console.log(JSON.stringify(result, null, 2))
 } finally {
-  await cleanup()
+  try {
+    await cleanup()
+  } finally {
+    if (w02DatabaseConnected) await w02Database.end()
+  }
 }
