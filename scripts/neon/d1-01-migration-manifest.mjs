@@ -134,11 +134,12 @@ if (w02Package.dependencies?.['better-auth'] !== '1.7.8' ||
     w02Package.devDependencies?.pg !== '8.20.0') {
   fail('W02 Better Auth CLI/runtime and PostgreSQL driver pins drifted')
 }
-if (manifest.entries.length !== 14) {
-  fail('D1-01 must retain exactly 14 ordered migration entries (W01 + W02 core + W02 custom x10 + W07 + W08)')
+if (manifest.entries.length !== 15) {
+  fail('D1-01 must retain exactly 15 ordered migration entries (W01 Payload + W01 AUTH-001 + W02 core/custom + W07 + W08)')
 }
 const requiredEntries = [
   [100, 'W01', 'D1-01-W01-PAYLOAD-BASELINE-20261107', 'PAYLOAD_NATIVE'],
+  [700, 'W01', 'D1-01-W01-AUTH-001-REGISTRATION-BATCH-0001', 'POSTGRESQL_SQL'],
   [200, 'W02', 'D1-01-W02-BETTER-AUTH-CORE-1.7.8', 'GENERATED_POSTGRESQL_SQL'],
   [500, 'W07', 'D1-01-W07-MEMBERSHIP-SCHEMA-0001', 'POSTGRESQL_SQL'],
   [600, 'W08', 'D1-01-W08-CREATOR-AUTHORIZATION-0001', 'POSTGRESQL_SQL'],

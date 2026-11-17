@@ -3,17 +3,24 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 describe('AUTH-001 registration idempotency ordering', () => {
-  it('reserves the idempotency key before creating a Better Auth identity', () => {
-    const source = readFileSync(
+  it('reserves the idempotency key through the selected persistence store before creating a Better Auth identity', () => {
+    const route = readFileSync(
       resolve(process.cwd(), 'src/app/auth/register/route.ts'),
       'utf8',
     )
+    const persistence = readFileSync(
+      resolve(process.cwd(), 'src/auth/registration-persistence.ts'),
+      'utf8',
+    )
 
-    const reservation = source.indexOf('INSERT INTO auth_registration_envelopes')
-    const betterAuth = source.indexOf("proxyBetterAuth(request, '/sign-up/email'")
+    const reservation = route.indexOf('await persistence.reserveEnvelope({')
+    const betterAuth = route.indexOf("proxyBetterAuth(request, '/sign-up/email'")
     expect(reservation).toBeGreaterThanOrEqual(0)
     expect(betterAuth).toBeGreaterThanOrEqual(0)
     expect(reservation).toBeLessThan(betterAuth)
+    expect(persistence).toContain('INSERT INTO auth_registration_envelopes')
+    expect(persistence).toContain('active_key')
+    expect(persistence).toContain('createPostgresRegistrationPersistenceStore')
   })
 
   it('releases an in-progress reservation on downstream registration failure', () => {
@@ -29,21 +36,28 @@ describe('AUTH-001 registration idempotency ordering', () => {
   })
 
   it('confirms that W02 returned a persisted identity before creating the Payload profile', () => {
-    const source = readFileSync(
+    const route = readFileSync(
       resolve(process.cwd(), 'src/app/auth/register/route.ts'),
       'utf8',
     )
+    const persistence = readFileSync(
+      resolve(process.cwd(), 'src/auth/registration-persistence.ts'),
+      'utf8',
+    )
 
-    const identityLookup = source.indexOf('SELECT id, email, username FROM "user" WHERE id = ? LIMIT 1')
-    const projectionWrite = source.indexOf('await payload.create({')
+    const identityLookup = route.indexOf('persistence.findIdentityById(userId)')
+    const projectionWrite = route.indexOf('await payload.create({')
     expect(identityLookup).toBeGreaterThanOrEqual(0)
     expect(projectionWrite).toBeGreaterThanOrEqual(0)
     expect(identityLookup).toBeLessThan(projectionWrite)
-    expect(source).toContain("event: 'auth.register.identity_not_persisted'")
-    expect(source).toContain("return errorResponse(422, 'VALIDATION_FAILED', 'Registration could not be completed')")
-    expect(source).toContain("env.D1.withSession('first-primary')")
-    expect(source).toContain('SELECT id FROM "user" WHERE email = ? LIMIT 1')
-    expect(source).not.toContain('lower(email) = ?')
+    expect(route).toContain("event: 'auth.register.identity_not_persisted'")
+    expect(route).toContain("return errorResponse(422, 'VALIDATION_FAILED', 'Registration could not be completed')")
+    expect(persistence).toContain("db.withSession('first-primary')")
+    expect(persistence).toContain('SELECT id, email, username FROM "user" WHERE id = ? LIMIT 1')
+    expect(persistence).toContain('SELECT id, email, username FROM "user" WHERE id = $1 LIMIT 1')
+    expect(persistence).toContain('SELECT id FROM "user" WHERE email = ? LIMIT 1')
+    expect(persistence).toContain('SELECT id FROM "user" WHERE email = $1 LIMIT 1')
+    expect(persistence).not.toContain('lower(email) = ?')
   })
 
   it('validates email, username and password policy at the registration API boundary', () => {

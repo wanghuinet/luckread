@@ -44,8 +44,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: Enable Corepack
-        run: corepack enable
+      - name: Enable the repository-supported pnpm 10 toolchain
+        run: corepack enable && corepack prepare pnpm@10.34.5 --activate
       - name: Install W01 dependencies
         working-directory: workers/W01-payload
         run: pnpm install --frozen-lockfile --ignore-scripts

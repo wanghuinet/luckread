@@ -15,35 +15,55 @@
   "review": {
     "reviewer": "GPT-6",
     "reviewType": "GPT-6 code-path audit plus current-SHA CI evidence reconciliation",
-    "reviewedAt": "2026-11-08",
-    "reviewedMainSha": "c57fe841bb861c9310c361266396f9ffe6a00de1",
+    "reviewedAt": "2026-11-17",
+    "reviewedMainSha": "860fcfe644ffd84091ac9bf02d5dbb96ffc1a251",
     "implementationMergeSha": "62e2a8264cc0c6c128a2290e281dba16a8257d6e",
     "postflightTargetFixMergeSha": "c57fe841bb861c9310c361266396f9ffe6a00de1",
     "result": "NO_BLOCKING_FINDINGS",
     "reviewedFiles": [
       {
-        "path": "scripts/neon/run-schema-migrations.mjs",
-        "gitBlobSha1": "56bb4961adf6cdaced056df7d6a933a7e390b215"
+        "path": ".github/workflows/neon-d1-01-full-local-rehearsal.yml",
+        "gitBlobSha1": "5e36c1089ea3e3c5d82d6b6114f32f7c604c5004"
       },
       {
-        "path": "scripts/neon/run-schema-migrations.test.mjs",
-        "gitBlobSha1": "c5c91870d9d7f2f1dbc467014ef12d06eda8722d"
+        "path": ".github/workflows/neon-d1-01-migration-ledger.yml",
+        "gitBlobSha1": "a014ec0480c23471707f61361e62f6b58456e90a"
       },
       {
-        "path": "scripts/neon/d1-01-migration-manifest.mjs",
-        "gitBlobSha1": "3e2a8781989f00d8216b551ef2ff9227f99722fa"
+        "path": ".github/workflows/neon-d1-01-reviewed-remote-schema-apply.yml",
+        "gitBlobSha1": "00d4acb8ac2bb26c3248caebcdfef550a5075a6a"
+      },
+      {
+        "path": ".github/workflows/neon-w01-payload-postgres-runtime-rehearsal.yml",
+        "gitBlobSha1": "14f290497d4177f47d07872bed58482b3a874647"
+      },
+      {
+        "path": ".github/workflows/w01-auth-me-import-verification.yml",
+        "gitBlobSha1": "1b14e7a1ba11e8b47296cb4c2f76beb223bbcdb7"
+      },
+      {
+        "path": "contracts/database/neon-d1-01-migration-manifest.v1.json",
+        "gitBlobSha1": "71ad261a25671cbc6b050cb0b29c4f38c8adf348"
+      },
+      {
+        "path": "contracts/database/neon-schema-migration-ledger.v1.json",
+        "gitBlobSha1": "8e0ed38ab3d30fa9994a80cb0361f914bf51f5f0"
       },
       {
         "path": "scripts/neon/assert-d1-01-migration-ledger-ready.mjs",
         "gitBlobSha1": "9079276205d81fe1e9224a7e04602908822c057c"
       },
       {
-        "path": "scripts/neon/remote-runner-review.mjs",
-        "gitBlobSha1": "149fc4b626d89b553c451513f1a7892ed84ca045"
+        "path": "scripts/neon/d1-01-migration-manifest.mjs",
+        "gitBlobSha1": "28d509d18669dd6d2da143df58e8949bbcb87191"
       },
       {
-        "path": "scripts/neon/remote-runner-review.test.mjs",
-        "gitBlobSha1": "2adc585ff515c961af10810c258955b0585be4a7"
+        "path": "scripts/neon/d1-01/0001_schema_migration_ledger.sql",
+        "gitBlobSha1": "b8cdec415ee4106d0b0618197b12b61d8656a2c9"
+      },
+      {
+        "path": "scripts/neon/d1-01/verify-combined-local-rehearsal.mjs",
+        "gitBlobSha1": "b002a89f6e8f9dafc67bb7e74b9ef408719b7c7f"
       },
       {
         "path": "scripts/neon/plan-d1-01-schema-migrations.mjs",
@@ -54,28 +74,44 @@
         "gitBlobSha1": "45be1292046aa94f91c4fc6cef02b0e20a0c6718"
       },
       {
-        "path": "scripts/neon/d1-01/0001_schema_migration_ledger.sql",
-        "gitBlobSha1": "b8cdec415ee4106d0b0618197b12b61d8656a2c9"
+        "path": "scripts/neon/remote-runner-review.mjs",
+        "gitBlobSha1": "149fc4b626d89b553c451513f1a7892ed84ca045"
       },
       {
-        "path": "scripts/neon/d1-01/verify-combined-local-rehearsal.mjs",
-        "gitBlobSha1": "3c4f4646bbfa678a82068dfff597ff1293e46606"
+        "path": "scripts/neon/remote-runner-review.test.mjs",
+        "gitBlobSha1": "2adc585ff515c961af10810c258955b0585be4a7"
       },
       {
-        "path": ".github/workflows/neon-d1-01-migration-ledger.yml",
-        "gitBlobSha1": "b171e0e5540bfeacadfc49c523c7b5ec9c2f21eb"
+        "path": "scripts/neon/run-schema-migrations.mjs",
+        "gitBlobSha1": "8c1f1efef8a5789e8ab1103352a2b6223b9c63bc"
       },
       {
-        "path": ".github/workflows/neon-d1-01-reviewed-remote-schema-apply.yml",
-        "gitBlobSha1": "00d4acb8ac2bb26c3248caebcdfef550a5075a6a"
+        "path": "scripts/neon/run-schema-migrations.test.mjs",
+        "gitBlobSha1": "c5c91870d9d7f2f1dbc467014ef12d06eda8722d"
       },
       {
-        "path": "contracts/database/neon-d1-01-migration-manifest.v1.json",
-        "gitBlobSha1": "6a04861f12b379147aad406a39921e8f1ceedd2f"
+        "path": "workers/W01-payload/scripts/neon/rehearse-auth001-registration-neon-postgres-runtime.mjs",
+        "gitBlobSha1": "5b4f6c00378f217fd2a6f76fe0519792366432b1"
       },
       {
-        "path": "contracts/database/neon-schema-migration-ledger.v1.json",
-        "gitBlobSha1": "8e0ed38ab3d30fa9994a80cb0361f914bf51f5f0"
+        "path": "workers/W01-payload/src/app/auth/register/route.ts",
+        "gitBlobSha1": "0dcd88582986c14c4ac6bed3a3d82d92cacf487a"
+      },
+      {
+        "path": "workers/W01-payload/src/auth/registration-persistence.ts",
+        "gitBlobSha1": "f5194aba450263491e5877cea97611914398dccb"
+      },
+      {
+        "path": "workers/W01-payload/src/migrations/20260928_020000_MIG_AUTH_001_REGISTRATION_BATCH_V1.ts",
+        "gitBlobSha1": "77ae87a7ecb6275d64c149b02347d1e4464491cc"
+      },
+      {
+        "path": "workers/W01-payload/src/neon-postgres-migrations-d1-01/0001_w01_auth001_registration_batch.sql",
+        "gitBlobSha1": "849545097a33ccebcc28b6fdddc340cbbde9a0d2"
+      },
+      {
+        "path": "workers/W01-payload/src/types/pg.d.ts",
+        "gitBlobSha1": "6f47e0a98cbc16ab0584ed9ebba18fd67f709b92"
       }
     ],
     "controlsChecked": [
@@ -102,11 +138,11 @@
     ],
     "formalGitHubReviewSubmissions": 0,
     "followUpReview": {
-      "reviewedAt": "2026-11-08",
-      "scope": "Re-reviewed D1-01 shared-runner readiness after D1-02 release was added. Confirmed the shared ledger remains globally disabled, D1-01 and D1-02 are individually pinned as reviewed, D1-03 through D1-05 stay blocked, and D1-01 manifest/planner/readiness guards accept only the two documented per-domain states.",
+      "reviewedAt": "2026-11-17",
+      "scope": "D1-01 follow-up code-path audit for W01 AUTH-001 registration idempotency and consent persistence. Added the W01-owned PostgreSQL SQL slice at append-only order 700 (after the existing fourteen applied migrations), aligned PostgreSQL envelope/consent columns and indexes to the committed D1 source migration, and confirmed the shared runner continues to apply each SQL migration and its append-only ledger row in one transaction. W01 registration now selects a provider-neutral persistence store: Neon mode uses the existing D1-01 Hyperdrive binding and a bounded cached node-postgres pool, while legacy D1 remains only in the D1 adapter. The local PG18 rehearsal verifies first reservation, unique active-key enforcement, completion/replay, atomic consent write, release, expired-key replacement, rollback on an envelope state-transition failure, and fixture cleanup.",
       "result": "NO_NEW_BLOCKING_FINDINGS",
       "formalGitHubReviewSubmissions": 0,
-      "limitations": "GPT-6 code-path review; not a human GitHub approval. Remote Neon DDL remains unexecuted."
+      "limitations": "GPT-6 code-path audit, not a human GitHub approval. The AUTH-001 migration is appended as D1-01 order 700 so the already-applied fourteen-row remote ledger remains an exact prefix; PR CI must confirm the updated fifteenth-entry manifest and local PostgreSQL 18 execution. Remote Neon DDL has not been executed; remote apply remains a separate manual workflow_dispatch with the exact confirmation token. Production D1 remains authoritative until a separate cutover authorization."
     }
   },
   "verificationEvidence": {
@@ -144,5 +180,16 @@
     "productionCutoverAuthorized": false,
     "manualWorkflowDispatchRequired": true,
     "exactConfirmationRequired": "APPLY_REVIEWED_SCHEMA_D1_01_LUCKREAD"
-  }
+  },
+  "findings": [],
+  "followUpReview": {
+    "reviewedAt": "2026-11-17",
+    "scope": "D1-01 follow-up code-path audit for W01 AUTH-001 registration idempotency and consent persistence. Added the W01-owned PostgreSQL SQL slice at order 150 (after the Payload baseline and before W02), aligned its PostgreSQL envelope/consent columns and indexes to the committed D1 source migration, and confirmed the shared runner still applies one SQL migration plus its append-only ledger row in one transaction. Registration uses a provider-neutral adapter; Neon mode uses the existing D1-01 Hyperdrive and a cached bounded PG pool; D1 fallback calls are absent from the Neon path. The new local PG18 rehearsal uses synthetic rows, verifies unique reservation, completed replay, consent+envelope commit atomicity, rollback, release and expiry replacement, and cleans its fixtures.",
+    "result": "NO_NEW_BLOCKING_FINDINGS",
+    "formalGitHubReviewSubmissions": 0,
+    "limitations": "GPT-6 code-path audit, not a human GitHub approval. CI evidence for this follow-up is recorded separately after PR validation. The remote Neon DDL has not been executed; remote apply remains a separate manual workflow_dispatch and requires its exact confirmation token. Production D1 remains authoritative until a separate cutover authorization."
+  },
+  "limitations": [
+    "The AUTH-001 PostgreSQL migration is staged in the D1-01 shared manifest and has local PostgreSQL 18 evidence only; remote Neon application and production Worker cutover are not performed by PR validation."
+  ]
 }

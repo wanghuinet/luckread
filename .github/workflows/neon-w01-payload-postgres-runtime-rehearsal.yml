@@ -6,6 +6,10 @@ on:
       - 'workers/W01-payload/src/payload.config.ts'
       - 'workers/W01-payload/src/neon-postgres-adapter.ts'
       - 'workers/W01-payload/src/payload-database-driver.ts'
+      - 'workers/W01-payload/src/auth/registration-persistence.ts'
+      - 'workers/W01-payload/src/app/auth/register/route.ts'
+      - 'workers/W01-payload/src/neon-postgres-migrations-d1-01/**'
+      - 'workers/W01-payload/scripts/neon/rehearse-auth001-registration-neon-postgres-runtime.mjs'
       - 'workers/W01-payload/tests/int/payload-database-driver.int.spec.ts'
       - 'workers/W01-payload/src/neon-postgres-runtime.config.ts'
       - 'workers/W01-payload/src/neon-postgres-schema.config.ts'
@@ -22,6 +26,10 @@ on:
       - 'workers/W01-payload/src/payload.config.ts'
       - 'workers/W01-payload/src/neon-postgres-adapter.ts'
       - 'workers/W01-payload/src/payload-database-driver.ts'
+      - 'workers/W01-payload/scripts/neon/rehearse-auth001-registration-neon-postgres-runtime.mjs'
+      - 'workers/W01-payload/src/neon-postgres-migrations-d1-01/**'
+      - 'workers/W01-payload/src/app/auth/register/route.ts'
+      - 'workers/W01-payload/src/auth/registration-persistence.ts'
       - 'workers/W01-payload/tests/int/payload-database-driver.int.spec.ts'
       - 'workers/W01-payload/src/neon-postgres-runtime.config.ts'
       - 'workers/W01-payload/src/neon-postgres-schema.config.ts'
@@ -77,6 +85,10 @@ jobs:
       - name: Install exact W01 dependency graph
         working-directory: workers/W01-payload
         run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Type-check W01 Payload and AUTH-001 Neon registration persistence
+        working-directory: workers/W01-payload
+        run: pnpm exec tsc --noEmit --incremental false
 
       - name: Verify Neon is selected and the production Worker has zero D1 bindings
         working-directory: workers/W01-payload
@@ -139,6 +151,16 @@ jobs:
           PAYLOAD_CONFIG_PATH: src/neon-postgres-schema.config.ts
         run: pnpm run neon:schema:apply
 
+      - name: Apply W01 AUTH-001 registration and consent SQL to disposable PostgreSQL 18
+        working-directory: workers/W01-payload
+        env:
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          psql --host 127.0.0.1 --port 5432 --username postgres --dbname luckread_schema \
+            --set ON_ERROR_STOP=1 --no-psqlrc \
+            --file src/neon-postgres-migrations-d1-01/0001_w01_auth001_registration_batch.sql
+
       - name: Syntax-check the JavaScript runtime rehearsal script
         working-directory: workers/W01-payload
         run: node --check scripts/neon/rehearse-payload-postgres-runtime.mjs
@@ -159,6 +181,13 @@ jobs:
           CLOUDFLARE_PERSIST_TO: ${{ runner.temp }}/w01-payload-cloudflare-runtime
         run: timeout --signal=TERM --kill-after=10s 360s node --import=tsx/esm scripts/neon/rehearse-payload-postgres-runtime.mjs
 
+      - name: Exercise W01 AUTH-001 Neon registration persistence on PostgreSQL 18
+        working-directory: workers/W01-payload
+        env:
+          PAYLOAD_SCHEMA_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/luckread_schema
+          AUTH001_NEON_POSTGRES_REPORT: artifacts/neon/w01-auth001-registration-neon-postgres-runtime-postflight.json
+        run: timeout --signal=TERM --kill-after=10s 180s node --import=tsx/esm scripts/neon/rehearse-auth001-registration-neon-postgres-runtime.mjs
+
       - name: Verify all W01 Payload business tables are empty after CRUD cleanup
         working-directory: workers/W01-payload
         env:
@@ -170,6 +199,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: w01-payload-postgres-runtime-rehearsal-${{ github.sha }}
-          path: workers/W01-payload/artifacts/neon/w01-payload-postgres-runtime-postflight.json
+          path: |
+            workers/W01-payload/artifacts/neon/w01-payload-postgres-runtime-postflight.json
+            workers/W01-payload/artifacts/neon/w01-auth001-registration-neon-postgres-runtime-postflight.json
           if-no-files-found: error
           retention-days: 30
