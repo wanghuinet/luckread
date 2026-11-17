@@ -168,6 +168,13 @@ export function buildMfaAuditEvent(input: {
   }
 }
 
+/**
+ * @deprecated-next-version
+ * Reason: Legacy Cloudflare D1 implementation retained only for isolated unit tests or the explicit schema/test fixture.
+ * Replacement: PostgreSQL MFA audit receipt/event Store and publisher in src/neon/.
+ * Removal: Next release.
+ * Condition: No production caller builds D1 prepared statements; tests use PostgreSQL/in-memory event Stores.
+ */
 export function buildMfaAuditOutboxInsert(
   db: D1Database,
   event: MfaAuditEvent,
