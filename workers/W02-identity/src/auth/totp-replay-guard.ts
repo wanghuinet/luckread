@@ -59,6 +59,13 @@ export async function matchTotpTimeStep(
  * Atomically consumes one TOTP step for the factor belonging to subjectId.
  * Only strictly increasing steps can win; concurrent replays return false.
  */
+/**
+ * @deprecated-next-version
+ * Reason: Legacy Cloudflare D1 implementation retained only for isolated unit tests or the explicit schema/test fixture.
+ * Replacement: PostgreSQL TOTP replay reservation through the Neon MFA factor-state Store.
+ * Removal: Next release.
+ * Condition: Replay-guard contract tests use the Neon factor-state Store and no direct D1 reservation remains.
+ */
 export async function consumeTotpTimeStep(
   db: D1Database,
   subjectId: string,
