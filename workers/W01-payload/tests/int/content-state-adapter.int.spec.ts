@@ -248,12 +248,16 @@ describe('1.1 content lifecycle closeout', () => {
       resolve(process.cwd(), '../W03-content/src/content-runtime.ts'),
       'utf8',
     )
+    const neonDetailStore = readFileSync(
+      resolve(process.cwd(), '../W03-content/src/content-detail-read-store-postgres.ts'),
+      'utf8',
+    )
     const detailPage = read('src/app/(twitter-clone)/content/[contentId]/page.tsx')
     const publicRoutes = read('src/app/(frontend)/content/PublicContentRoutes.tsx')
     const detailClient = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
 
-    expect(runtime).toMatch(
-      /WHERE \(id = \? OR slug = \?\)\s+AND \(state = 'PUBLISHED' OR owner_user_id = \?\)/,
+    expect(neonDetailStore).toMatch(
+      /WHERE \(id = \$1 OR slug = \$1\)\s+AND \(state = 'PUBLISHED' OR owner_user_id = \$2\)/,
     )
     expect(detailPage).toContain('renderLegacyContentRoute(contentId)')
     expect(publicRoutes).toContain("if (!content || content.state !== 'PUBLISHED') notFound()")
