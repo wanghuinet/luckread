@@ -1,7 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 import { fetchPublishedContentSocialContexts, type PublishedContentSocialContext, type W03ContentBinding } from './w03-content-context-client.js'
 import {
-  createD1NotificationPreferencesStore,
   NotificationPreferencesStoreError,
   type NotificationPreferencePatch,
   type NotificationPreferencesStore,
@@ -904,18 +903,11 @@ export async function markAllNotificationsRead(source: SocialClosureDataSource, 
     .markAllNotificationsRead(recipientUserId))
 }
 
-type NotificationPreferencesDataSource = D1Database | NotificationPreferencesStore
-
-function resolveNotificationPreferencesStore(
-  source: NotificationPreferencesDataSource,
+function requireNotificationPreferencesStore(
+  source: NotificationPreferencesStore | undefined,
 ): NotificationPreferencesStore {
-  if (
-    typeof (source as NotificationPreferencesStore).get === 'function' &&
-    typeof (source as NotificationPreferencesStore).set === 'function'
-  ) {
-    return source as NotificationPreferencesStore
-  }
-  return createD1NotificationPreferencesStore(source as D1Database)
+  if (!source) throw new SocialClosureRuntimeError('SERVICE_UNAVAILABLE', 503)
+  return source
 }
 
 const mapNotificationPreferencesStoreError = (error: unknown): SocialClosureRuntimeError => {
@@ -925,23 +917,25 @@ const mapNotificationPreferencesStoreError = (error: unknown): SocialClosureRunt
   return new SocialClosureRuntimeError('INTERNAL_ERROR', 500)
 }
 
-export async function getNotificationPreferences(source: NotificationPreferencesDataSource, userIdValue: string) {
+export async function getNotificationPreferences(source: NotificationPreferencesStore | undefined, userIdValue: string) {
   const userId = id(userIdValue, 'UNAUTHENTICATED')
+  const store = requireNotificationPreferencesStore(source)
   try {
-    return await resolveNotificationPreferencesStore(source).get(userId)
+    return await store.get(userId)
   } catch (error) {
     throw mapNotificationPreferencesStoreError(error)
   }
 }
 
 export async function setNotificationPreferences(
-  source: NotificationPreferencesDataSource,
+  source: NotificationPreferencesStore | undefined,
   userIdValue: string,
   input: NotificationPreferencePatch,
 ) {
   const userId = id(userIdValue, 'UNAUTHENTICATED')
+  const store = requireNotificationPreferencesStore(source)
   try {
-    return await resolveNotificationPreferencesStore(source).set(userId, input)
+    return await store.set(userId, input)
   } catch (error) {
     throw mapNotificationPreferencesStoreError(error)
   }
