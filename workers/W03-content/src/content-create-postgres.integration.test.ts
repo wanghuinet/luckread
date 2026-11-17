@@ -81,7 +81,7 @@ postgresSuite('W03 PostgreSQL 18 content-create runtime integration', () => {
     const fixture = await createFixture()
     const { created, ownerUserId, idempotencyKey, bodyRef } = fixture
 
-    expect(created.id).toMatch(/^\\d{16,20}$/)
+    expect(created.id).toMatch(/^[0-9]{16,20}$/)
     expect(created.state).toBe('DRAFT')
     expect(created.ownerUserId).toBe(ownerUserId)
 
