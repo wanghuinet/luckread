@@ -74,7 +74,7 @@ jobs:
               echo "W08 Creator deployment was confirmed, but source_sha does not contain W08 Creator files."
               exit 1
             fi
-            node --input-type=module -e 'import fs from "node:fs"; const w01=JSON.parse(fs.readFileSync("workers/W01-payload/wrangler.jsonc","utf8")); const w08=JSON.parse(fs.readFileSync("workers/W08-creator/wrangler.jsonc","utf8")); const ingress=(w01.services||[]).find((x)=>x.binding==="W08_CREATOR"); const hyperdrive=(w08.hyperdrive||[]).find((x)=>x.binding==="HYPERDRIVE"); if(w08.name!=="luckread-w08-creator") throw new Error("W08 worker identity mismatch"); if((w08.d1_databases||[]).length!==0||w08.vars?.W08_DATABASE_DRIVER!=="neon") throw new Error("W08 production must be Neon-only"); if(!hyperdrive||hyperdrive.id!=="0c53a1bb9bc0484bac146e8ae2d3158b") throw new Error("W08 Neon Hyperdrive mismatch"); if(!ingress||ingress.service!=="luckread-w08-creator") throw new Error("W01 W08_CREATOR binding mismatch"); if(!fs.existsSync("workers/W08-creator/migrations/0001_creator_authorization.sql")) throw new Error("W08 source migration evidence missing"); console.log("W08_NEON_ONLY_RUNTIME=PASS"); console.log("W01_W08_BINDING=PASS");'
+            node --input-type=module -e 'import fs from "node:fs"; const w01=JSON.parse(fs.readFileSync("workers/W01-payload/wrangler.neon.jsonc","utf8")); const w08=JSON.parse(fs.readFileSync("workers/W08-creator/wrangler.jsonc","utf8")); const ingress=(w01.services||[]).find((x)=>x.binding==="W08_CREATOR"); const hyperdrive=(w08.hyperdrive||[]).find((x)=>x.binding==="HYPERDRIVE"); if(w08.name!=="luckread-w08-creator") throw new Error("W08 worker identity mismatch"); if((w08.d1_databases||[]).length!==0||w08.vars?.W08_DATABASE_DRIVER!=="neon") throw new Error("W08 production must be Neon-only"); if(!hyperdrive||hyperdrive.id!=="0c53a1bb9bc0484bac146e8ae2d3158b") throw new Error("W08 Neon Hyperdrive mismatch"); if(!ingress||ingress.service!=="luckread-w08-creator") throw new Error("W01 W08_CREATOR binding mismatch"); if(!fs.existsSync("workers/W08-creator/migrations/0001_creator_authorization.sql")) throw new Error("W08 source migration evidence missing"); console.log("W08_NEON_ONLY_RUNTIME=PASS"); console.log("W01_W08_BINDING=PASS");'
           else
             echo "W08 Creator deployment not requested; migration and deployment will be skipped."
           fi
@@ -85,7 +85,8 @@ jobs:
           node --input-type=module <<'NODE'
           import fs from 'node:fs'
           const read = (path) => JSON.parse(fs.readFileSync(path, 'utf8'))
-          const w01 = read('workers/W01-payload/wrangler.jsonc')
+          const w01Source = read('workers/W01-payload/wrangler.jsonc')
+          const w01 = read('workers/W01-payload/wrangler.neon.jsonc')
           const w02Source = read('workers/W02-identity/wrangler.jsonc')
           const w02 = read('workers/W02-identity/wrangler.neon.jsonc')
           const w08 = read('workers/W08-creator/wrangler.jsonc')
@@ -112,6 +113,9 @@ jobs:
             if (!hyperdrive || hyperdrive.id !== hyperdriveId) {
               throw new Error(worker + ' must bind the verified D1-01 Hyperdrive')
             }
+            if ((config.d1_databases || []).length !== 0) {
+              throw new Error(worker + ' production Neon config must not bind Cloudflare D1')
+            }
             if (!(config.compatibility_flags || []).includes('nodejs_compat')) {
               throw new Error(worker + ' requires nodejs_compat for PostgreSQL runtime')
             }
@@ -119,7 +123,7 @@ jobs:
           if (w01.name !== 'luckread-w01-payload' || w02.name !== 'luckread-w02' || w08.name !== 'luckread-w08-creator') {
             throw new Error('D1-01 Worker identities changed')
           }
-          assertBinding(w01, 'D1', 'W01')
+          assertBinding(w01Source, 'D1', 'W01')
           const w02HistoricalD1 = (w02Source.d1_databases || []).find((item) => item.binding === 'D1_01')
           if (!w02HistoricalD1 || w02HistoricalD1.database_name !== 'luckread' || w02HistoricalD1.database_id !== databaseId) {
             throw new Error('W02 historical D1-01 migration source mapping drifted')
@@ -260,12 +264,12 @@ jobs:
       - name: Verify W01 W02_AUTH binding
         working-directory: workers/W01-payload
         run: |
-          node -e "const fs=require('fs'); const c=JSON.parse(fs.readFileSync('wrangler.jsonc','utf8')); const b=(c.services||[]).find(x=>x.binding==='W02_AUTH'); if(!b || b.service!=='luckread-w02') throw new Error('W02_AUTH binding mismatch'); console.log(JSON.stringify(b));"
+          node -e "const fs=require('fs'); const c=JSON.parse(fs.readFileSync('wrangler.neon.jsonc','utf8')); const b=(c.services||[]).find(x=>x.binding==='W02_AUTH'); if(!b || b.service!=='luckread-w02') throw new Error('W02_AUTH binding mismatch'); console.log(JSON.stringify(b));"
 
       - name: Verify W01 traffic guard bindings
         working-directory: workers/W01-payload
         run: |
-          node -e 'const fs=require("fs"); const c=JSON.parse(fs.readFileSync("wrangler.jsonc","utf8")); const required=["PUBLIC_ORIGIN_GLOBAL_LIMITER","PUBLIC_READ_LIMITER","AUTH_ORIGIN_GLOBAL_LIMITER","AUTH_REGISTER_LIMITER","AUTH_LOGIN_LIMITER","AUTH_REFRESH_LIMITER"]; const names=new Set((c.ratelimits||[]).map(x=>x.name)); for(const name of required) if(!names.has(name)) throw new Error("missing rate limiter: "+name); console.log(JSON.stringify({rateLimitBindings:[...names].sort()}));'
+          node -e 'const fs=require("fs"); const c=JSON.parse(fs.readFileSync("wrangler.neon.jsonc","utf8")); const required=["PUBLIC_ORIGIN_GLOBAL_LIMITER","PUBLIC_READ_LIMITER","AUTH_ORIGIN_GLOBAL_LIMITER","AUTH_REGISTER_LIMITER","AUTH_LOGIN_LIMITER","AUTH_REFRESH_LIMITER"]; const names=new Set((c.ratelimits||[]).map(x=>x.name)); for(const name of required) if(!names.has(name)) throw new Error("missing rate limiter: "+name); console.log(JSON.stringify({rateLimitBindings:[...names].sort()}));'
       - name: Ensure W01 PAYLOAD_SECRET runtime secret
         working-directory: workers/W01-payload
         env:
@@ -274,15 +278,15 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p ../../artifacts/mapping-0
-          secret_list="$(npx --yes wrangler@4.116.0 secret list --name luckread-w01-payload --format json)"
+          secret_list="$(npx --yes wrangler@4.156.0 secret list --name luckread-w01-payload --config wrangler.neon.jsonc --format json)"
           has_payload_secret="$(printf '%s' "$secret_list" | node --input-type=module -e 'let data=""; process.stdin.on("data", c => data += c); process.stdin.on("end", () => { const parsed=JSON.parse(data); const names=new Set(Array.isArray(parsed) ? parsed.map(item => item?.name) : []); process.stdout.write(names.has("PAYLOAD_SECRET") ? "true" : "false"); })')"
           if [ "$has_payload_secret" != "true" ]; then
-            openssl rand -hex 32 | npx --yes wrangler@4.116.0 secret put PAYLOAD_SECRET --name luckread-w01-payload >/dev/null
+            openssl rand -hex 32 | npx --yes wrangler@4.156.0 secret put PAYLOAD_SECRET --name luckread-w01-payload --config wrangler.neon.jsonc >/dev/null
             action="generated_and_put"
           else
             action="already_present"
           fi
-          verify_list="$(npx --yes wrangler@4.116.0 secret list --name luckread-w01-payload --format json)"
+          verify_list="$(npx --yes wrangler@4.156.0 secret list --name luckread-w01-payload --config wrangler.neon.jsonc --format json)"
           verified="$(printf '%s' "$verify_list" | node --input-type=module -e 'let data=""; process.stdin.on("data", c => data += c); process.stdin.on("end", () => { const parsed=JSON.parse(data); const names=new Set(Array.isArray(parsed) ? parsed.map(item => item?.name) : []); process.stdout.write(names.has("PAYLOAD_SECRET") ? "true" : "false"); })')"
           test "$verified" = "true"
           ACTION="$action" node -e "const fs=require('fs'); fs.writeFileSync('../../artifacts/mapping-0/w01-payload-secret-provenance.json', JSON.stringify({worker:'luckread-w01-payload',secretName:'PAYLOAD_SECRET',action:process.env.ACTION,verified:true,secretValueExposed:false}, null, 2)+'\\n')"
@@ -290,7 +294,7 @@ jobs:
 
       - name: Build W01 application without database migration
         working-directory: workers/W01-payload
-        run: pnpm exec opennextjs-cloudflare build
+        run: pnpm exec opennextjs-cloudflare build --config=wrangler.neon.jsonc
 
       - name: Verify W02 migration artifacts are committed
         run: |
@@ -344,15 +348,15 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p ../../artifacts/mapping-0
-          npx --yes wrangler@4.156.0 deploy --config wrangler.jsonc 2>&1 | tee ../../artifacts/mapping-0/w01-w02-binding-deploy.log
+          npx --yes wrangler@4.156.0 deploy --config wrangler.neon.jsonc 2>&1 | tee ../../artifacts/mapping-0/w01-w02-binding-deploy.log
           version_id="$(sed -n 's/.*Current Version ID: //p' ../../artifacts/mapping-0/w01-w02-binding-deploy.log | tail -n 1)"
           if [ -z "$version_id" ]; then
             echo "Wrangler did not return a W01 Worker Version ID; refusing to report a deployment."
             exit 1
           fi
           echo "W01_UPLOADED_VERSION_ID=$version_id"
-          npx --yes wrangler@4.156.0 versions deploy "$version_id@100%" --name luckread-w01-payload --config wrangler.jsonc --yes
-          npx --yes wrangler@4.156.0 deployments list --name luckread-w01-payload --config wrangler.jsonc
+          npx --yes wrangler@4.156.0 versions deploy "$version_id@100%" --name luckread-w01-payload --config wrangler.neon.jsonc --yes
+          npx --yes wrangler@4.156.0 deployments list --name luckread-w01-payload --config wrangler.neon.jsonc
 
       - name: Write deployment provenance
         env:

@@ -113,6 +113,21 @@ describe('creator qualification application page', () => {
     }
   })
 
+  it('builds and deploys W01 with the D1-free Neon production config in the coordinated D1-01 cutover', () => {
+    const workflow = readFileSync(
+      resolve(workerRoot, '../../.github/workflows/w01-w02-binding-deploy.yml'),
+      'utf8',
+    )
+
+    expect(workflow).toContain("const w01 = read('workers/W01-payload/wrangler.neon.jsonc')")
+    expect(workflow).toContain("opennextjs-cloudflare build --config=wrangler.neon.jsonc")
+    expect(workflow).toContain("wrangler@4.156.0 deploy --config wrangler.neon.jsonc")
+    expect(workflow).toContain("production Neon config must not bind Cloudflare D1")
+    expect(workflow).toContain("readFileSync('wrangler.neon.jsonc','utf8')")
+    expect(workflow).not.toContain('pnpm exec opennextjs-cloudflare build\\n')
+    expect(workflow).not.toContain('deploy --config wrangler.jsonc 2>&1 | tee ../../artifacts/mapping-0/w01-w02-binding-deploy.log')
+  })
+
   it('routes creator review identity through the W01 public API and restricts review to L7/L8', () => {
     const page = read('src/app/(frontend)/creator-review/page.tsx')
     const client = read('src/app/(frontend)/creator-review/CreatorReviewClient.tsx')
