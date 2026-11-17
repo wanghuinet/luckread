@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { SocialTargetsReadStoreError } from './social-targets-read-store.js'
 import { extractSocialTokens, getContentSocialSummary, getSocialTargets, listDiscoveryTopics, listNotifications, syncSocialTokens } from './social-closure-runtime.js'
 import type { NotificationEnqueueStore } from './notification-enqueue-store.js'
+import type { SocialClosureReadStore, SocialDiscoveryTopicEdge } from './social-closure-read-store.js'
 import type { SocialTokenSyncCommentContext, SocialTokenSyncMentionInput, SocialTokenSyncMentionRow, SocialTokenSyncStore, SocialTokenSyncTargetInput, SocialTokenSyncTargetType, SocialTokenSyncTopicInput } from './social-token-sync-store.js'
 
 type TokenSyncStoreFixture = Readonly<{
@@ -33,6 +34,25 @@ function createMemorySocialTokenSyncStore(options: TokenSyncStoreFixture = {}) {
   return { store, mentions }
 }
 
+
+function createMemorySocialClosureReadStore(
+  overrides: Partial<SocialClosureReadStore> = {},
+): SocialClosureReadStore {
+  return {
+    getTargets: async () => ({ topics: [], mentions: [] }),
+    getTopicByName: async () => null,
+    listTopicContentEdges: async () => [],
+    listDiscoveryContentEdges: async () => [],
+    listNotificationRows: async () => [],
+    countUnreadNotifications: async () => 0,
+    markNotificationRead: async () => undefined,
+    markAllNotificationsRead: async () => undefined,
+    getContentSocialCounts: async () => null,
+    getContentSocialViewerState: async () => null,
+    ...overrides,
+  }
+}
+
 describe('W05 unified social closure', () => {
   it('normalizes and deduplicates mentions and hashtags', () => {
     expect(extractSocialTokens('你好 @Alice #Travel #travel @Alice #日本')).toEqual([
@@ -51,23 +71,11 @@ describe('W05 unified social closure', () => {
     expect(['FOLLOW', 'LIKE', 'COMMENT', 'REPLY', 'MENTION']).toHaveLength(5)
   })
 
-  it('uses W03 content context and W05-only SQL for social summary counts and pin state', async () => {
-    const firstResults: unknown[] = [
-      { likes: 3, comments: 2, favorites: 1, shares: 4, reposts: 7, pinned: 1 },
-      { liked: 1, favorited: 0, reposted: 1 },
-    ]
-    const queries: string[] = []
-    const db = {
-      prepare: (sql: string) => {
-        queries.push(sql)
-        return {
-          bind: (..._values: unknown[]) => ({
-            first: async () => firstResults.shift() ?? null,
-            all: async () => ({ results: [] }),
-          }),
-        }
-      },
-    } as unknown as D1Database
+  it('uses W03 content context and the injected PostgreSQL store for social summary counts and pin state', async () => {
+    const store = createMemorySocialClosureReadStore({
+      getContentSocialCounts: vi.fn(async () => ({ likes: 3, comments: 2, favorites: 1, shares: 4, reposts: 7, pinned: true })),
+      getContentSocialViewerState: vi.fn(async () => ({ liked: true, favorited: false, reposted: true })),
+    })
     const contentContext = {
       contentId: 'content-1',
       ownerUserId: 'owner-1',
@@ -76,7 +84,7 @@ describe('W05 unified social closure', () => {
       updatedAt: '2026-10-17T04:00:00.000Z',
     } as const
 
-    await expect(getContentSocialSummary(db, 'content-1', contentContext, 'viewer-1')).resolves.toMatchObject({
+    await expect(getContentSocialSummary(store, 'content-1', contentContext, 'viewer-1')).resolves.toMatchObject({
       contentId: 'content-1',
       contentType: 'post',
       counts: { likes: 3, comments: 2, favorites: 1, shares: 4, reposts: 7 },
@@ -85,29 +93,27 @@ describe('W05 unified social closure', () => {
       topics: [],
       mentions: [],
     })
-    expect(queries.some(sql => /(?:FROM|JOIN)\s+contents/i.test(sql))).toBe(false)
-    const countsQuery = queries.find(sql => sql.includes('AS pinned'))
-    expect(countsQuery).toContain('FROM social_profile_pins p')
-    expect(countsQuery).not.toContain('JOIN contents')
+    expect(store.getContentSocialCounts).toHaveBeenCalledWith('content-1', 'owner-1')
+    expect(store.getContentSocialViewerState).toHaveBeenCalledWith('viewer-1', 'content-1')
   })
 
   it('rejects a mismatched or unpublished social context before querying W05', async () => {
-    const prepare = vi.fn()
-    const db = { prepare } as unknown as D1Database
-    await expect(getContentSocialSummary(db, 'content-1', {
+    const getContentSocialCounts = vi.fn(async () => null)
+    const store = createMemorySocialClosureReadStore({ getContentSocialCounts })
+    await expect(getContentSocialSummary(store, 'content-1', {
       contentId: 'another-content',
       ownerUserId: 'owner-1',
       contentType: 'post',
       state: 'PUBLISHED',
       updatedAt: '2026-10-17T04:00:00.000Z',
     })).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 })
-    await expect(getContentSocialSummary(db, 'content-1', {
+    await expect(getContentSocialSummary(store, 'content-1', {
       contentId: 'content-1',
       ownerUserId: 'owner-1',
       contentType: 'post',
       state: 'UNPUBLISHED',
     } as never)).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 })
-    expect(prepare).not.toHaveBeenCalled()
+    expect(getContentSocialCounts).not.toHaveBeenCalled()
   })
 
   it('validates content token synchronization through W03 context and writes only W05-owned edges', async () => {
@@ -172,34 +178,21 @@ describe('W05 unified social closure', () => {
     })
   })
 
-  it('keeps a historical mention attached to its stored identity after its handle is reclaimed', async () => {
-    const queries: string[] = []
-    const db = {
-      prepare: (sql: string) => {
-        queries.push(sql)
-        return {
-          bind: (..._values: unknown[]) => ({
-            all: async () => sql.includes('FROM social_mentions')
-              ? { results: [{ mentioned_user_id: 'original-user-id', handle: 'alice' }] }
-              : { results: [] },
-          }),
-        }
-      },
-    } as unknown as D1Database
+  it('keeps a historical mention attached to its stored immutable identity after its handle is reclaimed', async () => {
+    const store = createMemorySocialClosureReadStore({
+      getTargets: vi.fn(async () => ({
+        topics: [],
+        mentions: [{ mentioned_user_id: 'original-user-id', handle: 'alice' }],
+      })),
+    })
 
     // The current username owner may now be a different account. Historical
-    // reads must use the immutable ID captured when the mention was created.
-    await expect(getSocialTargets(db, 'content', 'content-1')).resolves.toEqual({
+    // reads use the immutable ID captured when the mention was created.
+    await expect(getSocialTargets(store, 'content', 'content-1')).resolves.toEqual({
       topics: [],
       mentions: [{ userId: 'original-user-id', handle: 'alice' }],
     })
-
-    const mentionRead = queries.find(sql => sql.includes('FROM social_mentions'))
-    expect(mentionRead).toContain('SELECT mentioned_user_id, handle')
-    expect(mentionRead).toContain('WHERE target_type = ? AND target_id = ?')
-    expect(mentionRead).not.toContain('JOIN users')
-    expect(mentionRead).not.toContain('JOIN profiles')
-    expect(mentionRead).not.toContain('username')
+    expect(store.getTargets).toHaveBeenCalledWith({ targetType: 'content', targetId: 'content-1' })
   })
 
   it('preserves an existing mention identity when the same handle is later owned by another account', async () => {
@@ -246,25 +239,15 @@ describe('W05 unified social closure', () => {
       { topic_id: 'topic_龥', normalized_name: '龥', display_name: '龥', target_id: 'content-6' },
       { topic_id: 'topic_𐐀', normalized_name: 'deseret', display_name: 'Deseret', target_id: 'content-7' },
     ]
-    const queries: string[] = []
-    const db = {
-      prepare: (sql: string) => {
-        queries.push(sql)
-        return {
-          bind: (...values: unknown[]) => ({
-            all: async () => {
-              const afterTopic = values.length === 3 ? String(values[0]) : null
-              const afterTarget = values.length === 3 ? String(values[1]) : null
-              const ordered = [...edges]
-                .filter(edge => !afterTopic || edge.topic_id > afterTopic ||
-                  (edge.topic_id === afterTopic && edge.target_id > afterTarget!))
-                .sort((a, b) => a.topic_id.localeCompare(b.topic_id) || a.target_id.localeCompare(b.target_id))
-              return { results: ordered.slice(0, 200) }
-            },
-          }),
-        }
-      },
-    } as unknown as D1Database
+    const store = createMemorySocialClosureReadStore({
+      listDiscoveryContentEdges: vi.fn(async ({ cursor, limit }: Parameters<SocialClosureReadStore['listDiscoveryContentEdges']>[0]) => {
+        const ordered = [...edges]
+          .filter(edge => !cursor || edge.topic_id > cursor.topicId ||
+            (edge.topic_id === cursor.topicId && edge.target_id > cursor.targetId))
+          .sort((a, b) => a.topic_id.localeCompare(b.topic_id) || a.target_id.localeCompare(b.target_id))
+        return ordered.slice(0, limit) as SocialDiscoveryTopicEdge[]
+      }),
+    })
     const contextById = new Map([
       ['content-1', { contentId: 'content-1', ownerUserId: 'owner-1', contentType: 'post', state: 'PUBLISHED', updatedAt: recent(1) }],
       ['content-2', { contentId: 'content-2', ownerUserId: 'owner-2', contentType: 'article', state: 'PUBLISHED', updatedAt: recent(2) }],
@@ -292,7 +275,7 @@ describe('W05 unified social closure', () => {
       }),
     }
 
-    const firstPage = await listDiscoveryTopics(db, binding, 'discovery-test', '2', null)
+    const firstPage = await listDiscoveryTopics(store, binding, 'discovery-test', '2', null)
     expect(firstPage.items).toMatchObject([
       { topicId: 'topic-1', name: 'reading', displayName: 'Reading', contentCount: 2 },
       { topicId: 'topic-2', name: 'books', displayName: 'Books', contentCount: 2 },
@@ -300,40 +283,37 @@ describe('W05 unified social closure', () => {
     expect(firstPage.hasMore).toBe(true)
     expect(firstPage.nextCursor).toEqual(expect.any(String))
     expect(binding.fetch).toHaveBeenCalled()
-    expect(queries.every(sql => !/(?:FROM|JOIN)\s+contents\b/i.test(sql))).toBe(true)
-    expect(queries[0]).toContain('ix_social_target_topics_content_topic_target')
-    expect(queries[0]).toContain('CROSS JOIN social_topics')
-    expect(queries[0]).not.toContain('SELECT DISTINCT')
+    expect(store.listDiscoveryContentEdges).toHaveBeenCalledWith({ cursor: null, limit: 200 })
 
-    const secondPage = await listDiscoveryTopics(db, binding, 'discovery-test', '1', firstPage.nextCursor)
+    const secondPage = await listDiscoveryTopics(store, binding, 'discovery-test', '1', firstPage.nextCursor)
     expect(secondPage.items).toMatchObject([
       { topicId: 'topic-3', name: 'writing', displayName: 'Writing', contentCount: 1 },
     ])
     expect(secondPage.hasMore).toBe(true)
     expect(secondPage.nextCursor).toEqual(expect.any(String))
 
-    const thirdPage = await listDiscoveryTopics(db, binding, 'discovery-test', '1', secondPage.nextCursor)
+    const thirdPage = await listDiscoveryTopics(store, binding, 'discovery-test', '1', secondPage.nextCursor)
     expect(thirdPage.items).toMatchObject([
       { topicId: 'topic_日本', name: '日本', displayName: '日本', contentCount: 1 },
     ])
     expect(thirdPage.hasMore).toBe(true)
     expect(thirdPage.nextCursor).toEqual(expect.any(String))
 
-    const fourthPage = await listDiscoveryTopics(db, binding, 'discovery-test', '1', thirdPage.nextCursor)
+    const fourthPage = await listDiscoveryTopics(store, binding, 'discovery-test', '1', thirdPage.nextCursor)
     expect(fourthPage.items).toMatchObject([
       { topicId: 'topic_日本語', name: '日本語', displayName: '日本語', contentCount: 1 },
     ])
     expect(fourthPage.hasMore).toBe(true)
     expect(fourthPage.nextCursor).toEqual(expect.any(String))
 
-    const fifthPage = await listDiscoveryTopics(db, binding, 'discovery-test', '1', fourthPage.nextCursor)
+    const fifthPage = await listDiscoveryTopics(store, binding, 'discovery-test', '1', fourthPage.nextCursor)
     expect(fifthPage.items).toMatchObject([
       { topicId: 'topic_龥', name: '龥', displayName: '龥', contentCount: 1 },
     ])
     expect(fifthPage.hasMore).toBe(true)
     expect(fifthPage.nextCursor).toEqual(expect.any(String))
 
-    const sixthPage = await listDiscoveryTopics(db, binding, 'discovery-test', '1', fifthPage.nextCursor)
+    const sixthPage = await listDiscoveryTopics(store, binding, 'discovery-test', '1', fifthPage.nextCursor)
     expect(sixthPage.items).toMatchObject([
       { topicId: 'topic_𐐀', name: 'deseret', displayName: 'Deseret', contentCount: 1 },
     ])
@@ -379,26 +359,14 @@ describe('W05 unified social closure', () => {
       target_id: 'content-00001',
     })
 
-    const queries: string[] = []
-    const db = {
-      prepare: (sql: string) => {
-        queries.push(sql)
-        return {
-          bind: (...values: unknown[]) => ({
-            all: async () => {
-              const afterTopic = values.length === 3 ? String(values[0]) : null
-              const afterTarget = values.length === 3 ? String(values[1]) : null
-              const ordered = edges
-                .filter(edge => !afterTopic || edge.topic_id > afterTopic ||
-                  (edge.topic_id === afterTopic && edge.target_id > afterTarget!))
-                .sort((a, b) => a.topic_id < b.topic_id ? -1 : a.topic_id > b.topic_id ? 1 :
-                  a.target_id < b.target_id ? -1 : a.target_id > b.target_id ? 1 : 0)
-              return { results: ordered.slice(0, 200) }
-            },
-          }),
-        }
-      },
-    } as unknown as D1Database
+    const store = createMemorySocialClosureReadStore({
+      listDiscoveryContentEdges: vi.fn(async ({ cursor, limit }: Parameters<SocialClosureReadStore['listDiscoveryContentEdges']>[0]) => edges
+        .filter(edge => !cursor || edge.topic_id > cursor.topicId ||
+          (edge.topic_id === cursor.topicId && edge.target_id > cursor.targetId))
+        .sort((a, b) => a.topic_id < b.topic_id ? -1 : a.topic_id > b.topic_id ? 1 :
+          a.target_id < b.target_id ? -1 : a.target_id > b.target_id ? 1 : 0)
+        .slice(0, limit) as SocialDiscoveryTopicEdge[]),
+    })
 
     const requestedIds: string[] = []
     const binding = {
@@ -422,13 +390,12 @@ describe('W05 unified social closure', () => {
     }
 
     try {
-      const page = await listDiscoveryTopics(db, binding, 'bounded-context-cache-test', '1', null)
+      const page = await listDiscoveryTopics(store, binding, 'bounded-context-cache-test', '1', null)
       expect(page.items).toMatchObject([
         { topicId: 'topic-05000', contentCount: 2 },
       ])
       expect(page.hasMore).toBe(true)
-      expect(queries.every(sql => !/(?:FROM|JOIN)\s+contents\b/i.test(sql))).toBe(true)
-      expect(queries.some(sql => sql.includes('(st.topic_id, st.target_id) > (?, ?)'))).toBe(true)
+      expect(store.listDiscoveryContentEdges).toHaveBeenCalled()
       expect(requestedIds).toHaveLength(5200)
       expect(requestedIds.filter(contentId => contentId === 'content-00001')).toHaveLength(2)
       expect(binding.fetch).toHaveBeenCalledTimes(105)
@@ -453,13 +420,12 @@ describe('W05 unified social closure', () => {
       { topic_id: 'topic-1', normalized_name: 'reading', display_name: 'Reading', target_id: 'content-1' },
       { topic_id: 'topic-2', normalized_name: 'books', display_name: 'Books', target_id: 'content-2' },
     ]
-    const queries: string[] = []
-    const db = {
-      prepare: (sql: string) => {
-        queries.push(sql)
-        return { bind: () => ({ all: async () => ({ results: edges }) }) }
-      },
-    } as unknown as D1Database
+    const store = createMemorySocialClosureReadStore({
+      listDiscoveryContentEdges: vi.fn(async ({ cursor, limit }: Parameters<SocialClosureReadStore['listDiscoveryContentEdges']>[0]) => edges
+        .filter(edge => !cursor || edge.topic_id > cursor.topicId ||
+          (edge.topic_id === cursor.topicId && edge.target_id > cursor.targetId))
+        .slice(0, limit) as SocialDiscoveryTopicEdge[]),
+    })
     const binding = {
       fetch: vi.fn(async (input: RequestInfo | URL) => {
         const request = input instanceof Request ? input : new Request(input)
@@ -479,20 +445,20 @@ describe('W05 unified social closure', () => {
     }
 
     try {
-      const firstPage = await listDiscoveryTopics(db, binding, 'discovery-cache-test', '1', null)
+      const firstPage = await listDiscoveryTopics(store, binding, 'discovery-cache-test', '1', null)
       expect(firstPage.items).toMatchObject([
         { topicId: 'topic-1', contentCount: 1 },
       ])
       expect(firstPage.hasMore).toBe(true)
       expect(firstPage.nextCursor).toEqual(expect.any(String))
 
-      const secondPage = await listDiscoveryTopics(db, binding, 'discovery-cache-test', '1', firstPage.nextCursor)
+      const secondPage = await listDiscoveryTopics(store, binding, 'discovery-cache-test', '1', firstPage.nextCursor)
       expect(secondPage.items).toMatchObject([
         { topicId: 'topic-2', contentCount: 1 },
       ])
       expect(secondPage.hasMore).toBe(false)
       expect(secondPage.nextCursor).toBeNull()
-      expect(queries).toHaveLength(1)
+      expect(store.listDiscoveryContentEdges).toHaveBeenCalledTimes(1)
       expect(binding.fetch).toHaveBeenCalledTimes(1)
       expect(cache.put).toHaveBeenCalledTimes(1)
       expect(cache.match).toHaveBeenCalledTimes(2)
@@ -502,9 +468,11 @@ describe('W05 unified social closure', () => {
   })
 
   it('rejects malformed discovery topic cursors', async () => {
-    const db = { prepare: () => { throw new Error('database must not be queried for an invalid cursor') } } as unknown as D1Database
-    await expect(listDiscoveryTopics(db, undefined, 'invalid-cursor-test', '20', 'not-a-cursor'))
+    const listDiscoveryContentEdges = vi.fn(async () => [])
+    const store = createMemorySocialClosureReadStore({ listDiscoveryContentEdges })
+    await expect(listDiscoveryTopics(store, undefined, 'invalid-cursor-test', '20', 'not-a-cursor'))
       .rejects.toMatchObject({ code: 'INVALID_CURSOR', status: 400 })
+    expect(listDiscoveryContentEdges).not.toHaveBeenCalled()
   })
 
 
@@ -524,34 +492,30 @@ describe('W05 notification deep-link lookup', () => {
       read_at: null,
       created_at: '2026-11-04T10:00:00.000Z',
     }
-    const statements: Array<{ sql: string; values: unknown[] }> = []
-    const db = {
-      prepare: (sql: string) => ({
-        bind: (...values: unknown[]) => {
-          statements.push({ sql, values })
-          return {
-            all: async () => ({ results: sql.includes('SELECT notification_id') ? [row] : [] }),
-            first: async () => ({ count: 3 }),
-          }
-        },
-      }),
-    } as unknown as D1Database
+    const store = createMemorySocialClosureReadStore({
+      listNotificationRows: vi.fn(async () => [row]),
+      countUnreadNotifications: vi.fn(async () => 3),
+    })
 
-    await expect(listNotifications(db, 'recipient-1', null, '1', null, 'notification-1'))
+    await expect(listNotifications(store, 'recipient-1', null, '1', null, 'notification-1'))
       .resolves.toMatchObject({
         items: [{ id: 'notification-1', type: 'COMMENT', actorUserId: 'actor-1', targetId: 'content-1' }],
         unreadCount: 3,
       })
-    expect(statements[0]?.sql).toContain('WHERE recipient_user_id = ?')
-    expect(statements[0]?.sql).toContain('AND notification_id = ?')
-    expect(statements[0]?.values).toEqual(['recipient-1', 'notification-1', 2])
+    expect(store.listNotificationRows).toHaveBeenCalledWith({
+      recipientUserId: 'recipient-1',
+      notificationType: null,
+      notificationId: 'notification-1',
+      cursor: null,
+      limit: 2,
+    })
   })
 
   it('rejects malformed notification IDs before querying the database', async () => {
-    const prepare = vi.fn()
-    const db = { prepare } as unknown as D1Database
-    await expect(listNotifications(db, 'recipient-1', null, '1', null, 'n'.repeat(129)))
+    const listNotificationRows = vi.fn(async () => [])
+    const store = createMemorySocialClosureReadStore({ listNotificationRows })
+    await expect(listNotifications(store, 'recipient-1', null, '1', null, 'n'.repeat(129)))
       .rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 })
-    expect(prepare).not.toHaveBeenCalled()
+    expect(listNotificationRows).not.toHaveBeenCalled()
   })
 })

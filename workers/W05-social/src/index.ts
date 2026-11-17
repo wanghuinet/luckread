@@ -69,7 +69,6 @@ import type { CommentCreateStore } from './comment-create-store.js'
 import type { CommentMutationStore } from './comment-mutation-store.js'
 import type { CommentNotificationContextStore } from './comment-notification-context-store.js'
 import type { NotificationEnqueueStore } from './notification-enqueue-store.js'
-import type { SocialTargetsReadStore } from './social-targets-read-store.js'
 import type { SocialClosureReadStore } from './social-closure-read-store.js'
 import type { SocialTokenSyncStore } from './social-token-sync-store.js'
 import type { NotificationPreferencesStore } from './notification-preferences-store.js'
@@ -283,6 +282,11 @@ const parseProfileChannelPath = (pathname: string): { userId: string; kind: 'rep
   return { userId, kind: parts[4] }
 }
 
+function requireSocialClosureReadStore(source: SocialClosureReadStore | undefined): SocialClosureReadStore {
+  if (!source) throw new SocialClosureRuntimeError('SERVICE_UNAVAILABLE', 503)
+  return source
+}
+
 export type W05SocialWorkerDependencies = Readonly<{
   /** W09-owned D1-03 endpoint mutations use the separately scoped Neon connection when enabled. */
   pushEndpointDatabase?: PushEndpointPostgresExecutor
@@ -302,9 +306,7 @@ export type W05SocialWorkerDependencies = Readonly<{
   commentMutationStore?: CommentMutationStore
   /** PostgreSQL comment/content token synchronization store; missing composition fails closed. */
   socialTokenSyncStore?: SocialTokenSyncStore
-  /** Optional PostgreSQL-capable social-target read store for comment mentions/topics. */
-  socialTargetsReadStore?: SocialTargetsReadStore
-  /** Optional PostgreSQL-capable notification inbox reader/writer; D1 remains the deployed default. */
+  /** Required PostgreSQL store for social closure, topics, notifications and social summaries. */
   socialClosureReadStore?: SocialClosureReadStore
   /** Optional PostgreSQL-capable comment notification context reader. */
   commentNotificationContextStore?: CommentNotificationContextStore
@@ -601,7 +603,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
             dependencies.notificationEnqueueStore,
           )
           const persistedMentions = await getSocialTargets(
-            dependencies.socialTargetsReadStore ?? env.DB,
+            requireSocialClosureReadStore(dependencies.socialClosureReadStore),
             'comment',
             commentId,
           )
@@ -655,7 +657,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
           contentId,
           correlationId: request.headers.get('X-LuckRead-Correlation-Id') ?? '',
         })
-        return json({ data: await getContentSocialSummary(dependencies.socialClosureReadStore ?? env.DB, contentId, contentContext, viewerUserId), requestId: crypto.randomUUID() })
+        return json({ data: await getContentSocialSummary(requireSocialClosureReadStore(dependencies.socialClosureReadStore), contentId, contentContext, viewerUserId), requestId: crypto.randomUUID() })
       }
 
       if (url.pathname.match(/^\/internal\/social\/contents\/[^/]+\/tokens$/)) {
@@ -671,7 +673,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
             contentId,
             correlationId: request.headers.get('X-LuckRead-Correlation-Id') ?? '',
           })
-          return json({ data: await getSocialTargets(dependencies.socialTargetsReadStore ?? env.DB, 'content', contentId), requestId: crypto.randomUUID() })
+          return json({ data: await getSocialTargets(requireSocialClosureReadStore(dependencies.socialClosureReadStore), 'content', contentId), requestId: crypto.randomUUID() })
         }
         if (request.method !== 'POST') return new Response(null, { status: 405, headers: { Allow: 'GET, POST' } })
         const actorUserId = requirePrincipal(request)
@@ -716,7 +718,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
           throw new SocialClosureRuntimeError('VALIDATION_FAILED', 400)
         }
         return json({
-          data: await listDiscoveryTopics(dependencies.socialClosureReadStore ?? env.DB, env.W03_CONTENT, request.headers.get('X-LuckRead-Correlation-Id') ?? '', discoveryUrl.searchParams.get('limit'), discoveryUrl.searchParams.get('cursor')),
+          data: await listDiscoveryTopics(requireSocialClosureReadStore(dependencies.socialClosureReadStore), env.W03_CONTENT, request.headers.get('X-LuckRead-Correlation-Id') ?? '', discoveryUrl.searchParams.get('limit'), discoveryUrl.searchParams.get('cursor')),
           requestId: createRequestId(),
         })
       }
@@ -731,7 +733,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
         const topicUrl = new URL(request.url)
         return json({
           data: await getTopicPage(
-            dependencies.socialClosureReadStore ?? env.DB,
+            requireSocialClosureReadStore(dependencies.socialClosureReadStore),
             env.W03_CONTENT,
             topicName,
             topicUrl.searchParams.get('limit'),
@@ -770,7 +772,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
         const url = new URL(request.url)
         return json({
           data: await listNotifications(
-            dependencies.socialClosureReadStore ?? env.DB,
+            requireSocialClosureReadStore(dependencies.socialClosureReadStore),
             actorUserId,
             url.searchParams.get('cursor'),
             url.searchParams.get('limit'),
@@ -788,7 +790,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
         requireInteractionLayer(request)
         const notificationId = decodePathPart(notificationReadMatch[1])
         if (notificationId === null) throw new SocialClosureRuntimeError('VALIDATION_FAILED', 400)
-        await markNotificationRead(dependencies.socialClosureReadStore ?? env.DB, actorUserId, notificationId)
+        await markNotificationRead(requireSocialClosureReadStore(dependencies.socialClosureReadStore), actorUserId, notificationId)
         return new Response(null, { status: 204 })
       }
 
@@ -796,7 +798,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
         if (request.method !== 'POST') return new Response(null, { status: 405, headers: { Allow: 'POST' } })
         const actorUserId = requirePrincipal(request)
         requireInteractionLayer(request)
-        await markAllNotificationsRead(dependencies.socialClosureReadStore ?? env.DB, actorUserId)
+        await markAllNotificationsRead(requireSocialClosureReadStore(dependencies.socialClosureReadStore), actorUserId)
         return new Response(null, { status: 204 })
       }
 
@@ -1058,7 +1060,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
           dependencies.notificationEnqueueStore,
         )
         const persistedMentions = await getSocialTargets(
-          dependencies.socialTargetsReadStore ?? env.DB,
+          requireSocialClosureReadStore(dependencies.socialClosureReadStore),
           'comment',
           comment.id,
         )

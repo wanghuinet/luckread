@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createW05SocialWorker } from './index.js'
+import type { SocialClosureReadStore } from './social-closure-read-store.js'
 
 const transportHeaders = {
   'X-LuckRead-Caller': 'W01',
@@ -100,7 +101,7 @@ describe('W05 Neon comment write route composition', () => {
         topics: [],
         mentions: [{ mentioned_user_id: 'mentioned-user', handle: 'alice' }],
       })),
-    }
+    } as unknown as SocialClosureReadStore
     const commentNotificationContextStore = {
       getPublishedContext: vi.fn(async () => ({
         comment_id: 'parent-1',
@@ -117,7 +118,7 @@ describe('W05 Neon comment write route composition', () => {
       commentCreateStore,
       commentMutationStore,
       socialTokenSyncStore,
-      socialTargetsReadStore,
+      socialClosureReadStore: socialTargetsReadStore,
       commentNotificationContextStore,
       notificationEnqueueStore,
     })

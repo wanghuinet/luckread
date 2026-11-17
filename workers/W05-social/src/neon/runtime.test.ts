@@ -78,7 +78,6 @@ describe('W05 Neon runtime composition', () => {
       'repostStore',
       'shareStore',
       'socialClosureReadStore',
-      'socialTargetsReadStore',
       'socialTokenSyncStore',
     ])
     expect(capturedConfig).toMatchObject({

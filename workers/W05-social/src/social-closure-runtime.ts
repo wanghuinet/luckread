@@ -6,12 +6,10 @@ import {
   type NotificationPreferencesStore,
 } from './notification-preferences-store.js'
 import {
-  createD1SocialTargetsReadStore,
   SocialTargetsReadStoreError,
   type SocialTargetsReadStore,
 } from './social-targets-read-store.js'
 import {
-  createD1SocialClosureReadStore,
   SocialClosureReadStoreError,
   type SocialClosureReadStore,
 } from './social-closure-read-store.js'
@@ -28,18 +26,7 @@ export class SocialClosureRuntimeError extends Error {
   constructor(readonly code: string, readonly status: number) { super(code) }
 }
 
-type SocialClosureDataSource = D1Database | SocialClosureReadStore
-
-function resolveSocialClosureReadStore(source: SocialClosureDataSource): SocialClosureReadStore {
-  if (
-    typeof (source as SocialClosureReadStore).getTopicByName === 'function' &&
-    typeof (source as SocialClosureReadStore).listNotificationRows === 'function' &&
-    typeof (source as SocialClosureReadStore).getContentSocialCounts === 'function'
-  ) {
-    return source as SocialClosureReadStore
-  }
-  return createD1SocialClosureReadStore(source as D1Database)
-}
+type SocialClosureDataSource = SocialClosureReadStore
 
 async function withSocialClosureRead<T>(operation: () => Promise<T>): Promise<T> {
   try {
@@ -399,14 +386,7 @@ export async function syncSocialTokens(
   return { topics: topics.length, mentions: mentionCount }
 }
 
-type SocialTargetsDataSource = D1Database | SocialTargetsReadStore
-
-function resolveSocialTargetsReadStore(source: SocialTargetsDataSource): SocialTargetsReadStore {
-  if (typeof (source as SocialTargetsReadStore).getTargets === 'function') {
-    return source as SocialTargetsReadStore
-  }
-  return createD1SocialTargetsReadStore(source as D1Database)
-}
+type SocialTargetsDataSource = SocialTargetsReadStore
 
 export async function getSocialTargets(
   source: SocialTargetsDataSource,
@@ -418,7 +398,7 @@ export async function getSocialTargets(
 }> {
   const targetValue = target(targetTypeValue, targetIdValue)
   try {
-    const result = await resolveSocialTargetsReadStore(source).getTargets({
+    const result = await source.getTargets({
       targetType: targetValue.targetType,
       targetId: targetValue.targetId,
     })
@@ -462,7 +442,7 @@ export async function getTopicPage(
 
   const limit = parseLimit(limitValue)
   const cursor = cursorValue ? decodeCursor(cursorValue) : null
-  const store = resolveSocialClosureReadStore(source)
+  const store = source
   const topic = await withSocialClosureRead(() => store.getTopicByName(normalizedName))
   if (!topic || topic.status !== 'ACTIVE') throw new SocialClosureRuntimeError('NOT_FOUND', 404)
 
@@ -641,7 +621,7 @@ export async function listDiscoveryTopics(
     return updatedAt
   }
   const stats = new Map<string, RankedDiscoveryTopic>()
-  const store = resolveSocialClosureReadStore(source)
+  const store = source
   type DiscoveryTopicRelation = { topic_id: string; normalized_name: string; display_name: string; target_id: string }
   let relationCursor: { topicId: string; targetId: string } | null = null
 
@@ -844,7 +824,7 @@ export async function listNotifications(
   }
   const notificationIdText = notificationIdValue?.trim() ?? ''
   const notificationId = notificationIdText ? id(notificationIdText) : null
-  const store = resolveSocialClosureReadStore(source)
+  const store = source
   const rows = await withSocialClosureRead(() => store.listNotificationRows({
     recipientUserId,
     notificationType: notificationType as SocialNotificationType | null,
@@ -881,13 +861,13 @@ export async function markNotificationRead(
 ): Promise<void> {
   const recipientUserId = id(recipientUserIdValue, 'UNAUTHENTICATED')
   const notificationId = id(notificationIdValue)
-  await withSocialClosureRead(() => resolveSocialClosureReadStore(source)
+  await withSocialClosureRead(() => source
     .markNotificationRead(recipientUserId, notificationId))
 }
 
 export async function markAllNotificationsRead(source: SocialClosureDataSource, recipientUserIdValue: string): Promise<void> {
   const recipientUserId = id(recipientUserIdValue, 'UNAUTHENTICATED')
-  await withSocialClosureRead(() => resolveSocialClosureReadStore(source)
+  await withSocialClosureRead(() => source
     .markAllNotificationsRead(recipientUserId))
 }
 
@@ -949,7 +929,7 @@ export async function getContentSocialSummary(
   const pinnedOwnerUserId = contentContext.contentType === 'post'
     ? contentContext.ownerUserId
     : null
-  const store = resolveSocialClosureReadStore(source)
+  const store = source
   const counts = await withSocialClosureRead(() =>
     store.getContentSocialCounts(contentId, pinnedOwnerUserId)
   )

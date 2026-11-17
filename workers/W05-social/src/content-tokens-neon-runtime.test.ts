@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { createW05SocialWorker } from './index.js'
 import type { NotificationEnqueueStore } from './notification-enqueue-store.js'
-import type { SocialTargetsReadStore } from './social-targets-read-store.js'
+import type { SocialClosureReadStore } from './social-closure-read-store.js'
 import type { SocialTokenSyncStore } from './social-token-sync-store.js'
 import type { W03ContentBinding } from './w03-content-context-client.js'
 
@@ -18,7 +18,7 @@ const transportHeaders = {
 }
 
 function createHarness() {
-  const socialTargetsReadStore: SocialTargetsReadStore = {
+  const socialTargetsReadStore = {
     getTargets: vi.fn(async () => ({
       topics: [{
         topic_id: 'topic-reading',
@@ -30,7 +30,7 @@ function createHarness() {
         handle: 'alice',
       }],
     })),
-  }
+  } as unknown as SocialClosureReadStore
 
   const socialTokenSyncStore: SocialTokenSyncStore = {
     getCommentContext: vi.fn(async () => null),
@@ -61,7 +61,7 @@ function createHarness() {
     throw new Error('D1 must not be accessed by the injected Neon content-token path')
   })
   const worker = createW05SocialWorker({
-    socialTargetsReadStore,
+    socialClosureReadStore: socialTargetsReadStore,
     socialTokenSyncStore,
     notificationEnqueueStore,
   })
