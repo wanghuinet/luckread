@@ -421,7 +421,7 @@ describe('W05 unified social closure', () => {
       { topic_id: 'topic-2', normalized_name: 'books', display_name: 'Books', target_id: 'content-2' },
     ]
     const store = createMemorySocialClosureReadStore({
-      listDiscoveryContentEdges: vi.fn(async ({ cursor, limit }) => edges
+      listDiscoveryContentEdges: vi.fn(async ({ cursor, limit }: Parameters<SocialClosureReadStore['listDiscoveryContentEdges']>[0]) => edges
         .filter(edge => !cursor || edge.topic_id > cursor.topicId ||
           (edge.topic_id === cursor.topicId && edge.target_id > cursor.targetId))
         .slice(0, limit) as SocialDiscoveryTopicEdge[]),
