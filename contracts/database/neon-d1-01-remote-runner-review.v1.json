@@ -87,7 +87,7 @@
       },
       {
         "path": "workers/W01-payload/scripts/neon/rehearse-auth001-registration-neon-postgres-runtime.mjs",
-        "gitBlobSha1": "cdf1ae14b58472778c26a4084fed5787437e8a61"
+        "gitBlobSha1": "5b4f6c00378f217fd2a6f76fe0519792366432b1"
       },
       {
         "path": "workers/W01-payload/src/app/auth/register/route.ts",
@@ -95,7 +95,7 @@
       },
       {
         "path": "workers/W01-payload/src/auth/registration-persistence.ts",
-        "gitBlobSha1": "29cfba012ffb3ade2df847a1edace827d5c5c930"
+        "gitBlobSha1": "d4f763eb2375929cb9e7c2bcd02715176e30e567"
       },
       {
         "path": "workers/W01-payload/src/migrations/20260928_020000_MIG_AUTH_001_REGISTRATION_BATCH_V1.ts",
@@ -130,11 +130,11 @@
     ],
     "formalGitHubReviewSubmissions": 0,
     "followUpReview": {
-      "reviewedAt": "2026-11-08",
-      "scope": "Re-reviewed D1-01 shared-runner readiness after D1-02 release was added. Confirmed the shared ledger remains globally disabled, D1-01 and D1-02 are individually pinned as reviewed, D1-03 through D1-05 stay blocked, and D1-01 manifest/planner/readiness guards accept only the two documented per-domain states.",
+      "reviewedAt": "2026-11-17",
+      "scope": "D1-01 follow-up code-path audit for W01 AUTH-001 registration idempotency and consent persistence. Added the W01-owned PostgreSQL SQL slice at order 150 (after the Payload baseline and before W02), aligned PostgreSQL envelope/consent columns and indexes to the committed D1 source migration, and confirmed the shared runner continues to apply each SQL migration and its append-only ledger row in one transaction. W01 registration now selects a provider-neutral persistence store: Neon mode uses the existing D1-01 Hyperdrive binding and a bounded cached node-postgres pool, while legacy D1 remains only in the D1 adapter. The local PG18 rehearsal verifies first reservation, unique active-key enforcement, completion/replay, atomic consent write, release, expired-key replacement, rollback on an envelope state-transition failure, and fixture cleanup.",
       "result": "NO_NEW_BLOCKING_FINDINGS",
       "formalGitHubReviewSubmissions": 0,
-      "limitations": "GPT-6 code-path review; not a human GitHub approval. Remote Neon DDL remains unexecuted."
+      "limitations": "GPT-6 code-path audit, not a human GitHub approval. The new AUTH-001 integration and updated 15-entry D1-01 manifest still require PR PostgreSQL 18 CI evidence. Remote Neon DDL has not been executed; remote apply remains a separate manual workflow_dispatch with the exact confirmation token. Production D1 remains authoritative until a separate cutover authorization."
     }
   },
   "verificationEvidence": {
