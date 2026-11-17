@@ -40,7 +40,7 @@
 | `workers/W05-social/wrangler.jsonc` | W05 | 配置文件名称含 legacy D1 binding domain 编号的 Hyperdrive 配置 | NEEDS_CONFIRMATION | 当前配置显式选择 Neon，且绑定 `HYPERDRIVE_D1_02`、`HYPERDRIVE_D1_03` 实际承载 Neon 域连接；不可误删现有 Hyperdrive/Service Binding | 当前配置内现有 Neon Hyperdrive | 仅在确认 binding 改名不会破坏 Worker 配置、secret/部署脚本和资源映射后才可改名；本清理任务不创建新资源 | 待确认 |
 | `workers/W08-creator/src/neon/runtime.ts` | W08 | D1 driver 选择、D1_01 env 及 createD1 runtime fallback | REPLACE_THEN_DELETE | **本批已完成：** 删除 D1 driver、D1_01 类型/注入和 store fallback；生产入口始终使用现有 Neon Hyperdrive 与 PostgreSQL creator store | `createPostgresW08CreatorStore` / `getW08PostgresPool` | D1 生产运行入口已移除；该文件保留 Neon provider 实现 | 本批完成 |
 | `workers/W08-creator/src/authz/handler.ts`、`src/authz/role-layer.ts` | W08 | CASL 权限读取和 RoleAssignment context 的 D1 SQL 分支 | REPLACE_THEN_DELETE | **本批已完成：** 移除 D1 账户状态查询及 D1 role-layer resolver；鉴权读取统一调用 W02 身份服务及 W08 Neon PostgreSQL | `resolvePermissionContextPostgres`、W08 现有 Hyperdrive pool | D1 权限读取代码已移除；保留 Neon 查询、L0-L8 fail-closed 策略和 W02 Service Binding | 本批完成 |
-| `workers/W08-creator/src/creator-store-d1.test-adapter.ts`、`src/index.runtime.test.ts` | W08 | Legacy D1 Store 与 W08D1Database / W08D1PreparedStatement 测试适配 | DELETE_NEXT_VERSION | 已从生产导入的 `creator-store.ts` 独立拆出；目前只有 worker 级单元测试显式注入调用，生产 worker 默认创建 Neon Store | 生产：`creator-store.ts` 中的 `createPostgresW08CreatorStore`；测试替代：内存 `W08CreatorStore` fixture | 将 worker 级生命周期测试改为内存 store fixture 后，删除本文件及测试专用 D1 types | 下一个版本 |
+| `workers/W08-creator/src/creator-store-d1.test-adapter.ts`、`src/index.runtime.test.ts` | W08 | Legacy D1 Store 与 W08D1Database / W08D1PreparedStatement 测试适配 | DELETE | **本批已完成：** worker runtime tests 已改用内存 `W08CreatorStore` fixture；D1 adapter 与测试专用 D1 types 已删除 | 生产：`createPostgresW08CreatorStore`；测试：`MemoryW08CreatorStore` | W08 12 项 worker runtime/lifecycle cases continue to exercise the Store port without SQL-string D1 emulation；Neon production provider and W02 Service Binding remain unchanged | 本批完成 |
 | `workers/W07-subscription-commerce/src/index.ts` | W07 | D1_01/D1_04 Env 类型、selected runtime env 兼容注入 | NEEDS_CONFIRMATION | 文件同时包含 Neon membership/payment runtime 入口；需要逐路由确认 selected DB wrapper 是否仍被调用，不能直接删除以免影响订阅、支付、退款和 webhook | `src/neon/membership-database-runtime.ts`、`src/neon/payment-method-read-runtime.ts` 及对应 Postgres stores | W07 所有业务入口明确只使用 Neon stores；无 D1 注入/prepare/batch 路径；支付幂等和 webhook 状态写入保持原有边界 | 待确认 |
 | `workers/W01-payload/src/payload-database-driver.ts` | W01 | Payload D1/SQLite provider selector | DELETE_NEXT_VERSION | 生产 Neon config 已选择 PostgreSQL，但 provider resolver 仍允许 D1 binding 选择；本轮先明确标记，保留 CLI/test 来源直到完全收敛 | `workers/W01-payload/src/neon-postgres-adapter.ts` | Payload CLI、schema generation 和所有受支持测试均不再需要 D1 adapter；删除 D1 selection、binding 类型和依赖 | 下一个版本 |
 | `workers/W01-payload/src/payload.config.ts` | W01 | `sqliteD1Adapter` runtime branch | DELETE_NEXT_VERSION | Neon 是生产运行目标；D1 branch 仍由 resolver 暴露，不能只删 import 而不处理 Payload CLI/test 入口 | `createW01NeonPostgresAdapter` | 所有 Payload runtime/CLI 入口只使用 Neon；D1 migration source 已由 PostgreSQL schema-source tooling 独立保留 | 下一个版本 |
@@ -77,7 +77,7 @@
 ## 第二批 W08 代码处置
 
 - W08 Neon runtime、CASL handler、role-layer resolver：D1 生产调用分支已删除，Neon-only 代码保留。
-- W08 creator D1 Store 及 statement/database 类型：已从生产导入的 `creator-store.ts` 移入独立 `creator-store-d1.test-adapter.ts`，统一添加 `@deprecated-next-version`；仅由隔离的 worker 级单元测试显式注入。
+- W08 creator D1 Store、statement/database 类型及 SQL-string mock 已从 worker runtime tests 删除；测试统一注入内存 `W08CreatorStore` fixture。
 - W08 worker 使用可注入 Store port 的 factory；生产默认实例仍调用 Neon Store provider。`creator-store.ts` 现在只包含 Postgres store 与共享类型，不含 D1 adapter。未改变 W02 Service Binding。
 
 ## 本轮代码标记
@@ -90,7 +90,7 @@
 ## 第二批清理结果
 
 - W08 生产 runtime 中的 D1 provider、D1 binding 类型、D1 Store fallback 已删除；W08 的 CASL 账户状态与 RoleAssignment 读取不再使用 D1 接口。
-- W08 旧 D1 Store 只剩 worker 级单元测试显式注入使用，已标记为下一个版本移除；不得将该测试适配误报为生产依赖。
+- W08 不再保留 D1 Store 测试适配器或 D1 测试数据库类型；worker runtime tests 使用内存 Store fixture。
 - 本批不改动 W08 已存在的 Neon Hyperdrive、W02_AUTH Service Binding、CASL 安全判断和业务 Store 事务。
 
 ## 本轮结论
