@@ -121,13 +121,7 @@ describe('W03 Neon content creation store', () => {
       async allocateContentId() { return encodeContentSnowflakeId(nowMs, 1) },
       async create(input) { created = input },
     }
-    const d1 = {
-      prepare() { throw new Error('D1 must not be queried in Neon mode') },
-      batch() { throw new Error('D1 must not be written in Neon mode') },
-    }
-
     const result = await createContent(
-      d1 as never,
       'user_123',
       { contentType: 'post', title: 'Neon post', bodyRef: 'body:neon-post', mediaRefs: [], coverRef: null },
       'neon-create-key',
