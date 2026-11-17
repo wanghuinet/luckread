@@ -2,12 +2,13 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-import { canTransitionContentState, ContentRuntimeError, type ContentRecord, createContent, createRequestId, deleteContent, getContent, decodeContentListCursor, decodeCursor, decodeScopedCursor, encodeContentListCursor, encodeCursor, encodeScopedCursor, isState, listContents, listPublishedContentsByIds, listContentRevisions, listCreatorContents, listDueScheduledContentCandidates, publishAuthorizedScheduledContents, publicContent, toErrorResponse, transitionContentState, updateContent, validateInput, validateListFilters } from './content-runtime.js'
+import { canTransitionContentState, ContentRuntimeError, type ContentMutationStore, type ContentRecord, createContent, createRequestId, deleteContent, getContent, decodeContentListCursor, decodeCursor, decodeScopedCursor, encodeContentListCursor, encodeCursor, encodeScopedCursor, isState, listContents, listPublishedContentsByIds, listContentRevisions, listCreatorContents, listDueScheduledContentCandidates, publishAuthorizedScheduledContents, publicContent, toErrorResponse, transitionContentState, updateContent, validateInput, validateListFilters } from './content-runtime.js'
 import w03Worker, { createW03ContentWorker, hasCreatorContentPermission, hasSocialPostPermission, parseListLimit } from './index.js'
 
 const makeContentMutationStore = (
   row: Record<string, unknown>,
   update: () => Promise<void> = async () => undefined,
+  transition: (input: Parameters<ContentMutationStore['transition']>[0]) => Promise<void> = async () => undefined,
 ) => ({
   async loadMutation() {
     return {
@@ -33,17 +34,18 @@ const makeContentMutationStore = (
         updatedAt: row.updated_at as string,
       } satisfies ContentRecord,
       idempotency: {
-        idem_id: null,
-        idem_owner_user_id: null,
-        idem_request_hash: null,
-        idem_status: null,
-        idem_response_status: null,
-        idem_response_json: null,
-        idem_expires_at: null,
+        idem_id: (row.idem_id as string | null | undefined) ?? null,
+        idem_owner_user_id: (row.idem_owner_user_id as string | null | undefined) ?? null,
+        idem_request_hash: (row.idem_request_hash as string | null | undefined) ?? null,
+        idem_status: (row.idem_status as 'IN_PROGRESS' | 'COMPLETED' | null | undefined) ?? null,
+        idem_response_status: (row.idem_response_status as number | null | undefined) ?? null,
+        idem_response_json: (row.idem_response_json as string | null | undefined) ?? null,
+        idem_expires_at: (row.idem_expires_at as string | null | undefined) ?? null,
       },
     }
   },
   update,
+  transition,
 })
 
 describe('W03 content contract core', () => {
@@ -876,12 +878,7 @@ describe('W03 content contract core', () => {
       idem_response_json: null,
       idem_expires_at: null,
     }
-    const db = {
-      prepare() {
-        return { bind: () => ({ first: async () => row }) }
-      },
-      batch: async () => { throw new Error('preflight failures must happen before a state write') },
-    } as never
+    const db = makeContentMutationStore(row)
 
     for (const layer of ['L2', 'L5', 'L6', 'L7', 'L8']) {
       await expect(
@@ -930,13 +927,10 @@ describe('W03 content contract core', () => {
         idem_response_json: null,
         idem_expires_at: null,
       }
-      let batchCalled = false
-      const db = {
-        prepare() {
-          return { bind: () => ({ first: async () => row }) }
-        },
-        batch: async () => { batchCalled = true; return [] },
-      } as never
+      let transitionCalled = false
+      const db = makeContentMutationStore(row, async () => undefined, async () => {
+        transitionCalled = true
+      })
 
       const result = await transitionContentState(
         db,
@@ -962,7 +956,7 @@ describe('W03 content contract core', () => {
       )
 
       expect(result).toMatchObject({ from: 'DRAFT', to: 'PUBLISHED', version: 2, etag: 'W/"2"' })
-      expect(batchCalled).toBe(true)
+      expect(transitionCalled).toBe(true)
     }
   })
 
@@ -994,13 +988,10 @@ describe('W03 content contract core', () => {
       idem_response_json: null,
       idem_expires_at: null,
     }
-    let batchCalls = 0
-    const db = {
-      prepare() {
-        return { bind: () => ({ first: async () => row }) }
-      },
-      batch: async () => { batchCalls += 1; return [] },
-    } as never
+    let transitionCalls = 0
+    const db = makeContentMutationStore(row, async () => undefined, async () => {
+      transitionCalls += 1
+    })
     const options = {
       preflight: {
         contentType: 'post',
@@ -1027,11 +1018,11 @@ describe('W03 content contract core', () => {
 
     await expect(transition()).rejects.toMatchObject({ code: 'PERMISSION_DENIED', status: 403 })
     await expect(transition('creator_other')).rejects.toMatchObject({ code: 'PERMISSION_DENIED', status: 403 })
-    expect(batchCalls).toBe(0)
+    expect(transitionCalls).toBe(0)
 
     const published = await transition('creator_verified_1')
     expect(published).toMatchObject({ from: 'DRAFT', to: 'PUBLISHED', version: 2 })
-    expect(batchCalls).toBe(1)
+    expect(transitionCalls).toBe(1)
   })
 
   it('does not let a higher-layer social author publish an article', async () => {
@@ -1061,10 +1052,7 @@ describe('W03 content contract core', () => {
       idem_response_json: null,
       idem_expires_at: null,
     }
-    const db = {
-      prepare() { return { bind: () => ({ first: async () => row }) } },
-      batch: async () => { throw new Error('a denied article transition must not write') },
-    } as never
+    const db = makeContentMutationStore(row)
 
     await expect(transitionContentState(
       db,
@@ -1116,19 +1104,10 @@ describe('W03 content contract core', () => {
       idem_response_json: null,
       idem_expires_at: null,
     }
-    let batchCalls = 0
-    const prepared: Array<{ sql: string; values: unknown[] }> = []
-    const db = {
-      prepare(sql: string) {
-        return {
-          bind: (...values: unknown[]) => {
-            prepared.push({ sql, values })
-            return { first: async () => row }
-          },
-        }
-      },
-      batch: async () => { batchCalls += 1; return [] },
-    } as never
+    let transitionInput: Parameters<ContentMutationStore['transition']>[0] | undefined
+    const db = makeContentMutationStore(row, async () => undefined, async (input) => {
+      transitionInput = input
+    })
     const scheduledAt = '2026-10-16T00:30:00.000Z'
     const preflight = {
       contentType: 'post',
@@ -1160,13 +1139,13 @@ describe('W03 content contract core', () => {
       etag: 'W/"2"',
       scheduledAt,
     })
-    expect(batchCalls).toBe(1)
-    const contentUpdate = prepared.find(({ sql }) => sql.includes('UPDATE contents SET state=?, scheduled_at=?, creator_id=?'))
-    expect(contentUpdate?.values.slice(0, 3)).toEqual([
-      'SCHEDULED',
+    expect(transitionInput).toMatchObject({
+      nextState: 'SCHEDULED',
       scheduledAt,
-      'creator-canonical-1',
-    ])
+      nextCreatorId: 'creator-canonical-1',
+      expectedVersion: 1,
+      expectedEtag: 'W/"1"',
+    })
   })
 
   it('does not schedule a draft social post when its W03 publish preflight is missing', async () => {
@@ -1197,11 +1176,10 @@ describe('W03 content contract core', () => {
       idem_response_json: null,
       idem_expires_at: null,
     }
-    let batchCalls = 0
-    const db = {
-      prepare() { return { bind: () => ({ first: async () => row }) } },
-      batch: async () => { batchCalls += 1; return [] },
-    } as never
+    let transitionCalled = false
+    const db = makeContentMutationStore(row, async () => undefined, async () => {
+      transitionCalled = true
+    })
 
     await expect(transitionContentState(
       db,
@@ -1218,7 +1196,7 @@ describe('W03 content contract core', () => {
         verifiedCreatorId: 'creator-canonical-1',
       },
     )).rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 })
-    expect(batchCalls).toBe(0)
+    expect(transitionCalled).toBe(false)
   })
 
   it('rejects scheduled publication when W08 has not verified a canonical Creator identity', async () => {
@@ -1249,11 +1227,10 @@ describe('W03 content contract core', () => {
       idem_response_json: null,
       idem_expires_at: null,
     }
-    let batchCalls = 0
-    const db = {
-      prepare() { return { bind: () => ({ first: async () => row }) } },
-      batch: async () => { batchCalls += 1; return [] },
-    } as never
+    let transitionCalled = false
+    const db = makeContentMutationStore(row, async () => undefined, async () => {
+      transitionCalled = true
+    })
     const preflight = {
       contentType: 'post',
       title: 'A useful update',
@@ -1279,15 +1256,11 @@ describe('W03 content contract core', () => {
         preflight,
       },
     )).rejects.toMatchObject({ code: 'PERMISSION_DENIED', status: 403 })
-    expect(batchCalls).toBe(0)
+    expect(transitionCalled).toBe(false)
   })
 
   it('requires a future timestamp before scheduling an approved content item', async () => {
-    const db = {
-      prepare() {
-        throw new Error('database should not be reached for invalid scheduledAt')
-      },
-    } as never
+    const db = undefined as never
 
     await expect(
       transitionContentState(
@@ -1846,12 +1819,7 @@ describe('W03 content contract core', () => {
       created_at: '2026-10-08T12:00:00.000Z',
       updated_at: '2026-10-08T12:00:00.000Z',
     }
-    const db = {
-      prepare() {
-        return { bind: () => ({ first: async () => content }) }
-      },
-      batch: async () => [],
-    } as never
+    const db = makeContentMutationStore(content)
 
     await expect(transitionContentState(
       db,
@@ -2419,10 +2387,7 @@ it('returns 409 for an owned but invalid lifecycle transition', async () => {
     created_at: '2026-10-07T00:00:00.000Z',
     updated_at: '2026-10-07T00:00:00.000Z',
   }
-  const db = {
-    prepare() { return { bind: () => ({ first: async () => content }) } },
-    batch: async () => { throw new Error('batch should not run for an invalid transition') },
-  } as never
+  const db = makeContentMutationStore(content)
   await expect(transitionContentState(
     db,
     'user_123',
@@ -2436,9 +2401,7 @@ it('returns 409 for an owned but invalid lifecycle transition', async () => {
 })
 
 it('blocks moderator layers from the generic state-transition path', async () => {
-  const db = {
-    prepare() { throw new Error('generic moderator transition must not reach D1') },
-  } as never
+  const db = undefined as never
   for (const layer of ['L6', 'L7', 'L8']) {
     await expect(transitionContentState(
       db,
@@ -2568,44 +2531,34 @@ describe('1.1 content lifecycle idempotency', () => {
       byte => byte.toString(16).padStart(2, '0'),
     ).join('')
 
-    let batchCalled = false
-    const db = {
-      prepare() {
-        return {
-          bind: () => ({
-            first: async () => ({
-              id: contentId,
-              content_type: 'article',
-              owner_user_id: 'user_publish_retry',
-              creator_id: 'user_publish_retry',
-              ip_id: null,
-              state: 'APPROVED',
-              version: 4,
-              revision: 4,
-              slug: 'publish-retry',
-              title: 'Retry-safe publish',
-              body_ref: 'https://cdn.example.com/body.json',
-              media_refs_json: '[]',
-              cover_ref: null,
-              etag: ifMatch,
-              created_at: '2026-10-08T00:00:00.000Z',
-              updated_at: '2026-10-08T00:01:00.000Z',
-              idem_id: 'idem_publish_retry',
-              idem_owner_user_id: 'user_publish_retry',
-              idem_request_hash: requestHash,
-              idem_status: 'COMPLETED',
-              idem_response_status: 200,
-              idem_response_json: JSON.stringify(result),
-              idem_expires_at: '2026-10-09T00:00:00.000Z',
-            }),
-          }),
-        }
-      },
-      batch: async () => {
-        batchCalled = true
-        throw new Error('duplicate publish must not write a second transition')
-      },
-    } as never
+    let transitionCalled = false
+    const db = makeContentMutationStore({
+      id: contentId,
+      content_type: 'article',
+      owner_user_id: 'user_publish_retry',
+      creator_id: 'user_publish_retry',
+      ip_id: null,
+      state: 'APPROVED',
+      version: 4,
+      revision: 4,
+      slug: 'publish-retry',
+      title: 'Retry-safe publish',
+      body_ref: 'https://cdn.example.com/body.json',
+      media_refs_json: '[]',
+      cover_ref: null,
+      etag: ifMatch,
+      created_at: '2026-10-08T00:00:00.000Z',
+      updated_at: '2026-10-08T00:01:00.000Z',
+      idem_id: 'idem_publish_retry',
+      idem_owner_user_id: 'user_publish_retry',
+      idem_request_hash: requestHash,
+      idem_status: 'COMPLETED',
+      idem_response_status: 200,
+      idem_response_json: JSON.stringify(result),
+      idem_expires_at: '2026-10-09T00:00:00.000Z',
+    }, async () => undefined, async () => {
+      transitionCalled = true
+    })
 
     await expect(
       transitionContentState(
@@ -2621,7 +2574,7 @@ describe('1.1 content lifecycle idempotency', () => {
       ),
     ).resolves.toEqual(result)
 
-    expect(batchCalled).toBe(false)
+    expect(transitionCalled).toBe(false)
   })
 })
 
