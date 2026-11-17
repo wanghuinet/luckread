@@ -74,6 +74,13 @@ function instrumentDevelopmentPgClient(client: object): void {
       operation,
     }))
 
+    // Keep transaction-control calls completely transparent to Kysely/pg.
+    // The development tracer must not wrap the pg Query/Promise object used
+    // by the transaction state machine.
+    if (operation === 'BEGIN' || operation === 'COMMIT' || operation === 'ROLLBACK') {
+      return originalQuery(...args)
+    }
+
     const callbackIndex = args.findIndex((value) => typeof value === 'function')
     if (callbackIndex >= 0) {
       const callback = args[callbackIndex] as (...callbackArgs: unknown[]) => unknown
