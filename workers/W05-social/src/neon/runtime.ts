@@ -344,3 +344,29 @@ export function getW05NotificationPushDeliveryDependencies(
 
   return dependencies
 }
+
+/**
+ * Closes cached social and delegated endpoint PostgreSQL pools created by the
+ * Neon Worker entrypoint in a disposable integration test. Production isolates
+ * keep these pools for their lifetime and never call this helper.
+ */
+export async function closeW05PostgresRuntimeForTest(
+  env: W05SocialRuntimeEnv,
+): Promise<void> {
+  const closing = new Set<Pool>()
+
+  for (const binding of [env.HYPERDRIVE_D1_02, env.HYPERDRIVE_D1_03]) {
+    if (!binding || typeof binding !== 'object') continue
+    const pool = pools.get(binding)
+    if (!pool) continue
+
+    pools.delete(binding)
+    compositions.delete(binding)
+    pushCompositions.delete(binding)
+    pushEndpointAccessStores.delete(binding)
+    closing.add(pool)
+  }
+
+  await Promise.all([...closing].map((pool) => pool.end()))
+}
+
