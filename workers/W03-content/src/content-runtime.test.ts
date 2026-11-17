@@ -1843,14 +1843,23 @@ describe('W03 content contract core', () => {
     expect(canTransitionContentState('RESTORED', 'PENDING_REVIEW', 'CREATOR', true)).toBe(false)
   })
 
-  it('keeps the D1 batch fail-closed CAS guard on every content mutation', () => {
+  it('requires Neon persistence for content creation and keeps the D1 CAS guard on remaining legacy mutations', () => {
     const runtime = readFileSync(
       resolve(process.cwd(), 'workers/W03-content/src/content-runtime.ts'),
       'utf8',
     )
 
+    const createStart = runtime.indexOf('export async function createContent')
+    expect(createStart).toBeGreaterThanOrEqual(0)
+    const createEnd = runtime.indexOf('\nexport ', createStart + 10)
+    const createSection = runtime.slice(createStart, createEnd >= 0 ? createEnd : runtime.length)
+    expect(createSection).toContain('mutationStore.allocateContentId')
+    expect(createSection).toContain('mutationStore.create(')
+    expect(createSection).not.toContain('db.prepare')
+    expect(createSection).not.toContain('batchMutation(db')
+    expect(createSection).not.toContain('allocateContentSnowflakeId')
+
     for (const functionName of [
-      'createContent',
       'updateContent',
       'deleteContent',
       'transitionContentState',
@@ -2429,30 +2438,27 @@ it('keeps create idempotency replay byte-stable across retry time', async () => 
     new TextEncoder().encode(JSON.stringify(hashInput)),
   )
   const hashHex = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('')
-  const db = {
-    prepare() {
-      return {
-        bind: () => ({
-          first: async () => ({
-            idem_id: 'idem_123',
-            idem_owner_user_id: 'user_123',
-            idem_request_hash: hashHex,
-            idem_status: 'COMPLETED',
-            idem_response_status: 201,
-            idem_response_json: JSON.stringify(original),
-            idem_expires_at: '2026-10-08T07:00:00.000Z',
-          }),
-        }),
-      }
-    },
-    batch: async () => { throw new Error('batch should not run on an idempotency replay') },
+  const store = {
+    loadIdempotency: async () => ({
+      idem_id: 'idem_123',
+      idem_owner_user_id: 'user_123',
+      idem_request_hash: hashHex,
+      idem_status: 'COMPLETED',
+      idem_response_status: 201,
+      idem_response_json: JSON.stringify(original),
+      idem_expires_at: '2026-10-08T07:00:00.000Z',
+    }),
+    allocateContentId: async () => { throw new Error('allocator must not run on idempotency replay') },
+    create: async () => { throw new Error('create must not run on idempotency replay') },
   } as never
   const result = await createContent(
-    db,
     'user_123',
     { contentType: 'article', title: 'Draft content', bodyRef: 'https://cdn.example.com/body.json', mediaRefs: [], coverRef: null },
     'create-key',
     new Date('2026-10-07T08:00:00.000Z'),
+    'runtime',
+    undefined,
+    store,
   )
   expect(result).toEqual(original)
 })
