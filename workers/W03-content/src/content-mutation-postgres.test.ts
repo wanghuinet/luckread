@@ -442,13 +442,8 @@ describe('W03 Neon content mutation store', () => {
       async listDueScheduled() { return [] },
       async publishScheduled() { return 0 },
     }
-    const d1 = {
-      prepare() { throw new Error('D1 must not be queried in Neon mode') },
-      batch() { throw new Error('D1 must not be written in Neon mode') },
-    }
-
     const result = await applyModerationContentTransition(
-      d1 as never,
+      store,
       {
         contentId: snapshotContent.id,
         decisionId: 'decision_123',
@@ -458,7 +453,6 @@ describe('W03 Neon content mutation store', () => {
         idempotencyKey: 'neon-moderation-key',
       },
       now,
-      store,
     )
 
     expect(result).toMatchObject({ from: 'PENDING_REVIEW', to: 'APPROVED', version: 5, etag: 'W/"5"' })
