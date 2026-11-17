@@ -1317,13 +1317,14 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
         const cursor = url.searchParams.get('cursor')
         const limit = parseRevisionListLimit(url.searchParams.get('limit'))
         if (cursor && cursor.length > 2048) throw new ContentRuntimeError('INVALID_CURSOR', 400)
+        const revisionReadStore = dependencies.contentRevisionReadStoreProvider?.(env)
+        if (!revisionReadStore) throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
         const page = await listContentRevisions(
-          NO_LEGACY_DATABASE_HANDLE,
+          revisionReadStore,
           principal.userId,
           path.id,
           cursor,
           limit,
-          dependencies.contentRevisionReadStoreProvider?.(env),
         )
         return json({
           data: {
@@ -1337,13 +1338,14 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
 
       if (path && path.revisions && path.id && path.revisionId && request.method === 'GET' && !path.rollback) {
         const principal = requiredCreatorPrincipal(request)
+        const revisionReadStore = dependencies.contentRevisionReadStoreProvider?.(env)
+        if (!revisionReadStore) throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
         return json({
           data: await getContentRevision(
-            NO_LEGACY_DATABASE_HANDLE,
+            revisionReadStore,
             principal.userId,
             path.id,
             path.revisionId,
-            dependencies.contentRevisionReadStoreProvider?.(env),
           ),
           requestId: createRequestId(),
         })
@@ -1352,8 +1354,10 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
       if (path && path.revisions && path.id && path.revisionId && path.rollback && request.method === 'POST') {
         const principal = requiredCreatorPrincipal(request)
         const body = await parseBody(request)
+        const mutationStore = dependencies.contentMutationStoreProvider?.(env)
+        if (!mutationStore) throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
         const result = await rollbackContentRevision(
-          NO_LEGACY_DATABASE_HANDLE,
+          mutationStore,
           principal.userId,
           path.id,
           path.revisionId,
@@ -1363,7 +1367,6 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
           request.headers.get('X-LuckRead-Correlation-Id')?.trim() || 'runtime',
           new Date(),
           request.headers.get('X-LuckRead-Verified-Creator-Id')?.trim() || undefined,
-          dependencies.contentMutationStoreProvider?.(env),
         )
         return json({
           ...result,

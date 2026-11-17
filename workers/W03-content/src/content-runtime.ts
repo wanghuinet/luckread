@@ -196,28 +196,6 @@ export interface ContentRevisionReadStore {
 }
 
 
-interface ContentRevisionRow {
-  id: string
-  content_id: string
-  revision: number
-  content_version: number
-  actor_user_id: string
-  source_revision: number | null
-  operation: ContentRevisionOperation
-  state: ContentState
-  access_mode?: ContentAccessMode
-  slug: string
-  title: string
-  body_ref: string
-  media_refs_json: string
-  cover_ref: string | null
-  media_warning?: ContentMediaWarning | null
-  etag: string
-  reason: string | null
-  correlation_id: string
-  created_at: string
-}
-
 export interface IdempotencyRow {
   idem_id: string | null
   idem_owner_user_id: string | null
@@ -673,28 +651,6 @@ const inspectIdempotency = (
 }
 
 
-const toRevision = (row: ContentRevisionRow): ContentRevision => ({
-  id: row.id,
-  contentId: row.content_id,
-  revision: row.revision,
-  contentVersion: row.content_version,
-  actorUserId: row.actor_user_id,
-  sourceRevision: row.source_revision,
-  operation: row.operation,
-  state: row.state,
-  accessMode: row.access_mode === 'MEMBERS_ONLY' ? 'MEMBERS_ONLY' : 'PUBLIC',
-  slug: row.slug,
-  title: row.title,
-  bodyRef: row.body_ref,
-  mediaRefs: JSON.parse(row.media_refs_json || '[]') as string[],
-  coverRef: row.cover_ref,
-  mediaWarning: row.media_warning ?? null,
-  etag: row.etag,
-  reason: row.reason,
-  correlationId: row.correlation_id,
-  createdAt: row.created_at,
-})
-
 const revisionPageSize = (limit: number): number =>
   Math.min(Math.max(Number.isSafeInteger(limit) ? limit : 20, 1), 100)
 
@@ -704,16 +660,6 @@ const normalizeCorrelationId = (value: string): string => {
   return normalized
 }
 
-const insertRevision = (db: ContentD1, revision: ContentRevision): D1PreparedStatement =>
-  db.prepare(`INSERT INTO content_revisions
-    (id, content_id, revision, content_version, actor_user_id, source_revision, operation,
-     state, access_mode, slug, title, body_ref, media_refs_json, cover_ref, media_warning, etag, reason, correlation_id, created_at)
-   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(
-    revision.id, revision.contentId, revision.revision, revision.contentVersion,
-    revision.actorUserId, revision.sourceRevision, revision.operation, revision.state,
-    revision.accessMode ?? 'PUBLIC', revision.slug, revision.title, revision.bodyRef, JSON.stringify(revision.mediaRefs), revision.coverRef,
-    revision.mediaWarning ?? null, revision.etag, revision.reason, revision.correlationId, revision.createdAt,
-  )
 const emptyIdempotency = (): IdempotencyRow => ({
   idem_id: null,
   idem_owner_user_id: null,
@@ -1094,69 +1040,40 @@ export async function getPublishedOwnerPostContext(
 }
 
 export async function listContentRevisions(
-  db: ContentD1,
+  readStore: ContentRevisionReadStore,
   principalUserId: string,
   contentId: string,
   cursor: string | null,
   limit: number,
-  readStore?: ContentRevisionReadStore,
 ): Promise<{ items: ContentRevision[]; nextCursor: string | null; hasMore: boolean }> {
   assertResourceId(principalUserId)
   assertResourceId(contentId)
   const pageSize = revisionPageSize(limit)
   const cursorScope = JSON.stringify({ type: 'content-revisions', principalUserId, contentId })
   const decoded = cursor ? decodeScopedCursor(cursor, cursorScope) : null
-
-  let page: ContentRevision[]
-  let hasMore: boolean
-  if (readStore) {
-    const rows = await readStore.list(principalUserId, contentId, decoded, pageSize + 1)
-    hasMore = rows.length > pageSize
-    page = rows.slice(0, pageSize)
-  } else {
-    const cursorClause = decoded ? 'AND (r.created_at < ? OR (r.created_at = ? AND r.id < ?))' : ''
-    const cursorBindings = decoded ? [decoded.updatedAt, decoded.updatedAt, decoded.id] : []
-    const rows = await db.prepare(`
-      SELECT r.id, r.content_id, r.revision, r.content_version, r.actor_user_id,
-             r.source_revision, r.operation, r.state, r.access_mode, r.slug, r.title, r.body_ref,
-             r.media_refs_json, r.cover_ref, r.media_warning, r.etag, r.reason, r.correlation_id, r.created_at
-        FROM content_revisions r
-        JOIN contents c ON c.id = r.content_id
-       WHERE r.content_id = ? AND c.owner_user_id = ? ${cursorClause}
-       ORDER BY r.created_at DESC, r.id DESC
-       LIMIT ?`).bind(contentId, principalUserId, ...cursorBindings, pageSize + 1).all<ContentRevisionRow>()
-    hasMore = rows.results.length > pageSize
-    page = rows.results.slice(0, pageSize).map(toRevision)
-  }
-
+  const rows = await readStore.list(principalUserId, contentId, decoded, pageSize + 1)
+  const hasMore = rows.length > pageSize
+  const page = rows.slice(0, pageSize)
   const last = page.at(-1)
-  return { items: page, hasMore, nextCursor: hasMore && last ? encodeScopedCursor(last.createdAt, last.id, cursorScope) : null }
+  return {
+    items: page,
+    hasMore,
+    nextCursor: hasMore && last ? encodeScopedCursor(last.createdAt, last.id, cursorScope) : null,
+  }
 }
 
 export async function getContentRevision(
-  db: ContentD1,
+  readStore: ContentRevisionReadStore,
   principalUserId: string,
   contentId: string,
   revisionId: string,
-  readStore?: ContentRevisionReadStore,
 ): Promise<ContentRevision> {
   assertResourceId(principalUserId)
   assertResourceId(contentId)
   assertResourceId(revisionId)
-  if (readStore) {
-    const revision = await readStore.get(principalUserId, contentId, revisionId)
-    if (!revision) throw new ContentRuntimeError('NOT_FOUND', 404)
-    return revision
-  }
-  const row = await db.prepare(`
-    SELECT r.id, r.content_id, r.revision, r.content_version, r.actor_user_id,
-           r.source_revision, r.operation, r.state, r.access_mode, r.slug, r.title, r.body_ref,
-           r.media_refs_json, r.cover_ref, r.media_warning, r.etag, r.reason, r.correlation_id, r.created_at
-      FROM content_revisions r
-      JOIN contents c ON c.id = r.content_id
-     WHERE r.id = ? AND r.content_id = ? AND c.owner_user_id = ?`).bind(revisionId, contentId, principalUserId).first<ContentRevisionRow>()
-  if (!row) throw new ContentRuntimeError('NOT_FOUND', 404)
-  return toRevision(row)
+  const revision = await readStore.get(principalUserId, contentId, revisionId)
+  if (!revision) throw new ContentRuntimeError('NOT_FOUND', 404)
+  return revision
 }
 
 export function validateListFilters(statusValue: string | null, typeValue: string | null): {
@@ -1760,7 +1677,7 @@ export async function updateContent(
 }
 
 export async function rollbackContentRevision(
-  db: ContentD1,
+  mutationStore: ContentMutationStore,
   principalUserId: string,
   contentId: string,
   revisionId: string,
@@ -1770,7 +1687,6 @@ export async function rollbackContentRevision(
   correlationId: string,
   now = new Date(),
   verifiedCreatorId?: string,
-  mutationStore?: ContentMutationStore,
 ): Promise<{ content: ContentRecord; sourceRevision: number; resultingRevision: number }> {
   assertResourceId(principalUserId)
   assertResourceId(contentId)
@@ -1782,10 +1698,12 @@ export async function rollbackContentRevision(
   const hash = await requestHash(operationId, {
     contentId, revisionId, ifMatch: normalizeEtag(ifMatch), reason: reason ?? null,
   })
-  const snapshot = mutationStore
-    ? await mutationStore.loadMutation(principalUserId, contentId, operationId, idempotencyKey)
-    : await loadMutationRow(db, contentId, operationId, idempotencyKey, principalUserId)
-  const { content, idempotency } = snapshot
+  const { content, idempotency } = await mutationStore.loadMutation(
+    principalUserId,
+    contentId,
+    operationId,
+    idempotencyKey,
+  )
   const replay = inspectIdempotency(idempotency, principalUserId, hash, now)
   if (replay.replayed) {
     if (!replay.body || typeof replay.body !== 'object') throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
@@ -1798,12 +1716,7 @@ export async function rollbackContentRevision(
     throw new ContentRuntimeError('INVALID_STATE', 409)
   }
 
-  const source = mutationStore
-    ? await mutationStore.loadRevision(contentId, revisionId)
-    : await db.prepare(`SELECT id, content_id, revision, content_version, actor_user_id, source_revision, operation,
-       state, access_mode, slug, title, body_ref, media_refs_json, cover_ref, media_warning, etag, reason, correlation_id, created_at
-  FROM content_revisions
- WHERE id = ? AND content_id = ?`).bind(revisionId, contentId).first<ContentRevisionRow>().then((row) => row ? toRevision(row) : null)
+  const source = await mutationStore.loadRevision(contentId, revisionId)
   if (!source) throw new ContentRuntimeError('NOT_FOUND', 404)
 
   const sourceAccessMode = source.accessMode === 'MEMBERS_ONLY' ? 'MEMBERS_ONLY' : 'PUBLIC'
@@ -1869,45 +1782,20 @@ export async function rollbackContentRevision(
     idempotencyKey,
   })
 
-  if (mutationStore) {
-    await mutationStore.rollback({
-      ownerUserId: principalUserId,
-      operationId,
-      idempotencyKey,
-      requestHash: hash,
-      responseJson: JSON.stringify(result),
-      updatedAt,
-      expiresAt,
-      expectedVersion: content.version,
-      expectedEtag: content.etag,
-      content: updated,
-      revision: rollbackRevision,
-      outboxEventPayloadJson,
-    })
-  } else {
-    await batchMutation(db, [
-      expireMutationRow(db, principalUserId, operationId, idempotencyKey, updatedAt),
-      insertCompletedIdempotency(db, principalUserId, operationId, idempotencyKey, hash, 200, JSON.stringify(result), updatedAt, expiresAt),
-      db.prepare(`UPDATE contents
-   SET title = ?, body_ref = ?, media_refs_json = ?, cover_ref = ?, media_warning = ?, access_mode = ?, version = ?, revision = ?, etag = ?, updated_at = ?
- WHERE id = ? AND owner_user_id = ? AND version = ? AND etag = ?`).bind(
-        updated.title, updated.bodyRef, JSON.stringify(updated.mediaRefs), updated.coverRef, updated.mediaWarning ?? null, updated.accessMode ?? 'PUBLIC',
-        nextVersion, nextRevision, updated.etag, updatedAt,
-        content.id, principalUserId, content.version, content.etag,
-      ),
-      atomicGuard(db),
-      insertRevision(db, rollbackRevision),
-      db.prepare(`INSERT INTO content_outbox_events
-        (event_id, operation_id, event_type, content_id, aggregate_version, payload_json, created_at, published_at)
-       VALUES (?, 'rollbackContentRevision', 'content.revision.rolled_back', ?, ?, ?, ?, NULL)`).bind(
-        crypto.randomUUID(),
-        content.id,
-        nextVersion,
-        outboxEventPayloadJson,
-        updatedAt,
-      ),
-    ])
-  }
+  await mutationStore.rollback({
+    ownerUserId: principalUserId,
+    operationId,
+    idempotencyKey,
+    requestHash: hash,
+    responseJson: JSON.stringify(result),
+    updatedAt,
+    expiresAt,
+    expectedVersion: content.version,
+    expectedEtag: content.etag,
+    content: updated,
+    revision: rollbackRevision,
+    outboxEventPayloadJson,
+  })
   return result
 }
 

@@ -636,13 +636,8 @@ describe('W03 Neon content mutation store', () => {
       async listDueScheduled() { return [] },
       async publishScheduled() { return 0 },
     }
-    const d1 = {
-      prepare() { throw new Error('D1 must not be queried in Neon mode') },
-      batch() { throw new Error('D1 must not be written in Neon mode') },
-    }
-
     const result = await rollbackContentRevision(
-      d1 as never,
+      store,
       'user_123',
       snapshotContent.id,
       source.id,
@@ -652,7 +647,6 @@ describe('W03 Neon content mutation store', () => {
       'rollback-correlation',
       now,
       undefined,
-      store,
     )
 
     expect(result).toMatchObject({
