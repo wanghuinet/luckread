@@ -124,6 +124,10 @@ describe('scheduled publication cache window', () => {
       resolve(process.cwd(), '../W03-content/src/content-runtime.ts'),
       'utf8',
     )
+    const w03MutationStore = readFileSync(
+      resolve(process.cwd(), '../W03-content/src/content-mutation-store-postgres.ts'),
+      'utf8',
+    )
     const w03Wrangler = readFileSync(
       resolve(process.cwd(), '../W03-content/wrangler.jsonc'),
       'utf8',
@@ -141,7 +145,9 @@ describe('scheduled publication cache window', () => {
     expect(w03Index).toContain('/internal/content/scheduled-due')
     expect(w03Index).toContain('/internal/content/scheduled-publish/commit')
     expect(w03Wrangler).not.toContain('"crons"')
-    expect(w03Runtime).toContain("SET state = 'PUBLISHED', scheduled_at = NULL")
+    expect(w03Runtime).toContain('await mutationStore.publishScheduled(authorizedCandidates, nowIso)')
+    expect(w03MutationStore).toContain("UPDATE contents SET state = 'PUBLISHED', scheduled_at = NULL, creator_id = $1, ")
+    expect(w03MutationStore).toContain('AND scheduled_at <= $9::timestamptz AND version = $10 RETURNING id')
     expect(listHandler).toContain("'content-list'")
     expect(listHandler).toContain("      30,\n    )")
     expect(cache).toContain('Cache-Control')
