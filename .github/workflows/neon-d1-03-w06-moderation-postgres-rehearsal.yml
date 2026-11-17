@@ -26,6 +26,7 @@ on:
       - 'workers/W06-governance/scripts/neon/rehearse-moderation-write-postgres-runtime.mjs'
       - 'workers/W09-platform/src/neon-postgres-migrations/**'
       - 'workers/W06-governance/scripts/neon/rehearse-moderation-queue-postgres-runtime.mjs'
+      - 'workers/W06-governance/scripts/neon/rehearse-moderation-entrypoint-postgres-runtime.mjs'
   push:
     branches: [main]
     paths:
@@ -47,6 +48,7 @@ on:
       - 'workers/W06-governance/src/moderation-runtime.test.ts'
       - 'workers/W06-governance/src/moderation-queue-read-store*.ts'
       - 'workers/W06-governance/scripts/neon/rehearse-moderation-queue-postgres-runtime.mjs'
+      - 'workers/W06-governance/scripts/neon/rehearse-moderation-entrypoint-postgres-runtime.mjs'
   workflow_dispatch:
 
 permissions:
@@ -90,6 +92,7 @@ jobs:
           node --check workers/W06-governance/scripts/neon/generate-d1-03-w06-postgres-migration.mjs
           node --check workers/W06-governance/scripts/neon/rehearse-moderation-queue-postgres-runtime.mjs
           node --check workers/W06-governance/scripts/neon/rehearse-moderation-write-postgres-runtime.mjs
+          node --check workers/W06-governance/scripts/neon/rehearse-moderation-entrypoint-postgres-runtime.mjs
           node --test workers/W06-governance/scripts/neon/generate-d1-03-w06-postgres-migration.test.mjs
           node workers/W06-governance/scripts/neon/generate-d1-03-w06-postgres-migration.mjs
           git diff --exit-code -- workers/W06-governance/src/neon-postgres-migrations/0001_w06_d1_03_moderation_schema.sql
@@ -127,6 +130,10 @@ jobs:
         working-directory: workers/W02-identity
         run: npm install --ignore-scripts --no-audit --no-fund
 
+      - name: Install W06 PostgreSQL Worker runtime dependency
+        working-directory: workers/W06-governance
+        run: npm install --ignore-scripts --no-audit --no-fund --package-lock=false
+
       - name: Rehearse W06 moderation queue reads against PostgreSQL 18
         working-directory: workers/W02-identity
         env:
@@ -141,6 +148,14 @@ jobs:
           D1_03_W06_WRITE_POSTGRES_REPORT: ../../artifacts/neon/d1-03-w06-moderation-write-postgres-runtime-postflight.json
         run: node --import=tsx/esm ../../workers/W06-governance/scripts/neon/rehearse-moderation-write-postgres-runtime.mjs
 
+      - name: Rehearse W06 Neon Worker entrypoint against PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          W06_ENTRY_POSTGRES_ADMIN_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/postgres
+          W06_ENTRY_POSTGRES_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_governance
+          W06_ENTRY_POSTGRES_REPORT: ../../artifacts/neon/w06-moderation-entrypoint-postgres-runtime-postflight.json
+        run: node --import=tsx/esm ../../workers/W06-governance/scripts/neon/rehearse-moderation-entrypoint-postgres-runtime.mjs
+
       - name: Upload W06 D1-03 PostgreSQL 18 rehearsal evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -150,5 +165,6 @@ jobs:
             artifacts/neon/d1-03-w06-moderation-postflight.txt
             artifacts/neon/d1-03-w06-moderation-queue-postgres-runtime-postflight.json
             artifacts/neon/d1-03-w06-moderation-write-postgres-runtime-postflight.json
+            artifacts/neon/w06-moderation-entrypoint-postgres-runtime-postflight.json
           if-no-files-found: error
           retention-days: 90

@@ -166,3 +166,19 @@ export function getW06ModerationQueueReadStore(
   queueStores.set(binding, store)
   return store
 }
+
+/** Close the Neon pool cached for a disposable PostgreSQL entrypoint rehearsal. */
+export async function closeW06ModerationPostgresRuntimeForTest(
+  binding: NonNullable<W06ModerationDatabaseRuntimeEnv['HYPERDRIVE_D1_03']>,
+): Promise<void> {
+  const pending = pools.get(binding)
+  if (!pending) return
+
+  pools.delete(binding)
+  poolAdapters.delete(binding)
+  databases.delete(binding)
+  queueStores.delete(binding)
+
+  const pool = await pending
+  await pool.end()
+}
