@@ -1843,14 +1843,23 @@ describe('W03 content contract core', () => {
     expect(canTransitionContentState('RESTORED', 'PENDING_REVIEW', 'CREATOR', true)).toBe(false)
   })
 
-  it('keeps the D1 batch fail-closed CAS guard on every content mutation', () => {
+  it('requires Neon persistence for content creation and keeps the D1 CAS guard on remaining legacy mutations', () => {
     const runtime = readFileSync(
       resolve(process.cwd(), 'workers/W03-content/src/content-runtime.ts'),
       'utf8',
     )
 
+    const createStart = runtime.indexOf('export async function createContent')
+    expect(createStart).toBeGreaterThanOrEqual(0)
+    const createEnd = runtime.indexOf('\\nexport ', createStart + 10)
+    const createSection = runtime.slice(createStart, createEnd >= 0 ? createEnd : runtime.length)
+    expect(createSection).toContain('mutationStore.allocateContentId')
+    expect(createSection).toContain('mutationStore.create(')
+    expect(createSection).not.toContain('db.prepare')
+    expect(createSection).not.toContain('batchMutation(db')
+    expect(createSection).not.toContain('allocateContentSnowflakeId')
+
     for (const functionName of [
-      'createContent',
       'updateContent',
       'deleteContent',
       'transitionContentState',
