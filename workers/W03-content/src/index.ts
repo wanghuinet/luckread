@@ -1679,12 +1679,13 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
             return pending
           }
           : undefined
+        const contentDetailReadStore = dependencies.contentDetailReadStoreProvider?.(env)
+        if (!contentDetailReadStore) throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
         const content = await getContent(
-          NO_LEGACY_DATABASE_HANDLE,
+          contentDetailReadStore,
           path.id,
           principalUserId,
           resolveMembership,
-          dependencies.contentDetailReadStoreProvider?.(env),
         )
         if (url.searchParams.get('bodyContext') === '1') {
           // A body object can be referenced by more than one content record.
