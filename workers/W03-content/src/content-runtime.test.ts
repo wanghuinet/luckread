@@ -1279,59 +1279,31 @@ describe('W03 content contract core', () => {
   })
 
   it('lists only due scheduled candidates with canonical owner and Creator IDs', async () => {
-    let query = ''
-    let bindings: unknown[] = []
-    const dueRows = [
-      {
-        id: 'scheduled_due_1',
-        owner_user_id: 'owner_1',
-        creator_id: 'creator_1',
-        version: 4,
-        scheduled_at: '2026-10-08T12:00:00.000Z',
-      },
-    ]
-    const db = {
-      prepare(sql: string) {
-        query = sql
-        return {
-          bind(...values: unknown[]) {
-            bindings = values
-            return { all: async () => ({ results: dueRows }) }
-          },
-        }
-      },
-    } as never
-
-    await expect(
-      listDueScheduledContentCandidates(db, new Date('2026-10-08T12:02:00.000Z'), 50),
-    ).resolves.toEqual([{
+    let requestedAt = ''
+    let requestedLimit = 0
+    const dueCandidates = [{
       contentId: 'scheduled_due_1',
       ownerUserId: 'owner_1',
       creatorId: 'creator_1',
       version: 4,
       scheduledAt: '2026-10-08T12:00:00.000Z',
-    }])
-    expect(query).toContain("state = 'SCHEDULED'")
-    expect(query).toContain('scheduled_at <= ?')
-    expect(query).toContain('owner_user_id')
-    expect(query).toContain('creator_id')
-    expect(bindings).toEqual(['2026-10-08T12:02:00.000Z', 50])
+    }]
+    const store = {
+      async listDueScheduled(nowIso: string, limit: number) {
+        requestedAt = nowIso
+        requestedLimit = limit
+        return dueCandidates
+      },
+    } as never
+
+    await expect(
+      listDueScheduledContentCandidates(store, new Date('2026-10-08T12:02:00.000Z'), 50),
+    ).resolves.toEqual(dueCandidates)
+    expect(requestedAt).toBe('2026-10-08T12:02:00.000Z')
+    expect(requestedLimit).toBe(50)
   })
 
   it('commits only W08-authorized candidates with a final owner/creator/version/time CAS', async () => {
-    const statements: Array<{ query: string; bindings: unknown[] }> = []
-    const db = {
-      prepare(query: string) {
-        return {
-          bind(...bindings: unknown[]) {
-            statements.push({ query, bindings })
-            return { query, bindings }
-          },
-        }
-      },
-      batch: async (items: Array<{ query: string }>) =>
-        items.map(() => ({ meta: { changes: 1 } })),
-    } as never
     const now = new Date('2026-10-08T12:02:00.000Z')
     const authorized = {
       decision: 'ALLOW',
@@ -1342,8 +1314,17 @@ describe('W03 content contract core', () => {
       ownerUserId: 'owner_1',
       creatorId: 'creator_1',
     }
+    let submittedCandidates: readonly unknown[] = []
+    let submittedAt = ''
+    const store = {
+      async publishScheduled(candidates: readonly unknown[], nowIso: string) {
+        submittedCandidates = candidates
+        submittedAt = nowIso
+        return 1
+      },
+    } as never
 
-    await expect(publishAuthorizedScheduledContents(db, [
+    await expect(publishAuthorizedScheduledContents(store, [
       {
         contentId: 'scheduled_due_1',
         ownerUserId: 'owner_1',
@@ -1378,34 +1359,27 @@ describe('W03 content contract core', () => {
       rejected: 2,
     })
 
-    expect(statements).toHaveLength(1)
-    expect(statements[0]?.query).toContain("SET state = 'PUBLISHED', scheduled_at = NULL")
-    expect(statements[0]?.query).toContain('owner_user_id = ?')
-    expect(statements[0]?.query).toContain('creator_id IS ?')
-    expect(statements[0]?.query).toContain('creator_id = ?')
-    expect(statements[0]?.query).toContain("state = 'SCHEDULED'")
-    expect(statements[0]?.query).toContain('scheduled_at <= ?')
-    expect(statements[0]?.query).toContain('version = ?')
-    expect(statements[0]?.bindings).toEqual([
-      'creator_1',
-      5,
-      'W/"5"',
-      '2026-10-08T12:02:00.000Z',
-      'scheduled_due_1',
-      'owner_1',
-      'owner_1',
-      '2026-10-08T12:00:00.000Z',
-      '2026-10-08T12:02:00.000Z',
-      4,
-    ])
+    expect(submittedCandidates).toEqual([{
+      contentId: 'scheduled_due_1',
+      ownerUserId: 'owner_1',
+      expectedCreatorId: 'owner_1',
+      creatorId: 'creator_1',
+      version: 4,
+      scheduledAt: '2026-10-08T12:00:00.000Z',
+      authorization: authorized,
+    }])
+    expect(submittedAt).toBe('2026-10-08T12:02:00.000Z')
   })
 
   it('does not publish when the final compare-and-set loses a concurrent race', async () => {
-    const db = {
-      prepare: () => ({ bind: () => ({}) }),
-      batch: async (items: unknown[]) => items.map(() => ({ meta: { changes: 0 } })),
+    let publishedCandidates = 0
+    const store = {
+      async publishScheduled(candidates: readonly unknown[]) {
+        publishedCandidates = candidates.length
+        return 0
+      },
     } as never
-    await expect(publishAuthorizedScheduledContents(db, [{
+    await expect(publishAuthorizedScheduledContents(store, [{
       contentId: 'scheduled_race_1',
       ownerUserId: 'owner_1',
       expectedCreatorId: 'creator_1',
@@ -1427,6 +1401,7 @@ describe('W03 content contract core', () => {
       published: 0,
       rejected: 0,
     })
+    expect(publishedCandidates).toBe(1)
   })
 
   it('serves scheduled due candidates only to the credential-free W01 background transport', async () => {
@@ -1468,6 +1443,12 @@ describe('W03 content contract core', () => {
       },
     })
     expect(storeReads).toBe(1)
+
+    const unavailable = await createW03ContentWorker().fetch(
+      new Request('https://luckread-w03.internal/internal/content/scheduled-due?limit=50', { headers }),
+      env,
+    )
+    expect(unavailable.status).toBe(503)
 
     const denied = await w03Worker.fetch(
       new Request('https://luckread-w03.internal/internal/content/scheduled-due?limit=50', {
@@ -1533,6 +1514,22 @@ describe('W03 content contract core', () => {
     })
     expect(published).toHaveLength(1)
     expect(published[0]).toMatchObject({ contentId: 'scheduled_route_2', ownerUserId: 'owner_2', creatorId: 'creator_2', version: 2 })
+
+    const unavailable = await createW03ContentWorker().fetch(
+      new Request('https://luckread-w03.internal/internal/content/scheduled-publish/commit', {
+        method: 'POST',
+        headers: {
+          'X-LuckRead-Caller': 'W01',
+          'X-LuckRead-Transport-Version': '1.0',
+          'X-LuckRead-Correlation-Id': 'scheduled-commit-unavailable-test',
+          'X-LuckRead-Rate-Key': 'scheduled-publish',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ items: [] }),
+      }),
+      env,
+    )
+    expect(unavailable.status).toBe(503)
   })
 
   it('requires at least one media reference for video content', () => {
@@ -1916,6 +1913,23 @@ describe('W03 content contract core', () => {
     expect(moderationSection).not.toContain('db.prepare')
     expect(moderationSection).not.toContain('batchMutation')
     expect(moderationSection).not.toContain('atomicGuard')
+
+    const dueReadStart = runtime.indexOf('export async function listDueScheduledContentCandidates')
+    expect(dueReadStart).toBeGreaterThanOrEqual(0)
+    const dueReadEnd = runtime.indexOf('\nexport async function publishAuthorizedScheduledContents', dueReadStart)
+    const dueReadSection = runtime.slice(dueReadStart, dueReadEnd)
+    expect(dueReadSection).toContain('return mutationStore.listDueScheduled(now.toISOString(), limit)')
+    expect(dueReadSection).not.toContain('ContentD1')
+    expect(dueReadSection).not.toContain('db.prepare')
+
+    const scheduledPublishStart = runtime.indexOf('export async function publishAuthorizedScheduledContents')
+    expect(scheduledPublishStart).toBeGreaterThanOrEqual(0)
+    const scheduledPublishEnd = runtime.indexOf('\nexport function encodeCursor', scheduledPublishStart)
+    const scheduledPublishSection = runtime.slice(scheduledPublishStart, scheduledPublishEnd)
+    expect(scheduledPublishSection).toContain('await mutationStore.publishScheduled(authorizedCandidates, nowIso)')
+    expect(scheduledPublishSection).not.toContain('ContentD1')
+    expect(scheduledPublishSection).not.toContain('db.prepare')
+    expect(scheduledPublishSection).not.toContain('batch')
 
     const deleteStart = runtime.indexOf('export async function deleteContent')
     expect(deleteStart).toBeGreaterThanOrEqual(0)
