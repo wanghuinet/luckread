@@ -13,9 +13,21 @@ import {
 import type { NotificationPushDeliveryClaimStore } from './notification-push-delivery-claim-store.js'
 import type { NotificationPushFanoutStore } from './notification-push-fanout-store.js'
 import type { NotificationPushReceiptStore } from './notification-push-receipt-store.js'
+import type { NotificationPushEndpointAccessStore } from './notification-push-endpoint-access-store.js'
+
+function createEndpointAccessStore(
+  overrides: Partial<NotificationPushEndpointAccessStore> = {},
+): NotificationPushEndpointAccessStore {
+  return {
+    listActiveForRecipient: vi.fn(async () => []),
+    findEndpointForOwner: vi.fn(async () => null),
+    clearTokenIfMatches: vi.fn(async () => false),
+    ...overrides,
+  }
+}
 
 describe('W05 durable Expo push delivery runtime', () => {
-  it('uses the injected fan-out store while preserving the D1 fallback for other callers', async () => {
+  it('runs the delivery batch with explicit Neon-owned and W09-owned stores', async () => {
     const fanoutStore: NotificationPushFanoutStore = {
       listPending: vi.fn(async () => []),
       markNoEndpoint: vi.fn(async () => undefined),
@@ -38,19 +50,15 @@ describe('W05 durable Expo push delivery runtime', () => {
       acceptReceipt: vi.fn(async () => true),
       failReceipt: vi.fn(async () => true),
     }
-    const d1Prepare = vi.fn()
-    const endpointPrepare = vi.fn()
-    const env = {
-      PUSH_DELIVERY_ENABLED: 'true',
-      DB: { prepare: d1Prepare },
-      D1_03: { prepare: endpointPrepare },
-    } as unknown as Parameters<typeof runNotificationPushBatch>[0]
+    const endpointAccessStore = createEndpointAccessStore()
+    const env = { PUSH_DELIVERY_ENABLED: 'true' } as NotificationPushDeliveryEnv
 
     await expect(runNotificationPushBatch(env, new Date('2026-11-11T08:00:00.000Z'), {
       fanoutStore,
       deliveryClaimStore,
       sendResultStore,
       receiptStore,
+      endpointAccessStore,
     })).resolves.toEqual({
       status: 'COMPLETED',
       fannedOut: 0,
@@ -62,21 +70,16 @@ describe('W05 durable Expo push delivery runtime', () => {
     })
 
     expect(fanoutStore.listPending).toHaveBeenCalledWith(25)
-    expect(d1Prepare).not.toHaveBeenCalled()
-    expect(endpointPrepare).not.toHaveBeenCalled()
+    expect(endpointAccessStore.findEndpointForOwner).not.toHaveBeenCalled()
   })
 
-  it('uses the injected W09 endpoint access store without requiring the D1-03 binding', async () => {
+  it('uses W09 endpoint reads only through the injected endpoint access Store', async () => {
     const fanoutStore: NotificationPushFanoutStore = {
       listPending: vi.fn(async () => [{ notification_id: 'notification-1', recipient_user_id: 'recipient-1' }]),
       markNoEndpoint: vi.fn(async () => undefined),
       fanOut: vi.fn(async () => undefined),
     }
-    const endpointAccessStore = {
-      listActiveForRecipient: vi.fn(async () => []),
-      findEndpointForOwner: vi.fn(async () => null),
-      clearTokenIfMatches: vi.fn(async () => false),
-    }
+    const endpointAccessStore = createEndpointAccessStore()
     const deliveryClaimStore = {
       claimDue: vi.fn(async () => []),
       cancel: vi.fn(async () => true),
@@ -94,11 +97,7 @@ describe('W05 durable Expo push delivery runtime', () => {
       acceptReceipt: vi.fn(async () => true),
       failReceipt: vi.fn(async () => true),
     }
-    const d1Prepare = vi.fn()
-    const env = {
-      PUSH_DELIVERY_ENABLED: 'true',
-      DB: { prepare: d1Prepare },
-    } as unknown as Parameters<typeof runNotificationPushBatch>[0]
+    const env = { PUSH_DELIVERY_ENABLED: 'true' } as NotificationPushDeliveryEnv
 
     await expect(runNotificationPushBatch(env, new Date('2026-11-12T12:00:00.000Z'), {
       fanoutStore,
@@ -110,21 +109,18 @@ describe('W05 durable Expo push delivery runtime', () => {
 
     expect(endpointAccessStore.listActiveForRecipient).toHaveBeenCalledWith('recipient-1', 20)
     expect(fanoutStore.markNoEndpoint).toHaveBeenCalledWith('notification-1', '2026-11-12T12:00:00.000Z')
-    expect(d1Prepare).not.toHaveBeenCalled()
   })
 
   it('keeps push execution disabled unless explicitly enabled', async () => {
-    const prepare = vi.fn()
-    const env = { PUSH_DELIVERY_ENABLED: 'false', DB: { prepare }, D1_03: { prepare } } as never
+    const env = { PUSH_DELIVERY_ENABLED: 'false' } as NotificationPushDeliveryEnv
     await expect(runNotificationPushBatch(env)).resolves.toEqual({
       status: 'DISABLED', fannedOut: 0, sent: 0, providerAccepted: 0, retried: 0, failed: 0, skipped: 0,
     })
-    expect(prepare).not.toHaveBeenCalled()
   })
 
-  it('fails closed when the delegated W05 D1-03 binding is absent', async () => {
-    const env = { PUSH_DELIVERY_ENABLED: 'true', DB: { prepare: vi.fn() } } as never
-    await expect(runNotificationPushBatch(env)).rejects.toThrow('W05_PUSH_DELIVERY_D1_BINDING_MISSING')
+  it('fails closed when the scheduled push workflow has no complete Neon Store composition', async () => {
+    const env = { PUSH_DELIVERY_ENABLED: 'true' } as NotificationPushDeliveryEnv
+    await expect(runNotificationPushBatch(env)).rejects.toThrow('W05_PUSH_DELIVERY_NEON_STORES_REQUIRED')
   })
 
   it('uses a stable inbox notification ID and never puts the push token in payload data', () => {
@@ -195,60 +191,53 @@ describe('W05 durable Expo push delivery runtime', () => {
     const newToken = 'ExponentPushToken[new_token_1234567890]'
     const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(oldToken))
     const oldTokenHash = Array.from(new Uint8Array(digest), (value) => value.toString(16).padStart(2, '0')).join('')
-    const update = vi.fn(async () => ({ success: true, meta: { changes: 1 } }))
-    const db = {
-      prepare: vi.fn((sql: string) => ({
-        bind: (..._values: unknown[]) => ({
-          first: async () => sql.startsWith('SELECT') ? { push_token: newToken, permission_status: 'granted' } : null,
-          run: update,
-        }),
+    const clearTokenIfMatches = vi.fn(async () => true)
+    const endpointAccessStore = createEndpointAccessStore({
+      findEndpointForOwner: vi.fn(async () => ({
+        endpoint_id: 'endpoint-1',
+        owner_user_id: 'recipient-1',
+        push_token: newToken,
+        permission_status: 'granted' as const,
       })),
-    } as unknown as D1Database
+      clearTokenIfMatches,
+    })
 
-    await expect(deactivateInvalidEndpoint(db, {
+    await expect(deactivateInvalidEndpoint(endpointAccessStore, {
       endpointId: 'endpoint-1',
       recipientUserId: 'recipient-1',
       pushTokenHash: oldTokenHash,
     }, new Date('2026-11-04T00:00:00.000Z'))).resolves.toBe(false)
 
-    expect(update).not.toHaveBeenCalled()
+    expect(clearTokenIfMatches).not.toHaveBeenCalled()
   })
 
-  it('clears only the exact current Expo token and never rewrites last_seen_at', async () => {
+  it('clears only the exact current Expo token through the W09 scoped compare-and-set port', async () => {
     const currentToken = 'ExponentPushToken[current_token_12345678]'
     const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(currentToken))
     const currentTokenHash = Array.from(new Uint8Array(digest), (value) => value.toString(16).padStart(2, '0')).join('')
-    let updateSql = ''
-    let updateBindings: unknown[] = []
-    const db = {
-      prepare: vi.fn((sql: string) => ({
-        bind: (...values: unknown[]) => {
-          if (sql.startsWith('UPDATE')) {
-            updateSql = sql
-            updateBindings = values
-            return { run: async () => ({ success: true, meta: { changes: 1 } }) }
-          }
-          return { first: async () => ({ push_token: currentToken, permission_status: 'granted' }) }
-        },
+    const clearTokenIfMatches = vi.fn(async () => true)
+    const endpointAccessStore = createEndpointAccessStore({
+      findEndpointForOwner: vi.fn(async () => ({
+        endpoint_id: 'endpoint-1',
+        owner_user_id: 'recipient-1',
+        push_token: currentToken,
+        permission_status: 'granted' as const,
       })),
-    } as unknown as D1Database
+      clearTokenIfMatches,
+    })
 
-    await expect(deactivateInvalidEndpoint(db, {
+    await expect(deactivateInvalidEndpoint(endpointAccessStore, {
       endpointId: 'endpoint-1',
       recipientUserId: 'recipient-1',
       pushTokenHash: currentTokenHash,
     }, new Date('2026-11-04T00:00:00.000Z'))).resolves.toBe(true)
 
-    expect(updateSql).toContain("permission_status = 'undetermined'")
-    expect(updateSql).toContain('AND push_token = ?')
-    expect(updateSql).not.toContain('last_seen_at')
-    expect(updateBindings).toEqual([
-      '2026-11-04T00:00:00.000Z',
-      'endpoint-1',
-      'recipient-1',
-      'expo',
-      currentToken,
-    ])
+    expect(clearTokenIfMatches).toHaveBeenCalledWith({
+      endpointId: 'endpoint-1',
+      ownerUserId: 'recipient-1',
+      expectedPushToken: currentToken,
+      now: '2026-11-04T00:00:00.000Z',
+    })
   })
 
   it('retries transient provider errors but not permanent device or payload errors', () => {
@@ -259,7 +248,7 @@ describe('W05 durable Expo push delivery runtime', () => {
     expect(isRetryableExpoError('InvalidCredentials')).toBe(false)
   })
 
-  it('keeps endpoint reads on W09 D1-03 and stores only a token hash in W05', async () => {
+  it('delegates endpoint reads to W09 and stores only a token hash in W05', async () => {
     const candidate = {
       delivery_id:'delivery-1', notification_id:'notification-1', endpoint_id:'endpoint-1',
       lease_token:'lease-1', attempt_count:2, recipient_user_id:'recipient-1',
@@ -272,18 +261,20 @@ describe('W05 durable Expo push delivery runtime', () => {
       savePushTokenHash,
     }
     const token = 'ExponentPushToken[private-token-value]'
-    const endpointDb = {
-      prepare: vi.fn(() => ({bind: (..._values: unknown[]) => ({
-        first: async () => ({endpoint_id:'endpoint-1',owner_user_id:'recipient-1',push_token:token,permission_status:'granted'}),
-      })})),
-    } as unknown as D1Database
+    const findEndpointForOwner = vi.fn(async () => ({
+      endpoint_id: 'endpoint-1',
+      owner_user_id: 'recipient-1',
+      push_token: token,
+      permission_status: 'granted' as const,
+    }))
+    const endpointAccessStore = createEndpointAccessStore({ findEndpointForOwner })
 
-    const result = await claimDueDeliveries(store, endpointDb, new Date('2026-11-11T08:00:00.000Z'))
+    const result = await claimDueDeliveries(store, endpointAccessStore, new Date('2026-11-11T08:00:00.000Z'))
     const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token))
     const expectedHash = Array.from(new Uint8Array(digest), value => value.toString(16).padStart(2,'0')).join('')
     expect(result).toHaveLength(1)
     expect(result[0]).toMatchObject({deliveryId:'delivery-1',pushTokenHash:expectedHash,pushToken:token,leaseToken:'lease-1'})
-    expect(endpointDb.prepare).toHaveBeenCalledWith(expect.stringContaining('FROM notification_push_endpoints'))
+    expect(findEndpointForOwner).toHaveBeenCalledWith('endpoint-1', 'recipient-1')
     expect(savePushTokenHash).toHaveBeenCalledWith({
       deliveryId:'delivery-1',leaseToken:'lease-1',pushTokenHash:expectedHash,now:'2026-11-11T08:00:00.000Z',
     })
@@ -301,8 +292,8 @@ describe('W05 durable Expo push delivery runtime', () => {
       cancel: vi.fn(async () => true),
       savePushTokenHash: vi.fn(async () => true),
     }
-    const endpointDb = {prepare:()=>({bind:()=>({first:async()=>null})})} as unknown as D1Database
-    await expect(claimDueDeliveries(store,endpointDb,new Date('2026-11-11T08:00:00.000Z'))).resolves.toEqual([])
+    const endpointAccessStore = createEndpointAccessStore()
+    await expect(claimDueDeliveries(store,endpointAccessStore,new Date('2026-11-11T08:00:00.000Z'))).resolves.toEqual([])
     expect(store.cancel).toHaveBeenCalledWith({
       deliveryId:'delivery-2',leaseToken:'lease-2',reason:'ENDPOINT_NOT_ACTIVE',now:'2026-11-11T08:00:00.000Z',
     })
@@ -319,10 +310,13 @@ describe('W05 durable Expo push delivery runtime', () => {
       claimDue: vi.fn(async () => [candidate]),cancel: vi.fn(async () => true),
       savePushTokenHash: vi.fn(async () => false),
     }
-    const endpointDb = {prepare:()=>({bind:()=>({first:async()=>({
-      endpoint_id:'endpoint-3',owner_user_id:'recipient-3',push_token:'ExponentPushToken[stale]',permission_status:'granted',
-    })})})} as unknown as D1Database
-    await expect(claimDueDeliveries(store,endpointDb,new Date('2026-11-11T08:00:00.000Z'))).resolves.toEqual([])
+    const endpointAccessStore = createEndpointAccessStore({
+      findEndpointForOwner: vi.fn(async () => ({
+        endpoint_id:'endpoint-3',owner_user_id:'recipient-3',
+        push_token:'ExponentPushToken[stale]',permission_status:'granted' as const,
+      })),
+    })
+    await expect(claimDueDeliveries(store,endpointAccessStore,new Date('2026-11-11T08:00:00.000Z'))).resolves.toEqual([])
   })
 
   it('cancels deliveries missing W05 notification context without querying W09', async () => {
@@ -335,12 +329,13 @@ describe('W05 durable Expo push delivery runtime', () => {
       claimDue: vi.fn(async () => [candidate]),cancel: vi.fn(async () => true),
       savePushTokenHash: vi.fn(async () => true),
     }
-    const endpointDb = {prepare:vi.fn()} as unknown as D1Database
-    await expect(claimDueDeliveries(store,endpointDb,new Date('2026-11-11T08:00:00.000Z'))).resolves.toEqual([])
+    const findEndpointForOwner = vi.fn()
+    const endpointAccessStore = createEndpointAccessStore({ findEndpointForOwner })
+    await expect(claimDueDeliveries(store,endpointAccessStore,new Date('2026-11-11T08:00:00.000Z'))).resolves.toEqual([])
     expect(store.cancel).toHaveBeenCalledWith({
       deliveryId:'delivery-4',leaseToken:'lease-4',reason:'NOTIFICATION_NOT_FOUND',now:'2026-11-11T08:00:00.000Z',
     })
-    expect(endpointDb.prepare).not.toHaveBeenCalled()
+    expect(findEndpointForOwner).not.toHaveBeenCalled()
   })
 
   it('cancels claimed receipts whose W05 outbox owner is missing',async()=>{

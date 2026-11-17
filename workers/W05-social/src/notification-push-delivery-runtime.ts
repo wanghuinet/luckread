@@ -2,16 +2,8 @@
 import Expo, { type ExpoPushMessage, type ExpoPushReceipt, type ExpoPushTicket } from 'expo-server-sdk'
 import { fanOutPendingNotifications } from './notification-push-fanout-runtime.js'
 import type { NotificationPushFanoutStore } from './notification-push-fanout-store.js'
-import {
-  createD1NotificationPushSendResultStore,
-  type NotificationPushSendResultStore,
-} from './notification-push-send-result-store.js'
-import { createD1NotificationPushDeliveryClaimStore } from './notification-push-delivery-claim-store-d1.js'
+import type { NotificationPushSendResultStore } from './notification-push-send-result-store.js'
 import type { NotificationPushDeliveryClaimStore as NotificationPushDeliveryClaimStorePort } from './notification-push-delivery-claim-store.js'
-import { createD1NotificationPushReceiptStore } from './notification-push-receipt-store-d1.js'
-import {
-  createD1NotificationPushEndpointAccessStore,
-} from './notification-push-endpoint-access-store-d1.js'
 import type { NotificationPushEndpointAccessStore } from './notification-push-endpoint-access-store.js'
 import { deactivateInvalidNotificationPushEndpoint, hashNotificationPushToken } from './notification-push-endpoint-access-runtime.js'
 import type { NotificationPushReceiptStore } from './notification-push-receipt-store.js'
@@ -19,25 +11,11 @@ import type { NotificationPushReceiptStore } from './notification-push-receipt-s
 type PushReceiptLike = ExpoPushReceipt
 type PushTicketLike = ExpoPushTicket
 
-type EndpointAccessSource = D1Database | NotificationPushEndpointAccessStore
-
-function resolveNotificationPushEndpointAccessStore(
-  source: EndpointAccessSource,
-): NotificationPushEndpointAccessStore {
-  if (
-    typeof (source as NotificationPushEndpointAccessStore).listActiveForRecipient === 'function' &&
-    typeof (source as NotificationPushEndpointAccessStore).findEndpointForOwner === 'function' &&
-    typeof (source as NotificationPushEndpointAccessStore).clearTokenIfMatches === 'function'
-  ) return source as NotificationPushEndpointAccessStore
-  return createD1NotificationPushEndpointAccessStore(source as D1Database)
-}
+type EndpointAccessSource = NotificationPushEndpointAccessStore
 
 export interface NotificationPushDeliveryEnv {
-  readonly DB: D1Database
-  readonly D1_03?: D1Database
   readonly W05_DATABASE_DRIVER?: string
   readonly HYPERDRIVE_D1_02?: { connectionString?: string }
-  readonly W05_PUSH_ENDPOINT_DATABASE_DRIVER?: string
   readonly HYPERDRIVE_D1_03?: { connectionString?: string }
   readonly PUSH_DELIVERY_ENABLED?: string
   readonly EXPO_ACCESS_TOKEN?: string
@@ -125,7 +103,7 @@ export async function claimDueDeliveries(
   endpointSource: EndpointAccessSource,
   now: Date,
 ): Promise<ClaimedDelivery[]> {
-  const endpointStore = resolveNotificationPushEndpointAccessStore(endpointSource)
+  const endpointStore = endpointSource
   const nowIso = now.toISOString()
   const candidates = await store.claimDue({
     now: nowIso,
@@ -192,7 +170,7 @@ export async function deactivateInvalidEndpoint(
   now: Date,
 ): Promise<boolean> {
   return deactivateInvalidNotificationPushEndpoint(
-    resolveNotificationPushEndpointAccessStore(endpointSource),
+    endpointSource,
     task,
     now,
   )
@@ -393,12 +371,12 @@ async function processReceiptBatch(
   return result
 }
 export type NotificationPushDeliveryRuntimeDependencies = Readonly<{
-  /** Inject the PostgreSQL-capable W05 outbox fan-out store; D1 remains the default. */
+  /** W05-owned PostgreSQL notification outbox and delivery state stores. */
   fanoutStore?: NotificationPushFanoutStore
   sendResultStore?: NotificationPushSendResultStore
   deliveryClaimStore?: NotificationPushDeliveryClaimStorePort
   receiptStore?: NotificationPushReceiptStore
-  /** Inject the scoped W09 D1-03 endpoint access store; D1 remains the default. */
+  /** Scoped W09-owned Neon endpoint access store. */
   endpointAccessStore?: NotificationPushEndpointAccessStore
 }>
 
@@ -410,19 +388,16 @@ export async function runNotificationPushBatch(
   if (env.PUSH_DELIVERY_ENABLED !== 'true') {
     return { status: 'DISABLED', fannedOut: 0, sent: 0, providerAccepted: 0, retried: 0, failed: 0, skipped: 0 }
   }
-  if (!env.DB || (!env.D1_03 && !dependencies.endpointAccessStore)) {
-    throw new Error('W05_PUSH_DELIVERY_D1_BINDING_MISSING')
+
+  const { fanoutStore, deliveryClaimStore, sendResultStore, receiptStore, endpointAccessStore } = dependencies
+  if (!fanoutStore || !deliveryClaimStore || !sendResultStore || !receiptStore || !endpointAccessStore) {
+    throw new Error('W05_PUSH_DELIVERY_NEON_STORES_REQUIRED')
   }
 
-  const endpointAccessStore = dependencies.endpointAccessStore ??
-    createD1NotificationPushEndpointAccessStore(env.D1_03 as D1Database)
-  const fannedOut = await fanOutPendingNotifications(dependencies.fanoutStore ?? env.DB, endpointAccessStore, now)
-  const deliveryClaimStore = dependencies.deliveryClaimStore ?? createD1NotificationPushDeliveryClaimStore(env.DB)
+  const fannedOut = await fanOutPendingNotifications(fanoutStore, endpointAccessStore, now)
   const deliveries = await claimDueDeliveries(deliveryClaimStore, endpointAccessStore, now)
-  const sendResultStore = dependencies.sendResultStore ?? createD1NotificationPushSendResultStore(env.DB)
   const client = new Expo(env.EXPO_ACCESS_TOKEN?.trim() ? { accessToken: env.EXPO_ACCESS_TOKEN.trim() } : {})
   const sendResult = await processSendBatch(sendResultStore, endpointAccessStore, client, deliveries, now)
-  const receiptStore = dependencies.receiptStore ?? createD1NotificationPushReceiptStore(env.DB)
   const receipts = await claimDueReceipts(receiptStore, now)
   const receiptResult = await processReceiptBatch(receiptStore, endpointAccessStore, client, receipts, now)
 

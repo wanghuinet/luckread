@@ -1,51 +1,20 @@
 /// <reference types="@cloudflare/workers-types" />
 
-import {
-  createD1NotificationPushFanoutStore,
-  type NotificationPushFanoutStore,
-} from './notification-push-fanout-store.js'
-
-import {
-  createD1NotificationPushEndpointAccessStore,
-} from './notification-push-endpoint-access-store-d1.js'
+import type { NotificationPushFanoutStore } from './notification-push-fanout-store.js'
 import type { NotificationPushEndpointAccessStore } from './notification-push-endpoint-access-store.js'
 
 const FANOUT_LIMIT = 25
 const ENDPOINT_LIMIT = 20
 
-type EndpointAccessSource = D1Database | NotificationPushEndpointAccessStore
-
-function resolveNotificationPushEndpointAccessStore(
-  source: EndpointAccessSource,
-): NotificationPushEndpointAccessStore {
-  if (
-    typeof (source as NotificationPushEndpointAccessStore).listActiveForRecipient === 'function' &&
-    typeof (source as NotificationPushEndpointAccessStore).findEndpointForOwner === 'function' &&
-    typeof (source as NotificationPushEndpointAccessStore).clearTokenIfMatches === 'function'
-  ) return source as NotificationPushEndpointAccessStore
-  return createD1NotificationPushEndpointAccessStore(source as D1Database)
-}
-
-type PushFanoutDataSource = D1Database | NotificationPushFanoutStore
-
-function resolveNotificationPushFanoutStore(source: PushFanoutDataSource): NotificationPushFanoutStore {
-  if (typeof (source as NotificationPushFanoutStore).listPending === 'function') {
-    return source as NotificationPushFanoutStore
-  }
-  return createD1NotificationPushFanoutStore(source as D1Database)
-}
-
 /**
  * Fan out W05-owned outbox rows to W09-owned active Expo endpoints.
- * W09 remains the D1-03 endpoint authority; D1 is the default until cutover.
+ * W09 remains the owner of endpoint state; W05 uses the scoped Neon access port.
  */
 export async function fanOutPendingNotifications(
-  source: PushFanoutDataSource,
-  endpointSource: EndpointAccessSource,
+  store: NotificationPushFanoutStore,
+  endpointStore: NotificationPushEndpointAccessStore,
   now: Date,
 ): Promise<number> {
-  const store = resolveNotificationPushFanoutStore(source)
-  const endpointStore = resolveNotificationPushEndpointAccessStore(endpointSource)
   const pending = await store.listPending(FANOUT_LIMIT)
   let count = 0
   for (const item of pending) {

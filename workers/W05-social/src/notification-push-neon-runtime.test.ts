@@ -6,28 +6,30 @@ import { runNotificationPushBatch, type NotificationPushDeliveryEnv } from './no
 describe('W05 notification push Neon runtime', () => {
   it('uses PostgreSQL for W05 outbox, delivery claim and receipt state while preserving W09 D1-03 authority', async () => {
     const calls: Array<{ sql: string; values?: unknown[] }> = []
-    const pool = {
+    const socialPool = {
       query: vi.fn(async (sql: string, values: unknown[] = []) => {
         calls.push({ sql, values })
         return { rows: [] }
       }),
       on: vi.fn(),
     } as unknown as Pool
-    const poolFactory = vi.fn((_config: PoolConfig) => pool)
-    const binding = { connectionString: 'postgresql://user:secret@hyperdrive.example/db?sslmode=require' }
+    const endpointPool = {
+      query: vi.fn(async () => ({ rows: [] })),
+      on: vi.fn(),
+    } as unknown as Pool
+    const socialBinding = { connectionString: 'postgresql://user:secret@hyperdrive.example/db?sslmode=require' }
+    const endpointBinding = {
+      connectionString: 'postgresql://user:secret@governance.example:5432/luckread_governance?sslmode=require',
+    }
+    const poolFactory = vi.fn((config: PoolConfig) =>
+      config.connectionString === endpointBinding.connectionString ? endpointPool : socialPool,
+    )
     const dependencies = getW05NotificationPushDeliveryDependencies({
       W05_DATABASE_DRIVER: 'neon',
-      HYPERDRIVE_D1_02: binding,
+      HYPERDRIVE_D1_02: socialBinding,
+      HYPERDRIVE_D1_03: endpointBinding,
     }, poolFactory)
-    const d1Prepare = vi.fn(() => { throw new Error('W05 D1-02 fallback must not run in Neon mode') })
-    const d1_03Prepare = vi.fn(() => { throw new Error('W09 D1-03 endpoint adapter should remain dormant for an empty batch') })
-    const env = {
-      PUSH_DELIVERY_ENABLED: 'true',
-      DB: { prepare: d1Prepare },
-      D1_03: { prepare: d1_03Prepare },
-      W05_DATABASE_DRIVER: 'neon',
-      HYPERDRIVE_D1_02: binding,
-    } as unknown as NotificationPushDeliveryEnv
+    const env = { PUSH_DELIVERY_ENABLED: 'true' } as NotificationPushDeliveryEnv
 
     await expect(runNotificationPushBatch(
       env,
@@ -35,12 +37,11 @@ describe('W05 notification push Neon runtime', () => {
       dependencies,
     )).resolves.toMatchObject({ status: 'COMPLETED', fannedOut: 0, sent: 0, providerAccepted: 0 })
 
-    expect(poolFactory).toHaveBeenCalledTimes(1)
+    expect(poolFactory).toHaveBeenCalledTimes(2)
     expect(calls.length).toBeGreaterThanOrEqual(3)
     expect(calls.some(call => call.sql.includes('social_notification_push_outbox'))).toBe(true)
     expect(calls.some(call => call.sql.includes('social_notification_push_deliveries'))).toBe(true)
-    expect(d1Prepare).not.toHaveBeenCalled()
-    expect(d1_03Prepare).not.toHaveBeenCalled()
-    expect(dependencies).not.toHaveProperty('endpointAccessStore')
+    expect(endpointPool.query).not.toHaveBeenCalled()
+    expect(dependencies.endpointAccessStore).toBeDefined()
   })
 })
