@@ -76,7 +76,12 @@ describe('renewal cycle runtime', () => {
       async all() { return { results: [] }; },
     };
     const db = { prepare: () => statement } as unknown as D1Database;
-    const env: RenewalRuntimeEnv = { D1_01: db, D1_04: db };
+    const env: RenewalRuntimeEnv = {
+      W07_DATABASE_DRIVER: 'd1',
+      W07_MEMBERSHIP_DATABASE_DRIVER: 'd1',
+      D1_01: db,
+      D1_04: db,
+    };
     const result = await processSubscriptionRenewalCycle(env, cycle.cycle_id, {
       createProviderCharge: async () => {
         providerCalled = true;
@@ -298,6 +303,8 @@ function scannerSetup(options: {
   const d1_04 = new ScanDatabase('scheduler');
   if (options.missingCursor) d1_04.cursor = null;
   const env: RenewalRuntimeEnv = {
+    W07_DATABASE_DRIVER: 'd1',
+    W07_MEMBERSHIP_DATABASE_DRIVER: 'd1',
     D1_01: d1_01 as unknown as D1Database,
     D1_04: d1_04 as unknown as D1Database,
     HYPERSWITCH_ENVIRONMENT: 'sandbox',
@@ -385,6 +392,8 @@ describe('W07 scheduled renewal batch', () => {
     const d1_01 = { marker: 'D1-01' } as unknown as D1Database;
     const d1_04 = { marker: 'D1-04' } as unknown as D1Database;
     const env: RenewalRuntimeEnv = {
+      W07_DATABASE_DRIVER: 'd1',
+      W07_MEMBERSHIP_DATABASE_DRIVER: 'd1',
       D1_01: d1_01, D1_04: d1_04,
       HYPERSWITCH_ENVIRONMENT: 'sandbox',
       HYPERSWITCH_API_KEY: 'test',
