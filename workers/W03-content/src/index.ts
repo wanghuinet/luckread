@@ -1627,15 +1627,16 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
             ? requiredSocialPostPrincipal(request)
             : requiredCreatorPrincipal(request)
         const verifiedCreatorId = membersOnly ? requireVerifiedCreatorId(request) : undefined
+        const contentCreateStore = dependencies.contentCreateStoreProvider?.(env)
+        if (!contentCreateStore) throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
         const content = await createContent(
-          NO_LEGACY_DATABASE_HANDLE,
           principal.userId,
           body,
           requireIdempotency(request),
           new Date(),
           request.headers.get('X-LuckRead-Correlation-Id')?.trim() || 'runtime',
           verifiedCreatorId,
-          dependencies.contentCreateStoreProvider?.(env),
+          contentCreateStore,
         )
         return json({
           id: content.id,
