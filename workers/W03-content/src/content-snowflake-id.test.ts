@@ -21,7 +21,7 @@ describe('W03 Snowflake content IDs', () => {
     const expected = ((BigInt(timestampDeltaMs) << BigInt(22)) | (BigInt(1) << BigInt(12)) | BigInt(7)).toString(10)
 
     expect(id).toBe(expected)
-    expect(id).toMatch(/^\\d{18,20}$/)
+    expect(id).toMatch(/^\d{18,20}$/)
     expect(BigInt(id).toString(10)).toBe(id)
   })
 
