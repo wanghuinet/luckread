@@ -1,0 +1,79 @@
+name: W05 Neon Following Feed Entrypoint PostgreSQL 18 CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/w05-neon-following-entry-postgres18-ci.yml'
+      - 'workers/W05-social/src/entry.ts'
+      - 'workers/W05-social/src/neon/runtime.ts'
+      - 'workers/W05-social/src/following-author-ids-read-store-postgres.ts'
+      - 'workers/W05-social/src/neon-postgres-migrations/0001_w05_d1_02_social_schema.sql'
+      - 'workers/W05-social/src/following-feed-entry-postgres18.integration.test.ts'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/w05-neon-following-entry-postgres18-ci.yml'
+      - 'workers/W05-social/src/entry.ts'
+      - 'workers/W05-social/src/neon/runtime.ts'
+      - 'workers/W05-social/src/following-author-ids-read-store-postgres.ts'
+      - 'workers/W05-social/src/neon-postgres-migrations/0001_w05_d1_02_social_schema.sql'
+      - 'workers/W05-social/src/following-feed-entry-postgres18.integration.test.ts'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: w05-neon-following-entry-postgres18-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  following-feed-entry-runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:18.6
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres_local_only
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      W05_ENTRY_PG_ADMIN_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/postgres
+      W05_ENTRY_PG_SOCIAL_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckreadpro
+      W05_ENTRY_PG_GOVERNANCE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_governance
+      W05_ENTRY_PG_REPORT: artifacts/neon/w05-following-feed-entry-postgres18-postflight.json
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install locked repository dependencies
+        run: npm ci
+
+      - name: Install pinned W05 PostgreSQL runtime dependency
+        run: npm ci --prefix workers/W05-social --ignore-scripts --no-audit --fund=false
+
+      - name: Run W05 Neon following-feed Worker entrypoint against PostgreSQL 18
+        run: npx vitest run workers/W05-social/src/following-feed-entry-postgres18.integration.test.ts
+
+      - name: Upload W05 following-feed Neon entrypoint postflight
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: w05-following-feed-entry-postgres18-${{ github.sha }}
+          path: artifacts/neon/w05-following-feed-entry-postgres18-postflight.json
+          if-no-files-found: warn
+          retention-days: 90
