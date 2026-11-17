@@ -1,4 +1,4 @@
-import { isW02NeonRuntime, getW02PostgresRuntime } from '../neon/runtime.js'
+import { getW02PostgresRuntime } from '../neon/runtime.js'
 import { activateEmailVerifiedAccountPostgres } from '../neon/email-verification-activation-postgres.js'
 import { ensureBaseUserRolePostgres } from '../neon/role-assignment-postgres.js'
 import { activateEmailVerifiedAccount } from '../account/account-state-transition.js'
@@ -31,8 +31,8 @@ export interface RateLimitBinding {
 }
 
 export interface BetterAuthEnv {
-  /** Legacy local/test provider only; createLuckReadAuth selects PostgreSQL in production. */
-  D1_01: D1Database
+  /** @deprecated-next-version: isolated Better Auth D1 fixture support only; never bound by production W02. */
+  D1_01?: D1Database
   W02_DATABASE_DRIVER?: string
   HYPERDRIVE?: { connectionString: string }
   RESEND_API_KEY?: string
@@ -81,6 +81,18 @@ async function sendPasswordResetEmail(
   })
 }
 
+function requireLegacyW02D1Database(env: BetterAuthEnv): D1Database {
+  if (!env.D1_01) throw new Error('W02_D1_TEST_BINDING_REQUIRED')
+  return env.D1_01
+}
+
+/**
+ * @deprecated-next-version
+ * Reason: Legacy D1 account activation remains only for the isolated Better Auth D1 test profile.
+ * Replacement: activateEmailVerifiedAccountPostgres in the production Neon lifecycle callback.
+ * Removal: Next release.
+ * Condition: D1 Better Auth profile tests and source-schema tooling no longer invoke the compatibility profile.
+ */
 async function activateVerifiedAccount(db: D1Database, userId: string): Promise<void> {
   const now = new Date().toISOString()
   const activation = await activateEmailVerifiedAccount(db, userId, now)
@@ -153,19 +165,20 @@ export type BetterAuthPostgresLifecycleAdapters = {
 
 export const buildLuckReadAuth = (
   env: BetterAuthEnv,
-  database: BetterAuthDatabase = env.D1_01 as BetterAuthDatabase,
+  database: BetterAuthDatabase = requireLegacyW02D1Database(env) as BetterAuthDatabase,
   persistenceProfile: BetterAuthPersistenceProfile = 'production',
-  mfaFactorStateStore: MfaFactorStateStore = createD1MfaFactorStateStore(env.D1_01),
+  mfaFactorStateStore: MfaFactorStateStore = createD1MfaFactorStateStore(requireLegacyW02D1Database(env)),
   postgresLifecycleAdapters?: BetterAuthPostgresLifecycleAdapters,
   mfaAuditOperationReceiptStore?: MfaAuditOperationReceiptStore,
   resolveMfaSessionSubject?: (headers: Headers) => Promise<string | null>,
 ) => {
   const postgresPersistence = persistenceProfile !== 'production'
+  const legacyD1 = postgresPersistence ? undefined : requireLegacyW02D1Database(env)
   const postgresEmailVerifiedCallback = postgresLifecycleAdapters?.afterEmailVerified
   // PostgreSQL runtime profiles require a provider-matched receipt store;
   // D1 production continues to construct its native store by default.
   const effectiveMfaAuditReceiptStore = mfaAuditOperationReceiptStore ??
-    (postgresPersistence ? undefined : createD1MfaAuditOperationReceiptStore(env.D1_01))
+    (postgresPersistence ? undefined : createD1MfaAuditOperationReceiptStore(legacyD1!))
   // Keep local origins available only to the local evidence/runtime profile.
   // Production must never inherit localhost trust from a shared config.
   const trustedOrigins = [
@@ -509,7 +522,7 @@ export const buildLuckReadAuth = (
         : {
             afterEmailVerification: async (user) => {
               const userId = String(user.id)
-              await activateVerifiedAccount(env.D1_01, userId)
+              await activateVerifiedAccount(legacyD1!, userId)
             },
           }),
     },
@@ -529,13 +542,13 @@ export const buildLuckReadAuth = (
           user: {
             create: {
               after: async (user) => {
-                await ensureBaseUserRole(env.D1_01, String(user.id), new Date().toISOString())
+                await ensureBaseUserRole(legacyD1!, String(user.id), new Date().toISOString())
               },
             },
             update: {
               after: async (user) => {
                 const userId = String(user.id)
-                const pendingMfaEnrollment = await env.D1_01.prepare(
+                const pendingMfaEnrollment = await legacyD1!.prepare(
                   'SELECT id FROM "user" WHERE id = ? AND two_factor_enabled = 1 AND mfa_enrolled_at IS NULL LIMIT 1',
                 ).bind(userId).first<{ id: string }>()
                 if (!pendingMfaEnrollment) return
@@ -544,8 +557,8 @@ export const buildLuckReadAuth = (
                 // sessions on every enable/disable transition. This hook is a fallback
                 // for a legacy or partially migrated row with a missing enrollment time.
                 const enrolledAt = new Date().toISOString()
-                await env.D1_01.batch([
-                  env.D1_01.prepare(
+                await legacyD1!.batch([
+                  legacyD1!.prepare(
                     'UPDATE "user" SET mfa_enrolled_at = ? WHERE id = ? AND two_factor_enabled = 1 AND mfa_enrolled_at IS NULL',
                   ).bind(enrolledAt, userId),
                   env.D1_01.prepare('DELETE FROM "session" WHERE user_id = ?').bind(userId),
@@ -697,37 +710,26 @@ export const buildLuckReadAuth = (
 
 const authInstances = new WeakMap<object, ReturnType<typeof buildLuckReadAuth>>()
 
-// Each isolate keeps one Better Auth instance per selected persistence binding.
-// Neon mode composes all core identity stores from the same Hyperdrive pool.
-// The D1 adapter is retained only for explicit local/test compatibility.
+// Each production isolate uses the existing Neon Hyperdrive pool. The D1 profile
+// remains reachable only through buildLuckReadAuth's explicit test/schema fixture API.
 export const createLuckReadAuth = (env: BetterAuthEnv) => {
-  if (isW02NeonRuntime(env)) {
-    const runtime = getW02PostgresRuntime(env)
-    const cached = authInstances.get(runtime.pool)
-    if (cached) return cached
-
-    const auth = buildLuckReadAuth(
-      env,
-      runtime.pool,
-      'postgres',
-      runtime.mfaFactorStateStore,
-      {
-        afterUserCreated: (userId) =>
-          ensureBaseUserRolePostgres(runtime.pool, userId, new Date().toISOString()),
-        afterEmailVerified: (userId, now) =>
-          activateEmailVerifiedAccountPostgres(runtime.pool, userId, now),
-      },
-      runtime.mfaAuditOperationReceiptStore,
-    )
-    authInstances.set(runtime.pool, auth)
-    return auth
-  }
-
-  const database = env.D1_01 as object
-  const cached = authInstances.get(database)
+  const runtime = getW02PostgresRuntime(env)
+  const cached = authInstances.get(runtime.pool)
   if (cached) return cached
 
-  const auth = buildLuckReadAuth(env)
-  authInstances.set(database, auth)
+  const auth = buildLuckReadAuth(
+    env,
+    runtime.pool,
+    'postgres',
+    runtime.mfaFactorStateStore,
+    {
+      afterUserCreated: (userId) =>
+        ensureBaseUserRolePostgres(runtime.pool, userId, new Date().toISOString()),
+      afterEmailVerified: (userId, now) =>
+        activateEmailVerifiedAccountPostgres(runtime.pool, userId, now),
+    },
+    runtime.mfaAuditOperationReceiptStore,
+  )
+  authInstances.set(runtime.pool, auth)
   return auth
 }
