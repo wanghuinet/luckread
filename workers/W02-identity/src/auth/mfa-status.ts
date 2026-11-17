@@ -69,6 +69,13 @@ export async function readAuthoritativeMfaStatus(
 }
 
 /** D1 remains the production-default MFA status projection store. */
+/**
+ * @deprecated-next-version
+ * Reason: Legacy Cloudflare D1 implementation retained only for isolated unit tests or the explicit schema/test fixture.
+ * Replacement: PostgreSQL MFA status Store in src/neon/mfa-factor-state-postgres.ts.
+ * Removal: Next release.
+ * Condition: MFA status tests use PostgreSQL/in-memory Store fixtures and no D1 status projection remains.
+ */
 export function createD1MfaStatusStore(db: D1Database): MfaStatusStore {
   return {
     read: (userId, now) => readAuthoritativeMfaStatus(db, userId, now),
