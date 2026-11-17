@@ -1,4 +1,4 @@
-import { createLuckReadAuth, type BetterAuthEnv } from './better-auth.js'
+import { createLuckReadAuth, requireLegacyW02D1Database, type BetterAuthEnv } from './better-auth.js'
 import {
   createD1MfaAuditOperationReceiptStore,
   type MfaAuditOperationReceiptStore,
@@ -148,9 +148,9 @@ export async function handleMfaEnrollmentConfirmRequest(
     return json({ error: { code: 'VALIDATION_FAILED', message: 'a six-digit TOTP code is required' } }, 400)
   }
 
-  const store = dependencies.store ?? createD1MfaEnrollmentConfirmStore(env.D1_01)
-  const statusStore = dependencies.statusStore ?? createD1MfaStatusStore(env.D1_01)
-  const receiptStore = dependencies.receiptStore ?? createD1MfaAuditOperationReceiptStore(env.D1_01)
+  const store = dependencies.store ?? createD1MfaEnrollmentConfirmStore(requireLegacyW02D1Database(env))
+  const statusStore = dependencies.statusStore ?? createD1MfaStatusStore(requireLegacyW02D1Database(env))
+  const receiptStore = dependencies.receiptStore ?? createD1MfaAuditOperationReceiptStore(requireLegacyW02D1Database(env))
   const auth = dependencies.auth ?? createLuckReadAuth(env)
 
   try {
