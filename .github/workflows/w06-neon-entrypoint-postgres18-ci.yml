@@ -1,0 +1,87 @@
+name: W06 Neon Moderation Entrypoint PostgreSQL 18 CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/w06-neon-entrypoint-postgres18-ci.yml'
+      - 'workers/W06-governance/scripts/postgres/rehearse-neon-moderation-entrypoint.mjs'
+      - 'workers/W06-governance/src/neon/moderation-database-runtime.ts'
+      - 'workers/W06-governance/src/index.ts'
+      - 'workers/W06-governance/src/moderation-runtime.ts'
+      - 'workers/W06-governance/src/neon-postgres-d1-database.ts'
+      - 'workers/W06-governance/src/neon-postgres-migrations/**'
+      - 'workers/W09-platform/src/neon-postgres-migrations/**'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/w06-neon-entrypoint-postgres18-ci.yml'
+      - 'workers/W06-governance/scripts/postgres/rehearse-neon-moderation-entrypoint.mjs'
+      - 'workers/W06-governance/src/neon/moderation-database-runtime.ts'
+      - 'workers/W06-governance/src/index.ts'
+      - 'workers/W06-governance/src/moderation-runtime.ts'
+      - 'workers/W06-governance/src/neon-postgres-d1-database.ts'
+      - 'workers/W06-governance/src/neon-postgres-migrations/**'
+      - 'workers/W09-platform/src/neon-postgres-migrations/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: w06-neon-entrypoint-postgres18-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  w06-neon-entrypoint-runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:18.6
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres_local_only
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - name: Checkout reviewed source
+        uses: actions/checkout@v4
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Check W06 Neon entrypoint rehearsal script
+        run: node --check workers/W06-governance/scripts/postgres/rehearse-neon-moderation-entrypoint.mjs
+
+      - name: Install pinned W02 PostgreSQL driver and TypeScript runner
+        working-directory: workers/W02-identity
+        run: npm install --ignore-scripts --no-audit --no-fund
+
+      - name: Install W06 PostgreSQL Worker runtime dependency
+        working-directory: workers/W06-governance
+        run: npm install --ignore-scripts --no-audit --no-fund --package-lock=false
+
+      - name: Rehearse actual W06 Neon moderation Worker entrypoint on PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          W06_ENTRY_POSTGRES_ADMIN_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/postgres
+          W06_ENTRY_POSTGRES_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_governance
+          W06_ENTRY_POSTGRES_REPORT: ../../artifacts/neon/w06-moderation-entrypoint-postgres-runtime-postflight.json
+        run: node --import=tsx/esm ../../workers/W06-governance/scripts/postgres/rehearse-neon-moderation-entrypoint.mjs
+
+      - name: Upload W06 Neon entrypoint PostgreSQL 18 evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: w06-neon-entrypoint-postgres18-${{ github.sha }}
+          path: artifacts/neon/w06-moderation-entrypoint-postgres-runtime-postflight.json
+          if-no-files-found: error
+          retention-days: 90
