@@ -256,9 +256,8 @@ describe('1.1 content lifecycle closeout', () => {
     const publicRoutes = read('src/app/(frontend)/content/PublicContentRoutes.tsx')
     const detailClient = read('src/app/(frontend)/content/[contentId]/ContentDetailClient.tsx')
 
-    expect(neonDetailStore).toMatch(
-      /WHERE \(id = \$1 OR slug = \$1\)\s+AND \(state = 'PUBLISHED' OR owner_user_id = \$2\)/,
-    )
+    expect(neonDetailStore).toContain("'WHERE (id = $1 OR slug = $1) '")
+    expect(neonDetailStore).toContain("AND (state = 'PUBLISHED' OR owner_user_id = $2)")
     expect(detailPage).toContain('renderLegacyContentRoute(contentId)')
     expect(publicRoutes).toContain("if (!content || content.state !== 'PUBLISHED') notFound()")
     expect(detailClient).toContain("if (!response.ok || !data?.id || data.state !== 'PUBLISHED')")
