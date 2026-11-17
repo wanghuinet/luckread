@@ -17,14 +17,7 @@ import { createPostgresSessionLogoutStore } from './session-logout-postgres-stor
 import { createPostgresSessionRevocationStore } from './session-revocation-postgres-store.js'
 import { createPostgresUsernameChangeStore } from './username-change-postgres.js'
 
-/**
- * @deprecated-next-version
- * Reason: Legacy D1 provider selection remains reachable from local/test callers.
- * Replacement: The Neon PostgreSQL runtime in this module.
- * Removal: Next release.
- * Condition: All W02 entrypoints and test fixtures require the Neon runtime and no longer construct D1 stores.
- */
-export type W02DatabaseDriver = 'd1' | 'neon'
+export type W02DatabaseDriver = 'neon'
 
 export type W02RuntimeEnv = {
   W02_DATABASE_DRIVER?: string
@@ -36,16 +29,11 @@ export type W02RuntimeEnv = {
 const pools = new WeakMap<object, Pool>()
 const runtimes = new WeakMap<object, ReturnType<typeof buildW02PostgresRuntime>>()
 
-/**
- * Neon is selected explicitly by the production Wrangler config and requires
- * the existing D1-01 Hyperdrive binding. The D1 provider is retained only for
- * local/test environments that actually provide the legacy D1 binding.
- * Unknown values fail closed and never fall back to another provider.
- */
+/** W02 runtime is Neon-only. Missing and legacy D1 selections fail closed. */
 export function resolveW02DatabaseDriver(env: W02RuntimeEnv): W02DatabaseDriver {
-  const configured = env.W02_DATABASE_DRIVER?.trim().toLowerCase() || 'd1'
-  if (configured === 'd1' || configured === 'neon') return configured
-  throw new Error('W02_DATABASE_DRIVER_UNSUPPORTED')
+  const configured = env.W02_DATABASE_DRIVER?.trim().toLowerCase()
+  if (configured !== 'neon') throw new Error('W02_DATABASE_DRIVER_UNSUPPORTED')
+  return 'neon'
 }
 
 export function isW02NeonRuntime(env: W02RuntimeEnv): boolean {
