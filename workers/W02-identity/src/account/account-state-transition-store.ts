@@ -28,6 +28,13 @@ export interface AccountStateTransitionStore {
  * transition behavior, including self-service, system/job, and approval
  * contract checks. PostgreSQL's narrower moderator/admin adapter is separate.
  */
+/**
+ * @deprecated-next-version
+ * Reason: Legacy Cloudflare D1 implementation retained only for isolated unit tests or the explicit schema/test fixture.
+ * Replacement: PostgreSQL account-state transition Store in src/neon/account-state-transition-store-postgres.ts.
+ * Removal: Next release.
+ * Condition: Account transition contract tests use PostgreSQL/in-memory Store fixtures and D1 batch compatibility is no longer needed.
+ */
 export function createD1AccountStateTransitionStore(
   db: D1Database,
 ): AccountStateTransitionStore {
