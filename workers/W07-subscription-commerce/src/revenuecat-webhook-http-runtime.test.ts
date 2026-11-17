@@ -58,6 +58,7 @@ function request(body: ArrayBuffer, headers: Record<string, string> = {}) {
 }
 
 const envBase = {
+  W07_DATABASE_DRIVER: 'd1',
   D1_04: {} as D1Database,
   REVENUECAT_WEBHOOK_AUTHORIZATION: AUTHORIZATION,
   REVENUECAT_ALLOWED_APP_IDS: 'app_luckread_android',
