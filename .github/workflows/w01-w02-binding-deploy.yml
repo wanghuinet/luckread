@@ -286,7 +286,7 @@ jobs:
           else
             action="already_present"
           fi
-          verify_list="$(npx --yes wrangler@4.116.0 secret list --name luckread-w01-payload --format json)"
+          verify_list="$(npx --yes wrangler@4.156.0 secret list --name luckread-w01-payload --config wrangler.neon.jsonc --format json)"
           verified="$(printf '%s' "$verify_list" | node --input-type=module -e 'let data=""; process.stdin.on("data", c => data += c); process.stdin.on("end", () => { const parsed=JSON.parse(data); const names=new Set(Array.isArray(parsed) ? parsed.map(item => item?.name) : []); process.stdout.write(names.has("PAYLOAD_SECRET") ? "true" : "false"); })')"
           test "$verified" = "true"
           ACTION="$action" node -e "const fs=require('fs'); fs.writeFileSync('../../artifacts/mapping-0/w01-payload-secret-provenance.json', JSON.stringify({worker:'luckread-w01-payload',secretName:'PAYLOAD_SECRET',action:process.env.ACTION,verified:true,secretValueExposed:false}, null, 2)+'\\n')"
