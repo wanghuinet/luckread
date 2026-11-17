@@ -501,6 +501,13 @@ export type EmailVerifiedActivationResult = {
  * an authenticated session whose emailVerified flag is true. Account activation
  * and the L2 role grant share the same D1 batch with the account-state journal.
  */
+/**
+ * @deprecated-next-version
+ * Reason: Legacy Cloudflare D1 account-state helper retained only for isolated unit tests.
+ * Replacement: activateEmailVerifiedAccountPostgres in src/neon/email-verification-activation-postgres.ts.
+ * Removal: Next release.
+ * Condition: Better Auth production callbacks use the Neon activation implementation; remaining D1 helper tests use PostgreSQL.
+ */
 export async function activateEmailVerifiedAccount(
   db: D1Database,
   userId: string,
