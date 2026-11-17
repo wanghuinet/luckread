@@ -4,6 +4,13 @@ export type W01PayloadDatabaseEnvironment = Readonly<{
   D1?: unknown
 }>
 
+/**
+ * @deprecated-next-version
+ * Reason: The D1/SQLite Payload provider remains available for local/test and legacy migration workflows.
+ * Replacement: W01 Neon PostgreSQL adapter selected by the production Wrangler config.
+ * Removal: Next release.
+ * Condition: Payload CLI/schema generation and every supported test fixture use Neon or isolated schema-source tooling; no D1 binding is required.
+ */
 export type W01PayloadDatabaseSelection =
   | Readonly<{ kind: 'd1' }>
   | Readonly<{ kind: 'neon'; connectionString: string }>
