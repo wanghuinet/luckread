@@ -308,7 +308,7 @@ export type W05SocialWorkerDependencies = Readonly<{
   socialClosureReadStore?: SocialClosureReadStore
   /** Optional PostgreSQL-capable comment notification context reader. */
   commentNotificationContextStore?: CommentNotificationContextStore
-  /** Optional PostgreSQL-capable notification inbox/outbox enqueue store. */
+  /** Optional PostgreSQL notification enqueue store; notification side effects remain best-effort. */
   notificationEnqueueStore?: NotificationEnqueueStore
   /** Optional PostgreSQL-capable owner reply-audience policy store; D1 remains the default. */
   replyAudienceStore?: ReplyAudienceStore
@@ -598,7 +598,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
             bodyValue,
             mentionTargets,
             undefined,
-            dependencies.notificationEnqueueStore ?? env.DB,
+            dependencies.notificationEnqueueStore,
           )
           const persistedMentions = await getSocialTargets(
             dependencies.socialTargetsReadStore ?? env.DB,
@@ -699,7 +699,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
           rawText,
           mentions,
           contentContext,
-          dependencies.notificationEnqueueStore ?? env.DB,
+          dependencies.notificationEnqueueStore,
         )
         return json({ data: result, requestId: crypto.randomUUID() })
       }
@@ -1055,7 +1055,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
           bodyValue,
           mentionTargets,
           undefined,
-          dependencies.notificationEnqueueStore ?? env.DB,
+          dependencies.notificationEnqueueStore,
         )
         const persistedMentions = await getSocialTargets(
           dependencies.socialTargetsReadStore ?? env.DB,
@@ -1068,7 +1068,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
             parentId,
           )
           if (parent?.author_user_id) {
-            await enqueueNotification(dependencies.notificationEnqueueStore ?? env.DB, {
+            await enqueueNotification(dependencies.notificationEnqueueStore, {
               recipientUserId: parent.author_user_id,
               actorUserId: viewerUserId,
               type: 'REPLY',
@@ -1084,7 +1084,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
             request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '',
           )
           if (contentOwnerUserId) {
-            await enqueueNotification(dependencies.notificationEnqueueStore ?? env.DB, {
+            await enqueueNotification(dependencies.notificationEnqueueStore, {
               recipientUserId: contentOwnerUserId,
               actorUserId: viewerUserId,
               type: 'COMMENT',
@@ -1206,7 +1206,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
                 correlationId,
               )
           if (notificationContext.recipientUserId) {
-            await enqueueNotification(dependencies.notificationEnqueueStore ?? env.DB, {
+            await enqueueNotification(dependencies.notificationEnqueueStore, {
               recipientUserId: notificationContext.recipientUserId,
               actorUserId: viewerUserId,
               type: 'LIKE',
@@ -1289,7 +1289,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
           if (idempotencyKey.length > 256) throw new FollowRuntimeError('VALIDATION_FAILED', 400)
           const row = await follow(dependencies.followStore ?? env.DB, viewerUserId, path.userId)
           await invalidateRelationshipGraph(viewerUserId, path.userId)
-          await enqueueNotification(dependencies.notificationEnqueueStore ?? env.DB, {
+          await enqueueNotification(dependencies.notificationEnqueueStore, {
             recipientUserId: path.userId,
             actorUserId: viewerUserId,
             type: 'FOLLOW',

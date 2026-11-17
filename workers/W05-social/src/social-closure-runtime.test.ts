@@ -1,7 +1,8 @@
 /// <reference types="@cloudflare/workers-types" />
 import { describe, expect, it, vi } from 'vitest'
 import { SocialTargetsReadStoreError } from './social-targets-read-store.js'
-import { enqueueNotification, extractSocialTokens, getContentSocialSummary, getSocialTargets, listDiscoveryTopics, listNotifications, syncSocialTokens } from './social-closure-runtime.js'
+import { extractSocialTokens, getContentSocialSummary, getSocialTargets, listDiscoveryTopics, listNotifications, syncSocialTokens } from './social-closure-runtime.js'
+import type { NotificationEnqueueStore } from './notification-enqueue-store.js'
 
 describe('W05 unified social closure', () => {
   it('normalizes and deduplicates mentions and hashtags', () => {
@@ -131,6 +132,7 @@ describe('W05 unified social closure', () => {
       updatedAt: '2026-10-17T04:00:00.000Z',
     } as const
 
+    const notificationStore: NotificationEnqueueStore = { enqueue: vi.fn(async () => undefined) }
     await expect(syncSocialTokens(
       db,
       'owner-1',
@@ -139,11 +141,12 @@ describe('W05 unified social closure', () => {
       'Thanks @alice',
       [{ userId: 'mentioned-user', handle: 'ＡＬＩＣＥ' }],
       contentContext,
+      notificationStore,
     )).resolves.toEqual({ topics: 0, mentions: 1 })
 
     const mentionInsert = inserts.find(({ sql }) => sql.includes('INSERT OR IGNORE INTO social_mentions'))
     expect(mentionInsert?.values[4]).toBe('mentioned-user')
-    expect(inserts.some(({ sql }) => sql.includes('INSERT OR IGNORE INTO social_notifications'))).toBe(true)
+    expect(notificationStore.enqueue).toHaveBeenCalledWith(expect.objectContaining({ recipientUserId: 'mentioned-user', actorUserId: 'owner-1', notificationType: 'MENTION', targetType: 'content', targetId: 'content-1', payloadJson: JSON.stringify({ handle: 'ＡＬＩＣＥ' }) }))
   })
 
   it('accepts an injected provider-neutral social-target read store', async () => {
@@ -254,7 +257,7 @@ describe('W05 unified social closure', () => {
     )).resolves.toEqual({ topics: 0, mentions: 1 })
 
     expect(inserts.some(({ sql }) => sql.includes('INSERT OR IGNORE INTO social_mentions'))).toBe(false)
-    expect(inserts.some(({ sql }) => sql.includes('INSERT OR IGNORE INTO social_notifications'))).toBe(false)
+
     const priorLookup = queries.find((sql) => sql.includes('FROM social_mentions'))
     expect(priorLookup).toContain('SELECT mention_id, mentioned_user_id, handle')
     expect(priorLookup).not.toContain('JOIN users')
@@ -558,119 +561,11 @@ describe('W05 unified social closure', () => {
   })
 
 
-  it('retries transient inbox persistence with a stable notification ID and dedupe key', async () => {
-    const insertBindings: unknown[][] = []
-    let insertAttempts = 0
-    const db = {
-      prepare: (sql: string) => ({
-        bind: (...values: unknown[]) => ({
-          first: async () => null,
-          run: async () => {
-            if (sql.includes('INSERT OR IGNORE INTO social_notifications')) {
-              insertAttempts += 1
-              insertBindings.push(values)
-              if (insertAttempts === 1) throw new Error('D1_ERROR: SQLITE_BUSY: database is locked')
-            }
-            return { success: true, meta: { changes: 1 } }
-          },
-        }),
-      }),
-    } as unknown as D1Database
-
-    await expect(enqueueNotification(db, {
-      recipientUserId: 'recipient-1',
-      actorUserId: 'actor-1',
-      type: 'COMMENT',
-      targetType: 'content',
-      targetId: 'content-1',
-      payload: { eventId: 'event-1' },
-    })).resolves.toBeUndefined()
-
-    expect(insertAttempts).toBe(2)
-    expect(insertBindings).toHaveLength(2)
-    expect(insertBindings[1]).toEqual(insertBindings[0])
-    expect(insertBindings[0]?.[0]).toEqual(expect.any(String))
-    expect(insertBindings[0]?.[6]).toBe('COMMENT:recipient-1:actor-1:content:content-1')
-  })
-
-  it('does not retry permanent notification SQL failures', async () => {
-    let insertAttempts = 0
-    const db = {
-      prepare: (sql: string) => ({
-        bind: (..._values: unknown[]) => ({
-          first: async () => null,
-          run: async () => {
-            if (sql.includes('INSERT OR IGNORE INTO social_notifications')) {
-              insertAttempts += 1
-              throw new Error('D1_ERROR: no such table: social_notifications')
-            }
-            return { success: true, meta: { changes: 1 } }
-          },
-        }),
-      }),
-    } as unknown as D1Database
-
-    await expect(enqueueNotification(db, {
-      recipientUserId: 'recipient-1',
-      actorUserId: 'actor-1',
-      type: 'COMMENT',
-      targetType: 'content',
-      targetId: 'content-1',
-    })).resolves.toBeUndefined()
-
-    expect(insertAttempts).toBe(1)
-  })
-
-  it('bounds exhausted inbox persistence retries and logs failures without leaking details', async () => {
-    let insertAttempts = 0
-    const insertBindings: unknown[][] = []
-    const db = {
-      prepare: (sql: string) => ({
-        bind: (...values: unknown[]) => ({
-          first: async () => null,
-          run: async () => {
-            if (sql.includes('INSERT OR IGNORE INTO social_notifications')) {
-              insertAttempts += 1
-              insertBindings.push(values)
-              throw new Error('D1_ERROR: SQLITE_BUSY: database is locked; private database detail that must not be logged')
-            }
-            return { success: true, meta: { changes: 1 } }
-          },
-        }),
-      }),
-    } as unknown as D1Database
-    const warning = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
-
-    try {
-      await expect(enqueueNotification(db, {
-        recipientUserId: 'recipient-1',
-        actorUserId: 'actor-1',
-        type: 'COMMENT',
-        targetType: 'content',
-        targetId: 'content-1',
-      })).resolves.toBeUndefined()
-
-      expect(insertAttempts).toBe(3)
-      expect(insertBindings).toHaveLength(3)
-      expect(insertBindings[1]).toEqual(insertBindings[0])
-      expect(insertBindings[2]).toEqual(insertBindings[0])
-      expect(warning).toHaveBeenCalledWith('W05_SOCIAL_NOTIFICATION_WRITE_FAILED', {
-        type: 'COMMENT',
-        targetType: 'content',
-        errorName: 'Error',
-      })
-      expect(JSON.stringify(warning.mock.calls)).not.toContain('recipient-1')
-      expect(JSON.stringify(warning.mock.calls)).not.toContain('content-1')
-      expect(JSON.stringify(warning.mock.calls)).not.toContain('private database detail')
-    } finally {
-      warning.mockRestore()
-    }
-  })
 
 })
 
 
-describe('W05 notification deep-link lookup', () => {
+describe('W05 notification deep-link lookup', () => {describe('W05 notification deep-link lookup', () => {
   it('returns only the requested notification owned by the authenticated recipient', async () => {
     const row = {
       notification_id: 'notification-1',
