@@ -339,8 +339,14 @@ async function handleActiveCreatorSelf(env: Env, request: Request, store: W08Cre
   return json({ creatorId: creator.creator_id, status: 'ACTIVE' })
 }
 
-export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+export type W08CreatorWorkerDependencies = Readonly<{
+  getCreatorStore?: (env: Env) => W08CreatorStore
+}>
+
+export function createW08CreatorWorker(dependencies: W08CreatorWorkerDependencies = {}) {
+  const getCreatorStore = dependencies.getCreatorStore ?? getW08CreatorStore
+  return {
+    async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url)
     if (request.method === 'POST' && url.pathname === '/internal/authz/check-permission') {
       try {
@@ -363,20 +369,23 @@ export default {
       }
     }
     if (url.pathname === '/internal/creator/self' && request.method === 'GET') {
-      try { return await handleActiveCreatorSelf(env, request, getW08CreatorStore(env)) } catch { return errorResponse(503, 'CREATOR_SERVICE_UNAVAILABLE', 'Creator service unavailable') }
+      try { return await handleActiveCreatorSelf(env, request, getCreatorStore(env)) } catch { return errorResponse(503, 'CREATOR_SERVICE_UNAVAILABLE', 'Creator service unavailable') }
     }
     if (url.pathname === '/api/v1/creator-applications' && request.method === 'POST') {
-      try { return await handleApplicationCreate(env, request, getW08CreatorStore(env)) } catch { return errorResponse(503, 'CREATOR_SERVICE_UNAVAILABLE', 'Creator application service unavailable') }
+      try { return await handleApplicationCreate(env, request, getCreatorStore(env)) } catch { return errorResponse(503, 'CREATOR_SERVICE_UNAVAILABLE', 'Creator application service unavailable') }
     }
     if (url.pathname === '/api/v1/creator-applications/me' && request.method === 'GET') {
-      try { return await handleApplicationRead(env, request, getW08CreatorStore(env)) } catch { return errorResponse(503, 'CREATOR_SERVICE_UNAVAILABLE', 'Creator application service unavailable') }
+      try { return await handleApplicationRead(env, request, getCreatorStore(env)) } catch { return errorResponse(503, 'CREATOR_SERVICE_UNAVAILABLE', 'Creator application service unavailable') }
     }
     if (url.pathname === '/api/v1/admin/creator-applications' && request.method === 'GET') {
-      try { return await handleAdminApplicationList(env, request, getW08CreatorStore(env)) } catch { return errorResponse(503, 'CREATOR_SERVICE_UNAVAILABLE', 'Creator application service unavailable') }
+      try { return await handleAdminApplicationList(env, request, getCreatorStore(env)) } catch { return errorResponse(503, 'CREATOR_SERVICE_UNAVAILABLE', 'Creator application service unavailable') }
     }
     if (url.pathname === '/api/v1/admin/creator-applications/decision' && request.method === 'POST') {
-      try { return await handleAdminApplicationDecision(env, request, getW08CreatorStore(env)) } catch { return errorResponse(503, 'CREATOR_SERVICE_UNAVAILABLE', 'Creator application service unavailable') }
+      try { return await handleAdminApplicationDecision(env, request, getCreatorStore(env)) } catch { return errorResponse(503, 'CREATOR_SERVICE_UNAVAILABLE', 'Creator application service unavailable') }
     }
     return errorResponse(404, 'NOT_FOUND', 'Creator endpoint not found')
   },
+  }
 }
+
+export default createW08CreatorWorker()
