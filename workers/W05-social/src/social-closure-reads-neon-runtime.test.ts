@@ -87,7 +87,7 @@ describe('W05 Neon social-closure read route composition', () => {
     const worker = createW05SocialWorker()
     const response = await worker.fetch(
       request('/internal/social/notifications'),
-      { DB: { prepare }, W03_CONTENT: w03Content } as never,
+      { DB: { prepare } } as never,
       {} as never,
     )
     expect(response.status).toBe(503)
