@@ -12,8 +12,8 @@ import { revokeUserSessionPostgres } from './session-revocation-postgres.js'
  * The existing repository owns the transaction: lock authority/session rows,
  * delete the native session, and insert the audit outbox in one commit.
  *
- * This adapter is only injected by the disposable PostgreSQL rehearsal.
- * The deployed W02 Worker continues to use the D1 store by default.
+ * The Neon-only W02 production runtime constructs this Store from its existing
+ * Hyperdrive pool; the disposable PostgreSQL 18 rehearsal uses the same adapter.
  */
 export function createPostgresSessionRevocationStore(pool: Pool): SessionRevocationStore {
   return {
