@@ -476,6 +476,13 @@ async function applyAccountStateTransitionInternal(
   }
 }
 
+/**
+ * @deprecated-next-version
+ * Reason: Legacy Cloudflare D1 account-state helper retained only for isolated unit tests.
+ * Replacement: createPostgresAccountStateTransitionStore in src/neon/account-state-transition-store-postgres.ts.
+ * Removal: Next release.
+ * Condition: Account-state transition tests use the PostgreSQL store contract and no D1 batch implementation remains in production.
+ */
 export async function applyAccountStateTransition(
   db: D1Database,
   input: AccountStateTransitionInput,
