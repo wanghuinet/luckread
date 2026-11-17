@@ -6,20 +6,21 @@ import {
   resolveW08DatabaseDriver,
 } from './runtime.js'
 
-describe('W08 database driver selection', () => {
-  it('keeps explicit D1 rollback and resolves the configured Neon runtime', () => {
-    expect(resolveW08DatabaseDriver({})).toBe('d1')
-    expect(resolveW08DatabaseDriver({ W08_DATABASE_DRIVER: 'd1' })).toBe('d1')
+describe('W08 Neon-only database runtime', () => {
+  it('defaults to Neon and rejects the retired D1 provider', () => {
+    expect(() => resolveW08DatabaseDriver({})).toThrow('W08_DATABASE_DRIVER_UNSUPPORTED')
     expect(resolveW08DatabaseDriver({ W08_DATABASE_DRIVER: 'neon' })).toBe('neon')
-    expect(() => getW08CreatorStore({})).toThrow('W08_D1_01_BINDING_REQUIRED')
+    expect(() => resolveW08DatabaseDriver({ W08_DATABASE_DRIVER: 'd1' }))
+      .toThrow('W08_DATABASE_DRIVER_UNSUPPORTED')
+    expect(() => getW08CreatorStore({ W08_DATABASE_DRIVER: 'neon' })).toThrow('W08_HYPERDRIVE_BINDING_REQUIRED')
   })
 
-  it('rejects unknown drivers rather than silently falling back to D1', () => {
+  it('rejects unknown drivers rather than silently accepting them', () => {
     expect(() => resolveW08DatabaseDriver({ W08_DATABASE_DRIVER: 'postgres' }))
       .toThrow('W08_DATABASE_DRIVER_UNSUPPORTED')
   })
 
-  it('requires the existing Hyperdrive binding in explicit Neon mode', () => {
+  it('requires the existing Hyperdrive binding', () => {
     const env = { W08_DATABASE_DRIVER: 'neon' }
     expect(() => getW08CreatorStore(env)).toThrow('W08_HYPERDRIVE_BINDING_REQUIRED')
     expect(() => getW08PostgresPool(env)).toThrow('W08_HYPERDRIVE_BINDING_REQUIRED')

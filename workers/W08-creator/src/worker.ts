@@ -6,7 +6,7 @@ import { evaluateCaslPermission, type LayerId } from './authz/casl-policy.js'
 import { getW08CreatorStore, type W08RuntimeEnv } from './neon/runtime.js'
 import type { CreatorApplicationRow, W08CreatorStore } from './creator-store.js'
 
-interface Env extends W08RuntimeEnv {
+export interface W08Env extends W08RuntimeEnv {
   W02_AUTH: Fetcher
 }
 
@@ -38,7 +38,7 @@ const readBody = async (request: Request): Promise<Record<string, unknown> | nul
   }
 }
 
-async function principalFor(env: Env, request: Request): Promise<Principal | Response> {
+async function principalFor(env: W08Env, request: Request): Promise<Principal | Response> {
   try {
     const headers = new Headers(request.headers)
     headers.delete('host')
@@ -70,7 +70,7 @@ async function principalFor(env: Env, request: Request): Promise<Principal | Res
 
 
 async function callRoleGrant(
-  env: Env,
+  env: W08Env,
   originalRequest: Request,
   input: {
     subjectId: string
@@ -110,7 +110,7 @@ async function callRoleGrant(
 
 
 async function retryCreatorGrant(
-  env: Env,
+  env: W08Env,
   request: Request,
   store: W08CreatorStore,
   application: ApplicationRow,
@@ -159,7 +159,7 @@ async function retryCreatorGrant(
   })
 }
 
-async function handleApplicationCreate(env: Env, request: Request, store: W08CreatorStore): Promise<Response> {
+async function handleApplicationCreate(env: W08Env, request: Request, store: W08CreatorStore): Promise<Response> {
   const principal = await principalFor(env, request)
   if (principal instanceof Response) return principal
   const key = request.headers.get('Idempotency-Key')
@@ -206,7 +206,7 @@ async function handleApplicationCreate(env: Env, request: Request, store: W08Cre
   return json({ applicationId, status: 'PENDING', grantState: 'NOT_REQUESTED', version: 1 }, 201, { etag: '"1"' })
 }
 
-async function handleApplicationRead(env: Env, request: Request, store: W08CreatorStore): Promise<Response> {
+async function handleApplicationRead(env: W08Env, request: Request, store: W08CreatorStore): Promise<Response> {
   const principal = await principalFor(env, request)
   if (principal instanceof Response) return principal
   if (evaluateCreatorApplicationPermission(principal, 'creator.application.read.own', { ownerId: principal.userId }).decision !== 'ALLOW') {
@@ -216,7 +216,7 @@ async function handleApplicationRead(env: Env, request: Request, store: W08Creat
   return json({ application: row ?? null }, 200, row ? { etag: '"' + row.version + '"' } : undefined)
 }
 
-async function handleAdminApplicationList(env: Env, request: Request, store: W08CreatorStore): Promise<Response> {
+async function handleAdminApplicationList(env: W08Env, request: Request, store: W08CreatorStore): Promise<Response> {
   const principal = await principalFor(env, request)
   if (principal instanceof Response) return principal
   if (evaluateCreatorApplicationPermission(principal, 'creator.application.review', {}).decision !== 'ALLOW') return errorResponse(403, 'PERMISSION_DENIED', 'L7 or L8 authorization is required')
@@ -227,7 +227,7 @@ async function handleAdminApplicationList(env: Env, request: Request, store: W08
   return json({ data: rows, limit })
 }
 
-async function handleAdminApplicationDecision(env: Env, request: Request, store: W08CreatorStore): Promise<Response> {
+async function handleAdminApplicationDecision(env: W08Env, request: Request, store: W08CreatorStore): Promise<Response> {
   const principal = await principalFor(env, request)
   if (principal instanceof Response) return principal
   if (evaluateCreatorApplicationPermission(principal, 'creator.application.review', {}).decision !== 'ALLOW') return errorResponse(403, 'PERMISSION_DENIED', 'L7 or L8 authorization is required')
@@ -318,7 +318,7 @@ async function handleAdminApplicationDecision(env: Env, request: Request, store:
   return json({ applicationId: application.application_id, status: application.status, grantState: application.grant_state, version: application.version })
 }
 
-async function handleActiveCreatorSelf(env: Env, request: Request, store: W08CreatorStore): Promise<Response> {
+async function handleActiveCreatorSelf(env: W08Env, request: Request, store: W08CreatorStore): Promise<Response> {
   const principal = await principalFor(env, request)
   if (principal instanceof Response) return principal
 
@@ -339,44 +339,82 @@ async function handleActiveCreatorSelf(env: Env, request: Request, store: W08Cre
   return json({ creatorId: creator.creator_id, status: 'ACTIVE' })
 }
 
-export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
-    const url = new URL(request.url)
-    if (request.method === 'POST' && url.pathname === '/internal/authz/check-permission') {
-      try {
-        return await handlePermissionCheck(request, env)
-      } catch {
-        return Response.json(
-          { decision: 'DENY', reasonCode: 'AUTHORIZATION_INPUT_UNAVAILABLE', policyVersion: 'casl-l0-l8-v1' },
-          { status: 503, headers: { 'cache-control': 'no-store' } },
-        )
+export type W08CreatorWorkerDependencies = Readonly<{
+  getCreatorStore?: (env: W08Env) => W08CreatorStore
+}>
+
+export function createW08CreatorWorker(dependencies: W08CreatorWorkerDependencies = {}) {
+  const getCreatorStore = dependencies.getCreatorStore ?? getW08CreatorStore
+
+  return {
+    async fetch(request: Request, env: W08Env): Promise<Response> {
+      const url = new URL(request.url)
+
+      if (request.method === 'POST' && url.pathname === '/internal/authz/check-permission') {
+        try {
+          return await handlePermissionCheck(request, env)
+        } catch {
+          return Response.json(
+            { decision: 'DENY', reasonCode: 'AUTHORIZATION_INPUT_UNAVAILABLE', policyVersion: 'casl-l0-l8-v1' },
+            { status: 503, headers: { 'cache-control': 'no-store' } },
+          )
+        }
       }
-    }
-    if (request.method === 'POST' && url.pathname === '/internal/authz/check-scheduled-publish') {
-      try {
-        return await handleScheduledPublishPermission(request, env)
-      } catch {
-        return Response.json(
-          { decision: 'DENY', reasonCode: 'AUTHORIZATION_INPUT_UNAVAILABLE', policyVersion: 'casl-l0-l8-v1' },
-          { status: 503, headers: { 'cache-control': 'no-store' } },
-        )
+
+      if (request.method === 'POST' && url.pathname === '/internal/authz/check-scheduled-publish') {
+        try {
+          return await handleScheduledPublishPermission(request, env)
+        } catch {
+          return Response.json(
+            { decision: 'DENY', reasonCode: 'AUTHORIZATION_INPUT_UNAVAILABLE', policyVersion: 'casl-l0-l8-v1' },
+            { status: 503, headers: { 'cache-control': 'no-store' } },
+          )
+        }
       }
-    }
-    if (url.pathname === '/internal/creator/self' && request.method === 'GET') {
-      try { return await handleActiveCreatorSelf(env, request, getW08CreatorStore(env)) } catch { return errorResponse(503, 'CREATOR_SERVICE_UNAVAILABLE', 'Creator service unavailable') }
-    }
-    if (url.pathname === '/api/v1/creator-applications' && request.method === 'POST') {
-      try { return await handleApplicationCreate(env, request, getW08CreatorStore(env)) } catch { return errorResponse(503, 'CREATOR_SERVICE_UNAVAILABLE', 'Creator application service unavailable') }
-    }
-    if (url.pathname === '/api/v1/creator-applications/me' && request.method === 'GET') {
-      try { return await handleApplicationRead(env, request, getW08CreatorStore(env)) } catch { return errorResponse(503, 'CREATOR_SERVICE_UNAVAILABLE', 'Creator application service unavailable') }
-    }
-    if (url.pathname === '/api/v1/admin/creator-applications' && request.method === 'GET') {
-      try { return await handleAdminApplicationList(env, request, getW08CreatorStore(env)) } catch { return errorResponse(503, 'CREATOR_SERVICE_UNAVAILABLE', 'Creator application service unavailable') }
-    }
-    if (url.pathname === '/api/v1/admin/creator-applications/decision' && request.method === 'POST') {
-      try { return await handleAdminApplicationDecision(env, request, getW08CreatorStore(env)) } catch { return errorResponse(503, 'CREATOR_SERVICE_UNAVAILABLE', 'Creator application service unavailable') }
-    }
-    return errorResponse(404, 'NOT_FOUND', 'Creator endpoint not found')
-  },
+
+      if (url.pathname === '/internal/creator/self' && request.method === 'GET') {
+        try {
+          return await handleActiveCreatorSelf(env, request, getCreatorStore(env))
+        } catch {
+          return errorResponse(503, 'CREATOR_SERVICE_UNAVAILABLE', 'Creator service unavailable')
+        }
+      }
+
+      if (url.pathname === '/api/v1/creator-applications' && request.method === 'POST') {
+        try {
+          return await handleApplicationCreate(env, request, getCreatorStore(env))
+        } catch {
+          return errorResponse(503, 'CREATOR_SERVICE_UNAVAILABLE', 'Creator application service unavailable')
+        }
+      }
+
+      if (url.pathname === '/api/v1/creator-applications/me' && request.method === 'GET') {
+        try {
+          return await handleApplicationRead(env, request, getCreatorStore(env))
+        } catch {
+          return errorResponse(503, 'CREATOR_SERVICE_UNAVAILABLE', 'Creator application service unavailable')
+        }
+      }
+
+      if (url.pathname === '/api/v1/admin/creator-applications' && request.method === 'GET') {
+        try {
+          return await handleAdminApplicationList(env, request, getCreatorStore(env))
+        } catch {
+          return errorResponse(503, 'CREATOR_SERVICE_UNAVAILABLE', 'Creator application service unavailable')
+        }
+      }
+
+      if (url.pathname === '/api/v1/admin/creator-applications/decision' && request.method === 'POST') {
+        try {
+          return await handleAdminApplicationDecision(env, request, getCreatorStore(env))
+        } catch {
+          return errorResponse(503, 'CREATOR_SERVICE_UNAVAILABLE', 'Creator application service unavailable')
+        }
+      }
+
+      return errorResponse(404, 'NOT_FOUND', 'Creator endpoint not found')
+    },
+  }
 }
+
+export default createW08CreatorWorker()

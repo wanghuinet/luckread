@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import worker from './worker.js'
+import { createW08CreatorWorker } from './worker.js'
+import { createD1W08CreatorStore, type W08D1Database } from './creator-store-d1.test-adapter.js'
+
+const worker = createW08CreatorWorker({
+  getCreatorStore: (env) => createD1W08CreatorStore((env as unknown as { D1_01: W08D1Database }).D1_01),
+})
 
 type TestPrincipal = {
   active: boolean
@@ -237,7 +242,7 @@ function harness(current: TestPrincipal | null, allowRoleGrant = false, sharedDb
     },
   }
   const env = {
-    D1_01: db as unknown as D1Database,
+    D1_01: db as unknown as W08D1Database,
     W02_AUTH: auth as unknown as Fetcher,
   } as Parameters<typeof worker.fetch>[1]
   return { db, env, roleGrants, principalAuthorizations, roleGrantAuthorizations }

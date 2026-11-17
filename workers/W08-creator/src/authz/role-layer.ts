@@ -1,6 +1,5 @@
 import layers from '../../../../contracts/authz/layers.json'
 import type { LayerId, ScopedRoleAssignment } from './casl-policy.js'
-import type { W08D1Database } from '../creator-store.js'
 
 export type RoleAssignmentRow = {
   roleId: string
@@ -59,28 +58,6 @@ function mapPermissionContext(rows: RoleAssignmentRow[]): PermissionContext | nu
 
 function validPermissionLookup(subjectId: string, now: string): boolean {
   return Boolean(subjectId && subjectId.length <= 128 && !Number.isNaN(Date.parse(now)))
-}
-
-/**
- * Read the authoritative, time-valid role facts from D1-01.
- * This adapter is retained for isolated local/unit-test compatibility.
- */
-export async function resolvePermissionContext(
-  db: W08D1Database,
-  subjectId: string,
-  now = new Date().toISOString(),
-): Promise<PermissionContext | null> {
-  if (!validPermissionLookup(subjectId, now)) return null
-
-  const result = await db.prepare(
-    "SELECT role_id AS roleId, scope_type AS scopeType, scope_id AS scopeId " +
-    "FROM role_assignments " +
-    "WHERE subject_id = ? AND status = 'ACTIVE' " +
-    "AND valid_from <= ? AND (valid_until IS NULL OR ? < valid_until) " +
-    "ORDER BY role_id ASC, id ASC",
-  ).bind(subjectId, now, now).all<RoleAssignmentRow>()
-
-  return mapPermissionContext(result.results ?? [])
 }
 
 /** Neon PostgreSQL equivalent; remains read-only and preserves the same validity window and ordering. */

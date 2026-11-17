@@ -6,8 +6,8 @@ import {
   type LayerId,
   type ScopedRoleAssignment,
 } from './casl-policy.js'
-import { resolvePermissionContext, resolvePermissionContextPostgres, type RoleAssignmentRow } from './role-layer.js'
-import { getW08PostgresPool, resolveW08DatabaseDriver, type W08RuntimeEnv } from '../neon/runtime.js'
+import { resolvePermissionContextPostgres, type RoleAssignmentRow } from './role-layer.js'
+import { getW08PostgresPool, type W08RuntimeEnv } from '../neon/runtime.js'
 import type { Pool } from 'pg'
 
 type Env = W08RuntimeEnv & { W02_AUTH: Fetcher }
@@ -133,33 +133,21 @@ export async function handlePermissionCheck(
       context = { layer: 'L0', scopedRoleAssignments: [] }
       accountState = null
     } else {
-      const useNeon = resolveW08DatabaseDriver(env) === 'neon'
-      const pool = useNeon
-        ? (dependencies.getPostgresPool ?? getW08PostgresPool)(env)
-        : undefined
-      const db = useNeon ? undefined : env.D1_01
-      if (!pool && !db) throw new Error('W08_AUTHORIZATION_DATABASE_UNAVAILABLE')
-
-      const account = pool
-        ? (await pool.query<{ accountState: string }>(
-            'SELECT account_state AS "accountState" FROM "user" WHERE id = $1 LIMIT 1',
-            [subjectId],
-          )).rows[0] ?? null
-        : await db!.prepare('SELECT account_state AS accountState FROM "user" WHERE id = ? LIMIT 1')
-            .bind(subjectId)
-            .first<{ accountState: string }>()
+      const pool = (dependencies.getPostgresPool ?? getW08PostgresPool)(env)
+      const account = (await pool.query<{ accountState: string }>(
+        'SELECT account_state AS "accountState" FROM "user" WHERE id = $1 LIMIT 1',
+        [subjectId],
+      )).rows[0] ?? null
       if (!account) return deny('SUBJECT_NOT_FOUND')
 
       accountState = account.accountState
       if (accountState === 'RESTRICTED' || accountState === 'FROZEN') {
         context = { layer: 'L1', scopedRoleAssignments: [] }
       } else if (accountState === 'ACTIVE' || accountState === 'PENDING_VERIFICATION') {
-        const resolved = pool
-          ? await resolvePermissionContextPostgres(
-              async (sql, values) => (await pool.query(sql, values as never)).rows as RoleAssignmentRow[],
-              subjectId,
-            )
-          : await resolvePermissionContext(db!, subjectId)
+        const resolved = await resolvePermissionContextPostgres(
+          async (sql, values) => (await pool.query(sql, values as never)).rows as RoleAssignmentRow[],
+          subjectId,
+        )
         if (!resolved) return deny('LAYER_RESOLUTION_DENIED')
         context = resolved
       } else {
