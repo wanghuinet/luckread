@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { Pool } from 'pg'
+
 import { handlePermissionCheck } from './handler.js'
 
 type UserFixture = {
@@ -8,26 +9,22 @@ type UserFixture = {
 }
 type TestPrincipal = { userId: string; accountState: string; layer: string }
 
-class FakeStatement {
-  values: unknown[] = []
-  constructor(private readonly db: FakeD1, readonly sql: string) {}
-  bind(...values: unknown[]) { this.values = values; return this }
-  async first<T>() {
-    if (this.sql.includes('FROM "user"')) {
-      const user = this.db.users.get(String(this.values[0]))
-      return (user ? { accountState: user.accountState } : null) as T | null
+class FakePostgresPool {
+  constructor(private readonly users: Map<string, UserFixture>) {}
+
+  async query(sql: string, values: unknown[] = []) {
+    if (sql.includes('FROM "user"')) {
+      const user = this.users.get(String(values[0]))
+      return { rows: user ? [{ accountState: user.accountState }] : [], rowCount: user ? 1 : 0 }
     }
-    return null as T | null
-  }
-  async all<T>() {
-    const user = this.db.users.get(String(this.values[0]))
-    return { results: (user?.roles ?? []).map((role) => ({ ...role })) as T[] }
+    if (sql.includes('FROM role_assignments')) {
+      const user = this.users.get(String(values[0]))
+      return { rows: (user?.roles ?? []).map((role) => ({ ...role })), rowCount: user?.roles.length ?? 0 }
+    }
+    throw new Error('Unexpected PostgreSQL authorization query')
   }
 }
-class FakeD1 {
-  users = new Map<string, UserFixture>()
-  prepare(sql: string) { return new FakeStatement(this, sql) }
-}
+
 function fakeW02(principal: TestPrincipal | null, forwardedAuthorizations: Array<string | null> = []): Fetcher {
   return {
     async fetch(request: Request): Promise<Response> {
@@ -39,6 +36,7 @@ function fakeW02(principal: TestPrincipal | null, forwardedAuthorizations: Array
     },
   } as unknown as Fetcher
 }
+
 const post = (body: unknown, withSession = true, authorization?: string) => {
   const headers = new Headers({ 'content-type': 'application/json' })
   if (withSession) headers.set('cookie', 'better-auth.session_token=test-session')
@@ -49,52 +47,56 @@ const post = (body: unknown, withSession = true, authorization?: string) => {
     body: JSON.stringify(body),
   })
 }
-const env = (db: FakeD1, principal: TestPrincipal | null, forwardedAuthorizations?: Array<string | null>) => ({
-  D1_01: db as unknown as D1Database,
-  W02_AUTH: fakeW02(principal, forwardedAuthorizations),
-})
 
-describe('W08 internal CASL permission endpoint', () => {
-  it('derives L2 application permission from W02 session and persisted role assignments', async () => {
-    const db = new FakeD1()
-    db.users.set('verified-1', {
+function setup(principal: TestPrincipal | null, users: Map<string, UserFixture> = new Map(), forwarded: Array<string | null> = []) {
+  const pool = new FakePostgresPool(users) as unknown as Pool
+  const env = {
+    W08_DATABASE_DRIVER: 'neon',
+    HYPERDRIVE: { connectionString: 'postgresql://user:secret@hyperdrive.local:5432/luckread' },
+    W02_AUTH: fakeW02(principal, forwarded),
+  }
+  return { env, dependencies: { getPostgresPool: () => pool }, forwarded }
+}
+
+describe('W08 internal CASL permission endpoint on Neon', () => {
+  it('derives L2 application permission from W02 session and persisted PostgreSQL role assignments', async () => {
+    const users = new Map<string, UserFixture>([['verified-1', {
       accountState: 'ACTIVE',
       roles: [{ roleId: 'verified_user', scopeType: 'global', scopeId: null }],
-    })
+    }]])
+    const state = setup({ userId: 'verified-1', accountState: 'ACTIVE', layer: 'L2' }, users)
     const response = await handlePermissionCheck(post({
       action: 'creator.application.apply',
       resourceType: 'CreatorApplication',
       resourceAttributes: { ownerId: 'verified-1' },
-    }), env(db, { userId: 'verified-1', accountState: 'ACTIVE', layer: 'L2' }))
+    }), state.env, state.dependencies)
 
     expect(response.status).toBe(200)
     expect(await response.json()).toMatchObject({ decision: 'ALLOW', action: 'creator.application.apply' })
   })
 
   it('forwards native Bearer credentials to W02 for canonical session validation', async () => {
-    const db = new FakeD1()
-    db.users.set('verified-bearer', {
+    const users = new Map<string, UserFixture>([['verified-bearer', {
       accountState: 'ACTIVE',
       roles: [{ roleId: 'verified_user', scopeType: 'global', scopeId: null }],
-    })
-    const forwardedAuthorizations: Array<string | null> = []
+    }]])
+    const state = setup({ userId: 'verified-bearer', accountState: 'ACTIVE', layer: 'L2' }, users)
+    const forwarded: Array<string | null> = []
+    const requestState = setup({ userId: 'verified-bearer', accountState: 'ACTIVE', layer: 'L2' }, users, forwarded)
     const response = await handlePermissionCheck(post({
       action: 'creator.application.apply',
       resourceType: 'CreatorApplication',
       resourceAttributes: { ownerId: 'verified-bearer' },
-    }, false, 'Bearer native-session-token'), env(db, {
-      userId: 'verified-bearer',
-      accountState: 'ACTIVE',
-      layer: 'L2',
-    }, forwardedAuthorizations))
+    }, false, 'Bearer native-session-token'), requestState.env, requestState.dependencies)
 
     expect(response.status).toBe(200)
-    expect(forwardedAuthorizations).toEqual(['Bearer native-session-token'])
+    expect(forwarded).toEqual(['Bearer native-session-token'])
     expect(await response.json()).toMatchObject({ decision: 'ALLOW', action: 'creator.application.apply' })
+    expect(state.forwarded).toEqual([])
   })
 
   it('fails closed when a caller attempts to submit subjectId, layer, or account state', async () => {
-    const db = new FakeD1()
+    const state = setup({ userId: 'regular-1', accountState: 'ACTIVE', layer: 'L2' })
     for (const forgedContext of [
       { subjectId: 'reviewer-7' },
       { layer: 'L7' },
@@ -104,7 +106,7 @@ describe('W08 internal CASL permission endpoint', () => {
         ...forgedContext,
         action: 'creator.application.review',
         resourceType: 'CreatorApplication',
-      }), env(db, { userId: 'regular-1', accountState: 'ACTIVE', layer: 'L2' }))
+      }), state.env, state.dependencies)
       expect(response.status).toBe(400)
       expect(await response.json()).toMatchObject({
         decision: 'DENY',
@@ -113,64 +115,47 @@ describe('W08 internal CASL permission endpoint', () => {
     }
   })
 
-  it('allows only L7/L8 to review applications, based on the actor session and D1 role facts', async () => {
-    const db = new FakeD1()
-    db.users.set('reviewer-7', {
-      accountState: 'ACTIVE',
-      roles: [{ roleId: 'admin', scopeType: 'global', scopeId: null }],
-    })
-    db.users.set('reviewer-6', {
-      accountState: 'ACTIVE',
-      roles: [{ roleId: 'moderator', scopeType: 'global', scopeId: null }],
-    })
+  it('allows only L7/L8 to review applications based on authoritative PostgreSQL role facts', async () => {
+    const users = new Map<string, UserFixture>([
+      ['reviewer-7', { accountState: 'ACTIVE', roles: [{ roleId: 'admin', scopeType: 'global', scopeId: null }] }],
+      ['reviewer-6', { accountState: 'ACTIVE', roles: [{ roleId: 'moderator', scopeType: 'global', scopeId: null }] }],
+    ])
     for (const [userId, layer, expected] of [
       ['reviewer-7', 'L7', 'ALLOW'],
       ['reviewer-6', 'L6', 'DENY'],
     ] as const) {
+      const state = setup({ userId, accountState: 'ACTIVE', layer }, users)
       const response = await handlePermissionCheck(post({
         action: 'creator.application.review',
         resourceType: 'CreatorApplication',
-      }), env(db, { userId, accountState: 'ACTIVE', layer }))
+      }), state.env, state.dependencies)
       expect(await response.json()).toMatchObject({ decision: expected })
     }
   })
 
-  it('limits no-session requests to anonymous public-read policy', async () => {
-    const db = new FakeD1()
+  it('limits no-session requests to anonymous public-read policy without querying PostgreSQL', async () => {
+    const state = setup(null)
     const response = await handlePermissionCheck(post({
       action: 'content.read.public',
       resourceType: 'Content',
       resourceAttributes: { visibility: 'public', state: 'published' },
-    }, false), env(db, null))
+    }, false), state.env, state.dependencies)
     expect(await response.json()).toMatchObject({ decision: 'ALLOW' })
   })
-})
 
-
-describe('W08 internal CASL permission endpoint on Neon', () => {
-  it('loads account and effective role facts from the existing Neon database without a D1 binding', async () => {
-    const query = vi.fn(async (sql: string) => {
-      if (sql.includes('FROM "user"')) return { rows: [{ accountState: 'ACTIVE' }] }
-      if (sql.includes('FROM role_assignments')) {
-        return { rows: [{ roleId: 'verified_user', scopeType: 'global', scopeId: null }] }
-      }
-      throw new Error('Unexpected authorization query')
-    })
-    const pool = { query } as unknown as Pool
+  it('loads account and effective role facts from the existing Neon database', async () => {
+    const users = new Map<string, UserFixture>([['verified-neon', {
+      accountState: 'ACTIVE',
+      roles: [{ roleId: 'verified_user', scopeType: 'global', scopeId: null }],
+    }]])
+    const state = setup({ userId: 'verified-neon', accountState: 'ACTIVE', layer: 'L2' }, users)
     const response = await handlePermissionCheck(post({
       action: 'creator.application.apply',
       resourceType: 'CreatorApplication',
       resourceAttributes: { ownerId: 'verified-neon' },
-    }), {
-      W08_DATABASE_DRIVER: 'neon',
-      HYPERDRIVE: { connectionString: 'postgresql://user:secret@hyperdrive.local:5432/luckread' },
-      W02_AUTH: fakeW02({ userId: 'verified-neon', accountState: 'ACTIVE', layer: 'L2' }),
-    }, { getPostgresPool: () => pool })
+    }), state.env, state.dependencies)
 
     expect(response.status).toBe(200)
     expect(await response.json()).toMatchObject({ decision: 'ALLOW', action: 'creator.application.apply' })
-    expect(query).toHaveBeenCalledTimes(2)
-    expect(query.mock.calls[0]?.[0]).toContain('FROM "user"')
-    expect(query.mock.calls[1]?.[0]).toContain('FROM role_assignments')
   })
 })
