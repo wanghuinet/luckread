@@ -95,19 +95,19 @@ describe('W08 Neon-only background scheduled-publish permission', () => {
     })
   })
 
-  it('routes the existing W01-to-W08 service binding operation without a user session', async () => {
-    const { env, pool } = setupNeon()
-    const response = await worker.fetch(makeRequest(), {
-      ...env,
-      // Test injection keeps this path independent of a live Hyperdrive socket.
-    } as never)
-    // The route uses the same Neon runtime pool factory; the unit-level handler
-    // below verifies the actual query path with an injected pool.
-    expect(response.status).toBe(503)
-    const direct = await handleScheduledPublishPermission(makeRequest(), env, {
-      getPostgresPool: () => pool,
+  it('routes the existing W01-to-W08 service binding boundary before any database access', async () => {
+    const { env, query } = setupNeon()
+    const response = await worker.fetch(
+      makeRequest(baseBody, { 'X-LuckRead-Caller': 'W05' }),
+      env as never,
+    )
+
+    expect(response.status).toBe(403)
+    await expect(response.json()).resolves.toMatchObject({
+      decision: 'DENY',
+      reasonCode: 'INVALID_SERVICE_CALLER',
     })
-    expect(direct.status).toBe(200)
+    expect(query).not.toHaveBeenCalled()
   })
 
   it('allows an active L4 Creator without accepting a caller-supplied layer', async () => {
