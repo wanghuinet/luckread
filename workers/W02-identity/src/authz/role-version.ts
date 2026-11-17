@@ -44,6 +44,13 @@ export async function readRoleVersion(db: D1Database, subjectId: string): Promis
  * Create the same monotonic role-version mutation for a larger D1 batch so
  * the version cannot be left behind if the related RoleAssignment write fails.
  */
+/**
+ * @deprecated-next-version
+ * Reason: Legacy Cloudflare D1 authorization helper retained for isolated unit tests.
+ * Replacement: Neon readRoleVersionPostgres / role-version mutation via PostgreSQL role assignment triggers.
+ * Removal: Next release.
+ * Condition: The remaining D1 version helper tests are moved to the PostgreSQL implementation and no D1 prepared statement is used in production.
+ */
 export function prepareRoleVersionAdvance(
   db: D1Database,
   subjectId: string,
