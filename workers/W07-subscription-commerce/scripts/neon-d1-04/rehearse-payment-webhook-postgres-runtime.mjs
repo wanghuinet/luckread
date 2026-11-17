@@ -216,7 +216,7 @@ try {
   assert.equal(replay.outcome, 'DUPLICATE')
   assert.equal(await count('payment_provider_events', 'event_id', successEventId), 1)
   const paymentAfterReplay = await pool.query(
-    'SELECT status, version FROM payments WHERE payment_id = $1',
+    'SELECT status, version::int AS version FROM payments WHERE payment_id = $1',
     [success.paymentId],
   )
   assert.deepEqual(paymentAfterReplay.rows, [{ status: 'succeeded', version: 2 }])
