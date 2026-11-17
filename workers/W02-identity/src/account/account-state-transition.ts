@@ -193,6 +193,13 @@ async function resolveSubjectAuthorization(
   return { layer: maxLayer, grantedPermissions }
 }
 
+/**
+ * @deprecated-next-version
+ * Reason: Legacy Cloudflare D1 account-state helper retained only for isolated unit tests.
+ * Replacement: Neon account transition authorization in createPostgresAccountStateTransitionStore in src/neon/account-state-transition-store-postgres.ts.
+ * Removal: Next release.
+ * Condition: All production account transition routes and lifecycle callbacks use the Neon account-state transition store.
+ */
 export async function authorizeAccountStateTransition(
   db: D1Database,
   input: { subjectId: string; targetUserId: string; to: AccountState; now?: string },
