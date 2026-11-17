@@ -19,6 +19,13 @@ function retryDelaySeconds(attempt: number): number {
   return Math.min(2 ** Math.max(0, attempt - 1), MAX_BACKOFF_SECONDS)
 }
 
+/**
+ * @deprecated-next-version
+ * Reason: Legacy Cloudflare D1 implementation retained only for isolated unit tests or the explicit schema/test fixture.
+ * Replacement: PostgreSQL account-state publication publisher in src/neon/account-state-publication-journal-publisher-postgres.ts.
+ * Removal: Next release.
+ * Condition: Queue publication tests use the PostgreSQL publisher; preserve the same two existing Queue bindings and delivery contract.
+ */
 export async function publishPendingAccountStateEvents(
   env: PublicationQueueEnv,
   now = new Date().toISOString(),
