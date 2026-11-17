@@ -53,10 +53,13 @@
 
 | `workers/W05-social/src/entry.ts` | W05 | 无；Neon 生产入口 | NEEDS_CONFIRMATION | 明确组合 Neon 社交 stores 与独立 push endpoint Neon store；不是旧 D1 fallback | 本文件本身 | 不适用 | 保留 |
 
+| `.github/workflows/auth-001-registration-local-evidence.yml`、`workers/W01-payload/scripts/auth-001-registration-runtime-evidence-local.mjs`、`workers/W01-payload/scripts/auth-010-session-list-runtime-evidence-local.mjs` | W01/W02 | 旧证据流程将 W02 Better Auth user/session 查询及本地 schema 仍放在 D1_01；W01 Payload 投影 D1 test fixture | REPLACE_THEN_DELETE / DELETE_NEXT_VERSION | **本批已完成 W02 替换：** AUTH-001 在临时 PostgreSQL 18 应用 W02 Neon core/custom schema，W02 Worker 使用 `wrangler.neon.jsonc`；AUTH-001 / AUTH-010 的 W02 user/session/RoleAssignment/revocation-journal 查询和清理均通过本地 Neon PostgreSQL 客户端。仅 W01 Payload 本地 projection / consent / registration-envelope fixture 仍使用隔离 D1 | W02 既有 Neon Postgres runtime 和 migrations；W01 Payload 的 Neon adapter 与 Postgres migration schema | W02 D1 证据路径已本批移除；下一个版本将 W01 local D1 evidence fixture 迁移到 Payload Neon PostgreSQL runtime rehearsal 后，删除脚本中的 `wrangler d1 execute`、D1 local config rewrite 和本地 D1 persistence | W01 fixture 下一个版本；W02 替换本批完成 |
+
 ## 第三批 W02 代码处置
 
 - W02 生产 runtime resolver 现在只接受显式 `W02_DATABASE_DRIVER=neon`；缺省与 `d1` 均失败关闭。
 - `workers/W02-identity/src/index.ts` 已删除 `D1_01` Env、createD1 Store fallback、D1 L8 bootstrap 分支和 D1 scheduled Queue publishers；HTTP 与 scheduled 入口都只使用 Neon PostgreSQL Stores。
+- AUTH-001 / AUTH-010 runtime evidence 已把 W02 schema、identity、session、RoleAssignment 和审计数据迁到临时 Neon PostgreSQL 18；W01 Payload 本地 D1 仅限测试投影 fixture，已单独登记下个版本删除。
 - `src/auth/principal.ts` 已移除 D1 principal Store fallback；`createLuckReadAuth` 已改成只创建 Neon Better Auth instance。
 - D1 Better Auth schema/test fixture 与 D1 Store/Queue publisher helpers 保留在源码供现存测试使用，全部加了 `@deprecated-next-version` 标记及 Neon 替代实现；不再由生产 W02 entrypoint 选择。
 - `wrangler.jsonc`、D1 migrations 和 `neon-postgres-schema.config.ts` 暂留为迁移来源/历史审计/CLI schema-source，按 NEEDS_CONFIRMATION 登记；生产配置仍是 D1-free 的 `wrangler.neon.jsonc`。
