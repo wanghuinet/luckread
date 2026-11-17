@@ -52,6 +52,13 @@ function assertStartedEvent(event: MfaAuditEvent, userId: string): void {
  * committed in one D1 batch; the outbox insert is conditional on the exact
  * reservation update changing one user row.
  */
+/**
+ * @deprecated-next-version
+ * Reason: Legacy Cloudflare D1 implementation retained only for isolated unit tests or the explicit schema/test fixture.
+ * Replacement: PostgreSQL MFA enrollment start Store in src/neon/mfa-enrollment-start-postgres.ts.
+ * Removal: Next release.
+ * Condition: MFA enrollment start tests use PostgreSQL/in-memory Store fixtures and D1 batch semantics are no longer used.
+ */
 export function createD1MfaEnrollmentStartStore(db: D1Database): MfaEnrollmentStartStore {
   return {
     async reserve(input) {
