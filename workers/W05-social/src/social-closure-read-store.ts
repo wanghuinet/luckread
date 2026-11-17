@@ -1,11 +1,4 @@
-import {
-  createD1SocialTargetsReadStore,
-} from './social-targets-read-store.js'
-import type {
-  SocialTargetsReadInput,
-  SocialTargetsReadResult,
-  SocialTargetsReadStore,
-} from './social-targets-read-store.js'
+import type { SocialTargetsReadStore } from './social-targets-read-store.js'
 
 export type SocialTopicRow = Readonly<{
   topic_id: string
