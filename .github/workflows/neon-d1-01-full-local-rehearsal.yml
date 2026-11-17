@@ -105,7 +105,7 @@ jobs:
           node --test ../../scripts/neon/d1-01/verify-combined-local-rehearsal.test.mjs
           node --test ../../scripts/neon/run-schema-migrations.test.mjs
 
-      - name: Validate the complete fourteen-entry D1-01 manifest before DDL
+      - name: Validate the complete fifteen-entry D1-01 manifest before DDL
         env:
           PGPASSWORD: postgres_local_only
         run: |
@@ -113,7 +113,7 @@ jobs:
           mkdir -p artifacts/neon
           node scripts/neon/d1-01-migration-manifest.mjs
           node scripts/neon/plan-d1-01-schema-migrations.mjs > /tmp/d1-01-plan.json
-          node --input-type=module -e "import fs from 'node:fs'; const p=JSON.parse(fs.readFileSync('/tmp/d1-01-plan.json','utf8')); if (p.summary.migrationCount !== 14 || p.readiness.generatedArtifactCount !== 0 || p.readiness.executable !== false || p.safety.remoteConnectionAttempted !== false) throw new Error('D1-01 manifest plan guard failed'); console.log('D1_01_MANIFEST_READY entries=' + p.summary.migrationCount)"
+          node --input-type=module -e "import fs from 'node:fs'; const p=JSON.parse(fs.readFileSync('/tmp/d1-01-plan.json','utf8')); if (p.summary.migrationCount !== 15 || p.readiness.generatedArtifactCount !== 0 || p.readiness.executable !== false || p.safety.remoteConnectionAttempted !== false) throw new Error('D1-01 manifest plan guard failed'); console.log('D1_01_MANIFEST_READY entries=' + p.summary.migrationCount)"
           node scripts/neon/d1-01-migration-manifest.mjs --print-checksums > artifacts/neon/d1-01-manifest-checksums.json
 
       - name: Re-generate Better Auth core twice and compare with committed artifact
@@ -239,7 +239,7 @@ jobs:
             --file workers/W08-creator/scripts/neon/verify-d1-01-creator-postgres-schema.sql \
             > workers/W08-creator/artifacts/neon/w08-d1-01-creator-postgres-schema-postflight.json
 
-      - name: Verify combined table ownership, foreign-key boundaries, empty business data and all fourteen ledger entries
+      - name: Verify combined table ownership, foreign-key boundaries, empty business data and all fifteen ledger entries
         working-directory: workers/W02-identity
         env:
           W02_SCHEMA_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/luckread_schema
