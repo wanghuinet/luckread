@@ -2835,6 +2835,19 @@ describe('creator-selected sensitive media warning', () => {
 
 
 describe('W03 Neon canonical content detail access behavior', () => {
+  it('requires the Neon detail read store for the canonical content lookup', () => {
+    const runtime = readFileSync(
+      resolve(process.cwd(), 'workers/W03-content/src/content-runtime.ts'),
+      'utf8',
+    )
+    const start = runtime.indexOf('export async function getContent(')
+    const end = runtime.indexOf('\nexport async function getPublishedContentAuthorContext', start)
+    const section = runtime.slice(start, end)
+    expect(section).toContain('await readStore.getContent(contentId, principalUserId)')
+    expect(section).not.toContain('ContentD1')
+    expect(section).not.toContain('db.prepare')
+  })
+
   it('keeps W07 membership checks and member-only body redaction after Neon lookup', async () => {
     const row = {
       id: 'content_member_1',
@@ -2864,14 +2877,10 @@ describe('W03 Neon canonical content detail access behavior', () => {
         return row
       },
     }
-    const db = {
-      prepare() { throw new Error('Neon detail reader must be used instead of D1') },
-    } as never
-
-    const denied = await getContent(db, 'member-article', 'reader_1', async creatorId => {
+    const denied = await getContent(readStore as never, 'member-article', 'reader_1', async creatorId => {
       expect(creatorId).toBe('creator_1')
       return false
-    }, readStore)
+    })
     expect(denied).toMatchObject({
       accessGranted: false,
       accessMode: 'MEMBERS_ONLY',
@@ -2881,10 +2890,10 @@ describe('W03 Neon canonical content detail access behavior', () => {
       coverRef: null,
     })
 
-    const entitled = await getContent(db, 'member-article', 'reader_1', async creatorId => {
+    const entitled = await getContent(readStore as never, 'member-article', 'reader_1', async creatorId => {
       expect(creatorId).toBe('creator_1')
       return true
-    }, readStore)
+    })
     expect(entitled).toMatchObject({
       accessGranted: true,
       accessMode: 'MEMBERS_ONLY',
@@ -2897,6 +2906,27 @@ describe('W03 Neon canonical content detail access behavior', () => {
       ['member-article', 'reader_1'],
       ['member-article', 'reader_1'],
     ])
+  })
+
+  it('fails closed when the Neon content detail reader is unavailable', async () => {
+    let prepareCalled = false
+    const prepare = () => {
+      prepareCalled = true
+      throw new Error('content detail must not read D1')
+    }
+    const worker = createW03ContentWorker()
+    const response = await worker.fetch(
+      new Request('https://w03.internal/internal/content/contents/content_1', {
+        headers: {
+          'X-LuckRead-Caller': 'W01',
+          'X-LuckRead-Transport-Version': '1.0',
+          'X-LuckRead-Correlation-Id': 'content-detail-neon-store-unavailable',
+        },
+      }),
+      { D1_02: { prepare } } as never,
+    )
+    expect(response.status).toBe(503)
+    expect(prepareCalled).toBe(false)
   })
 
   it('keeps anonymous and owner principals explicit at the reader boundary', async () => {
@@ -2928,9 +2958,8 @@ describe('W03 Neon canonical content detail access behavior', () => {
         return row
       },
     }
-    const db = { prepare() { throw new Error('Neon reader must be used instead of D1') } } as never
-    await getContent(db, 'public-post', null, undefined, readStore)
-    await getContent(db, 'public-post', 'owner_1', undefined, readStore)
+    await getContent(readStore as never, 'public-post', null)
+    await getContent(readStore as never, 'public-post', 'owner_1')
     expect(principals).toEqual([null, 'owner_1'])
   })
 })
