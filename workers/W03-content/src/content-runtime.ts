@@ -1,7 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import { contentSlugFor, isContentSlug } from './content-slug.js'
-import { allocateContentSnowflakeId } from './content-snowflake-id.js'
 import { normalizePreflightInput, preflightContent } from './publish-preflight.js'
 import type {
   PublishedMediaReferenceReadStore,
@@ -1495,14 +1494,13 @@ export async function listFollowingOwnerContents(
 }
 
 export async function createContent(
-  db: ContentD1,
   ownerUserId: string,
   input: unknown,
   idempotencyKey: string,
-  now = new Date(),
+  now: Date = new Date(),
   correlationId = 'runtime',
-  verifiedCreatorId?: string,
-  mutationStore?: ContentCreateStore,
+  verifiedCreatorId: string | undefined,
+  mutationStore: ContentCreateStore,
 ): Promise<ContentRecord> {
   assertResourceId(ownerUserId)
   if (!idempotencyKey || idempotencyKey.length > 256) {
@@ -1524,16 +1522,11 @@ export async function createContent(
     : { ownerUserId, input: normalized }
   const hash = await requestHash(operationId, hashInput)
 
-  const existing = mutationStore
-    ? await mutationStore.loadIdempotency(ownerUserId, operationId, idempotencyKey)
-    : await db.prepare(
-        `SELECT id AS idem_id, owner_user_id AS idem_owner_user_id, request_hash AS idem_request_hash,
-                status AS idem_status, response_status AS idem_response_status, response_json AS idem_response_json,
-                expires_at AS idem_expires_at
-           FROM content_mutation_idempotency
-          WHERE owner_user_id = ? AND operation_id = ? AND idempotency_key = ?
-          ORDER BY created_at DESC LIMIT 1`,
-      ).bind(ownerUserId, operationId, idempotencyKey).first<IdempotencyRow>()
+  const existing = await mutationStore.loadIdempotency(
+    ownerUserId,
+    operationId,
+    idempotencyKey,
+  )
 
   const replay = inspectIdempotency(existing, ownerUserId, hash, now)
   if (replay.replayed) {
@@ -1569,12 +1562,9 @@ export async function createContent(
 
   let contentId: string
   try {
-    // Every newly created content type shares W03's atomic D1-02 ID sequence.
-    // Never fall back to an isolate-local generator: concurrent W03 isolates
-    // must draw from the same uniqueness boundary.
-    contentId = mutationStore
-      ? await mutationStore.allocateContentId(now.getTime())
-      : await allocateContentSnowflakeId(db, now.getTime())
+    // All W03 content IDs use the shared PostgreSQL sequence on D1-02 / Neon.
+    // Allocation is atomic across isolates and never falls back to D1 or memory.
+    contentId = await mutationStore.allocateContentId(now.getTime())
   } catch {
     throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
   }
@@ -1626,31 +1616,17 @@ export async function createContent(
     createdAt,
   }
 
-  if (mutationStore) {
-    await mutationStore.create({
-      ownerUserId,
-      operationId,
-      idempotencyKey,
-      requestHash: hash,
-      responseJson: JSON.stringify(createdContent),
-      createdAt,
-      expiresAt,
-      content: createdContent,
-      revision,
-    })
-  } else {
-    await batchMutation(db, [
-      expireMutationRow(db, ownerUserId, operationId, idempotencyKey, createdAt),
-      insertCompletedIdempotency(db, ownerUserId, operationId, idempotencyKey, hash, 201, JSON.stringify(createdContent), createdAt, expiresAt),
-      db.prepare(
-        `INSERT INTO contents
-          (id, content_type, owner_user_id, creator_id, ip_id, state, scheduled_at, access_mode, version, revision, slug, title, body_ref, media_refs_json, cover_ref, media_warning, etag, created_at, updated_at)
-         VALUES (?, ?, ?, ?, NULL, 'DRAFT', NULL, ?, 1, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      ).bind(contentId, normalized.contentType, ownerUserId, creatorId, normalized.accessMode ?? 'PUBLIC', slug, normalized.title, normalized.bodyRef, JSON.stringify(normalized.mediaRefs), normalized.coverRef, createdContent.mediaWarning ?? null, createdContent.etag, createdAt, createdAt),
-      atomicGuard(db),
-      insertRevision(db, revision),
-    ])
-  }
+  await mutationStore.create({
+    ownerUserId,
+    operationId,
+    idempotencyKey,
+    requestHash: hash,
+    responseJson: JSON.stringify(createdContent),
+    createdAt,
+    expiresAt,
+    content: createdContent,
+    revision,
+  })
 
   return createdContent
 }
