@@ -1,5 +1,5 @@
 import usernameReservationPolicy from '../../../../contracts/security/username-reservation-policy.v1.json'
-import type { BetterAuthEnv } from './better-auth.js'
+import { requireLegacyW02D1Database, type BetterAuthEnv } from './better-auth.js'
 import { resolveBetterAuthPrincipal, type AuthenticatedPrincipal } from './principal.js'
 import { createD1UsernameChangeStore, type UsernameChangeContext, type UsernameChangeStore } from './username-change-store.js'
 
@@ -153,7 +153,7 @@ export async function handleUsernameStateRequest(
   env: BetterAuthEnv,
   request: Request,
   now = new Date(),
-  store: UsernameChangeStore = createD1UsernameChangeStore(env.D1_01),
+  store: UsernameChangeStore = createD1UsernameChangeStore(requireLegacyW02D1Database(env)),
 ): Promise<Response> {
   if (!callerAllowed(request)) return error(403, 'FORBIDDEN', 'Authorized W01 service boundary required')
   const auth = await authenticate(env, request)
@@ -186,7 +186,7 @@ export async function handleUsernameChangeRequest(
   env: BetterAuthEnv,
   request: Request,
   now = new Date(),
-  store: UsernameChangeStore = createD1UsernameChangeStore(env.D1_01),
+  store: UsernameChangeStore = createD1UsernameChangeStore(requireLegacyW02D1Database(env)),
 ): Promise<Response> {
   if (!callerAllowed(request)) return error(403, 'FORBIDDEN', 'Authorized W01 service boundary required')
   const auth = await authenticate(env, request)

@@ -2,6 +2,9 @@ import type { Pool, PoolClient } from 'pg'
 
 import {
   RegistrationRollbackStoreError,
+  type RegistrationIdentity,
+  type RegistrationIdentityConfirmationCommand,
+  type RegistrationIdentityConfirmation,
   type RegistrationRollbackCommand,
   type RegistrationRollbackResult,
   type RegistrationRollbackStore,
@@ -12,6 +15,26 @@ type RegistrationRow = {
   email: string
   username: string | null
   accountState: string
+}
+
+function normalizeIdentityConfirmation(
+  command: RegistrationIdentityConfirmationCommand,
+): RegistrationIdentityConfirmationCommand {
+  if (
+    !command ||
+    typeof command.userId !== 'string' ||
+    command.userId.length < 1 ||
+    command.userId.length > 128 ||
+    typeof command.email !== 'string' ||
+    command.email.trim().length === 0 ||
+    command.email.trim().length > 254
+  ) {
+    throw new RegistrationRollbackStoreError('INVALID_INPUT', 'invalid registration identity confirmation')
+  }
+  return {
+    userId: command.userId,
+    email: command.email.trim().toLowerCase(),
+  }
 }
 
 function normalizeCommand(command: RegistrationRollbackCommand): RegistrationRollbackCommand {
@@ -89,9 +112,23 @@ async function rollbackRegistration(
   return { rolledBack: true }
 }
 
-/** PostgreSQL counterpart for disposable PG18 rehearsal; not a production binding. */
+/** Production Neon PostgreSQL adapter for W02 registration identity confirmation and rollback. */
 export function createPostgresRegistrationRollbackStore(pool: Pool): RegistrationRollbackStore {
   return {
+    async confirmIdentity(rawCommand): Promise<RegistrationIdentityConfirmation> {
+      const command = normalizeIdentityConfirmation(rawCommand)
+      const result = await pool.query<RegistrationIdentity>(
+        'SELECT id, email, username FROM "user" WHERE id = $1 OR email = $2',
+        [command.userId, command.email],
+      )
+      const identityById = result.rows.find((row) => row.id === command.userId) ?? null
+      const identityByEmail = result.rows.find((row) => row.email === command.email) ?? null
+      return {
+        identityById,
+        identityByEmailId: identityByEmail?.id ?? null,
+      }
+    },
+
     async rollback(rawCommand) {
       const command = normalizeCommand(rawCommand)
       const client = await pool.connect()

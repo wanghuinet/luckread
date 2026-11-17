@@ -46,6 +46,13 @@ function assertInput(input: SessionRevocationStoreInput): void {
  * It resolves effective L1 authority, checks target ownership, and batches
  * native-session deletion with the durable audit outbox insertion.
  */
+/**
+ * @deprecated-next-version
+ * Reason: Legacy Cloudflare D1 implementation retained only for isolated unit tests or the explicit schema/test fixture.
+ * Replacement: PostgreSQL session revocation Store in src/neon/session-revocation-postgres-store.ts.
+ * Removal: Next release.
+ * Condition: Session revocation tests use PostgreSQL/in-memory Store fixtures and preserve the durable audit transaction boundary.
+ */
 export function createD1SessionRevocationStore(db: D1Database): SessionRevocationStore {
   return {
     async revoke(input) {

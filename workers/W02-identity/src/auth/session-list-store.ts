@@ -64,6 +64,13 @@ function assertInput(input: SessionListStoreInput): void {
 }
 
 /** D1 remains the production default until the complete W02 runtime switch. */
+/**
+ * @deprecated-next-version
+ * Reason: Legacy Cloudflare D1 implementation retained only for isolated unit tests or the explicit schema/test fixture.
+ * Replacement: PostgreSQL session list Store in src/neon/session-list-postgres.ts.
+ * Removal: Next release.
+ * Condition: Session list tests use PostgreSQL/in-memory Store fixtures and no D1 session reads are required.
+ */
 export function createD1SessionListStore(db: D1Database): SessionListStore {
   return {
     async list(input) {

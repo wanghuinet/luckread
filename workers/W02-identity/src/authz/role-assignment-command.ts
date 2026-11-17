@@ -181,6 +181,13 @@ async function grantCreatorBusinessRoleD1(
  * W02 selects one provider for identity, session, RoleAssignment and lifecycle
  * stores together; do not mix providers within an active runtime.
  */
+/**
+ * @deprecated-next-version
+ * Reason: Legacy Cloudflare D1 implementation retained only for isolated unit tests or the explicit schema/test fixture.
+ * Replacement: PostgreSQL creator-role grant Store in src/neon/creator-role-grant-store-postgres.ts.
+ * Removal: Next release.
+ * Condition: RoleAssignment contract tests use PostgreSQL/in-memory Store fixtures; no direct D1 grant transaction remains.
+ */
 export function createD1CreatorRoleGrantStore(db: D1Database): CreatorRoleGrantStore {
   return {
     grant: (command, now) => grantCreatorBusinessRoleD1(db, command, now),

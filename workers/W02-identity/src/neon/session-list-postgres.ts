@@ -50,8 +50,9 @@ function assertInput(input: SessionListStoreInput): void {
  * subject's effective base-user RoleAssignment in the same statement. It
  * returns no token, IP, user-agent, or cross-account session fields.
  *
- * This adapter is for disposable PostgreSQL rehearsal and future staged
- * admission. The deployed W02 Worker still uses createD1SessionListStore.
+ * The Neon-only W02 production runtime constructs this adapter from its
+ * existing Hyperdrive pool; the disposable PostgreSQL 18 rehearsal uses the
+ * same Store implementation.
  */
 export function createPostgresSessionListStore(pool: Pool): SessionListStore {
   return {

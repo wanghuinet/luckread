@@ -78,6 +78,13 @@ const STATE_SQL = [
  * Production remains on this D1 adapter until an independently approved
  * runtime-adapter/cutover change control changes the W02 Worker entry point.
  */
+/**
+ * @deprecated-next-version
+ * Reason: Legacy Cloudflare D1 implementation retained only for isolated unit tests or the explicit schema/test fixture.
+ * Replacement: PostgreSQL username change Store in src/neon/username-change-postgres.ts.
+ * Removal: Next release.
+ * Condition: Username change tests use PostgreSQL/in-memory Store fixtures and preserve idempotency, cooldown, and uniqueness constraints.
+ */
 export function createD1UsernameChangeStore(db: D1Database): UsernameChangeStore {
   return {
     async loadContext(userId, idempotencyKeyHash, nowIso) {

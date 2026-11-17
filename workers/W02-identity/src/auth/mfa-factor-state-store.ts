@@ -41,6 +41,13 @@ function assertSubject(userId: string): void {
  * Production adapter. It deliberately delegates the established D1 authority
  * and conditional UPDATE implementations without changing their SQL semantics.
  */
+/**
+ * @deprecated-next-version
+ * Reason: Legacy Cloudflare D1 implementation retained only for isolated unit tests or the explicit schema/test fixture.
+ * Replacement: PostgreSQL MFA factor-state Store in src/neon/mfa-factor-state-postgres.ts.
+ * Removal: Next release.
+ * Condition: Better Auth and MFA route tests use PostgreSQL/in-memory factor-state Stores; all replay guards use Neon.
+ */
 export function createD1MfaFactorStateStore(db: D1Database): MfaFactorStateStore {
   return {
     isActiveSubject(userId) {

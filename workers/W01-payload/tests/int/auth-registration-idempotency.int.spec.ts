@@ -44,20 +44,26 @@ describe('AUTH-001 registration idempotency ordering', () => {
       resolve(process.cwd(), 'src/auth/registration-persistence.ts'),
       'utf8',
     )
+    const w02Client = readFileSync(
+      resolve(process.cwd(), 'src/auth/w02-session-client.ts'),
+      'utf8',
+    )
 
-    const identityLookup = route.indexOf('persistence.findIdentityById(userId)')
+    const identityLookup = route.indexOf('confirmRegistrationIdentity(request,')
     const projectionWrite = route.indexOf('await payload.create({')
     expect(identityLookup).toBeGreaterThanOrEqual(0)
     expect(projectionWrite).toBeGreaterThanOrEqual(0)
     expect(identityLookup).toBeLessThan(projectionWrite)
+    expect(route).toContain('identityConfirmation.identityById')
+    expect(route).toContain('identityConfirmation.identityByEmailId')
     expect(route).toContain("event: 'auth.register.identity_not_persisted'")
     expect(route).toContain("return errorResponse(422, 'VALIDATION_FAILED', 'Registration could not be completed')")
-    expect(persistence).toContain("db.withSession('first-primary')")
-    expect(persistence).toContain('SELECT id, email, username FROM "user" WHERE id = ? LIMIT 1')
-    expect(persistence).toContain('SELECT id, email, username FROM "user" WHERE id = $1 LIMIT 1')
-    expect(persistence).toContain('SELECT id FROM "user" WHERE email = ? LIMIT 1')
-    expect(persistence).toContain('SELECT id FROM "user" WHERE email = $1 LIMIT 1')
-    expect(persistence).not.toContain('lower(email) = ?')
+    expect(w02Client).toContain('/internal/auth/registration/identity-confirmation')
+    expect(w02Client).toContain("'X-LuckRead-Caller': 'W01'")
+    expect(w02Client).toContain('confirmRegistrationIdentity(')
+    expect(persistence).not.toContain('findIdentityById')
+    expect(persistence).not.toContain('findIdentityByEmail')
+    expect(persistence).not.toContain('FROM "user"')
   })
 
   it('validates email, username and password policy at the registration API boundary', () => {

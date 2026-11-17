@@ -403,7 +403,7 @@ if (blockers.length === 0) {
       /effectiveMfaAuditReceiptStore!\.reconcile\(\)/.test(betterAuth) &&
       /auth\.mfa\.replay_rejected/.test(betterAuth) &&
       /mfaAuditOperationReceiptStore\?: MfaAuditOperationReceiptStore/.test(betterAuth) &&
-      /createD1MfaAuditOperationReceiptStore\(env\.D1_01\)/.test(betterAuth) &&
+      /createD1MfaAuditOperationReceiptStore\(legacyD1!\)/.test(betterAuth) &&
       /createD1MfaAuditOperationReceiptStore\(db: D1Database\)/.test(mfaAuditReceiptStorePort) &&
       /appendMfaAuditOperationReceiptEvent\(db/.test(mfaAuditReceiptStorePort) &&
       /finalizeMfaAuditOperationReceipt\(db/.test(mfaAuditReceiptStorePort) &&

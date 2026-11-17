@@ -72,6 +72,64 @@ export async function proxyBetterAuth(
   return new Response(await response.arrayBuffer(), { status: response.status, headers })
 }
 
+export type RegistrationIdentityConfirmation = {
+  identityById: {
+    id: string
+    email: string
+    username: string | null
+  } | null
+  identityByEmailId: string | null
+}
+
+/**
+ * Confirm a newly registered identity through W02's own authority store.
+ * W01 must never read Better Auth's user table through its Payload database.
+ */
+export async function confirmRegistrationIdentity(
+  request: Request,
+  body: { userId: string; email: string },
+): Promise<RegistrationIdentityConfirmation> {
+  const response = await callW02('/internal/auth/registration/identity-confirmation', {
+    request,
+    body,
+    headers: {
+      'X-LuckRead-Caller': 'W01',
+      'X-LuckRead-Transport-Version': '1.0',
+    },
+  })
+
+  let payload: unknown = null
+  try { payload = await response.json() } catch {}
+  if (!response.ok || !payload || typeof payload !== 'object') {
+    throw new W02AuthClientError(response.status || 503, 'registration identity confirmation failed', errorCode(payload) ?? undefined)
+  }
+
+  const value = payload as {
+    identityById?: unknown
+    identityByEmailId?: unknown
+  }
+  const identity = value.identityById
+  const validIdentity = identity === null || (
+    !!identity &&
+    typeof identity === 'object' &&
+    typeof (identity as { id?: unknown }).id === 'string' &&
+    typeof (identity as { email?: unknown }).email === 'string' &&
+    ((identity as { username?: unknown }).username === null ||
+      typeof (identity as { username?: unknown }).username === 'string')
+  )
+  if (
+    !validIdentity ||
+    (value.identityByEmailId !== null && typeof value.identityByEmailId !== 'string')
+  ) {
+    throw new W02AuthClientError(503, 'registration identity confirmation response invalid')
+  }
+
+  return {
+    identityById: identity as RegistrationIdentityConfirmation['identityById'],
+    identityByEmailId: value.identityByEmailId as string | null,
+  }
+}
+
 export type BetterAuthPrincipal = {
   active: boolean
   userId: string
@@ -314,6 +372,13 @@ export async function rollbackRegistrationUser(
   request: Request,
   body: { userId: string; email: string; username: string },
 ): Promise<void> {
-  const response = await callW02('/internal/auth/registration/rollback', { request, body })
+  const response = await callW02('/internal/auth/registration/rollback', {
+    request,
+    body,
+    headers: {
+      'X-LuckRead-Caller': 'W01',
+      'X-LuckRead-Transport-Version': '1.0',
+    },
+  })
   if (!response.ok) throw new W02AuthClientError(response.status, 'registration rollback failed')
 }

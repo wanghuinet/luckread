@@ -1,6 +1,10 @@
 import { execFileSync } from 'node:child_process'
+import { createRequire } from 'node:module'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
+
+const requireW02 = createRequire(new URL('../../W02-identity/package.json', import.meta.url))
+const { Client: PostgresClient } = requireW02('pg')
 
 const baseUrl = (process.env.AUTH001_BASE_URL || 'http://127.0.0.1:8787').replace(/\/$/, '')
 const persistTo = process.env.CLOUDFLARE_PERSIST_TO || '/tmp/luckread-auth001-state'
@@ -20,6 +24,17 @@ const registerKeyB = 'AUTH010-LOCAL-' + suffix + '-REGISTER-B'
 const emails = [emailA, emailB]
 const registerKeys = [registerKeyA, registerKeyB]
 const userIds = []
+const sessionIds = []
+const w02DatabaseUrl = process.env.AUTH001_W02_DATABASE_URL
+if (!w02DatabaseUrl) throw new Error('AUTH001_W02_DATABASE_URL is required for the Neon-backed W02 session evidence')
+const w02DatabaseTarget = new URL(w02DatabaseUrl)
+if (!new Set(['127.0.0.1', 'localhost']).has(w02DatabaseTarget.hostname) ||
+    w02DatabaseTarget.port !== '5432' || w02DatabaseTarget.pathname !== '/luckread_schema') {
+  throw new Error('Refusing AUTH-010 W02 session evidence outside disposable local luckread_schema PostgreSQL')
+}
+const w02Database = new PostgresClient({ connectionString: w02DatabaseUrl })
+let w02DatabaseConnected = false
+const pgScalar = async (sql, ...args) => (await w02Database.query(sql, args)).rows[0] ?? null
 
 const escapeSql = (value) => "'" + String(value).replaceAll("'", "''") + "'"
 const renderSql = (sql, args = []) => {
@@ -42,22 +57,14 @@ const d1Json = (command, options = {}) => {
       const busy = /SQLITE_BUSY|database is locked/i.test(message)
       if (!retryBusy || !busy || attempt >= maxRetries) throw error
 
-      // W01 and W02 local Workers share one SQLite persistence directory.
-      // Retry only read-only CLI queries while workerd briefly holds its lock.
+      // W01 uses a local D1 persistence directory only for the Payload projection fixture.
+      // Retry only read-only W01 CLI queries while workerd briefly holds its lock.
       // Writes/DDL are never replayed because their commit outcome may be unknown.
       const delayMs = Math.min(250 * (2 ** attempt), 3_000)
       Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, delayMs)
     }
   }
 }
-const d1Rows = (command) => {
-  const value = d1Json(command, { retryBusy: true })
-  if (Array.isArray(value)) return value.flatMap((item) => Array.isArray(item) ? item : item && Array.isArray(item.results) ? item.results : item && Array.isArray(item.result) ? item.result : [])
-  if (value && Array.isArray(value.results)) return value.results
-  if (value && Array.isArray(value.result)) return value.result
-  return []
-}
-const scalar = (sql, ...args) => d1Rows(renderSql(sql, args))[0] ?? null
 const runSql = (sql, ...args) => d1Json(renderSql(sql, args))
 
 const parseJson = async (response, label) => {
@@ -104,12 +111,12 @@ const registerAccount = async ({ email, username, password, idempotencyKey }) =>
   }
   userIds.push(String(payload.userId))
 
-  runSql(
-    'UPDATE "user" SET email_verified = 1, account_state = \'ACTIVE\', account_state_version = account_state_version + 1 WHERE id = ?',
-    payload.userId,
+  await w02Database.query(
+    'UPDATE "user" SET email_verified = TRUE, account_state = $1, account_state_version = account_state_version + 1 WHERE id = $2',
+    ['ACTIVE', payload.userId],
   )
-  const activated = scalar(
-    'SELECT id, email_verified AS emailVerified, account_state AS accountState FROM "user" WHERE id = ? LIMIT 1',
+  const activated = await pgScalar(
+    'SELECT id, email_verified AS "emailVerified", account_state AS "accountState" FROM "user" WHERE id = $1 LIMIT 1',
     payload.userId,
   )
   if (!activated || Number(activated.emailVerified) !== 1 || activated.accountState !== 'ACTIVE') {
@@ -139,17 +146,17 @@ const createSecondIsolatedIdentity = async () => {
     throw new Error('AUTH010_SECOND_IDENTITY_SIGNUP_FAILED_HTTP_' + signupResponse.status)
   }
 
-  const identity = scalar('SELECT id FROM "user" WHERE email = ? LIMIT 1', emailB)
+  const identity = await pgScalar('SELECT id FROM "user" WHERE email = $1 LIMIT 1', emailB)
   const userId = typeof identity?.id === 'string' ? identity.id : ''
   if (!userId) throw new Error('AUTH010_SECOND_IDENTITY_NOT_PERSISTED')
   userIds.push(userId)
 
-  runSql(
-    'UPDATE "user" SET email_verified = 1, account_state = \'ACTIVE\', account_state_version = account_state_version + 1 WHERE id = ?',
-    userId,
+  await w02Database.query(
+    'UPDATE "user" SET email_verified = TRUE, account_state = $1, account_state_version = account_state_version + 1 WHERE id = $2',
+    ['ACTIVE', userId],
   )
-  const activated = scalar(
-    'SELECT id, email_verified AS emailVerified, account_state AS accountState FROM "user" WHERE id = ? LIMIT 1',
+  const activated = await pgScalar(
+    'SELECT id, email_verified AS "emailVerified", account_state AS "accountState" FROM "user" WHERE id = $1 LIMIT 1',
     userId,
   )
   if (!activated || Number(activated.emailVerified) !== 1 || activated.accountState !== 'ACTIVE') {
@@ -245,11 +252,14 @@ const revokeSession = async (cookie, sessionId, idempotencyKey) => {
 
 const cleanup = async () => {
   const ids = [...new Set(userIds)]
-  try { runSql('DELETE FROM role_assignments WHERE subject_id IN (' + ids.map(escapeSql).join(',') + ')') } catch {}
-  try { runSql('DELETE FROM auth_session_state WHERE user_id IN (' + ids.map(escapeSql).join(',') + ')') } catch {}
-  try { runSql('DELETE FROM "session" WHERE user_id IN (' + ids.map(escapeSql).join(',') + ')') } catch {}
-  try { runSql('DELETE FROM "account" WHERE user_id IN (' + ids.map(escapeSql).join(',') + ')') } catch {}
-  try { runSql('DELETE FROM "verification" WHERE identifier IN (' + emails.map(escapeSql).join(',') + ')') } catch {}
+  try { if (ids.length) await w02Database.query('DELETE FROM role_assignments WHERE subject_id = ANY($1::text[])', [ids]) } catch {}
+  try { if (ids.length) await w02Database.query('DELETE FROM role_authorization_versions WHERE subject_id = ANY($1::text[])', [ids]) } catch {}
+  try { if (ids.length) await w02Database.query('DELETE FROM auth_session_state WHERE user_id = ANY($1::text[])', [ids]) } catch {}
+  try { if (ids.length) await w02Database.query('DELETE FROM auth_013_publication_journal WHERE resource_id = ANY($1::text[])', [ids]) } catch {}
+  try { if (sessionIds.length) await w02Database.query('DELETE FROM auth_010_session_revocation_journal WHERE resource_id = ANY($1::text[])', [[...new Set(sessionIds)]]) } catch {}
+  try { if (ids.length) await w02Database.query('DELETE FROM "session" WHERE user_id = ANY($1::text[])', [ids]) } catch {}
+  try { if (ids.length) await w02Database.query('DELETE FROM "account" WHERE user_id = ANY($1::text[])', [ids]) } catch {}
+  try { if (emails.length) await w02Database.query('DELETE FROM "verification" WHERE identifier = ANY($1::text[])', [emails]) } catch {}
   try {
     runSql(
       'DELETE FROM consents WHERE resource_id IN (SELECT CAST(id AS TEXT) FROM users WHERE email IN (' + emails.map(escapeSql).join(',') + '))',
@@ -257,12 +267,14 @@ const cleanup = async () => {
   } catch {}
   try { runSql('DELETE FROM auth_registration_envelopes WHERE idempotency_key IN (' + registerKeys.map(escapeSql).join(',') + ')') } catch {}
   try { runSql('DELETE FROM users WHERE email IN (' + emails.map(escapeSql).join(',') + ')') } catch {}
-  try { runSql('DELETE FROM "user" WHERE id IN (' + ids.map(escapeSql).join(',') + ')') } catch {}
+  try { if (ids.length) await w02Database.query('DELETE FROM "user" WHERE id = ANY($1::text[])', [ids]) } catch {}
 }
 
 let cleaned = false
 let currentStage = 'startup'
 try {
+  await w02Database.connect()
+  w02DatabaseConnected = true
   currentStage = 'health-check'
   const health = await fetch(baseUrl + '/')
   if (health.status >= 500) throw new Error('AUTH010_LOCAL_W01_NOT_READY')
@@ -284,27 +296,26 @@ try {
   }
 
   currentStage = 'native-session-check'
-  const currentRow = scalar('SELECT id, user_id AS userId FROM "session" WHERE user_id = ? ORDER BY created_at DESC LIMIT 1', userAId)
+  const currentRow = await pgScalar('SELECT id, user_id AS "userId" FROM "session" WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1', userAId)
   if (!currentRow?.id || String(currentRow.userId) !== userAId) {
     throw new Error('AUTH010_NATIVE_LOGIN_SESSION_NOT_FOUND')
   }
+  sessionIds.push(String(currentRow.id))
 
   currentStage = 'seed-session-fixtures'
   const seedNow = Date.now()
-  const sessionValues = Array.from({ length: 55 }, (_, index) => {
+  for (let index = 0; index < 55; index += 1) {
     const sessionId = 'auth010-seed-' + suffix + '-' + String(index).padStart(2, '0')
     const token = 'auth010-token-' + suffix + '-' + String(index).padStart(2, '0')
     const createdAt = new Date(seedNow - (60 + index) * 1000).toISOString()
     const expiresAt = new Date(seedNow + 24 * 60 * 60 * 1000).toISOString()
-    const updatedAt = createdAt
-    return '(' + [
-      sessionId, expiresAt, token, createdAt, updatedAt, null, null, userAId,
-    ].map((value) => value === null ? 'NULL' : escapeSql(value)).join(',') + ')'
-  })
-  runSql(
-    'INSERT INTO "session" (id, expires_at, token, created_at, updated_at, ip_address, user_agent, user_id) VALUES ' + sessionValues.join(','),
-  )
-  const seededCount = scalar('SELECT COUNT(*) AS count FROM "session" WHERE user_id = ?', userAId)
+    sessionIds.push(sessionId)
+    await w02Database.query(
+      'INSERT INTO "session" (id, expires_at, token, created_at, updated_at, ip_address, user_agent, user_id) VALUES ($1, $2, $3, $4, $4, NULL, NULL, $5)',
+      [sessionId, expiresAt, token, createdAt, userAId],
+    )
+  }
+  const seededCount = await pgScalar('SELECT COUNT(*)::integer AS count FROM "session" WHERE user_id = $1', userAId)
   if (Number(seededCount?.count) < 56) throw new Error('AUTH010_SESSION_FIXTURE_SEED_FAILED')
 
   currentStage = 'list-page-one'
@@ -362,8 +373,8 @@ try {
   if (currentRevokeResponse.status !== 409 || currentRevokePayload?.error?.code !== 'CURRENT_SESSION_PROTECTED') {
     throw new Error('AUTH010_CURRENT_SESSION_REVOKE_NOT_PROTECTED')
   }
-  const currentSessionAfterRejectedRevoke = scalar(
-    'SELECT id FROM "session" WHERE id = ? AND user_id = ? LIMIT 1',
+  const currentSessionAfterRejectedRevoke = await pgScalar(
+    'SELECT id FROM "session" WHERE id = $1 AND user_id = $2 LIMIT 1',
     currentRow.id,
     userAId,
   )
@@ -372,7 +383,7 @@ try {
   currentStage = 'cross-account-revoke'
   const crossAccountRevoke = await revokeSession(cookieB, targetSessionId, 'AUTH010-' + suffix + '-CROSS')
   if (crossAccountRevoke.status !== 204) throw new Error('AUTH010_CROSS_ACCOUNT_REVOKE_STATUS_UNEXPECTED')
-  const targetAfterCross = scalar('SELECT id FROM "session" WHERE id = ? AND user_id = ? LIMIT 1', targetSessionId, userAId)
+  const targetAfterCross = await pgScalar('SELECT id FROM "session" WHERE id = $1 AND user_id = $2 LIMIT 1', targetSessionId, userAId)
   if (!targetAfterCross) throw new Error('AUTH010_CROSS_ACCOUNT_REVOKE_CHANGED_OWNER_SESSION')
 
   currentStage = 'owned-revoke'
@@ -380,15 +391,15 @@ try {
   if (ownRevoke.status !== 204) throw new Error('AUTH010_OWNED_REVOKE_STATUS_UNEXPECTED')
   const repeatedRevoke = await revokeSession(cookieA, targetSessionId, 'AUTH010-' + suffix + '-OWN-REPLAY')
   if (repeatedRevoke.status !== 204) throw new Error('AUTH010_REPEATED_REVOKE_NOT_IDEMPOTENT')
-  const targetAfterOwn = scalar('SELECT id FROM "session" WHERE id = ? AND user_id = ? LIMIT 1', targetSessionId, userAId)
+  const targetAfterOwn = await pgScalar('SELECT id FROM "session" WHERE id = $1 AND user_id = $2 LIMIT 1', targetSessionId, userAId)
   if (targetAfterOwn) throw new Error('AUTH010_OWNED_REVOKE_DID_NOT_REMOVE_NATIVE_SESSION')
-  const sessionAuditRow = scalar(
-    'SELECT event_id AS eventId, event_type AS eventType, resource_id AS resourceId, idempotency_key AS idempotencyKey, status FROM auth_010_session_revocation_journal WHERE resource_id = ? AND event_type = ? LIMIT 1',
+  const sessionAuditRow = await pgScalar(
+    'SELECT event_id AS "eventId", event_type AS "eventType", resource_id AS "resourceId", idempotency_key AS "idempotencyKey", status FROM auth_010_session_revocation_journal WHERE resource_id = $1 AND event_type = $2 LIMIT 1',
     targetSessionId,
     'user.session.revoked',
   )
-  const sessionAuditCount = scalar(
-    'SELECT COUNT(*) AS count FROM auth_010_session_revocation_journal WHERE resource_id = ? AND event_type = ?',
+  const sessionAuditCount = await pgScalar(
+    'SELECT COUNT(*)::integer AS count FROM auth_010_session_revocation_journal WHERE resource_id = $1 AND event_type = $2',
     targetSessionId,
     'user.session.revoked',
   )
@@ -415,8 +426,8 @@ try {
     status: 'PASS',
     evidenceType: 'AUTH-010_SESSION_LIST_REVOKE_W01_W02_LOCAL_RUNTIME',
     testedCommitSha: sourceSha,
-    environmentClass: 'CONTROLLED_LOCAL_D1',
-    databaseName: 'luckread',
+    environmentClass: 'CONTROLLED_LOCAL_D1_W01_NEON_W02',
+    databaseName: 'W01 local D1 fixture + W02 Neon luckread_schema',
     assertions: {
       profileRead: true,
       loginCookieAuthenticatesSessionApi: true,
@@ -457,7 +468,7 @@ try {
     status: 'FAIL',
     evidenceType: 'AUTH-010_SESSION_LIST_REVOKE_W01_W02_LOCAL_RUNTIME',
     testedCommitSha: sourceSha,
-    environmentClass: 'CONTROLLED_LOCAL_D1',
+    environmentClass: 'CONTROLLED_LOCAL_D1_W01_NEON_W02',
     errorName: name,
     failureStage: currentStage,
     failureCode: error instanceof Error && /^AUTH010_[A-Z0-9_]+$/.test(error.message)
@@ -470,7 +481,11 @@ try {
   try { writeFileSync(new URL('runtime-result.json', artifactDir), JSON.stringify(result, null, 2) + '\n') } catch {}
   throw new Error('AUTH010_LOCAL_RUNTIME_FAILED_' + name)
 } finally {
-  if (!cleaned) {
-    try { await cleanup() } catch { console.error('AUTH010_LOCAL_CLEANUP_INCOMPLETE') }
+  try {
+    if (!cleaned) {
+      try { await cleanup() } catch { console.error('AUTH010_LOCAL_CLEANUP_INCOMPLETE') }
+    }
+  } finally {
+    if (w02DatabaseConnected) await w02Database.end()
   }
 }

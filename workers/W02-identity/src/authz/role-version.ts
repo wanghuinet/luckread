@@ -20,6 +20,13 @@ const SELECT_ROLE_VERSION = [
  * role-assignment mutation creates the row at version 1. Subsequent mutations
  * advance it atomically in D1/SQLite.
  */
+/**
+ * @deprecated-next-version
+ * Reason: Legacy Cloudflare D1 role/MFA state helper retained for isolated unit tests.
+ * Replacement: readRoleVersionPostgres in src/neon/role-assignment-postgres.ts.
+ * Removal: Next release.
+ * Condition: Role-version tests use the PostgreSQL helper and the D1 role-version functions are no longer called by production W02 routes.
+ */
 export async function readRoleVersion(db: D1Database, subjectId: string): Promise<number> {
   if (!subjectId) throw new Error('role version requires subjectId')
 
@@ -37,6 +44,13 @@ export async function readRoleVersion(db: D1Database, subjectId: string): Promis
  * Create the same monotonic role-version mutation for a larger D1 batch so
  * the version cannot be left behind if the related RoleAssignment write fails.
  */
+/**
+ * @deprecated-next-version
+ * Reason: Legacy Cloudflare D1 authorization helper retained for isolated unit tests.
+ * Replacement: Neon readRoleVersionPostgres / role-version mutation via PostgreSQL role assignment triggers.
+ * Removal: Next release.
+ * Condition: The remaining D1 version helper tests are moved to the PostgreSQL implementation and no D1 prepared statement is used in production.
+ */
 export function prepareRoleVersionAdvance(
   db: D1Database,
   subjectId: string,
@@ -47,6 +61,13 @@ export function prepareRoleVersionAdvance(
   return db.prepare(UPSERT_ROLE_VERSION).bind(subjectId, now)
 }
 
+/**
+ * @deprecated-next-version
+ * Reason: Legacy Cloudflare D1 authorization helper retained for isolated unit tests.
+ * Replacement: Neon role-version mutation via PostgreSQL role assignment triggers.
+ * Removal: Next release.
+ * Condition: The remaining D1 version helper tests are moved to the PostgreSQL implementation and no D1 prepared statement is used in production.
+ */
 export async function advanceRoleVersion(
   db: D1Database,
   subjectId: string,

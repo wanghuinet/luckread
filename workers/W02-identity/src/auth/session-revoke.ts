@@ -1,5 +1,5 @@
 import permissions from '../../../../contracts/authz/permissions.json'
-import { createLuckReadAuth, type BetterAuthEnv } from './better-auth.js'
+import { createLuckReadAuth, requireLegacyW02D1Database, type BetterAuthEnv } from './better-auth.js'
 import { createD1SessionRevocationStore, type SessionRevocationStore } from './session-revoke-store.js'
 import {
   enforceSessionRevokeRateLimits,
@@ -82,7 +82,7 @@ export async function handleCurrentUserSessionRevoke(
   }
 
   try {
-    const store = dependencies.store ?? createD1SessionRevocationStore(env.D1_01)
+    const store = dependencies.store ?? createD1SessionRevocationStore(requireLegacyW02D1Database(env))
     const result = await store.revoke({
       userId,
       sessionId,

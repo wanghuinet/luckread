@@ -6,7 +6,7 @@ import priv004DevPolicy from '../../../../../../artifacts/mapping-0/priv004-appr
 import priv004ProdPolicy from '../../../../../../artifacts/mapping-0/priv004-production-policy-instance-2026-09-27.json'
 import { enforceAuthRateLimit, TrafficLimitError, rateLimitResponse } from '../../../auth/traffic-limit.js'
 import { getW01RegistrationPersistenceStore } from '../../../auth/registration-persistence.js'
-import { proxyBetterAuth, rollbackRegistrationUser } from '../../../auth/w02-session-client.js'
+import { confirmRegistrationIdentity, proxyBetterAuth, rollbackRegistrationUser } from '../../../auth/w02-session-client.js'
 import type { User as PayloadUser } from '../../../payload-types'
 
 const ACCOUNT_STATE = 'PENDING_VERIFICATION'
@@ -407,12 +407,14 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
   }
 
   // Better Auth intentionally returns a synthetic user for duplicate-email
-  // sign-up when email verification is required. Never treat an ID in that
-  // response as proof that W02 persisted a real identity. The Neon adapter
-  // performs this read against the same D1-01 PostgreSQL primary.
-  let persistedIdentity: { id: string; email: string; username: string | null } | null = null
+  // sign-up when email verification is required. W02 confirms persistence from
+  // its own Neon authority; W01 never reads the W02-owned identity table.
+  let identityConfirmation: Awaited<ReturnType<typeof confirmRegistrationIdentity>>
   try {
-    persistedIdentity = await persistence.findIdentityById(userId)
+    identityConfirmation = await confirmRegistrationIdentity(request, {
+      userId,
+      email: normalized.identity,
+    })
   } catch (error) {
     await releaseReservation()
     console.error(JSON.stringify({
@@ -424,29 +426,18 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Registration service unavailable')
   }
 
+  const persistedIdentity = identityConfirmation.identityById
   if (
     !persistedIdentity ||
     persistedIdentity.email.trim().toLowerCase() !== normalized.identity ||
     String(persistedIdentity.username ?? '').trim() !== normalized.username
   ) {
     // Better Auth can return a synthetic identity for an email that is already
-    // registered while verification is required. Check by normalized email so
-    // the UI can guide the user without treating the synthetic ID as persisted.
-    try {
-      const identityByEmail = await persistence.findIdentityByEmail(normalized.identity)
-      if (identityByEmail && identityByEmail.id !== userId) {
-        await releaseReservation()
-        return errorResponse(409, 'EMAIL_ALREADY_REGISTERED', '该邮箱可能已注册，请尝试登录或使用“忘记密码”找回账号。')
-      }
-    } catch (error) {
+    // registered while verification is required. W02 performs the email lookup
+    // on the same authoritative Neon store and returns only the matching ID.
+    if (identityConfirmation.identityByEmailId && identityConfirmation.identityByEmailId !== userId) {
       await releaseReservation()
-      console.error(JSON.stringify({
-        event: 'auth.register.duplicate_identity_check_failure',
-        diagnosticCode: 'AUTH001_DUPLICATE_IDENTITY_CHECK_FAILURE',
-        cfRay: request.headers.get('cf-ray') ?? null,
-        errorName: error instanceof Error ? error.name : typeof error,
-      }))
-      return errorResponse(503, 'SERVICE_UNAVAILABLE', '注册服务暂时不可用，请稍后重试。')
+      return errorResponse(409, 'EMAIL_ALREADY_REGISTERED', '该邮箱可能已注册，请尝试登录或使用“忘记密码”找回账号。')
     }
     await releaseReservation()
     console.warn(JSON.stringify({

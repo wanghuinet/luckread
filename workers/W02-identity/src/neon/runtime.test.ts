@@ -8,10 +8,11 @@ import {
 } from './runtime.js'
 
 describe('W02 database driver selection', () => {
-  it('keeps D1 as the default and does not require a Hyperdrive binding', () => {
-    expect(resolveW02DatabaseDriver({})).toBe('d1')
-    expect(resolveW02DatabaseDriver({ W02_DATABASE_DRIVER: 'd1' })).toBe('d1')
-    expect(isW02NeonRuntime({})).toBe(false)
+  it('requires explicit Neon selection and rejects missing or legacy D1 configuration', () => {
+    expect(() => resolveW02DatabaseDriver({})).toThrow('W02_DATABASE_DRIVER_UNSUPPORTED')
+    expect(() => resolveW02DatabaseDriver({ W02_DATABASE_DRIVER: 'd1' })).toThrow('W02_DATABASE_DRIVER_UNSUPPORTED')
+    expect(resolveW02DatabaseDriver({ W02_DATABASE_DRIVER: 'neon' })).toBe('neon')
+    expect(isW02NeonRuntime({ W02_DATABASE_DRIVER: 'neon' })).toBe(true)
   })
 
   it('rejects unknown drivers instead of silently selecting D1', () => {

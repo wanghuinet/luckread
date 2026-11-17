@@ -21,6 +21,13 @@ export type LayerResolution = {
   roleAssignments?: ResolvedRoleAssignment[]
 }
 
+/**
+ * @deprecated-next-version
+ * Reason: Legacy Cloudflare D1 authorization helper retained for isolated unit tests.
+ * Replacement: ensureBaseUserRolePostgres in src/neon/role-assignment-postgres.ts.
+ * Removal: Next release.
+ * Condition: The D1 role-assignment unit tests are replaced with PostgreSQL/in-memory Store tests.
+ */
 export async function ensureBaseUserRole(
   db: D1Database,
   subjectId: string,
@@ -104,6 +111,13 @@ type VerifiedRoleAssignment = Pick<
   'id' | 'subjectId' | 'roleId' | 'scopeType' | 'scopeId' | 'status' | 'validFrom' | 'validUntil'
 >
 
+/**
+ * @deprecated-next-version
+ * Reason: Legacy Cloudflare D1 authorization helper retained for isolated unit tests.
+ * Replacement: ensureVerifiedUserRolePostgres in src/neon/role-assignment-postgres.ts.
+ * Removal: Next release.
+ * Condition: The D1 role-assignment unit tests are replaced with PostgreSQL/in-memory Store tests.
+ */
 export async function ensureVerifiedUserRole(
   db: D1Database,
   subjectId: string,
@@ -180,6 +194,13 @@ export async function ensureVerifiedUserRole(
   }
 }
 
+/**
+ * @deprecated-next-version
+ * Reason: Legacy Cloudflare D1 authorization helper retained for isolated unit tests.
+ * Replacement: resolveGlobalLayerPostgres in src/neon/role-assignment-postgres.ts.
+ * Removal: Next release.
+ * Condition: The D1 role-layer unit tests are replaced with PostgreSQL/in-memory Store tests.
+ */
 export async function resolveGlobalLayer(
   db: D1Database,
   subjectId: string,

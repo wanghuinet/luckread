@@ -193,6 +193,13 @@ async function resolveSubjectAuthorization(
   return { layer: maxLayer, grantedPermissions }
 }
 
+/**
+ * @deprecated-next-version
+ * Reason: Legacy Cloudflare D1 account-state helper retained only for isolated unit tests.
+ * Replacement: Neon account transition authorization in createPostgresAccountStateTransitionStore in src/neon/account-state-transition-store-postgres.ts.
+ * Removal: Next release.
+ * Condition: All production account transition routes and lifecycle callbacks use the Neon account-state transition store.
+ */
 export async function authorizeAccountStateTransition(
   db: D1Database,
   input: { subjectId: string; targetUserId: string; to: AccountState; now?: string },
@@ -469,6 +476,13 @@ async function applyAccountStateTransitionInternal(
   }
 }
 
+/**
+ * @deprecated-next-version
+ * Reason: Legacy Cloudflare D1 account-state helper retained only for isolated unit tests.
+ * Replacement: createPostgresAccountStateTransitionStore in src/neon/account-state-transition-store-postgres.ts.
+ * Removal: Next release.
+ * Condition: Account-state transition tests use the PostgreSQL store contract and no D1 batch implementation remains in production.
+ */
 export async function applyAccountStateTransition(
   db: D1Database,
   input: AccountStateTransitionInput,
@@ -486,6 +500,13 @@ export type EmailVerifiedActivationResult = {
  * Called only after Better Auth proves the email-verification token or returns
  * an authenticated session whose emailVerified flag is true. Account activation
  * and the L2 role grant share the same D1 batch with the account-state journal.
+ */
+/**
+ * @deprecated-next-version
+ * Reason: Legacy Cloudflare D1 account-state helper retained only for isolated unit tests.
+ * Replacement: activateEmailVerifiedAccountPostgres in src/neon/email-verification-activation-postgres.ts.
+ * Removal: Next release.
+ * Condition: Better Auth production callbacks use the Neon activation implementation; remaining D1 helper tests use PostgreSQL.
  */
 export async function activateEmailVerifiedAccount(
   db: D1Database,

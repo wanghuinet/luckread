@@ -1,6 +1,6 @@
 import { resolveBetterAuthPrincipal } from './principal.js'
 import type { AuthenticatedPrincipal } from './principal.js'
-import type { BetterAuthEnv } from './better-auth.js'
+import { requireLegacyW02D1Database, type BetterAuthEnv } from './better-auth.js'
 
 export type AuthoritativeMfaStatus = {
   enabled: boolean
@@ -69,6 +69,13 @@ export async function readAuthoritativeMfaStatus(
 }
 
 /** D1 remains the production-default MFA status projection store. */
+/**
+ * @deprecated-next-version
+ * Reason: Legacy Cloudflare D1 implementation retained only for isolated unit tests or the explicit schema/test fixture.
+ * Replacement: PostgreSQL MFA status Store in src/neon/mfa-factor-state-postgres.ts.
+ * Removal: Next release.
+ * Condition: MFA status tests use PostgreSQL/in-memory Store fixtures and no D1 status projection remains.
+ */
 export function createD1MfaStatusStore(db: D1Database): MfaStatusStore {
   return {
     read: (userId, now) => readAuthoritativeMfaStatus(db, userId, now),
@@ -101,7 +108,7 @@ export async function handleMfaStatusRequest(
     if (!principal || principal.accountState !== 'ACTIVE') {
       return response({ error: { code: 'UNAUTHENTICATED', message: 'Authentication required' } }, 401)
     }
-    const store = dependencies.store ?? createD1MfaStatusStore(env.D1_01)
+    const store = dependencies.store ?? createD1MfaStatusStore(requireLegacyW02D1Database(env))
     const status = await store.read(principal.userId, new Date())
     if (!status) return response({ error: { code: 'UNAUTHENTICATED', message: 'Authentication required' } }, 401)
     return response({ data: status })

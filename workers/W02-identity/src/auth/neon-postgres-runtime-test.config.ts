@@ -2,9 +2,9 @@
  * Test-only W02 runtime rehearsal configuration.
  *
  * It reuses the canonical Better Auth builder and official PostgreSQL Pool
- * adapter, but selects the explicit postgres-rehearsal profile. That profile
- * omits D1-only account/MFA side effects and injects PostgreSQL-backed L1
- * registration and AUTH-013 email-verification lifecycle callbacks.
+ * adapter, but selects the explicit postgres-rehearsal profile. It injects the
+ * PostgreSQL MFA factor-state Store, L1 role materialization and AUTH-013
+ * email-verification lifecycle callbacks.
  *
  * This file is never imported by the deployed Worker.
  */
@@ -12,6 +12,7 @@ import { Pool } from 'pg'
 
 import { activateEmailVerifiedAccountPostgres } from '../neon/email-verification-activation-postgres.js'
 import { ensureBaseUserRolePostgres } from '../neon/role-assignment-postgres.js'
+import { createPostgresMfaFactorStateStore } from '../neon/mfa-factor-state-postgres.js'
 
 import {
   buildLuckReadAuth,
@@ -41,9 +42,8 @@ export const postgresPool = new Pool({
 })
 
 const rehearsalEnvironment = {
-  D1_01: undefined as unknown as BetterAuthEnv['D1_01'],
   CLOUDFLARE_ENV: 'development',
-} satisfies BetterAuthEnv
+} satisfies Omit<BetterAuthEnv, 'D1_01'>
 
 export const postgresLifecycleAdapters = {
   afterUserCreated: (userId: string) => ensureBaseUserRolePostgres(postgresPool, userId),
@@ -55,6 +55,6 @@ export const auth = buildLuckReadAuth(
   rehearsalEnvironment,
   postgresPool,
   'postgres-rehearsal',
-  undefined,
+  createPostgresMfaFactorStateStore(postgresPool),
   postgresLifecycleAdapters,
 )

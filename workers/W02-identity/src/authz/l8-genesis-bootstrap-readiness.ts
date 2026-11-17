@@ -12,6 +12,13 @@ export class L8BootstrapReadinessError extends Error {
  * command and never writes the D1 database. The write command rechecks every
  * mutable precondition to protect against races between preflight and commit.
  */
+/**
+ * @deprecated-next-version
+ * Reason: Legacy Cloudflare D1 implementation retained only for isolated unit tests or the explicit schema/test fixture.
+ * Replacement: PostgreSQL read-only readiness implementation in src/neon/l8-genesis-bootstrap-postgres.ts.
+ * Removal: Next release.
+ * Condition: Bootstrap readiness tests and worker route use the PostgreSQL implementation; approval and fail-closed policy remain unchanged.
+ */
 export async function checkL8BootstrapReadiness(
   db: D1Database,
   approval: VerifiedL8BootstrapApproval,

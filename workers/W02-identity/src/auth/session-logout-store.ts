@@ -42,6 +42,13 @@ function assertInput(input: SessionLogoutStoreInput): void {
  * D1 batch. A concurrent/replayed logout is a no-op and cannot add a second
  * event for the same Session resource.
  */
+/**
+ * @deprecated-next-version
+ * Reason: Legacy Cloudflare D1 implementation retained only for isolated unit tests or the explicit schema/test fixture.
+ * Replacement: PostgreSQL session logout Store in src/neon/session-logout-postgres-store.ts.
+ * Removal: Next release.
+ * Condition: Session logout tests use PostgreSQL/in-memory Store fixtures and preserve one-transaction audit outbox semantics.
+ */
 export function createD1SessionLogoutStore(db: D1Database): SessionLogoutStore {
   return {
     async logout(input: SessionLogoutStoreInput): Promise<SessionLogoutStoreResult> {

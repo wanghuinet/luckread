@@ -18,6 +18,9 @@ on:
       - "workers/W02-identity/src/index.ts"
       - "workers/W02-identity/migrations/0005_better_auth_identity_core.sql"
       - "workers/W02-identity/migrations/0012_auth_010_session_revocation_journal.sql"
+      - "workers/W02-identity/wrangler.neon.jsonc"
+      - "workers/W02-identity/src/neon-postgres-migrations/**"
+      - "workers/W02-identity/artifacts/neon/w02-better-auth-postgres-schema.sql"
       - "workers/W01-payload/src/collections/Users.ts"
       - "workers/W01-payload/src/migrations/**"
       - "workers/W01-payload/src/payload.config.ts"
@@ -42,6 +45,9 @@ on:
       - "workers/W01-payload/tests/int/auth-registration-idempotency.int.spec.ts"
       - "workers/W01-payload/scripts/auth-010-session-list-runtime-evidence-local.mjs"
       - "workers/W02-identity/wrangler.jsonc"
+      - "workers/W02-identity/wrangler.neon.jsonc"
+      - "workers/W02-identity/src/neon-postgres-migrations/**"
+      - "workers/W02-identity/artifacts/neon/w02-better-auth-postgres-schema.sql"
       - "artifacts/mapping-0/priv004-approved-policy-instance-2026-09-27.json"
   workflow_dispatch:
     inputs:
@@ -63,11 +69,11 @@ jobs:
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: local_postgres_only
-          POSTGRES_DB: luckread_auth001
+          POSTGRES_DB: luckread_schema
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U postgres -d luckread_auth001"
+          --health-cmd "pg_isready -U postgres -d luckread_schema"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 20
@@ -119,9 +125,8 @@ jobs:
         working-directory: workers/W01-payload
         run: pnpm install --frozen-lockfile
 
-      # This evidence run intentionally remains isolated on local D1 even
-      # though production W01 now selects Neon. getCloudflareContextFromWrangler()
-      # reads the Wrangler vars, so override the local config as well as process env.
+      # W01 Payload projection/evidence remains an isolated local D1 fixture. W02 identity
+      # is exercised against the disposable PostgreSQL 18 schema and its Neon runtime.
       - name: Force W01 local D1 driver and binding for registration evidence
         run: |
           set -euo pipefail
@@ -152,9 +157,28 @@ jobs:
         working-directory: workers/W01-payload
         run: pnpm exec vitest run tests/int/auth-registration-idempotency.int.spec.ts --config ./vitest.config.mts
 
-      - name: Apply exact W02 Better Auth migrations
-        working-directory: workers/W01-payload
-        run: pnpm exec wrangler d1 migrations apply luckread --local --persist-to /tmp/luckread-auth001-state --config ../W02-identity/wrangler.jsonc
+      - name: Apply committed W02 Neon PostgreSQL schema to disposable local PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          PGPASSWORD: local_postgres_only
+        run: |
+          set -euo pipefail
+          test -s artifacts/neon/w02-better-auth-postgres-schema.sql
+          psql --host 127.0.0.1 --port 5432 --username postgres --dbname luckread_schema --set ON_ERROR_STOP=1 --no-psqlrc --single-transaction --file artifacts/neon/w02-better-auth-postgres-schema.sql
+          for file in \
+            src/neon-postgres-migrations/0001_role_assignments.sql \
+            src/neon-postgres-migrations/0002_role_authorization_versions.sql \
+            src/neon-postgres-migrations/0003_auth_003_credentials.sql \
+            src/neon-postgres-migrations/0004_auth_013_publication_journal.sql \
+            src/neon-postgres-migrations/0005_auth_015_lifecycle_windows.sql \
+            src/neon-postgres-migrations/0006_auth_010_session_revocation_journal.sql \
+            src/neon-postgres-migrations/0007_auth_007_mfa_lifecycle.sql \
+            src/neon-postgres-migrations/0008_auth_username_change_state.sql \
+            src/neon-postgres-migrations/0009_auth_007_mfa_publication_journal.sql \
+            src/neon-postgres-migrations/0010_auth_007_mfa_operation_receipts.sql; do
+            test -s "$file"
+            psql --host 127.0.0.1 --port 5432 --username postgres --dbname luckread_schema --set ON_ERROR_STOP=1 --no-psqlrc --single-transaction --file "$file"
+          done
 
       - name: Build exact W01 OpenNext worker
         working-directory: workers/W01-payload
@@ -165,14 +189,14 @@ jobs:
           set -euo pipefail
           pnpm exec opennextjs-cloudflare build > auth-001-open-next-build.log 2>&1
 
-      - name: Start exact W02 local Worker runtime
+      - name: Start exact W02 Neon local Worker runtime
         working-directory: workers/W02-identity
         env:
           NODE_ENV: development
-          CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE: postgresql://postgres:local_postgres_only@127.0.0.1:5432/luckread_auth001
+          CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE: postgresql://postgres:local_postgres_only@127.0.0.1:5432/luckread_schema
         run: |
           set -euo pipefail
-          pnpm --dir ../W01-payload exec wrangler dev --local --persist-to /tmp/luckread-auth001-state --config ../W02-identity/wrangler.jsonc --port 8788 --var "CLOUDFLARE_ENV:development" --var "W02_DATABASE_DRIVER:d1" > auth-001-w02-preview.log 2>&1 &
+          pnpm --dir ../W01-payload exec wrangler dev --local --persist-to /tmp/luckread-auth001-state --config ../W02-identity/wrangler.neon.jsonc --port 8788 --var "CLOUDFLARE_ENV:development" --var "W02_DATABASE_DRIVER:neon" > auth-001-w02-preview.log 2>&1 &
           echo $! > auth-001-w02-preview.pid
           ready=0
           for _ in $(seq 1 120); do
@@ -212,6 +236,7 @@ jobs:
         env:
           AUTH001_BASE_URL: http://127.0.0.1:8787
           CLOUDFLARE_PERSIST_TO: /tmp/luckread-auth001-state
+          AUTH001_W02_DATABASE_URL: postgresql://postgres:local_postgres_only@127.0.0.1:5432/luckread_schema
         run: |
           set -euo pipefail
           node --import=tsx/esm scripts/auth-001-registration-runtime-evidence-local.mjs
@@ -221,6 +246,7 @@ jobs:
         working-directory: workers/W01-payload
         env:
           AUTH001_BASE_URL: http://127.0.0.1:8787
+          AUTH001_W02_DATABASE_URL: postgresql://postgres:local_postgres_only@127.0.0.1:5432/luckread_schema
           CLOUDFLARE_PERSIST_TO: /tmp/luckread-auth001-state
         run: |
           set -euo pipefail
@@ -235,7 +261,7 @@ jobs:
           tail -n 500 auth-001-open-next-build.log || true
           echo "===== W01 local preview log ====="
           tail -n 500 auth-001-preview.log || true
-          echo "===== W02 local preview log ====="
+          echo "===== W02 Neon local preview log ====="
           tail -n 500 ../W02-identity/auth-001-w02-preview.log || true
 
       - name: Upload same-SHA runtime evidence

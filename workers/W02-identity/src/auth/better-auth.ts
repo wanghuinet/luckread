@@ -1,4 +1,4 @@
-import { isW02NeonRuntime, getW02PostgresRuntime } from '../neon/runtime.js'
+import { getW02PostgresRuntime } from '../neon/runtime.js'
 import { activateEmailVerifiedAccountPostgres } from '../neon/email-verification-activation-postgres.js'
 import { ensureBaseUserRolePostgres } from '../neon/role-assignment-postgres.js'
 import { activateEmailVerifiedAccount } from '../account/account-state-transition.js'
@@ -31,8 +31,8 @@ export interface RateLimitBinding {
 }
 
 export interface BetterAuthEnv {
-  /** Legacy local/test provider only; createLuckReadAuth selects PostgreSQL in production. */
-  D1_01: D1Database
+  /** @deprecated-next-version: isolated Better Auth D1 fixture support only; never bound by production W02. */
+  D1_01?: D1Database
   W02_DATABASE_DRIVER?: string
   HYPERDRIVE?: { connectionString: string }
   RESEND_API_KEY?: string
@@ -81,6 +81,25 @@ async function sendPasswordResetEmail(
   })
 }
 
+/**
+ * @deprecated-next-version
+ * Reason: Explicit D1 database accessor exists only for the legacy Better Auth schema/test profile.
+ * Replacement: createLuckReadAuth uses the W02 Neon Hyperdrive runtime exclusively.
+ * Removal: Next release.
+ * Condition: Better Auth schema generation and all D1-profile unit tests move to PostgreSQL or isolated in-memory fixtures.
+ */
+export function requireLegacyW02D1Database(env: BetterAuthEnv): D1Database {
+  if (!env.D1_01) throw new Error('W02_D1_TEST_BINDING_REQUIRED')
+  return env.D1_01
+}
+
+/**
+ * @deprecated-next-version
+ * Reason: Legacy D1 account activation remains only for the isolated Better Auth D1 test profile.
+ * Replacement: activateEmailVerifiedAccountPostgres in the production Neon lifecycle callback.
+ * Removal: Next release.
+ * Condition: D1 Better Auth profile tests and source-schema tooling no longer invoke the compatibility profile.
+ */
 async function activateVerifiedAccount(db: D1Database, userId: string): Promise<void> {
   const now = new Date().toISOString()
   const activation = await activateEmailVerifiedAccount(db, userId, now)
@@ -153,19 +172,35 @@ export type BetterAuthPostgresLifecycleAdapters = {
 
 export const buildLuckReadAuth = (
   env: BetterAuthEnv,
-  database: BetterAuthDatabase = env.D1_01 as BetterAuthDatabase,
+  database: BetterAuthDatabase = requireLegacyW02D1Database(env) as BetterAuthDatabase,
   persistenceProfile: BetterAuthPersistenceProfile = 'production',
-  mfaFactorStateStore: MfaFactorStateStore = createD1MfaFactorStateStore(env.D1_01),
+  mfaFactorStateStore?: MfaFactorStateStore,
   postgresLifecycleAdapters?: BetterAuthPostgresLifecycleAdapters,
   mfaAuditOperationReceiptStore?: MfaAuditOperationReceiptStore,
   resolveMfaSessionSubject?: (headers: Headers) => Promise<string | null>,
 ) => {
   const postgresPersistence = persistenceProfile !== 'production'
+  const legacyD1 = postgresPersistence ? undefined : requireLegacyW02D1Database(env)
+  const unavailablePostgresRehearsalMfaFactorStateStore: MfaFactorStateStore = {
+    async isActiveSubject() {
+      throw new Error('W02_MFA_FACTOR_STORE_NOT_CONFIGURED_FOR_SCHEMA_PROFILE')
+    },
+    async readVerificationMaterial() {
+      throw new Error('W02_MFA_FACTOR_STORE_NOT_CONFIGURED_FOR_SCHEMA_PROFILE')
+    },
+    async consumeTotpTimeStep() {
+      throw new Error('W02_MFA_FACTOR_STORE_NOT_CONFIGURED_FOR_SCHEMA_PROFILE')
+    },
+  }
+  const effectiveMfaFactorStateStore = mfaFactorStateStore ??
+    (postgresPersistence
+      ? unavailablePostgresRehearsalMfaFactorStateStore
+      : createD1MfaFactorStateStore(legacyD1!))
   const postgresEmailVerifiedCallback = postgresLifecycleAdapters?.afterEmailVerified
-  // PostgreSQL runtime profiles require a provider-matched receipt store;
-  // D1 production continues to construct its native store by default.
+  // The Neon production factory injects a provider-matched receipt store;
+  // only the deprecated explicit D1 test/schema profile constructs a D1 store.
   const effectiveMfaAuditReceiptStore = mfaAuditOperationReceiptStore ??
-    (postgresPersistence ? undefined : createD1MfaAuditOperationReceiptStore(env.D1_01))
+    (postgresPersistence ? undefined : createD1MfaAuditOperationReceiptStore(legacyD1!))
   // Keep local origins available only to the local evidence/runtime profile.
   // Production must never inherit localhost trust from a shared config.
   const trustedOrigins = [
@@ -183,6 +218,7 @@ export const buildLuckReadAuth = (
     ...(effectiveMfaAuditReceiptStore ? {
     hooks: {
       before: createAuthMiddleware(async (ctx) => {
+        if (ctx.path === '/sign-up/email') console.info(JSON.stringify({ event: 'w02.better_auth.signup_before_hook' }))
         const isTotpVerification = ctx.path === '/two-factor/verify-totp'
         const isBackupCodeVerification = ctx.path === '/two-factor/verify-backup-code'
         const isDisable = ctx.path === '/two-factor/disable'
@@ -322,7 +358,7 @@ export const buildLuckReadAuth = (
 
         // Factor completion must never activate a suspended, pending or missing
         // account. Check W02-owned account state for TOTP and recovery paths.
-        const accountActive = await mfaFactorStateStore.isActiveSubject(subjectId)
+        const accountActive = await effectiveMfaFactorStateStore.isActiveSubject(subjectId)
         if (!accountActive) {
           if (!isEnrollmentConfirmation) {
             await finalizeKnownMfaRejection(effectiveMfaAuditReceiptStore!, receiptId,
@@ -343,7 +379,7 @@ export const buildLuckReadAuth = (
         // persisted monotonic time-step guard applies specifically to TOTP.
         if (isBackupCodeVerification) return
 
-        const factor = await mfaFactorStateStore.readVerificationMaterial(subjectId)
+        const factor = await effectiveMfaFactorStateStore.readVerificationMaterial(subjectId)
         // Let the pinned plugin produce its canonical not-enabled/challenge error.
         if (!factor) return
 
@@ -369,7 +405,7 @@ export const buildLuckReadAuth = (
           throw APIError.from('UNAUTHORIZED', { code: 'INVALID_CODE', message: 'Invalid code' })
         }
 
-        const consumed = await mfaFactorStateStore.consumeTotpTimeStep(subjectId, match.timeStep)
+        const consumed = await effectiveMfaFactorStateStore.consumeTotpTimeStep(subjectId, match.timeStep)
         if (!consumed) {
           // The TOTP was valid but its monotonically increasing step was already
           // accepted. Persist the rejection before returning the auth failure.
@@ -398,6 +434,7 @@ export const buildLuckReadAuth = (
         }
       }),
       after: createAuthMiddleware(async (ctx) => {
+        if (ctx.path === '/sign-up/email') console.info(JSON.stringify({ event: 'w02.better_auth.signup_after_hook' }))
         if (!MFA_AUDIT_OBSERVED_PATHS.has(ctx.path)) return
         const state = getMfaAuditHookState(ctx.context)
         if (!state?.receiptId) return
@@ -421,7 +458,7 @@ export const buildLuckReadAuth = (
         if (failed &&
             (ctx.path === '/two-factor/verify-totp' || ctx.path === '/two-factor/verify-backup-code')) {
           try {
-            const factor = await mfaFactorStateStore.readVerificationMaterial(state.userId)
+            const factor = await effectiveMfaFactorStateStore.readVerificationMaterial(state.userId)
             const lockUntilValue = factor?.lockedUntil
             const lockUntil = lockUntilValue instanceof Date
               ? lockUntilValue.getTime()
@@ -471,8 +508,8 @@ export const buildLuckReadAuth = (
       }),
     },
     } : {}),
-    // W02 is the platform identity authority. Better Auth uses native D1
-    // persistence here; Payload is not an authentication/database adapter.
+    // W02 is the platform identity authority. Production Better Auth uses the
+    // Neon PostgreSQL pool supplied by createLuckReadAuth; Payload is not an adapter.
     database,
     baseURL: 'https://luckread.com',
     basePath: '/api/auth',
@@ -498,7 +535,13 @@ export const buildLuckReadAuth = (
       autoSignInAfterVerification: false,
       expiresIn: 60 * 60,
       sendVerificationEmail: async ({ user, url }) => {
+        if (env.CLOUDFLARE_ENV?.trim().toLowerCase() === 'development') {
+          console.info(JSON.stringify({ event: 'w02.better_auth.verification_email_started' }))
+        }
         await sendVerificationEmail(env, { user, url })
+        if (env.CLOUDFLARE_ENV?.trim().toLowerCase() === 'development') {
+          console.info(JSON.stringify({ event: 'w02.better_auth.verification_email_completed' }))
+        }
       },
       ...(postgresPersistence
         ? (postgresEmailVerifiedCallback ? {
@@ -509,7 +552,7 @@ export const buildLuckReadAuth = (
         : {
             afterEmailVerification: async (user) => {
               const userId = String(user.id)
-              await activateVerifiedAccount(env.D1_01, userId)
+              await activateVerifiedAccount(legacyD1!, userId)
             },
           }),
     },
@@ -518,8 +561,16 @@ export const buildLuckReadAuth = (
           databaseHooks: {
             user: {
               create: {
+                before: async () => {
+                  if (env.CLOUDFLARE_ENV?.trim().toLowerCase() === 'development') {
+                    console.info(JSON.stringify({ event: 'w02.better_auth.user_create_before' }))
+                  }
+                },
                 after: async (user) => {
+                  const developmentDiagnostics = env.CLOUDFLARE_ENV?.trim().toLowerCase() === 'development'
+                  if (developmentDiagnostics) console.info(JSON.stringify({ event: 'w02.better_auth.role_materialization_started' }))
                   await postgresLifecycleAdapters.afterUserCreated(String(user.id))
+                  if (developmentDiagnostics) console.info(JSON.stringify({ event: 'w02.better_auth.role_materialization_completed' }))
                 },
               },
             },
@@ -529,13 +580,13 @@ export const buildLuckReadAuth = (
           user: {
             create: {
               after: async (user) => {
-                await ensureBaseUserRole(env.D1_01, String(user.id), new Date().toISOString())
+                await ensureBaseUserRole(legacyD1!, String(user.id), new Date().toISOString())
               },
             },
             update: {
               after: async (user) => {
                 const userId = String(user.id)
-                const pendingMfaEnrollment = await env.D1_01.prepare(
+                const pendingMfaEnrollment = await legacyD1!.prepare(
                   'SELECT id FROM "user" WHERE id = ? AND two_factor_enabled = 1 AND mfa_enrolled_at IS NULL LIMIT 1',
                 ).bind(userId).first<{ id: string }>()
                 if (!pendingMfaEnrollment) return
@@ -544,11 +595,11 @@ export const buildLuckReadAuth = (
                 // sessions on every enable/disable transition. This hook is a fallback
                 // for a legacy or partially migrated row with a missing enrollment time.
                 const enrolledAt = new Date().toISOString()
-                await env.D1_01.batch([
-                  env.D1_01.prepare(
+                await legacyD1!.batch([
+                  legacyD1!.prepare(
                     'UPDATE "user" SET mfa_enrolled_at = ? WHERE id = ? AND two_factor_enabled = 1 AND mfa_enrolled_at IS NULL',
                   ).bind(enrolledAt, userId),
-                  env.D1_01.prepare('DELETE FROM "session" WHERE user_id = ?').bind(userId),
+                  legacyD1!.prepare('DELETE FROM "session" WHERE user_id = ?').bind(userId),
                 ])
               },
             },
@@ -697,37 +748,26 @@ export const buildLuckReadAuth = (
 
 const authInstances = new WeakMap<object, ReturnType<typeof buildLuckReadAuth>>()
 
-// Each isolate keeps one Better Auth instance per selected persistence binding.
-// Neon mode composes all core identity stores from the same Hyperdrive pool.
-// The D1 adapter is retained only for explicit local/test compatibility.
+// Each production isolate uses the existing Neon Hyperdrive pool. The D1 profile
+// remains reachable only through buildLuckReadAuth's explicit test/schema fixture API.
 export const createLuckReadAuth = (env: BetterAuthEnv) => {
-  if (isW02NeonRuntime(env)) {
-    const runtime = getW02PostgresRuntime(env)
-    const cached = authInstances.get(runtime.pool)
-    if (cached) return cached
-
-    const auth = buildLuckReadAuth(
-      env,
-      runtime.pool,
-      'postgres',
-      runtime.mfaFactorStateStore,
-      {
-        afterUserCreated: (userId) =>
-          ensureBaseUserRolePostgres(runtime.pool, userId, new Date().toISOString()),
-        afterEmailVerified: (userId, now) =>
-          activateEmailVerifiedAccountPostgres(runtime.pool, userId, now),
-      },
-      runtime.mfaAuditOperationReceiptStore,
-    )
-    authInstances.set(runtime.pool, auth)
-    return auth
-  }
-
-  const database = env.D1_01 as object
-  const cached = authInstances.get(database)
+  const runtime = getW02PostgresRuntime(env)
+  const cached = authInstances.get(runtime.pool)
   if (cached) return cached
 
-  const auth = buildLuckReadAuth(env)
-  authInstances.set(database, auth)
+  const auth = buildLuckReadAuth(
+    env,
+    runtime.pool,
+    'postgres',
+    runtime.mfaFactorStateStore,
+    {
+      afterUserCreated: (userId) =>
+        ensureBaseUserRolePostgres(runtime.pool, userId, new Date().toISOString()),
+      afterEmailVerified: (userId, now) =>
+        activateEmailVerifiedAccountPostgres(runtime.pool, userId, now),
+    },
+    runtime.mfaAuditOperationReceiptStore,
+  )
+  authInstances.set(runtime.pool, auth)
   return auth
 }

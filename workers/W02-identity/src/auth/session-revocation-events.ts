@@ -94,6 +94,13 @@ export async function buildSessionRevokedEvent(input: {
  * changes() therefore inserts the durable event only when that DELETE
  * actually removed one caller-owned session row.
  */
+/**
+ * @deprecated-next-version
+ * Reason: Legacy Cloudflare D1 implementation retained only for isolated unit tests or the explicit schema/test fixture.
+ * Replacement: PostgreSQL session revocation Store and publisher in src/neon/.
+ * Removal: Next release.
+ * Condition: Session revocation outbox tests use the PostgreSQL Store and do not construct D1 prepared statements.
+ */
 export function buildSessionRevocationOutboxInsert(
   db: D1Database,
   event: SessionRevokedEvent,
