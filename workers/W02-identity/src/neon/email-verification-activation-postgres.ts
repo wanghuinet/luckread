@@ -57,7 +57,8 @@ const SUBJECT_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/
  *
  * The account transition, verified_user L2 assignment (including its existing
  * authorization-version trigger), and AUTH-013 publication journal are one
- * PostgreSQL transaction. The Better Auth/D1 production path is unchanged.
+ * PostgreSQL transaction. The W02 Better Auth production callback uses this
+ * Neon PostgreSQL implementation.
  */
 export async function activateEmailVerifiedAccountPostgres(
   pool: Pool,
