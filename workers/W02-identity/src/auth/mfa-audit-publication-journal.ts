@@ -29,6 +29,13 @@ function retryDelaySeconds(attempt: number): number {
  * The W02 D1-01 outbox remains durable until queue acceptance; consumer
  * idempotency is required because queue delivery is at-least-once.
  */
+/**
+ * @deprecated-next-version
+ * Reason: Legacy Cloudflare D1 implementation retained only for isolated unit tests or the explicit schema/test fixture.
+ * Replacement: PostgreSQL MFA audit publisher in src/neon/mfa-audit-publication-journal-publisher-postgres.ts.
+ * Removal: Next release.
+ * Condition: MFA audit publication tests use the PostgreSQL publisher on the existing AUTH013_QUEUE.
+ */
 export async function publishPendingMfaAuditEvents(
   env: PublicationEnv,
   now = new Date().toISOString(),
