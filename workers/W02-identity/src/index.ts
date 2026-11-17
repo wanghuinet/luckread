@@ -32,6 +32,7 @@ interface Env {
   AUTH_EMAIL_FROM?: string
   AUTH013_QUEUE: Queue
   AUTH013_PROJECTION_QUEUE: Queue
+  CLOUDFLARE_ENV?: string
 }
 
 const readJsonBody = async <T>(request: Request): Promise<T | null> => {
@@ -62,7 +63,41 @@ export default {
     const url = new URL(request.url)
 
     if (url.pathname === '/api/auth' || url.pathname.startsWith('/api/auth/')) {
-      return createLuckReadAuth(env).handler(request)
+      const developmentDiagnostics = env.CLOUDFLARE_ENV?.trim().toLowerCase() === 'development'
+      if (developmentDiagnostics) {
+        console.info(JSON.stringify({
+          event: 'w02.better_auth.request_started',
+          method: request.method,
+          path: url.pathname,
+        }))
+      }
+      try {
+        const response = await createLuckReadAuth(env).handler(request)
+        if (developmentDiagnostics) {
+          console.info(JSON.stringify({
+            event: 'w02.better_auth.request_completed',
+            method: request.method,
+            path: url.pathname,
+            status: response.status,
+          }))
+        }
+        return response
+      } catch (error) {
+        const value = error && typeof error === 'object' ? error as { code?: unknown; name?: unknown } : {}
+        const code = typeof value.code === 'string' && /^[A-Z0-9_.-]{1,80}$/.test(value.code)
+          ? value.code
+          : undefined
+        if (developmentDiagnostics) {
+          console.error(JSON.stringify({
+            event: 'w02.better_auth.request_failed',
+            method: request.method,
+            path: url.pathname,
+            errorName: typeof value.name === 'string' ? value.name : 'UNKNOWN',
+            ...(code ? { code } : {}),
+          }))
+        }
+        return json({ error: { code: 'AUTHENTICATION_SERVICE_UNAVAILABLE', message: 'authentication service unavailable' } }, 503)
+      }
     }
 
     if (request.method === 'POST' && url.pathname === '/internal/account/transition') {
