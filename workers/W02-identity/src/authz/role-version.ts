@@ -20,6 +20,13 @@ const SELECT_ROLE_VERSION = [
  * role-assignment mutation creates the row at version 1. Subsequent mutations
  * advance it atomically in D1/SQLite.
  */
+/**
+ * @deprecated-next-version
+ * Reason: Legacy Cloudflare D1 role/MFA state helper retained for isolated unit tests.
+ * Replacement: readRoleVersionPostgres in src/neon/role-assignment-postgres.ts.
+ * Removal: Next release.
+ * Condition: Role-version tests use the PostgreSQL helper and the D1 role-version functions are no longer called by production W02 routes.
+ */
 export async function readRoleVersion(db: D1Database, subjectId: string): Promise<number> {
   if (!subjectId) throw new Error('role version requires subjectId')
 
