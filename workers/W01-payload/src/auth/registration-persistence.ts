@@ -1,6 +1,5 @@
 /// <reference types="@cloudflare/workers-types" />
 
-import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { Pool, type PoolClient } from 'pg'
 
 import {
@@ -53,7 +52,7 @@ export interface RegistrationPersistenceStore {
   completeRegistration(input: RegistrationCompletion): Promise<string | null>
 }
 
-type D1Binding = Awaited<ReturnType<typeof getCloudflareContext>>['env']['D1']
+type D1Binding = D1Database
 type D1Result = { meta?: { changes?: number }; results?: Array<Record<string, unknown>> }
 type D1Statement = ReturnType<D1Binding['prepare']>
 
