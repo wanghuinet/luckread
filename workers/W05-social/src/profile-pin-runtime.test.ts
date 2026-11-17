@@ -1,80 +1,59 @@
-/// <reference types="@cloudflare/workers-types" />
 import { describe, expect, it, vi } from 'vitest'
 import type { OwnedPostContext } from './owned-post-context.js'
 import { getProfilePinReference, pinProfileContent, unpinProfileContent } from './profile-pin-runtime.js'
-
-const db = (firstResults: unknown[] = []) => {
-  let firstIndex = 0
-  const prepare = vi.fn((sql: string) => ({
-    bind: vi.fn((...args: unknown[]) => ({
-      first: vi.fn(async () => firstResults[firstIndex++] ?? null),
-      run: vi.fn(async () => ({ sql, args, meta: { changes: 1 } })),
-    })),
-  }))
-  return { prepare } as unknown as D1Database
-}
+import { ProfilePinStoreError, type ProfilePinStorageRow, type ProfilePinStore } from './profile-pin-store.js'
 
 const publishedContext: OwnedPostContext = {
-  contentId: 'content-1',
-  ownerUserId: 'viewer-1',
-  contentType: 'post',
-  state: 'PUBLISHED',
+  contentId: 'content-1', ownerUserId: 'viewer-1', contentType: 'post', state: 'PUBLISHED',
   updatedAt: '2026-10-20T00:00:00.000Z',
 }
-const pin = { user_id: 'viewer-1', content_id: 'content-1', pinned_at: '2026-10-16T00:00:00.000Z' }
+
+function memoryStore(seed: ProfilePinStorageRow[] = []): ProfilePinStore {
+  const rows = new Map(seed.map(row => [row.user_id, row]))
+  return {
+    async pin(userId, contentId, pinnedAt) {
+      const existing = rows.get(userId)
+      const row = {
+        user_id: userId,
+        content_id: contentId,
+        pinned_at: existing?.content_id === contentId ? existing.pinned_at : pinnedAt,
+      }
+      rows.set(userId, row)
+      return row
+    },
+    async get(userId) { return rows.get(userId) ?? null },
+    async unpin(userId, contentId) {
+      if (rows.get(userId)?.content_id === contentId) rows.delete(userId)
+    },
+  }
+}
+
+const pin: ProfilePinStorageRow = {
+  user_id: 'viewer-1', content_id: 'content-1', pinned_at: '2026-10-16T00:00:00.000Z',
+}
 
 describe('profile pin runtime', () => {
-  it('pins W03-verified published owner content and writes only W05-owned state', async () => {
-    const d = db([pin])
-    await expect(pinProfileContent(d, 'viewer-1', 'content-1', publishedContext)).resolves.toEqual({
-      userId: 'viewer-1', contentId: 'content-1', pinnedAt: pin.pinned_at,
-    })
-    const prepare = (d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare
-    expect(prepare).toHaveBeenCalledTimes(2)
-    expect(String(prepare.mock.calls[0]?.[0])).toContain('INSERT INTO social_profile_pins')
-    expect(String(prepare.mock.calls[0]?.[0])).toContain('ON CONFLICT(user_id) DO UPDATE')
-    expect(String(prepare.mock.calls[0]?.[0])).toContain('social_profile_pins.content_id = excluded.content_id')
-    expect(String(prepare.mock.calls[0]?.[0])).not.toContain('FROM contents')
-    expect(String(prepare.mock.calls[1]?.[0])).toContain('FROM social_profile_pins')
+  it('pins W03-verified owner content, preserves repeated timestamps and supports read/unpin', async () => {
+    const store = memoryStore()
+    const first = await pinProfileContent('viewer-1', 'content-1', publishedContext, store)
+    const retry = await pinProfileContent('viewer-1', 'content-1', publishedContext, store)
+    expect(first).toMatchObject({ userId: 'viewer-1', contentId: 'content-1' })
+    expect(retry.pinnedAt).toBe(first.pinnedAt)
+    expect(await getProfilePinReference('viewer-1', store)).toEqual(first)
+    await unpinProfileContent('viewer-1', 'content-1', store)
+    await expect(getProfilePinReference('viewer-1', store)).resolves.toBeNull()
   })
 
-  it('uses an injected store for pin, reference read and unpin without D1 access', async () => {
-    const store = {
-      pin: vi.fn(async () => pin),
-      get: vi.fn(async () => pin),
-      unpin: vi.fn(async () => undefined),
-    }
-    const d = db()
-    await expect(pinProfileContent(d, 'viewer-1', 'content-1', publishedContext, store)).resolves.toMatchObject({
-      userId: 'viewer-1', contentId: 'content-1',
-    })
-    await expect(getProfilePinReference(d, 'viewer-1', store)).resolves.toMatchObject({ contentId: 'content-1' })
-    await expect(unpinProfileContent(d, 'viewer-1', 'content-1', store)).resolves.toBeUndefined()
-    expect(store.pin).toHaveBeenCalledTimes(1)
-    expect(store.get).toHaveBeenCalledWith('viewer-1')
-    expect(store.unpin).toHaveBeenCalledWith('viewer-1', 'content-1')
-    expect((d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
-  })
-
-  it('rejects non-owner context before consulting an injected store', async () => {
-    const store = { pin: vi.fn(), get: vi.fn(), unpin: vi.fn() }
-    const d = db()
-    await expect(pinProfileContent(d, 'viewer-1', 'content-1', {
+  it('rejects non-owner context before consulting the Store', async () => {
+    const store: ProfilePinStore = { pin: vi.fn(), get: vi.fn(), unpin: vi.fn() }
+    await expect(pinProfileContent('viewer-1', 'content-1', {
       ...publishedContext, ownerUserId: 'someone-else',
     }, store)).rejects.toMatchObject({ code: 'PERMISSION_DENIED', status: 403 })
     expect(store.pin).not.toHaveBeenCalled()
-    expect((d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
   })
 
-  it('rejects non-owner context and does not query or write W05 state', async () => {
-    const d = db()
-    await expect(pinProfileContent(d, 'viewer-1', 'content-1', {
-      ...publishedContext, ownerUserId: 'someone-else',
-    })).rejects.toMatchObject({ code: 'PERMISSION_DENIED', status: 403 })
-    expect((d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
-  })
-
-  it('rejects missing, mismatched, non-post, or unpublished context before writing', async () => {
+  it('rejects missing, mismatched, non-post or unpublished context before writing', async () => {
+    const store: ProfilePinStore = { pin: vi.fn(), get: vi.fn(), unpin: vi.fn() }
     const cases = [
       null,
       { ...publishedContext, contentId: 'other-content' },
@@ -83,37 +62,34 @@ describe('profile pin runtime', () => {
       { ...publishedContext, state: 'UNPUBLISHED' },
     ]
     for (const context of cases) {
-      const d = db()
-      await expect(pinProfileContent(d, 'viewer-1', 'content-1', context as never))
+      await expect(pinProfileContent('viewer-1', 'content-1', context as never, store))
         .rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 })
-      expect((d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
     }
+    expect(store.pin).not.toHaveBeenCalled()
   })
 
-  it('rejects invalid identifiers before querying W05 state', async () => {
-    const d = db()
-    await expect(pinProfileContent(d, 'viewer-1', 'content/1', publishedContext))
+  it('validates identifiers before Store access', async () => {
+    const store: ProfilePinStore = { pin: vi.fn(), get: vi.fn(), unpin: vi.fn() }
+    await expect(pinProfileContent('viewer-1', 'content/1', publishedContext, store))
       .rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 })
-    expect((d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
+    expect(store.pin).not.toHaveBeenCalled()
   })
 
-  it('unpins only the matching item for the authenticated owner and repeats safely', async () => {
-    const d = db()
-    await expect(unpinProfileContent(d, 'viewer-1', 'content-1')).resolves.toBeUndefined()
-    const prepare = (d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare
-    expect(String(prepare.mock.calls[0]?.[0])).toContain('DELETE FROM social_profile_pins WHERE user_id = ? AND content_id = ?')
-    expect(prepare.mock.calls[0]?.[0]).toContain('content_id')
-  })
-
-  it('reads only the W05-owned pin reference and leaves content state to W03', async () => {
-    const d = db([pin])
-    await expect(getProfilePinReference(d, 'viewer-1')).resolves.toEqual({
+  it('reads the pin reference and clears only a matching owner/content pair', async () => {
+    const store = memoryStore([pin])
+    await expect(getProfilePinReference('viewer-1', store)).resolves.toEqual({
       userId: 'viewer-1', contentId: 'content-1', pinnedAt: pin.pinned_at,
     })
-    const prepare = (d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare
-    expect(prepare).toHaveBeenCalledTimes(1)
-    expect(String(prepare.mock.calls[0]?.[0])).toContain('FROM social_profile_pins')
-    expect(String(prepare.mock.calls[0]?.[0])).not.toContain('JOIN contents')
-    await expect(getProfilePinReference(db([null]), 'viewer-1')).resolves.toBeNull()
+    await unpinProfileContent('viewer-1', 'content-1', store)
+    await expect(getProfilePinReference('viewer-1', store)).resolves.toBeNull()
+  })
+
+  it('maps persistence failures to a sanitized service error', async () => {
+    const store: ProfilePinStore = {
+      pin: vi.fn(async () => { throw new ProfilePinStoreError() }),
+      get: vi.fn(), unpin: vi.fn(),
+    }
+    await expect(pinProfileContent('viewer-1', 'content-1', publishedContext, store))
+      .rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE', status: 503 })
   })
 })

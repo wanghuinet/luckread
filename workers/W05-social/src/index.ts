@@ -369,13 +369,15 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
         const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
         if (!idempotencyKey) throw new RepostRuntimeError('PRECONDITION_REQUIRED', 428)
         if (idempotencyKey.length > 256) throw new RepostRuntimeError('VALIDATION_FAILED', 400)
+        const store = dependencies.repostStore
+        if (!store) throw new RepostRuntimeError('SERVICE_UNAVAILABLE', 503)
         if (request.method === 'POST') {
           return json({
-            data: await createRepost(env.DB, env.W03_CONTENT, actorUserId, contentId, request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '', dependencies.repostStore),
+            data: await createRepost(env.W03_CONTENT, actorUserId, contentId, request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '', store),
             requestId: createRequestId(),
           }, 201)
         }
-        await removeRepost(env.DB, actorUserId, contentId, dependencies.repostStore)
+        await removeRepost(actorUserId, contentId, store)
         return new Response(null, { status: 204, headers: { 'cache-control': 'no-store' } })
       }
 
@@ -391,6 +393,8 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
         const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
         if (!idempotencyKey) throw new ProfilePinRuntimeError('PRECONDITION_REQUIRED', 428)
         if (idempotencyKey.length > 256) throw new ProfilePinRuntimeError('VALIDATION_FAILED', 400)
+        const store = dependencies.profilePinStore
+        if (!store) throw new ProfilePinRuntimeError('SERVICE_UNAVAILABLE', 503)
         if (request.method === 'POST') {
           const context = await fetchOwnedPostContext(env.W03_CONTENT, {
             principalUserId: actorUserId,
@@ -399,11 +403,11 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
             correlationId: request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '',
           })
           return json({
-            data: await pinProfileContent(env.DB, actorUserId, contentId, context, dependencies.profilePinStore),
+            data: await pinProfileContent(actorUserId, contentId, context, store),
             requestId: createRequestId(),
           })
         }
-        await unpinProfileContent(env.DB, actorUserId, contentId, dependencies.profilePinStore)
+        await unpinProfileContent(actorUserId, contentId, store)
         return new Response(null, { status: 204 })
       }
 
@@ -413,7 +417,9 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
         requireTransport(request)
         const userId = decodePathPart(pinnedContentMatch[1] ?? '')
         if (userId === null) throw new ProfilePinRuntimeError('VALIDATION_FAILED', 400)
-        const pin = await getProfilePinReference(env.DB, userId, dependencies.profilePinStore)
+        const store = dependencies.profilePinStore
+        if (!store) throw new ProfilePinRuntimeError('SERVICE_UNAVAILABLE', 503)
+        const pin = await getProfilePinReference(userId, store)
         if (!pin) return json({ data: null, requestId: createRequestId() })
         try {
           await fetchPublishedOwnerPostContext(env.W03_CONTENT, {
@@ -437,7 +443,9 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
         requireTransport(request)
         const shareId = decodePathPart(parts[3])
         if (shareId === null) throw new ShareRuntimeError('VALIDATION_FAILED', 400)
-        return json({ data: await resolveShare(env.DB, env.W03_CONTENT, shareId, request.headers.get('X-LuckRead-Correlation-Id') ?? '', dependencies.shareStore), requestId: createRequestId() })
+        const store = dependencies.shareStore
+        if (!store) throw new ShareRuntimeError('SERVICE_UNAVAILABLE', 503)
+        return json({ data: await resolveShare(env.W03_CONTENT, shareId, request.headers.get('X-LuckRead-Correlation-Id') ?? '', store), requestId: createRequestId() })
       }
 
       if (url.pathname.startsWith('/internal/social/content/')) {
@@ -449,8 +457,12 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
         const contentId = decodePathPart(parts[3])
         if (contentId === null) throw new ShareRuntimeError('VALIDATION_FAILED', 400)
         const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
+        if (!idempotencyKey) throw new ShareRuntimeError('PRECONDITION_REQUIRED', 428)
+        if (idempotencyKey.length > 256) throw new ShareRuntimeError('VALIDATION_FAILED', 400)
+        const store = dependencies.shareStore
+        if (!store) throw new ShareRuntimeError('SERVICE_UNAVAILABLE', 503)
         return json({
-          data: await createShare(env.DB, env.W03_CONTENT, actorUserId, contentId, idempotencyKey, request.headers.get('X-LuckRead-Correlation-Id') ?? '', dependencies.shareStore),
+          data: await createShare(env.W03_CONTENT, actorUserId, contentId, idempotencyKey, request.headers.get('X-LuckRead-Correlation-Id') ?? '', store),
           requestId: createRequestId(),
         }, 201)
       }

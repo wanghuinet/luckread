@@ -1,17 +1,28 @@
-/// <reference types="@cloudflare/workers-types" />
 import { describe, expect, it, vi } from 'vitest'
 import { createShare, resolveShare } from './share-runtime.js'
+import { ShareStoreError, type ShareStorageRow, type ShareStore } from './share-store.js'
 import type { W03ContentBinding } from './w03-content-context-client.js'
 
-const db = (firstResults: unknown[] = []) => {
-  let firstIndex = 0
-  const prepare = vi.fn((sql: string) => ({
-    bind: vi.fn((...args: unknown[]) => ({
-      first: vi.fn(async () => firstResults[firstIndex++] ?? null),
-      run: vi.fn(async () => ({ sql, args, success: true, meta: { changes: 1 } })),
-    })),
-  }))
-  return { prepare } as unknown as D1Database
+function memoryStore(): ShareStore {
+  const byKey = new Map<string, ShareStorageRow>()
+  const byId = new Map<string, ShareStorageRow>()
+  return {
+    async findByActorAndKey(actorUserId, idempotencyKey) {
+      return byKey.get(actorUserId + ':' + idempotencyKey) ?? null
+    },
+    async insertIfAbsent(shareId, contentId, actorUserId, idempotencyKey, createdAt) {
+      const key = actorUserId + ':' + idempotencyKey
+      if (!byKey.has(key)) {
+        const row = { share_id: shareId, content_id: contentId, actor_user_id: actorUserId, created_at: createdAt }
+        byKey.set(key, row)
+        byId.set(shareId, row)
+      }
+    },
+    async findById(shareId) {
+      const row = byId.get(shareId)
+      return row ? { share_id: row.share_id, content_id: row.content_id, created_at: row.created_at } : null
+    },
+  }
 }
 
 const publishedContextBinding = (status = 200): W03ContentBinding & { fetch: ReturnType<typeof vi.fn> } => ({
@@ -19,132 +30,88 @@ const publishedContextBinding = (status = 200): W03ContentBinding & { fetch: Ret
     const request = input instanceof Request ? input : new Request(input, init)
     const parts = new URL(request.url).pathname.split('/').filter(Boolean)
     const contentId = decodeURIComponent(parts.at(-2) ?? '')
-    const body = {
-      data: {
-        contentId,
-        ownerUserId: 'owner-1',
-        contentType: 'post',
-        state: 'PUBLISHED',
-        updatedAt: '2026-11-14T00:00:00.000Z',
-      },
-    }
+    const body = { data: { contentId, ownerUserId: 'owner-1', contentType: 'post', state: 'PUBLISHED', updatedAt: '2026-11-14T00:00:00.000Z' } }
     return Response.json(status === 200 ? body : { error: 'NOT_FOUND' }, { status })
   }),
 })
 
-const shareRow = (contentId = 'content-1') => ({
-  share_id: 'share-1',
-  content_id: contentId,
-  actor_user_id: 'user-1',
+const row: ShareStorageRow = {
+  share_id: 'share-row-1', content_id: 'content-1', actor_user_id: 'user-1',
   created_at: '2026-10-02T00:00:00.000Z',
-})
+}
 
 describe('share runtime', () => {
-  it('creates a share token through W03 and only queries W05-owned share records', async () => {
-    const d = db([null, shareRow()])
+  it('creates an idempotent share after W03 publication validation', async () => {
+    const store = memoryStore()
     const binding = publishedContextBinding()
-    const result = await createShare(d, binding, 'user-1', 'content-1', 'share-request-1', 'correlation-1')
-
-    expect(result).toMatchObject({ shareId: 'share-1', contentId: 'content-1', actorUserId: 'user-1' })
-    expect(binding.fetch).toHaveBeenCalledTimes(1)
-    const sent = binding.fetch.mock.calls[0][0] as Request
+    const first = await createShare(binding, 'user-1', 'content-1', 'same-key', 'correlation-1', store)
+    const retry = await createShare(binding, 'user-1', 'content-1', 'same-key', 'retry-correlation', store)
+    expect(first.shareId).toEqual(expect.any(String))
+    expect(retry).toEqual(first)
+    expect(binding.fetch).toHaveBeenCalledTimes(2)
+    const sent = binding.fetch.mock.calls[0]?.[0] as Request
     expect(sent.url).toContain('/internal/content/contents/content-1/published-social-context')
     expect(sent.headers.get('X-LuckRead-Caller')).toBe('W05')
     expect(sent.headers.has('Authorization')).toBe(false)
     expect(sent.headers.has('Cookie')).toBe(false)
-
-    const prepare = (d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare
-    expect(prepare.mock.calls.some(([sql]) => /\b(?:FROM|JOIN)\s+contents\b/i.test(String(sql)))).toBe(false)
   })
 
-  it('uses an injected share store while keeping W03 publication validation', async () => {
-    const store = {
-      findByActorAndKey: vi.fn()
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce({
-          share_id: 'share-injected', content_id: 'content-1', actor_user_id: 'user-1',
-          created_at: '2026-10-02T00:00:00.000Z',
-        }),
-      insertIfAbsent: vi.fn(async () => undefined),
-      findById: vi.fn(async () => ({
-        share_id: 'share-injected', content_id: 'content-1', created_at: '2026-10-02T00:00:00.000Z',
-      })),
+  it('rejects reusing an actor idempotency key for another content item', async () => {
+    const store: ShareStore = {
+      findByActorAndKey: vi.fn(async () => row),
+      insertIfAbsent: vi.fn(),
+      findById: vi.fn(),
     }
-    const d = db()
-    await expect(createShare(d, publishedContextBinding(), 'user-1', 'content-1', 'key-injected', 'corr', store))
-      .resolves.toMatchObject({ shareId: 'share-injected', contentId: 'content-1' })
-    await expect(resolveShare(d, publishedContextBinding(), 'share-injected', 'corr', store))
-      .resolves.toMatchObject({ shareId: 'share-injected', contentId: 'content-1' })
-    expect(store.findByActorAndKey).toHaveBeenCalledTimes(2)
-    expect(store.insertIfAbsent).toHaveBeenCalledWith(expect.any(String), 'content-1', 'user-1', 'key-injected', expect.any(String))
-    expect(store.findById).toHaveBeenCalledWith('share-injected')
-    expect((d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
+    await expect(createShare(publishedContextBinding(), 'user-1', 'content-2', 'same-key', 'corr', store))
+      .rejects.toMatchObject({ code: 'CONFLICT', status: 409 })
   })
 
-  it('fails closed before reading or writing a share record when W03 says content is not published', async () => {
-    const d = db()
-    const binding = publishedContextBinding(404)
-    await expect(createShare(d, binding, 'user-1', 'content-1', 'key-1', 'correlation-1')).rejects.toMatchObject({
-      code: 'NOT_FOUND',
-      status: 404,
-    })
-    expect((d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
-  })
-
-  it('is idempotent for the same actor and key', async () => {
-    await expect(createShare(
-      db([shareRow()]),
-      publishedContextBinding(),
-      'user-1',
-      'content-1',
-      'same-key',
-      'correlation-1',
-    )).resolves.toMatchObject({ shareId: 'share-1', contentId: 'content-1' })
-  })
-
-  it('rejects reuse of the same key for another content item', async () => {
-    await expect(createShare(
-      db([shareRow('content-1')]),
-      publishedContextBinding(),
-      'user-1',
-      'content-2',
-      'same-key',
-      'correlation-1',
-    )).rejects.toMatchObject({ code: 'CONFLICT', status: 409 })
-  })
-
-  it('resolves a share only after W03 confirms the target is still published', async () => {
+  it('resolves a share only after W03 confirms the content is still published', async () => {
+    const store: ShareStore = {
+      findByActorAndKey: vi.fn(), insertIfAbsent: vi.fn(),
+      findById: vi.fn(async () => ({ share_id: row.share_id, content_id: row.content_id, created_at: row.created_at })),
+    }
     const binding = publishedContextBinding()
-    await expect(resolveShare(db([shareRow()]), binding, 'share-1', 'correlation-1')).resolves.toEqual({
-      shareId: 'share-1',
-      contentId: 'content-1',
-      createdAt: '2026-10-02T00:00:00.000Z',
+    await expect(resolveShare(binding, 'share-row-1', 'correlation-1', store)).resolves.toEqual({
+      shareId: 'share-row-1', contentId: 'content-1', createdAt: row.created_at,
     })
     expect(binding.fetch).toHaveBeenCalledTimes(1)
   })
 
-  it('returns not found for a missing share record', async () => {
+  it('does not call W03 for a missing share', async () => {
+    const store = memoryStore()
     const binding = publishedContextBinding()
-    await expect(resolveShare(db([null]), binding, 'share-1', 'correlation-1')).rejects.toMatchObject({
-      code: 'NOT_FOUND',
-      status: 404,
-    })
+    await expect(resolveShare(binding, 'missing-share', 'corr', store))
+      .rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 })
     expect(binding.fetch).not.toHaveBeenCalled()
   })
 
-  it('fails closed when W03 no longer exposes the content as published', async () => {
-    await expect(resolveShare(
-      db([shareRow()]),
-      publishedContextBinding(404),
-      'share-1',
-      'correlation-1',
-    )).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 })
+  it('fails closed before Store access when W03 no longer publishes the content', async () => {
+    const store: ShareStore = {
+      findByActorAndKey: vi.fn(), insertIfAbsent: vi.fn(), findById: vi.fn(),
+    }
+    await expect(createShare(publishedContextBinding(404), 'user-1', 'content-1', 'key-1', 'corr', store))
+      .rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 })
+    expect(store.findByActorAndKey).not.toHaveBeenCalled()
   })
 
-  it('rejects invalid actor and idempotency inputs', async () => {
-    await expect(createShare(db(), publishedContextBinding(), '', 'content-1', 'key', 'correlation-1'))
+  it('rejects invalid actor and idempotency inputs before Store access', async () => {
+    const store: ShareStore = {
+      findByActorAndKey: vi.fn(), insertIfAbsent: vi.fn(), findById: vi.fn(),
+    }
+    await expect(createShare(publishedContextBinding(), '', 'content-1', 'key', 'corr', store))
       .rejects.toMatchObject({ code: 'UNAUTHENTICATED', status: 401 })
-    await expect(createShare(db(), publishedContextBinding(), 'user-1', 'content-1', '', 'correlation-1'))
+    await expect(createShare(publishedContextBinding(), 'user-1', 'content-1', '', 'corr', store))
       .rejects.toMatchObject({ code: 'PRECONDITION_REQUIRED', status: 428 })
+    expect(store.findByActorAndKey).not.toHaveBeenCalled()
+  })
+
+  it('maps persistence failures to a sanitized service error', async () => {
+    const store: ShareStore = {
+      findByActorAndKey: vi.fn(async () => { throw new ShareStoreError() }),
+      insertIfAbsent: vi.fn(), findById: vi.fn(),
+    }
+    await expect(createShare(publishedContextBinding(), 'user-1', 'content-1', 'key', 'corr', store))
+      .rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE', status: 503 })
   })
 })
