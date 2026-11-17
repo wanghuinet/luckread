@@ -86,6 +86,13 @@ export interface W08CreatorStore {
   findActiveCreator(userId: string): Promise<{ creator_id: string } | null>
 }
 
+/**
+ * @deprecated-next-version
+ * Reason: Legacy D1 statement surface is used only by the isolated W08 unit-test adapter.
+ * Replacement: W08CreatorStore contract with the Neon PostgreSQL implementation.
+ * Removal: Next release.
+ * Condition: W08 unit tests construct in-memory W08CreatorStore fixtures instead of exercising D1 SQL compatibility.
+ */
 export interface W08D1PreparedStatement {
   bind(...values: unknown[]): W08D1PreparedStatement
   first<T = unknown>(): Promise<T | null>
@@ -189,6 +196,13 @@ const auditInsertSql =
   'VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) ' +
   'ON CONFLICT (event_key) DO NOTHING'
 
+/**
+ * @deprecated-next-version
+ * Reason: This D1 store is retained only for isolated local unit tests; production W08 runtime is Neon-only.
+ * Replacement: createPostgresW08CreatorStore.
+ * Removal: Next release.
+ * Condition: W08 creator worker tests inject W08CreatorStore fixtures and no longer call this adapter.
+ */
 export function createD1W08CreatorStore(db: W08D1Database): W08CreatorStore {
   return {
     findApplicationByIdempotency(userId, idempotencyKey) {
