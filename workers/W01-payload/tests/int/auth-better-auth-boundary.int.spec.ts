@@ -113,8 +113,9 @@ describe('W01 Better Auth boundary', () => {
     expect(authConfig).toContain('requireEmailVerification: true')
     expect(authConfig).toContain('sendVerificationEmail: async ({ user, url })')
     expect(authConfig).toContain('afterEmailVerification: async (user)')
-    expect(authConfig).toContain("activateEmailVerifiedAccount(db, userId, now)")
-    expect(authConfig).toContain("await ensureVerifiedUserRole(db, userId, now)")
+    expect(authConfig).toContain('afterEmailVerified: (userId, now) =>')
+    expect(authConfig).toContain('activateEmailVerifiedAccountPostgres(runtime.pool, userId, now)')
+    expect(authConfig).toContain('ensureBaseUserRolePostgres(runtime.pool, userId, new Date().toISOString())')
     const activation = readFileSync(
       resolve(process.cwd(), '../W02-identity/src/account/account-state-transition.ts'),
       'utf8',
@@ -143,11 +144,11 @@ describe('W01 Better Auth boundary', () => {
       'utf8',
     )
 
-    // Borrow the plugin's initialize-once model while retaining the W02-native D1 fallback.
+    // Production Better Auth instances are cached by the existing Neon Hyperdrive pool.
     expect(authConfig).toContain('const authInstances = new WeakMap')
-    expect(authConfig).toContain('const database = env.D1_01 as object')
-    expect(authConfig).toContain('authInstances.get(database)')
-    expect(authConfig).toContain('authInstances.set(database, auth)')
+    expect(authConfig).toContain('const runtime = getW02PostgresRuntime(env)')
+    expect(authConfig).toContain('const cached = authInstances.get(runtime.pool)')
+    expect(authConfig).toContain('authInstances.set(runtime.pool, auth)')
     expect(principal).toContain('createLuckReadAuth(env)')
     expect(w02Index).toContain('resolveBetterAuthPrincipal(env, request)')
     expect(w02Index).toContain('createLuckReadAuth(env)')
