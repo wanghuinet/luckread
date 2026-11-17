@@ -1868,7 +1868,7 @@ describe('W03 content contract core', () => {
     expect(canTransitionContentState('RESTORED', 'PENDING_REVIEW', 'CREATOR', true)).toBe(false)
   })
 
-  it('requires Neon persistence for content create, update, and owner state transitions while tracking remaining legacy moderation writes', () => {
+  it('requires Neon persistence for content create, update, owner state, and moderation transitions', () => {
     const runtime = readFileSync(
       resolve(process.cwd(), 'workers/W03-content/src/content-runtime.ts'),
       'utf8',
@@ -1909,8 +1909,13 @@ describe('W03 content contract core', () => {
     const moderationStart = runtime.indexOf('export async function applyModerationContentTransition')
     expect(moderationStart).toBeGreaterThanOrEqual(0)
     const moderationSection = runtime.slice(moderationStart)
-    expect(moderationSection).toContain('await batchMutation(db, [')
-    expect(moderationSection).toContain('atomicGuard(db)')
+    expect(moderationSection).toContain("await mutationStore.loadMutation(")
+    expect(moderationSection).toContain("await mutationStore.moderationTransition({")
+    expect(moderationSection).not.toContain('ContentD1')
+    expect(moderationSection).not.toContain('loadMutationRow(db')
+    expect(moderationSection).not.toContain('db.prepare')
+    expect(moderationSection).not.toContain('batchMutation')
+    expect(moderationSection).not.toContain('atomicGuard')
 
     const deleteStart = runtime.indexOf('export async function deleteContent')
     expect(deleteStart).toBeGreaterThanOrEqual(0)

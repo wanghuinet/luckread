@@ -2473,7 +2473,7 @@ export function toErrorResponse(error: unknown): Response {
 }
 
 export async function applyModerationContentTransition(
-  db: ContentD1,
+  mutationStore: ContentMutationStore,
   input: {
     contentId: string
     decisionId: string
@@ -2483,7 +2483,6 @@ export async function applyModerationContentTransition(
     idempotencyKey: string
   },
   now = new Date(),
-  mutationStore?: ContentMutationStore,
 ): Promise<{ from: ContentState; to: ContentState; version: number; etag: string }> {
   assertResourceId(input.contentId)
   assertResourceId(input.decisionId)
@@ -2506,10 +2505,12 @@ export async function applyModerationContentTransition(
     outcome: input.outcome,
     ifMatch: normalizeEtag(input.ifMatch),
   })
-  const snapshot = mutationStore
-    ? await mutationStore.loadMutation('W06', input.contentId, operationId, input.idempotencyKey)
-    : await loadMutationRow(db, input.contentId, operationId, input.idempotencyKey, 'W06')
-  const { content, idempotency } = snapshot
+  const { content, idempotency } = await mutationStore.loadMutation(
+    'W06',
+    input.contentId,
+    operationId,
+    input.idempotencyKey,
+  )
   const replay = inspectIdempotency(idempotency, 'W06', hash, now)
   if (replay.replayed) {
     if (!replay.body) throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
@@ -2532,51 +2533,21 @@ export async function applyModerationContentTransition(
   }
   const expiresAt = new Date(now.getTime() + IDEMPOTENCY_TTL_MS).toISOString()
 
-  if (mutationStore) {
-    await mutationStore.moderationTransition({
-      idempotencyOwnerUserId: 'W06',
-      operationId,
-      idempotencyKey: input.idempotencyKey,
-      requestHash: hash,
-      responseJson: JSON.stringify(result),
-      updatedAt,
-      expiresAt,
-      contentId: content.id,
-      expectedVersion: content.version,
-      expectedEtag: content.etag,
-      nextState: input.outcome,
-      nextVersion,
-      nextEtag: result.etag,
-    })
-  } else {
-    await batchMutation(db, [
-      expireMutationRow(db, 'W06', operationId, input.idempotencyKey, updatedAt),
-      insertCompletedIdempotency(
-        db,
-        'W06',
-        operationId,
-        input.idempotencyKey,
-        hash,
-        200,
-        JSON.stringify(result),
-        updatedAt,
-        expiresAt,
-      ),
-      db.prepare(
-        `UPDATE contents SET state=?, version=?, etag=?, updated_at=?
-          WHERE id=? AND version=? AND etag=?`,
-      ).bind(
-        input.outcome,
-        nextVersion,
-        result.etag,
-        updatedAt,
-        content.id,
-        content.version,
-        content.etag,
-      ),
-      atomicGuard(db),
-    ])
-  }
+  await mutationStore.moderationTransition({
+    idempotencyOwnerUserId: 'W06',
+    operationId,
+    idempotencyKey: input.idempotencyKey,
+    requestHash: hash,
+    responseJson: JSON.stringify(result),
+    updatedAt,
+    expiresAt,
+    contentId: content.id,
+    expectedVersion: content.version,
+    expectedEtag: content.etag,
+    nextState: input.outcome,
+    nextVersion,
+    nextEtag: result.etag,
+  })
 
   return result
 }

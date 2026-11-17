@@ -785,17 +785,18 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
         ) {
           throw new ContentRuntimeError('VALIDATION_FAILED', 400)
         }
+        const mutationStore = dependencies.contentMutationStoreProvider?.(env)
+        if (!mutationStore) throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
         const parts = url.pathname.split('/').filter(Boolean)
         return json({
-          ...await applyModerationContentTransition(NO_LEGACY_DATABASE_HANDLE, {
+          ...await applyModerationContentTransition(mutationStore, {
             contentId: decodeURIComponent(parts[3]),
             decisionId,
             policyVersion,
             outcome: outcome as 'APPROVED' | 'REJECTED',
             ifMatch,
             idempotencyKey,
-          }, new Date(), dependencies.contentMutationStoreProvider?.(env)),
-
+          }, new Date()),
           requestId: createRequestId(),
         })
       }
