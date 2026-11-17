@@ -1,5 +1,3 @@
-/// <reference types="@cloudflare/workers-types" />
-
 import { Pool, type PoolClient } from 'pg'
 
 import {
@@ -52,7 +50,19 @@ export interface RegistrationPersistenceStore {
   completeRegistration(input: RegistrationCompletion): Promise<string | null>
 }
 
-type D1Binding = D1Database
+type D1PreparedStatement = {
+  bind(...values: unknown[]): D1PreparedStatement
+  first<T = Record<string, unknown>>(): Promise<T | null>
+  run(): Promise<D1Result>
+}
+type D1Session = {
+  prepare(query: string): D1PreparedStatement
+}
+type D1Binding = {
+  prepare(query: string): D1PreparedStatement
+  batch(statements: D1PreparedStatement[]): Promise<D1Result[]>
+  withSession(consistency: 'first-primary'): D1Session
+}
 type D1Result = { meta?: { changes?: number }; results?: Array<Record<string, unknown>> }
 type D1Statement = ReturnType<D1Binding['prepare']>
 
