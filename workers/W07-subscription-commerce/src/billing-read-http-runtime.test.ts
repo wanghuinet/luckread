@@ -30,7 +30,10 @@ function createFixture() {
       return page;
     },
   };
-  const env: Parameters<typeof handleCommerceBillingReadRequest>[2] = { D1_04: {} as D1Database };
+  const env: Parameters<typeof handleCommerceBillingReadRequest>[2] = {
+    W07_DATABASE_DRIVER: 'd1',
+    D1_04: {} as D1Database,
+  };
   return { calls, dependencies, env };
 }
 

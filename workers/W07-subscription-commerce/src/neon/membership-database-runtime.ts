@@ -17,8 +17,16 @@ const databases = new WeakMap<object, D1Database>()
 export function resolveW07MembershipDatabaseDriver(
   env: W07MembershipDatabaseRuntimeEnv,
 ): 'd1' | 'neon' {
-  const configured = env.W07_MEMBERSHIP_DATABASE_DRIVER?.trim().toLowerCase() || 'd1'
-  if (configured === 'd1' || configured === 'neon') return configured
+  const configured = env.W07_MEMBERSHIP_DATABASE_DRIVER?.trim().toLowerCase()
+  /**
+   * @deprecated-next-version
+   * Reason: The explicit legacy D1 selector remains only for existing D1-backed SQL consumers and isolated tests.
+   * Replacement: The existing D1-01 Neon Hyperdrive bridge and PostgreSQL-native membership Stores.
+   * Removal: Next release.
+   * Condition: All W07 membership consumers and tests use PostgreSQL-native Stores instead of D1Database.
+   */
+  if (configured === 'd1') return 'd1'
+  if (configured === 'neon') return 'neon'
   throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
 }
 

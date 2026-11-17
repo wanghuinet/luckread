@@ -62,6 +62,7 @@ function createFixture(options: {
   const attempt = options.attempt ?? { payment: paymentDto, replayed: false, pricingMode: 'live' };
   const remotePayment = options.providerPayment ?? providerPayment;
   const env = {
+    W07_DATABASE_DRIVER: 'd1',
     D1_04: {} as D1Database,
     HYPERSWITCH_ENVIRONMENT: 'sandbox',
     HYPERSWITCH_API_KEY: 'sandbox-api-key',

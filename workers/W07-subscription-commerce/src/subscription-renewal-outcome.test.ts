@@ -144,7 +144,7 @@ class MemoryD1 {
 function env(cycle: Cycle | null = makeCycle(), subscription: Subscription | null = makeSubscription(), failRead = false) {
   const d1_01 = new MemoryD1(null, subscription, failRead) as unknown as D1Database;
   const d1_04 = new MemoryD1(cycle, null) as unknown as D1Database;
-  return { value: { D1_01: d1_01, D1_04: d1_04 }, d1_01: d1_01 as unknown as MemoryD1, d1_04: d1_04 as unknown as MemoryD1 };
+  return { value: { W07_DATABASE_DRIVER: 'd1', W07_MEMBERSHIP_DATABASE_DRIVER: 'd1', D1_01: d1_01, D1_04: d1_04 }, d1_01: d1_01 as unknown as MemoryD1, d1_04: d1_04 as unknown as MemoryD1 };
 }
 
 describe('D1-04 renewal outcome to D1-01 Subscription synchronization', () => {
@@ -220,7 +220,7 @@ describe('D1-04 renewal outcome to D1-01 Subscription synchronization', () => {
     const d1_01 = new MemoryD1(null, null) as unknown as D1Database;
     const d1_04 = new MemoryD1(null, null, false, true) as unknown as D1Database;
     const result = await syncRenewalCycleOutcomeForPayment(
-      { D1_01: d1_01, D1_04: d1_04 },
+      { W07_DATABASE_DRIVER: 'd1', W07_MEMBERSHIP_DATABASE_DRIVER: 'd1', D1_01: d1_01, D1_04: d1_04 },
       PAYMENT_ID,
       'merchant_test',
       { now: () => new Date(NOW) },

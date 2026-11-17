@@ -138,6 +138,8 @@ function fixture(overrides: {
     insertCount: 0,
   };
   const env = {
+    W07_DATABASE_DRIVER: 'd1',
+    W07_MEMBERSHIP_DATABASE_DRIVER: 'd1',
     D1_01: fakeDb('D1_01', state),
     D1_04: fakeDb('D1_04', state),
   };

@@ -10,10 +10,16 @@ import {
 } from './payment-method-read-runtime.js'
 
 describe('W07 payment-method Neon read runtime', () => {
-  it('keeps D1 as the default and does not create a PostgreSQL pool', () => {
+  it('requires an explicit provider and keeps legacy D1 only for explicit test selection', () => {
+    const d1 = {} as D1Database
     const poolFactory = vi.fn()
-    expect(resolveW07DatabaseDriver({})).toBe('d1')
-    expect(getW07PaymentMethodReadStore({}, poolFactory)).toBeUndefined()
+    expect(() => resolveW07DatabaseDriver({})).toThrow('SERVICE_UNAVAILABLE')
+    expect(() => getW07PaymentMethodReadStore({}, poolFactory)).toThrow('SERVICE_UNAVAILABLE')
+
+    const env = { D1_04: d1, W07_DATABASE_DRIVER: 'd1' }
+    expect(resolveW07DatabaseDriver(env)).toBe('d1')
+    expect(getW07PaymentMethodReadStore(env, poolFactory)).toBeUndefined()
+    expect(getW07SelectedD104Database(env, poolFactory)).toBe(d1)
     expect(poolFactory).not.toHaveBeenCalled()
   })
 

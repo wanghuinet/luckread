@@ -27,8 +27,16 @@ const orderCreateStores = new WeakMap<object, OrderCreatePersistenceStore>()
 export function resolveW07DatabaseDriver(
   env: W07PaymentMethodReadRuntimeEnv,
 ): 'd1' | 'neon' {
-  const configured = env.W07_DATABASE_DRIVER?.trim().toLowerCase() || 'd1'
-  if (configured === 'd1' || configured === 'neon') return configured
+  const configured = env.W07_DATABASE_DRIVER?.trim().toLowerCase()
+  /**
+   * @deprecated-next-version
+   * Reason: The explicit legacy D1 selector remains only for existing D1-backed SQL consumers and isolated tests.
+   * Replacement: The existing D1-04 Neon Hyperdrive bridge and PostgreSQL-native payment/order Stores.
+   * Removal: Next release.
+   * Condition: All W07 finance consumers and tests use PostgreSQL-native Stores instead of D1Database.
+   */
+  if (configured === 'd1') return 'd1'
+  if (configured === 'neon') return 'neon'
   throw new PaymentMethodRuntimeError('SERVICE_UNAVAILABLE', 503)
 }
 
