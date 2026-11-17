@@ -248,7 +248,7 @@ async function inTransaction<T>(client: PoolClient, operation: () => Promise<T>)
 function createPostgresRegistrationPersistenceStore(pool: Pool): RegistrationPersistenceStore {
   return {
     async getExistingEnvelope(idempotencyKey) {
-      const result = await pool.query<RegistrationEnvelope>(
+      const result = await pool.query<RegistrationEnvelope & Record<string, unknown>>(
         `SELECT
            id,
            payload_hash AS "payloadHash",
@@ -316,7 +316,7 @@ function createPostgresRegistrationPersistenceStore(pool: Pool): RegistrationPer
     },
 
     async findIdentityById(userId) {
-      const result = await pool.query<RegistrationIdentity>(
+      const result = await pool.query<RegistrationIdentity & Record<string, unknown>>(
         'SELECT id, email, username FROM "user" WHERE id = $1 LIMIT 1',
         [userId],
       )
