@@ -883,17 +883,16 @@ describe('W03 Neon content mutation store', () => {
     }
 
     const updated = await updateContent(
-      d1 as never,
       'user_123',
       snapshotContent.id,
       { contentType: 'post', title: 'Updated from Neon', bodyRef: 'body:updated', mediaRefs: [], coverRef: null },
       'W/"4"',
       'neon-update-key',
+      store,
       now,
       'neon-update-test',
       'L2',
       undefined,
-      store,
     )
     await deleteContent(
       'user_123',
