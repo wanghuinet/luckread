@@ -1868,7 +1868,7 @@ describe('W03 content contract core', () => {
     expect(canTransitionContentState('RESTORED', 'PENDING_REVIEW', 'CREATOR', true)).toBe(false)
   })
 
-  it('requires Neon persistence for content creation and keeps the D1 CAS guard on remaining legacy mutations', () => {
+  it('requires Neon persistence for content create, update, and owner state transitions while tracking remaining legacy moderation writes', () => {
     const runtime = readFileSync(
       resolve(process.cwd(), 'workers/W03-content/src/content-runtime.ts'),
       'utf8',
@@ -1895,17 +1895,24 @@ describe('W03 content contract core', () => {
     expect(updateSection).not.toContain('batchMutation')
     expect(updateSection).not.toContain('atomicGuard')
 
-    for (const functionName of [
-      'transitionContentState',
-      'applyModerationContentTransition',
-    ]) {
-      const start = runtime.indexOf('export async function ' + functionName)
-      expect(start).toBeGreaterThanOrEqual(0)
-      const end = runtime.indexOf('\nexport ', start + 10)
-      const section = runtime.slice(start, end >= 0 ? end : runtime.length)
-      expect(section).toContain('await batchMutation(db, [')
-      expect(section).toContain('atomicGuard(db)')
-    }
+    const transitionStart = runtime.indexOf('export async function transitionContentState')
+    expect(transitionStart).toBeGreaterThanOrEqual(0)
+    const transitionEnd = runtime.indexOf('\nexport type DueScheduledContentCandidate', transitionStart)
+    const transitionSection = runtime.slice(transitionStart, transitionEnd)
+    expect(transitionSection).toContain('await mutationStore.loadMutation(')
+    expect(transitionSection).toContain('await mutationStore.transition({')
+    expect(transitionSection).not.toContain('ContentD1')
+    expect(transitionSection).not.toContain('db.prepare')
+    expect(transitionSection).not.toContain('batchMutation')
+    expect(transitionSection).not.toContain('atomicGuard')
+
+    const moderationStart = runtime.indexOf('export async function applyModerationContentTransition')
+    expect(moderationStart).toBeGreaterThanOrEqual(0)
+    const moderationEnd = runtime.indexOf('\nexport async function listContentRevisions', moderationStart)
+    expect(moderationEnd).toBeGreaterThan(moderationStart)
+    const moderationSection = runtime.slice(moderationStart, moderationEnd)
+    expect(moderationSection).toContain('await batchMutation(db, [')
+    expect(moderationSection).toContain('atomicGuard(db)')
 
     const deleteStart = runtime.indexOf('export async function deleteContent')
     expect(deleteStart).toBeGreaterThanOrEqual(0)
