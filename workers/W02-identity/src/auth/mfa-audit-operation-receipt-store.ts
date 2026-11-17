@@ -33,6 +33,13 @@ export interface MfaAuditOperationReceiptStore {
 }
 
 /** D1 remains the production-default durable MFA receipt implementation. */
+/**
+ * @deprecated-next-version
+ * Reason: Legacy Cloudflare D1 implementation retained only for isolated unit tests or the explicit schema/test fixture.
+ * Replacement: PostgreSQL MFA audit operation receipt Store in src/neon/mfa-audit-operation-receipts-postgres.ts.
+ * Removal: Next release.
+ * Condition: MFA receipt tests and Better Auth test profile use the PostgreSQL implementation or in-memory Store fixtures.
+ */
 export function createD1MfaAuditOperationReceiptStore(db: D1Database): MfaAuditOperationReceiptStore {
   return {
     assertOwner: (input) => assertMfaAuditOperationReceiptOwner(db, input),
