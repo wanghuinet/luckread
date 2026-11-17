@@ -9,7 +9,12 @@ export interface W11AnalyticsHyperdriveBinding {
   connectionString?: string
 }
 
-const databases = new WeakMap<object, ReturnType<typeof createPostgresAnalyticsDatabase>>()
+interface RuntimeState {
+  pool: Pool
+  database: ReturnType<typeof createPostgresAnalyticsDatabase>
+}
+
+const runtimes = new WeakMap<object, RuntimeState>()
 
 function validateConnectionString(value: unknown): string {
   if (typeof value !== 'string' || value.length === 0 || value.length > 4096) {
@@ -42,8 +47,8 @@ export function getW11AnalyticsPostgresDatabase(
     throw new Error('W11_ANALYTICS_HYPERDRIVE_BINDING_REQUIRED')
   }
 
-  const cached = databases.get(binding)
-  if (cached) return cached
+  const cached = runtimes.get(binding)
+  if (cached) return cached.database
 
   const pool = new Pool({
     connectionString: validateConnectionString(binding.connectionString),
@@ -63,6 +68,19 @@ export function getW11AnalyticsPostgresDatabase(
   const database = createPostgresAnalyticsDatabase(
     pool as unknown as AnalyticsPostgresPool,
   )
-  databases.set(binding, database)
+  runtimes.set(binding, { pool, database })
   return database
+}
+
+/**
+ * Closes the cached pool created for a disposable integration-test binding.
+ * Workers do not call this: Hyperdrive pools live for the isolate lifetime.
+ */
+export async function closeW11AnalyticsPostgresDatabaseForTest(
+  binding: W11AnalyticsHyperdriveBinding,
+): Promise<void> {
+  const runtime = runtimes.get(binding)
+  if (!runtime) return
+  runtimes.delete(binding)
+  await runtime.pool.end()
 }

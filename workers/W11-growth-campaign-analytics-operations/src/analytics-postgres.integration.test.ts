@@ -2,18 +2,19 @@ import { readFile } from 'node:fs/promises'
 import { Pool } from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
+import entry from './entry.js'
 import {
-  createPostgresAnalyticsDatabase,
-  type AnalyticsPostgresPool,
-} from './analytics-postgres-store.js'
-import worker, { type W11Env } from './worker.js'
+  closeW11AnalyticsPostgresDatabaseForTest,
+  getW11AnalyticsPostgresDatabase,
+  type W11AnalyticsHyperdriveBinding,
+} from './analytics-postgres-runtime.js'
 
 const connectionString = process.env.W11_PG_TEST_DATABASE_URL
 const postgresSuite = connectionString ? describe : describe.skip
 
 postgresSuite('W11 PostgreSQL 18 runtime integration', () => {
   let pool: Pool
-  let database: ReturnType<typeof createPostgresAnalyticsDatabase>
+  let binding: W11AnalyticsHyperdriveBinding
 
   beforeAll(async () => {
     if (!connectionString) throw new Error('W11_PG_TEST_DATABASE_URL is required')
@@ -33,19 +34,30 @@ postgresSuite('W11 PostgreSQL 18 runtime integration', () => {
     )
     await pool.query(migration)
 
-    database = createPostgresAnalyticsDatabase(
-      pool as unknown as AnalyticsPostgresPool,
-    )
+    binding = { connectionString }
+    // Resolve through the exact Hyperdrive runtime path used by the Neon entry.
+    getW11AnalyticsPostgresDatabase(binding)
   })
 
   afterAll(async () => {
+    if (binding) await closeW11AnalyticsPostgresDatabaseForTest(binding)
     await pool?.end()
   })
 
   it('executes W01 ingestion, schema readiness, deduplication, projection and rollback on PostgreSQL', async () => {
-    const env: W11Env = {
-      D1_05: database,
+    const legacyD1 = {
+      prepare() {
+        throw new Error('Neon entry must not access legacy D1_05')
+      },
+      batch() {
+        throw new Error('Neon entry must not write legacy D1_05')
+      },
     }
+    const env = {
+      W11_DATABASE_DRIVER: 'neon',
+      HYPERDRIVE_ANALYTICS_PG: binding,
+      D1_05: legacyD1,
+    } as never
     const event = {
       eventId: 'evt_pg18_runtime_0001',
       dedupeKey: 'dedupe_pg18_runtime_0001',
@@ -61,7 +73,7 @@ postgresSuite('W11 PostgreSQL 18 runtime integration', () => {
       'X-LuckRead-Transport-Version': '1.0',
       'X-LuckRead-Correlation-Id': 'corr_pg18_runtime_000001',
     }
-    const ingest = () => worker.fetch(
+    const ingest = () => entry.fetch(
       new Request('https://w11.internal/internal/analytics/events', {
         method: 'POST',
         headers,
@@ -70,7 +82,7 @@ postgresSuite('W11 PostgreSQL 18 runtime integration', () => {
       env,
     )
 
-    const ready = await worker.fetch(
+    const ready = await entry.fetch(
       new Request('https://w11.internal/readyz'),
       env,
     )
@@ -144,6 +156,7 @@ postgresSuite('W11 PostgreSQL 18 runtime integration', () => {
     )
     expect(aggregateAfterDuplicate.rows).toEqual([{ opens: 1 }])
 
+    const database = getW11AnalyticsPostgresDatabase(binding)
     await expect(database.batch([
       database.prepare(
         'INSERT INTO analytics_rollup_watermark (consumer_name) VALUES (?)',
