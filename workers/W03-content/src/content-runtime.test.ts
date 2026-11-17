@@ -5,6 +5,47 @@ import { resolve } from 'node:path'
 import { canTransitionContentState, ContentRuntimeError, type ContentRecord, createContent, createRequestId, deleteContent, getContent, decodeContentListCursor, decodeCursor, decodeScopedCursor, encodeContentListCursor, encodeCursor, encodeScopedCursor, isState, listContents, listPublishedContentsByIds, listContentRevisions, listCreatorContents, listDueScheduledContentCandidates, publishAuthorizedScheduledContents, publicContent, toErrorResponse, transitionContentState, updateContent, validateInput, validateListFilters } from './content-runtime.js'
 import w03Worker, { createW03ContentWorker, hasCreatorContentPermission, hasSocialPostPermission, parseListLimit } from './index.js'
 
+const makeContentMutationStore = (
+  row: Record<string, unknown>,
+  update: () => Promise<void> = async () => undefined,
+) => ({
+  async loadMutation() {
+    return {
+      content: {
+        id: row.id as string,
+        contentType: row.content_type as ContentRecord['contentType'],
+        ownerUserId: row.owner_user_id as string,
+        creatorId: (row.creator_id as string | null | undefined) ?? null,
+        ipId: (row.ip_id as string | null | undefined) ?? null,
+        state: row.state as ContentRecord['state'],
+        scheduledAt: (row.scheduled_at as string | null | undefined) ?? null,
+        accessMode: row.access_mode === 'MEMBERS_ONLY' ? 'MEMBERS_ONLY' : 'PUBLIC',
+        version: row.version as number,
+        revision: row.revision as number,
+        slug: row.slug as string,
+        title: row.title as string,
+        bodyRef: row.body_ref as string,
+        mediaRefs: JSON.parse((row.media_refs_json as string | undefined) ?? '[]') as string[],
+        coverRef: (row.cover_ref as string | null | undefined) ?? null,
+        mediaWarning: (row.media_warning as ContentRecord['mediaWarning'] | undefined) ?? null,
+        etag: row.etag as string,
+        createdAt: row.created_at as string,
+        updatedAt: row.updated_at as string,
+      } satisfies ContentRecord,
+      idempotency: {
+        idem_id: null,
+        idem_owner_user_id: null,
+        idem_request_hash: null,
+        idem_status: null,
+        idem_response_status: null,
+        idem_response_json: null,
+        idem_expires_at: null,
+      },
+    }
+  },
+  update,
+})
+
 describe('W03 content contract core', () => {
 
   it('redacts member-only content titles and protected references when access is denied', () => {
@@ -653,21 +694,17 @@ describe('W03 content contract core', () => {
       idem_response_json: null,
       idem_expires_at: null,
     }
-    let prepareCount = 0
-    const db = {
-      prepare() {
-        prepareCount += 1
-        return {
-          bind: () => ({
-            first: async () => row,
-          }),
-        }
+    let loadCount = 0
+    const mutationStore = {
+      ...makeContentMutationStore(row),
+      async loadMutation() {
+        loadCount += 1
+        return makeContentMutationStore(row).loadMutation()
       },
     } as never
 
     await expect(
       updateContent(
-        db,
         'user_type_guard',
         'content_type_guard_123',
         {
@@ -679,10 +716,11 @@ describe('W03 content contract core', () => {
         },
         'W/"1"',
         'content-type-guard-idem',
+        mutationStore,
       ),
     ).rejects.toMatchObject({ code: 'VALIDATION_FAILED' })
 
-    expect(prepareCount).toBe(1)
+    expect(loadCount).toBe(1)
   })
 
   it('allows only the contracted creator and moderator transitions', () => {
@@ -755,12 +793,6 @@ describe('W03 content contract core', () => {
       idem_response_json: null,
       idem_expires_at: null,
     }
-    const db = {
-      prepare() {
-        return { bind: () => ({ first: async () => row }) }
-      },
-      batch: async () => { throw new Error('a denied mutation must not write') },
-    } as never
     const mutationStore = {
       async loadMutation() {
         return {
@@ -783,18 +815,19 @@ describe('W03 content contract core', () => {
           },
         }
       },
+      async update() { throw new Error('a denied mutation must not write') },
       async delete() { throw new Error('a denied mutation must not write') },
     } as never
 
     for (const layer of ['L2', 'L5', 'L6', 'L7', 'L8']) {
       await expect(
         updateContent(
-          db,
           'user_article_guard_1',
           'content_article_guard_1',
           { contentType: 'post', title: 'Spoofed type', bodyRef: 'https://cdn.example.com/body.txt', mediaRefs: [], coverRef: null },
           'W/"1"',
           'spoof-type-key-' + layer,
+          mutationStore,
           new Date('2026-10-16T00:01:00.000Z'),
           'test',
           layer,
@@ -1883,8 +1916,18 @@ describe('W03 content contract core', () => {
     expect(createSection).not.toContain('batchMutation(db')
     expect(createSection).not.toContain('allocateContentSnowflakeId')
 
+    const updateStart = runtime.indexOf('export async function updateContent')
+    expect(updateStart).toBeGreaterThanOrEqual(0)
+    const updateEnd = runtime.indexOf('\nexport async function rollbackContentRevision', updateStart)
+    const updateSection = runtime.slice(updateStart, updateEnd)
+    expect(updateSection).toContain('await mutationStore.loadMutation(')
+    expect(updateSection).toContain('await mutationStore.update({')
+    expect(updateSection).not.toContain('ContentD1')
+    expect(updateSection).not.toContain('db.prepare')
+    expect(updateSection).not.toContain('batchMutation')
+    expect(updateSection).not.toContain('atomicGuard')
+
     for (const functionName of [
-      'updateContent',
       'transitionContentState',
       'applyModerationContentTransition',
     ]) {
@@ -2104,19 +2147,23 @@ describe('W03 content contract core', () => {
 
 })
 
-  it('stores the full ContentRecord for update idempotency replay', () => {
+  it('stores the full ContentRecord through Neon for update idempotency replay', () => {
     const runtime = readFileSync(
       resolve(process.cwd(), 'workers/W03-content/src/content-runtime.ts'),
       'utf8',
     )
     const start = runtime.indexOf('export async function updateContent')
-    const end = runtime.indexOf('\nexport async function deleteContent', start)
+    const end = runtime.indexOf('\nexport async function rollbackContentRevision', start)
     const section = runtime.slice(start, end)
     expect(section).toContain('const idempotencyResponseBody = JSON.stringify(updated)')
-    expect(section).toContain(
-      'insertCompletedIdempotency(db, principalUserId, operationId, idempotencyKey, hash, 200, idempotencyResponseBody, updatedAt, expiresAt),',
-    )
+    expect(section).toContain('await mutationStore.update({')
+    expect(section).toContain('responseJson: idempotencyResponseBody,')
+    expect(section).toContain('requestHash: hash,')
+    expect(section).toContain('expectedVersion: content.version,')
+    expect(section).toContain('expectedEtag: content.etag,')
+    expect(section).toContain('revision,')
     expect(section).toContain('return updated')
+    expect(section).not.toContain('insertCompletedIdempotency')
   })
 
 
@@ -2196,7 +2243,7 @@ describe('1.1 content revision history', () => {
     expect(index).toContain("request.headers.get('X-LuckRead-Verified-Creator-Id')?.trim() || undefined")
   })
 
-  it('records create, update and rollback history after the authoritative CAS guard', () => {
+  it('records create, update and rollback history through their authoritative persistence transactions', () => {
     const runtime = readFileSync(
       resolve(process.cwd(), 'workers/W03-content/src/content-runtime.ts'),
       'utf8',
@@ -2209,19 +2256,18 @@ describe('1.1 content revision history', () => {
       expect(runtime).toContain(marker)
     }
 
-    const updateIndex = runtime.indexOf('UPDATE contents')
-    const updateGuard = runtime.indexOf('atomicGuard(db)', updateIndex)
-    const updateRevision = runtime.indexOf('const revision: ContentRevision = {')
+    const updateIndex = runtime.indexOf('export async function updateContent')
+    const updateStoreWrite = runtime.indexOf('await mutationStore.update({', updateIndex)
+    const updateRevision = runtime.indexOf('const revision: ContentRevision = {', updateIndex)
     const updateRevisionOperation = runtime.indexOf("operation: 'UPDATE'", updateRevision)
-    const updateRevisionWrite = runtime.indexOf('insertRevision(db, revision)', updateGuard)
+    const updateEnd = runtime.indexOf('\nexport async function rollbackContentRevision', updateIndex)
+    const updateSection = runtime.slice(updateIndex, updateEnd)
     expect(updateIndex).toBeGreaterThanOrEqual(0)
-    expect(updateGuard).toBeGreaterThan(updateIndex)
-    // The immutable revision payload is prepared before the write, but D1 persists it
-    // after the CAS guard in the same atomic batch. The Neon store persists the same
-    // payload in its own CAS + idempotency + revision transaction.
-    expect(updateRevision).toBeGreaterThanOrEqual(0)
+    expect(updateRevision).toBeGreaterThan(updateIndex)
     expect(updateRevisionOperation).toBeGreaterThan(updateRevision)
-    expect(updateRevisionWrite).toBeGreaterThan(updateGuard)
+    expect(updateStoreWrite).toBeGreaterThan(updateRevision)
+    expect(updateSection).not.toContain('db.prepare')
+    expect(updateSection).not.toContain('batchMutation')
 
     const rollbackIndex = runtime.indexOf('export async function rollbackContentRevision')
     const rollbackUpdate = runtime.indexOf('UPDATE contents', rollbackIndex)
@@ -2231,7 +2277,7 @@ describe('1.1 content revision history', () => {
     const rollbackRevisionWrite = runtime.indexOf('insertRevision(db, rollbackRevision)', rollbackGuard)
     expect(rollbackUpdate).toBeGreaterThanOrEqual(rollbackIndex)
     expect(rollbackGuard).toBeGreaterThan(rollbackUpdate)
-    // Build the immutable revision payload before the transaction, then persist it only after the CAS guard.
+    // Build the immutable revision payload before the current persistence adapter commits it.
     expect(rollbackRevisionIndex).toBeGreaterThanOrEqual(rollbackIndex)
     expect(rollbackOperation).toBeGreaterThan(rollbackRevisionIndex)
     expect(rollbackRevisionWrite).toBeGreaterThan(rollbackGuard)
@@ -2267,23 +2313,21 @@ it('maps an authoritative D1 CAS guard failure to HTTP 412', async () => {
     idem_response_json: null,
     idem_expires_at: null,
   }
-  const db = {
-    prepare() {
-      return { bind: (...bindings: unknown[]) => ({ first: async () => { expect(bindings).toContain('content_cas_412_123'); return row } }) }
-    },
-    batch: async () => { throw new Error('CHECK constraint failed: successful') },
-  } as never
+  const mutationStore = makeContentMutationStore(
+    row,
+    async () => { throw new ContentRuntimeError('PRECONDITION_FAILED', 412) },
+  )
   await expect(updateContent(
-    db,
     'user_cas_412',
     'content_cas_412_123',
     { contentType: 'article', title: 'Updated title', bodyRef: 'https://cdn.example.com/body-v2.txt', mediaRefs: [], coverRef: null },
     'W/"2"',
     'content-cas-412-idem',
+    mutationStore,
   )).rejects.toMatchObject({ code: 'PRECONDITION_FAILED', status: 412 })
 })
 
-it('does not misclassify unrelated UNIQUE violations as idempotency conflicts', async () => {
+it('surfaces unavailable Neon persistence without falling back to D1', async () => {
   const row = {
     id: 'content_unique_123',
     content_type: 'article',
@@ -2301,29 +2345,21 @@ it('does not misclassify unrelated UNIQUE violations as idempotency conflicts', 
     etag: 'W/"1"',
     created_at: '2026-10-07T12:00:00.000Z',
     updated_at: '2026-10-07T12:00:00.000Z',
-    idem_id: null,
-    idem_owner_user_id: null,
-    idem_request_hash: null,
-    idem_status: null,
-    idem_response_status: null,
-    idem_response_json: null,
-    idem_expires_at: null,
   }
-  const db = {
-    prepare() {
-      return { bind: (...bindings: unknown[]) => ({ first: async () => { expect(bindings).toContain('content_unique_123'); return row } }) }
-    },
-    batch: async () => { throw new Error('UNIQUE constraint failed: contents.body_ref') },
-  } as never
+  const mutationStore = makeContentMutationStore(
+    row,
+    async () => { throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503) },
+  )
   await expect(updateContent(
-    db,
     'user_unique',
     'content_unique_123',
     { contentType: 'article', title: 'Updated title', bodyRef: 'https://cdn.example.com/body-v2.txt', mediaRefs: [], coverRef: null },
     'W/"1"',
     'content-unique-idem',
+    mutationStore,
   )).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE', status: 503 })
 })
+
 
 it('locks content edits while moderation review is pending', async () => {
   const row = {
@@ -2351,22 +2387,17 @@ it('locks content edits while moderation review is pending', async () => {
     idem_response_json: null,
     idem_expires_at: null,
   }
-  let batchCalled = false
-  const db = {
-    prepare() {
-      return { bind: () => ({ first: async () => row }) }
-    },
-    batch: async () => { batchCalled = true },
-  } as never
+  let updateCalled = false
+  const mutationStore = makeContentMutationStore(row, async () => { updateCalled = true })
   await expect(updateContent(
-    db,
     'user_review_lock',
     'content_review_lock_123',
     { contentType: 'article', title: 'Attempted edit during review', bodyRef: 'https://cdn.example.com/body-v2.txt', mediaRefs: [], coverRef: null },
     'W/"2"',
     'review-lock-idem',
+    mutationStore,
   )).rejects.toMatchObject({ code: 'INVALID_STATE', status: 409 })
-  expect(batchCalled).toBe(false)
+  expect(updateCalled).toBe(false)
 })
 
 it('returns 409 for an owned but invalid lifecycle transition', async () => {

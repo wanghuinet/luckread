@@ -857,7 +857,7 @@ describe('W03 Neon content mutation store', () => {
     expect(publishedCandidates).toHaveLength(1)
   })
 
-  it('injects Neon-backed update and delete stores without issuing a D1 statement', async () => {
+  it('routes content update and delete through the injected Neon stores', async () => {
     let currentContent = snapshotContent
     let updateInput: Parameters<ContentMutationStore['update']>[0] | undefined
     let deleteInput: Parameters<ContentMutationStore['delete']>[0] | undefined
@@ -877,23 +877,17 @@ describe('W03 Neon content mutation store', () => {
       async listDueScheduled() { return [] },
       async publishScheduled() { return 0 },
     }
-    const d1 = {
-      prepare() { throw new Error('D1 must not be queried in Neon mode') },
-      batch() { throw new Error('D1 must not be written in Neon mode') },
-    }
-
     const updated = await updateContent(
-      d1 as never,
       'user_123',
       snapshotContent.id,
       { contentType: 'post', title: 'Updated from Neon', bodyRef: 'body:updated', mediaRefs: [], coverRef: null },
       'W/"4"',
       'neon-update-key',
+      store,
       now,
       'neon-update-test',
       'L2',
       undefined,
-      store,
     )
     await deleteContent(
       'user_123',

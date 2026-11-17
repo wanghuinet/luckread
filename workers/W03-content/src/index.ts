@@ -1741,18 +1741,19 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
             ? requiredSocialPostPrincipal(request)
             : requiredCreatorPrincipal(request)
         const verifiedCreatorId = explicitlyChangesAccessMode ? requireVerifiedCreatorId(request) : undefined
+        const mutationStore = dependencies.contentMutationStoreProvider?.(env)
+        if (!mutationStore) throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
         const content = await updateContent(
-          NO_LEGACY_DATABASE_HANDLE,
           principal.userId,
           path.id,
           body,
           requireIfMatch(request),
           requireIdempotency(request),
+          mutationStore,
           new Date(),
           request.headers.get('X-LuckRead-Correlation-Id')?.trim() || 'runtime',
           principal.layer,
           verifiedCreatorId,
-          dependencies.contentMutationStoreProvider?.(env),
         )
         return json({
           id: content.id,
