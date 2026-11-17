@@ -99,6 +99,13 @@ export interface W08D1PreparedStatement {
   all<T = unknown>(): Promise<{ results?: T[] | null }>
 }
 
+/**
+ * @deprecated-next-version
+ * Reason: Legacy D1 database facade is retained only by the isolated W08 unit-test adapter.
+ * Replacement: W08CreatorStore port with createPostgresW08CreatorStore in production.
+ * Removal: Next release.
+ * Condition: W08 unit tests use in-memory W08CreatorStore fixtures and no longer require SQL-level D1 emulation.
+ */
 export interface W08D1Database {
   prepare(sql: string): W08D1PreparedStatement
   batch(statements: W08D1PreparedStatement[]): Promise<Array<{ meta?: { changes?: number } }>>
