@@ -205,9 +205,27 @@ export function getW02PostgresPool(env: W02RuntimeEnv): Pool {
     console.info(JSON.stringify({ event: 'w02.postgres.pool_created' }))
     pool.on('connect', (client) => {
       instrumentDevelopmentPgClient(client)
+      const diagnosticClient = client as unknown as {
+        connection?: { stream?: { destroyed?: unknown; readable?: unknown; writable?: unknown } }
+        on?: (event: string, listener: (...values: unknown[]) => void) => unknown
+      }
+      diagnosticClient.on?.('end', () => console.info(JSON.stringify({
+        event: 'w02.postgres.client_end',
+      })))
       console.info(JSON.stringify({ event: 'w02.postgres.connection_established' }))
     })
-    pool.on('acquire', () => console.info(JSON.stringify({ event: 'w02.postgres.connection_acquired' })))
+    pool.on('acquire', (client) => {
+      const diagnosticClient = client as unknown as {
+        connection?: { stream?: { destroyed?: unknown; readable?: unknown; writable?: unknown } }
+      }
+      const stream = diagnosticClient.connection?.stream
+      console.info(JSON.stringify({
+        event: 'w02.postgres.connection_acquired',
+        streamDestroyed: typeof stream?.destroyed === 'boolean' ? stream.destroyed : null,
+        streamReadable: typeof stream?.readable === 'boolean' ? stream.readable : null,
+        streamWritable: typeof stream?.writable === 'boolean' ? stream.writable : null,
+      }))
+    })
     pool.on('remove', () => console.info(JSON.stringify({ event: 'w02.postgres.connection_removed' })))
   }
   pool.on('error', (error) => {
