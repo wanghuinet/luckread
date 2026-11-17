@@ -190,14 +190,14 @@ export default {
       }
     }
     if (request.method === 'POST' && url.pathname === '/internal/auth/mfa/enrollment/start') {
-      return handleMfaEnrollmentStartRequest(env, request, postgres ? {
+      return handleMfaEnrollmentStartRequest(env, request, {
         store: postgres.mfaEnrollmentStartStore,
         auth: createLuckReadAuth(env),
       })
     }
 
     if (request.method === 'POST' && url.pathname === '/internal/auth/mfa/enrollment/confirm') {
-      return handleMfaEnrollmentConfirmRequest(env, request, postgres ? {
+      return handleMfaEnrollmentConfirmRequest(env, request, {
         store: postgres.mfaEnrollmentConfirmStore,
         receiptStore: postgres.mfaAuditOperationReceiptStore,
         statusStore: postgres.mfaStatusStore,
@@ -226,7 +226,7 @@ export default {
     }
 
     if (request.method === 'POST' && url.pathname === '/internal/auth/session/logout') {
-      return handleCurrentUserSessionLogout(env, request, postgres ? {
+      return handleCurrentUserSessionLogout(env, request, {
         store: postgres.sessionLogoutStore,
         auth: createLuckReadAuth(env),
       })
