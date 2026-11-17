@@ -2,7 +2,9 @@
 
 Canonical Worker identity: **W08**  
 Primary Task: **T04**  
-Primary D1 authority: **D1-01**
+Primary persistence domain: **D1-01 (Neon PostgreSQL)**
+
+Production W08 uses the existing Neon Hyperdrive binding only. The Cloudflare D1 provider is not available from the production runtime; its remaining adapter is isolated to a deprecated local worker-test harness and is scheduled for removal in the next release.
 
 ## Responsibility
 
