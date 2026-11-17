@@ -1,4 +1,4 @@
-import { createLuckReadAuth, type BetterAuthEnv } from './better-auth.js'
+import { createLuckReadAuth, requireLegacyW02D1Database, type BetterAuthEnv } from './better-auth.js'
 import {
   createD1SessionLogoutStore,
   type SessionLogoutStore,
@@ -125,7 +125,7 @@ export async function handleCurrentUserSessionLogout(
     }
 
     try {
-      const store = dependencies.store ?? createD1SessionLogoutStore(env.D1_01)
+      const store = dependencies.store ?? createD1SessionLogoutStore(requireLegacyW02D1Database(env))
       await store.logout({
         userId,
         sessionId,
