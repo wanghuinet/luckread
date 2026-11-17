@@ -1602,8 +1602,10 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
         const verifiedCreatorId = request.headers.has('X-LuckRead-Verified-Creator-Id')
           ? requireVerifiedCreatorId(request)
           : undefined
+        const mutationStore = dependencies.contentMutationStoreProvider?.(env)
+        if (!mutationStore) throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
         const result = await transitionContentState(
-          NO_LEGACY_DATABASE_HANDLE,
+          mutationStore,
           principal.userId,
           principal.layer,
           path.id,
@@ -1613,7 +1615,6 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
           requireIdempotency(request),
           new Date(),
           { scheduledAt: requestedScheduledAt, preflight: body.preflight, verifiedCreatorId },
-          dependencies.contentMutationStoreProvider?.(env),
         )
         return json({ ...result, requestId: createRequestId() })
       }
