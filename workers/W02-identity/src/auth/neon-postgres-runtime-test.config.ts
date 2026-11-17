@@ -41,9 +41,8 @@ export const postgresPool = new Pool({
 })
 
 const rehearsalEnvironment = {
-  D1_01: undefined as unknown as BetterAuthEnv['D1_01'],
   CLOUDFLARE_ENV: 'development',
-} satisfies BetterAuthEnv
+} satisfies Omit<BetterAuthEnv, 'D1_01'>
 
 export const postgresLifecycleAdapters = {
   afterUserCreated: (userId: string) => ensureBaseUserRolePostgres(postgresPool, userId),
