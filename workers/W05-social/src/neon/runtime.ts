@@ -53,7 +53,6 @@ export type W05SocialDatabaseDriver = 'd1' | 'neon'
 export interface W05SocialRuntimeEnv {
   W05_DATABASE_DRIVER?: string
   HYPERDRIVE_D1_02?: { connectionString?: string }
-  W05_PUSH_ENDPOINT_DATABASE_DRIVER?: string
   HYPERDRIVE_D1_03?: { connectionString?: string }
 }
 
@@ -65,14 +64,6 @@ const pushCompositions = new WeakMap<object, NotificationPushDeliveryRuntimeDepe
 const pushEndpointAccessStores = new WeakMap<object, NotificationPushEndpointAccessStore>()
 const EMPTY_DEPENDENCIES: W05SocialWorkerDependencies = Object.freeze({})
 const EMPTY_PUSH_DEPENDENCIES: NotificationPushDeliveryRuntimeDependencies = Object.freeze({})
-
-export function resolveW05PushEndpointDatabaseDriver(
-  env: W05SocialRuntimeEnv,
-): W05SocialDatabaseDriver {
-  const configured = env.W05_PUSH_ENDPOINT_DATABASE_DRIVER?.trim().toLowerCase() || 'd1'
-  if (configured === 'd1' || configured === 'neon') return configured
-  throw new Error('W05_PUSH_ENDPOINT_DATABASE_DRIVER_UNSUPPORTED')
-}
 
 function validateD103HyperdriveConnectionString(value: unknown): string {
   if (typeof value !== 'string' || value.length === 0 || value.length > 4096) {
@@ -108,9 +99,7 @@ function validateD103HyperdriveConnectionString(value: unknown): string {
 export function getW05PushEndpointPostgresDatabase(
   env: W05SocialRuntimeEnv,
   poolFactory: W05PoolFactory = (config) => new Pool(config),
-): PushEndpointPostgresExecutor | undefined {
-  if (resolveW05PushEndpointDatabaseDriver(env) === 'd1') return undefined
-
+): PushEndpointPostgresExecutor {
   const binding = env.HYPERDRIVE_D1_03
   if (!binding || typeof binding !== 'object') {
     throw new Error('W05_HYPERDRIVE_D1_03_BINDING_REQUIRED')
@@ -306,50 +295,48 @@ export function getW05NotificationPushDeliveryDependencies(
   env: W05SocialRuntimeEnv,
   poolFactory: W05PoolFactory = (config) => new Pool(config),
 ): NotificationPushDeliveryRuntimeDependencies {
-  let dependencies: NotificationPushDeliveryRuntimeDependencies = EMPTY_PUSH_DEPENDENCIES
-
-  if (resolveW05SocialDatabaseDriver(env) === 'neon') {
-    const binding = env.HYPERDRIVE_D1_02
-    if (!binding || typeof binding !== 'object') {
-      throw new Error('W05_HYPERDRIVE_D1_02_BINDING_REQUIRED')
-    }
-
-    const cached = pushCompositions.get(binding)
-    if (cached) {
-      dependencies = cached
-    } else {
-      const connectionString = validateHyperdriveConnectionString(binding.connectionString)
-      const pool = getPool(binding, connectionString, poolFactory)
-      dependencies = {
-        fanoutStore: createPostgresNotificationPushFanoutStore(
-          asExecutor<Parameters<typeof createPostgresNotificationPushFanoutStore>[0]>(pool),
-        ),
-        deliveryClaimStore: createPostgresNotificationPushDeliveryClaimStore(
-          asExecutor<Parameters<typeof createPostgresNotificationPushDeliveryClaimStore>[0]>(pool),
-        ),
-        sendResultStore: createPostgresNotificationPushSendResultStore(
-          asExecutor<Parameters<typeof createPostgresNotificationPushSendResultStore>[0]>(pool),
-        ),
-        receiptStore: createPostgresNotificationPushReceiptStore(
-          asExecutor<Parameters<typeof createPostgresNotificationPushReceiptStore>[0]>(pool),
-        ),
-      }
-      pushCompositions.set(binding, dependencies)
-    }
+  if (resolveW05SocialDatabaseDriver(env) !== 'neon') {
+    throw new Error('W05_NOTIFICATION_PUSH_NEON_DATABASE_REQUIRED')
   }
 
+  const binding = env.HYPERDRIVE_D1_02
+  if (!binding || typeof binding !== 'object') {
+    throw new Error('W05_HYPERDRIVE_D1_02_BINDING_REQUIRED')
+  }
+
+  let dependencies = pushCompositions.get(binding)
+  if (!dependencies) {
+    const connectionString = validateHyperdriveConnectionString(binding.connectionString)
+    const pool = getPool(binding, connectionString, poolFactory)
+    dependencies = {
+      fanoutStore: createPostgresNotificationPushFanoutStore(
+        asExecutor<Parameters<typeof createPostgresNotificationPushFanoutStore>[0]>(pool),
+      ),
+      deliveryClaimStore: createPostgresNotificationPushDeliveryClaimStore(
+        asExecutor<Parameters<typeof createPostgresNotificationPushDeliveryClaimStore>[0]>(pool),
+      ),
+      sendResultStore: createPostgresNotificationPushSendResultStore(
+        asExecutor<Parameters<typeof createPostgresNotificationPushSendResultStore>[0]>(pool),
+      ),
+      receiptStore: createPostgresNotificationPushReceiptStore(
+        asExecutor<Parameters<typeof createPostgresNotificationPushReceiptStore>[0]>(pool),
+      ),
+    }
+    pushCompositions.set(binding, dependencies)
+  }
+
+  const endpointBinding = env.HYPERDRIVE_D1_03
+  if (!endpointBinding || typeof endpointBinding !== 'object') {
+    throw new Error('W05_HYPERDRIVE_D1_03_BINDING_REQUIRED')
+  }
   const endpointDatabase = getW05PushEndpointPostgresDatabase(env, poolFactory)
-  if (endpointDatabase) {
-    const binding = env.HYPERDRIVE_D1_03!
-    let endpointAccessStore = pushEndpointAccessStores.get(binding)
-    if (!endpointAccessStore) {
-      endpointAccessStore = createPostgresNotificationPushEndpointAccessStore(endpointDatabase)
-      pushEndpointAccessStores.set(binding, endpointAccessStore)
-    }
-    return { ...dependencies, endpointAccessStore }
+  let endpointAccessStore = pushEndpointAccessStores.get(endpointBinding)
+  if (!endpointAccessStore) {
+    endpointAccessStore = createPostgresNotificationPushEndpointAccessStore(endpointDatabase)
+    pushEndpointAccessStores.set(endpointBinding, endpointAccessStore)
   }
 
-  return dependencies
+  return { ...dependencies, endpointAccessStore }
 }
 
 /**

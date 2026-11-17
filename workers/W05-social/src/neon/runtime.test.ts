@@ -4,7 +4,6 @@ import {
   getW05SocialWorkerDependencies,
   getW05NotificationPushDeliveryDependencies,
   getW05PushEndpointPostgresDatabase,
-  resolveW05PushEndpointDatabaseDriver,
   resolveW05SocialDatabaseDriver,
 } from './runtime.js'
 
@@ -93,11 +92,21 @@ describe('W05 Neon runtime composition', () => {
 })
 
 describe('W05 Neon notification push composition', () => {
-  it('composes only W05-owned push stores on the shared D1-02 pool and caches them', () => {
-    const binding = { connectionString: 'postgresql://user:secret@hyperdrive.example/db?sslmode=require' }
-    const pool = fakePool()
-    const poolFactory = vi.fn(() => pool)
-    const env = { W05_DATABASE_DRIVER: 'neon', HYPERDRIVE_D1_02: binding }
+  it('composes W05 push stores and the separately scoped W09 Neon endpoint store', () => {
+    const socialBinding = { connectionString: 'postgresql://user:secret@hyperdrive.example/db?sslmode=require' }
+    const endpointBinding = {
+      connectionString: 'postgresql://user:secret@governance.example:5432/luckread_governance?sslmode=require',
+    }
+    const socialPool = fakePool()
+    const endpointPool = fakePool()
+    const poolFactory = vi.fn((config: PoolConfig) =>
+      config.connectionString === endpointBinding.connectionString ? endpointPool : socialPool,
+    )
+    const env = {
+      W05_DATABASE_DRIVER: 'neon',
+      HYPERDRIVE_D1_02: socialBinding,
+      HYPERDRIVE_D1_03: endpointBinding,
+    }
 
     const first = getW05NotificationPushDeliveryDependencies(env, poolFactory)
     const second = getW05NotificationPushDeliveryDependencies(env, poolFactory)
@@ -105,12 +114,13 @@ describe('W05 Neon notification push composition', () => {
     expect(first).toBe(second)
     expect(Object.keys(first).sort()).toEqual([
       'deliveryClaimStore',
+      'endpointAccessStore',
       'fanoutStore',
       'receiptStore',
       'sendResultStore',
     ])
-    expect(poolFactory).toHaveBeenCalledTimes(1)
-    expect(first).not.toHaveProperty('endpointAccessStore')
+    expect(poolFactory).toHaveBeenCalledTimes(2)
+    expect(first.endpointAccessStore).toBeDefined()
   })
 
   it('uses a separate D1-03 Neon Hyperdrive only for W09-owned push endpoint access', async () => {
@@ -126,11 +136,9 @@ describe('W05 Neon notification push composition', () => {
     const env = {
       W05_DATABASE_DRIVER: 'neon',
       HYPERDRIVE_D1_02: socialBinding,
-      W05_PUSH_ENDPOINT_DATABASE_DRIVER: 'neon',
       HYPERDRIVE_D1_03: endpointBinding,
     }
 
-    expect(resolveW05PushEndpointDatabaseDriver(env)).toBe('neon')
     expect(getW05PushEndpointPostgresDatabase(env, poolFactory)).toBe(endpointPool)
     const dependencies = getW05NotificationPushDeliveryDependencies(env, poolFactory)
 
@@ -146,23 +154,19 @@ describe('W05 Neon notification push composition', () => {
   })
 
   it('fails closed when Neon is selected for D1-03 but its binding or database identity is invalid', () => {
-    expect(() => resolveW05PushEndpointDatabaseDriver({
-      W05_PUSH_ENDPOINT_DATABASE_DRIVER: 'postgres',
-    })).toThrow('W05_PUSH_ENDPOINT_DATABASE_DRIVER_UNSUPPORTED')
     expect(() => getW05PushEndpointPostgresDatabase({
-      W05_PUSH_ENDPOINT_DATABASE_DRIVER: 'neon',
     })).toThrow('W05_HYPERDRIVE_D1_03_BINDING_REQUIRED')
     expect(() => getW05PushEndpointPostgresDatabase({
-      W05_PUSH_ENDPOINT_DATABASE_DRIVER: 'neon',
       HYPERDRIVE_D1_03: {
         connectionString: 'postgresql://user:secret@governance.example:5432/luckread?sslmode=require',
       },
     })).toThrow('W05_HYPERDRIVE_D1_03_CONNECTION_STRING_INVALID')
   })
 
-  it('keeps D1 as the safe default for scheduled push delivery', () => {
+  it('fails closed instead of selecting D1 when the W05 social driver is not Neon', () => {
     const poolFactory = vi.fn(() => fakePool())
-    expect(getW05NotificationPushDeliveryDependencies({}, poolFactory)).toEqual({})
+    expect(() => getW05NotificationPushDeliveryDependencies({ W05_DATABASE_DRIVER: 'd1' }, poolFactory))
+      .toThrow('W05_NOTIFICATION_PUSH_NEON_DATABASE_REQUIRED')
     expect(poolFactory).not.toHaveBeenCalled()
   })
 })

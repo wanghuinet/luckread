@@ -18,19 +18,17 @@ function stepRunner() {
 
 describe('W05 notification push durable Workflow', () => {
   it('does not create a durable step while delivery is disabled', async () => {
-    const prepare = vi.fn()
-    const env = { PUSH_DELIVERY_ENABLED: 'false', DB: { prepare }, D1_03: { prepare } } as unknown as NotificationPushDeliveryEnv
+    const env = { PUSH_DELIVERY_ENABLED: 'false' } as unknown as NotificationPushDeliveryEnv
     const step = stepRunner()
     const result = await runScheduledNotificationPush(env, schedule, step.runStep)
     expect(result.status).toBe('DISABLED')
     expect(step.calls).toEqual([])
-    expect(prepare).not.toHaveBeenCalled()
   })
 
   it('uses one retryable Workflow step for the W05-owned delivery batch', async () => {
     const result = { status: 'COMPLETED' as const, fannedOut: 1, sent: 2, providerAccepted: 1, retried: 1, failed: 0, skipped: 0 }
     const runBatch = vi.fn(async () => result)
-    const env = { PUSH_DELIVERY_ENABLED: 'true', DB: { prepare: vi.fn() }, D1_03: { prepare: vi.fn() } } as unknown as NotificationPushDeliveryEnv
+    const env = { PUSH_DELIVERY_ENABLED: 'true' } as unknown as NotificationPushDeliveryEnv
     const step = stepRunner()
     const output = await runScheduledNotificationPush(env, schedule, async (name, options) => {
       step.calls.push({ name, options })
@@ -45,7 +43,7 @@ describe('W05 notification push durable Workflow', () => {
   })
 
   it('rejects missing schedule data rather than starting an ambiguous batch', async () => {
-    const env = { PUSH_DELIVERY_ENABLED: 'true', DB: { prepare: vi.fn() }, D1_03: { prepare: vi.fn() } } as unknown as NotificationPushDeliveryEnv
+    const env = { PUSH_DELIVERY_ENABLED: 'true' } as unknown as NotificationPushDeliveryEnv
     const step = stepRunner()
     await expect(runScheduledNotificationPush(env, undefined, step.runStep)).rejects.toThrow('W05_PUSH_DELIVERY_SCHEDULE_REQUIRED')
     expect(step.calls).toEqual([])
