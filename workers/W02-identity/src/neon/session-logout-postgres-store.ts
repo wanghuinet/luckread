@@ -8,9 +8,9 @@ import type {
 import { logoutCurrentSessionPostgres } from './session-logout-postgres.js'
 
 /**
- * PostgreSQL implementation of the AUTH-010 current-session logout command.
- * It is injected only by the disposable PostgreSQL 18 rehearsal. The deployed
- * W02 Worker continues to use the D1 store by default.
+ * PostgreSQL production implementation of the AUTH-010 current-session logout
+ * command. The Neon-only W02 runtime constructs this Store from its existing
+ * Hyperdrive pool; the disposable PostgreSQL 18 rehearsal uses the same adapter.
  */
 export function createPostgresSessionLogoutStore(pool: Pool): SessionLogoutStore {
   return {
