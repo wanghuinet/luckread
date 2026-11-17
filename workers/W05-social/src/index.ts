@@ -1210,7 +1210,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
           const notificationContext = publishedContentContext
             ? { recipientUserId: publishedContentContext.ownerUserId, contentId: null }
             : await getInteractionNotificationContext(
-                dependencies.commentNotificationContextStore ?? env.DB,
+                requireCommentNotificationContextStore(dependencies.commentNotificationContextStore),
                 target.targetType,
                 target.targetId,
                 env.W03_CONTENT,
