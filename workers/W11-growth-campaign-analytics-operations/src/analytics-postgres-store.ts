@@ -30,6 +30,10 @@ export interface AnalyticsPostgresPreparedStatement extends AnalyticsD1PreparedS
   first<Row = Record<string, unknown>>(): Promise<Row | null>
 }
 
+export interface AnalyticsPostgresDatabase extends Omit<AnalyticsD1Database, 'prepare'> {
+  prepare(sql: string): AnalyticsPostgresPreparedStatement
+}
+
 const POSTGRES_SCHEMA_PROBE = String.raw`
   SELECT 'table'::text AS type,
          table_name AS name,
@@ -129,9 +133,7 @@ class PostgresPreparedStatement implements AnalyticsPostgresPreparedStatement {
  */
 export function createPostgresAnalyticsDatabase(
   pool: AnalyticsPostgresPool,
-): AnalyticsD1Database & {
-  prepare(sql: string): AnalyticsPostgresPreparedStatement
-} {
+): AnalyticsPostgresDatabase {
   return {
     prepare(sql: string): AnalyticsPostgresPreparedStatement {
       return new PostgresPreparedStatement(pool, sql)
