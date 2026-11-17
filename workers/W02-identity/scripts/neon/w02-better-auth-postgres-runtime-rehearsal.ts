@@ -1041,6 +1041,12 @@ try {
   } as never
   workerRuntimePool = getW02PostgresRuntime(workerEnv).pool
 
+  const pendingWorkerEntryUpdate = await workerRuntimePool.query(
+    'UPDATE "user" SET email_verified = FALSE, account_state = $1, account_state_version = 1 WHERE id = $2',
+    ['PENDING_VERIFICATION', workerEntryUserId],
+  )
+  assert.equal(pendingWorkerEntryUpdate.rowCount, 1)
+
   const pendingWorkerEntryUser = await workerRuntimePool.query<{
     emailVerified: boolean
     accountState: string
