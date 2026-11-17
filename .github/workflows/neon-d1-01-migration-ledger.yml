@@ -74,7 +74,7 @@ jobs:
           node --check scripts/neon/plan-d1-01-schema-migrations.mjs
           node --test scripts/neon/plan-d1-01-schema-migrations.test.mjs scripts/neon/remote-runner-review.test.mjs
           node scripts/neon/plan-d1-01-schema-migrations.mjs > /tmp/d1-01-read-only-migration-plan.json
-          node --input-type=module -e "import fs from 'node:fs'; const p=JSON.parse(fs.readFileSync('/tmp/d1-01-read-only-migration-plan.json','utf8')); if (p.planType !== 'READ_ONLY_D1_01_SCHEMA_MIGRATION_PLAN' || p.summary.migrationCount !== 14 || p.safety.remoteConnectionAttempted !== false || p.safety.ddlExecuted !== false || p.readiness.executable !== false) throw new Error('read-only D1-01 plan safety assertion failed'); console.log('D1_01_READ_ONLY_MIGRATION_PLAN_PASS entries=' + p.summary.migrationCount)"
+          node --input-type=module -e "import fs from 'node:fs'; const p=JSON.parse(fs.readFileSync('/tmp/d1-01-read-only-migration-plan.json','utf8')); if (p.planType !== 'READ_ONLY_D1_01_SCHEMA_MIGRATION_PLAN' || p.summary.migrationCount !== 15 || p.safety.remoteConnectionAttempted !== false || p.safety.ddlExecuted !== false || p.readiness.executable !== false) throw new Error('read-only D1-01 plan safety assertion failed'); console.log('D1_01_READ_ONLY_MIGRATION_PLAN_PASS entries=' + p.summary.migrationCount)"
           node scripts/neon/d1-01-migration-manifest.mjs
           node scripts/neon/d1-01-migration-manifest.mjs --print-order
           node scripts/neon/d1-01-migration-manifest.mjs --print-checksums
