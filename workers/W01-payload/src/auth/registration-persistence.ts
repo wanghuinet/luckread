@@ -45,8 +45,6 @@ export interface RegistrationPersistenceStore {
   getExistingEnvelope(idempotencyKey: string): Promise<RegistrationEnvelope | null>
   reserveEnvelope(input: RegistrationReservation): Promise<void>
   releaseReservation(reservationId: string): Promise<void>
-  findIdentityById(userId: string): Promise<RegistrationIdentity | null>
-  findIdentityByEmail(email: string): Promise<{ id: string } | null>
   completeRegistration(input: RegistrationCompletion): Promise<string | null>
 }
 
@@ -187,20 +185,6 @@ function createD1RegistrationPersistenceStore(db: D1Binding): RegistrationPersis
       ).bind(reservationId).run()
     },
 
-    async findIdentityById(userId) {
-      return db.withSession('first-primary')
-        .prepare('SELECT id, email, username FROM "user" WHERE id = ? LIMIT 1')
-        .bind(userId)
-        .first<RegistrationIdentity>()
-    },
-
-    async findIdentityByEmail(email) {
-      return db.withSession('first-primary')
-        .prepare('SELECT id FROM "user" WHERE email = ? LIMIT 1')
-        .bind(email)
-        .first<{ id: string }>()
-    },
-
     async completeRegistration(input) {
       const statements = [
         db.prepare(
@@ -323,22 +307,6 @@ function createPostgresRegistrationPersistenceStore(pool: Pool): RegistrationPer
          WHERE id = $1 AND state = 'IN_PROGRESS'`,
         [reservationId],
       )
-    },
-
-    async findIdentityById(userId) {
-      const result = await pool.query<RegistrationIdentity & Record<string, unknown>>(
-        'SELECT id, email, username FROM "user" WHERE id = $1 LIMIT 1',
-        [userId],
-      )
-      return result.rows[0] ?? null
-    },
-
-    async findIdentityByEmail(email) {
-      const result = await pool.query<{ id: string } & Record<string, unknown>>(
-        'SELECT id FROM "user" WHERE email = $1 LIMIT 1',
-        [email],
-      )
-      return result.rows[0] ?? null
     },
 
     async completeRegistration(input) {
