@@ -565,7 +565,7 @@ describe('W05 unified social closure', () => {
 })
 
 
-describe('W05 notification deep-link lookup', () => {describe('W05 notification deep-link lookup', () => {
+describe('W05 notification deep-link lookup', () => {
   it('returns only the requested notification owned by the authenticated recipient', async () => {
     const row = {
       notification_id: 'notification-1',
