@@ -8,11 +8,11 @@ import {
 
 describe('W08 Neon-only database runtime', () => {
   it('defaults to Neon and rejects the retired D1 provider', () => {
-    expect(resolveW08DatabaseDriver({})).toBe('neon')
+    expect(() => resolveW08DatabaseDriver({})).toThrow('W08_DATABASE_DRIVER_UNSUPPORTED')
     expect(resolveW08DatabaseDriver({ W08_DATABASE_DRIVER: 'neon' })).toBe('neon')
     expect(() => resolveW08DatabaseDriver({ W08_DATABASE_DRIVER: 'd1' }))
       .toThrow('W08_DATABASE_DRIVER_UNSUPPORTED')
-    expect(() => getW08CreatorStore({})).toThrow('W08_HYPERDRIVE_BINDING_REQUIRED')
+    expect(() => getW08CreatorStore({ W08_DATABASE_DRIVER: 'neon' })).toThrow('W08_HYPERDRIVE_BINDING_REQUIRED')
   })
 
   it('rejects unknown drivers rather than silently accepting them', () => {
