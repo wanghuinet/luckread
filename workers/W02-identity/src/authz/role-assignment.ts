@@ -194,6 +194,13 @@ export async function ensureVerifiedUserRole(
   }
 }
 
+/**
+ * @deprecated-next-version
+ * Reason: Legacy Cloudflare D1 authorization helper retained for isolated unit tests.
+ * Replacement: resolveGlobalLayerPostgres in src/neon/role-assignment-postgres.ts.
+ * Removal: Next release.
+ * Condition: The D1 role-layer unit tests are replaced with PostgreSQL/in-memory Store tests.
+ */
 export async function resolveGlobalLayer(
   db: D1Database,
   subjectId: string,
