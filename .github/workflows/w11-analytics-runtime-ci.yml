@@ -37,6 +37,9 @@ jobs:
       - name: Install locked root dependencies
         run: npm ci
 
+      - name: Install W11 PostgreSQL Worker runtime dependency
+        run: npm install --prefix workers/W11-growth-campaign-analytics-operations --ignore-scripts --no-audit --no-fund --package-lock=false
+
       - name: Run W11 analytics unit tests
         run: >-
           npx vitest run
@@ -44,6 +47,7 @@ jobs:
           workers/W11-growth-campaign-analytics-operations/src/analytics-aggregation.test.ts
           workers/W11-growth-campaign-analytics-operations/src/analytics-period.test.ts
           workers/W11-growth-campaign-analytics-operations/src/analytics-d1-store.test.ts
+          workers/W11-growth-campaign-analytics-operations/src/analytics-postgres-store.test.ts
           workers/W11-growth-campaign-analytics-operations/src/analytics-reconciliation.test.ts
           workers/W11-growth-campaign-analytics-operations/src/analytics-ingest.test.ts
           workers/W11-growth-campaign-analytics-operations/src/worker.test.ts
@@ -63,6 +67,10 @@ jobs:
           workers/W11-growth-campaign-analytics-operations/src/analytics-period.ts
           workers/W11-growth-campaign-analytics-operations/src/analytics-aggregation.test.ts
           workers/W11-growth-campaign-analytics-operations/src/analytics-d1-store.ts
+          workers/W11-growth-campaign-analytics-operations/src/analytics-postgres-store.ts
+          workers/W11-growth-campaign-analytics-operations/src/analytics-postgres-store.test.ts
+          workers/W11-growth-campaign-analytics-operations/src/analytics-postgres-runtime.ts
+          workers/W11-growth-campaign-analytics-operations/src/entry.ts
           workers/W11-growth-campaign-analytics-operations/src/analytics-reconciliation.ts
           workers/W11-growth-campaign-analytics-operations/src/analytics-reconciliation.test.ts
           workers/W11-growth-campaign-analytics-operations/src/analytics-d1-store.test.ts
