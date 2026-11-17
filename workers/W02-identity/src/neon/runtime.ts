@@ -40,7 +40,7 @@ function pgOperationLabel(input: unknown): string {
     const text = (input as { text?: unknown }).text
     if (typeof text === 'string') statement = text
   }
-  const operation = /^(SELECT|INSERT|UPDATE|DELETE|BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE|WITH)\\b/i.exec(statement.trim())?.[1]
+  const operation = /^(SELECT|INSERT|UPDATE|DELETE|BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE|WITH)\b/i.exec(statement.trim())?.[1]
   return operation?.toUpperCase() ?? 'OTHER'
 }
 
