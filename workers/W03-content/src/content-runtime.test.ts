@@ -1851,7 +1851,7 @@ describe('W03 content contract core', () => {
 
     const createStart = runtime.indexOf('export async function createContent')
     expect(createStart).toBeGreaterThanOrEqual(0)
-    const createEnd = runtime.indexOf('\\nexport ', createStart + 10)
+    const createEnd = runtime.indexOf('\nexport ', createStart + 10)
     const createSection = runtime.slice(createStart, createEnd >= 0 ? createEnd : runtime.length)
     expect(createSection).toContain('mutationStore.allocateContentId')
     expect(createSection).toContain('mutationStore.create(')
