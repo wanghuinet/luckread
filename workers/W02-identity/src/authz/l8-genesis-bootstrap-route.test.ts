@@ -1,9 +1,29 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+
+const { roleLayerStore, neonRuntime } = vi.hoisted(() => {
+  const roleLayerStore = {
+    readAccountState: vi.fn(async () => 'SUSPENDED'),
+    resolveGlobalLayer: vi.fn(async (_subjectId: string, accountState: string) => ({
+      decision: accountState === 'SUSPENDED' ? 'DENY' : 'ALLOW',
+    })),
+  }
+  return {
+    roleLayerStore,
+    neonRuntime: {
+      pool: {},
+      roleLayerStore,
+    },
+  }
+})
+
+vi.mock('../neon/runtime.js', () => ({
+  getW02PostgresRuntime: vi.fn(() => neonRuntime),
+}))
+
 import worker from '../index.js'
 
-const env = {} as never
 const neonProductionEnv = {
   W02_DATABASE_DRIVER: 'neon',
   HYPERDRIVE: {
@@ -43,31 +63,17 @@ describe('W02 L8 genesis bootstrap service-boundary gate', () => {
           mfaVerified: true,
         }),
       },
-    ), env)
+    ), neonProductionEnv)
     expect(response.status).toBe(403)
     await expect(response.json()).resolves.toMatchObject({
       error: { code: 'FORBIDDEN' },
     })
   })
 
-  it('uses W02-owned account state and ignores a caller-supplied ACTIVE state', async () => {
-    type TestStatement = {
-      bind: (...values: unknown[]) => TestStatement
-      first: <T>() => Promise<T | null>
-      all: <T>() => Promise<{ results: T[] }>
-    }
-    const db = {
-      prepare: (sql: string) => {
-        const statement: TestStatement = {
-          bind: (..._values: unknown[]) => statement,
-          first: async <T>() => sql.includes('FROM "user"')
-            ? ({ accountState: 'SUSPENDED' } as T)
-            : null,
-          all: async <T>() => ({ results: [] as T[] }),
-        }
-        return statement
-      },
-    }
+  it('uses W02-owned PostgreSQL account state and ignores caller-supplied ACTIVE state', async () => {
+    roleLayerStore.readAccountState.mockClear()
+    roleLayerStore.resolveGlobalLayer.mockClear()
+
     const response = await worker.fetch(new Request(
       'https://luckread-w02.internal/internal/authz/resolve-layer',
       {
@@ -79,16 +85,23 @@ describe('W02 L8 genesis bootstrap service-boundary gate', () => {
           now: '2000-01-01T00:00:00.000Z',
         }),
       },
-    ), { D1_01: db } as never)
+    ), neonProductionEnv)
+
     expect(response.status).toBe(200)
     await expect(response.json()).resolves.toMatchObject({ decision: 'DENY' })
+    expect(roleLayerStore.readAccountState).toHaveBeenCalledWith('existing-user-123')
+    expect(roleLayerStore.resolveGlobalLayer).toHaveBeenCalledWith(
+      'existing-user-123',
+      'SUSPENDED',
+      expect.any(String),
+    )
   })
 
   it('does not accept a request-body MFA boolean as authentication evidence', () => {
     const path = fileURLToPath(new URL('../index.ts', import.meta.url))
     const source = readFileSync(path, 'utf8')
-    expect(source).not.toMatch(/mfaVerified\s*:\s*true/)
-    expect(source).not.toMatch(/mfaVerified\??\s*:/)
+    expect(source).not.toMatch(/mfaVerified\\s*:\\s*true/)
+    expect(source).not.toMatch(/mfaVerified\\??\\s*:/)
     expect(source).toContain('verifyTargetBoundSingleApproval')
     expect(source).toContain('bootstrapSuperAdminPostgres(postgres.pool, approval')
 
@@ -96,6 +109,6 @@ describe('W02 L8 genesis bootstrap service-boundary gate', () => {
     expect(authSource).toContain('trustDeviceMaxAge: 0')
     expect(authSource).toContain('skipVerificationOnEnable: false')
     expect(authSource).toContain('totpOptions: { allowPasswordless: false }')
-    expect(authSource).not.toMatch(/sendOTP\s*:/)
+    expect(authSource).not.toMatch(/sendOTP\\s*:/)
   })
 })
