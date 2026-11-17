@@ -8,7 +8,7 @@ import {
   type ContentRecord,
   type ContentRevision,
 } from './content-runtime.js'
-import { createPostgresContentCreateStore } from './content-create-store-postgres.js'
+import { createPostgresContentCreateStore, type ContentCreatePostgresDatabase } from './content-create-store-postgres.js'
 
 const connectionString = process.env.W03_POSTGRES_TEST_URL
 const postgresSuite = connectionString ? describe : describe.skip
@@ -36,7 +36,7 @@ postgresSuite('W03 PostgreSQL 18 content-create runtime integration', () => {
       await pool.query(migration)
     }
 
-    store = createPostgresContentCreateStore(pool)
+    store = createPostgresContentCreateStore(pool as unknown as ContentCreatePostgresDatabase)
   })
 
   afterAll(async () => {
