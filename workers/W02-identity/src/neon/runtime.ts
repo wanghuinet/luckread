@@ -78,7 +78,25 @@ function instrumentDevelopmentPgClient(client: object): void {
     // The development tracer must not wrap the pg Query/Promise object used
     // by the transaction state machine.
     if (operation === 'BEGIN' || operation === 'COMMIT' || operation === 'ROLLBACK') {
-      return originalQuery(...args)
+      const query = originalQuery(...args)
+      if (query && typeof query === 'object' && 'once' in query &&
+          typeof (query as { once?: unknown }).once === 'function') {
+        const eventQuery = query as {
+          once: (event: string, listener: (...values: unknown[]) => void) => unknown
+        }
+        eventQuery.once('end', () => console.info(JSON.stringify({
+          event: 'w02.postgres.transaction_query_end',
+          operation,
+          durationMs: Math.max(0, Date.now() - startedAt),
+        })))
+        eventQuery.once('error', (error) => console.error(JSON.stringify({
+          event: 'w02.postgres.transaction_query_error',
+          operation,
+          durationMs: Math.max(0, Date.now() - startedAt),
+          errorType: error instanceof Error ? error.name : 'UNKNOWN',
+        })))
+      }
+      return query
     }
 
     const callbackIndex = args.findIndex((value) => typeof value === 'function')
