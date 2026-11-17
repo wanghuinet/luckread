@@ -817,11 +817,12 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
           throw new ContentRuntimeError('VALIDATION_FAILED', 400)
         }
         const limit = parseListLimit(url.searchParams.get('limit') ?? '50')
+        const mutationStore = dependencies.contentMutationStoreProvider?.(env)
+        if (!mutationStore) throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
         const items = await listDueScheduledContentCandidates(
-          NO_LEGACY_DATABASE_HANDLE,
+          mutationStore,
           new Date(),
           limit,
-          dependencies.contentMutationStoreProvider?.(env),
         )
         return json({ data: { items }, requestId: createRequestId() })
       }
@@ -840,11 +841,12 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
         ) {
           throw new ContentRuntimeError('VALIDATION_FAILED', 400)
         }
+        const mutationStore = dependencies.contentMutationStoreProvider?.(env)
+        if (!mutationStore) throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
         const result = await publishAuthorizedScheduledContents(
-          NO_LEGACY_DATABASE_HANDLE,
+          mutationStore,
           body.items,
           new Date(),
-          dependencies.contentMutationStoreProvider?.(env),
         )
         return json({ data: result, requestId: createRequestId() })
       }

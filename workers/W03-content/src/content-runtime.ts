@@ -2192,14 +2192,6 @@ export type AuthorizedScheduledPublishCandidate = Omit<DueScheduledContentCandid
   authorization: ScheduledPublishAuthorization
 }>
 
-type DueScheduledContentRow = {
-  id: string
-  owner_user_id: string
-  creator_id: string | null
-  version: number
-  scheduled_at: string
-}
-
 const scheduledPublishIdentifier = (value: unknown, maxLength = 128): value is string =>
   typeof value === 'string' &&
   value.length > 0 &&
@@ -2207,31 +2199,15 @@ const scheduledPublishIdentifier = (value: unknown, maxLength = 128): value is s
   /^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(value)
 
 export async function listDueScheduledContentCandidates(
-  db: ContentD1,
+  mutationStore: ContentMutationStore,
   now = new Date(),
   limit = 50,
-  mutationStore?: ContentMutationStore,
 ): Promise<DueScheduledContentCandidate[]> {
   if (!Number.isSafeInteger(limit) || limit < 1 || limit > 50) {
     throw new ContentRuntimeError('VALIDATION_FAILED', 400)
   }
   const nowIso = now.toISOString()
-  if (mutationStore) return mutationStore.listDueScheduled(nowIso, limit)
-  const rows = await db.prepare(
-    `SELECT id, owner_user_id, creator_id, version, scheduled_at
-       FROM contents
-      WHERE state = 'SCHEDULED' AND scheduled_at IS NOT NULL AND scheduled_at <= ?
-      ORDER BY scheduled_at ASC, id ASC
-      LIMIT ?`,
-  ).bind(nowIso, limit).all<DueScheduledContentRow>()
-
-  return (rows.results ?? []).map((row) => ({
-    contentId: row.id,
-    ownerUserId: row.owner_user_id,
-    creatorId: row.creator_id,
-    version: row.version,
-    scheduledAt: row.scheduled_at,
-  }))
+  return mutationStore.listDueScheduled(nowIso, limit)
 }
 
 /**
@@ -2239,18 +2215,21 @@ export async function listDueScheduledContentCandidates(
  * derived from the current ACTIVE Creator/account/role facts is admitted, and
  * the final D1 update rechecks owner, creator, lifecycle, due time and version.
  */
+/**
+ * W03 remains the final content-state authority. Only a W08 ALLOW decision
+ * derived from the current ACTIVE Creator/account/role facts is admitted, and
+ * the existing Neon transaction rechecks owner, creator, lifecycle, due time and version.
+ */
 export async function publishAuthorizedScheduledContents(
-  db: ContentD1,
+  mutationStore: ContentMutationStore,
   candidatesValue: unknown,
   now = new Date(),
-  mutationStore?: ContentMutationStore,
 ): Promise<{ scanned: number; authorized: number; published: number; rejected: number }> {
   if (!Array.isArray(candidatesValue) || candidatesValue.length > 50) {
     throw new ContentRuntimeError('VALIDATION_FAILED', 400)
   }
 
   const nowIso = now.toISOString()
-  const statements: D1PreparedStatement[] = []
   const authorizedCandidates: AuthorizedScheduledPublishCandidate[] = []
   let authorized = 0
   let rejected = 0
@@ -2299,7 +2278,7 @@ export async function publishAuthorizedScheduledContents(
     }
 
     authorized++
-    const accepted: AuthorizedScheduledPublishCandidate = {
+    authorizedCandidates.push({
       contentId: contentId as string,
       ownerUserId: ownerUserId as string,
       expectedCreatorId: candidate.expectedCreatorId as string | null,
@@ -2307,48 +2286,16 @@ export async function publishAuthorizedScheduledContents(
       version: Number(version),
       scheduledAt: scheduledAt as string,
       authorization: authorization as unknown as ScheduledPublishAuthorization,
-    }
-    authorizedCandidates.push(accepted)
-    if (!mutationStore) {
-      const nextVersion = Number(version) + 1
-      statements.push(db.prepare(
-        `UPDATE contents
-            SET state = 'PUBLISHED', scheduled_at = NULL, creator_id = ?, version = ?, etag = ?, updated_at = ?
-          WHERE id = ?
-            AND owner_user_id = ?
-            AND creator_id IS ?
-            AND state = 'SCHEDULED'
-            AND scheduled_at = ?
-            AND scheduled_at <= ?
-            AND version = ?`,
-      ).bind(
-        creatorId,
-        nextVersion,
-        etagForVersion(nextVersion),
-        nowIso,
-        contentId,
-        ownerUserId,
-        candidate.expectedCreatorId,
-        scheduledAt,
-        nowIso,
-        version,
-      ))
-    }
+    })
   }
 
   if (authorizedCandidates.length === 0) {
     return { scanned: candidatesValue.length, authorized, published: 0, rejected }
   }
-  if (mutationStore) {
-    const published = await mutationStore.publishScheduled(authorizedCandidates, nowIso)
-    return { scanned: candidatesValue.length, authorized, published, rejected }
-  }
 
-  const results = await db.batch(statements)
-  const published = results.reduce((count, result) => count + Number(result.meta?.changes ?? 0), 0)
+  const published = await mutationStore.publishScheduled(authorizedCandidates, nowIso)
   return { scanned: candidatesValue.length, authorized, published, rejected }
 }
-
 export function encodeCursor(updatedAt: string, id: string): string {
   const raw = JSON.stringify({ updatedAt, id })
   const bytes = new TextEncoder().encode(raw)
