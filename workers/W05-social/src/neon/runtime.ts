@@ -25,7 +25,6 @@ import { createPostgresCommentMutationStore } from '../comment-mutation-store-po
 import { createPostgresCommentNotificationContextStore } from '../comment-notification-context-store-postgres.js'
 import { createPostgresNotificationEnqueueStore } from '../notification-enqueue-store-postgres.js'
 import { createPostgresNotificationPreferencesStore } from '../notification-preferences-store-postgres.js'
-import { createPostgresSocialTargetsReadStore } from '../social-targets-read-store-postgres.js'
 import { createPostgresSocialClosureReadStore } from '../social-closure-read-store-postgres.js'
 import { createPostgresSocialTokenSyncStore } from '../social-token-sync-store-postgres.js'
 import { createPostgresPollConfigurationStore } from '../poll-configuration-store-postgres.js'
@@ -260,9 +259,6 @@ export function getW05SocialWorkerDependencies(
     ),
     notificationPreferencesStore: createPostgresNotificationPreferencesStore(
       asExecutor<Parameters<typeof createPostgresNotificationPreferencesStore>[0]>(pool),
-    ),
-    socialTargetsReadStore: createPostgresSocialTargetsReadStore(
-      asExecutor<Parameters<typeof createPostgresSocialTargetsReadStore>[0]>(pool),
     ),
     socialClosureReadStore: createPostgresSocialClosureReadStore(
       asExecutor<Parameters<typeof createPostgresSocialClosureReadStore>[0]>(pool),
