@@ -67,6 +67,7 @@ describe('unified W05 social closure adapters', () => {
     const shell = read('src/app/(twitter-clone)/TwitterCloneSecondaryPageLayout.tsx')
     const runtime = read('../../workers/W05-social/src/social-closure-runtime.ts')
     const closureReadStore = read('../../workers/W05-social/src/social-closure-read-store.ts')
+    const postgresClosureReadStore = read('../../workers/W05-social/src/social-closure-read-store-postgres.ts')
     const worker = read('../../workers/W05-social/src/index.ts')
 
     expect(route).toContain('/internal/social/discovery/topics')
@@ -83,9 +84,12 @@ describe('unified W05 social closure adapters', () => {
     const discoveryRuntime = runtime.slice(runtime.indexOf('export async function listDiscoveryTopics'), runtime.indexOf('export async function enqueueNotification'))
     expect(discoveryRuntime).toContain('fetchPublishedContentSocialContexts')
     expect(discoveryRuntime).toContain('store.listDiscoveryContentEdges')
-    expect(closureReadStore).toContain("t.status = 'ACTIVE'")
-    expect(closureReadStore).toContain('INDEXED BY ix_social_target_topics_content_topic_target')
-    expect(closureReadStore).not.toMatch(/(?:FROM|JOIN)\s+contents\b/i)
+    expect(closureReadStore).not.toContain('social_target_topics')
+    expect(closureReadStore).not.toContain('social_notifications')
+    expect(postgresClosureReadStore).toContain("t.status = 'ACTIVE'")
+    expect(postgresClosureReadStore).toContain('ORDER BY st.topic_id ASC, st.target_id ASC')
+    expect(postgresClosureReadStore).toContain('createPostgresSocialTargetsReadStore')
+    expect(postgresClosureReadStore).not.toMatch(/(?:FROM|JOIN)\s+contents\b/i)
     expect(discoveryRuntime).not.toMatch(/(?:FROM|JOIN)\s+contents\b/i)
   })
 
