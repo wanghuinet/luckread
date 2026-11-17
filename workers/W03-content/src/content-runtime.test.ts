@@ -632,42 +632,45 @@ describe('W03 content contract core', () => {
   it('binds revision cursors to the owning user and content', async () => {
     const row = {
       id: 'revision_2',
-      content_id: 'content_123',
+      contentId: 'content_123',
       revision: 2,
-      content_version: 2,
-      actor_user_id: 'user_123',
-      source_revision: 1,
+      contentVersion: 2,
+      actorUserId: 'user_123',
+      sourceRevision: 1,
       operation: 'UPDATE',
       state: 'DRAFT',
+      accessMode: 'PUBLIC',
       slug: 'article-123',
       title: 'Revision title',
-      body_ref: 'https://cdn.example.com/body.txt',
-      media_refs_json: '[]',
-      cover_ref: null,
+      bodyRef: 'https://cdn.example.com/body.txt',
+      mediaRefs: [],
+      coverRef: null,
+      mediaWarning: null,
       etag: 'W/"2"',
       reason: null,
-      correlation_id: 'test-correlation',
-      created_at: '2026-10-02T12:01:00.000Z',
+      correlationId: 'test-correlation',
+      createdAt: '2026-10-02T12:01:00.000Z',
     }
-    let prepareCalls = 0
-    const db = {
-      prepare() {
-        prepareCalls += 1
-        return { bind: () => ({ all: async () => ({ results: [row, { ...row, id: 'revision_1' }] }) }) }
+    let listCalls = 0
+    const readStore = {
+      async list() {
+        listCalls += 1
+        return [row, { ...row, id: 'revision_1' }]
       },
+      async get() { return row },
     } as never
-    const first = await listContentRevisions(db, 'user_123', 'content_123', null, 1)
+    const first = await listContentRevisions(readStore, 'user_123', 'content_123', null, 1)
     expect(first.hasMore).toBe(true)
     expect(first.nextCursor).toEqual(expect.any(String))
-    await expect(listContentRevisions(db, 'user_123', 'content_999', first.nextCursor, 1)).rejects.toMatchObject({
+    await expect(listContentRevisions(readStore, 'user_123', 'content_999', first.nextCursor, 1)).rejects.toMatchObject({
       code: 'INVALID_CURSOR',
       status: 400,
     })
-    await expect(listContentRevisions(db, 'user_999', 'content_123', first.nextCursor, 1)).rejects.toMatchObject({
+    await expect(listContentRevisions(readStore, 'user_999', 'content_123', first.nextCursor, 1)).rejects.toMatchObject({
       code: 'INVALID_CURSOR',
       status: 400,
     })
-    expect(prepareCalls).toBe(1)
+    expect(listCalls).toBe(1)
   })
 
   it('rejects update requests that change the immutable content type', async () => {
@@ -2261,18 +2264,38 @@ describe('1.1 content revision history', () => {
     expect(updateSection).not.toContain('db.prepare')
     expect(updateSection).not.toContain('batchMutation')
 
+    const revisionListStart = runtime.indexOf('export async function listContentRevisions')
+    const revisionListEnd = runtime.indexOf('\nexport async function getContentRevision', revisionListStart)
+    const revisionListSection = runtime.slice(revisionListStart, revisionListEnd)
+    expect(revisionListSection).toContain('await readStore.list(')
+    expect(revisionListSection).not.toContain('ContentD1')
+    expect(revisionListSection).not.toContain('db.prepare')
+
+    const revisionGetStart = runtime.indexOf('export async function getContentRevision')
+    const revisionGetEnd = runtime.indexOf('\nexport function validateListFilters', revisionGetStart)
+    const revisionGetSection = runtime.slice(revisionGetStart, revisionGetEnd)
+    expect(revisionGetSection).toContain('await readStore.get(')
+    expect(revisionGetSection).not.toContain('ContentD1')
+    expect(revisionGetSection).not.toContain('db.prepare')
+
     const rollbackIndex = runtime.indexOf('export async function rollbackContentRevision')
-    const rollbackUpdate = runtime.indexOf('UPDATE contents', rollbackIndex)
-    const rollbackGuard = runtime.indexOf('atomicGuard(db)', rollbackIndex)
-    const rollbackRevisionIndex = runtime.indexOf('const rollbackRevision: ContentRevision = {', rollbackIndex)
-    const rollbackOperation = runtime.indexOf("operation: 'ROLLBACK'", rollbackRevisionIndex)
-    const rollbackRevisionWrite = runtime.indexOf('insertRevision(db, rollbackRevision)', rollbackGuard)
-    expect(rollbackUpdate).toBeGreaterThanOrEqual(rollbackIndex)
-    expect(rollbackGuard).toBeGreaterThan(rollbackUpdate)
-    // Build the immutable revision payload before the current persistence adapter commits it.
-    expect(rollbackRevisionIndex).toBeGreaterThanOrEqual(rollbackIndex)
+    const rollbackEnd = runtime.indexOf('\nexport async function deleteContent', rollbackIndex)
+    const rollbackSection = runtime.slice(rollbackIndex, rollbackEnd)
+    const rollbackRevisionIndex = rollbackSection.indexOf('const rollbackRevision: ContentRevision = {')
+    const rollbackOperation = rollbackSection.indexOf("operation: 'ROLLBACK'", rollbackRevisionIndex)
+    expect(rollbackSection).toContain('await mutationStore.loadMutation(')
+    expect(rollbackSection).toContain('await mutationStore.loadRevision(')
+    expect(rollbackSection).toContain('await mutationStore.rollback({')
+    expect(rollbackSection).not.toContain('ContentD1')
+    expect(rollbackSection).not.toContain('db.prepare')
+    expect(rollbackSection).not.toContain('batchMutation')
+    expect(rollbackRevisionIndex).toBeGreaterThanOrEqual(0)
     expect(rollbackOperation).toBeGreaterThan(rollbackRevisionIndex)
-    expect(rollbackRevisionWrite).toBeGreaterThan(rollbackGuard)
+    const postgresMutationStore = readFileSync(
+      resolve(process.cwd(), 'workers/W03-content/src/content-mutation-store-postgres.ts'),
+      'utf8',
+    )
+    expect(postgresMutationStore).toContain("'content.revision.rolled_back'")
     expect(runtime).toContain("sourceAccessMode !== currentAccessMode")
     expect(runtime).toContain("verifiedCreatorId !== content.creatorId")
   })
