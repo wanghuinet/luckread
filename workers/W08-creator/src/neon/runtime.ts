@@ -7,6 +7,13 @@ import {
   type W08D1Database,
 } from '../creator-store.js'
 
+/**
+ * @deprecated-next-version
+ * Reason: Legacy D1 provider selection and creator-store fallback remain reachable.
+ * Replacement: createPostgresW08CreatorStore via getW08PostgresPool.
+ * Removal: Next release.
+ * Condition: All W08 callers and test fixtures use the Neon creator store; D1 binding fixtures are retired.
+ */
 export type W08DatabaseDriver = 'd1' | 'neon'
 
 export type W08RuntimeEnv = Readonly<{
