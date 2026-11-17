@@ -24,6 +24,22 @@ jobs:
   analytics-runtime:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:18.6
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres_local_only
+          POSTGRES_DB: w11_analytics_runtime
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d w11_analytics_runtime"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      W11_PG_TEST_DATABASE_URL: postgresql://postgres:postgres_local_only@127.0.0.1:5432/w11_analytics_runtime
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -48,6 +64,7 @@ jobs:
           workers/W11-growth-campaign-analytics-operations/src/analytics-period.test.ts
           workers/W11-growth-campaign-analytics-operations/src/analytics-d1-store.test.ts
           workers/W11-growth-campaign-analytics-operations/src/analytics-postgres-store.test.ts
+          workers/W11-growth-campaign-analytics-operations/src/analytics-postgres.integration.test.ts
           workers/W11-growth-campaign-analytics-operations/src/entry.test.ts
           workers/W11-growth-campaign-analytics-operations/src/analytics-reconciliation.test.ts
           workers/W11-growth-campaign-analytics-operations/src/analytics-ingest.test.ts
@@ -70,6 +87,7 @@ jobs:
           workers/W11-growth-campaign-analytics-operations/src/analytics-d1-store.ts
           workers/W11-growth-campaign-analytics-operations/src/analytics-postgres-store.ts
           workers/W11-growth-campaign-analytics-operations/src/analytics-postgres-store.test.ts
+          workers/W11-growth-campaign-analytics-operations/src/analytics-postgres.integration.test.ts
           workers/W11-growth-campaign-analytics-operations/src/analytics-postgres-runtime.ts
           workers/W11-growth-campaign-analytics-operations/src/entry.ts
           workers/W11-growth-campaign-analytics-operations/src/entry.test.ts
