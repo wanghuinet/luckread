@@ -36,6 +36,7 @@ on:
       - 'contracts/authz/layers.json'
       - 'workers/W02-identity/package.json'
       - 'workers/W02-identity/src/auth/better-auth.ts'
+      - 'workers/W02-identity/src/index.ts'
       - 'workers/W02-identity/src/auth/mfa-factor-state-store.ts'
       - 'workers/W02-identity/src/auth/mfa-status.ts'
       - 'workers/W02-identity/src/auth/mfa-factor-state-store.test.ts'
