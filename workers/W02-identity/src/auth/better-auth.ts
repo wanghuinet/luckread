@@ -484,8 +484,8 @@ export const buildLuckReadAuth = (
       }),
     },
     } : {}),
-    // W02 is the platform identity authority. Better Auth uses native D1
-    // persistence here; Payload is not an authentication/database adapter.
+    // W02 is the platform identity authority. Production Better Auth uses the
+    // Neon PostgreSQL pool supplied by createLuckReadAuth; Payload is not an adapter.
     database,
     baseURL: 'https://luckread.com',
     basePath: '/api/auth',
@@ -561,7 +561,7 @@ export const buildLuckReadAuth = (
                   legacyD1!.prepare(
                     'UPDATE "user" SET mfa_enrolled_at = ? WHERE id = ? AND two_factor_enabled = 1 AND mfa_enrolled_at IS NULL',
                   ).bind(enrolledAt, userId),
-                  env.D1_01.prepare('DELETE FROM "session" WHERE user_id = ?').bind(userId),
+                  legacyD1!.prepare('DELETE FROM "session" WHERE user_id = ?').bind(userId),
                 ])
               },
             },
