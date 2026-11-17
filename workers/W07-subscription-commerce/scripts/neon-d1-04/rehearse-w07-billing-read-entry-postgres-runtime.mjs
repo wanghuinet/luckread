@@ -190,7 +190,7 @@ try {
   assert.equal(issuedReceipt.documentType, 'RECEIPT')
 
   const issuedDocuments = await adminPool.query(
-    'SELECT document_type, payment_id, amount_minor, currency FROM billing_documents WHERE customer_id = $1 ORDER BY document_type',
+    'SELECT document_type, payment_id, amount_minor::int AS amount_minor, currency FROM billing_documents WHERE customer_id = $1 ORDER BY document_type',
     [customerId],
   )
   assert.deepEqual(issuedDocuments.rows, [
