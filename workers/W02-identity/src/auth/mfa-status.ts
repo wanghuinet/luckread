@@ -1,6 +1,6 @@
 import { resolveBetterAuthPrincipal } from './principal.js'
 import type { AuthenticatedPrincipal } from './principal.js'
-import type { BetterAuthEnv } from './better-auth.js'
+import { requireLegacyW02D1Database, type BetterAuthEnv } from './better-auth.js'
 
 export type AuthoritativeMfaStatus = {
   enabled: boolean
@@ -108,7 +108,7 @@ export async function handleMfaStatusRequest(
     if (!principal || principal.accountState !== 'ACTIVE') {
       return response({ error: { code: 'UNAUTHENTICATED', message: 'Authentication required' } }, 401)
     }
-    const store = dependencies.store ?? createD1MfaStatusStore(env.D1_01)
+    const store = dependencies.store ?? createD1MfaStatusStore(requireLegacyW02D1Database(env))
     const status = await store.read(principal.userId, new Date())
     if (!status) return response({ error: { code: 'UNAUTHENTICATED', message: 'Authentication required' } }, 401)
     return response({ data: status })
