@@ -554,7 +554,10 @@ export const buildLuckReadAuth = (
             user: {
               create: {
                 after: async (user) => {
+                  const developmentDiagnostics = env.CLOUDFLARE_ENV?.trim().toLowerCase() === 'development'
+                  if (developmentDiagnostics) console.info(JSON.stringify({ event: 'w02.better_auth.role_materialization_started' }))
                   await postgresLifecycleAdapters.afterUserCreated(String(user.id))
+                  if (developmentDiagnostics) console.info(JSON.stringify({ event: 'w02.better_auth.role_materialization_completed' }))
                 },
               },
             },
