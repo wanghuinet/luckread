@@ -82,7 +82,7 @@ export function translateAnalyticsSqlToPostgres(sql: string): string {
   )
 
   let parameter = 0
-  return withPostgresClock.replace(/\?/g, () => `$\{++parameter}`)
+  return withPostgresClock.replace(/\?/g, () => `${++parameter}`)
 }
 
 class PostgresPreparedStatement implements AnalyticsPostgresPreparedStatement {
