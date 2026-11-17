@@ -6,12 +6,10 @@ import {
   type NotificationPreferencesStore,
 } from './notification-preferences-store.js'
 import {
-  createD1SocialTargetsReadStore,
   SocialTargetsReadStoreError,
   type SocialTargetsReadStore,
 } from './social-targets-read-store.js'
 import {
-  createD1SocialClosureReadStore,
   SocialClosureReadStoreError,
   type SocialClosureReadStore,
 } from './social-closure-read-store.js'
@@ -28,18 +26,7 @@ export class SocialClosureRuntimeError extends Error {
   constructor(readonly code: string, readonly status: number) { super(code) }
 }
 
-type SocialClosureDataSource = D1Database | SocialClosureReadStore
-
-function resolveSocialClosureReadStore(source: SocialClosureDataSource): SocialClosureReadStore {
-  if (
-    typeof (source as SocialClosureReadStore).getTopicByName === 'function' &&
-    typeof (source as SocialClosureReadStore).listNotificationRows === 'function' &&
-    typeof (source as SocialClosureReadStore).getContentSocialCounts === 'function'
-  ) {
-    return source as SocialClosureReadStore
-  }
-  return createD1SocialClosureReadStore(source as D1Database)
-}
+type SocialClosureDataSource = SocialClosureReadStore
 
 async function withSocialClosureRead<T>(operation: () => Promise<T>): Promise<T> {
   try {
@@ -399,14 +386,7 @@ export async function syncSocialTokens(
   return { topics: topics.length, mentions: mentionCount }
 }
 
-type SocialTargetsDataSource = D1Database | SocialTargetsReadStore
-
-function resolveSocialTargetsReadStore(source: SocialTargetsDataSource): SocialTargetsReadStore {
-  if (typeof (source as SocialTargetsReadStore).getTargets === 'function') {
-    return source as SocialTargetsReadStore
-  }
-  return createD1SocialTargetsReadStore(source as D1Database)
-}
+type SocialTargetsDataSource = SocialTargetsReadStore
 
 export async function getSocialTargets(
   source: SocialTargetsDataSource,
@@ -418,7 +398,7 @@ export async function getSocialTargets(
 }> {
   const targetValue = target(targetTypeValue, targetIdValue)
   try {
-    const result = await resolveSocialTargetsReadStore(source).getTargets({
+    const result = await source.getTargets({
       targetType: targetValue.targetType,
       targetId: targetValue.targetId,
     })
@@ -462,7 +442,7 @@ export async function getTopicPage(
 
   const limit = parseLimit(limitValue)
   const cursor = cursorValue ? decodeCursor(cursorValue) : null
-  const store = resolveSocialClosureReadStore(source)
+  const store = source
   const topic = await withSocialClosureRead(() => store.getTopicByName(normalizedName))
   if (!topic || topic.status !== 'ACTIVE') throw new SocialClosureRuntimeError('NOT_FOUND', 404)
 
