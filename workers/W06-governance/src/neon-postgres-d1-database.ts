@@ -203,6 +203,13 @@ function toD1Result<T>(rows: T[], changes: number): D1Result<T> {
  * guard receives the preceding UPDATE row count, preserving D1 changes() CAS
  * semantics and rolling the full decision transaction back on a stale version.
  */
+/**
+ * @deprecated-next-version
+ * Reason: This adapter translates D1/SQLite SQL and batch semantics into PostgreSQL.
+ * Replacement: Native PostgreSQL moderation repositories and transaction boundaries.
+ * Removal: Next release.
+ * Condition: All W06 moderation/report/audit callers and tests use PostgreSQL-native stores; no D1PreparedStatement or D1Result compatibility surface remains.
+ */
 export function createPostgresModerationD1Database(pool: W06ModerationPostgresPool): D1Database {
   async function execute<Row extends Record<string, unknown>>(
     statement: BoundStatement,
