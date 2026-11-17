@@ -13,6 +13,10 @@ on:
       - 'workers/W07-subscription-commerce/scripts/neon-d1-04/**'
       - 'workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/**'
       - 'workers/W07-subscription-commerce/README-neon-d1-04-postgres-schema.md'
+      - 'workers/W07-subscription-commerce/src/index.ts'
+      - 'workers/W07-subscription-commerce/src/billing-read-http-runtime.ts'
+      - 'workers/W07-subscription-commerce/src/neon/payment-method-read-runtime.ts'
+      - 'workers/W07-subscription-commerce/scripts/neon-d1-04/rehearse-w07-billing-read-entry-postgres-runtime.mjs'
       - '.github/workflows/neon-d1-04-w07-refunds-billing-postgres-rehearsal.yml'
   workflow_dispatch:
 
@@ -43,7 +47,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
@@ -80,6 +84,20 @@ jobs:
         run: psql "$PGURL" -v ON_ERROR_STOP=1 --single-transaction -f workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0005_w07_d1_04_refunds_billing_documents.sql
       - name: Verify PAY-006 refund accounting, billing documents and full rollback
         run: psql "$PGURL" -v ON_ERROR_STOP=1 --no-psqlrc -f workers/W07-subscription-commerce/scripts/neon-d1-04/verify-w07-refunds-billing-documents-postgres-schema.sql
+      - name: Install W07 PostgreSQL Worker runtime dependency
+        working-directory: workers/W07-subscription-commerce
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Install W02 TSX runner for the Worker entrypoint rehearsal
+        working-directory: workers/W02-identity
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Rehearse signed payment success and W01 billing reads through the W07 Neon Worker entrypoint
+        working-directory: workers/W02-identity
+        env:
+          W07_BILLING_READ_POSTGRES_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/luckread_finance_schema
+          W07_BILLING_READ_POSTGRES_REPORT: ../../artifacts/neon/w07-billing-read-entry-postgres-runtime-postflight.json
+        run: |
+          node --check ../../workers/W07-subscription-commerce/scripts/neon-d1-04/rehearse-w07-billing-read-entry-postgres-runtime.mjs
+          node --import=tsx/esm ../../workers/W07-subscription-commerce/scripts/neon-d1-04/rehearse-w07-billing-read-entry-postgres-runtime.mjs
       - name: Upload exact local rehearsal sources
         if: always()
         uses: actions/upload-artifact@v4
@@ -89,5 +107,8 @@ jobs:
             workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0005_w07_d1_04_refunds_billing_documents.sql
             contracts/database/neon-d1-04-w07-refunds-billing-documents-schema.v1.json
             workers/W07-subscription-commerce/scripts/neon-d1-04/verify-w07-refunds-billing-documents-postgres-schema.sql
+            workers/W07-subscription-commerce/scripts/neon-d1-04/rehearse-w07-billing-read-entry-postgres-runtime.mjs
+            workers/W07-subscription-commerce/src/neon/payment-method-read-runtime.ts
+            artifacts/neon/w07-billing-read-entry-postgres-runtime-postflight.json
           if-no-files-found: error
           retention-days: 30
