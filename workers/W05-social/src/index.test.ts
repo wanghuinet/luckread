@@ -17,6 +17,7 @@ import type { LikeTargetContextReadStore } from './like-target-context-read-stor
 import type { RepostStore } from './repost-store.js'
 import type { ShareStore } from './share-store.js'
 import type { ProfilePinStore } from './profile-pin-store.js'
+import type { SocialTokenSyncStore } from './social-token-sync-store.js'
 
 
 const dbFor = (results: unknown[] = []) => {
@@ -501,28 +502,25 @@ describe('W05 social query transport', () => {
     expect((unpublishedDb as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
   })
 
-  it('synchronizes content topics and mentions only after W03 validates published ownership', async () => {
-    const binding = {
-      fetch: vi.fn(async () => Response.json({
-        data: {
-          contentId: 'content-1',
-          ownerUserId: 'viewer-1',
-          contentType: 'post',
-          state: 'PUBLISHED',
-          updatedAt: '2026-10-17T04:00:00.000Z',
-        },
-      })),
+  it('synchronizes content topics and mentions only after W03 validates published ownership through an injected Neon Store', async () => {
+    const binding = { fetch: vi.fn(async () => Response.json({ data: { contentId: 'content-1', ownerUserId: 'viewer-1', contentType: 'post', state: 'PUBLISHED', updatedAt: '2026-10-17T04:00:00.000Z' } })) }
+    const store: SocialTokenSyncStore = {
+      getCommentContext: vi.fn(async () => null),
+      listMentions: vi.fn(async () => []),
+      replaceTargetRelations: vi.fn(async () => undefined),
+      upsertTopicAndAttach: vi.fn(async () => undefined),
+      insertMention: vi.fn(async () => undefined),
     }
-    const d = dbFor()
-    const batch = vi.fn(async () => [])
-    ;(d as unknown as { batch: typeof batch }).batch = batch
-    const response = await worker.fetch(
+    const prepare = vi.fn(() => { throw new Error('D1 must not be used for Social Token Sync') })
+    const neonWorker = createW05SocialWorker({ socialTokenSyncStore: store })
+    const response = await neonWorker.fetch(
       new Request('https://luckread-w05.internal/internal/social/contents/content-1/tokens', {
         method: 'POST',
         headers: { ...transportHeaders, 'content-type': 'application/json' },
         body: JSON.stringify({ text: 'plain text', mentions: [] }),
       }),
-      { DB: d, W03_CONTENT: binding },
+      { DB: { prepare }, W03_CONTENT: binding } as never,
+      {} as never,
     )
     expect(response.status).toBe(200)
     expect(binding.fetch).toHaveBeenCalledTimes(1)
@@ -531,23 +529,52 @@ describe('W05 social query transport', () => {
     expect(forwarded.headers.get('X-LuckRead-Caller')).toBe('W05')
     expect(forwarded.headers.has('Authorization')).toBe(false)
     expect(forwarded.headers.has('Cookie')).toBe(false)
-    const prepare = (d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare
-    expect(prepare.mock.calls.some(([sql]) => /(?:FROM|JOIN)\s+contents/i.test(String(sql)))).toBe(false)
+    expect(store.listMentions).toHaveBeenCalledWith('content', 'content-1')
+    expect(store.replaceTargetRelations).toHaveBeenCalledWith({ targetType: 'content', targetId: 'content-1', retainedMentionIds: [] })
+    expect(store.upsertTopicAndAttach).not.toHaveBeenCalled()
+    expect(store.insertMention).not.toHaveBeenCalled()
+    expect(prepare).not.toHaveBeenCalled()
     await expect(response.json()).resolves.toMatchObject({ data: { topics: 0, mentions: 0 } })
   })
 
-  it('fails closed without W03 before content-token D1 access', async () => {
-    const d = dbFor()
+  it('fails closed before token Store access when W03 context is missing', async () => {
+    const store: SocialTokenSyncStore = {
+      getCommentContext: vi.fn(async () => null),
+      listMentions: vi.fn(async () => []),
+      replaceTargetRelations: vi.fn(async () => undefined),
+      upsertTopicAndAttach: vi.fn(async () => undefined),
+      insertMention: vi.fn(async () => undefined),
+    }
+    const prepare = vi.fn(() => { throw new Error('D1 must not be used for Social Token Sync') })
+    const neonWorker = createW05SocialWorker({ socialTokenSyncStore: store })
+    const response = await neonWorker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/contents/content-1/tokens', {
+        method: 'POST',
+        headers: { ...transportHeaders, 'content-type': 'application/json' },
+        body: JSON.stringify({ text: 'plain text', mentions: [] }),
+      }),
+      { DB: { prepare } } as never,
+      {} as never,
+    )
+    expect(response.status).toBe(503)
+    expect(store.listMentions).not.toHaveBeenCalled()
+    expect(store.replaceTargetRelations).not.toHaveBeenCalled()
+    expect(prepare).not.toHaveBeenCalled()
+  })
+
+  it('fails closed when the Social Token Sync Store is not composed', async () => {
+    const binding = { fetch: vi.fn(async () => Response.json({ data: { contentId: 'content-1', ownerUserId: 'viewer-1', contentType: 'post', state: 'PUBLISHED', updatedAt: '2026-10-17T04:00:00.000Z' } })) }
     const response = await worker.fetch(
       new Request('https://luckread-w05.internal/internal/social/contents/content-1/tokens', {
         method: 'POST',
         headers: { ...transportHeaders, 'content-type': 'application/json' },
         body: JSON.stringify({ text: 'plain text', mentions: [] }),
       }),
-      { DB: d },
+      { W03_CONTENT: binding } as never,
+      {} as never,
     )
     expect(response.status).toBe(503)
-    expect((d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
+    expect(binding.fetch).toHaveBeenCalledTimes(1)
   })
 
   it('gets content social summary through W03 and keeps canonical-content reads out of W05', async () => {

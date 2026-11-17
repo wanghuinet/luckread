@@ -20,7 +20,6 @@ import {
   type NotificationEnqueueStore,
 } from './notification-enqueue-store.js'
 import {
-  createD1SocialTokenSyncStore,
   SocialTokenSyncStoreError,
   type SocialTokenSyncStore,
 } from './social-token-sync-store.js'
@@ -227,20 +226,15 @@ export const extractSocialTokens = (input: string): SocialToken[] => {
   return tokens
 }
 
-type SocialTokenSyncDataSource = D1Database | SocialTokenSyncStore
-
-function resolveSocialTokenSyncStore(source: SocialTokenSyncDataSource): SocialTokenSyncStore {
-  if (
-    typeof (source as SocialTokenSyncStore).getCommentContext === 'function' &&
-    typeof (source as SocialTokenSyncStore).listMentions === 'function'
-  ) return source as SocialTokenSyncStore
-  return createD1SocialTokenSyncStore(source as D1Database)
+function requireSocialTokenSyncStore(source: SocialTokenSyncStore | undefined): SocialTokenSyncStore {
+  if (!source) throw new SocialClosureRuntimeError('SERVICE_UNAVAILABLE', 503)
+  return source
 }
 
 export type MentionTarget = { userId: string; handle: string }
 
 export async function syncSocialTokens(
-  source: SocialTokenSyncDataSource,
+  source: SocialTokenSyncStore | undefined,
   actorUserIdValue: string,
   targetTypeValue: string,
   targetIdValue: string,
@@ -254,7 +248,7 @@ export async function syncSocialTokens(
   const text = textValue.normalize('NFKC').trim()
   if (text.length > MAX_TEXT) throw new SocialClosureRuntimeError('VALIDATION_FAILED', 400)
 
-  const store = resolveSocialTokenSyncStore(source)
+  const store = requireSocialTokenSyncStore(source)
   let relatedContentId: string | null = null
   if (targetValue.targetType === 'content') {
     if (!contentContext) throw new SocialClosureRuntimeError('SERVICE_UNAVAILABLE', 503)

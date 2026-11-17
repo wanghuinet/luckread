@@ -300,7 +300,7 @@ export type W05SocialWorkerDependencies = Readonly<{
   commentCreateStore?: CommentCreateStore
   /** Optional PostgreSQL-capable comment edit/delete store; D1 remains the deployed default. */
   commentMutationStore?: CommentMutationStore
-  /** Optional PostgreSQL-capable comment-owned mention/topic synchronization store. */
+  /** PostgreSQL comment/content token synchronization store; missing composition fails closed. */
   socialTokenSyncStore?: SocialTokenSyncStore
   /** Optional PostgreSQL-capable social-target read store for comment mentions/topics. */
   socialTargetsReadStore?: SocialTargetsReadStore
@@ -591,7 +591,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
           )
           const mentionTargets = rawMentions === undefined ? [] : rawMentions as Array<{ userId: string; handle: string }>
           await syncSocialTokens(
-            dependencies.socialTokenSyncStore ?? env.DB,
+            dependencies.socialTokenSyncStore,
             actorUserId,
             'comment',
             commentId,
@@ -692,7 +692,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
           correlationId: request.headers.get('X-LuckRead-Correlation-Id') ?? '',
         })
         const result = await syncSocialTokens(
-          dependencies.socialTokenSyncStore ?? env.DB,
+          dependencies.socialTokenSyncStore,
           actorUserId,
           'content',
           contentId,
@@ -1048,7 +1048,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
         }, actorVerified, dependencies.commentCreateStore)
         const mentionTargets = rawMentions === undefined ? [] : rawMentions as Array<{ userId: string; handle: string }>
         await syncSocialTokens(
-          dependencies.socialTokenSyncStore ?? env.DB,
+          dependencies.socialTokenSyncStore,
           viewerUserId,
           'comment',
           comment.id,
