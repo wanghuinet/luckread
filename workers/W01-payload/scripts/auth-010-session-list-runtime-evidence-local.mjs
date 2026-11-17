@@ -1,6 +1,10 @@
 import { execFileSync } from 'node:child_process'
+import { createRequire } from 'node:module'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
+
+const requireW02 = createRequire(new URL('../../W02-identity/package.json', import.meta.url))
+const { Client: PostgresClient } = requireW02('pg')
 
 const baseUrl = (process.env.AUTH001_BASE_URL || 'http://127.0.0.1:8787').replace(/\/$/, '')
 const persistTo = process.env.CLOUDFLARE_PERSIST_TO || '/tmp/luckread-auth001-state'
@@ -20,6 +24,16 @@ const registerKeyB = 'AUTH010-LOCAL-' + suffix + '-REGISTER-B'
 const emails = [emailA, emailB]
 const registerKeys = [registerKeyA, registerKeyB]
 const userIds = []
+const w02DatabaseUrl = process.env.AUTH001_W02_DATABASE_URL
+if (!w02DatabaseUrl) throw new Error('AUTH001_W02_DATABASE_URL is required for the Neon-backed W02 session evidence')
+const w02DatabaseTarget = new URL(w02DatabaseUrl)
+if (!new Set(['127.0.0.1', 'localhost']).has(w02DatabaseTarget.hostname) ||
+    w02DatabaseTarget.port !== '5432' || w02DatabaseTarget.pathname !== '/luckread_schema') {
+  throw new Error('Refusing AUTH-010 W02 session evidence outside disposable local luckread_schema PostgreSQL')
+}
+const w02Database = new PostgresClient({ connectionString: w02DatabaseUrl })
+let w02DatabaseConnected = false
+const pgScalar = async (sql, ...args) => (await w02Database.query(sql, args)).rows[0] ?? null
 
 const escapeSql = (value) => "'" + String(value).replaceAll("'", "''") + "'"
 const renderSql = (sql, args = []) => {
@@ -104,12 +118,12 @@ const registerAccount = async ({ email, username, password, idempotencyKey }) =>
   }
   userIds.push(String(payload.userId))
 
-  runSql(
-    'UPDATE "user" SET email_verified = 1, account_state = \'ACTIVE\', account_state_version = account_state_version + 1 WHERE id = ?',
-    payload.userId,
+  await w02Database.query(
+    'UPDATE "user" SET email_verified = TRUE, account_state = $1, account_state_version = account_state_version + 1 WHERE id = $2',
+    ['ACTIVE', payload.userId],
   )
-  const activated = scalar(
-    'SELECT id, email_verified AS emailVerified, account_state AS accountState FROM "user" WHERE id = ? LIMIT 1',
+  const activated = await pgScalar(
+    'SELECT id, email_verified AS "emailVerified", account_state AS "accountState" FROM "user" WHERE id = $1 LIMIT 1',
     payload.userId,
   )
   if (!activated || Number(activated.emailVerified) !== 1 || activated.accountState !== 'ACTIVE') {
@@ -139,17 +153,17 @@ const createSecondIsolatedIdentity = async () => {
     throw new Error('AUTH010_SECOND_IDENTITY_SIGNUP_FAILED_HTTP_' + signupResponse.status)
   }
 
-  const identity = scalar('SELECT id FROM "user" WHERE email = ? LIMIT 1', emailB)
+  const identity = await pgScalar('SELECT id FROM "user" WHERE email = $1 LIMIT 1', emailB)
   const userId = typeof identity?.id === 'string' ? identity.id : ''
   if (!userId) throw new Error('AUTH010_SECOND_IDENTITY_NOT_PERSISTED')
   userIds.push(userId)
 
-  runSql(
-    'UPDATE "user" SET email_verified = 1, account_state = \'ACTIVE\', account_state_version = account_state_version + 1 WHERE id = ?',
-    userId,
+  await w02Database.query(
+    'UPDATE "user" SET email_verified = TRUE, account_state = $1, account_state_version = account_state_version + 1 WHERE id = $2',
+    ['ACTIVE', userId],
   )
-  const activated = scalar(
-    'SELECT id, email_verified AS emailVerified, account_state AS accountState FROM "user" WHERE id = ? LIMIT 1',
+  const activated = await pgScalar(
+    'SELECT id, email_verified AS "emailVerified", account_state AS "accountState" FROM "user" WHERE id = $1 LIMIT 1',
     userId,
   )
   if (!activated || Number(activated.emailVerified) !== 1 || activated.accountState !== 'ACTIVE') {
@@ -245,11 +259,11 @@ const revokeSession = async (cookie, sessionId, idempotencyKey) => {
 
 const cleanup = async () => {
   const ids = [...new Set(userIds)]
-  try { runSql('DELETE FROM role_assignments WHERE subject_id IN (' + ids.map(escapeSql).join(',') + ')') } catch {}
-  try { runSql('DELETE FROM auth_session_state WHERE user_id IN (' + ids.map(escapeSql).join(',') + ')') } catch {}
-  try { runSql('DELETE FROM "session" WHERE user_id IN (' + ids.map(escapeSql).join(',') + ')') } catch {}
-  try { runSql('DELETE FROM "account" WHERE user_id IN (' + ids.map(escapeSql).join(',') + ')') } catch {}
-  try { runSql('DELETE FROM "verification" WHERE identifier IN (' + emails.map(escapeSql).join(',') + ')') } catch {}
+  try { if (ids.length) await w02Database.query('DELETE FROM role_assignments WHERE subject_id = ANY($1::text[])', [ids]) } catch {}
+  try { if (ids.length) await w02Database.query('DELETE FROM auth_session_state WHERE user_id = ANY($1::text[])', [ids]) } catch {}
+  try { if (ids.length) await w02Database.query('DELETE FROM "session" WHERE user_id = ANY($1::text[])', [ids]) } catch {}
+  try { if (ids.length) await w02Database.query('DELETE FROM "account" WHERE user_id = ANY($1::text[])', [ids]) } catch {}
+  try { if (emails.length) await w02Database.query('DELETE FROM "verification" WHERE identifier = ANY($1::text[])', [emails]) } catch {}
   try {
     runSql(
       'DELETE FROM consents WHERE resource_id IN (SELECT CAST(id AS TEXT) FROM users WHERE email IN (' + emails.map(escapeSql).join(',') + '))',
@@ -257,12 +271,14 @@ const cleanup = async () => {
   } catch {}
   try { runSql('DELETE FROM auth_registration_envelopes WHERE idempotency_key IN (' + registerKeys.map(escapeSql).join(',') + ')') } catch {}
   try { runSql('DELETE FROM users WHERE email IN (' + emails.map(escapeSql).join(',') + ')') } catch {}
-  try { runSql('DELETE FROM "user" WHERE id IN (' + ids.map(escapeSql).join(',') + ')') } catch {}
+  try { if (ids.length) await w02Database.query('DELETE FROM "user" WHERE id = ANY($1::text[])', [ids]) } catch {}
 }
 
 let cleaned = false
 let currentStage = 'startup'
 try {
+  await w02Database.connect()
+  w02DatabaseConnected = true
   currentStage = 'health-check'
   const health = await fetch(baseUrl + '/')
   if (health.status >= 500) throw new Error('AUTH010_LOCAL_W01_NOT_READY')
