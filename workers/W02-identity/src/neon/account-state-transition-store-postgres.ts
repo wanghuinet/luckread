@@ -17,8 +17,9 @@ import {
  * The existing PostgreSQL transaction intentionally supports only moderator /
  * admin transitions without a separate approval receipt. Self-service,
  * lifecycle-job and approval-required transitions remain on their dedicated
- * adapters and fail closed here. This adapter is used by PostgreSQL rehearsal;
- * the production Worker continues to construct the D1 store.
+ * adapters and fail closed here. The Neon-only W02 production runtime uses this
+ * Store for moderator/admin transitions; the PostgreSQL rehearsal exercises
+ * the same implementation.
  */
 export function createPostgresAccountStateTransitionStore(
   pool: Pool,
