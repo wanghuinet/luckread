@@ -20,6 +20,13 @@ interface W11AnalyticsDatabase {
   batch(statements: AnalyticsD1PreparedStatement[]): Promise<AnalyticsD1Result[]>
 }
 
+/**
+ * @deprecated-next-version
+ * Reason: Analytics worker still consumes a D1-shaped database API even when entry.ts supplies a Neon-backed facade.
+ * Replacement: PostgreSQL-native analytics ingestion and health/read repositories.
+ * Removal: Next release.
+ * Condition: Analytics health probes, ingestion batches, and schema checks use PostgreSQL-native SQL and transaction APIs.
+ */
 export interface W11Env {
   D1_05: W11AnalyticsDatabase
 }
