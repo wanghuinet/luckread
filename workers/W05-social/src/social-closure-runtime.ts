@@ -57,7 +57,7 @@ const isSqlTrue = (value: number | boolean | null | undefined): boolean =>
   value === true || Number(value ?? 0) === 1
 
 function requireNotificationEnqueueStore(source: NotificationEnqueueStore | undefined): NotificationEnqueueStore {
-  if (!source) throw new SocialClosureRuntimeError('SERVICE_UNAVAILABLE', 503)
+  if (!source) throw new NotificationEnqueueStoreError(false)
   return source
 }
 
