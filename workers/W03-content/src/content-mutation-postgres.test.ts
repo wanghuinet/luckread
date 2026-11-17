@@ -821,12 +821,8 @@ describe('W03 Neon content mutation store', () => {
         return 1
       },
     }
-    const d1 = {
-      prepare() { throw new Error('D1 must not be queried in Neon mode') },
-      batch() { throw new Error('D1 must not be written in Neon mode') },
-    }
-    const due = await listDueScheduledContentCandidates(d1 as never, now, 10, store)
-    const result = await publishAuthorizedScheduledContents(d1 as never, [{
+    const due = await listDueScheduledContentCandidates(store, now, 10)
+    const result = await publishAuthorizedScheduledContents(store, [{
       ...dueCandidate,
       expectedCreatorId: null,
       authorization: {
@@ -838,7 +834,7 @@ describe('W03 Neon content mutation store', () => {
         ownerUserId: 'user_123',
         creatorId: 'creator_456',
       },
-    }], now, store)
+    }], now)
 
     expect(due).toEqual([dueCandidate])
     expect(result).toEqual({ scanned: 1, authorized: 1, published: 1, rejected: 0 })
