@@ -111,6 +111,13 @@ type VerifiedRoleAssignment = Pick<
   'id' | 'subjectId' | 'roleId' | 'scopeType' | 'scopeId' | 'status' | 'validFrom' | 'validUntil'
 >
 
+/**
+ * @deprecated-next-version
+ * Reason: Legacy Cloudflare D1 authorization helper retained for isolated unit tests.
+ * Replacement: ensureVerifiedUserRolePostgres in src/neon/role-assignment-postgres.ts.
+ * Removal: Next release.
+ * Condition: The D1 role-assignment unit tests are replaced with PostgreSQL/in-memory Store tests.
+ */
 export async function ensureVerifiedUserRole(
   db: D1Database,
   subjectId: string,
