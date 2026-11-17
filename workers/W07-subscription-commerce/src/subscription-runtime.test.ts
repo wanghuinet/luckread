@@ -285,6 +285,8 @@ describe('subscription runtime', () => {
       },
     } as unknown as D1Database
     const env = {
+      W07_DATABASE_DRIVER: 'd1',
+      W07_MEMBERSHIP_DATABASE_DRIVER: 'd1',
       D1_01: membershipDb,
       D1_04: {} as D1Database,
       SUBSCRIPTION_ORIGIN_GLOBAL_LIMITER: allowLimiter,
@@ -349,6 +351,8 @@ describe('subscription runtime', () => {
       },
     })
     const response = await w07.fetch(request, {
+      W07_DATABASE_DRIVER: 'd1',
+      W07_MEMBERSHIP_DATABASE_DRIVER: 'd1',
       D1_01: fakeDb([], [
         activePlan('plan_creator_one', { owner_id: 'creator_one' }),
         activePlan('plan_creator_two', { owner_id: 'creator_two' }),
@@ -381,6 +385,8 @@ describe('subscription runtime', () => {
       },
     })
     const response = await w07.fetch(request, {
+      W07_DATABASE_DRIVER: 'd1',
+      W07_MEMBERSHIP_DATABASE_DRIVER: 'd1',
       D1_01: fakeDb([], [activePlan('plan_catalog')]),
       D1_04: {} as D1Database,
       SUBSCRIPTION_ORIGIN_GLOBAL_LIMITER: allowLimiter,
@@ -415,6 +421,8 @@ describe('subscription runtime', () => {
     })
     const db = fakeDb([])
     const env = {
+      W07_DATABASE_DRIVER: 'd1',
+      W07_MEMBERSHIP_DATABASE_DRIVER: 'd1',
       D1_01: db,
       D1_04: {} as D1Database,
       SUBSCRIPTION_ORIGIN_GLOBAL_LIMITER: allowLimiter,
@@ -449,6 +457,8 @@ describe('subscription runtime', () => {
       version: 1,
     })])
     const env = {
+      W07_DATABASE_DRIVER: 'd1',
+      W07_MEMBERSHIP_DATABASE_DRIVER: 'd1',
       D1_01: db,
       D1_04: {} as D1Database,
       SUBSCRIPTION_ORIGIN_GLOBAL_LIMITER: allowLimiter,
@@ -520,6 +530,8 @@ describe('subscription runtime', () => {
       },
       body: JSON.stringify({ name: 'Supporter', tier: 'supporter', billingInterval: 'MONTHLY', priceMinor: 500, currency: 'USD', benefits: [] }),
     }), {
+      W07_DATABASE_DRIVER: 'd1',
+      W07_MEMBERSHIP_DATABASE_DRIVER: 'd1',
       D1_01: db,
       D1_04: {} as D1Database,
       SUBSCRIPTION_ORIGIN_GLOBAL_LIMITER: allowLimiter,
@@ -552,6 +564,8 @@ describe('subscription runtime', () => {
     })
     const allowLimiter = { limit: async () => ({ success: true }) }
     const response = await w07.fetch(request, {
+      W07_DATABASE_DRIVER: 'd1',
+      W07_MEMBERSHIP_DATABASE_DRIVER: 'd1',
       D1_01: db,
       D1_04: {} as D1Database,
       SUBSCRIPTION_ORIGIN_GLOBAL_LIMITER: allowLimiter,
