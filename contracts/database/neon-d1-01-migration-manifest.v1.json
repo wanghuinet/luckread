@@ -40,6 +40,29 @@
       }
     },
     {
+      "order": 150,
+      "ownerWorker": "W01",
+      "migrationId": "D1-01-W01-AUTH-001-REGISTRATION-BATCH-0001",
+      "kind": "POSTGRESQL_SQL",
+      "artifactState": "COMMITTED",
+      "artifactPaths": [
+        "workers/W01-payload/src/neon-postgres-migrations-d1-01/0001_w01_auth001_registration_batch.sql"
+      ],
+      "sourcePaths": [
+        "workers/W01-payload/src/migrations/20260928_020000_MIG_AUTH_001_REGISTRATION_BATCH_V1.ts",
+        "workers/W01-payload/src/auth/registration-persistence.ts",
+        "workers/W01-payload/src/app/auth/register/route.ts"
+      ],
+      "dependsOn": [
+        "D1-01-W01-PAYLOAD-BASELINE-20261107"
+      ],
+      "execution": {
+        "executor": "POSTGRESQL_SQL_EXECUTOR",
+        "packageDirectory": "workers/W01-payload",
+        "transactionPolicy": "RUNNER_OWNED_DDL_AND_LEDGER_TRANSACTION"
+      }
+    },
+    {
       "order": 200,
       "ownerWorker": "W02",
       "migrationId": "D1-01-W02-BETTER-AUTH-CORE-1.7.8",
