@@ -102,7 +102,7 @@ jobs:
           const relationships = fs.readFileSync('workers/W03-content/src/content-relationships.ts', 'utf8')
           const bootstrap = JSON.parse(fs.readFileSync('contracts/database/neon-five-domain-schema-bootstrap.v1.json', 'utf8'))
           const domain = (bootstrap.domains || []).find(x => x.domainId === 'D1-02')
-          const hyperdrive = (config.hyperdrive || []).find(x => x.binding === 'HYPERDRIVE_D1_02')
+          const hyperdrive = (config.hyperdrive || []).find(x => x.binding === 'HYPERDRIVE_CONTENT_PG')
           if (config.name !== 'luckread-w03' || config.main !== 'src/entry.ts') {
             throw new Error('W03 worker identity or deployment entrypoint changed')
           }
