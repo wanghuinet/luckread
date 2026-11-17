@@ -6,6 +6,10 @@ const mocks = vi.hoisted(() => ({
 }))
 
 vi.mock('./better-auth.js', () => ({
+  requireLegacyW02D1Database: (env: { D1_01?: D1Database }) => {
+    if (!env.D1_01) throw new Error('W02_D1_TEST_BINDING_REQUIRED')
+    return env.D1_01
+  },
   createLuckReadAuth: () => ({
     api: { getSession: mocks.getSession },
     handler: mocks.handler,
