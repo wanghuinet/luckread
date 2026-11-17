@@ -95,7 +95,7 @@
       },
       {
         "path": "workers/W01-payload/src/auth/registration-persistence.ts",
-        "gitBlobSha1": "d4f763eb2375929cb9e7c2bcd02715176e30e567"
+        "gitBlobSha1": "29251ec9368e47dcd27b56396ce2eb81151ca131"
       },
       {
         "path": "workers/W01-payload/src/migrations/20260928_020000_MIG_AUTH_001_REGISTRATION_BATCH_V1.ts",
