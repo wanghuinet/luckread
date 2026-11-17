@@ -14,7 +14,7 @@ const postgresSuite = connectionString ? describe : describe.skip
 
 postgresSuite('W11 PostgreSQL 18 runtime integration', () => {
   let pool: Pool
-  let binding: W11AnalyticsHyperdriveBinding
+  let binding: W11AnalyticsHyperdriveBinding | undefined
 
   beforeAll(async () => {
     if (!connectionString) throw new Error('W11_PG_TEST_DATABASE_URL is required')
@@ -34,9 +34,10 @@ postgresSuite('W11 PostgreSQL 18 runtime integration', () => {
     )
     await pool.query(migration)
 
-    binding = { connectionString }
+    const hyperdriveBinding = { connectionString }
+    binding = hyperdriveBinding
     // Resolve through the exact Hyperdrive runtime path used by the Neon entry.
-    getW11AnalyticsPostgresDatabase(binding)
+    getW11AnalyticsPostgresDatabase(hyperdriveBinding)
   })
 
   afterAll(async () => {
@@ -44,7 +45,9 @@ postgresSuite('W11 PostgreSQL 18 runtime integration', () => {
     await pool?.end()
   })
 
-  it('executes W01 ingestion, schema readiness, deduplication, projection and rollback on PostgreSQL', async () => {
+  it('executes the Neon deployment entrypoint, W01 ingestion, deduplication, projection and rollback on PostgreSQL', async () => {
+    const hyperdriveBinding = binding
+    if (!hyperdriveBinding) throw new Error('W11 Hyperdrive test binding was not initialized')
     const legacyD1 = {
       prepare() {
         throw new Error('Neon entry must not access legacy D1_05')
@@ -55,7 +58,7 @@ postgresSuite('W11 PostgreSQL 18 runtime integration', () => {
     }
     const env = {
       W11_DATABASE_DRIVER: 'neon',
-      HYPERDRIVE_ANALYTICS_PG: binding,
+      HYPERDRIVE_ANALYTICS_PG: hyperdriveBinding,
       D1_05: legacyD1,
     } as never
     const event = {
@@ -156,7 +159,7 @@ postgresSuite('W11 PostgreSQL 18 runtime integration', () => {
     )
     expect(aggregateAfterDuplicate.rows).toEqual([{ opens: 1 }])
 
-    const database = getW11AnalyticsPostgresDatabase(binding)
+    const database = getW11AnalyticsPostgresDatabase(hyperdriveBinding)
     await expect(database.batch([
       database.prepare(
         'INSERT INTO analytics_rollup_watermark (consumer_name) VALUES (?)',
