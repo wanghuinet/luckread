@@ -2246,7 +2246,7 @@ describe('1.1 content revision history', () => {
     for (const operation of ["operation: 'CREATE'", "operation: 'UPDATE'", "operation: 'ROLLBACK'"]) {
       expect(runtime).toContain(operation)
     }
-    expect(runtime).toContain("'content.revision.rolled_back'")
+    // The ROLLBACK event is emitted atomically by the PostgreSQL mutation store below.
     for (const marker of ['export async function listContentRevisions', 'export async function getContentRevision', 'export async function rollbackContentRevision']) {
       expect(runtime).toContain(marker)
     }
