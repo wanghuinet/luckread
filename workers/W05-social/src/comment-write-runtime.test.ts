@@ -100,7 +100,7 @@ describe('W05 Neon comment write route composition', () => {
         topics: [],
         mentions: [{ mentioned_user_id: 'mentioned-user', handle: 'alice' }],
       })),
-    }
+    } as unknown as SocialClosureReadStore
     const commentNotificationContextStore = {
       getPublishedContext: vi.fn(async () => ({
         comment_id: 'parent-1',
@@ -117,7 +117,7 @@ describe('W05 Neon comment write route composition', () => {
       commentCreateStore,
       commentMutationStore,
       socialTokenSyncStore,
-      socialTargetsReadStore,
+      socialClosureReadStore: socialTargetsReadStore,
       commentNotificationContextStore,
       notificationEnqueueStore,
     })
