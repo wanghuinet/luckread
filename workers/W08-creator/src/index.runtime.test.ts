@@ -242,7 +242,7 @@ function harness(current: TestPrincipal | null, allowRoleGrant = false, sharedDb
     },
   }
   const env = {
-    D1_01: db as unknown as D1Database,
+    D1_01: db as unknown as W08D1Database,
     W02_AUTH: auth as unknown as Fetcher,
   } as Parameters<typeof worker.fetch>[1]
   return { db, env, roleGrants, principalAuthorizations, roleGrantAuthorizations }
