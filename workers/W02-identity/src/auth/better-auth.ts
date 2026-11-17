@@ -456,7 +456,7 @@ export const buildLuckReadAuth = (
         if (failed &&
             (ctx.path === '/two-factor/verify-totp' || ctx.path === '/two-factor/verify-backup-code')) {
           try {
-            const factor = await mfaFactorStateStore.readVerificationMaterial(state.userId)
+            const factor = await effectiveMfaFactorStateStore.readVerificationMaterial(state.userId)
             const lockUntilValue = factor?.lockedUntil
             const lockUntil = lockUntilValue instanceof Date
               ? lockUntilValue.getTime()
