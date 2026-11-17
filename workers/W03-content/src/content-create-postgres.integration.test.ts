@@ -48,17 +48,7 @@ postgresSuite('W03 PostgreSQL 18 content-create runtime integration', () => {
     const idempotencyKey = 'create_pg18_' + crypto.randomUUID()
     const bodyRef = 'body:pg18:' + crypto.randomUUID()
     const now = new Date()
-    const d1MustNotBeUsed = {
-      prepare() {
-        throw new Error('W03 PostgreSQL runtime must not access D1')
-      },
-      batch() {
-        throw new Error('W03 PostgreSQL runtime must not write D1')
-      },
-    }
-
     const created = await createContent(
-      d1MustNotBeUsed as never,
       ownerUserId,
       {
         contentType: 'post',
@@ -74,7 +64,7 @@ postgresSuite('W03 PostgreSQL 18 content-create runtime integration', () => {
       store,
     )
 
-    return { ownerUserId, idempotencyKey, bodyRef, now, created, d1MustNotBeUsed }
+    return { ownerUserId, idempotencyKey, bodyRef, now, created }
   }
 
   it('allocates a bigint Snowflake ID and commits content, revision, idempotency and trigger outbox on PostgreSQL', async () => {
@@ -168,7 +158,6 @@ postgresSuite('W03 PostgreSQL 18 content-create runtime integration', () => {
     }])
 
     const replay = await createContent(
-      fixture.d1MustNotBeUsed as never,
       ownerUserId,
       {
         contentType: 'post',
