@@ -103,6 +103,8 @@ function setup(options: {
   const d1_04 = new MemoryD1(baseCycle(options.cycle), null, options.activeMandate);
   const d1_01 = new MemoryD1(null, baseSubscription(options.subscription));
   const env: RenewalRuntimeEnv = {
+    W07_DATABASE_DRIVER: 'd1',
+    W07_MEMBERSHIP_DATABASE_DRIVER: 'd1',
     D1_01: d1_01 as unknown as D1Database,
     D1_04: d1_04 as unknown as D1Database,
   };
