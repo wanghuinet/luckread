@@ -44,7 +44,7 @@ const makeContentMutationStore = (
     }
   },
   update,
-}) as never
+})
 
 describe('W03 content contract core', () => {
 
