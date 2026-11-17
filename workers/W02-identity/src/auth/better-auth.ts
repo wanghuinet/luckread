@@ -81,6 +81,13 @@ async function sendPasswordResetEmail(
   })
 }
 
+/**
+ * @deprecated-next-version
+ * Reason: Explicit D1 database accessor exists only for the legacy Better Auth schema/test profile.
+ * Replacement: createLuckReadAuth uses the W02 Neon Hyperdrive runtime exclusively.
+ * Removal: Next release.
+ * Condition: Better Auth schema generation and all D1-profile unit tests move to PostgreSQL or isolated in-memory fixtures.
+ */
 function requireLegacyW02D1Database(env: BetterAuthEnv): D1Database {
   if (!env.D1_01) throw new Error('W02_D1_TEST_BINDING_REQUIRED')
   return env.D1_01
@@ -175,8 +182,8 @@ export const buildLuckReadAuth = (
   const postgresPersistence = persistenceProfile !== 'production'
   const legacyD1 = postgresPersistence ? undefined : requireLegacyW02D1Database(env)
   const postgresEmailVerifiedCallback = postgresLifecycleAdapters?.afterEmailVerified
-  // PostgreSQL runtime profiles require a provider-matched receipt store;
-  // D1 production continues to construct its native store by default.
+  // The Neon production factory injects a provider-matched receipt store;
+  // only the deprecated explicit D1 test/schema profile constructs a D1 store.
   const effectiveMfaAuditReceiptStore = mfaAuditOperationReceiptStore ??
     (postgresPersistence ? undefined : createD1MfaAuditOperationReceiptStore(legacyD1!))
   // Keep local origins available only to the local evidence/runtime profile.
