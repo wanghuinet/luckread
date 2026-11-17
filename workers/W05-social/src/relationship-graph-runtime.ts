@@ -70,6 +70,8 @@ export async function getRelationshipGraph(
     }
   }
 
+  const store = requireRelationshipGraphReadStore(source)
+
   const cacheKey = relationshipGraphKey(viewer, target)
   const cached = relationshipGraphCache.get(cacheKey)
   if (cached) {
@@ -79,7 +81,7 @@ export async function getRelationshipGraph(
 
   let row: RelationshipGraphReadRow | null
   try {
-    row = await requireRelationshipGraphReadStore(source).read(viewer, target)
+    row = await store.read(viewer, target)
   } catch (error) {
     if (error instanceof RelationshipGraphStoreError) {
       throw new RelationshipGraphRuntimeError(error.code, error.status)
