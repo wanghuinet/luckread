@@ -1632,17 +1632,16 @@ export async function createContent(
 }
 
 export async function updateContent(
-  db: ContentD1,
   principalUserId: string,
   contentId: string,
   input: unknown,
   ifMatch: string,
   idempotencyKey: string,
-  now = new Date(),
+  mutationStore: ContentMutationStore,
+  now: Date = new Date(),
   correlationId = 'runtime',
   principalLayer?: string,
   verifiedCreatorId?: string,
-  mutationStore?: ContentMutationStore,
 ): Promise<ContentRecord> {
   assertResourceId(principalUserId)
   assertResourceId(contentId)
@@ -1651,10 +1650,12 @@ export async function updateContent(
   const normalized = validateInput(input)
   const operationId = 'updateContent'
   const hash = await requestHash(operationId, { contentId, input: normalized, ifMatch: normalizeEtag(ifMatch) })
-  const snapshot = mutationStore
-    ? await mutationStore.loadMutation(principalUserId, contentId, operationId, idempotencyKey)
-    : await loadMutationRow(db, contentId, operationId, idempotencyKey, principalUserId)
-  const { content, idempotency } = snapshot
+  const { content, idempotency } = await mutationStore.loadMutation(
+    principalUserId,
+    contentId,
+    operationId,
+    idempotencyKey,
+  )
   const replay = inspectIdempotency(idempotency, principalUserId, hash, now)
   if (replay.replayed) {
     if (!replay.body) throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
@@ -1741,33 +1742,19 @@ export async function updateContent(
     createdAt: updatedAt,
   }
 
-  if (mutationStore) {
-    await mutationStore.update({
-      ownerUserId: principalUserId,
-      operationId,
-      idempotencyKey,
-      requestHash: hash,
-      responseJson: idempotencyResponseBody,
-      updatedAt,
-      expiresAt,
-      expectedVersion: content.version,
-      expectedEtag: content.etag,
-      content: updated,
-      revision,
-    })
-  } else {
-    await batchMutation(db, [
-      expireMutationRow(db, principalUserId, operationId, idempotencyKey, updatedAt),
-      insertCompletedIdempotency(db, principalUserId, operationId, idempotencyKey, hash, 200, idempotencyResponseBody, updatedAt, expiresAt),
-      db.prepare(
-        `UPDATE contents
-            SET creator_id = ?, title = ?, body_ref = ?, media_refs_json = ?, cover_ref = ?, media_warning = ?, access_mode = ?, version = ?, revision = ?, etag = ?, updated_at = ?
-          WHERE id = ? AND owner_user_id = ? AND version = ? AND etag = ?`,
-      ).bind(nextCreatorId, updated.title, updated.bodyRef, JSON.stringify(updated.mediaRefs), updated.coverRef, updated.mediaWarning ?? null, nextAccessMode, nextVersion, nextRevision, updated.etag, updatedAt, content.id, principalUserId, content.version, content.etag),
-      atomicGuard(db),
-      insertRevision(db, revision),
-    ])
-  }
+  await mutationStore.update({
+    ownerUserId: principalUserId,
+    operationId,
+    idempotencyKey,
+    requestHash: hash,
+    responseJson: idempotencyResponseBody,
+    updatedAt,
+    expiresAt,
+    expectedVersion: content.version,
+    expectedEtag: content.etag,
+    content: updated,
+    revision,
+  })
 
   return updated
 }
