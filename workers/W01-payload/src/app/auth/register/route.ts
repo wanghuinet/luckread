@@ -259,7 +259,17 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
     return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Registration service unavailable')
   }
 
-  const existing = await persistence.getExistingEnvelope(idempotencyKey)
+  let existing: Awaited<ReturnType<typeof persistence.getExistingEnvelope>>
+  try {
+    existing = await persistence.getExistingEnvelope(idempotencyKey)
+  } catch (error) {
+    console.error(JSON.stringify({
+      event: 'auth.register.envelope_read_failure',
+      diagnosticCode: 'AUTH001_ENVELOPE_READ_FAILURE',
+      errorName: error instanceof Error ? error.name : typeof error,
+    }))
+    return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Registration service unavailable')
+  }
   if (existing && !isExpired(existing.expiresAt, now)) {
     if (existing.payloadHash !== payloadHash) return errorResponse(422, 'IDEMPOTENCY_KEY_REUSE_CONFLICT', 'Idempotency key cannot be reused with different input')
     if (existing.state === 'IN_PROGRESS') return errorResponse(409, 'IDEMPOTENCY_IN_PROGRESS', 'A registration with this Idempotency-Key is already in progress', { 'retry-after': '1' })
@@ -289,7 +299,17 @@ const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     if (isUniqueConstraintError(error) && /auth_registration_envelopes|active_key/i.test(message)) {
-      const current = await persistence.getExistingEnvelope(idempotencyKey)
+      let current: Awaited<ReturnType<typeof persistence.getExistingEnvelope>>
+      try {
+        current = await persistence.getExistingEnvelope(idempotencyKey)
+      } catch (readError) {
+        console.error(JSON.stringify({
+          event: 'auth.register.envelope_conflict_reread_failure',
+          diagnosticCode: 'AUTH001_ENVELOPE_REREAD_FAILURE',
+          errorName: readError instanceof Error ? readError.name : typeof readError,
+        }))
+        return errorResponse(503, 'SERVICE_UNAVAILABLE', 'Registration service unavailable')
+      }
       if (current && current.payloadHash !== payloadHash) {
         return errorResponse(422, 'IDEMPOTENCY_KEY_REUSE_CONFLICT', 'Idempotency key cannot be reused with different input')
       }
