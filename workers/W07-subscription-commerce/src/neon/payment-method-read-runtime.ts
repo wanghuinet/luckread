@@ -146,8 +146,6 @@ export function getW07SelectedD104Database(
   return env.D1_04
 }
 
-/** Reuse the existing atomic order-create adapter over the shared bounded Hyperdrive pool. */
-
 /**
  * Close the Neon pool cached by the real W07 Worker entrypoint in a disposable
  * PostgreSQL integration test. Production isolates keep this pool for their
@@ -168,7 +166,7 @@ export async function closeW07PostgresRuntimeForTest(
   await pool.end()
 }
 
-
+/** Reuse the existing atomic order-create adapter over the shared bounded Hyperdrive pool. */
 export function getW07OrderCreatePersistenceStore(
   env: W07PaymentMethodReadRuntimeEnv,
   poolFactory: W07PoolFactory = (config) => new Pool(config),
