@@ -74,6 +74,15 @@ describe('W05 notification enqueue runtime', () => {
     }
   })
 
+  it('does not fall back to D1 when the notification Store composition is missing', async () => {
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    try {
+      await expect(enqueueNotification(undefined, request)).resolves.toBeUndefined()
+      expect(warning).toHaveBeenCalledWith('W05_SOCIAL_NOTIFICATION_WRITE_FAILED', { type: 'COMMENT', targetType: 'content', errorName: 'NotificationEnqueueStoreError' })
+      expect(JSON.stringify(warning.mock.calls)).not.toContain('recipient-1')
+    } finally { warning.mockRestore() }
+  })
+
   it('does not attempt a store write for self-notifications', async () => {
     const enqueue = vi.fn(async () => undefined)
     await expect(enqueueNotification({ enqueue }, {

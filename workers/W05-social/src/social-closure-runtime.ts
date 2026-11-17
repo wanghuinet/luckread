@@ -16,7 +16,6 @@ import {
   type SocialClosureReadStore,
 } from './social-closure-read-store.js'
 import {
-  createD1NotificationEnqueueStore,
   NotificationEnqueueStoreError,
   type NotificationEnqueueStore,
 } from './notification-enqueue-store.js'
@@ -57,13 +56,9 @@ async function withSocialClosureRead<T>(operation: () => Promise<T>): Promise<T>
 const isSqlTrue = (value: number | boolean | null | undefined): boolean =>
   value === true || Number(value ?? 0) === 1
 
-type NotificationEnqueueDataSource = D1Database | NotificationEnqueueStore
-
-function resolveNotificationEnqueueStore(source: NotificationEnqueueDataSource): NotificationEnqueueStore {
-  if (typeof (source as NotificationEnqueueStore).enqueue === 'function') {
-    return source as NotificationEnqueueStore
-  }
-  return createD1NotificationEnqueueStore(source as D1Database)
+function requireNotificationEnqueueStore(source: NotificationEnqueueStore | undefined): NotificationEnqueueStore {
+  if (!source) throw new NotificationEnqueueStoreError(false)
+  return source
 }
 
 export type SocialTargetType = 'content' | 'comment'
@@ -252,7 +247,7 @@ export async function syncSocialTokens(
   textValue: string,
   mentions: MentionTarget[] = [],
   contentContext?: PublishedContentSocialContext,
-  notificationSource?: D1Database | NotificationEnqueueStore,
+  notificationSource?: NotificationEnqueueStore,
 ): Promise<{ topics: number; mentions: number }> {
   const actorUserId = id(actorUserIdValue, 'UNAUTHENTICATED')
   const targetValue = target(targetTypeValue, targetIdValue)
@@ -260,7 +255,6 @@ export async function syncSocialTokens(
   if (text.length > MAX_TEXT) throw new SocialClosureRuntimeError('VALIDATION_FAILED', 400)
 
   const store = resolveSocialTokenSyncStore(source)
-  const isInjectedStore = typeof (source as SocialTokenSyncStore).getCommentContext === 'function'
   let relatedContentId: string | null = null
   if (targetValue.targetType === 'content') {
     if (!contentContext) throw new SocialClosureRuntimeError('SERVICE_UNAVAILABLE', 503)
@@ -363,7 +357,7 @@ export async function syncSocialTokens(
     resolved.set(normalizedHandle, { userId: id(entry.userId), handle })
   }
 
-  const notificationDataSource = notificationSource ?? (isInjectedStore ? undefined : source as D1Database)
+  const notificationDataSource = notificationSource
   let mentionCount = 0
   for (const token of tokens.filter((item) => item.kind === 'mention')) {
     // An edit must not rebind an unchanged historical @handle to a new account
@@ -793,7 +787,7 @@ const withNotificationDbRetry = async <T>(operation: () => Promise<T>): Promise<
 }
 
 export async function enqueueNotification(
-  source: NotificationEnqueueDataSource,
+  source: NotificationEnqueueStore | undefined,
   input: {
     recipientUserId: string
     actorUserId: string
@@ -822,7 +816,7 @@ export async function enqueueNotification(
       payloadJson: JSON.stringify(input.payload ?? {}),
       createdAt: new Date().toISOString(),
     }
-    const store = resolveNotificationEnqueueStore(source)
+    const store = requireNotificationEnqueueStore(source)
     await withNotificationDbRetry(() => store.enqueue(enqueueInput))
   } catch (error) {
     // Notifications are a non-authoritative social side effect. A bounded
