@@ -125,7 +125,7 @@ describe('creator qualification application page', () => {
     expect(workflow).toContain("production Neon config must not bind Cloudflare D1")
     expect(workflow).toContain("readFileSync('wrangler.neon.jsonc','utf8')")
     expect(workflow).not.toContain('pnpm exec opennextjs-cloudflare build\\n')
-    expect(workflow).not.toContain('wrangler@4.156.0 deploy --config wrangler.jsonc')
+    expect(workflow).not.toContain('deploy --config wrangler.jsonc 2>&1 | tee ../../artifacts/mapping-0/w01-w02-binding-deploy.log')
   })
 
   it('routes creator review identity through the W01 public API and restricts review to L7/L8', () => {
