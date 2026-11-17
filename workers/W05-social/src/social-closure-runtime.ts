@@ -621,7 +621,7 @@ export async function listDiscoveryTopics(
     return updatedAt
   }
   const stats = new Map<string, RankedDiscoveryTopic>()
-  const store = resolveSocialClosureReadStore(source)
+  const store = source
   type DiscoveryTopicRelation = { topic_id: string; normalized_name: string; display_name: string; target_id: string }
   let relationCursor: { topicId: string; targetId: string } | null = null
 
@@ -824,7 +824,7 @@ export async function listNotifications(
   }
   const notificationIdText = notificationIdValue?.trim() ?? ''
   const notificationId = notificationIdText ? id(notificationIdText) : null
-  const store = resolveSocialClosureReadStore(source)
+  const store = source
   const rows = await withSocialClosureRead(() => store.listNotificationRows({
     recipientUserId,
     notificationType: notificationType as SocialNotificationType | null,
@@ -861,13 +861,13 @@ export async function markNotificationRead(
 ): Promise<void> {
   const recipientUserId = id(recipientUserIdValue, 'UNAUTHENTICATED')
   const notificationId = id(notificationIdValue)
-  await withSocialClosureRead(() => resolveSocialClosureReadStore(source)
+  await withSocialClosureRead(() => source
     .markNotificationRead(recipientUserId, notificationId))
 }
 
 export async function markAllNotificationsRead(source: SocialClosureDataSource, recipientUserIdValue: string): Promise<void> {
   const recipientUserId = id(recipientUserIdValue, 'UNAUTHENTICATED')
-  await withSocialClosureRead(() => resolveSocialClosureReadStore(source)
+  await withSocialClosureRead(() => source
     .markAllNotificationsRead(recipientUserId))
 }
 
@@ -929,7 +929,7 @@ export async function getContentSocialSummary(
   const pinnedOwnerUserId = contentContext.contentType === 'post'
     ? contentContext.ownerUserId
     : null
-  const store = resolveSocialClosureReadStore(source)
+  const store = source
   const counts = await withSocialClosureRead(() =>
     store.getContentSocialCounts(contentId, pinnedOwnerUserId)
   )
