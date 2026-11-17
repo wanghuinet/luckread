@@ -218,6 +218,7 @@ export const buildLuckReadAuth = (
     ...(effectiveMfaAuditReceiptStore ? {
     hooks: {
       before: createAuthMiddleware(async (ctx) => {
+        if (ctx.path === '/sign-up/email') console.info(JSON.stringify({ event: 'w02.better_auth.signup_before_hook' }))
         const isTotpVerification = ctx.path === '/two-factor/verify-totp'
         const isBackupCodeVerification = ctx.path === '/two-factor/verify-backup-code'
         const isDisable = ctx.path === '/two-factor/disable'
@@ -433,6 +434,7 @@ export const buildLuckReadAuth = (
         }
       }),
       after: createAuthMiddleware(async (ctx) => {
+        if (ctx.path === '/sign-up/email') console.info(JSON.stringify({ event: 'w02.better_auth.signup_after_hook' }))
         if (!MFA_AUDIT_OBSERVED_PATHS.has(ctx.path)) return
         const state = getMfaAuditHookState(ctx.context)
         if (!state?.receiptId) return
@@ -533,7 +535,13 @@ export const buildLuckReadAuth = (
       autoSignInAfterVerification: false,
       expiresIn: 60 * 60,
       sendVerificationEmail: async ({ user, url }) => {
+        if (env.CLOUDFLARE_ENV?.trim().toLowerCase() === 'development') {
+          console.info(JSON.stringify({ event: 'w02.better_auth.verification_email_started' }))
+        }
         await sendVerificationEmail(env, { user, url })
+        if (env.CLOUDFLARE_ENV?.trim().toLowerCase() === 'development') {
+          console.info(JSON.stringify({ event: 'w02.better_auth.verification_email_completed' }))
+        }
       },
       ...(postgresPersistence
         ? (postgresEmailVerifiedCallback ? {
@@ -553,6 +561,11 @@ export const buildLuckReadAuth = (
           databaseHooks: {
             user: {
               create: {
+                before: async () => {
+                  if (env.CLOUDFLARE_ENV?.trim().toLowerCase() === 'development') {
+                    console.info(JSON.stringify({ event: 'w02.better_auth.user_create_before' }))
+                  }
+                },
                 after: async (user) => {
                   const developmentDiagnostics = env.CLOUDFLARE_ENV?.trim().toLowerCase() === 'development'
                   if (developmentDiagnostics) console.info(JSON.stringify({ event: 'w02.better_auth.role_materialization_started' }))
