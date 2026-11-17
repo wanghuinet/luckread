@@ -166,6 +166,14 @@ jobs:
               !contentRuntime.includes('const revision = await readStore.get(principalUserId, contentId, revisionId)')) {
             throw new Error('W03 Neon content revision history read wiring is incomplete')
           }
+          if (!entry.includes('contentDetailReadStoreProvider') ||
+              !runtime.includes('getW03ContentDetailReadStore') ||
+              !router.includes('const contentDetailReadStore = dependencies.contentDetailReadStoreProvider?.(env)') ||
+              !router.includes("if (!contentDetailReadStore) throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)") ||
+              !router.includes('          contentDetailReadStore,') ||
+              !contentRuntime.includes('await readStore.getContent(contentId, principalUserId)')) {
+            throw new Error('W03 Neon canonical content detail read wiring is incomplete')
+          }
           if (!router.includes('const mutationStore = dependencies.contentMutationStoreProvider?.(env)') ||
               !router.includes("if (!mutationStore) throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)") ||
               !contentRuntime.includes('await mutationStore.loadRevision(contentId, revisionId)') ||
