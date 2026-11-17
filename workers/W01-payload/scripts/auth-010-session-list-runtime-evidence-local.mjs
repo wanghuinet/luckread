@@ -24,6 +24,7 @@ const registerKeyB = 'AUTH010-LOCAL-' + suffix + '-REGISTER-B'
 const emails = [emailA, emailB]
 const registerKeys = [registerKeyA, registerKeyB]
 const userIds = []
+const sessionIds = []
 const w02DatabaseUrl = process.env.AUTH001_W02_DATABASE_URL
 if (!w02DatabaseUrl) throw new Error('AUTH001_W02_DATABASE_URL is required for the Neon-backed W02 session evidence')
 const w02DatabaseTarget = new URL(w02DatabaseUrl)
@@ -255,14 +256,8 @@ const cleanup = async () => {
   try { if (ids.length) await w02Database.query('DELETE FROM role_authorization_versions WHERE subject_id = ANY($1::text[])', [ids]) } catch {}
   try { if (ids.length) await w02Database.query('DELETE FROM auth_session_state WHERE user_id = ANY($1::text[])', [ids]) } catch {}
   try { if (ids.length) await w02Database.query('DELETE FROM auth_013_publication_journal WHERE resource_id = ANY($1::text[])', [ids]) } catch {}
-  try {
-    if (ids.length) {
-      const sessions = await w02Database.query('SELECT id FROM "session" WHERE user_id = ANY($1::text[])', [ids])
-      const sessionIds = sessions.rows.map((row) => String(row.id))
-      if (sessionIds.length) await w02Database.query('DELETE FROM auth_010_session_revocation_journal WHERE resource_id = ANY($1::text[])', [sessionIds])
-      await w02Database.query('DELETE FROM "session" WHERE user_id = ANY($1::text[])', [ids])
-    }
-  } catch {}
+  try { if (sessionIds.length) await w02Database.query('DELETE FROM auth_010_session_revocation_journal WHERE resource_id = ANY($1::text[])', [[...new Set(sessionIds)]]) } catch {}
+  try { if (ids.length) await w02Database.query('DELETE FROM "session" WHERE user_id = ANY($1::text[])', [ids]) } catch {}
   try { if (ids.length) await w02Database.query('DELETE FROM "account" WHERE user_id = ANY($1::text[])', [ids]) } catch {}
   try { if (emails.length) await w02Database.query('DELETE FROM "verification" WHERE identifier = ANY($1::text[])', [emails]) } catch {}
   try {
@@ -305,6 +300,7 @@ try {
   if (!currentRow?.id || String(currentRow.userId) !== userAId) {
     throw new Error('AUTH010_NATIVE_LOGIN_SESSION_NOT_FOUND')
   }
+  sessionIds.push(String(currentRow.id))
 
   currentStage = 'seed-session-fixtures'
   const seedNow = Date.now()
@@ -313,6 +309,7 @@ try {
     const token = 'auth010-token-' + suffix + '-' + String(index).padStart(2, '0')
     const createdAt = new Date(seedNow - (60 + index) * 1000).toISOString()
     const expiresAt = new Date(seedNow + 24 * 60 * 60 * 1000).toISOString()
+    sessionIds.push(sessionId)
     await w02Database.query(
       'INSERT INTO "session" (id, expires_at, token, created_at, updated_at, ip_address, user_agent, user_id) VALUES ($1, $2, $3, $4, $4, NULL, NULL, $5)',
       [sessionId, expiresAt, token, createdAt, userAId],
