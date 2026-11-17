@@ -761,6 +761,30 @@ describe('W03 content contract core', () => {
       },
       batch: async () => { throw new Error('a denied mutation must not write') },
     } as never
+    const mutationStore = {
+      async loadMutation() {
+        return {
+          content: {
+            id: row.id,
+            contentType: row.content_type,
+            ownerUserId: row.owner_user_id,
+            state: row.state,
+            version: row.version,
+            etag: row.etag,
+          } as ContentRecord,
+          idempotency: {
+            idem_id: null,
+            idem_owner_user_id: null,
+            idem_request_hash: null,
+            idem_status: null,
+            idem_response_status: null,
+            idem_response_json: null,
+            idem_expires_at: null,
+          },
+        }
+      },
+      async delete() { throw new Error('a denied mutation must not write') },
+    } as never
 
     for (const layer of ['L2', 'L5', 'L6', 'L7', 'L8']) {
       await expect(
@@ -779,13 +803,13 @@ describe('W03 content contract core', () => {
 
       await expect(
         deleteContent(
-          db,
           'user_article_guard_1',
           'content_article_guard_1',
           'W/"1"',
           'delete-article-key-' + layer,
           new Date('2026-10-16T00:01:00.000Z'),
           layer,
+          mutationStore,
         ),
       ).rejects.toMatchObject({ code: 'PERMISSION_DENIED', status: 403 })
     }
@@ -1861,7 +1885,6 @@ describe('W03 content contract core', () => {
 
     for (const functionName of [
       'updateContent',
-      'deleteContent',
       'transitionContentState',
       'applyModerationContentTransition',
     ]) {
@@ -1872,6 +1895,15 @@ describe('W03 content contract core', () => {
       expect(section).toContain('await batchMutation(db, [')
       expect(section).toContain('atomicGuard(db)')
     }
+
+    const deleteStart = runtime.indexOf('export async function deleteContent')
+    expect(deleteStart).toBeGreaterThanOrEqual(0)
+    const deleteEnd = runtime.indexOf('\nconst isSocialOnlyLayer', deleteStart)
+    const deleteSection = runtime.slice(deleteStart, deleteEnd)
+    expect(deleteSection).toContain('await mutationStore.delete({')
+    expect(deleteSection).not.toContain('db.prepare')
+    expect(deleteSection).not.toContain('batchMutation')
+    expect(deleteSection).not.toContain('ContentD1')
 
     expect(runtime).toContain('INSERT OR REPLACE INTO content_txn_guard')
     expect(runtime).toContain('VALUES (1, changes())')
