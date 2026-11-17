@@ -9,8 +9,6 @@ import { getW01RegistrationPersistenceStore } from '../../../auth/registration-p
 import { proxyBetterAuth, rollbackRegistrationUser } from '../../../auth/w02-session-client.js'
 import type { User as PayloadUser } from '../../../payload-types'
 
-const SCOPE = 'ACCOUNT_REGISTRATION'
-const ENDPOINT = 'authRegister'
 const ACCOUNT_STATE = 'PENDING_VERIFICATION'
 const IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000
 
@@ -27,13 +25,6 @@ type RegistrationResponse = {
   accountState: typeof ACCOUNT_STATE
 }
 
-type ExistingEnvelope = {
-  id: string
-  payloadHash: string
-  state: 'IN_PROGRESS' | 'COMPLETED' | 'FAILED'
-  committedResponse?: { userId?: unknown; accountState?: unknown } | null
-  expiresAt: string
-}
 
 const json = (body: unknown, status = 200, headers: Record<string, string> = {}) =>
   new Response(JSON.stringify(body), {
