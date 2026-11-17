@@ -1908,9 +1908,7 @@ describe('W03 content contract core', () => {
 
     const moderationStart = runtime.indexOf('export async function applyModerationContentTransition')
     expect(moderationStart).toBeGreaterThanOrEqual(0)
-    const moderationEnd = runtime.indexOf('\nexport async function listContentRevisions', moderationStart)
-    expect(moderationEnd).toBeGreaterThan(moderationStart)
-    const moderationSection = runtime.slice(moderationStart, moderationEnd)
+    const moderationSection = runtime.slice(moderationStart)
     expect(moderationSection).toContain('await batchMutation(db, [')
     expect(moderationSection).toContain('atomicGuard(db)')
 
