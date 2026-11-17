@@ -56,18 +56,39 @@ function instrumentDevelopmentPgClient(client: object): void {
   const instrumentable = client as InstrumentablePgClient
   const originalQuery = instrumentable.query.bind(client)
   instrumentable.query = (...args: unknown[]) => {
-    // Callback-style queries are uncommon in Better Auth; preserve their exact
-    // callback/return contract and do not wrap the callback result.
-    if (args.some((value) => typeof value === 'function')) {
-      return originalQuery(...args)
-    }
-
     const operation = pgOperationLabel(args[0])
     const startedAt = Date.now()
+    const logCompleted = () => console.info(JSON.stringify({
+      event: 'w02.postgres.query_completed',
+      operation,
+      durationMs: Math.max(0, Date.now() - startedAt),
+    }))
+    const logFailed = (error: unknown) => console.error(JSON.stringify({
+      event: 'w02.postgres.query_failed',
+      operation,
+      durationMs: Math.max(0, Date.now() - startedAt),
+      errorType: error instanceof Error ? error.name : 'UNKNOWN',
+    }))
     console.info(JSON.stringify({
       event: 'w02.postgres.query_started',
       operation,
     }))
+
+    const callbackIndex = args.findIndex((value) => typeof value === 'function')
+    if (callbackIndex >= 0) {
+      const callback = args[callbackIndex] as (...callbackArgs: unknown[]) => unknown
+      args[callbackIndex] = (...callbackArgs: unknown[]) => {
+        if (callbackArgs[0]) logFailed(callbackArgs[0])
+        else logCompleted()
+        return callback(...callbackArgs)
+      }
+      try {
+        return originalQuery(...args)
+      } catch (error) {
+        logFailed(error)
+        throw error
+      }
+    }
 
     let result: unknown
     try {
@@ -85,30 +106,17 @@ function instrumentDevelopmentPgClient(client: object): void {
         typeof (result as { then?: unknown }).then === 'function') {
       return Promise.resolve(result).then(
         (value) => {
-          console.info(JSON.stringify({
-            event: 'w02.postgres.query_completed',
-            operation,
-            durationMs: Math.max(0, Date.now() - startedAt),
-          }))
+          logCompleted()
           return value
         },
         (error: unknown) => {
-          console.error(JSON.stringify({
-            event: 'w02.postgres.query_failed',
-            operation,
-            durationMs: Math.max(0, Date.now() - startedAt),
-            errorType: error instanceof Error ? error.name : 'UNKNOWN',
-          }))
+          logFailed(error)
           throw error
         },
       )
     }
 
-    console.info(JSON.stringify({
-      event: 'w02.postgres.query_completed',
-      operation,
-      durationMs: Math.max(0, Date.now() - startedAt),
-    }))
+    logCompleted()
     return result
   }
 }
