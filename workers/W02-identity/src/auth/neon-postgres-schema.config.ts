@@ -13,7 +13,6 @@ import { Pool } from 'pg'
 import { buildLuckReadAuth, type BetterAuthEnv } from './better-auth.js'
 
 const schemaEnvironment = {
-  D1_01: undefined as unknown as BetterAuthEnv['D1_01'],
   CLOUDFLARE_ENV: 'production',
 } satisfies BetterAuthEnv
 
@@ -27,4 +26,4 @@ const postgresPool = new Pool({
   connectionTimeoutMillis: 5_000,
 })
 
-export const auth = buildLuckReadAuth(schemaEnvironment, postgresPool)
+export const auth = buildLuckReadAuth(schemaEnvironment, postgresPool, 'postgres')
