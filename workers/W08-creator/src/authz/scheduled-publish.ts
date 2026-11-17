@@ -3,7 +3,7 @@ import {
   evaluateCaslPermission,
   type LayerId,
 } from './casl-policy.js'
-import { resolvePermissionContext, resolvePermissionContextPostgres, type RoleAssignmentRow } from './role-layer.js'
+import { resolvePermissionContextPostgres, type RoleAssignmentRow } from './role-layer.js'
 import { getW08PostgresPool, resolveW08DatabaseDriver, type W08RuntimeEnv } from '../neon/runtime.js'
 import type { Pool } from 'pg'
 
@@ -96,26 +96,17 @@ export async function handleScheduledPublishPermission(
   }
 
   try {
-    const useNeon = resolveW08DatabaseDriver(env) === 'neon'
-    const pool = useNeon
-      ? (dependencies.getPostgresPool ?? getW08PostgresPool)(env)
-      : undefined
-    const db = useNeon ? undefined : env.D1_01
-    if (!pool && !db) throw new Error('W08_AUTHORIZATION_DATABASE_UNAVAILABLE')
+    if (resolveW08DatabaseDriver(env) !== 'neon') {
+      throw new Error('W08_NEON_AUTHORIZATION_DATABASE_REQUIRED')
+    }
+    const pool = (dependencies.getPostgresPool ?? getW08PostgresPool)(env)
 
-    const creator = pool
-      ? (await pool.query<{ creatorId: string; userId: string }>(
-          'SELECT creator_id AS "creatorId", user_id AS "userId" FROM creators ' +
-          "WHERE status = 'ACTIVE' AND (creator_id = $1 OR user_id = $2) " +
-          'ORDER BY CASE WHEN creator_id = $3 THEN 0 ELSE 1 END LIMIT 1',
-          [body.creatorId, body.creatorId, body.creatorId],
-        )).rows[0] ?? null
-      : await db!.prepare(
-          "SELECT creator_id AS creatorId, user_id AS userId FROM creators " +
-          "WHERE status = 'ACTIVE' AND (creator_id = ? OR user_id = ?) " +
-          "ORDER BY CASE WHEN creator_id = ? THEN 0 ELSE 1 END LIMIT 1",
-        ).bind(body.creatorId, body.creatorId, body.creatorId)
-          .first<{ creatorId: string; userId: string }>()
+    const creator = (await pool.query<{ creatorId: string; userId: string }>(
+      'SELECT creator_id AS "creatorId", user_id AS "userId" FROM creators ' +
+      "WHERE status = 'ACTIVE' AND (creator_id = $1 OR user_id = $2) " +
+      'ORDER BY CASE WHEN creator_id = $3 THEN 0 ELSE 1 END LIMIT 1',
+      [body.creatorId, body.creatorId, body.creatorId],
+    )).rows[0] ?? null
 
     if (
       !creator ||
@@ -126,25 +117,19 @@ export async function handleScheduledPublishPermission(
       return deny('CREATOR_NOT_ACTIVE')
     }
 
-    const account = pool
-      ? (await pool.query<{ accountState: string }>(
-          'SELECT account_state AS "accountState" FROM "user" WHERE id = $1 LIMIT 1',
-          [creator.userId],
-        )).rows[0] ?? null
-      : await db!.prepare(
-          'SELECT account_state AS accountState FROM "user" WHERE id = ? LIMIT 1',
-        ).bind(creator.userId).first<{ accountState: string }>()
+    const account = (await pool.query<{ accountState: string }>(
+      'SELECT account_state AS "accountState" FROM "user" WHERE id = $1 LIMIT 1',
+      [creator.userId],
+    )).rows[0] ?? null
 
     if (!account || account.accountState !== 'ACTIVE') {
       return deny('ACCOUNT_NOT_ACTIVE')
     }
 
-    const context = pool
-      ? await resolvePermissionContextPostgres(
-          async (sql, values) => (await pool.query(sql, values as never)).rows as RoleAssignmentRow[],
-          creator.userId,
-        )
-      : await resolvePermissionContext(db!, creator.userId)
+    const context = await resolvePermissionContextPostgres(
+      async (sql, values) => (await pool.query(sql, values as never)).rows as RoleAssignmentRow[],
+      creator.userId,
+    )
     if (!context) return deny('LAYER_RESOLUTION_DENIED')
     if (context.layer !== 'L3' && context.layer !== 'L4') {
       return deny('CREATOR_LAYER_REQUIRED')
