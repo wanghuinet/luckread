@@ -81,6 +81,39 @@ const sameRegistrationResult = (left, right) => Boolean(
   left.accountState === 'PENDING_VERIFICATION' && right.accountState === left.accountState,
 )
 const request = (path, idempotencyKey, body, cookie) => fetch(baseUrl + path, { method: 'POST', headers: { 'content-type': 'application/json', origin: process.env.AUTH001_ORIGIN || 'https://luckread.com', ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}), ...(cookie ? { cookie } : {}) }, body: body === undefined ? undefined : JSON.stringify(body) })
+
+// Read only the PostgreSQL backend state after a failed local Worker request.
+// Query text and bound values are deliberately not emitted.
+const w02PostgresActivitySnapshot = async () => {
+  try {
+    const result = await w02Database.query(`
+      SELECT
+        state,
+        wait_event_type,
+        wait_event,
+        split_part(ltrim(query), ' ', 1) AS query_command,
+        CASE
+          WHEN xact_start IS NULL THEN NULL
+          ELSE GREATEST(0, floor(extract(epoch FROM (clock_timestamp() - xact_start)) * 1000))::bigint
+        END AS transaction_age_ms,
+        CASE
+          WHEN query_start IS NULL THEN NULL
+          ELSE GREATEST(0, floor(extract(epoch FROM (clock_timestamp() - query_start)) * 1000))::bigint
+        END AS query_age_ms
+      FROM pg_stat_activity
+      WHERE datname = current_database()
+        AND usename = current_user
+        AND pid <> pg_backend_pid()
+      ORDER BY query_start DESC NULLS LAST
+      LIMIT 10
+    `)
+    return result.rows
+  } catch (error) {
+    return [{
+      diagnosticErrorType: error instanceof Error ? error.name : 'UNKNOWN',
+    }]
+  }
+}
 const getSetCookie = (response) => typeof response.headers.getSetCookie === 'function' ? response.headers.getSetCookie() : [response.headers.get('set-cookie')].filter(Boolean)
 const firstCookieHeader = (response) => getSetCookie(response).map((value) => value.split(';', 1)[0]).join('; ')
 
@@ -122,9 +155,26 @@ try {
   const health = await fetch(baseUrl + '/')
   if (health.status >= 500) throw new Error('Local W01 did not start cleanly: HTTP ' + health.status)
 
-  const firstResponse = await request('/auth/register', keySuccess, body)
+  let firstResponse
+  try {
+    firstResponse = await request('/auth/register', keySuccess, body)
+  } catch (error) {
+    console.error(JSON.stringify({
+      event: 'auth001.w02_postgres_activity_after_registration_failure',
+      cause: error instanceof Error ? error.name : 'UNKNOWN',
+      activity: await w02PostgresActivitySnapshot(),
+    }))
+    throw error
+  }
   const first = await responseJson(firstResponse)
-  if (firstResponse.status !== 201) throw new Error('Registration failed: HTTP ' + firstResponse.status)
+  if (firstResponse.status !== 201) {
+    console.error(JSON.stringify({
+      event: 'auth001.w02_postgres_activity_after_registration_failure',
+      httpStatus: firstResponse.status,
+      activity: await w02PostgresActivitySnapshot(),
+    }))
+    throw new Error('Registration failed: HTTP ' + firstResponse.status)
+  }
   if (!first.userId || first.accountState !== 'PENDING_VERIFICATION') throw new Error('Registration response is not the canonical Better Auth registration response')
 
   const projection = await profileForEmail(email, username)
