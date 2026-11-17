@@ -159,10 +159,18 @@ jobs:
           }
           if (!entry.includes('contentRevisionReadStoreProvider') ||
               !runtime.includes('getW03ContentRevisionReadStore') ||
-              !router.includes('dependencies.contentRevisionReadStoreProvider?.(env),') ||
+              !router.includes('const revisionReadStore = dependencies.contentRevisionReadStoreProvider?.(env)') ||
+              !router.includes("if (!revisionReadStore) throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)") ||
+              !router.includes('          revisionReadStore,') ||
               !contentRuntime.includes('readStore.list(principalUserId, contentId, decoded, pageSize + 1)') ||
               !contentRuntime.includes('const revision = await readStore.get(principalUserId, contentId, revisionId)')) {
             throw new Error('W03 Neon content revision history read wiring is incomplete')
+          }
+          if (!router.includes('const mutationStore = dependencies.contentMutationStoreProvider?.(env)') ||
+              !router.includes("if (!mutationStore) throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)") ||
+              !contentRuntime.includes('await mutationStore.loadRevision(contentId, revisionId)') ||
+              !contentRuntime.includes('await mutationStore.rollback({')) {
+            throw new Error('W03 Neon revision restore wiring is incomplete')
           }
           if (!contentRuntime.includes('mutationStore.transition({') ||
               !router.includes('dependencies.contentMutationStoreProvider?.(env),')) {
