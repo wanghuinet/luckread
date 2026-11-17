@@ -21,6 +21,7 @@ export type W02DatabaseDriver = 'neon'
 
 export type W02RuntimeEnv = {
   W02_DATABASE_DRIVER?: string
+  CLOUDFLARE_ENV?: string
   HYPERDRIVE?: {
     connectionString?: string
   }
@@ -80,6 +81,13 @@ export function getW02PostgresPool(env: W02RuntimeEnv): Pool {
     idleTimeoutMillis: 30_000,
     keepAlive: true,
   })
+  const developmentDiagnostics = env.CLOUDFLARE_ENV?.trim().toLowerCase() === 'development'
+  if (developmentDiagnostics) {
+    console.info(JSON.stringify({ event: 'w02.postgres.pool_created' }))
+    pool.on('connect', () => console.info(JSON.stringify({ event: 'w02.postgres.connection_established' })))
+    pool.on('acquire', () => console.info(JSON.stringify({ event: 'w02.postgres.connection_acquired' })))
+    pool.on('remove', () => console.info(JSON.stringify({ event: 'w02.postgres.connection_removed' })))
+  }
   pool.on('error', (error) => {
     console.error(JSON.stringify({
       event: 'w02.postgres.pool_error',
