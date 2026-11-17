@@ -44,6 +44,7 @@ const w06MigrationReadmePath = resolve(root, 'workers/W06-governance/migrations/
 const w09NeonMigrationPath = resolve(root, 'workers/W09-platform/src/neon-postgres-migrations/0001_w09_d1_03_platform_schema.sql')
 const w09NeonSchemaContractPath = resolve(root, 'contracts/database/neon-d1-03-w09-platform-schema.v1.json')
 
+for (const path of [w05ConfigPath, w09MigrationConfigPath, w05SourcePath, pushRuntimePath, deliveryRuntimePath, fanoutRuntimePath, endpointAccessPortPath, endpointAccessPostgresPath, endpointAccessRuntimePath, deliveryContractPath, pushMigrationPath, auditSchemaPath, w06MigrationReadmePath, w09NeonMigrationPath, w09NeonSchemaContractPath]) {
   if (!existsSync(path)) throw new Error(`Missing scoped NotificationPushEndpoint owner artifact: ${path}`)
 }
 
