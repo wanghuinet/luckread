@@ -25,13 +25,13 @@ function fakeD1(options: FakeD1Options = {}) {
         },
         async first<T>() {
           if (sql.includes('FROM "user"') && sql.includes('WHERE id = ?')) {
-            return options.user?.id === call.values[0]
-              ? ({
-                  id: options.user.id,
-                  email: options.user.email,
-                  username: options.user.username,
-                } as unknown as T)
-              : null
+            if (options.user?.id !== call.values[0]) return null
+            if (sql.includes('account_state AS accountState')) return options.user as unknown as T
+            return ({
+              id: options.user.id,
+              email: options.user.email,
+              username: options.user.username,
+            } as unknown as T)
           }
           if (sql.includes('FROM "user"') && sql.includes('WHERE email = ?')) {
             return options.user?.email === call.values[0]
