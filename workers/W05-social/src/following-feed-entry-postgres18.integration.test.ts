@@ -323,4 +323,75 @@ integrationSuite('W05 Neon entrypoint following-feed PostgreSQL 18 integration',
 
     runtimePassed = true
   })
+
+  it('executes W01 Follow and Unfollow through the W05 Neon entrypoint and PostgreSQL 18', async () => {
+    if (!env || !socialPool) throw new Error('W05 PostgreSQL entrypoint fixture was not initialized')
+
+    const viewerId = marker + '-http-follow-viewer'
+    const targetId = marker + '-http-follow-target'
+    const correlationId = marker + '-http-follow-correlation'
+    const makeMutationRequest = (method: 'POST' | 'DELETE', idempotencyKey: string) =>
+      new Request('https://w05.internal/internal/social/follows/' + encodeURIComponent(targetId), {
+        method,
+        headers: {
+          'X-LuckRead-Caller': 'W01',
+          'X-LuckRead-Transport-Version': '1.0',
+          'X-LuckRead-Correlation-Id': correlationId,
+          'X-LuckRead-Principal-User-Id': viewerId,
+          'X-LuckRead-Principal-Layer': 'L2',
+          'Idempotency-Key': idempotencyKey,
+        },
+      })
+
+    const followed = await entry.fetch(
+      makeMutationRequest('POST', marker + '-follow-idempotency'),
+      env as never,
+      {} as never,
+    )
+    expect(followed.status).toBe(201)
+    const followBody = await followed.json() as {
+      data: { following: boolean; relationshipId: string; targetUserId: string }
+    }
+    expect(followBody.data.following).toBe(true)
+    expect(followBody.data.targetUserId).toBe(targetId)
+    expect(followBody.data.relationshipId).toEqual(expect.any(String))
+
+    const persistedRelationship = await socialPool.query<{
+      relationship_id: string
+      follower_user_id: string
+      target_user_id: string
+    }>(
+      'SELECT relationship_id, follower_user_id, target_user_id FROM social_follow_relationships WHERE follower_user_id = $1 AND target_user_id = $2',
+      [viewerId, targetId],
+    )
+    expect(persistedRelationship.rows).toEqual([{
+      relationship_id: followBody.data.relationshipId,
+      follower_user_id: viewerId,
+      target_user_id: targetId,
+    }])
+
+    const persistedNotification = await socialPool.query<{ count: number }>(
+      "SELECT count(*)::int AS count FROM social_notifications WHERE recipient_user_id = $1 AND actor_user_id = $2 AND notification_type = 'FOLLOW' AND target_id = $3",
+      [targetId, viewerId, targetId],
+    )
+    expect(persistedNotification.rows[0]?.count).toBe(1)
+
+    const unfollowed = await entry.fetch(
+      makeMutationRequest('DELETE', marker + '-unfollow-idempotency'),
+      env as never,
+      {} as never,
+    )
+    expect(unfollowed.status).toBe(204)
+
+    const removedRelationship = await socialPool.query<{ count: number }>(
+      'SELECT count(*)::int AS count FROM social_follow_relationships WHERE follower_user_id = $1 AND target_user_id = $2',
+      [viewerId, targetId],
+    )
+    expect(removedRelationship.rows[0]?.count).toBe(0)
+
+    expect((env.DB as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
+    expect((env.DB as { batch: ReturnType<typeof vi.fn> }).batch).not.toHaveBeenCalled()
+    expect((env.D1_03 as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
+    expect((env.D1_03 as { batch: ReturnType<typeof vi.fn> }).batch).not.toHaveBeenCalled()
+  })
 })
