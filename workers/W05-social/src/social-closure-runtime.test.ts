@@ -285,35 +285,35 @@ describe('W05 unified social closure', () => {
     expect(binding.fetch).toHaveBeenCalled()
     expect(store.listDiscoveryContentEdges).toHaveBeenCalledWith({ cursor: null, limit: 200 })
 
-    const secondPage = await listDiscoveryTopics(db, binding, 'discovery-test', '1', firstPage.nextCursor)
+    const secondPage = await listDiscoveryTopics(store, binding, 'discovery-test', '1', firstPage.nextCursor)
     expect(secondPage.items).toMatchObject([
       { topicId: 'topic-3', name: 'writing', displayName: 'Writing', contentCount: 1 },
     ])
     expect(secondPage.hasMore).toBe(true)
     expect(secondPage.nextCursor).toEqual(expect.any(String))
 
-    const thirdPage = await listDiscoveryTopics(db, binding, 'discovery-test', '1', secondPage.nextCursor)
+    const thirdPage = await listDiscoveryTopics(store, binding, 'discovery-test', '1', secondPage.nextCursor)
     expect(thirdPage.items).toMatchObject([
       { topicId: 'topic_日本', name: '日本', displayName: '日本', contentCount: 1 },
     ])
     expect(thirdPage.hasMore).toBe(true)
     expect(thirdPage.nextCursor).toEqual(expect.any(String))
 
-    const fourthPage = await listDiscoveryTopics(db, binding, 'discovery-test', '1', thirdPage.nextCursor)
+    const fourthPage = await listDiscoveryTopics(store, binding, 'discovery-test', '1', thirdPage.nextCursor)
     expect(fourthPage.items).toMatchObject([
       { topicId: 'topic_日本語', name: '日本語', displayName: '日本語', contentCount: 1 },
     ])
     expect(fourthPage.hasMore).toBe(true)
     expect(fourthPage.nextCursor).toEqual(expect.any(String))
 
-    const fifthPage = await listDiscoveryTopics(db, binding, 'discovery-test', '1', fourthPage.nextCursor)
+    const fifthPage = await listDiscoveryTopics(store, binding, 'discovery-test', '1', fourthPage.nextCursor)
     expect(fifthPage.items).toMatchObject([
       { topicId: 'topic_龥', name: '龥', displayName: '龥', contentCount: 1 },
     ])
     expect(fifthPage.hasMore).toBe(true)
     expect(fifthPage.nextCursor).toEqual(expect.any(String))
 
-    const sixthPage = await listDiscoveryTopics(db, binding, 'discovery-test', '1', fifthPage.nextCursor)
+    const sixthPage = await listDiscoveryTopics(store, binding, 'discovery-test', '1', fifthPage.nextCursor)
     expect(sixthPage.items).toMatchObject([
       { topicId: 'topic_𐐀', name: 'deseret', displayName: 'Deseret', contentCount: 1 },
     ])
@@ -452,7 +452,7 @@ describe('W05 unified social closure', () => {
       expect(firstPage.hasMore).toBe(true)
       expect(firstPage.nextCursor).toEqual(expect.any(String))
 
-      const secondPage = await listDiscoveryTopics(db, binding, 'discovery-cache-test', '1', firstPage.nextCursor)
+      const secondPage = await listDiscoveryTopics(store, binding, 'discovery-cache-test', '1', firstPage.nextCursor)
       expect(secondPage.items).toMatchObject([
         { topicId: 'topic-2', contentCount: 1 },
       ])
