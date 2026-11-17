@@ -1,8 +1,8 @@
 # Legacy D1 Cleanup Register
 
 基准分支：`main`
-基准提交：`b8ae6fa3d221649eda9ee02458a2a6902713c949`
-本清理批次：`chore/legacy-d1-cleanup-batch-2`
+基准提交：`74b30e495341c3c72f936ac694eab1c3864b96a2`
+本清理批次：`chore/legacy-d1-cleanup-batch-3`
 
 本登记表区分生产数据库运行时依赖、仍可被选择的旧适配器，以及仅作为迁移来源保留的历史材料。名称中出现 `D1-01` 至 `D1-05` 的 Neon 数据库域编号、Hyperdrive binding 名称，不等同于 Cloudflare D1 运行时连接，不得据此删除。
 
@@ -17,8 +17,20 @@
 
 | 文件路径 | Worker | 旧代码类型 | 当前状态 | 处理结果 / 保留原因 | Neon 替代实现 | 删除条件 | 目标版本 |
 |---|---|---|---|---|---|---|---|
-| `workers/W02-identity/src/index.ts` | W02 | D1 env 类型、多个 createD1* Store 入口及 Neon 缺省回退 | REPLACE_THEN_DELETE | 已有 Postgres runtime store composition，但路由仍在多个入口回退到 D1 store；不可只删类型而丢失账户状态、注册回滚、角色/MFA 等能力 | `workers/W02-identity/src/neon/runtime.ts` 中的 Postgres stores | 所有 D1 调用点改为必需 Postgres store；移除 D1 env、createD1* imports/calls；对应路由保留 fail-closed 行为 | 下一个版本 |
-| `workers/W02-identity/src/neon/runtime.ts` | W02 | `d1` driver 默认值及旧 provider 选择 | DELETE_NEXT_VERSION | 当前 driver 未配置时默认 `d1`；生产 Neon 配置显式设置 `W02_DATABASE_DRIVER=neon`。本轮尚未核对所有本地/测试构造器 | 同文件 Postgres runtime | W02 所有入口及测试改为显式 Neon；不存在依赖 D1 默认值的 fixture | 下一个版本 |
+| `workers/W02-identity/src/index.ts` | W02 | D1_01 Env binding、createD1* 路由 fallback、D1 scheduled publisher | REPLACE_THEN_DELETE | **本批已完成：** 生产 HTTP 路由与 scheduled handler 全部要求 Neon runtime；账户状态、注册回滚、MFA、用户名、会话、L8 bootstrap、RoleAssignment 和三类 Queue publisher 均改用 Postgres Stores；文件中已无 D1 binding / createD1 / D1 publisher 引用 | `workers/W02-identity/src/neon/runtime.ts` 与对应 `src/neon/*-postgres.ts` | 本批已移除 W02 Worker 生产入口中的 D1 fallback；后续仅清理测试专用 D1 adapter | 本批完成 |
+| `workers/W02-identity/src/neon/runtime.ts` | W02 | D1 database driver option / default | REPLACE_THEN_DELETE | **本批已完成：** driver resolver 只接受显式 `W02_DATABASE_DRIVER=neon`；缺失值和 `d1` 均失败关闭；保留原有 Hyperdrive pool 和所有 PostgreSQL Stores | 同文件 PostgreSQL runtime | D1 provider selection 已从 W02 runtime 删除；保留 Neon-only resolver | 本批完成 |
+| `workers/W02-identity/src/auth/principal.ts` | W02 | D1 principal authority Store fallback | REPLACE_THEN_DELETE | **本批已完成：** 默认 principal authority 只从 W02 Neon runtime 取 Postgres Store；测试仍可通过明确的 Store 注入 | `src/neon/principal-authority-postgres.ts` | 生产路径已无 D1 principal Store fallback；测试只需保留纯 Store fixture | 本批完成 |
+| `workers/W02-identity/src/auth/better-auth.ts` | W02 | Better Auth D1 environment / D1 database lifecycle adapter profile | DELETE_NEXT_VERSION | `createLuckReadAuth` 现已只构造现有 Neon Hyperdrive pool；显式 D1 仅留在 `buildLuckReadAuth` 的旧 schema/test fixture profile，并由 `@deprecated-next-version` helper 限定，不可作为生产入口 | Better Auth PostgreSQL pool、`mfa-factor-state-postgres.ts`、`mfa-audit-operation-receipts-postgres.ts`、Neon lifecycle callbacks | Better Auth schema/test fixture 改为 PostgreSQL 或隔离 in-memory fixture 后，删除 `D1_01` 类型、`requireLegacyW02D1Database`、D1 hooks 和 `activateVerifiedAccount` | 下一个版本 |
+| `workers/W02-identity/src/auth/principal-store.ts` | W02 | D1 PrincipalAuthorityStore adapter | DELETE_NEXT_VERSION | 仅作为历史 D1 单元测试适配器保留，已在 `createD1PrincipalAuthorityStore` 源码标注 `@deprecated-next-version`；生产 principal resolver 不再导入 | `src/neon/principal-authority-postgres.ts` | PrincipalAuthorityStore contract tests 迁移到 Neon/in-memory fixtures 后删除 D1 factory | 下一个版本 |
+| `workers/W02-identity/src/authz/role-layer-store.ts`、`src/authz/role-assignment-command.ts` | W02 | D1 RoleLayer / CreatorRoleGrant adapters | DELETE_NEXT_VERSION | 已在 D1 factory 源码添加统一标记；生产 Worker 改用 Neon roleLayerStore / creatorRoleGrantStore | `src/neon/role-layer-postgres.ts`、`src/neon/creator-role-grant-store-postgres.ts` | 角色授权测试迁移到 Neon/in-memory fixtures，删除 D1 role SQL adapters | 下一个版本 |
+| `workers/W02-identity/src/account/account-state-transition-store.ts`、`src/auth/registration-rollback-store.ts` | W02 | D1 account-state transition / registration rollback stores | DELETE_NEXT_VERSION | 已在 D1 factory 源码添加统一标记；生产路由直接注入 Neon Stores | `src/neon/account-state-transition-store-postgres.ts`、`src/neon/registration-rollback-postgres.ts` | 状态转换与注册回滚测试改为 Neon/in-memory fixture 后删除旧 factory | 下一个版本 |
+| `workers/W02-identity/src/auth/mfa-audit-operation-receipt-store.ts`、`src/auth/mfa-enrollment-start-store.ts`、`src/auth/mfa-enrollment-confirm-store.ts`、`src/auth/mfa-factor-state-store.ts`、`src/auth/mfa-status.ts` | W02 | D1 MFA receipts / enrollment / factor-state / status adapters | DELETE_NEXT_VERSION | 所有 D1 factory 已添加统一标记；生产 Better Auth 与 MFA handlers 由 Neon runtime 提供相应 Store | `src/neon/mfa-audit-operation-receipts-postgres.ts`、`mfa-enrollment-start-postgres.ts`、`mfa-enrollment-confirm-postgres.ts`、`mfa-factor-state-postgres.ts` | MFA 单元与集成测试使用 PostgreSQL/in-memory Store 后，删除 D1 adapter 及其依赖 SQL | 下一个版本 |
+| `workers/W02-identity/src/auth/session-list-store.ts`、`src/auth/session-revoke-store.ts`、`src/auth/session-logout-store.ts`、`src/auth/username-change-store.ts` | W02 | D1 session / username adapters | DELETE_NEXT_VERSION | D1 factory 已添加统一标记；生产会话和用户名路由全部注入 Neon Stores，认证仍由 Better Auth 和 W02 负责 | `src/neon/session-list-postgres.ts`、`session-revocation-postgres-store.ts`、`session-logout-postgres-store.ts`、`username-change-postgres.ts` | 相关 contract tests 全部使用 Neon/in-memory Store 后删除 D1 factories | 下一个版本 |
+| `workers/W02-identity/src/account/publication-journal-publisher.ts`、`src/auth/mfa-audit-publication-journal.ts`、`src/auth/session-revocation-publication-journal.ts` | W02 | D1 scheduled Queue publishers | DELETE_NEXT_VERSION | 三个旧 D1 publisher 均已添加统一标记；生产 scheduled handler 已改用三个 Neon PostgreSQL publisher，并继续使用原有 AUTH013_QUEUE / AUTH013_PROJECTION_QUEUE | `src/neon/account-state-publication-journal-publisher-postgres.ts`、`mfa-audit-publication-journal-publisher-postgres.ts`、`session-revocation-publisher-postgres.ts` | Queue publisher contract tests 使用 Neon/Postgres 实现后删除 D1 SQL publishers；不改 Queue 名称或绑定 | 下一个版本 |
+| `workers/W02-identity/src/auth/totp-replay-guard.ts`、`src/auth/mfa-audit-events.ts`、`src/auth/mfa-audit-receipts.ts`、`src/auth/session-revocation-events.ts` | W02 | D1 MFA replay / audit / revocation SQL helpers | DELETE_NEXT_VERSION | D1 helper/factory 已添加统一标记；生产使用 Neon factor-state、receipt、session revocation Stores | 对应 `src/neon/*-postgres.ts` MFA / audit / session Stores | 删除依赖这些 D1 prepared statements 的旧 adapter 后删除 helper；保留安全事件语义和幂等性 | 下一个版本 |
+| `workers/W02-identity/src/authz/l8-genesis-bootstrap-readiness.ts`、`src/authz/l8-genesis-bootstrap-command.ts` | W02 | D1 L8 bootstrap read/write functions | DELETE_NEXT_VERSION | 生产 W02 route 已直接调用 PostgreSQL readiness/bootstrap 实现；D1 helper 留作旧 test fixture 并已加标记 | `src/neon/l8-genesis-bootstrap-postgres.ts` | L8 tests 全部迁移到 PostgreSQL fixture 后删除 D1 helpers；不改变 OIDC、单审批和一次性状态安全要求 | 下一个版本 |
+| `workers/W02-identity/wrangler.jsonc` | W02 | 历史 D1 source binding / Wrangler config | NEEDS_CONFIRMATION | 仍被历史只读证据、部署对照工作流、Neon schema-source contracts / 生成器引用；不得与生产 `wrangler.neon.jsonc` 混淆 | `wrangler.neon.jsonc` | 将旧 D1 binding 的来源证据归档并逐项迁移所有有效 CI/部署引用后再删除；本批不删 | 待确认 |
+| `workers/W02-identity/migrations/**`、`src/auth/neon-postgres-schema.config.ts` | W02 | D1 migration lineage / schema-generation source and inert D1 type shim | NEEDS_CONFIRMATION | W02 Neon PostgreSQL migration artifacts以这些 D1 migration 作为来源；schema config 的 D1 类型为 Better Auth schema-only CLI inert placeholder，不是生产 Worker 连接 | W02 `src/neon-postgres-migrations/**`、Better Auth pinned PostgreSQL schema CLI output | PostgreSQL schema generation / lineage manifest 不再依赖这些来源文件，且 CLI 不再要求 placeholder 类型后方可审查移除；历史来源证据必须留档 | 待确认 |
 | `workers/W02-identity/wrangler.jsonc` | W02 | D1 binding 和历史部署配置 | NEEDS_CONFIRMATION | 同目录 `wrangler.neon.jsonc` 为 D1-free 配置；旧配置还可能作为迁移来源或测试配置被脚本读取，不能仅凭重复配置删除 | `workers/W02-identity/wrangler.neon.jsonc` | 全仓确认无脚本、CI、测试、部署命令引用旧配置；确认迁移来源证据已独立归档 | 待确认后下一个版本 |
 | `workers/W05-social/src/neon/runtime.ts` | W05 | D1 driver 默认值、D1 空依赖分支及 legacy fallback 选择 | DELETE_NEXT_VERSION | Neon Postgres stores 已覆盖社交读写与推送；但 runtime 仍允许 `d1` 分支并返回空依赖，不能在未清点 index.ts 所有 D1 store 入口前直接删除 | `workers/W05-social/src/entry.ts` 注入的 Postgres stores；同文件 Postgres composition | W05 所有业务路由只接受必需 Postgres stores；无 env.DB/D1 store 调用；推送端点继续使用独立 W09-owned Neon domain pool | 下一个版本 |
 | `workers/W05-social/wrangler.jsonc` | W05 | 配置文件名称含 legacy D1 binding domain 编号的 Hyperdrive 配置 | NEEDS_CONFIRMATION | 当前配置显式选择 Neon，且绑定 `HYPERDRIVE_D1_02`、`HYPERDRIVE_D1_03` 实际承载 Neon 域连接；不可误删现有 Hyperdrive/Service Binding | 当前配置内现有 Neon Hyperdrive | 仅在确认 binding 改名不会破坏 Worker 配置、secret/部署脚本和资源映射后才可改名；本清理任务不创建新资源 | 待确认 |
@@ -37,6 +49,14 @@
 
 | `workers/W02-identity/wrangler.neon.jsonc` | W02 | 无；Neon 生产配置 | NEEDS_CONFIRMATION | 当前 Neon 生产配置；不是 D1 代码，必须保留 | 本文件本身 | 不适用 | 保留 |
 | `workers/W05-social/src/entry.ts` | W05 | 无；Neon 生产入口 | NEEDS_CONFIRMATION | 明确组合 Neon 社交 stores 与独立 push endpoint Neon store；不是旧 D1 fallback | 本文件本身 | 不适用 | 保留 |
+
+## 第三批 W02 代码处置
+
+- W02 生产 runtime resolver 现在只接受显式 `W02_DATABASE_DRIVER=neon`；缺省与 `d1` 均失败关闭。
+- `workers/W02-identity/src/index.ts` 已删除 `D1_01` Env、createD1 Store fallback、D1 L8 bootstrap 分支和 D1 scheduled Queue publishers；HTTP 与 scheduled 入口都只使用 Neon PostgreSQL Stores。
+- `src/auth/principal.ts` 已移除 D1 principal Store fallback；`createLuckReadAuth` 已改成只创建 Neon Better Auth instance。
+- D1 Better Auth schema/test fixture 与 D1 Store/Queue publisher helpers 保留在源码供现存测试使用，全部加了 `@deprecated-next-version` 标记及 Neon 替代实现；不再由生产 W02 entrypoint 选择。
+- `wrangler.jsonc`、D1 migrations 和 `neon-postgres-schema.config.ts` 暂留为迁移来源/历史审计/CLI schema-source，按 NEEDS_CONFIRMATION 登记；生产配置仍是 D1-free 的 `wrangler.neon.jsonc`。
 
 ## 第二批代码标记
 
@@ -69,7 +89,8 @@
 
 ## 本轮结论
 
-- 本轮已确认至少存在 W02、W05、W08、W07 的旧 D1 运行时代码/接口，不能宣称全仓 D1 清理完成。
+- 第三批已清理 W02 生产 Worker D1 路由、scheduled publisher 和 Better Auth 工厂回退；剩余 D1 适配仅在显式测试/schema profile 中保留，待下一个版本删除。
+- 全仓仍有 W05、W06、W07、W01、W11 的生产 bundle 兼容适配或旧配置，不能宣称全仓 D1 清理完成。
 - 本登记表是已发现项，不是全仓最终总表；后续批次必须继续覆盖 W01、W03、W06、W10、W11 及所有 Worker 的配置、脚本、测试和迁移目录。
 - 历史 D1 migration、PostgreSQL 迁移来源、只读核对记录、不可逆操作记录、回滚证据，不因包含 D1 字样而自动列为删除项。
 - `HYPERDRIVE_D1_01` 至 `HYPERDRIVE_D1_05` 若连接 Neon，只是沿用的数据库域命名；除非完成全链路重命名评估，否则保留。
