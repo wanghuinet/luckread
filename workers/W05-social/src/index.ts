@@ -523,7 +523,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
           const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
           if (!idempotencyKey) throw new BlockMuteRuntimeError('PRECONDITION_REQUIRED', 428)
           if (idempotencyKey.length > 256) throw new BlockMuteRuntimeError('VALIDATION_FAILED', 400)
-          await removeRelation(dependencies.blockMuteRelationStore ?? env.DB, actorUserId, targetFromPath, relationType)
+          await removeRelation(dependencies.blockMuteRelationStore, actorUserId, targetFromPath, relationType)
           await invalidateRelationshipGraph(actorUserId, targetFromPath)
           if (relationType === 'block') {
             await invalidateFollowListCountCache(actorUserId, targetFromPath)
