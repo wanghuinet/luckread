@@ -182,10 +182,11 @@ try {
   )
   assert.deepEqual(persistedPayment.rows, [{ status: 'succeeded', version: 2 }])
 
+  let issuedDocumentSequence = 0
   const issuedReceipt = await issueReceiptForPaidPayment(database, paymentId, merchantId, {
     now: () => new Date(now),
-    createDocumentId: () => marker + '-receipt-document',
-    createDocumentNumber: () => 'RCT-' + marker,
+    createDocumentId: () => marker + '-document-' + (++issuedDocumentSequence),
+    createDocumentNumber: () => (issuedDocumentSequence === 1 ? 'INV-' : 'RCT-') + marker,
   })
   assert.equal(issuedReceipt.documentType, 'RECEIPT')
 
