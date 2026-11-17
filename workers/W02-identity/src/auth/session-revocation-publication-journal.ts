@@ -19,6 +19,13 @@ function retryDelaySeconds(attempt: number): number {
 }
 
 /** Publish AUTH-010 session audit events through the already provisioned W02->W06 audit queue. */
+/**
+ * @deprecated-next-version
+ * Reason: Legacy Cloudflare D1 implementation retained only for isolated unit tests or the explicit schema/test fixture.
+ * Replacement: PostgreSQL session revocation publisher in src/neon/session-revocation-publisher-postgres.ts.
+ * Removal: Next release.
+ * Condition: Session revocation publication tests use the PostgreSQL publisher on the existing AUTH013_QUEUE.
+ */
 export async function publishPendingSessionRevocationEvents(
   env: PublicationEnv,
   now = new Date().toISOString(),
