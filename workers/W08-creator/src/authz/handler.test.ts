@@ -80,7 +80,6 @@ describe('W08 internal CASL permission endpoint on Neon', () => {
       accountState: 'ACTIVE',
       roles: [{ roleId: 'verified_user', scopeType: 'global', scopeId: null }],
     }]])
-    const state = setup({ userId: 'verified-bearer', accountState: 'ACTIVE', layer: 'L2' }, users)
     const forwarded: Array<string | null> = []
     const requestState = setup({ userId: 'verified-bearer', accountState: 'ACTIVE', layer: 'L2' }, users, forwarded)
     const response = await handlePermissionCheck(post({
@@ -92,7 +91,6 @@ describe('W08 internal CASL permission endpoint on Neon', () => {
     expect(response.status).toBe(200)
     expect(forwarded).toEqual(['Bearer native-session-token'])
     expect(await response.json()).toMatchObject({ decision: 'ALLOW', action: 'creator.application.apply' })
-    expect(state.forwarded).toEqual([])
   })
 
   it('fails closed when a caller attempts to submit subjectId, layer, or account state', async () => {
