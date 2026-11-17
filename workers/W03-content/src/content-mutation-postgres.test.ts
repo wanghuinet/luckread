@@ -771,13 +771,8 @@ describe('W03 Neon content mutation store', () => {
       async listDueScheduled() { return [] },
       async publishScheduled() { return 0 },
     }
-    const d1 = {
-      prepare() { throw new Error('D1 must not be queried in Neon mode') },
-      batch() { throw new Error('D1 must not be written in Neon mode') },
-    }
-
     const result = await transitionContentState(
-      d1 as never,
+      store,
       'user_123',
       'L2',
       snapshotContent.id,
@@ -787,7 +782,6 @@ describe('W03 Neon content mutation store', () => {
       'neon-transition-key',
       now,
       {},
-      store,
     )
 
     expect(result).toMatchObject({ from: 'PUBLISHED', to: 'UNPUBLISHED', version: 5, etag: 'W/"5"', scheduledAt: null })
