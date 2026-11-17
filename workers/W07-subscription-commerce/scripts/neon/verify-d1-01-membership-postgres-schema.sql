@@ -20,6 +20,8 @@ DECLARE
     'payload_preferences',
     'payload_preferences_rels',
     'payload_migrations',
+    'auth_registration_envelopes',
+    'consents',
     'user',
     'session',
     'account',
