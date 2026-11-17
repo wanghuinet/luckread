@@ -10,7 +10,12 @@ import type {
 } from './renewal-runtime.js';
 
 const database = {} as D1Database;
-const env = { D1_01: database, D1_04: database } as RenewalRuntimeEnv;
+const env = {
+  W07_DATABASE_DRIVER: 'd1',
+  W07_MEMBERSHIP_DATABASE_DRIVER: 'd1',
+  D1_01: database,
+  D1_04: database,
+} as RenewalRuntimeEnv;
 
 const cleanRecovery = {
   scanned: 0,
