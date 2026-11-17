@@ -240,7 +240,7 @@ describe('W05 unified social closure', () => {
       { topic_id: 'topic_𐐀', normalized_name: 'deseret', display_name: 'Deseret', target_id: 'content-7' },
     ]
     const store = createMemorySocialClosureReadStore({
-      listDiscoveryContentEdges: vi.fn(async ({ cursor, limit }) => {
+      listDiscoveryContentEdges: vi.fn(async ({ cursor, limit }: Parameters<SocialClosureReadStore['listDiscoveryContentEdges']>[0]) => {
         const ordered = [...edges]
           .filter(edge => !cursor || edge.topic_id > cursor.topicId ||
             (edge.topic_id === cursor.topicId && edge.target_id > cursor.targetId))
@@ -360,7 +360,7 @@ describe('W05 unified social closure', () => {
     })
 
     const store = createMemorySocialClosureReadStore({
-      listDiscoveryContentEdges: vi.fn(async ({ cursor, limit }) => edges
+      listDiscoveryContentEdges: vi.fn(async ({ cursor, limit }: Parameters<SocialClosureReadStore['listDiscoveryContentEdges']>[0]) => edges
         .filter(edge => !cursor || edge.topic_id > cursor.topicId ||
           (edge.topic_id === cursor.topicId && edge.target_id > cursor.targetId))
         .sort((a, b) => a.topic_id < b.topic_id ? -1 : a.topic_id > b.topic_id ? 1 :
