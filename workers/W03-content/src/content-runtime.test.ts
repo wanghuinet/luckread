@@ -2429,30 +2429,27 @@ it('keeps create idempotency replay byte-stable across retry time', async () => 
     new TextEncoder().encode(JSON.stringify(hashInput)),
   )
   const hashHex = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('')
-  const db = {
-    prepare() {
-      return {
-        bind: () => ({
-          first: async () => ({
-            idem_id: 'idem_123',
-            idem_owner_user_id: 'user_123',
-            idem_request_hash: hashHex,
-            idem_status: 'COMPLETED',
-            idem_response_status: 201,
-            idem_response_json: JSON.stringify(original),
-            idem_expires_at: '2026-10-08T07:00:00.000Z',
-          }),
-        }),
-      }
-    },
-    batch: async () => { throw new Error('batch should not run on an idempotency replay') },
+  const store = {
+    loadIdempotency: async () => ({
+      idem_id: 'idem_123',
+      idem_owner_user_id: 'user_123',
+      idem_request_hash: hashHex,
+      idem_status: 'COMPLETED',
+      idem_response_status: 201,
+      idem_response_json: JSON.stringify(original),
+      idem_expires_at: '2026-10-08T07:00:00.000Z',
+    }),
+    allocateContentId: async () => { throw new Error('allocator must not run on idempotency replay') },
+    create: async () => { throw new Error('create must not run on idempotency replay') },
   } as never
   const result = await createContent(
-    db,
     'user_123',
     { contentType: 'article', title: 'Draft content', bodyRef: 'https://cdn.example.com/body.json', mediaRefs: [], coverRef: null },
     'create-key',
     new Date('2026-10-07T08:00:00.000Z'),
+    'runtime',
+    undefined,
+    store,
   )
   expect(result).toEqual(original)
 })
