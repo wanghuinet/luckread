@@ -317,11 +317,8 @@ try {
 
   // Exercise the complete principal boundary with one provider-matched
   // Better Auth session reader and PostgreSQL account/RoleAssignment store.
-  // The D1 placeholder is intentionally unused because both authorities are
-  // injected; this rehearsal never falls back to the production D1 binding.
-  const principalEnv = {
-    D1_01: undefined as unknown as D1Database,
-  } as Parameters<typeof resolveBetterAuthPrincipal>[0]
+  // Both session and principal authorities are explicitly injected from the Neon test database.
+  const principalEnv = {} as Parameters<typeof resolveBetterAuthPrincipal>[0]
   const principalAuthorityStore = createPostgresPrincipalAuthorityStore(postgresPool)
   const resolvedPrincipal = await withTimeout('postgres-principal-authority-resolution', () =>
     resolveBetterAuthPrincipal(
@@ -363,9 +360,7 @@ try {
   // Exercise the private W01 -> W02 MFA status handler with a PostgreSQL
   // read store and a real Better Auth PostgreSQL session. The response is
   // restricted to the public status DTO and does not touch D1.
-  const mfaStatusEnv = {
-    D1_01: undefined as unknown as D1Database,
-  } as Parameters<typeof handleMfaStatusRequest>[0]
+  const mfaStatusEnv = {} as Parameters<typeof handleMfaStatusRequest>[0]
   const mfaStatusRequest = new Request(
     'https://luckread-w02.internal/internal/auth/mfa/status',
     {
@@ -435,7 +430,6 @@ try {
   )
 
   const sessionListEnv = {
-    D1_01: undefined as unknown as D1Database,
     AUTH_SESSION_READ_LIMITER: {
       limit: async (_input: { key: string }) => ({ success: true }),
     },
@@ -529,7 +523,6 @@ try {
   )
 
   const sessionRevokeEnv = {
-    D1_01: undefined as unknown as D1Database,
     AUTH_SESSION_WRITE_LIMITER: {
       limit: async (_input: { key: string }) => ({ success: true }),
     },
@@ -601,7 +594,6 @@ try {
   // native session, persist USER_LOGOUT audit intent, and expire cookies.
   logoutSessionId = currentSessionId
   const sessionLogoutEnv = {
-    D1_01: undefined as unknown as D1Database,
     AUTH_SESSION_WRITE_LIMITER: {
       limit: async (_input: { key: string }) => ({ success: true }),
     },
@@ -699,7 +691,6 @@ try {
   assert.ok(enrollmentCookieHeader.length > 0, 'MFA enrollment sign-in must issue a session cookie')
 
   const mfaEnrollmentEnv = {
-    D1_01: undefined as unknown as D1Database,
     AUTH_SESSION_WRITE_LIMITER: {
       limit: async (_input: { key: string }) => ({ success: true }),
     },
