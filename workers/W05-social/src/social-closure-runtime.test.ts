@@ -239,25 +239,15 @@ describe('W05 unified social closure', () => {
       { topic_id: 'topic_龥', normalized_name: '龥', display_name: '龥', target_id: 'content-6' },
       { topic_id: 'topic_𐐀', normalized_name: 'deseret', display_name: 'Deseret', target_id: 'content-7' },
     ]
-    const queries: string[] = []
-    const db = {
-      prepare: (sql: string) => {
-        queries.push(sql)
-        return {
-          bind: (...values: unknown[]) => ({
-            all: async () => {
-              const afterTopic = values.length === 3 ? String(values[0]) : null
-              const afterTarget = values.length === 3 ? String(values[1]) : null
-              const ordered = [...edges]
-                .filter(edge => !afterTopic || edge.topic_id > afterTopic ||
-                  (edge.topic_id === afterTopic && edge.target_id > afterTarget!))
-                .sort((a, b) => a.topic_id.localeCompare(b.topic_id) || a.target_id.localeCompare(b.target_id))
-              return { results: ordered.slice(0, 200) }
-            },
-          }),
-        }
-      },
-    } as unknown as D1Database
+    const store = createMemorySocialClosureReadStore({
+      listDiscoveryContentEdges: vi.fn(async ({ cursor, limit }) => {
+        const ordered = [...edges]
+          .filter(edge => !cursor || edge.topic_id > cursor.topicId ||
+            (edge.topic_id === cursor.topicId && edge.target_id > cursor.targetId))
+          .sort((a, b) => a.topic_id.localeCompare(b.topic_id) || a.target_id.localeCompare(b.target_id))
+        return ordered.slice(0, limit) as SocialDiscoveryTopicEdge[]
+      }),
+    })
     const contextById = new Map([
       ['content-1', { contentId: 'content-1', ownerUserId: 'owner-1', contentType: 'post', state: 'PUBLISHED', updatedAt: recent(1) }],
       ['content-2', { contentId: 'content-2', ownerUserId: 'owner-2', contentType: 'article', state: 'PUBLISHED', updatedAt: recent(2) }],
@@ -285,7 +275,7 @@ describe('W05 unified social closure', () => {
       }),
     }
 
-    const firstPage = await listDiscoveryTopics(db, binding, 'discovery-test', '2', null)
+    const firstPage = await listDiscoveryTopics(store, binding, 'discovery-test', '2', null)
     expect(firstPage.items).toMatchObject([
       { topicId: 'topic-1', name: 'reading', displayName: 'Reading', contentCount: 2 },
       { topicId: 'topic-2', name: 'books', displayName: 'Books', contentCount: 2 },
@@ -293,10 +283,7 @@ describe('W05 unified social closure', () => {
     expect(firstPage.hasMore).toBe(true)
     expect(firstPage.nextCursor).toEqual(expect.any(String))
     expect(binding.fetch).toHaveBeenCalled()
-    expect(queries.every(sql => !/(?:FROM|JOIN)\s+contents\b/i.test(sql))).toBe(true)
-    expect(queries[0]).toContain('ix_social_target_topics_content_topic_target')
-    expect(queries[0]).toContain('CROSS JOIN social_topics')
-    expect(queries[0]).not.toContain('SELECT DISTINCT')
+    expect(store.listDiscoveryContentEdges).toHaveBeenCalledWith({ cursor: null, limit: 200 })
 
     const secondPage = await listDiscoveryTopics(db, binding, 'discovery-test', '1', firstPage.nextCursor)
     expect(secondPage.items).toMatchObject([
@@ -372,26 +359,14 @@ describe('W05 unified social closure', () => {
       target_id: 'content-00001',
     })
 
-    const queries: string[] = []
-    const db = {
-      prepare: (sql: string) => {
-        queries.push(sql)
-        return {
-          bind: (...values: unknown[]) => ({
-            all: async () => {
-              const afterTopic = values.length === 3 ? String(values[0]) : null
-              const afterTarget = values.length === 3 ? String(values[1]) : null
-              const ordered = edges
-                .filter(edge => !afterTopic || edge.topic_id > afterTopic ||
-                  (edge.topic_id === afterTopic && edge.target_id > afterTarget!))
-                .sort((a, b) => a.topic_id < b.topic_id ? -1 : a.topic_id > b.topic_id ? 1 :
-                  a.target_id < b.target_id ? -1 : a.target_id > b.target_id ? 1 : 0)
-              return { results: ordered.slice(0, 200) }
-            },
-          }),
-        }
-      },
-    } as unknown as D1Database
+    const store = createMemorySocialClosureReadStore({
+      listDiscoveryContentEdges: vi.fn(async ({ cursor, limit }) => edges
+        .filter(edge => !cursor || edge.topic_id > cursor.topicId ||
+          (edge.topic_id === cursor.topicId && edge.target_id > cursor.targetId))
+        .sort((a, b) => a.topic_id < b.topic_id ? -1 : a.topic_id > b.topic_id ? 1 :
+          a.target_id < b.target_id ? -1 : a.target_id > b.target_id ? 1 : 0)
+        .slice(0, limit) as SocialDiscoveryTopicEdge[]),
+    })
 
     const requestedIds: string[] = []
     const binding = {
@@ -415,13 +390,12 @@ describe('W05 unified social closure', () => {
     }
 
     try {
-      const page = await listDiscoveryTopics(db, binding, 'bounded-context-cache-test', '1', null)
+      const page = await listDiscoveryTopics(store, binding, 'bounded-context-cache-test', '1', null)
       expect(page.items).toMatchObject([
         { topicId: 'topic-05000', contentCount: 2 },
       ])
       expect(page.hasMore).toBe(true)
-      expect(queries.every(sql => !/(?:FROM|JOIN)\s+contents\b/i.test(sql))).toBe(true)
-      expect(queries.some(sql => sql.includes('(st.topic_id, st.target_id) > (?, ?)'))).toBe(true)
+      expect(store.listDiscoveryContentEdges).toHaveBeenCalled()
       expect(requestedIds).toHaveLength(5200)
       expect(requestedIds.filter(contentId => contentId === 'content-00001')).toHaveLength(2)
       expect(binding.fetch).toHaveBeenCalledTimes(105)
@@ -446,13 +420,12 @@ describe('W05 unified social closure', () => {
       { topic_id: 'topic-1', normalized_name: 'reading', display_name: 'Reading', target_id: 'content-1' },
       { topic_id: 'topic-2', normalized_name: 'books', display_name: 'Books', target_id: 'content-2' },
     ]
-    const queries: string[] = []
-    const db = {
-      prepare: (sql: string) => {
-        queries.push(sql)
-        return { bind: () => ({ all: async () => ({ results: edges }) }) }
-      },
-    } as unknown as D1Database
+    const store = createMemorySocialClosureReadStore({
+      listDiscoveryContentEdges: vi.fn(async ({ cursor, limit }) => edges
+        .filter(edge => !cursor || edge.topic_id > cursor.topicId ||
+          (edge.topic_id === cursor.topicId && edge.target_id > cursor.targetId))
+        .slice(0, limit) as SocialDiscoveryTopicEdge[]),
+    })
     const binding = {
       fetch: vi.fn(async (input: RequestInfo | URL) => {
         const request = input instanceof Request ? input : new Request(input)
@@ -472,7 +445,7 @@ describe('W05 unified social closure', () => {
     }
 
     try {
-      const firstPage = await listDiscoveryTopics(db, binding, 'discovery-cache-test', '1', null)
+      const firstPage = await listDiscoveryTopics(store, binding, 'discovery-cache-test', '1', null)
       expect(firstPage.items).toMatchObject([
         { topicId: 'topic-1', contentCount: 1 },
       ])
@@ -485,7 +458,7 @@ describe('W05 unified social closure', () => {
       ])
       expect(secondPage.hasMore).toBe(false)
       expect(secondPage.nextCursor).toBeNull()
-      expect(queries).toHaveLength(1)
+      expect(store.listDiscoveryContentEdges).toHaveBeenCalledTimes(1)
       expect(binding.fetch).toHaveBeenCalledTimes(1)
       expect(cache.put).toHaveBeenCalledTimes(1)
       expect(cache.match).toHaveBeenCalledTimes(2)
@@ -495,9 +468,11 @@ describe('W05 unified social closure', () => {
   })
 
   it('rejects malformed discovery topic cursors', async () => {
-    const db = { prepare: () => { throw new Error('database must not be queried for an invalid cursor') } } as unknown as D1Database
-    await expect(listDiscoveryTopics(db, undefined, 'invalid-cursor-test', '20', 'not-a-cursor'))
+    const listDiscoveryContentEdges = vi.fn(async () => [])
+    const store = createMemorySocialClosureReadStore({ listDiscoveryContentEdges })
+    await expect(listDiscoveryTopics(store, undefined, 'invalid-cursor-test', '20', 'not-a-cursor'))
       .rejects.toMatchObject({ code: 'INVALID_CURSOR', status: 400 })
+    expect(listDiscoveryContentEdges).not.toHaveBeenCalled()
   })
 
 
@@ -517,34 +492,30 @@ describe('W05 notification deep-link lookup', () => {
       read_at: null,
       created_at: '2026-11-04T10:00:00.000Z',
     }
-    const statements: Array<{ sql: string; values: unknown[] }> = []
-    const db = {
-      prepare: (sql: string) => ({
-        bind: (...values: unknown[]) => {
-          statements.push({ sql, values })
-          return {
-            all: async () => ({ results: sql.includes('SELECT notification_id') ? [row] : [] }),
-            first: async () => ({ count: 3 }),
-          }
-        },
-      }),
-    } as unknown as D1Database
+    const store = createMemorySocialClosureReadStore({
+      listNotificationRows: vi.fn(async () => [row]),
+      countUnreadNotifications: vi.fn(async () => 3),
+    })
 
-    await expect(listNotifications(db, 'recipient-1', null, '1', null, 'notification-1'))
+    await expect(listNotifications(store, 'recipient-1', null, '1', null, 'notification-1'))
       .resolves.toMatchObject({
         items: [{ id: 'notification-1', type: 'COMMENT', actorUserId: 'actor-1', targetId: 'content-1' }],
         unreadCount: 3,
       })
-    expect(statements[0]?.sql).toContain('WHERE recipient_user_id = ?')
-    expect(statements[0]?.sql).toContain('AND notification_id = ?')
-    expect(statements[0]?.values).toEqual(['recipient-1', 'notification-1', 2])
+    expect(store.listNotificationRows).toHaveBeenCalledWith({
+      recipientUserId: 'recipient-1',
+      notificationType: null,
+      notificationId: 'notification-1',
+      cursor: null,
+      limit: 2,
+    })
   })
 
   it('rejects malformed notification IDs before querying the database', async () => {
-    const prepare = vi.fn()
-    const db = { prepare } as unknown as D1Database
-    await expect(listNotifications(db, 'recipient-1', null, '1', null, 'n'.repeat(129)))
+    const listNotificationRows = vi.fn(async () => [])
+    const store = createMemorySocialClosureReadStore({ listNotificationRows })
+    await expect(listNotifications(store, 'recipient-1', null, '1', null, 'n'.repeat(129)))
       .rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 })
-    expect(prepare).not.toHaveBeenCalled()
+    expect(listNotificationRows).not.toHaveBeenCalled()
   })
 })
