@@ -8,6 +8,13 @@ import {
 import { createPostgresModerationQueueReadStore } from '../moderation-queue-read-store-postgres.js'
 import type { ModerationQueueReadStore } from '../moderation-queue-read-store.js'
 
+/**
+ * @deprecated-next-version
+ * Reason: W06 Neon runtime still exposes a D1-shaped persistence facade and D1 provider branch.
+ * Replacement: Native PostgreSQL moderation stores and explicit PostgreSQL transaction/query contracts.
+ * Removal: Next release.
+ * Condition: Report, moderation, audit, and queue consumers accept native PostgreSQL stores without D1Database signatures or SQL translation.
+ */
 export type W06ModerationDatabaseDriver = 'd1' | 'neon'
 
 export type W06ModerationDatabaseRuntimeEnv = Readonly<{
