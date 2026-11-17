@@ -2909,7 +2909,11 @@ describe('W03 Neon canonical content detail access behavior', () => {
   })
 
   it('fails closed when the Neon content detail reader is unavailable', async () => {
-    const prepare = vi.fn(() => { throw new Error('content detail must not read D1') })
+    let prepareCalled = false
+    const prepare = () => {
+      prepareCalled = true
+      throw new Error('content detail must not read D1')
+    }
     const worker = createW03ContentWorker()
     const response = await worker.fetch(
       new Request('https://w03.internal/internal/content/contents/content_1', {
@@ -2922,7 +2926,7 @@ describe('W03 Neon canonical content detail access behavior', () => {
       { D1_02: { prepare } } as never,
     )
     expect(response.status).toBe(503)
-    expect(prepare).not.toHaveBeenCalled()
+    expect(prepareCalled).toBe(false)
   })
 
   it('keeps anonymous and owner principals explicit at the reader boundary', async () => {
