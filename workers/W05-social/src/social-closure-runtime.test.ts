@@ -3,6 +3,35 @@ import { describe, expect, it, vi } from 'vitest'
 import { SocialTargetsReadStoreError } from './social-targets-read-store.js'
 import { extractSocialTokens, getContentSocialSummary, getSocialTargets, listDiscoveryTopics, listNotifications, syncSocialTokens } from './social-closure-runtime.js'
 import type { NotificationEnqueueStore } from './notification-enqueue-store.js'
+import type { SocialTokenSyncCommentContext, SocialTokenSyncMentionInput, SocialTokenSyncMentionRow, SocialTokenSyncStore, SocialTokenSyncTargetInput, SocialTokenSyncTargetType, SocialTokenSyncTopicInput } from './social-token-sync-store.js'
+
+type TokenSyncStoreFixture = Readonly<{
+  commentContext?: SocialTokenSyncCommentContext | null
+  mentions?: readonly SocialTokenSyncMentionRow[]
+}>
+
+function createMemorySocialTokenSyncStore(options: TokenSyncStoreFixture = {}) {
+  const mentions: SocialTokenSyncMentionRow[] = [...(options.mentions ?? [])]
+  const store: SocialTokenSyncStore = {
+    getCommentContext: vi.fn(async (_commentId: string) => options.commentContext ?? null),
+    listMentions: vi.fn(async (_targetType: SocialTokenSyncTargetType, _targetId: string) => [...mentions]),
+    replaceTargetRelations: vi.fn(async (input: SocialTokenSyncTargetInput) => {
+      const retained = new Set(input.retainedMentionIds)
+      for (let index = mentions.length - 1; index >= 0; index -= 1) {
+        if (!retained.has(mentions[index]!.mention_id)) mentions.splice(index, 1)
+      }
+    }),
+    upsertTopicAndAttach: vi.fn(async (_input: SocialTokenSyncTopicInput) => undefined),
+    insertMention: vi.fn(async (input: SocialTokenSyncMentionInput) => {
+      mentions.push({
+        mention_id: input.mentionId,
+        mentioned_user_id: input.mentionedUserId,
+        handle: input.handle,
+      })
+    }),
+  }
+  return { store, mentions }
+}
 
 describe('W05 unified social closure', () => {
   it('normalizes and deduplicates mentions and hashtags', () => {
@@ -82,71 +111,31 @@ describe('W05 unified social closure', () => {
   })
 
   it('validates content token synchronization through W03 context and writes only W05-owned edges', async () => {
-    const queries: string[] = []
-    const batch = vi.fn(async () => [])
-    const db = {
-      prepare: (sql: string) => {
-        queries.push(sql)
-        return { bind: (..._values: unknown[]) => ({
-          all: async () => ({ results: [] }),
-          run: async () => ({ success: true, meta: { changes: 1 } }),
-        }) }
-      },
-      batch,
-    } as unknown as D1Database
-    const contentContext = {
-      contentId: 'content-1',
-      ownerUserId: 'owner-1',
-      contentType: 'post',
-      state: 'PUBLISHED',
-      updatedAt: '2026-10-17T04:00:00.000Z',
-    } as const
-
-    await expect(syncSocialTokens(db, 'owner-1', 'content', 'content-1', 'plain text', [], contentContext))
+    const { store } = createMemorySocialTokenSyncStore()
+    const contentContext = { contentId: 'content-1', ownerUserId: 'owner-1', contentType: 'post', state: 'PUBLISHED', updatedAt: '2026-10-17T04:00:00.000Z' } as const
+    await expect(syncSocialTokens(store, 'owner-1', 'content', 'content-1', 'plain text', [], contentContext))
       .resolves.toEqual({ topics: 0, mentions: 0 })
-    expect(batch).toHaveBeenCalledTimes(1)
-    expect(queries.some(sql => /(?:FROM|JOIN)\s+contents/i.test(sql))).toBe(false)
-    expect(queries.every(sql => !/\b(?:FROM|JOIN)\s+contents\b/i.test(sql))).toBe(true)
+    expect(store.getCommentContext).not.toHaveBeenCalled()
+    expect(store.listMentions).toHaveBeenCalledWith('content', 'content-1')
+    expect(store.replaceTargetRelations).toHaveBeenCalledWith({ targetType: 'content', targetId: 'content-1', retainedMentionIds: [] })
+    expect(store.upsertTopicAndAttach).not.toHaveBeenCalled()
+    expect(store.insertMention).not.toHaveBeenCalled()
   })
 
   it('resolves Unicode-equivalent mention handles with the same NFKC and lowercase rules as parsed tokens', async () => {
-    const inserts: Array<{ sql: string; values: unknown[] }> = []
-    const db = {
-      prepare: (sql: string) => ({
-        bind: (...values: unknown[]) => ({
-          first: async () => null,
-          all: async () => ({ results: [] }),
-          run: async () => {
-            inserts.push({ sql, values })
-            return { success: true, meta: { changes: 1 } }
-          },
-        }),
-      }),
-      batch: async () => [],
-    } as unknown as D1Database
-    const contentContext = {
-      contentId: 'content-1',
-      ownerUserId: 'owner-1',
-      contentType: 'post',
-      state: 'PUBLISHED',
-      updatedAt: '2026-10-17T04:00:00.000Z',
-    } as const
-
+    const { store } = createMemorySocialTokenSyncStore()
+    const contentContext = { contentId: 'content-1', ownerUserId: 'owner-1', contentType: 'post', state: 'PUBLISHED', updatedAt: '2026-10-17T04:00:00.000Z' } as const
     const notificationStore: NotificationEnqueueStore = { enqueue: vi.fn(async () => undefined) }
-    await expect(syncSocialTokens(
-      db,
-      'owner-1',
-      'content',
-      'content-1',
-      'Thanks @alice',
-      [{ userId: 'mentioned-user', handle: 'ＡＬＩＣＥ' }],
-      contentContext,
-      notificationStore,
-    )).resolves.toEqual({ topics: 0, mentions: 1 })
-
-    const mentionInsert = inserts.find(({ sql }) => sql.includes('INSERT OR IGNORE INTO social_mentions'))
-    expect(mentionInsert?.values[4]).toBe('mentioned-user')
-    expect(notificationStore.enqueue).toHaveBeenCalledWith(expect.objectContaining({ recipientUserId: 'mentioned-user', actorUserId: 'owner-1', notificationType: 'MENTION', targetType: 'content', targetId: 'content-1', payloadJson: JSON.stringify({ handle: 'ＡＬＩＣＥ' }) }))
+    await expect(syncSocialTokens(store, 'owner-1', 'content', 'content-1', 'Thanks @alice', [{ userId: 'mentioned-user', handle: 'ＡＬＩＣＥ' }], contentContext, notificationStore))
+      .resolves.toEqual({ topics: 0, mentions: 1 })
+    expect(store.insertMention).toHaveBeenCalledWith(expect.objectContaining({
+      targetType: 'content', targetId: 'content-1', actorUserId: 'owner-1',
+      mentionedUserId: 'mentioned-user', handle: 'ＡＬＩＣＥ',
+    }))
+    expect(notificationStore.enqueue).toHaveBeenCalledWith(expect.objectContaining({
+      recipientUserId: 'mentioned-user', actorUserId: 'owner-1', notificationType: 'MENTION',
+      targetType: 'content', targetId: 'content-1', payloadJson: JSON.stringify({ handle: 'ＡＬＩＣＥ' }),
+    }))
   })
 
   it('accepts an injected provider-neutral social-target read store', async () => {
@@ -214,72 +203,30 @@ describe('W05 unified social closure', () => {
   })
 
   it('preserves an existing mention identity when the same handle is later owned by another account', async () => {
-    const inserts: Array<{ sql: string; values: unknown[] }> = []
-    const boundStatements: Array<{ sql: string; values: unknown[] }> = []
-    const queries: string[] = []
-    const db = {
-      prepare: (sql: string) => {
-        queries.push(sql)
-        return {
-          bind: (...values: unknown[]) => {
-            boundStatements.push({ sql, values })
-            return {
-              first: async () => null,
-              all: async () => sql.includes('FROM social_mentions')
-                ? { results: [{ mention_id: 'mention-original', mentioned_user_id: 'original-user-id', handle: 'alice' }] }
-                : { results: [] },
-              run: async () => {
-                inserts.push({ sql, values })
-                return { success: true, meta: { changes: 1 } }
-              },
-            }
-          },
-        }
-      },
-      batch: async () => [],
-    } as unknown as D1Database
-    const contentContext = {
-      contentId: 'content-1',
-      ownerUserId: 'owner-1',
-      contentType: 'post',
-      state: 'PUBLISHED',
-      updatedAt: '2026-10-17T04:00:00.000Z',
-    } as const
-
-    await expect(syncSocialTokens(
-      db,
-      'owner-1',
-      'content',
-      'content-1',
-      'Still mentioning @alice',
-      [{ userId: 'reclaimed-handle-owner-id', handle: 'alice' }],
-      contentContext,
-    )).resolves.toEqual({ topics: 0, mentions: 1 })
-
-    expect(inserts.some(({ sql }) => sql.includes('INSERT OR IGNORE INTO social_mentions'))).toBe(false)
-
-    const priorLookup = queries.find((sql) => sql.includes('FROM social_mentions'))
-    expect(priorLookup).toContain('SELECT mention_id, mentioned_user_id, handle')
-    expect(priorLookup).not.toContain('JOIN users')
-    expect(priorLookup).not.toContain('username')
-    const cleanup = boundStatements.find(({ sql }) => sql.includes('DELETE FROM social_mentions'))
-    expect(cleanup?.sql).toContain('mention_id NOT IN (?)')
-    expect(cleanup?.values).toEqual(['content', 'content-1', 'mention-original'])
+    const { store } = createMemorySocialTokenSyncStore({ mentions: [{ mention_id: 'mention-original', mentioned_user_id: 'original-user-id', handle: 'alice' }] })
+    const contentContext = { contentId: 'content-1', ownerUserId: 'owner-1', contentType: 'post', state: 'PUBLISHED', updatedAt: '2026-10-17T04:00:00.000Z' } as const
+    await expect(syncSocialTokens(store, 'owner-1', 'content', 'content-1', 'Still mentioning @alice', [{ userId: 'reclaimed-handle-owner-id', handle: 'alice' }], contentContext))
+      .resolves.toEqual({ topics: 0, mentions: 1 })
+    expect(store.insertMention).not.toHaveBeenCalled()
+    expect(store.replaceTargetRelations).toHaveBeenCalledWith({ targetType: 'content', targetId: 'content-1', retainedMentionIds: ['mention-original'] })
+    expect(store.listMentions).toHaveBeenCalledWith('content', 'content-1')
   })
 
   it('fails closed for content token sync without W03 context or when the actor is not the owner', async () => {
-    const prepare = vi.fn()
-    const db = { prepare } as unknown as D1Database
-    await expect(syncSocialTokens(db, 'owner-1', 'content', 'content-1', 'plain text'))
+    const { store } = createMemorySocialTokenSyncStore()
+    await expect(syncSocialTokens(store, 'owner-1', 'content', 'content-1', 'plain text'))
       .rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE', status: 503 })
-    await expect(syncSocialTokens(db, 'owner-1', 'content', 'content-1', 'plain text', [], {
-      contentId: 'content-1',
-      ownerUserId: 'someone-else',
-      contentType: 'post',
-      state: 'PUBLISHED',
+    await expect(syncSocialTokens(store, 'owner-1', 'content', 'content-1', 'plain text', [], {
+      contentId: 'content-1', ownerUserId: 'someone-else', contentType: 'post', state: 'PUBLISHED',
       updatedAt: '2026-10-17T04:00:00.000Z',
     })).rejects.toMatchObject({ code: 'PERMISSION_DENIED', status: 403 })
-    expect(prepare).not.toHaveBeenCalled()
+    expect(store.getCommentContext).not.toHaveBeenCalled()
+    expect(store.listMentions).not.toHaveBeenCalled()
+    expect(store.replaceTargetRelations).not.toHaveBeenCalled()
+    await expect(syncSocialTokens(undefined, 'owner-1', 'content', 'content-1', 'plain text', [], {
+      contentId: 'content-1', ownerUserId: 'owner-1', contentType: 'post', state: 'PUBLISHED',
+      updatedAt: '2026-10-17T04:00:00.000Z',
+    })).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE', status: 503 })
   })
 
   it('ranks active discovery topics using W03-published contexts without querying canonical contents', async () => {
