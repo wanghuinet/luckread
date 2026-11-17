@@ -47,19 +47,15 @@ const endpointRowsByRecipient = new Map([
   [marker + '-recipient-without-endpoints', []],
 ])
 const endpointQueries = []
-const endpointDb = {
-  prepare(sql) {
-    return {
-      bind(...values) {
-        endpointQueries.push({ sql, values })
-        return {
-          async all() {
-            return { results: endpointRowsByRecipient.get(values[0]) ?? [] }
-          },
-        }
-      },
-    }
+// W09 owns endpoint state in the separate D1-03 Neon database. This W05-local
+// rehearsal injects that boundary as a port fixture and never opens W09 tables.
+const endpointStore = {
+  async listActiveForRecipient(recipientUserId, limit) {
+    endpointQueries.push({ recipientUserId, limit })
+    return (endpointRowsByRecipient.get(recipientUserId) ?? []).slice(0, limit)
   },
+  async findEndpointForOwner() { return null },
+  async clearTokenIfMatches() { return false },
 }
 
 try {
@@ -78,7 +74,7 @@ try {
     ],
   )
 
-  const fannedOut = await fanOutPendingNotifications(store, endpointDb, now)
+  const fannedOut = await fanOutPendingNotifications(store, endpointStore, now)
   assert.equal(fannedOut, 1)
 
   const firstState = await pool.query(
@@ -115,17 +111,13 @@ try {
   checks.outboxAndDeliveryTransitionAtomic = true
 
   assert.ok(endpointQueries.length >= 2)
-  assert.ok(endpointQueries.every(call =>
-    call.sql.includes('FROM notification_push_endpoints') &&
-    call.sql.includes("provider = 'expo'") &&
-    call.sql.includes("permission_status = 'granted'") &&
-    call.sql.includes('ORDER BY updated_at DESC LIMIT ?')
-  ))
-  assert.deepEqual(endpointQueries.map(call => call.values[0]), [recipientWithEndpoints, recipientWithoutEndpoints])
-  assert.ok(endpointQueries.every(call => call.values[1] === 20))
+  assert.deepEqual(endpointQueries, [
+    { recipientUserId: recipientWithEndpoints, limit: 20 },
+    { recipientUserId: recipientWithoutEndpoints, limit: 20 },
+  ])
   checks.activeEndpointsReadThroughW09D103Boundary = true
 
-  const repeatedCount = await fanOutPendingNotifications(store, endpointDb, now)
+  const repeatedCount = await fanOutPendingNotifications(store, endpointStore, now)
   assert.equal(repeatedCount, 0)
   const repeatedRows = await pool.query(
     'SELECT count(*)::int AS count FROM social_notification_push_deliveries WHERE notification_id = $1',
