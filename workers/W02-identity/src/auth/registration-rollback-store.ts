@@ -48,6 +48,13 @@ function normalizeCommand(command: RegistrationRollbackCommand): RegistrationRol
  * Production adapter. Preserve the existing registration rollback checks
  * and D1 batch boundary; D1-01 remains the W02 production authority.
  */
+/**
+ * @deprecated-next-version
+ * Reason: Legacy Cloudflare D1 implementation retained only for isolated unit tests or the explicit schema/test fixture.
+ * Replacement: PostgreSQL registration rollback Store in src/neon/registration-rollback-postgres.ts.
+ * Removal: Next release.
+ * Condition: Registration rollback tests use PostgreSQL/in-memory Store fixtures and all W02 production callers use the Neon runtime.
+ */
 export function createD1RegistrationRollbackStore(db: D1Database): RegistrationRollbackStore {
   return {
     async rollback(rawCommand) {
