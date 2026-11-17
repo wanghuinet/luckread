@@ -12,6 +12,17 @@ import type { User as PayloadUser } from '../../../payload-types'
 const ACCOUNT_STATE = 'PENDING_VERIFICATION'
 const IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000
 
+const SCOPE = 'ACCOUNT_REGISTRATION'
+const ENDPOINT = 'authRegister'
+
+type ExistingEnvelope = {
+  id: string
+  payloadHash: string
+  state: 'IN_PROGRESS' | 'COMPLETED' | 'FAILED'
+  committedResponse?: string | null
+  expiresAt: string
+}
+
 type AuthRegisterRequest = {
   identityType?: unknown
   identity?: unknown
