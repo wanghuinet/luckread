@@ -101,7 +101,7 @@ describe('W02 L8 genesis bootstrap service-boundary gate', () => {
     const path = fileURLToPath(new URL('../index.ts', import.meta.url))
     const source = readFileSync(path, 'utf8')
     expect(source).not.toMatch(/mfaVerified\s*:\s*true/)
-    expect(source).not.toMatch(/mfaVerified\\??\s*:/)
+    expect(source).not.toMatch(/mfaVerified\??\s*:/)
     expect(source).toContain('verifyTargetBoundSingleApproval')
     expect(source).toContain('bootstrapSuperAdminPostgres(postgres.pool, approval')
 
