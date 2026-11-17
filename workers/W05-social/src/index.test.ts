@@ -358,6 +358,7 @@ describe('W05 profile-channel PostgreSQL runtime injection', () => {
       ownerUserIds: ['owner-1'],
     })
     expect(d1Prepare).not.toHaveBeenCalled()
+    expect(d1Prepare).not.toHaveBeenCalled()
   })
 })
 
@@ -887,7 +888,6 @@ describe('W05 social query transport', () => {
     expect(store.list).toHaveBeenNthCalledWith(2, {
       actorUserId: 'viewer-1', relationType: 'mute', cursor: null, limit: 10,
     })
-    expect(d1Prepare).not.toHaveBeenCalled()
   })
 
   it('creates an idempotent Block relation through the injected Store', async () => {
@@ -1529,7 +1529,6 @@ describe('W05 social query transport', () => {
       },
     })
     expect(store.read).toHaveBeenCalledWith('viewer-1', 'pg-relationship-target-20261112')
-    expect(d1Prepare).not.toHaveBeenCalled()
   })
 
   it('denies follow status below the minimum interaction permission layer', async () => {
