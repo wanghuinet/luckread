@@ -1,11 +1,6 @@
 import { Pool } from 'pg'
 
-import {
-  createD1W08CreatorStore,
-  createPostgresW08CreatorStore,
-  type W08CreatorStore,
-  type W08D1Database,
-} from '../creator-store.js'
+import { createPostgresW08CreatorStore, type W08CreatorStore } from '../creator-store.js'
 
 /**
  * @deprecated-next-version
@@ -14,10 +9,9 @@ import {
  * Removal: Next release.
  * Condition: All W08 callers and test fixtures use the Neon creator store; D1 binding fixtures are retired.
  */
-export type W08DatabaseDriver = 'd1' | 'neon'
+export type W08DatabaseDriver = 'neon'
 
 export type W08RuntimeEnv = Readonly<{
-  D1_01?: W08D1Database
   W08_DATABASE_DRIVER?: string
   HYPERDRIVE?: Readonly<{ connectionString?: string }>
 }>
@@ -25,11 +19,11 @@ export type W08RuntimeEnv = Readonly<{
 const pools = new WeakMap<object, Pool>()
 const stores = new WeakMap<object, W08CreatorStore>()
 
-/** Wrangler selects Neon for production; D1 remains an explicit rollback and local fallback. */
+/** W08 production and runtime are Neon-only; legacy D1 driver selection is rejected. */
 export function resolveW08DatabaseDriver(env: W08RuntimeEnv): W08DatabaseDriver {
-  const configured = env.W08_DATABASE_DRIVER?.trim().toLowerCase() || 'd1'
-  if (configured === 'd1' || configured === 'neon') return configured
-  throw new Error('W08_DATABASE_DRIVER_UNSUPPORTED')
+  const configured = env.W08_DATABASE_DRIVER?.trim().toLowerCase() || 'neon'
+  if (configured !== 'neon') throw new Error('W08_DATABASE_DRIVER_UNSUPPORTED')
+  return 'neon'
 }
 
 function hyperdriveConnectionString(value: unknown): string {
@@ -85,12 +79,7 @@ export function getW08PostgresPool(env: W08RuntimeEnv): Pool {
  * and RoleAssignment operations remain on the existing W02 Service Binding.
  */
 export function getW08CreatorStore(env: W08RuntimeEnv): W08CreatorStore {
-  const driver = resolveW08DatabaseDriver(env)
-  if (driver === 'd1') {
-    if (!env.D1_01) throw new Error('W08_D1_01_BINDING_REQUIRED')
-    return createD1W08CreatorStore(env.D1_01)
-  }
-
+  resolveW08DatabaseDriver(env)
   const binding = env.HYPERDRIVE
   if (!binding || typeof binding !== 'object') {
     throw new Error('W08_HYPERDRIVE_BINDING_REQUIRED')
