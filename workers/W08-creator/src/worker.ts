@@ -345,46 +345,75 @@ export type W08CreatorWorkerDependencies = Readonly<{
 
 export function createW08CreatorWorker(dependencies: W08CreatorWorkerDependencies = {}) {
   const getCreatorStore = dependencies.getCreatorStore ?? getW08CreatorStore
+
   return {
     async fetch(request: Request, env: Env): Promise<Response> {
-    const url = new URL(request.url)
-    if (request.method === 'POST' && url.pathname === '/internal/authz/check-permission') {
-      try {
-        return await handlePermissionCheck(request, env)
-      } catch {
-        return Response.json(
-          { decision: 'DENY', reasonCode: 'AUTHORIZATION_INPUT_UNAVAILABLE', policyVersion: 'casl-l0-l8-v1' },
-          { status: 503, headers: { 'cache-control': 'no-store' } },
-        )
+      const url = new URL(request.url)
+
+      if (request.method === 'POST' && url.pathname === '/internal/authz/check-permission') {
+        try {
+          return await handlePermissionCheck(request, env)
+        } catch {
+          return Response.json(
+            { decision: 'DENY', reasonCode: 'AUTHORIZATION_INPUT_UNAVAILABLE', policyVersion: 'casl-l0-l8-v1' },
+            { status: 503, headers: { 'cache-control': 'no-store' } },
+          )
+        }
       }
-    }
-    if (request.method === 'POST' && url.pathname === '/internal/authz/check-scheduled-publish') {
-      try {
-        return await handleScheduledPublishPermission(request, env)
-      } catch {
-        return Response.json(
-          { decision: 'DENY', reasonCode: 'AUTHORIZATION_INPUT_UNAVAILABLE', policyVersion: 'casl-l0-l8-v1' },
-          { status: 503, headers: { 'cache-control': 'no-store' } },
-        )
+
+      if (request.method === 'POST' && url.pathname === '/internal/authz/check-scheduled-publish') {
+        try {
+          return await handleScheduledPublishPermission(request, env)
+        } catch {
+          return Response.json(
+            { decision: 'DENY', reasonCode: 'AUTHORIZATION_INPUT_UNAVAILABLE', policyVersion: 'casl-l0-l8-v1' },
+            { status: 503, headers: { 'cache-control': 'no-store' } },
+          )
+        }
       }
-    }
-    if (url.pathname === '/internal/creator/self' && request.method === 'GET') {
-      try { return await handleActiveCreatorSelf(env, request, getCreatorStore(env)) } catch { return errorResponse(503, 'CREATOR_SERVICE_UNAVAILABLE', 'Creator service unavailable') }
-    }
-    if (url.pathname === '/api/v1/creator-applications' && request.method === 'POST') {
-      try { return await handleApplicationCreate(env, request, getCreatorStore(env)) } catch { return errorResponse(503, 'CREATOR_SERVICE_UNAVAILABLE', 'Creator application service unavailable') }
-    }
-    if (url.pathname === '/api/v1/creator-applications/me' && request.method === 'GET') {
-      try { return await handleApplicationRead(env, request, getCreatorStore(env)) } catch { return errorResponse(503, 'CREATOR_SERVICE_UNAVAILABLE', 'Creator application service unavailable') }
-    }
-    if (url.pathname === '/api/v1/admin/creator-applications' && request.method === 'GET') {
-      try { return await handleAdminApplicationList(env, request, getCreatorStore(env)) } catch { return errorResponse(503, 'CREATOR_SERVICE_UNAVAILABLE', 'Creator application service unavailable') }
-    }
-    if (url.pathname === '/api/v1/admin/creator-applications/decision' && request.method === 'POST') {
-      try { return await handleAdminApplicationDecision(env, request, getCreatorStore(env)) } catch { return errorResponse(503, 'CREATOR_SERVICE_UNAVAILABLE', 'Creator application service unavailable') }
-    }
-    return errorResponse(404, 'NOT_FOUND', 'Creator endpoint not found')
-  },
+
+      if (url.pathname === '/internal/creator/self' && request.method === 'GET') {
+        try {
+          return await handleActiveCreatorSelf(env, request, getCreatorStore(env))
+        } catch {
+          return errorResponse(503, 'CREATOR_SERVICE_UNAVAILABLE', 'Creator service unavailable')
+        }
+      }
+
+      if (url.pathname === '/api/v1/creator-applications' && request.method === 'POST') {
+        try {
+          return await handleApplicationCreate(env, request, getCreatorStore(env))
+        } catch {
+          return errorResponse(503, 'CREATOR_SERVICE_UNAVAILABLE', 'Creator application service unavailable')
+        }
+      }
+
+      if (url.pathname === '/api/v1/creator-applications/me' && request.method === 'GET') {
+        try {
+          return await handleApplicationRead(env, request, getCreatorStore(env))
+        } catch {
+          return errorResponse(503, 'CREATOR_SERVICE_UNAVAILABLE', 'Creator application service unavailable')
+        }
+      }
+
+      if (url.pathname === '/api/v1/admin/creator-applications' && request.method === 'GET') {
+        try {
+          return await handleAdminApplicationList(env, request, getCreatorStore(env))
+        } catch {
+          return errorResponse(503, 'CREATOR_SERVICE_UNAVAILABLE', 'Creator application service unavailable')
+        }
+      }
+
+      if (url.pathname === '/api/v1/admin/creator-applications/decision' && request.method === 'POST') {
+        try {
+          return await handleAdminApplicationDecision(env, request, getCreatorStore(env))
+        } catch {
+          return errorResponse(503, 'CREATOR_SERVICE_UNAVAILABLE', 'Creator application service unavailable')
+        }
+      }
+
+      return errorResponse(404, 'NOT_FOUND', 'Creator endpoint not found')
+    },
   }
 }
 
