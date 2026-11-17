@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { SocialTargetsReadStoreError } from './social-targets-read-store.js'
 import { extractSocialTokens, getContentSocialSummary, getSocialTargets, listDiscoveryTopics, listNotifications, syncSocialTokens } from './social-closure-runtime.js'
 import type { NotificationEnqueueStore } from './notification-enqueue-store.js'
+import type { SocialClosureReadStore, SocialDiscoveryTopicEdge, NotificationInboxRow } from './social-closure-read-store.js'
 import type { SocialTokenSyncCommentContext, SocialTokenSyncMentionInput, SocialTokenSyncMentionRow, SocialTokenSyncStore, SocialTokenSyncTargetInput, SocialTokenSyncTargetType, SocialTokenSyncTopicInput } from './social-token-sync-store.js'
 
 type TokenSyncStoreFixture = Readonly<{
@@ -33,6 +34,25 @@ function createMemorySocialTokenSyncStore(options: TokenSyncStoreFixture = {}) {
   return { store, mentions }
 }
 
+
+function createMemorySocialClosureReadStore(
+  overrides: Partial<SocialClosureReadStore> = {},
+): SocialClosureReadStore {
+  return {
+    getTargets: async () => ({ topics: [], mentions: [] }),
+    getTopicByName: async () => null,
+    listTopicContentEdges: async () => [],
+    listDiscoveryContentEdges: async () => [],
+    listNotificationRows: async () => [],
+    countUnreadNotifications: async () => 0,
+    markNotificationRead: async () => undefined,
+    markAllNotificationsRead: async () => undefined,
+    getContentSocialCounts: async () => null,
+    getContentSocialViewerState: async () => null,
+    ...overrides,
+  }
+}
+
 describe('W05 unified social closure', () => {
   it('normalizes and deduplicates mentions and hashtags', () => {
     expect(extractSocialTokens('你好 @Alice #Travel #travel @Alice #日本')).toEqual([
@@ -51,23 +71,11 @@ describe('W05 unified social closure', () => {
     expect(['FOLLOW', 'LIKE', 'COMMENT', 'REPLY', 'MENTION']).toHaveLength(5)
   })
 
-  it('uses W03 content context and W05-only SQL for social summary counts and pin state', async () => {
-    const firstResults: unknown[] = [
-      { likes: 3, comments: 2, favorites: 1, shares: 4, reposts: 7, pinned: 1 },
-      { liked: 1, favorited: 0, reposted: 1 },
-    ]
-    const queries: string[] = []
-    const db = {
-      prepare: (sql: string) => {
-        queries.push(sql)
-        return {
-          bind: (..._values: unknown[]) => ({
-            first: async () => firstResults.shift() ?? null,
-            all: async () => ({ results: [] }),
-          }),
-        }
-      },
-    } as unknown as D1Database
+  it('uses W03 content context and the injected PostgreSQL store for social summary counts and pin state', async () => {
+    const store = createMemorySocialClosureReadStore({
+      getContentSocialCounts: vi.fn(async () => ({ likes: 3, comments: 2, favorites: 1, shares: 4, reposts: 7, pinned: true })),
+      getContentSocialViewerState: vi.fn(async () => ({ liked: true, favorited: false, reposted: true })),
+    })
     const contentContext = {
       contentId: 'content-1',
       ownerUserId: 'owner-1',
@@ -76,7 +84,7 @@ describe('W05 unified social closure', () => {
       updatedAt: '2026-10-17T04:00:00.000Z',
     } as const
 
-    await expect(getContentSocialSummary(db, 'content-1', contentContext, 'viewer-1')).resolves.toMatchObject({
+    await expect(getContentSocialSummary(store, 'content-1', contentContext, 'viewer-1')).resolves.toMatchObject({
       contentId: 'content-1',
       contentType: 'post',
       counts: { likes: 3, comments: 2, favorites: 1, shares: 4, reposts: 7 },
@@ -85,29 +93,27 @@ describe('W05 unified social closure', () => {
       topics: [],
       mentions: [],
     })
-    expect(queries.some(sql => /(?:FROM|JOIN)\s+contents/i.test(sql))).toBe(false)
-    const countsQuery = queries.find(sql => sql.includes('AS pinned'))
-    expect(countsQuery).toContain('FROM social_profile_pins p')
-    expect(countsQuery).not.toContain('JOIN contents')
+    expect(store.getContentSocialCounts).toHaveBeenCalledWith('content-1', 'owner-1')
+    expect(store.getContentSocialViewerState).toHaveBeenCalledWith('viewer-1', 'content-1')
   })
 
   it('rejects a mismatched or unpublished social context before querying W05', async () => {
-    const prepare = vi.fn()
-    const db = { prepare } as unknown as D1Database
-    await expect(getContentSocialSummary(db, 'content-1', {
+    const getContentSocialCounts = vi.fn(async () => null)
+    const store = createMemorySocialClosureReadStore({ getContentSocialCounts })
+    await expect(getContentSocialSummary(store, 'content-1', {
       contentId: 'another-content',
       ownerUserId: 'owner-1',
       contentType: 'post',
       state: 'PUBLISHED',
       updatedAt: '2026-10-17T04:00:00.000Z',
     })).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 })
-    await expect(getContentSocialSummary(db, 'content-1', {
+    await expect(getContentSocialSummary(store, 'content-1', {
       contentId: 'content-1',
       ownerUserId: 'owner-1',
       contentType: 'post',
       state: 'UNPUBLISHED',
     } as never)).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 })
-    expect(prepare).not.toHaveBeenCalled()
+    expect(getContentSocialCounts).not.toHaveBeenCalled()
   })
 
   it('validates content token synchronization through W03 context and writes only W05-owned edges', async () => {
@@ -172,34 +178,21 @@ describe('W05 unified social closure', () => {
     })
   })
 
-  it('keeps a historical mention attached to its stored identity after its handle is reclaimed', async () => {
-    const queries: string[] = []
-    const db = {
-      prepare: (sql: string) => {
-        queries.push(sql)
-        return {
-          bind: (..._values: unknown[]) => ({
-            all: async () => sql.includes('FROM social_mentions')
-              ? { results: [{ mentioned_user_id: 'original-user-id', handle: 'alice' }] }
-              : { results: [] },
-          }),
-        }
-      },
-    } as unknown as D1Database
+  it('keeps a historical mention attached to its stored immutable identity after its handle is reclaimed', async () => {
+    const store = createMemorySocialClosureReadStore({
+      getTargets: vi.fn(async () => ({
+        topics: [],
+        mentions: [{ mentioned_user_id: 'original-user-id', handle: 'alice' }],
+      })),
+    })
 
     // The current username owner may now be a different account. Historical
-    // reads must use the immutable ID captured when the mention was created.
-    await expect(getSocialTargets(db, 'content', 'content-1')).resolves.toEqual({
+    // reads use the immutable ID captured when the mention was created.
+    await expect(getSocialTargets(store, 'content', 'content-1')).resolves.toEqual({
       topics: [],
       mentions: [{ userId: 'original-user-id', handle: 'alice' }],
     })
-
-    const mentionRead = queries.find(sql => sql.includes('FROM social_mentions'))
-    expect(mentionRead).toContain('SELECT mentioned_user_id, handle')
-    expect(mentionRead).toContain('WHERE target_type = ? AND target_id = ?')
-    expect(mentionRead).not.toContain('JOIN users')
-    expect(mentionRead).not.toContain('JOIN profiles')
-    expect(mentionRead).not.toContain('username')
+    expect(store.getTargets).toHaveBeenCalledWith({ targetType: 'content', targetId: 'content-1' })
   })
 
   it('preserves an existing mention identity when the same handle is later owned by another account', async () => {
