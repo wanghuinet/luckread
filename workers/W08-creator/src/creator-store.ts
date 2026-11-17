@@ -86,13 +86,6 @@ export interface W08CreatorStore {
   findActiveCreator(userId: string): Promise<{ creator_id: string } | null>
 }
 
-/**
- * @deprecated-next-version
- * Reason: Legacy D1 statement surface is used only by the isolated W08 unit-test adapter.
- * Replacement: W08CreatorStore contract with the Neon PostgreSQL implementation.
- * Removal: Next release.
- * Condition: W08 unit tests construct in-memory W08CreatorStore fixtures instead of exercising D1 SQL compatibility.
- */
 type AuditEventInput = Readonly<{
   eventKey: string
   actorId: string
@@ -107,7 +100,11 @@ type AuditEventInput = Readonly<{
   correlationId: string | null
   occurredAt: string
   details: Record<string, unknown>
-}>
+ }>
+
+function correlationFor(event: AuditEventInput): string | null {
+  return event.correlationId?.trim().slice(0, 128) || null
+}
 
 function postgresAuditValues(input: AuditEventInput): unknown[] {
   return [
@@ -133,13 +130,6 @@ const auditInsertSql =
   'VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) ' +
   'ON CONFLICT (event_key) DO NOTHING'
 
-/**
- * @deprecated-next-version
- * Reason: This D1 store is retained only for isolated local unit tests; production W08 runtime is Neon-only.
- * Replacement: createPostgresW08CreatorStore.
- * Removal: Next release.
- * Condition: W08 creator worker tests inject W08CreatorStore fixtures and no longer call this adapter.
- */
 const isoTimestamp = (column: string): string =>
   "to_char(" + column + " AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"')"
 
