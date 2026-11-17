@@ -81,6 +81,25 @@ describe('W02 registration identity confirmation service boundary', () => {
     expect(registrationRollbackStore.confirmIdentity).toHaveBeenCalledWith(body)
   })
 
+  it('rejects registration rollback calls outside the W01 service boundary', async () => {
+    registrationRollbackStore.rollback.mockClear()
+    const response = await worker.fetch(new Request(
+      'https://luckread-w02.internal/internal/auth/registration/rollback',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          userId: 'identity-user-123',
+          email: 'person@example.test',
+          username: 'person123',
+        }),
+      },
+    ), neonEnv)
+
+    expect(response.status).toBe(403)
+    expect(registrationRollbackStore.rollback).not.toHaveBeenCalled()
+  })
+
   it('rejects malformed confirmation input before querying W02 storage', async () => {
     registrationRollbackStore.confirmIdentity.mockClear()
     const response = await worker.fetch(new Request(
