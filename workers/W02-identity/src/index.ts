@@ -495,68 +495,33 @@ export default {
       cron: controller.cron,
       scheduledTime: controller.scheduledTime,
     })
-    if (isW02NeonRuntime(env)) {
-      const postgres = getW02PostgresRuntime(env)
-      await runScheduledPublicationTicks([
-        {
-          name: 'account-state',
-          publish: () => publishPendingAccountStateEventsPostgres(postgres.pool, {
-            auth013: env.AUTH013_QUEUE,
-            projection: env.AUTH013_PROJECTION_QUEUE,
-          }),
-        },
-        {
-          name: 'session-audit',
-          publish: () => publishPendingSessionRevocationEventsPostgres(postgres.pool, env.AUTH013_QUEUE),
-        },
-        {
-          name: 'mfa-audit',
-          publish: async () => {
-            let receiptSummary = { selected: 0, emitted: 0, failed: 0, unknown: 0 }
-            try {
-              receiptSummary = await reconcileMfaAuditOperationReceiptsPostgres(postgres.pool)
-            } catch {
-              console.error(JSON.stringify({
-                event: 'auth.mfa.audit_receipt_reconcile_failed',
-                code: 'MFA_AUDIT_RECEIPT_RECONCILE_FAILED',
-              }))
-              receiptSummary.failed = 1
-            }
-            const publication = await publishPendingMfaAuditEventsPostgres(postgres.pool, env.AUTH013_QUEUE)
-            return {
-              ...publication,
-              receiptSelected: receiptSummary.selected,
-              receiptEmitted: receiptSummary.emitted,
-              receiptFailed: receiptSummary.failed,
-              receiptUnknown: receiptSummary.unknown,
-            }
-          },
-        },
-      ])
-      return
-    }
-
-    if (!env.D1_01) throw new Error('W02_D1_BINDING_REQUIRED')
+    const postgres = getW02PostgresRuntime(env)
     await runScheduledPublicationTicks([
-      { name: 'account-state', publish: () => publishPendingAccountStateEvents(env) },
-      { name: 'session-audit', publish: () => publishPendingSessionRevocationEvents(env) },
+      {
+        name: 'account-state',
+        publish: () => publishPendingAccountStateEventsPostgres(postgres.pool, {
+          auth013: env.AUTH013_QUEUE,
+          projection: env.AUTH013_PROJECTION_QUEUE,
+        }),
+      },
+      {
+        name: 'session-audit',
+        publish: () => publishPendingSessionRevocationEventsPostgres(postgres.pool, env.AUTH013_QUEUE),
+      },
       {
         name: 'mfa-audit',
         publish: async () => {
           let receiptSummary = { selected: 0, emitted: 0, failed: 0, unknown: 0 }
           try {
-            receiptSummary = await createD1MfaAuditOperationReceiptStore(env.D1_01).reconcile()
+            receiptSummary = await reconcileMfaAuditOperationReceiptsPostgres(postgres.pool)
           } catch {
-            // Keep the durable outbox publisher independent from receipt scanning.
-            // The fixed code is safe for logs; never print receipt rows or user IDs.
             console.error(JSON.stringify({
               event: 'auth.mfa.audit_receipt_reconcile_failed',
               code: 'MFA_AUDIT_RECEIPT_RECONCILE_FAILED',
             }))
             receiptSummary.failed = 1
           }
-
-          const publication = await publishPendingMfaAuditEvents(env)
+          const publication = await publishPendingMfaAuditEventsPostgres(postgres.pool, env.AUTH013_QUEUE)
           return {
             ...publication,
             receiptSelected: receiptSummary.selected,
