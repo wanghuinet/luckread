@@ -15,7 +15,7 @@ const stores = new WeakMap<object, W08CreatorStore>()
 
 /** W08 production and runtime are Neon-only; legacy D1 driver selection is rejected. */
 export function resolveW08DatabaseDriver(env: W08RuntimeEnv): W08DatabaseDriver {
-  const configured = env.W08_DATABASE_DRIVER?.trim().toLowerCase() || 'neon'
+  const configured = env.W08_DATABASE_DRIVER?.trim().toLowerCase()
   if (configured !== 'neon') throw new Error('W08_DATABASE_DRIVER_UNSUPPORTED')
   return 'neon'
 }
