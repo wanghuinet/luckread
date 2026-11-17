@@ -61,6 +61,13 @@ export function prepareRoleVersionAdvance(
   return db.prepare(UPSERT_ROLE_VERSION).bind(subjectId, now)
 }
 
+/**
+ * @deprecated-next-version
+ * Reason: Legacy Cloudflare D1 authorization helper retained for isolated unit tests.
+ * Replacement: Neon role-version mutation via PostgreSQL role assignment triggers.
+ * Removal: Next release.
+ * Condition: The remaining D1 version helper tests are moved to the PostgreSQL implementation and no D1 prepared statement is used in production.
+ */
 export async function advanceRoleVersion(
   db: D1Database,
   subjectId: string,
