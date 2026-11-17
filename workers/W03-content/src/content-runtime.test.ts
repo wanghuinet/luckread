@@ -2147,19 +2147,23 @@ describe('W03 content contract core', () => {
 
 })
 
-  it('stores the full ContentRecord for update idempotency replay', () => {
+  it('stores the full ContentRecord through Neon for update idempotency replay', () => {
     const runtime = readFileSync(
       resolve(process.cwd(), 'workers/W03-content/src/content-runtime.ts'),
       'utf8',
     )
     const start = runtime.indexOf('export async function updateContent')
-    const end = runtime.indexOf('\nexport async function deleteContent', start)
+    const end = runtime.indexOf('\nexport async function rollbackContentRevision', start)
     const section = runtime.slice(start, end)
     expect(section).toContain('const idempotencyResponseBody = JSON.stringify(updated)')
-    expect(section).toContain(
-      'insertCompletedIdempotency(db, principalUserId, operationId, idempotencyKey, hash, 200, idempotencyResponseBody, updatedAt, expiresAt),',
-    )
+    expect(section).toContain('await mutationStore.update({')
+    expect(section).toContain('responseJson: idempotencyResponseBody,')
+    expect(section).toContain('requestHash: hash,')
+    expect(section).toContain('expectedVersion: content.version,')
+    expect(section).toContain('expectedEtag: content.etag,')
+    expect(section).toContain('revision,')
     expect(section).toContain('return updated')
+    expect(section).not.toContain('insertCompletedIdempotency')
   })
 
 
