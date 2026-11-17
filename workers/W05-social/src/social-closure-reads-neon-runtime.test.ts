@@ -82,6 +82,18 @@ const request = (pathname: string) => new Request('https://luckread-w05.internal
 })
 
 describe('W05 Neon social-closure read route composition', () => {
+  it('fails closed when the Neon closure Store is missing instead of falling back to D1', async () => {
+    const prepare = vi.fn(() => { throw new Error('D1 fallback must not execute') })
+    const worker = createW05SocialWorker()
+    const response = await worker.fetch(
+      request('/internal/social/notifications'),
+      { DB: { prepare }, W03_CONTENT: w03Content } as never,
+      {} as never,
+    )
+    expect(response.status).toBe(503)
+    expect(prepare).not.toHaveBeenCalled()
+  })
+
   it('reads content social summary and viewer state through PostgreSQL after W03 validation without D1', async () => {
     const h = createHarness()
     const response = await h.worker.fetch(
