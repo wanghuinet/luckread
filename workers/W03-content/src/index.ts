@@ -1774,15 +1774,16 @@ export function createW03ContentWorker(dependencies: W03ContentWorkerDependencie
 
       if (request.method === 'DELETE' && path.id) {
         const principal = requiredSocialPostPrincipal(request)
+        const mutationStore = dependencies.contentMutationStoreProvider?.(env)
+        if (!mutationStore) throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)
         await deleteContent(
-          NO_LEGACY_DATABASE_HANDLE,
           principal.userId,
           path.id,
           requireIfMatch(request),
           requireIdempotency(request),
           new Date(),
           principal.layer,
-          dependencies.contentMutationStoreProvider?.(env),
+          mutationStore,
         )
         return new Response(null, { status: 204 })
       }
