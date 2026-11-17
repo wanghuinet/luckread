@@ -88,7 +88,7 @@ async function sendPasswordResetEmail(
  * Removal: Next release.
  * Condition: Better Auth schema generation and all D1-profile unit tests move to PostgreSQL or isolated in-memory fixtures.
  */
-function requireLegacyW02D1Database(env: BetterAuthEnv): D1Database {
+export function requireLegacyW02D1Database(env: BetterAuthEnv): D1Database {
   if (!env.D1_01) throw new Error('W02_D1_TEST_BINDING_REQUIRED')
   return env.D1_01
 }
@@ -174,13 +174,28 @@ export const buildLuckReadAuth = (
   env: BetterAuthEnv,
   database: BetterAuthDatabase = requireLegacyW02D1Database(env) as BetterAuthDatabase,
   persistenceProfile: BetterAuthPersistenceProfile = 'production',
-  mfaFactorStateStore: MfaFactorStateStore = createD1MfaFactorStateStore(requireLegacyW02D1Database(env)),
+  mfaFactorStateStore?: MfaFactorStateStore,
   postgresLifecycleAdapters?: BetterAuthPostgresLifecycleAdapters,
   mfaAuditOperationReceiptStore?: MfaAuditOperationReceiptStore,
   resolveMfaSessionSubject?: (headers: Headers) => Promise<string | null>,
 ) => {
   const postgresPersistence = persistenceProfile !== 'production'
   const legacyD1 = postgresPersistence ? undefined : requireLegacyW02D1Database(env)
+  const unavailablePostgresRehearsalMfaFactorStateStore: MfaFactorStateStore = {
+    async isActiveSubject() {
+      throw new Error('W02_MFA_FACTOR_STORE_NOT_CONFIGURED_FOR_SCHEMA_PROFILE')
+    },
+    async readVerificationMaterial() {
+      throw new Error('W02_MFA_FACTOR_STORE_NOT_CONFIGURED_FOR_SCHEMA_PROFILE')
+    },
+    async consumeTotpTimeStep() {
+      throw new Error('W02_MFA_FACTOR_STORE_NOT_CONFIGURED_FOR_SCHEMA_PROFILE')
+    },
+  }
+  const effectiveMfaFactorStateStore = mfaFactorStateStore ??
+    (postgresPersistence
+      ? unavailablePostgresRehearsalMfaFactorStateStore
+      : createD1MfaFactorStateStore(legacyD1!))
   const postgresEmailVerifiedCallback = postgresLifecycleAdapters?.afterEmailVerified
   // The Neon production factory injects a provider-matched receipt store;
   // only the deprecated explicit D1 test/schema profile constructs a D1 store.
@@ -342,7 +357,7 @@ export const buildLuckReadAuth = (
 
         // Factor completion must never activate a suspended, pending or missing
         // account. Check W02-owned account state for TOTP and recovery paths.
-        const accountActive = await mfaFactorStateStore.isActiveSubject(subjectId)
+        const accountActive = await effectiveMfaFactorStateStore.isActiveSubject(subjectId)
         if (!accountActive) {
           if (!isEnrollmentConfirmation) {
             await finalizeKnownMfaRejection(effectiveMfaAuditReceiptStore!, receiptId,
@@ -363,7 +378,7 @@ export const buildLuckReadAuth = (
         // persisted monotonic time-step guard applies specifically to TOTP.
         if (isBackupCodeVerification) return
 
-        const factor = await mfaFactorStateStore.readVerificationMaterial(subjectId)
+        const factor = await effectiveMfaFactorStateStore.readVerificationMaterial(subjectId)
         // Let the pinned plugin produce its canonical not-enabled/challenge error.
         if (!factor) return
 
@@ -389,7 +404,7 @@ export const buildLuckReadAuth = (
           throw APIError.from('UNAUTHORIZED', { code: 'INVALID_CODE', message: 'Invalid code' })
         }
 
-        const consumed = await mfaFactorStateStore.consumeTotpTimeStep(subjectId, match.timeStep)
+        const consumed = await effectiveMfaFactorStateStore.consumeTotpTimeStep(subjectId, match.timeStep)
         if (!consumed) {
           // The TOTP was valid but its monotonically increasing step was already
           // accepted. Persist the rejection before returning the auth failure.
