@@ -290,7 +290,7 @@ export type W05SocialWorkerDependencies = Readonly<{
   followListReadStore?: FollowListReadStore
   /** Optional PostgreSQL-capable Follow/Unfollow writer; D1 remains the deployed default. */
   followStore?: FollowStore
-  /** Optional PostgreSQL-capable relationship graph reader; D1 remains the deployed default. */
+  /** Optional PostgreSQL relationship graph reader; missing composition fails closed. */
   relationshipGraphReadStore?: RelationshipGraphReadStore
   /** Optional PostgreSQL-capable Following-feed author reader; D1 remains the deployed default. */
   followingAuthorIdsReadStore?: FollowingAuthorIdsReadStore
@@ -328,9 +328,9 @@ export type W05SocialWorkerDependencies = Readonly<{
   pollReadStore?: PollReadStore
   /** Optional PostgreSQL-capable poll vote writer; D1 remains the deployed default. */
   pollVoteStore?: PollVoteStore
-  /** Optional PostgreSQL-capable Block/Mute list reader; D1 remains the deployed default. */
+  /** Optional PostgreSQL Block/Mute list reader; missing composition fails closed. */
   blockMuteListReadStore?: BlockMuteListReadStore
-  /** Optional PostgreSQL-capable Block/Mute relation reader and writer; D1 remains the deployed default. */
+  /** Optional PostgreSQL Block/Mute relation store; missing composition fails closed. */
   blockMuteRelationStore?: BlockMuteRelationStore
   /** Optional PostgreSQL-capable profile replies/likes reader; D1 remains the deployed default. */
   profileChannelReadStore?: ProfileChannelReadStore
@@ -485,7 +485,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
           }
           const limit = parseBlockMuteListLimit(limitValues[0] ?? null)
           return json({
-            data: await listRelations(dependencies.blockMuteListReadStore ?? env.DB, actorUserId, relationType, cursorValues[0] ?? null, limit),
+            data: await listRelations(dependencies.blockMuteListReadStore, actorUserId, relationType, cursorValues[0] ?? null, limit),
             requestId: createRequestId(),
           })
         }
@@ -506,7 +506,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
           if (typeof targetUserId !== 'string' || !targetUserId.trim()) {
             throw new BlockMuteRuntimeError('VALIDATION_FAILED', 400)
           }
-          const relation = await setRelation(dependencies.blockMuteRelationStore ?? env.DB, actorUserId, targetUserId, relationType)
+          const relation = await setRelation(dependencies.blockMuteRelationStore, actorUserId, targetUserId, relationType)
           await invalidateRelationshipGraph(actorUserId, targetUserId)
           if (relationType === 'block') {
             await invalidateFollowListCountCache(actorUserId, targetUserId)
@@ -523,7 +523,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
           const idempotencyKey = request.headers.get('Idempotency-Key')?.trim() ?? ''
           if (!idempotencyKey) throw new BlockMuteRuntimeError('PRECONDITION_REQUIRED', 428)
           if (idempotencyKey.length > 256) throw new BlockMuteRuntimeError('VALIDATION_FAILED', 400)
-          await removeRelation(dependencies.blockMuteRelationStore ?? env.DB, actorUserId, targetFromPath, relationType)
+          await removeRelation(dependencies.blockMuteRelationStore, actorUserId, targetFromPath, relationType)
           await invalidateRelationshipGraph(actorUserId, targetFromPath)
           if (relationType === 'block') {
             await invalidateFollowListCountCache(actorUserId, targetFromPath)
@@ -1319,7 +1319,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
 
         if (request.method === 'GET') {
           requireInteractionLayer(request)
-          const relationship = await getRelationshipGraph(dependencies.relationshipGraphReadStore ?? env.DB, viewerUserId, path.userId)
+          const relationship = await getRelationshipGraph(dependencies.relationshipGraphReadStore, viewerUserId, path.userId)
           return json({
             data: {
               following: relationship.following,

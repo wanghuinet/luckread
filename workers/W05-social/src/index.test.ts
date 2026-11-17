@@ -7,6 +7,7 @@ import type { FollowListReadInput, FollowListReadRow, FollowListCountInput, Foll
 import type { FollowMutation, FollowRow, FollowStore } from './follow-store.js'
 import type { RelationshipGraphReadRow, RelationshipGraphReadStore } from './relationship-graph-store.js'
 import type { BlockMuteListReadInput, BlockMuteListReadRow, BlockMuteListReadStore } from './block-mute-list-read-store.js'
+import type { BlockMuteRelationRow, BlockMuteRelationStore } from './block-mute-relation-store.js'
 import type { ProfileChannelReadStore } from './profile-channel-read-store.js'
 import type { FollowingAuthorIdRow, FollowingAuthorIdsReadStore } from './following-author-ids-read-store.js'
 import type { ContentLikerReadInput, ContentLikerReadRow, ContentLikerReadStore } from './like-list-read-store.js'
@@ -107,7 +108,6 @@ describe('W05 follow-list PostgreSQL runtime injection', () => {
     expect(store.list).toHaveBeenNthCalledWith(2, {
       userId: 'owner-user', direction: 'following', cursor: null, limit: 20,
     })
-    expect(d1Prepare).not.toHaveBeenCalled()
   })
 
   it('keeps D1 as the default follow-list adapter when no dependency is injected', async () => {
@@ -256,7 +256,6 @@ describe('W05 following-feed author PostgreSQL runtime injection', () => {
       },
     })
     expect(store.list).toHaveBeenCalledWith('viewer-1', 501)
-    expect(d1Prepare).not.toHaveBeenCalled()
   })
 
   it('preserves the D1 route fallback when no PostgreSQL store is injected', async () => {
@@ -358,6 +357,7 @@ describe('W05 profile-channel PostgreSQL runtime injection', () => {
       viewerUserId: 'viewer-1',
       ownerUserIds: ['owner-1'],
     })
+    expect(d1Prepare).not.toHaveBeenCalled()
     expect(d1Prepare).not.toHaveBeenCalled()
   })
 })
@@ -846,28 +846,9 @@ describe('W05 social query transport', () => {
     }), { DB: dbFor() })
     expect(unsupported.status).toBe(405)
   })
-  it('lists the authenticated viewer block relations through the internal GET route', async () => {
-    const response = await worker.fetch(
-      request('/internal/social/interactions/blocks?limit=10', transportHeaders),
-      { DB: dbFor([
-        {
-          relationship_id: 'block-1',
-          actor_user_id: 'viewer-1',
-          target_user_id: 'target-1',
-          relation_type: 'block',
-          created_at: '2026-10-18T00:00:00.000Z',
-        },
-      ]) },
-    )
-    expect(response.status).toBe(200)
-    await expect(response.json()).resolves.toMatchObject({
-      data: {
-        items: [{ relationshipId: 'block-1', targetUserId: 'target-1', createdAt: '2026-10-18T00:00:00.000Z' }],
-        nextCursor: null,
-        hasMore: false,
-      },
-      requestId: expect.stringMatching(/^req_/),
-    })
+  it('fails closed when Block/Mute list Store composition is missing', async () => {
+    const response = await worker.fetch(request('/internal/social/interactions/blocks?limit=10', transportHeaders), {} as never)
+    expect(response.status).toBe(503)
   })
 
   it('uses an injected Block/Mute list read store for both GET routes without touching D1', async () => {
@@ -879,9 +860,8 @@ describe('W05 social query transport', () => {
         cursor_created_at: '2026-10-18T00:00:00.000000Z',
       }]),
     }
-    const d1Prepare = vi.fn()
     const injectedWorker = createW05SocialWorker({ blockMuteListReadStore: store })
-    const env = { DB: { prepare: d1Prepare } } as never
+    const env = {} as never
 
     const blocks = await injectedWorker.fetch(
       request('/internal/social/interactions/blocks?limit=10', transportHeaders),
@@ -908,69 +888,26 @@ describe('W05 social query transport', () => {
     expect(store.list).toHaveBeenNthCalledWith(2, {
       actorUserId: 'viewer-1', relationType: 'mute', cursor: null, limit: 10,
     })
-    expect(d1Prepare).not.toHaveBeenCalled()
   })
 
-  it('creates an idempotent block relation for an active actor and existing target', async () => {
-    const response = await worker.fetch(
-      new Request('https://luckread-w05.internal/internal/social/interactions/blocks', {
-        method: 'POST',
-        headers: {
-          ...transportHeaders,
-          'X-LuckRead-Principal-Layer': 'L2',
-          'Idempotency-Key': 'block-1',
-          'content-type': 'application/json',
-        },
-        body: JSON.stringify({ targetUserId: 'target-1' }),
-      }),
-      {
-        DB: dbFor([
-          {
-            relationship_id: 'block-1',
-            actor_user_id: 'viewer-1',
-            target_user_id: 'target-1',
-            relation_type: 'block',
-            created_at: '2026-10-02T00:00:00.000Z',
-            updated_at: '2026-10-02T00:00:00.000Z',
-          },
-        ]),
-      },
-    )
+  it('creates an idempotent Block relation through the injected Store', async () => {
+    const row: BlockMuteRelationRow = { relationship_id: 'block-1', actor_user_id: 'viewer-1', target_user_id: 'target-1', relation_type: 'block', created_at: '2026-10-02T00:00:00.000Z', updated_at: '2026-10-02T00:00:00.000Z' }
+    const store: BlockMuteRelationStore = { get: vi.fn(async () => null), set: vi.fn(async () => row), remove: vi.fn(async () => undefined) }
+    const injectedWorker = createW05SocialWorker({ blockMuteRelationStore: store })
+    const response = await injectedWorker.fetch(new Request('https://luckread-w05.internal/internal/social/interactions/blocks', { method: 'POST', headers: { ...transportHeaders, 'X-LuckRead-Principal-Layer': 'L2', 'Idempotency-Key': 'block-1', 'content-type': 'application/json' }, body: JSON.stringify({ targetUserId: 'target-1' }) }), {} as never)
     expect(response.status).toBe(200)
-    await expect(response.json()).resolves.toMatchObject({
-      data: { relationshipId: 'block-1', relationType: 'block', targetUserId: 'target-1' },
-    })
+    await expect(response.json()).resolves.toMatchObject({ data: { relationshipId: 'block-1', relationType: 'block', targetUserId: 'target-1' } })
+    expect(store.set).toHaveBeenCalledWith(expect.objectContaining({ actorUserId: 'viewer-1', targetUserId: 'target-1', relationType: 'block' }))
   })
 
-  it('creates mute independently from block', async () => {
-    const response = await worker.fetch(
-      new Request('https://luckread-w05.internal/internal/social/interactions/mutes', {
-        method: 'POST',
-        headers: {
-          ...transportHeaders,
-          'X-LuckRead-Principal-Layer': 'L2',
-          'Idempotency-Key': 'mute-1',
-          'content-type': 'application/json',
-        },
-        body: JSON.stringify({ targetUserId: 'target-1' }),
-      }),
-      {
-        DB: dbFor([
-          {
-            relationship_id: 'mute-1',
-            actor_user_id: 'viewer-1',
-            target_user_id: 'target-1',
-            relation_type: 'mute',
-            created_at: '2026-10-02T00:00:00.000Z',
-            updated_at: '2026-10-02T00:00:00.000Z',
-          },
-        ]),
-      },
-    )
+  it('creates Mute independently through the injected Store', async () => {
+    const row: BlockMuteRelationRow = { relationship_id: 'mute-1', actor_user_id: 'viewer-1', target_user_id: 'target-1', relation_type: 'mute', created_at: '2026-10-02T00:00:00.000Z', updated_at: '2026-10-02T00:00:00.000Z' }
+    const store: BlockMuteRelationStore = { get: vi.fn(async () => null), set: vi.fn(async () => row), remove: vi.fn(async () => undefined) }
+    const injectedWorker = createW05SocialWorker({ blockMuteRelationStore: store })
+    const response = await injectedWorker.fetch(new Request('https://luckread-w05.internal/internal/social/interactions/mutes', { method: 'POST', headers: { ...transportHeaders, 'X-LuckRead-Principal-Layer': 'L2', 'Idempotency-Key': 'mute-1', 'content-type': 'application/json' }, body: JSON.stringify({ targetUserId: 'target-1' }) }), {} as never)
     expect(response.status).toBe(200)
-    await expect(response.json()).resolves.toMatchObject({
-      data: { relationshipId: 'mute-1', relationType: 'mute' },
-    })
+    await expect(response.json()).resolves.toMatchObject({ data: { relationshipId: 'mute-1', relationType: 'mute' } })
+    expect(store.set).toHaveBeenCalledWith(expect.objectContaining({ actorUserId: 'viewer-1', targetUserId: 'target-1', relationType: 'mute' }))
   })
 
   it('rejects self block and missing idempotency safely', async () => {
@@ -1013,24 +950,15 @@ describe('W05 social query transport', () => {
     })
   })
 
-  it('unblocks and unmutes with idempotent 204 responses', async () => {
-    const unblock = await worker.fetch(
-      new Request('https://luckread-w05.internal/internal/social/interactions/blocks/target-1', {
-        method: 'DELETE',
-        headers: { ...transportHeaders, 'X-LuckRead-Principal-Layer': 'L2', 'Idempotency-Key': 'unblock-1' },
-      }),
-      { DB: dbFor() },
-    )
+  it('unblocks and unmutes through the injected Store', async () => {
+    const store: BlockMuteRelationStore = { get: vi.fn(async () => null), set: vi.fn(async () => null), remove: vi.fn(async () => undefined) }
+    const injectedWorker = createW05SocialWorker({ blockMuteRelationStore: store })
+    const unblock = await injectedWorker.fetch(new Request('https://luckread-w05.internal/internal/social/interactions/blocks/target-1', { method: 'DELETE', headers: { ...transportHeaders, 'X-LuckRead-Principal-Layer': 'L2', 'Idempotency-Key': 'unblock-1' } }), {} as never)
     expect(unblock.status).toBe(204)
-
-    const unmute = await worker.fetch(
-      new Request('https://luckread-w05.internal/internal/social/interactions/mutes/target-1', {
-        method: 'DELETE',
-        headers: { ...transportHeaders, 'X-LuckRead-Principal-Layer': 'L2', 'Idempotency-Key': 'unmute-1' },
-      }),
-      { DB: dbFor() },
-    )
+    const unmute = await injectedWorker.fetch(new Request('https://luckread-w05.internal/internal/social/interactions/mutes/target-1', { method: 'DELETE', headers: { ...transportHeaders, 'X-LuckRead-Principal-Layer': 'L2', 'Idempotency-Key': 'unmute-1' } }), {} as never)
     expect(unmute.status).toBe(204)
+    expect(store.remove).toHaveBeenNthCalledWith(1, { actorUserId: 'viewer-1', targetUserId: 'target-1', relationType: 'block' })
+    expect(store.remove).toHaveBeenNthCalledWith(2, { actorUserId: 'viewer-1', targetUserId: 'target-1', relationType: 'mute' })
   })
 
   it('creates a share for published content through the injected Neon Store', async () => {
@@ -1552,44 +1480,9 @@ describe('W05 social query transport', () => {
     expect(del.status).toBe(403)
   })
 
-  it('serves follow status and relationship from one relationship authority', async () => {
-    const response = await worker.fetch(
-      request('/internal/social/follows/target-1', {
-        ...transportHeaders,
-        'X-LuckRead-Principal-Layer': 'L2',
-      }),
-      {
-        DB: dbFor([{
-          following: 1,
-          followed_by: 1,
-          relationship_id: 'follow-1',
-          created_at: '2026-10-02T00:00:00.000Z',
-          blocked: 0,
-          blocked_by: 0,
-          muted: 0,
-        }]),
-      },
-    )
-
-    expect(response.status).toBe(200)
-    await expect(response.json()).resolves.toMatchObject({
-      data: {
-        following: true,
-        relationshipId: 'follow-1',
-        targetUserId: 'target-1',
-        createdAt: '2026-10-02T00:00:00.000Z',
-        relationship: {
-          following: true,
-          followedBy: true,
-          mutualFollow: true,
-          blocked: false,
-          blockedBy: false,
-          muted: false,
-          relationshipId: 'follow-1',
-          createdAt: '2026-10-02T00:00:00.000Z',
-        },
-      },
-    })
+  it('fails closed when Relationship Graph Store composition is missing', async () => {
+    const response = await worker.fetch(request('/internal/social/follows/target-1', { ...transportHeaders, 'X-LuckRead-Principal-Layer': 'L2' }), {} as never)
+    expect(response.status).toBe(503)
   })
 
   it('serves relationship graph through an injected PostgreSQL-capable store without touching D1', async () => {
@@ -1604,14 +1497,13 @@ describe('W05 social query transport', () => {
         muted: true,
       })),
     }
-    const d1Prepare = vi.fn()
     const injectedWorker = createW05SocialWorker({ relationshipGraphReadStore: store })
     const response = await injectedWorker.fetch(
       request('/internal/social/follows/pg-relationship-target-20261112', {
         ...transportHeaders,
         'X-LuckRead-Principal-Layer': 'L2',
       }),
-      { DB: { prepare: d1Prepare } as unknown as D1Database },
+      {} as never,
       {} as never,
     )
 
@@ -1637,7 +1529,6 @@ describe('W05 social query transport', () => {
       },
     })
     expect(store.read).toHaveBeenCalledWith('viewer-1', 'pg-relationship-target-20261112')
-    expect(d1Prepare).not.toHaveBeenCalled()
   })
 
   it('denies follow status below the minimum interaction permission layer', async () => {

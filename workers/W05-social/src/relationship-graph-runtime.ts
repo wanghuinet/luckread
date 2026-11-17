@@ -1,7 +1,4 @@
-/// <reference types="@cloudflare/workers-types" />
-
 import {
-  createD1RelationshipGraphReadStore,
   RelationshipGraphStoreError,
   type RelationshipGraphReadStore,
   type RelationshipGraphReadRow,
@@ -45,17 +42,13 @@ const validateUserId = (value: string): string => {
   return normalized
 }
 
-type RelationshipGraphDataSource = D1Database | RelationshipGraphReadStore
-
-function resolveRelationshipGraphReadStore(source: RelationshipGraphDataSource): RelationshipGraphReadStore {
-  if (typeof (source as RelationshipGraphReadStore).read === 'function') {
-    return source as RelationshipGraphReadStore
-  }
-  return createD1RelationshipGraphReadStore(source as D1Database)
+function requireRelationshipGraphReadStore(source: RelationshipGraphReadStore | undefined): RelationshipGraphReadStore {
+  if (!source) throw new RelationshipGraphRuntimeError('SERVICE_UNAVAILABLE', 503)
+  return source
 }
 
 export async function getRelationshipGraph(
-  source: RelationshipGraphDataSource,
+  source: RelationshipGraphReadStore | undefined,
   viewerUserId: string,
   targetUserId: string,
 ): Promise<RelationshipGraph> {
@@ -77,6 +70,8 @@ export async function getRelationshipGraph(
     }
   }
 
+  const store = requireRelationshipGraphReadStore(source)
+
   const cacheKey = relationshipGraphKey(viewer, target)
   const cached = relationshipGraphCache.get(cacheKey)
   if (cached) {
@@ -86,7 +81,7 @@ export async function getRelationshipGraph(
 
   let row: RelationshipGraphReadRow | null
   try {
-    row = await resolveRelationshipGraphReadStore(source).read(viewer, target)
+    row = await store.read(viewer, target)
   } catch (error) {
     if (error instanceof RelationshipGraphStoreError) {
       throw new RelationshipGraphRuntimeError(error.code, error.status)
