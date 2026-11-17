@@ -1925,14 +1925,13 @@ export async function rollbackContentRevision(
 }
 
 export async function deleteContent(
-  db: ContentD1,
   principalUserId: string,
   contentId: string,
   ifMatch: string,
   idempotencyKey: string,
-  now = new Date(),
-  principalLayer?: string,
-  mutationStore?: ContentMutationStore,
+  now: Date = new Date(),
+  principalLayer: string | undefined,
+  mutationStore: ContentMutationStore,
 ): Promise<void> {
   assertResourceId(principalUserId)
   assertResourceId(contentId)
@@ -1940,10 +1939,12 @@ export async function deleteContent(
 
   const operationId = 'deleteContent'
   const hash = await requestHash(operationId, { contentId, ifMatch: normalizeEtag(ifMatch) })
-  const snapshot = mutationStore
-    ? await mutationStore.loadMutation(principalUserId, contentId, operationId, idempotencyKey)
-    : await loadMutationRow(db, contentId, operationId, idempotencyKey, principalUserId)
-  const { content, idempotency } = snapshot
+  const { content, idempotency } = await mutationStore.loadMutation(
+    principalUserId,
+    contentId,
+    operationId,
+    idempotencyKey,
+  )
   const replay = inspectIdempotency(idempotency, principalUserId, hash, now)
   if (replay.replayed) return
   if (!content) throw new ContentRuntimeError('NOT_FOUND', 404)
@@ -1961,31 +1962,19 @@ export async function deleteContent(
   const updatedEtag = etagForVersion(deletedVersion)
   const expiresAt = new Date(now.getTime() + IDEMPOTENCY_TTL_MS).toISOString()
 
-  if (mutationStore) {
-    await mutationStore.delete({
-      ownerUserId: principalUserId,
-      operationId,
-      idempotencyKey,
-      requestHash: hash,
-      deletedAt: updatedAt,
-      expiresAt,
-      contentId: content.id,
-      expectedVersion: content.version,
-      expectedEtag: content.etag,
-      nextVersion: deletedVersion,
-      nextEtag: updatedEtag,
-    })
-  } else {
-    await batchMutation(db, [
-      expireMutationRow(db, principalUserId, operationId, idempotencyKey, updatedAt),
-      insertCompletedIdempotency(db, principalUserId, operationId, idempotencyKey, hash, 204, '', updatedAt, expiresAt),
-      db.prepare(
-        `UPDATE contents SET state='DELETED', version=?, etag=?, updated_at=?
-          WHERE id=? AND owner_user_id=? AND version=? AND etag=?`,
-      ).bind(deletedVersion, updatedEtag, updatedAt, content.id, principalUserId, content.version, content.etag),
-      atomicGuard(db),
-    ])
-  }
+  await mutationStore.delete({
+    ownerUserId: principalUserId,
+    operationId,
+    idempotencyKey,
+    requestHash: hash,
+    deletedAt: updatedAt,
+    expiresAt,
+    contentId: content.id,
+    expectedVersion: content.version,
+    expectedEtag: content.etag,
+    nextVersion: deletedVersion,
+    nextEtag: updatedEtag,
+  })
 }
 
 const isSocialOnlyLayer = (layer: string | undefined): boolean =>

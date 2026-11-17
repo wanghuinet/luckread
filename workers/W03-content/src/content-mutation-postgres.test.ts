@@ -896,7 +896,6 @@ describe('W03 Neon content mutation store', () => {
       store,
     )
     await deleteContent(
-      d1 as never,
       'user_123',
       snapshotContent.id,
       updated.etag,
