@@ -65,6 +65,13 @@ function mapState(row: {
  * The read is a secret-free projection; the final marker update is conditional
  * on the authoritative Better Auth factor already being verified.
  */
+/**
+ * @deprecated-next-version
+ * Reason: Legacy Cloudflare D1 implementation retained only for isolated unit tests or the explicit schema/test fixture.
+ * Replacement: PostgreSQL MFA enrollment confirm Store in src/neon/mfa-enrollment-confirm-postgres.ts.
+ * Removal: Next release.
+ * Condition: MFA enrollment confirm tests use PostgreSQL/in-memory Store fixtures and D1 statement compatibility is no longer required.
+ */
 export function createD1MfaEnrollmentConfirmStore(db: D1Database): MfaEnrollmentConfirmStore {
   return {
     async read(userId) {
