@@ -82,8 +82,8 @@ function normalizeCommand(command: RegistrationRollbackCommand): RegistrationRol
 }
 
 /**
- * Production adapter. Preserve the existing registration rollback checks
- * and D1 batch boundary; D1-01 remains the W02 production authority.
+ * Deprecated D1 fixture retained for isolated legacy adapter tests only.
+ * Production W02 uses the Neon PostgreSQL registration rollback Store.
  */
 /**
  * @deprecated-next-version
