@@ -62,8 +62,8 @@ const pools = new WeakMap<object, Pool>()
 const compositions = new WeakMap<object, W05SocialWorkerDependencies>()
 const pushCompositions = new WeakMap<object, NotificationPushDeliveryRuntimeDependencies>()
 const pushEndpointAccessStores = new WeakMap<object, NotificationPushEndpointAccessStore>()
+const pushRuntimeCompositions = new WeakMap<object, WeakMap<object, NotificationPushDeliveryRuntimeDependencies>>()
 const EMPTY_DEPENDENCIES: W05SocialWorkerDependencies = Object.freeze({})
-const EMPTY_PUSH_DEPENDENCIES: NotificationPushDeliveryRuntimeDependencies = Object.freeze({})
 
 function validateD103HyperdriveConnectionString(value: unknown): string {
   if (typeof value !== 'string' || value.length === 0 || value.length > 4096) {
@@ -303,6 +303,14 @@ export function getW05NotificationPushDeliveryDependencies(
   if (!binding || typeof binding !== 'object') {
     throw new Error('W05_HYPERDRIVE_D1_02_BINDING_REQUIRED')
   }
+  const endpointBinding = env.HYPERDRIVE_D1_03
+  if (!endpointBinding || typeof endpointBinding !== 'object') {
+    throw new Error('W05_HYPERDRIVE_D1_03_BINDING_REQUIRED')
+  }
+
+  let scopedCompositions = pushRuntimeCompositions.get(binding)
+  const cached = scopedCompositions?.get(endpointBinding)
+  if (cached) return cached
 
   let dependencies = pushCompositions.get(binding)
   if (!dependencies) {
@@ -325,10 +333,6 @@ export function getW05NotificationPushDeliveryDependencies(
     pushCompositions.set(binding, dependencies)
   }
 
-  const endpointBinding = env.HYPERDRIVE_D1_03
-  if (!endpointBinding || typeof endpointBinding !== 'object') {
-    throw new Error('W05_HYPERDRIVE_D1_03_BINDING_REQUIRED')
-  }
   const endpointDatabase = getW05PushEndpointPostgresDatabase(env, poolFactory)
   let endpointAccessStore = pushEndpointAccessStores.get(endpointBinding)
   if (!endpointAccessStore) {
@@ -336,7 +340,13 @@ export function getW05NotificationPushDeliveryDependencies(
     pushEndpointAccessStores.set(endpointBinding, endpointAccessStore)
   }
 
-  return { ...dependencies, endpointAccessStore }
+  const complete = { ...dependencies, endpointAccessStore }
+  if (!scopedCompositions) {
+    scopedCompositions = new WeakMap<object, NotificationPushDeliveryRuntimeDependencies>()
+    pushRuntimeCompositions.set(binding, scopedCompositions)
+  }
+  scopedCompositions.set(endpointBinding, complete)
+  return complete
 }
 
 /**
