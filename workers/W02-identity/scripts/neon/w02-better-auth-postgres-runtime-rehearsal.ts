@@ -13,6 +13,8 @@ import { buildMfaAuditEvent } from '../../src/auth/mfa-audit-events.js'
 import { handleCurrentUserSessionList } from '../../src/auth/session-list.js'
 import { handleCurrentUserSessionLogout } from '../../src/auth/session-logout.js'
 import { resolveBetterAuthPrincipal } from '../../src/auth/principal.js'
+import w02Worker from '../../src/index.js'
+import { getW02PostgresRuntime } from '../../src/neon/runtime.js'
 import { handleCurrentUserSessionRevoke } from '../../src/auth/session-revoke.js'
 import {
   auth,
@@ -111,6 +113,16 @@ let revocationTargetSessionId: string | undefined
 let logoutSessionId: string | undefined
 let mfaEnrollmentStarted = false
 let mfaEnrollmentConfirmed = false
+const workerEntryEmail = 'w02-worker-' + nonce + '@example.test'
+const workerEntryUsername = 'w02worker' + nonce
+const workerEntryPassword = 'W02-Worker-Entry-' + randomUUID().replaceAll('-', '').slice(0, 20)
+let workerEntryUserId: string | undefined
+let workerRuntimePool: ReturnType<typeof getW02PostgresRuntime>['pool'] | undefined
+let workerEntryEmailDeliveryAccepted = false
+let workerEntryEmailVerificationPassed = false
+let workerEntryLoginSessionPassed = false
+let workerEntryPrincipalPassed = false
+const workerEntryD1Accesses = { prepare: 0, batch: 0 }
 let primaryError: unknown
 let report: Record<string, unknown> | undefined
 let cleanupVerified = false
