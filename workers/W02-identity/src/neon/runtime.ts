@@ -17,6 +17,13 @@ import { createPostgresSessionLogoutStore } from './session-logout-postgres-stor
 import { createPostgresSessionRevocationStore } from './session-revocation-postgres-store.js'
 import { createPostgresUsernameChangeStore } from './username-change-postgres.js'
 
+/**
+ * @deprecated-next-version
+ * Reason: Legacy D1 provider selection remains reachable from local/test callers.
+ * Replacement: The Neon PostgreSQL runtime in this module.
+ * Removal: Next release.
+ * Condition: All W02 entrypoints and test fixtures require the Neon runtime and no longer construct D1 stores.
+ */
 export type W02DatabaseDriver = 'd1' | 'neon'
 
 export type W02RuntimeEnv = {
