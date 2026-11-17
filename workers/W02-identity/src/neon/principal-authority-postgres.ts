@@ -8,10 +8,9 @@ import {
 } from './role-assignment-postgres.js'
 
 /**
- * PostgreSQL adapter for the same principal-authority port used by the
- * production D1 path. It composes the existing transactional AUTH-013
- * activation and PostgreSQL RoleAssignment/MFA reads; it does not change
- * Worker bindings or promote this adapter into production.
+ * PostgreSQL production adapter for W02 principal authority. It composes the
+ * existing transactional AUTH-013 activation and PostgreSQL RoleAssignment/MFA
+ * reads and is constructed by the Neon-only W02 runtime.
  */
 export function createPostgresPrincipalAuthorityStore(pool: Pool): PrincipalAuthorityStore {
   return {
