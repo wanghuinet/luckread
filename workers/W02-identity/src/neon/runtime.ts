@@ -27,6 +27,92 @@ export type W02RuntimeEnv = {
   }
 }
 
+type InstrumentablePgClient = {
+  query: (...args: unknown[]) => unknown
+}
+
+const instrumentedClients = new WeakSet<object>()
+
+function pgOperationLabel(input: unknown): string {
+  let statement = ''
+  if (typeof input === 'string') statement = input
+  else if (input && typeof input === 'object' && 'text' in input) {
+    const text = (input as { text?: unknown }).text
+    if (typeof text === 'string') statement = text
+  }
+  const operation = /^(SELECT|INSERT|UPDATE|DELETE|BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE|WITH)\\b/i.exec(statement.trim())?.[1]
+  return operation?.toUpperCase() ?? 'OTHER'
+}
+
+/**
+ * Development-only PostgreSQL query tracing. It deliberately logs only the
+ * SQL command category, completion/failure state and duration; never SQL text,
+ * bound values, row data or connection credentials.
+ */
+function instrumentDevelopmentPgClient(client: object): void {
+  if (instrumentedClients.has(client)) return
+  instrumentedClients.add(client)
+
+  const instrumentable = client as InstrumentablePgClient
+  const originalQuery = instrumentable.query.bind(client)
+  instrumentable.query = (...args: unknown[]) => {
+    // Callback-style queries are uncommon in Better Auth; preserve their exact
+    // callback/return contract and do not wrap the callback result.
+    if (args.some((value) => typeof value === 'function')) {
+      return originalQuery(...args)
+    }
+
+    const operation = pgOperationLabel(args[0])
+    const startedAt = Date.now()
+    console.info(JSON.stringify({
+      event: 'w02.postgres.query_started',
+      operation,
+    }))
+
+    let result: unknown
+    try {
+      result = originalQuery(...args)
+    } catch (error) {
+      console.error(JSON.stringify({
+        event: 'w02.postgres.query_failed',
+        operation,
+        errorType: error instanceof Error ? error.name : 'UNKNOWN',
+      }))
+      throw error
+    }
+
+    if (result && typeof result === 'object' && 'then' in result &&
+        typeof (result as { then?: unknown }).then === 'function') {
+      return Promise.resolve(result).then(
+        (value) => {
+          console.info(JSON.stringify({
+            event: 'w02.postgres.query_completed',
+            operation,
+            durationMs: Math.max(0, Date.now() - startedAt),
+          }))
+          return value
+        },
+        (error: unknown) => {
+          console.error(JSON.stringify({
+            event: 'w02.postgres.query_failed',
+            operation,
+            durationMs: Math.max(0, Date.now() - startedAt),
+            errorType: error instanceof Error ? error.name : 'UNKNOWN',
+          }))
+          throw error
+        },
+      )
+    }
+
+    console.info(JSON.stringify({
+      event: 'w02.postgres.query_completed',
+      operation,
+      durationMs: Math.max(0, Date.now() - startedAt),
+    }))
+    return result
+  }
+}
+
 const pools = new WeakMap<object, Pool>()
 const runtimes = new WeakMap<object, ReturnType<typeof buildW02PostgresRuntime>>()
 
@@ -84,7 +170,10 @@ export function getW02PostgresPool(env: W02RuntimeEnv): Pool {
   const developmentDiagnostics = env.CLOUDFLARE_ENV?.trim().toLowerCase() === 'development'
   if (developmentDiagnostics) {
     console.info(JSON.stringify({ event: 'w02.postgres.pool_created' }))
-    pool.on('connect', () => console.info(JSON.stringify({ event: 'w02.postgres.connection_established' })))
+    pool.on('connect', (client) => {
+      instrumentDevelopmentPgClient(client)
+      console.info(JSON.stringify({ event: 'w02.postgres.connection_established' }))
+    })
     pool.on('acquire', () => console.info(JSON.stringify({ event: 'w02.postgres.connection_acquired' })))
     pool.on('remove', () => console.info(JSON.stringify({ event: 'w02.postgres.connection_removed' })))
   }
