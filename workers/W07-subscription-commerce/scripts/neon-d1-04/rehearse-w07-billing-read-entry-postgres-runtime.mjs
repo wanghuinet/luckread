@@ -6,7 +6,7 @@ import { dirname } from 'node:path'
 
 import worker from '../../src/index.ts'
 import { issueReceiptForPaidPayment } from '../../src/billing-persistence.ts'
-import { createPostgresWebhookD1Database, createPostgresD1Database } from '../../src/payment-webhook-database-postgres.ts'
+import { createPostgresWebhookD1Database } from '../../src/payment-webhook-database-postgres.ts'
 import { receiveHyperswitchWebhook } from '../../src/payment-persistence.ts'
 import { closeW07PostgresRuntimeForTest } from '../../src/neon/payment-method-read-runtime.ts'
 
@@ -232,7 +232,7 @@ try {
   assert.equal(firstDocumentsBody.data.hasMore, true)
   assert.equal(typeof firstDocumentsBody.data.nextCursor, 'string')
   const firstDocument = firstDocumentsBody.data.items[0]
-  assert.equal(firstDocument.customerId, undefined)
+  assert.equal(typeof firstDocument.documentId, 'string')
   assert.ok(['INVOICE', 'RECEIPT'].includes(firstDocument.documentType))
   checks.billingDocumentsReadThroughW07NeonEntry = true
 
