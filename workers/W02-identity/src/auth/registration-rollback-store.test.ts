@@ -24,7 +24,14 @@ function fakeD1(options: FakeD1Options = {}) {
           return this
         },
         async first<T>() {
-          if (sql.includes('FROM "user"')) return (options.user ?? null) as unknown as T | null
+          if (sql.includes('FROM "user"') && sql.includes('WHERE id = ?')) {
+            return options.user?.id === call.values[0] ? options.user as unknown as T : null
+          }
+          if (sql.includes('FROM "user"') && sql.includes('WHERE email = ?')) {
+            return options.user?.email === call.values[0]
+              ? ({ id: options.user.id } as unknown as T)
+              : null
+          }
           if (sql.includes('FROM "session"')) return (options.session ?? null) as unknown as T | null
           return null
         },
@@ -48,6 +55,12 @@ function fakePool(options: FakePgOptions = {}) {
   const client = {
     async query<T>(sql: string, values: unknown[] = []) {
       calls.push({ sql, values })
+      if (sql.includes('FROM "user"') && sql.includes('OR email = $2')) {
+        const rows = options.user && (
+          options.user.id === values[0] || options.user.email === values[1]
+        ) ? [options.user] : []
+        return { rows, rowCount: rows.length } as unknown as T
+      }
       if (sql.includes('FROM "user"')) {
         const rows = options.user ? [options.user] : []
         return { rows, rowCount: rows.length } as unknown as T
@@ -81,6 +94,47 @@ const user = {
 }
 
 describe('W02 registration rollback store', () => {
+  it('confirms a persisted identity and normalized email from the W02-owned D1 fixture', async () => {
+    const { db, prepared } = fakeD1({ user })
+    await expect(createD1RegistrationRollbackStore(db).confirmIdentity({
+      userId: user.id,
+      email: ' PENDING@EXAMPLE.TEST ',
+    })).resolves.toEqual({
+      identityById: user,
+      identityByEmailId: user.id,
+    })
+    expect(prepared.map((call) => call.values)).toEqual([
+      [user.id],
+      ['pending@example.test'],
+    ])
+  })
+
+  it('does not report a different email as the confirmed identity owner', async () => {
+    const { db } = fakeD1({ user })
+    await expect(createD1RegistrationRollbackStore(db).confirmIdentity({
+      userId: user.id,
+      email: 'other@example.test',
+    })).resolves.toEqual({
+      identityById: user,
+      identityByEmailId: null,
+    })
+  })
+
+  it('confirms the user only through the Neon Postgres rollback authority store', async () => {
+    const { pool, calls } = fakePool({ user })
+    await expect(createPostgresRegistrationRollbackStore(pool).confirmIdentity({
+      userId: user.id,
+      email: ' PENDING@EXAMPLE.TEST ',
+    })).resolves.toEqual({
+      identityById: user,
+      identityByEmailId: user.id,
+    })
+    expect(calls).toEqual([{
+      sql: 'SELECT id, email, username FROM "user" WHERE id = $1 OR email = $2',
+      values: [user.id, 'pending@example.test'],
+    }])
+  })
+
   it('keeps absent D1 registrations idempotent', async () => {
     const { db, batches } = fakeD1({ user: null })
     await expect(createD1RegistrationRollbackStore(db).rollback(command)).resolves.toEqual({ rolledBack: true })
