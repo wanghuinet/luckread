@@ -1,8 +1,6 @@
-/// <reference types="@cloudflare/workers-types" />
-
 import { ReplyAudienceRuntimeError } from './reply-audience-runtime.js'
 import { fetchPublishedContentSocialContext, type W03ContentBinding } from './w03-content-context-client.js'
-import { createD1RepostStore, RepostStoreError, type RepostStorageRow, type RepostStore } from './repost-store.js'
+import { RepostStoreError, type RepostStorageRow, type RepostStore } from './repost-store.js'
 
 export class RepostRuntimeError extends Error {
   constructor(readonly code: string, readonly status: number) { super(code) }
@@ -53,12 +51,11 @@ const getPublishedOwner = async (
  * still validate canonical content visibility before disclosing a repost.
  */
 export async function createRepost(
-  db: D1Database,
   w03Content: W03ContentBinding | undefined,
   actorUserIdValue: string,
   contentIdValue: string,
   correlationId: string,
-  store: RepostStore = createD1RepostStore(db),
+  store: RepostStore,
 ): Promise<RepostRecord> {
   const actorUserId = validateActor(actorUserIdValue)
   const contentId = validateId(contentIdValue)
@@ -99,10 +96,9 @@ export async function createRepost(
 
 /** Delete only the current actor's relation; repeated deletes are harmless. */
 export async function removeRepost(
-  db: D1Database,
   actorUserIdValue: string,
   contentIdValue: string,
-  store: RepostStore = createD1RepostStore(db),
+  store: RepostStore,
 ): Promise<void> {
   const actorUserId = validateActor(actorUserIdValue)
   const contentId = validateId(contentIdValue)

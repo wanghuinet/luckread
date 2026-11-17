@@ -1,8 +1,6 @@
-/// <reference types="@cloudflare/workers-types" />
-
 import { ReplyAudienceRuntimeError } from './reply-audience-runtime.js'
 import { fetchPublishedContentSocialContext, type W03ContentBinding } from './w03-content-context-client.js'
-import { createD1ShareStore, ShareStoreError, type ShareStorageRow, type ShareStore } from './share-store.js'
+import { ShareStoreError, type ShareStorageRow, type ShareStore } from './share-store.js'
 
 export class ShareRuntimeError extends Error {
   constructor(readonly code: string, readonly status: number) { super(code) }
@@ -66,13 +64,12 @@ const assertPublishedContent = async (
  * be transactionally locked, every resolve repeats this check before disclosure.
  */
 export async function createShare(
-  db: D1Database,
   w03Content: W03ContentBinding | undefined,
   actorUserId: string,
   contentIdValue: string,
   idempotencyKeyValue: string,
   correlationId: string,
-  store: ShareStore = createD1ShareStore(db),
+  store: ShareStore,
 ): Promise<ShareRecord> {
   const actor = validateActor(actorUserId)
   const contentId = validateId(contentIdValue)
@@ -121,11 +118,10 @@ export async function createShare(
 }
 
 export async function resolveShare(
-  db: D1Database,
   w03Content: W03ContentBinding | undefined,
   shareIdValue: string,
   correlationId: string,
-  store: ShareStore = createD1ShareStore(db),
+  store: ShareStore,
 ): Promise<{ shareId: string; contentId: string; createdAt: string }> {
   const shareId = validateId(shareIdValue)
   let row: Pick<ShareStorageRow, 'share_id' | 'content_id' | 'created_at'> | null

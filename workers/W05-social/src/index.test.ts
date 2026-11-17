@@ -13,6 +13,9 @@ import type { ContentLikerReadInput, ContentLikerReadRow, ContentLikerReadStore 
 import type { FavoriteListReadInput, FavoriteListReadRow, FavoriteListReadStore } from './favorite-list-read-store.js'
 import type { LikeStatusReadInput, LikeStatusReadResult, LikeStatusReadStore } from './like-status-read-store.js'
 import type { LikeTargetContextReadStore } from './like-target-context-read-store.js'
+import type { RepostStore } from './repost-store.js'
+import type { ShareStore } from './share-store.js'
+import type { ProfilePinStore } from './profile-pin-store.js'
 
 
 const dbFor = (results: unknown[] = []) => {
@@ -1030,29 +1033,34 @@ describe('W05 social query transport', () => {
     expect(unmute.status).toBe(204)
   })
 
-  it('creates a share for published content', async () => {
-    const response = await worker.fetch(
+  it('creates a share for published content through the injected Neon Store', async () => {
+    const row = { share_id: 'share-1', content_id: 'content-1', actor_user_id: 'viewer-1', created_at: '2026-10-02T00:00:00.000Z' }
+    const shareStore: ShareStore = {
+      findByActorAndKey: vi.fn().mockResolvedValueOnce(null).mockResolvedValueOnce(row),
+      insertIfAbsent: vi.fn(async () => undefined),
+      findById: vi.fn(async () => ({ share_id: row.share_id, content_id: row.content_id, created_at: row.created_at })),
+    }
+    const injectedWorker = createW05SocialWorker({ shareStore })
+    const response = await injectedWorker.fetch(
       new Request('https://luckread-w05.internal/internal/social/content/content-1/shares', {
         method: 'POST',
-        headers: {
-          ...transportHeaders,
-          'X-LuckRead-Principal-Layer': 'L2',
-          'Idempotency-Key': 'share-1',
-        },
+        headers: { ...transportHeaders, 'Idempotency-Key': 'share-1' },
       }),
-      {
-        DB: dbFor([
-          null,
-          { share_id: 'share-1', content_id: 'content-1', actor_user_id: 'viewer-1', created_at: '2026-10-02T00:00:00.000Z' },
-        ]),
-        W03_CONTENT: publishedContextBinding(),
-      },
+      { W03_CONTENT: publishedContextBinding() } as never,
+      {} as never,
     )
     expect(response.status).toBe(201)
+    expect(shareStore.insertIfAbsent).toHaveBeenCalledWith(expect.any(String), 'content-1', 'viewer-1', 'share-1', expect.any(String))
   })
 
-  it('resolves a share without a viewer principal', async () => {
-    const response = await worker.fetch(
+  it('resolves a share without a viewer principal through the injected Neon Store', async () => {
+    const shareStore: ShareStore = {
+      findByActorAndKey: vi.fn(),
+      insertIfAbsent: vi.fn(),
+      findById: vi.fn(async () => ({ share_id: 'share-1', content_id: 'content-1', created_at: '2026-10-02T00:00:00.000Z' })),
+    }
+    const injectedWorker = createW05SocialWorker({ shareStore })
+    const response = await injectedWorker.fetch(
       new Request('https://luckread-w05.internal/internal/social/shares/share-1', {
         method: 'GET',
         headers: {
@@ -1061,19 +1069,21 @@ describe('W05 social query transport', () => {
           'X-LuckRead-Correlation-Id': 'share-resolve',
         },
       }),
-      { DB: dbFor([{ share_id: 'share-1', content_id: 'content-1', created_at: '2026-10-02T00:00:00.000Z' }]), W03_CONTENT: publishedContextBinding() },
+      { W03_CONTENT: publishedContextBinding() } as never,
+      {} as never,
     )
     expect(response.status).toBe(200)
     await expect(response.json()).resolves.toMatchObject({ data: { contentId: 'content-1' } })
   })
 
-  it('requires an idempotency key for share creation', async () => {
+  it('requires a share idempotency key before requiring a Neon Store', async () => {
     const response = await worker.fetch(
       new Request('https://luckread-w05.internal/internal/social/content/content-1/shares', {
         method: 'POST',
-        headers: { ...transportHeaders, 'X-LuckRead-Principal-Layer': 'L2' },
+        headers: { ...transportHeaders },
       }),
-      { DB: dbFor([{ id: 'content-1', state: 'PUBLISHED' }]) },
+      {} as never,
+      {} as never,
     )
     expect(response.status).toBe(428)
   })
@@ -2092,41 +2102,45 @@ describe('W05 social comment transport', () => {
     expect((pinDb as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
   })
 
-  it('creates a repost relation through the authenticated W01 principal', async () => {
-    const response = await worker.fetch(
+  it('creates a repost relation through the authenticated W01 principal using the injected Store', async () => {
+    const row = { repost_id: 'repost-1', content_id: 'content-1', actor_user_id: 'viewer-1', created_at: '2026-10-16T00:00:00.000Z' }
+    const repostStore: RepostStore = {
+      isBlocked: vi.fn(async () => false),
+      find: vi.fn().mockResolvedValueOnce(null).mockResolvedValueOnce(row),
+      insertIfAbsent: vi.fn(async () => undefined),
+      remove: vi.fn(async () => undefined),
+    }
+    const injectedWorker = createW05SocialWorker({ repostStore })
+    const response = await injectedWorker.fetch(
       requestWithMethod('/internal/social/content/content-1/reposts', 'POST', {
-        ...transportHeaders,
-        'Idempotency-Key': 'repost-1',
+        ...transportHeaders, 'Idempotency-Key': 'repost-1',
       }),
-      {
-        DB: dbFor([
-          { blocked: 0 },
-          null,
-          { repost_id: 'repost-1', content_id: 'content-1', actor_user_id: 'viewer-1', created_at: '2026-10-16T00:00:00.000Z' },
-        ]),
-        W03_CONTENT: publishedContextBinding(),
-      },
+      { W03_CONTENT: publishedContextBinding() } as never,
+      {} as never,
     )
     expect(response.status).toBe(201)
     await expect(response.json()).resolves.toMatchObject({
       data: { repostId: 'repost-1', contentId: 'content-1', actorUserId: 'viewer-1' },
     })
+    expect(repostStore.insertIfAbsent).toHaveBeenCalledWith(expect.any(String), 'content-1', 'viewer-1', expect.any(String))
   })
 
-  it('returns a no-store 204 when removing the caller repost', async () => {
-    const d = dbFor()
-    const response = await worker.fetch(
+  it('returns a no-store 204 when removing the caller repost through the injected Store', async () => {
+    const repostStore: RepostStore = {
+      isBlocked: vi.fn(async () => false), find: vi.fn(),
+      insertIfAbsent: vi.fn(), remove: vi.fn(async () => undefined),
+    }
+    const injectedWorker = createW05SocialWorker({ repostStore })
+    const response = await injectedWorker.fetch(
       requestWithMethod('/internal/social/content/content-1/reposts', 'DELETE', {
-        ...transportHeaders,
-        'Idempotency-Key': 'repost-remove-1',
+        ...transportHeaders, 'Idempotency-Key': 'repost-remove-1',
       }),
-      { DB: d },
+      {} as never,
+      {} as never,
     )
-
     expect(response.status).toBe(204)
     expect(response.headers.get('cache-control')).toBe('no-store')
-    const prepare = (d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare
-    expect(String(prepare.mock.calls[0]?.[0])).toContain('DELETE FROM social_reposts WHERE actor_user_id = ? AND content_id = ?')
+    expect(repostStore.remove).toHaveBeenCalledWith('viewer-1', 'content-1')
   })
 
   it('requires the minimum interaction layer and idempotency key for reposts', async () => {
@@ -2147,29 +2161,29 @@ describe('W05 social comment transport', () => {
     expect(missingKey.status).toBe(428)
   })
 
-  it('pins only W03-verified owner content and unpins idempotently', async () => {
+  it('pins only W03-verified owner content and unpins idempotently through the injected Store', async () => {
+    const row = { user_id: 'viewer-1', content_id: 'content-1', pinned_at: '2026-10-16T00:00:00.000Z' }
+    const profilePinStore: ProfilePinStore = {
+      pin: vi.fn(async () => row),
+      get: vi.fn(async () => row),
+      unpin: vi.fn(async () => undefined),
+    }
+    const injectedWorker = createW05SocialWorker({ profilePinStore })
     const contextBinding = {
       fetch: vi.fn(async (_input: RequestInfo | URL) => Response.json({
         data: {
-          contentId: 'content-1',
-          ownerUserId: 'viewer-1',
-          contentType: 'post',
-          state: 'PUBLISHED',
-          updatedAt: '2026-10-20T00:00:00.000Z',
+          contentId: 'content-1', ownerUserId: 'viewer-1', contentType: 'post',
+          state: 'PUBLISHED', updatedAt: '2026-10-20T00:00:00.000Z',
         },
         requestId: 'req_w03',
       })),
     }
-    const writeDb = dbFor([
-      { user_id: 'viewer-1', content_id: 'content-1', pinned_at: '2026-10-16T00:00:00.000Z' },
-    ])
-    const pinResponse = await worker.fetch(
+    const pinResponse = await injectedWorker.fetch(
       requestWithMethod('/internal/social/content/content-1/pin', 'POST', {
-        ...transportHeaders,
-        'X-LuckRead-Principal-Layer': 'L2',
-        'Idempotency-Key': 'pin-1',
+        ...transportHeaders, 'Idempotency-Key': 'pin-1',
       }),
-      { DB: writeDb, W03_CONTENT: contextBinding },
+      { W03_CONTENT: contextBinding } as never,
+      {} as never,
     )
     expect(pinResponse.status).toBe(200)
     expect(contextBinding.fetch).toHaveBeenCalledTimes(1)
@@ -2178,34 +2192,33 @@ describe('W05 social comment transport', () => {
     expect(forwarded.headers.get('X-LuckRead-Caller')).toBe('W05')
     expect(forwarded.headers.get('X-LuckRead-Principal-User-Id')).toBe('viewer-1')
     expect(forwarded.headers.has('Authorization')).toBe(false)
-    expect((writeDb as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).toHaveBeenCalledTimes(2)
-    await expect(pinResponse.json()).resolves.toMatchObject({
-      data: { userId: 'viewer-1', contentId: 'content-1' },
-    })
+    await expect(pinResponse.json()).resolves.toMatchObject({ data: { userId: 'viewer-1', contentId: 'content-1' } })
 
-    const unpinResponse = await worker.fetch(
+    const unpinResponse = await injectedWorker.fetch(
       requestWithMethod('/internal/social/content/content-1/pin', 'DELETE', {
-        ...transportHeaders,
-        'X-LuckRead-Principal-Layer': 'L2',
-        'Idempotency-Key': 'unpin-1',
+        ...transportHeaders, 'Idempotency-Key': 'unpin-1',
       }),
-      { DB: dbFor() },
+      {} as never,
+      {} as never,
     )
     expect(unpinResponse.status).toBe(204)
+    expect(profilePinStore.unpin).toHaveBeenCalledWith('viewer-1', 'content-1')
   })
 
   it('fails profile pin writes closed when W03 context binding is missing', async () => {
-    const d = dbFor()
-    const response = await worker.fetch(
+    const profilePinStore: ProfilePinStore = {
+      pin: vi.fn(), get: vi.fn(), unpin: vi.fn(),
+    }
+    const injectedWorker = createW05SocialWorker({ profilePinStore })
+    const response = await injectedWorker.fetch(
       requestWithMethod('/internal/social/content/content-1/pin', 'POST', {
-        ...transportHeaders,
-        'X-LuckRead-Principal-Layer': 'L2',
-        'Idempotency-Key': 'pin-no-w03',
+        ...transportHeaders, 'Idempotency-Key': 'pin-no-w03',
       }),
-      { DB: d },
+      {} as never,
+      {} as never,
     )
     expect(response.status).toBe(503)
-    expect((d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
+    expect(profilePinStore.pin).not.toHaveBeenCalled()
   })
 
   it('rejects profile pin writes from below L2', async () => {
@@ -2224,23 +2237,24 @@ describe('W05 social comment transport', () => {
     const binding = {
       fetch: vi.fn(async (input: RequestInfo | URL) => Response.json({
         data: {
-          contentId: 'content-1',
-          ownerUserId: 'owner-1',
-          contentType: 'post',
-          state: 'PUBLISHED',
-          updatedAt: '2026-10-20T00:00:00.000Z',
+          contentId: 'content-1', ownerUserId: 'owner-1', contentType: 'post',
+          state: 'PUBLISHED', updatedAt: '2026-10-20T00:00:00.000Z',
         },
         requestId: 'req_public_pin',
       })),
     }
-    const d = dbFor([{ user_id: 'owner-1', content_id: 'content-1', pinned_at: '2026-10-16T00:00:00.000Z' }])
-    const response = await worker.fetch(
+    const profilePinStore: ProfilePinStore = {
+      pin: vi.fn(), unpin: vi.fn(),
+      get: vi.fn(async () => ({ user_id: 'owner-1', content_id: 'content-1', pinned_at: '2026-10-16T00:00:00.000Z' })),
+    }
+    const injectedWorker = createW05SocialWorker({ profilePinStore })
+    const response = await injectedWorker.fetch(
       request('/internal/social/users/owner-1/pinned-content', {
-        'X-LuckRead-Caller': 'W01',
-        'X-LuckRead-Transport-Version': '1.0',
+        'X-LuckRead-Caller': 'W01', 'X-LuckRead-Transport-Version': '1.0',
         'X-LuckRead-Correlation-Id': 'public-pin',
       }),
-      { DB: d, W03_CONTENT: binding },
+      { W03_CONTENT: binding } as never,
+      {} as never,
     )
     expect(response.status).toBe(200)
     expect(binding.fetch).toHaveBeenCalledTimes(1)
@@ -2249,43 +2263,47 @@ describe('W05 social comment transport', () => {
     expect(forwarded.headers.get('X-LuckRead-Caller')).toBe('W05')
     expect(forwarded.headers.has('X-LuckRead-Principal-User-Id')).toBe(false)
     expect(forwarded.headers.has('Authorization')).toBe(false)
-    const prepare = (d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare
-    expect(prepare).toHaveBeenCalledTimes(1)
-    expect(String(prepare.mock.calls[0]?.[0])).toContain('FROM social_profile_pins')
-    expect(String(prepare.mock.calls[0]?.[0])).not.toContain('JOIN contents')
-    await expect(response.json()).resolves.toMatchObject({
-      data: { userId: 'owner-1', contentId: 'content-1' },
-    })
+    expect(profilePinStore.get).toHaveBeenCalledWith('owner-1')
+    await expect(response.json()).resolves.toMatchObject({ data: { userId: 'owner-1', contentId: 'content-1' } })
   })
 
   it('hides a stale profile pin when W03 no longer exposes the post as published owner content', async () => {
     const binding = {
       fetch: vi.fn(async () => Response.json({ error: { code: 'NOT_FOUND' } }, { status: 404 })),
     }
-    const response = await worker.fetch(
+    const profilePinStore: ProfilePinStore = {
+      pin: vi.fn(), unpin: vi.fn(),
+      get: vi.fn(async () => ({ user_id: 'owner-1', content_id: 'content-1', pinned_at: '2026-10-16T00:00:00.000Z' })),
+    }
+    const injectedWorker = createW05SocialWorker({ profilePinStore })
+    const response = await injectedWorker.fetch(
       request('/internal/social/users/owner-1/pinned-content', {
-        'X-LuckRead-Caller': 'W01',
-        'X-LuckRead-Transport-Version': '1.0',
+        'X-LuckRead-Caller': 'W01', 'X-LuckRead-Transport-Version': '1.0',
         'X-LuckRead-Correlation-Id': 'stale-public-pin',
       }),
-      { DB: dbFor([{ user_id: 'owner-1', content_id: 'content-1', pinned_at: '2026-10-16T00:00:00.000Z' }]), W03_CONTENT: binding },
+      { W03_CONTENT: binding } as never,
+      {} as never,
     )
     expect(response.status).toBe(200)
     await expect(response.json()).resolves.toMatchObject({ data: null })
   })
 
   it('fails closed on public profile pin reads when W03 is unavailable', async () => {
-    const d = dbFor([{ user_id: 'owner-1', content_id: 'content-1', pinned_at: '2026-10-16T00:00:00.000Z' }])
-    const response = await worker.fetch(
+    const profilePinStore: ProfilePinStore = {
+      pin: vi.fn(), unpin: vi.fn(),
+      get: vi.fn(async () => ({ user_id: 'owner-1', content_id: 'content-1', pinned_at: '2026-10-16T00:00:00.000Z' })),
+    }
+    const injectedWorker = createW05SocialWorker({ profilePinStore })
+    const response = await injectedWorker.fetch(
       request('/internal/social/users/owner-1/pinned-content', {
-        'X-LuckRead-Caller': 'W01',
-        'X-LuckRead-Transport-Version': '1.0',
+        'X-LuckRead-Caller': 'W01', 'X-LuckRead-Transport-Version': '1.0',
         'X-LuckRead-Correlation-Id': 'public-pin-no-w03',
       }),
-      { DB: d },
+      {} as never,
+      {} as never,
     )
     expect(response.status).toBe(503)
-    expect((d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).toHaveBeenCalledTimes(1)
+    expect(profilePinStore.get).toHaveBeenCalledWith('owner-1')
   })
 
 })

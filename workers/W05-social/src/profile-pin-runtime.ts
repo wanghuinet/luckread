@@ -1,6 +1,5 @@
-/// <reference types="@cloudflare/workers-types" />
 import type { OwnedPostContext } from './owned-post-context.js'
-import { createD1ProfilePinStore, ProfilePinStoreError, type ProfilePinStorageRow, type ProfilePinStore } from './profile-pin-store.js'
+import { ProfilePinStoreError, type ProfilePinStorageRow, type ProfilePinStore } from './profile-pin-store.js'
 
 export class ProfilePinRuntimeError extends Error {
   constructor(readonly code: string, readonly status: number) { super(code) }
@@ -22,11 +21,10 @@ const validateId = (value: string, actor = false): string => {
 
 /** A profile has at most one pinned, published item; content remains canonical in W03. */
 export async function pinProfileContent(
-  db: D1Database,
   actorUserIdValue: string,
   contentIdValue: string,
   context: OwnedPostContext,
-  store: ProfilePinStore = createD1ProfilePinStore(db),
+  store: ProfilePinStore,
 ): Promise<ProfilePinRecord> {
   const actorUserId = validateId(actorUserIdValue, true)
   const contentId = validateId(contentIdValue)
@@ -53,10 +51,9 @@ export async function pinProfileContent(
 
 /** Only the authenticated owner can clear their own matching profile pin. */
 export async function unpinProfileContent(
-  db: D1Database,
   actorUserIdValue: string,
   contentIdValue: string,
-  store: ProfilePinStore = createD1ProfilePinStore(db),
+  store: ProfilePinStore,
 ): Promise<void> {
   const actorUserId = validateId(actorUserIdValue, true)
   const contentId = validateId(contentIdValue)
@@ -75,9 +72,8 @@ export async function unpinProfileContent(
  * content through W03 before presenting this reference as a public profile pin.
  */
 export async function getProfilePinReference(
-  db: D1Database,
   userIdValue: string,
-  store: ProfilePinStore = createD1ProfilePinStore(db),
+  store: ProfilePinStore,
 ): Promise<ProfilePinRecord | null> {
   const userId = validateId(userIdValue)
   try {

@@ -43,8 +43,14 @@ const auditSchemaPath = resolve(root, 'contracts/schemas/common/audit-event.json
 const w06MigrationReadmePath = resolve(root, 'workers/W06-governance/migrations/README.md')
 const w09NeonMigrationPath = resolve(root, 'workers/W09-platform/src/neon-postgres-migrations/0001_w09_d1_03_platform_schema.sql')
 const w09NeonSchemaContractPath = resolve(root, 'contracts/database/neon-d1-03-w09-platform-schema.v1.json')
+const repostRuntimePath = resolve(root, 'workers/W05-social/src/repost-runtime.ts')
+const repostStorePath = resolve(root, 'workers/W05-social/src/repost-store.ts')
+const shareRuntimePath = resolve(root, 'workers/W05-social/src/share-runtime.ts')
+const shareStorePath = resolve(root, 'workers/W05-social/src/share-store.ts')
+const profilePinRuntimePath = resolve(root, 'workers/W05-social/src/profile-pin-runtime.ts')
+const profilePinStorePath = resolve(root, 'workers/W05-social/src/profile-pin-store.ts')
 
-for (const path of [w05ConfigPath, w09MigrationConfigPath, w05SourcePath, pushRuntimePath, deliveryRuntimePath, fanoutRuntimePath, endpointAccessPortPath, endpointAccessPostgresPath, endpointAccessRuntimePath, deliveryContractPath, pushMigrationPath, auditSchemaPath, w06MigrationReadmePath, w09NeonMigrationPath, w09NeonSchemaContractPath]) {
+for (const path of [w05ConfigPath, w09MigrationConfigPath, w05SourcePath, pushRuntimePath, deliveryRuntimePath, fanoutRuntimePath, endpointAccessPortPath, endpointAccessPostgresPath, endpointAccessRuntimePath, deliveryContractPath, pushMigrationPath, auditSchemaPath, w06MigrationReadmePath, w09NeonMigrationPath, w09NeonSchemaContractPath, repostRuntimePath, repostStorePath, shareRuntimePath, shareStorePath, profilePinRuntimePath, profilePinStorePath]) {
   if (!existsSync(path)) throw new Error(`Missing scoped NotificationPushEndpoint owner artifact: ${path}`)
 }
 
@@ -141,6 +147,20 @@ if (
   throw new Error('NotificationPushEndpoint must remain W09-owned with only the explicit W05/T14 self-service writer delegation')
 }
 
+const repostRuntime = readFileSync(repostRuntimePath, 'utf8')
+const repostStore = readFileSync(repostStorePath, 'utf8')
+const shareRuntime = readFileSync(shareRuntimePath, 'utf8')
+const shareStore = readFileSync(shareStorePath, 'utf8')
+const profilePinRuntime = readFileSync(profilePinRuntimePath, 'utf8')
+const profilePinStore = readFileSync(profilePinStorePath, 'utf8')
+for (const [name, source] of Object.entries({
+  repostRuntime, repostStore, shareRuntime, shareStore, profilePinRuntime, profilePinStore,
+})) {
+  if (source.includes('D1Database') || source.includes('createD1') || source.includes('D1QueryExecutor')) {
+    throw new Error(`W05 publication relation runtime must not retain D1 fallback: ${name}`)
+  }
+}
+
 const deliveryRuntime = readFileSync(deliveryRuntimePath, 'utf8')
 const fanoutRuntime = readFileSync(fanoutRuntimePath, 'utf8')
 const endpointAccessPort = readFileSync(endpointAccessPortPath, 'utf8')
@@ -190,7 +210,7 @@ if (
   deliveryRuntime.includes('last_seen_at =') ||
   fanoutRuntime.includes('last_seen_at =')
 ) {
-  throw new Error('W05 notification delivery must use the scoped W09-owned Neon endpoint access port without D1 fallback')
+  throw new Error('W05 notification delivery and publication relation routes must use scoped Neon Store ports without D1 fallback')
 }
 
 for (const rule of contract.boundaryRules ?? []) {
