@@ -1,9 +1,19 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createW08CreatorWorker } from './worker.js'
-import { createD1W08CreatorStore, type W08D1Database } from './creator-store-d1.test-adapter.js'
+import type {
+  CompleteCreatorGrantInput,
+  CreateCreatorApplicationInput,
+  CreatorApplicationOwnRow,
+  CreatorApplicationReplayRow,
+  CreatorApplicationReviewRow,
+  CreatorApplicationRow,
+  CreatorIdentityRow,
+  DecideCreatorApplicationInput,
+  W08CreatorStore,
+} from './creator-store.js'
 
 const worker = createW08CreatorWorker({
-  getCreatorStore: (env) => createD1W08CreatorStore((env as unknown as { D1_01: W08D1Database }).D1_01),
+  getCreatorStore: (env) => (env as unknown as { CREATOR_STORE: W08CreatorStore }).CREATOR_STORE,
 })
 
 type TestPrincipal = {
@@ -14,187 +24,181 @@ type TestPrincipal = {
   layer: string
 }
 
-type TestApplication = {
-  application_id: string
-  user_id: string
-  creator_type: string
-  statement: string
-  status: 'PENDING' | 'APPROVED' | 'REJECTED'
-  grant_state: 'NOT_REQUESTED' | 'PENDING' | 'GRANTED'
-  version: number
-  application_idempotency_key: string
-  decision_idempotency_key: string | null
-  decided_by: string | null
-  decision_reason: string | null
-  created_at: string
-  updated_at: string
-  decided_at: string | null
-}
+type TestApplication = CreatorApplicationRow
 
-class FakeStatement {
-  values: unknown[] = []
+class MemoryW08CreatorStore implements W08CreatorStore {
+  applications = new Map<string, TestApplication>()
+  creators = new Map<string, {
+    creator_id: string
+    application_id: string
+    status: 'PENDING_ROLE_GRANT' | 'ACTIVE'
+    version: number
+    updated_at: string
+  }>()
+  reads: string[] = []
+  writes: string[] = []
 
-  constructor(private readonly db: FakeD1, readonly sql: string) {}
-
-  bind(...values: unknown[]) {
-    this.values = values
-    return this
+  async findApplicationByIdempotency(userId: string, idempotencyKey: string): Promise<CreatorApplicationReplayRow | null> {
+    this.reads.push('findApplicationByIdempotency')
+    const row = [...this.applications.values()].find((item) =>
+      item.user_id === userId && item.application_idempotency_key === idempotencyKey)
+    if (!row) return null
+    return {
+      application_id: row.application_id,
+      user_id: row.user_id,
+      creator_type: row.creator_type,
+      statement: row.statement,
+      status: row.status,
+      grant_state: row.grant_state,
+      version: row.version,
+      created_at: row.created_at,
+    }
   }
 
-  async first<T>(): Promise<T | null> {
-    this.db.queries.push({ sql: this.sql, values: this.values })
-    const [a, b] = this.values
-
-    if (this.sql.includes('FROM creator_applications WHERE user_id = ? AND application_idempotency_key = ?')) {
-      const row = [...this.db.applications.values()].find(
-        (item) => item.user_id === a && item.application_idempotency_key === b,
-      )
-      return (row ?? null) as T | null
-    }
-
-    if (this.sql.includes('FROM creator_applications WHERE user_id = ? AND status = \'PENDING\'')) {
-      const row = [...this.db.applications.values()].find(
-        (item) => item.user_id === a && item.status === 'PENDING',
-      )
-      return row ? { application_id: row.application_id } as T : null
-    }
-
-    if (this.sql.includes('FROM creator_applications WHERE application_id = ? LIMIT 1')) {
-      return (this.db.applications.get(String(a)) ?? null) as T | null
-    }
-
-    if (this.sql.includes('FROM creator_applications WHERE user_id = ? ORDER BY created_at DESC LIMIT 1')) {
-      const row = [...this.db.applications.values()]
-        .filter((item) => item.user_id === a)
-        .sort((left, right) => right.created_at.localeCompare(left.created_at))[0]
-      if (!row) return null
-      const { application_id, creator_type, statement, status, grant_state, version, created_at, updated_at, decided_at, decision_reason } = row
-      return { application_id, creator_type, statement, status, grant_state, version, created_at, updated_at, decided_at, decision_reason } as T
-    }
-
-    if (this.sql.includes('FROM creators WHERE user_id = ?')) {
-      const row = this.db.creators.get(String(a))
-      if (!row) return null
-      if (this.sql.includes('AS creatorId')) {
-        return { creatorId: row.creator_id, applicationId: row.application_id } as T
-      }
-      return { creator_id: row.creator_id, application_id: row.application_id } as T
-    }
-
-    return null
+  async findCreatorByUser(userId: string): Promise<CreatorIdentityRow | null> {
+    this.reads.push('findCreatorByUser')
+    const row = this.creators.get(userId)
+    return row ? {
+      creator_id: row.creator_id,
+      application_id: row.application_id,
+      status: row.status,
+    } : null
   }
 
-  async all<T>(): Promise<{ results: T[] }> {
-    this.db.queries.push({ sql: this.sql, values: this.values })
-    const reviewerId = String(this.values[0] ?? '')
-    const limit = Number(this.values[1] ?? 25)
-    const results = [...this.db.applications.values()]
+  async findPendingApplicationByUser(userId: string): Promise<{ application_id: string } | null> {
+    this.reads.push('findPendingApplicationByUser')
+    const row = [...this.applications.values()].find((item) =>
+      item.user_id === userId && item.status === 'PENDING')
+    return row ? { application_id: row.application_id } : null
+  }
+
+  async createApplication(input: CreateCreatorApplicationInput): Promise<void> {
+    this.writes.push('createApplication')
+    this.applications.set(input.applicationId, {
+      application_id: input.applicationId,
+      user_id: input.userId,
+      creator_type: input.creatorType,
+      statement: input.statement,
+      status: 'PENDING',
+      grant_state: 'NOT_REQUESTED',
+      version: 1,
+      application_idempotency_key: input.idempotencyKey,
+      decision_idempotency_key: null,
+      decided_by: null,
+      decision_reason: null,
+      created_at: input.now,
+      updated_at: input.now,
+      decided_at: null,
+    })
+  }
+
+  async findOwnApplication(userId: string): Promise<CreatorApplicationOwnRow | null> {
+    this.reads.push('findOwnApplication')
+    const row = [...this.applications.values()]
+      .filter((item) => item.user_id === userId)
+      .sort((left, right) => right.created_at.localeCompare(left.created_at))[0]
+    if (!row) return null
+    return {
+      application_id: row.application_id,
+      creator_type: row.creator_type,
+      statement: row.statement,
+      status: row.status,
+      grant_state: row.grant_state,
+      version: row.version,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+      decided_at: row.decided_at,
+      decision_reason: row.decision_reason,
+    }
+  }
+
+  async listReviewableApplications(reviewerId: string, limit: number): Promise<CreatorApplicationReviewRow[]> {
+    this.reads.push('listReviewableApplications')
+    return [...this.applications.values()]
       .filter((item) => item.status === 'PENDING' ||
         (item.status === 'APPROVED' && item.grant_state === 'PENDING' && item.decided_by === reviewerId))
       .sort((left, right) => left.created_at.localeCompare(right.created_at))
       .slice(0, limit)
-      .map(({ application_id, user_id, creator_type, statement, status, grant_state, version, created_at }) => ({
-        application_id, user_id, creator_type, statement, status, grant_state, version, created_at,
+      .map((row) => ({
+        application_id: row.application_id,
+        user_id: row.user_id,
+        creator_type: row.creator_type,
+        statement: row.statement,
+        status: row.status,
+        grant_state: row.grant_state,
+        version: row.version,
+        created_at: row.created_at,
       }))
-    return { results: results as T[] }
-  }
-}
-
-class FakeD1 {
-  applications = new Map<string, TestApplication>()
-  creators = new Map<string, { creator_id: string; application_id: string; status?: string; version?: number; updated_at?: string }>()
-  queries: Array<{ sql: string; values: unknown[] }> = []
-  batches = 0
-
-  prepare(sql: string) {
-    return new FakeStatement(this, sql)
   }
 
-  async batch(statements: unknown[]) {
-    this.batches++
-    const results = statements.map((item) => {
-      const statement = item as FakeStatement
-      const values = statement.values
+  async readApplication(applicationId: string): Promise<CreatorApplicationRow | null> {
+    this.reads.push('readApplication')
+    return this.applications.get(applicationId) ?? null
+  }
 
-      if (statement.sql.includes('INSERT INTO creator_applications')) {
-        const [applicationId, userId, creatorType, statementText, idempotencyKey, now, updatedAt] = values
-        this.applications.set(String(applicationId), {
-          application_id: String(applicationId),
-          user_id: String(userId),
-          creator_type: String(creatorType),
-          statement: String(statementText),
-          status: 'PENDING',
-          grant_state: 'NOT_REQUESTED',
-          version: 1,
-          application_idempotency_key: String(idempotencyKey),
-          decision_idempotency_key: null,
-          decided_by: null,
-          decision_reason: null,
-          created_at: String(now),
-          updated_at: String(updatedAt),
-          decided_at: null,
-        })
-        return { meta: { changes: 1 } }
-      }
-
-      if (statement.sql.includes("UPDATE creator_applications SET status = 'APPROVED'")) {
-        const [key, actorId, reason, decidedAt, updatedAt, applicationId, expectedVersion] = values
-        const row = this.applications.get(String(applicationId))
-        if (!row || row.status !== 'PENDING' || row.version !== Number(expectedVersion)) {
-          return { meta: { changes: 0 } }
-        }
-        Object.assign(row, {
-          status: 'APPROVED',
-          grant_state: 'PENDING',
-          version: row.version + 1,
-          decision_idempotency_key: String(key),
-          decided_by: String(actorId),
-          decision_reason: String(reason),
-          decided_at: String(decidedAt),
-          updated_at: String(updatedAt),
-        })
-        return { meta: { changes: 1 } }
-      }
-
-      if (statement.sql.includes('INSERT INTO creators')) {
-        const [creatorId, createdAt, updatedAt, applicationId, key, actorId] = values
-        const row = this.applications.get(String(applicationId))
-        if (!row || row.status !== 'APPROVED' || row.decision_idempotency_key !== key || row.decided_by !== actorId) {
-          return { meta: { changes: 0 } }
-        }
-        this.creators.set(row.user_id, {
-          creator_id: String(creatorId),
-          application_id: row.application_id,
-          status: 'PENDING_ROLE_GRANT',
-          version: 1,
-          updated_at: String(updatedAt ?? createdAt),
-        })
-        return { meta: { changes: 1 } }
-      }
-
-      if (statement.sql.includes("UPDATE creator_applications SET grant_state = 'GRANTED'")) {
-        const [updatedAt, applicationId] = values
-        const row = this.applications.get(String(applicationId))
-        if (!row || row.status !== 'APPROVED' || row.grant_state !== 'PENDING') return { meta: { changes: 0 } }
-        row.grant_state = 'GRANTED'
-        row.version++
-        row.updated_at = String(updatedAt)
-        return { meta: { changes: 1 } }
-      }
-
-      if (statement.sql.includes("UPDATE creators SET status = 'ACTIVE'")) {
-        const [updatedAt, applicationId] = values
-        const row = [...this.creators.values()].find((item) => item.application_id === String(applicationId))
-        if (!row || row.status !== 'PENDING_ROLE_GRANT') return { meta: { changes: 0 } }
-        row.status = 'ACTIVE'
-        row.version = (row.version ?? 1) + 1
-        row.updated_at = String(updatedAt)
-        return { meta: { changes: 1 } }
-      }
-
-      return { meta: { changes: 1 } }
+  async approveApplication(input: DecideCreatorApplicationInput): Promise<boolean> {
+    this.writes.push('approveApplication')
+    const row = this.applications.get(input.applicationId)
+    if (!row || row.status !== 'PENDING' || row.version !== input.expectedVersion) return false
+    Object.assign(row, {
+      status: 'APPROVED',
+      grant_state: 'PENDING',
+      version: row.version + 1,
+      decision_idempotency_key: input.idempotencyKey,
+      decided_by: input.actorId,
+      decision_reason: input.reason,
+      decided_at: input.now,
+      updated_at: input.now,
     })
-    return results
+    if (!this.creators.has(row.user_id)) {
+      this.creators.set(row.user_id, {
+        creator_id: 'creator-' + row.application_id,
+        application_id: row.application_id,
+        status: 'PENDING_ROLE_GRANT',
+        version: 1,
+        updated_at: input.now,
+      })
+    }
+    return true
+  }
+
+  async rejectApplication(input: DecideCreatorApplicationInput): Promise<boolean> {
+    this.writes.push('rejectApplication')
+    const row = this.applications.get(input.applicationId)
+    if (!row || row.status !== 'PENDING' || row.version !== input.expectedVersion) return false
+    Object.assign(row, {
+      status: 'REJECTED',
+      grant_state: 'NOT_REQUESTED',
+      version: row.version + 1,
+      decision_idempotency_key: input.idempotencyKey,
+      decided_by: input.actorId,
+      decision_reason: input.reason,
+      decided_at: input.now,
+      updated_at: input.now,
+    })
+    return true
+  }
+
+  async completeCreatorGrant(input: CompleteCreatorGrantInput): Promise<void> {
+    this.writes.push('completeCreatorGrant')
+    const application = this.applications.get(input.applicationId)
+    if (application && application.status === 'APPROVED' && application.grant_state === 'PENDING') {
+      application.grant_state = 'GRANTED'
+      application.version += 1
+      application.updated_at = input.now
+    }
+    const creator = [...this.creators.values()].find((item) => item.application_id === input.applicationId)
+    if (creator && creator.status === 'PENDING_ROLE_GRANT') {
+      creator.status = 'ACTIVE'
+      creator.version += 1
+      creator.updated_at = input.now
+    }
+  }
+
+  async findActiveCreator(userId: string): Promise<{ creator_id: string } | null> {
+    this.reads.push('findActiveCreator')
+    const row = this.creators.get(userId)
+    return row?.status === 'ACTIVE' ? { creator_id: row.creator_id } : null
   }
 }
 
@@ -218,8 +222,8 @@ const request = (path: string, method: string, body?: unknown, headers?: Headers
   })
 }
 
-function harness(current: TestPrincipal | null, allowRoleGrant = false, sharedDb?: FakeD1) {
-  const db = sharedDb ?? new FakeD1()
+function harness(current: TestPrincipal | null, allowRoleGrant = false, sharedDb?: MemoryW08CreatorStore) {
+  const db = sharedDb ?? new MemoryW08CreatorStore()
   const roleGrants: Array<Record<string, unknown>> = []
   const principalAuthorizations: Array<string | null> = []
   const roleGrantAuthorizations: Array<string | null> = []
@@ -242,7 +246,7 @@ function harness(current: TestPrincipal | null, allowRoleGrant = false, sharedDb
     },
   }
   const env = {
-    D1_01: db as unknown as W08D1Database,
+    CREATOR_STORE: db,
     W02_AUTH: auth as unknown as Fetcher,
   } as Parameters<typeof worker.fetch>[1]
   return { db, env, roleGrants, principalAuthorizations, roleGrantAuthorizations }
@@ -298,7 +302,7 @@ describe('W08 creator qualification runtime guards', () => {
     expect(setup.principalAuthorizations).toEqual(['Bearer native-session-token'])
   })
 
-  it('routes the internal CASL endpoint and rejects a forged subject before any D1 access', async () => {
+  it('routes the internal CASL endpoint and rejects a forged subject before any Store access', async () => {
     const setup = harness(principal('regular-user-0001', 'L2'))
     const response = await worker.fetch(request('/internal/authz/check-permission', 'POST', {
       subjectId: 'admin-user-0001',
@@ -311,11 +315,11 @@ describe('W08 creator qualification runtime guards', () => {
       decision: 'DENY',
       reasonCode: 'CALLER_SUPPLIED_AUTHORIZATION_CONTEXT',
     })
-    expect(setup.db.queries).toHaveLength(0)
-    expect(setup.db.batches).toBe(0)
+    expect(setup.db.reads).toHaveLength(0)
+    expect(setup.db.writes).toHaveLength(0)
   })
 
-  let db: FakeD1
+  let db: MemoryW08CreatorStore
   let env: Parameters<typeof worker.fetch>[1]
 
   beforeEach(() => {
@@ -334,7 +338,7 @@ describe('W08 creator qualification runtime guards', () => {
     expect(response.status).toBe(403)
     expect((await responseBody(response)).data?.error?.code).toBe('VERIFIED_USER_REQUIRED')
     expect(setup.db.applications.size).toBe(0)
-    expect(setup.db.batches).toBe(0)
+    expect(setup.db.writes).toHaveLength(0)
   })
 
   it('rejects L6 from both review-list and decision endpoints before reading or writing D1', async () => {
@@ -350,17 +354,17 @@ describe('W08 creator qualification runtime guards', () => {
     expect((await responseBody(listResponse)).data?.error?.code).toBe('PERMISSION_DENIED')
     expect(decisionResponse.status).toBe(403)
     expect((await responseBody(decisionResponse)).data?.error?.code).toBe('PERMISSION_DENIED')
-    expect(setup.db.queries).toHaveLength(0)
-    expect(setup.db.batches).toBe(0)
+    expect(setup.db.reads).toHaveLength(0)
+    expect(setup.db.writes).toHaveLength(0)
   })
 
-  it('rejects missing identity and fails closed before any D1 work', async () => {
+  it('rejects missing identity and fails closed before any Store work', async () => {
     const setup = harness(null)
     const response = await worker.fetch(request('/api/v1/creator-applications/me', 'GET'), setup.env)
 
     expect(response.status).toBe(401)
     expect((await responseBody(response)).data?.error?.code).toBe('UNAUTHENTICATED')
-    expect(setup.db.queries).toHaveLength(0)
+    expect(setup.db.reads).toHaveLength(0)
   })
 
   it('creates an L2 application once and replays the same idempotency key without a second write', async () => {
@@ -386,7 +390,7 @@ describe('W08 creator qualification runtime guards', () => {
     expect(replay.data?.replayed).toBe(true)
     expect(replay.data?.applicationId).toBe(first.data?.applicationId)
     expect(db.applications.size).toBe(1)
-    expect(db.batches).toBe(1)
+    expect(db.writes).toHaveLength(1)
   })
 
   it('allows an applicant to read only their own application status', async () => {
@@ -414,7 +418,7 @@ describe('W08 creator qualification runtime guards', () => {
     }, { 'Idempotency-Key': 'creator-review-self-0001', 'If-Match': '"1"' }), selfHarness.env)
     expect(selfResponse.status).toBe(403)
     expect((await responseBody(selfResponse)).data?.error?.code).toBe('SELF_APPROVAL_DENIED')
-    expect(selfHarness.db.batches).toBe(0)
+    expect(selfHarness.db.writes).toHaveLength(0)
 
     const staleHarness = harness(principal('reviewer-l7-0002', 'L7'))
     staleHarness.db.applications.set('creator-app-0001', existingApplication())
@@ -423,10 +427,10 @@ describe('W08 creator qualification runtime guards', () => {
     }, { 'Idempotency-Key': 'creator-review-stale-0001', 'If-Match': '"9"' }), staleHarness.env)
     expect(staleResponse.status).toBe(412)
     expect((await responseBody(staleResponse)).data?.error?.code).toBe('PRECONDITION_FAILED')
-    expect(staleHarness.db.batches).toBe(0)
+    expect(staleHarness.db.writes).toHaveLength(0)
   })
 
-  it('closes the applicant-to-review-to-W02-grant lifecycle against one shared D1 state', async () => {
+  it('closes the applicant-to-review-to-W02-grant lifecycle against one shared Store state', async () => {
     const applicant = harness(principal('applicant-lifecycle-0001', 'L2'))
     const submittedResponse = await worker.fetch(request('/api/v1/creator-applications', 'POST', {
       creatorType: 'WRITER',
@@ -561,6 +565,6 @@ describe('W08 creator qualification runtime guards', () => {
 
     expect(response.status).toBe(409)
     expect((await responseBody(response)).data?.error?.code).toBe('DECISION_CONFLICT')
-    expect(setup.db.batches).toBe(0)
+    expect(setup.db.writes).toHaveLength(0)
   })
 })

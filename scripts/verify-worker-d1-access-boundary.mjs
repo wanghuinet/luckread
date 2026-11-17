@@ -152,7 +152,7 @@ for (const dir of dirs) {
         (configExists ? (jsonc(wranglerPath).d1_databases ?? []) : []).map((x) => x.binding),
       )
       if (!declaredBindings.has(binding)) {
-        const compatibilityOnly = (w05NeonProduction && ['DB', 'D1_03'].includes(binding)) || (w08NeonProduction && binding === 'D1_01')
+        const compatibilityOnly = w05NeonProduction && ['DB', 'D1_03'].includes(binding)
         if (compatibilityOnly) continue
         const relative = path.slice(root.length + 1)
         throw new Error(`${workerId}: raw D1 binding ${binding} used by ${relative} but not declared in wrangler.jsonc`)

@@ -230,9 +230,9 @@ describe('W08 Neon-only background scheduled-publish permission', () => {
     const poolFactory = vi.fn(() => {
       throw new Error('Neon pool must not be created')
     })
-    const response = await handleScheduledPublishPermission(makeRequest(), {
-      D1_01: { prepare: vi.fn() },
-    } as never, { getPostgresPool: poolFactory })
+    const response = await handleScheduledPublishPermission(makeRequest(), {} as never, {
+      getPostgresPool: poolFactory,
+    })
 
     expect(response.status).toBe(503)
     await expect(response.json()).resolves.toMatchObject({
