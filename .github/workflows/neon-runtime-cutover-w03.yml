@@ -173,16 +173,20 @@ jobs:
             throw new Error('W03 Neon revision restore wiring is incomplete')
           }
           if (!contentRuntime.includes('mutationStore.transition({') ||
-              !router.includes('dependencies.contentMutationStoreProvider?.(env),')) {
+              !router.includes('const mutationStore = dependencies.contentMutationStoreProvider?.(env)') ||
+              !router.includes("if (!mutationStore) throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)") ||
+              !router.includes('transitionContentState(\n          mutationStore,')) {
             throw new Error('W03 Neon owner-authorized content state transition wiring is incomplete')
           }
           if (!contentRuntime.includes('mutationStore.moderationTransition({') ||
-              !router.includes('dependencies.contentMutationStoreProvider?.(env),') ||
-              !runtime.includes('getW03ContentMutationStore')) {
+              !router.includes('applyModerationContentTransition(mutationStore, {') ||
+              !runtime.includes('getW03ContentMutationStore') ||
+              !router.includes("if (!mutationStore) throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)")) {
             throw new Error('W03 Neon W06 moderation transition wiring is incomplete')
           }
           if (!contentRuntime.includes('mutationStore.rollback({') ||
-              !router.includes('dependencies.contentMutationStoreProvider?.(env),')) {
+              !router.includes('rollbackContentRevision(\n          mutationStore,') ||
+              !router.includes("if (!mutationStore) throw new ContentRuntimeError('SERVICE_UNAVAILABLE', 503)")) {
             throw new Error('W03 Neon revision rollback wiring is incomplete')
           }
           if (!relationships.includes('mutationStore.create({') ||
