@@ -1,5 +1,5 @@
 import permissions from '../../../../contracts/authz/permissions.json'
-import { createLuckReadAuth, type BetterAuthEnv } from './better-auth.js'
+import { createLuckReadAuth, requireLegacyW02D1Database, type BetterAuthEnv } from './better-auth.js'
 import {
   createD1SessionListStore,
   type SessionListCursor,
@@ -126,7 +126,7 @@ export async function handleCurrentUserSessionList(
   }
 
   try {
-    const store = dependencies.store ?? createD1SessionListStore(env.D1_01)
+    const store = dependencies.store ?? createD1SessionListStore(requireLegacyW02D1Database(env))
     const result = await store.list({
       userId,
       now,
