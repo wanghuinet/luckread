@@ -41,6 +41,13 @@ import { createPostgresNotificationPushEndpointAccessStore } from '../notificati
 import type { NotificationPushEndpointAccessStore } from '../notification-push-endpoint-access-store.js'
 import type { PushEndpointPostgresExecutor } from '../push-endpoint-runtime.js'
 
+/**
+ * @deprecated-next-version
+ * Reason: Legacy D1 provider selection remains reachable from local/test callers.
+ * Replacement: The Neon PostgreSQL stores composed by this module and src/entry.ts.
+ * Removal: Next release.
+ * Condition: Every W05 route and push workflow requires injected Neon stores; no D1-backed fallback remains.
+ */
 export type W05SocialDatabaseDriver = 'd1' | 'neon'
 
 export interface W05SocialRuntimeEnv {

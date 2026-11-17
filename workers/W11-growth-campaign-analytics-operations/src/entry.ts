@@ -33,6 +33,13 @@ const entry = {
       const database = getW11AnalyticsPostgresDatabase(
         env.HYPERDRIVE_ANALYTICS_PG as W11AnalyticsHyperdriveBinding,
       )
+      /**
+       * @deprecated-next-version
+       * Reason: Neon analytics database is still injected into a D1_05-shaped worker contract.
+       * Replacement: Native PostgreSQL analytics repository/worker contract.
+       * Removal: Next release.
+       * Condition: worker.ts and analytics-ingest use PostgreSQL-native stores and no longer require D1_05.
+       */
       const compatibleEnv = {
         ...env,
         D1_05: database,
