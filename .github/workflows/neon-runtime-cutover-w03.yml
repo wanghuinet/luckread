@@ -153,8 +153,8 @@ jobs:
               throw new Error('W03 Neon provider wiring is incomplete: ' + provider)
             }
           }
-          const productionRuntime = [entry, runtime, contentRuntime, router, relationships].join('\\n')
-          if (/\\b(?:env|context\\.env)\\.D1_02\\b/.test(productionRuntime)) {
+          const productionRuntime = [entry, runtime, contentRuntime, router, relationships].join('\n')
+          if (/\b(?:env|context\.env)\.D1_02\b/.test(productionRuntime)) {
             throw new Error('W03 production entrypoint still directly accesses the removed D1_02 binding')
           }
           if (!entry.includes('contentRevisionReadStoreProvider') ||
