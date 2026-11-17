@@ -3,10 +3,8 @@
  *
  * This module reuses W02's canonical Better Auth options/plugins and injects a
  * local PostgreSQL pool for the pinned Better Auth CLI. It is not imported by
- * the Worker entrypoint and does not alter W02's production D1_01 binding.
- *
- * The D1Database value below is an inert type-only placeholder captured by
- * request hooks. Schema generation never invokes those hooks.
+ * the Worker entrypoint. The schema-only profile explicitly selects PostgreSQL
+ * and no longer constructs or requires a legacy D1 test binding.
  */
 import { Pool } from 'pg'
 
