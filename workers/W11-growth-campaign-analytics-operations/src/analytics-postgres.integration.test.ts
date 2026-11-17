@@ -45,6 +45,88 @@ postgresSuite('W11 PostgreSQL 18 runtime integration', () => {
     await pool?.end()
   })
 
+  it('enforces W01 transport security through the Neon entrypoint before any PostgreSQL write', async () => {
+    const hyperdriveBinding = binding
+    if (!hyperdriveBinding) throw new Error('W11 Hyperdrive test binding was not initialized')
+    const legacyD1 = {
+      prepare() {
+        throw new Error('Neon entry must not access legacy D1_05')
+      },
+      batch() {
+        throw new Error('Neon entry must not write legacy D1_05')
+      },
+    }
+    const env = {
+      W11_DATABASE_DRIVER: 'neon',
+      HYPERDRIVE_ANALYTICS_PG: hyperdriveBinding,
+      D1_05: legacyD1,
+    } as never
+    const deniedEvent = {
+      eventId: 'evt_pg18_denied_' + crypto.randomUUID().replaceAll('-', ''),
+      dedupeKey: 'dedupe_pg18_denied_' + crypto.randomUUID().replaceAll('-', ''),
+      eventName: 'content_open',
+      occurredAt: new Date(Date.now() - 60_000).toISOString(),
+      sessionId: 'session_pg18_denied_01',
+      contentId: 'content_pg18_denied_01',
+      contentType: 'article',
+    }
+    const trustedHeaders = {
+      'Content-Type': 'application/json',
+      'X-LuckRead-Caller': 'W01',
+      'X-LuckRead-Transport-Version': '1.0',
+      'X-LuckRead-Correlation-Id': 'corr_pg18_security_000001',
+    }
+    const post = (headers: Record<string, string>, body = JSON.stringify({ events: [deniedEvent] })) =>
+      entry.fetch(new Request('https://w11.internal/internal/analytics/events', {
+        method: 'POST',
+        headers,
+        body,
+      }), env)
+
+    const missingCallerHeaders = Object.fromEntries(
+      Object.entries(trustedHeaders).filter(([name]) => name !== 'X-LuckRead-Caller'),
+    )
+    expect((await post(missingCallerHeaders)).status).toBe(404)
+    expect((await post({ ...trustedHeaders, 'X-LuckRead-Caller': 'W05' })).status).toBe(404)
+    expect((await post({ ...trustedHeaders, 'X-LuckRead-Transport-Version': '2.0' })).status).toBe(404)
+    expect((await post({ ...trustedHeaders, 'X-LuckRead-Correlation-Id': 'bad correlation' })).status).toBe(404)
+    expect((await post({
+      ...trustedHeaders,
+      'X-LuckRead-Principal-User-Id': 'invalid principal!',
+    })).status).toBe(403)
+    expect((await post({ ...trustedHeaders, 'Content-Type': 'text/plain' })).status).toBe(415)
+    expect((await post(trustedHeaders, 'x'.repeat(65 * 1024))).status).toBe(413)
+    expect((await post(trustedHeaders, JSON.stringify({
+      events: [{ ...deniedEvent, eventName: 'like_created' }],
+    }))).status).toBe(422)
+    expect((await post(trustedHeaders, JSON.stringify({
+      events: [{ ...deniedEvent, actorId: 'untrusted-client-field' }],
+    }))).status).toBe(422)
+
+    const oversizedBatch = {
+      events: Array.from({ length: 91 }, (_, index) => ({
+        ...deniedEvent,
+        eventId: deniedEvent.eventId + '_' + index,
+        dedupeKey: deniedEvent.dedupeKey + '_' + index,
+      })),
+    }
+    expect((await post(trustedHeaders, JSON.stringify(oversizedBatch))).status).toBe(422)
+
+    const unsupportedRead = await entry.fetch(
+      new Request('https://w11.internal/api/analytics/creators'),
+      env,
+    )
+    expect(unsupportedRead.status).toBe(404)
+
+    const persisted = await pool.query<{ count: number }>(
+      'SELECT count(*)::int AS count FROM analytics_event_dedupe WHERE event_id LIKE $1',
+      ['evt_pg18_denied_%'],
+    )
+    expect(persisted.rows[0]?.count).toBe(0)
+    expect(legacyD1.prepare).not.toHaveBeenCalled
+    expect(legacyD1.batch).not.toHaveBeenCalled
+  })
+
   it('executes the Neon deployment entrypoint, W01 ingestion, deduplication, projection and rollback on PostgreSQL', async () => {
     const hyperdriveBinding = binding
     if (!hyperdriveBinding) throw new Error('W11 Hyperdrive test binding was not initialized')
