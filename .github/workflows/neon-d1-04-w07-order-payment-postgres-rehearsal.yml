@@ -85,7 +85,16 @@ jobs:
           node --check workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-order-payment-postgres-migration.mjs
           node --test workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-order-payment-postgres-migration.test.mjs
           node workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-order-payment-postgres-migration.mjs
-          git diff --exit-code -- workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0001_w07_d1_04_order_payment_schema.sql
+          node --check workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-saved-methods-mandates-postgres-migration.mjs
+          node --test workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-saved-methods-mandates-postgres-migration.test.mjs
+          node workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-saved-methods-mandates-postgres-migration.mjs
+          node --check workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-renewal-cycles-postgres-migration.mjs
+          node --test workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-renewal-cycles-postgres-migration.test.mjs
+          node workers/W07-subscription-commerce/scripts/neon-d1-04/generate-w07-renewal-cycles-postgres-migration.mjs
+          git diff --exit-code -- \
+            workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0001_w07_d1_04_order_payment_schema.sql \
+            workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0002_w07_d1_04_saved_methods_mandates.sql \
+            workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0003_w07_d1_04_renewal_cycles.sql
 
       - name: Apply W07 D1-04 order/payment schema to disposable PostgreSQL 18
         env:
@@ -107,6 +116,26 @@ jobs:
             --file workers/W07-subscription-commerce/scripts/neon-d1-04/verify-w07-order-payment-postgres-schema.sql \
             | tee artifacts/neon/w07-d1-04-order-payment-postflight.txt
 
+      - name: Apply and verify W07 saved-method/mandate predecessor
+        env:
+          W07_D104_SCHEMA_DATABASE_URL: postgresql://schema_generator:schema_local_only@127.0.0.1:5432/luckread_finance_schema
+        run: |
+          set -euo pipefail
+          psql "$W07_D104_SCHEMA_DATABASE_URL" --set ON_ERROR_STOP=1 --no-psqlrc --single-transaction \
+            --file workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0002_w07_d1_04_saved_methods_mandates.sql
+          psql "$W07_D104_SCHEMA_DATABASE_URL" --set ON_ERROR_STOP=1 --no-psqlrc \
+            --file workers/W07-subscription-commerce/scripts/neon-d1-04/verify-w07-saved-methods-mandates-postgres-schema.sql
+
+      - name: Apply and verify W07 renewal-cycle predecessor for webhook runtime
+        env:
+          W07_D104_SCHEMA_DATABASE_URL: postgresql://schema_generator:schema_local_only@127.0.0.1:5432/luckread_finance_schema
+        run: |
+          set -euo pipefail
+          psql "$W07_D104_SCHEMA_DATABASE_URL" --set ON_ERROR_STOP=1 --no-psqlrc --single-transaction \
+            --file workers/W07-subscription-commerce/src/neon-postgres-migrations-d1-04/0003_w07_d1_04_renewal_cycles.sql
+          psql "$W07_D104_SCHEMA_DATABASE_URL" --set ON_ERROR_STOP=1 --no-psqlrc \
+            --file workers/W07-subscription-commerce/scripts/neon-d1-04/verify-w07-renewal-cycles-postgres-schema.sql
+
       - name: Install pinned W02 PostgreSQL driver and TS runner for W07 runtime rehearsal
         working-directory: workers/W02-identity
         run: npm install --ignore-scripts --no-audit --no-fund
@@ -117,6 +146,15 @@ jobs:
           W07_ORDER_PERSISTENCE_POSTGRES_DATABASE_URL: postgresql://schema_generator:schema_local_only@127.0.0.1:5432/luckread_finance_schema
           W07_ORDER_PERSISTENCE_POSTGRES_REPORT: ../../artifacts/neon/w07-order-persistence-postgres-runtime-postflight.json
         run: node --import=tsx/esm ../../workers/W07-subscription-commerce/scripts/neon-d1-04/rehearse-order-persistence-postgres-runtime.mjs
+
+      - name: Rehearse signed W07 Hyperswitch payment webhook against PostgreSQL 18
+        working-directory: workers/W02-identity
+        env:
+          W07_PAYMENT_WEBHOOK_POSTGRES_DATABASE_URL: postgresql://schema_generator:schema_local_only@127.0.0.1:5432/luckread_finance_schema
+          W07_PAYMENT_WEBHOOK_POSTGRES_REPORT: ../../artifacts/neon/w07-payment-webhook-postgres-runtime-postflight.json
+        run: |
+          node --check ../../workers/W07-subscription-commerce/scripts/neon-d1-04/rehearse-payment-webhook-postgres-runtime.mjs
+          node --import=tsx/esm ../../workers/W07-subscription-commerce/scripts/neon-d1-04/rehearse-payment-webhook-postgres-runtime.mjs
 
       - name: Upload W07 D1-04 PostgreSQL 18 rehearsal evidence
         if: always()
