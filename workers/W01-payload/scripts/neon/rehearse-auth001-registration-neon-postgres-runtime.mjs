@@ -61,7 +61,7 @@ const checks = {
   completedIdempotencyReplayReadable: false,
   releasedReservationRemoved: false,
   expiredReservationReplaced: false,
-  failedConsentWriteRolledBackEnvelopeUpdate: false,
+  failedEnvelopeTransitionRolledBackConsentInsert: false,
   legacyD1BindingsNeverAccessed: false,
   syntheticRowsCleaned: false,
 }
@@ -172,11 +172,11 @@ try {
   await store.reserveEnvelope(reservation(rollbackKey, rollbackId, rollbackConsentId))
   await assert.rejects(
     store.completeRegistration({
-      reservationId: rollbackId,
+      reservationId: rollbackId + '-missing',
       consentRecordId: rollbackConsentId,
       userId: marker + '-rollback-identity',
       policyVersion: 'PRIV-004/registration-v1',
-      retentionUntil: 'not-a-valid-timestamp',
+      retentionUntil: future,
       sourceAuthority: 'W01',
       committedResponse,
       now: nowIso,
