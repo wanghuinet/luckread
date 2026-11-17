@@ -246,6 +246,7 @@ jobs:
         working-directory: workers/W01-payload
         env:
           AUTH001_BASE_URL: http://127.0.0.1:8787
+          AUTH001_W02_DATABASE_URL: postgresql://postgres:local_postgres_only@127.0.0.1:5432/luckread_schema
           CLOUDFLARE_PERSIST_TO: /tmp/luckread-auth001-state
         run: |
           set -euo pipefail
