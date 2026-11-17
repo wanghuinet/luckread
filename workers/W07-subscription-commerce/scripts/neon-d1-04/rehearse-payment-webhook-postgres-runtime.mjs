@@ -333,7 +333,10 @@ try {
       'order_create_idempotency',
     ]
     const counts = {}
-    for (const table of tables) counts[table] = await count(table, table === 'orders' ? 'order_id' : table === 'order_lines' ? 'order_line_id' : table === 'order_create_idempotency' ? 'id' : table === 'payments' ? 'payment_id' : table === 'payment_provider_events' ? 'event_row_id' : 'conflict_id', '__never_matches__')
+    for (const table of tables) {
+      const result = await pool.query(`SELECT count(*)::int AS count FROM ${table}`)
+      counts[table] = Number(result.rows[0]?.count ?? -1)
+    }
     checks.fixtureRowsCleaned = Object.values(counts).every(value => value === 0)
   } catch (cleanupError) {
     failure ??= cleanupError
