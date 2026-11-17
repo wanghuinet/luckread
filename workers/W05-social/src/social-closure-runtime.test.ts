@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { SocialTargetsReadStoreError } from './social-targets-read-store.js'
 import { extractSocialTokens, getContentSocialSummary, getSocialTargets, listDiscoveryTopics, listNotifications, syncSocialTokens } from './social-closure-runtime.js'
 import type { NotificationEnqueueStore } from './notification-enqueue-store.js'
-import type { SocialClosureReadStore, SocialDiscoveryTopicEdge, NotificationInboxRow } from './social-closure-read-store.js'
+import type { SocialClosureReadStore, SocialDiscoveryTopicEdge } from './social-closure-read-store.js'
 import type { SocialTokenSyncCommentContext, SocialTokenSyncMentionInput, SocialTokenSyncMentionRow, SocialTokenSyncStore, SocialTokenSyncTargetInput, SocialTokenSyncTargetType, SocialTokenSyncTopicInput } from './social-token-sync-store.js'
 
 type TokenSyncStoreFixture = Readonly<{
