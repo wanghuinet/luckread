@@ -316,7 +316,7 @@ describe('W08 creator qualification runtime guards', () => {
       reasonCode: 'CALLER_SUPPLIED_AUTHORIZATION_CONTEXT',
     })
     expect(setup.db.reads).toHaveLength(0)
-    expect(setup.db.writes).toBe(0)
+    expect(setup.db.writes).toHaveLength(0)
   })
 
   let db: MemoryW08CreatorStore
@@ -338,7 +338,7 @@ describe('W08 creator qualification runtime guards', () => {
     expect(response.status).toBe(403)
     expect((await responseBody(response)).data?.error?.code).toBe('VERIFIED_USER_REQUIRED')
     expect(setup.db.applications.size).toBe(0)
-    expect(setup.db.writes).toBe(0)
+    expect(setup.db.writes).toHaveLength(0)
   })
 
   it('rejects L6 from both review-list and decision endpoints before reading or writing D1', async () => {
@@ -355,7 +355,7 @@ describe('W08 creator qualification runtime guards', () => {
     expect(decisionResponse.status).toBe(403)
     expect((await responseBody(decisionResponse)).data?.error?.code).toBe('PERMISSION_DENIED')
     expect(setup.db.reads).toHaveLength(0)
-    expect(setup.db.writes).toBe(0)
+    expect(setup.db.writes).toHaveLength(0)
   })
 
   it('rejects missing identity and fails closed before any Store work', async () => {
@@ -390,7 +390,7 @@ describe('W08 creator qualification runtime guards', () => {
     expect(replay.data?.replayed).toBe(true)
     expect(replay.data?.applicationId).toBe(first.data?.applicationId)
     expect(db.applications.size).toBe(1)
-    expect(db.writes).toBe(1)
+    expect(db.writes).toHaveLength(1)
   })
 
   it('allows an applicant to read only their own application status', async () => {
@@ -418,7 +418,7 @@ describe('W08 creator qualification runtime guards', () => {
     }, { 'Idempotency-Key': 'creator-review-self-0001', 'If-Match': '"1"' }), selfHarness.env)
     expect(selfResponse.status).toBe(403)
     expect((await responseBody(selfResponse)).data?.error?.code).toBe('SELF_APPROVAL_DENIED')
-    expect(selfHarness.db.writes).toBe(0)
+    expect(selfHarness.db.writes).toHaveLength(0)
 
     const staleHarness = harness(principal('reviewer-l7-0002', 'L7'))
     staleHarness.db.applications.set('creator-app-0001', existingApplication())
@@ -427,7 +427,7 @@ describe('W08 creator qualification runtime guards', () => {
     }, { 'Idempotency-Key': 'creator-review-stale-0001', 'If-Match': '"9"' }), staleHarness.env)
     expect(staleResponse.status).toBe(412)
     expect((await responseBody(staleResponse)).data?.error?.code).toBe('PRECONDITION_FAILED')
-    expect(staleHarness.db.writes).toBe(0)
+    expect(staleHarness.db.writes).toHaveLength(0)
   })
 
   it('closes the applicant-to-review-to-W02-grant lifecycle against one shared Store state', async () => {
@@ -565,6 +565,6 @@ describe('W08 creator qualification runtime guards', () => {
 
     expect(response.status).toBe(409)
     expect((await responseBody(response)).data?.error?.code).toBe('DECISION_CONFLICT')
-    expect(setup.db.writes).toBe(0)
+    expect(setup.db.writes).toHaveLength(0)
   })
 })
