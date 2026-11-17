@@ -38,6 +38,10 @@
         "gitBlobSha1": "14f290497d4177f47d07872bed58482b3a874647"
       },
       {
+        "path": ".github/workflows/w01-auth-me-import-verification.yml",
+        "gitBlobSha1": "1b14e7a1ba11e8b47296cb4c2f76beb223bbcdb7"
+      },
+      {
         "path": "contracts/database/neon-d1-01-migration-manifest.v1.json",
         "gitBlobSha1": "30aa5627c68505742020fe14bda9cf2a5f2408f6"
       },
@@ -91,11 +95,11 @@
       },
       {
         "path": "workers/W01-payload/src/app/auth/register/route.ts",
-        "gitBlobSha1": "00762aa60fdffb6b24de6b475f8970c8bf0c05b3"
+        "gitBlobSha1": "0dcd88582986c14c4ac6bed3a3d82d92cacf487a"
       },
       {
         "path": "workers/W01-payload/src/auth/registration-persistence.ts",
-        "gitBlobSha1": "29251ec9368e47dcd27b56396ce2eb81151ca131"
+        "gitBlobSha1": "f5194aba450263491e5877cea97611914398dccb"
       },
       {
         "path": "workers/W01-payload/src/migrations/20260928_020000_MIG_AUTH_001_REGISTRATION_BATCH_V1.ts",
@@ -104,6 +108,10 @@
       {
         "path": "workers/W01-payload/src/neon-postgres-migrations-d1-01/0001_w01_auth001_registration_batch.sql",
         "gitBlobSha1": "849545097a33ccebcc28b6fdddc340cbbde9a0d2"
+      },
+      {
+        "path": "workers/W01-payload/src/types/pg.d.ts",
+        "gitBlobSha1": "6f47e0a98cbc16ab0584ed9ebba18fd67f709b92"
       }
     ],
     "controlsChecked": [
@@ -134,7 +142,7 @@
       "scope": "D1-01 follow-up code-path audit for W01 AUTH-001 registration idempotency and consent persistence. Added the W01-owned PostgreSQL SQL slice at order 150 (after the Payload baseline and before W02), aligned PostgreSQL envelope/consent columns and indexes to the committed D1 source migration, and confirmed the shared runner continues to apply each SQL migration and its append-only ledger row in one transaction. W01 registration now selects a provider-neutral persistence store: Neon mode uses the existing D1-01 Hyperdrive binding and a bounded cached node-postgres pool, while legacy D1 remains only in the D1 adapter. The local PG18 rehearsal verifies first reservation, unique active-key enforcement, completion/replay, atomic consent write, release, expired-key replacement, rollback on an envelope state-transition failure, and fixture cleanup.",
       "result": "NO_NEW_BLOCKING_FINDINGS",
       "formalGitHubReviewSubmissions": 0,
-      "limitations": "GPT-6 code-path audit, not a human GitHub approval. The new AUTH-001 integration and updated 15-entry D1-01 manifest still require PR PostgreSQL 18 CI evidence. Remote Neon DDL has not been executed; remote apply remains a separate manual workflow_dispatch with the exact confirmation token. Production D1 remains authoritative until a separate cutover authorization."
+      "limitations": "GPT-6 code-path audit, not a human GitHub approval. TypeScript compatibility issues found by initial W01 CI were corrected (provider-neutral D1 interface, local node-postgres declarations, and restored PRIV-004 scope constants); the current PR CI run must confirm these fixes. Remote Neon DDL has not been executed; remote apply remains a separate manual workflow_dispatch with the exact confirmation token. Production D1 remains authoritative until a separate cutover authorization."
     }
   },
   "verificationEvidence": {
