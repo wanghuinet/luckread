@@ -11,6 +11,8 @@ import { handleCommerceOrderRequest } from './order-http-runtime.js';
 import { issueInvoiceForOrder } from './billing-persistence.js';
 
 const env: Parameters<typeof handleCommerceOrderRequest>[2] = {
+  W07_DATABASE_DRIVER: 'd1',
+  W07_MEMBERSHIP_DATABASE_DRIVER: 'd1',
   D1_01: {} as D1Database,
   D1_04: {} as D1Database,
 };
