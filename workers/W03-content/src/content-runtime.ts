@@ -2206,7 +2206,8 @@ export async function listDueScheduledContentCandidates(
   if (!Number.isSafeInteger(limit) || limit < 1 || limit > 50) {
     throw new ContentRuntimeError('VALIDATION_FAILED', 400)
   }
-  return mutationStore.listDueScheduled(now.toISOString(), limit)
+  const nowIso = now.toISOString()
+  return mutationStore.listDueScheduled(nowIso, limit)
 }
 
 /**
