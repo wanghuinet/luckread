@@ -998,10 +998,267 @@ try {
 
   mfaEnrollmentConfirmed = true
 
+  // W01 owns public registration; use the existing Better Auth-backed
+  // synthetic registration fixture, then exercise W01->W02 verification
+  // delivery and the actual W02 Worker verification/login/session routes.
+  const workerEntryFixture = await withTimeout('worker-entry-fixture-sign-up', () =>
+    auth.api.signUpEmail({
+      body: {
+        name: 'W02 Worker Entry PostgreSQL Rehearsal',
+        email: workerEntryEmail,
+        password: workerEntryPassword,
+        username: workerEntryUsername,
+      },
+      returnHeaders: true,
+    }),
+  )
+  workerEntryUserId = String(workerEntryFixture.response.user.id)
+  assert.equal(workerEntryFixture.response.user.email, workerEntryEmail)
+  assert.equal(workerEntryFixture.response.user.username, workerEntryUsername)
+
+  const workerD1Sentinel = {
+    prepare() {
+      workerEntryD1Accesses.prepare += 1
+      throw new Error('W02 Neon Worker entrypoint must not access legacy D1_01')
+    },
+    batch() {
+      workerEntryD1Accesses.batch += 1
+      throw new Error('W02 Neon Worker entrypoint must not write legacy D1_01')
+    },
+  }
+  const allowAuthRateLimit = { async limit() { return { success: true } } }
+  const noopQueue = { async send(_message: unknown) { return undefined } }
+  const workerEnv = {
+    W02_DATABASE_DRIVER: 'neon',
+    HYPERDRIVE: { connectionString: process.env.W02_RUNTIME_DATABASE_URL },
+    D1_01: workerD1Sentinel,
+    AUTH_SESSION_READ_LIMITER: allowAuthRateLimit,
+    AUTH_SESSION_WRITE_LIMITER: allowAuthRateLimit,
+    AUTH013_QUEUE: noopQueue,
+    AUTH013_PROJECTION_QUEUE: noopQueue,
+    RESEND_API_KEY: 're_w02_local_pg18_only',
+    AUTH_EMAIL_FROM: 'LuckRead PostgreSQL Rehearsal <no-reply@example.test>',
+  } as never
+  workerRuntimePool = getW02PostgresRuntime(workerEnv).pool
+
+  const pendingWorkerEntryUser = await workerRuntimePool.query<{
+    emailVerified: boolean
+    accountState: string
+  }>(
+    'SELECT email_verified AS "emailVerified", account_state AS "accountState" ' +
+      'FROM "user" WHERE id = $1',
+    [workerEntryUserId],
+  )
+  assert.equal(pendingWorkerEntryUser.rowCount, 1)
+  assert.equal(pendingWorkerEntryUser.rows[0]?.emailVerified, false)
+  assert.equal(pendingWorkerEntryUser.rows[0]?.accountState, 'PENDING_VERIFICATION')
+
+  const originalFetch = globalThis.fetch
+  let capturedVerificationUrl: string | undefined
+  let resendRequests = 0
+  let verificationSendResponse: Response
+  try {
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      resendRequests += 1
+      assert.equal(String(input), 'https://api.resend.com/emails')
+      assert.equal(init?.method, 'POST')
+      const mail = JSON.parse(String(init?.body ?? '{}')) as {
+        to?: string[]
+        text?: string
+        from?: string
+      }
+      assert.deepEqual(mail.to, [workerEntryEmail])
+      assert.equal(mail.from, 'LuckRead PostgreSQL Rehearsal <no-reply@example.test>')
+      const match = (mail.text ?? '').match(
+        /https:\/\/luckread\.com\/api\/auth\/verify-email\?[^\s]+/,
+      )
+      assert.ok(match?.[0], 'W02 must send a usable Better Auth verification URL')
+      capturedVerificationUrl = match[0]
+      return new Response(JSON.stringify({ id: 're_w02_pg18_' + nonce }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+    }) as typeof fetch
+
+    verificationSendResponse = await w02Worker.fetch(
+      new Request('https://luckread.com/api/auth/send-verification-email', {
+        method: 'POST',
+        headers: {
+          origin: 'https://luckread.com',
+          'content-type': 'application/json',
+          'X-LuckRead-Caller': 'W01',
+          'X-LuckRead-Transport-Version': '1.0',
+          'X-LuckRead-Correlation-Id': 'w02-worker-verification-' + nonce,
+        },
+        body: JSON.stringify({
+          email: workerEntryEmail,
+          callbackURL: 'https://luckread.com/login?verified=1',
+        }),
+      }),
+      workerEnv,
+    )
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+  assert.ok(verificationSendResponse!.status >= 200 && verificationSendResponse!.status < 300)
+  assert.equal(resendRequests, 1)
+  assert.ok(capturedVerificationUrl)
+  workerEntryEmailDeliveryAccepted = true
+
+  const verificationResponse = await withTimeout('worker-entry-email-verification', () =>
+    w02Worker.fetch(
+      new Request(capturedVerificationUrl!, {
+        method: 'GET',
+        headers: {
+          origin: 'https://luckread.com',
+          'X-LuckRead-Caller': 'W01',
+          'X-LuckRead-Transport-Version': '1.0',
+          'X-LuckRead-Correlation-Id': 'w02-worker-verify-' + nonce,
+        },
+      }),
+      workerEnv,
+    ),
+  )
+  assert.ok(
+    verificationResponse.status >= 200 && verificationResponse.status < 400,
+    'the W02 Better Auth verification URL must complete or redirect after Neon persistence',
+  )
+
+  const verifiedWorkerEntryUser = await workerRuntimePool.query<{
+    emailVerified: boolean
+    accountState: string
+    accountStateVersion: number
+  }>(
+    'SELECT email_verified AS "emailVerified", account_state AS "accountState", ' +
+      'account_state_version AS "accountStateVersion" FROM "user" WHERE id = $1',
+    [workerEntryUserId],
+  )
+  assert.equal(verifiedWorkerEntryUser.rows[0]?.emailVerified, true)
+  assert.equal(verifiedWorkerEntryUser.rows[0]?.accountState, 'ACTIVE')
+  assert.equal(Number(verifiedWorkerEntryUser.rows[0]?.accountStateVersion), 2)
+
+  const verifiedWorkerEntryRole = await workerRuntimePool.query(
+    "SELECT role_id FROM role_assignments WHERE subject_id = $1 AND role_id = 'verified_user' " +
+      "AND status = 'ACTIVE'",
+    [workerEntryUserId],
+  )
+  assert.equal(verifiedWorkerEntryRole.rowCount, 1)
+  const workerEntryJournal = await workerRuntimePool.query(
+    "SELECT COUNT(*)::integer AS count FROM auth_013_publication_journal " +
+      "WHERE resource_id = $1 AND event_type = 'identity.account_state_changed'",
+    [workerEntryUserId],
+  )
+  assert.equal(Number(workerEntryJournal.rows[0]?.count), 1)
+  workerEntryEmailVerificationPassed = true
+
+  const workerSignInResponse = await withTimeout('worker-entry-sign-in-email', () =>
+    w02Worker.fetch(
+      new Request('https://luckread.com/api/auth/sign-in/email', {
+        method: 'POST',
+        headers: {
+          origin: 'https://luckread.com',
+          'content-type': 'application/json',
+          'X-LuckRead-Caller': 'W01',
+          'X-LuckRead-Transport-Version': '1.0',
+          'X-LuckRead-Correlation-Id': 'w02-worker-sign-in-' + nonce,
+        },
+        body: JSON.stringify({
+          email: workerEntryEmail,
+          password: workerEntryPassword,
+          rememberMe: true,
+        }),
+      }),
+      workerEnv,
+    ),
+  )
+  assert.equal(workerSignInResponse.status, 200)
+  const workerSignInPayload = await workerSignInResponse.json() as Record<string, unknown>
+  const workerSignInData = workerSignInPayload.data &&
+    typeof workerSignInPayload.data === 'object'
+    ? workerSignInPayload.data as Record<string, unknown>
+    : workerSignInPayload
+  const workerSignInUser = workerSignInData.user as { id?: unknown; email?: unknown } | undefined
+  assert.equal(workerSignInUser?.id, workerEntryUserId)
+  assert.equal(workerSignInUser?.email, workerEntryEmail)
+
+  const workerSignInHeaders = workerSignInResponse.headers as Headers & {
+    getSetCookie?: () => string[]
+  }
+  const workerSetCookies = workerSignInHeaders.getSetCookie?.() ??
+    [workerSignInResponse.headers.get('set-cookie') ?? '']
+  const workerCookieHeader = workerSetCookies
+    .map((value) => value.split(';', 1)[0].trim())
+    .filter((value) => value.includes('='))
+    .join('; ')
+  assert.ok(workerCookieHeader.length > 0)
+
+  const workerSessionResponse = await w02Worker.fetch(
+    new Request('https://luckread.com/api/auth/get-session', {
+      method: 'GET',
+      headers: {
+        origin: 'https://luckread.com',
+        cookie: workerCookieHeader,
+      },
+    }),
+    workerEnv,
+  )
+  assert.equal(workerSessionResponse.status, 200)
+  const workerSessionPayload = await workerSessionResponse.json() as Record<string, unknown>
+  const workerSessionData = workerSessionPayload.data &&
+    typeof workerSessionPayload.data === 'object'
+    ? workerSessionPayload.data as Record<string, unknown>
+    : workerSessionPayload
+  const workerSessionUser = workerSessionData.user as { id?: unknown } | undefined
+  const workerSession = workerSessionData.session as { id?: unknown } | undefined
+  assert.equal(workerSessionUser?.id, workerEntryUserId)
+  assert.equal(typeof workerSession?.id, 'string')
+  const workerSessionId = String(workerSession?.id)
+
+  const workerPrincipalResponse = await w02Worker.fetch(
+    new Request('https://luckread-w02.internal/internal/auth/principal', {
+      method: 'POST',
+      headers: {
+        origin: 'https://luckread.com',
+        cookie: workerCookieHeader,
+        'X-LuckRead-Caller': 'W01',
+        'X-LuckRead-Transport-Version': '1.0',
+        'X-LuckRead-Correlation-Id': 'w02-worker-principal-' + nonce,
+      },
+    }),
+    workerEnv,
+  )
+  assert.equal(workerPrincipalResponse.status, 200)
+  const workerPrincipal = await workerPrincipalResponse.json() as {
+    active: boolean
+    userId: string
+    email: string
+    sessionId: string
+    accountState: string
+    accountStateVersion: number
+    layer: string
+  }
+  assert.equal(workerPrincipal.active, true)
+  assert.equal(workerPrincipal.userId, workerEntryUserId)
+  assert.equal(workerPrincipal.email, workerEntryEmail)
+  assert.equal(workerPrincipal.sessionId, workerSessionId)
+  assert.equal(workerPrincipal.accountState, 'ACTIVE')
+  assert.equal(workerPrincipal.accountStateVersion, 2)
+  assert.equal(workerPrincipal.layer, 'L2')
+
+  const workerSessionRows = await workerRuntimePool.query(
+    'SELECT COUNT(*)::integer AS count FROM "session" WHERE user_id = $1',
+    [workerEntryUserId],
+  )
+  assert.equal(Number(workerSessionRows.rows[0]?.count), 1)
+  assert.equal(workerEntryD1Accesses.prepare, 0)
+  assert.equal(workerEntryD1Accesses.batch, 0)
+  workerEntryLoginSessionPassed = true
+  workerEntryPrincipalPassed = true
+
   report = {
     reportVersion: 8,
     status: 'W02_BETTER_AUTH_POSTGRES_RUNTIME_REHEARSAL_PASS',
-    scope: 'Better Auth core PostgreSQL runtime, provider-bound principal resolution, L1/L2 role materialization, AUTH-013 activation, AUTH-007 MFA status/enrollment-start/enrollment-confirm HTTP handlers with provider-backed factor/replay/receipt stores, and AUTH-010 session-list, session-revocation and current-session logout HTTP adapters; D1 production remains authoritative.',
+    scope: 'Better Auth core PostgreSQL runtime and the real W02 Worker entrypoint in Neon mode: W01-to-W02 verification-mail service call, Better Auth verification URL callback, sign-in, session read and W01 principal resolution; existing provider-bound principal, L1/L2 role materialization, AUTH-013 activation, AUTH-007 MFA, and AUTH-010 rehearsals remain covered; D1 production remains authoritative.',
     betterAuthVersion: '1.7.8',
     adapter: 'Better Auth native PostgreSQL dialect via pg.Pool plus W02 PostgreSQL identity lifecycle, AUTH-007 MFA status/enrollment-start/enrollment-confirm and durable receipt hooks, AUTH-010 session-list, atomic session-revocation and current-session logout adapters',
     operationsVerified: [
@@ -1044,6 +1301,12 @@ try {
       'AUTH010_SESSION_LOGOUT_IDEMPOTENT_REPLAY',
       'SIGN_OUT',
       'SESSION_REVOKED',
+      'W02_NEON_WORKER_ENTRYPOINT_VERIFICATION_EMAIL',
+      'W02_NEON_WORKER_ENTRYPOINT_EMAIL_VERIFICATION_CALLBACK',
+      'W02_NEON_WORKER_ENTRYPOINT_SIGN_IN',
+      'W02_NEON_WORKER_ENTRYPOINT_SESSION_READ',
+      'W02_NEON_WORKER_ENTRYPOINT_W01_PRINCIPAL_RESOLUTION',
+      'W02_NEON_WORKER_ENTRYPOINT_NO_D1_FALLBACK',
     ],
     signedUp: true,
     activationConcurrencyWinners: activations.filter((result) => result.activated).length,
@@ -1053,6 +1316,11 @@ try {
     principalAuthorityResolved: true,
     mfaEnrollmentStarted,
     mfaEnrollmentConfirmed,
+    workerEntryEmailDeliveryAccepted,
+    workerEntryEmailVerificationPassed,
+    workerEntryLoginSessionPassed,
+    workerEntryPrincipalPassed,
+    workerEntryD1Accesses,
     testUserRowsRemaining: 0,
     productionAuthorityChanged: false,
     neonConnectionAttempted: false,
