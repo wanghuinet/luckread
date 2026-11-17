@@ -1342,6 +1342,43 @@ try {
       if (typeof byEmail.rows[0]?.id === 'string') cleanupUserId = byEmail.rows[0].id
     }
 
+    let cleanupWorkerEntryUserId = workerEntryUserId
+    if (!cleanupWorkerEntryUserId) {
+      const byWorkerEmail = await postgresPool.query(
+        'SELECT id FROM "user" WHERE email = $1 LIMIT 1',
+        [workerEntryEmail],
+      )
+      if (typeof byWorkerEmail.rows[0]?.id === 'string') {
+        cleanupWorkerEntryUserId = byWorkerEmail.rows[0].id
+      }
+    }
+    await postgresPool.query('DELETE FROM "verification" WHERE identifier = $1', [workerEntryEmail])
+    if (cleanupWorkerEntryUserId) {
+      await postgresPool.query(
+        'DELETE FROM auth_013_publication_journal WHERE resource_id = $1',
+        [cleanupWorkerEntryUserId],
+      )
+      await postgresPool.query('DELETE FROM "twoFactor" WHERE "userId" = $1', [cleanupWorkerEntryUserId])
+      await postgresPool.query('DELETE FROM "session" WHERE user_id = $1', [cleanupWorkerEntryUserId])
+      await postgresPool.query('DELETE FROM "account" WHERE user_id = $1', [cleanupWorkerEntryUserId])
+      await postgresPool.query('DELETE FROM role_assignments WHERE subject_id = $1', [cleanupWorkerEntryUserId])
+      await postgresPool.query('DELETE FROM role_authorization_versions WHERE subject_id = $1', [cleanupWorkerEntryUserId])
+      await postgresPool.query('DELETE FROM "user" WHERE id = $1', [cleanupWorkerEntryUserId])
+      const workerResidual = await postgresPool.query(
+        'SELECT ' +
+          '(SELECT COUNT(*) FROM "user" WHERE id = $1 OR email = $2) AS users, ' +
+          '(SELECT COUNT(*) FROM "account" WHERE user_id = $1) AS accounts, ' +
+          '(SELECT COUNT(*) FROM "session" WHERE user_id = $1) AS sessions, ' +
+          '(SELECT COUNT(*) FROM "verification" WHERE identifier = $2) AS verifications, ' +
+          '(SELECT COUNT(*) FROM auth_013_publication_journal WHERE resource_id = $1) AS journals, ' +
+          '(SELECT COUNT(*) FROM role_assignments WHERE subject_id = $1) AS role_assignments, ' +
+          '(SELECT COUNT(*) FROM role_authorization_versions WHERE subject_id = $1) AS role_versions',
+        [cleanupWorkerEntryUserId, workerEntryEmail],
+      )
+      if (Object.values(workerResidual.rows[0] ?? {}).some((value) => Number(value) !== 0)) {
+        throw new Error('W02_WORKER_ENTRY_SYNTHETIC_CLEANUP_FAILED')
+      }
+    }
     await postgresPool.query('DELETE FROM "verification" WHERE identifier = $1', [email])
     if (logoutSessionId) {
       await postgresPool.query(
@@ -1400,6 +1437,12 @@ try {
     cleanupVerified = true
   } catch (cleanupError) {
     if (!primaryError) primaryError = cleanupError
+  }
+
+  try {
+    await workerRuntimePool?.end()
+  } catch (poolError) {
+    if (!primaryError) primaryError = poolError
   }
 
   try {
