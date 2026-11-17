@@ -1918,7 +1918,7 @@ describe('W03 content contract core', () => {
     expect(dueReadStart).toBeGreaterThanOrEqual(0)
     const dueReadEnd = runtime.indexOf('\nexport async function publishAuthorizedScheduledContents', dueReadStart)
     const dueReadSection = runtime.slice(dueReadStart, dueReadEnd)
-    expect(dueReadSection).toContain('return mutationStore.listDueScheduled(now.toISOString(), limit)')
+    expect(dueReadSection).toContain('return mutationStore.listDueScheduled(nowIso, limit)')
     expect(dueReadSection).not.toContain('ContentD1')
     expect(dueReadSection).not.toContain('db.prepare')
 
