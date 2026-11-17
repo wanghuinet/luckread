@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createW05SocialWorker } from './index.js'
+import type { SocialClosureReadStore } from './social-closure-read-store.js'
 
 const transportHeaders = {
   'X-LuckRead-Caller': 'W01',
