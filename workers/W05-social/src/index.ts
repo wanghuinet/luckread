@@ -69,7 +69,6 @@ import type { CommentCreateStore } from './comment-create-store.js'
 import type { CommentMutationStore } from './comment-mutation-store.js'
 import type { CommentNotificationContextStore } from './comment-notification-context-store.js'
 import type { NotificationEnqueueStore } from './notification-enqueue-store.js'
-import type { SocialTargetsReadStore } from './social-targets-read-store.js'
 import type { SocialClosureReadStore } from './social-closure-read-store.js'
 import type { SocialTokenSyncStore } from './social-token-sync-store.js'
 import type { NotificationPreferencesStore } from './notification-preferences-store.js'
@@ -283,6 +282,11 @@ const parseProfileChannelPath = (pathname: string): { userId: string; kind: 'rep
   return { userId, kind: parts[4] }
 }
 
+function requireSocialClosureReadStore(source: SocialClosureReadStore | undefined): SocialClosureReadStore {
+  if (!source) throw new SocialClosureRuntimeError('SERVICE_UNAVAILABLE', 503)
+  return source
+}
+
 export type W05SocialWorkerDependencies = Readonly<{
   /** W09-owned D1-03 endpoint mutations use the separately scoped Neon connection when enabled. */
   pushEndpointDatabase?: PushEndpointPostgresExecutor
@@ -302,9 +306,7 @@ export type W05SocialWorkerDependencies = Readonly<{
   commentMutationStore?: CommentMutationStore
   /** PostgreSQL comment/content token synchronization store; missing composition fails closed. */
   socialTokenSyncStore?: SocialTokenSyncStore
-  /** Optional PostgreSQL-capable social-target read store for comment mentions/topics. */
-  socialTargetsReadStore?: SocialTargetsReadStore
-  /** Optional PostgreSQL-capable notification inbox reader/writer; D1 remains the deployed default. */
+  /** Required PostgreSQL store for social closure, topics, notifications and social summaries. */
   socialClosureReadStore?: SocialClosureReadStore
   /** Optional PostgreSQL-capable comment notification context reader. */
   commentNotificationContextStore?: CommentNotificationContextStore
@@ -601,7 +603,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
             dependencies.notificationEnqueueStore,
           )
           const persistedMentions = await getSocialTargets(
-            dependencies.socialTargetsReadStore ?? env.DB,
+            requireSocialClosureReadStore(dependencies.socialClosureReadStore),
             'comment',
             commentId,
           )
@@ -655,7 +657,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
           contentId,
           correlationId: request.headers.get('X-LuckRead-Correlation-Id') ?? '',
         })
-        return json({ data: await getContentSocialSummary(dependencies.socialClosureReadStore ?? env.DB, contentId, contentContext, viewerUserId), requestId: crypto.randomUUID() })
+        return json({ data: await getContentSocialSummary(requireSocialClosureReadStore(dependencies.socialClosureReadStore), contentId, contentContext, viewerUserId), requestId: crypto.randomUUID() })
       }
 
       if (url.pathname.match(/^\/internal\/social\/contents\/[^/]+\/tokens$/)) {
