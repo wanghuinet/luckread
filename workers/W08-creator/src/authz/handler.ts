@@ -7,7 +7,7 @@ import {
   type ScopedRoleAssignment,
 } from './casl-policy.js'
 import { resolvePermissionContextPostgres, type RoleAssignmentRow } from './role-layer.js'
-import { getW08PostgresPool, resolveW08DatabaseDriver, type W08RuntimeEnv } from '../neon/runtime.js'
+import { getW08PostgresPool, type W08RuntimeEnv } from '../neon/runtime.js'
 import type { Pool } from 'pg'
 
 type Env = W08RuntimeEnv & { W02_AUTH: Fetcher }
