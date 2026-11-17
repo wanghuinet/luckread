@@ -48,6 +48,7 @@ jobs:
           workers/W11-growth-campaign-analytics-operations/src/analytics-period.test.ts
           workers/W11-growth-campaign-analytics-operations/src/analytics-d1-store.test.ts
           workers/W11-growth-campaign-analytics-operations/src/analytics-postgres-store.test.ts
+          workers/W11-growth-campaign-analytics-operations/src/entry.test.ts
           workers/W11-growth-campaign-analytics-operations/src/analytics-reconciliation.test.ts
           workers/W11-growth-campaign-analytics-operations/src/analytics-ingest.test.ts
           workers/W11-growth-campaign-analytics-operations/src/worker.test.ts
@@ -71,6 +72,7 @@ jobs:
           workers/W11-growth-campaign-analytics-operations/src/analytics-postgres-store.test.ts
           workers/W11-growth-campaign-analytics-operations/src/analytics-postgres-runtime.ts
           workers/W11-growth-campaign-analytics-operations/src/entry.ts
+          workers/W11-growth-campaign-analytics-operations/src/entry.test.ts
           workers/W11-growth-campaign-analytics-operations/src/analytics-reconciliation.ts
           workers/W11-growth-campaign-analytics-operations/src/analytics-reconciliation.test.ts
           workers/W11-growth-campaign-analytics-operations/src/analytics-d1-store.test.ts
