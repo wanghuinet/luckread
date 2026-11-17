@@ -42,6 +42,13 @@ for (const layer of layers['x-layers']) {
   mfaRequiredByLayer.set(layer.id, layer.mfa === true)
 }
 
+/**
+ * @deprecated-next-version
+ * Reason: Legacy Cloudflare D1 implementation retained only for isolated unit tests or the explicit schema/test fixture.
+ * Replacement: PostgreSQL L8 bootstrap command in src/neon/l8-genesis-bootstrap-postgres.ts.
+ * Removal: Next release.
+ * Condition: Bootstrap command tests use the PostgreSQL implementation; target-bound OIDC, one-approval and one-time state rules remain unchanged.
+ */
 export async function bootstrapSuperAdmin(
   db: D1Database,
   approval: VerifiedL8BootstrapApproval,
