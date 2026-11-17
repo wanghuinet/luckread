@@ -193,14 +193,19 @@ export function getW02PostgresPool(env: W02RuntimeEnv): Pool {
   if (cached) return cached
 
   const connectionString = validateHyperdriveConnectionString(binding.connectionString)
+  const developmentDiagnostics = env.CLOUDFLARE_ENV?.trim().toLowerCase() === 'development'
   const pool = new Pool({
     connectionString,
     max: 5,
     connectionTimeoutMillis: 5_000,
     idleTimeoutMillis: 30_000,
     keepAlive: true,
+    // Local wrangler development connects directly to PostgreSQL rather than
+    // through Hyperdrive's managed pool. Rotate direct sockets after each
+    // checkout so a workerd request cannot leave a stale idle client for the
+    // next request. This is intentionally development-only.
+    ...(developmentDiagnostics ? { maxUses: 1 } : {}),
   })
-  const developmentDiagnostics = env.CLOUDFLARE_ENV?.trim().toLowerCase() === 'development'
   if (developmentDiagnostics) {
     console.info(JSON.stringify({ event: 'w02.postgres.pool_created' }))
     pool.on('connect', (client) => {
