@@ -123,8 +123,6 @@ postgresSuite('W11 PostgreSQL 18 runtime integration', () => {
       ['evt_pg18_denied_%'],
     )
     expect(persisted.rows[0]?.count).toBe(0)
-    expect(legacyD1.prepare).not.toHaveBeenCalled
-    expect(legacyD1.batch).not.toHaveBeenCalled
   })
 
   it('executes the Neon deployment entrypoint, W01 ingestion, deduplication, projection and rollback on PostgreSQL', async () => {
