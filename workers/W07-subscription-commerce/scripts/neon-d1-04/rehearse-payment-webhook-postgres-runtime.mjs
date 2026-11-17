@@ -179,7 +179,7 @@ try {
   checks.signedSuccessReceiptApplied = true
 
   const payment = await pool.query(
-    'SELECT status, version, provider_updated_at FROM payments WHERE payment_id = $1',
+    'SELECT status, version::int AS version, provider_updated_at FROM payments WHERE payment_id = $1',
     [success.paymentId],
   )
   assert.deepEqual(payment.rows, [{
@@ -189,7 +189,7 @@ try {
   }])
 
   const order = await pool.query(
-    'SELECT status, version, confirmed_at FROM orders WHERE order_id = $1',
+    'SELECT status, version::int AS version, confirmed_at FROM orders WHERE order_id = $1',
     [success.orderId],
   )
   assert.equal(order.rows[0]?.status, 'CONFIRMED')
@@ -247,7 +247,7 @@ try {
     state: 'APPLIED',
   }])
   const conflicts = await pool.query(
-    'SELECT conflict_id, existing_payload_sha256, incoming_payload_sha256, state, occurrence_count FROM payment_provider_event_conflicts WHERE conflict_id = $1',
+    'SELECT conflict_id, existing_payload_sha256, incoming_payload_sha256, state, occurrence_count::int AS occurrence_count FROM payment_provider_event_conflicts WHERE conflict_id = $1',
     [marker + '-conflict-success'],
   )
   assert.equal(conflicts.rows.length, 1)
@@ -290,7 +290,7 @@ try {
   )
 
   const rollbackPayment = await pool.query(
-    'SELECT status, version, provider_updated_at FROM payments WHERE payment_id = $1',
+    'SELECT status, version::int AS version, provider_updated_at FROM payments WHERE payment_id = $1',
     [rollback.paymentId],
   )
   assert.deepEqual(rollbackPayment.rows, [{
@@ -299,7 +299,7 @@ try {
     provider_updated_at: null,
   }])
   const rollbackOrder = await pool.query(
-    'SELECT status, version, confirmed_at FROM orders WHERE order_id = $1',
+    'SELECT status, version::int AS version, confirmed_at FROM orders WHERE order_id = $1',
     [rollback.orderId],
   )
   assert.deepEqual(rollbackOrder.rows, [{
