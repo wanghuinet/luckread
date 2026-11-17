@@ -156,6 +156,14 @@ integrationSuite('W05 Neon entrypoint following-feed PostgreSQL 18 integration',
 
     try {
       if (socialPool) {
+        await socialPool.query(
+          'DELETE FROM social_follow_relationships WHERE follower_user_id LIKE $1 OR target_user_id LIKE $1 OR relationship_id LIKE $1',
+          [marker + '%'],
+        )
+        await socialPool.query(
+          'DELETE FROM social_user_interactions WHERE actor_user_id LIKE $1 OR target_user_id LIKE $1 OR relationship_id LIKE $1',
+          [marker + '%'],
+        )
         const remaining = await socialPool.query(
           'SELECT ' +
             '(SELECT count(*)::int FROM social_follow_relationships WHERE follower_user_id LIKE $1 OR target_user_id LIKE $1 OR relationship_id LIKE $1) AS follow_rows, ' +
