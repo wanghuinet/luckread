@@ -279,7 +279,7 @@ export async function handleHyperswitchWebhookRequest(
         }
       }
       const sync = dependencies.syncRenewalOutcome ?? syncRenewalCycleOutcomeForPayment;
-      const renewalEnv = { D1_01: env.D1_01, D1_04: selectedWebhookDatabase, W06_GOVERNANCE: env.W06_GOVERNANCE };
+      const renewalEnv = { ...env, D1_01: env.D1_01, D1_04: selectedWebhookDatabase, W06_GOVERNANCE: env.W06_GOVERNANCE };
       subscriptionSync = await sync(
         renewalEnv,
         paymentId,
