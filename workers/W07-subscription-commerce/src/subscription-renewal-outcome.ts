@@ -3,6 +3,19 @@
 import { strictlyAfterCanonicalUtcTimestamp } from './canonical-utc-timestamp.js';
 import { getW07SelectedD104Database, type W07PaymentMethodReadRuntimeEnv } from './neon/payment-method-read-runtime.js';
 import type { W07MembershipDatabaseRuntimeEnv } from './neon/membership-database-runtime.js';
+import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
+import {
+  applyRenewalSubscriptionUpdatePostgres,
+  readSubscriptionOutcomePostgres,
+} from './subscription-renewal-outcome-postgres.js';
+
+type RenewalOutcomeMembershipStore = D1Database | W07WebhookPostgresPool;
+
+function isPostgresRenewalOutcomeStore(
+  store: RenewalOutcomeMembershipStore,
+): store is W07WebhookPostgresPool {
+  return typeof (store as W07WebhookPostgresPool).query === 'function';
+}
 import {
   getScheduledPlanChangeStore,
   readScheduledSubscriptionPlanDowngradeForPeriod,
@@ -32,7 +45,7 @@ type RenewalOutcomeCycle = Readonly<{
   version: number; updated_at: string;
 }>;
 
-type SubscriptionOutcomeRow = Readonly<{
+export type SubscriptionOutcomeRow = Readonly<{
   subscription_id: string; subscriber_id: string; plan_id: string; plan_version: number;
   creator_id: string | null;
   billing_interval: 'MONTHLY' | 'YEARLY';
@@ -102,8 +115,23 @@ async function readCycleById(db: D1Database, cycleId: string): Promise<RenewalOu
 }
 
 async function readSubscription(
-  db: D1Database, subscriptionId: string, subscriberId: string,
+  db: RenewalOutcomeMembershipStore,
+  subscriptionId: string,
+  subscriberId: string,
 ): Promise<SubscriptionOutcomeRow | null> {
+  if (isPostgresRenewalOutcomeStore(db)) {
+    try {
+      const row = await readSubscriptionOutcomePostgres(db, subscriptionId, subscriberId);
+      return row ? {
+        ...row,
+        trial_started_at: row.trial_started_at ?? null,
+        trial_ends_at: row.trial_ends_at ?? null,
+        trial_converted_at: row.trial_converted_at ?? null,
+      } : null;
+    } catch {
+      throw new RenewalOutcomeSyncError('SERVICE_UNAVAILABLE', 503);
+    }
+  }
   try {
     const row = await db.prepare(
       'SELECT s.subscription_id, s.subscriber_id, s.plan_id, s.plan_version, s.creator_id, v.billing_interval, ' +
@@ -121,12 +149,10 @@ async function readSubscription(
     } : null;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    if (!/no such column:\s*(?:s\.)?trial_(?:started|ends|converted)_at/i.test(message)) {
+    if (!/no such column:\\s*(?:s\\.)?trial_(?:started|ends|converted)_at/i.test(message)) {
       throw new RenewalOutcomeSyncError('SERVICE_UNAVAILABLE', 503);
     }
-    // A worker can be deployed ahead of migration 0008. Existing paid renewal
-    // webhook synchronization must continue to work; no trial row can be
-    // created before the migration-backed trial endpoint is available.
+    // Explicit D1 test profiles preserve the legacy pre-migration read.
     try {
       const legacy = await db.prepare(
         'SELECT s.subscription_id, s.subscriber_id, s.plan_id, s.plan_version, s.creator_id, v.billing_interval, ' +
@@ -135,7 +161,8 @@ async function readSubscription(
         'FROM membership_subscriptions s INNER JOIN membership_plan_versions v ' +
         'ON v.plan_id = s.plan_id AND v.plan_version = s.plan_version ' +
         'WHERE s.subscription_id = ? AND s.subscriber_id = ? LIMIT 1',
-      ).bind(subscriptionId, subscriberId).first<Omit<SubscriptionOutcomeRow, 'trial_started_at' | 'trial_ends_at' | 'trial_converted_at'>>();
+      ).bind(subscriptionId, subscriberId)
+        .first<Omit<SubscriptionOutcomeRow, 'trial_started_at' | 'trial_ends_at' | 'trial_converted_at'>>();
       return legacy ? { ...legacy, trial_started_at: null, trial_ends_at: null, trial_converted_at: null } : null;
     } catch {
       throw new RenewalOutcomeSyncError('SERVICE_UNAVAILABLE', 503);
