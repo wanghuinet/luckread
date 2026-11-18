@@ -28,7 +28,7 @@ Search-index results can lag behind `main`; file-level decisions are based on re
 | Worker | Classification | Remaining D1 references / confirmed state | Neon replacement and next action |
 |---|---|---|---|
 | W01 Payload | B / D | `workers/W01-payload/src/payload.config.ts` still contains `sqliteD1Adapter` selection alongside the Neon adapter. W01 Wrangler/evidence workflows and AUTH-002 schema-generation admission still expect controlled D1/SQLite tooling. Historical Payload migrations and the upstream D1 adapter manifest are separate lineage evidence. | Complete Payload CLI/schema-generation and controlled local-evidence workflows on PostgreSQL before removing the selector/dependency. Preserve upstream Payload behavior; do not patch vendor code. Keep migration lineage and evidence as D. |
-| W02 Identity | A / B / D | This PR removes the unused-in-production `createD1RoleLayerStore` adapter after confirming the Neon Store is wired by `src/neon/runtime.ts`; its only remaining callsite was the D1 adapter unit test. Other D1-backed test/schema adapters remain in Better Auth, principal, role assignment, account lifecycle, MFA, session and publisher modules. `wrangler.jsonc` and `migrations/**` remain historical/source evidence; production uses `wrangler.neon.jsonc`. | Continue one adapter family at a time, converting tests to PostgreSQL or in-memory Store contracts. Do not delete W02 source migrations or schema evidence as part of runtime cleanup. |
+| W02 Identity | A / B / D | This PR removes the unused-in-production `createD1RoleLayerStore` adapter after confirming the Neon Store is wired by `src/neon/runtime.ts`; its only remaining callsite was the D1 adapter unit test. Other D1-backed test/schema adapters remain in Better Auth, account lifecycle, MFA, session and publisher modules; principal authority, role-layer and registration rollback D1 test adapters have been removed. `wrangler.jsonc` and `migrations/**` remain historical/source evidence; production uses `wrangler.neon.jsonc`. | Continue one adapter family at a time, converting tests to PostgreSQL or in-memory Store contracts. Do not delete W02 source migrations or schema evidence as part of runtime cleanup. |
 | W03 Content | B / D (provisional) | Initial targeted search did not establish a complete runtime call graph. D1-named migration generators, source SQL templates, PostgreSQL migration artifacts and traffic-guard tests are present. | Inspect all W03 entrypoints, runtime dependencies, deploy configs and scripts; distinguish current Neon PostgreSQL readers/writers from D1 schema source and contract fixtures before assigning any runtime deletion. |
 | W04 Feed/Search | C (audit pending) | No direct `D1Database` / `createD1` adapter was identified in the initial targeted search. This is not a proof of absence; configuration and imported shared stores have not been exhaustively traced. | Verify worker entry/config, shared query clients, scheduled jobs and deployment workflow before marking Neon-only. No deletion authorized by this preliminary scan. |
 | W05 Social | A / B / D | Merged PRs #1904, #1906, #1907, #1908 and #1910 remove D1 fallbacks for Social Token Sync, Social Closure/Targets Read, Comment Notification Context, Comment List Read and Following-feed author candidates. Other follow/unfollow, relationship status/list, like/favorite, polls, comment create/mutation and related route adapters still appear in the D1 search surface. | Continue with isolated route/store slices. Preserve W05 ownership of social relations and W09 ownership of push endpoint registry. Keep Neon-backed `HYPERDRIVE_D1_02` / `HYPERDRIVE_D1_03` bindings; names alone do not mean Cloudflare D1. |
@@ -49,7 +49,9 @@ Search-index results can lag behind `main`; file-level decisions are based on re
 | #1907 | W05 Comment Notification Context D1 adapter/fallback removal | Merged |
 | #1908 | W05 Comment List Read D1 dialect/adapter/resolver removal | Merged |
 | #1910 | W05 Following-feed author candidate D1 adapter/fallback removal | Merged |
-| This PR | W02 RoleLayerStore D1 test adapter removal; Neon adapter assertion retained | Pending CI/review |
+| #1939 | W02 PrincipalAuthorityStore D1 test adapter removal | Merged |
+| #1940 | W02 RoleLayerStore D1 test adapter removal; Neon adapter assertion retained | Merged |
+| This PR | W02 RegistrationRollbackStore D1 test adapter removal; PostgreSQL transaction tests retained | Pending CI/review |
 
 ## Cross-cutting D-class references to retain
 
@@ -61,7 +63,7 @@ Search-index results can lag behind `main`; file-level decisions are based on re
 
 ## Immediate queue
 
-1. W02 remaining test-only D1 adapters (Better Auth schema profile, principal/role assignment, account-state, MFA, session and publisher fixtures): split by non-overlapping adapter family; do not combine with the historical migration/config work.
+1. W02 remaining test-only D1 adapters (Better Auth schema profile, account-state, MFA, session and publisher fixtures): split by non-overlapping adapter family; do not combine with the historical migration/config work.
 2. W05 remaining Follow, Like/Favorite, Poll, Comment mutation and route adapters: keep separate route/store slices; do not change push endpoint ownership.
 3. W06 PostgreSQL-native moderation store migration: replace translator/facade only after consumer ports and transactions are migrated.
 4. W07 membership/order/payment/refund/webhook runtime paths: finish PostgreSQL-native store composition before deleting compatibility SQL.
