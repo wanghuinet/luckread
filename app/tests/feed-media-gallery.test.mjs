@@ -24,3 +24,18 @@ test('member-only images are not passed to Galeria as unauthenticated remote URL
   expect(feedItem).toContain('!requiresAuthenticatedViewer && imageItems.length > 0 ?');
   expect(feedItem).toContain('requiresAuthenticatedViewer && viewerStartIndex !== null ?');
 });
+
+
+test('feed video attachments do not allocate native players until the reader taps play', () => {
+  expect(feedItem).toContain('const [activated, setActivated] = useState(false)');
+  expect(feedItem).toContain('if (activated) return <ActiveFeedVideoPlayer uri={uri} headers={headers} />');
+  expect(feedItem).toContain('onPress={() => setActivated(true)}');
+  expect(feedItem).toContain('accessibilityLabel="播放视频"');
+});
+
+test('feed attachments keep at most one active native video player and release it on unmount', () => {
+  expect(feedItem).toContain('let activeFeedVideoPlayer: { pause: () => void } | null = null');
+  expect(feedItem).toContain('activeFeedVideoPlayer?.pause()');
+  expect(feedItem).toContain('player.pause()');
+  expect(feedItem).toContain('if (activeFeedVideoPlayer === player) activeFeedVideoPlayer = null');
+});

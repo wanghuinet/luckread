@@ -164,11 +164,37 @@ export const ProfileImage: React.FC<ProfileImageProps> = ({ style, displaySize =
 };
 
 
-const FeedVideoAttachment = ({ uri, headers }: { uri: string; headers?: Record<string, string> }) => {
+// Feed attachments must not allocate native decoders while merely scrolling.
+// Only the attachment the reader explicitly opens creates a player.
+let activeFeedVideoPlayer: { pause: () => void } | null = null;
+
+const ActiveFeedVideoPlayer = ({ uri, headers }: { uri: string; headers?: Record<string, string> }) => {
     const source = headers ? { uri, headers } : uri;
     const player = useVideoPlayer(source, (instance) => {
+        activeFeedVideoPlayer?.pause();
+        activeFeedVideoPlayer = instance;
         instance.loop = false;
+        instance.play();
     });
+
+    useEffect(() => {
+        // Native controls can resume a previously paused row. Observe actual
+        // playback state as well as initial activation so only one feed player
+        // can remain playing at a time.
+        const subscription = player.addListener('playingChange', ({ isPlaying }) => {
+            if (!isPlaying) return;
+            if (activeFeedVideoPlayer && activeFeedVideoPlayer !== player) {
+                activeFeedVideoPlayer.pause();
+            }
+            activeFeedVideoPlayer = player;
+        });
+
+        return () => {
+            subscription.remove();
+            player.pause();
+            if (activeFeedVideoPlayer === player) activeFeedVideoPlayer = null;
+        };
+    }, [player]);
 
     return (
         <VideoView
@@ -179,6 +205,32 @@ const FeedVideoAttachment = ({ uri, headers }: { uri: string; headers?: Record<s
             fullscreenOptions={{ enable: true }}
             allowsPictureInPicture={false}
         />
+    );
+};
+
+const FeedVideoAttachment = ({ uri, headers }: { uri: string; headers?: Record<string, string> }) => {
+    const [activated, setActivated] = useState(false);
+
+    if (activated) return <ActiveFeedVideoPlayer uri={uri} headers={headers} />;
+
+    return (
+        <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="播放视频"
+            accessibilityHint="点击后加载并播放视频"
+            activeOpacity={0.9}
+            onPress={() => setActivated(true)}
+            style={{
+                width: '100%',
+                aspectRatio: 1,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: '#111827',
+            }}
+        >
+            <Feather name="play-circle" size={52} color="#ffffff" />
+            <Text className="mt-2 text-sm font-semibold text-white">点击播放视频</Text>
+        </TouchableOpacity>
     );
 };
 
