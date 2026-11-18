@@ -641,6 +641,7 @@ export const buildLuckReadAuth = (
         accountState: {
           type: 'string',
           required: false,
+          defaultValue: 'PENDING_VERIFICATION',
           input: false,
           returned: true,
           fieldName: 'account_state',
@@ -648,6 +649,7 @@ export const buildLuckReadAuth = (
         accountStateVersion: {
           type: 'number',
           required: false,
+          defaultValue: 1,
           input: false,
           returned: true,
           fieldName: 'account_state_version',
