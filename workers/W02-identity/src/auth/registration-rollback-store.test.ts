@@ -60,6 +60,8 @@ const user = {
 }
 
 describe('W02 registration rollback store', () => {
+
+
   it('confirms the user only through the Neon Postgres rollback authority store', async () => {
     const { pool, calls } = fakePool({ user })
     const identity = { id: user.id, email: user.email, username: user.username }
@@ -76,6 +78,18 @@ describe('W02 registration rollback store', () => {
     }])
   })
 
+  it('does not report a different email as the confirmed identity owner through Neon PostgreSQL', async () => {
+    const { pool } = fakePool({ user })
+    const identity = { id: user.id, email: user.email, username: user.username }
+    await expect(createPostgresRegistrationRollbackStore(pool).confirmIdentity({
+      userId: user.id,
+      email: 'other@example.test',
+    })).resolves.toEqual({
+      identityById: identity,
+      identityByEmailId: null,
+    })
+  })
+
   it('rejects invalid registration identity confirmation before database access', async () => {
     const { pool, calls } = fakePool({ user })
     await expect(createPostgresRegistrationRollbackStore(pool).confirmIdentity({
@@ -84,6 +98,9 @@ describe('W02 registration rollback store', () => {
     })).rejects.toMatchObject({ code: 'INVALID_INPUT' })
     expect(calls).toHaveLength(0)
   })
+
+
+
 
   it('executes PostgreSQL rollback atomically and in the same delete order', async () => {
     const { pool, calls } = fakePool({ user })
@@ -102,6 +119,22 @@ describe('W02 registration rollback store', () => {
     expect(calls.find((call) => call.sql.includes('DELETE FROM "verification"'))?.values)
       .toEqual(['pending@example.test'])
     expect(calls.some((call) => call.sql.includes('FOR UPDATE'))).toBe(true)
+  })
+
+  it('rejects rollback when PostgreSQL identity ownership or pending-state preconditions no longer match', async () => {
+    const mismatches = [
+      { ...user, email: 'someone-else@example.test' },
+      { ...user, username: 'someone_else' },
+      { ...user, accountState: 'ACTIVE' },
+    ]
+
+    for (const persistedUser of mismatches) {
+      const { pool, calls } = fakePool({ user: persistedUser })
+      await expect(createPostgresRegistrationRollbackStore(pool).rollback(command))
+        .rejects.toMatchObject({ code: 'PRECONDITION_FAILED' })
+      expect(calls.some((call) => call.sql === 'ROLLBACK')).toBe(true)
+      expect(calls.some((call) => call.sql.startsWith('DELETE FROM'))).toBe(false)
+    }
   })
 
   it('rolls back PostgreSQL changes when an active session exists', async () => {
