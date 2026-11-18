@@ -519,10 +519,11 @@ async function insertOrReadCycle(
   const cycleEnd = addBillingPeriod(cycleStart, cyclePlan.billingInterval as 'MONTHLY' | 'YEARLY');
   const cycleId = await renewalCycleIdFor(subscription.subscription_id, cycleStart, cycleEnd);
 
+  const cycleStore = getW07RenewalCycleStore(env);
   // PAST_DUE may only resume a previously recorded cycle; never synthesize a
   // second cycle to "repair" a missing paid-cycle record.
   if (subscription.status === 'PAST_DUE') {
-    const existing = await readCycleByPeriod(env.D1_04, subscription.subscription_id, cycleStart);
+    const existing = await readCycleByPeriod(cycleStore, subscription.subscription_id, cycleStart);
     if (!existing || existing.cycle_id !== cycleId || existing.cycle_end !== cycleEnd ||
         existing.plan_id !== cyclePlan.planId || existing.plan_version !== cyclePlan.planVersion ||
         existing.subscriber_id !== subscription.subscriber_id) {
@@ -556,19 +557,40 @@ async function insertOrReadCycle(
     benefits: benefits as string[],
   };
   const offerSnapshotJson = JSON.stringify(offer);
-  await env.D1_04.prepare(
-    'INSERT INTO subscription_renewal_cycles ' +
-    '(cycle_id, provider, merchant_id, subscription_id, subscriber_id, plan_id, plan_version, ' +
-    'cycle_start, cycle_end, billing_interval, currency, offer_snapshot_json, amount_minor, ' +
-    'pricing_snapshot_json, payment_method_id, mandate_record_id, order_id, payment_id, state, ' +
-    'attempt_number, provider_response_status, outcome_code, lease_token, lease_expires_at, version, created_at, updated_at) ' +
-    "VALUES (?, 'hyperswitch', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, NULL, NULL, NULL, 'AWAITING_PRICING', " +
-    '0, NULL, NULL, NULL, NULL, 1, ?, ?) ON CONFLICT(subscription_id, cycle_start) DO NOTHING',
-  ).bind(
-    cycleId, merchantId, offer.subscriptionId, offer.subscriberId, offer.planId, offer.planVersion,
-    cycleStart, cycleEnd, offer.billingInterval, offer.currency, offerSnapshotJson, now, now,
-  ).run();
-  const cycle = await readCycleByPeriod(env.D1_04, subscription.subscription_id, cycleStart);
+  if (isPostgresRenewalCycleStore(cycleStore)) {
+    try {
+      await insertRenewalCyclePostgres(cycleStore, {
+        cycleId,
+        merchantId,
+        subscriptionId: offer.subscriptionId,
+        subscriberId: offer.subscriberId,
+        planId: offer.planId,
+        planVersion: offer.planVersion,
+        cycleStart,
+        cycleEnd,
+        billingInterval: offer.billingInterval,
+        currency: offer.currency,
+        offerSnapshotJson,
+        now,
+      });
+    } catch {
+      throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
+    }
+  } else {
+    await cycleStore.prepare(
+      'INSERT INTO subscription_renewal_cycles ' +
+      '(cycle_id, provider, merchant_id, subscription_id, subscriber_id, plan_id, plan_version, ' +
+      'cycle_start, cycle_end, billing_interval, currency, offer_snapshot_json, amount_minor, ' +
+      'pricing_snapshot_json, payment_method_id, mandate_record_id, order_id, payment_id, state, ' +
+      'attempt_number, provider_response_status, outcome_code, lease_token, lease_expires_at, version, created_at, updated_at) ' +
+      "VALUES (?, 'hyperswitch', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, NULL, NULL, NULL, 'AWAITING_PRICING', " +
+      '0, NULL, NULL, NULL, NULL, 1, ?, ?) ON CONFLICT(subscription_id, cycle_start) DO NOTHING',
+    ).bind(
+      cycleId, merchantId, offer.subscriptionId, offer.subscriberId, offer.planId, offer.planVersion,
+      cycleStart, cycleEnd, offer.billingInterval, offer.currency, offerSnapshotJson, now, now,
+    ).run();
+  }
+  const cycle = await readCycleByPeriod(cycleStore, subscription.subscription_id, cycleStart);
   if (!cycle) throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
   if (cycle.cycle_end !== cycleEnd || cycle.plan_id !== cyclePlan.planId ||
       cycle.plan_version !== cyclePlan.planVersion || cycle.subscriber_id !== subscription.subscriber_id) {
@@ -577,11 +599,20 @@ async function insertOrReadCycle(
   return cycle;
 }
 
-async function readSchedulerCursor(db: D1Database): Promise<RenewalCursorRow> {
-  const row = await db.prepare(
-    "SELECT state_id, cursor_period_end, cursor_subscription_id, version, updated_at " +
-    "FROM subscription_renewal_scheduler_state WHERE state_id = 'subscription-renewals' LIMIT 1",
-  ).first<RenewalCursorRow>();
+async function readSchedulerCursor(db: RenewalCycleStore): Promise<RenewalCursorRow> {
+  let row: RenewalCursorRow | null;
+  if (isPostgresRenewalCycleStore(db)) {
+    try {
+      row = await readRenewalSchedulerCursorPostgres(db);
+    } catch {
+      throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
+    }
+  } else {
+    row = await db.prepare(
+      "SELECT state_id, cursor_period_end, cursor_subscription_id, version, updated_at " +
+      "FROM subscription_renewal_scheduler_state WHERE state_id = 'subscription-renewals' LIMIT 1",
+    ).first<RenewalCursorRow>();
+  }
   if (!row) throw new RenewalRuntimeError('SCHEDULER_STATE_NOT_INITIALIZED', 503);
   if (!Number.isSafeInteger(row.version) || row.version < 1 ||
       !isCanonicalIso(row.updated_at) ||
@@ -594,16 +625,24 @@ async function readSchedulerCursor(db: D1Database): Promise<RenewalCursorRow> {
 }
 
 async function writeSchedulerCursor(
-  db: D1Database,
+  db: RenewalCycleStore,
   cursor: RenewalCursorRow,
   periodEnd: string | null,
   subscriptionId: string | null,
   now: string,
 ): Promise<boolean> {
+  const updatedAt = strictlyAfter(now, cursor.updated_at);
+  if (isPostgresRenewalCycleStore(db)) {
+    try {
+      return await writeRenewalSchedulerCursorPostgres(db, cursor, periodEnd, subscriptionId, updatedAt);
+    } catch {
+      throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
+    }
+  }
   const result = await db.prepare(
     "UPDATE subscription_renewal_scheduler_state SET cursor_period_end = ?, cursor_subscription_id = ?, " +
     "version = version + 1, updated_at = ? WHERE state_id = 'subscription-renewals' AND version = ?",
-  ).bind(periodEnd, subscriptionId, strictlyAfter(now, cursor.updated_at), cursor.version).run();
+  ).bind(periodEnd, subscriptionId, updatedAt, cursor.version).run();
   return Number(result.meta?.changes ?? 0) === 1;
 }
 
@@ -622,7 +661,8 @@ export async function scanDueSubscriptionRenewals(
   const now = nowIso(dependencies.now ?? (() => new Date()));
   const config = resolveHyperswitchConfig(env);
   const limit = Number.isSafeInteger(options.limit) ? Math.min(Math.max(options.limit!, 1), MAX_PAGE_SIZE) : 20;
-  const cursor = await readSchedulerCursor(env.D1_04);
+  const cycleStore = getW07RenewalCycleStore(env);
+  const cursor = await readSchedulerCursor(cycleStore);
   const membershipStore = getScheduledPlanChangeStore(env);
   let rows: RenewalSubscriptionRow[];
   if (isPostgresRenewalMembershipStore(membershipStore)) {
@@ -680,7 +720,7 @@ export async function scanDueSubscriptionRenewals(
 
   if (rows.length === 0) {
     if (cursor.cursor_period_end !== null && cursor.cursor_subscription_id !== null) {
-      const reset = await writeSchedulerCursor(env.D1_04, cursor, null, null, now);
+      const reset = await writeSchedulerCursor(cycleStore, cursor, null, null, now);
       return { scanned: 0, cycleIds: [], cursorAdvanced: false, cursorReset: reset };
     }
     return { scanned: 0, cycleIds: [], cursorAdvanced: false, cursorReset: false };
@@ -817,7 +857,7 @@ async function persistPricingDecision(
 ): Promise<RenewalCycleRow> {
   const decision = normalizePricingDecision(cycle, offer, pricing);
   if (decision.totalMinor === 0) {
-    return updateCycle(env.D1_04, cycle, now,
+    return updateCycle(getW07RenewalCycleStore(env), cycle, now,
       "amount_minor = 0, pricing_snapshot_json = ?, state = 'RECONCILIATION_REQUIRED', outcome_code = 'NON_POSITIVE_RENEWAL_TOTAL'",
       [JSON.stringify(decision.pricing)],
     );
@@ -825,7 +865,7 @@ async function persistPricingDecision(
   const config = resolveHyperswitchConfig(env);
   const mandate = await readActiveMandate(env.D1_04, String(config.expectedMerchantId), cycle.subscriber_id);
   return updateCycle(
-    env.D1_04,
+    getW07RenewalCycleStore(env),
     cycle,
     now,
     "amount_minor = ?, pricing_snapshot_json = ?, payment_method_id = ?, mandate_record_id = ?, state = ?, outcome_code = ?",
@@ -848,7 +888,7 @@ async function advanceAwaitingMandate(
   const config = resolveHyperswitchConfig(env);
   const mandate = await readActiveMandate(env.D1_04, String(config.expectedMerchantId), cycle.subscriber_id);
   if (!mandate) return cycle;
-  return updateCycle(env.D1_04, cycle, now,
+  return updateCycle(getW07RenewalCycleStore(env), cycle, now,
     "payment_method_id = ?, mandate_record_id = ?, state = 'PREPARED', outcome_code = NULL",
     [mandate.payment_method_id, mandate.mandate_record_id],
   );
@@ -860,7 +900,7 @@ async function storeOrderReference(
   orderId: string,
   now: string,
 ): Promise<RenewalCycleRow> {
-  return updateCycle(env.D1_04, cycle, now,
+  return updateCycle(getW07RenewalCycleStore(env), cycle, now,
     'order_id = ?', [orderId],
   );
 }
@@ -872,7 +912,7 @@ async function storePaymentReference(
   attemptNumber: number,
   now: string,
 ): Promise<RenewalCycleRow> {
-  return updateCycle(env.D1_04, cycle, now,
+  return updateCycle(getW07RenewalCycleStore(env), cycle, now,
     'payment_id = ?, attempt_number = ?', [payment.paymentId, attemptNumber],
   );
 }
@@ -889,8 +929,8 @@ async function transitionCycleToPaymentReady(
   ).bind(
     strictlyAfter(now, cycle.updated_at), cycle.cycle_id, cycle.version, cycle.state,
   ).run();
-  if (Number(updated.meta?.changes ?? 0) === 1) return readCycleById(env.D1_04, cycle.cycle_id);
-  return readCycleById(env.D1_04, cycle.cycle_id);
+  if (Number(updated.meta?.changes ?? 0) === 1) return readCycleById(getW07RenewalCycleStore(env), cycle.cycle_id);
+  return readCycleById(getW07RenewalCycleStore(env), cycle.cycle_id);
 }
 
 async function acquireSubmissionLease(
@@ -915,7 +955,7 @@ async function acquireSubmissionLease(
     cycle.cycle_id, cycle.version, now,
   ).run();
   if (Number(result.meta?.changes ?? 0) !== 1) return null;
-  return readCycleById(env.D1_04, cycle.cycle_id);
+  return readCycleById(getW07RenewalCycleStore(env), cycle.cycle_id);
 }
 
 type FailedCycleRetryPreparation = 'PREPARED' | 'AWAITING_RETRY' | 'AWAITING_OUTCOME_SYNC' | 'TERMINAL';
@@ -981,7 +1021,7 @@ async function prepareFailedCycleRetry(
     throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
   }
   if (Number(result.meta?.changes ?? 0) === 1) return 'PREPARED';
-  const latest = await readCycleById(env.D1_04, cycle.cycle_id);
+  const latest = await readCycleById(getW07RenewalCycleStore(env), cycle.cycle_id);
   if (latest.state === 'PREPARED') return 'PREPARED';
   if (latest.state === 'FAILED' && latest.subscription_sync_state !== 'APPLIED') return 'AWAITING_OUTCOME_SYNC';
   return 'AWAITING_RETRY';
@@ -1002,10 +1042,10 @@ export async function prepareFailedRenewalCycleRetry(
     throw new RenewalRuntimeError('VALIDATION_FAILED', 400);
   }
   const now = nowIso(dependencies.now ?? (() => new Date()));
-  const cycle = await readCycleById(env.D1_04, cycleIdInput);
+  const cycle = await readCycleById(getW07RenewalCycleStore(env), cycleIdInput);
   const preparation = await prepareFailedCycleRetry(env, cycle, now);
   const latest = preparation === 'PREPARED'
-    ? await readCycleById(env.D1_04, cycleIdInput)
+    ? await readCycleById(getW07RenewalCycleStore(env), cycleIdInput)
     : cycle;
   const action = preparation === 'PREPARED'
     ? 'PREPARED'
@@ -1036,7 +1076,7 @@ export async function processSubscriptionRenewalCycle(
   const orderCreateStore = (dependencies.getOrderCreateStore ?? getW07OrderCreatePersistenceStore)(env);
   const nowFn = dependencies.now ?? (() => new Date());
   let now = nowIso(nowFn);
-  let cycle = await readCycleById(env.D1_04, cycleId);
+  let cycle = await readCycleById(getW07RenewalCycleStore(env), cycleId);
   if (cycle.state === 'FAILED') {
     const retry = await prepareFailedCycleRetry(env, cycle, now);
     if (retry !== 'PREPARED') {
@@ -1047,7 +1087,7 @@ export async function processSubscriptionRenewalCycle(
           : 'TERMINAL';
       return { cycleId, state: cycle.state, action, ...(cycle.payment_id ? { paymentId: cycle.payment_id } : {}) };
     }
-    cycle = await readCycleById(env.D1_04, cycleId);
+    cycle = await readCycleById(getW07RenewalCycleStore(env), cycleId);
   }
   if (cycle.state === 'SUCCEEDED' || cycle.state === 'SUBMITTED' ||
       cycle.state === 'RECONCILIATION_REQUIRED') {
@@ -1083,15 +1123,15 @@ export async function processSubscriptionRenewalCycle(
     offer = parseOfferSnapshot(cycle.offer_snapshot_json);
     if (!cycle.pricing_snapshot_json || !isSafeMinor(cycle.amount_minor, false) ||
         !cycle.payment_method_id || !cycle.mandate_record_id) {
-      cycle = await writeCycleReconciliation(env.D1_04, cycle, 'PREPARED_SNAPSHOT_INCOMPLETE', now);
+      cycle = await writeCycleReconciliation(getW07RenewalCycleStore(env), cycle, 'PREPARED_SNAPSHOT_INCOMPLETE', now);
       return { cycleId, state: cycle.state, action: 'RECONCILIATION_REQUIRED' };
     }
     if (!(await isSubscriptionChargeableForCycle(env, cycle))) {
-      cycle = await writeCycleReconciliation(env.D1_04, cycle, 'SUBSCRIPTION_NOT_CHARGEABLE_BEFORE_ORDER', now);
+      cycle = await writeCycleReconciliation(getW07RenewalCycleStore(env), cycle, 'SUBSCRIPTION_NOT_CHARGEABLE_BEFORE_ORDER', now);
       return { cycleId, state: cycle.state, action: 'RECONCILIATION_REQUIRED' };
     }
     if (!(await isExactMandateActive(env.D1_04, cycle))) {
-      cycle = await writeCycleReconciliation(env.D1_04, cycle, 'MANDATE_NOT_ACTIVE', now);
+      cycle = await writeCycleReconciliation(getW07RenewalCycleStore(env), cycle, 'MANDATE_NOT_ACTIVE', now);
       return { cycleId, state: cycle.state, action: 'RECONCILIATION_REQUIRED' };
     }
     const pricing = parsePricingSnapshot(cycle.pricing_snapshot_json);
@@ -1122,7 +1162,7 @@ export async function processSubscriptionRenewalCycle(
 
     if (!cycle.payment_id) {
       if (cycle.attempt_number >= MAX_ATTEMPTS) {
-        cycle = await writeCycleReconciliation(env.D1_04, cycle, 'PAYMENT_ATTEMPT_LIMIT_REACHED', now);
+        cycle = await writeCycleReconciliation(getW07RenewalCycleStore(env), cycle, 'PAYMENT_ATTEMPT_LIMIT_REACHED', now);
         return { cycleId, state: cycle.state, action: 'RECONCILIATION_REQUIRED' };
       }
       const attemptNumber = cycle.attempt_number + 1;
@@ -1145,7 +1185,7 @@ export async function processSubscriptionRenewalCycle(
 
   if (cycle.state === 'PAYMENT_READY' || cycle.state === 'SUBMITTING') {
     if (!(await isExactMandateActive(env.D1_04, cycle))) {
-      cycle = await writeCycleReconciliation(env.D1_04, cycle, 'MANDATE_NOT_ACTIVE_AT_SUBMISSION', now);
+      cycle = await writeCycleReconciliation(getW07RenewalCycleStore(env), cycle, 'MANDATE_NOT_ACTIVE_AT_SUBMISSION', now);
       return { cycleId, state: cycle.state, action: 'RECONCILIATION_REQUIRED' };
     }
     let leased: RenewalCycleRow | null;
@@ -1155,7 +1195,7 @@ export async function processSubscriptionRenewalCycle(
       throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
     }
     if (!leased) {
-      cycle = await readCycleById(env.D1_04, cycleId);
+      cycle = await readCycleById(getW07RenewalCycleStore(env), cycleId);
       return { cycleId, state: cycle.state, action: 'SUBMISSION_IN_PROGRESS', ...(cycle.payment_id ? { paymentId: cycle.payment_id } : {}) };
     }
     cycle = leased;
@@ -1173,17 +1213,17 @@ export async function processSubscriptionRenewalCycle(
     if (!payment || payment.merchant_id !== cycle.merchant_id || payment.provider !== PROVIDER ||
         payment.order_id !== cycle.order_id || payment.amount_minor !== cycle.amount_minor ||
         payment.currency !== cycle.currency) {
-      cycle = await writeCycleReconciliation(env.D1_04, cycle, 'PAYMENT_ATTEMPT_BINDING_MISMATCH', now);
+      cycle = await writeCycleReconciliation(getW07RenewalCycleStore(env), cycle, 'PAYMENT_ATTEMPT_BINDING_MISMATCH', now);
       return { cycleId, state: cycle.state, action: 'RECONCILIATION_REQUIRED' };
     }
 
     if (payment.status !== 'INITIATING') {
       if (['failed', 'cancelled', 'expired', 'cancelled_post_capture'].includes(payment.status)) {
-        cycle = await writeCycleReconciliation(env.D1_04, cycle, 'PAYMENT_ALREADY_TERMINAL_WITHOUT_CYCLE_RESULT', now);
+        cycle = await writeCycleReconciliation(getW07RenewalCycleStore(env), cycle, 'PAYMENT_ALREADY_TERMINAL_WITHOUT_CYCLE_RESULT', now);
         return { cycleId, state: cycle.state, action: 'RECONCILIATION_REQUIRED' };
       }
       now = nowIso(nowFn);
-      cycle = await updateCycle(env.D1_04, cycle, now,
+      cycle = await updateCycle(getW07RenewalCycleStore(env), cycle, now,
         "state = 'SUBMITTED', provider_response_status = 'processing', outcome_code = 'RECOVERED_SUBMISSION_RESPONSE_UNKNOWN', lease_token = NULL, lease_expires_at = NULL",
         [],
       );
@@ -1191,7 +1231,7 @@ export async function processSubscriptionRenewalCycle(
     }
 
     if (!(await isSubscriptionChargeableForCycle(env, cycle))) {
-      cycle = await writeCycleReconciliation(env.D1_04, cycle, 'SUBSCRIPTION_NOT_CHARGEABLE_AT_SUBMISSION', now);
+      cycle = await writeCycleReconciliation(getW07RenewalCycleStore(env), cycle, 'SUBSCRIPTION_NOT_CHARGEABLE_AT_SUBMISSION', now);
       return { cycleId, state: cycle.state, action: 'RECONCILIATION_REQUIRED' };
     }
 
@@ -1230,17 +1270,17 @@ export async function processSubscriptionRenewalCycle(
       );
     } catch {
       now = nowIso(nowFn);
-      cycle = await writeCycleReconciliation(env.D1_04, cycle, 'PROVIDER_RESPONSE_NOT_DURABLY_RECORDED', now);
+      cycle = await writeCycleReconciliation(getW07RenewalCycleStore(env), cycle, 'PROVIDER_RESPONSE_NOT_DURABLY_RECORDED', now);
       return { cycleId, state: cycle.state, action: 'RECONCILIATION_REQUIRED', ...(cycle.payment_id ? { paymentId: cycle.payment_id } : {}) };
     }
 
     now = nowIso(nowFn);
-    const latest = await readCycleById(env.D1_04, cycleId);
+    const latest = await readCycleById(getW07RenewalCycleStore(env), cycleId);
     if (latest.state === 'SUCCEEDED' || latest.state === 'FAILED' ||
         latest.state === 'RECONCILIATION_REQUIRED') {
       return { cycleId, state: latest.state, action: 'TERMINAL', ...(latest.payment_id ? { paymentId: latest.payment_id } : {}) };
     }
-    cycle = await updateCycle(env.D1_04, latest, now,
+    cycle = await updateCycle(getW07RenewalCycleStore(env), latest, now,
       "state = 'SUBMITTED', provider_response_status = ?, outcome_code = 'AWAITING_SIGNED_WEBHOOK', lease_token = NULL, lease_expires_at = NULL",
       [providerPayment.status],
     );
