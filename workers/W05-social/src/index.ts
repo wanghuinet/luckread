@@ -590,6 +590,7 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
           }
 
           const result = await updateComment(
+            env.DB,
             env.W03_CONTENT,
             actorUserId,
             commentId,
