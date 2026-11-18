@@ -7,6 +7,7 @@ const bodyReader = readFileSync(resolve(process.cwd(), 'src/subscription/provide
 const client = readFileSync(resolve(process.cwd(), 'src/subscription/w07-subscription-client.ts'), 'utf8')
 const receiver = readFileSync(resolve(process.cwd(), '../../workers/W07-subscription-commerce/src/payment-webhook-http-runtime.ts'), 'utf8')
 const persistence = readFileSync(resolve(process.cwd(), '../../workers/W07-subscription-commerce/src/payment-persistence.ts'), 'utf8')
+const mandatePersistence = readFileSync(resolve(process.cwd(), '../../workers/W07-subscription-commerce/src/mandate-webhook-postgres-persistence.ts'), 'utf8')
 const openapi = readFileSync(resolve(process.cwd(), '../../contracts/openapi/v1/openapi.yaml'), 'utf8')
 const inventory = JSON.parse(readFileSync(resolve(process.cwd(), '../../contracts/api/api-inventory.v1.json'), 'utf8'))
 const transport = JSON.parse(readFileSync(resolve(process.cwd(), '../../contracts/transport/W01-W07-membership-commerce-http-binding.v1.json'), 'utf8'))
@@ -46,6 +47,16 @@ describe('Hyperswitch provider webhook ingress', () => {
     expect(persistence).toContain('recordWebhookConflict')
     expect(receiver).not.toContain('grantSubscriptionEntitlement')
     expect(receiver).not.toContain('postLedger')
+  })
+
+  it('routes mandate lifecycle events through the native W07 PostgreSQL transaction', () => {
+    expect(receiver).toContain('receiveHyperswitchMandateWebhookPostgres')
+    expect(receiver).toContain('receiveMandateWebhookPostgres')
+    expect(mandatePersistence).toContain('UPDATE payment_mandates')
+    expect(mandatePersistence).toContain('UPDATE payment_method_revocation_requests')
+    expect(mandatePersistence).toContain("state = 'RECONCILIATION_REQUIRED'")
+    expect(mandatePersistence).toContain('ROLLBACK')
+    expect(mandatePersistence).toContain('verifyHyperswitchWebhookSignature')
   })
 
   it('contracts the public W01 path, private W07 path, byte limit and signature header', () => {
