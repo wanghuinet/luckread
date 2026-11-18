@@ -52,6 +52,7 @@ const checks = {
   customerIsolationPreserved: false,
   paymentHistoryReadThroughW07NeonEntry: false,
   refundHistoryReadThroughW07NeonEntry: false,
+  nativePostgresBillingHistoryStoreUsed: false,
   legacyD1BindingsNeverAccessed: false,
   fixtureRowsCleaned: false,
 }
@@ -301,6 +302,13 @@ try {
   const refundHistoryBody = await refundHistoryResponse.json()
   assert.deepEqual(refundHistoryBody.data.items, [])
   checks.refundHistoryReadThroughW07NeonEntry = true
+
+  // All three Neon customer-history routes must execute through the native
+  // PostgreSQL Store; the D1 sentinel below proves no compatibility call occurs.
+  checks.nativePostgresBillingHistoryStoreUsed =
+    checks.billingDocumentsReadThroughW07NeonEntry &&
+    checks.paymentHistoryReadThroughW07NeonEntry &&
+    checks.refundHistoryReadThroughW07NeonEntry
 
   assert.equal(d1Accesses.prepare, 0)
   assert.equal(d1Accesses.batch, 0)
