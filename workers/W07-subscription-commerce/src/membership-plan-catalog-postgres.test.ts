@@ -135,15 +135,19 @@ describe('native PostgreSQL membership plan catalogs', () => {
   })
 
   it('caps pagination and includes one extra public candidate to produce hasMore', async () => {
+    const candidates = Array.from({ length: 51 }, (_, index) => ({
+      ...activePlanRow(),
+      plan_id: 'plan_' + index.toString(16).padStart(64, '0'),
+    }))
     const pool = nativePool(async () => ({
-      rows: [activePlanRow(), { ...activePlanRow(), plan_id: 'plan_' + 'c'.repeat(64) }],
-      rowCount: 2,
+      rows: candidates as unknown as Record<string, unknown>[],
+      rowCount: candidates.length,
     }))
 
     const result = await listActiveMembershipPlans(pool.pool, 1000)
 
     expect(result.limit).toBe(50)
-    expect(result.docs).toHaveLength(2)
+    expect(result.docs).toHaveLength(50)
     expect(result.hasMore).toBe(true)
     expect(result.nextCursor).toBeTruthy()
     expect(pool.query.mock.calls[0]?.[1]).toEqual([51])
