@@ -837,7 +837,7 @@ async function isSubscriptionChargeableForCycle(
 }
 
 async function writeCycleReconciliation(
-  db: D1Database,
+  db: RenewalCycleStore,
   cycle: RenewalCycleRow,
   code: string,
   now: string,
@@ -922,15 +922,22 @@ async function transitionCycleToPaymentReady(
   cycle: RenewalCycleRow,
   now: string,
 ): Promise<RenewalCycleRow> {
-  const updated = await env.D1_04.prepare(
+  const store = getW07RenewalCycleStore(env);
+  const updatedAt = strictlyAfter(now, cycle.updated_at);
+  if (isPostgresRenewalCycleStore(store)) {
+    try {
+      return await transitionRenewalCycleToPaymentReadyPostgres(store, cycle, updatedAt);
+    } catch {
+      throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
+    }
+  }
+  const updated = await store.prepare(
     "UPDATE subscription_renewal_cycles SET state = 'PAYMENT_READY', outcome_code = NULL, " +
     'version = version + 1, updated_at = ? WHERE cycle_id = ? AND version = ? AND state = ? ' +
     'AND order_id IS NOT NULL AND payment_id IS NOT NULL',
-  ).bind(
-    strictlyAfter(now, cycle.updated_at), cycle.cycle_id, cycle.version, cycle.state,
-  ).run();
-  if (Number(updated.meta?.changes ?? 0) === 1) return readCycleById(getW07RenewalCycleStore(env), cycle.cycle_id);
-  return readCycleById(getW07RenewalCycleStore(env), cycle.cycle_id);
+  ).bind(updatedAt, cycle.cycle_id, cycle.version, cycle.state).run();
+  if (Number(updated.meta?.changes ?? 0) === 1) return readCycleById(store, cycle.cycle_id);
+  return readCycleById(store, cycle.cycle_id);
 }
 
 async function acquireSubmissionLease(
@@ -946,16 +953,26 @@ async function acquireSubmissionLease(
   const leaseToken = (dependencies.createLeaseToken ?? defaultLeaseToken)();
   if (!/^[A-Za-z0-9_-]{1,128}$/.test(leaseToken)) throw new RenewalRuntimeError('INTEGRITY_VIOLATION', 500);
   const leaseExpiresAt = new Date(nowMs + LEASE_MS).toISOString();
-  const result = await env.D1_04.prepare(
+  const updatedAt = strictlyAfter(now, cycle.updated_at);
+  const store = getW07RenewalCycleStore(env);
+  if (isPostgresRenewalCycleStore(store)) {
+    try {
+      return await acquireRenewalSubmissionLeasePostgres(
+        store, cycle, leaseToken, leaseExpiresAt, updatedAt, now,
+      );
+    } catch {
+      throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
+    }
+  }
+  const result = await store.prepare(
     "UPDATE subscription_renewal_cycles SET state = 'SUBMITTING', lease_token = ?, lease_expires_at = ?, " +
     'version = version + 1, updated_at = ? WHERE cycle_id = ? AND version = ? ' +
     "AND (state = 'PAYMENT_READY' OR (state = 'SUBMITTING' AND lease_expires_at <= ?))",
   ).bind(
-    leaseToken, leaseExpiresAt, strictlyAfter(now, cycle.updated_at),
-    cycle.cycle_id, cycle.version, now,
+    leaseToken, leaseExpiresAt, updatedAt, cycle.cycle_id, cycle.version, now,
   ).run();
   if (Number(result.meta?.changes ?? 0) !== 1) return null;
-  return readCycleById(getW07RenewalCycleStore(env), cycle.cycle_id);
+  return readCycleById(store, cycle.cycle_id);
 }
 
 type FailedCycleRetryPreparation = 'PREPARED' | 'AWAITING_RETRY' | 'AWAITING_OUTCOME_SYNC' | 'TERMINAL';
@@ -1007,21 +1024,31 @@ async function prepareFailedCycleRetry(
 
   const retryCutoff = new Date(Date.parse(now) - renewalRetryDelayMs(cycle.attempt_number)).toISOString();
   const updatedAt = strictlyAfter(now, cycle.updated_at);
-  let result: D1Result;
-  try {
-    result = await env.D1_04.prepare(
-      "UPDATE subscription_renewal_cycles SET state = 'PREPARED', payment_id = NULL, " +
-      "provider_response_status = NULL, outcome_code = 'RETRY_PREPARED', " +
-      "subscription_sync_state = 'PENDING', subscription_sync_updated_at = NULL, subscription_sync_error_code = NULL, " +
-      'lease_token = NULL, lease_expires_at = NULL, version = version + 1, updated_at = ? ' +
-      "WHERE cycle_id = ? AND version = ? AND state = 'FAILED' AND subscription_sync_state = 'APPLIED' " +
-      'AND attempt_number < ? AND updated_at <= ?',
-    ).bind(updatedAt, cycle.cycle_id, cycle.version, MAX_ATTEMPTS, retryCutoff).run();
-  } catch {
-    throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
+  const store = getW07RenewalCycleStore(env);
+  let updated = false;
+  if (isPostgresRenewalCycleStore(store)) {
+    try {
+      updated = await retryFailedRenewalCyclePostgres(store, cycle, updatedAt, retryCutoff, MAX_ATTEMPTS);
+    } catch {
+      throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
+    }
+  } else {
+    try {
+      const result = await store.prepare(
+        "UPDATE subscription_renewal_cycles SET state = 'PREPARED', payment_id = NULL, " +
+        "provider_response_status = NULL, outcome_code = 'RETRY_PREPARED', " +
+        "subscription_sync_state = 'PENDING', subscription_sync_updated_at = NULL, subscription_sync_error_code = NULL, " +
+        'lease_token = NULL, lease_expires_at = NULL, version = version + 1, updated_at = ? ' +
+        "WHERE cycle_id = ? AND version = ? AND state = 'FAILED' AND subscription_sync_state = 'APPLIED' " +
+        'AND attempt_number < ? AND updated_at <= ?',
+      ).bind(updatedAt, cycle.cycle_id, cycle.version, MAX_ATTEMPTS, retryCutoff).run();
+      updated = Number(result.meta?.changes ?? 0) === 1;
+    } catch {
+      throw new RenewalRuntimeError('SERVICE_UNAVAILABLE', 503);
+    }
   }
-  if (Number(result.meta?.changes ?? 0) === 1) return 'PREPARED';
-  const latest = await readCycleById(getW07RenewalCycleStore(env), cycle.cycle_id);
+  if (updated) return 'PREPARED';
+  const latest = await readCycleById(store, cycle.cycle_id);
   if (latest.state === 'PREPARED') return 'PREPARED';
   if (latest.state === 'FAILED' && latest.subscription_sync_state !== 'APPLIED') return 'AWAITING_OUTCOME_SYNC';
   return 'AWAITING_RETRY';
