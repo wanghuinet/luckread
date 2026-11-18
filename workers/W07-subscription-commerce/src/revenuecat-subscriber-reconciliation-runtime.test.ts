@@ -5,6 +5,7 @@ import {
   type RevenueCatSubscriberReconciliationRuntimeEnv,
 } from './revenuecat-subscriber-reconciliation-runtime.js';
 import type { RevenueCatSubscriberSnapshot } from './revenuecat-subscriber-api.js';
+import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
 
 const USER_ID = '123e4567-e89b-42d3-a456-426614174000';
 const APP_ID = 'luckread-ios-production';
@@ -225,3 +226,34 @@ describe('W07 RevenueCat subscriber reconciliation runtime', () => {
     expect(payload.data.candidates).toEqual([]);
   });
 });
+
+describe('W07 RevenueCat reconciliation Neon routing', () => {
+  it('uses the existing native D1-01 pool for product-binding candidate reads in Neon mode', async () => {
+    const pool = { query: vi.fn(), connect: vi.fn() } as unknown as W07WebhookPostgresPool
+    let selectedStore: unknown
+    const buildCandidates = vi.fn(async (store: D1Database | W07WebhookPostgresPool) => {
+      selectedStore = store
+      return {
+        appUserId: USER_ID,
+        originalAppUserId: USER_ID,
+        identityMatch: 'ORIGINAL_APP_USER_ID' as const,
+        snapshotRequestDateMs: Date.parse('2026-10-30T11:59:00.000Z'),
+        customerCreatedOnLookup: false,
+        candidates: [],
+      }
+    }) as unknown as typeof import('./revenuecat-subscriber-reconciliation.js').buildRevenueCatSubscriberReconciliationCandidates
+    const dependencies = successDependencies({
+      buildCandidates,
+      getMembershipPostgresPool: () => pool,
+    })
+    const configuration = { ...env(), W07_MEMBERSHIP_DATABASE_DRIVER: 'neon' }
+
+    const response = await handleRevenueCatSubscriberReconciliationRequest(
+      request(), configuration, dependencies,
+    )
+
+    expect(response?.status).toBe(200)
+    expect(selectedStore).toBe(pool)
+    expect(buildCandidates).toHaveBeenCalledTimes(1)
+  })
+})
