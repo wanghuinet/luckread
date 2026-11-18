@@ -22,8 +22,6 @@ import type { ProfilePinStore } from './profile-pin-store.js'
 import type { SocialTokenSyncStore } from './social-token-sync-store.js'
 import type { PollReadStore } from './poll-read-store.js'
 import type { PollConfigurationStore } from './poll-configuration-store.js'
-import type { PollVoteStore } from './poll-vote-store.js'
-import type { PollDeleteStore } from './poll-delete-store.js'
 
 
 const dbFor = (results: unknown[] = []) => {
@@ -51,15 +49,6 @@ const emptyPollConfigurationStore: PollConfigurationStore = {
   countVotes: vi.fn(async () => 0),
   createDraftPoll: vi.fn(async () => undefined),
   updateDraftPoll: vi.fn(async () => undefined),
-}
-const emptyPollVoteStore: PollVoteStore = {
-  getVote: vi.fn(async () => null),
-  insertVote: vi.fn(async () => undefined),
-}
-const emptyPollDeleteStore: PollDeleteStore = {
-  getPoll: vi.fn(async () => null),
-  countVotes: vi.fn(async () => 0),
-  deleteDraftPoll: vi.fn(async () => true),
 }
 
 const request = (pathname: string, headers: Record<string, string> = {}) =>
