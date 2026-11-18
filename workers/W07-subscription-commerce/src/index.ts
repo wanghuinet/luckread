@@ -551,15 +551,17 @@ export default {
         const creatorId = requireVerifiedCreatorId(request)
         const url = new URL(request.url)
         const requestedLimit = parseBoundedPositiveInt(url.searchParams.get('limit'), 20, 50)
-        const result = await listCreatorMembershipPlans(runtimeEnv.D1_01, creatorId, requestedLimit, url.searchParams.get('cursor'))
+        const planCatalogStore = getW07MembershipPostgresPool(runtimeEnv) ?? runtimeEnv.D1_01
+        const result = await listCreatorMembershipPlans(planCatalogStore, creatorId, requestedLimit, url.searchParams.get('cursor'))
         return json({ data: result, requestId: crypto.randomUUID() })
       }
       if (operation.operation === 'listPlans') {
         const url = new URL(request.url)
         const requestedLimit = parseBoundedPositiveInt(url.searchParams.get('limit'), 20, 50)
         const creatorId = url.searchParams.get('creatorId')
+        const planCatalogStore = getW07MembershipPostgresPool(runtimeEnv) ?? runtimeEnv.D1_01
         const result = await listActiveMembershipPlans(
-          runtimeEnv.D1_01,
+          planCatalogStore,
           requestedLimit,
           url.searchParams.get('cursor'),
           creatorId,
