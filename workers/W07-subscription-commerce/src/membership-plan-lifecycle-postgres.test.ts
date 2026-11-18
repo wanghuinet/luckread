@@ -148,14 +148,17 @@ describe('native PostgreSQL membership plan lifecycle writes', () => {
   })
 
   it('rolls back a new immutable version when the main plan version CAS loses', async () => {
-    let current = planRow({ status: 'ACTIVE', visibility: 'PUBLIC', version: 3, current_version: 2 })
+    let current = planRow({ status: 'ACTIVE', visibility: 'PUBLIC', version: 2, current_version: 2 })
     const transactionSql: string[] = []
     const client = {
       query: vi.fn(async (sql: string) => {
         transactionSql.push(sql)
         if (sql === 'BEGIN' || sql === 'ROLLBACK') return { rows: [], rowCount: null }
         if (sql.startsWith('INSERT INTO membership_plan_versions')) return { rows: [{ plan_id: planId }], rowCount: 1 }
-        if (sql.startsWith('UPDATE membership_plans SET current_version')) return { rows: [], rowCount: 0 }
+        if (sql.startsWith('UPDATE membership_plans SET current_version')) {
+          current = { ...current, status: 'PAUSED', visibility: 'PRIVATE', version: 3 }
+          return { rows: [], rowCount: 0 }
+        }
         throw new Error('unexpected PostgreSQL revision SQL')
       }),
       release: vi.fn(),
