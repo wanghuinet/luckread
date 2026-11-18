@@ -354,7 +354,16 @@ describe('W05 profile-channel PostgreSQL runtime injection', () => {
       ownerUserIds: ['owner-1'],
     })
     expect(d1Prepare).not.toHaveBeenCalled()
-    expect(d1Prepare).not.toHaveBeenCalled()
+  })
+
+  it('fails closed for both Profile Channel routes when the Neon Store is missing', async () => {
+    const prepare = vi.fn(() => { throw new Error('D1 must not be used by Profile Channel') })
+    const env = { DB: { prepare }, W03_CONTENT: publishedContextsBatchBinding() } as never
+    const replies = await worker.fetch(request('/internal/social/users/profile-user/replies?limit=10', transportHeaders), env, {} as never)
+    const likes = await worker.fetch(request('/internal/social/users/profile-user/likes?limit=10', transportHeaders), env, {} as never)
+    expect(replies.status).toBe(503)
+    expect(likes.status).toBe(503)
+    expect(prepare).not.toHaveBeenCalled()
   })
 })
 
