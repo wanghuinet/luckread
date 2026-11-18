@@ -31,3 +31,11 @@ No Worker deployment is implied by source changes. Remote D1 mutation and contro
 - The W02 rehearsal is schema-only. It does not execute the SQLite/D1 source migrations on PostgreSQL, connect to Neon, touch Cloudflare D1, import users/sessions/credentials, or deploy/change the Worker runtime.
 - \`0007_l8_genesis_bootstrap_audit.sql\` is intentionally excluded from this staged Neon schema because its referenced genesis change-control record still declares PR #1299 proposed/unmerged/undeployed. It requires separate admission after the out-of-band approval and MFA readiness conditions are met.
 - The historical \`0002_auth_013_account_state.sql\` alters the W01 Payload \`users\` projection; it is not executed as a W02 Better Auth migration. W02 Better Auth account state is represented by the canonical custom fields in the generated \`user\` schema, while W01 remains the owner of Payload tables.
+
+
+## W02 Role Layer Store Cleanup
+
+- Removed the legacy D1 `RoleLayerStore` adapter and its D1-only SQL fixture.
+- The role-layer boundary remains a provider-neutral `RoleLayerStore` contract; production composition continues to use the existing Neon PostgreSQL adapter from `src/neon/role-layer-postgres.ts`.
+- Tests retain the account-state authority, deny-on-missing-account, blocked-state, and input-validation cases, and now assert the PostgreSQL adapter uses numbered parameters.
+- This slice does not remove other W02 D1 test adapters, historical SQLite/D1 migrations, or schema-source evidence.
