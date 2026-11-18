@@ -138,8 +138,7 @@ export function buildCommentListReadQuery(
   const threadLikeCountSql = input.sort === 'liked'
     ? `(SELECT COUNT(*) FROM interaction_likes thread_likes WHERE thread_likes.target_type = 'comment' AND thread_likes.target_id = c.thread_id) AS thread_like_count`
     : '0 AS thread_like_count'
-  const mentionsSql = true
-    ? `COALESCE((
+  const mentionsSql = `COALESCE((
          SELECT json_agg(json_build_object(
            'userId', mention.mentioned_user_id,
            'handle', mention.handle
@@ -167,18 +166,15 @@ export function buildCommentListReadQuery(
             LIMIT 100
          ) mention
        ), '[]') AS mentions_json`
-  const createdAtSql = true
-    ? 'to_char(c.created_at AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.US"Z"\')'
+  const createdAtSql = 'to_char(c.created_at AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.US"Z"\')'
     : 'c.created_at'
-  const updatedAtSql = true
-    ? 'to_char(c.updated_at AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.US"Z"\')'
+  const updatedAtSql = 'to_char(c.updated_at AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.US"Z"\')'
     : 'c.updated_at'
-  const threadCreatedAtSql = true
-    ? 'to_char(c.thread_created_at AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.US"Z"\')'
+  const threadCreatedAtSql = 'to_char(c.thread_created_at AT TIME ZONE \'UTC\', \'YYYY-MM-DD"T"HH24:MI:SS.US"Z"\')'
     : 'c.thread_created_at'
   const limitParameter = parameter(input.limit + 1)
 
-  const viewerSelect = true ? `${viewerParameter}::text` : viewerParameter
+  const viewerSelect = `${viewerParameter}::text`
   const sql = `WITH RECURSIVE viewer AS (SELECT ${viewerSelect} AS user_id), public_comments AS (
        SELECT
          c.id,
