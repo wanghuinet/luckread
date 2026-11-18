@@ -141,3 +141,10 @@
 - Both mutation routes require the injected Neon PostgreSQL writer and fail closed with 503 before touching `env.DB` when it is missing.
 - Preserved the PostgreSQL adapter's atomic bidirectional Block guard, existing relationship identity/timestamp, idempotent Unfollow, relationship-graph cache invalidation, and best-effort notification enqueue.
 - The separate Follow status reader remains out of scope and is tracked independently.
+
+
+## W05 Follow Status Read
+
+- Removed `FollowStatusD1Database`, `createD1FollowStatusReadStore`, and the runtime D1/Store resolver. `getFollowStatus` now accepts only `FollowStatusReadStore`.
+- The helper is referenced by the Neon PostgreSQL rehearsal and focused runtime tests; it is not currently injected into a public production route.
+- Kept the PostgreSQL adapter and rehearsal coverage for active/missing relationships and both Block directions; runtime tests now use provider-neutral Store fixtures only.
