@@ -45,3 +45,11 @@ No Worker deployment is implied by source changes. Remote D1 mutation and contro
 - Removed the legacy D1 registration rollback adapter and its D1-only test fixture after confirming the production runtime injects `createPostgresRegistrationRollbackStore` from the existing Neon runtime.
 - Registration rollback tests now exercise the PostgreSQL Store contract, including normalized identity matching, idempotent rollback for an absent user, ownership and pending-state guards, active-session rejection, and atomic delete ordering.
 - Historical D1/SQLite migrations, the source Wrangler config, and schema-lineage evidence remain unchanged.
+
+
+## W02 AUTH-010 Session List Store Cleanup
+
+- Removed the legacy D1 session-list Store adapter and its D1-only SQL tests.
+- The session-list handler now resolves the existing Neon PostgreSQL runtime Store by default; production routing continues to inject the same Store explicitly.
+- Handler and PostgreSQL Store tests preserve authenticated-subject scoping, effective base-user role rechecks, bounded keyset pagination, look-ahead behavior, and PostgreSQL timestamp precision.
+- Historical D1/SQLite migrations and session revoke/logout/username-change adapters remain separate and are not changed by this slice.
