@@ -12,6 +12,7 @@ import type { ProfileChannelReadStore } from './profile-channel-read-store.js'
 import type { FollowingAuthorIdRow, FollowingAuthorIdsReadStore } from './following-author-ids-read-store.js'
 import type { ContentLikerReadInput, ContentLikerReadRow, ContentLikerReadStore } from './like-list-read-store.js'
 import type { FavoriteListReadInput, FavoriteListReadRow, FavoriteListReadStore } from './favorite-list-read-store.js'
+import type { FavoriteStatusReadStore } from './favorite-status-read-store.js'
 import type { LikeStatusReadInput, LikeStatusReadResult, LikeStatusReadStore } from './like-status-read-store.js'
 import type { LikeTargetContextReadStore } from './like-target-context-read-store.js'
 import type { RepostStore } from './repost-store.js'
@@ -1137,18 +1138,38 @@ describe('W05 social query transport', () => {
     expect(response.status).toBe(403)
   })
 
-  it('reads favorite status for the authenticated actor', async () => {
-    const response = await worker.fetch(
+  it('reads favorite status through the injected PostgreSQL Store without touching D1', async () => {
+    const statusStore: FavoriteStatusReadStore = {
+      isFavorited: vi.fn(async () => true),
+    }
+    const injectedWorker = createW05SocialWorker({ favoriteStatusReadStore: statusStore })
+    const db = dbFor()
+    const response = await injectedWorker.fetch(
       new Request('https://luckread-w05.internal/internal/social/interactions/bookmarks?targetType=content&targetId=content-1', {
         method: 'GET',
         headers: { ...transportHeaders, 'X-LuckRead-Principal-Layer': 'L2' },
       }),
-      { DB: dbFor([{ favorited: 1 }]), W03_CONTENT: publishedContextBinding() },
+      { DB: db, W03_CONTENT: publishedContextBinding() },
     )
     expect(response.status).toBe(200)
     await expect(response.json()).resolves.toMatchObject({
       data: { favorited: true },
     })
+    expect(statusStore.isFavorited).toHaveBeenCalledWith({ actorUserId: 'viewer-1', targetId: 'content-1' })
+    expect((db as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
+  })
+
+  it('fails closed when favorite status Store composition is missing', async () => {
+    const db = dbFor()
+    const response = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/interactions/bookmarks?targetType=content&targetId=content-1', {
+        method: 'GET',
+        headers: { ...transportHeaders, 'X-LuckRead-Principal-Layer': 'L2' },
+      }),
+      { DB: db, W03_CONTENT: publishedContextBinding() },
+    )
+    expect(response.status).toBe(503)
+    expect((db as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
   })
 
   it('fails closed before favorite D1 access when W03 context is unavailable', async () => {
