@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from 'vitest'
 
 import worker, { createW05SocialWorker } from './index.js'
 import type { CommentListReadInput, CommentListReadRow, CommentListReadStore } from './comment-list-read-store.js'
+import type { CommentCreateStore, CommentCreateValidation, StoredCommentCreate } from './comment-create-store.js'
+import type { CommentMutationStore, CommentDeleteRow, CommentUpdateRow, CommentMutationState } from './comment-mutation-store.js'
 import type { FollowListReadInput, FollowListReadRow, FollowListCountInput, FollowListReadStore } from './follow-list-read-store.js'
 import type { FollowMutation, FollowRow, FollowStore } from './follow-store.js'
 import type { RelationshipGraphReadRow, RelationshipGraphReadStore } from './relationship-graph-store.js'
@@ -36,6 +38,48 @@ const dbFor = (results: unknown[] = []) => {
   }))
   return { prepare } as unknown as D1Database
 }
+
+
+const makeCommentCreateStore = (overrides: Partial<CommentCreateValidation> = {}): CommentCreateStore => ({
+  validate: vi.fn(async () => ({
+    existing_id: null, existing_content_id: null, existing_parent_id: null, existing_body: null,
+    existing_author_user_id: null, existing_state: null, existing_depth: null,
+    existing_created_at: null, existing_updated_at: null,
+    content_state: 'PUBLISHED', content_owner_user_id: 'owner-1',
+    parent_content_id: null, parent_author_user_id: null, parent_state: null, parent_depth: null,
+    recent_count: 0, blocked: false, reply_audience_allowed: true,
+    ...overrides,
+  })),
+  insert: vi.fn(async (input): Promise<StoredCommentCreate> => ({
+    id: 'comment-created', content_id: input.contentId, author_user_id: input.actorUserId,
+    parent_id: input.parentId, body: input.body, state: 'PUBLISHED', depth: input.depth,
+    created_at: input.now, updated_at: input.now,
+  })),
+  getFinalState: vi.fn(async () => ({ content_state: 'PUBLISHED', reply_audience_allowed: true })),
+})
+const makeCommentMutationStore = (options: {
+  deleteRow?: CommentDeleteRow | null
+  markedDeleted?: boolean
+  deleteState?: CommentMutationState | null
+  updateRow?: CommentUpdateRow | null
+  updatedRow?: CommentUpdateRow | null
+} = {}): CommentMutationStore => ({
+  getForDelete: vi.fn(async () => options.deleteRow === undefined ? {
+    id: 'comment-1', content_id: 'content-1', author_user_id: 'viewer-1', state: 'PUBLISHED', has_replies: false,
+  } : options.deleteRow),
+  markDeleted: vi.fn(async () => options.markedDeleted ?? true),
+  getDeleteState: vi.fn(async () => options.deleteState ?? null),
+  getForUpdate: vi.fn(async () => options.updateRow === undefined ? {
+    id: 'comment-1', content_id: 'content-1', author_user_id: 'viewer-1', parent_id: null,
+    body: '原评论', state: 'PUBLISHED', depth: 0,
+    created_at: '2026-10-02T00:00:00.000Z', updated_at: '2026-10-02T00:01:00.000Z',
+  } : options.updateRow),
+  update: vi.fn(async (input) => options.updatedRow ?? {
+    id: 'comment-1', content_id: 'content-1', author_user_id: 'viewer-1', parent_id: null,
+    body: input.body, state: 'PUBLISHED', depth: 0,
+    created_at: '2026-10-02T00:00:00.000Z', updated_at: '2026-10-02T00:02:00.000Z',
+  }),
+})
 
 const emptyPollReadStore = (): PollReadStore => ({
   isBlocked: vi.fn(async () => false),
