@@ -231,3 +231,10 @@
 - Preserved W03 published-content validation, owner/viewer bidirectional Block filtering, anonymous viewer semantics, bounded cursor pagination, and microsecond timestamp precision.
 - Updated runtime tests to provider-neutral Store fixtures and route tests to assert fail-closed behavior.
 - Scope: Content Liker list read only. No production DB/schema, Hyperdrive binding, Worker deployment, or traffic change.
+
+
+## W05 orphaned D1 helper and stale test residue
+
+- Removed the unreferenced legacy `block-policy.ts` D1 query helper and its standalone test; repository-wide references showed no production caller.
+- Removed obsolete D1-only test files for Comment List Read and Comment Notification Context. Their production D1 adapters had already been removed; the PostgreSQL adapter tests remain the active storage verification.
+- No production route, Store contract, migration, database schema, Hyperdrive binding, Worker deployment, or traffic behavior changed. W05 Block/Mute enforcement remains in the active PostgreSQL Store queries.

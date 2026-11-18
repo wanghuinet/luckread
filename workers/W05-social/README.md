@@ -125,3 +125,10 @@ Comment list reads now require the injected Neon PostgreSQL Store and fail close
 - Preserved W03 published-content authority, content-owner bidirectional Block exclusion, viewer-to-owner and viewer-to-liker Block exclusion, anonymous-viewer behavior, bounded keyset pagination, and exact PostgreSQL microsecond cursor precision.
 - Runtime and route tests now use provider-neutral Store fixtures; PostgreSQL SQL tests and the content-liker PostgreSQL rehearsal remain the database verification path.
 - This closes the content liker list read only; W05 still has separate D1-compatible paths, including W09-owned push-endpoint scope. No production database/schema, Hyperdrive binding, Worker deployment, or traffic change.
+
+
+## W05 orphaned D1 helper and stale test residue
+
+- Removed the unreferenced legacy `block-policy.ts` D1 query helper and its standalone test; repository-wide references showed no production caller.
+- Removed obsolete D1-only test files for Comment List Read and Comment Notification Context. Their production D1 adapters had already been removed; the PostgreSQL adapter tests remain the active storage verification.
+- No production route, Store contract, migration, database schema, Hyperdrive binding, Worker deployment, or traffic behavior changed. W05 Block/Mute enforcement remains in the active PostgreSQL Store queries.
