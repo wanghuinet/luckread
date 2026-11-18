@@ -115,3 +115,13 @@ Comment list reads now require the injected Neon PostgreSQL Store and fail close
 - Preserved W03 published-content authority, idempotent comment creation, rate limiting, parent ownership/state/depth constraints, bidirectional Block checks in the final PostgreSQL INSERT, reply-audience checks in the final INSERT, author-only deletion of published leaf comments, tombstone replay, and ETag compare-and-swap edits.
 - Existing PostgreSQL adapters, SQL tests, and Neon runtime composition remain the production storage path. This closes Comment Create/Update/Delete writes only; comment list and other W05 modules are tracked separately.
 - No production database/schema, Hyperdrive binding, Worker deployment, or traffic change.
+
+
+## W05 Content Liker list
+
+- Removed the D1 Content Liker read adapter and the runtime D1-or-Store resolver.
+- The content likes list route now requires the injected Neon PostgreSQL `ContentLikerReadStore`; missing composition returns sanitized 503 and never falls back to `env.DB`.
+- Existing PostgreSQL adapter and PostgreSQL 18 rehearsal remain composed through `workers/W05-social/src/neon/runtime.ts`.
+- Preserved W03 published-content authority, content-owner bidirectional Block exclusion, viewer-to-owner and viewer-to-liker Block exclusion, anonymous-viewer behavior, bounded keyset pagination, and exact PostgreSQL microsecond cursor precision.
+- Runtime and route tests now use provider-neutral Store fixtures; PostgreSQL SQL tests and the content-liker PostgreSQL rehearsal remain the database verification path.
+- This closes the content liker list read only; W05 still has separate D1-compatible paths, including W09-owned push-endpoint scope. No production database/schema, Hyperdrive binding, Worker deployment, or traffic change.
