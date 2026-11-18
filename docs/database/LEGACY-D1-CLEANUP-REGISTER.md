@@ -202,3 +202,14 @@
 - Existing PostgreSQL adapter remains composed by `workers/W05-social/src/neon/runtime.ts`; PostgreSQL 18 rehearsal scripts now use the Store-only API.
 - Preserved W03 owner validation, owner-scoped persistence, audience validation, bounded mention deduplication, default audience and sanitized provider errors.
 - Important boundary: `replyAudienceAllowedSql` remains for the separate legacy D1 Comment Create adapter. Comment creation / its final SQL authorization predicate is not closed by this change and remains a distinct D1 cleanup item. No production DB/schema, Hyperdrive binding, Worker deployment, or traffic change.
+
+
+## W05 Comment Create / Update / Delete writes
+
+- Removed `createD1CommentCreateStore`, `createD1CommentMutationStore`, the D1 query executor implementations, and runtime D1/default Store resolution from Comment Create and Comment Mutation.
+- Comment POST now requires the injected Neon PostgreSQL `CommentCreateStore`; PATCH and DELETE require the injected Neon PostgreSQL `CommentMutationStore`. Missing Store composition fails closed with 503 before write operations.
+- Removed the legacy D1 `replyAudienceAllowedSql` predicate. Comment creation now uses the PostgreSQL predicate for validation, final INSERT authorization, and post-race audience recheck.
+- Existing PostgreSQL implementations remain composed by `workers/W05-social/src/neon/runtime.ts`.
+- Preserved W03 publication authority, idempotency, rate limiting, parent depth/content checks, final atomic Block and reply-audience predicates, author-only leaf-comment tombstones, deletion race replay, and ETag compare-and-swap updates.
+- Updated runtime and route tests to use provider-neutral Store fixtures; PostgreSQL SQL tests and Reply Audience integration assertions cover the PostgreSQL-only predicate.
+- Scope: Comment Create/Update/Delete writes only. Comment list, remaining W05 D1-compatible routes, production DB/schema, Hyperdrive bindings, Worker deployment, and traffic are unchanged.
