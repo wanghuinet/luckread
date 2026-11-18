@@ -143,6 +143,16 @@ try {
   userId = String(user.id)
   assert.equal(user.email, email)
   assert.equal(user.username, username)
+  assert.equal(user.accountState, 'PENDING_VERIFICATION')
+  assert.equal(Number(user.accountStateVersion), 1)
+
+  const initialLifecycle = await postgresPool.query(
+    'SELECT account_state AS "accountState", account_state_version AS "accountStateVersion" ' +
+      'FROM "user" WHERE id = $1',
+    [userId],
+  )
+  assert.equal(initialLifecycle.rows[0]?.accountState, 'PENDING_VERIFICATION')
+  assert.equal(Number(initialLifecycle.rows[0]?.accountStateVersion), 1)
 
   // Better Auth's user-create hook must materialize the canonical L1 role
   // through the PostgreSQL adapter before registration is considered ready.
@@ -175,14 +185,17 @@ try {
   assert.equal(typeof credential.rows[0]?.password, 'string')
   assert.ok(credential.rows[0].password.length > 20, 'credential hash must be persisted, not a plaintext password')
 
-  // Model the existing W02 registration baseline without bypassing the
-  // PostgreSQL activation adapter: this disposable subject starts pending
-  // verification and has no L2 assignment or AUTH-013 activation journal.
+  // The registration write itself must persist the canonical pending
+  // lifecycle baseline. Do not repair or overwrite it in the rehearsal.
   const pending = await postgresPool.query(
-    'UPDATE "user" SET email_verified = FALSE, account_state = $1, account_state_version = 1 WHERE id = $2',
-    ['PENDING_VERIFICATION', userId],
+    'SELECT email_verified AS "emailVerified", account_state AS "accountState", account_state_version AS "accountStateVersion" ' +
+      'FROM "user" WHERE id = $1',
+    [userId],
   )
-  assert.equal(pending.rowCount, 1, 'test subject must enter the pending-verification baseline')
+  assert.equal(pending.rowCount, 1)
+  assert.equal(pending.rows[0]?.emailVerified, false)
+  assert.equal(pending.rows[0]?.accountState, 'PENDING_VERIFICATION')
+  assert.equal(Number(pending.rows[0]?.accountStateVersion), 1)
 
   await assert.rejects(
     postgresLifecycleAdapters.afterEmailVerified(userId),
