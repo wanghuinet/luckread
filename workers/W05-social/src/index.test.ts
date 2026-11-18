@@ -1019,54 +1019,6 @@ describe('W05 social query transport', () => {
     expect(response.status).toBe(428)
   })
 
-  it('accepts an idempotent content favorite', async () => {
-    const response = await worker.fetch(
-      new Request('https://luckread-w05.internal/internal/social/interactions/bookmarks', {
-        method: 'POST',
-        headers: {
-          ...transportHeaders,
-          'X-LuckRead-Principal-Layer': 'L2',
-          'content-type': 'application/json',
-          'Idempotency-Key': 'favorite-1',
-        },
-        body: JSON.stringify({ targetType: 'content', targetId: 'content-1' }),
-      }),
-      {
-        DB: dbFor([{
-          relationship_id: 'favorite-1',
-          actor_user_id: 'viewer-1',
-          target_type: 'content',
-          target_id: 'content-1',
-          created_at: '2026-10-02T00:00:00.000Z',
-        }]),
-        W03_CONTENT: publishedContextBinding(),
-      },
-    )
-    expect(response.status).toBe(200)
-    await expect(response.json()).resolves.toMatchObject({
-      data: { relationshipId: 'favorite-1', targetId: 'content-1' },
-    })
-  })
-
-
-  it('lists the authenticated viewer favorite IDs with an opaque bounded cursor', async () => {
-    const response = await worker.fetch(
-      request('/internal/social/interactions/bookmarks/list?limit=1', transportHeaders),
-      { DB: dbFor([
-        { relationship_id: 'favorite-1', target_id: 'content-1', created_at: '2026-10-03T00:00:00.000Z' },
-        { relationship_id: 'favorite-2', target_id: 'content-2', created_at: '2026-10-02T00:00:00.000Z' },
-      ]) },
-    )
-    expect(response.status).toBe(200)
-    await expect(response.json()).resolves.toMatchObject({
-      data: {
-        items: [{ targetId: 'content-1', createdAt: '2026-10-03T00:00:00.000Z' }],
-        hasMore: true,
-        nextCursor: expect.any(String),
-      },
-    })
-  })
-
   it('uses the injected PostgreSQL-capable favorite list store without touching D1', async () => {
     const cursor = btoa(encodeURIComponent(JSON.stringify({
       v: 1,
@@ -1116,6 +1068,65 @@ describe('W05 social query transport', () => {
     expect(d1Prepare).not.toHaveBeenCalled()
   })
 
+
+  it('routes Favorite, Unfavorite and Favorite Status through injected Neon Stores', async () => {
+    const mutationStore: FavoriteMutationStore = {
+      create: vi.fn(async (input) => ({
+        relationship_id: 'favorite-pg-route',
+        actor_user_id: input.actorUserId,
+        target_type: 'content',
+        target_id: input.targetId,
+        created_at: input.createdAt,
+      })),
+      remove: vi.fn(async () => undefined),
+    }
+    const statusStore: FavoriteStatusReadStore = { isFavorited: vi.fn(async () => true) }
+    const injectedWorker = createW05SocialWorker({
+      favoriteMutationStore: mutationStore,
+      favoriteStatusReadStore: statusStore,
+    })
+    const env = { W03_CONTENT: publishedContextBinding() } as never
+
+    const status = await injectedWorker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/interactions/bookmarks?targetType=content&targetId=content-1', {
+        method: 'GET', headers: { ...transportHeaders, 'X-LuckRead-Principal-Layer': 'L2' },
+      }), env, {} as never,
+    )
+    expect(status.status).toBe(200)
+    await expect(status.json()).resolves.toMatchObject({ data: { favorited: true } })
+
+    const created = await injectedWorker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/interactions/bookmarks', {
+        method: 'POST',
+        headers: { ...transportHeaders, 'X-LuckRead-Principal-Layer': 'L2', 'content-type': 'application/json', 'Idempotency-Key': 'favorite-route-1' },
+        body: JSON.stringify({ targetType: 'content', targetId: 'content-1' }),
+      }), env, {} as never,
+    )
+    expect(created.status).toBe(200)
+    await expect(created.json()).resolves.toMatchObject({ data: { relationshipId: 'favorite-pg-route' } })
+
+    const removed = await injectedWorker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/interactions/bookmarks', {
+        method: 'DELETE',
+        headers: { ...transportHeaders, 'X-LuckRead-Principal-Layer': 'L2', 'content-type': 'application/json', 'Idempotency-Key': 'favorite-route-delete' },
+        body: JSON.stringify({ targetType: 'content', targetId: 'content-1' }),
+      }), env, {} as never,
+    )
+    expect(removed.status).toBe(204)
+    expect(mutationStore.remove).toHaveBeenCalledWith({ actorUserId: 'viewer-1', targetType: 'content', targetId: 'content-1' })
+  })
+
+  it('fails closed for favorite-list reads when the Neon Store is missing', async () => {
+    const prepare = vi.fn(() => { throw new Error('D1 must not be used') })
+    const response = await worker.fetch(
+      request('/internal/social/interactions/bookmarks/list?limit=20', transportHeaders),
+      { DB: { prepare } } as never,
+      {} as never,
+    )
+    expect(response.status).toBe(503)
+    expect(prepare).not.toHaveBeenCalled()
+  })
+
   it('requires an authenticated transport for favorite-list reads', async () => {
     const response = await worker.fetch(
       request('/internal/social/interactions/bookmarks/list?limit=20', {
@@ -1127,20 +1138,6 @@ describe('W05 social query transport', () => {
       { DB: dbFor([]) },
     )
     expect(response.status).toBe(403)
-  })
-
-  it('reads favorite status for the authenticated actor', async () => {
-    const response = await worker.fetch(
-      new Request('https://luckread-w05.internal/internal/social/interactions/bookmarks?targetType=content&targetId=content-1', {
-        method: 'GET',
-        headers: { ...transportHeaders, 'X-LuckRead-Principal-Layer': 'L2' },
-      }),
-      { DB: dbFor([{ favorited: 1 }]), W03_CONTENT: publishedContextBinding() },
-    )
-    expect(response.status).toBe(200)
-    await expect(response.json()).resolves.toMatchObject({
-      data: { favorited: true },
-    })
   })
 
   it('fails closed before favorite D1 access when W03 context is unavailable', async () => {
@@ -1176,23 +1173,6 @@ describe('W05 social query transport', () => {
       { DB: dbFor() },
     )
     expect(response.status).toBe(428)
-  })
-
-  it('unfavorites with a 204 response', async () => {
-    const response = await worker.fetch(
-      new Request('https://luckread-w05.internal/internal/social/interactions/bookmarks', {
-        method: 'DELETE',
-        headers: {
-          ...transportHeaders,
-          'X-LuckRead-Principal-Layer': 'L2',
-          'content-type': 'application/json',
-          'Idempotency-Key': 'favorite-delete-1',
-        },
-        body: JSON.stringify({ targetType: 'content', targetId: 'content-1' }),
-      }),
-      { DB: dbFor() },
-    )
-    expect(response.status).toBe(204)
   })
 
   it('denies favorites below the minimum interaction permission layer', async () => {
