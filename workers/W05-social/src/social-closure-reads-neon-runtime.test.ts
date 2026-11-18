@@ -158,7 +158,7 @@ describe('W05 Neon social-closure read route composition', () => {
     })
     expect(h.w03Content.fetch).toHaveBeenCalledTimes(1)
     expect(readLimiter.limit).toHaveBeenCalledWith({
-      key: 'read:internal/social/contents/summary-batch:user:' + viewerUserId,
+      key: 'read:/internal/social/contents:user:' + viewerUserId,
     })
     expect(writeLimiter.limit).not.toHaveBeenCalled()
     expect(h.socialClosureReadStore.getContentSocialBatchRows).toHaveBeenCalledWith(
