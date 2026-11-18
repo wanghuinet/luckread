@@ -325,6 +325,46 @@ export async function readContentSocial(
   }
 }
 
+/** Fetch authoritative social projections for a bounded visible feed window. */
+export async function readContentSocialBatch(
+  contentIds: readonly string[],
+  signal?: AbortSignal,
+): Promise<Map<string, ApiContentSocial>> {
+  const uniqueIds = [...new Set(contentIds.filter((id) => typeof id === 'string' && id.trim()).map((id) => id.trim()))];
+  if (uniqueIds.length === 0) return new Map();
+  if (uniqueIds.length > 50) throw new Error('Social batch is limited to 50 content IDs');
+
+  try {
+    const { response, data } = await apiRequest<unknown>('/contents/social/batch', {
+      method: 'POST',
+      signal,
+      body: JSON.stringify({ contentIds: uniqueIds }),
+      headers: { 'content-type': 'application/json' },
+    });
+    if (!response.ok) return new Map();
+    const envelope = unwrapApiData<{ items?: unknown }>(data);
+    if (!envelope || !Array.isArray(envelope.items)) return new Map();
+
+    const requested = new Set(uniqueIds);
+    const result = new Map<string, ApiContentSocial>();
+    for (const item of envelope.items) {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+      const row = item as { contentId?: unknown; counts?: unknown; viewer?: unknown };
+      if (typeof row.contentId !== 'string' || !requested.has(row.contentId)) continue;
+      result.set(row.contentId, {
+        counts: row.counts && typeof row.counts === 'object' ? row.counts as ApiContentCounts : undefined,
+        viewer: row.viewer && typeof row.viewer === 'object'
+          ? row.viewer as { liked?: boolean; favorited?: boolean; reposted?: boolean }
+          : null,
+      });
+    }
+    return result;
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') throw error;
+    return new Map();
+  }
+}
+
 /**
  * W03 may expose the body directly or by bodyRef. Do not derive a body from a
  * local sample post; if the body is absent, use the real content's summary/title.

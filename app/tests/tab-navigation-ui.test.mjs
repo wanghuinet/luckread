@@ -194,11 +194,13 @@ test('home feed renders first-page projections while optional detail hydration r
   expect(homeScreen).toContain('viewabilityConfig={viewabilityConfig}');
   expect(homeScreen).toContain('for (const item of pendingRecords) {');
   expect(homeScreen).toContain('void (async () => {');
-  expect(homeScreen).toContain('const [bodyResult, socialResult, authorResult] = await Promise.allSettled([');
+  expect(homeScreen).toContain('const socialBatchPromise = readContentSocialBatch(');
+  expect(homeScreen).toContain('pendingRecords.map((item) => item.id)');
+  expect(homeScreen).toContain('const [bodyResult, authorResult] = await Promise.allSettled([');
   expect(homeScreen).not.toContain('pendingRecords.map(async (item) =>');
   expect(homeScreen).toContain('readContentBody(item, controller.signal, sessionToken)');
-  expect(homeScreen).toContain('readContentSocial(item.id, controller.signal)');
   expect(homeScreen).toContain('readContentAuthor(item, controller.signal)');
+  expect(homeScreen).toContain('return () => socialBatchController.abort();');
   expect(homeScreen).toContain('generation !== hydrationGenerationRef.current');
   expect(homeScreen).not.toContain('setItems(visibleItems)');
   expect(homeScreen).not.toContain('!loading && !loadingMore');
