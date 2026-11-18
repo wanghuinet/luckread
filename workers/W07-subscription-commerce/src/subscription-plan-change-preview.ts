@@ -195,7 +195,8 @@ export async function previewSubscriptionPlanChange(
         'INNER JOIN membership_plan_versions AS v ON v.plan_id = s.plan_id AND v.plan_version = s.plan_version ' +
         'WHERE s.subscription_id = ? AND s.subscriber_id = ? LIMIT 1',
       ).bind(subscriptionId, subscriberId).first<SubscriptionPlanChangeRow>()
-    }  } catch {
+    }
+  } catch {
     throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503);
   }
   if (!subscription || subscription.subscription_id !== subscriptionId || subscription.subscriber_id !== subscriberId) {
