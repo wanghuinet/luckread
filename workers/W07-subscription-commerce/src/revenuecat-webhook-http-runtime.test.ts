@@ -78,21 +78,22 @@ describe('RevenueCat private W07 webhook receiver', () => {
     const d1Database = {
       prepare: vi.fn(() => { throw new Error('D1 must not be used in Neon mode') }),
     } as unknown as D1Database
+    const record = vi.fn(async () => receipt)
+    const getWebhookStore = vi.fn(() => ({ record }))
     const getWebhookDatabase = vi.fn(() => neonDatabase)
-    const receive = vi.fn(async (database: D1Database) => {
-      expect(database).toBe(neonDatabase)
-      return receipt
-    })
+    const receive = vi.fn(async () => receipt)
 
     const response = await handleRevenueCatWebhookRequest(
       request(body),
       { ...envBase, D1_04: d1Database, W07_DATABASE_DRIVER: 'neon' },
-      { receive, getWebhookDatabase, nowMs: () => NOW_MS },
+      { receive, getWebhookDatabase, getWebhookStore, nowMs: () => NOW_MS },
     )
 
     expect(response?.status).toBe(200)
-    expect(getWebhookDatabase).toHaveBeenCalledOnce()
-    expect(receive).toHaveBeenCalledOnce()
+    expect(getWebhookStore).toHaveBeenCalledOnce()
+    expect(record).toHaveBeenCalledOnce()
+    expect(getWebhookDatabase).not.toHaveBeenCalled()
+    expect(receive).not.toHaveBeenCalled()
     expect(d1Database.prepare).not.toHaveBeenCalled()
   })
 

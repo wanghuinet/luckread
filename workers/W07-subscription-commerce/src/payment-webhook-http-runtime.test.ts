@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   handleHyperswitchWebhookRequest,
 } from './payment-webhook-http-runtime.js';
@@ -10,6 +10,7 @@ import type { ReceiveHyperswitchWebhookInput } from './payment-persistence.js';
 import type { RenewalOutcomeSyncResult } from './subscription-renewal-outcome.js';
 import type { PaidMembershipPurchaseFulfillmentResult } from './paid-membership-order-fulfillment.js';
 import { type BillingDocumentDto } from './billing-persistence.js';
+import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
 
 const SECRET = 'hyperswitch-webhook-test-secret';
 const MERCHANT = 'merchant_test';
@@ -36,12 +37,15 @@ function fixture(options: {
   pendingRecoveryResult?: Readonly<{ scanned: number; applied: number; reconciliationRequired: number; pendingRetry: number }>;
   purchaseFulfillmentResult?: PaidMembershipPurchaseFulfillmentResult;
   webhookDatabase?: D1Database;
+  nativeRefundResult?: WebhookReceiptResult;
 } = {}) {
   const calls: Array<{ db: unknown; input: ReceiveHyperswitchWebhookInput }> = [];
   const syncCalls: Array<{ env: unknown; paymentId: string; merchantId: string }> = [];
   const pendingRecoveryCalls: Array<{ env: unknown; options?: Readonly<{ limit?: number }> }> = [];
   const purchaseFulfillmentCalls: Array<{ env: unknown; paymentId: string; merchantId: string }> = [];
   const receiptCalls: Array<{ db: unknown; paymentId: string; merchantId: string }> = [];
+  const postgresCalls: Array<{ pool: unknown; input: ReceiveHyperswitchWebhookInput }> = [];
+  const postgresPool = {} as W07WebhookPostgresPool;
   const receive: Receiver = async (db, input) => {
     calls.push({ db, input });
     if (options.error) throw options.error;
@@ -83,8 +87,25 @@ function fixture(options: {
     D1_04: { marker: 'd1-04' } as unknown as D1Database,
     HYPERSWITCH_WEBHOOK_SECRET: SECRET,
     HYPERSWITCH_MERCHANT_ID: MERCHANT,
+    W07_DATABASE_DRIVER: undefined as string | undefined,
   };
-  return { env, calls, syncCalls, pendingRecoveryCalls, purchaseFulfillmentCalls, receiptCalls, dependencies: { receive, getWebhookDatabase: () => options.webhookDatabase, syncRenewalOutcome, syncPendingOutcomes, fulfillPaidOrder, issueReceipt, expirePendingPlanUpgrade: async () => {} } };
+  return {
+    env, calls, syncCalls, pendingRecoveryCalls, purchaseFulfillmentCalls, receiptCalls, postgresCalls,
+    dependencies: {
+      receive,
+      getWebhookDatabase: vi.fn(() => options.webhookDatabase),
+      getWebhookPostgresPool: () => postgresPool,
+      receiveRefundWebhookPostgres: async (
+        pool: W07WebhookPostgresPool,
+        input: ReceiveHyperswitchWebhookInput,
+      ) => {
+        postgresCalls.push({ pool, input });
+        return options.nativeRefundResult ?? null;
+      },
+      syncRenewalOutcome, syncPendingOutcomes, fulfillPaidOrder, issueReceipt,
+      expirePendingPlanUpgrade: async () => {},
+    },
+  };
 }
 
 function request(options: {
@@ -477,6 +498,39 @@ describe('W07 Hyperswitch webhook HTTP receiver', () => {
     expect(f.receiptCalls[0]?.db).toBe(neonDatabase);
     expect(f.syncCalls[0]?.env).toMatchObject({ D1_01: f.env.D1_01, D1_04: neonDatabase });
     expect(f.purchaseFulfillmentCalls[0]?.env).toMatchObject({ D1_01: f.env.D1_01, D1_04: neonDatabase });
+  });
+
+  it('uses the native PostgreSQL Store for Neon refund_details events without resolving the D1-shaped webhook bridge', async () => {
+    const f = fixture({ nativeRefundResult: receipt('APPLIED') });
+    f.env.W07_DATABASE_DRIVER = 'neon';
+    const body = JSON.stringify({
+      event_id: 'evt_refund_native_01',
+      event_type: 'refund_succeeded',
+      merchant_id: MERCHANT,
+      content: {
+        type: 'refund_details',
+        object: {
+          refund_id: 'ref_' + 'r'.repeat(26),
+          payment_id: 'pay_' + 'p'.repeat(26),
+          amount: 300,
+          currency: 'USD',
+          status: 'succeeded',
+          updated_at: '2026-11-18T12:00:01.000Z',
+        },
+      },
+    });
+    const response = await handleHyperswitchWebhookRequest(
+      request({ body, signature: 'signed-provider-event' }),
+      f.env,
+      f.dependencies,
+    );
+
+    expect(response?.status).toBe(200);
+    expect(f.postgresCalls).toHaveLength(1);
+    expect(new TextDecoder().decode(f.postgresCalls[0]!.input.rawBody)).toBe(body);
+    expect(f.dependencies.getWebhookDatabase).not.toHaveBeenCalled();
+    expect(f.calls).toHaveLength(0);
+    expect(f.syncCalls).toHaveLength(0);
   });
 
 });
