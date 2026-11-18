@@ -54,6 +54,7 @@ const request = (overrides: {
 
 const env = (): RevenueCatSubscriberReconciliationRuntimeEnv => ({
   D1_01: {} as D1Database,
+  W07_MEMBERSHIP_DATABASE_DRIVER: 'd1',
   REVENUECAT_SECRET_API_KEY: 'sk_server_only_secret',
   REVENUECAT_ALLOWED_APP_IDS: APP_ID + ',luckread-android-production',
 });
