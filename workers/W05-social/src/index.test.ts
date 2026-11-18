@@ -22,6 +22,7 @@ import type { ProfilePinStore } from './profile-pin-store.js'
 import type { SocialTokenSyncStore } from './social-token-sync-store.js'
 import type { PollReadStore } from './poll-read-store.js'
 import type { PollConfigurationStore } from './poll-configuration-store.js'
+import type { ReplyAudienceStore, StoredReplyAudiencePolicy } from './reply-audience-store.js'
 
 
 const dbFor = (results: unknown[] = []) => {
@@ -751,14 +752,26 @@ describe('W05 social query transport', () => {
   })
 
   it('sets and reads reply audience policy through the authenticated W05 route', async () => {
-    const savedPolicy = {
-      id: 'content-1',
-      content_id: 'content-1',
-      owner_user_id: 'viewer-1',
-      content_type: 'post',
-      audience: 'following',
-      mentioned_user_ids_json: '[]',
-      updated_at: '2026-10-19T00:00:00.000Z',
+    let savedPolicy: StoredReplyAudiencePolicy = {
+      contentId: 'content-1',
+      ownerUserId: 'viewer-1',
+      audience: 'everyone',
+      mentionedUserIdsJson: '[]',
+      updatedAt: '2026-10-19T00:00:00.000Z',
+    }
+    const replyAudienceStore: ReplyAudienceStore = {
+      get: vi.fn(async (contentId, ownerUserId) =>
+        contentId === savedPolicy.contentId && ownerUserId === savedPolicy.ownerUserId ? savedPolicy : null),
+      set: vi.fn(async input => {
+        savedPolicy = {
+          contentId: input.contentId,
+          ownerUserId: input.ownerUserId,
+          audience: input.audience,
+          mentionedUserIdsJson: input.mentionedUserIdsJson,
+          updatedAt: input.now,
+        }
+        return savedPolicy
+      }),
     }
     const contextBinding = {
       fetch: vi.fn(async () => Response.json({
@@ -772,8 +785,10 @@ describe('W05 social query transport', () => {
         requestId: 'req_context',
       })),
     }
-    const writeDb = dbFor([savedPolicy])
-    const write = await worker.fetch(
+    const injectedWorker = createW05SocialWorker({ replyAudienceStore })
+    const d1Prepare = vi.fn(() => { throw new Error('D1 must not be used by Reply Audience routes') })
+    const env = { DB: { prepare: d1Prepare }, W03_CONTENT: contextBinding } as never
+    const write = await injectedWorker.fetch(
       new Request('https://luckread-w05.internal/internal/social/contents/content-1/reply-audience', {
         method: 'PUT',
         headers: {
@@ -783,10 +798,11 @@ describe('W05 social query transport', () => {
         },
         body: JSON.stringify({ replyAudience: 'following', mentionedUserIds: [] }),
       }),
-      { DB: writeDb, W03_CONTENT: contextBinding },
+      env,
+      {} as never,
     )
     expect(contextBinding.fetch).toHaveBeenCalledTimes(1)
-    expect(writeDb.prepare).toHaveBeenCalledTimes(1)
+    expect(replyAudienceStore.set).toHaveBeenCalledTimes(1)
     const writeBody = await write.clone().json()
     expect(write.status, JSON.stringify(writeBody)).toBe(200)
     await expect(write.json()).resolves.toMatchObject({
@@ -805,14 +821,17 @@ describe('W05 social query transport', () => {
         requestId: 'req_context',
       })),
     }
-    const read = await worker.fetch(
+    const read = await injectedWorker.fetch(
       request('/internal/social/contents/content-1/reply-audience', transportHeaders),
-      { DB: dbFor([savedPolicy]), W03_CONTENT: readContextBinding },
+      { DB: { prepare: d1Prepare }, W03_CONTENT: readContextBinding } as never,
+      {} as never,
     )
     expect(read.status).toBe(200)
     await expect(read.json()).resolves.toMatchObject({
       data: { contentId: 'content-1', ownerUserId: 'viewer-1', replyAudience: 'following' },
     })
+    expect(replyAudienceStore.get).toHaveBeenCalledWith('content-1', 'viewer-1')
+    expect(d1Prepare).not.toHaveBeenCalled()
   })
 
   it('fails closed on reply-audience PUT when W03 context binding is missing', async () => {

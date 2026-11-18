@@ -97,3 +97,11 @@ Comment list reads now require the injected Neon PostgreSQL Store and fail close
 - Both profile channel HTTP routes require the Neon PostgreSQL Store and return 503 when it is not composed; neither route falls back to `env.DB`.
 - Preserved W03 published-content batch validation, profile-level Block/Mute visibility, reply-owner Block filtering, liked-content Block filtering for profile and viewer, viewer Mute filtering, bounded pagination, profile/viewer-scoped opaque cursors, and PostgreSQL microsecond timestamp precision.
 - Existing PostgreSQL adapter and Neon runtime composition remain unchanged. This closes Profile Channel reads only; other W05 D1-compatible routes remain separate work.
+
+
+## W05 Reply Audience policy persistence
+
+- Removed the D1 Reply Audience Store adapter and the runtime's D1 database parameter/default Store construction.
+- Reply Audience GET and PUT routes now require the injected Neon PostgreSQL `ReplyAudienceStore`; missing composition returns 503 instead of falling back to `env.DB`.
+- Preserved W03 owner-context validation, owner-only policy changes, audience validation, bounded/deduplicated mention allowlists, default `everyone` behavior, owner-scoped reads, and sanitized persistence failures.
+- Existing PostgreSQL Store and PostgreSQL 18 rehearsal remain. The legacy `replyAudienceAllowedSql` predicate is intentionally retained for the separate legacy D1 Comment Create adapter; this PR does not claim Comment Create is D1-free.

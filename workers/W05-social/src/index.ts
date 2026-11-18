@@ -319,7 +319,7 @@ export type W05SocialWorkerDependencies = Readonly<{
   commentNotificationContextStore?: CommentNotificationContextStore
   /** Optional PostgreSQL notification enqueue store; notification side effects remain best-effort. */
   notificationEnqueueStore?: NotificationEnqueueStore
-  /** Optional PostgreSQL-capable owner reply-audience policy store; D1 remains the default. */
+  /** Neon PostgreSQL Reply Audience policy Store; GET/PUT routes fail closed when missing. */
   replyAudienceStore?: ReplyAudienceStore
   /** Optional PostgreSQL per-user notification preferences store; missing composition fails closed. */
   notificationPreferencesStore?: NotificationPreferencesStore
@@ -958,8 +958,9 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
             contentId,
             correlationId: request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '',
           })
+          if (!dependencies.replyAudienceStore) throw new ReplyAudienceRuntimeError('SERVICE_UNAVAILABLE', 503)
           return json({
-            data: await getContentReplyAudience(env.DB, actorUserId, contentId, context, dependencies.replyAudienceStore),
+            data: await getContentReplyAudience(dependencies.replyAudienceStore, actorUserId, contentId, context),
             requestId: createRequestId(),
           })
         }
@@ -982,14 +983,14 @@ export function createW05SocialWorker(dependencies: W05SocialWorkerDependencies 
           contentId,
           correlationId: request.headers.get('X-LuckRead-Correlation-Id')?.trim() ?? '',
         })
+        if (!dependencies.replyAudienceStore) throw new ReplyAudienceRuntimeError('SERVICE_UNAVAILABLE', 503)
         const policy = await setContentReplyAudience(
-          env.DB,
+          dependencies.replyAudienceStore,
           actorUserId,
           contentId,
           raw.replyAudience,
           raw.mentionedUserIds,
           context,
-          dependencies.replyAudienceStore,
         )
         return json({ data: policy, requestId: createRequestId() })
       }

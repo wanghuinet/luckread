@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 import type { OwnedPostContext } from './owned-post-context.js'
-import { createD1ReplyAudienceStore, type ReplyAudienceStore } from './reply-audience-store.js'
+import type { ReplyAudienceStore } from './reply-audience-store.js'
 
 export type ReplyAudience = 'everyone' | 'verified' | 'following' | 'mentioned' | 'followingNetwork'
 
@@ -55,13 +55,12 @@ const validateMentionedUserIds = (value: unknown): string[] => {
  * this table stores only the W05-owned policy and the bounded mention allowlist.
  */
 export async function setContentReplyAudience(
-  db: D1Database,
+  store: ReplyAudienceStore,
   actorUserIdValue: string,
   contentIdValue: string,
   audienceValue: unknown,
   mentionedUserIdsValue: unknown,
   context: OwnedPostContext,
-  store: ReplyAudienceStore = createD1ReplyAudienceStore(db),
 ): Promise<ReplyAudienceRecord> {
   const actorUserId = validateId(actorUserIdValue, true)
   const contentId = validateId(contentIdValue)
@@ -111,11 +110,10 @@ export async function setContentReplyAudience(
 
 /** The owner check comes from W03; W05 reads only its own persisted reply policy. */
 export async function getContentReplyAudience(
-  db: D1Database,
+  store: ReplyAudienceStore,
   actorUserIdValue: string,
   contentIdValue: string,
   context: OwnedPostContext,
-  store: ReplyAudienceStore = createD1ReplyAudienceStore(db),
 ): Promise<ReplyAudienceRecord> {
   const actorUserId = validateId(actorUserIdValue, true)
   const contentId = validateId(contentIdValue)
@@ -154,6 +152,7 @@ export async function getContentReplyAudience(
  * SQL predicate shared by the pre-check and final INSERT. The final INSERT
  * re-evaluates it to close races with follow/block/policy changes.
  */
+// Legacy D1 Comment Create adapter still imports this SQL fragment; the PostgreSQL path uses reply-audience-postgres-predicate.ts.
 export const replyAudienceAllowedSql = `(
   ? = content.owner_user_id
   OR

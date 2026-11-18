@@ -193,3 +193,12 @@
 - Existing PostgreSQL implementation `createPostgresProfileChannelReadStore` remains composed by `workers/W05-social/src/neon/runtime.ts`.
 - Preserved W03 published-content batch authority, profile-level Block/Mute checks, owner Block checks, profile/viewer Block and viewer Mute filters for liked content, bounded cursor pagination and microsecond timestamp precision.
 - Runtime tests now use Store fixtures; route tests verify missing-store fail-closed behavior. No production DB/schema, Hyperdrive binding, Worker deployment, or traffic change.
+
+
+## W05 Reply Audience policy persistence
+
+- Removed `ReplyAudienceD1QueryExecutor` and `createD1ReplyAudienceStore`; `setContentReplyAudience` / `getContentReplyAudience` now accept only explicit `ReplyAudienceStore`.
+- Reply Audience GET/PUT routes require the injected Neon PostgreSQL Store and fail closed with 503 when absent; no Reply Audience route passes `env.DB` into the runtime.
+- Existing PostgreSQL adapter remains composed by `workers/W05-social/src/neon/runtime.ts`; PostgreSQL 18 rehearsal scripts now use the Store-only API.
+- Preserved W03 owner validation, owner-scoped persistence, audience validation, bounded mention deduplication, default audience and sanitized provider errors.
+- Important boundary: `replyAudienceAllowedSql` remains for the separate legacy D1 Comment Create adapter. Comment creation / its final SQL authorization predicate is not closed by this change and remains a distinct D1 cleanup item. No production DB/schema, Hyperdrive binding, Worker deployment, or traffic change.

@@ -84,4 +84,31 @@ describe('W05 reply-audience Neon HTTP runtime', () => {
     }))
     expect(d1Prepare).not.toHaveBeenCalled()
   })
+
+  it('fails closed for GET and PUT when the Neon Reply Audience Store is missing', async () => {
+    const d1Prepare = vi.fn(() => { throw new Error('D1 must not be used by Reply Audience') })
+    const w03Fetch = vi.fn(async () => Response.json({
+      data: { contentId: 'content-1', ownerUserId: 'owner-1', contentType: 'post', state: 'PUBLISHED', updatedAt: '2026-11-14T00:00:00.000Z' },
+    }))
+    const worker = createW05SocialWorker()
+    const env = { DB: { prepare: d1Prepare }, W03_CONTENT: { fetch: w03Fetch } } as never
+    const ctx = {} as never
+
+    const get = await worker.fetch(new Request(
+      'https://luckread-w05.internal/internal/social/contents/content-1/reply-audience',
+      { headers },
+    ), env, ctx)
+    const put = await worker.fetch(new Request(
+      'https://luckread-w05.internal/internal/social/contents/content-1/reply-audience',
+      {
+        method: 'PUT',
+        headers: { ...headers, 'Idempotency-Key': 'reply-policy-no-store', 'content-type': 'application/json' },
+        body: JSON.stringify({ replyAudience: 'everyone', mentionedUserIds: [] }),
+      },
+    ), env, ctx)
+    expect(get.status).toBe(503)
+    expect(put.status).toBe(503)
+    expect(w03Fetch).toHaveBeenCalledTimes(2)
+    expect(d1Prepare).not.toHaveBeenCalled()
+  })
 })
