@@ -537,8 +537,9 @@ export default {
       if (operation.operation === 'createPlan') {
         requireCreatorLayer(request)
         const creatorId = requireVerifiedCreatorId(request)
+        const membershipWriteStore = getW07MembershipPostgresPool(runtimeEnv) ?? runtimeEnv.D1_01
         const result = await createMembershipPlanDraft(
-          runtimeEnv.D1_01,
+          membershipWriteStore,
           principal,
           creatorId,
           await readJsonBody(request),

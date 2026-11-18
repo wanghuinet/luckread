@@ -1,7 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import { sha256BytesToHex } from '../../W10-async/src/canonical-json-idempotency.js';
-import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
+import type { W07WebhookPostgresClient, W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
 
 export type SubscriptionStatus = 'PENDING' | 'TRIALING' | 'ACTIVE' | 'PAST_DUE' | 'PAUSED' | 'CANCELED' | 'EXPIRED'
 
@@ -705,8 +705,122 @@ const mapMembershipPlan = (row: MembershipPlanStoredRow, replayed?: boolean) => 
  * deterministic per creator/idempotency key; the immutable v1 record lets a
  * replay detect key reuse with a different request even after later edits.
  */
+async function readMembershipPlanDraftByIdPostgres(
+  pool: W07WebhookPostgresPool,
+  planId: string,
+): Promise<MembershipPlanStoredRow | null> {
+  try {
+    const result = await pool.query<MembershipPlanStoredRow & Record<string, unknown>>(
+      'SELECT p.plan_id, p.owner_id, p.current_version, p.status, p.visibility, p.version, ' +
+      `to_char(p.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at, ` +
+      `to_char(p.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS updated_at, ` +
+      'v.name, v.tier, v.billing_interval, v.price_minor, v.currency, v.benefits_json, v.trial_period_days ' +
+      'FROM membership_plans AS p INNER JOIN membership_plan_versions AS v ' +
+      'ON v.plan_id = p.plan_id AND v.plan_version = 1 WHERE p.plan_id = $1 LIMIT 1',
+      [planId],
+    )
+    return result.rows[0] ?? null
+  } catch {
+    throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
+  }
+}
+
+function membershipPlanDraftMatches(
+  row: MembershipPlanStoredRow,
+  creatorId: string,
+  plan: MembershipPlanDraftInput,
+  benefitsJson: string,
+): boolean {
+  return row.owner_id === creatorId &&
+    row.name === plan.name &&
+    row.tier === plan.tier &&
+    row.billing_interval === plan.billingInterval &&
+    row.price_minor === plan.priceMinor &&
+    row.currency === plan.currency &&
+    row.benefits_json === benefitsJson &&
+    (row.trial_period_days ?? 0) === plan.trialPeriodDays
+}
+
+function replayMembershipPlanDraft(row: MembershipPlanStoredRow): ReturnType<typeof mapMembershipPlan> {
+  // Return the immutable original create result, not current mutable plan state.
+  return mapMembershipPlan({
+    ...row,
+    current_version: 1,
+    status: 'DRAFT',
+    visibility: 'PRIVATE',
+    version: 1,
+    updated_at: row.created_at,
+  }, true)
+}
+
+async function insertMembershipPlanDraftPostgres(
+  pool: W07WebhookPostgresPool,
+  input: Readonly<{
+    planId: string
+    creatorId: string
+    plan: MembershipPlanDraftInput
+    benefitsJson: string
+    now: string
+  }>,
+): Promise<boolean> {
+  let client: W07WebhookPostgresClient | undefined
+  let inTransaction = false
+  try {
+    client = await pool.connect()
+    await client.query('BEGIN')
+    inTransaction = true
+    const planInsert = await client.query<{ plan_id: string } & Record<string, unknown>>(
+      "INSERT INTO membership_plans " +
+      '(plan_id, owner_type, owner_id, current_version, status, visibility, version, created_at, updated_at) ' +
+      "VALUES ($1, 'CREATOR', $2, 1, 'DRAFT', 'PRIVATE', 1, $3::timestamptz, $4::timestamptz) " +
+      'ON CONFLICT (plan_id) DO NOTHING RETURNING plan_id',
+      [input.planId, input.creatorId, input.now, input.now],
+    )
+    if (planInsert.rows.length !== 1) {
+      await client.query('ROLLBACK')
+      inTransaction = false
+      return false
+    }
+    const versionInsert = await client.query<{ plan_id: string } & Record<string, unknown>>(
+      'INSERT INTO membership_plan_versions ' +
+      '(plan_id, plan_version, name, tier, billing_interval, price_minor, currency, benefits_json, trial_period_days, created_at) ' +
+      'VALUES ($1, 1, $2, $3, $4, $5, $6, $7, $8, $9::timestamptz) ' +
+      'ON CONFLICT (plan_id, plan_version) DO NOTHING RETURNING plan_id',
+      [
+        input.planId, input.plan.name, input.plan.tier, input.plan.billingInterval,
+        input.plan.priceMinor, input.plan.currency, input.benefitsJson,
+        input.plan.trialPeriodDays, input.now,
+      ],
+    )
+    if (versionInsert.rows.length !== 1) {
+      await client.query('ROLLBACK')
+      inTransaction = false
+      return false
+    }
+    await client.query('COMMIT')
+    inTransaction = false
+    return true
+  } catch {
+    if (client && inTransaction) {
+      try {
+        await client.query('ROLLBACK')
+      } catch {
+        // Keep database diagnostics private and preserve the sanitized error.
+      }
+    }
+    throw new SubscriptionRuntimeError('SERVICE_UNAVAILABLE', 503)
+  } finally {
+    client?.release()
+  }
+}
+
+/**
+ * Creates a private DRAFT under the creator ID resolved by W08. Plan IDs are
+ * deterministic per creator/idempotency key; the immutable v1 record lets a
+ * replay detect key reuse with a different request even after later edits.
+ */
 export async function createMembershipPlanDraft(
-  db: D1Database,
+  db: D1Database | W07WebhookPostgresPool,
   actorUserId: string,
   verifiedCreatorId: string,
   input: unknown,
@@ -719,6 +833,55 @@ export async function createMembershipPlanDraft(
   const planId = await membershipPlanIdFromIdempotency(creatorId, idempotencyKey)
   const benefitsJson = canonicalBenefitsJson(plan.benefits)
 
+  if (isPostgresSubscriptionStore(db)) {
+    const existing = await readMembershipPlanDraftByIdPostgres(db, planId)
+    if (existing) {
+      if (!membershipPlanDraftMatches(existing, creatorId, plan, benefitsJson)) {
+        throw new SubscriptionRuntimeError('CONFLICT', 409)
+      }
+      return replayMembershipPlanDraft(existing)
+    }
+
+    const now = nowIso()
+    const inserted = await insertMembershipPlanDraftPostgres(db, {
+      planId, creatorId, plan, benefitsJson, now,
+    })
+    if (!inserted) {
+      const raced = await readMembershipPlanDraftByIdPostgres(db, planId)
+      if (!raced || !membershipPlanDraftMatches(raced, creatorId, plan, benefitsJson)) {
+        throw new SubscriptionRuntimeError('CONFLICT', 409)
+      }
+      return replayMembershipPlanDraft(raced)
+    }
+
+    console.log(JSON.stringify({
+      event: 'membership.plan.draft.created',
+      operation: 'createMembershipPlanDraft',
+      planId,
+      creatorId,
+      actorUserId: actor,
+    }))
+    return {
+      planId,
+      creatorId,
+      planVersion: 1,
+      name: plan.name,
+      tier: plan.tier,
+      billingInterval: plan.billingInterval,
+      priceMinor: plan.priceMinor,
+      currency: plan.currency,
+      benefits: plan.benefits,
+      trialPeriodDays: plan.trialPeriodDays,
+      status: 'DRAFT',
+      visibility: 'PRIVATE',
+      version: 1,
+      createdAt: now,
+      updatedAt: now,
+      etag: '"lr-plan-v1"',
+      replayed: false,
+    }
+  }
+
   const existing = await db.prepare(
     'SELECT p.plan_id, p.owner_id, p.current_version, p.status, p.visibility, p.version, p.created_at, p.updated_at, ' +
     'v.name, v.tier, v.billing_interval, v.price_minor, v.currency, v.benefits_json, v.trial_period_days ' +
@@ -726,13 +889,10 @@ export async function createMembershipPlanDraft(
     'ON v.plan_id = p.plan_id AND v.plan_version = 1 WHERE p.plan_id = ? LIMIT 1',
   ).bind(planId).first<MembershipPlanStoredRow>()
   if (existing) {
-    if (
-      existing.owner_id !== creatorId || existing.name !== plan.name || existing.tier !== plan.tier ||
-      existing.billing_interval !== plan.billingInterval || existing.price_minor !== plan.priceMinor ||
-      existing.currency !== plan.currency || existing.benefits_json !== benefitsJson || (existing.trial_period_days ?? 0) !== plan.trialPeriodDays
-    ) throw new SubscriptionRuntimeError('CONFLICT', 409)
-    // Return the immutable original create result, not current mutable plan state.
-    return mapMembershipPlan({ ...existing, current_version: 1, status: 'DRAFT', visibility: 'PRIVATE', version: 1, updated_at: existing.created_at }, true)
+    if (!membershipPlanDraftMatches(existing, creatorId, plan, benefitsJson)) {
+      throw new SubscriptionRuntimeError('CONFLICT', 409)
+    }
+    return replayMembershipPlanDraft(existing)
   }
 
   const now = nowIso()
@@ -753,16 +913,19 @@ export async function createMembershipPlanDraft(
       'FROM membership_plans AS p INNER JOIN membership_plan_versions AS v ' +
       'ON v.plan_id = p.plan_id AND v.plan_version = 1 WHERE p.plan_id = ? LIMIT 1',
     ).bind(planId).first<MembershipPlanStoredRow>()
-    if (!raced) throw new SubscriptionRuntimeError('CONFLICT', 409)
-    if (
-      raced.owner_id !== creatorId || raced.name !== plan.name || raced.tier !== plan.tier ||
-      raced.billing_interval !== plan.billingInterval || raced.price_minor !== plan.priceMinor ||
-      raced.currency !== plan.currency || raced.benefits_json !== benefitsJson || (raced.trial_period_days ?? 0) !== plan.trialPeriodDays
-    ) throw new SubscriptionRuntimeError('CONFLICT', 409)
-    return mapMembershipPlan({ ...raced, current_version: 1, status: 'DRAFT', visibility: 'PRIVATE', version: 1, updated_at: raced.created_at }, true)
+    if (!raced || !membershipPlanDraftMatches(raced, creatorId, plan, benefitsJson)) {
+      throw new SubscriptionRuntimeError('CONFLICT', 409)
+    }
+    return replayMembershipPlanDraft(raced)
   }
 
-  console.log(JSON.stringify({ event: 'membership.plan.draft.created', operation: 'createMembershipPlanDraft', planId, creatorId, actorUserId: actor }))
+  console.log(JSON.stringify({
+    event: 'membership.plan.draft.created',
+    operation: 'createMembershipPlanDraft',
+    planId,
+    creatorId,
+    actorUserId: actor,
+  }))
   return {
     planId,
     creatorId,
@@ -783,8 +946,6 @@ export async function createMembershipPlanDraft(
     replayed: false,
   }
 }
-
-
 
 const planVersionFromEtag = (etag: string): number => {
   const match = /^"lr-plan-v([1-9]\d*)"$/.exec(etag)
