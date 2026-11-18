@@ -93,7 +93,7 @@ try {
   await assert.rejects(
     configureContentPoll(
       configurationStore, readStore, owner, contentId, ['Different', 'Options'], 240,
-      draftContext('PUBLISHED'), configurationStore, readStore,
+      draftContext('PUBLISHED'),
     ),
     error => error instanceof SocialPollError && error.code === 'CONFLICT' && error.status === 409,
   )
