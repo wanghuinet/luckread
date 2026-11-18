@@ -13,6 +13,7 @@ import type { FollowingAuthorIdRow, FollowingAuthorIdsReadStore } from './follow
 import type { ContentLikerReadInput, ContentLikerReadRow, ContentLikerReadStore } from './like-list-read-store.js'
 import type { FavoriteListReadInput, FavoriteListReadRow, FavoriteListReadStore } from './favorite-list-read-store.js'
 import type { FavoriteStatusReadStore } from './favorite-status-read-store.js'
+import type { FavoriteMutationStore } from './favorite-mutation-store.js'
 import type { LikeStatusReadInput, LikeStatusReadResult, LikeStatusReadStore } from './like-status-read-store.js'
 import type { LikeTargetContextReadStore } from './like-target-context-read-store.js'
 import type { RepostStore } from './repost-store.js'
@@ -1028,33 +1029,38 @@ describe('W05 social query transport', () => {
     expect(response.status).toBe(428)
   })
 
-  it('accepts an idempotent content favorite', async () => {
-    const response = await worker.fetch(
+  it('fails closed for Favorite and Unfavorite without the injected Neon Store', async () => {
+    const prepare = vi.fn(() => { throw new Error('D1 must not be used for Favorite mutations') })
+    const env = { DB: { prepare } as unknown as D1Database, W03_CONTENT: publishedContextBinding() }
+    const post = await worker.fetch(
       new Request('https://luckread-w05.internal/internal/social/interactions/bookmarks', {
         method: 'POST',
         headers: {
           ...transportHeaders,
           'X-LuckRead-Principal-Layer': 'L2',
           'content-type': 'application/json',
-          'Idempotency-Key': 'favorite-1',
+          'Idempotency-Key': 'favorite-missing-store',
         },
         body: JSON.stringify({ targetType: 'content', targetId: 'content-1' }),
       }),
-      {
-        DB: dbFor([{
-          relationship_id: 'favorite-1',
-          actor_user_id: 'viewer-1',
-          target_type: 'content',
-          target_id: 'content-1',
-          created_at: '2026-10-02T00:00:00.000Z',
-        }]),
-        W03_CONTENT: publishedContextBinding(),
-      },
+      env,
     )
-    expect(response.status).toBe(200)
-    await expect(response.json()).resolves.toMatchObject({
-      data: { relationshipId: 'favorite-1', targetId: 'content-1' },
-    })
+    const del = await worker.fetch(
+      new Request('https://luckread-w05.internal/internal/social/interactions/bookmarks', {
+        method: 'DELETE',
+        headers: {
+          ...transportHeaders,
+          'X-LuckRead-Principal-Layer': 'L2',
+          'content-type': 'application/json',
+          'Idempotency-Key': 'unfavorite-missing-store',
+        },
+        body: JSON.stringify({ targetType: 'content', targetId: 'content-1' }),
+      }),
+      env,
+    )
+    expect(post.status).toBe(503)
+    expect(del.status).toBe(503)
+    expect(prepare).not.toHaveBeenCalled()
   })
 
 
@@ -1164,9 +1170,19 @@ describe('W05 social query transport', () => {
     expect((db as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
   })
 
-  it('fails closed before favorite D1 access when W03 context is unavailable', async () => {
-    const d = dbFor()
-    const response = await worker.fetch(
+  it('validates W03 before calling the injected Favorite Store', async () => {
+    const mutationStore: FavoriteMutationStore = {
+      create: vi.fn(async () => ({
+        relationship_id: 'favorite-1',
+        actor_user_id: 'viewer-1',
+        target_type: 'content',
+        target_id: 'content-1',
+        created_at: '2026-10-02T00:00:00.000Z',
+      })),
+      remove: vi.fn(async () => undefined),
+    }
+    const injectedWorker = createW05SocialWorker({ favoriteMutationStore: mutationStore })
+    const response = await injectedWorker.fetch(
       new Request('https://luckread-w05.internal/internal/social/interactions/bookmarks', {
         method: 'POST',
         headers: {
@@ -1177,10 +1193,10 @@ describe('W05 social query transport', () => {
         },
         body: JSON.stringify({ targetType: 'content', targetId: 'content-1' }),
       }),
-      { DB: d },
+      { DB: dbFor() },
     )
     expect(response.status).toBe(503)
-    expect((d as unknown as { prepare: ReturnType<typeof vi.fn> }).prepare).not.toHaveBeenCalled()
+    expect(mutationStore.create).not.toHaveBeenCalled()
   })
 
   it('requires an idempotency key for favorite mutations', async () => {
@@ -1199,22 +1215,7 @@ describe('W05 social query transport', () => {
     expect(response.status).toBe(428)
   })
 
-  it('unfavorites with a 204 response', async () => {
-    const response = await worker.fetch(
-      new Request('https://luckread-w05.internal/internal/social/interactions/bookmarks', {
-        method: 'DELETE',
-        headers: {
-          ...transportHeaders,
-          'X-LuckRead-Principal-Layer': 'L2',
-          'content-type': 'application/json',
-          'Idempotency-Key': 'favorite-delete-1',
-        },
-        body: JSON.stringify({ targetType: 'content', targetId: 'content-1' }),
-      }),
-      { DB: dbFor() },
-    )
-    expect(response.status).toBe(204)
-  })
+
 
   it('denies favorites below the minimum interaction permission layer', async () => {
     const response = await worker.fetch(
