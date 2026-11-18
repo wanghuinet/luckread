@@ -1,5 +1,3 @@
-import { replyAudienceAllowedParams, replyAudienceAllowedSql } from './reply-audience-runtime.js'
-
 export type CommentCreateState = 'PENDING' | 'PUBLISHED' | 'REJECTED' | 'AUTHOR_DELETED'
 
 export type CommentCreateValidation = {
