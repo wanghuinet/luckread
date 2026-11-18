@@ -5,6 +5,12 @@ import { getW07SelectedD104Database, type W07PaymentMethodReadRuntimeEnv } from 
 import type { W07MembershipDatabaseRuntimeEnv } from './neon/membership-database-runtime.js';
 import type { W07WebhookPostgresPool } from './payment-webhook-database-postgres.js';
 import {
+  getScheduledPlanChangeStore,
+  readScheduledSubscriptionPlanDowngradeForPeriod,
+  readScheduledDowngradeTargetPlan,
+  type ScheduledSubscriptionPlanDowngrade,
+} from './subscription-plan-change-schedule.js';
+import {
   applyRenewalSubscriptionUpdatePostgres,
   readSubscriptionOutcomePostgres,
 } from './subscription-renewal-outcome-postgres.js';
@@ -16,12 +22,6 @@ function isPostgresRenewalOutcomeStore(
 ): store is W07WebhookPostgresPool {
   return typeof (store as W07WebhookPostgresPool).query === 'function';
 }
-import {
-  getScheduledPlanChangeStore,
-  readScheduledSubscriptionPlanDowngradeForPeriod,
-  readScheduledDowngradeTargetPlan,
-  type ScheduledSubscriptionPlanDowngrade,
-} from './subscription-plan-change-schedule.js';
 
 export type RenewalSubscriptionSyncOutcome =
   | 'APPLIED' | 'ALREADY_APPLIED' | 'NO_RENEWAL_CYCLE' | 'NOT_TERMINAL'
