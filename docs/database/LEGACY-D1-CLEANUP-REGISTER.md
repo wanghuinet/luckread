@@ -201,7 +201,7 @@
 - Reply Audience GET/PUT routes require the injected Neon PostgreSQL Store and fail closed with 503 when absent; no Reply Audience route passes `env.DB` into the runtime.
 - Existing PostgreSQL adapter remains composed by `workers/W05-social/src/neon/runtime.ts`; PostgreSQL 18 rehearsal scripts now use the Store-only API.
 - Preserved W03 owner validation, owner-scoped persistence, audience validation, bounded mention deduplication, default audience and sanitized provider errors.
-- Important boundary: `replyAudienceAllowedSql` remains for the separate legacy D1 Comment Create adapter. Comment creation / its final SQL authorization predicate is not closed by this change and remains a distinct D1 cleanup item. No production DB/schema, Hyperdrive binding, Worker deployment, or traffic change.
+- At the time of this Reply Audience persistence phase, Comment Create still used a separate legacy predicate; that remaining path was closed in the subsequent W05 Comment Create / Update / Delete cleanup. No production DB/schema, Hyperdrive binding, Worker deployment, or traffic change.
 
 
 ## W05 Comment Create / Update / Delete writes
